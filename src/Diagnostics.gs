@@ -1,0 +1,343 @@
+/**
+ * Diagnostics 工作表：把「查看 ▸」各個唯讀工具的報告同時寫入一張細小、結構化的
+ * 工作表，方便用 Google Drive connector 一次過完整讀取。
+ *
+ * 存在的理由：SendLog、AuditLog、RosterAssignments 三張表太大，connector 讀取一定
+ * 被截斷，核對系統狀態只能靠人手逐張截圖，這是整個開發流程最慢的一環。
+ * 這張表只放「統計與摘要」，不放原始資料，所以永遠夠細，可以被完整讀到。
+ *
+ * ⚠️ 這個改動令「查看 ▸」由「零寫入」變成「只寫 Diagnostics」。
+ * 除了 Diagnostics 這一張表之外，「查看 ▸」底下所有工具仍然不會改動任何其他工作表、
+ * 不會改動職事表資料、不會產生版本、不會寄電郵。選單標題已改為
+ * 「查看（唯讀，只寫 Diagnostics）」，各個工具的對話框也會註明這一點。
+ *
+ * 每次執行同一個工具，會先刪走該工具上一次的紀錄再寫入新的，不會無限累積。
+ */
+
+/** Diagnostics 單一報告最多保留的行數；超出的部分截斷並附一行說明。 */
+const DIAGNOSTICS_MAX_ROWS_PER_REPORT = 250;
+
+/** Diagnostics 整張表最多保留的行數；超出時由最舊的報告開始整份丟棄。 */
+const DIAGNOSTICS_MAX_ROWS_TOTAL = 800;
+
+/** 第 1 行的中文標題，對應 COLUMNS.DIAGNOSTICS 的機器鍵次序。 */
+const DIAGNOSTICS_TITLES_TC = ['報告名稱', '執行時間', '分區', '項目', '數值', '備註'];
+
+/**
+ * 組出一行 Diagnostics 紀錄。純粹是可讀性包裝，省得每處都寫物件字面值。
+ * @param {string} section 分區名稱（例如 'Quarters'／'SendLog'）
+ * @param {string} item 項目名稱（例如季度 ID、批次 ID）
+ * @param {*} value 數值
+ * @param {string=} note 備註
+ * @returns {{section: string, item: string, value: *, note: string}} 一行紀錄
+ */
+function diagRow_(section, item, value, note) {
+  return { section: section, item: item, value: value, note: note || '' };
+}
+
+/**
+ * 取得（必要時建立）Diagnostics 工作表，並確保第 1、2 行的標題正確。
+ * 沿用全專案的慣例：第 1 行中文標題、第 2 行機器鍵、資料由第 3 行開始。
+ * @returns {Sheet} Diagnostics 工作表
+ */
+function ensureDiagnosticsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.DIAGNOSTICS);
+  if (!sheet) sheet = ss.insertSheet(SHEETS.DIAGNOSTICS);
+
+  const C = COLUMNS.DIAGNOSTICS;
+  const keys = [C.REPORT_NAME, C.GENERATED_AT, C.SECTION, C.ITEM, C.VALUE, C.NOTE];
+
+  const existingKeys = sheet.getLastColumn() > 0
+    ? sheet.getRange(2, 1, 1, Math.max(sheet.getLastColumn(), keys.length)).getValues()[0]
+    : [];
+  const headerOk = keys.every(function (k, i) { return existingKeys[i] === k; });
+
+  if (!headerOk) {
+    sheet.getRange(1, 1, 1, DIAGNOSTICS_TITLES_TC.length).setValues([DIAGNOSTICS_TITLES_TC])
+      .setFontWeight('bold').setBackground(GRID_COLORS.HEADER);
+    sheet.getRange(2, 1, 1, keys.length).setValues([keys]).setFontWeight('bold');
+    sheet.setFrozenRows(2);
+    sheet.setColumnWidth(1, 200);
+    sheet.setColumnWidth(2, 150);
+    sheet.setColumnWidth(3, 140);
+    sheet.setColumnWidth(4, 220);
+    sheet.setColumnWidth(5, 200);
+    sheet.setColumnWidth(6, 380);
+  }
+  return sheet;
+}
+
+/**
+ * 把一份報告寫入 Diagnostics：先刪走同名報告上一次的全部紀錄，再寫入這一次的。
+ *
+ * 「同名覆蓋」而不是「一直附加」是刻意的——這張表的唯一用途是讓 connector 一次過
+ * 讀到目前狀態，累積歷史紀錄只會令它變大到讀不完，反而失去意義。需要歷史紀錄的
+ * 場合請看 AuditLog／SendLog，那才是紀錄用的表。
+ *
+ * @param {string} reportName 報告名稱，同名視為同一份報告
+ * @param {Object[]} rows diagRow_() 產生的行陣列
+ * @returns {number} 實際寫入的行數
+ */
+function writeDiagnosticsReport_(reportName, rows) {
+  const sheet = ensureDiagnosticsSheet_();
+  const C = COLUMNS.DIAGNOSTICS;
+  const keys = [C.REPORT_NAME, C.GENERATED_AT, C.SECTION, C.ITEM, C.VALUE, C.NOTE];
+  const now = nowTimestamp_();
+
+  let incoming = (rows || []).slice();
+  let truncatedNote = null;
+  if (incoming.length > DIAGNOSTICS_MAX_ROWS_PER_REPORT) {
+    const dropped = incoming.length - DIAGNOSTICS_MAX_ROWS_PER_REPORT;
+    incoming = incoming.slice(0, DIAGNOSTICS_MAX_ROWS_PER_REPORT);
+    truncatedNote = diagRow_('（截斷）', '超出單一報告上限',
+      dropped + ' 行未寫入',
+      '單一報告上限 ' + DIAGNOSTICS_MAX_ROWS_PER_REPORT + ' 行，避免這張表大到 connector 讀不完。');
+    incoming.push(truncatedNote);
+  }
+
+  // 保留其他報告的既有紀錄，只換走同名那一份
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), keys.length);
+  const existing = lastRow >= 3
+    ? sheet.getRange(3, 1, lastRow - 2, lastCol).getValues()
+      .filter(function (row) {
+        return String(row[0] || '').trim() !== '' && String(row[0]) !== reportName;
+      })
+    : [];
+
+  const fresh = incoming.map(function (r) {
+    return [reportName, now, r.section, r.item,
+      (r.value === null || r.value === undefined) ? '' : r.value, r.note];
+  });
+
+  let combined = existing.concat(fresh);
+
+  // 總量安全網：超出上限時，由最舊的報告開始整份丟棄（同一份報告不會被斬半）
+  if (combined.length > DIAGNOSTICS_MAX_ROWS_TOTAL) {
+    const orderByReport = [];
+    const seen = {};
+    combined.forEach(function (row) {
+      const name = String(row[0]);
+      if (!seen[name]) { seen[name] = true; orderByReport.push(name); }
+    });
+    // 目前這一份永遠保留，其餘由排在最前（最舊寫入）的開始丟
+    while (combined.length > DIAGNOSTICS_MAX_ROWS_TOTAL && orderByReport.length > 0) {
+      const victim = orderByReport.shift();
+      if (victim === reportName) continue;
+      combined = combined.filter(function (row) { return String(row[0]) !== victim; });
+    }
+  }
+
+  // 先清空資料區再重寫，避免舊資料殘留在後面
+  if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, lastCol).clearContent();
+  if (combined.length > 0) {
+    const width = keys.length;
+    const normalized = combined.map(function (row) {
+      const out = row.slice(0, width);
+      while (out.length < width) out.push('');
+      return out;
+    });
+    sheet.getRange(3, 1, normalized.length, width).setValues(normalized);
+  }
+  return fresh.length;
+}
+
+/**
+ * 供各個唯讀工具呼叫的安全包裝：寫入 Diagnostics 失敗時只記 Logger，不影響工具本身
+ * 顯示報告。工具的主要用途是給幹事看對話框，寫 Diagnostics 只是順帶方便 connector
+ * 讀取，不應該因為後者失敗而令前者也用不到。
+ * @param {string} reportName 報告名稱
+ * @param {Object[]} rows diagRow_() 產生的行陣列
+ * @returns {boolean} 是否成功寫入
+ */
+function tryWriteDiagnostics_(reportName, rows) {
+  try {
+    writeDiagnosticsReport_(reportName, rows);
+    return true;
+  } catch (err) {
+    log_('WARN', 'writeDiagnosticsReport_(' + reportName + ') 失敗（不影響工具本身）：' + err.message);
+    return false;
+  }
+}
+
+/* ============================================================
+ * 「匯出關鍵狀態」——一次過把最常需要核對的狀態寫入 Diagnostics
+ * ============================================================ */
+
+/**
+ * 收集全系統最常需要核對的狀態，回傳 Diagnostics 用的行陣列。只讀取，不改動任何東西。
+ *
+ * 刻意只出「統計與摘要」，不出原始資料：SendLog 只出每個批次的各 Status 數目、
+ * Requests 只出 Status 與是否已指派 RequestID（不出 ResultNote 全文），
+ * RosterAssignments 完全不出（那張表太大，需要時請用「檢查各版本派工紀錄」）。
+ * 目的是令這份報告永遠細到可以被 connector 一次過完整讀到。
+ *
+ * 每一區都各自 try/catch：其中一張表有問題（例如未建立、欄位缺失）只會在該區寫一行
+ * 錯誤說明，不會令整份報告產生不到。
+ *
+ * @returns {Object[]} diagRow_() 產生的行陣列
+ */
+function collectKeyStateRows_() {
+  const rows = [];
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+
+  const section = function (name, fn) {
+    try {
+      fn();
+    } catch (err) {
+      rows.push(diagRow_(name, '（讀取失敗）', 'ERROR', err.message));
+    }
+  };
+
+  // ---- Quarters：每季的 Stage 與 StageUpdatedAt ----
+  section('Quarters', function () {
+    const Q = COLUMNS.QUARTERS;
+    const quarters = readSheet(SHEETS.QUARTERS);
+    if (quarters.length === 0) rows.push(diagRow_('Quarters', '（沒有資料）', '', ''));
+    quarters.forEach(function (q) {
+      const quarterId = String(q[Q.QUARTER_ID] || '').trim();
+      if (!quarterId) return;
+      rows.push(diagRow_('Quarters', quarterId,
+        String(q[Q.STAGE] || '（空白，視同 DRAFT）'),
+        'StageUpdatedAt=' + (toDateString(q[Q.STAGE_UPDATED_AT], timezone) || String(q[Q.STAGE_UPDATED_AT] || '（空白）'))
+          + '　StartDate=' + toDateString(q[Q.START_DATE], timezone)
+          + '　EndDate=' + toDateString(q[Q.END_DATE], timezone)));
+    });
+  });
+
+  // ---- RosterVersions：最新五個版本 ----
+  section('RosterVersions', function () {
+    const V = COLUMNS.ROSTER_VERSIONS;
+    const versions = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (v) {
+      return String(v[V.QUARTER_ID] || '').trim() !== '';
+    });
+    rows.push(diagRow_('RosterVersions', '（全表版本總數）', versions.length, ''));
+
+    versions.sort(function (a, b) {
+      const qa = String(a[V.QUARTER_ID]), qb = String(b[V.QUARTER_ID]);
+      if (qa !== qb) return qa < qb ? 1 : -1;
+      return Number(b[V.VERSION_NO]) - Number(a[V.VERSION_NO]);
+    });
+    versions.slice(0, 5).forEach(function (v) {
+      rows.push(diagRow_('RosterVersions',
+        String(v[V.QUARTER_ID]) + ' v' + v[V.VERSION_NO],
+        'Basis=' + String(v[V.BASIS] || ''),
+        'WarningCount=' + String(v[V.WARNING_COUNT] || 0)
+          + '　Parent=v' + String(v[V.PARENT_VERSION_NO] || '')
+          + '　Protected=' + String(v[V.PROTECTED] || '')
+          + '　CreatedAt=' + String(v[V.CREATED_AT] || '')));
+    });
+  });
+
+  // ---- SendLog：每個批次的統計（不逐行） ----
+  section('SendLog', function () {
+    const S = COLUMNS.SEND_LOG;
+    const logs = readSheet(SHEETS.SEND_LOG);
+    rows.push(diagRow_('SendLog', '（全表紀錄總數）', logs.length, ''));
+
+    const batches = {};
+    const order = [];
+    logs.forEach(function (row) {
+      const sendId = String(row[S.SEND_ID] || '').trim();
+      if (!sendId) return;
+      // SendID 格式為 "季度-vN-階段-時間戳-序號"，去掉最後的序號就是批次
+      const batchId = sendId.replace(/-\d+$/, '');
+      if (!batches[batchId]) {
+        batches[batchId] = { count: 0, stage: String(row[S.STAGE] || ''), statuses: {} };
+        order.push(batchId);
+      }
+      const b = batches[batchId];
+      b.count++;
+      const status = String(row[S.STATUS] || '（空白）');
+      b.statuses[status] = (b.statuses[status] || 0) + 1;
+    });
+
+    if (order.length === 0) rows.push(diagRow_('SendLog', '（沒有資料）', '', ''));
+    order.forEach(function (batchId) {
+      const b = batches[batchId];
+      const statusText = Object.keys(b.statuses).sort().map(function (s) {
+        return s + '=' + b.statuses[s];
+      }).join('　');
+      rows.push(diagRow_('SendLog', batchId, b.count + ' 筆',
+        'Stage=' + b.stage + '　' + statusText));
+    });
+  });
+
+  // ---- Requests：每行的 Status 與是否已指派 RequestID ----
+  section('Requests', function () {
+    const R = COLUMNS.REQUESTS;
+    let requests;
+    try {
+      requests = readSheet(SHEETS.REQUESTS);
+    } catch (err) {
+      rows.push(diagRow_('Requests', '（工作表不存在）', '', '請先執行「維護 ▸ 建立 Requests 工作表」'));
+      return;
+    }
+    rows.push(diagRow_('Requests', '（資料列總數）', requests.length, ''));
+    requests.forEach(function (r, i) {
+      const dateText = toDateString(r[R.SERVICE_DATE], timezone);
+      const person = String(r[R.PERSON_NAME] || '').trim();
+      const post = String(r[R.POST_NAME] || '').trim();
+      const type = String(r[R.REQUEST_TYPE] || '').trim();
+      if (!dateText && !person && !post && !type) return; // 整行空白
+      const hasId = String(r[R.REQUEST_ID] || '').trim() !== '';
+      rows.push(diagRow_('Requests', '第 ' + (i + 3) + ' 行',
+        String(r[R.STATUS] || '（空白）'),
+        '已指派 RequestID=' + (hasId ? 'YES（不再是待處理）' : 'NO（仍是待處理）')
+          + '　' + dateText + '　' + post + '　' + person + '　' + type));
+    });
+  });
+
+  // ---- Unavailable：全部行（這張表細） ----
+  section('Unavailable', function () {
+    const U = COLUMNS.UNAVAILABLE;
+    const unavailable = readSheet(SHEETS.UNAVAILABLE);
+    rows.push(diagRow_('Unavailable', '（資料列總數）', unavailable.length, ''));
+    unavailable.forEach(function (u) {
+      const personId = String(u[U.PERSON_ID] || '').trim();
+      if (!personId) return;
+      rows.push(diagRow_('Unavailable', personId,
+        toDateString(u[U.DATE_FROM], timezone) + ' → ' + toDateString(u[U.DATE_TO], timezone),
+        'AppliesTo=' + String(u[U.APPLIES_TO] || '')
+          + '　PostIDs=' + String(u[U.POST_IDS] || '（空白）')
+          + '　Source=' + String(u[U.SOURCE] || '')
+          + '　Status=' + String(u[U.STATUS] || '')));
+    });
+  });
+
+  // ---- RosterPDF 資料夾：每個版本的 PDF 數目與最小檔案大小 ----
+  section('RosterPDF', function () {
+    const folder = resolveMailAttachmentFolder_();
+    const sizes = listExistingFileSizes_(folder);
+    rows.push(diagRow_('RosterPDF', '（資料夾名稱）', folder.getName(), ''));
+    rows.push(diagRow_('RosterPDF', '（檔案總數）', sizes.size, ''));
+
+    const byVersion = {};
+    sizes.forEach(function (size, name) {
+      const match = /^(.+?)_v(\d+)_/.exec(name);
+      const key = match ? match[1] + ' v' + match[2] : '（不符合命名慣例）';
+      if (!byVersion[key]) byVersion[key] = { count: 0, minSize: null };
+      byVersion[key].count++;
+      if (byVersion[key].minSize === null || size < byVersion[key].minSize) byVersion[key].minSize = size;
+    });
+    const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+    Object.keys(byVersion).sort().forEach(function (key) {
+      const v = byVersion[key];
+      const flag = (v.minSize !== null && v.minSize < minBytes) ? '⚠️ 低於門檻 ' + minBytes + ' bytes' : '';
+      rows.push(diagRow_('RosterPDF', key, v.count + ' 個',
+        '最小檔案 ' + v.minSize + ' bytes　' + flag));
+    });
+  });
+
+  // ---- Config：只出最常需要確認的兩個值 ----
+  section('Config', function () {
+    const config = readConfig();
+    rows.push(diagRow_('Config', CONFIG_KEYS.DRY_RUN, String(config[CONFIG_KEYS.DRY_RUN]),
+      config[CONFIG_KEYS.DRY_RUN] === false ? '⚠️ FALSE 代表會真正寄出電郵' : 'TRUE 代表不會真正寄出'));
+    rows.push(diagRow_('Config', CONFIG_KEYS.MAIL_SUBJECT_PREFIX,
+      String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '（空白）'), ''));
+  });
+
+  return rows;
+}

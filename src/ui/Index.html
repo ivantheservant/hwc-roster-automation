@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= includeHtml('ui/Style') ?>
+</head>
+<body>
+  <h1>粵語堂職事表系統</h1>
+  <p class="subtitle">五階段流程 Web UI——每一步的規則、確認方式與選單版本完全一致，這裡不能編輯職事表格子。</p>
+
+  <div class="toolbar">
+    <label for="quarter">季度</label>
+    <select id="quarter"></select>
+    <span class="badge" id="stageBadge"></span>
+    <span class="badge" id="dryRunBadge"></span>
+    <button id="btnRefresh" class="secondary">重新整理狀態</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="steps" id="steps"></div>
+
+  <div class="panel" id="wizardPanel" hidden>
+    <div id="wizardBody"></div>
+  </div>
+
+  <?!= includeHtml('ui/Script') ?>
+</body>
+</html>

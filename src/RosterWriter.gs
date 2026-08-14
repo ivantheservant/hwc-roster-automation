@@ -1,0 +1,474 @@
+/**
+ * 建立職事表 grid 工作表 Roster_{quarterId}_v{versionNo}。
+ * 第 1 行為中文標題、第 2 行為隱藏的機器鍵、第 3 行起每個主日一行，
+ * 末段附上每人本季服侍次數統計。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object[]} assignments performRosterGeneration_() 產生的派工結果
+ * @param {Object[]} warnings performRosterGeneration_() 產生的警告清單
+ * @returns {string} 建立的工作表名稱
+ */
+function createRosterSheet(quarterId, versionNo, assignments, warnings) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = buildRosterSheetName_(quarterId, versionNo);
+
+  const existing = ss.getSheetByName(sheetName);
+  if (existing) {
+    throw new Error('工作表 ' + sheetName + ' 已存在，請先刪除或改用新的版本號');
+  }
+  const sheet = ss.insertSheet(sheetName);
+
+  const layout = buildGridLayout_(quarterId, assignments);
+  const warningIndex = indexWarnings_(warnings);
+
+  // 第 1 行中文標題、第 2 行機器鍵
+  sheet.getRange(1, 1, 1, layout.headers.length).setValues([layout.headers]);
+  sheet.getRange(2, 1, 1, layout.keys.length).setValues([layout.keys]);
+  // 標題設為自動換行：欄位在 PDF 被縮窄時，文字會往下折行而不是被裁掉或溢出到隔壁欄
+  sheet.getRange(1, 1, 1, layout.headers.length)
+    .setFontWeight('bold')
+    .setBackground(GRID_COLORS.HEADER)
+    .setWrap(true)
+    .setVerticalAlignment('middle');
+
+  log_('INFO', 'createRosterSheet 標題陣列：' + JSON.stringify(layout.headers));
+
+  // 第 3 行起：每個主日一行
+  if (layout.rows.length > 0) {
+    sheet.getRange(3, 1, layout.rows.length, layout.keys.length).setValues(layout.rows);
+  }
+
+  applyCellMarks_(sheet, layout, warningIndex);
+  writeStatsSection_(sheet, layout, assignments);
+
+  sheet.hideRows(2);
+  sheet.setFrozenRows(2);
+  sheet.setFrozenColumns(1);
+  sheet.autoResizeColumns(1, layout.keys.length);
+
+  return sheetName;
+}
+
+/**
+ * 組出職事表 grid 工作表的名稱。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {string} 工作表名稱，例如 "Roster_2026T4_v0"
+ */
+function buildRosterSheetName_(quarterId, versionNo) {
+  return SHEET_PREFIXES.ROSTER + quarterId + '_v' + versionNo;
+}
+
+/**
+ * 依派工結果排出 grid 的欄位結構與資料列。
+ * 欄位順序：日期 / 週次 / 類型，之後每個崗位的每個 slot 各一欄（依 DisplayOrder）。
+ * @param {string} quarterId 季度 ID
+ * @param {Object[]} assignments 派工結果
+ * @returns {{headers: string[], keys: string[], rows: Array[], dates: Object[], cellIndex: Object}}
+ *   headers 為中文標題、keys 為機器鍵、rows 為資料列、cellIndex 為 "date|postId|slot" 對應欄號
+ */
+function buildGridLayout_(quarterId, assignments) {
+  const posts = readPosts();
+  const serviceDates = readServiceDates(quarterId);
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const pendingLabel = getConfig(CONFIG_KEYS.GRID_PENDING_LABEL, DEFAULTS.GRID_PENDING_LABEL);
+  const naLabel = getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL);
+
+  const specialSkipLabel = getConfig(CONFIG_KEYS.GRID_SPECIAL_SKIP_LABEL, DEFAULTS.GRID_SPECIAL_SKIP_LABEL);
+  const headers = [GRID_LABELS.DATE, GRID_LABELS.WEEK, GRID_LABELS.TYPE];
+  const keys = [GRID_KEYS.DATE, GRID_KEYS.WEEK, GRID_KEYS.TYPE];
+  const cellIndex = {};
+  const emptyDisplayByPostId = {};
+
+  posts.forEach(function (post) {
+    emptyDisplayByPostId[post[COLUMNS.POSTS.POST_ID]] = post[COLUMNS.POSTS.EMPTY_DISPLAY];
+  });
+
+  posts.forEach(function (post) {
+    const slotCount = Number(post[COLUMNS.POSTS.SLOT_COUNT]) || 1;
+    for (let slot = 1; slot <= slotCount; slot++) {
+      // 編號與崗位名之間不加空格：PDF 的窄欄會在空格處換行，
+      // 令「聖餐襄禮 1」拆成兩行，看起來像編號錯位到下一欄。
+      const label = slotCount > 1
+        ? post[COLUMNS.POSTS.POST_NAME_TC] + slot
+        : post[COLUMNS.POSTS.POST_NAME_TC];
+      headers.push(label);
+      keys.push(post[COLUMNS.POSTS.POST_ID] + '#' + slot);
+    }
+  });
+
+  const dates = serviceDates
+    .map(function (row) {
+      return {
+        serviceDate: toDateString(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone),
+        weekIndex: Number(row[COLUMNS.SERVICE_DATES.WEEK_INDEX]),
+        serviceType: row[COLUMNS.SERVICE_DATES.SERVICE_TYPE]
+      };
+    })
+    .sort(function (a, b) { return a.weekIndex - b.weekIndex; });
+
+  const assignmentIndex = {};
+  assignments.forEach(function (a) {
+    assignmentIndex[a.serviceDate + '|' + a.postId + '|' + a.slotIndex] = a;
+  });
+
+  const rows = dates.map(function (d, rowOffset) {
+    const row = [d.serviceDate, d.weekIndex, d.serviceType];
+    for (let c = 3; c < keys.length; c++) {
+      const parts = keys[c].split('#');
+      const key = d.serviceDate + '|' + parts[0] + '|' + parts[1];
+      const assignment = assignmentIndex[key];
+      cellIndex[key] = { row: rowOffset + 3, column: c + 1, assignment: assignment };
+      if (!assignment) {
+        row.push('');
+      } else if (assignment.assignSource === ASSIGN_SOURCE.SKIPPED) {
+        row.push(isStructuralNotApplicable_(assignment)
+          ? naLabel
+          : (isSpecialSundaySkip_(assignment)
+            ? specialSkipLabel
+            : resolveEmptyDisplayText_(emptyDisplayByPostId[assignment.postId], pendingLabel, naLabel)));
+      } else {
+        row.push(assignment.personName || '');
+      }
+    }
+    return row;
+  });
+
+  return { headers: headers, keys: keys, rows: rows, dates: dates, cellIndex: cellIndex };
+}
+
+/**
+ * 判斷一個 SKIPPED 格是不是「結構性不適用」——該崗位在這一週根本不存在
+ * （目前只有非首主日的聖餐襄禮，見 STRUCTURAL_NA_RULE_IDS），不是「崗位存在、
+ * 只是留空待人手填」。這是顯示優先級最高的判斷，優先於 Posts.EmptyDisplay。
+ * @param {Object} assignment 派工結果（含 ruleFlags 陣列）
+ * @returns {boolean} 是否為結構性不適用
+ */
+function isStructuralNotApplicable_(assignment) {
+  return (assignment.ruleFlags || []).some(function (id) {
+    return STRUCTURAL_NA_RULE_IDS.indexOf(id) !== -1;
+  });
+}
+
+/**
+ * 階段 A 新增：判斷一個 SKIPPED 格是不是「因為特別主日而跳過」——這個崗位平常
+ * 會自動生成，只是這一週被 SpecialSundays.SkipPostIDs 標記跳過（見
+ * SPECIAL_SKIP_RULE_IDS），跟「這個崗位本來就永遠不自動生成」（講員／翻譯／
+ * 獻花，走 resolveEmptyDisplayText_() 的一般 PENDING／NA／BLANK 判斷）是不同
+ * 概念，顯示優先級低於 isStructuralNotApplicable_()、高於一般 EmptyDisplay 判斷。
+ * @param {Object} assignment 派工結果（含 ruleFlags 陣列）
+ * @returns {boolean} 是否為特別主日跳過
+ */
+function isSpecialSundaySkip_(assignment) {
+  return (assignment.ruleFlags || []).some(function (id) {
+    return SPECIAL_SKIP_RULE_IDS.indexOf(id) !== -1;
+  });
+}
+
+/**
+ * 決定「崗位存在但留空」的格子要顯示什麼文字，依 Posts.EmptyDisplay 欄的設定。
+ * 供 buildGridLayout_()（grid 工作表——完整版／個人 highlight PDF 都是從這張
+ * 工作表匯出，不需要另外處理）與 WebApp.gs 的 apiGetRosterGrid()（Web UI）共用，
+ * 確保三處顯示邏輯一致。
+ * @param {string} rawEmptyDisplay Posts.EmptyDisplay 欄的原始值
+ * @param {string} pendingLabel Config 的 GRID_PENDING_LABEL
+ * @param {string} naLabel Config 的 GRID_NOT_APPLICABLE_LABEL
+ * @returns {string} 要顯示的文字
+ */
+function resolveEmptyDisplayText_(rawEmptyDisplay, pendingLabel, naLabel) {
+  const value = String(rawEmptyDisplay || '').trim().toUpperCase();
+  if (value === POST_EMPTY_DISPLAY.NA) return naLabel;
+  if (value === POST_EMPTY_DISPLAY.BLANK) return '';
+  return pendingLabel;
+}
+
+/**
+ * 把警告清單整理成以 "date|postId|slot" 為鍵的索引，方便標示格子。
+ * @param {Object[]} warnings 警告清單
+ * @returns {Object.<string, Object[]>} 每格對應的警告陣列
+ */
+function indexWarnings_(warnings) {
+  const index = {};
+  (warnings || []).forEach(function (w) {
+    const key = w.serviceDate + '|' + w.postId + '|' + w.slotIndex;
+    if (!index[key]) index[key] = [];
+    index[key].push(w);
+  });
+  return index;
+}
+
+/**
+ * 為有警告或被略過的格子加上底色，並只在真正需要注意時加批註。
+ *
+ * 批註一律只來自 warnings。AutoGenerate=FALSE 與 FIRST_SUNDAY 這類「正常留空」
+ * 的格只上灰底、不加批註 —— 因為 Google Sheets 的批註在匯出 PDF 時會變成頁尾註腳，
+ * 幾十個「略過原因」會佔去大半篇幅。
+ *
+ * @param {Sheet} sheet 目標工作表
+ * @param {Object} layout buildGridLayout_() 的結果
+ * @param {Object.<string, Object[]>} warningIndex 警告索引
+ * @returns {void}
+ */
+function applyCellMarks_(sheet, layout, warningIndex) {
+  if (layout.rows.length === 0) return;
+
+  const rowCount = layout.rows.length;
+  const colCount = layout.keys.length;
+  const backgrounds = [];
+  const notes = [];
+  for (let r = 0; r < rowCount; r++) {
+    backgrounds.push(new Array(colCount).fill(null));
+    notes.push(new Array(colCount).fill(''));
+  }
+
+  Object.keys(layout.cellIndex).forEach(function (key) {
+    const cell = layout.cellIndex[key];
+    const r = cell.row - 3;
+    const c = cell.column - 1;
+    const assignment = cell.assignment;
+    const cellWarnings = warningIndex[key];
+
+    const isSkipped = assignment && assignment.assignSource === ASSIGN_SOURCE.SKIPPED;
+    const isForced = assignment && assignment.assignSource === ASSIGN_SOURCE.FORCED;
+
+    if (isSkipped) {
+      // 階段 A：特別主日跳過的格子用獨立底色，跟一般略過（結構性不適用／永遠
+      // 不自動生成）的灰底區分開，一眼就看得出「這一週不一樣」。
+      backgrounds[r][c] = isSpecialSundaySkip_(assignment) ? GRID_COLORS.SPECIAL_SKIP : GRID_COLORS.SKIPPED;
+    } else if (cellWarnings && cellWarnings.length > 0) {
+      backgrounds[r][c] = isForced ? GRID_COLORS.FORCED : GRID_COLORS.WARNING;
+    }
+
+    // 只有真正的規則警告才加批註（例如某崗位完全沒有合資格人選）。
+    // 正常留空的格即使有 ruleFlags 也不加，避免 PDF 產生大量註腳。
+    if (cellWarnings && cellWarnings.length > 0) {
+      notes[r][c] = cellWarnings.map(function (w) {
+        return w.ruleId + ': ' + w.reason;
+      }).join('\n');
+    }
+  });
+
+  const range = sheet.getRange(3, 1, rowCount, colCount);
+  range.setBackgrounds(backgrounds);
+  range.setNotes(notes);
+}
+
+/**
+ * 在 grid 資料列之後附上每人本季服侍次數統計。
+ * @param {Sheet} sheet 目標工作表
+ * @param {Object} layout buildGridLayout_() 的結果
+ * @param {Object[]} assignments 派工結果
+ * @returns {void}
+ */
+function writeStatsSection_(sheet, layout, assignments) {
+  const counts = {};
+  assignments.forEach(function (a) {
+    if (!a.personId) return;
+    if (!counts[a.personId]) counts[a.personId] = { name: a.personName, count: 0 };
+    counts[a.personId].count++;
+  });
+
+  const stats = Object.keys(counts)
+    .map(function (personId) {
+      return [counts[personId].name, personId, counts[personId].count];
+    })
+    .sort(function (a, b) {
+      if (b[2] !== a[2]) return b[2] - a[2];
+      return a[1] < b[1] ? -1 : 1;
+    });
+
+  const startRow = layout.rows.length + 5;
+  sheet.getRange(startRow, 1).setValue(GRID_LABELS.STATS_TITLE)
+    .setFontWeight('bold')
+    .setBackground(GRID_COLORS.STATS_HEADER);
+  sheet.getRange(startRow + 1, 1, 1, 3)
+    .setValues([[GRID_LABELS.NAME, GRID_LABELS.PERSON_ID, GRID_LABELS.COUNT]])
+    .setFontWeight('bold');
+  if (stats.length > 0) {
+    sheet.getRange(startRow + 2, 1, stats.length, 3).setValues(stats);
+  }
+}
+
+/**
+ * 把派工結果寫入 RosterAssignments 長表（附加在現有資料之後）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object[]} assignments 派工結果
+ * @returns {number} 寫入的列數
+ */
+function writeAssignments(quarterId, versionNo, assignments) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_ASSIGNMENTS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_ASSIGNMENTS);
+  if (assignments.length === 0) return 0;
+
+  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const now = nowTimestamp_();
+  const actor = Session.getActiveUser().getEmail();
+  const C = COLUMNS.ROSTER_ASSIGNMENTS;
+
+  const rows = assignments.map(function (a) {
+    const record = {};
+    record[C.ASSIGNMENT_ID] = [quarterId, 'v' + versionNo, a.serviceDateId, a.postId, a.slotIndex].join('-');
+    record[C.QUARTER_ID] = quarterId;
+    record[C.VERSION_NO] = versionNo;
+    record[C.SERVICE_DATE_ID] = a.serviceDateId;
+    record[C.SERVICE_DATE] = a.serviceDate;
+    record[C.POST_ID] = a.postId;
+    record[C.SLOT_INDEX] = a.slotIndex;
+    record[C.PERSON_ID] = a.personId;
+    record[C.PERSON_NAME_SNAPSHOT] = a.personName;
+    record[C.ASSIGN_SOURCE] = a.assignSource;
+    record[C.RULE_FLAGS] = (a.ruleFlags || []).join(',');
+    record[C.LOCKED] = a.assignSource === ASSIGN_SOURCE.LOCKED ? BOOLEAN_TEXT.TRUE : BOOLEAN_TEXT.FALSE;
+    record[C.UPDATED_AT] = now;
+    record[C.UPDATED_BY] = actor;
+    return headers.map(function (h) {
+      return record[h] === undefined ? '' : record[h];
+    });
+  });
+
+  const targetRow = sheet.getLastRow() + 1;
+  sheet.getRange(targetRow, 1, rows.length, headers.length).setValues(rows);
+  applyTimestampFormat_(sheet, headers, [C.UPDATED_AT], targetRow, rows.length);
+  return rows.length;
+}
+
+/**
+ * 在 RosterVersions 登記一個新版本。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} sheetName 對應的 grid 工作表名稱
+ * @param {string} basis 版本依據，例如 "AUTO_GENERATE"
+ * @param {?number} parentVersionNo 上一版版本號，沒有時傳 null
+ * @param {number} warningCount 警告數目
+ * @param {boolean} isProtected 是否已加保護
+ * @param {string=} notes 備註，例如採用的 seed，供日後重現該版本
+ * @returns {void}
+ */
+function registerVersion(quarterId, versionNo, sheetName, basis, parentVersionNo, warningCount, isProtected, notes) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_VERSIONS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_VERSIONS);
+
+  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const C = COLUMNS.ROSTER_VERSIONS;
+  const record = {};
+  record[C.VERSION_ID] = quarterId + '-v' + versionNo;
+  record[C.QUARTER_ID] = quarterId;
+  record[C.VERSION_NO] = versionNo;
+  record[C.SHEET_NAME] = sheetName;
+  record[C.BASIS] = basis;
+  record[C.PARENT_VERSION_NO] = parentVersionNo === null ? '' : parentVersionNo;
+  record[C.STATUS] = VERSION_VALUES.STATUS_DRAFT;
+  record[C.PROTECTED] = isProtected ? BOOLEAN_TEXT.TRUE : BOOLEAN_TEXT.FALSE;
+  record[C.WARNING_COUNT] = warningCount;
+  record[C.CREATED_AT] = nowTimestamp_();
+  record[C.CREATED_BY] = Session.getActiveUser().getEmail();
+  record[C.NOTES] = notes || '';
+
+  const row = headers.map(function (h) {
+    return record[h] === undefined ? '' : record[h];
+  });
+  const targetRow = sheet.getLastRow() + 1;
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  applyTimestampFormat_(sheet, headers, [C.CREATED_AT], targetRow, 1);
+
+  // 階段 F 新增：版本建立是全部五個步驟共用的唯一登記點，「版本號、基於哪個版本、
+  // 原因」原本只寫進 RosterVersions 本身（record 已經含 ParentVersionNo／Basis／
+  // Notes），這裡另外寫一筆 AuditLog，讓「查看 AuditLog 摘要」不需要另外去讀
+  // RosterVersions 就能看到這件事發生過。
+  writeAuditLog_({
+    action: '建立新版本',
+    targetSheet: SHEETS.ROSTER_VERSIONS,
+    targetKey: quarterId + '-v' + versionNo,
+    oldValue: parentVersionNo === null ? '（無，新季度第一版）' : 'v' + parentVersionNo,
+    newValue: basis,
+    notes: notes || ''
+  });
+}
+
+/**
+ * 找出指定季度目前最大的版本號。
+ * @param {string} quarterId 季度 ID
+ * @returns {number} 最大版本號；尚未有任何版本時回傳 -1
+ */
+function findLatestVersionNo(quarterId) {
+  const rows = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (row) {
+    return row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] === quarterId;
+  });
+  let max = -1;
+  rows.forEach(function (row) {
+    const versionNo = Number(row[COLUMNS.ROSTER_VERSIONS.VERSION_NO]);
+    if (!isNaN(versionNo) && versionNo > max) max = versionNo;
+  });
+  return max;
+}
+
+/**
+ * 追加階段 V 新增的唯讀診斷：統計 RosterAssignments 每個「季度＋版本」實際有幾多行、
+ * 幾多行有 PersonID、涉及幾多個不同的人。
+ *
+ * 用途：`buildMailContext_()`（Mailer.gs）與 `buildFineTuneContext_()`（FineTune.gs）
+ * 都是靠「QuarterID＋VersionNo」去 RosterAssignments 篩資料，一旦某個版本在這張表
+ * 沒有資料，寄送會找不到收件人、步驟 3 會直接拋錯。用試算表的檢視工具人手數行數
+ * 很容易只讀到最前面一部分（例如只看到第一個版本的 175 行就以為全表只有 175 行），
+ * 所以改由程式自己完整掃一次、按版本分組報告，數字才可靠。
+ *
+ * @returns {{totalRows: number, groups: Object[]}}
+ *   groups 每項為 {quarterId, versionNo, rowCount, assignedCount, personCount}，
+ *   依 quarterId、versionNo 排序
+ */
+function summariseAssignmentVersions_() {
+  const C = COLUMNS.ROSTER_ASSIGNMENTS;
+  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS);
+  const byKey = {};
+
+  rows.forEach(function (row) {
+    const quarterId = String(row[C.QUARTER_ID] || '');
+    const versionNo = Number(row[C.VERSION_NO]);
+    const key = quarterId + '|' + versionNo;
+    if (!byKey[key]) {
+      byKey[key] = {
+        quarterId: quarterId, versionNo: versionNo,
+        rowCount: 0, assignedCount: 0, persons: {}
+      };
+    }
+    const g = byKey[key];
+    g.rowCount++;
+    const personId = row[C.PERSON_ID];
+    if (personId) {
+      g.assignedCount++;
+      g.persons[personId] = true;
+    }
+  });
+
+  const groups = Object.keys(byKey).map(function (k) {
+    const g = byKey[k];
+    return {
+      quarterId: g.quarterId, versionNo: g.versionNo, rowCount: g.rowCount,
+      assignedCount: g.assignedCount, personCount: Object.keys(g.persons).length
+    };
+  }).sort(function (a, b) {
+    if (a.quarterId !== b.quarterId) return a.quarterId < b.quarterId ? -1 : 1;
+    return a.versionNo - b.versionNo;
+  });
+
+  return { totalRows: rows.length, groups: groups };
+}
+
+/**
+ * 為 v0 原始版工作表加上保護，只留 Config 的 SCRIPT_ACCOUNT_EMAIL 可編輯。
+ * 注意：試算表擁有者無法被移除編輯權，這是 Google 的限制。
+ * @param {string} sheetName 要保護的工作表名稱
+ * @returns {void}
+ */
+function protectV0(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error('找不到工作表: ' + sheetName);
+
+  const protection = sheet.protect().setDescription('v0 原始版，建立後鎖定');
+  const scriptAccount = getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '');
+
+  protection.removeEditors(protection.getEditors());
+  if (scriptAccount) protection.addEditor(scriptAccount);
+  if (protection.canDomainEdit()) protection.setDomainEdit(false);
+}

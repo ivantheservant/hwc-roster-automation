@@ -1,0 +1,690 @@
+<script>
+  const el = (id) => document.getElementById(id);
+  const RELEASE_PHRASE = '確認放行';
+
+  /** 目前選取的季度與最近一次取得的流程狀態。 */
+  let currentQuarterId = '';
+  let currentFlowState = null;
+
+  /** 顯示狀態訊息；isError 為 true 時用紅色。 */
+  function setStatus(message, isError) {
+    const node = el('status');
+    node.textContent = message || '';
+    node.className = isError ? 'status error' : 'status';
+  }
+
+  /** 執行期間停用所有按鈕，避免重複點擊。 */
+  function setBusy(busy) {
+    document.querySelectorAll('button').forEach((b) => { b.disabled = busy; });
+  }
+
+  /** 把 google.script.run 包成 Promise，方便用 async/await。 */
+  function callServer(fnName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((err) => reject(new Error(err.message || String(err))))
+        [fnName](...args);
+    });
+  }
+
+  /** 包住每個動作的共同流程：忙碌狀態、錯誤處理。 */
+  async function runAction(label, action) {
+    setBusy(true);
+    setStatus(label + '…');
+    try {
+      await action();
+      setStatus('');
+    } catch (err) {
+      setStatus(err.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // ── 小型 DOM 建構工具 ─────────────────────────────────────────────
+  function make(tag, opts, children) {
+    const node = document.createElement(tag);
+    opts = opts || {};
+    if (opts.text !== undefined) node.textContent = opts.text;
+    if (opts.className) node.className = opts.className;
+    if (opts.html !== undefined) node.innerHTML = opts.html;
+    (children || []).forEach((c) => { if (c) node.appendChild(c); });
+    return node;
+  }
+  function button(label, onClick, className) {
+    const b = make('button', { text: label, className: className || '' });
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function para(text, className) { return make('p', { text: text, className: className || 'wizard-lines' }); }
+  function title(text) { return make('p', { text: text, className: 'wizard-title' }); }
+  function actionsRow(nodes) { return make('div', { className: 'wizard-actions' }, nodes); }
+
+  function renderWizard(nodes) {
+    const body = el('wizardBody');
+    body.innerHTML = '';
+    nodes.forEach((n) => { if (n) body.appendChild(n); });
+    el('wizardPanel').hidden = false;
+    el('wizardPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function closeWizard() {
+    el('wizardPanel').hidden = true;
+    el('wizardBody').innerHTML = '';
+  }
+  async function closeWizardAndRefresh() {
+    closeWizard();
+    await loadFlowState();
+  }
+
+  /** 違規清單，硬規則與準硬規則分開兩節顯示，內容對應 buildViolationReportLines_()。 */
+  function renderViolations(violations) {
+    if (!violations || violations.length === 0) {
+      return para('重跑規則檢查：沒有發現任何違反 ✓');
+    }
+    const hard = violations.filter((v) => v.severity === 'HARD');
+    const others = violations.filter((v) => v.severity !== 'HARD');
+    const nodes = [make('p', { text: '重跑規則檢查，共 ' + violations.length + ' 項違反：', className: 'wizard-lines' })];
+
+    const describe = (v) => v.serviceDate + '　' + v.postNameTC + '#' + v.slotIndex + '　' + v.personName + '　' + v.ruleId + '：' + v.reason;
+    if (hard.length > 0) {
+      const block = make('div', { className: 'violation-block hard' });
+      block.appendChild(make('div', { text: '⚠️ 硬規則違反：' + hard.length + ' 項（本系統的原則是硬規則絕不自動違反）' }));
+      hard.forEach((v) => block.appendChild(make('div', { text: describe(v), className: 'violation-row' })));
+      nodes.push(block);
+    }
+    if (others.length > 0) {
+      const block = make('div', { className: 'violation-block other' });
+      block.appendChild(make('div', { text: '準硬規則／其他提示：' + others.length + ' 項' }));
+      others.forEach((v) => block.appendChild(make('div', { text: describe(v), className: 'violation-row' })));
+      nodes.push(block);
+    }
+    return make('div', {}, nodes);
+  }
+
+  /**
+   * 硬規則放行輸入框，對應選單版本要求逐字輸入「確認放行」的打字關卡。
+   * onSubmit(text) 由呼叫端決定文字對不對之後要做什麼——後端一律會重新驗證，
+   * 這裡的檢查只是提早給使用者回饋，不是唯一防線。
+   */
+  function renderReleaseBox(consequenceText, onSubmit) {
+    const box = make('div', { className: 'release-box' });
+    box.appendChild(make('p', { text: '需要明確放行：', className: 'wizard-lines' }));
+    box.appendChild(make('p', { text: consequenceText, className: 'wizard-lines' }));
+    box.appendChild(make('p', { text: '確定要放行的話，請輸入「' + RELEASE_PHRASE + '」四個字：', className: 'wizard-lines' }));
+    const input = make('input', {});
+    input.type = 'text';
+    input.placeholder = RELEASE_PHRASE;
+    box.appendChild(input);
+    box.appendChild(actionsRow([
+      button('放行並繼續', () => onSubmit(input.value), ''),
+      button('取消', () => closeWizardAndRefresh(), 'secondary')
+    ]));
+    return box;
+  }
+
+  // ── 步驟卡片渲染 ─────────────────────────────────────────────────
+  const STEP_META = {
+    2: { name: '步驟 2：寄給堂委審閱', desc: 'Stage=DRAFT 時可執行；寄出後 Stage → REVIEW_SENT。' },
+    3: { name: '步驟 3：套用修改申報', desc: 'Stage=REVIEW_SENT 或 REQUESTS_APPLIED 時可執行，可重複執行。' },
+    4: { name: '步驟 4：正式發出', desc: 'Stage=REQUESTS_APPLIED 時可執行；寄出後 Stage → OFFICIAL_SENT。' },
+    5: { name: '步驟 5：改動後重發', desc: 'Stage=OFFICIAL_SENT 時可執行，可重複執行、無次數限制。' }
+  };
+
+  function renderSteps(state) {
+    const container = el('steps');
+    container.innerHTML = '';
+
+    // 步驟 1：一律唯讀顯示，Web UI 不提供人手入口（由自動排程執行）。
+    const s1 = make('div', { className: 'step-card ' + (state.step1.versionExists ? 'done' : 'locked') });
+    const s1left = make('div', {}, [
+      make('div', { text: '步驟 1：生成初稿（唯讀顯示）', className: 'step-title' }),
+      make('div', { text: '由自動排程執行，Web UI 沒有人手入口。', className: 'step-desc' }),
+      make('div', {
+        text: state.step1.versionExists
+          ? '目前最新版本：' + state.step1.sheetName + (state.step1.createdAt ? '　建立時間：' + state.step1.createdAt : '')
+          : '這一季尚未生成任何版本。',
+        className: 'step-meta'
+      })
+    ]);
+    s1.appendChild(s1left);
+    container.appendChild(s1);
+
+    [2, 3, 4, 5].forEach((n) => {
+      const s = state['step' + n];
+      const meta = STEP_META[n];
+      const cls = s.available ? 'available' : (s.done ? 'done' : 'locked');
+      const card = make('div', { className: 'step-card ' + cls });
+      const left = make('div', {}, [
+        make('div', { text: meta.name, className: 'step-title' }),
+        make('div', { text: meta.desc, className: 'step-desc' }),
+        make('div', {
+          text: s.available
+            ? '現在可以執行。'
+            : (s.done !== undefined && s.done && n !== 5 ? '已完成。' : '目前鎖定——現在 Stage 是「' + state.stage + '」。')
+            + (s.lastSentAt ? '　最後一次執行：' + s.lastSentAt : ''),
+          className: 'step-meta'
+        })
+      ]);
+      card.appendChild(left);
+      if (s.available) {
+        card.appendChild(button('開始', () => openStep(n), ''));
+      }
+      container.appendChild(card);
+    });
+  }
+
+  function openStep(n) {
+    if (n === 2) return openStep2();
+    if (n === 3) return openStep3();
+    if (n === 4) return openStep4();
+    if (n === 5) return openStep5();
+  }
+
+  // ── 步驟 2：寄給堂委審閱 ─────────────────────────────────────────
+  async function openStep2() {
+    await runAction('讀取確認資料', async () => {
+      const preview = await callServer('apiStep2Preview', currentQuarterId);
+      renderWizard([
+        title('步驟 2：寄給堂委審閱（確認）'),
+        para(
+          'QuarterID：' + preview.quarterId + '\n'
+            + '版本號：v' + preview.versionNo + '\n'
+            + '收件人數（Role=REVIEWER）：' + preview.recipientCount + '\n'
+            + '附件數量：1（完整版 PDF，若不存在會自動匯出一次）\n'
+            + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
+            + (preview.recipientCount === 0
+              ? '\n\n⚠ 目前沒有 Role=REVIEWER 的收件人，寄出後不會有任何人收到。'
+              : '')
+        ),
+        actionsRow([
+          button('確定寄出', () => confirmStep2(), ''),
+          button('取消', () => closeWizard(), 'secondary')
+        ])
+      ]);
+    });
+  }
+  async function confirmStep2() {
+    await runAction('寄送中，請稍候', async () => {
+      const result = await callServer('apiStep2Confirm', currentQuarterId);
+      renderWizard([
+        title('步驟 2：寄給堂委審閱（完成）'),
+        para(
+          (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
+            + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
+            + '查無電郵略過：' + result.skipped + '\n'
+            + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '\n\n'
+            + 'Stage 已前進到 REVIEW_SENT。'
+        ),
+        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
+      ]);
+    });
+  }
+
+  // ── 步驟 3：套用修改申報 ─────────────────────────────────────────
+  function renderRequestList(labelText, items) {
+    const nodes = [make('p', { text: labelText + '：' + items.length + ' 筆', className: 'wizard-lines' })];
+    items.forEach((r) => {
+      nodes.push(make('div', {
+        text: r.serviceDateText + ' ' + r.postNameText + ' ' + r.personNameText
+          + (r.reason ? '：' + r.reason : '（' + r.requestType + '）'),
+        className: 'violation-row'
+      }));
+    });
+    return make('div', {}, nodes);
+  }
+
+  async function openStep3() {
+    await runAction('讀取驗證結果', async () => {
+      const plan = await callServer('apiStep3Plan', currentQuarterId);
+      renderStep3Plan(plan);
+    });
+  }
+
+  function renderStep3Plan(plan) {
+    if (plan.mode === 'NO_PENDING_DONE') {
+      renderWizard([
+        title('步驟 3：套用修改申報'),
+        para(currentQuarterId + ' 目前沒有待處理（PENDING）的申報。'),
+        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+      ]);
+      return;
+    }
+    if (plan.mode === 'NO_VERSION') {
+      renderWizard([
+        title('步驟 3：套用修改申報'),
+        para('找不到 ' + currentQuarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。'),
+        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+      ]);
+      return;
+    }
+    if (plan.mode === 'NO_PENDING_NEEDS_ADVANCE') {
+      const nodes = [
+        title('步驟 3：套用修改申報（重新檢查）'),
+        para(
+          currentQuarterId + ' 目前沒有待處理的申報，但 Stage 仍是「' + plan.stage + '」，'
+            + '未前進到 REQUESTS_APPLIED，所以「步驟 4：正式發出」暫時執行不到。\n\n'
+            + '以下是最新版本 ' + plan.sheetName + ' 目前的規則檢查結果（只讀取，沒有改動任何東西）：'
+        ),
+        renderViolations(plan.violations)
+      ];
+      if (plan.requiresRelease) {
+        nodes.push(renderReleaseBox(STEP3_CONSEQUENCE, (text) => step3Release(text)));
+      } else {
+        nodes.push(actionsRow([
+          button('確認前進', () => step3Release(''), ''),
+          button('取消', () => closeWizard(), 'secondary')
+        ]));
+      }
+      renderWizard(nodes);
+      return;
+    }
+
+    // mode === 'HAS_PENDING'：對應選單版本 1/3
+    const nodes = [title('步驟 3：套用修改申報（1/3，驗證結果）')];
+    if (plan.skippedIncompleteCount > 0) {
+      nodes.push(para('已略過 ' + plan.skippedIncompleteCount + ' 行不完整申報（日期／崗位／姓名／類型未填滿四欄）'));
+    }
+    nodes.push(renderRequestList('可直接套用', plan.applyList));
+    nodes.push(renderRequestList('需要你確認（未曾任該崗位，屬硬規則）', plan.confirmList));
+    nodes.push(renderRequestList('無法套用（記為 NEEDS_INPUT）', plan.needsInputList));
+    nodes.push(actionsRow([
+      button('繼續', () => step3ContinueAfterPlan(plan), ''),
+      button('取消', () => step3Decline(), 'secondary')
+    ]));
+    renderWizard(nodes);
+  }
+
+  async function step3Decline() {
+    await runAction('取消中', async () => {
+      const result = await callServer('apiStep3Decline', currentQuarterId);
+      renderWizard([
+        title('步驟 3：套用修改申報'),
+        para('已取消，沒有套用任何申報、沒有建立新版本。'
+          + (result.recorded > 0
+            ? '\n\n不過其中 ' + result.recorded + ' 筆「無法套用」的申報，已經把攔截原因寫回 Requests 工作表。'
+            : '')),
+        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+      ]);
+    });
+  }
+
+  function step3ContinueAfterPlan(plan) {
+    if (plan.confirmList.length > 0) {
+      renderWizard([
+        title('確認「未曾任該崗位」的申報'),
+        renderRequestList('以下申報要全部接受嗎（選「否」則全部記為 REJECTED）', plan.confirmList),
+        actionsRow([
+          button('是，全部接受', () => step3Apply(true), ''),
+          button('否，全部拒絕', () => step3Apply(false), 'secondary')
+        ])
+      ]);
+    } else {
+      step3Apply(false);
+    }
+  }
+
+  async function step3Apply(acceptConfirmList) {
+    await runAction('套用中，請稍候', async () => {
+      const result = await callServer('apiStep3Apply', currentQuarterId, acceptConfirmList);
+      const nodes = [
+        title('步驟 3：套用修改申報（套用完成）'),
+        para(
+          '已建立新版本 ' + result.sheetName + '（底本 v' + result.baseVersionNo + '）\n\n'
+            + '已套用：' + result.appliedCount + ' 筆\n'
+            + '已拒絕：' + result.rejectedCount + ' 筆\n'
+            + '無法套用：' + result.needsInputCount + ' 筆\n\n'
+            + '待補格子（黃底）：' + result.pendingBackfillCount + ' 格'
+        ),
+        renderViolations(result.violations)
+      ];
+      if (result.advanced) {
+        nodes.push(para('Stage 已前進到 REQUESTS_APPLIED（可重複執行此步驟繼續處理新的申報）。'));
+        nodes.push(actionsRow([button('完成', () => closeWizardAndRefresh(), '')]));
+      } else {
+        nodes.push(renderReleaseBox(STEP3_CONSEQUENCE, (text) => step3Release(text)));
+      }
+      renderWizard(nodes);
+    });
+  }
+
+  async function step3Release(text) {
+    await runAction('確認中', async () => {
+      const result = await callServer('apiStep3Release', currentQuarterId, text);
+      if (result.alreadyAdvanced) {
+        renderWizard([
+          title('步驟 3：套用修改申報'),
+          para('Stage 已經是 REQUESTS_APPLIED，不需要再前進。'),
+          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+        ]);
+        return;
+      }
+      if (!result.advanced) {
+        renderWizard([
+          title('步驟 3：套用修改申報'),
+          para('輸入的文字不是「' + RELEASE_PHRASE + '」，已當作取消，Stage 未前進。\n\n'
+            + '新版本已經建立並保留，你可以人手修正之後再執行一次本步驟。'),
+          renderViolations(result.violations),
+          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+        ]);
+        return;
+      }
+      renderWizard([
+        title('步驟 3：套用修改申報（完成）'),
+        para('Stage 已前進到 REQUESTS_APPLIED。'),
+        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
+      ]);
+    });
+  }
+
+  const STEP3_CONSEQUENCE =
+    '繼續下去不會立即寄出任何電郵——步驟 3 只是把這一版定案。\n'
+    + '但 Stage 會前進到 REQUESTS_APPLIED，「步驟 4：正式發出」就會解鎖，屆時這些違反規則的安排會原封不動寄給各位義工。\n\n'
+    + '建議先取消，到新版本的工作表人手修正之後再執行一次本步驟（新版本已經建立並保留，取消不會令你損失任何東西）。';
+  const STEP5_CONSEQUENCE =
+    '繼續下去代表你知情並且決定照樣寄出，收信人收到的職事表會包含這些違反規則的安排。\n\n'
+    + '建議先取消，到新版本的工作表人手修正之後再執行一次本步驟（新版本已經建立、不會消失）。';
+
+  // ── 步驟 4：正式發出 ─────────────────────────────────────────────
+  async function openStep4() {
+    await runAction('讀取確認資料', async () => {
+      const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
+      if (warnings.pendingRequests.length > 0 || warnings.pendingCellsTotal > 0) {
+        const nodes = [title('有未完成事項')];
+        if (warnings.pendingRequests.length > 0) {
+          nodes.push(renderRequestList('仍有 PENDING 的申報（建議先執行「步驟 3」）', warnings.pendingRequests));
+        }
+        if (warnings.pendingCellsTotal > 0) {
+          nodes.push(para('仍有 ' + warnings.pendingCellsTotal + ' 格待補（黃底，建議先人手處理）'
+            + (warnings.pendingCells.length < warnings.pendingCellsTotal
+              ? '，只顯示前 ' + warnings.pendingCells.length + ' 格' : '')));
+        }
+        nodes.push(actionsRow([
+          button('繼續', () => step4CheckMissingPdf(warnings.versionNo), ''),
+          button('取消，先處理', () => closeWizard(), 'secondary')
+        ]));
+        renderWizard(nodes);
+        return;
+      }
+      await step4CheckMissingPdf(warnings.versionNo);
+    });
+  }
+
+  async function step4CheckMissingPdf(versionNo) {
+    const missingCheck = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);
+    if (missingCheck.applicable && missingCheck.missingTotal > 0) {
+      renderWizard([
+        title('有 ' + missingCheck.missingTotal + ' / ' + missingCheck.total + ' 人缺個人 PDF'),
+        para(missingCheck.missing.map((p) => p.nameTC + '（' + p.personId + '）').join('\n')
+          + (missingCheck.missing.length < missingCheck.missingTotal
+            ? '\n……另有 ' + (missingCheck.missingTotal - missingCheck.missing.length) + ' 人' : '')),
+        actionsRow([
+          button('繼續', () => step4SendPreview(versionNo), ''),
+          button('取消，先產生 PDF', () => closeWizard(), 'secondary')
+        ])
+      ]);
+      return;
+    }
+    await step4SendPreview(versionNo);
+  }
+
+  async function step4SendPreview(versionNo) {
+    const preview = await callServer('apiStep4GetSendPreview', currentQuarterId, versionNo);
+    renderWizard([
+      title('步驟 4：正式發出（確認）'),
+      para(
+        'QuarterID：' + currentQuarterId + '\n'
+          + '版本號：v' + versionNo + '\n'
+          + '收件人數：' + preview.recipientCount + '\n'
+          + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
+      ),
+      actionsRow([
+        button('確定要正式發出', () => step4Confirm(), ''),
+        button('取消', () => closeWizard(), 'secondary')
+      ])
+    ]);
+  }
+
+  async function step4Confirm() {
+    await runAction('寄送中，請稍候', async () => {
+      const result = await callServer('apiStep4Confirm', currentQuarterId);
+      renderWizard([
+        title('步驟 4：正式發出（完成）'),
+        para(
+          (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
+            + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
+            + '查無電郵略過：' + result.skipped + '　未變略過：' + result.unchanged + '\n'
+            + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '　PDF缺件：' + result.errorPdfMissing + '\n\n'
+            + 'Stage 已前進到 OFFICIAL_SENT。'
+        ),
+        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
+      ]);
+    });
+  }
+
+  // ── 步驟 5：改動後重發 ───────────────────────────────────────────
+  async function openStep5() {
+    await runAction('讀取狀態', async () => {
+      const plan = await callServer('apiStep5Plan', currentQuarterId);
+      if (plan.mode === 'NO_PENDING') {
+        await step5GeneratePdfs('');
+        return;
+      }
+      renderStep5Plan(plan);
+    });
+  }
+
+  function renderStep5Plan(plan) {
+    const nodes = [title('步驟 5：改動後重發（套用申報，1/3）')];
+    if (plan.skippedIncompleteCount > 0) {
+      nodes.push(para('已略過 ' + plan.skippedIncompleteCount + ' 行不完整申報'));
+    }
+    nodes.push(para('目前版本號：v' + plan.baseVersionNo + '　即將建立的新版本號：v' + plan.nextVersionNo
+      + '\nDRY_RUN：' + (plan.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')));
+    nodes.push(renderRequestList('可直接套用', plan.applyList));
+    nodes.push(renderRequestList('需要你確認（未曾任該崗位，屬硬規則）', plan.confirmList));
+    nodes.push(renderRequestList('無法套用（記為 NEEDS_INPUT）', plan.needsInputList));
+    nodes.push(actionsRow([
+      button('繼續', () => step5ContinueAfterPlan(plan), ''),
+      button('取消', () => step5Decline(), 'secondary')
+    ]));
+    renderWizard(nodes);
+  }
+
+  async function step5Decline() {
+    await runAction('取消中', async () => {
+      const result = await callServer('apiStep5Decline', currentQuarterId);
+      renderWizard([
+        title('步驟 5：改動後重發'),
+        para('已取消，沒有套用任何申報、沒有建立新版本。'
+          + (result.recorded > 0
+            ? '\n\n不過其中 ' + result.recorded + ' 筆「無法套用」的申報，已經把攔截原因寫回 Requests 工作表。'
+            : '')),
+        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+      ]);
+    });
+  }
+
+  function step5ContinueAfterPlan(plan) {
+    if (plan.confirmList.length > 0) {
+      renderWizard([
+        title('確認「未曾任該崗位」的申報'),
+        renderRequestList('以下申報要全部接受嗎（選「否」則全部記為 REJECTED）', plan.confirmList),
+        actionsRow([
+          button('是，全部接受', () => step5Apply(true), ''),
+          button('否，全部拒絕', () => step5Apply(false), 'secondary')
+        ])
+      ]);
+    } else {
+      step5Apply(false);
+    }
+  }
+
+  async function step5Apply(acceptConfirmList) {
+    await runAction('套用中，請稍候', async () => {
+      const result = await callServer('apiStep5Apply', currentQuarterId, acceptConfirmList);
+      const nodes = [
+        title('步驟 5：改動後重發（套用申報完成，2/3）'),
+        para(
+          '已建立新版本 ' + result.sheetName + '（底本 v' + result.baseVersionNo + '）\n\n'
+            + '已套用：' + result.appliedCount + ' 筆\n'
+            + '已拒絕：' + result.rejectedCount + ' 筆\n'
+            + '無法套用：' + result.needsInputCount + ' 筆\n\n'
+            + '待補格子（黃底）：' + result.pendingBackfillCount + ' 格'
+        ),
+        renderViolations(result.violations)
+      ];
+      if (result.requiresAck) {
+        nodes.push(renderReleaseBox(STEP5_CONSEQUENCE, (text) => step5GeneratePdfs(text)));
+      } else {
+        nodes.push(para('接下來會比對這一版跟上次寄出時的差異，決定要通知誰。'));
+        nodes.push(actionsRow([button('繼續', () => step5GeneratePdfs(''), '')]));
+      }
+      renderWizard(nodes);
+    });
+  }
+
+  /**
+   * 產生 PDF，可能要按時間預算分批、重複呼叫。releaseText 全程帶著，
+   * 每次呼叫後端都會用「目前最新版本」重新驗證一次，不是只信任第一次的結果。
+   */
+  async function step5GeneratePdfs(releaseText) {
+    await runAction('產生個人 PDF 中，請稍候', async () => {
+      const result = await callServer('apiStep5GeneratePdfs', currentQuarterId, releaseText);
+      if (result.blocked) {
+        renderWizard([
+          title('步驟 5：改動後重發'),
+          para('放行文字不正確，或尚未輸入。'),
+          renderViolations(result.violations),
+          renderReleaseBox(STEP5_CONSEQUENCE, (text) => step5GeneratePdfs(text))
+        ]);
+        return;
+      }
+      if (result.noChanges) {
+        renderWizard([
+          title('步驟 5：改動後重發'),
+          para(currentQuarterId + ' 沒有改動需要重發。'),
+          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+        ]);
+        return;
+      }
+      if (!result.done) {
+        renderWizard([
+          title('步驟 5：改動後重發（PDF 尚未完成）'),
+          para('這次先完成了 ' + result.doneCount + ' / ' + result.totalPeople + ' 人（接近單次執行時間上限自動停下）。'),
+          actionsRow([button('繼續產生', () => step5GeneratePdfs(releaseText), '')])
+        ]);
+        return;
+      }
+      await step5SendPreview(releaseText);
+    });
+  }
+
+  async function step5SendPreview(releaseText) {
+    const preview = await callServer('apiStep5SendPreview', currentQuarterId);
+    if (preview.mode === 'NO_CHANGES') {
+      renderWizard([
+        title('步驟 5：改動後重發'),
+        para(currentQuarterId + ' 沒有改動需要重發。'),
+        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+      ]);
+      return;
+    }
+
+    const nodes = [
+      title('步驟 5：改動後重發（確認寄送，3/3）'),
+      para('版本號：v' + preview.versionNo + '\n這一輪有改動、需要通知的人共 ' + preview.changedList.length + ' 位：')
+    ];
+    const list = make('div', {});
+    preview.changedList.forEach((c) => {
+      const row = make('div', { className: 'violation-row' });
+      row.appendChild(document.createTextNode(c.nameTC));
+      if (!c.hasAssignments) row.appendChild(make('span', { text: '本季已無服侍安排', className: 'tag no-assign' }));
+      if (c.firstNotifyDueToEmail) row.appendChild(make('span', { text: '首次通知，之前無電郵', className: 'tag first-notify' }));
+      if (!c.hasEmail) row.appendChild(make('span', { text: '無電郵無法通知', className: 'tag no-email' }));
+      list.appendChild(row);
+    });
+    nodes.push(list);
+    nodes.push(para(
+      '即將寄出的信件數：' + (preview.personSendableCount + preview.listRecipientCount)
+        + '（個人通知 ' + preview.personSendableCount + ' 封 ＋ LIST 摘要 ' + preview.listRecipientCount + ' 封）\n'
+        + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
+    ));
+    nodes.push(actionsRow([
+      button('確定要繼續', () => step5SendConfirm(releaseText), ''),
+      button('取消（新版本會保留）', () => closeWizardAndRefresh(), 'secondary')
+    ]));
+    renderWizard(nodes);
+  }
+
+  async function step5SendConfirm(releaseText) {
+    await runAction('寄送中，請稍候', async () => {
+      const result = await callServer('apiStep5SendConfirm', currentQuarterId, releaseText);
+      if (result.blocked) {
+        renderWizard([
+          title('步驟 5：改動後重發'),
+          para('放行文字不正確，或尚未輸入，尚未寄出任何電郵。'),
+          renderViolations(result.violations),
+          renderReleaseBox(STEP5_CONSEQUENCE, (text) => step5SendConfirm(text))
+        ]);
+        return;
+      }
+      if (result.noChanges) {
+        renderWizard([
+          title('步驟 5：改動後重發'),
+          para(currentQuarterId + ' 沒有改動需要重發。'),
+          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
+        ]);
+        return;
+      }
+      renderWizard([
+        title('步驟 5：改動後重發（完成）'),
+        para(
+          (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
+            + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
+            + '查無電郵略過：' + result.skipped + '\n'
+            + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '　PDF缺件：' + result.errorPdfMissing + '\n\n'
+            + 'Stage 維持 OFFICIAL_SENT。'
+        ),
+        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
+      ]);
+    });
+  }
+
+  // ── 季度切換與初始化 ─────────────────────────────────────────────
+  async function loadQuarters() {
+    const quarters = await callServer('apiListQuarters');
+    const select = el('quarter');
+    select.innerHTML = '';
+    quarters.forEach((q) => {
+      const option = document.createElement('option');
+      option.value = q.quarterId;
+      option.textContent = `${q.quarterId}（${q.startDate} 至 ${q.endDate}）`;
+      select.appendChild(option);
+    });
+    if (quarters.length > 0) {
+      currentQuarterId = select.value;
+      await loadFlowState();
+    }
+  }
+
+  async function loadFlowState() {
+    if (!currentQuarterId) return;
+    closeWizard();
+    const state = await callServer('apiGetFlowState', currentQuarterId);
+    currentFlowState = state;
+    el('stageBadge').textContent = 'Stage: ' + state.stage;
+    el('stageBadge').className = 'badge stage';
+    el('dryRunBadge').textContent = 'DRY_RUN: ' + (state.isDryRun ? 'TRUE' : 'FALSE');
+    el('dryRunBadge').className = 'badge ' + (state.isDryRun ? 'dryrun-on' : 'dryrun-off');
+    renderSteps(state);
+  }
+
+  el('quarter').addEventListener('change', () => runAction('載入狀態', async () => {
+    currentQuarterId = el('quarter').value;
+    await loadFlowState();
+  }));
+  el('btnRefresh').addEventListener('click', () => runAction('重新整理狀態', loadFlowState));
+
+  runAction('初始化', loadQuarters);
+</script>

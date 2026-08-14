@@ -1,0 +1,952 @@
+/**
+ * 集中管理所有工作表名稱與欄位名稱常數，避免字串寫死在多個檔案中。
+ * 修改試算表欄位時只需更新此處。
+ */
+
+const SHEETS = {
+  CONFIG: 'Config',
+  POSTS: 'Posts',
+  NAME_MAPPING: 'NameMapping',
+  NAME_ALIAS: 'NameAlias',
+  ELIGIBILITY: 'Eligibility',
+  SERVICE_DATES: 'ServiceDates',
+  SPECIAL_SUNDAYS: 'SpecialSundays',
+  UNAVAILABLE: 'Unavailable',
+  RULE_SETTINGS: 'RuleSettings',
+  QUARTERS: 'Quarters',
+  ROSTER_VERSIONS: 'RosterVersions',
+  ROSTER_ASSIGNMENTS: 'RosterAssignments',
+  EMAIL_RECIPIENTS: 'EmailRecipients',
+  EMAIL_TEMPLATES: 'EmailTemplates',
+  SEND_LOG: 'SendLog',
+  FINE_TUNE_PROPOSALS: 'FineTuneProposals',
+  AUDIT_LOG: 'AuditLog',
+  NAME_MAPPING_DRAFT: 'NameMapping_Draft',
+  SELF_TEST_RESULT: 'SelfTest_Result',
+  TUNE_RESULT: 'Tune_Result',
+  MULTIRUN_RESULT: 'MultiRun_Result',
+  REQUESTS: 'Requests',
+  DIAGNOSTICS: 'Diagnostics'
+};
+
+/**
+ * 多次生成揀最好的時間預算（毫秒）。
+ * Apps Script 上限為 6 分鐘，這裡只用 3 分鐘，其餘留給建表、寫長表與登記版本。
+ */
+const MULTIRUN_TIME_BUDGET_MS = 180000;
+
+/** 參數掃描要試的組合，以及分批執行的設定。 */
+const TUNE_GRID = {
+  CHAIR_DUAL_BONUS: [30, 45, 60, 75],
+  WEIGHT_HISTORICAL: [0.5, 0.65, 0.8]
+};
+
+/**
+ * 單次執行的時間預算（毫秒）。Apps Script 上限為 6 分鐘，
+ * 這裡留 2 分鐘餘裕給寫入工作表與收尾，超時就把進度存起來下次繼續。
+ */
+const TUNE_TIME_BUDGET_MS = 240000;
+
+/** 存放參數掃描進度的 Script Property 鍵名。 */
+const TUNE_PROGRESS_KEY = 'roster_tune_progress';
+
+/** 存放「產生個人 PDF」批次進度的 Script Property 鍵名。 */
+const PDF_BATCH_PROGRESS_KEY = 'roster_pdf_batch_progress';
+
+/**
+ * 存放步驟 5「改動後重發」批次進度的 Script Property 鍵名。獨立於
+ * PDF_BATCH_PROGRESS_KEY 之外，避免跟「準備工作 ▸ 產生個人 PDF」（處理全體）
+ * 的進度互相覆蓋——兩者可能在同一個季度交替執行。
+ */
+const PDF_RESEND_BATCH_PROGRESS_KEY = 'roster_pdf_resend_batch_progress';
+
+/**
+ * 「產生個人 PDF」單次執行的時間安全網（毫秒）。Apps Script 上限為 6 分鐘，
+ * 這裡留 2 分鐘餘裕給收尾；即使 Config 的 PDF_BATCH_SIZE 設得太大，
+ * 一批處理到接近這個時間也會提早停止並存進度，不會被硬中斷。
+ */
+const PDF_BATCH_TIME_BUDGET_MS = 240000;
+
+/** 由程式動態產生的工作表名稱前綴。 */
+const SHEET_PREFIXES = {
+  ROSTER: 'Roster_',
+  VERIFY: 'Verify_',
+  TEMP_PDF: '_TempPdf_'
+};
+
+const COLUMNS = {
+  CONFIG: {
+    KEY: 'Key',
+    VALUE: 'Value',
+    TYPE: 'Type',
+    GROUP: 'Group',
+    DEFAULT: 'Default',
+    DESCRIPTION: 'Description',
+    EDITABLE: 'Editable',
+    UPDATED_AT: 'UpdatedAt',
+    UPDATED_BY: 'UpdatedBy'
+  },
+  POSTS: {
+    POST_ID: 'PostID',
+    POST_NAME_TC: 'PostName_TC',
+    POST_NAME_EN: 'PostName_EN',
+    SLOT_COUNT: 'SlotCount',
+    DISTINCT_WITHIN_POST: 'DistinctWithinPost',
+    CATEGORY: 'Category',
+    FREQUENCY: 'Frequency',
+    AUTO_GENERATE: 'AutoGenerate',
+    ALLOW_CONSECUTIVE: 'AllowConsecutive',
+    MUTEX_GROUP: 'MutexGroup',
+    DISPLAY_ORDER: 'DisplayOrder',
+    ACTIVE: 'Active',
+    NOTES: 'Notes',
+    EMPTY_DISPLAY: 'EmptyDisplay'
+  },
+  NAME_MAPPING: {
+    PERSON_ID: 'PersonID',
+    NAME_TC: 'NameTC',
+    NAME_EN: 'NameEN',
+    MEMBER_NO: 'MemberNo',
+    CONGREGATION: 'Congregation',
+    MEMBER_TYPE: 'MemberType',
+    MEETING_POINT: 'MeetingPoint',
+    EMAIL: 'Email',
+    EMAIL_SOURCE: 'EmailSource',
+    EMAIL_VERIFIED_AT: 'EmailVerifiedAt',
+    PHONE: 'Phone',
+    LAST_ATTENDANCE: 'LastAttendance',
+    ACTIVE: 'Active',
+    MAX_PER_QUARTER: 'MaxPerQuarter',
+    PREFERRED_POSTS: 'PreferredPosts',
+    NOTES: 'Notes',
+    SYNCED_AT: 'SyncedAt'
+  },
+  NAME_ALIAS: {
+    ALIAS_ID: 'AliasID',
+    ALIAS: 'Alias',
+    PERSON_ID: 'PersonID',
+    ALIAS_TYPE: 'AliasType',
+    SOURCE: 'Source',
+    ACTIVE: 'Active',
+    NOTES: 'Notes'
+  },
+  ELIGIBILITY: {
+    ELIGIBILITY_ID: 'EligibilityID',
+    PERSON_ID: 'PersonID',
+    POST_ID: 'PostID',
+    ELIGIBLE: 'Eligible',
+    HISTORICAL_COUNT: 'HistoricalCount',
+    SOURCE: 'Source',
+    ADDED_BY: 'AddedBy',
+    ADDED_AT: 'AddedAt',
+    ACTIVE: 'Active',
+    NOTES: 'Notes'
+  },
+  SERVICE_DATES: {
+    SERVICE_DATE_ID: 'ServiceDateID',
+    QUARTER_ID: 'QuarterID',
+    SERVICE_DATE: 'ServiceDate',
+    WEEK_INDEX: 'WeekIndex',
+    IS_FIRST_SUNDAY_OF_MONTH: 'IsFirstSundayOfMonth',
+    SERVICE_TYPE: 'ServiceType',
+    SPECIAL_ID: 'SpecialID',
+    AUTO_GENERATE: 'AutoGenerate',
+    NOTES: 'Notes'
+  },
+  SPECIAL_SUNDAYS: {
+    SPECIAL_ID: 'SpecialID',
+    QUARTER_ID: 'QuarterID',
+    SERVICE_DATE: 'ServiceDate',
+    TYPE: 'Type',
+    TITLE: 'Title',
+    SKIP_POST_IDS: 'SkipPostIDs',
+    LOCK_POST_IDS: 'LockPostIDs',
+    EXTERNAL_OWNER: 'ExternalOwner',
+    COMMUNION_OVERRIDE: 'CommunionOverride',
+    TRANSLATION_REQUIRED: 'TranslationRequired',
+    ACTIVE: 'Active',
+    NOTES: 'Notes'
+  },
+  UNAVAILABLE: {
+    UNAVAILABLE_ID: 'UnavailableID',
+    PERSON_ID: 'PersonID',
+    DATE_FROM: 'DateFrom',
+    DATE_TO: 'DateTo',
+    APPLIES_TO: 'AppliesTo',
+    POST_IDS: 'PostIDs',
+    REASON: 'Reason',
+    SOURCE: 'Source',
+    STATUS: 'Status',
+    CREATED_AT: 'CreatedAt',
+    CREATED_BY: 'CreatedBy'
+  },
+  RULE_SETTINGS: {
+    RULE_ID: 'RuleID',
+    RULE_NAME: 'RuleName',
+    LEVEL: 'Level',
+    ENABLED: 'Enabled',
+    SCOPE_POST_IDS: 'ScopePostIDs',
+    TARGET_VALUE: 'TargetValue',
+    TOLERANCE: 'Tolerance',
+    PARAM_JSON: 'ParamJSON',
+    ON_VIOLATION: 'OnViolation',
+    PRIORITY: 'Priority',
+    DESCRIPTION: 'Description'
+  },
+  QUARTERS: {
+    QUARTER_ID: 'QuarterID',
+    YEAR: 'Year',
+    TERM: 'Term',
+    START_DATE: 'StartDate',
+    END_DATE: 'EndDate',
+    WEEK_COUNT: 'WeekCount',
+    GENERATE_ON: 'GenerateOn',
+    // 追加階段 Q 查證過 RemindOn 是死欄位：全專案只有 computeAutomationSchedule_()
+    // 讀過它，而且算出來的 remindDate 從沒有任何呼叫端使用（REMIND 已改由
+    // REMIND_STUCK_DAYS／Quarters.StageUpdatedAt 驅動，不再是日期概念，見 Trigger.gs
+    // 的 judgeRemindStuckAction_()）。已依你的決定移除這個欄位的註冊與對應計算
+    // （computeAutomationSchedule_() 已同步移除 remindDate）。Quarters 工作表上原本的
+    // RemindOn 欄本身還在（程式沒有自動刪除工作表上的欄），如果你已經人手刪掉了，
+    // 這則註解可以忽略。
+    OFFICIAL_SEND_ON: 'OfficialSendOn',
+    STATUS: 'Status',
+    // 追加階段 T 查證過 CurrentVersion 是死欄位（沒有任何程式碼讀寫過），
+    // 追加階段 I 已依你的決定移除這個欄位的註冊。「目前用哪個版本」一律由
+    // findLatestVersionNo()（RosterWriter.gs）即時掃描 RosterVersions、
+    // 取 VersionNo 最大值決定；四階段流程步驟 3（RequestsApply.gs 的
+    // planApplyRequests_()）也是呼叫這個函式，不依賴任何欄位。
+    // Quarters 工作表上原本的 CurrentVersion 欄本身還在（程式沒有自動刪除
+    // 工作表上的欄），如果你已經人手刪掉了，這則註解可以忽略。
+    NOTES: 'Notes',
+    STAGE: 'Stage',
+    STAGE_UPDATED_AT: 'StageUpdatedAt'
+  },
+  ROSTER_VERSIONS: {
+    VERSION_ID: 'VersionID',
+    QUARTER_ID: 'QuarterID',
+    VERSION_NO: 'VersionNo',
+    SHEET_NAME: 'SheetName',
+    BASIS: 'Basis',
+    PARENT_VERSION_NO: 'ParentVersionNo',
+    STATUS: 'Status',
+    PROTECTED: 'Protected',
+    WARNING_COUNT: 'WarningCount',
+    CREATED_AT: 'CreatedAt',
+    CREATED_BY: 'CreatedBy',
+    NOTES: 'Notes'
+  },
+  EMAIL_RECIPIENTS: {
+    RECIPIENT_ID: 'RecipientID',
+    GROUP_ID: 'GroupID',
+    EMAIL: 'Email',
+    DISPLAY_NAME: 'DisplayName',
+    STAGE: 'Stage',
+    SEND_AS: 'SendAs',
+    ACTIVE: 'Active',
+    NOTES: 'Notes',
+    ROLE: 'Role'
+  },
+  EMAIL_TEMPLATES: {
+    TEMPLATE_ID: 'TemplateID',
+    STAGE: 'Stage',
+    LANG: 'Lang',
+    SUBJECT: 'Subject',
+    BODY_HTML: 'BodyHtml',
+    BODY_PLAIN: 'BodyPlain',
+    PLACEHOLDERS: 'Placeholders',
+    ATTACH_TYPE: 'AttachType',
+    ACTIVE: 'Active',
+    UPDATED_AT: 'UpdatedAt'
+  },
+  SEND_LOG: {
+    SEND_ID: 'SendID',
+    QUARTER_ID: 'QuarterID',
+    VERSION_NO: 'VersionNo',
+    STAGE: 'Stage',
+    RECIPIENT_TYPE: 'RecipientType',
+    PERSON_ID: 'PersonID',
+    EMAIL: 'Email',
+    DISPLAY_NAME: 'DisplayName',
+    ASSIGNMENT_HASH: 'AssignmentHash',
+    ASSIGNMENT_SUMMARY: 'AssignmentSummary',
+    ATTACHMENT_NAME: 'AttachmentName',
+    SENT_AT: 'SentAt',
+    STATUS: 'Status',
+    MESSAGE_ID: 'MessageId',
+    ERROR_MESSAGE: 'ErrorMessage',
+    TRIGGERED_BY: 'TriggeredBy'
+  },
+  FINE_TUNE_PROPOSALS: {
+    PROPOSAL_ID: 'ProposalID',
+    BATCH_ID: 'BatchID',
+    QUARTER_ID: 'QuarterID',
+    BASE_VERSION_NO: 'BaseVersionNo',
+    SERVICE_DATE_ID: 'ServiceDateID',
+    POST_ID: 'PostID',
+    SLOT_INDEX: 'SlotIndex',
+    ORIGINAL_PERSON_ID: 'OriginalPersonID',
+    MANUAL_PERSON_ID: 'ManualPersonID',
+    SUGGESTED_PERSON_ID: 'SuggestedPersonID',
+    BROKEN_RULE_ID: 'BrokenRuleID',
+    SEVERITY: 'Severity',
+    REASON: 'Reason',
+    DECISION: 'Decision',
+    DECIDED_BY: 'DecidedBy',
+    DECIDED_AT: 'DecidedAt',
+    RESULT_VERSION_NO: 'ResultVersionNo'
+  },
+  AUDIT_LOG: {
+    LOG_ID: 'LogID',
+    TIMESTAMP: 'Timestamp',
+    ACTOR: 'Actor',
+    ACTION: 'Action',
+    TARGET_SHEET: 'TargetSheet',
+    TARGET_KEY: 'TargetKey',
+    OLD_VALUE: 'OldValue',
+    NEW_VALUE: 'NewValue',
+    SOURCE: 'Source',
+    NOTES: 'Notes'
+  },
+  ROSTER_ASSIGNMENTS: {
+    ASSIGNMENT_ID: 'AssignmentID',
+    QUARTER_ID: 'QuarterID',
+    VERSION_NO: 'VersionNo',
+    SERVICE_DATE_ID: 'ServiceDateID',
+    SERVICE_DATE: 'ServiceDate',
+    POST_ID: 'PostID',
+    SLOT_INDEX: 'SlotIndex',
+    PERSON_ID: 'PersonID',
+    PERSON_NAME_SNAPSHOT: 'PersonNameSnapshot',
+    ASSIGN_SOURCE: 'AssignSource',
+    RULE_FLAGS: 'RuleFlags',
+    LOCKED: 'Locked',
+    UPDATED_AT: 'UpdatedAt',
+    UPDATED_BY: 'UpdatedBy'
+  },
+  REQUESTS: {
+    REQUEST_ID: 'RequestID',
+    QUARTER_ID: 'QuarterID',
+    SERVICE_DATE: 'ServiceDate',
+    POST_NAME: 'PostName',
+    PERSON_NAME: 'PersonName',
+    REQUEST_TYPE: 'RequestType',
+    STATUS: 'Status',
+    RESULT_NOTE: 'ResultNote',
+    CREATED_AT: 'CreatedAt',
+    PROCESSED_AT: 'ProcessedAt',
+    NOTES: 'Notes'
+  },
+  DIAGNOSTICS: {
+    REPORT_NAME: 'ReportName',
+    GENERATED_AT: 'GeneratedAt',
+    SECTION: 'Section',
+    ITEM: 'Item',
+    VALUE: 'Value',
+    NOTE: 'Note'
+  }
+};
+
+/**
+ * RuleSettings 工作表中使用的 RuleID。程式以這些 ID 向 RuleSettings 查詢
+ * Level / Enabled / ScopePostIDs / TargetValue / Tolerance / ParamJSON / OnViolation / Priority，
+ * 所有實際參數與嚴重程度一律以工作表內容為準，此處只是 ID 名稱的單一來源。
+ */
+const RULE_IDS = {
+  ELIGIBILITY: 'HARD_ELIGIBILITY',
+  DISTINCT_SLOT: 'HARD_DISTINCT_SLOT',
+  UNAVAILABLE: 'HARD_UNAVAILABLE',
+  COMMUNION_FIRST_SUNDAY: 'HARD_COMMUNION_FIRST_SUNDAY',
+  NO_AUTO_GENERATE: 'HARD_NO_AUTO_PREACHER',
+  // 階段 A 新增：專門給 SpecialSundays.SkipPostIDs 造成的「這一週跳過」用，
+  // 不跟 NO_AUTO_GENERATE 共用同一個 ID——這個崗位平常會自動生成，只是這一週
+  // 因為特別主日而跳過，跟「這個崗位本來就永遠不自動生成」（講員／翻譯／獻花）
+  // 語意不同，見 getSkipReason_()（Generator.gs）與 SPECIAL_SKIP_RULE_IDS。
+  SPECIAL_SUNDAY_SKIP: 'HARD_SPECIAL_SUNDAY_SKIP',
+  MUTEX_GROUP: 'HARD_MUTEX_GROUP',
+  NO_CONSECUTIVE: 'SEMI_NO_CONSECUTIVE',
+  CHAIR_EQ_ANNOUNCE: 'SOFT_CHAIR_EQ_ANNOUNCE',
+  CHAIR_PREFER_DUAL: 'SOFT_CHAIR_PREFER_DUAL',
+  ANNOUNCE_RELIEF: 'SOFT_ANNOUNCE_RELIEF',
+  MAX_PER_QUARTER: 'SOFT_MAX_PER_QUARTER',
+  LOAD_BALANCE: 'SOFT_LOAD_BALANCE',
+  QUARTER_DISTRIBUTION: 'SOFT_QUARTER_DISTRIBUTION',
+  PERSONAL_QUOTA: 'SOFT_PERSONAL_QUOTA'
+};
+
+/**
+ * 「結構性不適用」的 RuleID 清單：該崗位在該週**根本不存在**，不是「留空待填」。
+ * 目前只有一種情況——非首主日的聖餐襄禮（RULE_IDS.COMMUNION_FIRST_SUNDAY）。
+ *
+ * 注意 RULE_IDS.NO_AUTO_GENERATE**不在**這個清單裡：AutoGenerate=FALSE 的崗位
+ * （講員／翻譯／獻花）是「崗位存在、只是不自動生成，要人手填」，跟「崗位不存在」
+ * 是不同概念，顯示上要分開處理（見 Posts 的 EmptyDisplay 欄，RosterWriter.gs 的
+ * buildGridLayout_() 與 WebApp.gs 的 apiGetRosterGrid()）。
+ *
+ * 日後如果有新崗位需要同樣「結構性不適用」的處理，把對應的 RuleID 加進這個陣列即可，
+ * 顯示層（isStructuralNotApplicable_() / isStructuralNotApplicableFlagsText_()）
+ * 不需要另外寫死崗位名稱。
+ */
+const STRUCTURAL_NA_RULE_IDS = [RULE_IDS.COMMUNION_FIRST_SUNDAY];
+
+/**
+ * 階段 A 新增：「本週因特別主日而跳過」的 RuleID 清單，跟上面的
+ * STRUCTURAL_NA_RULE_IDS 是兩個不同概念，不可混用：
+ * - STRUCTURAL_NA：這個崗位「根本不存在」（例如非首主日的聖餐襄禮），不需要
+ *   任何人處理，顯示「—」。
+ * - SPECIAL_SKIP：這個崗位平常會自動生成，只是「這一週」因為 SpecialSundays
+ *   標記了 SkipPostIDs 而跳過（例如合堂週的領詩／司琴改由華語堂／英語堂負責），
+ *   崗位本身沒有消失，只是這一週不用系統自動排——需要跟「這個崗位本來就永遠
+ *   不自動生成，要人手填」（RULE_IDS.NO_AUTO_GENERATE，講員／翻譯／獻花）
+ *   區分開，否則兩者在職事表上看起來一模一樣，幹事無法一眼分辨。
+ * 顯示層見 RosterWriter.gs 的 isSpecialSundaySkip_()。
+ */
+const SPECIAL_SKIP_RULE_IDS = [RULE_IDS.SPECIAL_SUNDAY_SKIP];
+
+/**
+ * Posts.EmptyDisplay 欄可能出現的值，決定「崗位存在但留空」的格子要顯示什麼：
+ * PENDING＝GRID_PENDING_LABEL（如「待確認」）、NA＝GRID_NOT_APPLICABLE_LABEL（如「—」）、
+ * BLANK＝留空字串。欄位空白或值不是這三者之一時，一律當作 PENDING。
+ * 「結構性不適用」（見 STRUCTURAL_NA_RULE_IDS）的優先級高於這個欄位設定，
+ * 不理該崗位的 EmptyDisplay，一律顯示 NA。
+ */
+const POST_EMPTY_DISPLAY = {
+  PENDING: 'PENDING',
+  NA: 'NA',
+  BLANK: 'BLANK'
+};
+
+/** RuleSettings 的 Level 欄可能出現的值。 */
+const RULE_LEVELS = {
+  HARD: 'HARD',
+  SEMI_HARD: 'SEMI_HARD',
+  SOFT: 'SOFT'
+};
+
+/**
+ * 各 Level 對應的扣分權重（純屬演算法內部的計分機制，不是業務規則）。
+ * 規則屬於哪個 Level 由 RuleSettings 決定；此處只定義「HARD 比 SEMI_HARD 重」的量級。
+ */
+const RULE_LEVEL_PENALTY = {
+  HARD: 1000000,
+  SEMI_HARD: 1000,
+  SOFT: 10
+};
+
+/**
+ * 排表計分的三個量級，全部可在 Config 覆寫（見 CONFIG_KEYS.SCORE_*）。
+ * 這裡只是 Config 沒有設定時採用的預設值，程式一律經 readScoreWeights_() 取值。
+ *
+ * 參考關係：SOFT_QUARTER_DISTRIBUTION 的扣分約 40、SOFT_MAX_PER_QUARTER 約 60。
+ * 獎勵分大於 40 才能突破「每季平均 3.3 次」的壓制；大於 60 則會連個人季度上限也蓋過。
+ */
+const SCORE_DEFAULTS = {
+  CHAIR_DUAL_BONUS: 30,
+  PREFERENCE_BONUS: 50,
+  SELECTION_WEIGHT: 45
+};
+
+/** 診斷用的 trace 每格最多記錄多少個候選人。 */
+const TRACE_CANDIDATE_LIMIT = 6;
+
+/** RosterAssignments 的 AssignSource 欄可能出現的值。 */
+const ASSIGN_SOURCE = {
+  AUTO: 'AUTO',
+  FORCED: 'FORCED',
+  SKIPPED: 'SKIPPED',
+  LOCKED: 'LOCKED',
+  MANUAL: 'MANUAL',
+  FINE_TUNED: 'FINE_TUNED'
+};
+
+/**
+ * Quarters.Stage 欄可能出現的值：四階段流程的狀態機，只能依此順序前進，不可倒退。
+ * REQUESTS_APPLIED 可以重複停留（步驟 3「套用修改申報」可以執行多次）。
+ * Stage 只可由 FourStageFlow.gs 的四個步驟函式改動，其他地方一律只讀。
+ */
+const QUARTER_STAGE = {
+  DRAFT: 'DRAFT',
+  REVIEW_SENT: 'REVIEW_SENT',
+  REQUESTS_APPLIED: 'REQUESTS_APPLIED',
+  OFFICIAL_SENT: 'OFFICIAL_SENT'
+};
+
+/** QUARTER_STAGE 的順序，索引越大代表越後面的階段；requireQuarterStage_() 用來檢查合法性。 */
+const QUARTER_STAGE_ORDER = [
+  QUARTER_STAGE.DRAFT,
+  QUARTER_STAGE.REVIEW_SENT,
+  QUARTER_STAGE.REQUESTS_APPLIED,
+  QUARTER_STAGE.OFFICIAL_SENT
+];
+
+/** Requests.RequestType 欄可能出現的兩個值（下拉選單直接顯示這兩個中文字串）。 */
+const REQUEST_TYPE = {
+  CANNOT_SERVE: '不能服侍',
+  DESIGNATED_SERVE: '指定服侍'
+};
+
+/** Requests.Status 欄可能出現的值。留空視同 PENDING（見 RequestsApply.gs）。 */
+const REQUEST_STATUS = {
+  PENDING: 'PENDING',
+  APPLIED: 'APPLIED',
+  REJECTED: 'REJECTED',
+  NEEDS_INPUT: 'NEEDS_INPUT'
+};
+
+/** 職事表 grid 工作表第 2 行機器鍵中，日期相關欄位的固定鍵名。 */
+const GRID_KEYS = {
+  DATE: '_DATE',
+  WEEK: '_WEEK',
+  TYPE: '_TYPE'
+};
+
+/** 職事表 grid 工作表的標示底色。 */
+const GRID_COLORS = {
+  HEADER: '#D9EAD3',
+  WARNING: '#FFF2CC',
+  FORCED: '#F9CB9C',
+  SKIPPED: '#EFEFEF',
+  SPECIAL_SKIP: '#D9D2E9',
+  STATS_HEADER: '#D9D9D9',
+  PERSONAL_HIGHLIGHT: '#CFE2F3'
+};
+
+/**
+ * 核對報告用的歷史基準值（來自 2025 T1 – 2026 T3 的實際服侍記錄）。
+ * 平均次數與每季上限另有 RuleSettings 的 TargetValue 可查，此處只保留人數基準。
+ */
+const HISTORICAL_BASELINE = {
+  PEOPLE_COUNT: 62,
+  AVG_PER_PERSON: 3.3,
+  MAX_PER_PERSON: 8,
+  PEOPLE_TOLERANCE_RATIO: 0.2
+};
+
+/**
+ * 歷史上每季服侍次數的實際分佈：{次數: 人數}，合計 62 人、平均 3.3、最高 8。
+ *
+ * 注意這個分佈明顯右偏，不是集中在平均值附近：
+ * 大部分人每季只服侍 1–3 次，另有一小群核心義工做到 7–8 次。
+ * 所以「每人上限 = 全體平均」的做法會同時壓住核心義工的次數與兼任比例。
+ */
+const HISTORICAL_BASELINE_DISTRIBUTION = {
+  1: 17, 2: 11, 3: 14, 4: 7, 5: 2, 6: 1, 7: 3, 8: 7
+};
+
+/** 電郵寄送的階段。 */
+const MAIL_STAGES = {
+  GENERATE: 'GENERATE',
+  REMIND: 'REMIND',
+  OFFICIAL: 'OFFICIAL',
+  RESEND: 'RESEND',
+  REVIEW: 'REVIEW'
+};
+
+/**
+ * EmailRecipients.Role 欄可能出現的值，供四階段流程的「步驟 2：寄給堂委審閱」判斷
+ * 收件人。REVIEWER＝這次要收到審閱信；ALL＝一般收件人（沿用既有 Stage 欄的邏輯，
+ * 不受這個新概念影響）。
+ */
+const RECIPIENT_ROLE = {
+  REVIEWER: 'REVIEWER',
+  ALL: 'ALL'
+};
+
+/** SendLog 的 Status 欄可能出現的值。 */
+const MAIL_STATUS = {
+  SENT: 'SENT',
+  DRY_RUN: 'DRY_RUN',
+  SKIPPED_NO_EMAIL: 'SKIPPED_NO_EMAIL',
+  SKIPPED_UNCHANGED: 'SKIPPED_UNCHANGED',
+  FAILED: 'FAILED',
+  ERROR_PDF: 'ERROR_PDF',
+  ERROR_PDF_MISSING: 'ERROR_PDF_MISSING'
+};
+
+/**
+ * 追加階段 AO：computeAssignmentHash_()（Mailer.gs）給「沒有任何派工」的人用的固定
+ * 標記，取代原本回傳的空字串。原因：SendLog.AssignmentHash 欄若寫入空字串，跟這一欄
+ * 「從來沒有被寫過」的真正空白儲存格在讀出來時完全無法分辨（兩者 getValues() 都是
+ * ''），這種歧義在步驟 5「改動後重發」逐輪比對 hash 時會變成脆弱的隱性假設。改用這個
+ * 固定、非空、跟真正的 16 位十六進位雜湊明顯不同的字串，讀寫兩邊都用同一個常數比對，
+ * 不再依賴空字串巧合相等。
+ */
+const ASSIGNMENT_HASH_EMPTY = 'NO_ASSIGNMENTS';
+
+/**
+ * 會眾編號前綴對照的預設值，格式為「前綴:堂會:身分」。
+ * Config 的 HWCAS_CONGREGATION_PREFIXES 一旦設定就以 Config 為準，此處只是後備。
+ */
+const HWCAS_CONGREGATION_PREFIX_DEFAULT = [
+  '10:粵語堂:會友',
+  '15:粵語堂:非會友',
+  '30:英語堂:會友',
+  '35:英語堂:非會友',
+  '50:國語堂:會友',
+  '55:國語堂:非會友'
+];
+
+/** NameMapping_Draft 工作表的欄位名稱。 */
+const DRAFT_COLUMNS = {
+  HWCAS_ROW: 'HWCAS 行號',
+  HWCAS_NAME: 'HWCAS 姓名',
+  HWCAS_EMAIL: 'HWCAS 電郵',
+  MEMBER_NO: '會眾編號',
+  LAST_ATTENDANCE: '最後出席',
+  MEETING_POINT: '聚會點',
+  PERSON_ID: 'PersonID',
+  NAME_TC: 'NameMapping 姓名',
+  EXISTING_EMAIL: '現有電郵',
+  MATCH_TYPE: '配對結果',
+  ACTION: '建議動作',
+  NOTE: '備註'
+};
+
+/** HWCAS 電郵來源在 NameMapping.EmailSource 欄的標示值。 */
+const EMAIL_SOURCE_HWCAS = 'HWCAS';
+
+/** 試算表的地區設定（紐西蘭），令日期以 dd/MM/yyyy 而非美式 MM/dd/yyyy 顯示。 */
+const SPREADSHEET_LOCALE_NZ = 'en_NZ';
+
+/** 已套用的 fine-tune 提案封存工作表名稱。 */
+const FINETUNE_ARCHIVE_SHEET = 'FineTuneProposals_Archive';
+
+/**
+ * 自動排程動作在 AuditLog 使用的 Action 值。GENERATE／REMIND 由 Trigger.gs 的
+ * judgeGenerateAction_()／judgeRemindStuckAction_() 使用，分別對應「同一季只成功
+ * 生成一次初稿」與「卡在 REVIEW_SENT 提醒過幾次、今天提醒過沒有」的判斷。
+ * OFFICIAL 追加階段 N 之後不再由自動排程使用（正式發出永遠只能由幹事手動觸發），
+ * 保留這個值只是為了跟 Config 的 LEAD_DAYS_OFFICIAL 命名對應，不代表還有程式碼
+ * 會拿它去查 AuditLog；真正阻擋自動觸發 OFFICIAL 的是 Trigger.gs 的
+ * assertOfficialNotFromAutomationTrigger_()，寫入 AuditLog 時用的是另一個獨立的
+ * 'OFFICIAL_BLOCKED_FROM_TRIGGER' 字串，不是這裡的 OFFICIAL。
+ */
+const AUTOMATION_ACTIONS = {
+  GENERATE: 'TRIGGER_GENERATE',
+  REMIND: 'TRIGGER_REMIND',
+  OFFICIAL: 'TRIGGER_OFFICIAL'
+};
+
+/** 未填寫資料時常見的佔位文字標記，validateSetup() 用來偵測未完成設定的欄位。 */
+const PLACEHOLDER_MARKER = '請填入';
+
+/** HWCAS 配對初稿的配對結果類型。 */
+const HWCAS_MATCH = {
+  EXACT: 'EXACT',
+  ALIAS: 'ALIAS',
+  AMBIGUOUS: 'AMBIGUOUS',
+  NONE: 'NONE',
+  MISSING_IN_HWCAS: 'MISSING_IN_HWCAS'
+};
+
+/**
+ * FineTuneProposals 的 Decision 欄可能出現的值，與資料表 schema 一致。
+ * PENDING = 未決定；KEEP_MANUAL = 保留幹事的改動；
+ * ACCEPT_SUGGESTED = 採用系統建議；REVERT_ORIGINAL = 還原為系統原本排的人。
+ */
+const FINETUNE_DECISION = {
+  PENDING: 'PENDING',
+  KEEP_MANUAL: 'KEEP_MANUAL',
+  ACCEPT_SUGGESTED: 'ACCEPT_SUGGESTED',
+  REVERT_ORIGINAL: 'REVERT_ORIGINAL'
+};
+
+/**
+ * 即使級別是 SOFT，fine-tune 仍要回報的規則。
+ *
+ * 幹事人手改動有可能令某人超出每季次數上限，但 SOFT_MAX_PER_QUARTER 的級別是 SOFT，
+ * 預設會被 findStateViolations_ 的 HARD／SEMI_HARD 過濾掉，變成完全不提示。
+ * 這些規則回報時 Severity 仍維持 SOFT，不會污染核對報表的硬規則統計。
+ */
+const FINETUNE_REPORTED_SOFT_RULES = [
+  RULE_IDS.MAX_PER_QUARTER
+];
+
+/** Decision 欄下拉選單的選項次序。 */
+const FINETUNE_DECISION_OPTIONS = [
+  FINETUNE_DECISION.PENDING,
+  FINETUNE_DECISION.KEEP_MANUAL,
+  FINETUNE_DECISION.ACCEPT_SUGGESTED,
+  FINETUNE_DECISION.REVERT_ORIGINAL
+];
+
+/**
+ * grid 格內代表「沒有派人」的佔位文字。
+ * 比對幹事改動時，這些文字與空白一律視為相同，否則整季幾十個留空格會被誤判為人手改動。
+ */
+const GRID_PLACEHOLDER_TEXTS = ['待確認', '另行安排', '-', '—', '－', 'N/A', 'n/a'];
+
+const CACHE_KEYS = {
+  CONFIG: 'roster_config_cache'
+};
+
+const CACHE_DURATIONS = {
+  CONFIG_SECONDS: 300
+};
+
+/**
+ * Config 工作表中所有 Key 的名稱。程式一律透過此處存取，不直接寫字面值。
+ */
+const CONFIG_KEYS = {
+  LEAD_DAYS_GENERATE: 'LEAD_DAYS_GENERATE',
+  // 追加階段 Q：LEAD_DAYS_REMIND 查證後確認是死 Key（唯一讀它的
+  // computeAutomationSchedule_() 算出來的 remindDate 從沒有任何呼叫端使用），
+  // 已依你的決定移除註冊，連同種子清單（ConfigSeed.gs）一併移除。
+  // REMIND 重新定義為「Stage 卡在 REVIEW_SENT 太久」的提醒，
+  // 不再是日期概念，見 Trigger.gs 的 judgeRemindStuckAction_()。
+  LEAD_DAYS_OFFICIAL: 'LEAD_DAYS_OFFICIAL',
+  REMIND_STUCK_DAYS: 'REMIND_STUCK_DAYS',
+  REMIND_STUCK_MAX_COUNT: 'REMIND_STUCK_MAX_COUNT',
+  SEND_HOUR_LOCAL: 'SEND_HOUR_LOCAL',
+  SEND_WEEKDAY_GUARD: 'SEND_WEEKDAY_GUARD',
+  SYS_TIMEZONE: 'SYS_TIMEZONE',
+  SYS_LOCALE: 'SYS_LOCALE',
+  SYS_TIMESTAMP_FORMAT: 'SYS_TIMESTAMP_FORMAT',
+  ROSTER_SPREADSHEET_ID: 'ROSTER_SPREADSHEET_ID',
+  ROSTER_DRIVE_FOLDER_ID: 'ROSTER_DRIVE_FOLDER_ID',
+  SCRIPT_ACCOUNT_EMAIL: 'SCRIPT_ACCOUNT_EMAIL',
+  DRY_RUN: 'DRY_RUN',
+  HWCAS_SPREADSHEET_ID: 'HWCAS_SPREADSHEET_ID',
+  HWCAS_MEMBERS_SHEET: 'HWCAS_MEMBERS_SHEET',
+  HWCAS_READ_COLUMNS: 'HWCAS_READ_COLUMNS',
+  HWCAS_COL_NAME: 'HWCAS_COL_NAME',
+  HWCAS_COL_EMAIL: 'HWCAS_COL_EMAIL',
+  HWCAS_COL_MEMBER_NO: 'HWCAS_COL_MEMBER_NO',
+  HWCAS_COL_LAST_ATTENDANCE: 'HWCAS_COL_LAST_ATTENDANCE',
+  HWCAS_COL_MEETING_POINT: 'HWCAS_COL_MEETING_POINT',
+  HWCAS_CONGREGATION_PREFIXES: 'HWCAS_CONGREGATION_PREFIXES',
+  MAIL_SENDER_NAME: 'MAIL_SENDER_NAME',
+  MAIL_REPLY_TO: 'MAIL_REPLY_TO',
+  MAIL_ADMIN_NOTIFY: 'MAIL_ADMIN_NOTIFY',
+  MAIL_SUBJECT_PREFIX: 'MAIL_SUBJECT_PREFIX',
+  MAIL_SUMMARY_DATE_FORMAT: 'MAIL_SUMMARY_DATE_FORMAT',
+  MAIL_SUMMARY_SEPARATOR: 'MAIL_SUMMARY_SEPARATOR',
+  ATTACH_HIGHLIGHT_PERSONAL: 'ATTACH_HIGHLIGHT_PERSONAL',
+  ATTACH_NAME_PATTERN: 'ATTACH_NAME_PATTERN',
+  ATTACH_PAGE_ORIENTATION: 'ATTACH_PAGE_ORIENTATION',
+  SYS_CONFIG_CACHE_SECONDS: 'SYS_CONFIG_CACHE_SECONDS',
+  PDF_EXPORT_MAX_RETRIES: 'PDF_EXPORT_MAX_RETRIES',
+  PDF_EXPORT_RETRY_DELAY_MS: 'PDF_EXPORT_RETRY_DELAY_MS',
+  PDF_EXPORT_PACING_MS: 'PDF_EXPORT_PACING_MS',
+  // 追加階段 AG：PDF 匯出偶爾會回傳 HTTP 200 但內容是空白或截斷的檔案，
+  // 這個門檻用來判斷「檔案是不是小得不正常」，見 PdfExport.gs 的 fetchWithRetry_()。
+  PDF_MIN_SIZE_BYTES: 'PDF_MIN_SIZE_BYTES',
+  PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
+  // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
+  // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
+  SEND_LOG_FLUSH_BATCH_SIZE: 'SEND_LOG_FLUSH_BATCH_SIZE',
+  PDF_REGENERATE_IF_EXISTS: 'PDF_REGENERATE_IF_EXISTS',
+  GRID_NOT_APPLICABLE_LABEL: 'GRID_NOT_APPLICABLE_LABEL',
+  GRID_PENDING_LABEL: 'GRID_PENDING_LABEL',
+  GRID_PENDING_FILL_COLOR: 'GRID_PENDING_FILL_COLOR',
+  // 階段 A 新增：特別主日（SpecialSundays.SkipPostIDs）跳過的格子專用標籤，
+  // 跟「這個崗位本來就不自動生成」（講員／翻譯／獻花等）的 GRID_PENDING_LABEL
+  // 區分開——同一個崗位平常會自動生成，只是「這一週」因為特別主日而跳過，
+  // 語意跟「永遠不自動生成」不同，見 RosterWriter.gs 的 isSpecialSundaySkip_()。
+  GRID_SPECIAL_SKIP_LABEL: 'GRID_SPECIAL_SKIP_LABEL',
+  DEFAULT_MAX_PER_QUARTER: 'DEFAULT_MAX_PER_QUARTER',
+  SELECTION_STRATEGY: 'SELECTION_STRATEGY',
+  SELECTION_WEIGHT_HISTORICAL: 'SELECTION_WEIGHT_HISTORICAL',
+  SCORE_CHAIR_DUAL_BONUS: 'SCORE_CHAIR_DUAL_BONUS',
+  SCORE_PREFERENCE_BONUS: 'SCORE_PREFERENCE_BONUS',
+  SCORE_SELECTION_WEIGHT: 'SCORE_SELECTION_WEIGHT',
+  MULTIRUN_ATTEMPTS: 'MULTIRUN_ATTEMPTS',
+  RANDOM_SEED: 'RANDOM_SEED',
+  CARRY_OVER_WEEKS: 'CARRY_OVER_WEEKS',
+  V0_PROTECT: 'V0_PROTECT',
+  RESEND_ONLY_CHANGED: 'RESEND_ONLY_CHANGED',
+  FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
+  WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
+  // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，
+  // doGet() 與全部 api* 函式都會拒絕運作，直到幹事自己把這格改成 TRUE。
+  // 見 WebApp.gs 的 assertWebAppEnabled_()。
+  WEBAPP_ENABLED: 'WEBAPP_ENABLED',
+  // 追加階段 AV：Web UI 呼叫者白名單（電郵，逗號分隔）。留空時退回只允許
+  // SCRIPT_ACCOUNT_EMAIL 那一個人——空白絕不代表「任何人皆可」。
+  // 見 WebApp.gs 的 assertApiCallerAuthorized_()。
+  WEBAPP_ALLOWED_EMAILS: 'WEBAPP_ALLOWED_EMAILS'
+};
+
+/**
+ * 核心讀取層運作所需的必填 Config Key。
+ * validateSetup() 會檢查這些 Key 是否有已解析的值（Value 或 Default）。
+ *
+ * 刻意寫成函式而非 const 陣列：Apps Script 會把所有 .gs 檔案的頂層程式碼
+ * 按檔名字母序依次求值，const 之間一旦有前向引用就會拋
+ * "Cannot access X before initialization"，連 onOpen 都無法執行。
+ * 改為函式後，CONFIG_KEYS 只在呼叫當下才被讀取，永遠不會早於它的定義。
+ *
+ * @returns {string[]} 必填的 Config Key 清單
+ */
+function getRequiredConfigKeys() {
+  return [
+    CONFIG_KEYS.LEAD_DAYS_GENERATE,
+    CONFIG_KEYS.LEAD_DAYS_OFFICIAL,
+    CONFIG_KEYS.SEND_HOUR_LOCAL,
+    CONFIG_KEYS.SYS_TIMEZONE,
+    CONFIG_KEYS.SYS_LOCALE,
+    CONFIG_KEYS.ROSTER_SPREADSHEET_ID,
+    CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL,
+    CONFIG_KEYS.DRY_RUN,
+    CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER,
+    CONFIG_KEYS.SELECTION_STRATEGY
+  ];
+}
+
+/** Config 工作表 Type 欄可能出現的值。 */
+const CONFIG_TYPES = {
+  INT: 'INT',
+  DEC: 'DEC',
+  BOOL: 'BOOL',
+  LIST: 'LIST',
+  STR: 'STR',
+  ENUM: 'ENUM',
+  EMAIL: 'EMAIL'
+};
+
+/** Posts 的 Frequency 欄可能出現的值。 */
+const POST_FREQUENCY = {
+  WEEKLY: 'WEEKLY',
+  FIRST_SUNDAY: 'FIRST_SUNDAY',
+  AS_NEEDED: 'AS_NEEDED'
+};
+
+/** Posts 的 AllowConsecutive 欄可能出現的值。 */
+const ALLOW_CONSECUTIVE = {
+  ALLOW: 'ALLOW',
+  WARN: 'WARN',
+  BLOCK: 'BLOCK'
+};
+
+/** RuleSettings 的 OnViolation 欄可能出現的值。 */
+const ON_VIOLATION = {
+  BLOCK: 'BLOCK',
+  WARN: 'WARN',
+  IGNORE: 'IGNORE'
+};
+
+/** Unavailable 的 AppliesTo 與 Status 欄可能出現的值。 */
+const UNAVAILABLE_VALUES = {
+  APPLIES_TO_ALL: 'ALL',
+  STATUS_ACTIVE: 'ACTIVE'
+};
+
+/** Config 的 SELECTION_STRATEGY 可能出現的值。 */
+const SELECTION_STRATEGIES = {
+  LONGEST_UNSERVED: 'LONGEST_UNSERVED'
+};
+
+/** Config 的 ATTACH_PAGE_ORIENTATION 可能出現的值。 */
+const PAGE_ORIENTATION = {
+  PORTRAIT: 'PORTRAIT',
+  LANDSCAPE: 'LANDSCAPE'
+};
+
+/** EmailTemplates 的 AttachType 欄可能出現的值。 */
+const ATTACH_TYPE = {
+  NONE: 'NONE',
+  FULL_PDF: 'FULL_PDF',
+  PERSONAL_PDF: 'PERSONAL_PDF'
+};
+
+/** SendLog 的 RecipientType 欄與 EmailRecipients 的 SendAs 欄可能出現的值。 */
+const RECIPIENT_TYPE = {
+  LIST: 'LIST',
+  PERSON: 'PERSON'
+};
+
+/** EmailRecipients 的 SendAs 欄可能出現的值。 */
+const SEND_AS = {
+  TO: 'TO',
+  CC: 'CC',
+  BCC: 'BCC'
+};
+
+/** RosterVersions 的 Basis 與 Status 欄可能出現的值。 */
+const VERSION_VALUES = {
+  BASIS_AUTO_GENERATE: 'AUTO_GENERATE',
+  BASIS_FINE_TUNE: 'FINE_TUNE',
+  BASIS_REQUESTS_APPLIED: 'REQUESTS_APPLIED',
+  // 步驟 5「改動後重發」：套用 Requests 產生新版本時用這個 Basis 標記，
+  // 跟步驟 3 的 REQUESTS_APPLIED 區分開來（同樣是套用 Requests，但發生在
+  // OFFICIAL_SENT 之後，語意上是「已經正式發出、這是後續改動」）。
+  BASIS_RESEND: 'RESEND',
+  STATUS_DRAFT: 'DRAFT'
+};
+
+/** 工作表儲存格中代表布林值的文字。 */
+const BOOLEAN_TEXT = {
+  TRUE: 'TRUE',
+  FALSE: 'FALSE'
+};
+
+/** 職事表 grid 與統計區使用的中文標籤。 */
+const GRID_LABELS = {
+  DATE: '日期',
+  WEEK: '週次',
+  TYPE: '類型',
+  PENDING: '待確認',
+  STATS_TITLE: '本季服侍次數統計',
+  NAME: '姓名',
+  PERSON_ID: 'PersonID',
+  COUNT: '次數',
+  FULL_VERSION: '完整版'
+};
+
+/** Web App 使用的 HTML 檔案名稱。 */
+const UI_FILES = {
+  INDEX: 'ui/Index',
+  STYLE: 'ui/Style',
+  SCRIPT: 'ui/Script'
+};
+
+/** 自我測試的結果類型。 */
+const SELF_TEST_RESULT = {
+  PASS: 'PASS',
+  FAIL: 'FAIL',
+  ERROR: 'ERROR'
+};
+
+/** 自我測試結果工作表的標示底色。 */
+const SELF_TEST_COLORS = {
+  PASS: '#D9EAD3',
+  FAIL: '#FCE8E6',
+  ERROR: '#F9CB9C'
+};
+
+/**
+ * 自我測試中需要實際資料的項目所使用的目標版本。
+ * 若日後改用其他季度測試，只需改動此處。
+ */
+const SELF_TEST_TARGET = {
+  QUARTER_ID: '2026T4',
+  VERSION_NO: 0
+};
+
+/** Config 未設定時程式採用的預設值。 */
+const DEFAULTS = {
+  TIMEZONE: 'Pacific/Auckland',
+  TIMESTAMP_FORMAT: 'yyyy-MM-dd HH:mm:ss',
+  MAX_PER_QUARTER: 8,
+  ATTACH_NAME_PATTERN: '{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf',
+  HWCAS_MEMBERS_SHEET: 'Members',
+  FINETUNE_MAX_MOVES: 6,
+  QUARTER_DISTRIBUTION_TOLERANCE: 0.5,
+  MULTIRUN_ATTEMPTS: 20,
+  MAIL_SUMMARY_DATE_FORMAT: 'dd/MM',
+  MAIL_SUMMARY_SEPARATOR: '；',
+  PDF_EXPORT_MAX_RETRIES: 4,
+  PDF_EXPORT_RETRY_DELAY_MS: 1000,
+  PDF_EXPORT_PACING_MS: 500,
+  PDF_BATCH_SIZE: 25,
+  SEND_LOG_FLUSH_BATCH_SIZE: 15,
+  GRID_NOT_APPLICABLE_LABEL: '—',
+  GRID_PENDING_LABEL: GRID_LABELS.PENDING,
+  GRID_SPECIAL_SKIP_LABEL: '特殊主日',
+  GRID_PENDING_FILL_COLOR: '#FFF2CC',
+  REMIND_STUCK_DAYS: 3,
+  REMIND_STUCK_MAX_COUNT: 3,
+  PDF_MIN_SIZE_BYTES: 10240
+};
+
+/** CacheService 的最大 TTL（秒），Config 的 SYS_CONFIG_CACHE_SECONDS 不可超過這個上限。 */
+const CACHE_MAX_TTL_SECONDS = 21600;

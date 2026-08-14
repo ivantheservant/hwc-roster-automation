@@ -1,0 +1,309 @@
+/**
+ * 把姓名的異體寫法透過 NameAlias 表轉換為正名（NameTC）。
+ * 找不到對應 Alias 時原樣回傳輸入的名稱。
+ * @param {string} name 輸入的姓名（可能是別名或正名）
+ * @returns {string} 正名；找不到對應時回傳原始輸入
+ */
+function normalizeName(name) {
+  if (!name) return name;
+  const aliasMap = readNameAlias();
+  const personId = aliasMap[name];
+  if (!personId) return name;
+
+  const people = readSheet(SHEETS.NAME_MAPPING);
+  for (let i = 0; i < people.length; i++) {
+    if (people[i][COLUMNS.NAME_MAPPING.PERSON_ID] === personId) {
+      return people[i][COLUMNS.NAME_MAPPING.NAME_TC] || name;
+    }
+  }
+  return name;
+}
+
+/**
+ * 依姓名精確查找 PersonID：先比對 NameMapping 的正名（NameTC），再查 NameAlias。
+ * 不做模糊比對。
+ * @param {string} name 姓名（正名或別名）
+ * @returns {?string} 找到的 PersonID；找不到則回傳 null
+ */
+function resolvePersonId(name) {
+  if (!name) return null;
+  const people = readSheet(SHEETS.NAME_MAPPING);
+  for (let i = 0; i < people.length; i++) {
+    if (people[i][COLUMNS.NAME_MAPPING.NAME_TC] === name) {
+      return people[i][COLUMNS.NAME_MAPPING.PERSON_ID];
+    }
+  }
+  const aliasMap = readNameAlias();
+  return aliasMap[name] || null;
+}
+
+/**
+ * 把 Date 物件格式化為 yyyy-MM-dd 字串，使用 Config 設定的時區（SYS_TIMEZONE）。
+ * @param {Date} date 日期物件
+ * @returns {string} 格式化後的日期字串
+ */
+function formatDate(date) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return toDateString(date, timezone);
+}
+
+/**
+ * 把 yyyy-MM-dd 字串解析為 Date 物件，使用 Config 設定的時區（SYS_TIMEZONE）。
+ * @param {string} str 日期字串，格式為 yyyy-MM-dd
+ * @returns {Date} 解析後的日期物件
+ */
+function parseDate(str) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return Utilities.parseDate(str + ' 00:00:00', timezone, 'yyyy-MM-dd HH:mm:ss');
+}
+
+/**
+ * 把儲存格值（可能是 Date 物件或字串）正規化為 yyyy-MM-dd 字串。
+ * 時區以參數明確傳入，不讀取 Config，方便在純函式中使用。
+ *
+ * 追加階段 AB：原本字串一律原樣 `String(value).trim()` 回傳，等於只處理了
+ * Date 物件那一半，跟這個函式自己的說明（「正規化為 yyyy-MM-dd」）並不相符。
+ * 實測踩到的問題：Requests 的日期格由下拉選單揀入之後，Google 試算表會把
+ * 「2026-10-04」自動辨識成真正的日期值，讀出來是 Date 物件；而當時
+ * readPendingRequests_() 用的是 `String(...)`，得出
+ * 「Sun Oct 04 2026 00:00:00 GMT+1300 (New Zealand Daylight Time)」，
+ * 拿去跟已正規化的 ServiceDates 比對必然對不上，三筆申報全部被判 NEEDS_INPUT。
+ *
+ * 現在字串也會嘗試辨識兩種常見寫法再統一輸出 yyyy-MM-dd：
+ *   yyyy-MM-dd／yyyy/MM/dd（補零，例如 2026-1-5 → 2026-01-05）
+ *   d/M/yyyy／dd-MM-yyyy（**日在前**，例如 4/10/2026 → 2026-10-04）
+ * 日在前是刻意的選擇，對應本專案的 en_NZ 地區設定（見 SPREADSHEET_LOCALE_NZ）
+ * 與幹事的書寫習慣；不會出現「4/10 被讀成 4 月 10 日」這種美式解讀。
+ * 兩種都辨識不到時原樣回傳（只 trim），讓錯誤訊息能顯示幹事實際輸入了什麼，
+ * 而不是靜靜換成一個猜出來的日期。
+ *
+ * @param {*} value 儲存格原始值，可為 Date 或字串
+ * @param {string} timezone 時區名稱，例如 "Pacific/Auckland"
+ * @returns {string} yyyy-MM-dd 格式字串；空值時回傳空字串；無法辨識時回傳原字串
+ */
+function toDateString(value, timezone) {
+  if (value === null || value === undefined || value === '') return '';
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
+  }
+
+  const text = String(value).trim();
+  if (text === '') return '';
+
+  const pad2 = function (s) { return s.length === 1 ? '0' + s : s; };
+
+  const isoLike = text.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if (isoLike) return isoLike[1] + '-' + pad2(isoLike[2]) + '-' + pad2(isoLike[3]);
+
+  const dayFirst = text.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  if (dayFirst) return dayFirst[3] + '-' + pad2(dayFirst[2]) + '-' + pad2(dayFirst[1]);
+
+  return text;
+}
+
+/**
+ * 把逗號分隔的字串拆成陣列，並去除前後空白與空項目。
+ * @param {*} value 原始儲存格值
+ * @returns {string[]} 拆分後的陣列；空值時回傳空陣列
+ */
+function splitList_(value) {
+  if (value === null || value === undefined || value === '') return [];
+  return String(value)
+    .split(',')
+    .map(function (s) { return s.trim(); })
+    .filter(function (s) { return s !== ''; });
+}
+
+/**
+ * 計算兩個 yyyy-MM-dd 日期字串之間相差的天數。
+ * 直接以日期數字運算，不受時區與夏令時間影響。
+ * @param {string} fromDateStr 起始日期，格式 yyyy-MM-dd
+ * @param {string} toDateStr 結束日期，格式 yyyy-MM-dd
+ * @returns {number} 相差天數；toDateStr 較早時為負數
+ */
+function daysBetween_(fromDateStr, toDateStr) {
+  const from = Date.UTC(
+    Number(fromDateStr.slice(0, 4)),
+    Number(fromDateStr.slice(5, 7)) - 1,
+    Number(fromDateStr.slice(8, 10))
+  );
+  const to = Date.UTC(
+    Number(toDateStr.slice(0, 4)),
+    Number(toDateStr.slice(5, 7)) - 1,
+    Number(toDateStr.slice(8, 10))
+  );
+  return Math.round((to - from) / 86400000);
+}
+
+/**
+ * 把 yyyy-MM-dd 日期字串平移指定天數，回傳新的 yyyy-MM-dd 字串。
+ * 用 UTC 日期數字運算，不受時區與夏令時間影響（與 daysBetween_ 同一套做法）。
+ * @param {string} dateStr 起始日期，格式 yyyy-MM-dd
+ * @param {number} days 要平移的天數，可為負數
+ * @returns {string} 平移後的日期字串
+ */
+function shiftDateString_(dateStr, days) {
+  const base = Date.UTC(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(5, 7)) - 1,
+    Number(dateStr.slice(8, 10))
+  );
+  const shifted = new Date(base + days * 86400000);
+  return Utilities.formatDate(shifted, 'UTC', 'yyyy-MM-dd');
+}
+
+/**
+ * 判斷一個 yyyy-MM-dd 日期字串是不是星期日。用 UTC 運算避免時區誤差。
+ * @param {string} dateStr 日期字串，格式 yyyy-MM-dd
+ * @returns {boolean} 是否為星期日
+ */
+function isSundayDate_(dateStr) {
+  const base = Date.UTC(
+    Number(dateStr.slice(0, 4)),
+    Number(dateStr.slice(5, 7)) - 1,
+    Number(dateStr.slice(8, 10))
+  );
+  return new Date(base).getUTCDay() === 0;
+}
+
+/**
+ * 逸出字串中的正規表示式特殊字元，讓字串可以安全地當成正規表示式的字面內容使用。
+ * @param {string} text 原始字串
+ * @returns {string} 逸出後的字串
+ */
+function escapeRegExp_(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * 產生統一格式的時間戳字串，供所有寫入儲存格的時間欄位使用。
+ *
+ * 刻意寫入**字串**而非 Date 物件：Date 物件在儲存格的顯示會受試算表本身的
+ * 地區與時區設定影響，設定不對就會出現差一日或美式日期格式。
+ * 字串則不論試算表設定如何都顯示相同內容。
+ *
+ * 時區一律從 Config 的 SYS_TIMEZONE 讀取，不寫死在程式內。
+ *
+ * @param {Date=} date 要格式化的時間；省略時採用現在時間
+ * @returns {string} yyyy-MM-dd HH:mm:ss 格式的字串
+ */
+function nowTimestamp_(date) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return Utilities.formatDate(date || new Date(), timezone, 'yyyy-MM-dd HH:mm:ss');
+}
+
+/**
+ * 產生用於 ID 的緊湊時間戳（yyyyMMddHHmmss），時區同樣取自 Config。
+ * @param {Date=} date 要格式化的時間；省略時採用現在時間
+ * @returns {string} yyyyMMddHHmmss 格式的字串
+ */
+function compactTimestamp_(date) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return Utilities.formatDate(date || new Date(), timezone, 'yyyyMMddHHmmss');
+}
+
+/**
+ * 把試算表本身的地區與時區設定改為與 Config 一致。
+ * 這會影響儲存格中 Date 物件的顯示方式，以及試算表內建函式的日期運算。
+ * @returns {{before: Object, after: Object, changed: boolean}} 改動前後的設定
+ */
+function applyTimezoneSettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const targetTimezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const targetLocale = SPREADSHEET_LOCALE_NZ;
+
+  const before = { timeZone: ss.getSpreadsheetTimeZone(), locale: ss.getSpreadsheetLocale() };
+  if (before.timeZone !== targetTimezone) ss.setSpreadsheetTimeZone(targetTimezone);
+  if (before.locale !== targetLocale) ss.setSpreadsheetLocale(targetLocale);
+
+  const after = { timeZone: ss.getSpreadsheetTimeZone(), locale: ss.getSpreadsheetLocale() };
+  return {
+    before: before,
+    after: after,
+    changed: before.timeZone !== after.timeZone || before.locale !== after.locale
+  };
+}
+
+/**
+ * 為指定的時間戳欄位設定儲存格數字格式。
+ *
+ * 即使我們寫入的是字串，Google Sheets 仍會把「像日期」的字串自動轉成日期值，
+ * 之後按儲存格的數字格式顯示。若該格原本是純日期格式，時分秒就會不見。
+ * 所以每次寫入時間戳都要一併設定格式。格式字串取自 Config，不寫死。
+ *
+ * @param {Sheet} sheet 目標工作表
+ * @param {string[]} headers 標題列
+ * @param {string[]} columnNames 要設定格式的欄位名稱
+ * @param {number} startRow 起始行號
+ * @param {number} rowCount 行數
+ * @returns {void}
+ */
+function applyTimestampFormat_(sheet, headers, columnNames, startRow, rowCount) {
+  if (rowCount <= 0) return;
+  const format = String(getConfig(CONFIG_KEYS.SYS_TIMESTAMP_FORMAT, DEFAULTS.TIMESTAMP_FORMAT));
+
+  columnNames.forEach(function (columnName) {
+    const columnIndex = headers.indexOf(columnName) + 1;
+    if (columnIndex === 0) return;
+    sheet.getRange(startRow, columnIndex, rowCount, 1).setNumberFormat(format);
+  });
+}
+
+/**
+ * 寫入一筆 AuditLog 紀錄。時間戳一律經 nowTimestamp_() 產生。
+ * AuditLog 工作表不存在時只記 Logger，不中斷呼叫端的流程。
+ * @param {{action: string, targetSheet: string, targetKey: string,
+ *   oldValue: (string|undefined), newValue: (string|undefined),
+ *   source: (string|undefined), notes: (string|undefined)}} entry 要記錄的內容
+ * @returns {void}
+ */
+function writeAuditLog_(entry) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.AUDIT_LOG);
+  if (!sheet) {
+    log_('WARN', '找不到 ' + SHEETS.AUDIT_LOG + ' 工作表，稽核紀錄只寫入 Logger：' + JSON.stringify(entry));
+    return;
+  }
+
+  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const C = COLUMNS.AUDIT_LOG;
+  const timestamp = nowTimestamp_();
+
+  const record = {};
+  record[C.LOG_ID] = 'LOG-' + compactTimestamp_() + '-' + Math.floor(Math.random() * 1000);
+  record[C.TIMESTAMP] = timestamp;
+  record[C.ACTOR] = Session.getActiveUser().getEmail();
+  record[C.ACTION] = entry.action || '';
+  record[C.TARGET_SHEET] = entry.targetSheet || '';
+  record[C.TARGET_KEY] = entry.targetKey || '';
+  record[C.OLD_VALUE] = entry.oldValue || '';
+  record[C.NEW_VALUE] = entry.newValue || '';
+  record[C.SOURCE] = entry.source || '';
+  record[C.NOTES] = entry.notes || '';
+
+  const row = headers.map(function (h) { return record[h] === undefined ? '' : record[h]; });
+  const targetRow = sheet.getLastRow() + 1;
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
+  applyTimestampFormat_(sheet, headers, [C.TIMESTAMP], targetRow, 1);
+}
+
+/**
+ * 把位元組數格式化為人看得懂的檔案大小。
+ * @param {number} bytes 位元組數
+ * @returns {string} 例如 "128 KB"、"1.35 MB"
+ */
+function formatFileSize_(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+  return (n / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+/**
+ * 統一格式的日誌輸出，寫入 Apps Script 的 Logger。
+ * @param {string} level 日誌等級，例如 'INFO'、'WARN'、'ERROR'
+ * @param {string} message 日誌內容
+ * @returns {void}
+ */
+function log_(level, message) {
+  Logger.log('[' + level + '] ' + message);
+}

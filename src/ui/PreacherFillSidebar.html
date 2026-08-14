@@ -1,0 +1,106 @@
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #202124; padding: 4px 8px 16px; }
+  h2 { font-size: 15px; margin: 8px 0 4px; }
+  .hint { color: #555; font-size: 12px; margin-bottom: 10px; line-height: 1.5; }
+  .warn { background: #FFF2CC; border: 1px solid #E8C61A; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; }
+  .cell { border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+  .cell .label { font-weight: bold; margin-bottom: 4px; }
+  .cell input[type=text] { width: 100%; box-sizing: border-box; padding: 4px; margin-bottom: 4px; }
+  .cell .suggestions { margin-bottom: 6px; }
+  .cell .suggestions button {
+    font-size: 11px; margin: 0 4px 4px 0; padding: 2px 6px; border: 1px solid #ccc;
+    border-radius: 10px; background: #f1f3f4; cursor: pointer;
+  }
+  .cell .save-btn { padding: 4px 10px; cursor: pointer; }
+  .cell .status { font-size: 11px; margin-left: 6px; }
+  .empty { color: #555; padding: 12px 0; }
+  #refreshBtn { margin-bottom: 10px; padding: 4px 10px; cursor: pointer; }
+  .error { color: #c00; white-space: pre-wrap; }
+</style>
+<body>
+  <h2>填寫講員與翻譯</h2>
+  <div class="hint">
+    講員／翻譯不受崗位資格限制，可以直接輸入新名字。填寫後會同時更新職事表格子、
+    RosterAssignments 與 AuditLog。可以隨時關閉側邊欄，之後重新開啟會繼續顯示還沒填的格子。
+  </div>
+  <button id="refreshBtn" onclick="load()">重新整理</button>
+  <div id="body">載入中…</div>
+
+<script>
+  var QUARTER_ID = <?= JSON.stringify(quarterId) ?>;
+
+  function load() {
+    document.getElementById('body').innerHTML = '載入中…';
+    google.script.run
+      .withSuccessHandler(render)
+      .withFailureHandler(function (err) {
+        document.getElementById('body').innerHTML = '<div class="error">' + escapeHtml(err.message || String(err)) + '</div>';
+      })
+      .apiListPreacherTranslationPending(QUARTER_ID);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function render(data) {
+    var html = '';
+    html += '<div class="hint">' + escapeHtml(data.quarterId) + '　v' + data.versionNo
+      + '　Stage=' + escapeHtml(data.stage) + '</div>';
+    if (data.officialSentHint) {
+      html += '<div class="warn">這一季已經正式發出過。如果這裡填的內容是發出之後才確定的，'
+        + '記得回選單執行「步驟 5：改動後重發」通知相關人士。</div>';
+    }
+    if (data.pending.length === 0) {
+      html += '<div class="empty">目前沒有還空著的講員／翻譯格子。</div>';
+    } else {
+      data.pending.forEach(function (p, i) {
+        var suggestions = p.postName === '講員' ? data.preacherSuggestions : data.translationSuggestions;
+        var cellId = 'cell_' + i;
+        html += '<div class="cell" id="' + cellId + '">';
+        html += '<div class="label">第 ' + p.weekIndex + ' 週　' + escapeHtml(p.serviceDate) + '　' + escapeHtml(p.postName) + '</div>';
+        if (suggestions && suggestions.length > 0) {
+          html += '<div class="suggestions">';
+          suggestions.forEach(function (name) {
+            html += '<button type="button" onclick="fillSuggestion(\'' + cellId + '\', ' + JSON.stringify(name) + ')">' + escapeHtml(name) + '</button>';
+          });
+          html += '</div>';
+        }
+        html += '<input type="text" id="' + cellId + '_input" placeholder="輸入姓名">';
+        html += '<button class="save-btn" onclick="save(\'' + cellId + '\', '
+          + JSON.stringify(p.serviceDate) + ', ' + JSON.stringify(p.postId) + ', ' + p.slotIndex + ')">儲存</button>';
+        html += '<span class="status" id="' + cellId + '_status"></span>';
+        html += '</div>';
+      });
+    }
+    document.getElementById('body').innerHTML = html;
+  }
+
+  function fillSuggestion(cellId, name) {
+    document.getElementById(cellId + '_input').value = name;
+  }
+
+  function save(cellId, serviceDate, postId, slotIndex) {
+    var input = document.getElementById(cellId + '_input');
+    var status = document.getElementById(cellId + '_status');
+    var name = input.value.trim();
+    if (!name) { status.textContent = '請先輸入姓名'; return; }
+    status.textContent = '儲存中…';
+    google.script.run
+      .withSuccessHandler(function () {
+        var cell = document.getElementById(cellId);
+        cell.style.opacity = '0.5';
+        status.textContent = '✓ 已儲存';
+        input.disabled = true;
+      })
+      .withFailureHandler(function (err) {
+        status.textContent = '失敗：' + (err.message || String(err));
+      })
+      .apiSavePreacherTranslationEntry(QUARTER_ID, serviceDate, postId, slotIndex, name);
+  }
+
+  load();
+</script>
+</body>
