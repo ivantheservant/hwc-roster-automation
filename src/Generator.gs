@@ -433,7 +433,22 @@ function getSkipReason_(post, serviceDate, special, rules) {
 
 /**
  * 為單一 slot 挑選人選：先以 HARD 規則篩選，再依違規扣分與選人策略排序。
- * 若所有候選人都違反 HARD 規則，改選違規最輕者並標記為 forced。
+ *
+ * 階段 A（Opus 深度輪）修正：若所有候選人都違反 HARD 規則，**留空並發出
+ * 警告**，不再「改選違規最輕者並標記為 forced」。
+ *
+ * 原本的 forced 機制會令系統在候選人池非空、但每個人都違反至少一條 HARD
+ * 規則時（最典型：整個崗位池當週全部表明不能服侍），自動指派其中一人，
+ * 即時造成 HARD 規則違反——雖然步驟 3／5 之後會透過「確認放行」關卡要求
+ * 幹事人手確認才能前進 Stage，但違反本身在生成當下已經發生，不是「留空
+ * 待人手處理」。這跟系統「絕不自動違反硬規則，寧可留空」的設計原則不一致，
+ * 已在 `docs/系統範圍稽核.md` 記錄為本輪找到的演算法問題並修正。
+ *
+ * 修正後：`candidates.length === 0`（完全沒有合資格人選）與「有候選人池，
+ * 但全部都違反 HARD 規則」現在是同一種結果——留空、`ASSIGN_SOURCE.SKIPPED`、
+ * 產生警告，交給 `summariseBlankAssignments_()` 歸入「系統應該排但排不出」
+ * 的「真正缺口」統計，讓幹事在步驟 1 的完成畫面就直接看到，需要人手指派。
+ *
  * @param {Object} state 目前的排表狀態（context / post / slot / 各項累計資料）
  * @returns {{personId: string, violations: Object[], forced: boolean, reason: string}} 挑選結果
  */
@@ -480,8 +495,23 @@ function pickPerson_(state) {
   });
 
   const clean = scored.filter(function (c) { return !c.hasHard; });
-  const forced = clean.length === 0;
-  const finalists = forced ? scored : clean;
+  if (clean.length === 0) {
+    const violatedRuleIds = {};
+    scored.forEach(function (c) {
+      c.violations.forEach(function (v) {
+        if (v.level === RULE_LEVELS.HARD) violatedRuleIds[v.ruleId] = true;
+      });
+    });
+    return {
+      personId: '',
+      violations: [],
+      forced: false,
+      reason: '此崗位合資格人選在本週全部違反 HARD 規則（'
+        + Object.keys(violatedRuleIds).sort().join('、') + '），系統選擇留空，'
+        + '不會為了填滿格子而違反硬規則'
+    };
+  }
+  const finalists = clean;
 
   finalists.sort(function (a, b) { return compareCandidates_(a, b, state.context.selectionStrategy); });
   const winner = finalists[0];
@@ -517,8 +547,11 @@ function pickPerson_(state) {
   return {
     personId: winner.personId,
     violations: winner.violations,
-    forced: forced,
-    reason: forced ? '所有候選人都違反 HARD 規則，已選擇違規最輕者' : ''
+    // clean 只保留 !hasHard 的候選人，走到這裡代表 winner 一定沒有 HARD 違反
+    // （最多只有 SEMI_HARD／SOFT），forced 永遠是 false——上面 clean.length===0
+    // 的分支已經處理了「全部候選人都違反 HARD 規則」的情況，不會再走到這裡。
+    forced: false,
+    reason: ''
   };
 }
 

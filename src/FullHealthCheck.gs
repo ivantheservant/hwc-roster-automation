@@ -211,6 +211,38 @@ function classifyRequestsHealth_(pendingAcrossQuarters) {
     }));
 }
 
+/**
+ * 階段 B（Opus 深度輪）新增：三張只增不減的大表的規模提示。
+ *
+ * 這是歸檔設計「方向三」的實作（見 Archive.gs 檔頭）：**提早提醒，不是
+ * 超過就會壞**。行數超過門檻只代表「值得規劃封存了」，功能本身仍然正常。
+ * 一律 SHOULD／INFO，永遠不會是 MUST——資料多本身不是錯誤。
+ *
+ * @param {Object.<string, number>} rowCounts {表名: 行數}
+ * @returns {Object} healthItem_() 的結果
+ */
+function classifyTableSizeHealth_(rowCounts) {
+  const checks = [
+    { name: SHEETS.SEND_LOG, rows: rowCounts[SHEETS.SEND_LOG], limit: ARCHIVE_SIZE_HINT_ROWS.SEND_LOG },
+    { name: SHEETS.ROSTER_ASSIGNMENTS, rows: rowCounts[SHEETS.ROSTER_ASSIGNMENTS], limit: ARCHIVE_SIZE_HINT_ROWS.ROSTER_ASSIGNMENTS },
+    { name: SHEETS.AUDIT_LOG, rows: rowCounts[SHEETS.AUDIT_LOG], limit: ARCHIVE_SIZE_HINT_ROWS.AUDIT_LOG }
+  ];
+  const over = checks.filter(function (c) { return c.rows >= c.limit; });
+  const details = checks.map(function (c) {
+    return c.name + '：' + c.rows + ' 行（提示門檻 ' + c.limit + '）'
+      + (c.rows >= c.limit ? '　⚠️ 建議規劃封存' : '');
+  });
+
+  return healthItem_('資料表規模', over.length > 0 ? HEALTH_SEVERITY.SHOULD : HEALTH_SEVERITY.INFO,
+    '只增不減的大表行數', over.length === 0 ? '全部未達提示門檻' : over.length + ' 張表已達提示門檻',
+    over.length === 0
+      ? '這幾張表只增不減，每次讀取都是整表讀取。目前規模仍然很輕鬆，不需要做任何事。'
+      : '這幾張表已經大到值得規劃封存。功能目前仍然正常，不是錯誤——'
+        + '可以執行「維護 ▸ 封存舊季度資料（唯讀預覽）」看看有沒有季度符合封存資格。'
+        + '封存是搬移不是刪除，詳見 docs/系統範圍稽核.md。',
+    details);
+}
+
 /** 上線前檢查裡「不就緒」時無條件升級為 MUST 的項目標籤（子字串比對）。 */
 const HEALTH_PRELAUNCH_MUST_LABEL_SUBSTRINGS = ['最新版本是否仍有未解決的硬規則違反'];
 
@@ -286,6 +318,13 @@ function buildFullHealthCheckReport_(quarterId) {
       '見備註', report.lines.join('\n'), []);
   });
   run(function () { return classifyRequestsHealth_(scanPendingRequestsAllQuarters_()); });
+  run(function () {
+    const counts = {};
+    counts[SHEETS.SEND_LOG] = readSheet(SHEETS.SEND_LOG).length;
+    counts[SHEETS.ROSTER_ASSIGNMENTS] = readSheet(SHEETS.ROSTER_ASSIGNMENTS).length;
+    counts[SHEETS.AUDIT_LOG] = readSheet(SHEETS.AUDIT_LOG).length;
+    return classifyTableSizeHealth_(counts);
+  });
 
   let skippedPreLaunch = true;
   if (quarterId) {
@@ -336,7 +375,8 @@ function runFullHealthCheck_() {
   bySeverity[HEALTH_SEVERITY.INFO] = report.sections.filter(function (s) { return s.severity === HEALTH_SEVERITY.INFO; });
 
   const lines = [
-    '共檢查 ' + (quarterId ? 9 : 8) + ' 大項'
+    // 階段 B（Opus 深度輪）新增「資料表規模」一項，基數由 8／9 改為 9／10
+    '共檢查 ' + (quarterId ? 10 : 9) + ' 大項'
       + (report.skippedPreLaunch ? '（已跳過上線前檢查，未輸入季度）' : '（含 ' + quarterId + ' 的上線前檢查）') + '：',
     '　🔴 必須處理：' + report.mustCount + ' 項　🟡 建議處理：' + report.shouldCount + ' 項　⚪ 資訊：' + report.infoCount + ' 項',
     ''

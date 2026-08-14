@@ -209,8 +209,9 @@
             // FiveStageCore.gs 的 planStep2_()／Mailer.gs 的 countAlreadySentForStage_()。
             + (preview.alreadySentCount > 0
               ? '\n\n⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
-                + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。如果不是刻意要重寄，'
-                + '建議先取消，打開 SendLog 核對狀況再決定。'
+                + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。\n'
+                + '👉 建議先取消，改用試算表選單「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」，'
+                + '只補寄真正未收到的人，不會令已收信的人重複收到。'
               : '')
         ),
         actionsRow([
@@ -466,8 +467,9 @@
           // 撞到 Apps Script 執行逾時，這個警告更重要。
           + (preview.alreadySentCount > 0
             ? '\n\n⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
-              + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。如果不是刻意要重寄，'
-              + '建議先取消，打開 SendLog 核對狀況再決定。'
+              + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。\n'
+              + '👉 建議先取消，改用試算表選單「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」，'
+              + '只補寄真正未收到的人，不會令已收信的人重複收到。'
             : '')
       ),
       actionsRow([

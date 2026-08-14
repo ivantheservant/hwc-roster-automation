@@ -125,10 +125,13 @@ function runFourStageStep2_() {
       + '請先到 EmailRecipients 把審閱者的 Role 設為 REVIEWER（或執行「補建 EmailRecipients 欄位」）。');
   }
   if (preview.alreadySentCount > 0) {
+    // 階段 C（Opus 深度輪）：改為直接指路去補寄工具，不再只叫幹事「自己核對」。
     confirmLines.push('', '⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
-      + '寄出／模擬紀錄，很可能是上一次執行到一半中斷後現在重新執行。如果不是刻意要重寄，'
-      + '建議先取消，打開 SendLog 核對狀況再決定——繼續的話，這些人會再收到一封（本系統目前'
-      + '不會自動略過已寄過的人，見 docs/中斷復原指引.md）。');
+      + '寄出／模擬紀錄，很可能是上一次執行到一半中斷後現在重新執行。\n\n'
+      + '👉 建議先取消，改用「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」——'
+      + '那個工具會自動分辨誰已經收過、誰未收到、誰無法寄，只補寄真正未收到的人，'
+      + '不會令已收信的人重複收到。\n'
+      + '（繼續執行本步驟的話，這 ' + preview.alreadySentCount + ' 位會再收到一封。）');
   }
   confirmLines.push('', '確定要繼續嗎？');
 
@@ -461,11 +464,15 @@ function runFourStageStep4_() {
     'DRY_RUN：' + (sendPreview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
   ];
   if (sendPreview.alreadySentCount > 0) {
+    // 階段 C（Opus 深度輪）：改為直接指路去補寄工具。步驟 4 收件人約六十位，
+    // 是最容易中斷、也是重複寄信後果最嚴重的一步。
     confirmLines.push('', '⚠️ 偵測到這個版本已經有 ' + sendPreview.alreadySentCount + ' 位收件人在 SendLog 有'
       + '寄出／模擬紀錄，很可能是上一次執行到一半中斷後現在重新執行（步驟 4 收件人多，'
-      + '最容易發生）。如果不是刻意要重寄，建議先取消，打開 SendLog 核對狀況再決定——'
-      + '繼續的話，這些人會再收到一封（本系統目前不會自動略過已寄過的人，'
-      + '見 docs/中斷復原指引.md）。');
+      + '最容易發生）。\n\n'
+      + '👉 建議先取消，改用「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」——'
+      + '那個工具會自動分辨誰已經收過、誰未收到、誰無法寄，只補寄真正未收到的人，'
+      + '不會令已收信的人重複收到，也不會改動流程階段。\n'
+      + '（繼續執行本步驟的話，這 ' + sendPreview.alreadySentCount + ' 位會再收到一封。）');
   }
   confirmLines.push('', '確定要正式發出嗎？');
   if (ui.alert('步驟 4：正式發出（確認）', confirmLines.join('\n'), ui.ButtonSet.YES_NO) !== ui.Button.YES) return;

@@ -25,6 +25,11 @@ function generateBest(quarterId, attempts) {
   let best = null;
   let attemptsRun = 0;
   let stoppedByTime = false;
+  // 階段 A（Opus 深度輪）新增：偵測「換 seed 有沒有令結果不同」，
+  // 見 MULTIRUN_SEED_PROBE_ATTEMPTS（Constants.gs）的完整說明。
+  let stoppedBySeedInert = false;
+  let firstSignature = null;
+  let allIdenticalSoFar = true;
 
   for (let i = 0; i < planned; i++) {
     // seed 由 RANDOM_SEED 遞增產生，令整輪多次生成本身也可完全重現
@@ -32,6 +37,14 @@ function generateBest(quarterId, attempts) {
     context.randomSeed = seed;
 
     const roster = buildRoster_(context);
+
+    const signature = buildRosterSignature_(roster);
+    if (i === 0) {
+      firstSignature = signature;
+    } else if (signature !== firstSignature) {
+      allIdenticalSoFar = false;
+    }
+
     const evaluation = evaluateRosterQuality_(context, roster, scope, baseline);
     const record = {
       attemptIndex: i + 1,
@@ -55,6 +68,17 @@ function generateBest(quarterId, attempts) {
       best.roster = roster;
     }
 
+    // 階段 A（Opus 深度輪）新增：頭 MULTIRUN_SEED_PROBE_ATTEMPTS 次如果產生
+    // 逐格完全相同的職事表，代表這份資料下換 seed 不會改變結果，再跑下去只是
+    // 把同一份表重複算——提早停止。輸出不受影響（見 Constants.gs 的說明）。
+    if (allIdenticalSoFar && attemptsRun >= MULTIRUN_SEED_PROBE_ATTEMPTS && attemptsRun < planned) {
+      stoppedBySeedInert = true;
+      log_('INFO', 'generateBest: 頭 ' + attemptsRun + ' 次生成的職事表逐格完全相同，'
+        + '判定這份資料下 RANDOM_SEED 不影響結果，已提早停止（原定 ' + planned + ' 次）。'
+        + '最佳結果與跑足全部次數相同。');
+      break;
+    }
+
     // 量度單次耗時，若再跑一次會超出預算就停止
     const elapsed = Date.now() - startedAt;
     const averagePerAttempt = elapsed / attemptsRun;
@@ -76,6 +100,7 @@ function generateBest(quarterId, attempts) {
     attemptsRun: attemptsRun,
     attemptsPlanned: planned,
     stoppedByTime: stoppedByTime,
+    stoppedBySeedInert: stoppedBySeedInert,
     deviation: best.deviation,
     hardViolations: best.hardViolations,
     histogramText: best.histogramText,
@@ -89,6 +114,23 @@ function generateBest(quarterId, attempts) {
     },
     results: results
   };
+}
+
+/**
+ * 階段 A（Opus 深度輪）新增：把一份職事表壓成一個字串簽名，供 generateBest()
+ * 判斷兩次生成的結果是否逐格完全相同。
+ *
+ * 只取「每一格派了誰」——那正是職事表的全部內容，其餘欄位（assignSource、
+ * ruleFlags）都是由 personId 與 context 推導出來的，不會出現「派的人一樣但
+ * 其他欄位不同」的情況。assignments 的產生順序由 buildRoster_() 的三層迴圈
+ * （週 → 崗位 → slot）決定，同一個 context 下必定一致，所以直接串接即可，
+ * 不需要另外排序。
+ *
+ * @param {{assignments: Object[]}} roster buildRoster_() 的結果
+ * @returns {string} 簽名字串
+ */
+function buildRosterSignature_(roster) {
+  return roster.assignments.map(function (a) { return a.personId || ''; }).join('|');
 }
 
 /**

@@ -12,6 +12,10 @@ function onOpen() {
         .addItem('⚠️ 步驟 3：套用修改申報', 'runFourStageStep3_')
         .addItem('⚠️ 步驟 4：正式發出', 'runFourStageStep4_')
         .addItem('⚠️ 步驟 5：改動後重發', 'runFourStageStep5_')
+        .addSeparator()
+        // 階段 C（Opus 深度輪）新增：步驟 2／4 寄到一半中斷之後的補救工具。
+        .addItem('補寄未收到的人（唯讀預覽）', 'runMakeupSendPlan_')
+        .addItem('⚠️ 執行補寄未收到的人', 'runMakeupSendExecute_')
     )
     .addSubMenu(
       // 查看 ▸：不會改動任何職事表資料、不會產生版本、不會寄電郵。
@@ -72,6 +76,9 @@ function onOpen() {
         .addItem('⚠️⚠️ 按季度清理 PDF', 'runQuarterPdfCleanup_')
         .addItem('⚠️ 清除一批 SendLog 記錄', 'runDeleteSendLogBatch_')
         .addItem('⚠️⚠️ 重設季度測試資料', 'runResetQuarterTestData_')
+        .addSeparator()
+        .addItem('封存舊季度資料（唯讀預覽）', 'runArchivePlan_')
+        .addItem('⚠️⚠️ 執行封存舊季度資料', 'runArchiveExecute_')
         .addSeparator()
         .addItem('修正試算表時區設定', 'runApplyTimezoneSettings_')
         .addSeparator()

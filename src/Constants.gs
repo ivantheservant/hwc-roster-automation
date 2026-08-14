@@ -26,7 +26,42 @@ const SHEETS = {
   TUNE_RESULT: 'Tune_Result',
   MULTIRUN_RESULT: 'MultiRun_Result',
   REQUESTS: 'Requests',
-  DIAGNOSTICS: 'Diagnostics'
+  DIAGNOSTICS: 'Diagnostics',
+  // 階段 B（Opus 深度輪）新增：歸檔用的封存表。封存是**搬移不是刪除**——
+  // 原始列完整搬到這兩張表，隨時可以人手查閱或搬回去。見 Archive.gs。
+  SEND_LOG_ARCHIVE: 'SendLog_Archive',
+  ROSTER_ASSIGNMENTS_ARCHIVE: 'RosterAssignments_Archive'
+};
+
+/**
+ * 階段 B（Opus 深度輪）：封存時一定要保留、不可搬走的「最近幾多個季度」。
+ *
+ * 為什麼一定要保留最近的季度，不可以只看「季度已結束」：
+ * `readPriorWeeks_()`（Generator.gs）在生成新一季時，會讀取**季度開始日之前**
+ * 最後 CARRY_OVER_WEEKS 個主日的派工紀錄，用來判斷跨季界的「連續兩週同一人」。
+ * 如果把緊接的上一季封存走，新一季第一週就會失去比對基準，可能排出「上季
+ * 最後一週同一人、今季第一週又是他」而系統不知道。
+ *
+ * 預設 2＝「目前正在處理的一季」＋「它前面那一季」。CARRY_OVER_WEEKS 通常是
+ * 1–2 週，一整季（約 13 週）遠遠覆蓋得到；planArchive_() 另外會檢查
+ * CARRY_OVER_WEEKS 有沒有大到連保留的季度都不夠，不夠會明確警告。
+ */
+const ARCHIVE_KEEP_RECENT_QUARTERS = 2;
+
+/** 執行封存時要逐字輸入的確認文字，沿用「確認重設」「確認清理」的既有慣例。 */
+const ARCHIVE_CONFIRM_TEXT = '確認封存';
+
+/**
+ * 階段 B（Opus 深度輪）：「🩺 全面體檢」提示「建議規劃封存」的行數門檻。
+ *
+ * 這幾張表只增不減、readSheet() 每次整表讀取（見 docs/系統範圍稽核.md 第六輪
+ * 階段 D 的規模評估）。門檻的用途只是**提早提醒**，不是「超過就會壞」——
+ * 現時真實資料約 762 行 SendLog，離門檻還很遠。
+ */
+const ARCHIVE_SIZE_HINT_ROWS = {
+  SEND_LOG: 5000,
+  ROSTER_ASSIGNMENTS: 10000,
+  AUDIT_LOG: 10000
 };
 
 /**
@@ -34,6 +69,29 @@ const SHEETS = {
  * Apps Script 上限為 6 分鐘，這裡只用 3 分鐘，其餘留給建表、寫長表與登記版本。
  */
 const MULTIRUN_TIME_BUDGET_MS = 180000;
+
+/**
+ * 階段 A（Opus 深度輪）新增：generateBest() 用來偵測「換 seed 到底有沒有令
+ * 結果不同」的探測次數。
+ *
+ * 背景：generateBest() 的設計是「用多個不同的 seed 各生成一份，再揀最貼近
+ * 歷史基準的一份」，但 seed 唯一的用途是 pickPerson_() 裡的 `tieBreak`，
+ * 而 tieBreak 只在**兩位候選人的 score 與 selectionScore 完全相等**時才會被
+ * 拿來比較（見 compareCandidates_()）。selectionScore 是連續浮點數，實務上
+ * 極少完全相等——用假資料實測 30 個不同 seed，30 份職事表逐格完全一樣。
+ * 換言之在這種資料下，跑 20 次等於把同一份表算 20 次，白花 20 倍時間
+ * （而且這是步驟 1 最耗時的部分，時間預算 3 分鐘）。
+ *
+ * 這個常數控制「先試幾次來判斷 seed 有沒有影響」：頭 N 次如果產生完全相同的
+ * 職事表，就當作這份資料下 seed 無效、提早停止。**這個提早停止不會改變輸出**
+ * ——isBetterCandidate_() 用嚴格小於（`deviation < best.deviation`）比較，
+ * 一份與已有候選完全相同的職事表 deviation 必然相等、不可能勝出，所以略過
+ * 它們之後選出的「最佳」跟跑足全部次數是同一份。
+ *
+ * 刻意做成「用實際結果判斷」而不是寫死跳過：真實資料如果真的出現同分候選人，
+ * 換 seed 就會產生不同結果，這時偵測不成立、會照樣跑足設定的次數。
+ */
+const MULTIRUN_SEED_PROBE_ATTEMPTS = 3;
 
 /** 參數掃描要試的組合，以及分批執行的設定。 */
 const TUNE_GRID = {
@@ -449,7 +507,19 @@ const SCORE_DEFAULTS = {
 /** 診斷用的 trace 每格最多記錄多少個候選人。 */
 const TRACE_CANDIDATE_LIMIT = 6;
 
-/** RosterAssignments 的 AssignSource 欄可能出現的值。 */
+/**
+ * RosterAssignments 的 AssignSource 欄可能出現的值。
+ *
+ * ⚠️ `FORCED` 是**歷史值，新生成的職事表不會再出現**：階段 A（Opus 深度輪）
+ * 修正了 pickPerson_()——原本在「候選人池非空、但每個人都違反至少一條 HARD
+ * 規則」時會硬派違規最輕的一個並標記 FORCED，即場造成硬規則違反；現在改為
+ * 留空並發出警告（見 Generator.gs 的 pickPerson_() 說明）。
+ *
+ * 這個值**刻意保留不移除**：修正之前生成的版本（已經寫進 RosterAssignments
+ * 的歷史資料）可能仍然含有 AssignSource=FORCED 的列，顯示層
+ * （RosterWriter.gs 的 applyCellMarks_()、WebApp.gs 的 apiGetRosterGrid()）
+ * 要繼續認得它，否則翻查舊版本時那些格會顯示不正常。
+ */
 const ASSIGN_SOURCE = {
   AUTO: 'AUTO',
   FORCED: 'FORCED',

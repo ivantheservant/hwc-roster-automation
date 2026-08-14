@@ -886,8 +886,15 @@ function writeSendLogRows_(outcomes, context) {
 
   const rows = outcomes.map(function (o, i) {
     const record = {};
+    // 階段 C（Opus 深度輪）：`context.sendIdTag` 是選填的批次標記，目前只有
+    // 補寄工具（MakeupSend.gs）會設成 'MAKEUP'。加在 SendID 中間而不是改
+    // Stage 欄——Stage 一定要維持真正的階段值，否則
+    // readLastSendRecordByPerson_()（步驟 5 hash 比對）與
+    // countAlreadySentForStage_() 都會漏掉這一批，補寄反而製造新問題。
     record[C.SEND_ID] = [context.quarterId, 'v' + context.versionNo, context.stage,
-      idStamp, i + 1].join('-');
+      context.sendIdTag || null, idStamp, i + 1]
+      .filter(function (part) { return part !== null && part !== undefined && part !== ''; })
+      .join('-');
     record[C.QUARTER_ID] = context.quarterId;
     record[C.VERSION_NO] = context.versionNo;
     record[C.STAGE] = context.stage;
