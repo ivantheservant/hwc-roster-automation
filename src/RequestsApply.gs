@@ -150,6 +150,63 @@ function buildRequestConflictKeys_(pending) {
 }
 
 /**
+ * 階段 B（第五輪批次）新增：掃描 Requests 全表（不限單一季度），列出每個
+ * 出現過的 QuarterID 有幾多筆待處理（RequestID 空白）申報，附上該季度目前
+ * 的 Stage，以及矛盾組合（同一人同一日「不能服侍」＋「指定服侍」）的偵測
+ * 結果——重用 readPendingRequests_()／buildRequestConflictKeys_()，不是
+ * 另外寫一套判斷邏輯，保證跟步驟 3／5 實際套用時看到的結果一致。純讀取，
+ * 不改動任何資料，也不要求這一季已經生成過版本（矛盾組合偵測只需要
+ * Requests 本身的內容，不需要底本版本）。
+ *
+ * 特別標示「季度已經是 OFFICIAL_SENT 但仍有待處理申報」——這種殘留申報會在
+ * 下次對該季度執行「步驟 5：改動後重發」時被撈起，屆時如果矛盾組合還在，
+ * 一樣會被判 NEEDS_INPUT、不會自動處理掉。及早在「上線前檢查」發現，比
+ * 等到真正執行步驟 5 才發現更好——尤其是幹事可能以為「這一季已經正式發出，
+ * 應該沒事了」，其實 Requests 裡還有沒處理完的殘留。
+ *
+ * @returns {Object[]} 只列出有待處理申報的季度，每項為 {quarterId, stage,
+ *   pendingCount, conflictCount, conflictDetails, isOfficialSentWithPending}；
+ *   conflictDetails 每項為 {personId, date, requests}
+ */
+function scanPendingRequestsAllQuarters_() {
+  let allQuarterIds = [];
+  try {
+    const R = COLUMNS.REQUESTS;
+    const seen = {};
+    readSheet(SHEETS.REQUESTS).forEach(function (row) {
+      const qid = String(row[R.QUARTER_ID] || '').trim();
+      if (qid && !seen[qid]) { seen[qid] = true; allQuarterIds.push(qid); }
+    });
+  } catch (err) {
+    return []; // Requests 工作表不存在，沒有東西可以掃，不當作錯誤
+  }
+
+  return allQuarterIds.map(function (quarterId) {
+    const pending = readPendingRequests_(quarterId);
+    const conflictKeys = buildRequestConflictKeys_(pending);
+    const conflictDetails = Object.keys(conflictKeys).map(function (key) {
+      const sep = key.indexOf('|');
+      const personId = key.slice(0, sep);
+      const date = key.slice(sep + 1);
+      const requests = pending.filter(function (r) {
+        return resolvePersonId(r.personNameText) === personId && r.serviceDateText === date;
+      });
+      return { personId: personId, date: date, requests: requests };
+    });
+    let stage = '';
+    try { stage = getQuarterStage_(quarterId); } catch (err) { stage = '（讀取失敗：' + err.message + '）'; }
+    return {
+      quarterId: quarterId,
+      stage: stage,
+      pendingCount: pending.length,
+      conflictCount: conflictDetails.length,
+      conflictDetails: conflictDetails,
+      isOfficialSentWithPending: stage === QUARTER_STAGE.OFFICIAL_SENT && pending.length > 0
+    };
+  }).filter(function (r) { return r.pendingCount > 0; });
+}
+
+/**
  * 驗證單一申報，分成三類：APPLY（可直接套用）、CONFIRM（需要幹事確認）、
  * NEEDS_INPUT（無法套用）。只判斷，不改動任何資料。
  * @param {Object} req readPendingRequests_() 的單一項目

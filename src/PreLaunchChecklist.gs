@@ -419,7 +419,39 @@ function buildPreLaunchChecklist_(quarterId) {
       .concat(genuineGapCells.length > 20 ? ['……另有 ' + (genuineGapCells.length - 20) + ' 格'] : [])
   ));
 
-  // 12. 階段 C2 新增：EmailRecipients 每個 Active 收件人的 Role／Stage／
+  // 12. 階段 B（第五輪批次）新增：全部季度的待處理 Requests 殘留＋矛盾組合（12、13 兩項都是「不限本次輸入季度」的全域檢查）
+  // 提早偵測。跟其他項目不同，這一項**不限於你剛剛輸入的 quarterId**——
+  // 掃描的是 Requests 全表，理由是「殘留申報最危險的地方就是幹事忘記自己
+  // 還有別的季度沒處理完」，如果只顯示當下輸入那一季，反而看不到全貌。
+  const pendingAcrossQuarters = scanPendingRequestsAllQuarters_();
+  const officialSentWithPending = pendingAcrossQuarters.filter(function (r) { return r.isOfficialSentWithPending; });
+  const totalConflicts = pendingAcrossQuarters.reduce(function (sum, r) { return sum + r.conflictCount; }, 0);
+  items.push(buildChecklistItem_(
+    '全部季度的待處理 Requests 殘留（不限本次輸入的季度）',
+    officialSentWithPending.length === 0 && totalConflicts === 0,
+    pendingAcrossQuarters.length === 0
+      ? '沒有任何季度有待處理申報'
+      : pendingAcrossQuarters.length + ' 個季度有待處理申報'
+        + (officialSentWithPending.length > 0 ? '，其中 ' + officialSentWithPending.length + ' 個已經 OFFICIAL_SENT 仍有殘留' : '')
+        + (totalConflicts > 0 ? '，共 ' + totalConflicts + ' 組矛盾組合（同一人同一日「不能服侍」＋「指定服侍」）' : ''),
+    pendingAcrossQuarters.length === 0
+      ? '目前沒有任何季度殘留未處理的申報。'
+      : '待處理申報本身不一定是問題（可能只是還沒排到套用的時機），但兩種情況要特別注意：'
+        + '(1) 季度已經 OFFICIAL_SENT 但仍有殘留——下次對該季度執行「步驟 5：改動後重發」時'
+        + '會被撈起，如果是矛盾組合會直接判 NEEDS_INPUT，不會自動處理；'
+        + '(2) 矛盾組合——同一人同一日同時有「不能服侍」與「指定服侍」，語意互相矛盾，'
+        + '套用時兩筆都會被攔下、要求你自己澄清保留哪一筆，建議提早到 Requests 工作表'
+        + '刪走其中一筆，不需要等到真正執行步驟 3／5 才處理。',
+    pendingAcrossQuarters.map(function (r) {
+      const flags = [];
+      if (r.isOfficialSentWithPending) flags.push('⚠️ 已 OFFICIAL_SENT 仍有殘留');
+      if (r.conflictCount > 0) flags.push('⚠️ ' + r.conflictCount + ' 組矛盾組合');
+      return r.quarterId + '　Stage=' + r.stage + '　待處理=' + r.pendingCount + ' 筆'
+        + (flags.length > 0 ? '　' + flags.join('　') : '');
+    })
+  ));
+
+  // 13. 階段 C2 新增：EmailRecipients 每個 Active 收件人的 Role／Stage／
   // 實際會收到的階段——直接算好結論顯示，見 buildRecipientRoleStageMatrix_()
   // （EmailRecipientsSeed.gs）。純資訊性質，一律「已就緒」（沒有「錯誤狀態」
   // 這回事，只是把現況攤開來給你看，你自己判斷是否符合預期）。

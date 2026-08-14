@@ -365,7 +365,10 @@ function collectKeyStateRows_() {
     });
   });
 
-  // ---- RosterPDF 資料夾：每個版本的 PDF 數目與最小檔案大小 ----
+  // ---- RosterPDF 資料夾：每個版本的 PDF 數目、最小檔案大小（階段 E 起就有，
+  // 用於偵測截斷／空白檔案）；階段 C（第五輪批次）新增總容量與「是否已非
+  // 該季度最新版本」（重用 scanPdfStatsByQuarterVersion_()，跟「上線前檢查」
+  // 如果日後也用到這個統計，兩邊保證一致，不是各自重複一份分組邏輯）----
   section('RosterPDF', function () {
     const folder = resolveMailAttachmentFolder_();
     const sizes = listExistingFileSizes_(folder);
@@ -387,6 +390,15 @@ function collectKeyStateRows_() {
       rows.push(diagRow_('RosterPDF', key, v.count + ' 個',
         '最小檔案 ' + v.minSize + ' bytes　' + flag));
     });
+
+    const stats = scanPdfStatsByQuarterVersion_(folder, sizes);
+    rows.push(diagRow_('RosterPDF', '（總容量）', formatFileSize_(stats.totalSizeBytes), ''));
+    stats.groups.forEach(function (g) {
+      const label = g.quarterId ? g.quarterId + ' v' + g.versionNo : '（不符合命名慣例）';
+      rows.push(diagRow_('RosterPDF（按季度＋版本容量）', label,
+        formatFileSize_(g.sizeBytes),
+        g.fileCount + ' 個檔案　' + (g.isLatestVersion ? '目前最新版本' : '⚠️ 已非最新版本（可考慮清理）')));
+    });
   });
 
   // ---- EmailRecipients：每個 Active 收件人的 Role 與實際適用階段（階段 E 新增，
@@ -403,38 +415,57 @@ function collectKeyStateRows_() {
     });
   });
 
-  // ---- 自動排程 trigger：目前數量，以及應有的樣子（階段 E 新增） ----
+  // ---- 自動排程 trigger：目前數量，以及應有的樣子（階段 E 新增；階段 A（第五輪
+  // 批次）改用 describeConfigValue_() 顯示 SEND_HOUR_LOCAL／SYS_TIMEZONE，
+  // 統一標註「Config 未設定，用預設值」，不再是這裡自己一套 undefined 判斷）----
   section('自動排程 Trigger', function () {
     const triggers = listAutomationTriggers_();
     const config = readConfig();
-    const sendHour = config[CONFIG_KEYS.SEND_HOUR_LOCAL];
+    const sendHour = describeConfigValue_(config, CONFIG_KEYS.SEND_HOUR_LOCAL, 9);
+    const tz = describeConfigValue_(config, CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     rows.push(diagRow_('自動排程 Trigger', '（目前安裝數量）', triggers.length,
       triggers.length === 0 ? '未安裝，自動排程目前不會執行任何動作' : ''));
     rows.push(diagRow_('自動排程 Trigger', '（應有的樣子）',
       '函式=' + AUTOMATION_TRIGGER_FUNCTION + '　頻率=每日一次',
-      '執行時間=' + (sendHour === '' || sendHour === undefined || sendHour === null
-        ? '（SEND_HOUR_LOCAL 未設定，安裝時退回 09:00）' : sendHour + ':00')
-        + '　時區=' + (config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE)));
+      '執行時間=' + sendHour.display + ':00　時區=' + tz.display));
   });
 
-  // ---- Config：關鍵開關現值（階段 E 擴充：加入 WEBAPP_ENABLED 與提醒相關三個
-  // Key，原本只有 DRY_RUN／MAIL_SUBJECT_PREFIX 兩個）----
+  // ---- Config：關鍵開關現值（階段 E 擴充加入 WEBAPP_ENABLED 與提醒相關三個
+  // Key；階段 A（第五輪批次）全部改用 describeConfigValue_()——原本 DRY_RUN／
+  // WEBAPP_ENABLED 兩個是直接 String(config[KEY])，Config 工作表沒有登記這個
+  // Key 時會顯示字面文字「undefined」，行為本身安全（其他地方都是用
+  // getConfig() 取得正確的生效值），但這份報告顯示的內容具誤導性。現在統一
+  // 顯示「實際生效的值」，並在使用了程式碼預設值時明確標註，不會再有任何一個
+  // 值顯示成 undefined／null／看起來空白卻沒有說明）----
   section('Config', function () {
     const config = readConfig();
-    rows.push(diagRow_('Config', CONFIG_KEYS.DRY_RUN, String(config[CONFIG_KEYS.DRY_RUN]),
-      config[CONFIG_KEYS.DRY_RUN] === false ? '⚠️ FALSE 代表會真正寄出電郵' : 'TRUE 代表不會真正寄出'));
+    const dryRun = describeConfigValue_(config, CONFIG_KEYS.DRY_RUN, true);
+    rows.push(diagRow_('Config', CONFIG_KEYS.DRY_RUN, dryRun.display,
+      dryRun.value === false ? '⚠️ FALSE 代表會真正寄出電郵' : 'TRUE 代表不會真正寄出'));
+
+    const subjectPrefix = describeConfigValue_(config, CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '');
     rows.push(diagRow_('Config', CONFIG_KEYS.MAIL_SUBJECT_PREFIX,
-      String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '（空白）'), ''));
-    rows.push(diagRow_('Config', CONFIG_KEYS.WEBAPP_ENABLED, String(config[CONFIG_KEYS.WEBAPP_ENABLED]),
-      config[CONFIG_KEYS.WEBAPP_ENABLED] === true ? 'TRUE 代表 Web UI 已啟用' : 'FALSE 代表 Web UI 已停用'));
-    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_STUCK_DAYS,
-      String(getConfig(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS)),
-      '「停滯時間」提醒門檻（天）'));
-    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_STUCK_MAX_COUNT,
-      String(getConfig(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT)),
-      '同一「季度＋Stage」最多提醒幾次'));
-    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_DEADLINE_DAYS,
-      String(getConfig(CONFIG_KEYS.REMIND_DEADLINE_DAYS, DEFAULTS.REMIND_DEADLINE_DAYS)),
+      subjectPrefix.value === '' ? '（空白）' : subjectPrefix.display, ''));
+
+    const webappEnabled = describeConfigValue_(config, CONFIG_KEYS.WEBAPP_ENABLED, false);
+    rows.push(diagRow_('Config', CONFIG_KEYS.WEBAPP_ENABLED, webappEnabled.display,
+      webappEnabled.value === true ? 'TRUE 代表 Web UI 已啟用' : 'FALSE 代表 Web UI 已停用'));
+
+    const allowedEmails = describeConfigValue_(config, CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
+    const allowedList = Array.isArray(allowedEmails.value) ? allowedEmails.value.filter(Boolean) : [];
+    rows.push(diagRow_('Config', CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS,
+      allowedList.length > 0 ? allowedList.join('、') : '（空白）'
+        + (allowedEmails.usedFallback ? '　Config 未設定，用預設值（空清單，退回只允許 SCRIPT_ACCOUNT_EMAIL）' : ''),
+      ''));
+
+    const stuckDays = describeConfigValue_(config, CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
+    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_STUCK_DAYS, stuckDays.display, '「停滯時間」提醒門檻（天）'));
+
+    const stuckMax = describeConfigValue_(config, CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT);
+    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, stuckMax.display, '同一「季度＋Stage」最多提醒幾次'));
+
+    const deadlineDays = describeConfigValue_(config, CONFIG_KEYS.REMIND_DEADLINE_DAYS, DEFAULTS.REMIND_DEADLINE_DAYS);
+    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_DEADLINE_DAYS, deadlineDays.display,
       '「死線接近」提醒門檻（距離 OfficialSendOn 幾天內）'));
   });
 

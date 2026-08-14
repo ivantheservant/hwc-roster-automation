@@ -69,11 +69,13 @@ function onOpen() {
         .addItem('補齊 Email 範本', 'runSeedEmailTemplates_')
         .addSeparator()
         .addItem('⚠️ 清理舊 PDF', 'runCleanupOldPdfs_')
+        .addItem('⚠️⚠️ 按季度清理 PDF', 'runQuarterPdfCleanup_')
         .addItem('⚠️ 清除一批 SendLog 記錄', 'runDeleteSendLogBatch_')
         .addItem('⚠️⚠️ 重設季度測試資料', 'runResetQuarterTestData_')
         .addSeparator()
         .addItem('修正試算表時區設定', 'runApplyTimezoneSettings_')
         .addSeparator()
+        .addItem('🩺 全面體檢（唯讀）', 'runFullHealthCheck_')
         .addItem('上線前檢查（唯讀）', 'runPreLaunchChecklist_')
     )
     .addSubMenu(
@@ -181,11 +183,15 @@ function runReloadConfig_() {
   try {
     reloadConfigCache();
     const config = readConfig();
+    // 階段 A（第五輪批次）修正：DRY_RUN 原本是 `config[CONFIG_KEYS.DRY_RUN]`
+    // 直接接字串，Config 工作表沒有登記這個 Key 時會顯示字面文字
+    // 「DRY_RUN：undefined」——改用 describeConfigValue_() 顯示實際生效值。
+    const dryRun = describeConfigValue_(config, CONFIG_KEYS.DRY_RUN, true);
     ui.alert(
       '重新載入設定（唯讀）',
       '已清除 Config 快取，以下是剛從工作表重新讀取的目前值：\n\n'
         + 'ROSTER_DRIVE_FOLDER_ID：' + (config[CONFIG_KEYS.ROSTER_DRIVE_FOLDER_ID] || '（空白）') + '\n'
-        + 'DRY_RUN：' + config[CONFIG_KEYS.DRY_RUN] + '\n'
+        + 'DRY_RUN：' + dryRun.display + '\n'
         + 'ATTACH_NAME_PATTERN：' + (config[CONFIG_KEYS.ATTACH_NAME_PATTERN] || '（空白，使用內建預設值）'),
       ui.ButtonSet.OK
     );
@@ -931,6 +937,83 @@ function runCleanupOldPdfs_() {
   } catch (err) {
     log_('ERROR', 'runCleanupOldPdfs_ 失敗: ' + err.message);
     ui.alert('清理舊 PDF', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/** 執行「按季度清理 PDF」前必須逐字輸入的確認字串。 */
+const QUARTER_PDF_CLEANUP_CONFIRM_TEXT = '確認清理';
+
+/**
+ * 階段 C（第五輪批次）新增：選單項目「⚠️⚠️ 按季度清理 PDF」的執行入口——
+ * 跟「清理舊 PDF」不同，這個工具**不分版本，把指定季度資料夾內全部已辨識
+ * 的檔案一次過清走**，給「整個季度已經測試完畢，不需要保留任何版本」這種
+ * 情境用（例如測試季度收工後）。跟「維護 ▸ ⚠️⚠️ 重設季度測試資料」一樣
+ * 是 plan-only＋打字確認：先列出將被清理的完整檔案清單（含檔名與大小），
+ * 要求逐字輸入「確認清理」才會真正執行，不分版本、不判斷「是否仍在使用」
+ * ——這正是為什麼跟「清理舊 PDF」是兩個獨立工具：一個安全（保留最新版），
+ * 一個徹底但需要你自己確認這個季度真的不需要任何 PDF 了。
+ * @returns {void}
+ */
+function runQuarterPdfCleanup_() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt('⚠️⚠️ 按季度清理 PDF',
+    '請輸入要清理的 QuarterID（例如 2026T4）：\n\n'
+      + '⚠️ 這個工具不分版本，會清走這個季度資料夾內的全部已辨識 PDF，'
+      + '不像「清理舊 PDF」會保留每人最新一份。適合整個季度已測試完畢、'
+      + '完全不需要保留任何版本的情境。',
+    ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+  const quarterId = response.getResponseText().trim();
+  if (!quarterId) return;
+
+  let plan;
+  try {
+    plan = planQuarterPdfCleanup_(quarterId);
+  } catch (err) {
+    ui.alert('按季度清理 PDF', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  if (plan.files.length === 0) {
+    ui.alert('按季度清理 PDF', quarterId + ' 資料夾內找不到任何已辨識的 PDF，不需要清理。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const lines = [
+    'QuarterID：' + quarterId,
+    '資料夾：' + plan.folderName,
+    '將清理：' + plan.files.length + ' 個檔案，共 ' + formatFileSize_(plan.totalSizeBytes),
+    '（移入 Google Drive 垃圾桶，30 日內可自行復原，之後 Google 會自動永久刪除）',
+    ''
+  ];
+  plan.files.slice(0, 20).forEach(function (f) { lines.push('　' + f.name + '　' + formatFileSize_(f.sizeBytes)); });
+  if (plan.files.length > 20) lines.push('　……另有 ' + (plan.files.length - 20) + ' 個');
+  lines.push('', '這個動作不分版本，即使某個版本仍在使用中也會一併清走。'
+    + '請確認要繼續，並在下一步逐字輸入「' + QUARTER_PDF_CLEANUP_CONFIRM_TEXT + '」：');
+
+  const confirm = ui.prompt('⚠️⚠️ 按季度清理 PDF（最後確認）', lines.join('\n'), ui.ButtonSet.OK_CANCEL);
+  if (confirm.getSelectedButton() !== ui.Button.OK) return;
+  if (confirm.getResponseText().trim() !== QUARTER_PDF_CLEANUP_CONFIRM_TEXT) {
+    ui.alert('按季度清理 PDF', '輸入的文字不是「' + QUARTER_PDF_CLEANUP_CONFIRM_TEXT + '」，已取消，沒有清走任何東西。', ui.ButtonSet.OK);
+    return;
+  }
+
+  try {
+    const trashed = executeQuarterPdfCleanup_(plan);
+    writeAuditLog_({
+      action: '按季度清理 PDF',
+      targetSheet: '（Google Drive）',
+      targetKey: quarterId,
+      oldValue: trashed + ' 個檔案，共 ' + formatFileSize_(plan.totalSizeBytes),
+      newValue: '（已移入垃圾桶，30 日內可復原）',
+      source: 'runQuarterPdfCleanup_',
+      notes: plan.files.slice(0, 20).map(function (f) { return f.name; }).join('；')
+        + (plan.files.length > 20 ? '；……另有 ' + (plan.files.length - 20) + ' 個' : '')
+    });
+    ui.alert('按季度清理 PDF', '已移到垃圾桶：' + trashed + ' 個檔案。', ui.ButtonSet.OK);
+  } catch (err) {
+    log_('ERROR', 'runQuarterPdfCleanup_ 失敗: ' + err.message);
+    ui.alert('按季度清理 PDF', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
   }
 }
 

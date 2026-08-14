@@ -273,16 +273,24 @@ function generateOnePersonalPdf_(
   const fileName = buildAttachmentName_(quarterId, versionNo, personName);
   const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
 
+  // 階段 E（第五輪批次）修正：forceRegenerate=TRUE 時，「是否已存在」這個問題
+  // 的答案永遠不影響結果（下面的 `!forceRegenerate && alreadyExists` 一定是
+  // false），原本卻仍然會執行整段查詢——`existingFileSizes` 在 forceRegenerate
+  // 時本來就是 null（見 generatePersonalPdfBatch_() 的呼叫端），於是每人都會
+  // 白白多一次 `folder.getFilesByName()` 的 Drive 查詢，查完卻完全用不到結果。
+  // 改成 forceRegenerate 時整段跳過，不查也不判斷。
   let existingSize;
-  if (existingFileSizes) {
-    existingSize = existingFileSizes.has(fileName) ? existingFileSizes.get(fileName) : undefined;
-  } else {
-    const found = folder.getFilesByName(fileName);
-    existingSize = found.hasNext() ? found.next().getSize() : undefined;
-  }
-  const alreadyExists = existingSize !== undefined && existingSize >= minBytes;
-  if (!forceRegenerate && alreadyExists) {
-    return { skippedExisting: true, retries: 0, highlightMs: 0, exportMs: 0, nameTC: personName };
+  if (!forceRegenerate) {
+    if (existingFileSizes) {
+      existingSize = existingFileSizes.has(fileName) ? existingFileSizes.get(fileName) : undefined;
+    } else {
+      const found = folder.getFilesByName(fileName);
+      existingSize = found.hasNext() ? found.next().getSize() : undefined;
+    }
+    const alreadyExists = existingSize !== undefined && existingSize >= minBytes;
+    if (alreadyExists) {
+      return { skippedExisting: true, retries: 0, highlightMs: 0, exportMs: 0, nameTC: personName };
+    }
   }
 
   const attemptStartedAt = new Date();

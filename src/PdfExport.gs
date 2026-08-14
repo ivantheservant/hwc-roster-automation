@@ -715,6 +715,106 @@ function trashFiles_(fileIds) {
 }
 
 /**
+ * 階段 C（第五輪批次）新增：按「季度＋版本」統計 RosterPDF 資料夾內的檔案數
+ * 與總容量，並標示哪個版本是該季度**目前登記的最新版本**（依 RosterVersions，
+ * 不是資料夾裡出現過的版本號最大值——步驟 5「改動後重發」之後，資料夾可能
+ * 混雜多個版本的檔案，但 RosterVersions 記錄的才是真正「目前生效」的版本）。
+ *
+ * 純統計用途，不判斷「該不該刪」——這裡標示的 `isLatestVersion=false` 只是
+ * 「這個版本已經不是最新」，不代表可以放心整批清掉：`scanNonLatestPdfs_()`
+ * 逐身分判斷才是實際清理（「清理舊 PDF」選單項）依據的邏輯，因為同一個
+ * 資料夾可能有人還在用舊版本（見該函式的檔頭說明）。這裡只是給你一個
+ * 「幾多空間可以透過清理釋放」的概觀。
+ *
+ * 呼叫端已經解析好 folder（`resolveMailAttachmentFolder_()`）與
+ * `listExistingFileSizes_(folder)`，這裡不重新呼叫 `folder.getFiles()`
+ * 第二次——Drive API 呼叫本身有延遲，同一份資料重複列兩次沒有必要。
+ *
+ * @param {Folder} folder 要統計的資料夾
+ * @param {Map<string, number>} fileSizes `listExistingFileSizes_(folder)` 的結果
+ * @returns {{totalFileCount: number, totalSizeBytes: number, groups: Object[]}}
+ *   groups 每項為 {quarterId, versionNo, fileCount, sizeBytes, isLatestVersion}，
+ *   按 quarterId、versionNo 排序；命名不符合慣例的檔案歸在
+ *   {quarterId: '', versionNo: null, ...} 這一組
+ */
+function scanPdfStatsByQuarterVersion_(folder, fileSizes) {
+  const pattern = /^(.+?)_v(\d+)_/;
+
+  const latestVersionByQuarter = {};
+  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+    const qid = String(row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] || '').trim();
+    if (!qid) return;
+    const vNo = Number(row[COLUMNS.ROSTER_VERSIONS.VERSION_NO]);
+    if (!(qid in latestVersionByQuarter) || vNo > latestVersionByQuarter[qid]) latestVersionByQuarter[qid] = vNo;
+  });
+
+  const groups = {};
+  let totalFileCount = 0;
+  let totalSizeBytes = 0;
+  fileSizes.forEach(function (size, name) {
+    totalFileCount++;
+    totalSizeBytes += size;
+    const match = pattern.exec(name);
+    const quarterId = match ? match[1] : '';
+    const versionNo = match ? Number(match[2]) : null;
+    const key = match ? quarterId + '|' + versionNo : '（不符合命名慣例）';
+    if (!groups[key]) groups[key] = { quarterId: quarterId, versionNo: versionNo, fileCount: 0, sizeBytes: 0 };
+    groups[key].fileCount++;
+    groups[key].sizeBytes += size;
+  });
+
+  const result = Object.keys(groups).map(function (key) {
+    const g = groups[key];
+    return Object.assign({}, g, {
+      isLatestVersion: !!g.quarterId && latestVersionByQuarter[g.quarterId] === g.versionNo
+    });
+  }).sort(function (a, b) {
+    if (a.quarterId !== b.quarterId) return a.quarterId < b.quarterId ? -1 : 1;
+    return (a.versionNo || 0) - (b.versionNo || 0);
+  });
+
+  return { totalFileCount: totalFileCount, totalSizeBytes: totalSizeBytes, groups: result };
+}
+
+/**
+ * 階段 C（第五輪批次）新增：「按季度清理」的 plan 階段——列出資料夾內屬於
+ * 指定季度的**全部**已辨識檔案（不分版本；跟「清理舊 PDF」／
+ * `scanNonLatestPdfs_()` 只清「非最新版本」不同，這個工具是給「整個季度已經
+ * 測試完畢，要整批清走」這種情境用的，例如測試季度收工後不需要保留任何
+ * 版本）。只讀取，完全不刪除任何東西。
+ * @param {string} quarterId 季度 ID
+ * @returns {{folderName: string, files: Object[], totalSizeBytes: number}}
+ *   files 每項為 {id, name, sizeBytes, versionNo}
+ */
+function planQuarterPdfCleanup_(quarterId) {
+  const folder = resolveMailAttachmentFolder_();
+  const pattern = new RegExp('^' + escapeRegExp_(quarterId) + '_v(\\d+)');
+  const files = [];
+  let totalSizeBytes = 0;
+  const iter = folder.getFiles();
+  while (iter.hasNext()) {
+    const file = iter.next();
+    const match = pattern.exec(file.getName());
+    if (!match) continue;
+    const size = file.getSize();
+    totalSizeBytes += size;
+    files.push({ id: file.getId(), name: file.getName(), sizeBytes: size, versionNo: Number(match[1]) });
+  }
+  return { folderName: folder.getName(), files: files, totalSizeBytes: totalSizeBytes };
+}
+
+/**
+ * 依 planQuarterPdfCleanup_() 的計畫，把整個季度的全部已辨識 PDF 一次過移到
+ * 垃圾桶（不分版本，30 日內可復原）。只應該由選單「維護 ▸ ⚠️⚠️ 按季度清理
+ * PDF」（經過打字確認）呼叫，不應該在其他地方自動呼叫。
+ * @param {Object} plan planQuarterPdfCleanup_() 的結果
+ * @returns {number} 移到垃圾桶的檔案數
+ */
+function executeQuarterPdfCleanup_(plan) {
+  return trashFiles_(plan.files.map(function (f) { return f.id; }));
+}
+
+/**
  * 依 Config 的 ATTACH_NAME_PATTERN 組出附件檔名。
  * 支援的變數：{QuarterID}、{PersonName}、{VersionNo}。
  * @param {string} quarterId 季度 ID
