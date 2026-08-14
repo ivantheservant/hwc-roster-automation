@@ -17,6 +17,7 @@ function validateSetup() {
   issues = issues.concat(validateServiceDatesSpecialId_());
   issues = issues.concat(validateRequiredConfig_());
   issues = issues.concat(validateEmailRecipientPlaceholders_());
+  issues = issues.concat(validateEmailRecipientsRole_());
 
   if (issues.length === 0) {
     log_('INFO', 'validateSetup: 沒有發現問題');
@@ -191,4 +192,38 @@ function validateEmailRecipientPlaceholders_() {
  */
 function isPlaceholderText_(value) {
   return value.indexOf(PLACEHOLDER_MARKER) !== -1;
+}
+
+/**
+ * 階段 D2 新增：檢查 EmailRecipients 的 Role 欄是否為合法值（REVIEWER 或 ALL），
+ * 以及 Active=TRUE 但 Email 欄空白的行。
+ *
+ * 這項檢查存在的理由：Role 空白或打錯字（例如多打一個空格、大小寫以外的錯字）
+ * 不會讓系統拋錯——`listRecipients_()`（Mailer.gs）的 REVIEW 分支只認完全等於
+ * REVIEWER 的值，其餘一律當作「不是審閱者」靜靜略過，不會有任何警示，後果是
+ * 「以為設定了 REVIEWER，其實那一行永遠收不到步驟 2 的審閱信」，只有等到寄出後
+ * 發現某人沒收到信才會被察覺。只回報，不自動修正——要填成 REVIEWER 還是 ALL、
+ * 要不要補電郵，都是人手判斷的事。
+ * @returns {string[]} 問題描述陣列
+ */
+function validateEmailRecipientsRole_() {
+  const issues = [];
+  const rows = readSheet(SHEETS.EMAIL_RECIPIENTS);
+  const C = COLUMNS.EMAIL_RECIPIENTS;
+  const validRoles = [RECIPIENT_ROLE.REVIEWER, RECIPIENT_ROLE.ALL];
+
+  rows.forEach(function (row) {
+    const label = row[C.RECIPIENT_ID] || row[C.DISPLAY_NAME] || '(無 RecipientID)';
+    const role = String(row[C.ROLE] || '').trim().toUpperCase();
+    if (validRoles.indexOf(role) === -1) {
+      issues.push('EmailRecipients: ' + label + ' 的 Role 欄不是合法值「' + (row[C.ROLE] || '（空白）') + '」'
+        + '——應為 REVIEWER 或 ALL。空白或打錯字的後果：如果本來想要它是 REVIEWER，'
+        + '這一行永遠不會收到「步驟 2：寄給堂委審閱」的信（listRecipients_() 的 REVIEW 分支'
+        + '只認完全等於 REVIEWER 的值，其餘一律略過，不會拋錯、也不會有任何警示）。');
+    }
+    if (isTrueValue_(row[C.ACTIVE]) && !String(row[C.EMAIL] || '').trim()) {
+      issues.push('EmailRecipients: ' + label + ' 的 Active=TRUE 但 Email 欄空白——這一行不會收到任何郵件。');
+    }
+  });
+  return issues;
 }

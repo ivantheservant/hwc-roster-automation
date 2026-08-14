@@ -1795,6 +1795,14 @@ function runResetQuarterTestData_() {
     '　以及其他季度的任何資料。'
   ];
 
+  if (plan.pdfFiles.length > 0) {
+    lines.push('', '將移到垃圾桶的 PDF 檔案：');
+    plan.pdfFiles.slice(0, 20).forEach(function (f) {
+      lines.push('　' + f.name + '　' + formatFileSize_(f.sizeBytes));
+    });
+    if (plan.pdfFiles.length > 20) lines.push('　……另有 ' + (plan.pdfFiles.length - 20) + ' 個');
+  }
+
   if (plan.manualAttention.length > 0) {
     lines.push('', '⚠ 以下項目系統不會自動處理，需要你人手判斷：');
     plan.manualAttention.forEach(function (m) { lines.push('　• ' + m); });

@@ -134,6 +134,17 @@ function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotInd
   const trimmedName = String(name || '').trim();
   if (!trimmedName) throw new Error('姓名不可留空。');
 
+  // 階段 B3 補強：這個工具的檔頭說明明確表示只服務「講員」「翻譯」兩個崗位，
+  // 但原本這裡完全沒有檢查傳入的 postId 是不是這兩個崗位之一——只要
+  // RosterAssignments 剛好有對應的格子，就會照樣寫入，等於這個本來設計上限定
+  // 兩個崗位的入口，實際上可以覆寫任何崗位的任何格子。加這道檢查作縱深防禦
+  // （側邊欄本身只會送出這兩個崗位的 postId，正常操作不會觸發這裡的錯誤）。
+  const ids = findPreacherTranslationPostIds_();
+  const allowedPostIds = [ids.preacherPostId, ids.translationPostId].filter(Boolean);
+  if (allowedPostIds.indexOf(postId) === -1) {
+    throw new Error('這個工具只能填寫「講員」或「翻譯」崗位的格子，收到的 PostID「' + postId + '」不屬於這兩個崗位。');
+  }
+
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 

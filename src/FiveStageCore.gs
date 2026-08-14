@@ -27,6 +27,49 @@
  */
 
 /* ============================================================
+ * Web UI 五張步驟卡片的可用／完成狀態
+ * ============================================================ */
+
+/**
+ * 階段 B5 抽出：依 Stage（與步驟 1 是否已有版本）決定步驟 2～5 四張卡片的
+ * available／done 狀態，純函式、不讀寫任何工作表——原本這段判斷邏輯直接寫在
+ * `WebAppFlow.gs` 的 `apiGetFlowState()` 裡，這裡抽出來只是把「純判斷」與
+ * 「讀 SendLog 找 lastSentAt 這類有 IO 的部分」分開，方便獨立測試，
+ * `apiGetFlowState()` 的輸出格式與行為完全不變（`ui/Index.html`／`ui/Script.html`
+ * 沒有任何改動）。
+ *
+ * ⚠️ 「任何時候最多只有一個步驟按鈕 available」這個直覺**不成立**：Stage＝
+ * REQUESTS_APPLIED 時，步驟 3（可重複執行套用新申報）與步驟 4（正式發出）
+ * 同時 available，這是既有、刻意的設計（步驟 3 的文件說明本來就是「可重複執行」），
+ * 不是這次抽函式引入的行為，抽出來時原封不動保留。
+ *
+ * @param {string} stage QUARTER_STAGE 其中一個值
+ * @param {boolean} step1VersionExists 這一季是否已有生成過的版本（決定步驟 2 能不能開）
+ * @returns {{step2: {available: boolean, done: boolean}, step3: {available: boolean, done: boolean},
+ *   step4: {available: boolean, done: boolean}, step5: {available: boolean}}}
+ */
+function computeFiveStepAvailability_(stage, step1VersionExists) {
+  const stageIndex = QUARTER_STAGE_ORDER.indexOf(stage);
+  return {
+    step2: {
+      available: stage === QUARTER_STAGE.DRAFT && step1VersionExists,
+      done: stageIndex > QUARTER_STAGE_ORDER.indexOf(QUARTER_STAGE.DRAFT)
+    },
+    step3: {
+      available: stage === QUARTER_STAGE.REVIEW_SENT || stage === QUARTER_STAGE.REQUESTS_APPLIED,
+      done: stageIndex > QUARTER_STAGE_ORDER.indexOf(QUARTER_STAGE.REVIEW_SENT)
+    },
+    step4: {
+      available: stage === QUARTER_STAGE.REQUESTS_APPLIED,
+      done: stage === QUARTER_STAGE.OFFICIAL_SENT
+    },
+    step5: {
+      available: stage === QUARTER_STAGE.OFFICIAL_SENT
+    }
+  };
+}
+
+/* ============================================================
  * 步驟 2：寄給堂委審閱
  * ============================================================ */
 

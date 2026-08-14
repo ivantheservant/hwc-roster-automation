@@ -190,8 +190,14 @@ function indexPeopleById_() {
  * 列出本階段的收件人。
  * LIST 類別來自 EmailRecipients：一般階段看 Stage 欄是否包含本階段；
  * REVIEW 階段（四階段流程的「步驟 2：寄給堂委審閱」）例外，完全依 Role=REVIEWER
- * 判斷，不理 Stage 欄——審閱者不一定跟 GENERATE/REMIND/OFFICIAL/RESEND 的名單重疊。
+ * 判斷（見 EmailRecipientsSeed.gs 的 `isReviewerRecipientRow_()`，與
+ * `countReviewerRecipients_()` 共用同一條件，不會出現兩邊各自實作、改一邊漏一邊的情況），
+ * 不理 Stage 欄——審閱者不一定跟 GENERATE/REMIND/OFFICIAL/RESEND 的名單重疊。
  * PERSON 類別只在 OFFICIAL 與 RESEND 階段產生，對象為本季有被派工的人。
+ *
+ * Role 欄兩個值的實際意思（階段 D，詳見 EmailRecipientsSeed.gs 檔頭說明）：
+ * REVIEWER＝會收步驟 2 的審閱信；ALL＝不會收步驟 2 的審閱信，只依 Stage 欄決定
+ * 其餘階段收不收——ALL 這個名稱容易誤會成「所有階段都收」，實際意思剛好相反。
  *
  * 步驟 5「改動後重發」：RESEND 階段的 PERSON 名單另外納入「這一版完全沒有任何
  * 派工、但 SendLog 有上次寄送紀錄」的人——即被整個頂走、這一版一格都沒有的人。
@@ -213,8 +219,7 @@ function listRecipients_(stage, context) {
     if (!isTrueValue_(row[COLUMNS.EMAIL_RECIPIENTS.ACTIVE])) return;
 
     if (stage === MAIL_STAGES.REVIEW) {
-      const role = String(row[COLUMNS.EMAIL_RECIPIENTS.ROLE] || '').trim().toUpperCase();
-      if (role !== RECIPIENT_ROLE.REVIEWER) return;
+      if (!isReviewerRecipientRow_(row)) return;
     } else {
       const stages = splitList_(row[COLUMNS.EMAIL_RECIPIENTS.STAGE]);
       if (stages.indexOf(stage) === -1) return;

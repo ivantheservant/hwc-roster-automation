@@ -34,7 +34,10 @@ function apiGetFlowState(quarterId) {
     step1.createdAt = findVersionCreatedAt_(quarterId, latestVersionNo);
   }
 
-  const stageIndex = QUARTER_STAGE_ORDER.indexOf(stage);
+  // 階段 B5：純判斷（哪個 Stage 對應哪些卡片 available／done）抽到 FiveStageCore.gs
+  // 的 computeFiveStepAvailability_()，這裡只負責把它跟另外兩個有 IO 的欄位
+  // （lastSentAt 要讀 SendLog）合併成前端要的完整格式，回傳內容與抽函式之前逐字相同。
+  const availability = computeFiveStepAvailability_(stage, step1.versionExists);
 
   return {
     quarterId: quarterId,
@@ -42,24 +45,10 @@ function apiGetFlowState(quarterId) {
     isDryRun: isDryRun,
     latestVersionNo: latestVersionNo,
     step1: step1,
-    step2: {
-      available: stage === QUARTER_STAGE.DRAFT && step1.versionExists,
-      done: stageIndex > QUARTER_STAGE_ORDER.indexOf(QUARTER_STAGE.DRAFT),
-      lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.REVIEW)
-    },
-    step3: {
-      available: stage === QUARTER_STAGE.REVIEW_SENT || stage === QUARTER_STAGE.REQUESTS_APPLIED,
-      done: stageIndex > QUARTER_STAGE_ORDER.indexOf(QUARTER_STAGE.REVIEW_SENT)
-    },
-    step4: {
-      available: stage === QUARTER_STAGE.REQUESTS_APPLIED,
-      done: stage === QUARTER_STAGE.OFFICIAL_SENT,
-      lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.OFFICIAL)
-    },
-    step5: {
-      available: stage === QUARTER_STAGE.OFFICIAL_SENT,
-      lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.RESEND)
-    }
+    step2: Object.assign({}, availability.step2, { lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.REVIEW) }),
+    step3: availability.step3,
+    step4: Object.assign({}, availability.step4, { lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.OFFICIAL) }),
+    step5: Object.assign({}, availability.step5, { lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.RESEND) })
   };
 }
 

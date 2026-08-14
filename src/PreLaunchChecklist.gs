@@ -145,16 +145,33 @@ function buildPreLaunchChecklist_(quarterId) {
   ));
 
   // 4. 是否已安裝自動排程 trigger
+  // 階段 C1 擴充：原本只講「裝了幾個」，現在補上「系統應該有的 trigger 長什麼樣」
+  // （函式名、頻率、執行時間、時區），方便跟「目前實際存在的」直接對照，
+  // 以及明確講清楚每日檢查涵蓋 GENERATE／REMIND，OFFICIAL 是刻意永遠不會由這裡
+  // 觸發（見 Trigger.gs 的 assertOfficialNotFromAutomationTrigger_() 結構性防護）。
   const triggers = listAutomationTriggers_();
+  const triggerSendHour = getConfig(CONFIG_KEYS.SEND_HOUR_LOCAL, null);
+  const triggerTimezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const expectedTriggerDesc = '函式：' + AUTOMATION_TRIGGER_FUNCTION
+    + '　頻率：每日一次　執行時間：' + (triggerSendHour === null || triggerSendHour === ''
+      ? '（Config 的 SEND_HOUR_LOCAL 未設定，安裝時會退回預設 09:00）'
+      : String(triggerSendHour) + ':00')
+    + '　時區：' + triggerTimezone
+    + '（Apps Script 只保證每 24 小時內於設定的小時觸發一次，不是精確到分鐘）';
   items.push(buildChecklistItem_(
     '自動排程 trigger 是否已安裝',
     true,
-    triggers.length === 0 ? '未安裝（0 個）' : '已安裝（' + triggers.length + ' 個）',
-    triggers.length === 0
+    (triggers.length === 0 ? '未安裝（0 個）' : '已安裝（' + triggers.length + ' 個）')
+      + '　｜　系統應該有的樣子：' + expectedTriggerDesc,
+    (triggers.length === 0
       ? '目前沒有安裝自動排程 trigger，四階段流程需要人手到選單逐步執行——這是安全的預設狀態。'
         + '如果你打算之後啟用自動排程，記得到「自動排程」子選單安裝。'
       : '已安裝 ' + triggers.length + ' 個自動排程 trigger，系統會在時間到達時自動檢查，並可能自動執行寄送。'
-        + '請確認這是你有意啟用的狀態（可到「自動排程 ▸ 查看自動排程狀態」查看詳情）。'
+        + '請確認這是你有意啟用的狀態（可到「自動排程 ▸ 查看自動排程狀態」查看詳情）。')
+      + ' 每日檢查只做兩件事：到期自動生成初稿（GENERATE，只通知幹事覆核）、'
+      + '卡在 REVIEW_SENT 太久時提醒幹事（REMIND，同樣只通知幹事）。'
+      + '正式發出（OFFICIAL）永遠不會由這裡觸發，一律要幹事在「步驟 4」手動執行——'
+      + '這是結構性防護（assertOfficialNotFromAutomationTrigger_()），不是單純「這裡沒寫」。'
   ));
 
   // 5. 職事表上的人是否都在 NameMapping 有電郵、格式是否明顯有問題
@@ -381,8 +398,56 @@ function buildPreLaunchChecklist_(quarterId) {
     quarterId: quarterId,
     items: items,
     readyCount: readyCount,
-    needsAttentionCount: items.length - readyCount
+    needsAttentionCount: items.length - readyCount,
+    // 階段 C2 新增：DRY_RUN／MAIL_SUBJECT_PREFIX／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS
+    // 四項各自的現況已經在上面的 items 逐項列出，這裡另外補一份「建議改動順序＋
+    // 每一步風險」的綜合說明——四項各自獨立看都合理，但上線切換的順序本身也有風險
+    // （例如：先開 DRY_RUN=FALSE 才設定 WEBAPP_ALLOWED_EMAILS，會有一段時間任何人
+    // 都連不上 Web UI 卻已經在真實寄信），這是單看一項看不出來的。
+    launchSequenceNotes: buildLaunchSequenceNotes_(dryRun, looksLikeTestPrefix, subjectPrefix, webappEnabled, webappReady)
   };
+}
+
+/**
+ * 階段 C2 新增：把 DRY_RUN／MAIL_SUBJECT_PREFIX／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS
+ * 綜合成一份建議的上線切換順序，附每一步的風險。純函式、不讀寫任何工作表——
+ * 四個現值由呼叫端（buildPreLaunchChecklist_()）已經算好的值傳入，避免重複讀取。
+ * @param {boolean} dryRun 目前 DRY_RUN 是否為 TRUE
+ * @param {boolean} looksLikeTestPrefix MAIL_SUBJECT_PREFIX 是否像測試字眼
+ * @param {string} subjectPrefix MAIL_SUBJECT_PREFIX 現值
+ * @param {boolean} webappEnabled WEBAPP_ENABLED 是否為 TRUE
+ * @param {boolean} webappReady WEBAPP_ENABLED 開啟時，白名單是否至少有一人能用
+ * @returns {string[]} 建議順序，每一項已包含風險說明
+ */
+function buildLaunchSequenceNotes_(dryRun, looksLikeTestPrefix, subjectPrefix, webappEnabled, webappReady) {
+  const notes = [];
+  let step = 1;
+
+  if (looksLikeTestPrefix) {
+    notes.push('第 ' + (step++) + ' 步：先清走 MAIL_SUBJECT_PREFIX 的測試字眼「' + subjectPrefix + '」。'
+      + '風險：低，只影響信件標題外觀，不影響任何收發邏輯，任何時候改都安全，'
+      + '建議在還是 DRY_RUN=TRUE 的時候就先改好，不用等到最後一刻。');
+  }
+
+  if (webappEnabled && !webappReady) {
+    notes.push('第 ' + (step++) + ' 步：WEBAPP_ENABLED 已經是 TRUE，但白名單目前沒有人能用，'
+      + '請先設定 WEBAPP_ALLOWED_EMAILS（或確認 SCRIPT_ACCOUNT_EMAIL 有值）。'
+      + '風險：低（Web UI 本身不寄信，只是操作介面），但如果你打算靠 Web UI 操作四階段流程，'
+      + '這一步沒做完，屆時會沒有人能用介面。');
+  } else if (!webappEnabled) {
+    notes.push('第 ' + (step++) + ' 步（視你是否要用 Web UI 而定）：如果打算用 Web UI 操作，'
+      + '先設定好 WEBAPP_ALLOWED_EMAILS，確認能連上、看得到正確的 Stage 之後，再把 WEBAPP_ENABLED 改成 TRUE。'
+      + '風險：低，這兩格只控制「誰能用 Web UI 操作介面」，不影響選單操作，也不會自己寄信。');
+  }
+
+  notes.push('第 ' + (step++) + ' 步（最後一步，風險最高，建議放在最後）：確認以上都處理好、'
+    + '也已經用 DRY_RUN=TRUE 完整測試過至少一次四階段流程之後，才把 DRY_RUN 改為 FALSE。'
+    + '風險：高——這一步之後，「步驟 2」「步驟 4」「步驟 5」與自動排程的每一次寄送都會'
+    + '真正寄出電郵，不能反悔已經寄出的那些封信。建議選一個非上線關鍵時期的季度先試跑一次'
+    + '正式模式，確認無誤後才在真正要用的季度切換。'
+    + (dryRun ? '' : '（目前 DRY_RUN 已經是 FALSE，這一步已完成。）'));
+
+  return notes;
 }
 
 /**
@@ -434,6 +499,17 @@ function runPreLaunchChecklist_() {
       rows.push(diagRow_('上線前檢查', item.label + '　明細', '', d));
     });
   });
+
+  if (result.launchSequenceNotes && result.launchSequenceNotes.length > 0) {
+    lines.push('建議上線切換順序（DRY_RUN／MAIL_SUBJECT_PREFIX／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）：', '');
+    result.launchSequenceNotes.forEach(function (n) {
+      lines.push(n);
+      lines.push('');
+      rows.push(diagRow_('上線前檢查', '建議上線切換順序', '', n));
+    });
+  } else {
+    lines.push('目前的設定已經沒有明顯需要按順序處理的切換步驟。', '');
+  }
 
   tryWriteDiagnostics_('上線前檢查', rows);
   lines.push(DIAGNOSTICS_WRITTEN_NOTE);
