@@ -140,9 +140,44 @@ function buildMailContext_(quarterId, versionNo, stage) {
       StartDate: toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone),
       EndDate: toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone),
       OfficialSendDate: toDateString(quarter[COLUMNS.QUARTERS.OFFICIAL_SEND_ON], timezone),
-      SpreadsheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl()
+      SpreadsheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(),
+      // 第三輪批次下一輪（新一批階段 B）新增：目前的四階段流程 Stage 與建議下一步，
+      // 供 docs/系統範圍稽核.md 建議的新 TPL_REMIND_TC 範本使用。用 try/catch
+      // 包住——buildMailContext_() 本來就會在 GENERATE／OFFICIAL 等各種階段被呼叫，
+      // 不希望這兩個新欄位的計算意外令其他階段的寄送失敗；查不到就留空，
+      // applyPlaceholders_() 的清理機制會處理掉範本裡對應的 {CurrentStage}／
+      // {NextAction} 文字，不會露出未代入的花括號。
+      CurrentStage: resolveCurrentStageForPlaceholder_(quarterId),
+      NextAction: resolveNextActionForPlaceholder_(quarterId)
     }
   };
+}
+
+/**
+ * 供 {CurrentStage} placeholder 使用：查詢目前的 Quarters.Stage，查不到（例如
+ * 季度不存在、Stage 欄缺失）就回傳空字串，不拋錯——見 buildMailContext_() 的
+ * 說明，這裡不能讓一個顯示用的小欄位打斷整個寄信流程。
+ * @param {string} quarterId 季度 ID
+ * @returns {string} Stage 值；查不到回傳空字串
+ */
+function resolveCurrentStageForPlaceholder_(quarterId) {
+  try {
+    return getQuarterStage_(quarterId);
+  } catch (err) {
+    return '';
+  }
+}
+
+/**
+ * 供 {NextAction} placeholder 使用：依目前 Stage 查 STAGE_NEXT_ACTION
+ * （Constants.gs）。Stage 是 OFFICIAL_SENT 或查詢失敗時回傳空字串——
+ * OFFICIAL_SENT 代表流程已經走完，沒有「下一步」這個概念。
+ * @param {string} quarterId 季度 ID
+ * @returns {string} 建議下一步的選單路徑文字；不適用時回傳空字串
+ */
+function resolveNextActionForPlaceholder_(quarterId) {
+  const stage = resolveCurrentStageForPlaceholder_(quarterId);
+  return STAGE_NEXT_ACTION[stage] || '';
 }
 
 /**
@@ -766,6 +801,14 @@ function htmlToPlainText_(html) {
 /**
  * 把範本中的 {變數} 換成實際值。
  * 支援季度層級的變數，以及 {PersonName}、{AssignmentSummary}。
+ *
+ * 第三輪批次下一輪（新一批階段 B）：處理完全部已知的 placeholder 之後，
+ * 加一道清理——任何還留在文字裡、形如 {XxxYyy} 的字串（代表範本用了一個
+ * 這個階段沒有提供的變數）一律換成空字串，不是拋錯、也不是保留原始的
+ * 「{XxxYyy}」文字留在信裡給收件人看到。這是為了讓
+ * docs/系統範圍稽核.md 建議的新 TPL_REMIND_TC 範本可以安全使用
+ * {CurrentStage}／{NextAction} 這類只有部分呼叫情境才有意義的變數——
+ * 即使某次呼叫沒有提供某個變數，範本也不會壞掉，只是那個位置留空。
  * @param {string} text 範本文字
  * @param {Object.<string, string>} placeholders 季度層級的變數對照
  * @param {Object} recipient 收件人資料
@@ -779,6 +822,7 @@ function applyPlaceholders_(text, placeholders, recipient, summary) {
   });
   result = result.split('{PersonName}').join(recipient.displayName || '');
   result = result.split('{AssignmentSummary}').join(summary || '');
+  result = result.replace(/\{[A-Za-z][A-Za-z0-9]*\}/g, '');
   return result;
 }
 
@@ -831,8 +875,8 @@ function writeSendLogRows_(outcomes, context) {
  * 統一的「只通知幹事」寄信函式：整個專案唯一呼叫 MailApp.sendEmail() 的兩個地方
  * 之一（另一個是 sendRealEmail_()，供一般收件人使用）。原本只服務「查無電郵名單」
  * 這一種用途（notifyAdminNoEmail_()），追加階段 N 把它一般化，讓「生成初稿完成通知」
- * 與「REVIEW_SENT 卡住提醒」這兩個新的幹事專屬通知（notifyAdminGenerateDone_()／
- * notifyAdminStuckReminder_()）可以共用同一個真正寄信的呼叫點，不需要新增第三個
+ * 與「Stage 停滯提醒」這兩個新的幹事專屬通知（notifyAdminGenerateDone_()／
+ * notifyAdminStageReminder_()）可以共用同一個真正寄信的呼叫點，不需要新增第三個
  * MailApp.sendEmail() 呼叫。DRY_RUN=TRUE 時只寫 Logger，不寄出。
  * @param {string} subject 標題（含前綴由呼叫端自行組好）
  * @param {string} body 純文字內文
@@ -889,24 +933,43 @@ function notifyAdminGenerateDone_(quarterId, genResult, config, isDryRun) {
 }
 
 /**
- * 追加階段 N：Stage 卡在 REVIEW_SENT（已寄給堂委審閱、但還未套用修改申報）太久時
- * 提醒幹事，只寄給幹事，不寄給堂委或義工。
+ * 第三輪批次下一輪（新一批階段 B）：Stage 停留在 DRAFT／REVIEW_SENT／
+ * REQUESTS_APPLIED 三者之一太久（停滯時間）、或距離正式發出日期太近（死線
+ * 接近）時提醒幹事，兩個原因可以同時成立、但只會寄這一封信。只寄給幹事，
+ * 不寄給堂委或義工——義工收到的第一封信永遠是「步驟 4：正式發出」那一封，
+ * 這一點不會因為 REMIND 擴大範圍而改變。
  * @param {string} quarterId 季度 ID
- * @param {Object} judgment judgeRemindStuckAction_() 的結果（outcome=WOULD_RUN 時呼叫）
+ * @param {Object} judgment judgeRemindAction_() 的結果（outcome=WOULD_RUN 時呼叫），
+ *   至少含 stage、reasons、reminderCount、maxCount、daysStuck、daysUntilDeadline、
+ *   stuckDays、deadlineDays
  * @param {Object} config readConfig() 的結果
  * @param {boolean} isDryRun 是否為測試模式
  * @returns {void}
  */
-function notifyAdminStuckReminder_(quarterId, judgment, config, isDryRun) {
+function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   const adminEmail = String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || '');
-  const subject = prefix + quarterId + ' 職事表卡在「已寄審閱」，請跟進';
-  const body = quarterId + ' 的職事表 Stage 已經停留在「REVIEW_SENT」（已寄給堂委審閱，'
-    + '但還未套用修改申報）一段時間，尚未進入下一步。\n\n'
-    + '這是第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次提醒（達到上限後不會再提醒）。\n\n'
-    + '請確認堂委的修改申報是否已收齊，收齊後到 Requests 工作表登記，'
-    + '再執行「職事表系統 → 四階段流程 → 步驟 3：套用修改申報」。\n\n'
-    + '（本通知只寄給你，不會寄給堂委或義工。）';
+  const nextAction = STAGE_NEXT_ACTION[judgment.stage];
+  const nextActionText = nextAction ? '「職事表系統 → ' + nextAction + '」' : '登入試算表查看目前狀態';
+
+  const reasonLines = [];
+  if (judgment.reasons.indexOf('STUCK') !== -1) {
+    reasonLines.push('　• 已經停留在「' + judgment.stage + '」' + judgment.daysStuck + ' 天（門檻 ' + judgment.stuckDays + ' 天）');
+  }
+  if (judgment.reasons.indexOf('DEADLINE') !== -1) {
+    reasonLines.push(judgment.daysUntilDeadline >= 0
+      ? '　• 距離預定的正式發出日期只剩 ' + judgment.daysUntilDeadline + ' 天（門檻 ' + judgment.deadlineDays + ' 天）'
+      : '　• 已經超過預定的正式發出日期 ' + Math.abs(judgment.daysUntilDeadline) + ' 天');
+  }
+
+  const subject = prefix + quarterId + ' 職事表停留在「' + judgment.stage + '」，請跟進';
+  const body = quarterId + ' 的職事表目前 Stage 是「' + judgment.stage + '」，尚未進入下一步。\n\n'
+    + '提醒原因：\n' + reasonLines.join('\n') + '\n\n'
+    + '這是第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次提醒'
+    + '（同一個 Stage 達到上限後不會再提醒，前進到下一個 Stage 之後次數會重新計算）。\n\n'
+    + '下一步請執行' + nextActionText + '。\n\n'
+    + '（本通知只寄給你，不會寄給堂委或義工——義工收到的第一封信永遠是'
+    + '「步驟 4：正式發出」那一封。）';
   notifyAdmin_(subject, body, adminEmail, isDryRun);
 }
 

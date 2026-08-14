@@ -190,19 +190,37 @@ function collectKeyStateRows_() {
     }
   };
 
-  // ---- Quarters：每季的 Stage 與 StageUpdatedAt ----
+  // ---- Quarters：每季的 Stage、StageUpdatedAt、最新版本號、版本總數、
+  // GenerateOn、OfficialSendOn（階段 E 擴充：原本沒有版本資訊與這兩個排程日期，
+  // 要另外去 RosterVersions 分頁才看得到，現在一次過在這裡列齊）----
   section('Quarters', function () {
     const Q = COLUMNS.QUARTERS;
+    const V = COLUMNS.ROSTER_VERSIONS;
     const quarters = readSheet(SHEETS.QUARTERS);
     if (quarters.length === 0) rows.push(diagRow_('Quarters', '（沒有資料）', '', ''));
+
+    const versionsByQuarter = {};
+    readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (v) {
+      const qId = String(v[V.QUARTER_ID] || '').trim();
+      if (!qId) return;
+      if (!versionsByQuarter[qId]) versionsByQuarter[qId] = [];
+      versionsByQuarter[qId].push(Number(v[V.VERSION_NO]));
+    });
+
     quarters.forEach(function (q) {
       const quarterId = String(q[Q.QUARTER_ID] || '').trim();
       if (!quarterId) return;
+      const versionNos = versionsByQuarter[quarterId] || [];
+      const latestVersionNo = versionNos.length > 0 ? Math.max.apply(null, versionNos) : -1;
       rows.push(diagRow_('Quarters', quarterId,
         String(q[Q.STAGE] || '（空白，視同 DRAFT）'),
         'StageUpdatedAt=' + (toDateString(q[Q.STAGE_UPDATED_AT], timezone) || String(q[Q.STAGE_UPDATED_AT] || '（空白）'))
           + '　StartDate=' + toDateString(q[Q.START_DATE], timezone)
-          + '　EndDate=' + toDateString(q[Q.END_DATE], timezone)));
+          + '　EndDate=' + toDateString(q[Q.END_DATE], timezone)
+          + '　GenerateOn=' + (toDateString(q[Q.GENERATE_ON], timezone) || '（空白，執行時退回 LEAD_DAYS_GENERATE 推算）')
+          + '　OfficialSendOn=' + (toDateString(q[Q.OFFICIAL_SEND_ON], timezone) || '（空白，執行時退回 LEAD_DAYS_OFFICIAL 推算）')
+          + '　最新版本=' + (latestVersionNo >= 0 ? 'v' + latestVersionNo : '（尚未生成）')
+          + '　版本總數=' + versionNos.length));
     });
   });
 
@@ -262,9 +280,35 @@ function collectKeyStateRows_() {
       rows.push(diagRow_('SendLog', batchId, b.count + ' 筆',
         'Stage=' + b.stage + '　' + statusText));
     });
+
+    // 階段 E 新增：按「季度＋階段」再聚合一次（上面是按「批次」，同一季同一階段
+    // 可能因為改動後重發等原因有多個批次；這裡直接答「這一季這個階段總共寄了
+    // 幾多封、各 Status 各幾多」這個更常被問到的問題，一樣只出統計，不逐行）。
+    const byQuarterStage = {};
+    const qsOrder = [];
+    logs.forEach(function (row) {
+      const quarterId = String(row[S.QUARTER_ID] || '').trim();
+      const stage = String(row[S.STAGE] || '').trim();
+      if (!quarterId || !stage) return;
+      const key = quarterId + '｜' + stage;
+      if (!byQuarterStage[key]) { byQuarterStage[key] = { count: 0, statuses: {} }; qsOrder.push(key); }
+      byQuarterStage[key].count++;
+      const status = String(row[S.STATUS] || '（空白）');
+      byQuarterStage[key].statuses[status] = (byQuarterStage[key].statuses[status] || 0) + 1;
+    });
+    qsOrder.sort().forEach(function (key) {
+      const g = byQuarterStage[key];
+      const statusText = Object.keys(g.statuses).sort().map(function (s) {
+        return s + '=' + g.statuses[s];
+      }).join('　');
+      rows.push(diagRow_('SendLog（按季度＋階段彙總）', key, g.count + ' 筆', statusText));
+    });
   });
 
-  // ---- Requests：每行的 Status 與是否已指派 RequestID ----
+  // ---- Requests：待處理筆數、各 Status 筆數（階段 E 改為只出統計，不逐行輸出
+  // 內容——逐行會把 Requests 裡的日期／崗位／姓名／類型細節整批倒進 Diagnostics，
+  // 這張表的定位是「統計與摘要」，不是「原始資料備份」，跟 SendLog／
+  // RosterAssignments 刻意不逐行是同一個理由）----
   section('Requests', function () {
     const R = COLUMNS.REQUESTS;
     let requests;
@@ -274,18 +318,33 @@ function collectKeyStateRows_() {
       rows.push(diagRow_('Requests', '（工作表不存在）', '', '請先執行「維護 ▸ 建立 Requests 工作表」'));
       return;
     }
-    rows.push(diagRow_('Requests', '（資料列總數）', requests.length, ''));
-    requests.forEach(function (r, i) {
+
+    let pendingCount = 0;
+    let blankCount = 0;
+    const statusCounts = {};
+    const quarterCounts = {};
+    requests.forEach(function (r) {
       const dateText = toDateString(r[R.SERVICE_DATE], timezone);
       const person = String(r[R.PERSON_NAME] || '').trim();
       const post = String(r[R.POST_NAME] || '').trim();
       const type = String(r[R.REQUEST_TYPE] || '').trim();
-      if (!dateText && !person && !post && !type) return; // 整行空白
+      if (!dateText && !person && !post && !type) { blankCount++; return; } // 整行空白
       const hasId = String(r[R.REQUEST_ID] || '').trim() !== '';
-      rows.push(diagRow_('Requests', '第 ' + (i + 3) + ' 行',
-        String(r[R.STATUS] || '（空白）'),
-        '已指派 RequestID=' + (hasId ? 'YES（不再是待處理）' : 'NO（仍是待處理）')
-          + '　' + dateText + '　' + post + '　' + person + '　' + type));
+      if (!hasId) pendingCount++;
+      const status = String(r[R.STATUS] || '（空白）');
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+      const quarterId = String(r[R.QUARTER_ID] || '（空白）').trim() || '（空白）';
+      quarterCounts[quarterId] = (quarterCounts[quarterId] || 0) + 1;
+    });
+
+    rows.push(diagRow_('Requests', '（資料列總數）', requests.length,
+      '空白列（不計入以下統計）＝' + blankCount));
+    rows.push(diagRow_('Requests', '待處理筆數（未指派 RequestID）', pendingCount, ''));
+    Object.keys(statusCounts).sort().forEach(function (s) {
+      rows.push(diagRow_('Requests（按 Status）', s, statusCounts[s], ''));
+    });
+    Object.keys(quarterCounts).sort().forEach(function (q) {
+      rows.push(diagRow_('Requests（按季度）', q, quarterCounts[q], ''));
     });
   });
 
@@ -330,13 +389,53 @@ function collectKeyStateRows_() {
     });
   });
 
-  // ---- Config：只出最常需要確認的兩個值 ----
+  // ---- EmailRecipients：每個 Active 收件人的 Role 與實際適用階段（階段 E 新增，
+  // 重用階段 C2 的 buildRecipientRoleStageMatrix_()，跟「上線前檢查」顯示的內容
+  // 保證一致，不是另外複製一份判斷邏輯）----
+  section('EmailRecipients', function () {
+    const matrix = buildRecipientRoleStageMatrix_();
+    rows.push(diagRow_('EmailRecipients', '（Active 收件人數）', matrix.length, ''));
+    matrix.forEach(function (r) {
+      rows.push(diagRow_('EmailRecipients', r.displayName + '（' + (r.recipientId || '無 ID') + '）',
+        'Role=' + r.role,
+        '實際會收：' + (r.effectiveStages.length > 0 ? r.effectiveStages.join('、') : '（不會收到任何階段的信）')
+          + '　Stage 欄原始值=' + r.stageRaw));
+    });
+  });
+
+  // ---- 自動排程 trigger：目前數量，以及應有的樣子（階段 E 新增） ----
+  section('自動排程 Trigger', function () {
+    const triggers = listAutomationTriggers_();
+    const config = readConfig();
+    const sendHour = config[CONFIG_KEYS.SEND_HOUR_LOCAL];
+    rows.push(diagRow_('自動排程 Trigger', '（目前安裝數量）', triggers.length,
+      triggers.length === 0 ? '未安裝，自動排程目前不會執行任何動作' : ''));
+    rows.push(diagRow_('自動排程 Trigger', '（應有的樣子）',
+      '函式=' + AUTOMATION_TRIGGER_FUNCTION + '　頻率=每日一次',
+      '執行時間=' + (sendHour === '' || sendHour === undefined || sendHour === null
+        ? '（SEND_HOUR_LOCAL 未設定，安裝時退回 09:00）' : sendHour + ':00')
+        + '　時區=' + (config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE)));
+  });
+
+  // ---- Config：關鍵開關現值（階段 E 擴充：加入 WEBAPP_ENABLED 與提醒相關三個
+  // Key，原本只有 DRY_RUN／MAIL_SUBJECT_PREFIX 兩個）----
   section('Config', function () {
     const config = readConfig();
     rows.push(diagRow_('Config', CONFIG_KEYS.DRY_RUN, String(config[CONFIG_KEYS.DRY_RUN]),
       config[CONFIG_KEYS.DRY_RUN] === false ? '⚠️ FALSE 代表會真正寄出電郵' : 'TRUE 代表不會真正寄出'));
     rows.push(diagRow_('Config', CONFIG_KEYS.MAIL_SUBJECT_PREFIX,
       String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '（空白）'), ''));
+    rows.push(diagRow_('Config', CONFIG_KEYS.WEBAPP_ENABLED, String(config[CONFIG_KEYS.WEBAPP_ENABLED]),
+      config[CONFIG_KEYS.WEBAPP_ENABLED] === true ? 'TRUE 代表 Web UI 已啟用' : 'FALSE 代表 Web UI 已停用'));
+    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_STUCK_DAYS,
+      String(getConfig(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS)),
+      '「停滯時間」提醒門檻（天）'));
+    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_STUCK_MAX_COUNT,
+      String(getConfig(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT)),
+      '同一「季度＋Stage」最多提醒幾次'));
+    rows.push(diagRow_('Config', CONFIG_KEYS.REMIND_DEADLINE_DAYS,
+      String(getConfig(CONFIG_KEYS.REMIND_DEADLINE_DAYS, DEFAULTS.REMIND_DEADLINE_DAYS)),
+      '「死線接近」提醒門檻（距離 OfficialSendOn 幾天內）'));
   });
 
   return rows;

@@ -245,24 +245,36 @@ function getConfigKeySeeds_() {
       defaultValue: '',
       description: '必填，自動排程「正式寄出」在季度開始日前幾天觸發，同上，故意留空不猜。'
         + '追加階段 N 之後：OFFICIAL 已經不會由自動排程觸發（一律要幹事手動執行「步驟 4」）。'
-        + '追加階段 Q 查證：這個 Key 目前全專案沒有任何呼叫端讀取——它算出來的 officialDate'
-        + '（computeAutomationSchedule_()）沒有被拿去用；郵件的 {OfficialSendDate} placeholder'
-        + '走的是另一條路徑（直接讀 Quarters 的 OfficialSendOn 原始欄位，不經過這個 Key），'
-        + '所以這個 Key 實質上也已經死了，是否移除待你決定，這次先保留。',
+        + '追加階段 Q 當時查證這個 Key 全專案沒有任何呼叫端讀取——但第三輪批次下一輪'
+        + '（新一批階段 B）已經重新啟用它：REMIND 的「死線接近」提醒維度會用它算出來的'
+        + 'officialDate（computeAutomationSchedule_()）當參考日期，所以這個 Key 現在不是'
+        + '死值了，不建議移除。',
       editable: 'TRUE'
     },
     {
       key: CONFIG_KEYS.REMIND_STUCK_DAYS, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: String(DEFAULTS.REMIND_STUCK_DAYS),
-      description: '追加階段 N 新增。Stage 停留在 REVIEW_SENT（已寄給堂委審閱、'
-        + '但還未套用修改申報）超過幾天未前進，開始每日提醒幹事。',
+      description: '「停滯時間」維度的門檻：Stage 停留在目前這個階段（DRAFT／'
+        + 'REVIEW_SENT／REQUESTS_APPLIED 三者之一）超過幾天未前進，開始每日提醒幹事。'
+        + '三個 Stage 共用同一個門檻，沒有分開設定——見 docs/系統範圍稽核.md 的說明。',
       editable: 'TRUE'
     },
     {
       key: CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: String(DEFAULTS.REMIND_STUCK_MAX_COUNT),
-      description: '追加階段 N 新增。卡在 REVIEW_SENT 的提醒最多對幹事發送幾次'
-        + '（每天最多一次），達到次數上限後不再提醒，避免無限期洗版。',
+      description: '卡在同一個 Stage 的提醒最多對幹事發送幾次（每天最多一次，'
+        + '兩個觸發維度同時成立當天也只算一次），達到次數上限後不再提醒；'
+        + '一旦 Stage 前進到下一個階段，這個計數會重新從零開始算。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.REMIND_DEADLINE_DAYS, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
+      defaultValue: String(DEFAULTS.REMIND_DEADLINE_DAYS),
+      description: '「死線接近」維度的門檻：距離正式發出日期（Quarters.OfficialSendOn，'
+        + '缺省時退回 LEAD_DAYS_OFFICIAL 從 StartDate 推算）少於幾天、而 Stage 仍未到'
+        + 'OFFICIAL_SENT，不論目前是哪個 Stage 都開始每日提醒幹事。這是系統範圍需求'
+        + '第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象只有幹事，不寄給義工，'
+        + '見 docs/系統範圍稽核.md。',
       editable: 'TRUE'
     },
     {

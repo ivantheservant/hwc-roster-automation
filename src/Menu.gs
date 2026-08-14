@@ -2063,10 +2063,11 @@ function runRemoveAutomation_() {
  * Apps Script 不提供「下次精確執行時間」的公開 API，所以這裡改為列出
  * 已安裝的觸發規則，以及每個季度目前的生成／提醒狀態。
  *
- * 追加階段 N：改用跟真正執行、跟「檢查自動排程條件（唯讀）」完全同一套
- * judgeGenerateAction_()／judgeRemindStuckAction_() 判斷，取代原本這裡自己一套
- * 簡化邏輯（describeAutomationSchedule_()，已因為跟 N 的新設計不符而移除）——
- * 避免第三份平行的判斷邏輯，也避免這裡顯示的內容跟實際行為不一致。
+ * 追加階段 N（第三輪批次下一輪的新一批階段 B 再更新一次）：改用跟真正執行、跟
+ * 「檢查自動排程條件（唯讀）」完全同一套 judgeGenerateAction_()／
+ * judgeRemindAction_() 判斷，取代原本這裡自己一套簡化邏輯（describeAutomationSchedule_()，
+ * 已因為跟 N 的新設計不符而移除）——避免第三份平行的判斷邏輯，也避免這裡顯示的
+ * 內容跟實際行為不一致。
  * @returns {void}
  */
 function runViewAutomationStatus_() {
@@ -2093,11 +2094,11 @@ function runViewAutomationStatus_() {
       if (!quarterId) return;
       const schedule = computeAutomationSchedule_(row, config);
       const generateJudgment = judgeGenerateAction_(quarterId, schedule.generateDate, today);
-      const remindJudgment = judgeRemindStuckAction_(quarterId, row, today, config);
+      const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
 
       lines.push('', '【' + quarterId + '】季初 ' + (startDate || '?'));
       lines.push('　生成初稿：' + (schedule.generateDate || '（未設定）') + '　' + describeGenerateStatus_(generateJudgment));
-      lines.push('　提醒（卡在審閱）：' + describeRemindStatus_(remindJudgment));
+      lines.push('　提醒（目前 Stage：' + remindJudgment.stage + '）：' + describeRemindStatus_(remindJudgment));
       lines.push('　正式發出：一律由幹事在「步驟 4」手動執行，不會被自動排程觸發');
     });
 
@@ -2187,7 +2188,7 @@ function runDailyAutomationCheckManually_() {
       SKIPPED_NO_DATE: '（無日期）',
       SKIPPED_STAGE: '（Stage 已不是 DRAFT）',
       SKIPPED_HAS_VERSION: '（已有版本）',
-      SKIPPED_NOT_STUCK: '（不是 REVIEW_SENT，不適用）',
+      SKIPPED_NOT_STUCK: '（Stage 已是 OFFICIAL_SENT，不適用）',
       SKIPPED_MAX_REACHED: '（已達提醒次數上限）'
     };
     const ran = result.filter(function (r) { return r.outcome === 'RAN'; }).length;
@@ -2223,14 +2224,14 @@ function describeGenerateStatus_(judgment) {
 }
 
 /**
- * 把 judgeRemindStuckAction_() 的判斷結果轉成「查看自動排程狀態」用的一段文字。
- * @param {Object} judgment judgeRemindStuckAction_() 的結果
+ * 把 judgeRemindAction_() 的判斷結果轉成「查看自動排程狀態」用的一段文字。
+ * @param {Object} judgment judgeRemindAction_() 的結果
  * @returns {string} 描述文字
  */
 function describeRemindStatus_(judgment) {
   switch (judgment.outcome) {
     case 'SKIPPED_NOT_STUCK': return '不適用（' + judgment.detail + '）';
-    case 'WOULD_RUN': return '已到期，等下次每日檢查提醒（第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次）';
+    case 'WOULD_RUN': return '已達門檻（' + judgment.reasons.join('＋') + '），等下次每日檢查提醒（第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次）';
     case 'SKIPPED_MAX_REACHED': return '已提醒 ' + judgment.reminderCount + ' / ' + judgment.maxCount + ' 次，達到上限';
     case 'SKIPPED_DONE': return '已提醒 ' + judgment.reminderCount + ' / ' + judgment.maxCount + ' 次，今天已提醒過';
     case 'SKIPPED_NOT_DUE': return judgment.detail + '（已提醒 ' + judgment.reminderCount + ' / ' + judgment.maxCount + ' 次）';

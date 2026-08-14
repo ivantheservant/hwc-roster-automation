@@ -42,21 +42,37 @@ const EMAIL_TEMPLATE_SEEDS = [
     attachType: ATTACH_TYPE.FULL_PDF
   },
   {
+    // 第三輪批次下一輪（新一批階段 B）改寫：舊文字假設「已經上載初稿，等審閱」
+    // 這個單一情境（對應舊版 REMIND 只顧 REVIEW_SENT 一種停滯）。REMIND 現在
+    // 涵蓋 DRAFT／REVIEW_SENT／REQUESTS_APPLIED 三種情境，這裡改成不預設是
+    // 哪一種，改用 {CurrentStage}／{NextAction} 兩個新 placeholder 讓內容
+    // 自動對應目前實際狀態。
+    //
+    // ⚠️ 這個範本目前只有兩種情況會真正用到：(1) 幹事自己用「測試工具 ▸ 寄送
+    // （測試模式）」手動指定 Stage=REMIND 測試；(2) 日後如果有程式碼改成透過
+    // sendStage() 寄送 REMIND（目前沒有）。**自動排程實際寄出的「Stage 停滯
+    // ／死線接近」提醒，完全不經過這個範本**——那是 Trigger.gs 的
+    // judgeRemindAction_() 直接呼叫 Mailer.gs 的 notifyAdminStageReminder_()，
+    // 訊息文字在程式碼裡直接組出，不讀 EmailTemplates。保留、更新這個範本
+    // 是為了「測試工具 ▸ 寄送（測試模式）」這個既有的人手測試功能，不是自動
+    // 提醒機制本身的一部分，見 docs/系統範圍稽核.md 的詳細說明。
     templateId: 'TPL_REMIND_TC',
     stage: MAIL_STAGES.REMIND,
     lang: 'TC',
-    subject: '{QuarterID} 粵語堂職事表提醒——請於 {OfficialSendDate} 前覆核',
+    subject: '{QuarterID} 粵語堂職事表提醒——目前狀態：{CurrentStage}',
     bodyHtml: '<p>各位堂委、幹事：</p>'
-      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已上載，現提醒各位：</p>'
-      + '<p>職事表將於 {OfficialSendDate} 正式發送給各服侍人員，請在此之前完成覆核及所需的人手調動。</p>'
+      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表目前狀態：{CurrentStage}，現提醒各位跟進。</p>'
+      + '<p>下一步：{NextAction}</p>'
+      + '<p>職事表計劃於 {OfficialSendDate} 正式發送給各服侍人員，請在此之前完成所需的步驟。</p>'
       + '<p>試算表連結：{SpreadsheetUrl}</p>'
       + '<p>如有查詢，請直接回覆本郵件。</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
-      + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已上載，現提醒各位：\n'
-      + '職事表將於 {OfficialSendDate} 正式發送給各服侍人員，請在此之前完成覆核及所需的人手調動。\n\n'
+      + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表目前狀態：{CurrentStage}，現提醒各位跟進。\n\n'
+      + '下一步：{NextAction}\n\n'
+      + '職事表計劃於 {OfficialSendDate} 正式發送給各服侍人員，請在此之前完成所需的步驟。\n\n'
       + '試算表連結：{SpreadsheetUrl}\n\n'
       + '如有查詢，請直接回覆本郵件。',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate},{SpreadsheetUrl}',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate},{SpreadsheetUrl},{CurrentStage},{NextAction}',
     attachType: ATTACH_TYPE.NONE
   },
   {

@@ -94,3 +94,33 @@ function isReviewerRecipientRow_(row) {
 function countReviewerRecipients_() {
   return readSheet(SHEETS.EMAIL_RECIPIENTS).filter(isReviewerRecipientRow_).length;
 }
+
+/**
+ * 階段 C2 新增：列出每個 Active=TRUE 收件人的 Role 與 Stage 欄，並直接算出
+ * 「這一行實際會收到哪些階段的信」——跟 Mailer.gs 的 listRecipients_() 同一套
+ * 規則：REVIEW 階段只看 Role 是否等於 REVIEWER（不理 Stage 欄），其餘階段
+ * （GENERATE／REMIND／OFFICIAL／RESEND）只看 Stage 欄是否包含（不理 Role）。
+ * 兩條規則各自獨立判斷，直接把結論算出來，不要求幹事自己在腦裡把兩個條件
+ * 兜在一起——供「上線前檢查」顯示，純讀取。
+ * @returns {Object[]} 每項為 {recipientId, displayName, role, stageRaw, effectiveStages}
+ */
+function buildRecipientRoleStageMatrix_() {
+  const C = COLUMNS.EMAIL_RECIPIENTS;
+  const allMailStages = [MAIL_STAGES.GENERATE, MAIL_STAGES.REMIND, MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND];
+  return readSheet(SHEETS.EMAIL_RECIPIENTS)
+    .filter(function (row) { return isTrueValue_(row[C.ACTIVE]); })
+    .map(function (row) {
+      const role = String(row[C.ROLE] || '').trim().toUpperCase();
+      const stageList = splitList_(row[C.STAGE]).map(function (s) { return s.trim().toUpperCase(); });
+      const effectiveStages = [];
+      if (role === RECIPIENT_ROLE.REVIEWER) effectiveStages.push(MAIL_STAGES.REVIEW);
+      allMailStages.forEach(function (s) { if (stageList.indexOf(s) !== -1) effectiveStages.push(s); });
+      return {
+        recipientId: row[C.RECIPIENT_ID] || '',
+        displayName: row[C.DISPLAY_NAME] || '（無名稱）',
+        role: row[C.ROLE] || '（空白）',
+        stageRaw: row[C.STAGE] || '（空白）',
+        effectiveStages: effectiveStages
+      };
+    });
+}

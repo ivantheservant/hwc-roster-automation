@@ -202,12 +202,13 @@ const COLUMNS = {
     WEEK_COUNT: 'WeekCount',
     GENERATE_ON: 'GenerateOn',
     // 追加階段 Q 查證過 RemindOn 是死欄位：全專案只有 computeAutomationSchedule_()
-    // 讀過它，而且算出來的 remindDate 從沒有任何呼叫端使用（REMIND 已改由
-    // REMIND_STUCK_DAYS／Quarters.StageUpdatedAt 驅動，不再是日期概念，見 Trigger.gs
-    // 的 judgeRemindStuckAction_()）。已依你的決定移除這個欄位的註冊與對應計算
-    // （computeAutomationSchedule_() 已同步移除 remindDate）。Quarters 工作表上原本的
-    // RemindOn 欄本身還在（程式沒有自動刪除工作表上的欄），如果你已經人手刪掉了，
-    // 這則註解可以忽略。
+    // 讀過它，而且算出來的 remindDate 從沒有任何呼叫端使用（REMIND 當時已改由
+    // REMIND_STUCK_DAYS／Quarters.StageUpdatedAt 驅動，不再是日期概念）。已依你的
+    // 決定移除這個欄位的註冊與對應計算（computeAutomationSchedule_() 已同步移除
+    // remindDate）。Quarters 工作表上原本的 RemindOn 欄本身還在（程式沒有自動刪除
+    // 工作表上的欄），如果你已經人手刪掉了，這則註解可以忽略。第三輪批次下一輪
+    // （新一批階段 B）的「死線接近」提醒維度改用 OfficialSendOn（下面這一欄）
+    // 當參考日期，不是復活 RemindOn，見 Trigger.gs 的 judgeRemindAction_()。
     OFFICIAL_SEND_ON: 'OfficialSendOn',
     STATUS: 'Status',
     // 追加階段 T 查證過 CurrentVersion 是死欄位（沒有任何程式碼讀寫過），
@@ -612,8 +613,10 @@ const FINETUNE_ARCHIVE_SHEET = 'FineTuneProposals_Archive';
 
 /**
  * 自動排程動作在 AuditLog 使用的 Action 值。GENERATE／REMIND 由 Trigger.gs 的
- * judgeGenerateAction_()／judgeRemindStuckAction_() 使用，分別對應「同一季只成功
- * 生成一次初稿」與「卡在 REVIEW_SENT 提醒過幾次、今天提醒過沒有」的判斷。
+ * judgeGenerateAction_()／judgeRemindAction_() 使用，分別對應「同一季只成功
+ * 生成一次初稿」與「目前這個 Stage 提醒過幾次、今天提醒過沒有」的判斷——REMIND
+ * 的 AuditLog TargetKey 是 `quarterId + '|' + stage`，不是單純 quarterId，
+ * 見 judgeRemindAction_() 與 readReminderLog_()。
  * OFFICIAL 追加階段 N 之後不再由自動排程使用（正式發出永遠只能由幹事手動觸發），
  * 保留這個值只是為了跟 Config 的 LEAD_DAYS_OFFICIAL 命名對應，不代表還有程式碼
  * 會拿它去查 AuditLog；真正阻擋自動觸發 OFFICIAL 的是 Trigger.gs 的
@@ -691,11 +694,23 @@ const CONFIG_KEYS = {
   // 追加階段 Q：LEAD_DAYS_REMIND 查證後確認是死 Key（唯一讀它的
   // computeAutomationSchedule_() 算出來的 remindDate 從沒有任何呼叫端使用），
   // 已依你的決定移除註冊，連同種子清單（ConfigSeed.gs）一併移除。
-  // REMIND 重新定義為「Stage 卡在 REVIEW_SENT 太久」的提醒，
-  // 不再是日期概念，見 Trigger.gs 的 judgeRemindStuckAction_()。
+  // REMIND 當時重新定義為「Stage 卡在 REVIEW_SENT 太久」的提醒，不再是日期概念。
+  // 第三輪批次的下一輪（新一批 A-F 階段 B）再擴大：REMIND 現在涵蓋
+  // DRAFT／REVIEW_SENT／REQUESTS_APPLIED 三種停滯情境（不只 REVIEW_SENT 一種），
+  // 且新增 REMIND_DEADLINE_DAYS 這個獨立維度（見下）——但這次新增的死線判斷
+  // 用的是 OfficialSendOn／LEAD_DAYS_OFFICIAL 算出來的日期，不是重新加回
+  // LEAD_DAYS_REMIND，兩者概念不同：LEAD_DAYS_REMIND 是「季度開始後第幾日」，
+  // 這次的死線判斷是「距離實際正式發出日期還有幾日」，語意更直接、也不需要
+  // 復活一個已經查證過是死 Key 的東西。詳見 Trigger.gs 的 judgeRemindAction_()。
   LEAD_DAYS_OFFICIAL: 'LEAD_DAYS_OFFICIAL',
   REMIND_STUCK_DAYS: 'REMIND_STUCK_DAYS',
   REMIND_STUCK_MAX_COUNT: 'REMIND_STUCK_MAX_COUNT',
+  // 新增：REMIND 的「死線接近」維度門檻（天數）。距離 Quarters.OfficialSendOn
+  // （缺省時退回 Config 的 LEAD_DAYS_OFFICIAL 從 StartDate 推算）少於這個天數、
+  // 而 Stage 仍未到 OFFICIAL_SENT，不論目前是哪個 Stage 都會觸發提醒——這是
+  // 系統範圍需求第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象改成只提醒
+  // 幹事（不是義工），見 docs/系統範圍稽核.md。
+  REMIND_DEADLINE_DAYS: 'REMIND_DEADLINE_DAYS',
   SEND_HOUR_LOCAL: 'SEND_HOUR_LOCAL',
   SEND_WEEKDAY_GUARD: 'SEND_WEEKDAY_GUARD',
   SYS_TIMEZONE: 'SYS_TIMEZONE',
@@ -945,8 +960,20 @@ const DEFAULTS = {
   GRID_PENDING_FILL_COLOR: '#FFF2CC',
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
+  REMIND_DEADLINE_DAYS: 7,
   PDF_MIN_SIZE_BYTES: 10240
 };
+
+/**
+ * REMIND 提醒訊息裡「下一步應該撳邊個選單項」的對照——單一事實來源，避免
+ * Trigger.gs／Mailer.gs 各自寫一份、日後改一邊漏一邊。只涵蓋會被提醒的三個
+ * Stage（DRAFT／REVIEW_SENT／REQUESTS_APPLIED）；OFFICIAL_SENT 不會被提醒，
+ * 不需要在這裡有對應項。
+ */
+const STAGE_NEXT_ACTION = {};
+STAGE_NEXT_ACTION[QUARTER_STAGE.DRAFT] = '四階段流程 ▸ 步驟 2：寄給堂委審閱';
+STAGE_NEXT_ACTION[QUARTER_STAGE.REVIEW_SENT] = '四階段流程 ▸ 步驟 3：套用修改申報';
+STAGE_NEXT_ACTION[QUARTER_STAGE.REQUESTS_APPLIED] = '四階段流程 ▸ 步驟 4：正式發出';
 
 /** CacheService 的最大 TTL（秒），Config 的 SYS_CONFIG_CACHE_SECONDS 不可超過這個上限。 */
 const CACHE_MAX_TTL_SECONDS = 21600;

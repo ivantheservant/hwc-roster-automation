@@ -1,17 +1,26 @@
 /**
- * 自動排程：每日檢查一次。追加階段 N 重新設計——四階段流程之下，
+ * 自動排程：每日檢查一次。追加階段 N 當時設計——四階段流程之下，
  * 只有「步驟 1：生成初稿」應該自動執行，步驟 2／3／4 一律要幹事人手覆核後按掣，
- * 所以這裡的自動化範圍縮小成只有兩件事：
+ * 所以這裡的自動化範圍是兩件事：
  *
  * 1. GENERATE：季度到達 GenerateOn 日期、Stage 仍是 DRAFT、且未有任何已生成版本時，
  *    自動生成一份初稿，並且只通知幹事（Config 的 MAIL_ADMIN_NOTIFY）「初稿已生成，
  *    請登入覆核後執行步驟 2」，不寄給堂委、不寄給義工——寄給堂委審閱是步驟 2 的責任，
  *    要幹事看過初稿、決定沒問題了才手動執行。
- * 2. REMIND（追加階段 N 重新定義，不再是「到了某個日期就寄一次給義工」）：
- *    Stage 停留在 REVIEW_SENT（已寄給堂委審閱、但還沒套用修改申報）超過
- *    REMIND_STUCK_DAYS 日（Config，預設 3）未前進時，每日提醒幹事一次
- *    （同樣只寄給幹事），最多提醒 REMIND_STUCK_MAX_COUNT 次（Config，預設 3），
- *    避免幹事忘記查看，也避免無限期一直洗版。
+ * 2. REMIND（第三輪批次下一輪的新一批階段 B 擴大範圍）：舊版只在 Stage 卡在
+ *    REVIEW_SENT 太久時提醒，DRAFT（幹事還沒撳步驟 2）與 REQUESTS_APPLIED
+ *    （幹事還沒撳步驟 4）停多久都完全沒有提醒，是一個真正的洞——現在改成
+ *    **只要 Stage 不是 OFFICIAL_SENT，都可能被提醒**，涵蓋 DRAFT／REVIEW_SENT／
+ *    REQUESTS_APPLIED 三種停滯情境。兩個獨立的觸發維度，任何一個成立就提醒
+ *    （同時成立也只寄一封，不是兩封）：
+ *    - 「停滯時間」：目前這個 Stage 已經停留超過 REMIND_STUCK_DAYS 日（三個
+ *      Stage 共用同一個門檻）。
+ *    - 「死線接近」：距離正式發出日期（Quarters.OfficialSendOn，缺省時退回
+ *      LEAD_DAYS_OFFICIAL 推算）少於 REMIND_DEADLINE_DAYS 日——這是系統範圍
+ *      需求第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，見
+ *      docs/系統範圍稽核.md。
+ *    每個「季度＋Stage」組合各自獨立計算提醒次數（最多 REMIND_STUCK_MAX_COUNT
+ *    次），一律只寄給幹事（同樣只寄給幹事），詳細判斷見 judgeRemindAction_()。
  *
  * OFFICIAL（正式發出）永遠不會由這裡觸發——四階段流程的步驟 4 一定要幹事在
  * 選單或 Web UI 手動執行，因為那是真正寄給全部義工、不可逆的動作。
@@ -19,7 +28,10 @@
  * 只要偵測到目前是在這個函式的執行期間（AUTOMATION_TRIGGER_CONTEXT_ACTIVE），
  * OFFICIAL 階段一律直接拒絕並記入 AuditLog，即使日後不小心在這裡加了一行呼叫
  * sendStage(..., MAIL_STAGES.OFFICIAL) 也會被擋下來，不是只靠「這裡沒寫」這種
- * 容易被以後的修改破壞的保證。
+ * 容易被以後的修改破壞的保證。REMIND 的擴大範圍完全沒有改動這道防護，也沒有
+ * 新增任何呼叫 sendStage() 的路徑——REMIND 一律經 notifyAdmin_() 寄出，那個
+ * 函式跟 sendStage() 是完全獨立的兩條路徑，見下面 notifyAdminStageReminder_()
+ * 與 Mailer.gs。
  *
  * 安全設計：
  * - 本檔案完全不會自己呼叫 ScriptApp.newTrigger()——那只發生在
@@ -29,8 +41,9 @@
  *   只有「真正寄出電郵」這一步會被攔截（notifyAdmin_() 內建的機制，見 Mailer.gs）。
  * - GENERATE 用「Stage 是否仍為 DRAFT」＋「是否已有版本」判斷有沒有執行過，
  *   比單純查 AuditLog 更可靠（就算幹事自己手動生成過，也會被正確偵測到，
- *   不會又自動生成一次）。REMIND-stuck 用 AuditLog 記錄判斷提醒過幾次、
- *   今天有沒有提醒過。
+ *   不會又自動生成一次）。REMIND 用 AuditLog 記錄判斷提醒過幾次、今天有沒有
+ *   提醒過，TargetKey 格式是 `quarterId + '|' + stage`（含 Stage，不只
+ *   quarterId），確保 Stage 前進之後提醒次數會重新從零開始算。
  */
 
 /** 每日檢查觸發器綁定的函式名稱，安裝／查詢／移除都以此為準。 */
@@ -99,11 +112,12 @@ function dailyAutomationCheck_() {
         return '已生成 ' + gen.sheetName + '（試 ' + gen.attemptsRun + ' 次，seed=' + gen.seed + '）；已通知幹事覆核';
       }));
 
-      const remindJudgment = judgeRemindStuckAction_(quarterId, row, today, config);
+      const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
       report.push(executeAutomationAction_(remindJudgment, today, function () {
-        notifyAdminStuckReminder_(quarterId, remindJudgment, config, isDryRun);
+        notifyAdminStageReminder_(quarterId, remindJudgment, config, isDryRun);
         return '第 ' + (remindJudgment.reminderCount + 1) + ' / ' + remindJudgment.maxCount
-          + ' 次提醒幹事：' + quarterId + ' 卡在 REVIEW_SENT';
+          + ' 次提醒幹事：' + quarterId + ' 停留在 ' + remindJudgment.stage
+          + '（' + remindJudgment.reasons.join('＋') + '）';
       }));
     });
 
@@ -223,96 +237,191 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
 }
 
 /**
- * 純判斷：REMIND（卡在 REVIEW_SENT 太久的提醒）今天要不要對這個季度提醒幹事，
- * 不執行任何動作、不寫入任何東西。追加階段 N 重新定義：不再是「到了某個日期
- * 就寄一次」，改成「Stage 停留在 REVIEW_SENT 超過 REMIND_STUCK_DAYS 日而未前進時，
- * 每日提醒一次，最多提醒 REMIND_STUCK_MAX_COUNT 次」——用 Quarters.StageUpdatedAt
- * 判斷停留了幾日，用 AuditLog 裡 action=TRIGGER_REMIND 的紀錄判斷提醒過幾次、
- * 今天有沒有提醒過（見 readStuckReminderLog_()）。
+ * 依 Stage 找出「這個 Stage 已經停留多久」的參考起始日期，供「停滯時間」這個
+ * 觸發維度使用。REVIEW_SENT／REQUESTS_APPLIED 用 Quarters.StageUpdatedAt——
+ * 這兩個 Stage 都是由 advanceQuarterStage_() 明確寫入的，時間點可靠。
+ *
+ * DRAFT 特別處理：DRAFT 是預設狀態，在 GENERATE 自動生成之前，
+ * StageUpdatedAt 很可能完全空白（從未被 advanceQuarterStage_() 寫過）——
+ * 這種情況不代表「卡住」，只是「還沒到生成日期」，本來就不需要停滯提醒
+ * （死線接近那個維度不受影響，仍然會正常判斷）。所以 DRAFT 改用「最新版本的
+ * 建立時間」（RosterVersions.CreatedAt）當參考點：版本已經生成，代表
+ * GENERATE 已經跑完、輪到幹事按「步驟 2」了，這個時間點才是「幹事開始需要
+ * 行動」的真正起點。如果連版本都還沒有，回傳空字串，呼叫端會正確判斷成
+ * 「這個維度無法判斷」，不會誤判成距離很近或很遠。
+ * @param {string} quarterId 季度 ID
+ * @param {string} stage 目前的 Stage
+ * @param {Object} quarterRow Quarters 的一列資料
+ * @param {string} timezone 時區名稱
+ * @returns {string} yyyy-MM-dd 參考日期；無法判斷時回傳空字串
+ */
+function resolveRemindReferenceDate_(quarterId, stage, quarterRow, timezone) {
+  if (stage === QUARTER_STAGE.DRAFT) {
+    const versionNo = findLatestVersionNo(quarterId);
+    if (versionNo < 0) return '';
+    return findLatestVersionCreatedDate_(quarterId, versionNo, timezone);
+  }
+  return toDateString(quarterRow[COLUMNS.QUARTERS.STAGE_UPDATED_AT], timezone);
+}
+
+/**
+ * 讀出 RosterVersions 中指定版本的建立日期（正規化為 yyyy-MM-dd）。
+ * 跟 WebAppFlow.gs 的 findVersionCreatedAt_() 不同——那個函式回傳的是
+ * String() 直接轉換的原始值（給畫面顯示用，可能是完整時間戳文字），這裡
+ * 需要的是可以直接餵給 daysBetween_() 的純日期字串，所以另外用
+ * toDateString() 正規化，不重用那個函式的輸出。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} timezone 時區名稱
+ * @returns {string} yyyy-MM-dd；找不到時回傳空字串
+ */
+function findLatestVersionCreatedDate_(quarterId, versionNo, timezone) {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  let found = '';
+  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+    if (row[V.QUARTER_ID] === quarterId && Number(row[V.VERSION_NO]) === versionNo) {
+      found = toDateString(row[V.CREATED_AT], timezone);
+    }
+  });
+  return found;
+}
+
+/**
+ * 純判斷：REMIND 今天要不要對這個季度提醒幹事，不執行任何動作、不寫入任何東西。
+ * 新一輪（第三輪批次下一輪）擴大範圍：只要 Stage 不是 OFFICIAL_SENT 都可能被
+ * 提醒（舊版只顧 REVIEW_SENT 一種），兩個獨立的觸發維度，任何一個成立就提醒：
+ *
+ * - 「停滯時間」（STUCK）：目前 Stage 已經停留超過 REMIND_STUCK_DAYS 日
+ *   （見 resolveRemindReferenceDate_() 決定參考日期）。
+ * - 「死線接近」（DEADLINE）：距離正式發出日期（computeAutomationSchedule_()
+ *   算出的 officialDate）少於 REMIND_DEADLINE_DAYS 日——這是系統範圍需求
+ *   第 3 項的現代版本，不需要任何前提（不要求已生成版本），是三個 Stage
+ *   共同的最後一道安全網。
+ *
+ * 兩個維度同時成立時，`reasons` 陣列會同時包含 'STUCK' 與 'DEADLINE'，
+ * 但仍然只是同一次 WOULD_RUN、只會寄一封信（呼叫端只呼叫一次 workFn()）。
+ *
+ * 提醒次數上限：用 AuditLog 裡 TargetKey=`quarterId + '|' + stage` 的
+ * action=TRIGGER_REMIND 紀錄判斷提醒過幾次、今天有沒有提醒過（見
+ * readReminderLog_()）——每個「季度＋Stage」組合各自獨立計算，Stage 前進
+ * 之後次數會重新從零開始算。
+ *
  * @param {string} quarterId 季度 ID
  * @param {Object} quarterRow Quarters 的一列資料（readSheet 的物件格式）
  * @param {string} today 今天的日期字串
  * @param {Object} config readConfig() 的結果
- * @returns {{quarterId: string, action: string, targetDate: string, outcome: string, detail: string,
- *   reminderCount: number, maxCount: number}}
- *   outcome 為 'SKIPPED_NOT_STUCK'／'SKIPPED_NO_DATE'／'SKIPPED_NOT_DUE'／
+ * @returns {{quarterId: string, action: string, targetKey: string, stage: string, targetDate: string,
+ *   outcome: string, detail: string, reasons: string[], reminderCount: number, maxCount: number,
+ *   daysStuck: (number|null), daysUntilDeadline: (number|null), stuckDays: (number|undefined),
+ *   deadlineDays: (number|undefined)}}
+ *   outcome 為 'SKIPPED_NOT_STUCK'（Stage 已經是 OFFICIAL_SENT）／'SKIPPED_NOT_DUE'／
  *   'SKIPPED_MAX_REACHED'／'SKIPPED_DONE'／'WOULD_RUN'
  */
-function judgeRemindStuckAction_(quarterId, quarterRow, today, config) {
+function judgeRemindAction_(quarterId, quarterRow, today, config) {
   const action = AUTOMATION_ACTIONS.REMIND;
-  const base = { quarterId: quarterId, action: action, targetDate: '' };
+  const stage = getQuarterStage_(quarterId);
+  const targetKey = quarterId + '|' + stage;
+  const base = { quarterId: quarterId, action: action, targetKey: targetKey, stage: stage, targetDate: '' };
   const maxCount = getConfig(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT);
 
-  const stage = getQuarterStage_(quarterId);
-  if (stage !== QUARTER_STAGE.REVIEW_SENT) {
+  if (stage === QUARTER_STAGE.OFFICIAL_SENT) {
     return Object.assign({}, base, {
-      outcome: 'SKIPPED_NOT_STUCK',
-      detail: 'Stage 目前是「' + stage + '」，不是 REVIEW_SENT，不需要提醒',
-      reminderCount: 0, maxCount: maxCount
+      outcome: 'SKIPPED_NOT_STUCK', detail: 'Stage 已經是 OFFICIAL_SENT，這一季不需要提醒',
+      reasons: [], reminderCount: 0, maxCount: maxCount, daysStuck: null, daysUntilDeadline: null
     });
   }
 
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
-  const stageUpdatedAt = toDateString(quarterRow[COLUMNS.QUARTERS.STAGE_UPDATED_AT], timezone);
-  const stuckDays = getConfig(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
-  const reminderLog = readStuckReminderLog_(quarterId, timezone);
+  const reminderLog = readReminderLog_(quarterId, stage, timezone);
   const reminderCount = reminderLog.length;
 
-  if (!stageUpdatedAt) {
-    return Object.assign({}, base, {
-      outcome: 'SKIPPED_NO_DATE', detail: 'Quarters 沒有 StageUpdatedAt 時間，無法判斷停留了多久',
-      reminderCount: reminderCount, maxCount: maxCount
-    });
-  }
-
-  const daysSince = daysBetween_(stageUpdatedAt, today);
-  if (daysSince < stuckDays) {
-    return Object.assign({}, base, {
-      outcome: 'SKIPPED_NOT_DUE', detail: '已停留 ' + daysSince + ' 天，未達 ' + stuckDays + ' 天門檻',
-      reminderCount: reminderCount, maxCount: maxCount
-    });
-  }
   if (reminderCount >= maxCount) {
     return Object.assign({}, base, {
-      outcome: 'SKIPPED_MAX_REACHED', detail: '已提醒 ' + reminderCount + ' 次，達到上限 ' + maxCount + ' 次，不再提醒',
-      reminderCount: reminderCount, maxCount: maxCount
+      outcome: 'SKIPPED_MAX_REACHED',
+      detail: '目前 Stage「' + stage + '」已提醒 ' + reminderCount + ' 次，達到上限 ' + maxCount + ' 次，不再提醒',
+      reasons: [], reminderCount: reminderCount, maxCount: maxCount, daysStuck: null, daysUntilDeadline: null
     });
   }
   if (reminderLog.indexOf(today) !== -1) {
     return Object.assign({}, base, {
-      outcome: 'SKIPPED_DONE', detail: '今天已經提醒過',
-      reminderCount: reminderCount, maxCount: maxCount
+      outcome: 'SKIPPED_DONE', detail: '今天已經就 Stage「' + stage + '」提醒過',
+      reasons: [], reminderCount: reminderCount, maxCount: maxCount, daysStuck: null, daysUntilDeadline: null
+    });
+  }
+
+  // 維度一：停滯時間
+  const stuckDays = getConfig(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
+  const referenceDate = resolveRemindReferenceDate_(quarterId, stage, quarterRow, timezone);
+  let daysStuck = null;
+  let stuckTriggered = false;
+  if (referenceDate) {
+    daysStuck = daysBetween_(referenceDate, today);
+    stuckTriggered = daysStuck >= stuckDays;
+  }
+
+  // 維度二：死線接近
+  const deadlineDays = getConfig(CONFIG_KEYS.REMIND_DEADLINE_DAYS, DEFAULTS.REMIND_DEADLINE_DAYS);
+  const schedule = computeAutomationSchedule_(quarterRow, config);
+  let daysUntilDeadline = null;
+  let deadlineTriggered = false;
+  if (schedule.officialDate) {
+    daysUntilDeadline = daysBetween_(today, schedule.officialDate);
+    deadlineTriggered = daysUntilDeadline <= deadlineDays;
+  }
+
+  const reasons = [];
+  if (stuckTriggered) reasons.push('STUCK');
+  if (deadlineTriggered) reasons.push('DEADLINE');
+
+  if (reasons.length === 0) {
+    const stuckDetail = referenceDate
+      ? '已停留 ' + daysStuck + ' 天（門檻 ' + stuckDays + ' 天）'
+      : '沒有可用的參考時間，停滯維度無法判斷';
+    const deadlineDetail = schedule.officialDate
+      ? '距離正式發出日期 ' + daysUntilDeadline + ' 天（門檻 ' + deadlineDays + ' 天）'
+      : '沒有可用的正式發出日期，死線維度無法判斷';
+    return Object.assign({}, base, {
+      outcome: 'SKIPPED_NOT_DUE',
+      detail: '目前 Stage「' + stage + '」：' + stuckDetail + '；' + deadlineDetail,
+      reasons: [], reminderCount: reminderCount, maxCount: maxCount,
+      daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline
     });
   }
 
   return Object.assign({}, base, {
     outcome: 'WOULD_RUN',
-    detail: '已停留 ' + daysSince + ' 天（門檻 ' + stuckDays + ' 天），這會是第 ' + (reminderCount + 1) + ' / ' + maxCount + ' 次提醒',
-    reminderCount: reminderCount, maxCount: maxCount
+    detail: '第 ' + (reminderCount + 1) + ' / ' + maxCount + ' 次提醒（' + reasons.join('＋') + '）',
+    reasons: reasons, reminderCount: reminderCount, maxCount: maxCount,
+    daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline, stuckDays: stuckDays, deadlineDays: deadlineDays
   });
 }
 
 /**
- * 讀取這個季度過去每一次「卡在 REVIEW_SENT」提醒成功送出的日期清單，
- * 用來判斷提醒過幾次（陣列長度）與今天有沒有提醒過（indexOf(today)）。
+ * 讀取這個「季度＋Stage」組合過去每一次提醒成功送出的日期清單，用來判斷
+ * 提醒過幾次（陣列長度）與今天有沒有提醒過（indexOf(today)）。
+ * TargetKey 用 `quarterId + '|' + stage`（不是單純 quarterId）——這樣同一季度
+ * 在不同 Stage 各自有自己的提醒次數配額，不會被上一個 Stage 用剩的次數拖累，
+ * 也不會被下一個 Stage 提早扣掉配額。
  * @param {string} quarterId 季度 ID
+ * @param {string} stage 目前的 Stage
  * @param {string} timezone 時區名稱
  * @returns {string[]} 已成功提醒的日期（yyyy-MM-dd）清單
  */
-function readStuckReminderLog_(quarterId, timezone) {
+function readReminderLog_(quarterId, stage, timezone) {
   const rows = readSheet(SHEETS.AUDIT_LOG);
   const C = COLUMNS.AUDIT_LOG;
+  const key = quarterId + '|' + stage;
   return rows
-    .filter(function (row) { return row[C.ACTION] === AUTOMATION_ACTIONS.REMIND && row[C.TARGET_KEY] === quarterId; })
+    .filter(function (row) { return row[C.ACTION] === AUTOMATION_ACTIONS.REMIND && row[C.TARGET_KEY] === key; })
     .map(function (row) { return toDateString(row[C.NEW_VALUE], timezone); })
     .filter(function (d) { return !!d; });
 }
 
 /**
  * 執行單一自動排程動作，附帶到期判斷與防重複執行。判斷邏輯完全委派給呼叫端傳入的
- * judgment（來自 judgeGenerateAction_() 或 judgeRemindStuckAction_()），這裡只負責
+ * judgment（來自 judgeGenerateAction_() 或 judgeRemindAction_()），這裡只負責
  * 在判斷結果是 WOULD_RUN 時才真正呼叫 workFn() 並寫入 AuditLog。
- * @param {Object} judgment judgeGenerateAction_() 或 judgeRemindStuckAction_() 的結果
+ * @param {Object} judgment judgeGenerateAction_() 或 judgeRemindAction_() 的結果
  * @param {string} today 今天的日期字串
  * @param {function(): string} workFn 實際要執行的動作，回傳供 AuditLog 記錄的說明文字
  * @returns {{quarterId: string, action: string, outcome: string, detail: string}} 本次判斷與執行結果
@@ -320,12 +429,17 @@ function readStuckReminderLog_(quarterId, timezone) {
 function executeAutomationAction_(judgment, today, workFn) {
   if (judgment.outcome !== 'WOULD_RUN') return judgment;
 
+  // targetKey 用 judgment 自帶的值（GENERATE 是純 quarterId；REMIND 是
+  // `quarterId + '|' + stage`，見 judgeRemindAction_()），不是每個 judge 函式
+  // 都用同一種 key 格式，這裡不假設、直接沿用呼叫端算好的值。
+  const targetKey = judgment.targetKey || judgment.quarterId;
+
   try {
     const notes = workFn();
     writeAuditLog_({
       action: judgment.action,
       targetSheet: SHEETS.QUARTERS,
-      targetKey: judgment.quarterId,
+      targetKey: targetKey,
       newValue: today,
       source: 'dailyAutomationCheck_',
       notes: notes || ''
@@ -334,12 +448,12 @@ function executeAutomationAction_(judgment, today, workFn) {
     return Object.assign({}, judgment, { outcome: 'RAN', detail: notes || '' });
   } catch (err) {
     // 刻意不寫入與成功時相同的 action 名稱：GENERATE 靠 Stage／版本狀態判斷、
-    // REMIND-stuck 靠這裡的紀錄判斷，寫成功名稱以外的值讓兩者都不會誤判為「已完成過」，
+    // REMIND 靠這裡的紀錄判斷，寫成功名稱以外的值讓兩者都不會誤判為「已完成過」，
     // 下次每日檢查會自動重試，直到成功或人手介入為止。
     writeAuditLog_({
       action: judgment.action + '_ERROR',
       targetSheet: SHEETS.QUARTERS,
-      targetKey: judgment.quarterId,
+      targetKey: targetKey,
       newValue: today,
       source: 'dailyAutomationCheck_',
       notes: err.message
@@ -350,11 +464,12 @@ function executeAutomationAction_(judgment, today, workFn) {
 }
 
 /**
- * 追加階段 M（追加階段 N 已配合新設計改寫內容）：組出「如果今天執行每日檢查
- * 會發生什麼事」的完整報告內容，供「檢查自動排程條件（唯讀）」與
- * 「⚠️⚠️ 立即執行自動排程檢查」的確認視窗共用——兩邊顯示的內容保證一字不差，
- * 因為都是呼叫這同一個函式，且底層判斷都經過 judgeGenerateAction_()／
- * judgeRemindStuckAction_()。這個函式本身只讀取，不寫入任何東西。
+ * 追加階段 M（追加階段 N、第三輪批次下一輪的新一批階段 B 都配合新設計改寫過
+ * 內容）：組出「如果今天執行每日檢查會發生什麼事」的完整報告內容，供
+ * 「檢查自動排程條件（唯讀）」與「⚠️⚠️ 立即執行自動排程檢查」的確認視窗
+ * 共用——兩邊顯示的內容保證一字不差，因為都是呼叫這同一個函式，且底層判斷
+ * 都經過 judgeGenerateAction_()／judgeRemindAction_()。這個函式本身只讀取，
+ * 不寫入任何東西。
  * @returns {{lines: string[], anyWouldRun: boolean, today: string, isDryRun: boolean}}
  */
 function buildAutomationCheckReport_() {
@@ -375,7 +490,8 @@ function buildAutomationCheckReport_() {
   lines.push('幹事通知信箱（MAIL_ADMIN_NOTIFY）：' + (adminEmail || '⚠ 未設定，通知只會寫入 Logger，不會有人收到'));
   lines.push('');
   lines.push('自動排程只做兩件事：到期自動生成初稿（只通知幹事）、'
-    + '卡在 REVIEW_SENT 太久時提醒幹事（只通知幹事）。'
+    + 'Stage 停滯或死線接近時提醒幹事（只通知幹事，涵蓋 DRAFT／REVIEW_SENT／'
+    + 'REQUESTS_APPLIED 三種情況）。'
     + '正式發出永遠不會由這裡觸發，一律要幹事在「步驟 4」手動執行。');
   lines.push('');
 
@@ -408,13 +524,13 @@ function buildAutomationCheckReport_() {
     }
     lines.push(genLine);
 
-    const remindJudgment = judgeRemindStuckAction_(quarterId, row, today, config);
-    let remindLine = '　提醒（卡在 REVIEW_SENT）：';
+    const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
+    let remindLine = '　提醒（目前 Stage：' + remindJudgment.stage + '）：';
     if (remindJudgment.outcome === 'SKIPPED_NOT_STUCK') {
       remindLine += '不適用（' + remindJudgment.detail + '）';
     } else if (remindJudgment.outcome === 'WOULD_RUN') {
       anyWouldRun = true;
-      remindLine += '→ 今天執行檢查會觸發，' + remindJudgment.detail;
+      remindLine += '→ 今天執行檢查會觸發（' + remindJudgment.reasons.join('＋') + '），' + remindJudgment.detail;
     } else {
       remindLine += remindJudgment.detail + '（已提醒 ' + remindJudgment.reminderCount + ' / ' + remindJudgment.maxCount + ' 次）';
     }

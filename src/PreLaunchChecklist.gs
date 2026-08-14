@@ -117,31 +117,57 @@ function buildPreLaunchChecklist_(quarterId) {
         : '目前的前綴沒有偵測到明顯的測試字眼，正式上線前建議再親眼確認一次是否符合預期。')
   ));
 
-  // 3. Web UI 總開關
+  // 3. Web UI 三層防護（階段 D1 擴充：原本只顧 WEBAPP_ENABLED 一層，現在把
+  // appsscript.json 的部署權限、WEBAPP_ENABLED、WEBAPP_ALLOWED_EMAILS 三層
+  // 一次過列出，並附上這次程式碼稽核的結論——見 docs/系統範圍稽核.md 階段 D
+  // 的完整說明。
+  //
+  // 第 1 層（appsscript.json 的 webapp.access）**沒有辦法在執行階段讀取**
+  // ——Apps Script 沒有提供任何 API 讓程式碼在執行時讀到自己的部署清單設定，
+  // 這裡只能顯示這次程式碼稽核當下的靜態事實，不是即時算出來的。
+  // 第 2、3 層（WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）才是可以即時讀 Config 判斷的。
+  //
+  // 「有沒有任何路徑可以繞過」的稽核結論：逐一檢查 WebApp.gs／WebAppFlow.gs
+  // 全部 24 個 api* 函式，**每一個的第一行都是 assertWebAppRequestAllowed_()**
+  // （合併呼叫 assertWebAppEnabled_() 與 assertApiCallerAuthorized_()），
+  // 沒有找到任何一個函式跳過這道檢查；doGet() 本身在渲染 ui/Index 之前
+  // 也已經先做同樣兩項檢查，未通過只會回傳說明頁，不會渲染任何介面。
+  // 這是程式碼審閱的結論，不是這裡執行時重新掃描一次原始碼——Apps Script
+  // 沒有安全、通用的方式讓程式碼在執行階段讀取並解析自己的原始碼檔案。
   const webappEnabled = getConfig(CONFIG_KEYS.WEBAPP_ENABLED, false) === true;
+  const allowedRaw = getConfig(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
+  const allowedList = (Array.isArray(allowedRaw) ? allowedRaw : []).filter(Boolean);
+  const scriptAccount = String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
   let webappReady = true;
   let webappGuidance;
   if (webappEnabled) {
-    const allowedRaw = getConfig(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
-    const allowedList = (Array.isArray(allowedRaw) ? allowedRaw : []).filter(Boolean);
-    const scriptAccount = String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
     if (allowedList.length === 0 && !scriptAccount) {
       webappReady = false;
-      webappGuidance = 'Web UI 總開關已開啟，但 WEBAPP_ALLOWED_EMAILS 與 SCRIPT_ACCOUNT_EMAIL 都是空白，'
-        + '等於沒有任何人能通過白名單——Web UI 實際上仍然沒有人可以使用。建議至少設定其中一項。';
+      webappGuidance = '第 2 層（WEBAPP_ENABLED）已開啟，但第 3 層（WEBAPP_ALLOWED_EMAILS 與 '
+        + 'SCRIPT_ACCOUNT_EMAIL）都是空白，等於沒有任何人能通過白名單——Web UI 實際上仍然'
+        + '沒有人可以使用。建議至少設定其中一項。';
     } else {
-      webappGuidance = 'Web UI 總開關已開啟。允許名單：'
+      webappGuidance = '第 2 層（WEBAPP_ENABLED）已開啟。第 3 層允許名單：'
         + (allowedList.length > 0 ? allowedList.join('、') : '（空白，退回只允許 ' + scriptAccount + ' 一人）') + '。';
     }
   } else {
-    webappGuidance = 'Web UI 總開關關閉，doGet() 只會顯示說明頁面，不會有任何人可以透過 Web UI 操作。'
-      + '如果你打算開始使用 Web UI，記得到 Config 把 WEBAPP_ENABLED 改為 TRUE，並設定 WEBAPP_ALLOWED_EMAILS。';
+    webappGuidance = '第 2 層（WEBAPP_ENABLED）關閉，doGet() 只會顯示說明頁面，不會有任何人可以透過 '
+      + 'Web UI 操作，第 3 層的白名單設定目前不生效。如果你打算開始使用 Web UI，記得到 Config 把 '
+      + 'WEBAPP_ENABLED 改為 TRUE，並設定 WEBAPP_ALLOWED_EMAILS。';
   }
   items.push(buildChecklistItem_(
-    'WEBAPP_ENABLED（Web UI 總開關）',
+    'Web UI 三層防護（appsscript.json 部署權限／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）',
     webappReady,
-    webappEnabled ? 'TRUE（已啟用）' : 'FALSE（已停用）',
-    webappGuidance
+    '第 1 層（部署權限，本次程式碼稽核的靜態事實）：appsscript.json 的 webapp.access='
+      + 'MYSELF（只有部署者本人能開啟網址，適合 Ivan 自己 deploy 自己用；日後交給幹事'
+      + '操作時需要改成 DOMAIN，見 docs/系統範圍稽核.md）\n'
+      + '　第 2 層：WEBAPP_ENABLED=' + (webappEnabled ? 'TRUE' : 'FALSE') + '\n'
+      + '　第 3 層：WEBAPP_ALLOWED_EMAILS='
+      + (allowedList.length > 0 ? allowedList.join('、') : '（空白）')
+      + '　SCRIPT_ACCOUNT_EMAIL=' + (scriptAccount || '（空白）'),
+    webappGuidance + '\n\n程式碼稽核結論：WebApp.gs／WebAppFlow.gs 全部 24 個 api* 函式'
+      + '第一行都呼叫 assertWebAppRequestAllowed_()，doGet() 渲染介面前也做同樣檢查，'
+      + '沒有發現任何繞過第 2、3 層的路徑。'
   ));
 
   // 4. 是否已安裝自動排程 trigger
@@ -391,6 +417,29 @@ function buildPreLaunchChecklist_(quarterId) {
             + '也不是結構性不適用），建議人手指派：')),
     genuineGapCells.slice(0, 20).map(function (c) { return c.serviceDate + ' ' + c.key + '：' + c.note; })
       .concat(genuineGapCells.length > 20 ? ['……另有 ' + (genuineGapCells.length - 20) + ' 格'] : [])
+  ));
+
+  // 12. 階段 C2 新增：EmailRecipients 每個 Active 收件人的 Role／Stage／
+  // 實際會收到的階段——直接算好結論顯示，見 buildRecipientRoleStageMatrix_()
+  // （EmailRecipientsSeed.gs）。純資訊性質，一律「已就緒」（沒有「錯誤狀態」
+  // 這回事，只是把現況攤開來給你看，你自己判斷是否符合預期）。
+  const roleMatrix = buildRecipientRoleStageMatrix_();
+  const noEffectiveStages = roleMatrix.filter(function (r) { return r.effectiveStages.length === 0; });
+  items.push(buildChecklistItem_(
+    'EmailRecipients 每個收件人實際會收到的階段',
+    true,
+    roleMatrix.length + ' 個 Active 收件人'
+      + (noEffectiveStages.length > 0 ? '，其中 ' + noEffectiveStages.length + ' 個目前不會收到任何階段的信' : ''),
+    roleMatrix.length === 0
+      ? 'EmailRecipients 目前沒有任何 Active=TRUE 的收件人。'
+      : '以下逐行列出 Role、Stage 欄原始值、以及直接算好的「實際會收到哪些階段」'
+        + '（REVIEW 只看 Role=REVIEWER，其餘階段只看 Stage 欄，兩者互不影響，'
+        + 'detail 是「Role=X｜Stage=Y｜實際會收：Z」這個格式）。',
+    roleMatrix.map(function (r) {
+      return (r.displayName) + '（' + (r.recipientId || '無 ID') + '）　'
+        + 'Role=' + r.role + '｜Stage=' + r.stageRaw + '｜實際會收：'
+        + (r.effectiveStages.length > 0 ? r.effectiveStages.join('、') : '（不會收到任何階段的信）');
+    })
   ));
 
   const readyCount = items.filter(function (it) { return it.ready; }).length;
