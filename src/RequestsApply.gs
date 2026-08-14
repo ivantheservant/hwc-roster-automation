@@ -469,14 +469,48 @@ function applyRequests_(plan, confirmedSheetRows, basis) {
     findStateViolations_(violationCheckState, plan.context), plan.context);
   const warnings = violations.map(function (v) { return makeWarning_(v, v.ruleId, v.reason); });
 
+  // 先建 grid 工作表：若名稱衝突會在寫入長表之前就中止，避免留下孤兒資料列
+  // （同 MultiRun.gs 的 performRosterGeneration_() 既有慣例）。
   const sheetName = createRosterSheet(plan.quarterId, newVersionNo, assignments, warnings);
   writeAssignments(plan.quarterId, newVersionNo, assignments);
-  registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false);
 
-  markPendingBackfillCells_(sheetName, pendingBackfillCells);
-  const newEligibilityCount = writeNewEligibilityRows_(newEligibilityRows);
-  const newUnavailableCount = writeNewUnavailableRows_(newUnavailableRows);
-  writeRequestOutcomes_(outcomes, plan.quarterId);
+  // 階段 A（收尾輪）新增：這裡的道理跟 performRosterGeneration_() 的
+  // registerVersion() 那段完全一樣——Apps Script 沒有交易機制，grid 工作表與
+  // RosterAssignments 這時已經真正寫入了。原本這裡之後的五個寫入
+  // （registerVersion／markPendingBackfillCells_／writeNewEligibilityRows_／
+  // writeNewUnavailableRows_／writeRequestOutcomes_）完全沒有保護，任何一個
+  // 中途失敗（配額錯誤、Apps Script 執行逾時等）都會留下「有 grid 工作表、有
+  // RosterAssignments 列，但 RosterVersions 沒有登記」的孤兒版本，而且 Requests
+  // 那批申報的 RequestID 仍然空白（writeRequestOutcomes_ 是最後一步）——幹事
+  // 完全不知道發生過什麼事，重新執行本步驟時，如果孤兒版本連 RosterVersions
+  // 都沒登記，findLatestVersionNo() 還是會算出同一個版本號，createRosterSheet()
+  // 會直接因為「工作表已存在」而失敗，卡住整個流程。
+  // 這裡跟步驟 1 一樣不嘗試自動回滾，只把已經寫了什麼、需要人手怎麼處理講清楚。
+  let newEligibilityCount = 0;
+  let newUnavailableCount = 0;
+  try {
+    registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false);
+    markPendingBackfillCells_(sheetName, pendingBackfillCells);
+    newEligibilityCount = writeNewEligibilityRows_(newEligibilityRows);
+    newUnavailableCount = writeNewUnavailableRows_(newUnavailableRows);
+    writeRequestOutcomes_(outcomes, plan.quarterId);
+  } catch (err) {
+    throw new Error(
+      '套用申報時，工作表 ' + sheetName + ' 與 RosterAssignments 的派工紀錄已經寫入成功，'
+        + '但後續登記（RosterVersions／待補格子底色／Eligibility／Unavailable／'
+        + 'Requests 處理結果其中一步）失敗（' + err.message + '），流程中途停住了。\n\n'
+        + '需要人手處理，建議：\n'
+        + '1. 打開 Requests 工作表，檢查這批申報的 RequestID 欄是否已填上——'
+        + '仍是空白代表系統還沒把這批標記為「已處理」，重新執行本步驟會再處理一次；\n'
+        + '2. 打開 RosterVersions，檢查有沒有 ' + plan.quarterId + '-v' + newVersionNo + ' 這一行——'
+        + '沒有的話，' + sheetName + ' 是系統找不到的孤兒版本，重新執行本步驟前'
+        + '建議先人手刪除它（連同 RosterAssignments 中 QuarterID=' + plan.quarterId
+        + '、VersionNo=' + newVersionNo + ' 的所有列），否則下次執行會因為工作表名稱'
+        + '衝突而立即失敗；\n'
+        + '3. 完整症狀對照與復原步驟見 docs/中斷復原指引.md「步驟 3／5：套用修改申報'
+        + '中途失敗」一節。'
+    );
+  }
 
   return {
     sheetName: sheetName,

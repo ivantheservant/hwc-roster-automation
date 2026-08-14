@@ -103,22 +103,45 @@ function dailyAutomationCheck_() {
       const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
       if (!quarterId) return;
 
-      const schedule = computeAutomationSchedule_(row, config);
+      // 階段 C（收尾輪）新增：這一整段（算日期、兩個 judge 函式）原本完全沒有
+      // try/catch 包住，只有 executeAutomationAction_() 內部 workFn() 真正執行
+      // 動作那一步才有保護。如果某個季度的資料不完整到連「判斷今天要不要做」
+      // 這一步都會拋錯（例如 StartDate 是完全無法辨識的自由文字，不是日期也不是
+      // 空白，令 shiftDateString_() 算出 Invalid Date，Utilities.formatDate()
+      // 對 Invalid Date 會直接拋錯），這一整個 forEach 迴圈會在那一季直接中斷，
+      // 排在它後面的其他季度全部不會被檢查到——這正是 C2 要求核查的情境。
+      // 包一層 try/catch，讓單一季度的判斷失敗只影響那一季，不拖累其他季度，
+      // 跟 executeAutomationAction_() 已有的「單一動作失敗不拖累其他動作」是
+      // 同一種防禦精神，只是往上多包一層。
+      try {
+        const schedule = computeAutomationSchedule_(row, config);
 
-      const generateJudgment = judgeGenerateAction_(quarterId, schedule.generateDate, today);
-      report.push(executeAutomationAction_(generateJudgment, today, function () {
-        const gen = performRosterGeneration_(quarterId);
-        notifyAdminGenerateDone_(quarterId, gen, config, isDryRun);
-        return '已生成 ' + gen.sheetName + '（試 ' + gen.attemptsRun + ' 次，seed=' + gen.seed + '）；已通知幹事覆核';
-      }));
+        const generateJudgment = judgeGenerateAction_(quarterId, schedule.generateDate, today);
+        report.push(executeAutomationAction_(generateJudgment, today, function () {
+          const gen = performRosterGeneration_(quarterId);
+          notifyAdminGenerateDone_(quarterId, gen, config, isDryRun);
+          return '已生成 ' + gen.sheetName + '（試 ' + gen.attemptsRun + ' 次，seed=' + gen.seed + '）；已通知幹事覆核';
+        }));
 
-      const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
-      report.push(executeAutomationAction_(remindJudgment, today, function () {
-        notifyAdminStageReminder_(quarterId, remindJudgment, config, isDryRun);
-        return '第 ' + (remindJudgment.reminderCount + 1) + ' / ' + remindJudgment.maxCount
-          + ' 次提醒幹事：' + quarterId + ' 停留在 ' + remindJudgment.stage
-          + '（' + remindJudgment.reasons.join('＋') + '）';
-      }));
+        const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
+        report.push(executeAutomationAction_(remindJudgment, today, function () {
+          notifyAdminStageReminder_(quarterId, remindJudgment, config, isDryRun);
+          return '第 ' + (remindJudgment.reminderCount + 1) + ' / ' + remindJudgment.maxCount
+            + ' 次提醒幹事：' + quarterId + ' 停留在 ' + remindJudgment.stage
+            + '（' + remindJudgment.reasons.join('＋') + '）';
+        }));
+      } catch (err) {
+        writeAuditLog_({
+          action: 'AUTOMATION_QUARTER_JUDGE_ERROR',
+          targetSheet: SHEETS.QUARTERS,
+          targetKey: quarterId,
+          newValue: today,
+          source: 'dailyAutomationCheck_',
+          notes: err.message
+        });
+        log_('ERROR', 'dailyAutomationCheck_: 季度 ' + quarterId + ' 判斷階段失敗，已略過，不影響其他季度：' + err.message);
+        report.push({ quarterId: quarterId, action: 'JUDGE', outcome: 'JUDGE_ERROR', detail: err.message });
+      }
     });
 
     return report;

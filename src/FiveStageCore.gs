@@ -86,7 +86,11 @@ function planStep2_(quarterId) {
     quarterId: quarterId,
     versionNo: versionNo,
     recipientCount: countReviewerRecipients_(),
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
+    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    // 階段 A（收尾輪）新增：>0 代表這個版本＋這個階段在 SendLog 已經有人收過信，
+    // 很可能是上次執行中途中斷後重新執行——見 Mailer.gs 的
+    // countAlreadySentForStage_() 說明，只示警不阻擋。
+    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.REVIEW)
   };
 }
 
@@ -253,7 +257,14 @@ function planStep4SendPreview_(quarterId, versionNo) {
   requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
   const recipientCount = listRecipients_(
     MAIL_STAGES.OFFICIAL, buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL)).length;
-  return { recipientCount: recipientCount, isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false };
+  return {
+    recipientCount: recipientCount,
+    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    // 階段 A（收尾輪）新增：見 planStep2_() 同一段說明——步驟 4 的收件人數量
+    // 遠多於步驟 2（約 60 人 vs 幾位堂委），實際撞到 Apps Script 執行逾時的
+    // 風險也高得多，這個警示對步驟 4 更重要。
+    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL)
+  };
 }
 
 /**

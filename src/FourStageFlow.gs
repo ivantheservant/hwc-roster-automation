@@ -124,6 +124,12 @@ function runFourStageStep2_() {
     confirmLines.push('', '⚠ 目前沒有 Role=REVIEWER 的收件人，寄出後不會有任何人收到。'
       + '請先到 EmailRecipients 把審閱者的 Role 設為 REVIEWER（或執行「補建 EmailRecipients 欄位」）。');
   }
+  if (preview.alreadySentCount > 0) {
+    confirmLines.push('', '⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
+      + '寄出／模擬紀錄，很可能是上一次執行到一半中斷後現在重新執行。如果不是刻意要重寄，'
+      + '建議先取消，打開 SendLog 核對狀況再決定——繼續的話，這些人會再收到一封（本系統目前'
+      + '不會自動略過已寄過的人，見 docs/中斷復原指引.md）。');
+  }
   confirmLines.push('', '確定要繼續嗎？');
 
   if (ui.alert('步驟 2：寄給堂委審閱（確認）', confirmLines.join('\n'), ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
@@ -452,10 +458,16 @@ function runFourStageStep4_() {
     'QuarterID：' + quarterId,
     '版本號：v' + versionNo,
     '收件人數：' + sendPreview.recipientCount,
-    'DRY_RUN：' + (sendPreview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）'),
-    '',
-    '確定要正式發出嗎？'
+    'DRY_RUN：' + (sendPreview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
   ];
+  if (sendPreview.alreadySentCount > 0) {
+    confirmLines.push('', '⚠️ 偵測到這個版本已經有 ' + sendPreview.alreadySentCount + ' 位收件人在 SendLog 有'
+      + '寄出／模擬紀錄，很可能是上一次執行到一半中斷後現在重新執行（步驟 4 收件人多，'
+      + '最容易發生）。如果不是刻意要重寄，建議先取消，打開 SendLog 核對狀況再決定——'
+      + '繼續的話，這些人會再收到一封（本系統目前不會自動略過已寄過的人，'
+      + '見 docs/中斷復原指引.md）。');
+  }
+  confirmLines.push('', '確定要正式發出嗎？');
   if (ui.alert('步驟 4：正式發出（確認）', confirmLines.join('\n'), ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
 
   try {

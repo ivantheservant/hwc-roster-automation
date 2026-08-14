@@ -39,16 +39,26 @@ function apiGetFlowState(quarterId) {
   // （lastSentAt 要讀 SendLog）合併成前端要的完整格式，回傳內容與抽函式之前逐字相同。
   const availability = computeFiveStepAvailability_(stage, step1.versionExists);
 
+  // 階段 D（收尾輪）修正：原本三個 lastSentAt 各自呼叫 findLastSendTimestamp_()，
+  // 即各自獨立呼叫一次 readSheet(SHEETS.SEND_LOG)——同一次 apiGetFlowState() 執行
+  // 內把整張 SendLog 完整讀了三次。SendLog 只會隨使用時間單調增長（目前已有幾百行，
+  // 沒有歸檔機制，見 docs/系統範圍稽核.md 階段 D 的規模壓力評估），這個函式在
+  // Web UI 幾乎每個操作之後都會被呼叫一次（見 Script.html 的 closeWizardAndRefresh()），
+  // 三次重複讀取是純粹的浪費，改成一次過讀完，三個 Stage 各自的最後寄送時間
+  // 一次算齊，讀取次數與 SendLog 大小無關，跟三個獨立呼叫比是 3 倍的節省。
+  const lastSentAtByStage = findLastSendTimestampsByStage_(
+    quarterId, [MAIL_STAGES.REVIEW, MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND]);
+
   return {
     quarterId: quarterId,
     stage: stage,
     isDryRun: isDryRun,
     latestVersionNo: latestVersionNo,
     step1: step1,
-    step2: Object.assign({}, availability.step2, { lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.REVIEW) }),
+    step2: Object.assign({}, availability.step2, { lastSentAt: lastSentAtByStage[MAIL_STAGES.REVIEW] }),
     step3: availability.step3,
-    step4: Object.assign({}, availability.step4, { lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.OFFICIAL) }),
-    step5: Object.assign({}, availability.step5, { lastSentAt: findLastSendTimestamp_(quarterId, MAIL_STAGES.RESEND) })
+    step4: Object.assign({}, availability.step4, { lastSentAt: lastSentAtByStage[MAIL_STAGES.OFFICIAL] }),
+    step5: Object.assign({}, availability.step5, { lastSentAt: lastSentAtByStage[MAIL_STAGES.RESEND] })
   };
 }
 
@@ -70,21 +80,29 @@ function findVersionCreatedAt_(quarterId, versionNo) {
 }
 
 /**
- * 找出 SendLog 中某季某階段最後一次寄送的時間（含 DRY_RUN 的紀錄，因為那也代表
- * 這個步驟「跑過一次」）。
+ * 找出 SendLog 中某季**多個**階段各自最後一次寄送的時間（含 DRY_RUN 的紀錄，
+ * 因為那也代表這個步驟「跑過一次」），一次過讀取 SendLog 一次算齊全部階段——
+ * 階段 D（收尾輪）新增，取代原本 `findLastSendTimestamp_()` 逐階段各自呼叫、
+ * 各自重新讀一次整張 SendLog 的寫法。SendLog 只會隨使用時間增長、沒有歸檔
+ * 機制，`apiGetFlowState()` 幾乎每次操作後都會呼叫，讀取次數不應該隨要查詢
+ * 的階段數量而重複倍增。
  * @param {string} quarterId 季度 ID
- * @param {string} stage MAIL_STAGES 其中一個值
- * @returns {?string} 最後一次的 SentAt；找不到回傳 null
+ * @param {string[]} stages 要查詢的 MAIL_STAGES 值陣列
+ * @returns {Object.<string, ?string>} {stage: 最後一次的 SentAt（找不到為 null）}
  */
-function findLastSendTimestamp_(quarterId, stage) {
+function findLastSendTimestampsByStage_(quarterId, stages) {
   const C = COLUMNS.SEND_LOG;
-  let latest = null;
+  const latestByStage = {};
+  stages.forEach(function (s) { latestByStage[s] = null; });
+
   readSheet(SHEETS.SEND_LOG).forEach(function (row) {
-    if (row[C.QUARTER_ID] !== quarterId || row[C.STAGE] !== stage) return;
+    if (row[C.QUARTER_ID] !== quarterId) return;
+    const stage = row[C.STAGE];
+    if (stages.indexOf(stage) === -1) return;
     const sentAt = String(row[C.SENT_AT] || '');
-    if (sentAt && (!latest || sentAt > latest)) latest = sentAt;
+    if (sentAt && (!latestByStage[stage] || sentAt > latestByStage[stage])) latestByStage[stage] = sentAt;
   });
-  return latest;
+  return latestByStage;
 }
 
 /**

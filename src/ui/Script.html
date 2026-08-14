@@ -72,9 +72,18 @@
     el('wizardPanel').hidden = true;
     el('wizardBody').innerHTML = '';
   }
+  /**
+   * 階段 B（收尾輪）修正：原本直接 `await loadFlowState()`，完全沒有包
+   * `runAction()`。`loadFlowState()` 本身也沒有 try/catch——如果這時 `apiGetFlowState`
+   * 失敗（例如 Stage 剛好被其他分頁改動、暫時性網路錯誤、`WEBAPP_ENABLED`
+   * 這時被關閉），會變成一個沒有任何處理的 rejected promise：畫面上唯一可見的
+   * 後果是精靈視窗關閉了，狀態卻完全沒有刷新、也沒有任何錯誤提示——使用者會
+   * 以為操作完成了，其實看到的是舊資料。這是全部五個步驟的「取消／完成／關閉」
+   * 按鈕共用的同一個函式，這裡修好一次全部步驟都受益，不需要逐一步驟改。
+   */
   async function closeWizardAndRefresh() {
     closeWizard();
-    await loadFlowState();
+    await runAction('重新整理狀態', loadFlowState);
   }
 
   /** 違規清單，硬規則與準硬規則分開兩節顯示，內容對應 buildViolationReportLines_()。 */
@@ -195,6 +204,13 @@
             + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
             + (preview.recipientCount === 0
               ? '\n\n⚠ 目前沒有 Role=REVIEWER 的收件人，寄出後不會有任何人收到。'
+              : '')
+            // 階段 A（收尾輪）新增：跟選單版本同步顯示已寄紀錄警告，見
+            // FiveStageCore.gs 的 planStep2_()／Mailer.gs 的 countAlreadySentForStage_()。
+            + (preview.alreadySentCount > 0
+              ? '\n\n⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
+                + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。如果不是刻意要重寄，'
+                + '建議先取消，打開 SendLog 核對狀況再決定。'
               : '')
         ),
         actionsRow([
@@ -400,7 +416,14 @@
               ? '，只顯示前 ' + warnings.pendingCells.length + ' 格' : '')));
         }
         nodes.push(actionsRow([
-          button('繼續', () => step4CheckMissingPdf(warnings.versionNo), ''),
+          // 階段 B（收尾輪）修正：原本直接 `() => step4CheckMissingPdf(...)`，
+          // 呼叫的是一個沒有自己包 runAction() 的函式，而這個按鈕本身是精靈
+          // 視窗裡的一顆按鈕（點擊時已經不在最外層 openStep4() 的 runAction()
+          // 範圍內）——如果 apiStep4GetMissingPdfWarnings 這時失敗，會變成一個
+          // 完全沒有處理的 rejected promise：按鈕點咗，畫面卻毫無反應，也沒有
+          // 任何錯誤訊息，使用者會以為系統卡住。包一層 runAction() 之後，失敗時
+          // 會用返 setStatus() 顯示紅色錯誤文字，跟其他步驟一致。
+          button('繼續', () => runAction('讀取確認資料', () => step4CheckMissingPdf(warnings.versionNo)), ''),
           button('取消，先處理', () => closeWizard(), 'secondary')
         ]));
         renderWizard(nodes);
@@ -419,7 +442,9 @@
           + (missingCheck.missing.length < missingCheck.missingTotal
             ? '\n……另有 ' + (missingCheck.missingTotal - missingCheck.missing.length) + ' 人' : '')),
         actionsRow([
-          button('繼續', () => step4SendPreview(versionNo), ''),
+          // 同上一個「繼續」按鈕的修正理由：step4SendPreview 本身沒有包 runAction()，
+          // 這裡是精靈視窗裡的按鈕，不在任何外層 runAction() 範圍內。
+          button('繼續', () => runAction('讀取確認資料', () => step4SendPreview(versionNo)), ''),
           button('取消，先產生 PDF', () => closeWizard(), 'secondary')
         ])
       ]);
@@ -437,6 +462,13 @@
           + '版本號：v' + versionNo + '\n'
           + '收件人數：' + preview.recipientCount + '\n'
           + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
+          // 階段 A（收尾輪）新增：步驟 4 收件人多（約六十人），比步驟 2 更容易
+          // 撞到 Apps Script 執行逾時，這個警告更重要。
+          + (preview.alreadySentCount > 0
+            ? '\n\n⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
+              + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。如果不是刻意要重寄，'
+              + '建議先取消，打開 SendLog 核對狀況再決定。'
+            : '')
       ),
       actionsRow([
         button('確定要正式發出', () => step4Confirm(), ''),
@@ -665,6 +697,15 @@
     if (quarters.length > 0) {
       currentQuarterId = select.value;
       await loadFlowState();
+    } else {
+      // 階段 B（收尾輪）修正：原本 Quarters 完全沒有資料時，這裡什麼都不做，
+      // 頁面只剩標題與一個空白下拉選單，看落好似壞咗（白畫面），使用者無法
+      // 判斷是「系統壞咗」還是「本來就未有資料」。明確顯示一句說明。
+      el('stageBadge').textContent = '';
+      el('dryRunBadge').textContent = '';
+      el('steps').innerHTML = '';
+      setStatus('目前 Quarters 工作表沒有任何季度資料，請先在試算表建立季度、'
+        + '或執行選單「準備工作 ▸ ⚠️ 新增季度」。', false);
     }
   }
 

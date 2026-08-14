@@ -11,6 +11,47 @@
  *   errorPdf: number, errorPdfMissing: number, isDryRun: boolean, noEmailPeople: string[],
  *   retryCount: number, durationMs: number}} 各類結果的統計
  */
+/**
+ * 階段 A（收尾輪）新增：計算「這個季度＋版本＋階段」目前 SendLog 已經有幾多個
+ * 收件人有 SENT／DRY_RUN 紀錄——純粹用來提醒幹事「這個組合好像已經寄過」，
+ * **不會**跳過任何收件人、不影響 sendStage() 實際寄不寄。跟 RESEND 的
+ * lastHashByPerson（會真的讓內容沒變的人被跳過）是完全不同的機制。
+ *
+ * 存在的理由：sendStage() 對 REVIEW／OFFICIAL／GENERATE 三個階段完全沒有
+ * 「已經寄過就跳過」的判斷（只有 RESEND 有），如果步驟 2／4 執行到一半中斷
+ * （Apps Script 逾時、Drive/Sheets 暫時性錯誤），Stage 這時還沒前進
+ * （advanceQuarterStage_() 是 sendStage() 完全跑完之後才呼叫，見
+ * FiveStageCore.gs 的 executeStep2_()／executeStep4Send_()），幹事很自然會
+ * 重新執行同一個步驟——這時如果 DRY_RUN=FALSE，已經真正收到信的人會收到
+ * 第二封重複的信。這個函式讓步驟 2／4 的確認視窗在偵測到這種情況時主動示警，
+ * 幹事看到警告就知道要先去 SendLog 核對，而不是在完全不知情的情況下重複寄出。
+ * 完整說明見 docs/中斷復原指引.md「步驟 2／4：寄信中途失敗」一節。
+ *
+ * 刻意不做成「自動跳過」：這個專案已有「測試工具 ▸ 寄送（測試模式）」讓幹事
+ * 在寄錯人之後刻意重寄，如果這裡自動跳過「已有 SENT 紀錄」的人，會令那個
+ * 刻意補寄的使用情境失效——所以只做「示警」，是否要繼續，交由幹事自己判斷。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} stage 寄送階段（REVIEW／OFFICIAL）
+ * @returns {number} 已有 SENT／DRY_RUN 紀錄的收件人數（LIST 用 Email、PERSON 用
+ *   PersonID 當識別鍵去重，同一人多筆紀錄只算一次）
+ */
+function countAlreadySentForStage_(quarterId, versionNo, stage) {
+  const C = COLUMNS.SEND_LOG;
+  const baselineStatuses = [MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN];
+  const seen = {};
+  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+    if (row[C.QUARTER_ID] !== quarterId) return;
+    if (Number(row[C.VERSION_NO]) !== versionNo) return;
+    if (row[C.STAGE] !== stage) return;
+    if (baselineStatuses.indexOf(String(row[C.STATUS] || '').toUpperCase()) === -1) return;
+    const key = row[C.PERSON_ID] || row[C.EMAIL];
+    if (key) seen[key] = true;
+  });
+  return Object.keys(seen).length;
+}
+
 function sendStage(quarterId, versionNo, stage) {
   assertNotPreviewMode_('sendStage');
   // 追加階段 N：OFFICIAL 永遠不可以由自動排程觸發，結構性防護見 Trigger.gs 的

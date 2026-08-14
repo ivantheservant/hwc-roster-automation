@@ -85,18 +85,27 @@
   function save(cellId, serviceDate, postId, slotIndex) {
     var input = document.getElementById(cellId + '_input');
     var status = document.getElementById(cellId + '_status');
+    var saveBtn = document.querySelector('#' + cellId + ' .save-btn');
     var name = input.value.trim();
     if (!name) { status.textContent = '請先輸入姓名'; return; }
+    // 階段 B（收尾輪）修正：原本冇停用按鈕，手快連撳兩下會送出兩次
+    // apiSavePreacherTranslationEntry 請求。呢個寫入本身係冪等嘅（同一格
+    // 寫同一個名唔會壞），但兩個請求同時處理時第二個嘅「儲存中…」／
+    // 「✓ 已儲存」狀態訊息可能互相蓋過，睇落好亂。停用按鈕同輸入框，
+    // 令使用者一次淨係可以撳一次。
+    saveBtn.disabled = true;
+    input.disabled = true;
     status.textContent = '儲存中…';
     google.script.run
       .withSuccessHandler(function () {
         var cell = document.getElementById(cellId);
         cell.style.opacity = '0.5';
         status.textContent = '✓ 已儲存';
-        input.disabled = true;
       })
       .withFailureHandler(function (err) {
         status.textContent = '失敗：' + (err.message || String(err));
+        saveBtn.disabled = false;
+        input.disabled = false;
       })
       .apiSavePreacherTranslationEntry(QUARTER_ID, serviceDate, postId, slotIndex, name);
   }
