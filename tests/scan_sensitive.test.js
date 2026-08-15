@@ -123,6 +123,7 @@ function buildDeclaredIdentifierAllowlist(files) {
 // 可以放心用 regex 描述，不需要逐一列出實際值）。
 const SAFE_LONG_TOKEN_PATTERNS = [
   /^\d{4}T\d-v\d+(-[A-Z]+)*-\d{14}$/, // 例：2026T4-v9-OFFICIAL-20260813171850
+  /^\d{4}T\d-P\d+-\d{4}-\d{2}-\d{2}-[A-Z]+-\d+$/, // ICS UID（buildIcsUid_ 組法）例：2027T1-P010-2027-01-10-CHAIR-1
 ];
 
 function isDeclaredOrSafe(token, allowlist) {

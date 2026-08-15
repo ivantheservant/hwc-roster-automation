@@ -924,6 +924,19 @@ const CONFIG_KEYS = {
   // 第十一輪批次階段 A：一季一條固定連結。公開試算表檔案的命名樣板，
   // 支援 {QuarterID}。見 PublicRoster.gs。
   PUBLIC_ROSTER_FILE_NAME_PATTERN: 'PUBLIC_ROSTER_FILE_NAME_PATTERN',
+  // 第十三輪批次階段 A4：公開/個人頁面日期欄嘅顯示格式。純字串代入
+  // （{M}＝月、{d}＝日），刻意唔用 Utilities.formatDate()——後者要真正
+  // GAS 環境，令產生呢個標籤嘅函式冧唔到再係純函式（見 RosterWriter.gs
+  // 嘅 formatShortDateLabel_()）。實測發現寫死數字字串（例如 "3"）會被
+  // Google 試算表自動判斷成數字格式顯示做 "3.0"，改用帶中文字嘅樣板
+  // 令儲存格內容一定唔會被誤判成數字。
+  PUBLIC_ROSTER_DATE_FORMAT: 'PUBLIC_ROSTER_DATE_FORMAT',
+  // 第十三輪批次階段 A6：公開/個人頁面嗰啲 Posts.EmptyDisplay=BLANK 嘅崗位
+  // （例如獻花、翻譯——刻意留空、唔想每格都顯示「（待填）」），喺幹事介面
+  // 留白冇問題（幹事知道呢啲係人手安排），但對外公開嘅版面成行留白冇任何
+  // 說明，義工會誤以為漏咗嘢。呢個 Key 提供一句通用嘅說明文字，喺公開/
+  // 個人頁面代替空白（幹事介面完全唔受影響，仍然顯示空白）。
+  PUBLIC_ROSTER_BLANK_NOTE: 'PUBLIC_ROSTER_BLANK_NOTE',
   // 第十一輪批次階段 C：ICS 日曆事件的預設崇拜時間（HH:mm，24 小時制，
   // Pacific/Auckland）。個別崗位的提早到場時間見 Posts 的 EarlyArrivalMinutes 欄
   // （見 PostSeed.gs 檔頭說明——為什麼改用 Posts 欄而不是逐一開 Config Key）。
@@ -1157,7 +1170,13 @@ const DEFAULTS = {
   PUBLIC_ROSTER_FILE_NAME_PATTERN: '{QuarterID} 粵語堂職事表（公開版）',
   // 第十一輪批次階段 C：預設崇拜時間 10:45–12:00（Ivan 已確認）。
   ICS_SERVICE_START_TIME: '10:45',
-  ICS_SERVICE_END_TIME: '12:00'
+  ICS_SERVICE_END_TIME: '12:00',
+  // 第十三輪批次階段 A4：預設「M月d日」（例如「1月3日」）——實測發現純數字
+  // 標籤會被試算表自動格式化成 "3.0"，帶中文字嘅樣板保證唔會被誤判做數字。
+  PUBLIC_ROSTER_DATE_FORMAT: '{M}月{d}日',
+  // 第十三輪批次階段 A6：獻花／翻譯呢類 EmptyDisplay=BLANK 崗位喺公開/個人
+  // 頁面代替空白嘅通用說明文字。
+  PUBLIC_ROSTER_BLANK_NOTE: '由會友另行安排，非本系統自動排定'
 };
 
 /**

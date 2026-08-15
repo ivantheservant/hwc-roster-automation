@@ -56,10 +56,27 @@ console.log('\n=== A2【核心】五種分類 → 底色嘅單一對照（resolv
     gas.resolveGridCellBackground_('SOME_UNKNOWN_CLASS', '#F4CCCC'), null);
 }
 
-console.log('\n=== A：日期短標籤與月份分組（formatShortDateLabel_／buildMonthGroups_） ===');
+console.log('\n=== A4【核心】formatShortDateLabel_：可配置樣板，永遠唔會係純數字字串 ===');
 {
-  checkEqual('★ 日期短標籤只留日、去除前導 0', gas.formatShortDateLabel_('2026-01-04'), '4');
-  checkEqual('★ 日期短標籤兩位數日照樣正確', gas.formatShortDateLabel_('2026-01-25'), '25');
+  checkEqual('★★★ 預設樣板（DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT＝"{M}月{d}日"）代入正確',
+    gas.formatShortDateLabel_('2026-01-04'), '1月4日');
+  checkEqual('★★ 自訂樣板（例如淨係想要日）都代入得到',
+    gas.formatShortDateLabel_('2026-01-25', '{d}'), '25');
+  checkEqual('★ 自訂樣板可以完全冇 {M}（純日）',
+    gas.formatShortDateLabel_('2026-12-05', '{d}日'), '5日');
+  checkEqual('★ 月／日都去除前導 0（1 位數字，唔係 "01"）',
+    gas.formatShortDateLabel_('2026-09-08', '{M}-{d}'), '9-8');
+
+  // 第十三輪批次階段 A4【回歸測試】：實測發現舊版純數字標籤（例如 "3"）
+  // 寫入 Google 試算表之後被自動格式化成 "3.0"（浮點數）。防止呢個 bug
+  // 復發嘅關鍵係「輸出一定要帶非數字字元」——純數字字串先會被試算表
+  // 誤判做數字型別，帶中文字／符號嘅字串唔會。
+  ['2026-01-04', '2026-01-25', '2026-12-31', '2026-02-01'].forEach(function (d) {
+    const label = gas.formatShortDateLabel_(d);
+    check('★★★ 預設樣板輸出「' + label + '」唔係純數字（帶非數字字元，'
+      + '試算表唔會誤判做數字再格式化成 "X.0"）',
+      !/^\d+$/.test(label), 'formatShortDateLabel_(\'' + d + '\') = ' + JSON.stringify(label));
+  });
 
   const dateColumns = [
     { serviceDate: '2026-01-04' }, { serviceDate: '2026-01-11' }, { serviceDate: '2026-01-18' },
@@ -107,8 +124,9 @@ console.log('\n=== A【本輪最重要】transposeRosterForPublicView_：崗位�
     { postId: 'COMMUNION', postNameTC: '聖餐襄禮', slotCount: 1 }
   ];
   const specialTitleByDate = { '2026-02-01': '浸禮' };
+  const displayOptions = { dateFormatPattern: '{d}', blankNote: '' };
 
-  const t = gas.transposeRosterForPublicView_(layout, posts, specialTitleByDate);
+  const t = gas.transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
 
   checkEqual('★★ dateColumns 數量同 layout.dates 一致', t.dateColumns.length, 2);
   checkEqual('★ 第一個日期欄嘅日標籤同特別主日名稱', t.dateColumns[0], {
@@ -117,6 +135,10 @@ console.log('\n=== A【本輪最重要】transposeRosterForPublicView_：崗位�
   checkEqual('★★ 第二個日期欄有特別主日名稱（浸禮）', t.dateColumns[1], {
     serviceDate: '2026-02-01', weekIndex: 5, dayLabel: '1', specialTitle: '浸禮'
   });
+
+  const tDefault = gas.transposeRosterForPublicView_(layout, posts, specialTitleByDate);
+  check('★ 唔傳 displayOptions 時退回預設樣板（"{M}月{d}日"），唔會拋錯',
+    tDefault.dateColumns[0].dayLabel === '1月4日');
 
   checkEqual('★ 月份分組正確（1 月 1 週、2 月 1 週）', t.monthGroups, [
     { month: 1, label: '1月', span: 1 },
@@ -242,8 +264,9 @@ console.log('\n=== A3：覆寫內容唔可以刪除／重建檔案本身 ===');
   const end = publicRosterSource.indexOf('\n}', start);
   const body = publicRosterSource.slice(start, end);
 
-  check('★★ 只清空既有分頁內容（clear），冇任何刪除整個檔案嘅呼叫',
-    body.indexOf('.clear()') !== -1
+  check('★★ 只完全還原並清空既有分頁內容（resetSheetToBlankSlate_），'
+    + '冇任何刪除整個檔案嘅呼叫（第十三輪批次改用共用還原 helper，唔再係直接 .clear()）',
+    body.indexOf('resetSheetToBlankSlate_(sheet)') !== -1
       && body.indexOf('DriveApp.getFileById') === -1
       && body.indexOf('setTrashed') === -1);
   check('★ 有處理「幹事手動加咗第二張分頁」嘅情況（刪走多餘分頁，確保連結'

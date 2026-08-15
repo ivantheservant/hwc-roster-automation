@@ -197,7 +197,13 @@ function buildPublicRosterContent_(quarterId, versionNo) {
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const posts = readPostsNormalized();
   const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
-  const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate);
+  // 第十三輪批次階段 A4／A6：日期格式與 BLANK 崗位說明文字都可以喺 Config 調，
+  // 見 transposeRosterForPublicView_() 的 displayOptions 說明。
+  const displayOptions = {
+    dateFormatPattern: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT)),
+    blankNote: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '')
+  };
+  const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
 
   const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
   const showLegend = getConfig(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
@@ -268,34 +274,59 @@ const PUBLIC_ROSTER_POST_COLUMN_WIDTH = 100;
  * 崗位（司事、司數、聖餐襄禮）嘅崗位名稱欄垂直合併，日期欄按月分組、
  * 月份標題橫跨該月嘅日期欄。
  *
+ * 第十三輪批次階段 A1／A2／A3／A5【bug 修正】：實測連續兩次重新發佈都
+ * 拋錯（「You can't merge frozen and non-frozen rows」／「Sorry, you
+ * can't freeze columns which contain only part of a merged cell」），
+ * 兩個問題共同根源見 `resetSheetToBlankSlate_()`（`Utils.gs`）嘅檔頭
+ * 說明。修正做法：
+ * 1. **重寫前一定先 `resetSheetToBlankSlate_()`**——完全解除舊有合併／
+ *    凍結／格式／多餘欄列，唔再假設「呢張表係第一次寫」；
+ * 2. **標題列（第 1 行）完全唔再合併**——原本橫跨全部欄嘅合併正正就係
+ *    A2 嘅根源：只凍結第 1 欄，一個橫跨全部欄嘅合併格必然一半喺凍結
+ *    範圍、一半唔喺，結構性違反「凍結唔可以切開合併格」。改為單一
+ *    儲存格（A1）唔合併，因為第 1 行其餘儲存格本身冇內容，Google 試算表
+ *    對長文字嘅預設行為就係向右溢出顯示，視覺效果同合併一樣，但完全
+ *    冇合併／凍結衝突嘅風險；
+ * 3. **嚴格次序：先寫內容 → 先合併 → 最後先至凍結**——凍結一定要排喺
+ *    合併之後，等呢次即將建立嘅全部合併格都已經到位，凍結範圍先可以
+ *    一次過對照埋去；欄闊獨立於合併／凍結，跟返做「內容穩定之後」嘅
+ *    收尾步驟，唔會再因為之前某一步拋錯而完全冇執行到（A3 嘅根源）；
+ * 4. **`ensureSheetDimensions_()` 明確擴到啱好嘅尺寸**——`resetSheetToBlankSlate_()`
+ *    會將工作表縮到 1x1，唔會再有上一版面留低嘅多餘欄／列（A5）。
+ *
  * @param {Spreadsheet} spreadsheet 目標公開試算表
  * @param {Object} content `buildPublicRosterContent_()` 的結果
  * @returns {void}
  */
 function writePublicRosterContent_(spreadsheet, content) {
-  let sheet = spreadsheet.getSheets()[0];
-  sheet.clear();
-  sheet.clearNotes();
-  sheet.setName(GRID_LABELS.FULL_VERSION);
+  const sheet = spreadsheet.getSheets()[0];
 
   const dateCols = content.dateColumns;
   const colCount = 1 + dateCols.length; // 第 1 欄崗位 + 每個日期一欄
+  const postRows = content.postRows;
+  const dataStartRow = 4;
+  const legendTitleRow = dataStartRow + postRows.length + 1;
+  const legendDataRow = legendTitleRow + 1;
+  const footerRow = legendDataRow + content.legendRows.length;
+  const totalRows = Math.max(dataStartRow + postRows.length, footerRow) + 1; // +1 少少緩衝
 
-  // 第 1 行：標題（跨全部欄）
-  sheet.getRange(1, 1, 1, colCount).merge()
-    .setValue(content.quarterId + ' 職事表　更新時間：' + content.updatedAt)
-    .setFontWeight('bold');
+  // ---- 第 0 步：完全還原（見檔頭說明）----
+  resetSheetToBlankSlate_(sheet);
+  ensureSheetDimensions_(sheet, totalRows, colCount);
+  sheet.setName(GRID_LABELS.FULL_VERSION);
 
-  // 第 2-3 行：崗位標題（垂直合併兩行）＋ 月份列（水平合併同月嘅日期欄）＋ 日期列
-  sheet.getRange(2, 1, 2, 1).merge().setValue(GRID_LABELS.POST_COLUMN)
+  // ---- 第 1 步：寫內容（完全未合併、未凍結）----
+  sheet.getRange(1, 1).setValue(
+    content.quarterId + ' 職事表　更新時間：' + content.updatedAt
+  ).setFontWeight('bold');
+
+  sheet.getRange(2, 1).setValue(GRID_LABELS.POST_COLUMN)
     .setFontWeight('bold').setBackground(GRID_COLORS.HEADER)
     .setVerticalAlignment('middle').setHorizontalAlignment('center');
 
   let col = 2;
   content.monthGroups.forEach(function (g) {
-    const range = sheet.getRange(2, col, 1, g.span);
-    if (g.span > 1) range.merge();
-    range.setValue(g.label).setFontWeight('bold')
+    sheet.getRange(2, col).setValue(g.label).setFontWeight('bold')
       .setBackground(GRID_COLORS.HEADER).setHorizontalAlignment('center');
     col += g.span;
   });
@@ -307,9 +338,6 @@ function writePublicRosterContent_(spreadsheet, content) {
     .setFontWeight('bold').setBackground(GRID_COLORS.HEADER).setWrap(true)
     .setHorizontalAlignment('center');
 
-  // 第 4 行起：資料列，每個崗位 slot 一行
-  const dataStartRow = 4;
-  const postRows = content.postRows;
   if (postRows.length > 0) {
     const dataValues = postRows.map(function (pr) {
       return [pr.isFirstSlot ? pr.postNameTC : ''].concat(
@@ -324,40 +352,45 @@ function writePublicRosterContent_(spreadsheet, content) {
       }));
     });
     sheet.getRange(dataStartRow, 1, backgrounds.length, colCount).setBackgrounds(backgrounds);
-
-    // 垂直合併多 slot 崗位嘅名稱欄（例如司事 2 個 slot、聖餐襄禮 4 個 slot）
-    postRows.forEach(function (pr, i) {
-      if (pr.isFirstSlot && pr.slotCount > 1) {
-        sheet.getRange(dataStartRow + i, 1, pr.slotCount, 1).merge()
-          .setVerticalAlignment('middle');
-      }
-    });
   }
 
-  let row = dataStartRow + postRows.length + 1;
   if (content.legendRows.length > 0) {
-    sheet.getRange(row, 1).setValue(GRID_LABELS.LEGEND_TITLE).setFontWeight('bold')
+    sheet.getRange(legendTitleRow, 1).setValue(GRID_LABELS.LEGEND_TITLE).setFontWeight('bold')
       .setBackground(GRID_COLORS.STATS_HEADER);
-    row++;
-    sheet.getRange(row, 1, content.legendRows.length, 3).setValues(content.legendRows);
-    row += content.legendRows.length;
+    sheet.getRange(legendDataRow, 1, content.legendRows.length, 3).setValues(content.legendRows);
   }
   if (content.footerNote) {
-    row++;
-    sheet.getRange(row, 1).setValue(content.footerNote).setFontStyle('italic');
+    sheet.getRange(footerRow, 1).setValue(content.footerNote).setFontStyle('italic');
   }
 
-  // 第十二輪批次階段 A2：凍結首欄（崗位）與首 3 行（標題／月份／日期），
-  // 義工橫向／縱向捲動時都仍然睇到自己要對照嘅崗位同日期。
-  sheet.setFrozenRows(3);
-  sheet.setFrozenColumns(1);
+  // ---- 第 2 步：合併（一定要等內容寫晒、位置穩定之後先做）----
+  // 第 1 行（標題）刻意唔合併——見檔頭 A2 說明。
+  sheet.getRange(2, 1, 2, 1).merge()
+    .setVerticalAlignment('middle').setHorizontalAlignment('center');
+  col = 2;
+  content.monthGroups.forEach(function (g) {
+    if (g.span > 1) sheet.getRange(2, col, 1, g.span).merge();
+    col += g.span;
+  });
+  postRows.forEach(function (pr, i) {
+    if (pr.isFirstSlot && pr.slotCount > 1) {
+      sheet.getRange(dataStartRow + i, 1, pr.slotCount, 1).merge()
+        .setVerticalAlignment('middle');
+    }
+  });
 
-  // 固定欄闊（唔淨係 autoResize——見 PUBLIC_ROSTER_DATE_COLUMN_WIDTH 說明）。
+  // ---- 第 3 步：欄闊／列高（獨立於合併／凍結，跟返內容一齊收尾）----
   sheet.setColumnWidth(1, PUBLIC_ROSTER_POST_COLUMN_WIDTH);
   for (let c = 2; c <= colCount; c++) {
     sheet.setColumnWidth(c, PUBLIC_ROSTER_DATE_COLUMN_WIDTH);
   }
   sheet.setRowHeight(3, 36); // 日期列容得下「日期＋特別主日」兩行
+
+  // ---- 第 4 步：凍結（一定要排喺最後——呢個時候全部合併已經到位，
+  // 凍結首欄／首 3 行唔會切開任何合併格：崗位欄合併／崗位名稱合併
+  // 全部喺欄 1 之內；月份合併全部喺欄 2 起、列 2；標題列完全冇合併）----
+  sheet.setFrozenRows(3);
+  sheet.setFrozenColumns(1);
 
   // 一開始 SpreadsheetApp.create() 只會有一張分頁，但如果係「重開已存在嘅
   // 檔案再覆寫」，理論上唔應該有其他分頁（呢個功能自己唔會加第二張），
@@ -405,9 +438,12 @@ function clearPublicRosterOnQuarterReset_(quarterId) {
     return false;
   }
 
+  // 第十三輪批次階段 B：同 writePublicRosterContent_() 一致，重寫前一定
+  // 先完全還原（唔淨係 clear()——嗰個唔會解除合併／歸零凍結，見
+  // resetSheetToBlankSlate_() 檔頭說明），先唔會同上一次發佈留低嘅
+  // 合併／凍結狀態衝突。
   const sheet = spreadsheet.getSheets()[0];
-  sheet.clear();
-  sheet.clearNotes();
+  resetSheetToBlankSlate_(sheet);
   sheet.setName(GRID_LABELS.FULL_VERSION);
   sheet.getRange(1, 1).setValue(
     quarterId + ' 職事表已重設，尚未重新發佈——如有疑問請聯絡幹事查詢最新安排。'

@@ -402,6 +402,19 @@ function getConfigKeySeeds_() {
         + '第一次建立檔案時的名稱，之後覆寫不會改檔名。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, type: CONFIG_TYPES.STR, group: 'PUBLIC',
+      defaultValue: DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT,
+      description: '公開/個人頁面日期欄嘅顯示格式，支援 {M}（月）與 {d}（日）。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, type: CONFIG_TYPES.STR, group: 'PUBLIC',
+      defaultValue: DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE,
+      description: '公開/個人頁面代替「EmptyDisplay=BLANK」崗位空白格嘅通用說明文字'
+        + '（例如獻花、翻譯）。留空則維持顯示空白。',
+      editable: 'TRUE'
+    },
     // ---- ICS（第十一輪批次階段 C：日曆檔）----
     {
       key: CONFIG_KEYS.ICS_SERVICE_START_TIME, type: CONFIG_TYPES.STR, group: 'ICS',

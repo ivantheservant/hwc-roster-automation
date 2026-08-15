@@ -442,15 +442,33 @@ function resolveGridCellBackground_(cellClass, gapColor) {
 }
 
 /**
- * 第十二輪批次階段 A：把 "yyyy-MM-dd" 轉成公開/個人頁面日期標題要用嘅
- * 精簡格式——淨係日（例如 "2026-01-04" → "4"），月份已經由
- * `buildMonthGroups_()` 產生嘅月份標題列涵蓋，唔需要每欄都重複月份。
+ * 第十三輪批次階段 A4【bug 修正】：把 "yyyy-MM-dd" 轉成公開/個人頁面日期
+ * 標題要用嘅標籤，用可配置嘅樣板代入（`{M}`＝月、`{d}`＝日）。
+ *
+ * 實測發現：第十二輪批次原本淨係回傳一個純數字字串（例如 "3"），寫入
+ * Google 試算表之後被自動判斷成數字格式，顯示做 "3.0"（浮點數）——
+ * `setValues()` 收到睇落似數字嘅字串，Google 試算表會主動轉做數字型別
+ * 儲存格，之後套用嘅預設數字格式可能帶小數位。改用帶中文字嘅樣板
+ * （預設 `{M}月{d}日`，例如「1月3日」）令儲存格內容一定唔會被誤判做
+ * 數字，同時比純數字對讀者更清楚（唔使抬頭對返上面嘅月份分組先知道
+ * 邊一個月）。
+ *
+ * 刻意唔用 `Utilities.formatDate()`——嗰個要真正 GAS 環境，會令呢個
+ * 函式冧唔到再係純函式，自己用簡單嘅 token 代入就夠（只需要月同日
+ * 兩個數字，唔需要完整嘅日期格式化能力）。
  * @param {string} dateStr "yyyy-MM-dd"
- * @returns {string} 日（去除前導 0）
+ * @param {string=} pattern 樣板，支援 `{M}`／`{d}`；留空用
+ *   `DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT`
+ * @returns {string} 代入後嘅日期標籤
  */
-function formatShortDateLabel_(dateStr) {
+function formatShortDateLabel_(dateStr, pattern) {
   const parts = String(dateStr || '').split('-');
-  return parts.length === 3 ? String(Number(parts[2])) : String(dateStr || '');
+  if (parts.length !== 3) return String(dateStr || '');
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  return String(pattern || DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT)
+    .split('{M}').join(String(month))
+    .split('{d}').join(String(day));
 }
 
 /**
@@ -492,12 +510,31 @@ function buildMonthGroups_(dateColumns) {
  * 「同一崗位嘅唔同 slot 各佔一列」，`isFirstSlot=true` 嘅嗰一列供呼叫端
  * 決定邊一列要垂直合併崗位名稱嗰個儲存格（`slotCount` 就係要合併幾多列）。
  *
+ * 第十三輪批次階段 A6【bug 修正】：`Posts.EmptyDisplay=BLANK` 嘅崗位
+ * （例如獻花、翻譯——刻意留空、幹事介面唔想每格都顯示「（待填）」）喺
+ * 幹事介面留白冇問題，但對外公開嘅版面成行留白冇任何說明，義工會誤以為
+ * 漏咗嘢。呢度喺轉置嗰陣做一個針對性嘅代換：`cellClass` 係
+ * `MANUAL_PENDING` 而 `text` 係空字串（呢個組合喺 `resolveGridCellText_()`
+ * 唯一對應 `EmptyDisplay=BLANK`，其餘 `MANUAL_PENDING` 情況一定有非空
+ * 文字，見 RosterWriter.gs 嘅 `resolveEmptyDisplayText_()`），就換成
+ * `displayOptions.blankNote` 呢句通用說明。
+ *
+ * 刻意**唔改** `resolveGridCellText_()`／幹事介面嘅 grid——嗰個嘅空白
+ * 係刻意設計（幹事知道呢啲係人手安排、唔需要提示），呢個代換只喺轉置
+ * 呢一層做，只影響公開／個人頁面。刻意唔做成逐崗位分別嘅文字（例如
+ * 獻花／翻譯用唔同句子）——一句通用文字已經解決「睇落好似漏咗」嘅
+ * 核心問題，唔使為咗呢個顯示細節新增 Posts 欄位／seed 工具，亦對將來
+ * 新增第三個 BLANK 崗位自動適用，唔使逐次追加。
+ *
  * @param {Object} layout `buildGridLayout_()` 的結果
  * @param {{postId: string, postNameTC: string, slotCount: number}[]} posts
  *   崗位清單，必須同 `buildGridLayout_()` 內部用嚟組 `layout.keys` 嘅
  *   `readPosts()` 次序完全一致（呼叫端負責保證，通常直接傳
  *   `readPostsNormalized()` 嘅結果）
  * @param {Object.<string, string>} specialTitleByDate {yyyy-MM-dd: 特別主日名稱}
+ * @param {{dateFormatPattern: string, blankNote: string}=} displayOptions
+ *   `dateFormatPattern` 見 `formatShortDateLabel_()`；`blankNote` 見上，
+ *   留空／唔傳就唔做任何代換（維持顯示空白）
  * @returns {{dateColumns: Object[], monthGroups: Object[], postRows: Object[]}}
  *   `dateColumns`：每個日期欄一項 `{serviceDate, weekIndex, dayLabel, specialTitle}`；
  *   `monthGroups`：`buildMonthGroups_()` 的結果；
@@ -505,12 +542,13 @@ function buildMonthGroups_(dateColumns) {
  *   `{postId, postNameTC, slotIndex, slotCount, isFirstSlot, cells}`，
  *   `cells` 為 `{text, cellClass}` 陣列，順序同 `dateColumns` 一致
  */
-function transposeRosterForPublicView_(layout, posts, specialTitleByDate) {
+function transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions) {
+  const opts = displayOptions || {};
   const dateColumns = layout.dates.map(function (d) {
     return {
       serviceDate: d.serviceDate,
       weekIndex: d.weekIndex,
-      dayLabel: formatShortDateLabel_(d.serviceDate),
+      dayLabel: formatShortDateLabel_(d.serviceDate, opts.dateFormatPattern),
       specialTitle: (specialTitleByDate && specialTitleByDate[d.serviceDate]) || ''
     };
   });
@@ -536,9 +574,12 @@ function transposeRosterForPublicView_(layout, posts, specialTitleByDate) {
       const cIdx = columnIndex;
       const cells = dateColumns.map(function (dc, dateIndex) {
         const rowArr = layout.rows[dateIndex];
+        const text = (rowArr && rowArr[cIdx] !== undefined) ? rowArr[cIdx] : '';
+        const cellClass = (classByCell[dateIndex] && classByCell[dateIndex][cIdx]) || null;
+        const isBlankPending = cellClass === GRID_CELL_CLASS.MANUAL_PENDING && text === '';
         return {
-          text: (rowArr && rowArr[cIdx] !== undefined) ? rowArr[cIdx] : '',
-          cellClass: (classByCell[dateIndex] && classByCell[dateIndex][cIdx]) || null
+          text: (isBlankPending && opts.blankNote) ? opts.blankNote : text,
+          cellClass: cellClass
         };
       });
       postRows.push({

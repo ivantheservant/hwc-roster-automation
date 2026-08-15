@@ -238,7 +238,14 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
   const layout = buildGridLayout_(quarterId, assignments);
   const posts = readPostsNormalized();
   const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
-  const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate);
+  // 第十三輪批次階段 A4／A6：日期格式與 BLANK 崗位說明文字，同
+  // PublicRoster.gs 嘅 buildPublicRosterContent_() 共用同一套 Config Key，
+  // 義工喺公開連結／個人連結見到嘅係同一套顯示邏輯。
+  const displayOptions = {
+    dateFormatPattern: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT)),
+    blankNote: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '')
+  };
+  const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
   const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
 
   // 逐格判斷係咪呢個人自己嘅——同步喺 postRows[].cells[] 加 `mine` 旗標，

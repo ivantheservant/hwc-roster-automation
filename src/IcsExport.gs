@@ -47,7 +47,12 @@ var ICS_VTIMEZONE_AUCKLAND_LINES = [
   'END:VTIMEZONE'
 ];
 
-var ICS_UID_DOMAIN = 'hwc-roster.local';
+// 第十三輪批次階段 E【bug 修正】：由 hwc-roster.local 改用 .invalid——
+// `.local` 係 RFC 6762 保留俾 mDNS（Bonjour／本機網絡裝置探索）用，唔係
+// 「呢個網域一定唔存在」嘅慣例；`.invalid` 先係 RFC 2606 明確保留、專門
+// 表達「呢個位址肯定唔會解析到任何嘢」嘅 TLD，同本專案其他測試/範例資料
+// 一致（見 tests/scan_sensitive.test.js 嘅安全網域清單）。
+var ICS_UID_DOMAIN = 'hwc-roster.invalid';
 var ICS_LINE_FOLD_MAX_OCTETS = 75;
 
 /**

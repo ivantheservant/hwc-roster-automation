@@ -92,9 +92,16 @@ function buildGasStubs_() {
  * 把指定的 .gs 檔案載入一個新的沙箱，回傳沙箱的全域物件——裡面可以直接取到
  * 正式碼定義的每一個函式與常數（跟 Apps Script 的全域作用域一致）。
  * @param {string[]=} files 要載入的檔名陣列；預設為排表測試需要的那一組
+ * @param {Object.<string, *>=} overrides 第十三輪批次階段 D 新增：可選嘅
+ *   全域替身覆寫，鍵係全域名稱（例如 `'HtmlService'`）、值係要用嚟取代
+ *   預設「一呼叫就拋錯」stub 嘅實際物件。用途：某啲函式只需要 GAS 全域
+ *   入面好細嘅一部分行為（例如 `renderPersonalRosterError_()` 淨係用到
+ *   `HtmlService.createHtmlOutput(...).setTitle(...)`），提供一個貼合
+ *   需要嘅簡化版 mock，就可以喺 Node 環境真正執行呢個函式，唔使成個
+ *   `HtmlService` 都要拋錯。冇傳呢個參數時行為同以前完全一致。
  * @returns {Object} 沙箱全域物件
  */
-function loadGasSource(files) {
+function loadGasSource(files, overrides) {
   const list = files || FILES_FOR_GENERATOR;
   const sources = list.map(function (name) {
     const full = path.join(SRC_DIR, name);
@@ -103,6 +110,7 @@ function loadGasSource(files) {
   });
 
   const sandbox = buildGasStubs_();
+  if (overrides) Object.keys(overrides).forEach(function (k) { sandbox[k] = overrides[k]; });
   vm.createContext(sandbox);
 
   // 串接後一次過執行：模仿 GAS 把全部 .gs 當成同一個全域作用域的做法。

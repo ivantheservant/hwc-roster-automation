@@ -145,8 +145,10 @@ console.log('\n=== C2：buildIcsUid_ 格式（季度-人-日期-崗位-slot@固�
   const expectedUid = ['2099T1', 'P001', '2099-01-04', 'AUDIO', 1].join('-') + '@' + gas.ICS_UID_DOMAIN;
   checkEqual('★★ UID 格式正確、唔含真實教會域名',
     gas.buildIcsUid_('2099T1', 'P001', '2099-01-04', 'AUDIO', 1), expectedUid);
-  check('★★ UID 域名唔含任何看起來似真實網域嘅字（不可寫死教會真實域名）',
-    gas.ICS_UID_DOMAIN.indexOf('.local') !== -1);
+  check('★★ UID 域名用 RFC 2606 保留嘅 .invalid（明確表達「呢個位址肯定'
+    + '唔會解析到任何嘢」，唔可寫死教會真實域名，亦唔用 .local——'
+    + '嗰個係 RFC 6762 保留俾 mDNS 用，唔係「呢個域名一定唔存在」嘅慣例）',
+    gas.ICS_UID_DOMAIN.indexOf('.invalid') !== -1);
 }
 
 console.log('\n=== C6【核心】整體格式符合 RFC 5545 基本要求 ===');

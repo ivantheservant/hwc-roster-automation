@@ -250,6 +250,76 @@ function applyTimestampFormat_(sheet, headers, columnNames, startRow, rowCount) 
 }
 
 /**
+ * 第十三輪批次階段 B【核心共用 helper】：完全還原一張工作表到「乾淨、
+ * 冇任何版面殘留」嘅狀態，供任何會設定版面（合併儲存格／凍結列或欄／
+ * 欄闊等）嘅寫入點喺重寫內容之前呼叫。
+ *
+ * ## 背景：點解需要呢個函式
+ *
+ * Google 試算表有兩個結構性限制（完整說明見
+ * `docs/GoogleSheetsAPI限制.md`）：
+ * 1. 合併儲存格唔可以跨越凍結／非凍結嘅分界線（列同欄都係）；
+ * 2. **`Range.clear()`／`Sheet.clear()` 唔會解除合併、唔會歸零凍結列／欄**
+ *    ——呢個唔係顯而易見嘅行為，好容易寫成「clear() 咗就等於乾淨」。
+ *
+ * 兩者夾埋嘅後果：重寫一張已經被寫過（甚至寫到一半失敗、留低中間狀態）
+ * 嘅工作表時，上一次留低嘅合併／凍結狀態會繼續存在，同呢一次即將設定
+ * 嘅新合併／凍結產生衝突——呢個係 `PublicRoster.gs` 實測撞到「You can't
+ * merge frozen and non-frozen rows」呢個 bug 嘅根源。
+ *
+ * ## 做法
+ *
+ * 唔去推斷「上次可能停喺邊一步」（例如上次可能因為拋錯而冇行到
+ * `setFrozenRows()`，令目前凍結狀態同預期唔一致），一律強制清到底：
+ * 1. 凍結列／欄歸零——一定要行喺解除合併之前，凍結範圍仲存在嘅話，
+ *    部分合併格可能解除唔到；
+ * 2. 解除全部合併（`breakApart()`，對成張表嘅範圍呼叫一次就可以解晒
+ *    全部獨立嘅合併群組，唔使逐個搵）；
+ * 3. 清除內容／格式／備註／資料驗證／條件格式；
+ * 4. 縮到只剩 1 欄 1 行——等寫入端自己用 `ensureSheetDimensions_()`
+ *    決定要幾大，避免上一版面用剩嘅多餘欄／列留喺右邊／下面
+ *    （實測發現：新版面 14 欄，舊版面 24 欄，重寫之後右邊 10 欄
+ *    仍然殘留住上一版嘅內容）。
+ *
+ * @param {Sheet} sheet 要還原嘅工作表
+ * @returns {void}
+ */
+function resetSheetToBlankSlate_(sheet) {
+  sheet.setFrozenRows(0);
+  sheet.setFrozenColumns(0);
+
+  const maxRows = sheet.getMaxRows();
+  const maxCols = sheet.getMaxColumns();
+  const fullRange = sheet.getRange(1, 1, maxRows, maxCols);
+  fullRange.breakApart();
+  fullRange.clearDataValidations();
+
+  sheet.clear();
+  sheet.clearNotes();
+  sheet.clearConditionalFormatRules();
+
+  if (sheet.getMaxColumns() > 1) sheet.deleteColumns(2, sheet.getMaxColumns() - 1);
+  if (sheet.getMaxRows() > 1) sheet.deleteRows(2, sheet.getMaxRows() - 1);
+}
+
+/**
+ * 確保一張工作表至少有指定嘅列數／欄數，唔夠就新增。刻意喺寫入內容之前
+ * 明確呼叫，唔依賴 `getRange()` 對超出目前工作表尺寸嘅範圍會唔會自動
+ * 擴展工作表呢個唔一定喺所有情況下都清楚保證嘅行為——`resetSheetToBlankSlate_()`
+ * 會將工作表縮到 1 欄 1 行，寫入端需要嘅實際尺寸一定要喺呢度先明確擴大。
+ * @param {Sheet} sheet 目標工作表
+ * @param {number} minRows 最少需要嘅列數
+ * @param {number} minCols 最少需要嘅欄數
+ * @returns {void}
+ */
+function ensureSheetDimensions_(sheet, minRows, minCols) {
+  const currentCols = sheet.getMaxColumns();
+  if (currentCols < minCols) sheet.insertColumnsAfter(currentCols, minCols - currentCols);
+  const currentRows = sheet.getMaxRows();
+  if (currentRows < minRows) sheet.insertRowsAfter(currentRows, minRows - currentRows);
+}
+
+/**
  * 寫入一筆 AuditLog 紀錄。時間戳一律經 nowTimestamp_() 產生。
  * AuditLog 工作表不存在時只記 Logger，不中斷呼叫端的流程。
  * @param {{action: string, targetSheet: string, targetKey: string,
