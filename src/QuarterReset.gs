@@ -51,6 +51,12 @@ function planQuarterReset_(quarterId, includeV0) {
     pdfFiles: [],          // {id, name, sizeBytes}
     pdfUnrecognised: [],   // 不確定屬於哪個季度的檔案，一律不刪
     quarterStage: '',
+    // 第十二輪批次階段 D：呢一季有冇發佈過公開職事表（PublicLinks）。
+    // 有嘅話，執行階段會**清空檔案內容**（顯示「已重設」提示）但**唔會
+    // 刪除檔案／PublicLinks 紀錄**，理由見 clearPublicRosterOnQuarterReset_()
+    // 檔頭說明。呢度只負責喺計畫階段查一次（唔寫入任何嘢），俾確認畫面
+    // 可以話畀幹事知呢一項將會發生。
+    publicLinkFileUrl: '',
     manualAttention: []    // 需要人手處理的項目說明
   };
 
@@ -212,6 +218,26 @@ function planQuarterReset_(quarterId, includeV0) {
     plan.manualAttention.push('讀取 Quarters 的 Stage 失敗：' + err.message);
   }
 
+  // ---- PublicLinks（第十二輪批次階段 D）----
+  // 刻意唔用 PublicRoster.gs 嗰個共用嘅查詢入口——嗰個入口為咗
+  // first-run 安全會喺讀取前順手確保工作表存在，全新環境下第一次呼叫
+  // 可能因此建立一張新工作表。呢個 plan 函式必須保持零寫入，所以自己做
+  // 一次唔會建表嘅唯讀查詢：工作表本身都未存在就直接當「呢一季冇發佈過」。
+  try {
+    const publicLinksSheet = ss.getSheetByName(SHEETS.PUBLIC_LINKS);
+    if (publicLinksSheet) {
+      const C = COLUMNS.PUBLIC_LINKS;
+      const row = readSheet(SHEETS.PUBLIC_LINKS).find(function (r) {
+        return String(r[C.QUARTER_ID] || '').trim() === quarterId;
+      });
+      if (row && String(row[C.FILE_ID] || '').trim()) {
+        plan.publicLinkFileUrl = String(row[C.FILE_URL] || '').trim();
+      }
+    }
+  } catch (err) {
+    plan.manualAttention.push('檢查 PublicLinks（公開職事表）失敗，略過：' + err.message);
+  }
+
   return plan;
 }
 
@@ -231,7 +257,7 @@ function executeQuarterReset_(plan) {
   const result = {
     versionRowsDeleted: 0, versionSheetsDeleted: 0, assignmentRowsDeleted: 0,
     sendLogRowsDeleted: 0, requestRowsDeleted: 0, unavailableRowsDeleted: 0,
-    pdfTrashed: 0, stageReset: false, errors: []
+    pdfTrashed: 0, stageReset: false, publicRosterCleared: false, errors: []
   };
 
   // 先留底：刪之前把打算刪什麼寫入 AuditLog
@@ -326,6 +352,18 @@ function executeQuarterReset_(plan) {
     result.stageReset = true;
   } catch (err) {
     result.errors.push('重設 Stage 失敗：' + err.message);
+  }
+
+  // ---- 公開職事表（第十二輪批次階段 D）----
+  // 只喺 plan 階段已經確認呢一季有發佈紀錄先嘗試——見
+  // clearPublicRosterOnQuarterReset_()（PublicRoster.gs）檔頭嘅決策說明：
+  // 唔刪除檔案／PublicLinks 紀錄，只清空內容做「已重設」提示。
+  if (plan.publicLinkFileUrl) {
+    try {
+      result.publicRosterCleared = clearPublicRosterOnQuarterReset_(plan.quarterId);
+    } catch (err) {
+      result.errors.push('清空公開職事表失敗：' + err.message);
+    }
   }
 
   return result;

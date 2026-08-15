@@ -239,7 +239,11 @@ function runDraftReviewReport_() {
     return;
   }
 
-  const written = tryWriteDiagnostics_('草稿覆核報告', rows);
+  // 第十二輪批次階段 C【bug 修正】：tryWriteDiagnostics_() 回傳嘅係
+  // 「有冇成功寫入」嘅布林值，唔係寫入行數，行數應該係 rows.length
+  // （同 PublicRoster.gs 嘅「公開連結狀態」發現嘅同一種型別錯誤）。
+  tryWriteDiagnostics_('草稿覆核報告', rows);
+  const written = rows.length;
 
   const d = metrics.distribution;
   const lines = [

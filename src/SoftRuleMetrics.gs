@@ -442,7 +442,10 @@ function runSoftRuleMetrics_() {
     return;
   }
 
-  const written = tryWriteDiagnostics_('軟規則實測量度', rows);
+  // 第十二輪批次階段 C【bug 修正】：tryWriteDiagnostics_() 回傳嘅係
+  // 「有冇成功寫入」嘅布林值，唔係寫入行數，行數應該係 rows.length。
+  tryWriteDiagnostics_('軟規則實測量度', rows);
+  const written = rows.length;
 
   const flagged = [];
   if (metrics.chairEqJudgement.judgement !== SOFT_METRIC_JUDGEMENT.NORMAL

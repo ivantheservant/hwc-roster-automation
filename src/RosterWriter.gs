@@ -421,6 +421,142 @@ function buildLegendRows_(layout) {
 }
 
 /**
+ * 第十二輪批次階段 A：把 `classifyGridCell_()` 的五種分類轉成公開/個人
+ * 頁面要用的底色，供 `computePublicRosterBackgrounds_()` 與
+ * `transposeRosterForPublicView_()` 共用同一套邏輯（一種分類一種顏色，
+ * 唔會兩處各自維護一份對照、改一邊漏一邊）。
+ * 刻意唔沿用 grid 工作表本身嘅底色邏輯（`applyCellMarks_()`）——嗰個會將
+ * 「有人但觸發規則警告」畫成黃色／橙色，兩者都係診斷用途，唔應該出現喺
+ * 對外公開嘅版本，見 `PublicRoster.gs` 檔頭說明。
+ * @param {string} cellClass `classifyGridCell_()` 的結果
+ * @param {string} gapColor 「排唔出」格要用嘅底色
+ * @returns {?string} 底色；`ASSIGNED`（或未知分類）一律回傳 `null`（唔上色）
+ */
+function resolveGridCellBackground_(cellClass, gapColor) {
+  if (cellClass === GRID_CELL_CLASS.GENUINE_GAP) return gapColor;
+  if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) return GRID_COLORS.SPECIAL_SKIP;
+  if (cellClass === GRID_CELL_CLASS.STRUCTURAL_NA || cellClass === GRID_CELL_CLASS.MANUAL_PENDING) {
+    return GRID_COLORS.SKIPPED;
+  }
+  return null;
+}
+
+/**
+ * 第十二輪批次階段 A：把 "yyyy-MM-dd" 轉成公開/個人頁面日期標題要用嘅
+ * 精簡格式——淨係日（例如 "2026-01-04" → "4"），月份已經由
+ * `buildMonthGroups_()` 產生嘅月份標題列涵蓋，唔需要每欄都重複月份。
+ * @param {string} dateStr "yyyy-MM-dd"
+ * @returns {string} 日（去除前導 0）
+ */
+function formatShortDateLabel_(dateStr) {
+  const parts = String(dateStr || '').split('-');
+  return parts.length === 3 ? String(Number(parts[2])) : String(dateStr || '');
+}
+
+/**
+ * 第十二輪批次階段 A：把已排序（按週次由小到大）嘅日期欄位陣列，
+ * 按月分組成「月份標題橫跨該月幾多個日期欄」嘅陣列，供公開/個人頁面
+ * 畫月份標題列（merge 跨欄）用。假設輸入已經按日期排序——`buildGridLayout_()`
+ * 產生嘅 `dates` 本來就按 `weekIndex` 由小到大排，季度內嘅週次同日期
+ * 必然同步遞增，所以連續同月份嘅日期一定相鄰，唔會斷開又重新出現。
+ * @param {{serviceDate: string}[]} dateColumns 已排序嘅日期欄位陣列
+ * @returns {{month: number, label: string, span: number}[]} 月份分組
+ */
+function buildMonthGroups_(dateColumns) {
+  const groups = [];
+  dateColumns.forEach(function (dc) {
+    const month = Number(String(dc.serviceDate).split('-')[1]);
+    const last = groups[groups.length - 1];
+    if (last && last.month === month) {
+      last.span++;
+    } else {
+      groups.push({ month: month, label: month + '月', span: 1 });
+    }
+  });
+  return groups;
+}
+
+/**
+ * 第十二輪批次階段 A【本輪最重要】：把 `buildGridLayout_()` 產生嘅「日期做列、
+ * 崗位做欄」grid，轉置成「崗位做列、日期做欄」——對照教會現行人手職事表嘅
+ * 方向（崗位在左欄、日期在頂列、按月分組），亦令欄數固定喺「幾多週 + 1」
+ * （通常 13＋1＝14 欄），唔會再因為崗位／slot 數量增加而越嚟越闊，
+ * 大幅改善手機睇嘅體驗。
+ *
+ * 刻意寫成純函式——唔碰 `SpreadsheetApp`，只食 `buildGridLayout_()` 已經
+ * 產生嘅 `layout`、崗位清單、特別主日對照三樣輸入，方便直接測試「邊一格
+ * 轉置去邊度」呢個結構本身係啱嘅，唔使真正嘅 GAS 環境。
+ *
+ * 多 slot 嘅崗位（例如司事、司數各 2 個 slot，聖餐襄禮 4 個 slot）喺原本
+ * 嘅日期做列版面係「同一崗位嘅唔同 slot 各佔一欄」，轉置之後就變成
+ * 「同一崗位嘅唔同 slot 各佔一列」，`isFirstSlot=true` 嘅嗰一列供呼叫端
+ * 決定邊一列要垂直合併崗位名稱嗰個儲存格（`slotCount` 就係要合併幾多列）。
+ *
+ * @param {Object} layout `buildGridLayout_()` 的結果
+ * @param {{postId: string, postNameTC: string, slotCount: number}[]} posts
+ *   崗位清單，必須同 `buildGridLayout_()` 內部用嚟組 `layout.keys` 嘅
+ *   `readPosts()` 次序完全一致（呼叫端負責保證，通常直接傳
+ *   `readPostsNormalized()` 嘅結果）
+ * @param {Object.<string, string>} specialTitleByDate {yyyy-MM-dd: 特別主日名稱}
+ * @returns {{dateColumns: Object[], monthGroups: Object[], postRows: Object[]}}
+ *   `dateColumns`：每個日期欄一項 `{serviceDate, weekIndex, dayLabel, specialTitle}`；
+ *   `monthGroups`：`buildMonthGroups_()` 的結果；
+ *   `postRows`：每個崗位 slot 一項
+ *   `{postId, postNameTC, slotIndex, slotCount, isFirstSlot, cells}`，
+ *   `cells` 為 `{text, cellClass}` 陣列，順序同 `dateColumns` 一致
+ */
+function transposeRosterForPublicView_(layout, posts, specialTitleByDate) {
+  const dateColumns = layout.dates.map(function (d) {
+    return {
+      serviceDate: d.serviceDate,
+      weekIndex: d.weekIndex,
+      dayLabel: formatShortDateLabel_(d.serviceDate),
+      specialTitle: (specialTitleByDate && specialTitleByDate[d.serviceDate]) || ''
+    };
+  });
+  const monthGroups = buildMonthGroups_(dateColumns);
+
+  // 建立 (dateIndex, columnIndex) → cellClass 對照——columnIndex 沿用
+  // layout.rows 本身嘅 0-based 欄索引（前 3 欄係日期／週次／類型），
+  // 直接由 layout.cellIndex 逐項反推，唔重新掃 assignments 一次。
+  const classByCell = dateColumns.map(function () { return []; });
+  Object.keys(layout.cellIndex).forEach(function (key) {
+    const cell = layout.cellIndex[key];
+    const dateIndex = cell.row - 3;
+    const columnIndex = cell.column - 1;
+    if (!classByCell[dateIndex]) classByCell[dateIndex] = [];
+    classByCell[dateIndex][columnIndex] = cell.cellClass;
+  });
+
+  let columnIndex = 3; // layout.keys／layout.rows 的 0-based 索引，前 3 欄係日期/週次/類型
+  const postRows = [];
+  posts.forEach(function (post) {
+    const slotCount = Math.max(1, Number(post.slotCount) || 1);
+    for (let slot = 1; slot <= slotCount; slot++) {
+      const cIdx = columnIndex;
+      const cells = dateColumns.map(function (dc, dateIndex) {
+        const rowArr = layout.rows[dateIndex];
+        return {
+          text: (rowArr && rowArr[cIdx] !== undefined) ? rowArr[cIdx] : '',
+          cellClass: (classByCell[dateIndex] && classByCell[dateIndex][cIdx]) || null
+        };
+      });
+      postRows.push({
+        postId: post.postId,
+        postNameTC: post.postNameTC,
+        slotIndex: slot,
+        slotCount: slotCount,
+        isFirstSlot: slot === 1,
+        cells: cells
+      });
+      columnIndex++;
+    }
+  });
+
+  return { dateColumns: dateColumns, monthGroups: monthGroups, postRows: postRows };
+}
+
+/**
  * 第十輪批次階段 A2：在 grid 資料列之後寫入圖例，並在最底加一句備註
  * （對照教會現行人手職事表底部嗰句聯絡人字句）。
  *

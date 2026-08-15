@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
-const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Generator.gs', 'PublicRoster.gs']);
+const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Generator.gs', 'RosterWriter.gs', 'PublicRoster.gs']);
 
 let fail = 0;
 function check(label, condition, extra) {
@@ -33,58 +33,149 @@ function checkEqual(label, actual, expected) {
 const SRC = path.join(__dirname, '..', 'src');
 const publicRosterSource = fs.readFileSync(path.join(SRC, 'PublicRoster.gs'), 'utf8');
 
-console.log('\n=== A2【核心】公開內容嘅底色對照，唔會露出規則警告 ===');
+console.log('\n=== A2【核心】五種分類 → 底色嘅單一對照（resolveGridCellBackground_），唔會露出規則警告 ===');
+{
+  const CLASS = gas.GRID_CELL_CLASS;
+  checkEqual('★ 已排定（含可能有規則警告）嘅格唔上色',
+    gas.resolveGridCellBackground_(CLASS.ASSIGNED, '#F4CCCC'), null);
+  checkEqual('★ 待人手填嘅格用灰底',
+    gas.resolveGridCellBackground_(CLASS.MANUAL_PENDING, '#F4CCCC'), gas.GRID_COLORS.SKIPPED);
+  checkEqual('★ 結構性不適用用灰底',
+    gas.resolveGridCellBackground_(CLASS.STRUCTURAL_NA, '#F4CCCC'), gas.GRID_COLORS.SKIPPED);
+  checkEqual('★ 特別主日用紫底',
+    gas.resolveGridCellBackground_(CLASS.SPECIAL_SKIP, '#F4CCCC'), gas.GRID_COLORS.SPECIAL_SKIP);
+  checkEqual('★★ 排唔出用粉紅底（同傳入嘅 gapColor 一致）',
+    gas.resolveGridCellBackground_(CLASS.GENUINE_GAP, '#F4CCCC'), '#F4CCCC');
+
+  const assignedBg = gas.resolveGridCellBackground_(CLASS.ASSIGNED, '#F4CCCC');
+  check('★★ 已排定嘅格即使有規則警告，都唔會用 WARNING／FORCED 底色'
+    + '（公開版本唔應該有任何診斷用途嘅顏色）',
+    assignedBg !== gas.GRID_COLORS.WARNING && assignedBg !== gas.GRID_COLORS.FORCED);
+
+  checkEqual('★ 未知／不存在嘅分類一律唔上色（防呆）',
+    gas.resolveGridCellBackground_('SOME_UNKNOWN_CLASS', '#F4CCCC'), null);
+}
+
+console.log('\n=== A：日期短標籤與月份分組（formatShortDateLabel_／buildMonthGroups_） ===');
+{
+  checkEqual('★ 日期短標籤只留日、去除前導 0', gas.formatShortDateLabel_('2026-01-04'), '4');
+  checkEqual('★ 日期短標籤兩位數日照樣正確', gas.formatShortDateLabel_('2026-01-25'), '25');
+
+  const dateColumns = [
+    { serviceDate: '2026-01-04' }, { serviceDate: '2026-01-11' }, { serviceDate: '2026-01-18' },
+    { serviceDate: '2026-02-01' }, { serviceDate: '2026-02-08' },
+    { serviceDate: '2026-03-01' }
+  ];
+  const groups = gas.buildMonthGroups_(dateColumns);
+  checkEqual('★★ 連續同月份嘅日期合併成一組，span 正確',
+    groups, [
+      { month: 1, label: '1月', span: 3 },
+      { month: 2, label: '2月', span: 2 },
+      { month: 3, label: '3月', span: 1 }
+    ]);
+}
+
+console.log('\n=== A【本輪最重要】transposeRosterForPublicView_：崗位做列、日期做欄 ===');
 {
   const CLASS = gas.GRID_CELL_CLASS;
   // 手砌一個 buildGridLayout_() 會產生嘅 layout 形狀（做法跟其他測試檔
   // 一樣：唔呼叫 buildGridLayout_() 本身——嗰個要讀 Posts／ServiceDates，
-  // 呢度只測「畀定一個 layout，底色點揀」呢個獨立嘅純邏輯）。
+  // 呢度只測「畀定一個 layout，點樣轉置」呢個獨立嘅純邏輯）。
+  // USHER（司事）2 個 slot、COMMUNION（聖餐襄禮）1 個 slot（首主日先有）。
   const layout = {
-    keys: ['_DATE', '_WEEK', '_TYPE', 'CHAIR#1', 'PREACHER#1', 'COMMUNION#1', 'WORSHIP#1', 'AUDIO#1'],
-    rows: [['2099-01-04', 1, '主日崇拜', '陳大文', '（待填）', '—', '特殊主日', '⚠ 未能安排']],
+    headers: ['日期', '週次', '類型', '司事1', '司事2', '聖餐襄禮1'],
+    keys: ['_DATE', '_WEEK', '_TYPE', 'USHER#1', 'USHER#2', 'COMMUNION#1'],
+    rows: [
+      ['2026-01-04', 1, '主日崇拜', '陳大文', '李小明', '張三'],
+      ['2026-02-01', 5, '主日崇拜（浸禮）', '王美美', '（待填）', '—']
+    ],
+    dates: [
+      { serviceDate: '2026-01-04', weekIndex: 1, serviceType: '主日崇拜' },
+      { serviceDate: '2026-02-01', weekIndex: 5, serviceType: '主日崇拜' }
+    ],
     cellIndex: {
-      'k1': { row: 3, column: 4, cellClass: CLASS.ASSIGNED },
-      'k2': { row: 3, column: 5, cellClass: CLASS.MANUAL_PENDING },
-      'k3': { row: 3, column: 6, cellClass: CLASS.STRUCTURAL_NA },
-      'k4': { row: 3, column: 7, cellClass: CLASS.SPECIAL_SKIP },
-      'k5': { row: 3, column: 8, cellClass: CLASS.GENUINE_GAP }
+      '2026-01-04|USHER|1': { row: 3, column: 4, cellClass: CLASS.ASSIGNED },
+      '2026-01-04|USHER|2': { row: 3, column: 5, cellClass: CLASS.ASSIGNED },
+      '2026-01-04|COMMUNION|1': { row: 3, column: 6, cellClass: CLASS.ASSIGNED },
+      '2026-02-01|USHER|1': { row: 4, column: 4, cellClass: CLASS.ASSIGNED },
+      '2026-02-01|USHER|2': { row: 4, column: 5, cellClass: CLASS.MANUAL_PENDING },
+      '2026-02-01|COMMUNION|1': { row: 4, column: 6, cellClass: CLASS.STRUCTURAL_NA }
     }
   };
-  const backgrounds = gas.computePublicRosterBackgrounds_(layout, '#F4CCCC');
+  const posts = [
+    { postId: 'USHER', postNameTC: '司事', slotCount: 2 },
+    { postId: 'COMMUNION', postNameTC: '聖餐襄禮', slotCount: 1 }
+  ];
+  const specialTitleByDate = { '2026-02-01': '浸禮' };
 
-  checkEqual('★ 已排定（含可能有規則警告）嘅格唔上色',
-    backgrounds[0][3], null);
-  checkEqual('★ 待人手填嘅格用灰底', backgrounds[0][4], gas.GRID_COLORS.SKIPPED);
-  checkEqual('★ 結構性不適用用灰底', backgrounds[0][5], gas.GRID_COLORS.SKIPPED);
-  checkEqual('★ 特別主日用紫底', backgrounds[0][6], gas.GRID_COLORS.SPECIAL_SKIP);
-  checkEqual('★★ 排唔出用粉紅底（同傳入嘅 gapColor 一致）', backgrounds[0][7], '#F4CCCC');
+  const t = gas.transposeRosterForPublicView_(layout, posts, specialTitleByDate);
 
-  check('★★ 已排定嘅格即使有規則警告，都唔會用 WARNING／FORCED 底色'
-    + '（公開版本唔應該有任何診斷用途嘅顏色）',
-    backgrounds[0][3] !== gas.GRID_COLORS.WARNING && backgrounds[0][3] !== gas.GRID_COLORS.FORCED);
+  checkEqual('★★ dateColumns 數量同 layout.dates 一致', t.dateColumns.length, 2);
+  checkEqual('★ 第一個日期欄嘅日標籤同特別主日名稱', t.dateColumns[0], {
+    serviceDate: '2026-01-04', weekIndex: 1, dayLabel: '4', specialTitle: ''
+  });
+  checkEqual('★★ 第二個日期欄有特別主日名稱（浸禮）', t.dateColumns[1], {
+    serviceDate: '2026-02-01', weekIndex: 5, dayLabel: '1', specialTitle: '浸禮'
+  });
+
+  checkEqual('★ 月份分組正確（1 月 1 週、2 月 1 週）', t.monthGroups, [
+    { month: 1, label: '1月', span: 1 },
+    { month: 2, label: '2月', span: 1 }
+  ]);
+
+  checkEqual('★★★ postRows 總數＝Σ各崗位 slotCount（2＋1＝3 行，唔係 2 個崗位＝2 行）',
+    t.postRows.length, 3);
+
+  const usherSlot1 = t.postRows[0];
+  const usherSlot2 = t.postRows[1];
+  const communionSlot1 = t.postRows[2];
+
+  checkEqual('★★ 司事 slot1：isFirstSlot=true，slotCount=2（呼叫端據此決定要合併幾多列）',
+    { postId: usherSlot1.postId, isFirstSlot: usherSlot1.isFirstSlot, slotCount: usherSlot1.slotCount },
+    { postId: 'USHER', isFirstSlot: true, slotCount: 2 });
+  checkEqual('★★ 司事 slot2：isFirstSlot=false（唔應該再顯示一次崗位名稱）',
+    usherSlot2.isFirstSlot, false);
+  checkEqual('★ 聖餐襄禮只有 1 個 slot，isFirstSlot 一樣係 true',
+    communionSlot1.isFirstSlot, true);
+
+  checkEqual('★★★ 司事 slot1 逐日嘅文字：跨兩個日期欄都攞啱咗個 cell（唔係得返第一日）',
+    usherSlot1.cells.map(function (c) { return c.text; }), ['陳大文', '王美美']);
+  checkEqual('★★★ 司事 slot2 逐日嘅文字（原本喺 date-major grid 係第 2 欄，轉置之後係第 2 行）',
+    usherSlot2.cells.map(function (c) { return c.text; }), ['李小明', '（待填）']);
+  checkEqual('★ 聖餐襄禮逐日嘅文字（第二週非首主日，顯示「—」）',
+    communionSlot1.cells.map(function (c) { return c.text; }), ['張三', '—']);
+
+  checkEqual('★★ 司事 slot2 第二日（待填）嘅 cellClass 轉置後冇跑位',
+    usherSlot2.cells[1].cellClass, CLASS.MANUAL_PENDING);
+  checkEqual('★ 聖餐襄禮第二日（非首主日）嘅 cellClass 轉置後冇跑位',
+    communionSlot1.cells[1].cellClass, CLASS.STRUCTURAL_NA);
 }
 
-console.log('\n=== A2：底色矩陣形狀同 layout.rows 一致，唔會漏格或者錯位 ===');
+console.log('\n=== A：多 slot 崗位（例如聖餐襄禮 4 個 slot）都會展開成對應行數，冇跑位 ===');
 {
   const CLASS = gas.GRID_CELL_CLASS;
   const layout = {
-    keys: ['_DATE', '_WEEK', '_TYPE', 'CHAIR#1', 'ANNOUNCE#1'],
-    rows: [
-      ['2099-01-04', 1, '主日崇拜', '陳大文', '李小明'],
-      ['2099-01-11', 2, '主日崇拜', '王美美', '']
-    ],
+    headers: ['日期', '週次', '類型', '聖餐襄禮1', '聖餐襄禮2', '聖餐襄禮3', '聖餐襄禮4'],
+    keys: ['_DATE', '_WEEK', '_TYPE', 'COMMUNION#1', 'COMMUNION#2', 'COMMUNION#3', 'COMMUNION#4'],
+    rows: [['2026-01-04', 1, '主日崇拜', '甲', '乙', '丙', '丁']],
+    dates: [{ serviceDate: '2026-01-04', weekIndex: 1, serviceType: '主日崇拜' }],
     cellIndex: {
-      'w1c1': { row: 3, column: 4, cellClass: CLASS.ASSIGNED },
-      'w1c2': { row: 3, column: 5, cellClass: CLASS.ASSIGNED },
-      'w2c1': { row: 4, column: 4, cellClass: CLASS.ASSIGNED },
-      'w2c2': { row: 4, column: 5, cellClass: CLASS.GENUINE_GAP }
+      '2026-01-04|COMMUNION|1': { row: 3, column: 4, cellClass: CLASS.ASSIGNED },
+      '2026-01-04|COMMUNION|2': { row: 3, column: 5, cellClass: CLASS.ASSIGNED },
+      '2026-01-04|COMMUNION|3': { row: 3, column: 6, cellClass: CLASS.ASSIGNED },
+      '2026-01-04|COMMUNION|4': { row: 3, column: 7, cellClass: CLASS.ASSIGNED }
     }
   };
-  const backgrounds = gas.computePublicRosterBackgrounds_(layout, '#F4CCCC');
-  checkEqual('★ 底色矩陣行數同 rows 一致', backgrounds.length, 2);
-  checkEqual('★ 底色矩陣每行欄數同 keys 一致', backgrounds[0].length, 5);
-  checkEqual('★ 第二週第二格（排唔出）定位正確', backgrounds[1][4], '#F4CCCC');
-  checkEqual('★ 第二週第一格（已排定）冇被錯誤上色', backgrounds[1][3], null);
+  const posts = [{ postId: 'COMMUNION', postNameTC: '聖餐襄禮', slotCount: 4 }];
+  const t = gas.transposeRosterForPublicView_(layout, posts, {});
+
+  checkEqual('★★★ 聖餐襄禮 4 個 slot 展開成 4 行', t.postRows.length, 4);
+  checkEqual('★ 4 行嘅 slotIndex 依次係 1-4',
+    t.postRows.map(function (r) { return r.slotIndex; }), [1, 2, 3, 4]);
+  checkEqual('★★ 4 行嘅文字對得返（甲乙丙丁冇錯位）',
+    t.postRows.map(function (r) { return r.cells[0].text; }), ['甲', '乙', '丙', '丁']);
+  checkEqual('★ 只有第一行 isFirstSlot=true（樣板／寫表只喺呢一行合併顯示崗位名稱）',
+    t.postRows.map(function (r) { return r.isFirstSlot; }), [true, false, false, false]);
 }
 
 console.log('\n=== A1：檔名樣板代入 ===');
@@ -179,10 +270,35 @@ console.log('\n=== A2：內容建構函式唔可以直接接觸敏感欄位 ==='
       '公開檔案內容組建函式唔應該直接接觸呢個欄位／功能');
   });
 
-  check('★ 回傳嘅內容只有職事表格、圖例、更新時間（headers/rows/backgrounds/legendRows/footerNote/updatedAt）',
-    /headers:\s*layout\.headers/.test(body)
+  check('★ 回傳嘅內容只有職事表格（轉置後嘅 dateColumns/monthGroups/postRows）、圖例、更新時間',
+    /dateColumns:\s*transposed\.dateColumns/.test(body)
+      && /monthGroups:\s*transposed\.monthGroups/.test(body)
+      && /postRows:\s*transposed\.postRows/.test(body)
       && /legendRows:/.test(body)
       && /updatedAt:\s*nowTimestamp_\(\)/.test(body));
+}
+
+console.log('\n=== A2／A3：寫入公開試算表時凍結首欄／首 3 行、日期欄有固定夠闊嘅欄闊（姓名唔會被截斷）===');
+{
+  const start = publicRosterSource.indexOf('function writePublicRosterContent_');
+  const end = publicRosterSource.indexOf('\nfunction publishPublicRoster_', start);
+  const body = publicRosterSource.slice(start, end);
+
+  check('★★ 凍結首欄（崗位），橫向捲動時崗位名稱一直睇得到', /setFrozenColumns\(1\)/.test(body));
+  check('★★ 凍結首 3 行（標題／月份／日期），縱向捲動時日期標題一直睇得到', /setFrozenRows\(3\)/.test(body));
+  check('★★ 月份標題有 merge 橫跨該月嘅日期欄', /content\.monthGroups\.forEach/.test(body) && /\.merge\(\)/.test(body));
+  check('★★ 多 slot 崗位嘅名稱欄有垂直 merge', /pr\.slotCount > 1/.test(body) && /getRange\(dataStartRow \+ i, 1, pr\.slotCount, 1\)\.merge\(\)/.test(body));
+
+  check('★★★ 日期欄用固定欄闊（唔淨係 autoResizeColumns），確保換版本／換人都唔會截斷姓名',
+    /setColumnWidth\(c, PUBLIC_ROSTER_DATE_COLUMN_WIDTH\)/.test(body));
+}
+
+console.log('\n=== A2：日期欄固定欄闊要夠容納 6 字中文姓名 ===');
+{
+  // 粗略估算：Google 試算表預設字型一個中文字約 13-15px，6 字加少少邊界
+  // 至少要 110px 先夠，呢度用 120 做保守下限（實際設定係 130）。
+  check('★★ PUBLIC_ROSTER_DATE_COLUMN_WIDTH 至少 120px（容得下 6 字中文姓名，例如「黃余麗貞師母」）',
+    gas.PUBLIC_ROSTER_DATE_COLUMN_WIDTH >= 120, '實際值：' + gas.PUBLIC_ROSTER_DATE_COLUMN_WIDTH);
 }
 
 console.log('\n=== A4：範本 placeholder 一致性（同 A4 相關的 4 個範本）===');

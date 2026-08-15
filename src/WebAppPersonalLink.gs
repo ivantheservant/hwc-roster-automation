@@ -65,11 +65,42 @@ function planPersonalLinkTokenSeed_() {
 }
 
 /**
+ * 第十二輪批次階段 B【first-run 修正】：確保 `NameMapping` 有
+ * `PersonalLinkToken` 欄——欄不存在就喺最後一欄之後新增（第 1 行寫中文
+ * 標題方便肉眼辨識、第 2 行寫機器鍵），已存在就乜都唔做、直接回傳現有欄號。
+ * 唔會覆寫任何現有欄位／資料，同「補建 Posts 欄位」（PostSeed.gs）一致嘅
+ * append-only 原則。
+ *
+ * 實測發現：改用呢個函式之前，`seedPersonalLinkTokens_()` 喺全新環境（欄
+ * 仲未存在）會直接拋錯，要求幹事自己手動去工作表加一欄先可以繼續——但
+ * PersonalLinkToken 完全係系統自己管理嘅欄位（唔需要人手決定填咩內容），
+ * 冇理由要人手介入先可以補建。`runEnsureNameMappingTokenColumn_()`
+ * （選單「補建 NameMapping 欄位」）可以喺補發 token 之前先執行呢個函式，
+ * `seedPersonalLinkTokens_()` 本身亦已經改為自動呼叫，兩條路徑都唔會再拋錯。
+ * @returns {number} `PersonalLinkToken` 欄嘅 1-based 欄號
+ */
+function ensureNameMappingPersonalLinkTokenColumn_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.NAME_MAPPING);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.NAME_MAPPING);
+
+  const lastCol = sheet.getLastColumn();
+  const headers = lastCol > 0 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  const existingIndex = headers.indexOf(COLUMNS.NAME_MAPPING.PERSONAL_LINK_TOKEN);
+  if (existingIndex !== -1) return existingIndex + 1;
+
+  const columnIndex = lastCol + 1;
+  sheet.getRange(1, columnIndex).setValue('個人專屬連結 Token');
+  sheet.getRange(2, columnIndex).setValue(COLUMNS.NAME_MAPPING.PERSONAL_LINK_TOKEN);
+  return columnIndex;
+}
+
+/**
  * 把缺 token 嘅人補上新 token（逐個 `generatePersonalLinkToken_()`）。
  * **只填空白嘅格**，已經有 token 嘅人一個都唔會動——同「補建 XXX 欄位」
  * 嗰批工具同一個保守原則。
  *
- * ⚠️ **本輪唔可以寫入試算表，呢個函式本輪唔會被執行**，只實作好俾之後用。
+ * 第十二輪批次階段 B：欄唔存在時自動先建欄（`ensureNameMappingPersonalLinkTokenColumn_()`），
+ * 唔再要求幹事自己手動加欄先可以執行。
  *
  * @param {Object[]} missing `planPersonalLinkTokenSeed_()` 嘅結果
  * @returns {number} 實際補上 token 嘅人數
@@ -79,13 +110,12 @@ function seedPersonalLinkTokens_(missing) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.NAME_MAPPING);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.NAME_MAPPING);
 
+  const tokenCol = ensureNameMappingPersonalLinkTokenColumn_();
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
   const C = COLUMNS.NAME_MAPPING;
-  const tokenCol = headers.indexOf(C.PERSONAL_LINK_TOKEN) + 1;
   const idCol = headers.indexOf(C.PERSON_ID) + 1;
-  if (tokenCol === 0 || idCol === 0) {
-    throw new Error('NameMapping 缺少 ' + C.PERSONAL_LINK_TOKEN + ' 或 ' + C.PERSON_ID + ' 欄，'
-      + '請先在工作表手動新增 ' + C.PERSONAL_LINK_TOKEN + ' 欄。');
+  if (idCol === 0) {
+    throw new Error('NameMapping 缺少 ' + C.PERSON_ID + ' 欄（系統核心欄位，需要人手檢查工作表結構）。');
   }
 
   const lastRow = sheet.getLastRow();
@@ -122,8 +152,13 @@ function reissuePersonalLinkToken_(personId) {
   const tokenCol = headers.indexOf(C.PERSONAL_LINK_TOKEN) + 1;
   const idCol = headers.indexOf(C.PERSON_ID) + 1;
   const nameCol = headers.indexOf(C.NAME_TC) + 1;
+  // 第十二輪批次階段 B：呢度刻意唔自動建欄——「重新產生」係針對某個人
+  // 覆寫現有 token，如果欄仲未存在，代表全體都仲未有任何 token，
+  // 應該用「補發個人專屬連結 token」畀全體，唔係喺呢度為一個人補建成欄。
   if (tokenCol === 0 || idCol === 0) {
-    throw new Error('NameMapping 缺少 ' + C.PERSONAL_LINK_TOKEN + ' 或 ' + C.PERSON_ID + ' 欄。');
+    throw new Error('NameMapping 缺少 ' + C.PERSONAL_LINK_TOKEN + ' 或 ' + C.PERSON_ID
+      + ' 欄。如果係第一次使用個人專屬連結功能，請先執行「補發個人專屬連結 token」'
+      + '（會自動建立欄位並為全體補上 token），唔好用呢個工具開始。');
   }
 
   const lastRow = sheet.getLastRow();
@@ -179,12 +214,19 @@ function matchPersonByToken_(rows, token) {
  * 只可以有職事表格、圖例、更新時間、呢個人自己嘅資料，唔可以有第二個人嘅
  * `PersonID`／電郵、規則警告標示或者任何診斷資訊。
  *
+ * 第十二輪批次階段 A：版面同步 `PublicRoster.gs` 改為「崗位做列、日期做欄」
+ * ——`transposeRosterForPublicView_()` 產生嘅 `postRows[].cells[]` 直接喺
+ * 呢度加多一個 `mine` 布林值（呢格係咪呢個人自己嘅），唔再分開一個獨立嘅
+ * `highlightMap` 矩陣——轉置之後行/列座標已經同原本嘅 date-major grid唔一樣，
+ * 喺呢度直接喺同一個 cell 物件加旗標，比另外維護一個對應座標嘅矩陣簡單
+ * 好多，亦唔會有兩個結構座標對唔齊嘅風險。
+ *
  * @param {string} quarterId 季度 ID
  * @param {string} personId 要 highlight 嘅人
  * @param {string} personNameTC 呢個人嘅中文名（已經喺 `findPersonByToken_()` 查過）
- * @returns {{quarterId: string, versionNo: number, personName: string, headers: string[],
- *   rows: Array[], highlightMap: boolean[][], mySchedule: Object[], legendRows: Array[],
- *   footerNote: string, updatedAt: string}}
+ * @returns {{quarterId: string, versionNo: number, personName: string,
+ *   dateColumns: Object[], monthGroups: Object[], postRows: Object[], gapColor: string,
+ *   mySchedule: Object[], legendRows: Array[], footerNote: string, updatedAt: string}}
  */
 function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
   const versionNo = findLatestVersionNo(quarterId);
@@ -194,29 +236,33 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const assignments = readVersionAssignmentsForGrid_(quarterId, versionNo);
   const layout = buildGridLayout_(quarterId, assignments);
+  const posts = readPostsNormalized();
+  const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
+  const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate);
   const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
-  const backgrounds = computePublicRosterBackgrounds_(layout, gapColor);
 
-  // highlightMap：邊幾格係呢個人自己嘅，供樣板加底色。跟 backgrounds
-  // 分開兩個矩陣（唔係直接改 backgrounds），因為 highlight 要蓋過任何其他
-  // 底色（例如呢個人自己嗰格啱啱好都係 GENUINE_GAP 嘅相鄰格——實務上唔會
-  // 發生，但分開兩層職責更清楚：backgrounds 講「呢格係咩分類」，highlight
-  // 講「呢格係咪呢個人」，樣板負責決定兩者同時成立時點畫）。
-  const highlightMap = layout.rows.map(function () { return new Array(layout.keys.length).fill(false); });
-  const postNames = {};
-  readPostsNormalized().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+  // 逐格判斷係咪呢個人自己嘅——同步喺 postRows[].cells[] 加 `mine` 旗標，
+  // 亦順手收集「你的服侍安排」摘要。
+  const postNameById = {};
+  posts.forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
   const mySchedule = [];
 
-  Object.keys(layout.cellIndex).forEach(function (key) {
-    const cell = layout.cellIndex[key];
-    if (!cell.assignment || cell.assignment.personId !== personId) return;
-    const r = cell.row - 3;
-    const c = cell.column - 1;
-    highlightMap[r][c] = true;
-    mySchedule.push({
-      serviceDate: cell.assignment.serviceDate,
-      postId: cell.assignment.postId,
-      postNameTC: postNames[cell.assignment.postId] || cell.assignment.postId
+  transposed.postRows.forEach(function (pr) {
+    pr.cells.forEach(function (cell, dateIndex) {
+      const key = transposed.dateColumns[dateIndex].serviceDate + '|' + pr.postId + '|' + pr.slotIndex;
+      const original = layout.cellIndex[key];
+      const mine = !!(original && original.assignment && original.assignment.personId === personId);
+      cell.mine = mine;
+      // 底色喺呢度直接算好放落 cell.background，樣板（ui/PersonalRoster.html）
+      // 唔需要自己識得 cellClass → 顏色嘅對照，維持樣板係純渲染、冇業務邏輯。
+      cell.background = resolveGridCellBackground_(cell.cellClass, gapColor);
+      if (mine) {
+        mySchedule.push({
+          serviceDate: transposed.dateColumns[dateIndex].serviceDate,
+          postId: pr.postId,
+          postNameTC: postNameById[pr.postId] || pr.postId
+        });
+      }
     });
   });
   mySchedule.sort(function (a, b) { return a.serviceDate < b.serviceDate ? -1 : 1; });
@@ -228,10 +274,9 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
     quarterId: quarterId,
     versionNo: versionNo,
     personName: personNameTC,
-    headers: layout.headers,
-    rows: layout.rows,
-    backgrounds: backgrounds,
-    highlightMap: highlightMap,
+    dateColumns: transposed.dateColumns,
+    monthGroups: transposed.monthGroups,
+    postRows: transposed.postRows,
     mySchedule: mySchedule,
     legendRows: showLegend ? buildLegendRows_(layout) : [],
     footerNote: footerNote,
@@ -300,6 +345,52 @@ function renderPersonalRosterError_() {
       + 'p{font-size:15px;line-height:1.6;max-width:360px;margin:0 auto;}</style></head>'
       + '<body><p>' + PERSONAL_LINK_INVALID_MESSAGE + '</p></body></html>'
   ).setTitle('粵語堂職事表');
+}
+
+/**
+ * 第十二輪批次階段 B3：選單項目「補建 NameMapping 欄位」的執行入口——
+ * 手法跟現有「補建 Posts 欄位」一致，只係呢欄冇逐行要填嘅值（純粹新增
+ * 欄位本身），所以確認訊息講清楚「只加欄，唔填任何內容」就夠，唔需要
+ * 好似 Posts.EmptyDisplay 咁列一份逐行預覽。
+ * @returns {void}
+ */
+function runEnsureNameMappingTokenColumn_() {
+  const ui = SpreadsheetApp.getUi();
+  const title = '補建 NameMapping 欄位（個人專屬連結 token）';
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.NAME_MAPPING);
+  if (!sheet) {
+    ui.alert(title, '找不到工作表: ' + SHEETS.NAME_MAPPING, ui.ButtonSet.OK);
+    return;
+  }
+  const lastCol = sheet.getLastColumn();
+  const headers = lastCol > 0 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  if (headers.indexOf(COLUMNS.NAME_MAPPING.PERSONAL_LINK_TOKEN) !== -1) {
+    ui.alert(title, 'PersonalLinkToken 欄已經存在，不需要補建。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const confirm = ui.alert(title,
+    '將在 NameMapping 最後一欄之後新增 PersonalLinkToken 欄'
+      + '（只新增欄位本身，不會填入任何內容，也不會動任何現有欄位）。\n\n'
+      + '新增之後可以用「維護 ▸ 補發個人專屬連結 token」逐一補上 token。\n\n'
+      + '確定要繼續嗎？', ui.ButtonSet.YES_NO);
+  if (confirm !== ui.Button.YES) return;
+
+  try {
+    const columnIndex = ensureNameMappingPersonalLinkTokenColumn_();
+    writeAuditLog_({
+      action: '補建 NameMapping 欄位',
+      targetSheet: SHEETS.NAME_MAPPING,
+      targetKey: COLUMNS.NAME_MAPPING.PERSONAL_LINK_TOKEN,
+      newValue: '新增於第 ' + columnIndex + ' 欄',
+      source: 'runEnsureNameMappingTokenColumn_'
+    });
+    ui.alert(title, '已新增 PersonalLinkToken 欄（第 ' + columnIndex + ' 欄）。', ui.ButtonSet.OK);
+  } catch (err) {
+    log_('ERROR', 'runEnsureNameMappingTokenColumn_ 失敗: ' + err.message);
+    ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  }
 }
 
 /**

@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
-const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Generator.gs', 'WebAppPersonalLink.gs']);
+const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Generator.gs', 'RosterWriter.gs', 'WebAppPersonalLink.gs']);
 
 let fail = 0;
 function check(label, condition, extra) {
@@ -202,9 +202,30 @@ console.log('\n=== B4：頁面內容涵蓋規格要求嘅五項 ===');
   check('★ 有「你的服侍安排」摘要列表', personalRosterHtml.indexOf('你的服侍安排') !== -1);
   check('★ 有更新時間', personalRosterHtml.indexOf('最後更新') !== -1);
   check('★ 有點樣申報唔能夠服侍嘅說明', personalRosterHtml.indexOf('如果這一週不能服侍') !== -1);
-  check('★ 有完整職事表（表頭同表格 loop）',
-    personalRosterHtml.indexOf('data.headers.forEach') !== -1
-      && personalRosterHtml.indexOf('data.rows.forEach') !== -1);
+  check('★★ 有完整職事表（月份列、日期列、崗位列 loop——第十二輪批次階段 A 轉置版面）',
+    personalRosterHtml.indexOf('data.monthGroups.forEach') !== -1
+      && personalRosterHtml.indexOf('data.dateColumns.forEach') !== -1
+      && personalRosterHtml.indexOf('data.postRows.forEach') !== -1);
+}
+
+console.log('\n=== A5：手機友善——崗位欄（第一欄）橫向捲動時要 sticky ===');
+{
+  check('★★ CSS 有 th.post-col／td.post-col 用 position: sticky; left: 0',
+    /\.post-col\s*{[^}]*position:\s*sticky;[^}]*left:\s*0;/.test(personalRosterHtml)
+      || /th\.post-col,\s*td\.post-col\s*{[\s\S]{0,200}?position:\s*sticky;[\s\S]{0,200}?left:\s*0;/.test(personalRosterHtml));
+  check('★ 崗位列標題（th）有 rowspan="2"（同月份列合併，唔需要每行都寫「崗位」）',
+    /class="post-col" rowspan="2"/.test(personalRosterHtml));
+  check('★ 多 slot 崗位嘅名稱格用 rowspan（HTML table 原生合併，對應試算表嘅垂直 merge）',
+    /rowspan="<\?= pr\.slotCount \?>"/.test(personalRosterHtml));
+  check('★ 只喺 isFirstSlot 先輸出崗位名稱格，唔會每個 slot 都重複一次崗位名',
+    /if \(pr\.isFirstSlot\)/.test(personalRosterHtml));
+}
+
+console.log('\n=== A：特別主日名稱喺日期下方顯示（同一格內第二行，唔係另開一行 header）===');
+{
+  check('★ 日期欄有輸出 dc.specialTitle（特別主日名稱），冇就唔顯示',
+    /dc\.specialTitle/.test(personalRosterHtml));
+  check('★ 日期短標籤（dc.dayLabel）有輸出', /dc\.dayLabel/.test(personalRosterHtml));
 }
 
 console.log('\n=== D3：呢個頁面預設淺色，唔會跟裝置嘅深色模式自動切換 ===');

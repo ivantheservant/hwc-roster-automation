@@ -446,7 +446,11 @@ function runEpsilonTrial_Menu_() {
     return;
   }
 
-  const written = tryWriteDiagnostics_('epsilon 試算', buildEpsilonTrialRows_(trial));
+  // 第十二輪批次階段 C【bug 修正】：tryWriteDiagnostics_() 回傳嘅係
+  // 「有冇成功寫入」嘅布林值，唔係寫入行數，行數應該係 rows.length。
+  const epsilonTrialRows = buildEpsilonTrialRows_(trial);
+  tryWriteDiagnostics_('epsilon 試算', epsilonTrialRows);
+  const written = epsilonTrialRows.length;
 
   const rec = trial.recommendation;
   const lines = [

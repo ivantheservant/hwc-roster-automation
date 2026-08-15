@@ -1061,7 +1061,10 @@ const GRID_LABELS = {
   NAME: '姓名',
   PERSON_ID: 'PersonID',
   COUNT: '次數',
-  FULL_VERSION: '完整版'
+  FULL_VERSION: '完整版',
+  // 第十二輪批次階段 A：公開/個人頁面轉置版面（崗位做列、日期做欄）
+  // 左上角崗位欄嘅標題。
+  POST_COLUMN: '崗位'
 };
 
 /** Web App 使用的 HTML 檔案名稱。 */

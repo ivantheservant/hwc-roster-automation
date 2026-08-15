@@ -78,6 +78,7 @@ function onOpen() {
         .addItem('重設 Requests 驗證規則', 'runResetRequestsValidations_')
         .addItem('補建 EmailRecipients 欄位', 'runSeedEmailRecipientsRole_')
         .addItem('補齊 Email 範本', 'runSeedEmailTemplates_')
+        .addItem('補建 NameMapping 欄位（個人專屬連結 token）', 'runEnsureNameMappingTokenColumn_')
         .addItem('補發個人專屬連結 token', 'runSeedPersonalLinkTokens_')
         .addItem('⚠️ 重新產生單一個人的 token（外洩時用）', 'runReissuePersonalLinkToken_')
         .addSeparator()
@@ -92,6 +93,7 @@ function onOpen() {
         .addItem('修正試算表時區設定', 'runApplyTimezoneSettings_')
         .addSeparator()
         .addItem('🩺 全面體檢（唯讀）', 'runFullHealthCheck_')
+        .addItem('全新環境自我檢查（唯讀）', 'runFreshEnvironmentCheck_')
         .addItem('上線前檢查（唯讀）', 'runPreLaunchChecklist_')
         .addSeparator()
         .addItem('⚠️⚠️ 上線切換嚮導（會令系統真正寄信）', 'runGoLiveWizard_')
@@ -1953,8 +1955,18 @@ function runResetQuarterTestData_() {
     '',
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
     '　EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays，',
-    '　以及其他季度的任何資料。'
+    '　以及其他季度的任何資料。個人專屬連結 token（NameMapping.PersonalLinkToken）',
+    '　跟人綁定、不跟季度，同樣不會受影響。'
   ];
+
+  // 第十二輪批次階段 D：呢一季曾經發佈過公開職事表時提醒——**唔會刪除
+  // 檔案或連結**，只會清空內容顯示「已重設」提示，連結本身維持不變。
+  if (plan.publicLinkFileUrl) {
+    lines.push('',
+      '⚠ 這一季曾經發佈過公開職事表（' + plan.publicLinkFileUrl + '）：',
+      '　連結本身不會改變、檔案不會刪除，但內容會清空並顯示「已重設」提示，',
+      '　等下次重新執行「發佈公開職事表」時自然覆寫回正確內容。');
+  }
 
   if (plan.pdfFiles.length > 0) {
     lines.push('', '將移到垃圾桶的 PDF 檔案：');
@@ -2039,6 +2051,9 @@ function runResetQuarterTestData_() {
       '　Unavailable（Source=REQUEST）：' + result.unavailableRowsDeleted + ' 行',
       '　RosterPDF：' + result.pdfTrashed + ' 個已移到垃圾桶',
       '　Quarters.Stage：' + (result.stageReset ? '已重設為 ' + QUARTER_STAGE.DRAFT : '⚠ 重設失敗'),
+      '　公開職事表：' + (plan.publicLinkFileUrl
+        ? (result.publicRosterCleared ? '已清空內容並顯示「已重設」提示（連結不變）' : '⚠ 清空失敗或檔案已不存在，請自行檢查')
+        : '（這一季沒有發佈過，不適用）'),
       '',
       '清理前的摘要已寫入 AuditLog。'
     ];

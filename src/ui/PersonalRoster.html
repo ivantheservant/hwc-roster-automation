@@ -77,14 +77,29 @@
   .schedule p { margin: 0; font-size: 13px; color: var(--muted); }
 
   .scroll { overflow-x: auto; margin-bottom: 14px; }
-  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  table { border-collapse: collapse; font-size: 12px; }
   th, td {
     border: 1px solid var(--border);
     padding: 4px 7px;
-    text-align: left;
+    text-align: center;
     white-space: nowrap;
   }
-  thead th { background: var(--header); position: sticky; top: 0; }
+  thead th { background: var(--header); position: sticky; top: 0; z-index: 1; }
+  .special-note { display: block; font-size: 10px; color: var(--muted); font-weight: normal; }
+  /* 第十二輪批次階段 A5：崗位在左（第一欄）、日期在頂，橫向捲動時第一欄
+     （崗位名稱）用 sticky 定位保持喺畫面左邊，義工用手機睇 13 週嘅表都
+     唔會捲走咗先前對照緊嘅崗位。左上角個 <th>（崗位標題）要同時 sticky
+     top＋left、z-index 要比其他 sticky 都高，先唔會俾兩邊嘅 sticky 元素
+     蓋過。 */
+  th.post-col, td.post-col {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg);
+    text-align: left;
+    font-weight: 700;
+  }
+  thead th.post-col { background: var(--header); z-index: 2; }
   td.mine {
     background: var(--highlight) !important;
     color: var(--highlight-fg);
@@ -133,20 +148,25 @@
     <table>
       <thead>
         <tr>
-          <? data.headers.forEach(function (h) { ?>
-            <th><?= h ?></th>
+          <th class="post-col" rowspan="2"><?= GRID_LABELS.POST_COLUMN ?></th>
+          <? data.monthGroups.forEach(function (g) { ?>
+            <th colspan="<?= g.span ?>"><?= g.label ?></th>
+          <? }); ?>
+        </tr>
+        <tr>
+          <? data.dateColumns.forEach(function (dc) { ?>
+            <th><?= dc.dayLabel ?><? if (dc.specialTitle) { ?><span class="special-note"><?= dc.specialTitle ?></span><? } ?></th>
           <? }); ?>
         </tr>
       </thead>
       <tbody>
-        <? data.rows.forEach(function (row, r) { ?>
+        <? data.postRows.forEach(function (pr) { ?>
           <tr>
-            <? row.forEach(function (cellText, c) { ?>
-              <?
-                var mine = data.highlightMap[r][c];
-                var bg = data.backgrounds[r][c];
-              ?>
-              <td<?!= mine ? ' class="mine"' : (bg ? ' style="background:' + bg + '"' : '') ?>><?= cellText ?></td>
+            <? if (pr.isFirstSlot) { ?>
+              <th class="post-col" rowspan="<?= pr.slotCount ?>"><?= pr.postNameTC ?></th>
+            <? } ?>
+            <? pr.cells.forEach(function (cell) { ?>
+              <td<?!= cell.mine ? ' class="mine"' : (cell.background ? ' style="background:' + cell.background + '"' : '') ?>><?= cell.text ?></td>
             <? }); ?>
           </tr>
         <? }); ?>
