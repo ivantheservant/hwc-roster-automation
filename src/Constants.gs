@@ -1027,7 +1027,12 @@ const DEFAULTS = {
   GRID_NOT_APPLICABLE_LABEL: '—',
   GRID_PENDING_LABEL: GRID_LABELS.PENDING,
   GRID_SPECIAL_SKIP_LABEL: '特殊主日',
-  GRID_PENDING_FILL_COLOR: '#FFF2CC',
+  // 刻意跟 GRID_COLORS.WARNING（#FFF2CC）不同色：這格是「空格，需要人手補」，
+  // WARNING 是「已經有人，但觸發規則警告」，兩者語意完全不同，2027T1 實測時
+  // 曾經因為兩者同色（都是 #FFF2CC）被幹事誤認、也曾讓 listPendingBackfillCells_()
+  // 的底色比對邏輯誤判（已改為讀 RosterAssignments 資料層，見 RequestsApply.gs）。
+  // 這裡改色是為了讓人眼也分得出來，屬於雙重防線的第二層。
+  GRID_PENDING_FILL_COLOR: '#F4CCCC',
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
   REMIND_DEADLINE_DAYS: 7,

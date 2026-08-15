@@ -831,7 +831,22 @@ function markPendingBackfillCells_(sheetName, cells) {
 }
 
 /**
- * 掃描指定版本的 grid，找出所有底色等於 GRID_PENDING_FILL_COLOR 的待補格子。
+ * 掃描指定版本，找出所有「待補格」——語意一律以資料層判斷：PersonID 是空、
+ * AssignSource 是 SKIPPED、RuleFlags 含 HARD_ELIGIBILITY，這是 Generator.gs
+ * 留空格（buildRoster_() 呼叫 pickPerson_() 找不到不違反硬規則的人選時）與
+ * applyCannotServe_() 找不到替補時共同寫入的訊號，兩處已經一致（見
+ * makeAssignment_() 呼叫點）。
+ *
+ * 不可用底色判斷格子語意：GRID_COLORS.WARNING 與 DEFAULTS.GRID_PENDING_FILL_COLOR
+ * 預設同為 #FFF2CC，applyCellMarks_()（RosterWriter.gs）在「有人但觸發規則警告」
+ * 的格子（例如指定服侍申報套用後觸發 SEMI_NO_CONSECUTIVE）也塗上同一種底色，
+ * 純靠底色比對會把這種格子誤判成待補格——這正是 2027T1 步驟 4 前置檢查
+ * 誤報「仍有 2 格待補」的真正原因（該 2 格其實有人，只是有規則警告）。
+ * 詳見 docs/系統範圍稽核.md「底色語意撞車」一節。
+ *
+ * 格子的 Note 文字仍然從 grid 讀出，但只用來組成回傳結果的顯示內容，
+ * 不參與「是不是待補格」的判斷。
+ *
  * 供「列出待補格子」選單與「步驟 4：正式發出」的前置檢查共用。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -847,20 +862,33 @@ function listPendingBackfillCells_(quarterId, versionNo) {
   if (lastRow < 3) return [];
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const fillColor = String(getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR)).toUpperCase();
+  const C = COLUMNS.ROSTER_ASSIGNMENTS;
+
+  const pendingKeys = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (row[C.QUARTER_ID] !== quarterId || Number(row[C.VERSION_NO]) !== versionNo) return;
+    if (row[C.PERSON_ID] || row[C.ASSIGN_SOURCE] !== ASSIGN_SOURCE.SKIPPED) return;
+    if (splitList_(row[C.RULE_FLAGS]).indexOf(RULE_IDS.ELIGIBILITY) === -1) return;
+    const key = cellKey_(toDateString(row[C.SERVICE_DATE], timezone), row[C.POST_ID], row[C.SLOT_INDEX]);
+    pendingKeys[key] = true;
+  });
+  if (Object.keys(pendingKeys).length === 0) return [];
 
   const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
   const dateValues = sheet.getRange(3, 1, lastRow - 2, 1).getValues();
-  const backgrounds = sheet.getRange(3, 1, lastRow - 2, lastCol).getBackgrounds();
   const notes = sheet.getRange(3, 1, lastRow - 2, lastCol).getNotes();
 
   const results = [];
-  for (let r = 0; r < backgrounds.length; r++) {
+  for (let r = 0; r < dateValues.length; r++) {
     const dateStr = toDateString(dateValues[r][0], timezone);
     for (let c = 3; c < keys.length; c++) {
-      if (String(keys[c] || '').indexOf('#') === -1) continue;
-      if (String(backgrounds[r][c] || '').toUpperCase() !== fillColor) continue;
-      results.push({ serviceDate: dateStr, key: String(keys[c]), note: notes[r][c] || '' });
+      const rawKey = String(keys[c] || '');
+      const hashIdx = rawKey.indexOf('#');
+      if (hashIdx === -1) continue;
+      const postId = rawKey.slice(0, hashIdx);
+      const slotIndex = rawKey.slice(hashIdx + 1);
+      if (!pendingKeys[cellKey_(dateStr, postId, slotIndex)]) continue;
+      results.push({ serviceDate: dateStr, key: rawKey, note: notes[r][c] || '' });
     }
   }
   return results;
