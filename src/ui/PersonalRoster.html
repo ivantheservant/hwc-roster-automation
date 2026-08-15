@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><?= data.quarterId ?> 職事表</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1f2328;
+    --muted: #6b7280;
+    --border: #d0d7de;
+    --header: #d9ead3;
+    --skipped: #efefef;
+    --special: #d9d2e9;
+    --gap: #f4cccc;
+    --highlight: #ffd54f;
+    --highlight-fg: #3e2c00;
+  }
+  /* 第十一輪批次階段 D3：呢個頁面預設淺色，唔跟裝置嘅深色模式自動切換
+     ——義工多數用手機睇，淺色較適合閱讀，亦較接近印出嚟嘅職事表。
+     只有幹事介面（ui/Style.html）先會跟裝置嘅深色模式設定自動切換，
+     呢度一定要義工自己撳掣先會轉深色。 */
+  :root[data-theme="dark"] {
+    --bg: #16181d;
+    --fg: #e6edf3;
+    --muted: #9198a1;
+    --border: #30363d;
+    --header: #24402a;
+    --skipped: #24272e;
+    --special: #3a2f52;
+    --gap: #5c2b2b;
+    --highlight: #b8860b;
+    --highlight-fg: #1a1200;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+  }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin: 0; }
+
+  button.theme-toggle {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--fg);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .schedule {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+  .schedule h2 { font-size: 14px; margin: 0 0 8px; }
+  .schedule ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .schedule p { margin: 0; font-size: 13px; color: var(--muted); }
+
+  .scroll { overflow-x: auto; margin-bottom: 14px; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 4px 7px;
+    text-align: left;
+    white-space: nowrap;
+  }
+  thead th { background: var(--header); position: sticky; top: 0; }
+  td.mine {
+    background: var(--highlight) !important;
+    color: var(--highlight-fg);
+    font-weight: 700;
+  }
+
+  .legend { font-size: 12px; margin-bottom: 14px; }
+  .legend table { width: auto; }
+
+  .footer-note { font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 14px; }
+
+  .how-to {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .how-to strong { color: var(--fg); }
+
+  .updated { font-size: 12px; color: var(--muted); margin-top: 16px; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <div>
+      <h1><?= data.quarterId ?> 職事表</h1>
+      <p class="subtitle"><?= data.personName ?> 專屬連結——這條連結不會改變，之後排表有任何更新，重新打開就會看到最新內容。</p>
+    </div>
+    <button class="theme-toggle" id="themeToggleBtn" type="button">🌙 深色</button>
+  </div>
+
+  <div class="schedule">
+    <h2>你的服侍安排</h2>
+    <? if (data.mySchedule.length === 0) { ?>
+      <p>本季你暫時沒有任何服侍安排。</p>
+    <? } else { ?>
+      <ul>
+        <? data.mySchedule.forEach(function (item) { ?>
+          <li><?= item.serviceDate ?>　<?= item.postNameTC ?></li>
+        <? }); ?>
+      </ul>
+    <? } ?>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <? data.headers.forEach(function (h) { ?>
+            <th><?= h ?></th>
+          <? }); ?>
+        </tr>
+      </thead>
+      <tbody>
+        <? data.rows.forEach(function (row, r) { ?>
+          <tr>
+            <? row.forEach(function (cellText, c) { ?>
+              <?
+                var mine = data.highlightMap[r][c];
+                var bg = data.backgrounds[r][c];
+              ?>
+              <td<?!= mine ? ' class="mine"' : (bg ? ' style="background:' + bg + '"' : '') ?>><?= cellText ?></td>
+            <? }); ?>
+          </tr>
+        <? }); ?>
+      </tbody>
+    </table>
+  </div>
+
+  <? if (data.legendRows.length > 0) { ?>
+    <div class="legend">
+      <table>
+        <? data.legendRows.forEach(function (row) { ?>
+          <tr><td><?= row[0] ?></td><td><?= row[1] ?></td><td><?= row[2] ?></td></tr>
+        <? }); ?>
+      </table>
+    </div>
+  <? } ?>
+
+  <? if (data.footerNote) { ?>
+    <p class="footer-note"><?= data.footerNote ?></p>
+  <? } ?>
+
+  <div class="how-to">
+    <p><strong>如果這一週不能服侍：</strong>請直接聯絡幹事安排調動，不要自行更改試算表內容。</p>
+  </div>
+
+  <p class="updated">最後更新：<?= data.updatedAt ?>（此連結長期有效，之後排表更新會自動反映在這裡）</p>
+
+  <script>
+    // 第十一輪批次階段 D：只用 localStorage，完全冇任何伺服器端腳本呼叫
+    // ——呢個頁面係 access=ANYONE 部署、匿名訪客都打得開，唔應該有任何
+    // 伺服器往返嘅路徑（連讀取偏好都唔應該有），亦冇「呢個訪客係邊個」
+    // 嘅身分可以將偏好存喺伺服器端（UserProperties 係跟 Google 帳戶行嘅，
+    // 匿名訪客冇對應嘅帳戶）。localStorage 讀寫失敗（例如瀏覽器封鎖）就
+    // 靜靜維持預設淺色，唔會令頁面壞晒。
+    (function () {
+      var STORAGE_KEY = 'hwcRosterTheme';
+      var btn = document.getElementById('themeToggleBtn');
+      var root = document.documentElement;
+
+      function applyTheme(theme) {
+        if (theme === 'dark') {
+          root.setAttribute('data-theme', 'dark');
+          btn.textContent = '☀️ 淺色';
+        } else {
+          root.removeAttribute('data-theme');
+          btn.textContent = '🌙 深色';
+        }
+      }
+
+      var stored = null;
+      try { stored = window.localStorage.getItem(STORAGE_KEY); } catch (err) { stored = null; }
+      applyTheme(stored === 'dark' ? 'dark' : 'light');
+
+      btn.addEventListener('click', function () {
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+        try { window.localStorage.setItem(STORAGE_KEY, next); } catch (err) { /* 靜靜失敗 */ }
+      });
+    })();
+  </script>
+</body>
+</html>

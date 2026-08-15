@@ -230,9 +230,30 @@ function buildMailContext_(quarterId, versionNo, stage) {
       // applyPlaceholders_() 的清理機制會處理掉範本裡對應的 {CurrentStage}／
       // {NextAction} 文字，不會露出未代入的花括號。
       CurrentStage: resolveCurrentStageForPlaceholder_(quarterId),
-      NextAction: resolveNextActionForPlaceholder_(quarterId)
+      NextAction: resolveNextActionForPlaceholder_(quarterId),
+      // 第十一輪批次階段 A：一季一條固定連結。同上用 try/catch 包住，
+      // 查不到（例如這一季從未執行過「發佈公開職事表」）就留空，
+      // applyPlaceholders_() 的清理機制會處理掉範本裡的 {PublicRosterUrl}，
+      // 不會有人收到一封信裡面留低一串花括號。
+      PublicRosterUrl: resolvePublicRosterUrlForPlaceholder_(quarterId)
     }
   };
+}
+
+/**
+ * 供 {PublicRosterUrl} placeholder 使用：查 `PublicLinks` 拿呢一季嘅公開連結。
+ * 查不到（未發佈過、或工作表都未建立）一律回傳空字串，唔會令寄信流程失敗
+ * ——第一次啟用呢個功能之前寄出嘅信，呢個位置本來就應該係冇連結可以放。
+ * @param {string} quarterId 季度 ID
+ * @returns {string} 公開連結網址；查不到回傳空字串
+ */
+function resolvePublicRosterUrlForPlaceholder_(quarterId) {
+  try {
+    const row = findPublicLinkRow_(quarterId);
+    return (row && row.fileUrl) ? row.fileUrl : '';
+  } catch (err) {
+    return '';
+  }
 }
 
 /**
@@ -440,8 +461,23 @@ function deliverOne_(recipient, template, context, isDryRun) {
       retries: err.retries || 0
     });
   }
-  const attachmentName = attachment ? decorateAttachmentName_(attachment) : '';
-  base.retries = attachment ? (attachment.retries || 0) : 0;
+  // 第十一輪批次階段 C：ICS 日曆檔，只在 OFFICIAL／RESEND 且收件人有派工時產生
+  // （見 IcsExport.gs 的 buildIcsAttachmentForPerson_()）。刻意跟 PDF 附件分開
+  // try/catch——ICS 是錦上添花的附加功能，不應該因為它產生失敗而令整封信
+  // （連同已經正確產生的個人 PDF）都寄不出，只記錄警告、繼續不附 ICS。
+  let icsAttachment = null;
+  try {
+    icsAttachment = buildIcsAttachmentForPerson_(context, recipient, personAssignments);
+  } catch (err) {
+    log_('WARN', 'ICS 日曆檔產生失敗（不影響本次寄信，本封信不附 ICS）：'
+      + recipient.displayName + '（' + recipient.personId + '）　' + err.message);
+  }
+
+  const attachmentName = [attachment, icsAttachment]
+    .filter(Boolean)
+    .map(decorateAttachmentName_)
+    .join('；');
+  base.retries = (attachment ? (attachment.retries || 0) : 0) + (icsAttachment ? (icsAttachment.retries || 0) : 0);
 
   if (!recipient.email) {
     return Object.assign({}, base, { status: MAIL_STATUS.SKIPPED_NO_EMAIL, attachmentName: attachmentName });
@@ -454,12 +490,12 @@ function deliverOne_(recipient, template, context, isDryRun) {
 
   if (isDryRun) {
     log_('INFO', '[DRY_RUN] 不寄出 → ' + recipient.email + ' | ' + subject
-      + (attachment ? '（附件已產生：' + attachmentName + '）' : ''));
+      + (attachmentName ? '（附件已產生：' + attachmentName + '）' : ''));
     return Object.assign({}, base, { status: MAIL_STATUS.DRY_RUN, attachmentName: attachmentName });
   }
 
   try {
-    sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attachment);
+    sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attachment, icsAttachment);
     return Object.assign({}, base, { status: MAIL_STATUS.SENT, attachmentName: attachmentName });
   } catch (err) {
     return Object.assign({}, base, { status: MAIL_STATUS.FAILED, errorMessage: err.message, attachmentName: attachmentName });
@@ -475,10 +511,11 @@ function deliverOne_(recipient, template, context, isDryRun) {
  * @param {string} bodyHtml HTML 內文
  * @param {string} bodyPlain 純文字內文
  * @param {Object} context 寄信 context
- * @param {?{blob: Blob}} attachment 已產生的附件；沒有附件時傳 null
+ * @param {?{blob: Blob}} attachment 已產生的附件（個人／完整版 PDF）；沒有時傳 null
+ * @param {?{blob: Blob}} icsAttachment 已產生的 ICS 日曆附件；沒有時傳 null
  * @returns {void}
  */
-function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attachment) {
+function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attachment, icsAttachment) {
   // 防呆：即使呼叫端判斷錯誤，這裡再擋一次
   assertNotPreviewMode_('sendRealEmail_');
   if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== false) {
@@ -487,7 +524,10 @@ function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attach
   const options = { htmlBody: bodyHtml };
   if (context.senderName) options.name = context.senderName;
   if (context.replyTo) options.replyTo = context.replyTo;
-  if (attachment && attachment.blob) options.attachments = [attachment.blob];
+  const blobs = [attachment, icsAttachment]
+    .filter(function (a) { return a && a.blob; })
+    .map(function (a) { return a.blob; });
+  if (blobs.length > 0) options.attachments = blobs;
   MailApp.sendEmail(recipient.email, subject, bodyPlain || '', options);
 }
 

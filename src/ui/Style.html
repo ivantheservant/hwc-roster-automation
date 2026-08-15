@@ -161,16 +161,51 @@
   }
   .release-box input { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); width: 220px; }
 
+  /* 第十一輪批次階段 D：深色/淺色切換掣。
+     架構：跟裝置設定自動切換（@media）與幹事手動選擇（[data-theme]）用同一組
+     CSS 變數值，唔另外寫第二套樣式——分別只在於邊個選擇器生效：
+     - 冇手動選過（root 冇 data-theme）：跟裝置設定，用 @media 那段。
+     - 手動選過「深色」：:root[data-theme="dark"]，唔理裝置設定點樣都係深色。
+     - 手動選過「淺色」：:root[data-theme="light"]，唔理裝置設定點樣都係淺色
+       （下面淺色選擇器故意留空/沿用 :root 頂層已經係淺色值，唔需要覆寫；但
+       要喺 @media 那段加 :not([data-theme="light"]) 防護，否則裝置係深色時
+       「已手動選淺色」會被 @media 選擇器蓋過——屬性選擇器嘅特異性一定夠贏
+       純 :root，但 @media 區塊入面嘅 :root 若果冇呢個防護，兩者特異性一樣，
+       CSS 就會用「原始碼排喺後面嗰條」，@media 排喺後面就會贏，令淺色選擇失效）。
+     切換邏輯與偏好記憶見 ui/Script.html。 */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
       --ok: #16181d; --warning: #4a3f1a; --forced: #5a3b1c; --skipped: #24272e;
       --gap: #5c2b2b;
       --header: #24402a;
     }
-    select, button.secondary { background: #1f232b; color: var(--fg); }
-    tr.section td { background: #2a2f37; }
-    .badge, .badge.stage, .badge.dryrun-on, .badge.dryrun-off { background: #1f232b; }
-    .violation-block.hard, .violation-block.other, .release-box { background: transparent; }
+    :root:not([data-theme="light"]) select,
+    :root:not([data-theme="light"]) button.secondary { background: #1f232b; color: var(--fg); }
+    :root:not([data-theme="light"]) tr.section td { background: #2a2f37; }
+    :root:not([data-theme="light"]) .badge,
+    :root:not([data-theme="light"]) .badge.stage,
+    :root:not([data-theme="light"]) .badge.dryrun-on,
+    :root:not([data-theme="light"]) .badge.dryrun-off { background: #1f232b; }
+    :root:not([data-theme="light"]) .violation-block.hard,
+    :root:not([data-theme="light"]) .violation-block.other,
+    :root:not([data-theme="light"]) .release-box { background: transparent; }
   }
+
+  :root[data-theme="dark"] {
+    --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
+    --ok: #16181d; --warning: #4a3f1a; --forced: #5a3b1c; --skipped: #24272e;
+    --gap: #5c2b2b;
+    --header: #24402a;
+  }
+  :root[data-theme="dark"] select,
+  :root[data-theme="dark"] button.secondary { background: #1f232b; color: var(--fg); }
+  :root[data-theme="dark"] tr.section td { background: #2a2f37; }
+  :root[data-theme="dark"] .badge,
+  :root[data-theme="dark"] .badge.stage,
+  :root[data-theme="dark"] .badge.dryrun-on,
+  :root[data-theme="dark"] .badge.dryrun-off { background: #1f232b; }
+  :root[data-theme="dark"] .violation-block.hard,
+  :root[data-theme="dark"] .violation-block.other,
+  :root[data-theme="dark"] .release-box { background: transparent; }
 </style>

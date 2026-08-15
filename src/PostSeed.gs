@@ -7,6 +7,32 @@
  * 這裡多一層考量——這是**欄**不是**列**，所以規則是：
  * - 欄本身不存在時，只能加在最後一欄之後，不可插入到中間
  * - 欄已存在時，只填補目前是空白的格，已經有值的格完全不動
+ *
+ * ---
+ * 第十一輪批次階段 C（ICS 日曆檔）架構調整說明：
+ *
+ * 原始需求文字是「每個崗位的提早分鐘數要在 Config 逐個設定」，實作時改為
+ * Posts 工作表新增 EarlyArrivalMinutes 欄，而不是逐一開 Config Key（例如
+ * EARLY_ARRIVAL_MINUTES_音響、EARLY_ARRIVAL_MINUTES_司事……）。理由：
+ *
+ * 1. ConfigSeed.gs 的「補建 Config 參數」與 SelfTest.gs 都假設 Config 是一份
+ *    **固定已知**的 Key 集合（逐一列出、逐一自我檢查完整性）。崗位數量與
+ *    名稱會隨季度調整（新增/停用崗位），若每個崗位對應一個動態 Config Key，
+ *    這兩份「固定清單」的自我檢查機制都會失效或需要另外改成動態掃描，
+ *    等於要另建一套跟 Config 平行的機制，複雜度更高。
+ * 2. Posts 工作表本來就是「每個崗位一列、逐崗位設定」的資料結構，已經有
+ *    EmptyDisplay、AllowConsecutive 這類逐崗位設定的欄位（就是這個檔案
+ *    在做的事）——EarlyArrivalMinutes 加進來是同一個既有模式的延伸，不是
+ *    新增一種資料形狀。
+ * 3. 對幹事而言，「呢個崗位要提早幾多分鐘」跟「呢個崗位留空點顯示」是同一類
+ *    決定（崗位本身的屬性），放在同一張 Posts 表比分散在 Config 表更直覺、
+ *    也更容易一次看晒全部崗位的設定。
+ *
+ * 全域預設崇拜時間（ICS_SERVICE_START_TIME／ICS_SERVICE_END_TIME）仍然留在
+ * Config——那是「一個」值，不是「每個崗位各一個」，符合 Config 原本的用途。
+ *
+ * 用法與 EmptyDisplay 完全一致：留空的崗位視為 0（不提早），只有真正需要
+ * 提早到場的崗位（例如音響、司事）才需要填數字。
  */
 
 /**
@@ -81,6 +107,72 @@ function seedPostEmptyDisplay_(plan) {
   if (!plan.columnExists) {
     sheet.getRange(1, plan.columnIndex).setValue('留空顯示方式');
     sheet.getRange(2, plan.columnIndex).setValue(COLUMNS.POSTS.EMPTY_DISPLAY);
+  }
+
+  plan.rows.forEach(function (r) {
+    sheet.getRange(r.sheetRow, plan.columnIndex).setValue(r.value);
+  });
+
+  return plan.rows.length;
+}
+
+/**
+ * 檢查 Posts 工作表的 EarlyArrivalMinutes 欄現況，算出要新增／填補的內容
+ * （只讀，不寫入）。留空的崗位一律視為 0（不提早），所以這個工具**不會**
+ * 幫任何崗位自動填一個非零的建議值——幹事需要自己判斷邊個崗位要提早、
+ * 提早幾多分鐘，工具只負責補建欄位本身，不猜測數值。
+ * @returns {{columnExists: boolean, columnIndex: number, rows: Object[]}}
+ *   columnIndex 為 1-based 欄號（欄不存在時＝目前最後一欄+1）；
+ *   rows 為要補 0 的格，每項 {sheetRow, postId, postName, value}
+ */
+function planPostEarlyArrivalMinutesSeed_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.POSTS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.POSTS);
+
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  const headers = lastCol > 0 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  const existingIndex = headers.indexOf(COLUMNS.POSTS.EARLY_ARRIVAL_MINUTES);
+  const columnExists = existingIndex !== -1;
+  const columnIndex = columnExists ? existingIndex + 1 : lastCol + 1;
+
+  const plan = { columnExists: columnExists, columnIndex: columnIndex, rows: [] };
+  const dataRowCount = lastRow - 2;
+  if (dataRowCount <= 0) return plan;
+
+  const postIdCol = headers.indexOf(COLUMNS.POSTS.POST_ID) + 1;
+  const postNameCol = headers.indexOf(COLUMNS.POSTS.POST_NAME_TC) + 1;
+  const ids = sheet.getRange(3, postIdCol, dataRowCount, 1).getValues();
+  const names = sheet.getRange(3, postNameCol, dataRowCount, 1).getValues();
+  const existingValues = columnExists
+    ? sheet.getRange(3, columnIndex, dataRowCount, 1).getValues()
+    : names.map(function () { return ['']; });
+
+  for (let i = 0; i < dataRowCount; i++) {
+    const currentValue = String(existingValues[i][0] || '').trim();
+    if (currentValue !== '') continue; // 已有值，略過（只填補空格，不覆蓋）
+
+    plan.rows.push({ sheetRow: i + 3, postId: ids[i][0], postName: String(names[i][0] || '').trim(), value: 0 });
+  }
+  return plan;
+}
+
+/**
+ * 依 planPostEarlyArrivalMinutesSeed_() 的計畫寫入 Posts 工作表：
+ * 欄不存在就先在最後一欄之後新增（第 2 行寫機器鍵 'EarlyArrivalMinutes'，
+ * 第 1 行寫一個中文標題方便你在工作表上辨識），然後把目前空白的格填 0
+ * （0＝不提早，之後你可以自行在工作表上改成需要的分鐘數）。
+ * 完全不會動到欄不存在以外的任何既有內容。
+ * @param {Object} plan planPostEarlyArrivalMinutesSeed_() 的結果
+ * @returns {number} 實際寫入的格數
+ */
+function seedPostEarlyArrivalMinutes_(plan) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.POSTS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.POSTS);
+
+  if (!plan.columnExists) {
+    sheet.getRange(1, plan.columnIndex).setValue('提早到場分鐘數');
+    sheet.getRange(2, plan.columnIndex).setValue(COLUMNS.POSTS.EARLY_ARRIVAL_MINUTES);
   }
 
   plan.rows.forEach(function (r) {

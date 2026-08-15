@@ -71,6 +71,14 @@ function assertWebAppRequestAllowed_() {
 /**
  * Web App 的進入點，回傳操作介面頁面。
  *
+ * ⚠️ 第十一輪批次階段 B：**呢個函式而家由兩個唔同 access 設定嘅部署共用**
+ * ——幹事介面本身嘅部署（`access=MYSELF`）同義工用嘅「個人專屬連結」部署
+ * （`access=ANYONE`，見 `WebAppPersonalLink.gs` 檔頭說明）。**必須假設呼叫者
+ * 未經任何權限檢查**，第一件事就要判斷「呢個係咪個人連結請求」，係嘅話
+ * 完全唔行下面幹事介面嗰三層防護（義工冇 Google 身分可以過白名單），
+ * 唔係先至行返原本嘅邏輯。呢個分流一定要排喺最頭，唔可以有任何共用邏輯
+ * 排喺分流之前。
+ *
  * 安全模型見上方「追加階段 AV」的說明區塊。總開關關閉、或呼叫者不在白名單內時，
  * **一律不會渲染 `ui/Index`**，只回傳一個不含任何職事表資料的說明頁——
  * 兩種情況用不同文字，方便幹事自己判斷是「未啟用」還是「無權限」。
@@ -79,10 +87,18 @@ function assertWebAppRequestAllowed_() {
  * 此函式已可運作，日後在編輯器按「部署 → 新增部署 → 網頁應用程式」即可啟用，
  * 但部署之後 `WEBAPP_ENABLED` 仍然是 FALSE，要幹事自己去 Config 開啟才會真正可用。
  *
- * @param {Object} e 查詢參數（目前未使用）
+ * @param {Object} e 查詢參數（`e.parameter.p` 有值就是個人專屬連結請求）
  * @returns {HtmlOutput} 要顯示的頁面
  */
 function doGet(e) {
+  // 第十一輪批次階段 B：分流一定排最頭。有 p 參數＝個人專屬連結，
+  // 完全唔行下面幹事介面嗰三層防護函式（renderPersonalRosterPage_() 自己
+  // 有一套完全獨立嘅安全模型，見 WebAppPersonalLink.gs 檔頭說明），
+  // 亦都唔會渲染 ui/Index。
+  if (e && e.parameter && e.parameter.p) {
+    return renderPersonalRosterPage_(e);
+  }
+
   try {
     assertWebAppEnabled_();
   } catch (err) {
@@ -116,6 +132,32 @@ function doGet(e) {
  */
 function includeHtml(fileName) {
   return HtmlService.createHtmlOutputFromFile(fileName).getContent();
+}
+
+/**
+ * 第十一輪批次階段 D：供前端呼叫——讀取幹事本人儲存喺 UserProperties 嘅
+ * 深色/淺色偏好。前端預設用瀏覽器 localStorage（同步、免來回伺服器），
+ * 只喺 localStorage 讀寫失敗（例如 HtmlService sandbox 擋咗）時先會退回
+ * 呼叫呢個 function（見 ui/Script.html 嘅切換邏輯）。
+ * @returns {string} 'dark'／'light'／''（未設定過，前端會改跟裝置設定）
+ */
+function apiGetThemePreference() {
+  assertWebAppRequestAllowed_();
+  const value = PropertiesService.getUserProperties().getProperty(WEBAPP_THEME_PROPERTY_KEY);
+  return (value === 'dark' || value === 'light') ? value : '';
+}
+
+/**
+ * 第十一輪批次階段 D：供前端呼叫——寫入幹事本人嘅深色/淺色偏好到
+ * UserProperties（localStorage 唔可用時嘅後備路徑，見 apiGetThemePreference()）。
+ * @param {string} theme 'dark'／'light'；其他值一律略過不寫入
+ * @returns {void}
+ */
+function apiSetThemePreference(theme) {
+  assertWebAppRequestAllowed_();
+  const normalized = (theme === 'dark' || theme === 'light') ? theme : '';
+  if (!normalized) return;
+  PropertiesService.getUserProperties().setProperty(WEBAPP_THEME_PROPERTY_KEY, normalized);
 }
 
 /**

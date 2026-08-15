@@ -104,7 +104,8 @@ function readPostsNormalized() {
       allowConsecutive: String(row[COLUMNS.POSTS.ALLOW_CONSECUTIVE] || ALLOW_CONSECUTIVE.ALLOW).toUpperCase(),
       mutexGroup: String(row[COLUMNS.POSTS.MUTEX_GROUP] || '').trim(),
       displayOrder: Number(row[COLUMNS.POSTS.DISPLAY_ORDER]),
-      emptyDisplay: row[COLUMNS.POSTS.EMPTY_DISPLAY]
+      emptyDisplay: row[COLUMNS.POSTS.EMPTY_DISPLAY],
+      earlyArrivalMinutes: Number(row[COLUMNS.POSTS.EARLY_ARRIVAL_MINUTES]) || 0
     };
   });
 }

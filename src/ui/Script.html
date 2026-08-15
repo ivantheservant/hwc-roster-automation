@@ -723,11 +723,82 @@
     renderSteps(state);
   }
 
+  // ── 第十一輪批次階段 D：深色/淺色切換 ────────────────────────────
+  // 偏好記憶策略：優先用瀏覽器 localStorage（同步、免來回伺服器）；只有
+  // localStorage 讀寫失敗（例如 HtmlService sandbox 擋咗）先會退回用
+  // PropertiesService 嘅 UserProperties（見 WebApp.gs 嘅
+  // apiGetThemePreference()／apiSetThemePreference()，要來回伺服器）。
+  // 冇手動選過（stored 係空）時完全唔設 data-theme，跟裝置設定
+  // （ui/Style.html 嘅 @media (prefers-color-scheme: dark) 那段）。
+  const THEME_STORAGE_KEY = 'hwcRosterTheme';
+  let themeLocalStorageOk = true;
+
+  function themeLocalStorageProbe() {
+    try {
+      const testKey = '__hwcRosterThemeProbe__';
+      window.localStorage.setItem(testKey, '1');
+      window.localStorage.removeItem(testKey);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /** 目前實際生效嘅主題（已手動選過就用嗰個，否則睇裝置設定）。 */
+  function currentEffectiveTheme() {
+    const explicit = document.documentElement.getAttribute('data-theme');
+    if (explicit === 'dark' || explicit === 'light') return explicit;
+    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    if (theme === 'dark' || theme === 'light') {
+      root.setAttribute('data-theme', theme);
+    } else {
+      root.removeAttribute('data-theme');
+    }
+    const btn = el('themeToggleBtn');
+    if (btn) btn.textContent = currentEffectiveTheme() === 'dark' ? '☀️ 淺色模式' : '🌙 深色模式';
+  }
+
+  async function initThemeToggle() {
+    themeLocalStorageOk = themeLocalStorageProbe();
+
+    if (themeLocalStorageOk) {
+      let stored = null;
+      try { stored = window.localStorage.getItem(THEME_STORAGE_KEY); } catch (err) { stored = null; }
+      applyTheme(stored || '');
+    } else {
+      try {
+        const stored = await callServer('apiGetThemePreference');
+        applyTheme(stored || '');
+      } catch (err) {
+        applyTheme('');
+      }
+    }
+
+    el('themeToggleBtn').addEventListener('click', () => {
+      const next = currentEffectiveTheme() === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
+      if (themeLocalStorageOk) {
+        try {
+          window.localStorage.setItem(THEME_STORAGE_KEY, next);
+          return;
+        } catch (err) {
+          themeLocalStorageOk = false; // 寫入先發現擋咗，之後都改行伺服器路徑
+        }
+      }
+      callServer('apiSetThemePreference', next).catch(() => {});
+    });
+  }
+
   el('quarter').addEventListener('change', () => runAction('載入狀態', async () => {
     currentQuarterId = el('quarter').value;
     await loadFlowState();
   }));
   el('btnRefresh').addEventListener('click', () => runAction('重新整理狀態', loadFlowState));
 
+  initThemeToggle();
   runAction('初始化', loadQuarters);
 </script>

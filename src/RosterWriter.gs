@@ -268,6 +268,43 @@ function resolveEmptyDisplayText_(rawEmptyDisplay, pendingLabel, naLabel) {
 }
 
 /**
+ * 第十一輪批次階段 A／B 新增：把 `RosterAssignments` 長表某個版本的紀錄，
+ * 轉換成 `buildGridLayout_()`／`classifyGridCell_()` 要的形狀
+ * （`{serviceDate, postId, slotIndex, personId, personName, assignSource, ruleFlags}`，
+ * `ruleFlags` 是陣列，不是逗號分隔字串）。
+ *
+ * 存在的理由：`createRosterSheet()` 當下用的是生成器剛產生、還在記憶體裡的
+ * 陣列（`ruleFlags` 本來就是陣列）；但「發佈公開職事表」（`PublicRoster.gs`）
+ * 與「個人專屬連結」（`WebAppPersonalLink.gs`）都是**事後**重新讀取已經寫入
+ * 長表的某個版本，`RuleFlags` 這時已經被 `writeAssignments()` 序列化成字串，
+ * 兩者形狀不同、不能直接傳給 `buildGridLayout_()`。這個函式只做一次轉換，
+ * 供上述兩個新功能共用，不會各自重複一份轉換邏輯。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {Object[]} 轉換後的派工結果，可直接傳給 `buildGridLayout_()`
+ */
+function readVersionAssignmentsForGrid_(quarterId, versionNo) {
+  const C = COLUMNS.ROSTER_ASSIGNMENTS;
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return readSheet(SHEETS.ROSTER_ASSIGNMENTS)
+    .filter(function (row) {
+      return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
+    })
+    .map(function (row) {
+      return {
+        serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+        postId: row[C.POST_ID],
+        slotIndex: Number(row[C.SLOT_INDEX]),
+        personId: row[C.PERSON_ID],
+        personName: row[C.PERSON_NAME_SNAPSHOT] || '',
+        assignSource: row[C.ASSIGN_SOURCE],
+        ruleFlags: splitList_(row[C.RULE_FLAGS])
+      };
+    });
+}
+
+/**
  * 把警告清單整理成以 "date|postId|slot" 為鍵的索引，方便標示格子。
  * @param {Object[]} warnings 警告清單
  * @returns {Object.<string, Object[]>} 每格對應的警告陣列

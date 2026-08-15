@@ -30,7 +30,11 @@ const SHEETS = {
   // 階段 B（Opus 深度輪）新增：歸檔用的封存表。封存是**搬移不是刪除**——
   // 原始列完整搬到這兩張表，隨時可以人手查閱或搬回去。見 Archive.gs。
   SEND_LOG_ARCHIVE: 'SendLog_Archive',
-  ROSTER_ASSIGNMENTS_ARCHIVE: 'RosterAssignments_Archive'
+  ROSTER_ASSIGNMENTS_ARCHIVE: 'RosterAssignments_Archive',
+  // 第十一輪批次階段 A：一季一條固定連結。每個季度對應一個**獨立公開試算表
+  // 檔案**（不是主試算表裡的分頁），檔案 ID／網址／發佈紀錄記在這張表。
+  // 見 PublicRoster.gs 的檔頭說明。
+  PUBLIC_LINKS: 'PublicLinks'
 };
 
 /**
@@ -119,6 +123,14 @@ const PDF_BATCH_PROGRESS_KEY = 'roster_pdf_batch_progress';
 const PDF_RESEND_BATCH_PROGRESS_KEY = 'roster_pdf_resend_batch_progress';
 
 /**
+ * 第十一輪批次階段 D：存放幹事介面深色/淺色偏好的 User Property 鍵名——只喺
+ * 瀏覽器 localStorage 唔可用（例如 HtmlService sandbox 擋咗）時，前端先會退回
+ * 用呢個 key 透過 PropertiesService.getUserProperties() 讀寫（見 WebApp.gs 的
+ * apiGetThemePreference()／apiSetThemePreference()，ui/Script.html 的切換邏輯）。
+ */
+const WEBAPP_THEME_PROPERTY_KEY = 'roster_webapp_theme';
+
+/**
  * 「產生個人 PDF」單次執行的時間安全網（毫秒）。Apps Script 上限為 6 分鐘，
  * 這裡留 2 分鐘餘裕給收尾；即使 Config 的 PDF_BATCH_SIZE 設得太大，
  * 一批處理到接近這個時間也會提早停止並存進度，不會被硬中斷。
@@ -158,7 +170,10 @@ const COLUMNS = {
     DISPLAY_ORDER: 'DisplayOrder',
     ACTIVE: 'Active',
     NOTES: 'Notes',
-    EMPTY_DISPLAY: 'EmptyDisplay'
+    EMPTY_DISPLAY: 'EmptyDisplay',
+    // 第十一輪批次階段 C：崗位提早到場分鐘數（見 PostSeed.gs 檔頭說明——
+    // 為什麼是 Posts 欄而不是逐一開 Config Key）。留空視為 0（不提早）。
+    EARLY_ARRIVAL_MINUTES: 'EarlyArrivalMinutes'
   },
   NAME_MAPPING: {
     PERSON_ID: 'PersonID',
@@ -177,7 +192,9 @@ const COLUMNS = {
     MAX_PER_QUARTER: 'MaxPerQuarter',
     PREFERRED_POSTS: 'PreferredPosts',
     NOTES: 'Notes',
-    SYNCED_AT: 'SyncedAt'
+    SYNCED_AT: 'SyncedAt',
+    // 第十一輪批次階段 B：個人專屬連結用嘅 token。見 WebAppPersonalLink.gs 檔頭說明。
+    PERSONAL_LINK_TOKEN: 'PersonalLinkToken'
   },
   NAME_ALIAS: {
     ALIAS_ID: 'AliasID',
@@ -279,6 +296,18 @@ const COLUMNS = {
     NOTES: 'Notes',
     STAGE: 'Stage',
     STAGE_UPDATED_AT: 'StageUpdatedAt'
+  },
+  // 第十一輪批次階段 A 新增：一季一條固定連結。一列對應一個季度，
+  // FileID 一旦建立就終身不變（覆寫內容不換檔案，見 PublicRoster.gs）。
+  PUBLIC_LINKS: {
+    QUARTER_ID: 'QuarterID',
+    FILE_ID: 'FileID',
+    FILE_URL: 'FileUrl',
+    LAST_PUBLISHED_AT: 'LastPublishedAt',
+    LAST_PUBLISHED_VERSION: 'LastPublishedVersion',
+    SHARING_ACCESS: 'SharingAccess',
+    SHARING_PERMISSION: 'SharingPermission',
+    CREATED_AT: 'CreatedAt'
   },
   ROSTER_VERSIONS: {
     VERSION_ID: 'VersionID',
@@ -891,7 +920,15 @@ const CONFIG_KEYS = {
   // pickEpsilonWinner_()）。**預設 0＝行為與加入這個 Key 之前完全一致**，
   // 要真的啟用必須由幹事自己改成非零值，而且應該先用「試算不同 epsilon
   // 的效果（唯讀）」在真實資料上比較過再改。
-  SCORE_TIE_EPSILON: 'SCORE_TIE_EPSILON'
+  SCORE_TIE_EPSILON: 'SCORE_TIE_EPSILON',
+  // 第十一輪批次階段 A：一季一條固定連結。公開試算表檔案的命名樣板，
+  // 支援 {QuarterID}。見 PublicRoster.gs。
+  PUBLIC_ROSTER_FILE_NAME_PATTERN: 'PUBLIC_ROSTER_FILE_NAME_PATTERN',
+  // 第十一輪批次階段 C：ICS 日曆事件的預設崇拜時間（HH:mm，24 小時制，
+  // Pacific/Auckland）。個別崗位的提早到場時間見 Posts 的 EarlyArrivalMinutes 欄
+  // （見 PostSeed.gs 檔頭說明——為什麼改用 Posts 欄而不是逐一開 Config Key）。
+  ICS_SERVICE_START_TIME: 'ICS_SERVICE_START_TIME',
+  ICS_SERVICE_END_TIME: 'ICS_SERVICE_END_TIME'
 };
 
 /**
@@ -1031,7 +1068,9 @@ const GRID_LABELS = {
 const UI_FILES = {
   INDEX: 'ui/Index',
   STYLE: 'ui/Style',
-  SCRIPT: 'ui/Script'
+  SCRIPT: 'ui/Script',
+  // 第十一輪批次階段 B：個人專屬連結的唯讀頁面，見 WebAppPersonalLink.gs。
+  PERSONAL_ROSTER: 'ui/PersonalRoster'
 };
 
 /** 自我測試的結果類型。 */
@@ -1110,7 +1149,12 @@ const DEFAULTS = {
   SOFT_METRIC_POST_USAGE_MIN_RATIO: 0.5,
   // 第九輪批次階段 B：**預設 0，代表完全不啟用**，選人行為與加入這個機制
   // 之前逐格完全一致（見 Generator.gs 的 compareCandidates_() 說明）。
-  SCORE_TIE_EPSILON: 0
+  SCORE_TIE_EPSILON: 0,
+  // 第十一輪批次階段 A：公開試算表檔案的預設命名樣板。
+  PUBLIC_ROSTER_FILE_NAME_PATTERN: '{QuarterID} 粵語堂職事表（公開版）',
+  // 第十一輪批次階段 C：預設崇拜時間 10:45–12:00（Ivan 已確認）。
+  ICS_SERVICE_START_TIME: '10:45',
+  ICS_SERVICE_END_TIME: '12:00'
 };
 
 /**

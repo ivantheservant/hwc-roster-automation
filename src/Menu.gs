@@ -41,6 +41,7 @@ function onOpen() {
         .addItem('軟規則實測量度（唯讀）', 'runSoftRuleMetrics_')
         .addItem('試算不同 epsilon 的效果（唯讀）', 'runEpsilonTrial_Menu_')
         .addItem('上線狀態（唯讀）', 'runGoLiveStatus_')
+        .addItem('公開連結狀態（唯讀）', 'runCheckPublicLinks_')
         .addItem('SOFT 規則與選人加權（唯讀）', 'runDebugSoftRules_')
         .addItem('欄標題對照（唯讀）', 'runDebugGridHeaders_')
         .addItem('個人版 highlight 定位（唯讀）', 'runDebugPersonalHighlight_')
@@ -57,6 +58,7 @@ function onOpen() {
         .addItem('⚠️ 生成職事表', 'runGenerateRoster_')
         .addItem('匯出 PDF', 'runExportPdf_')
         .addItem('產生個人 PDF', 'runGeneratePersonalPdfBatch_')
+        .addItem('⚠️ 發佈公開職事表（一季一條固定連結）', 'runPublishPublicRoster_')
         .addSeparator()
         .addItem('檢查改動', 'runDetectChanges_')
         .addItem('⚠️ 套用決定', 'runApplyDecisions_')
@@ -68,6 +70,7 @@ function onOpen() {
       ui.createMenu('維護')
         .addItem('補建 Config 參數', 'runSeedConfigKeys_')
         .addItem('補建 Posts 欄位', 'runSeedPostEmptyDisplay_')
+        .addItem('補建 Posts 欄位（提早到場分鐘數）', 'runSeedPostEarlyArrivalMinutes_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')
         .addItem('補建 SpecialSundays 工作表', 'runEnsureSpecialSundaysSheet_')
         .addItem('建立 Requests 工作表', 'runCreateRequestsSheet_')
@@ -75,6 +78,8 @@ function onOpen() {
         .addItem('重設 Requests 驗證規則', 'runResetRequestsValidations_')
         .addItem('補建 EmailRecipients 欄位', 'runSeedEmailRecipientsRole_')
         .addItem('補齊 Email 範本', 'runSeedEmailTemplates_')
+        .addItem('補發個人專屬連結 token', 'runSeedPersonalLinkTokens_')
+        .addItem('⚠️ 重新產生單一個人的 token（外洩時用）', 'runReissuePersonalLinkToken_')
         .addSeparator()
         .addItem('⚠️ 清理舊 PDF', 'runCleanupOldPdfs_')
         .addItem('⚠️⚠️ 按季度清理 PDF', 'runQuarterPdfCleanup_')
@@ -517,6 +522,65 @@ function runSeedPostEmptyDisplay_() {
   } catch (err) {
     log_('ERROR', 'runSeedPostEmptyDisplay_ 失敗: ' + err.message);
     ui.alert('補建 Posts 欄位', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 選單項目「補建 Posts 欄位（提早到場分鐘數）」的執行入口：Posts 工作表補上
+ * EarlyArrivalMinutes 欄，供 ICS 日曆檔計算個別崗位（例如音響、司事）需要
+ * 提早到場的時間（見 IcsExport.gs／PostSeed.gs 檔頭「Config-vs-Posts 欄」
+ * 架構調整說明）。欄不存在時新增在最後一欄之後，已存在時只填補空白的格
+ * （一律填 0＝不提早），已有值的格完全不動。執行前列出將寫入哪些崗位並要求確認。
+ * @returns {void}
+ */
+function runSeedPostEarlyArrivalMinutes_() {
+  const ui = SpreadsheetApp.getUi();
+  let plan;
+  try {
+    plan = planPostEarlyArrivalMinutesSeed_();
+  } catch (err) {
+    ui.alert('補建 Posts 欄位（提早到場分鐘數）', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  if (plan.rows.length === 0) {
+    ui.alert(
+      '補建 Posts 欄位（提早到場分鐘數）',
+      plan.columnExists
+        ? 'EarlyArrivalMinutes 欄已存在，且全部崗位都已有值，不需要新增。'
+        : 'Posts 沒有任何崗位資料，不需要新增。',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  const lines = [
+    plan.columnExists
+      ? '將在既有的 EarlyArrivalMinutes 欄補上以下空格（只填空白的格，已有值的不動）：'
+      : '將新增 EarlyArrivalMinutes 欄（append 在最後一欄之後，不影響其他欄），並填入：',
+    ''
+  ];
+  plan.rows.forEach(function (r) {
+    lines.push('　' + r.postName + '（' + r.postId + '）　→　0（不提早）');
+  });
+  lines.push('', '填 0 之後可自行到 Posts 工作表，把需要提早到場的崗位（例如音響、司事）改成需要的分鐘數。');
+  lines.push('', '確定要繼續嗎？');
+
+  if (ui.alert('補建 Posts 欄位（提早到場分鐘數）', lines.join('\n'), ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+
+  try {
+    const written = seedPostEarlyArrivalMinutes_(plan);
+    writeAuditLog_({
+      action: '補建 Posts 欄位',
+      targetSheet: SHEETS.POSTS,
+      targetKey: COLUMNS.POSTS.EARLY_ARRIVAL_MINUTES,
+      newValue: '新增/補值 ' + written + ' 格',
+      source: 'runSeedPostEarlyArrivalMinutes_'
+    });
+    ui.alert('補建 Posts 欄位（提早到場分鐘數）', '已寫入 ' + written + ' 格。', ui.ButtonSet.OK);
+  } catch (err) {
+    log_('ERROR', 'runSeedPostEarlyArrivalMinutes_ 失敗: ' + err.message);
+    ui.alert('補建 Posts 欄位（提早到場分鐘數）', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
   }
 }
 

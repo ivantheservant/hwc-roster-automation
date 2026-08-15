@@ -128,7 +128,8 @@ function buildPreLaunchChecklist_(quarterId) {
   // 第 2、3 層（WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）才是可以即時讀 Config 判斷的。
   //
   // 「有沒有任何路徑可以繞過」的稽核結論：逐一檢查 WebApp.gs／WebAppFlow.gs
-  // 全部 24 個 api* 函式，**每一個的第一行都是 assertWebAppRequestAllowed_()**
+  // 全部 api* 函式（數量隨版本增減，見 tests/webapp_access_guard.test.js 的
+  // 自動掃描結果），**每一個的第一行都是 assertWebAppRequestAllowed_()**
   // （合併呼叫 assertWebAppEnabled_() 與 assertApiCallerAuthorized_()），
   // 沒有找到任何一個函式跳過這道檢查；doGet() 本身在渲染 ui/Index 之前
   // 也已經先做同樣兩項檢查，未通過只會回傳說明頁，不會渲染任何介面。
@@ -165,7 +166,8 @@ function buildPreLaunchChecklist_(quarterId) {
       + '　第 3 層：WEBAPP_ALLOWED_EMAILS='
       + (allowedList.length > 0 ? allowedList.join('、') : '（空白）')
       + '　SCRIPT_ACCOUNT_EMAIL=' + (scriptAccount || '（空白）'),
-    webappGuidance + '\n\n程式碼稽核結論：WebApp.gs／WebAppFlow.gs 全部 24 個 api* 函式'
+    webappGuidance + '\n\n程式碼稽核結論：WebApp.gs／WebAppFlow.gs 全部 api* 函式'
+      + '（數量隨版本增減，見 tests/webapp_access_guard.test.js 的自動掃描結果）'
       + '第一行都呼叫 assertWebAppRequestAllowed_()，doGet() 渲染介面前也做同樣檢查，'
       + '沒有發現任何繞過第 2、3 層的路徑。'
   ));

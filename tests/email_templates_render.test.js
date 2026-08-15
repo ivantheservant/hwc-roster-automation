@@ -48,7 +48,9 @@ const SAMPLE_PLACEHOLDERS = {
   OfficialSendDate: '2099-01-11',
   SpreadsheetUrl: 'https://example.invalid/spreadsheet-url',
   CurrentStage: 'REVIEW_SENT',
-  NextAction: '四階段流程 ▸ 步驟 3：套用修改申報'
+  NextAction: '四階段流程 ▸ 步驟 3：套用修改申報',
+  // 第十一輪批次階段 A：一季一條固定連結。
+  PublicRosterUrl: 'https://example.invalid/public-roster-url'
 };
 
 /** 虛構的個人派工摘要（已經是 buildAssignmentSummary_() 會產生的格式）。 */

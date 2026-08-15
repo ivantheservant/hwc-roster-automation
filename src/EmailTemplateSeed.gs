@@ -84,13 +84,21 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經確定，閣下本季的服侍安排如下：</p>'
       + '<p>{AssignmentSummary}</p>'
       + '<p>個人版職事表已作為附件，敬請查收並預留時間。如因特殊情況未能出席，請盡早聯絡幹事安排調動。</p>'
+      // 第十一輪批次階段 A：一季一條固定連結。呢一段刻意用 try/catch 包住
+      // 產生（見 Mailer.gs 的 resolvePublicRosterUrlForPlaceholder_()），
+      // 未發佈過公開職事表時 {PublicRosterUrl} 會被 applyPlaceholders_() 清走，
+      // 呢句本身唔會露出未代入嘅花括號，但會變成「完整職事表：」後面直接
+      // 空白——呢句本身係選擇性嘅裝飾句，唔係必要資訊，可以接受。
+      + '<p>如想隨時查看完整版職事表（同一條連結，之後排表有改動都係呢一條）：'
+      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
       + '<p>多謝配搭服侍！</p>',
     bodyPlain: '{PersonName} 弟兄／姊妹：\n\n'
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經確定，閣下本季的服侍安排如下：\n\n'
       + '{AssignmentSummary}\n\n'
       + '個人版職事表已作為附件，敬請查收並預留時間。如因特殊情況未能出席，請盡早聯絡幹事安排調動。\n\n'
+      + '如想隨時查看完整版職事表（同一條連結，之後排表有改動都係呢一條）：{PublicRosterUrl}\n\n'
       + '多謝配搭服侍！',
-    placeholders: '{PersonName},{QuarterID},{StartDate},{EndDate},{AssignmentSummary},{SpreadsheetUrl}',
+    placeholders: '{PersonName},{QuarterID},{StartDate},{EndDate},{AssignmentSummary},{SpreadsheetUrl},{PublicRosterUrl}',
     attachType: ATTACH_TYPE.PERSONAL_PDF
   },
   {
@@ -119,6 +127,8 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
       + '並已於今日分別發送給本季各位有服侍的義工，每位收到的是自己那一份個人職事表。</p>'
       + '<p>完整版職事表已作為附件，方便各位存檔及查閱。</p>'
+      + '<p>公開版連結（同一條連結，之後排表有改動都係呢一條）：'
+      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
       + '<p>如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
       + '由幹事統一處理後再重新發出，請勿直接修改試算表上的儲存格，以便追蹤所有改動。</p>'
       + '<p>試算表連結：{SpreadsheetUrl}</p>',
@@ -126,10 +136,11 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
       + '並已於今日分別發送給本季各位有服侍的義工，每位收到的是自己那一份個人職事表。\n\n'
       + '完整版職事表已作為附件，方便各位存檔及查閱。\n\n'
+      + '公開版連結（同一條連結，之後排表有改動都係呢一條）：{PublicRosterUrl}\n\n'
       + '如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
       + '由幹事統一處理後再重新發出，請勿直接修改試算表上的儲存格，以便追蹤所有改動。\n\n'
       + '試算表連結：{SpreadsheetUrl}',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{SpreadsheetUrl}',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{SpreadsheetUrl},{PublicRosterUrl}',
     attachType: ATTACH_TYPE.FULL_PDF
   },
   {
@@ -142,13 +153,16 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '閣下本季最新的服侍安排如下：</p>'
       + '<p>{AssignmentSummary}</p>'
       + '<p>最新版個人職事表已作為附件，敬請以此為準。如有疑問，請直接回覆本郵件或聯絡幹事。</p>'
+      + '<p>如想隨時查看完整版職事表（同一條連結，之後排表有改動都係呢一條）：'
+      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
       + '<p>多謝配搭服侍！</p>',
     bodyPlain: '{PersonName} 弟兄／姊妹：\n\n'
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動有所更新，閣下本季最新的服侍安排如下：\n\n'
       + '{AssignmentSummary}\n\n'
       + '最新版個人職事表已作為附件，敬請以此為準。如有疑問，請直接回覆本郵件或聯絡幹事。\n\n'
+      + '如想隨時查看完整版職事表（同一條連結，之後排表有改動都係呢一條）：{PublicRosterUrl}\n\n'
       + '多謝配搭服侍！',
-    placeholders: '{PersonName},{QuarterID},{StartDate},{EndDate},{AssignmentSummary},{SpreadsheetUrl}',
+    placeholders: '{PersonName},{QuarterID},{StartDate},{EndDate},{AssignmentSummary},{SpreadsheetUrl},{PublicRosterUrl}',
     attachType: ATTACH_TYPE.PERSONAL_PDF
   },
   {
@@ -164,13 +178,18 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動已重新發出，'
       + '本輪有異動的人員及其最新安排如下：</p>'
       + '<p>{ChangedPeopleSummary}</p>'
-      + '<p>完整版職事表已作為附件。如有查詢，請直接回覆本郵件。</p>',
+      + '<p>完整版職事表已作為附件。</p>'
+      + '<p>公開版連結（同一條連結，之後排表有改動都係呢一條）：'
+      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
+      + '<p>如有查詢，請直接回覆本郵件。</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
       + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動已重新發出，'
       + '本輪有異動的人員及其最新安排如下：\n\n'
       + '{ChangedPeopleSummary}\n\n'
-      + '完整版職事表已作為附件。如有查詢，請直接回覆本郵件。',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{ChangedPeopleSummary},{SpreadsheetUrl}',
+      + '完整版職事表已作為附件。\n\n'
+      + '公開版連結（同一條連結，之後排表有改動都係呢一條）：{PublicRosterUrl}\n\n'
+      + '如有查詢，請直接回覆本郵件。',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{ChangedPeopleSummary},{SpreadsheetUrl},{PublicRosterUrl}',
     attachType: ATTACH_TYPE.FULL_PDF
   }
 ];

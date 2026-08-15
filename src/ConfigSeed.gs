@@ -394,6 +394,29 @@ function getConfigKeySeeds_() {
         + '低於這個比例就標為偏低。0.5＝合資格的人整季有一半以上從未被派到就提示。',
       editable: 'TRUE'
     },
+    // ---- PUBLIC（第十一輪批次階段 A：一季一條固定連結）----
+    {
+      key: CONFIG_KEYS.PUBLIC_ROSTER_FILE_NAME_PATTERN, type: CONFIG_TYPES.STR, group: 'PUBLIC',
+      defaultValue: DEFAULTS.PUBLIC_ROSTER_FILE_NAME_PATTERN,
+      description: '公開試算表檔案的命名樣板，支援 {QuarterID}。只影響「發佈公開職事表」'
+        + '第一次建立檔案時的名稱，之後覆寫不會改檔名。',
+      editable: 'TRUE'
+    },
+    // ---- ICS（第十一輪批次階段 C：日曆檔）----
+    {
+      key: CONFIG_KEYS.ICS_SERVICE_START_TIME, type: CONFIG_TYPES.STR, group: 'ICS',
+      defaultValue: DEFAULTS.ICS_SERVICE_START_TIME,
+      description: '崇拜預設開始時間（HH:mm，24 小時制）。個別崗位的提早到場時間見 Posts 的 '
+        + 'EarlyArrivalMinutes 欄，不在這裡設定。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ICS_SERVICE_END_TIME, type: CONFIG_TYPES.STR, group: 'ICS',
+      defaultValue: DEFAULTS.ICS_SERVICE_END_TIME,
+      description: '崇拜預設結束時間（HH:mm，24 小時制），日曆事件的結束時間一律用這個'
+        + '（提早到場只影響開始時間，不影響結束時間）。',
+      editable: 'TRUE'
+    },
     {
       key: CONFIG_KEYS.V0_PROTECT, type: CONFIG_TYPES.BOOL, group: 'GENERATOR',
       defaultValue: 'FALSE',
