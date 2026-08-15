@@ -848,7 +848,19 @@ const CONFIG_KEYS = {
   // 追加階段 AV：Web UI 呼叫者白名單（電郵，逗號分隔）。留空時退回只允許
   // SCRIPT_ACCOUNT_EMAIL 那一個人——空白絕不代表「任何人皆可」。
   // 見 WebApp.gs 的 assertApiCallerAuthorized_()。
-  WEBAPP_ALLOWED_EMAILS: 'WEBAPP_ALLOWED_EMAILS'
+  WEBAPP_ALLOWED_EMAILS: 'WEBAPP_ALLOWED_EMAILS',
+  // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
+  // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
+  // 本來就應該由幹事按實際情況調整。
+  SOFT_METRIC_RATIO_TOLERANCE: 'SOFT_METRIC_RATIO_TOLERANCE',
+  SOFT_METRIC_COUNT_TOLERANCE_RATIO: 'SOFT_METRIC_COUNT_TOLERANCE_RATIO',
+  SOFT_METRIC_POST_USAGE_MIN_RATIO: 'SOFT_METRIC_POST_USAGE_MIN_RATIO',
+  // 第九輪批次階段 B：候選人分數的「視為同分」容差，令 RANDOM_SEED 的
+  // tieBreak 真正參與決勝（見 Generator.gs 的 compareCandidates_()／
+  // pickEpsilonWinner_()）。**預設 0＝行為與加入這個 Key 之前完全一致**，
+  // 要真的啟用必須由幹事自己改成非零值，而且應該先用「試算不同 epsilon
+  // 的效果（唯讀）」在真實資料上比較過再改。
+  SCORE_TIE_EPSILON: 'SCORE_TIE_EPSILON'
 };
 
 /**
@@ -1017,7 +1029,15 @@ const DEFAULTS = {
   FINETUNE_MAX_MOVES: 6,
   QUARTER_DISTRIBUTION_TOLERANCE: 0.5,
   MULTIRUN_ATTEMPTS: 20,
-  MAIL_SUMMARY_DATE_FORMAT: 'dd/MM',
+  // 第九輪批次階段 C：由 'dd/MM' 改為 'M月d日'。
+  // 'dd/MM' 對習慣 MM/dd 的讀者有月日歧義——「03/04」究竟是 3 月 4 日還是
+  // 4 月 3 日分不出。而義工就是靠個人信裡這一行去記自己邊個禮拜要返，記錯
+  // 日期的代價很實際（當日冇人到位）。'M月d日' 對中文讀者完全沒有歧義，
+  // 也不受地區慣例影響。CJK 字元在 SimpleDateFormat 屬於字面字元，
+  // 不是格式符號（只有 ASCII 字母才是），所以「月」「日」會原樣輸出。
+  // ⚠️ 這是程式碼預設值。如果 Config 工作表已經有 MAIL_SUMMARY_DATE_FORMAT
+  // 這一行，工作表的值優先，要一併改才會生效——見 docs/電郵範本樣本.md。
+  MAIL_SUMMARY_DATE_FORMAT: 'M月d日',
   MAIL_SUMMARY_SEPARATOR: '；',
   PDF_EXPORT_MAX_RETRIES: 4,
   PDF_EXPORT_RETRY_DELAY_MS: 1000,
@@ -1036,7 +1056,17 @@ const DEFAULTS = {
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
   REMIND_DEADLINE_DAYS: 7,
-  PDF_MIN_SIZE_BYTES: 10240
+  PDF_MIN_SIZE_BYTES: 10240,
+  // 第九輪批次階段 A：軟規則實測量度的三個判斷門檻（見 SoftRuleMetrics.gs）。
+  // 比例型 ±5 個百分點、次數型 ±20%（沿用 HISTORICAL_BASELINE.PEOPLE_TOLERANCE_RATIO
+  // 一直在用的同一個寬鬆度）、崗位動用率下限 50%（合資格的人整季有一半以上
+  // 從未被派到，就值得看一眼是不是人手過度集中）。
+  SOFT_METRIC_RATIO_TOLERANCE: 0.05,
+  SOFT_METRIC_COUNT_TOLERANCE_RATIO: 0.2,
+  SOFT_METRIC_POST_USAGE_MIN_RATIO: 0.5,
+  // 第九輪批次階段 B：**預設 0，代表完全不啟用**，選人行為與加入這個機制
+  // 之前逐格完全一致（見 Generator.gs 的 compareCandidates_() 說明）。
+  SCORE_TIE_EPSILON: 0
 };
 
 /**

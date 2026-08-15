@@ -291,6 +291,9 @@ function buildGeneratorContextMock(options) {
     historicalWeight: o.historicalWeight === undefined ? 0.65 : o.historicalWeight,
     scoreWeights: o.scoreWeights || { chairDualBonus: 30, preferenceBonus: 50, selectionWeight: 45 },
     randomSeed: o.randomSeed === undefined ? 1 : o.randomSeed,
+    // 第九輪批次階段 B：候選人分數的「視為同分」容差。預設 0＝不啟用，
+    // 排表行為與加入這個機制之前逐格一致（見 Generator.gs 的 compareCandidates_()）。
+    scoreTieEpsilon: o.scoreTieEpsilon === undefined ? 0 : o.scoreTieEpsilon,
     // findStateViolations_()（FineTune.gs）額外需要的兩個欄位——測試的斷言
     // 直接重用那個函式，所以 context 要同時滿足兩邊的需求
     warnOnSemiHard: o.warnOnSemiHard === undefined ? true : o.warnOnSemiHard

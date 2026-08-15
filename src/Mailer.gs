@@ -52,6 +52,38 @@ function countAlreadySentForStage_(quarterId, versionNo, stage) {
   return Object.keys(seen).length;
 }
 
+/**
+ * 決定某個寄送階段要用哪些範本：PERSON 收件人一個、LIST 收件人一個。
+ *
+ * 第九輪批次階段 C 新增。背景是實測會發生、但一直沒有人讀信所以沒發現的問題：
+ * 步驟 4「正式發出」同時寄給義工（PERSON）與堂委／辦公室名單（LIST），
+ * 修正前兩者共用 `TPL_OFFICIAL_TC`，令 LIST 收件人收到一封稱呼自己
+ * 「弟兄／姊妹」、服侍安排一片空白、又聲稱附了個人 PDF（實際沒有附）的信。
+ * 完整分析見 `docs/電郵範本樣本.md`。
+ *
+ * OFFICIAL 一律用 TemplateID 直接指定，不靠 `findEmailTemplate_()` 的 Stage
+ * 比對——Stage=OFFICIAL 現在有兩行範本，依 Stage 找會拿到「工作表上排先嗰行」，
+ * 結果取決於列順序，這正是 `findEmailTemplate_()` 檔頭警告過的歧義。
+ *
+ * **向後相容**：`TPL_OFFICIAL_LIST_TC` 還沒有加進 EmailTemplates 工作表時
+ * （幹事未執行「維護 ▸ 補齊 Email 範本」），`list` 會是 null，呼叫端會退回
+ * 沿用 PERSON 範本——行為跟修正前完全一樣，不會因為缺一行範本而寄不出信。
+ *
+ * @param {string} stage 寄送階段
+ * @returns {{person: ?Object, list: ?Object}} 兩種收件人各自要用的範本
+ */
+function resolveStageTemplates_(stage) {
+  if (stage === MAIL_STAGES.OFFICIAL) {
+    return {
+      person: findEmailTemplateById_('TPL_OFFICIAL_TC') || findEmailTemplate_(stage),
+      list: findEmailTemplateById_('TPL_OFFICIAL_LIST_TC')
+    };
+  }
+  // 其餘階段維持原本行為：REVIEW／REMIND 只有 LIST 收件人、只有一個範本；
+  // RESEND 不經過 sendStage()（步驟 5 用 ResendFlow.gs 的 sendResendStage_()）。
+  return { person: findEmailTemplate_(stage), list: null };
+}
+
 function sendStage(quarterId, versionNo, stage) {
   assertNotPreviewMode_('sendStage');
   // 追加階段 N：OFFICIAL 永遠不可以由自動排程觸發，結構性防護見 Trigger.gs 的
@@ -60,16 +92,21 @@ function sendStage(quarterId, versionNo, stage) {
   if (stage === MAIL_STAGES.OFFICIAL) assertOfficialNotFromAutomationTrigger_(quarterId);
   const startedAt = Date.now();
   const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
-  const template = findEmailTemplate_(stage);
+  const templates = resolveStageTemplates_(stage);
+  const template = templates.person;
   if (!template) throw new Error('EmailTemplates 中找不到 Stage=' + stage + ' 的範本（也沒有 OFFICIAL 可退回使用）');
 
   // 需求 3：附件要存 Shared Drive 時，一開始就驗證資料夾，無效立即中止——
   // 不要讓 58 人的迴圈跑到一半才發現存不了（曾經花 538 秒才報錯）。
   // 這裡涵蓋選單與自動排程兩個呼叫路徑，是唯一的把關點。
-  const attachType = String(template.attachType || ATTACH_TYPE.NONE).toUpperCase();
-  if (attachType === ATTACH_TYPE.FULL_PDF || attachType === ATTACH_TYPE.PERSONAL_PDF) {
-    resolveMailAttachmentFolder_();
-  }
+  // 兩個範本都要看：LIST 專用範本（OFFICIAL）附的是完整版 PDF，
+  // 只檢查個人範本會漏掉「個人範本不用附件、但 LIST 範本要」的組合。
+  const needsFolder = [templates.person, templates.list].some(function (t) {
+    if (!t) return false;
+    const at = String(t.attachType || ATTACH_TYPE.NONE).toUpperCase();
+    return at === ATTACH_TYPE.FULL_PDF || at === ATTACH_TYPE.PERSONAL_PDF;
+  });
+  if (needsFolder) resolveMailAttachmentFolder_();
 
   const context = buildMailContext_(quarterId, versionNo, stage);
   const outcomes = [];
@@ -85,7 +122,11 @@ function sendStage(quarterId, versionNo, stage) {
   const flushBatchSize = Number(getConfig(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
   listRecipients_(stage, context).forEach(function (recipient) {
-    outcomes.push(deliverOne_(recipient, template, context, isDryRun));
+    // 第九輪批次階段 C：LIST 收件人（堂委／教會辦公室名單）與 PERSON 收件人
+    // （逐一義工）用不同範本，見 resolveStageTemplates_() 的說明。
+    const chosen = (recipient.type === RECIPIENT_TYPE.LIST && templates.list)
+      ? templates.list : template;
+    outcomes.push(deliverOne_(recipient, chosen, context, isDryRun));
     if (outcomes.length - flushedCount >= flushBatchSize) {
       writeSendLogRows_(outcomes.slice(flushedCount), context);
       flushedCount = outcomes.length;

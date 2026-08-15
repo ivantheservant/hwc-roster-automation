@@ -66,7 +66,11 @@ function buildGeneratorContext_(quarterId) {
     selectionStrategy: String(config[CONFIG_KEYS.SELECTION_STRATEGY] || SELECTION_STRATEGIES.LONGEST_UNSERVED).toUpperCase(),
     historicalWeight: readHistoricalWeight_(config),
     scoreWeights: readScoreWeights_(config),
-    randomSeed: Number(config[CONFIG_KEYS.RANDOM_SEED]) || 0
+    randomSeed: Number(config[CONFIG_KEYS.RANDOM_SEED]) || 0,
+    // 第九輪批次階段 B：分數容差。負數一律當 0（不啟用），避免打錯符號時
+    // 產生無法預期的比較行為。見 compareCandidates_()／pickEpsilonWinner_()。
+    scoreTieEpsilon: Math.max(0,
+      readNumericConfig_(config, CONFIG_KEYS.SCORE_TIE_EPSILON, DEFAULTS.SCORE_TIE_EPSILON))
   };
 }
 
@@ -513,8 +517,12 @@ function pickPerson_(state) {
   }
   const finalists = clean;
 
-  finalists.sort(function (a, b) { return compareCandidates_(a, b, state.context.selectionStrategy); });
-  const winner = finalists[0];
+  // 第九輪批次階段 B：epsilon 容差（Config 的 SCORE_TIE_EPSILON，預設 0＝不啟用）。
+  // 排序保留給下面的 trace 顯示用；真正的優勝者一律由 pickEpsilonWinner_() 決定，
+  // 原因見該函式的說明（sort 遇上不可傳遞的比較函式會有「近似鏈」問題）。
+  const epsilon = state.context.scoreTieEpsilon || 0;
+  finalists.sort(function (a, b) { return compareCandidates_(a, b, state.context.selectionStrategy, epsilon); });
+  const winner = pickEpsilonWinner_(finalists, state.context.selectionStrategy, epsilon);
 
   if (state.context.trace) {
     state.context.trace.push({
@@ -557,17 +565,86 @@ function pickPerson_(state) {
 
 /**
  * 比較兩位候選人的優先次序：規則扣分少者優先，其次選人分數高者優先，最後用 seeded 亂數。
+ *
+ * 第九輪批次階段 B 新增 `epsilon` 參數（分數容差），用來根治「RANDOM_SEED 完全
+ * 沒有作用」這個問題：`score = penalty - bonus - selectionScore × selectionWeight`，
+ * 其中 `selectionScore` 是連續浮點數，兩個人的 score 實務上幾乎不可能剛好相等，
+ * 所以 `a.score !== b.score` 幾乎永遠成立，`tieBreak`（唯一用到 seed 的地方）
+ * 永遠輪不到——實測 30 個不同 seed 產生逐格完全相同的職事表，`generateBest()`
+ * 跑 20 次等於把同一份表算 20 次。
+ *
+ * **epsilon = 0 時，本函式的行為跟加入這個參數之前逐字相同**：
+ * `Math.abs(a.score - b.score) > 0` 跟原本的 `a.score !== b.score` 是同一個條件
+ * （兩數不等 ⟺ 差的絕對值大於 0）。這是刻意的——預設值就是 0，不啟用時
+ * 排表結果一格都不會變，要真的改變行為必須由幹事自己在 Config 設定非零值。
+ *
  * @param {Object} a 候選人 A 的評分結果
  * @param {Object} b 候選人 B 的評分結果
  * @param {string} strategy 選人策略；非 LONGEST_UNSERVED 時只用亂數決定
+ * @param {number=} epsilon 分數容差，差距在這個範圍內視為同分；預設 0（不啟用）
  * @returns {number} 排序用的比較值
  */
-function compareCandidates_(a, b, strategy) {
-  if (a.score !== b.score) return a.score - b.score;
-  if (strategy === SELECTION_STRATEGIES.LONGEST_UNSERVED && a.selectionScore !== b.selectionScore) {
+function compareCandidates_(a, b, strategy, epsilon) {
+  const eps = (epsilon > 0) ? epsilon : 0;
+  if (Math.abs(a.score - b.score) > eps) return a.score - b.score;
+  // 只在**沒有**啟用容差時才保留 selectionScore 這一層。
+  //
+  // 原因（離線測試實際抓到的問題）：只對 score 加容差是不夠的——`selectionScore`
+  // 本身也是連續浮點數，兩個人幾乎不可能相等，所以同分群組內的決勝權只是從
+  // 「score」轉移到「selectionScore」，`tieBreak`（唯一用到 seed 的地方）
+  // 一樣永遠輪不到，換 seed 照樣產生逐格相同的表，等於白做。
+  // 第一版改動就是這樣寫，測試量度到「容差確實改變了排表結果，但 30 個 seed
+  // 仍然只產生 1 份表」，才發現這一層。
+  //
+  // 而且這一層在容差生效時本來就是重複計算：`score` 的定義是
+  // `penalty - bonus - selectionScore × selectionWeight`，**已經包含了
+  // selectionScore**。既然兩個人的 score 差距在容差之內、視為「一樣好」，
+  // 就不應該再拿已經算進去的同一個訊號決勝一次，應該直接交給 seed 亂數。
+  //
+  // eps === 0 時這一層原封不動保留，所以預設行為跟加入容差之前逐字相同。
+  if (eps === 0 && strategy === SELECTION_STRATEGIES.LONGEST_UNSERVED
+    && a.selectionScore !== b.selectionScore) {
     return b.selectionScore - a.selectionScore;
   }
   return a.tieBreak - b.tieBreak;
+}
+
+/**
+ * 從候選人中挑出優勝者，容差版本。
+ *
+ * 為什麼不直接用 `finalists.sort(compareCandidates_)[0]`：加了 epsilon 之後，
+ * `compareCandidates_()` 不再是一個**可傳遞**（transitive）的比較函式——
+ * a≈b、b≈c 不代表 a≈c（a 與 c 可能相差 2×epsilon）。把不可傳遞的比較函式交給
+ * `Array.prototype.sort()`，結果雖然仍然可重現（同一組輸入必定得出同一個輸出），
+ * 但可能經由「近似鏈」讓一個分數遠差於最佳者的候選人排到第一——epsilon 越大
+ * 越容易發生。那等於在幹事完全不知情的情況下降低排表品質。
+ *
+ * 這裡改為明確定義：**只有「跟最佳分數相差不超過 epsilon」的候選人才算同分**，
+ * 同分群組之內再用 selectionScore 與 tieBreak 決勝。這樣：
+ * - 優勝者永遠不會比最佳分數差超過 epsilon（差距有明確上界，不會被鏈式放大）；
+ * - 同分群組內任何兩人的分數差最多是 epsilon，所以群組內用
+ *   `compareCandidates_()` 排序時，一律走到 selectionScore／tieBreak 那兩層，
+ *   等於一個真正可傳遞的排序，不會有上面那個問題；
+ * - **epsilon = 0 時結果跟舊寫法逐字相同**：群組＝分數剛好等於最低分的那些人，
+ *   再按 selectionScore 高者優先、tieBreak 細者優先，正是原本
+ *   `sort(compareCandidates_)[0]` 會挑出來的同一個人。
+ *
+ * @param {Object[]} finalists 已濾走 HARD 違反的候選人（至少一個）
+ * @param {string} strategy 選人策略
+ * @param {number} epsilon 分數容差
+ * @returns {Object} 優勝的候選人
+ */
+function pickEpsilonWinner_(finalists, strategy, epsilon) {
+  const eps = (epsilon > 0) ? epsilon : 0;
+
+  let bestScore = finalists[0].score;
+  for (let i = 1; i < finalists.length; i++) {
+    if (finalists[i].score < bestScore) bestScore = finalists[i].score;
+  }
+
+  const tied = finalists.filter(function (c) { return c.score <= bestScore + eps; });
+  tied.sort(function (a, b) { return compareCandidates_(a, b, strategy, eps); });
+  return tied[0];
 }
 
 /**

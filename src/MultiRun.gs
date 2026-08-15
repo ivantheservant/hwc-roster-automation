@@ -30,6 +30,14 @@ function generateBest(quarterId, attempts) {
   let stoppedBySeedInert = false;
   let firstSignature = null;
   let allIdenticalSoFar = true;
+  // 第九輪批次階段 B（B4）：「seed 是不是完全沒作用」這個提早停止偵測，建立在
+  // 「換 seed 不會改變結果」這個前提上；而啟用分數容差（SCORE_TIE_EPSILON > 0）
+  // 的**目的**正是要推翻那個前提、讓 seed 真正影響選人。容差生效時，頭三次剛好
+  // 產生相同的表完全可能只是巧合（例如那三個 seed 下每一格的同分群組都只有一個人），
+  // 這時停下來會白白放棄後面本來會產生的不同候選表，令「多次生成揀最好」退化成
+  // 「只生成三次」。所以容差非零時整個偵測直接關掉。
+  // 容差為 0（預設值）時，這個旗標是 true，行為與上一輪逐字相同。
+  const seedProbeEnabled = !(context.scoreTieEpsilon > 0);
 
   for (let i = 0; i < planned; i++) {
     // seed 由 RANDOM_SEED 遞增產生，令整輪多次生成本身也可完全重現
@@ -71,7 +79,11 @@ function generateBest(quarterId, attempts) {
     // 階段 A（Opus 深度輪）新增：頭 MULTIRUN_SEED_PROBE_ATTEMPTS 次如果產生
     // 逐格完全相同的職事表，代表這份資料下換 seed 不會改變結果，再跑下去只是
     // 把同一份表重複算——提早停止。輸出不受影響（見 Constants.gs 的說明）。
-    if (allIdenticalSoFar && attemptsRun >= MULTIRUN_SEED_PROBE_ATTEMPTS && attemptsRun < planned) {
+    //
+    // 第九輪批次階段 B（B4）：啟用了分數容差（SCORE_TIE_EPSILON > 0）時一律
+    // 不做這個提早停止（見上面 seedProbeEnabled 的說明）。
+    if (seedProbeEnabled && allIdenticalSoFar
+      && attemptsRun >= MULTIRUN_SEED_PROBE_ATTEMPTS && attemptsRun < planned) {
       stoppedBySeedInert = true;
       log_('INFO', 'generateBest: 頭 ' + attemptsRun + ' 次生成的職事表逐格完全相同，'
         + '判定這份資料下 RANDOM_SEED 不影響結果，已提早停止（原定 ' + planned + ' 次）。'

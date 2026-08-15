@@ -341,6 +341,36 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.SCORE_TIE_EPSILON, type: CONFIG_TYPES.DEC, group: 'SCORE',
+      defaultValue: String(DEFAULTS.SCORE_TIE_EPSILON),
+      description: '候選人分數相差多少以內視為「同分」，令 RANDOM_SEED 的隨機決勝真正生效。'
+        + '⚠️ 預設 0＝完全不啟用，排表行為與加入這個設定之前逐格一致。'
+        + '改成非零值之前，請先用「查看 ▸ 試算不同 epsilon 的效果（唯讀）」在真實資料上比較。',
+      editable: 'TRUE'
+    },
+    // ---- SOFT_METRIC（軟規則實測量度工具的判斷門檻）----
+    {
+      key: CONFIG_KEYS.SOFT_METRIC_RATIO_TOLERANCE, type: CONFIG_TYPES.DEC, group: 'SOFT_METRIC',
+      defaultValue: String(DEFAULTS.SOFT_METRIC_RATIO_TOLERANCE),
+      description: '「軟規則實測量度」判斷比例型指標（主席兼報告％、報告連續兩週％）'
+        + '偏離歷史基準多少才算不正常。0.05＝相差 5 個百分點以內算正常。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.SOFT_METRIC_COUNT_TOLERANCE_RATIO, type: CONFIG_TYPES.DEC, group: 'SOFT_METRIC',
+      defaultValue: String(DEFAULTS.SOFT_METRIC_COUNT_TOLERANCE_RATIO),
+      description: '「軟規則實測量度」判斷次數型指標（總用人數、平均次數、最高次數）的容差比例。'
+        + '0.2＝跟歷史基準相差 20% 以內算正常。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.SOFT_METRIC_POST_USAGE_MIN_RATIO, type: CONFIG_TYPES.DEC, group: 'SOFT_METRIC',
+      defaultValue: String(DEFAULTS.SOFT_METRIC_POST_USAGE_MIN_RATIO),
+      description: '「軟規則實測量度」判斷某崗位人手是否過度集中：實際動用人數 ÷ 合資格人數'
+        + '低於這個比例就標為偏低。0.5＝合資格的人整季有一半以上從未被派到就提示。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.V0_PROTECT, type: CONFIG_TYPES.BOOL, group: 'GENERATOR',
       defaultValue: 'FALSE',
       description: '多次生成揀最佳結果後，是否自動為 v0 加上保護（只留 SCRIPT_ACCOUNT_EMAIL 可編輯）。',

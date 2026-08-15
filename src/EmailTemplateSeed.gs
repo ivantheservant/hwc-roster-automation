@@ -94,6 +94,45 @@ const EMAIL_TEMPLATE_SEEDS = [
     attachType: ATTACH_TYPE.PERSONAL_PDF
   },
   {
+    // 第九輪批次階段 C 新增，修正一個實測會發生、但一直沒有人發現的內容問題。
+    //
+    // 問題：步驟 4「正式發出」同時有兩種收件人——每一位有服侍的義工（PERSON）
+    // 與 EmailRecipients 中 Stage 欄含 OFFICIAL 的名單（LIST，例如堂委、教會
+    // 辦公室；2027T1 實測就有 2 位）。修正前兩者共用 TPL_OFFICIAL_TC，於是
+    // LIST 收件人收到的是一封：
+    //   - 稱呼自己「XXX 弟兄／姊妹」（LIST 是一份名單，不是一個人）；
+    //   - 「閣下本季的服侍安排如下：」後面**完全空白**（LIST 收件人沒有
+    //     personId，buildAssignmentSummary_() 回傳空字串，而 deliverOne_()
+    //     的「本季您暫時沒有任何服侍安排」替代句只對 PERSON 收件人生效）；
+    //   - 聲稱「個人版職事表已作為附件」，但 generateMailAttachment_() 對
+    //     PERSONAL_PDF ＋ 非 PERSON 收件人一律回傳 null，**實際上沒有附件**。
+    // 三個問題疊在一起，就是一封讀起來明顯壞掉、而且講了兩句不實內容的信。
+    //
+    // 修正方式沿用步驟 5 已經驗證過的同一套做法（TPL_RESEND_LIST_TC）：
+    // LIST 收件人用自己的範本，附完整版 PDF。sendStage() 依收件人類型選範本，
+    // 見 Mailer.gs。
+    templateId: 'TPL_OFFICIAL_LIST_TC',
+    stage: MAIL_STAGES.OFFICIAL,
+    lang: 'TC',
+    subject: '{QuarterID} 粵語堂職事表已正式發出——完整版隨郵附上',
+    bodyHtml: '<p>各位堂委、幹事：</p>'
+      + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
+      + '並已於今日分別發送給本季各位有服侍的義工，每位收到的是自己那一份個人職事表。</p>'
+      + '<p>完整版職事表已作為附件，方便各位存檔及查閱。</p>'
+      + '<p>如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
+      + '由幹事統一處理後再重新發出，請勿直接修改試算表上的儲存格，以便追蹤所有改動。</p>'
+      + '<p>試算表連結：{SpreadsheetUrl}</p>',
+    bodyPlain: '各位堂委、幹事：\n\n'
+      + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
+      + '並已於今日分別發送給本季各位有服侍的義工，每位收到的是自己那一份個人職事表。\n\n'
+      + '完整版職事表已作為附件，方便各位存檔及查閱。\n\n'
+      + '如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
+      + '由幹事統一處理後再重新發出，請勿直接修改試算表上的儲存格，以便追蹤所有改動。\n\n'
+      + '試算表連結：{SpreadsheetUrl}',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{SpreadsheetUrl}',
+    attachType: ATTACH_TYPE.FULL_PDF
+  },
+  {
     templateId: 'TPL_RESEND_TC',
     stage: MAIL_STAGES.RESEND,
     lang: 'TC',
