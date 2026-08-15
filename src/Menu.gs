@@ -37,6 +37,7 @@ function onOpen() {
         .addItem('檢查 Config 行數（唯讀）', 'runCheckConfigRowCount_')
         .addItem('檢查各版本派工紀錄（唯讀）', 'runCheckAssignmentVersions_')
         .addItem('檢查個人 PDF 完整性（唯讀）', 'runCheckPersonalPdfIntegrity_')
+        .addItem('草稿覆核報告（唯讀，給堂委看）', 'runDraftReviewReport_')
         .addItem('軟規則實測量度（唯讀）', 'runSoftRuleMetrics_')
         .addItem('試算不同 epsilon 的效果（唯讀）', 'runEpsilonTrial_Menu_')
         .addItem('上線狀態（唯讀）', 'runGoLiveStatus_')
@@ -1897,6 +1898,38 @@ function runResetQuarterTestData_() {
       lines.push('　' + f.name + '　' + formatFileSize_(f.sizeBytes));
     });
     if (plan.pdfFiles.length > 20) lines.push('　……另有 ' + (plan.pdfFiles.length - 20) + ' 個');
+  }
+
+  // 第十輪批次階段 B1：逐行列出「落喺呢季但唔係申報自動加入」嘅 Unavailable。
+  // 以前淨係喺 manualAttention 報一個數字，幹事要自己去成張表慢慢對——
+  // 實測時就係咁漏咗一行測試資料。列出嚟，但一樣唔會自動刪。
+  if (plan.unavailableManualDetails && plan.unavailableManualDetails.length > 0) {
+    lines.push('', '⚠ 落在這一季、但不是由申報自動加入的 Unavailable（不會清，請自己看一次）：');
+    plan.unavailableManualDetails.slice(0, 20).forEach(function (u) {
+      lines.push('　' + u.personId + '　' + u.dateFrom + ' → ' + u.dateTo
+        + '　Source=' + u.source
+        + (u.appliesTo ? '　AppliesTo=' + u.appliesTo : '')
+        + (u.postIds ? '　PostIDs=' + u.postIds : '')
+        + (u.status ? '　Status=' + u.status : ''));
+    });
+    if (plan.unavailableManualDetails.length > 20) {
+      lines.push('　……另有 ' + (plan.unavailableManualDetails.length - 20) + ' 行');
+    }
+  }
+
+  // 第十輪批次階段 B2：由「指定服侍」申報自動寫入 Eligibility 的行。
+  // 不屬於任何季度，所以重設季度永遠碰不到，但會繼續影響之後每一次生成。
+  if (plan.eligibilityRequestRows && plan.eligibilityRequestRows.length > 0) {
+    lines.push('', '⚠ Eligibility 中由「指定服侍」申報自動加入的行（不會清，會影響重新生成）：');
+    plan.eligibilityRequestRows.slice(0, 20).forEach(function (e) {
+      lines.push('　' + e.personId + '　崗位 ' + e.postId
+        + '　Active=' + e.active
+        + (e.addedAt ? '　加入於 ' + e.addedAt : '')
+        + (e.eligibilityId ? '　（' + e.eligibilityId + '）' : ''));
+    });
+    if (plan.eligibilityRequestRows.length > 20) {
+      lines.push('　……另有 ' + (plan.eligibilityRequestRows.length - 20) + ' 行');
+    }
   }
 
   if (plan.manualAttention.length > 0) {

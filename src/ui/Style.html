@@ -9,6 +9,9 @@
     --warning: #fff2cc;
     --forced: #f9cb9c;
     --skipped: #efefef;
+    /* 第十輪批次階段 A：「系統應該排但排不出」專用色，跟 grid 工作表的
+       GRID_PENDING_FILL_COLOR 同一隻粉紅——一種顏色一個意思。 */
+    --gap: #f4cccc;
     --header: #d9ead3;
   }
 
@@ -87,6 +90,9 @@
   td.warning { background: var(--warning); }
   td.forced  { background: var(--forced); }
   td.skipped { background: var(--skipped); color: var(--muted); }
+  /* 第十輪批次階段 A：排唔出嘅格唔用灰色淡字——佢係唯一真正要人跟進嘅一類，
+     要突出，唔係要淡化。 */
+  td.gap     { background: var(--gap); font-weight: 600; }
   td.meta    { color: var(--muted); }
 
   tr.section td { background: #d9d9d9; font-weight: 600; }
@@ -159,6 +165,7 @@
     :root {
       --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
       --ok: #16181d; --warning: #4a3f1a; --forced: #5a3b1c; --skipped: #24272e;
+      --gap: #5c2b2b;
       --header: #24402a;
     }
     select, button.secondary { background: #1f232b; color: var(--fg); }

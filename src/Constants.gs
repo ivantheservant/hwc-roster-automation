@@ -448,6 +448,30 @@ const RULE_IDS = {
 const STRUCTURAL_NA_RULE_IDS = [RULE_IDS.COMMUNION_FIRST_SUNDAY];
 
 /**
+ * 第十輪批次階段 A 新增：一格職事表的五種語意分類。判斷邏輯見 Generator.gs 的
+ * `classifyGridCell_()`——全系統唯一的分類來源，顯示文字、底色、圖例計數、
+ * 生成完成畫面的統計全部共用。
+ *
+ * - `ASSIGNED`：已經有人。
+ * - `STRUCTURAL_NA`：這一週根本冇呢個崗位（聖餐襄禮只喺每月第一個主日）。
+ * - `SPECIAL_SKIP`：呢個崗位平時有，只係呢一週因為特別主日而唔用系統排。
+ * - `MANUAL_PENDING`：崗位存在，但系統設計上就唔會自動排（講員／翻譯／獻花），
+ *   **預期中要人手填**，唔係出錯。
+ * - `GENUINE_GAP`：系統應該排但排唔出（例如整池人當週都唔得閒）——
+ *   **唯一真正代表「有問題、要優先處理」嘅一類**。
+ *
+ * `MANUAL_PENDING` 同 `GENUINE_GAP` 分開係本輪最重要嘅改動：兩者以前喺表上
+ * 一模一樣，堂委分唔出「本來就要人手填」同「系統排唔到」。
+ */
+const GRID_CELL_CLASS = {
+  ASSIGNED: 'ASSIGNED',
+  STRUCTURAL_NA: 'STRUCTURAL_NA',
+  SPECIAL_SKIP: 'SPECIAL_SKIP',
+  MANUAL_PENDING: 'MANUAL_PENDING',
+  GENUINE_GAP: 'GENUINE_GAP'
+};
+
+/**
  * 階段 A 新增：「本週因特別主日而跳過」的 RuleID 清單，跟上面的
  * STRUCTURAL_NA_RULE_IDS 是兩個不同概念，不可混用：
  * - STRUCTURAL_NA：這個崗位「根本不存在」（例如非首主日的聖餐襄禮），不需要
@@ -823,6 +847,13 @@ const CONFIG_KEYS = {
   GRID_NOT_APPLICABLE_LABEL: 'GRID_NOT_APPLICABLE_LABEL',
   GRID_PENDING_LABEL: 'GRID_PENDING_LABEL',
   GRID_PENDING_FILL_COLOR: 'GRID_PENDING_FILL_COLOR',
+  // 第十輪批次階段 A 新增：草稿印俾堂委睇時的呈現設定。
+  // GRID_GAP_LABEL＝「系統應該排但排不出」的格子文字（跟「待人手填」分開）；
+  // GRID_SHOW_LEGEND＝是否在 grid 底部加圖例（連每一類的實際格數）；
+  // GRID_FOOTER_NOTE＝表格最底的一句備註（對照現行人手職事表的聯絡人一行）。
+  GRID_GAP_LABEL: 'GRID_GAP_LABEL',
+  GRID_SHOW_LEGEND: 'GRID_SHOW_LEGEND',
+  GRID_FOOTER_NOTE: 'GRID_FOOTER_NOTE',
   // 階段 A 新增：特別主日（SpecialSundays.SkipPostIDs）跳過的格子專用標籤，
   // 跟「這個崗位本來就不自動生成」（講員／翻譯／獻花等）的 GRID_PENDING_LABEL
   // 區分開——同一個崗位平常會自動生成，只是「這一週」因為特別主日而跳過，
@@ -981,8 +1012,15 @@ const GRID_LABELS = {
   DATE: '日期',
   WEEK: '週次',
   TYPE: '類型',
-  PENDING: '待確認',
+  // 第十輪批次階段 A：由「待確認」改為「（待填）」。「待確認」讀落似係
+  // 「系統唔肯定」，而呢一類其實係**預期中要人手填**（講員／翻譯／獻花），
+  // 系統完全冇出錯。加括號亦令佢喺表上一眼睇得出唔係人名。
+  PENDING: '（待填）',
+  // 第十輪批次階段 A 新增：真正排唔出嘅格。刻意同 PENDING 用完全唔同嘅字，
+  // 而且帶一個 ⚠ 符號——即使印成黑白，一眼都分得出。
+  GAP: '⚠ 未能安排',
   STATS_TITLE: '本季服侍次數統計',
+  LEGEND_TITLE: '圖例（本季實際格數）',
   NAME: '姓名',
   PERSON_ID: 'PersonID',
   COUNT: '次數',
@@ -1053,6 +1091,12 @@ const DEFAULTS = {
   // 的底色比對邏輯誤判（已改為讀 RosterAssignments 資料層，見 RequestsApply.gs）。
   // 這裡改色是為了讓人眼也分得出來，屬於雙重防線的第二層。
   GRID_PENDING_FILL_COLOR: '#F4CCCC',
+  // 第十輪批次階段 A：草稿呈現設定。GRID_GAP_LABEL 跟 GRID_PENDING_LABEL
+  // 刻意用完全不同的字，令黑白列印一樣分得出；圖例預設開啟；
+  // 底部備註刻意用不含任何姓名／電郵的通用句子（public repo 規則）。
+  GRID_GAP_LABEL: GRID_LABELS.GAP,
+  GRID_SHOW_LEGEND: true,
+  GRID_FOOTER_NOTE: '如未能按上表服侍，請盡早聯絡幹事安排調動。',
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
   REMIND_DEADLINE_DAYS: 7,

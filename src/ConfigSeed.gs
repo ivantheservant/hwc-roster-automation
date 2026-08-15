@@ -83,7 +83,31 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.GRID_PENDING_FILL_COLOR, type: CONFIG_TYPES.STR, group: 'GRID',
       defaultValue: DEFAULTS.GRID_PENDING_FILL_COLOR,
-      description: '「套用修改申報」找不到合資格替補、留空待補的格子底色（十六進位色碼）。',
+      description: '「系統應該排但排不出」的格子底色（十六進位色碼）。同時用於生成時'
+        + '找不到合資格人選的格，以及「套用修改申報」找不到合資格替補的格——'
+        + '兩者語意相同（都要人手補），刻意用同一種顏色。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.GRID_GAP_LABEL, type: CONFIG_TYPES.STR, group: 'GRID',
+      defaultValue: DEFAULTS.GRID_GAP_LABEL,
+      description: '「系統應該排但排不出」的格子顯示的文字。刻意跟 GRID_PENDING_LABEL'
+        + '（講員／翻譯／獻花那類本來就要人手填的格）用完全不同的字，'
+        + '令黑白列印出來一樣分得出。只影響日後新生成的版本。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.GRID_SHOW_LEGEND, type: CONFIG_TYPES.BOOL, group: 'GRID',
+      defaultValue: 'TRUE',
+      description: '職事表 grid 底部是否加一段圖例，說明每種標示的意思與本季實際格數。'
+        + '草稿要印給堂委看時特別有用。只影響日後新生成的版本。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.GRID_FOOTER_NOTE, type: CONFIG_TYPES.STR, group: 'GRID',
+      defaultValue: DEFAULTS.GRID_FOOTER_NOTE,
+      description: '職事表 grid 最底的一句備註（對照現行人手職事表底部的聯絡人字句）。'
+        + '留空則不顯示。只影響日後新生成的版本。',
       editable: 'TRUE'
     },
     // ---- ATTACH ----

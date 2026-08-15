@@ -215,8 +215,12 @@ function isStructuralNotApplicableFlagsText_(flagsText) {
 function apiGetRosterGrid(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const pendingLabel = getConfig(CONFIG_KEYS.GRID_PENDING_LABEL, DEFAULTS.GRID_PENDING_LABEL);
-  const naLabel = getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL);
+  // 第十輪批次階段 A：改為跟 grid／PDF 完全共用同一套分類與文字對照
+  // （classifyGridCell_() ＋ resolveGridCellText_()），令三個顯示面
+  // （grid 工作表、由 grid 匯出的 PDF、Web UI）永遠講同一件事。
+  // 修正前 Web UI 只分得出「結構性不適用」與其餘，「排唔出」同「待人手填」
+  // 一律顯示同一個 pendingLabel，跟 grid 一樣有分唔開嘅問題。
+  const labels = readGridCellLabels_();
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
 
   const assignments = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
@@ -228,9 +232,13 @@ function apiGetRosterGrid(quarterId, versionNo) {
   assignments.forEach(function (row) {
     const key = toDateString(row[C.SERVICE_DATE], timezone) + '|' + row[C.POST_ID] + '|' + row[C.SLOT_INDEX];
     byKey[key] = {
-      text: row[C.PERSON_NAME_SNAPSHOT] || '',
-      source: row[C.ASSIGN_SOURCE],
-      flags: row[C.RULE_FLAGS]
+      // classifyGridCell_() 要嘅形狀：RuleFlags 喺長表係逗號分隔字串，
+      // 拆返做陣列先餵入去，判斷邏輯就同 grid 嗰邊一模一樣。
+      personId: row[C.PERSON_ID],
+      personName: row[C.PERSON_NAME_SNAPSHOT] || '',
+      assignSource: row[C.ASSIGN_SOURCE],
+      ruleFlags: splitList_(row[C.RULE_FLAGS]),
+      flagsText: row[C.RULE_FLAGS]
     };
   });
 
@@ -256,15 +264,20 @@ function apiGetRosterGrid(quarterId, versionNo) {
       const cell = byKey[d.serviceDate + '|' + parts[0] + '|' + parts[1]];
       if (!cell) {
         row.push({ text: '', state: 'empty' });
-      } else if (cell.source === ASSIGN_SOURCE.SKIPPED) {
-        const label = isStructuralNotApplicableFlagsText_(cell.flags)
-          ? naLabel
-          : resolveEmptyDisplayText_(emptyDisplayByPostId[parts[0]], pendingLabel, naLabel);
-        row.push({ text: label, state: 'skipped', title: cell.flags });
-      } else if (cell.source === ASSIGN_SOURCE.FORCED) {
-        row.push({ text: cell.text, state: 'forced', title: cell.flags });
+        return;
+      }
+      const cellClass = classifyGridCell_(cell);
+      const text = resolveGridCellText_(cell, cellClass, emptyDisplayByPostId[parts[0]], labels);
+
+      if (cellClass === GRID_CELL_CLASS.GENUINE_GAP) {
+        // 'gap' 係本輪新增嘅狀態，前端樣式見 ui/Style.html
+        row.push({ text: text, state: 'gap', title: cell.flagsText });
+      } else if (cellClass !== GRID_CELL_CLASS.ASSIGNED) {
+        row.push({ text: text, state: 'skipped', title: cell.flagsText });
+      } else if (cell.assignSource === ASSIGN_SOURCE.FORCED) {
+        row.push({ text: text, state: 'forced', title: cell.flagsText });
       } else {
-        row.push({ text: cell.text, state: cell.flags ? 'warning' : 'ok', title: cell.flags });
+        row.push({ text: text, state: cell.flagsText ? 'warning' : 'ok', title: cell.flagsText });
       }
     });
     return row;

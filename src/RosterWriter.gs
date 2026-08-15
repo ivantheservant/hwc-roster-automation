@@ -39,7 +39,10 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   }
 
   applyCellMarks_(sheet, layout, warningIndex);
-  writeStatsSection_(sheet, layout, assignments);
+  // 第十輪批次階段 A2：圖例排喺統計之前——PDF 由上而下讀，睇完表就即刻見到
+  // 每個標示係咩意思，唔使揭到最後。回傳實際用咗幾多行，令統計區跟住浮動。
+  const legendRowCount = writeLegendSection_(sheet, layout);
+  writeStatsSection_(sheet, layout, assignments, legendRowCount);
 
   sheet.hideRows(2);
   sheet.setFrozenRows(2);
@@ -71,10 +74,18 @@ function buildGridLayout_(quarterId, assignments) {
   const posts = readPosts();
   const serviceDates = readServiceDates(quarterId);
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const pendingLabel = getConfig(CONFIG_KEYS.GRID_PENDING_LABEL, DEFAULTS.GRID_PENDING_LABEL);
-  const naLabel = getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL);
+  const labels = readGridCellLabels_();
+  const pendingLabel = labels.pending;
+  const naLabel = labels.na;
 
-  const specialSkipLabel = getConfig(CONFIG_KEYS.GRID_SPECIAL_SKIP_LABEL, DEFAULTS.GRID_SPECIAL_SKIP_LABEL);
+  const specialSkipLabel = labels.specialSkip;
+  // 第十輪批次階段 A3：對照教會現行人手製作的職事表——特別主日會喺日期下面
+  // 註明（「浸禮」「堂慶合堂」「宣教月」），堂委一眼就知道嗰一週唔同。
+  // 系統原本只顯示 ServiceDates.ServiceType（例如「主日崇拜」），
+  // SpecialSundays.Title 完全冇出現喺表上。呢度把 Title 併入「類型」欄，
+  // 唔另開新欄——新開欄會令全部「第 4 欄起先係崗位」嘅假設要逐處覆核，
+  // 而「類型」欄本身就喺日期隔籬，位置同人手版一樣。
+  const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
   const headers = [GRID_LABELS.DATE, GRID_LABELS.WEEK, GRID_LABELS.TYPE];
   const keys = [GRID_KEYS.DATE, GRID_KEYS.WEEK, GRID_KEYS.TYPE];
   const cellIndex = {};
@@ -112,29 +123,103 @@ function buildGridLayout_(quarterId, assignments) {
     assignmentIndex[a.serviceDate + '|' + a.postId + '|' + a.slotIndex] = a;
   });
 
+  const classCounts = {};
+  Object.keys(GRID_CELL_CLASS).forEach(function (k) { classCounts[GRID_CELL_CLASS[k]] = 0; });
+
   const rows = dates.map(function (d, rowOffset) {
-    const row = [d.serviceDate, d.weekIndex, d.serviceType];
+    const row = [d.serviceDate, d.weekIndex, describeServiceType_(d.serviceType, specialTitleByDate[d.serviceDate])];
     for (let c = 3; c < keys.length; c++) {
       const parts = keys[c].split('#');
       const key = d.serviceDate + '|' + parts[0] + '|' + parts[1];
       const assignment = assignmentIndex[key];
-      cellIndex[key] = { row: rowOffset + 3, column: c + 1, assignment: assignment };
-      if (!assignment) {
-        row.push('');
-      } else if (assignment.assignSource === ASSIGN_SOURCE.SKIPPED) {
-        row.push(isStructuralNotApplicable_(assignment)
-          ? naLabel
-          : (isSpecialSundaySkip_(assignment)
-            ? specialSkipLabel
-            : resolveEmptyDisplayText_(emptyDisplayByPostId[assignment.postId], pendingLabel, naLabel)));
-      } else {
-        row.push(assignment.personName || '');
-      }
+      const cellClass = classifyGridCell_(assignment);
+      cellIndex[key] = {
+        row: rowOffset + 3, column: c + 1, assignment: assignment, cellClass: cellClass
+      };
+      classCounts[cellClass]++;
+      row.push(resolveGridCellText_(
+        assignment, cellClass, emptyDisplayByPostId[parts[0]], labels));
     }
     return row;
   });
 
-  return { headers: headers, keys: keys, rows: rows, dates: dates, cellIndex: cellIndex };
+  return {
+    headers: headers, keys: keys, rows: rows, dates: dates,
+    cellIndex: cellIndex, classCounts: classCounts, labels: labels
+  };
+}
+
+/**
+ * 第十輪批次階段 A：讀齊四種留空格子的顯示文字，一次過讀完傳落去，
+ * 避免逐格呼叫 `getConfig()`。全部可在 Config 調整，冇一個寫死。
+ * @returns {{pending: string, na: string, specialSkip: string, gap: string}}
+ */
+function readGridCellLabels_() {
+  return {
+    pending: getConfig(CONFIG_KEYS.GRID_PENDING_LABEL, DEFAULTS.GRID_PENDING_LABEL),
+    na: getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL),
+    specialSkip: getConfig(CONFIG_KEYS.GRID_SPECIAL_SKIP_LABEL, DEFAULTS.GRID_SPECIAL_SKIP_LABEL),
+    gap: getConfig(CONFIG_KEYS.GRID_GAP_LABEL, DEFAULTS.GRID_GAP_LABEL)
+  };
+}
+
+/**
+ * 第十輪批次階段 A：決定一格要顯示咩文字。分類本身由 `classifyGridCell_()`
+ * （Generator.gs）負責，呢度淨係做「分類 → 文字」嘅對照，兩者職責分開。
+ *
+ * `MANUAL_PENDING` 仍然行返 `resolveEmptyDisplayText_()`，即係尊重
+ * `Posts.EmptyDisplay` 逐個崗位嘅設定（PENDING／NA／BLANK）——有啲崗位
+ * 幹事可能想佢完全空白，唔想見到「（待填）」。
+ *
+ * @param {?Object} assignment 派工結果
+ * @param {string} cellClass `classifyGridCell_()` 的結果
+ * @param {string} emptyDisplay 該崗位的 Posts.EmptyDisplay 設定
+ * @param {{pending: string, na: string, specialSkip: string, gap: string}} labels
+ * @returns {string} 該格要顯示的文字
+ */
+function resolveGridCellText_(assignment, cellClass, emptyDisplay, labels) {
+  if (cellClass === GRID_CELL_CLASS.ASSIGNED) return (assignment && assignment.personName) || '';
+  if (cellClass === GRID_CELL_CLASS.STRUCTURAL_NA) return labels.na;
+  if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) return labels.specialSkip;
+  if (cellClass === GRID_CELL_CLASS.GENUINE_GAP) return labels.gap;
+  return resolveEmptyDisplayText_(emptyDisplay, labels.pending, labels.na);
+}
+
+/**
+ * 第十輪批次階段 A3：建立「主日日期 → 特別主日名稱」對照，供「類型」欄註明。
+ * 只取 Active=TRUE 的行；`Title` 空白時退回 `Type`，兩者都空白就當作冇特別安排。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>} {yyyy-MM-dd: 特別主日名稱}
+ */
+function buildSpecialSundayTitleIndex_(quarterId, timezone) {
+  const S = COLUMNS.SPECIAL_SUNDAYS;
+  const index = {};
+  readSpecialSundays(quarterId).forEach(function (row) {
+    if (!isTrueValue_(row[S.ACTIVE])) return;
+    const dateStr = toDateString(row[S.SERVICE_DATE], timezone);
+    if (!dateStr) return;
+    const title = String(row[S.TITLE] || '').trim() || String(row[S.TYPE] || '').trim();
+    if (title) index[dateStr] = title;
+  });
+  return index;
+}
+
+/**
+ * 第十輪批次階段 A3：把「類型」欄組成「主日崇拜（浸禮）」這種寫法。
+ * 冇特別安排就照舊淨係顯示 ServiceType，行為與加入呢個功能之前一致。
+ * @param {*} serviceType ServiceDates.ServiceType 的原始值
+ * @param {string=} specialTitle 該日的特別主日名稱
+ * @returns {string} 「類型」欄要顯示的文字
+ */
+function describeServiceType_(serviceType, specialTitle) {
+  const base = String(serviceType === null || serviceType === undefined ? '' : serviceType).trim();
+  const special = String(specialTitle || '').trim();
+  if (!special) return base;
+  if (!base) return special;
+  // 名稱本身已經包含 ServiceType 時唔重複（例如 Title 直接寫「主日崇拜（浸禮）」）
+  if (special.indexOf(base) !== -1) return special;
+  return base + '（' + special + '）';
 }
 
 /**
@@ -228,13 +313,26 @@ function applyCellMarks_(sheet, layout, warningIndex) {
     const assignment = cell.assignment;
     const cellWarnings = warningIndex[key];
 
-    const isSkipped = assignment && assignment.assignSource === ASSIGN_SOURCE.SKIPPED;
     const isForced = assignment && assignment.assignSource === ASSIGN_SOURCE.FORCED;
+    // 第十輪批次階段 A：底色一律跟 classifyGridCell_() 的分類走，唔再自己
+    // 判斷一次 assignSource／ruleFlags。cellClass 由 buildGridLayout_() 算好
+    // 放喺 cellIndex，顯示文字同底色用同一個分類，唔會兩邊唔一致。
+    const cellClass = cell.cellClass || classifyGridCell_(assignment);
 
-    if (isSkipped) {
-      // 階段 A：特別主日跳過的格子用獨立底色，跟一般略過（結構性不適用／永遠
-      // 不自動生成）的灰底區分開，一眼就看得出「這一週不一樣」。
-      backgrounds[r][c] = isSpecialSundaySkip_(assignment) ? GRID_COLORS.SPECIAL_SKIP : GRID_COLORS.SKIPPED;
+    if (cellClass === GRID_CELL_CLASS.GENUINE_GAP) {
+      // 「系統應該排但排唔出」——沿用「待補格」同一隻粉紅色。兩者語意本來就
+      // 係同一件事（系統排唔到、要人手補），資料層訊號亦都一模一樣
+      // （PersonID 空 + AssignSource=SKIPPED + RuleFlags 含 HARD_ELIGIBILITY），
+      // 所以 listPendingBackfillCells_() 本來就會列到呢啲格。一種顏色一個意思。
+      backgrounds[r][c] = getConfig(
+        CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
+    } else if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) {
+      // 階段 A（第六輪）：特別主日跳過的格子用獨立底色，跟一般略過的灰底
+      // 區分開，一眼就看得出「這一週不一樣」。
+      backgrounds[r][c] = GRID_COLORS.SPECIAL_SKIP;
+    } else if (cellClass === GRID_CELL_CLASS.STRUCTURAL_NA
+      || cellClass === GRID_CELL_CLASS.MANUAL_PENDING) {
+      backgrounds[r][c] = GRID_COLORS.SKIPPED;
     } else if (cellWarnings && cellWarnings.length > 0) {
       backgrounds[r][c] = isForced ? GRID_COLORS.FORCED : GRID_COLORS.WARNING;
     }
@@ -254,13 +352,93 @@ function applyCellMarks_(sheet, layout, warningIndex) {
 }
 
 /**
- * 在 grid 資料列之後附上每人本季服侍次數統計。
+ * 第十輪批次階段 A2：組出圖例的內容（純函式，不碰工作表，方便測試）。
+ *
+ * 每一行都附上「本季實際幾多格」——呢個數字對堂委特別有用：
+ * 「未能安排：0 格」本身就係系統嘅賣點，而「（待填）：39 格」亦都即刻解釋咗
+ * 點解表上有咁多空位（講員／翻譯／獻花 3 個崗位 × 13 週），
+ * 唔會俾人誤會成「系統排唔到咁多格」。
+ *
+ * 刻意**全部五類都列出嚟**（包括 0 格嘅），唔係淨係列有出現嘅——
+ * 圖例嘅作用係解釋整套標示方式，而「呢一類係 0 格」本身就係一項資訊。
+ *
+ * @param {Object} layout buildGridLayout_() 的結果（需要 classCounts 與 labels）
+ * @returns {Array[]} 每項為 [標示, 意思, 格數文字]
+ */
+function buildLegendRows_(layout) {
+  const counts = layout.classCounts || {};
+  const labels = layout.labels || readGridCellLabels_();
+  const countText = function (cls) { return (counts[cls] || 0) + ' 格'; };
+
+  return [
+    ['（姓名）', '系統自動安排，已排定人選', countText(GRID_CELL_CLASS.ASSIGNED)],
+    [labels.pending, '此崗位不由系統自動安排（講員、翻譯、獻花），需要人手填寫',
+      countText(GRID_CELL_CLASS.MANUAL_PENDING)],
+    [labels.na, '這一週不設此崗位（例如聖餐襄禮只在每月第一個主日）',
+      countText(GRID_CELL_CLASS.STRUCTURAL_NA)],
+    [labels.specialSkip, '這一週有特別安排（見「類型」欄），此崗位不用系統安排',
+      countText(GRID_CELL_CLASS.SPECIAL_SKIP)],
+    [labels.gap, '系統找不到合資格而當日又有空的人，需要人手處理',
+      countText(GRID_CELL_CLASS.GENUINE_GAP)]
+  ];
+}
+
+/**
+ * 第十輪批次階段 A2：在 grid 資料列之後寫入圖例，並在最底加一句備註
+ * （對照教會現行人手職事表底部嗰句聯絡人字句）。
+ *
+ * 兩者都可以喺 Config 關掉／改字：`GRID_SHOW_LEGEND`、`GRID_FOOTER_NOTE`。
+ * 備註留空就唔會寫嗰一行。
+ *
+ * @param {Sheet} sheet 目標工作表
+ * @param {Object} layout buildGridLayout_() 的結果
+ * @returns {number} 這一段實際佔用的行數（供統計區接落去排）
+ */
+function writeLegendSection_(sheet, layout) {
+  const showLegend = getConfig(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
+  const footerNote = String(getConfig(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '').trim();
+  if (!showLegend && !footerNote) return 0;
+
+  let row = layout.rows.length + 4;
+  const startRow = row;
+
+  if (showLegend) {
+    sheet.getRange(row, 1).setValue(GRID_LABELS.LEGEND_TITLE)
+      .setFontWeight('bold')
+      .setBackground(GRID_COLORS.STATS_HEADER);
+    row++;
+
+    const legendRows = buildLegendRows_(layout);
+    sheet.getRange(row, 1, legendRows.length, 3).setValues(legendRows);
+
+    // 每一行嘅第一格用返該類別喺表上嘅實際底色，令圖例同表格對得上
+    const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
+    const markerColors = [
+      [null], [GRID_COLORS.SKIPPED], [GRID_COLORS.SKIPPED],
+      [GRID_COLORS.SPECIAL_SKIP], [gapColor]
+    ];
+    sheet.getRange(row, 1, markerColors.length, 1).setBackgrounds(markerColors);
+    row += legendRows.length;
+  }
+
+  if (footerNote) {
+    row++;
+    sheet.getRange(row, 1).setValue(footerNote).setFontStyle('italic');
+    row++;
+  }
+
+  return row - startRow;
+}
+
+/**
+ * 在 grid 資料列（與圖例）之後附上每人本季服侍次數統計。
  * @param {Sheet} sheet 目標工作表
  * @param {Object} layout buildGridLayout_() 的結果
  * @param {Object[]} assignments 派工結果
+ * @param {number=} extraOffset 圖例區佔用的行數，統計區順序排喺佢下面
  * @returns {void}
  */
-function writeStatsSection_(sheet, layout, assignments) {
+function writeStatsSection_(sheet, layout, assignments, extraOffset) {
   const counts = {};
   assignments.forEach(function (a) {
     if (!a.personId) return;
@@ -277,7 +455,7 @@ function writeStatsSection_(sheet, layout, assignments) {
       return a[1] < b[1] ? -1 : 1;
     });
 
-  const startRow = layout.rows.length + 5;
+  const startRow = layout.rows.length + 5 + (Number(extraOffset) || 0);
   sheet.getRange(startRow, 1).setValue(GRID_LABELS.STATS_TITLE)
     .setFontWeight('bold')
     .setBackground(GRID_COLORS.STATS_HEADER);

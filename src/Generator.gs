@@ -1230,13 +1230,15 @@ function summariseBlankAssignments_(assignments) {
   assignments.forEach(function (a) {
     if (a.personId) return; // 已經有人，不算留空
 
-    const flags = a.ruleFlags || [];
-    if (flags.some(function (id) { return STRUCTURAL_NA_RULE_IDS.indexOf(id) !== -1; })) {
+    // 第十輪批次階段 A：分類判斷抽成 classifyGridCell_()，本函式與 grid 顯示層
+    // （RosterWriter.gs 的文字與底色）共用同一個判斷，不會出現「統計說是待人手
+    // 填、但表上畫成排不出」這種兩邊各自判斷而漂移的情況。
+    const cellClass = classifyGridCell_(a);
+    if (cellClass === GRID_CELL_CLASS.STRUCTURAL_NA) {
       structuralNaCount++;
-    } else if (flags.some(function (id) { return SPECIAL_SKIP_RULE_IDS.indexOf(id) !== -1; })) {
+    } else if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) {
       specialSkipCount++;
-    } else if (a.assignSource === ASSIGN_SOURCE.SKIPPED
-      && flags.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) {
+    } else if (cellClass === GRID_CELL_CLASS.MANUAL_PENDING) {
       manualPendingCount++;
     } else {
       // 涵蓋 RULE_IDS.ELIGIBILITY（完全找不到合資格人選）與 LockPostIDs
@@ -1260,6 +1262,44 @@ function summariseBlankAssignments_(assignments) {
     genuineGapCells: genuineGapCells,
     totalBlank: structuralNaCount + specialSkipCount + manualPendingCount + genuineGapCount
   };
+}
+
+/**
+ * 第十輪批次階段 A 新增：把一格職事表分類成五種語意之一。**全系統唯一的分類
+ * 判斷來源**——grid 的顯示文字、grid 的底色、圖例的計數、生成完成畫面的
+ * 「留空格子分類」統計，全部走這一個函式。
+ *
+ * 存在的理由（2026T4 草稿要印俾堂委睇，這是本輪最重要的一件事）：
+ * 修正前，「講員／翻譯／獻花」（本來就不由系統排）與「系統應該排但排不出」
+ * 兩類在 grid 同 PDF 上**完全一模一樣**——同樣顯示 `GRID_PENDING_LABEL`
+ * 的文字、同樣是 `GRID_COLORS.SKIPPED` 灰底。唯一分別是後者有一個儲存格
+ * 批註，而批註喺 PDF 只會變成頁尾註腳，一格格對唔返上去。
+ * 結果就是堂委睇住一份表，分唔出邊啲空格「本來就要人手填」、邊啲係
+ * 「系統排唔到」——第一反應好可能係「呢個系統排唔出嘢」。
+ *
+ * 分類次序與 `summariseBlankAssignments_()` 完全一致（那個函式現在直接呼叫
+ * 本函式），確保「統計講幾多格」與「表上畫成點」永遠對得上。
+ *
+ * @param {?Object} assignment 派工結果（含 personId／assignSource／ruleFlags）；
+ *   傳 null／undefined 代表該格根本沒有紀錄，視為待人手填寫
+ * @returns {string} GRID_CELL_CLASS 五個值之一
+ */
+function classifyGridCell_(assignment) {
+  if (!assignment) return GRID_CELL_CLASS.MANUAL_PENDING;
+  if (assignment.personId) return GRID_CELL_CLASS.ASSIGNED;
+
+  const flags = assignment.ruleFlags || [];
+  if (flags.some(function (id) { return STRUCTURAL_NA_RULE_IDS.indexOf(id) !== -1; })) {
+    return GRID_CELL_CLASS.STRUCTURAL_NA;
+  }
+  if (flags.some(function (id) { return SPECIAL_SKIP_RULE_IDS.indexOf(id) !== -1; })) {
+    return GRID_CELL_CLASS.SPECIAL_SKIP;
+  }
+  if (assignment.assignSource === ASSIGN_SOURCE.SKIPPED
+    && flags.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) {
+    return GRID_CELL_CLASS.MANUAL_PENDING;
+  }
+  return GRID_CELL_CLASS.GENUINE_GAP;
 }
 
 /**

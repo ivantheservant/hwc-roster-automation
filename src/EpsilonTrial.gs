@@ -32,6 +32,23 @@ const EPSILON_TRIAL_DEFAULT_VALUES = [0, 0.5, 1, 2, 5];
 const EPSILON_TRIAL_DEFAULT_SEEDS = 10;
 
 /**
+ * 第十輪批次階段 C：非零 epsilon 至少要把總偏差改善呢個比率，先值得建議去改設定。
+ * 改善得太少（例如 1%）唔值得為咗佢動一個影響全部排表嘅設定，維持 0 更保守。
+ */
+const EPSILON_TRIAL_MIN_IMPROVEMENT = 0.05;
+
+/**
+ * 第十輪批次階段 C3：整個試算最多生成幾多份職事表。
+ *
+ * 實測（89 人／13 週／18 個崗位欄）：每份約 18 毫秒（Node），Apps Script 保守
+ * 估 15–25 倍即每份約 0.3–0.45 秒。預設 5 個 epsilon × 10 seed ＝ 50 份，
+ * 約 13–22 秒，離 6 分鐘上限好遠。但幹事可以自己輸入 epsilon 清單同 seed 數，
+ * 例如 10 個值 × 50 seed ＝ 500 份就會去到 150–225 秒，開始接近上限。
+ * 所以加一個總量上限，超出就唔跑、直接叫佢分開幾次試。
+ */
+const EPSILON_TRIAL_MAX_TOTAL_ROSTERS = 200;
+
+/**
  * 單一 epsilon 值的試算：用同一份 context、連續 N 個 seed 各生成一份表，
  * 統計「產生了多少份真正不同的表」與各項品質指標。
  *
@@ -130,6 +147,123 @@ function summariseEpsilonTrialRecords_(epsilon, seedCount, distinctRosters,
 }
 
 /**
+ * 第十輪批次階段 C：**由程式直接判斷應該用邊一個 epsilon 值**，唔係丟一堆
+ * 指標俾幹事自己諗。
+ *
+ * 判斷準則刻意對齊 `generateBest()` 實際做緊嘅嘢：佢跑 N 次然後**揀最好嗰份**，
+ * 所以真正緊要嘅唔係平均品質，而係「最好嗰份可以去到幾好」——即係
+ * `deviation.min`（總偏差最細嗰份，`generateBest()` 就係揀佢）。
+ *
+ * 逐層篩選：
+ * 1. 硬規則違反必須係 0——有違反嘅一律出局，冇得商量。
+ * 2. 準硬規則（同崗位連續兩週）唔可以比 epsilon=0 差。
+ * 3. 喺剩低嘅之中揀 `deviation.min` 最細嗰個。
+ * 4. 要贏 epsilon=0 至少 `EPSILON_TRIAL_MIN_IMPROVEMENT`（相對改善率），
+ *    贏得太少就唔值得改設定——維持 0 更保守。
+ * 5. 同分時揀**較細**嗰個 epsilon（容差越細，優勝者偏離最佳分數嘅上界越細）。
+ *
+ * @param {Object[]} trials `runEpsilonTrialFor_()` 的結果陣列
+ * @param {number} preferenceBonus Config 的 SCORE_PREFERENCE_BONUS（用來提醒
+ *   「epsilon 唔可以大到蓋過獎勵分」）
+ * @returns {{value: number, reason: string, warnings: string[], baselineDeviation: ?number,
+ *   bestDeviation: ?number, improvementRatio: ?number}}
+ */
+function recommendEpsilon_(trials, preferenceBonus) {
+  const warnings = [];
+  const deviationOf = function (t) {
+    return (t.deviation && !isNaN(t.deviation.min)) ? t.deviation.min : null;
+  };
+  const semiOf = function (t) {
+    return (t.semiHardWarnings && !isNaN(t.semiHardWarnings.min)) ? t.semiHardWarnings.min : 0;
+  };
+
+  const baseline = trials.filter(function (t) { return t.epsilon === 0; })[0] || null;
+  const baselineDeviation = baseline ? deviationOf(baseline) : null;
+  const baselineSemi = baseline ? semiOf(baseline) : null;
+
+  if (!baseline) {
+    return {
+      value: 0, warnings: warnings, baselineDeviation: null, bestDeviation: null,
+      improvementRatio: null,
+      reason: '試算清單裡沒有 epsilon = 0 這一組，無法跟「現狀」比較。'
+        + '請重跑一次並在 epsilon 清單中加入 0。'
+    };
+  }
+
+  const dirty = trials.filter(function (t) { return t.hardViolationTotal > 0; });
+  if (dirty.length > 0) {
+    warnings.push('有 ' + dirty.length + ' 個 epsilon 值出現硬規則違反（'
+      + dirty.map(function (t) { return t.epsilon; }).join('、')
+      + '），這些值一律不可使用。正常情況不應該發生，如果見到請告訴 Claude。');
+  }
+
+  const candidates = trials.filter(function (t) {
+    if (t.epsilon <= 0) return false;
+    if (t.hardViolationTotal > 0) return false;
+    if (deviationOf(t) === null) return false;
+    // 準硬規則唔可以比現狀差
+    if (baselineSemi !== null && semiOf(t) > baselineSemi) return false;
+    // 冇多樣性就等於冇改變，唔使考慮
+    return t.distinctRosters > 1;
+  });
+
+  if (candidates.length === 0 || baselineDeviation === null) {
+    return {
+      value: 0, warnings: warnings, baselineDeviation: baselineDeviation, bestDeviation: null,
+      improvementRatio: null,
+      reason: '沒有任何非零值同時做到「產生多份不同的表」「硬規則違反 0」'
+        + '「準硬規則不比現狀差」。建議維持 ' + CONFIG_KEYS.SCORE_TIE_EPSILON + ' = 0（即不啟用）。'
+    };
+  }
+
+  candidates.sort(function (a, b) {
+    const da = deviationOf(a);
+    const db = deviationOf(b);
+    if (Math.abs(da - db) > 1e-9) return da - db;
+    return a.epsilon - b.epsilon; // 同分揀較保守（較細）嗰個
+  });
+  const best = candidates[0];
+  const bestDeviation = deviationOf(best);
+  const improvementRatio = baselineDeviation > 0
+    ? (baselineDeviation - bestDeviation) / baselineDeviation
+    : (bestDeviation < baselineDeviation ? 1 : 0);
+
+  if (improvementRatio < EPSILON_TRIAL_MIN_IMPROVEMENT) {
+    return {
+      value: 0, warnings: warnings,
+      baselineDeviation: baselineDeviation, bestDeviation: bestDeviation,
+      improvementRatio: improvementRatio,
+      reason: '最好的非零值是 ' + best.epsilon + '，但它只把總偏差由 '
+        + baselineDeviation.toFixed(4) + ' 改善到 ' + bestDeviation.toFixed(4)
+        + '（改善 ' + (improvementRatio * 100).toFixed(1) + '%），'
+        + '低於值得改設定的門檻 ' + (EPSILON_TRIAL_MIN_IMPROVEMENT * 100).toFixed(0) + '%。'
+        + '建議維持 ' + CONFIG_KEYS.SCORE_TIE_EPSILON + ' = 0（即不啟用），改動不划算。'
+    };
+  }
+
+  // 安全提醒：epsilon 大到接近獎勵分量級時，軟規則偏好會被蓋過
+  if (preferenceBonus > 0 && best.epsilon >= preferenceBonus / 2) {
+    warnings.push('建議值 ' + best.epsilon + ' 已經達到獎勵分量級（'
+      + CONFIG_KEYS.SCORE_PREFERENCE_BONUS + ' = ' + preferenceBonus
+      + '）的一半以上。容差太大會蓋過「主席兼報告」這類軟規則偏好，'
+      + '令服侍次數分佈被拉平。採用前請一併看上面的「平均次數」與「最高次數」，'
+      + '確認仍然貼近歷史（平均約 3.3 次、最高約 8 次）。');
+  }
+
+  return {
+    value: best.epsilon, warnings: warnings,
+    baselineDeviation: baselineDeviation, bestDeviation: bestDeviation,
+    improvementRatio: improvementRatio,
+    reason: '在 ' + best.seedCount + ' 個 seed 之中，它排得出的最好一份總偏差是 '
+      + bestDeviation.toFixed(4) + '，比現狀（epsilon = 0）的 '
+      + baselineDeviation.toFixed(4) + ' 改善 ' + (improvementRatio * 100).toFixed(1) + '%；'
+      + '硬規則違反 0 項，準硬規則沒有比現狀差，而且產生了 '
+      + best.distinctRosters + ' / ' + best.seedCount + ' 份不同的表——'
+      + '「多次生成揀最好」到這裡才真正發揮作用。'
+  };
+}
+
+/**
  * 統計一份生成結果裡準硬規則（`SEMI_NO_CONSECUTIVE`）的警告數。
  * `evaluateRosterQuality_()` 只算硬規則違反，準硬規則要另外數。
  * @param {{warnings: Object[]}} roster `buildRoster_()` 的結果
@@ -153,6 +287,20 @@ function runEpsilonTrial_(quarterId, epsilonValues, seedCount) {
     ? epsilonValues : EPSILON_TRIAL_DEFAULT_VALUES;
   const seeds = Math.max(1, Math.round(seedCount || EPSILON_TRIAL_DEFAULT_SEEDS));
 
+  // 階段 C3：總量把關。實測每份約 0.3–0.45 秒（Apps Script，89 人／13 週），
+  // 超過上限就唔跑——寧可叫幹事分兩次試，都好過跑到一半撞正 6 分鐘上限、
+  // 咩結果都拎唔到。
+  const totalRosters = values.length * seeds;
+  if (totalRosters > EPSILON_TRIAL_MAX_TOTAL_ROSTERS) {
+    throw new Error('這次試算要生成 ' + totalRosters + ' 份職事表（'
+      + values.length + ' 個 epsilon × ' + seeds + ' 個 seed），超出單次上限 '
+      + EPSILON_TRIAL_MAX_TOTAL_ROSTERS + ' 份。\n\n'
+      + 'Apps Script 單次執行上限是 6 分鐘，每份大約需要 0.3–0.45 秒，'
+      + '跑太多會中途被系統中斷、白做一場。\n\n'
+      + '建議：減少 epsilon 的數目或 seed 數（例如 5 個值 × 10 個 seed ＝ 50 份，'
+      + '大約 15–25 秒），或者分兩次試不同的值。');
+  }
+
   const context = buildGeneratorContext_(quarterId);
   const configuredEpsilon = context.scoreTieEpsilon;
   const scope = getChairAnnounceScope_(context.rules);
@@ -170,7 +318,9 @@ function runEpsilonTrial_(quarterId, epsilonValues, seedCount) {
     quarterId: quarterId,
     seedCount: seeds,
     configuredEpsilon: configuredEpsilon,
-    trials: trials
+    trials: trials,
+    // 階段 C2：建議值由程式算，唔係丟一堆數字俾幹事自己判斷
+    recommendation: recommendEpsilon_(trials, context.scoreWeights.preferenceBonus)
   };
 }
 
@@ -194,36 +344,53 @@ function buildEpsilonTrialRows_(trial) {
     'Config 目前的 ' + CONFIG_KEYS.SCORE_TIE_EPSILON + ' ＝ ' + trial.configuredEpsilon
       + '　（本試算完全在記憶體進行，沒有改動 Config、沒有建立任何版本或工作表）'));
 
+  // ---- 階段 C2：每個 epsilon 一行，最重要嘅數字排喺前面 ----
+  // 修正前係每個 epsilon 出 10 行指標（5 個值就 50 行），要橫向比較就要
+  // 上上下下捲——幹事根本睇唔出邊個好。而家改成一個值一行。
+  const best = trial.recommendation ? trial.recommendation.value : 0;
   trial.trials.forEach(function (t) {
-    const label = 'epsilon = ' + t.epsilon + (t.epsilon === 0 ? '（現狀）' : '');
-    rows.push(diagRow_('產生的表有多少種', label,
-      t.distinctRosters + ' 種 / ' + t.seedCount + ' 個 seed',
-      t.distinctRosters === 1
-        ? '換 seed 完全不影響結果——這正是 epsilon=0 時已知的現象'
-        : '換 seed 真的會排出不同的表，「多次生成揀最好」才有意義'));
-    rows.push(diagRow_('硬規則違反', label,
-      t.worstHardViolations + ' 項（最壞的一份）',
-      t.hardViolationTotal === 0
-        ? '✅ 全部 ' + t.seedCount + ' 份表都是 0 項——任何 epsilon 值都不可以出現硬規則違反'
-        : '⚠️ 總共 ' + t.hardViolationTotal + ' 項，這個 epsilon 值不可使用'));
-    rows.push(diagRow_('準硬規則警告（同崗位連續兩週）', label,
-      fmtRange(t.semiHardWarnings, false, 1), ''));
-    rows.push(diagRow_('主席兼報告比例', label, fmtRange(t.chairEq, true), ''));
-    rows.push(diagRow_('報告連續兩週比例', label, fmtRange(t.announce, true), ''));
-    rows.push(diagRow_('總用人數', label, fmtRange(t.peopleCount, false, 0), ''));
-    rows.push(diagRow_('平均次數', label, fmtRange(t.average, false, 2), ''));
-    rows.push(diagRow_('最高次數', label, fmtRange(t.maxCount, false, 0), ''));
-    rows.push(diagRow_('總偏差（越細越貼近基準）', label, fmtRange(t.deviation, false, 4),
-      '「多次生成揀最好」就是揀這個數字最細的一份'));
-    rows.push(diagRow_('與歷史分佈的卡方距離', label, fmtRange(t.chiSquare, false, 2), ''));
+    const label = 'epsilon = ' + t.epsilon
+      + (t.epsilon === 0 ? '（現狀）' : '')
+      + (t.epsilon === best && best > 0 ? '　⭐ 建議' : '');
+    const bestDeviation = (t.deviation && !isNaN(t.deviation.min)) ? t.deviation.min.toFixed(4) : '-';
+    rows.push(diagRow_('逐個 epsilon 比較', label,
+      '最好一份的總偏差 ' + bestDeviation
+        + '　｜　排出 ' + t.distinctRosters + '/' + t.seedCount + ' 份不同的表'
+        + '　｜　硬規則違反 ' + t.worstHardViolations + ' 項',
+      '總偏差越細越貼近歷史基準（「多次生成揀最好」就是揀這個數字最細的一份）。'
+        + '　主席兼報告 ' + fmtRange(t.chairEq, true)
+        + '　報告連續 ' + fmtRange(t.announce, true)
+        + '　用人數 ' + fmtRange(t.peopleCount, false, 0)
+        + '　平均次數 ' + fmtRange(t.average, false, 2)
+        + '　最高次數 ' + fmtRange(t.maxCount, false, 0)
+        + '　準硬規則警告 ' + fmtRange(t.semiHardWarnings, false, 1)
+        + '　卡方距離 ' + fmtRange(t.chiSquare, false, 2)));
   });
 
-  rows.push(diagRow_('怎樣解讀', '建議',
-    '揀「產生的表有多種、硬規則違反 0、總偏差的最小值比 epsilon=0 更細」的那個值',
-    'epsilon 越大，同分群組越大、隨機性越強，但優勝者的分數也可能比最佳分數差最多 epsilon。'
-      + '如果某個 epsilon 產生了多種表、而總偏差的最小值比 epsilon=0 那一行更細，'
-      + '代表「多次生成揀最好」真的揀到了更貼近歷史基準的表，值得採用。'
-      + '如果全部 epsilon 的總偏差都跟 epsilon=0 差不多，就維持 0 不要改。'));
+  // ---- 階段 C2：結論。判斷邏輯喺 recommendEpsilon_()，唔係靠人睇數字 ----
+  const rec = trial.recommendation;
+  if (rec) {
+    rows.push(diagRow_('★ 結論', '建議值',
+      CONFIG_KEYS.SCORE_TIE_EPSILON + ' = ' + rec.value
+        + (rec.value === 0 ? '（維持現狀，不要改）' : '（建議改成這個值）'),
+      rec.reason));
+
+    if (rec.value !== trial.configuredEpsilon) {
+      rows.push(diagRow_('★ 結論', '要怎樣做',
+        '去 Config 工作表，把 ' + CONFIG_KEYS.SCORE_TIE_EPSILON
+          + ' 由目前的 ' + trial.configuredEpsilon + ' 改成 ' + rec.value,
+        '改完之後，下一次「步驟 1：生成初稿」就會用新設定。'
+          + '本工具不會自動改 Config——要不要採用由你決定。'));
+    } else {
+      rows.push(diagRow_('★ 結論', '要怎樣做', '不用做任何事',
+        'Config 目前的 ' + CONFIG_KEYS.SCORE_TIE_EPSILON + ' 已經是 '
+          + trial.configuredEpsilon + '，跟建議值一樣。'));
+    }
+
+    (rec.warnings || []).forEach(function (w, i) {
+      rows.push(diagRow_('★ 結論', '⚠️ 提醒 ' + (i + 1), '請留意', w));
+    });
+  }
 
   return rows;
 }
@@ -281,24 +448,49 @@ function runEpsilonTrial_Menu_() {
 
   const written = tryWriteDiagnostics_('epsilon 試算', buildEpsilonTrialRows_(trial));
 
+  const rec = trial.recommendation;
   const lines = [
     trial.quarterId + '　每個 epsilon 各試 ' + trial.seedCount + ' 個 seed',
     'Config 目前的 ' + CONFIG_KEYS.SCORE_TIE_EPSILON + ' ＝ ' + trial.configuredEpsilon,
-    ''
+    '',
+    '逐個比較（總偏差越細越好）：'
   ];
   trial.trials.forEach(function (t) {
-    lines.push('epsilon ' + t.epsilon + '：'
-      + t.distinctRosters + ' 種表　硬規則違反 ' + t.worstHardViolations + ' 項　'
-      + '總偏差 ' + (t.deviation ? t.deviation.min.toFixed(4) : '-') + '（最好的一份）');
+    lines.push('　epsilon ' + t.epsilon
+      + '：總偏差 ' + (t.deviation ? t.deviation.min.toFixed(4) : '-')
+      + '　排出 ' + t.distinctRosters + '/' + t.seedCount + ' 份不同的表'
+      + '　硬規則違反 ' + t.worstHardViolations + ' 項'
+      + (rec && t.epsilon === rec.value && rec.value > 0 ? '　⭐ 建議' : ''));
   });
+
+  if (rec) {
+    lines.push('');
+    lines.push('━━━━━━━━━━━━━━━━━━━━');
+    lines.push('建議值：' + CONFIG_KEYS.SCORE_TIE_EPSILON + ' = ' + rec.value
+      + (rec.value === 0 ? '（維持現狀，不要改）' : ''));
+    lines.push('');
+    lines.push('理由：' + rec.reason);
+    if (rec.value !== trial.configuredEpsilon) {
+      lines.push('');
+      lines.push('要改的話：去 Config 工作表，把 ' + CONFIG_KEYS.SCORE_TIE_EPSILON
+        + ' 由 ' + trial.configuredEpsilon + ' 改成 ' + rec.value + '。');
+    } else {
+      lines.push('');
+      lines.push('Config 目前已經是這個值，不用做任何事。');
+    }
+    (rec.warnings || []).forEach(function (w) {
+      lines.push('');
+      lines.push('⚠️ ' + w);
+    });
+    lines.push('━━━━━━━━━━━━━━━━━━━━');
+  }
+
   lines.push('');
-  lines.push('完整對照表已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「epsilon 試算」，共 '
+  lines.push('完整明細已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「epsilon 試算」，共 '
     + written + ' 行。');
   lines.push('');
   lines.push('本工具完全唯讀：全部在記憶體生成，沒有建立任何版本或工作表、'
     + '沒有改動 Config、沒有寄出任何電郵。');
-  lines.push('看完覺得某個 epsilon 值更好，要自己去 Config 把 '
-    + CONFIG_KEYS.SCORE_TIE_EPSILON + ' 改成該值才會生效。');
 
   ui.alert(title, lines.join('\n'), ui.ButtonSet.OK);
 }

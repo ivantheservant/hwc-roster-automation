@@ -45,6 +45,8 @@ function scanGridCellClassification_(quarterId, versionNo) {
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const naLabel = getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL);
+  const gapColor = String(getConfig(
+    CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR)).toUpperCase();
   const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
   const dateValues = sheet.getRange(3, 1, lastRow - 2, 1).getValues();
   const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
@@ -55,7 +57,21 @@ function scanGridCellClassification_(quarterId, versionNo) {
   const genuineGap = [];
   const dataColumns = keys.filter(function (k) { return String(k || '').indexOf('#') !== -1; }).length;
 
+  // 第十輪批次階段 A：只掃「第一欄真係一個日期」嗰啲行。
+  //
+  // 修正前呢度由第 3 行一路掃到 getLastRow()，把 grid 下面嘅統計區
+  // （「本季服侍次數統計」）都當成主日行——`weekCount` 因此一直大過實際週數
+  // （13 週會報成 16＋人數），令「PDF 內容自我檢查」嘅「週數是否齊全」
+  // 恆常對唔上。本輪喺 grid 底部再加咗圖例區，唔修正只會更加錯。
+  // 用「第一欄 parse 唔到日期就當作已經超出資料區」判斷，同 PdfExport.gs 的
+  // buildGridIndex_() 一直以嚟嘅做法一致（嗰邊本來就只索引 parse 到日期嘅行）。
+  let weekRowCount = 0;
   for (let r = 0; r < values.length; r++) {
+    if (!toDateString(dateValues[r][0], timezone)) break;
+    weekRowCount++;
+  }
+
+  for (let r = 0; r < weekRowCount; r++) {
     const dateStr = toDateString(dateValues[r][0], timezone);
     for (let c = 3; c < keys.length; c++) {
       if (String(keys[c] || '').indexOf('#') === -1) continue;
@@ -64,8 +80,16 @@ function scanGridCellClassification_(quarterId, versionNo) {
       const note = String(notes[r][c] || '').trim();
 
       if (bg === GRID_COLORS.SPECIAL_SKIP.toUpperCase()) { specialSkip++; continue; }
+      // 第十輪批次階段 A：「系統應該排但排唔出」而家有自己嘅粉紅底色
+      // （見 RosterWriter.gs 的 applyCellMarks_()），唔再同「待人手填」共用灰底。
+      if (bg === gapColor) {
+        genuineGap.push({ serviceDate: dateStr, key: String(keys[c]), note: note || text });
+        continue;
+      }
       if (bg !== GRID_COLORS.SKIPPED.toUpperCase()) continue; // 有名字或其他顏色，不是留空格
       if (text === naLabel) { structuralNa++; continue; }
+      // 舊版本相容：階段 A 之前產生嘅工作表，排唔出嘅格一樣係灰底，
+      // 只有批註分得出。舊工作表照樣要驗得到，所以保留呢一層判斷。
       if (note) { genuineGap.push({ serviceDate: dateStr, key: String(keys[c]), note: note }); continue; }
       manualPending++;
     }
@@ -73,8 +97,8 @@ function scanGridCellClassification_(quarterId, versionNo) {
 
   return {
     structuralNa: structuralNa, specialSkip: specialSkip, manualPending: manualPending,
-    genuineGap: genuineGap, totalCells: values.length * dataColumns,
-    weekCount: values.length, columnCount: dataColumns
+    genuineGap: genuineGap, totalCells: weekRowCount * dataColumns,
+    weekCount: weekRowCount, columnCount: dataColumns
   };
 }
 

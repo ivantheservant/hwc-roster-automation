@@ -37,6 +37,17 @@ function planQuarterReset_(quarterId, includeV0) {
     requestRows: 0,
     unavailableRequestRows: 0,
     unavailableManualRows: 0,
+    // 第十輪批次階段 B1：逐行列出「落喺呢一季、但 Source 唔係 REQUEST」嘅
+    // Unavailable。以前淨係報一個數字「有 N 行」，幹事要自己去成張 Unavailable
+    // 慢慢揀邊幾行落喺呢季——實測時就係因為咁，有一行人手輸入嘅測試資料
+    // 冇被清走。**列出嚟但一樣唔會自動刪**：人手輸入嘅真實請假絕對唔可以
+    // 由程式判斷「應該係測試資料」。
+    unavailableManualDetails: [],
+    // 第十輪批次階段 B2：由「指定服侍」申報自動寫入 Eligibility 嘅行
+    // （writeNewEligibilityRows_()，Source=REQUEST）。Eligibility 喺呢個工具嘅
+    // 「絕對不碰」名單入面，所以唔會清——但佢會**永久影響之後每一次生成**
+    // （嗰個人由此對嗰個崗位變成合資格），所以一定要列出嚟俾幹事知。
+    eligibilityRequestRows: [],
     pdfFiles: [],          // {id, name, sizeBytes}
     pdfUnrecognised: [],   // 不確定屬於哪個季度的檔案，一律不刪
     quarterStage: '',
@@ -124,13 +135,55 @@ function planQuarterReset_(quarterId, includeV0) {
         plan.unavailableRequestRows++;
       } else {
         plan.unavailableManualRows++;
+        plan.unavailableManualDetails.push({
+          personId: String(row[U.PERSON_ID] || '').trim(),
+          dateFrom: dateFrom,
+          dateTo: toDateString(row[U.DATE_TO], timezone),
+          source: String(row[U.SOURCE] || '').trim() || '（空白）',
+          appliesTo: String(row[U.APPLIES_TO] || '').trim(),
+          postIds: String(row[U.POST_IDS] || '').trim(),
+          status: String(row[U.STATUS] || '').trim()
+        });
       }
     });
     if (plan.unavailableManualRows > 0) {
       plan.manualAttention.push('Unavailable 有 ' + plan.unavailableManualRows
-        + ' 行落在這一季、但 Source 不是 REQUEST（即幹事人手輸入的真實不可服侍日），'
-        + '一律保留不清。如果其中有測試資料，請自行刪除。');
+        + ' 行落在這一季、但 Source 不是 REQUEST（即幹事人手輸入的不可服侍日），'
+        + '一律保留不清——程式無法分辨哪一行是真實請假、哪一行是測試時打的。'
+        + '下面已逐行列出，請自己看一次，測試資料請自行到 Unavailable 刪除，'
+        + '否則重新生成時系統會繼續避開這些人。');
     }
+  }
+
+  // ---- Eligibility：由「指定服侍」申報自動加入的行（不清，但一定要講）----
+  // 這一項是階段 B2 逐項確認「清乾淨之後重新生成會不會有殘留影響」時發現的：
+  // 步驟 3 套用「指定服侍」申報時，如果申報的人未曾做過該崗位，
+  // writeNewEligibilityRows_() 會在 Eligibility 新增一行（Source=REQUEST、
+  // HistoricalCount=0）。這一行**不屬於任何季度**，重設季度不會碰到它，
+  // 於是它會永久留下來、影響之後每一季的生成結果——那個人從此對那個崗位
+  // 變成合資格，而且因為 HistoricalCount=0，還會輕微改變配額與選人分數的正規化。
+  try {
+    const E = COLUMNS.ELIGIBILITY;
+    readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+      if (String(row[E.SOURCE] || '').trim().toUpperCase() !== 'REQUEST') return;
+      plan.eligibilityRequestRows.push({
+        eligibilityId: String(row[E.ELIGIBILITY_ID] || '').trim(),
+        personId: String(row[E.PERSON_ID] || '').trim(),
+        postId: String(row[E.POST_ID] || '').trim(),
+        active: String(row[E.ACTIVE] || '').trim(),
+        addedAt: String(row[E.ADDED_AT] || '').trim()
+      });
+    });
+    if (plan.eligibilityRequestRows.length > 0) {
+      plan.manualAttention.push('Eligibility 有 ' + plan.eligibilityRequestRows.length
+        + ' 行是由「指定服侍」申報自動加入的（Source=REQUEST）。'
+        + 'Eligibility 屬於人員基礎資料，本工具絕對不碰——但這些行**會繼續影響'
+        + '重新生成的結果**（那個人從此對那個崗位算合資格）。'
+        + '如果是測試時亂填出來的，請自己到 Eligibility 把該行 Active 改成 FALSE 或刪除；'
+        + '如果是真實的資格變更，就保留。下面已逐行列出。');
+    }
+  } catch (err) {
+    plan.manualAttention.push('Eligibility 讀取失敗，無法檢查「指定服侍自動加入」的行：' + err.message);
   }
 
   // ---- RosterPDF 資料夾 ----

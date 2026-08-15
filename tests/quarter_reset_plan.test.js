@@ -35,12 +35,39 @@ function planVersionSelection(versions, includeV0) {
 // ---- 移植：Unavailable 只清 Source=REQUEST 的行（QuarterReset.gs 第 106-134 行）----
 function planUnavailableSelection(unavailableRows, quarterStart, quarterEnd) {
   let requestRows = 0, manualRows = 0;
+  // 第十輪批次階段 B1：除咗數目，仲要逐行列出邊幾行——以前淨係報一個數字，
+  // 幹事要自己去成張 Unavailable 慢慢對邊幾行落喺呢季，實測時就係因為咁
+  // 漏咗一行人手輸入嘅測試資料。
+  const manualDetails = [];
   unavailableRows.forEach(function (row) {
     if (!row.dateFrom || row.dateFrom < quarterStart || row.dateFrom > quarterEnd) return;
-    if (String(row.source || '').trim().toUpperCase() === 'REQUEST') requestRows++;
-    else manualRows++;
+    if (String(row.source || '').trim().toUpperCase() === 'REQUEST') {
+      requestRows++;
+      return;
+    }
+    manualRows++;
+    manualDetails.push({
+      personId: row.personId || '',
+      dateFrom: row.dateFrom,
+      dateTo: row.dateTo || '',
+      source: String(row.source || '').trim() || '（空白）'
+    });
   });
-  return { requestRows: requestRows, manualRows: manualRows };
+  return { requestRows: requestRows, manualRows: manualRows, manualDetails: manualDetails };
+}
+
+/**
+ * 第十輪批次階段 B2：Eligibility 入面由「指定服侍」申報自動加入嘅行。
+ * 逐字對應 QuarterReset.gs 的判斷（Source=REQUEST）。
+ * 呢啲行**唔屬於任何季度**，所以重設季度永遠碰唔到，但會繼續影響之後
+ * 每一次生成——所以一定要列出嚟。
+ */
+function planEligibilityRequestRows(eligibilityRows) {
+  return eligibilityRows.filter(function (row) {
+    return String(row.source || '').trim().toUpperCase() === 'REQUEST';
+  }).map(function (row) {
+    return { personId: row.personId, postId: row.postId, active: row.active };
+  });
 }
 
 console.log('\n=== v0 預設保留，不列入清理清單 ===');
@@ -120,6 +147,67 @@ console.log('\n=== Unavailable：只算 Source=REQUEST 的行，幹事人手輸�
   const result = planUnavailableSelection(rows, '2027-01-01', '2027-03-31');
   check('★ Source=REQUEST 且在季度範圍內：2 行會被清理', result.requestRows, 2);
   check('★ 幹事人手輸入的（Source 空白或非 REQUEST）：2 行保留、列入人手處理', result.manualRows, 2);
+}
+
+console.log('\n=== B1：人手輸入嗰啲要逐行列出嚟（唔可以淨係報一個數字）===');
+{
+  const rows = [
+    { personId: 'P001', dateFrom: '2027-02-01', dateTo: '2027-02-01', source: 'REQUEST' },
+    { personId: 'P002', dateFrom: '2027-02-20', dateTo: '2027-02-20', source: '' },
+    { personId: 'P003', dateFrom: '2027-02-25', dateTo: '2027-03-05', source: 'MANUAL' },
+    { personId: 'P004', dateFrom: '2027-06-01', dateTo: '2027-06-01', source: 'MANUAL' }
+  ];
+  const result = planUnavailableSelection(rows, '2027-01-01', '2027-03-31');
+
+  check('★★ 有逐行明細，唔係淨係一個數字', result.manualDetails.length, 2);
+  check('★ 明細數目同計數一致', result.manualDetails.length, result.manualRows);
+  check('★ 明細有 PersonID（幹事要靠佢去 Unavailable 搵返嗰行）',
+    result.manualDetails.map(function (d) { return d.personId; }), ['P002', 'P003']);
+  check('★ 明細有日期範圍', result.manualDetails[1].dateFrom + '→' + result.manualDetails[1].dateTo,
+    '2027-02-25→2027-03-05');
+  check('★ Source 空白時顯示成「（空白）」而唔係空字串',
+    result.manualDetails[0].source, '（空白）');
+  check('★★ 唔喺呢一季嘅行完全唔會出現喺明細（唔可以叫幹事去睇無關嘅行）',
+    result.manualDetails.some(function (d) { return d.personId === 'P004'; }), false);
+}
+
+console.log('\n=== B2：由「指定服侍」申報寫入 Eligibility 嘅行要列出（清唔到，但會影響重新生成）===');
+{
+  const eligibility = [
+    { personId: 'P001', postId: 'CHAIR', source: 'SEED', active: 'TRUE' },
+    { personId: 'P002', postId: 'AUDIO', source: 'REQUEST', active: 'TRUE' },
+    { personId: 'P003', postId: 'PIANO', source: 'request', active: 'TRUE' },
+    { personId: 'P004', postId: 'USHER', source: '', active: 'TRUE' }
+  ];
+  const found = planEligibilityRequestRows(eligibility);
+
+  check('★★ 抓到 2 行由申報自動加入嘅 Eligibility', found.length, 2);
+  check('★ 大小寫唔同一樣抓得到（source 欄可能係 request）',
+    found.map(function (e) { return e.personId; }), ['P002', 'P003']);
+  check('★ 原本就有嘅資格行唔會被當成申報加入',
+    found.some(function (e) { return e.personId === 'P001'; }), false);
+  check('★ 有記低係邊個崗位（幹事要知道影響邊個崗位嘅人選池）',
+    found[0].postId, 'AUDIO');
+}
+
+console.log('\n=== B2：確認邊啲殘留真係會／唔會影響重新生成 ===');
+{
+  // 呢一段唔係測程式，係把階段 B2 逐項確認嘅結論鎖死做斷言——
+  // 日後如果有人改咗生成器去讀 SendLog，呢度就要重新檢視。
+  const fs = require('fs');
+  const path = require('path');
+  const generatorSource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'Generator.gs'), 'utf8');
+
+  check('★★ 生成器完全唔讀 SendLog（所以 SendLog 殘留唔會影響排表結果）',
+    generatorSource.indexOf('SEND_LOG') === -1, true);
+  check('★★ 軟規則歷史基準係寫死嘅常數，唔係由 RosterAssignments 即時計'
+    + '（所以測試版本唔會污染基準）',
+    /HISTORICAL_BASELINE\s*=\s*\{/.test(
+      fs.readFileSync(path.join(__dirname, '..', 'src', 'Constants.gs'), 'utf8')), true);
+  // 呢項故意斷言「係，佢真係會讀」——正因為會影響，先要喺重設計畫列出嚟俾幹事睇。
+  check('★ 生成器讀 Eligibility 嘅 HistoricalCount（所以申報加入嘅行**會**影響配額）',
+    generatorSource.indexOf('historicalCount') !== -1, true);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
