@@ -1090,10 +1090,23 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
       ? '　• 距離預定的正式發出日期只剩 ' + judgment.daysUntilDeadline + ' 天（門檻 ' + judgment.deadlineDays + ' 天）'
       : '　• 已經超過預定的正式發出日期 ' + Math.abs(judgment.daysUntilDeadline) + ' 天');
   }
+  // 第十六輪批次階段 D2：未確認日期的特殊主日（教會新規則 5 的五月合堂）
+  if (judgment.reasons.indexOf('UNCONFIRMED_SPECIAL') !== -1) {
+    reasonLines.push('　• 距離生成初稿只剩 ' + judgment.daysUntilGenerate + ' 天（門檻 '
+      + judgment.unconfirmedLeadDays + ' 天），但這一季還有 '
+      + judgment.unconfirmedSpecials.length + ' 個特殊主日的日期尚未確認');
+  }
+
+  // 未確認特殊主日的明細另外成段，因為要列出逐一項目與具體處理方式
+  let specialSection = '';
+  if (judgment.reasons.indexOf('UNCONFIRMED_SPECIAL') !== -1) {
+    specialSection = '\n' + describeUnconfirmedSpecialSundays_(judgment.unconfirmedSpecials) + '\n';
+  }
 
   const subject = prefix + quarterId + ' 職事表停留在「' + judgment.stage + '」，請跟進';
   const body = quarterId + ' 的職事表目前 Stage 是「' + judgment.stage + '」，尚未進入下一步。\n\n'
-    + '提醒原因：\n' + reasonLines.join('\n') + '\n\n'
+    + '提醒原因：\n' + reasonLines.join('\n') + '\n'
+    + specialSection + '\n'
     + '這是第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次提醒'
     + '（同一個 Stage 達到上限後不會再提醒，前進到下一個 Stage 之後次數會重新計算）。\n\n'
     + '下一步請執行' + nextActionText + '。\n\n'

@@ -231,7 +231,13 @@ function apiGenerateRoster(quarterId) {
     attemptsRun: result.attemptsRun,
     attemptIndex: result.attemptIndex,
     seed: result.seed,
-    deviation: result.deviation
+    deviation: result.deviation,
+    // 第十六輪批次階段 D3：未確認日期的特殊主日。目前 Web UI 的步驟 1 是
+    // 唯讀顯示（生成一律由選單或自動排程執行），所以前端暫時沒有畫面用到
+    // 這個欄位；照樣回傳是為了讓兩個入口的回傳結構保持一致——日後如果
+    // Web UI 加回生成入口，唔使再記得補呢一項。
+    unconfirmedSpecials: result.unconfirmedSpecials || [],
+    unconfirmedSpecialsText: describeUnconfirmedSpecialSundays_(result.unconfirmedSpecials)
   };
 }
 

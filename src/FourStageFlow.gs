@@ -79,12 +79,11 @@ function runFourStageStep1_() {
       });
       if (b.genuineGapCells.length > 15) lines.push('　　……另有 ' + (b.genuineGapCells.length - 15) + ' 格');
     }
-    lines.push(
-      '',
-      '警告：' + result.warnings + ' 項',
-      '',
-      'Stage 維持 DRAFT。覆核無誤後可執行「步驟 2：寄給堂委審閱」。'
-    );
+    lines.push('', '警告：' + result.warnings + ' 項');
+    // 第十六輪批次階段 D3：未確認日期的特殊主日要喺完成畫面明確標示出嚟。
+    const unconfirmedText = describeUnconfirmedSpecialSundays_(result.unconfirmedSpecials);
+    if (unconfirmedText) lines.push('', unconfirmedText);
+    lines.push('', 'Stage 維持 DRAFT。覆核無誤後可執行「步驟 2：寄給堂委審閱」。');
     ui.alert('步驟 1：生成初稿', lines.join('\n'), ui.ButtonSet.OK);
   } catch (err) {
     log_('ERROR', 'runFourStageStep1_ 失敗: ' + err.message);

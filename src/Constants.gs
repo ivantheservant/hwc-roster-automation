@@ -34,7 +34,12 @@ const SHEETS = {
   // 第十一輪批次階段 A：一季一條固定連結。每個季度對應一個**獨立公開試算表
   // 檔案**（不是主試算表裡的分頁），檔案 ID／網址／發佈紀錄記在這張表。
   // 見 PublicRoster.gs 的檔頭說明。
-  PUBLIC_LINKS: 'PublicLinks'
+  PUBLIC_LINKS: 'PublicLinks',
+  // 第十六輪批次階段 A：教會身分名單（堂委／執事）與個人崗位排除。
+  // 兩張表都是**可選的**——不存在時 readRolesSafe_()／readPersonPostExclusionsSafe_()
+  // 回傳空陣列，全部相關規則自動失效，舊環境完全不受影響。見 Roles.gs 檔頭。
+  ROLES: 'Roles',
+  PERSON_POST_EXCLUSIONS: 'PersonPostExclusions'
 };
 
 /**
@@ -173,7 +178,16 @@ const COLUMNS = {
     EMPTY_DISPLAY: 'EmptyDisplay',
     // 第十一輪批次階段 C：崗位提早到場分鐘數（見 PostSeed.gs 檔頭說明——
     // 為什麼是 Posts 欄而不是逐一開 Config Key）。留空視為 0（不提早）。
-    EARLY_ARRIVAL_MINUTES: 'EarlyArrivalMinutes'
+    EARLY_ARRIVAL_MINUTES: 'EarlyArrivalMinutes',
+    // 第十六輪批次階段 B：擔任這個崗位必須具備的身分（ROLE_CODES 的值，
+    // 逗號分隔＝**任何一個**符合即可，不是全部都要）。留空＝冇身分要求，
+    // 呢個崗位嘅行為同以前完全一樣。
+    //
+    // 呢一欄就係規則 1／2 嘅「開關」：填咗先至有身分限制，冇填就當冇呢條規則。
+    // 放喺 Posts 而唔係 RuleSettings，理由同 EarlyArrivalMinutes 一樣——
+    // 「呢個崗位要咩身分」係崗位本身嘅屬性，逐崗位設定，Posts 本來就係
+    // 「一個崗位一列」嘅資料結構。見 Roles.gs 檔頭。
+    REQUIRED_ROLES: 'RequiredRoles'
   },
   NAME_MAPPING: {
     PERSON_ID: 'PersonID',
@@ -217,6 +231,32 @@ const COLUMNS = {
     ACTIVE: 'Active',
     NOTES: 'Notes'
   },
+
+  // 第十六輪批次階段 A：教會身分名單。一個人可以有多行（同時係堂委又係執事、
+  // 或者卸任之後再連任），靠 EffectiveFrom／EffectiveTo 分辨邊段時間有效。
+  ROLES: {
+    ROLE_ASSIGNMENT_ID: 'RoleAssignmentID',
+    PERSON_ID: 'PersonID',
+    ROLE_CODE: 'RoleCode',
+    EFFECTIVE_FROM: 'EffectiveFrom',
+    EFFECTIVE_TO: 'EffectiveTo',
+    ACTIVE: 'Active',
+    NOTES: 'Notes'
+  },
+
+  // 第十六輪批次階段 B：個人崗位排除（規則 3）。表達「某人暫時唔做某崗位，
+  // 日後解除」——解除時**填 EffectiveTo，唔好刪除成行**，噉樣舊季度嘅職事表
+  // 唔會因為今日解除咗而被追溯判定為違規（同 Roles 一樣嘅道理）。
+  PERSON_POST_EXCLUSIONS: {
+    EXCLUSION_ID: 'ExclusionID',
+    PERSON_ID: 'PersonID',
+    POST_ID: 'PostID',
+    REASON: 'Reason',
+    EFFECTIVE_FROM: 'EffectiveFrom',
+    EFFECTIVE_TO: 'EffectiveTo',
+    ACTIVE: 'Active',
+    NOTES: 'Notes'
+  },
   SERVICE_DATES: {
     SERVICE_DATE_ID: 'ServiceDateID',
     QUARTER_ID: 'QuarterID',
@@ -240,7 +280,19 @@ const COLUMNS = {
     COMMUNION_OVERRIDE: 'CommunionOverride',
     TRANSLATION_REQUIRED: 'TranslationRequired',
     ACTIVE: 'Active',
-    NOTES: 'Notes'
+    NOTES: 'Notes',
+    // 第十六輪批次階段 D：日期本身係咪已經確認。
+    //
+    // ⚠️ **空白＝已確認**，只有明確填 FALSE 先當「未確認」——呢個方向係
+    // 刻意揀嘅：呢一欄係後加嘅，如果空白當「未確認」，全部既有列一開機
+    // 就會變成未確認，提醒機制即刻噴一堆假警報。判斷邏輯只有一個入口
+    // `isUnconfirmedSpecialSunday_()`（AnnualCombined.gs），唔好喺其他
+    // 地方另外寫一次 isTrueValue_ 判斷——方向搞錯咗就會完全相反。
+    //
+    // 用途：五月嗰次合堂（5 月 22 日前後）要出表時先向教會確認實際日期，
+    // 年度合堂工具會寫一行建議日期並標 Confirmed=FALSE，提醒機制與生成
+    // 完成畫面都會把佢揪出嚟。
+    CONFIRMED: 'Confirmed'
   },
   UNAVAILABLE: {
     UNAVAILABLE_ID: 'UnavailableID',
@@ -439,6 +491,30 @@ const COLUMNS = {
  * Level / Enabled / ScopePostIDs / TargetValue / Tolerance / ParamJSON / OnViolation / Priority，
  * 所有實際參數與嚴重程度一律以工作表內容為準，此處只是 ID 名稱的單一來源。
  */
+/**
+ * 第十六輪批次階段 A：教會身分代號。`Roles.RoleCode` 與 `Posts.RequiredRoles`
+ * 兩邊都用呢一組值，兩邊必須一致（打錯字會令規則靜靜噉唔生效——所以
+ * 「身分名單概況（唯讀）」會專門檢查 `Posts.RequiredRoles` 有冇引用到
+ * 完全冇人持有嘅身分代號，見 `buildRoleOverviewRows_()`）。
+ *
+ * 用英文代號而唔係直接用中文「堂委」／「執事」：中文字喺試算表好容易
+ * 因為輸入法而變成全形／異體字，肉眼睇唔出但比對唔到（第十五輪批次已經
+ * 為咗同一類問題全面加咗 `normalizeIdInput_()`）。
+ */
+const ROLE_CODES = {
+  COMMITTEE: 'COMMITTEE',
+  DEACON: 'DEACON'
+};
+
+/**
+ * 身分代號對應嘅中文顯示名。只用喺畀人睇嘅訊息（違規原因、報告、對話框），
+ * 唔參與任何比對邏輯。呢度係**身分類別名**，唔係任何人嘅姓名。
+ */
+const ROLE_LABELS_TC = {
+  COMMITTEE: '堂委',
+  DEACON: '執事'
+};
+
 const RULE_IDS = {
   ELIGIBILITY: 'HARD_ELIGIBILITY',
   DISTINCT_SLOT: 'HARD_DISTINCT_SLOT',
@@ -451,7 +527,16 @@ const RULE_IDS = {
   // 語意不同，見 getSkipReason_()（Generator.gs）與 SPECIAL_SKIP_RULE_IDS。
   SPECIAL_SUNDAY_SKIP: 'HARD_SPECIAL_SUNDAY_SKIP',
   MUTEX_GROUP: 'HARD_MUTEX_GROUP',
+  // 第十六輪批次階段 B（教會新規則 1／2）：呢個崗位要求某個身分，但獲派嘅人
+  // 喺嗰個主日當日並唔持有任何一個所需身分。
+  ROLE_REQUIRED: 'HARD_ROLE_REQUIRED',
+  // 第十六輪批次階段 B（教會新規則 3）：PersonPostExclusions 明確排除咗
+  // 呢個人做呢個崗位，而且喺嗰個主日當日仍然生效。
+  PERSON_POST_EXCLUDED: 'HARD_PERSON_POST_EXCLUDED',
   NO_CONSECUTIVE: 'SEMI_NO_CONSECUTIVE',
+  // 第十六輪批次階段 C（教會新規則 4）：堂委盡量集中喺指定嘅幾個崗位，
+  // 其餘崗位盡量唔排。軟規則——排唔到人嗰陣仍然可以派，只係扣分。
+  ROLE_POST_FOCUS: 'SOFT_ROLE_POST_FOCUS',
   CHAIR_EQ_ANNOUNCE: 'SOFT_CHAIR_EQ_ANNOUNCE',
   CHAIR_PREFER_DUAL: 'SOFT_CHAIR_PREFER_DUAL',
   ANNOUNCE_RELIEF: 'SOFT_ANNOUNCE_RELIEF',
@@ -542,6 +627,44 @@ const RULE_LEVEL_PENALTY = {
   HARD: 1000000,
   SEMI_HARD: 1000,
   SOFT: 10
+};
+
+/**
+ * 第十六輪批次階段 B：規則喺 `RuleSettings` 工作表**冇對應一列**時，
+ * 應該當佢係邊個級別。
+ *
+ * 點解需要呢個 map（呢個係本輪最容易出事嘅一點，寫清楚）：
+ * `makeViolation_()`（Generator.gs）同 `findStateViolations_()` 嘅 `add()`
+ * （FineTune.gs）兩處都係 `rule[LEVEL] || RULE_LEVELS.SOFT`——即係**規則列
+ * 唔存在就當 SOFT**。對舊有規則冇問題（佢哋全部都預期幹事已經喺
+ * RuleSettings 有一列），但對本輪兩條新硬規則係致命嘅：
+ * 生成器排除候選人嘅條件係 `violations.some(v => v.level === HARD)`，
+ * 級別跌做 SOFT 就變成「只扣 10 分」，一個唔係堂委嘅人照樣可以被派去做報告，
+ * 而且畫面上完全睇唔出有嘢唔妥。
+ *
+ * 兩條新硬規則刻意設計成「唔使幹事去 RuleSettings 加一列都即刻生效」，
+ * 因為佢哋真正嘅開關喺資料本身：
+ * - `HARD_ROLE_REQUIRED` 要 `Posts.RequiredRoles` 有填先會檢查到嘢；
+ * - `HARD_PERSON_POST_EXCLUDED` 要 `PersonPostExclusions` 有列先會檢查到嘢。
+ * 兩者都係「冇資料＝完全冇影響」，所以預設啟用係安全嘅，反而預設停用會令
+ * 幹事以為規則已經生效但其實冇。
+ *
+ * 冇列喺呢個 map 嘅規則維持原本行為（fallback 仍然係 SOFT）。
+ */
+const RULE_DEFAULT_LEVELS = {
+  [RULE_IDS.ROLE_REQUIRED]: RULE_LEVELS.HARD,
+  [RULE_IDS.PERSON_POST_EXCLUDED]: RULE_LEVELS.HARD
+};
+
+/**
+ * 第十六輪批次階段 B：`RuleSettings` 冇對應一列時，預設當佢**啟用**嘅規則。
+ * 理由同 `RULE_DEFAULT_LEVELS` 一樣（見上面），判斷入口係
+ * `isRuleEnabledAllowingDefault_()`（Generator.gs）——其餘全部規則一律繼續用
+ * `isRuleEnabled_()`（冇列＝停用），呢個行為冇改過。
+ */
+const RULE_DEFAULT_ENABLED = {
+  [RULE_IDS.ROLE_REQUIRED]: true,
+  [RULE_IDS.PERSON_POST_EXCLUDED]: true
 };
 
 /**
@@ -834,6 +957,12 @@ const CONFIG_KEYS = {
   // 系統範圍需求第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象改成只提醒
   // 幹事（不是義工），見 docs/系統範圍稽核.md。
   REMIND_DEADLINE_DAYS: 'REMIND_DEADLINE_DAYS',
+  // 第十六輪批次階段 D：提醒幹事「呢一季仲有未確認日期嘅特殊主日」嘅提前日數。
+  // 距離自動生成日期（computeAutomationSchedule_() 算出嘅 generateDate）
+  // 仲有唔夠呢個日數、而該季 SpecialSundays 有 Confirmed=FALSE 嘅列，
+  // 就會觸發提醒。預設 7 日（生成前一星期），符合教會新規則第 5 條
+  // 「5 月嗰次合堂要出表時先確認」——出表前一星期問，仲有時間去問。
+  REMIND_UNCONFIRMED_SPECIAL_DAYS: 'REMIND_UNCONFIRMED_SPECIAL_DAYS',
   SEND_HOUR_LOCAL: 'SEND_HOUR_LOCAL',
   SEND_WEEKDAY_GUARD: 'SEND_WEEKDAY_GUARD',
   SYS_TIMEZONE: 'SYS_TIMEZONE',
@@ -1155,6 +1284,8 @@ const DEFAULTS = {
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
   REMIND_DEADLINE_DAYS: 7,
+  // 第十六輪批次階段 D：生成前幾多日開始提醒「仲有未確認日期嘅特殊主日」。
+  REMIND_UNCONFIRMED_SPECIAL_DAYS: 7,
   PDF_MIN_SIZE_BYTES: 10240,
   // 第九輪批次階段 A：軟規則實測量度的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 比例型 ±5 個百分點、次數型 ±20%（沿用 HISTORICAL_BASELINE.PEOPLE_TOLERANCE_RATIO

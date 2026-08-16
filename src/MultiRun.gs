@@ -393,8 +393,21 @@ function performRosterGeneration_(quarterId) {
   const assigned = genResult.assignments.filter(function (a) { return !!a.personId; }).length;
   const blankBreakdown = summariseBlankAssignments_(genResult.assignments);
 
+  // 第十六輪批次階段 D3：呢一季有冇未確認日期嘅特殊主日。放喺生成結果入面，
+  // 令選單同 Web UI 兩邊嘅完成畫面都顯示得到（兩邊都讀同一個回傳值）。
+  // 包 try/catch：呢個純粹係提示資訊，讀唔到（例如 SpecialSundays 冇
+  // Confirmed 欄）都唔應該令一次成功嘅生成變成失敗。
+  let unconfirmedSpecials = [];
+  try {
+    const tz = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    unconfirmedSpecials = listUnconfirmedSpecialSundays_(quarterId, tz);
+  } catch (err) {
+    log_('WARN', 'performRosterGeneration_: 讀取未確認特殊主日失敗，略過這項提示：' + err.message);
+  }
+
   return {
     quarterId: quarterId,
+    unconfirmedSpecials: unconfirmedSpecials,
     sheetName: sheetName,
     versionNo: versionNo,
     previousVersionNo: previousVersionNo,

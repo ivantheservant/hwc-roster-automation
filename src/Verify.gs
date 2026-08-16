@@ -41,13 +41,23 @@ function buildVerifyContext_(quarterId, versionNo) {
       };
     });
 
+  // 第十六輪批次階段 B：身分名單與個人崗位排除。三條路徑
+  // （生成／步驟 3-5 重跑／核對）用同一個 `buildRoleContext_()`，
+  // 見 Roles.gs 檔頭嘅 B1 說明。
+  const posts = readPostsNormalized();
+  const eligibility = readEligibility();
+  const roleContext = buildRoleContext_(eligibility, posts, timezone);
+  eligibility.byPost = roleContext.eligibleByPost;
+
   return {
     quarterId: quarterId,
     versionNo: versionNo,
     assignments: assignments,
     serviceDates: readServiceDatesNormalized(quarterId, timezone),
-    posts: readPostsNormalized(),
-    eligibility: readEligibility(),
+    posts: posts,
+    eligibility: eligibility,
+    roles: roleContext.roles,
+    personPostExclusions: roleContext.exclusions,
     unavailable: readUnavailableNormalized(timezone),
     rules: readRules()
   };
@@ -359,6 +369,9 @@ function checkHardRuleViolations_(context) {
   const unavailableHits = [];
   const notFirstSunday = [];
   const autoGenerateHits = [];
+  // 第十六輪批次階段 B：教會新規則 1／2／3
+  const roleViolations = [];
+  const exclusionViolations = [];
 
   context.assignments.forEach(function (a) {
     if (!a.personId) return;
@@ -368,6 +381,22 @@ function checkHardRuleViolations_(context) {
     const pool = context.eligibility.byPost[a.postId] || [];
     if (pool.indexOf(a.personId) === -1) {
       notEligible.push(label + '：不在 Eligibility 名單內');
+    }
+
+    if (post) {
+      const required = requiredRolesOfPost_(post);
+      if (required.length > 0
+          && !personHasAnyRoleOn_(context.roles || [], a.personId, required, a.serviceDate)) {
+        roleViolations.push(label + '：' + post.postNameTC + ' 要求'
+          + describeRoleCodes_(required) + '，但此人當日並未持有這個身分');
+      }
+      const exclusion = findActivePersonPostExclusion_(
+        context.personPostExclusions || [], a.personId, a.postId, a.serviceDate);
+      if (exclusion) {
+        exclusionViolations.push(label + '：'
+          + SHEETS.PERSON_POST_EXCLUSIONS + ' 明確排除此人擔任這個崗位（原因：'
+          + (exclusion.reason || '未填') + '）');
+      }
     }
     if (isPersonUnavailable_(a.personId, a.serviceDate, a.postId, context.unavailable)) {
       unavailableHits.push(label + '：該日已表明不能服侍');
@@ -405,7 +434,9 @@ function checkHardRuleViolations_(context) {
     { label: '違反 Unavailable', items: unavailableHits },
     { label: '同週 DistinctWithinPost 重複', items: duplicates },
     { label: '第一主日限定崗位出現在其他週', items: notFirstSunday },
-    { label: 'AutoGenerate=FALSE 崗位被派人', items: autoGenerateHits }
+    { label: 'AutoGenerate=FALSE 崗位被派人', items: autoGenerateHits },
+    { label: '違反身分限制（規則 1／2：報告限堂委、當值堂委限堂委或執事）', items: roleViolations },
+    { label: '違反個人崗位限制（規則 3）', items: exclusionViolations }
   ];
   const total = groups.reduce(function (sum, g) { return sum + g.items.length; }, 0);
   return { groups: groups, total: total };

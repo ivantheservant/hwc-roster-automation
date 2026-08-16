@@ -29,6 +29,15 @@ function buildFineTuneContext_(quarterId, versionNo) {
     throw new Error('找不到 ' + quarterId + ' v' + versionNo + ' 的派工紀錄');
   }
 
+  // 第十六輪批次階段 B：身分名單與個人崗位排除。做法同
+  // `buildGeneratorContext_()` 完全一致（增補後嘅名單蓋過 `eligibility.byPost`），
+  // 確保「生成嗰陣容許嘅安排」同「步驟 3／5 重跑規則檢查」用同一份資料、
+  // 同一套增補邏輯——唔會出現生成完全乾淨、一重跑就話違規呢種矛盾。
+  const posts = readPostsNormalized();
+  const eligibility = readEligibility();
+  const roleContext = buildRoleContext_(eligibility, posts, timezone);
+  eligibility.byPost = roleContext.eligibleByPost;
+
   return {
     quarterId: quarterId,
     versionNo: versionNo,
@@ -36,8 +45,10 @@ function buildFineTuneContext_(quarterId, versionNo) {
     original: original,
     gridValues: readGridPersonIds_(quarterId, versionNo, timezone),
     serviceDates: readServiceDatesNormalized(quarterId, timezone),
-    posts: readPostsNormalized(),
-    eligibility: readEligibility(),
+    posts: posts,
+    eligibility: eligibility,
+    roles: roleContext.roles,
+    personPostExclusions: roleContext.exclusions,
     peopleById: indexPeopleById_(),
     unavailable: readUnavailableNormalized(timezone),
     rules: readRules(),
@@ -202,7 +213,11 @@ function findStateViolations_(state, context) {
       personId: cell.personId,
       isManual: cell.isManual,
       ruleId: ruleId,
-      severity: String(rule[COLUMNS.RULE_SETTINGS.LEVEL] || RULE_LEVELS.SOFT).toUpperCase(),
+      // 第十六輪批次階段 B：同 `makeViolation_()`（Generator.gs）一樣，
+      // RuleSettings 冇對應一列時查 `RULE_DEFAULT_LEVELS`。兩處必須一致，
+      // 否則同一條規則喺生成同重跑檢查會被當成兩個唔同級別。
+      severity: String(rule[COLUMNS.RULE_SETTINGS.LEVEL]
+        || RULE_DEFAULT_LEVELS[ruleId] || RULE_LEVELS.SOFT).toUpperCase(),
       reason: reason
     });
   };
@@ -229,6 +244,30 @@ function findStateViolations_(state, context) {
     }
     if (post && !post.autoGenerate && isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)) {
       add(cell, RULE_IDS.NO_AUTO_GENERATE, 'AutoGenerate=FALSE 的崗位被派人');
+    }
+
+    // ---- 第十六輪批次階段 B：教會新規則 1／2（身分限制）----
+    // 呢條係本輪最需要涵蓋到重跑檢查嘅規則：幹事可以喺 grid 直接打一個名，
+    // 生成器管唔到，所以只有呢度（步驟 3／5 重跑）同 Verify.gs 捉得到。
+    if (post && isRuleEnabledAllowingDefault_(rules, RULE_IDS.ROLE_REQUIRED)) {
+      const required = requiredRolesOfPost_(post);
+      if (required.length > 0
+          && !personHasAnyRoleOn_(context.roles || [], cell.personId, required, cell.serviceDate)) {
+        add(cell, RULE_IDS.ROLE_REQUIRED,
+          '違反身分限制：' + post.postNameTC + ' 只可以由' + describeRoleCodes_(required)
+            + '擔任，但此人在 ' + cell.serviceDate + ' 當日並未持有這個身分');
+      }
+    }
+
+    // ---- 第十六輪批次階段 B：教會新規則 3（個別人士的崗位限制）----
+    if (post && isRuleEnabledAllowingDefault_(rules, RULE_IDS.PERSON_POST_EXCLUDED)) {
+      const exclusion = findActivePersonPostExclusion_(
+        context.personPostExclusions || [], cell.personId, cell.postId, cell.serviceDate);
+      if (exclusion) {
+        add(cell, RULE_IDS.PERSON_POST_EXCLUDED,
+          '違反個人崗位限制：' + SHEETS.PERSON_POST_EXCLUSIONS + ' 明確排除此人擔任 '
+            + post.postNameTC + '（原因：' + (exclusion.reason || '未填') + '）');
+      }
     }
   });
 

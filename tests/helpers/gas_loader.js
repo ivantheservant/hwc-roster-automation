@@ -39,6 +39,12 @@ const FILES_FOR_GENERATOR = [
   'Constants.gs',   // 全部常數（RULE_IDS／POST_FREQUENCY／ASSIGN_SOURCE 等）
   'Utils.gs',       // splitList_／daysBetween_／shiftDateString_ 等純函式
   'SheetReader.gs', // isTrueValue_（規則 Enabled 判斷會用到）
+  // 第十六輪批次階段 B：身分規則（教會新規則 1／2／3）嘅純函式判斷
+  // （personHasAnyRoleOn_／findActivePersonPostExclusion_／requiredRolesOfPost_）
+  // 住喺呢度，而 evaluateViolations_()／findStateViolations_() 兩邊都會呼叫，
+  // 所以生成器測試一定要載入佢。檔案入面碰試算表嘅只有 readOptionalSheet_()
+  // 同幾個 ensure*Sheet_() 建表工具，測試路徑唔會行到嗰度。
+  'Roles.gs',
   'Generator.gs',   // 排表生成器本身（本輪測試的主角）
   'FineTune.gs'     // findStateViolations_（重跑規則檢查，斷言直接重用它）
 ];

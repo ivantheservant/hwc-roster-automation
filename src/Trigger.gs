@@ -392,9 +392,36 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
     deadlineTriggered = daysUntilDeadline <= deadlineDays;
   }
 
+  // 維度三（第十六輪批次階段 D2）：這一季仲有未確認日期嘅特殊主日。
+  //
+  // 點解要併入呢個既有機制而唔係另建一套（任務明確要求）：呢度已經有齊
+  // 「每個季度＋Stage 各自計提醒次數」「今日提醒過就唔會再提」「上限
+  // REMIND_STUCK_MAX_COUNT 次」「一律經 notifyAdmin_() 寄、絕對唔會誤寄畀
+  // 義工」全部保護。另開一套等於要重新實作呢四樣嘢，而且會變成同一日
+  // 幹事收到兩封唔同嘅提醒信。
+  //
+  // 觸發時機用**生成日期**（generateDate）而唔係正式發出日期：五月嗰次
+  // 合堂嘅日期一定要喺生成之前確認好，因為 SkipPostIDs 係喺生成嗰陣先
+  // 套用落去——生成完先發現日期錯咗就要成張表重新生成。預設提前 7 日。
+  const unconfirmedLeadDays = getConfig(
+    CONFIG_KEYS.REMIND_UNCONFIRMED_SPECIAL_DAYS, DEFAULTS.REMIND_UNCONFIRMED_SPECIAL_DAYS);
+  let unconfirmedSpecials = [];
+  let daysUntilGenerate = null;
+  let unconfirmedTriggered = false;
+  if (schedule.generateDate) {
+    daysUntilGenerate = daysBetween_(today, schedule.generateDate);
+    if (daysUntilGenerate <= unconfirmedLeadDays) {
+      // 只喺真係接近生成日期先讀工作表——每日對每個季度都讀一次
+      // SpecialSundays 係冇必要嘅開銷。
+      unconfirmedSpecials = listUnconfirmedSpecialSundays_(quarterId, timezone);
+      unconfirmedTriggered = unconfirmedSpecials.length > 0;
+    }
+  }
+
   const reasons = [];
   if (stuckTriggered) reasons.push('STUCK');
   if (deadlineTriggered) reasons.push('DEADLINE');
+  if (unconfirmedTriggered) reasons.push('UNCONFIRMED_SPECIAL');
 
   if (reasons.length === 0) {
     const stuckDetail = referenceDate
@@ -403,11 +430,17 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
     const deadlineDetail = schedule.officialDate
       ? '距離正式發出日期 ' + daysUntilDeadline + ' 天（門檻 ' + deadlineDays + ' 天）'
       : '沒有可用的正式發出日期，死線維度無法判斷';
+    const unconfirmedDetail = schedule.generateDate
+      ? '距離生成日期 ' + daysUntilGenerate + ' 天（門檻 ' + unconfirmedLeadDays
+        + ' 天），未確認的特殊主日 ' + unconfirmedSpecials.length + ' 個'
+      : '沒有可用的生成日期，未確認特殊主日維度無法判斷';
     return Object.assign({}, base, {
       outcome: 'SKIPPED_NOT_DUE',
-      detail: '目前 Stage「' + stage + '」：' + stuckDetail + '；' + deadlineDetail,
+      detail: '目前 Stage「' + stage + '」：' + stuckDetail + '；' + deadlineDetail
+        + '；' + unconfirmedDetail,
       reasons: [], reminderCount: reminderCount, maxCount: maxCount,
-      daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline
+      daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline,
+      daysUntilGenerate: daysUntilGenerate, unconfirmedSpecials: unconfirmedSpecials
     });
   }
 
@@ -415,7 +448,10 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
     outcome: 'WOULD_RUN',
     detail: '第 ' + (reminderCount + 1) + ' / ' + maxCount + ' 次提醒（' + reasons.join('＋') + '）',
     reasons: reasons, reminderCount: reminderCount, maxCount: maxCount,
-    daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline, stuckDays: stuckDays, deadlineDays: deadlineDays
+    daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline, stuckDays: stuckDays,
+    deadlineDays: deadlineDays,
+    daysUntilGenerate: daysUntilGenerate, unconfirmedLeadDays: unconfirmedLeadDays,
+    unconfirmedSpecials: unconfirmedSpecials
   });
 }
 

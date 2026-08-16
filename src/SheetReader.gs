@@ -71,13 +71,26 @@ function readEligibility() {
   const byPost = {};
   const byPerson = {};
   const historicalCount = {};
+  const explicitlyExcluded = {};
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ACTIVE])) continue;
-    if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ELIGIBLE])) continue;
     const personId = row[COLUMNS.ELIGIBILITY.PERSON_ID];
     const postId = row[COLUMNS.ELIGIBILITY.POST_ID];
     if (!personId || !postId) continue;
+
+    // 第十六輪批次階段 B 新增：`Active=TRUE` 但 `Eligible=FALSE` 的行，語意是
+    // 幹事**明確**寫低「呢個人唔好排呢個崗位」，跟「根本沒有這一行」（從來
+    // 沒有人考慮過）是兩回事。以前兩者的結果一樣（都是不在 byPost 裡），
+    // 所以無須分辨；但身分名單上線之後，一個持有所需身分的人會被
+    // `buildRoleAugmentedEligibleByPost_()` 自動補進候選池——如果不記住這個
+    // 明確的否決，幹事寫落的 `Eligible=FALSE` 會被身分規則靜靜噉推翻。
+    if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ELIGIBLE])) {
+      if (!explicitlyExcluded[postId]) explicitlyExcluded[postId] = {};
+      explicitlyExcluded[postId][personId] = true;
+      continue;
+    }
+
     if (!byPost[postId]) byPost[postId] = [];
     byPost[postId].push(personId);
     if (!byPerson[personId]) byPerson[personId] = [];
@@ -85,7 +98,12 @@ function readEligibility() {
     if (!historicalCount[postId]) historicalCount[postId] = {};
     historicalCount[postId][personId] = Number(row[COLUMNS.ELIGIBILITY.HISTORICAL_COUNT]) || 0;
   }
-  return { byPost: byPost, byPerson: byPerson, historicalCount: historicalCount };
+  return {
+    byPost: byPost,
+    byPerson: byPerson,
+    historicalCount: historicalCount,
+    explicitlyExcluded: explicitlyExcluded
+  };
 }
 
 /**
@@ -105,7 +123,11 @@ function readPostsNormalized() {
       mutexGroup: String(row[COLUMNS.POSTS.MUTEX_GROUP] || '').trim(),
       displayOrder: Number(row[COLUMNS.POSTS.DISPLAY_ORDER]),
       emptyDisplay: row[COLUMNS.POSTS.EMPTY_DISPLAY],
-      earlyArrivalMinutes: Number(row[COLUMNS.POSTS.EARLY_ARRIVAL_MINUTES]) || 0
+      earlyArrivalMinutes: Number(row[COLUMNS.POSTS.EARLY_ARRIVAL_MINUTES]) || 0,
+      // 第十六輪批次階段 B：擔任這個崗位所需的身分（逗號分隔＝任一符合即可）。
+      // 欄不存在時 row[...] 是 undefined，`splitList_()` 會得出空陣列＝沒有要求，
+      // 所以未補建這一欄的舊環境完全不受影響。
+      requiredRoles: String(row[COLUMNS.POSTS.REQUIRED_ROLES] || '').trim()
     };
   });
 }

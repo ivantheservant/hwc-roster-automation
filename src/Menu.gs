@@ -42,6 +42,7 @@ function onOpen() {
         .addItem('試算不同 epsilon 的效果（唯讀）', 'runEpsilonTrial_Menu_')
         .addItem('上線狀態（唯讀）', 'runGoLiveStatus_')
         .addItem('公開連結狀態（唯讀）', 'runCheckPublicLinks_')
+        .addItem('身分名單概況（唯讀）', 'runRoleOverview_')
         .addItem('SOFT 規則與選人加權（唯讀）', 'runDebugSoftRules_')
         .addItem('欄標題對照（唯讀）', 'runDebugGridHeaders_')
         .addItem('個人版 highlight 定位（唯讀）', 'runDebugPersonalHighlight_')
@@ -53,6 +54,7 @@ function onOpen() {
       ui.createMenu('準備工作')
         .addItem('⚠️ 新增季度', 'runNewQuarterWizard_')
         .addItem('⚠️ 計算季度日期', 'runComputeQuarterDates_')
+        .addItem('⚠️ 產生年度合堂建議', 'runAnnualCombinedWizard_')
         .addItem('填寫講員／翻譯／獻花', 'runOpenPreacherTranslationFill_')
         .addSeparator()
         .addItem('⚠️ 生成職事表', 'runGenerateRoster_')
@@ -71,6 +73,8 @@ function onOpen() {
         .addItem('補建 Config 參數', 'runSeedConfigKeys_')
         .addItem('補建 Posts 欄位', 'runSeedPostEmptyDisplay_')
         .addItem('補建 Posts 欄位（提早到場分鐘數）', 'runSeedPostEarlyArrivalMinutes_')
+        .addItem('補建 Posts 欄位（崗位身分要求）', 'runSeedPostRequiredRoles_')
+        .addItem('補建身分名單工作表', 'runEnsureRoleSheets_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')
         .addItem('補建 SpecialSundays 工作表', 'runEnsureSpecialSundaysSheet_')
         .addItem('建立 Requests 工作表', 'runCreateRequestsSheet_')
@@ -812,12 +816,16 @@ function runGenerateRoster_() {
     // 生成多份候選揀最貼近歷史基準的一份，並建立版本；與 Web UI、自動排程共用同一入口
     const result = performRosterGeneration_(quarterId);
 
+    // 第十六輪批次階段 D3：未確認日期的特殊主日要喺完成畫面明確標示出嚟
+    // （同「四階段流程 ▸ 步驟 1」嗰個畫面一致，兩邊讀同一個回傳值）。
+    const unconfirmedText = describeUnconfirmedSpecialSundays_(result.unconfirmedSpecials);
     ui.alert(
       '生成職事表',
       '已建立 ' + result.sheetName + '\n\n'
         + '已派人：' + result.assigned + ' 格\n'
         + '留空待確認：' + result.blank + ' 格\n'
         + '警告：' + result.warnings + ' 項\n'
+        + (unconfirmedText ? '\n' + unconfirmedText + '\n' : '')
         + '\n'
         + '試了 ' + result.attemptsRun + ' 次'
         + (result.stoppedByTime ? '（原定 ' + result.attemptsPlanned + ' 次，因時間上限提早停止）' : '') + '\n'
@@ -1962,7 +1970,9 @@ function runResetQuarterTestData_() {
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
     '　EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays，',
     '　以及其他季度的任何資料。個人專屬連結 token（NameMapping.PersonalLinkToken）',
-    '　跟人綁定、不跟季度，同樣不會受影響。'
+    '　跟人綁定、不跟季度，同樣不會受影響。',
+    '　身分名單（Roles）與個人崗位排除（PersonPostExclusions）同樣跟人不跟季度，',
+    '　不會受影響——它們用生效日期表達時間範圍，本來就不屬於任何一季。'
   ];
 
   // 第十二輪批次階段 D：呢一季曾經發佈過公開職事表時提醒——**唔會刪除

@@ -50,11 +50,23 @@ function buildGeneratorContext_(quarterId) {
   const eligibility = readEligibility();
   const maxPerQuarterDefault = Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER;
 
+  // 第十六輪批次階段 B：身分名單（堂委／執事）與個人崗位排除。
+  // `eligibility.byPost` 用增補後嘅版本蓋過原本嗰個——噉樣下游全部讀
+  // `context.eligibility.byPost` 嘅地方（候選池、`HARD_ELIGIBILITY` 檢查、
+  // 崗位動用率統計……）自動睇到同一份增補後嘅名單，唔使逐個呼叫點去改，
+  // 亦都唔會有邊個地方漏咗改而同其他地方對唔上。
+  // `historicalCount` 唔會被增補（新任堂委喺呢個崗位嘅歷史次數本來就係 0），
+  // 呢個係正確嘅：配額按歷史比例分配，佢確實冇歷史。
+  const roleContext = buildRoleContext_(eligibility, posts, timezone);
+  eligibility.byPost = roleContext.eligibleByPost;
+
   return {
     quarterId: quarterId,
     serviceDates: serviceDates,
     posts: posts,
     eligibility: eligibility,
+    roles: roleContext.roles,
+    personPostExclusions: roleContext.exclusions,
     peopleById: peopleById,
     unavailable: unavailable,
     specialByDate: specialByDate,
@@ -853,6 +865,30 @@ function evaluateViolations_(personId, state) {
     }
   }
 
+  // ---- 第十六輪批次階段 B：教會新規則 1／2（身分限制）----
+  // 判斷一律以**該主日當日**為準（唔係今日），所以換屆之後重新核對舊季度
+  // 唔會將當時合法嘅安排追溯判定為違規。見 Roles.gs 檔頭嘅 A3 說明。
+  if (isRuleEnabledAllowingDefault_(rules, RULE_IDS.ROLE_REQUIRED)) {
+    const required = requiredRolesOfPost_(post);
+    if (required.length > 0
+        && !personHasAnyRoleOn_(state.context.roles || [], personId, required, state.serviceDate.serviceDate)) {
+      violations.push(makeViolation_(rules, RULE_IDS.ROLE_REQUIRED,
+        '違反身分限制：' + post.postNameTC + ' 只可以由' + describeRoleCodes_(required)
+          + '擔任，但此人在 ' + state.serviceDate.serviceDate + ' 當日並未持有這個身分'));
+    }
+  }
+
+  // ---- 第十六輪批次階段 B：教會新規則 3（個別人士的崗位限制）----
+  if (isRuleEnabledAllowingDefault_(rules, RULE_IDS.PERSON_POST_EXCLUDED)) {
+    const exclusion = findActivePersonPostExclusion_(
+      state.context.personPostExclusions || [], personId, post.postId, state.serviceDate.serviceDate);
+    if (exclusion) {
+      violations.push(makeViolation_(rules, RULE_IDS.PERSON_POST_EXCLUDED,
+        '違反個人崗位限制：' + SHEETS.PERSON_POST_EXCLUSIONS + ' 明確排除此人擔任 '
+          + post.postNameTC + '（原因：' + (exclusion.reason || '未填') + '）'));
+    }
+  }
+
   if (isRuleEnabled_(rules, RULE_IDS.MUTEX_GROUP) && post.mutexGroup) {
     const postsThisWeek = state.weekByPerson[personId] || [];
     const clash = postsThisWeek.filter(function (otherPostId) {
@@ -903,6 +939,9 @@ function evaluateViolations_(personId, state) {
     }
   }
 
+  const roleFocus = evaluateRolePostFocus_(personId, state);
+  if (roleFocus) violations.push(roleFocus);
+
   const chairEq = evaluateChairEqAnnounce_(personId, state);
   if (chairEq) violations.push(chairEq);
 
@@ -938,6 +977,90 @@ function evaluatePersonalQuota_(personId, state) {
   return makeViolation_(rules, RULE_IDS.PERSONAL_QUOTA,
     '本季已排 ' + used + ' 次，超出個人配額 ' + quota + '（容差後 ' + allowed.toFixed(1) + '）',
     overage);
+}
+
+/**
+ * 第十六輪批次階段 C：評估 `SOFT_ROLE_POST_FOCUS`（教會新規則 4）——
+ * 現任堂委盡量集中喺指定嘅幾個崗位（主席、報告、當值堂委、聖餐襄禮），
+ * 其餘崗位盡量唔排，避免負擔過重。
+ *
+ * ## C1：點解係軟規則而唔係硬規則
+ *
+ * 教會嘅講法係「**盡量**集中」，唔係「不得擔任」。如果做成硬規則，一個
+ * 人手緊絀嘅主日（例如當日得三個人有空，其中兩個係堂委）會直接排唔到人，
+ * 留低一個 `GENUINE_GAP` 要幹事人手補——結果反而更差，而且違背咗規則本身
+ * 「避免負擔過重」嘅原意（排唔到人最後仲係要搵人補）。所以做成扣分：
+ * 有其他人選嗰陣自然唔會揀堂委，冇其他人選嗰陣照樣排得出。
+ *
+ * ## C2：強度可配置
+ *
+ * 扣分 = `(SOFT 基礎分 10 + max(0, 100 − Priority)) × TargetValue`
+ * （見 `sumPenalty_()`）。`TargetValue` 就係強度倍率：
+ * - `1`（預設）＝跟一般軟規則同級，只係一個輕微偏好；
+ * - `5`～`10`＝明顯偏好，通常足以令有其他人選時一定唔揀堂委；
+ * - 調得太大（例如 100）會令堂委喺其餘崗位幾乎等同硬規則，人手緊絀時
+ *   仍然排得出，但會壓過其他軟規則（例如次數平衡），要小心。
+ * 建議由 `5` 開始試，用「軟規則實測量度」睇實際效果再調。
+ *
+ * ## 設定放喺邊
+ *
+ * - `ScopePostIDs`＝**集中嘅四個崗位**（唔係要避開嘅崗位）。用「白名單」
+ *   而唔係「黑名單」，因為日後新增崗位時，白名單嘅預設行為係「新崗位
+ *   堂委都應該少做」，正正就係規則 4 嘅原意；黑名單就要記得逐個補上去。
+ * - `ParamJSON`＝`{"roles":["COMMITTEE"]}`，即係呢條規則針對邊個身分。
+ *   留空／解析失敗時預設 `["COMMITTEE"]`（堂委），因為規則 4 講嘅就係堂委。
+ *
+ * @param {string} personId 候選人的 PersonID
+ * @param {Object} state 目前的排表狀態
+ * @returns {?Object} 違規物件；不適用或不違規時回傳 null
+ */
+function evaluateRolePostFocus_(personId, state) {
+  const rules = state.context.rules;
+  if (!isRuleEnabled_(rules, RULE_IDS.ROLE_POST_FOCUS)) return null;
+
+  const rule = rules[RULE_IDS.ROLE_POST_FOCUS];
+  const focusPostIds = splitList_(rule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]);
+  // 一個崗位都冇填＝設定未完成。呢種情況下每一格都會扣分（因為「唔喺白名單」
+  // 永遠成立），會令排表結果離奇噉偏，所以直接當規則未生效。
+  if (focusPostIds.length === 0) return null;
+
+  // 已經喺集中崗位之內＝正正就係我哋想要嘅安排，唔扣分
+  if (focusPostIds.indexOf(state.post.postId) !== -1) return null;
+
+  const focusRoles = readRoleFocusRoles_(rule);
+  if (!personHasAnyRoleOn_(state.context.roles || [], personId, focusRoles, state.serviceDate.serviceDate)) {
+    return null; // 唔係目標身分（例如唔係堂委）＝呢條規則同佢無關
+  }
+
+  const strength = Number(rule[COLUMNS.RULE_SETTINGS.TARGET_VALUE]);
+  const multiplier = (isNaN(strength) || strength <= 0) ? 1 : strength;
+
+  return makeViolation_(rules, RULE_IDS.ROLE_POST_FOCUS,
+    describeRoleCodes_(focusRoles) + '應盡量集中在指定崗位，'
+      + state.post.postNameTC + ' 不在集中範圍內（軟規則，人手不足時仍可排）',
+    multiplier);
+}
+
+/**
+ * 讀取 `SOFT_ROLE_POST_FOCUS` 的 `ParamJSON`，取出這條規則針對哪些身分。
+ * 解析失敗一律退回 `[COMMITTEE]`（堂委）而不是拋錯——ParamJSON 打錯一個
+ * 逗號就令整個排表流程中斷，代價遠大於用一個合理預設值繼續。
+ * @param {Object} rule RuleSettings 中 SOFT_ROLE_POST_FOCUS 那一列
+ * @returns {string[]} 身分代號陣列（已大寫）
+ */
+function readRoleFocusRoles_(rule) {
+  const fallback = [ROLE_CODES.COMMITTEE];
+  const raw = String(rule[COLUMNS.RULE_SETTINGS.PARAM_JSON] || '').trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.roles) || parsed.roles.length === 0) return fallback;
+    return parsed.roles.map(function (r) { return String(r).trim().toUpperCase(); });
+  } catch (err) {
+    log_('WARN', 'SOFT_ROLE_POST_FOCUS 的 ParamJSON 無法解析（' + err.message
+      + '），改用預設值 ' + JSON.stringify(fallback));
+    return fallback;
+  }
 }
 
 /**
@@ -1123,7 +1246,13 @@ function makeViolation_(rules, ruleId, reason, multiplier) {
   const rule = rules[ruleId] || {};
   return {
     ruleId: ruleId,
-    level: String(rule[COLUMNS.RULE_SETTINGS.LEVEL] || RULE_LEVELS.SOFT).toUpperCase(),
+    // 第十六輪批次階段 B：RuleSettings 冇對應一列時嘅級別改為查
+    // `RULE_DEFAULT_LEVELS`（冇登記嘅規則仍然 fallback 做 SOFT，行為不變）。
+    // 點解一定要噉做，見 Constants.gs 嗰個 map 上面嘅說明——兩條新硬規則
+    // 如果跌返做 SOFT，生成器就唔會將違規者排除，一個唔係堂委嘅人照樣
+    // 排得到做報告，而畫面上完全睇唔出。
+    level: String(rule[COLUMNS.RULE_SETTINGS.LEVEL]
+      || RULE_DEFAULT_LEVELS[ruleId] || RULE_LEVELS.SOFT).toUpperCase(),
     priority: Number(rule[COLUMNS.RULE_SETTINGS.PRIORITY]),
     onViolation: String(rule[COLUMNS.RULE_SETTINGS.ON_VIOLATION] || ON_VIOLATION.WARN).toUpperCase(),
     reason: reason,
@@ -1140,6 +1269,28 @@ function makeViolation_(rules, ruleId, reason, multiplier) {
 function isRuleEnabled_(rules, ruleId) {
   const rule = rules[ruleId];
   if (!rule) return false;
+  return isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED]);
+}
+
+/**
+ * 同 `isRuleEnabled_()` 一樣，但**規則喺 RuleSettings 完全冇一列時，
+ * 查 `RULE_DEFAULT_ENABLED` 決定預設值**（目前只有第十六輪批次新增嘅兩條
+ * 身分硬規則預設啟用）。有列嗰陣一律以 `Enabled` 欄為準，幹事仍然可以
+ * 明確停用。
+ *
+ * 點解只有呢兩條規則需要噉樣：佢哋真正嘅開關喺資料本身（`Posts.RequiredRoles`
+ * 有冇填、`PersonPostExclusions` 有冇列），冇資料就完全冇影響。反過來如果
+ * 沿用「冇列＝停用」，幹事補建咗工作表、填好名單、填好 RequiredRoles 之後
+ * 規則仍然唔生效，而且冇任何地方會提示佢仲差一步去 RuleSettings 加一列——
+ * 呢種「睇落做齊咗但其實冇生效」正正係最危險嘅失敗方式。
+ *
+ * @param {Object.<string, Object>} rules RuleSettings 對照表
+ * @param {string} ruleId 規則 ID
+ * @returns {boolean} 是否啟用
+ */
+function isRuleEnabledAllowingDefault_(rules, ruleId) {
+  const rule = rules[ruleId];
+  if (!rule) return RULE_DEFAULT_ENABLED[ruleId] === true;
   return isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED]);
 }
 

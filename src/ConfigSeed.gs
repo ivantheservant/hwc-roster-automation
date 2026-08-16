@@ -302,6 +302,17 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.REMIND_UNCONFIRMED_SPECIAL_DAYS, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
+      defaultValue: String(DEFAULTS.REMIND_UNCONFIRMED_SPECIAL_DAYS),
+      description: '第十六輪批次新增（教會規則 5）：距離自動生成日期少於幾天，就開始提醒'
+        + '「這一季還有未確認日期的特殊主日」。用生成日期而不是正式發出日期，因為'
+        + 'SpecialSundays 的 SkipPostIDs 是在生成那一刻才套用——生成完才發現日期錯了，'
+        + '整張表要重新生成。預設 7 天（生成前一星期問，還有時間去問教會）。'
+        + '未確認的列是指 SpecialSundays 的 Confirmed 欄明確填了 FALSE 的列'
+        + '（空白一律視為已確認，見 docs/排表規則.md）。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.SEND_HOUR_LOCAL, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: '9',
       description: '每日自動排程檢查大約在幾點執行（0-23，只保證在該小時內觸發）。'

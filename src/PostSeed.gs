@@ -158,6 +158,110 @@ function planPostEarlyArrivalMinutesSeed_() {
 }
 
 /**
+ * 第十六輪批次階段 B：檢查 Posts 工作表的 `RequiredRoles` 欄現況（只讀，不寫入）。
+ *
+ * 跟另外兩個 seed 工具一個重要分別：**這個工具只補建欄位本身，一格值都不會填。**
+ * 「邊個崗位需要邊個身分」係教會嘅規定，工具冇資格猜——而且猜錯嘅後果好嚴重：
+ * 亂填一個身分要求落去，嗰個崗位就會即刻排唔到人（因為冇人符合），
+ * 而幹事只會見到一堆莫名其妙嘅空格。所以一律留空（＝冇身分要求＝行為不變），
+ * 由幹事按教會規則自己填。
+ *
+ * 對照另外兩個工具：`EmptyDisplay` 有明確嘅安全預設值（PENDING）、
+ * `EarlyArrivalMinutes` 有明確嘅安全預設值（0＝不提早），兩者填錯都唔會令
+ * 排表排唔到人，所以佢哋會填預設值；`RequiredRoles` 冇呢種安全預設值。
+ *
+ * @returns {{columnExists: boolean, columnIndex: number, postCount: number}}
+ *   columnIndex 為 1-based 欄號（欄不存在時＝目前最後一欄+1）
+ */
+function planPostRequiredRolesSeed_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.POSTS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.POSTS);
+
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  const headers = lastCol > 0 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  const existingIndex = headers.indexOf(COLUMNS.POSTS.REQUIRED_ROLES);
+  const columnExists = existingIndex !== -1;
+
+  return {
+    columnExists: columnExists,
+    columnIndex: columnExists ? existingIndex + 1 : lastCol + 1,
+    postCount: Math.max(0, lastRow - 2)
+  };
+}
+
+/**
+ * 依 planPostRequiredRolesSeed_() 的計畫，在 Posts 工作表補建 `RequiredRoles` 欄。
+ * 只加欄（第 2 行機器鍵、第 1 行中文標題），**不填任何一格的值**。
+ * 欄已存在時完全不動，回傳 false。
+ * @param {Object} plan planPostRequiredRolesSeed_() 的結果
+ * @returns {boolean} 是否真的新增了欄位
+ */
+function seedPostRequiredRoles_(plan) {
+  if (plan.columnExists) return false;
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.POSTS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.POSTS);
+
+  sheet.getRange(1, plan.columnIndex).setValue('崗位身分要求（逗號分隔，留空＝沒有要求）');
+  sheet.getRange(2, plan.columnIndex).setValue(COLUMNS.POSTS.REQUIRED_ROLES);
+  return true;
+}
+
+/**
+ * 選單項目「維護 ▸ 補建 Posts 欄位（崗位身分要求）」的執行入口。
+ * @returns {void}
+ */
+function runSeedPostRequiredRoles_() {
+  const ui = SpreadsheetApp.getUi();
+  const title = '補建 Posts 欄位（崗位身分要求）';
+  try {
+    const plan = planPostRequiredRolesSeed_();
+    if (plan.columnExists) {
+      ui.alert(title,
+        'Posts 工作表已經有 ' + COLUMNS.POSTS.REQUIRED_ROLES + ' 欄（第 '
+          + plan.columnIndex + ' 欄），沒有做任何改動。\n\n'
+          + '要設定身分要求，請直接在該欄填入身分代號：\n'
+          + '　報告 → ' + ROLE_CODES.COMMITTEE + '\n'
+          + '　當值堂委 → ' + ROLE_CODES.COMMITTEE + ',' + ROLE_CODES.DEACON + '\n'
+          + '　其餘崗位 → 留空（＝沒有身分要求）',
+        ui.ButtonSet.OK);
+      return;
+    }
+
+    const confirm = ui.alert(title,
+      '會在 Posts 工作表最後一欄之後新增 ' + COLUMNS.POSTS.REQUIRED_ROLES + ' 欄'
+        + '（目前共 ' + plan.postCount + ' 個崗位）。\n\n'
+        + '⚠️ 只會加欄位本身，**不會填任何一格的值**——\n'
+        + '　 「哪個崗位需要哪個身分」是教會的規定，系統不會替你猜，\n'
+        + '　 填錯的話那個崗位會直接排不到人。\n\n'
+        + '新增之後請自己填：\n'
+        + '　報告 → ' + ROLE_CODES.COMMITTEE + '（堂委）\n'
+        + '　當值堂委 → ' + ROLE_CODES.COMMITTEE + ',' + ROLE_CODES.DEACON + '（堂委或執事）\n'
+        + '　其餘崗位 → 留空\n\n'
+        + '確定要新增嗎？',
+      ui.ButtonSet.YES_NO);
+    if (confirm !== ui.Button.YES) return;
+
+    seedPostRequiredRoles_(plan);
+    writeAuditLog_({
+      action: '補建 Posts 欄位',
+      targetSheet: SHEETS.POSTS,
+      targetKey: COLUMNS.POSTS.REQUIRED_ROLES,
+      newValue: '（只新增欄位，沒有填任何值）',
+      source: 'runSeedPostRequiredRoles_'
+    });
+    ui.alert(title,
+      '已新增 ' + COLUMNS.POSTS.REQUIRED_ROLES + ' 欄（第 ' + plan.columnIndex + ' 欄），全部留空。\n\n'
+        + '請自己填入身分要求，填完用「查看 ▸ 身分名單概況（唯讀）」核對一次。',
+      ui.ButtonSet.OK);
+  } catch (err) {
+    log_('ERROR', 'runSeedPostRequiredRoles_ 失敗: ' + err.message);
+    ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
  * 依 planPostEarlyArrivalMinutesSeed_() 的計畫寫入 Posts 工作表：
  * 欄不存在就先在最後一欄之後新增（第 2 行寫機器鍵 'EarlyArrivalMinutes'，
  * 第 1 行寫一個中文標題方便你在工作表上辨識），然後把目前空白的格填 0

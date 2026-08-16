@@ -182,6 +182,80 @@ function computePostManpowerUsage_(assignments, posts, eligibleByPost, minRatio)
 }
 
 /**
+ * 第十六輪批次階段 C3：量度教會新規則 4 執行得點——**持有指定身分嘅人
+ * （堂委）喺「集中崗位」以外做咗幾多次**。
+ *
+ * 呢一項係規則 4 唯一睇得到成效嘅數字。規則 4 係軟規則，所以「有幾次落喺
+ * 集中範圍以外」唔一定係錯（人手緊絀時本來就容許），重點係畀幹事睇到
+ * **實際偏離咗幾多**，再決定要唔要調 `TargetValue` 強度。
+ *
+ * 判斷一律以**該主日當日**嘅身分為準，同硬規則完全一致——換屆之後翻查
+ * 舊季度，唔會將當時仲未係堂委嘅人計入。
+ *
+ * 純函式，不讀任何工作表。
+ * @param {Object[]} assignments 已正規化的派工紀錄
+ * @param {Object[]} posts 已正規化的崗位清單
+ * @param {Object[]} roles `readRolesSafe_()` 的結果
+ * @param {string[]} focusRoles 針對哪些身分（例如 ['COMMITTEE']）
+ * @param {string[]} focusPostIds 集中崗位（白名單）
+ * @returns {{applicable: boolean, focusRoles: string[], focusPostIds: string[],
+ *   insideCount: number, outsideCount: number, totalCount: number, outsideRatio: ?number,
+ *   byPost: Object[], byPerson: Object[]}}
+ */
+function measureRolePostFocus_(assignments, posts, roles, focusRoles, focusPostIds) {
+  const postNameById = {};
+  posts.forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
+  const focusSet = {};
+  focusPostIds.forEach(function (id) { focusSet[id] = true; });
+
+  const result = {
+    applicable: focusPostIds.length > 0 && roles.length > 0,
+    focusRoles: focusRoles,
+    focusPostIds: focusPostIds,
+    insideCount: 0,
+    outsideCount: 0,
+    totalCount: 0,
+    outsideRatio: null,
+    byPost: [],
+    byPerson: []
+  };
+  if (!result.applicable) return result;
+
+  const outsideByPost = {};
+  const outsideByPerson = {};
+
+  assignments.forEach(function (a) {
+    if (!a.personId) return;
+    if (!personHasAnyRoleOn_(roles, a.personId, focusRoles, a.serviceDate)) return;
+    result.totalCount++;
+    if (focusSet[a.postId]) {
+      result.insideCount++;
+      return;
+    }
+    result.outsideCount++;
+    outsideByPost[a.postId] = (outsideByPost[a.postId] || 0) + 1;
+    outsideByPerson[a.personId] = (outsideByPerson[a.personId] || 0) + 1;
+  });
+
+  result.outsideRatio = result.totalCount === 0 ? null : result.outsideCount / result.totalCount;
+
+  result.byPost = Object.keys(outsideByPost)
+    .map(function (postId) {
+      return { postId: postId, postNameTC: postNameById[postId] || postId, count: outsideByPost[postId] };
+    })
+    .sort(function (a, b) { return b.count - a.count; });
+
+  // 只回傳 PersonID 同次數，唔回傳姓名——呢個報告會寫入 Diagnostics，
+  // 而 Diagnostics 有機會被複製去對話／文件（同 Roles.gs 嘅
+  // `buildRoleOverviewRows_()` 同一個考慮）。
+  result.byPerson = Object.keys(outsideByPerson)
+    .map(function (personId) { return { personId: personId, count: outsideByPerson[personId] }; })
+    .sort(function (a, b) { return b.count - a.count; });
+
+  return result;
+}
+
+/**
  * 量度單一版本的全部軟規則指標。唯讀：只讀工作表，不寫任何東西。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -204,6 +278,14 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
     context.assignments, context.posts, sortedDates);
   const manpower = computePostManpowerUsage_(
     context.assignments, context.posts, context.eligibility.byPost, thresholds.postUsageMinRatio);
+
+  // 第十六輪批次階段 C3：規則 4（堂委集中四崗位）嘅實測數字。
+  // `buildVerifyContext_()` 已經幫我哋讀好 `context.roles`（見 Verify.gs）。
+  const focusRule = context.rules[RULE_IDS.ROLE_POST_FOCUS];
+  const roleFocus = measureRolePostFocus_(
+    context.assignments, context.posts, context.roles || [],
+    focusRule ? readRoleFocusRoles_(focusRule) : [ROLE_CODES.COMMITTEE],
+    focusRule ? splitList_(focusRule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]) : []);
 
   // 歷史基準：比例型取自 RuleSettings 的 TargetValue（那就是由 78 週歷史算出來
   // 再寫進工作表的值），次數型取自 HISTORICAL_BASELINE（Constants.gs）
@@ -234,7 +316,8 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
       distribution.maxCount, HISTORICAL_BASELINE.MAX_PER_PERSON,
       HISTORICAL_BASELINE.MAX_PER_PERSON * thresholds.countToleranceRatio),
     consecutive: consecutive,
-    manpower: manpower
+    manpower: manpower,
+    roleFocus: roleFocus
   };
 }
 
@@ -344,6 +427,34 @@ function buildSoftRuleMetricRows_(m) {
       '本季派了 ' + p.assignedSlots + ' 格；判斷：' + p.judgement
         + (p.unusedCount > 0 ? '　整季未被派到：' + p.unusedCount + ' 人' : '')));
   });
+
+  // ---- 6. 規則 4：指定身分（堂委）集中在指定崗位的程度 ----
+  const rf = m.roleFocus;
+  if (!rf || !rf.applicable) {
+    rows.push(diagRow_('6. 堂委崗位集中度（規則 4）', label, '無法計算',
+      'RuleSettings 沒有 ' + RULE_IDS.ROLE_POST_FOCUS + '（或 ScopePostIDs 是空的），'
+        + '又或者 ' + SHEETS.ROLES + ' 工作表還沒有任何身分資料。'
+        + '這一項不影響其他指標。'));
+  } else {
+    rows.push(diagRow_('6. 堂委崗位集中度（規則 4）', label,
+      describeRoleCodes_(rf.focusRoles) + '本季共服侍 ' + rf.totalCount + ' 次，'
+        + '其中 ' + rf.outsideCount + ' 次在集中崗位以外（'
+        + formatMetricPercent_(rf.outsideRatio) + '）',
+      '集中崗位：' + rf.focusPostIds.join('、')
+        + '　　數字越低代表規則 4 執行得越好；偏高時可以調大 RuleSettings 的 '
+        + RULE_IDS.ROLE_POST_FOCUS + ' TargetValue（強度倍率，建議由 5 開始試）'));
+
+    rf.byPost.forEach(function (p) {
+      rows.push(diagRow_('6. 堂委崗位集中度（規則 4）',
+        '　集中範圍外：' + p.postNameTC + '（' + p.postId + '）',
+        p.count + ' 次', ''));
+    });
+    rf.byPerson.forEach(function (p) {
+      rows.push(diagRow_('6. 堂委崗位集中度（規則 4）',
+        '　集中範圍外：' + p.personId, p.count + ' 次',
+        '（只顯示 PersonID，姓名請自行到 NameMapping 對照）'));
+    });
+  }
 
   return rows;
 }
