@@ -3,8 +3,17 @@
   h2 { font-size: 15px; margin: 8px 0 4px; }
   .hint { color: #555; font-size: 12px; margin-bottom: 10px; line-height: 1.5; }
   .warn { background: #FFF2CC; border: 1px solid #E8C61A; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; }
+  .toolbar { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .toolbar button { padding: 4px 10px; cursor: pointer; }
+  #bulkSaveBtn { font-weight: bold; }
+  #bulkStatus { font-size: 12px; color: #555; }
   .cell { border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+  .cell.optional { border-style: dashed; background: #fafafa; }
   .cell .label { font-weight: bold; margin-bottom: 4px; }
+  .cell .optional-badge {
+    font-weight: normal; font-size: 11px; color: #886400; background: #FFF2CC;
+    border-radius: 8px; padding: 1px 6px; margin-left: 6px;
+  }
   .cell input[type=text] { width: 100%; box-sizing: border-box; padding: 4px; margin-bottom: 4px; }
   .cell .suggestions { margin-bottom: 6px; }
   .cell .suggestions button {
@@ -14,23 +23,34 @@
   .cell .save-btn { padding: 4px 10px; cursor: pointer; }
   .cell .status { font-size: 11px; margin-left: 6px; }
   .empty { color: #555; padding: 12px 0; }
-  #refreshBtn { margin-bottom: 10px; padding: 4px 10px; cursor: pointer; }
+  #refreshBtn { padding: 4px 10px; cursor: pointer; }
   .error { color: #c00; white-space: pre-wrap; }
 </style>
 <body>
-  <h2>填寫講員與翻譯</h2>
+  <h2>填寫講員／翻譯／獻花</h2>
   <div class="hint">
-    講員／翻譯不受崗位資格限制，可以直接輸入新名字。填寫後會同時更新職事表格子、
-    RosterAssignments 與 AuditLog。可以隨時關閉側邊欄，之後重新開啟會繼續顯示還沒填的格子。
+    講員／翻譯／獻花不受崗位資格限制，可以直接輸入新名字，不用先出現在名單裡。
+    填寫後會同時更新職事表格子、RosterAssignments 與 AuditLog，<b>不會</b>建立新版本、
+    不會觸發規則重新檢查、不會影響已經寄出的通知（只有這個人自己的內容才會被記為
+    「有更新」）。可以隨時關閉側邊欄，之後重新開啟會繼續顯示還沒填的格子。<br>
+    <b>獻花由會友自行認獻，不是每週都有人</b>——虛線邊框、標「可留空」的格子不用
+    勉強填，留空不撳「儲存」就是正常情況，不代表漏做。
   </div>
-  <button id="refreshBtn" onclick="load()">重新整理</button>
+  <div class="toolbar">
+    <button id="refreshBtn" onclick="load()">重新整理</button>
+    <button id="bulkSaveBtn" onclick="saveAll()" style="display:none">全部儲存已輸入的格子</button>
+    <span id="bulkStatus"></span>
+  </div>
   <div id="body">載入中…</div>
 
 <script>
   var QUARTER_ID = <?= JSON.stringify(quarterId) ?>;
+  var PENDING = [];
 
   function load() {
     document.getElementById('body').innerHTML = '載入中…';
+    document.getElementById('bulkSaveBtn').style.display = 'none';
+    document.getElementById('bulkStatus').textContent = '';
     google.script.run
       .withSuccessHandler(render)
       .withFailureHandler(function (err) {
@@ -45,7 +65,15 @@
     });
   }
 
+  function suggestionsFor(data, postName) {
+    if (postName === '講員') return data.preacherSuggestions;
+    if (postName === '翻譯') return data.translationSuggestions;
+    if (postName === '獻花') return data.flowerSuggestions;
+    return [];
+  }
+
   function render(data) {
+    PENDING = data.pending;
     var html = '';
     html += '<div class="hint">' + escapeHtml(data.quarterId) + '　v' + data.versionNo
       + '　Stage=' + escapeHtml(data.stage) + '</div>';
@@ -54,13 +82,14 @@
         + '記得回選單執行「步驟 5：改動後重發」通知相關人士。</div>';
     }
     if (data.pending.length === 0) {
-      html += '<div class="empty">目前沒有還空著的講員／翻譯格子。</div>';
+      html += '<div class="empty">目前沒有還空著的講員／翻譯／獻花格子。</div>';
     } else {
       data.pending.forEach(function (p, i) {
-        var suggestions = p.postName === '講員' ? data.preacherSuggestions : data.translationSuggestions;
+        var suggestions = suggestionsFor(data, p.postName);
         var cellId = 'cell_' + i;
-        html += '<div class="cell" id="' + cellId + '">';
-        html += '<div class="label">第 ' + p.weekIndex + ' 週　' + escapeHtml(p.serviceDate) + '　' + escapeHtml(p.postName) + '</div>';
+        html += '<div class="cell' + (p.optional ? ' optional' : '') + '" id="' + cellId + '">';
+        html += '<div class="label">第 ' + p.weekIndex + ' 週　' + escapeHtml(p.serviceDate) + '　' + escapeHtml(p.postName)
+          + (p.optional ? '<span class="optional-badge">可留空</span>' : '') + '</div>';
         if (suggestions && suggestions.length > 0) {
           html += '<div class="suggestions">';
           suggestions.forEach(function (name) {
@@ -68,18 +97,38 @@
           });
           html += '</div>';
         }
-        html += '<input type="text" id="' + cellId + '_input" placeholder="輸入姓名">';
+        html += '<input type="text" id="' + cellId + '_input" placeholder="' + (p.optional ? '輸入姓名（沒有人認獻可以留空）' : '輸入姓名') + '">';
         html += '<button class="save-btn" onclick="save(\'' + cellId + '\', '
           + JSON.stringify(p.serviceDate) + ', ' + JSON.stringify(p.postId) + ', ' + p.slotIndex + ')">儲存</button>';
         html += '<span class="status" id="' + cellId + '_status"></span>';
         html += '</div>';
       });
+      document.getElementById('bulkSaveBtn').style.display = '';
     }
     document.getElementById('body').innerHTML = html;
   }
 
   function fillSuggestion(cellId, name) {
     document.getElementById(cellId + '_input').value = name;
+  }
+
+  /**
+   * 送出單一格子的儲存請求，回傳一個 Promise（google.script.run 本身唔支援
+   * Promise，呢度包一層方便 saveAll() 用 Promise.all 一次過等全部完成）。
+   * @param {string} cellId
+   * @param {string} serviceDate
+   * @param {string} postId
+   * @param {number} slotIndex
+   * @param {string} name
+   * @returns {Promise<void>}
+   */
+  function saveOne(cellId, serviceDate, postId, slotIndex, name) {
+    return new Promise(function (resolve, reject) {
+      google.script.run
+        .withSuccessHandler(function () { resolve(); })
+        .withFailureHandler(function (err) { reject(err); })
+        .apiSavePreacherTranslationEntry(QUARTER_ID, serviceDate, postId, slotIndex, name);
+    });
   }
 
   function save(cellId, serviceDate, postId, slotIndex) {
@@ -96,18 +145,74 @@
     saveBtn.disabled = true;
     input.disabled = true;
     status.textContent = '儲存中…';
-    google.script.run
-      .withSuccessHandler(function () {
+    saveOne(cellId, serviceDate, postId, slotIndex, name)
+      .then(function () {
         var cell = document.getElementById(cellId);
         cell.style.opacity = '0.5';
         status.textContent = '✓ 已儲存';
       })
-      .withFailureHandler(function (err) {
+      .catch(function (err) {
         status.textContent = '失敗：' + (err.message || String(err));
         saveBtn.disabled = false;
         input.disabled = false;
-      })
-      .apiSavePreacherTranslationEntry(QUARTER_ID, serviceDate, postId, slotIndex, name);
+      });
+  }
+
+  /**
+   * 第十四輪批次階段 C 新增：一次過儲存全部已經輸入咗姓名嘅格子，唔使一格
+   * 一格咁撳——加入獻花之後，一季最多可能同時有 39 格（3 個崗位 × 13 週）
+   * 待填，逐格撳「儲存」對幹事嚟講太多動作。冇輸入嘅格子（包括刻意留空嘅
+   * 獻花）唔會被觸碰，同逐格撳「儲存」效果一致。
+   */
+  function saveAll() {
+    var bulkBtn = document.getElementById('bulkSaveBtn');
+    var bulkStatus = document.getElementById('bulkStatus');
+    var targets = [];
+    PENDING.forEach(function (p, i) {
+      var cellId = 'cell_' + i;
+      var input = document.getElementById(cellId + '_input');
+      if (input && !input.disabled && input.value.trim()) {
+        targets.push({ cellId: cellId, serviceDate: p.serviceDate, postId: p.postId, slotIndex: p.slotIndex });
+      }
+    });
+    if (targets.length === 0) {
+      bulkStatus.textContent = '沒有已輸入姓名、還未儲存的格子。';
+      return;
+    }
+    bulkBtn.disabled = true;
+    bulkStatus.textContent = '儲存緊 0 / ' + targets.length + ' 格……';
+    var done = 0;
+    var failed = [];
+    targets.forEach(function (t) {
+      var input = document.getElementById(t.cellId + '_input');
+      var status = document.getElementById(t.cellId + '_status');
+      var saveBtn = document.querySelector('#' + t.cellId + ' .save-btn');
+      var name = input.value.trim();
+      saveBtn.disabled = true;
+      input.disabled = true;
+      status.textContent = '儲存中…';
+      saveOne(t.cellId, t.serviceDate, t.postId, t.slotIndex, name)
+        .then(function () {
+          document.getElementById(t.cellId).style.opacity = '0.5';
+          status.textContent = '✓ 已儲存';
+        })
+        .catch(function (err) {
+          status.textContent = '失敗：' + (err.message || String(err));
+          saveBtn.disabled = false;
+          input.disabled = false;
+          failed.push(t.cellId);
+        })
+        .then(function () {
+          done++;
+          bulkStatus.textContent = '儲存緊 ' + done + ' / ' + targets.length + ' 格……';
+          if (done === targets.length) {
+            bulkBtn.disabled = false;
+            bulkStatus.textContent = failed.length === 0
+              ? '✅ 已儲存 ' + targets.length + ' 格。'
+              : '完成，但有 ' + failed.length + ' 格失敗，請檢查對應格子的狀態文字。';
+          }
+        });
+    });
   }
 
   load();

@@ -86,6 +86,10 @@ function buildGridLayout_(quarterId, assignments) {
   // 唔另開新欄——新開欄會令全部「第 4 欄起先係崗位」嘅假設要逐處覆核，
   // 而「類型」欄本身就喺日期隔籬，位置同人手版一樣。
   const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
+  // 第十四輪批次階段 D：對照教會現行人手職事表——被跳過嘅格子唔係淨係寫
+  // 「特殊主日」呢句通用字，而係直接寫邊個單位負責（例如「英語堂」
+  // 「華語堂」），見 buildSpecialSundayExternalOwnerIndex_() 檔頭說明。
+  const externalOwnerByDate = buildSpecialSundayExternalOwnerIndex_(quarterId, timezone);
   const headers = [GRID_LABELS.DATE, GRID_LABELS.WEEK, GRID_LABELS.TYPE];
   const keys = [GRID_KEYS.DATE, GRID_KEYS.WEEK, GRID_KEYS.TYPE];
   const cellIndex = {};
@@ -138,7 +142,7 @@ function buildGridLayout_(quarterId, assignments) {
       };
       classCounts[cellClass]++;
       row.push(resolveGridCellText_(
-        assignment, cellClass, emptyDisplayByPostId[parts[0]], labels));
+        assignment, cellClass, emptyDisplayByPostId[parts[0]], labels, externalOwnerByDate[d.serviceDate]));
     }
     return row;
   });
@@ -171,16 +175,26 @@ function readGridCellLabels_() {
  * `Posts.EmptyDisplay` 逐個崗位嘅設定（PENDING／NA／BLANK）——有啲崗位
  * 幹事可能想佢完全空白，唔想見到「（待填）」。
  *
+ * 第十四輪批次階段 D：`SPECIAL_SKIP` 優先用 `specialSkipText`（來自
+ * `SpecialSundays.ExternalOwner`，例如「英語堂」「華語堂」）——對照教會
+ * 現行人手職事表嘅做法，被跳過嘅格子直接寫邊個單位負責，比一句通用嘅
+ * 「特殊主日」更有用（義工一睇就知道唔使自己搵人、亦知道去邊度問）。
+ * `ExternalOwner` 冇填（幹事未填、或者呢個特別主日根本冇外部單位負責，
+ * 例如純粹減少崗位、唔係轉俾另一堂）就退回原本嘅通用文字，行為同加呢個
+ * 功能之前一致，唔強制要求填。
+ *
  * @param {?Object} assignment 派工結果
  * @param {string} cellClass `classifyGridCell_()` 的結果
  * @param {string} emptyDisplay 該崗位的 Posts.EmptyDisplay 設定
  * @param {{pending: string, na: string, specialSkip: string, gap: string}} labels
+ * @param {string=} specialSkipText 該主日嘅 `SpecialSundays.ExternalOwner`；
+ *   留空就用 `labels.specialSkip`
  * @returns {string} 該格要顯示的文字
  */
-function resolveGridCellText_(assignment, cellClass, emptyDisplay, labels) {
+function resolveGridCellText_(assignment, cellClass, emptyDisplay, labels, specialSkipText) {
   if (cellClass === GRID_CELL_CLASS.ASSIGNED) return (assignment && assignment.personName) || '';
   if (cellClass === GRID_CELL_CLASS.STRUCTURAL_NA) return labels.na;
-  if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) return labels.specialSkip;
+  if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) return String(specialSkipText || '').trim() || labels.specialSkip;
   if (cellClass === GRID_CELL_CLASS.GENUINE_GAP) return labels.gap;
   return resolveEmptyDisplayText_(emptyDisplay, labels.pending, labels.na);
 }
@@ -201,6 +215,36 @@ function buildSpecialSundayTitleIndex_(quarterId, timezone) {
     if (!dateStr) return;
     const title = String(row[S.TITLE] || '').trim() || String(row[S.TYPE] || '').trim();
     if (title) index[dateStr] = title;
+  });
+  return index;
+}
+
+/**
+ * 第十四輪批次階段 D：建立「主日日期 → 外部負責單位」對照，供 `SPECIAL_SKIP`
+ * 格子顯示用（見 `resolveGridCellText_()`）。
+ *
+ * 背景：`SpecialSundays.ExternalOwner` 呢個欄喺 schema 定義咗（見
+ * `SpecialSundaysSeed.gs`），但之前全專案完全冇任何程式碼讀取——被跳過嘅
+ * 格子一律顯示同一句通用文字（`GRID_SPECIAL_SKIP_LABEL`，預設「特殊主日」），
+ * 完全冧唔到係邊個單位接手。對照教會現行人手職事表嘅做法，合堂週被跳過嘅
+ * 格子會直接寫「英語堂」／「華語堂」（邊個單位負責），呢個資訊對義工嚟講
+ * 比一句「特殊主日」更有用（唔使自己估、亦知道有疑問去邊度問）。
+ *
+ * 只取 `Active=TRUE` 嘅行；`ExternalOwner` 空白就唔加入索引（呼叫端
+ * `resolveGridCellText_()` 會退回通用文字）——填唔填係人手決定，唔強制。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>} {yyyy-MM-dd: 外部負責單位文字}
+ */
+function buildSpecialSundayExternalOwnerIndex_(quarterId, timezone) {
+  const S = COLUMNS.SPECIAL_SUNDAYS;
+  const index = {};
+  readSpecialSundays(quarterId).forEach(function (row) {
+    if (!isTrueValue_(row[S.ACTIVE])) return;
+    const dateStr = toDateString(row[S.SERVICE_DATE], timezone);
+    if (!dateStr) return;
+    const owner = String(row[S.EXTERNAL_OWNER] || '').trim();
+    if (owner) index[dateStr] = owner;
   });
   return index;
 }
@@ -510,21 +554,26 @@ function buildMonthGroups_(dateColumns) {
  * 「同一崗位嘅唔同 slot 各佔一列」，`isFirstSlot=true` 嘅嗰一列供呼叫端
  * 決定邊一列要垂直合併崗位名稱嗰個儲存格（`slotCount` 就係要合併幾多列）。
  *
- * 第十三輪批次階段 A6【bug 修正】：`Posts.EmptyDisplay=BLANK` 嘅崗位
- * （例如獻花、翻譯——刻意留空、幹事介面唔想每格都顯示「（待填）」）喺
- * 幹事介面留白冇問題，但對外公開嘅版面成行留白冇任何說明，義工會誤以為
- * 漏咗嘢。呢度喺轉置嗰陣做一個針對性嘅代換：`cellClass` 係
- * `MANUAL_PENDING` 而 `text` 係空字串（呢個組合喺 `resolveGridCellText_()`
- * 唯一對應 `EmptyDisplay=BLANK`，其餘 `MANUAL_PENDING` 情況一定有非空
- * 文字，見 RosterWriter.gs 嘅 `resolveEmptyDisplayText_()`），就換成
- * `displayOptions.blankNote` 呢句通用說明。
+ * 第十三輪批次階段 A6【bug 修正，第十四輪批次階段 A 再修正】：
+ * `Posts.EmptyDisplay=BLANK` 嘅崗位（例如獻花、翻譯——刻意留空、幹事
+ * 介面唔想每格都顯示「（待填）」）喺幹事介面留白冇問題，但對外公開嘅
+ * 版面成行留白冇任何說明，義工會誤以為漏咗嘢。
+ *
+ * 第十三輪批次原本嘅做法係逐格代入 `displayOptions.blankNote` 呢句
+ * 說明文字——**實測發現呢個做法本身有問題**：一行通常有 13 個日期欄，
+ * 13 格全部重複同一句十幾字嘅說明，唔單止畫面好嘈吵，仲會令儲存格
+ * 內文字換行、拉高成行嘅列高，令表格睇落成大截無啦啦變闊變高。
+ *
+ * 改為**完全唔喺格內寫任何文字**（留返自然嘅空白，同幹事介面一致），
+ * 說明改成**喺圖例加一行**（見 `PublicRoster.gs` 嘅
+ * `buildBlankRowLegendEntry_()`）。呢個函式呢度淨係負責數清楚實際有幾多
+ * 格屬於呢一類（`blankPendingCount`），俾圖例組數字用——判斷邏輯本身
+ * 冇變，仍然係 `cellClass === MANUAL_PENDING && text === ''`（呢個組合喺
+ * `resolveGridCellText_()` 唯一對應 `EmptyDisplay=BLANK`）。
  *
  * 刻意**唔改** `resolveGridCellText_()`／幹事介面嘅 grid——嗰個嘅空白
- * 係刻意設計（幹事知道呢啲係人手安排、唔需要提示），呢個代換只喺轉置
- * 呢一層做，只影響公開／個人頁面。刻意唔做成逐崗位分別嘅文字（例如
- * 獻花／翻譯用唔同句子）——一句通用文字已經解決「睇落好似漏咗」嘅
- * 核心問題，唔使為咗呢個顯示細節新增 Posts 欄位／seed 工具，亦對將來
- * 新增第三個 BLANK 崗位自動適用，唔使逐次追加。
+ * 係刻意設計（幹事知道呢啲係人手安排、唔需要提示），呢個統計只喺轉置
+ * 呢一層做，只影響公開／個人頁面嘅圖例。
  *
  * @param {Object} layout `buildGridLayout_()` 的結果
  * @param {{postId: string, postNameTC: string, slotCount: number}[]} posts
@@ -532,15 +581,16 @@ function buildMonthGroups_(dateColumns) {
  *   `readPosts()` 次序完全一致（呼叫端負責保證，通常直接傳
  *   `readPostsNormalized()` 嘅結果）
  * @param {Object.<string, string>} specialTitleByDate {yyyy-MM-dd: 特別主日名稱}
- * @param {{dateFormatPattern: string, blankNote: string}=} displayOptions
- *   `dateFormatPattern` 見 `formatShortDateLabel_()`；`blankNote` 見上，
- *   留空／唔傳就唔做任何代換（維持顯示空白）
- * @returns {{dateColumns: Object[], monthGroups: Object[], postRows: Object[]}}
+ * @param {{dateFormatPattern: string}=} displayOptions
+ *   `dateFormatPattern` 見 `formatShortDateLabel_()`
+ * @returns {{dateColumns: Object[], monthGroups: Object[], postRows: Object[], blankPendingCount: number}}
  *   `dateColumns`：每個日期欄一項 `{serviceDate, weekIndex, dayLabel, specialTitle}`；
  *   `monthGroups`：`buildMonthGroups_()` 的結果；
  *   `postRows`：每個崗位 slot 一項
  *   `{postId, postNameTC, slotIndex, slotCount, isFirstSlot, cells}`，
- *   `cells` 為 `{text, cellClass}` 陣列，順序同 `dateColumns` 一致
+ *   `cells` 為 `{text, cellClass}` 陣列，順序同 `dateColumns` 一致；
+ *   `blankPendingCount`：全表 `EmptyDisplay=BLANK` 而實際留空嘅格數，
+ *   供圖例組「（空白）」一行用
  */
 function transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions) {
   const opts = displayOptions || {};
@@ -568,6 +618,7 @@ function transposeRosterForPublicView_(layout, posts, specialTitleByDate, displa
 
   let columnIndex = 3; // layout.keys／layout.rows 的 0-based 索引，前 3 欄係日期/週次/類型
   const postRows = [];
+  let blankPendingCount = 0;
   posts.forEach(function (post) {
     const slotCount = Math.max(1, Number(post.slotCount) || 1);
     for (let slot = 1; slot <= slotCount; slot++) {
@@ -576,11 +627,8 @@ function transposeRosterForPublicView_(layout, posts, specialTitleByDate, displa
         const rowArr = layout.rows[dateIndex];
         const text = (rowArr && rowArr[cIdx] !== undefined) ? rowArr[cIdx] : '';
         const cellClass = (classByCell[dateIndex] && classByCell[dateIndex][cIdx]) || null;
-        const isBlankPending = cellClass === GRID_CELL_CLASS.MANUAL_PENDING && text === '';
-        return {
-          text: (isBlankPending && opts.blankNote) ? opts.blankNote : text,
-          cellClass: cellClass
-        };
+        if (cellClass === GRID_CELL_CLASS.MANUAL_PENDING && text === '') blankPendingCount++;
+        return { text: text, cellClass: cellClass };
       });
       postRows.push({
         postId: post.postId,
@@ -594,7 +642,38 @@ function transposeRosterForPublicView_(layout, posts, specialTitleByDate, displa
     }
   });
 
-  return { dateColumns: dateColumns, monthGroups: monthGroups, postRows: postRows };
+  return {
+    dateColumns: dateColumns, monthGroups: monthGroups, postRows: postRows,
+    blankPendingCount: blankPendingCount
+  };
+}
+
+/**
+ * 第十四輪批次階段 A：組出公開／個人頁面圖例入面「（空白）」嗰一行——
+ * 解釋「有啲崗位嘅格完全留空，唔係漏咗」，取代第十三輪批次逐格重複
+ * 寫呢句說明嘅做法（見 `transposeRosterForPublicView_()` 檔頭說明）。
+ *
+ * 沿用 `buildLegendRows_()` 已有嘅慣例（`docs/幹事操作說明.md`／
+ * `RosterWriter.gs` 都係「刻意全部類別都列出嚟，包括 0 格嘅」），呢一行
+ * 只喺 `blankNote` 有設定（幹事冇喺 Config 清空呢個功能）先會出現，
+ * 有出現就一定顯示（唔理 count 係咪 0）——「0 格」本身都係一項有用資訊
+ * （代表呢一季冇任何崗位整格留空）。
+ *
+ * 標記欄用「（空白）」而唔係留空白——同 `buildLegendRows_()` 嘅
+ * 「（姓名）」一致，圖例入面嘅標記本來就係*描述*呢一類格會顯示咩，
+ * 唔係逐字複製格入面嘅實際內容（呢一類格入面實際上乜都冇）。
+ *
+ * @param {string} blankNote `PUBLIC_ROSTER_BLANK_NOTE` 嘅內容（同一段文字
+ *   直接沿用做圖例說明，唔需要另外設一個 Config key）
+ * @param {number} count `transposeRosterForPublicView_()` 回傳嘅
+ *   `blankPendingCount`
+ * @returns {?Array} `[marker, meaning, countText]`；`blankNote` 空白時
+ *   回傳 `null`（呼叫端唔加呢一行）
+ */
+function buildBlankRowLegendEntry_(blankNote, count) {
+  const note = String(blankNote || '').trim();
+  if (!note) return null;
+  return ['（空白）', note, (Number(count) || 0) + ' 格'];
 }
 
 /**

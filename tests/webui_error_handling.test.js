@@ -74,8 +74,27 @@ console.log('\n=== PreacherFillSidebar.html：save() 必須在請求進行中停
   check('★ 找得到 save() 函式本身', !!fnMatch);
   const body = fnMatch ? fnMatch[1] : '';
   check('★ 函式內容有把 saveBtn.disabled 設成 true（送出請求前停用按鈕）', /saveBtn\.disabled\s*=\s*true/.test(body));
-  check('★ withFailureHandler 內有把按鈕重新啟用（saveBtn.disabled = false），失敗後使用者才可以重試',
-    /withFailureHandler[\s\S]*?saveBtn\.disabled\s*=\s*false/.test(body));
+  // 第十四輪批次階段 C：save() 改用共用嘅 saveOne()（包 Promise，畀「全部儲存」
+  // 按鈕可以用 Promise 一齊等），失敗處理由 .withFailureHandler() 改成
+  // .catch(——兩個檢查分別鎖住呢兩層各自嘅失敗路徑都有將按鈕重新啟用。
+  check('★ save() 本身嘅 .catch( 有把按鈕重新啟用（saveBtn.disabled = false），失敗後使用者才可以重試',
+    /\.catch\([\s\S]*?saveBtn\.disabled\s*=\s*false/.test(body));
+
+  const saveOneMatch = sidebarHtml.match(/function saveOne\([^)]*\)\s*\{([\s\S]*?)\n  \}/);
+  check('★★ 找得到共用嘅 saveOne()（save()／saveAll() 共用同一個真正送出請求嘅函式）', !!saveOneMatch);
+  const saveOneBody = saveOneMatch ? saveOneMatch[1] : '';
+  check('★★ saveOne() 用 withFailureHandler 將 google.script.run 嘅失敗轉成 Promise reject（唔會靜默吞錯誤）',
+    /withFailureHandler[\s\S]*?reject\(/.test(saveOneBody));
+}
+
+console.log('\n=== PreacherFillSidebar.html：saveAll()（全部儲存）失敗時一樣要重新啟用按鈕、唔會靜默 ===');
+{
+  const fnMatch = sidebarHtml.match(/function saveAll\(\)\s*\{([\s\S]*?)\n  \}/);
+  check('★★ 找得到 saveAll() 函式本身（第十四輪批次階段 C 新增）', !!fnMatch);
+  const body = fnMatch ? fnMatch[1] : '';
+  check('★ saveAll() 的 .catch( 有把對應格子嘅 saveBtn.disabled 重新啟用', /\.catch\([\s\S]*?saveBtn\.disabled\s*=\s*false/.test(body));
+  check('★ saveAll() 有記錄失敗嘅格子（failed 陣列）並喺完成訊息反映，唔會靜默略過失敗',
+    body.indexOf('failed.push') !== -1 && /failed\.length/.test(body));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

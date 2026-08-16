@@ -165,6 +165,56 @@ console.log('\n=== A2：MANUAL_PENDING 仍然尊重 Posts.EmptyDisplay 逐崗位
     gas.resolveGridCellText_(gapCell, gapCls, 'BLANK', labels), '⚠ 未能安排');
 }
 
+console.log('\n=== 第十四輪批次階段 D【核心】SPECIAL_SKIP 格子優先顯示 ExternalOwner ===');
+{
+  const labels = {
+    pending: '（待填）', na: '—', specialSkip: '特殊主日', gap: '⚠ 未能安排'
+  };
+  const cell = makeCell('specialSkip');
+  const cls = gas.classifyGridCell_(cell);
+
+  checkEqual('★★★★ 有填 ExternalOwner（例如「英語堂」）就直接顯示，唔再顯示通用嘅「特殊主日」',
+    gas.resolveGridCellText_(cell, cls, 'PENDING', labels, '英語堂'), '英語堂');
+  checkEqual('★★ 冇傳第 5 個參數（舊呼叫方式）退回通用文字，向下相容',
+    gas.resolveGridCellText_(cell, cls, 'PENDING', labels), '特殊主日');
+  checkEqual('★ ExternalOwner 係空字串照樣退回通用文字',
+    gas.resolveGridCellText_(cell, cls, 'PENDING', labels, ''), '特殊主日');
+  checkEqual('★ ExternalOwner 淨係空白字元都當冇填，退回通用文字',
+    gas.resolveGridCellText_(cell, cls, 'PENDING', labels, '   '), '特殊主日');
+  checkEqual('★ 非 SPECIAL_SKIP 嘅格唔受 ExternalOwner 影響（就算傳咗都唔會用到）',
+    gas.resolveGridCellText_(makeCell('preacher'), gas.classifyGridCell_(makeCell('preacher')), 'PENDING', labels, '英語堂'),
+    '（待填）');
+}
+
+console.log('\n=== 第十四輪批次階段 D：buildSpecialSundayExternalOwnerIndex_() ===');
+{
+  const S = gas.COLUMNS.SPECIAL_SUNDAYS;
+  const fakeRows = [
+    { [S.ACTIVE]: 'TRUE', [S.SERVICE_DATE]: '2026-10-04', [S.EXTERNAL_OWNER]: '英語堂' },
+    { [S.ACTIVE]: 'TRUE', [S.SERVICE_DATE]: '2026-11-01', [S.EXTERNAL_OWNER]: '' }, // 冇填 ExternalOwner
+    { [S.ACTIVE]: 'FALSE', [S.SERVICE_DATE]: '2026-12-06', [S.EXTERNAL_OWNER]: '華語堂' } // Active=FALSE 唔應該計入
+  ];
+  // 刻意唔載入 SheetReader.gs——嗰個檔案本身會宣告 readSpecialSundays()，
+  // vm 沙箱入面 top-level function 宣告會蓋過呢度預先設低嘅 override，
+  // 令假資料完全冧唔到用。改為連 isTrueValue_ 都一齊用 override 提供
+  // （原始碼一樣簡單：value===true 或者 trim().toUpperCase()==='TRUE'）。
+  const gas2 = loadGasSource(['Constants.gs', 'Utils.gs', 'RosterWriter.gs'], {
+    readSpecialSundays: function () { return fakeRows; },
+    isTrueValue_: function (value) {
+      if (value === true) return true;
+      return String(value).trim().toUpperCase() === 'TRUE';
+    },
+    toDateString: function (v) { return v; } // 呢個測試嘅日期已經係字串，唔需要真正轉換
+  });
+  const index = gas2.buildSpecialSundayExternalOwnerIndex_('2026T4', 'Pacific/Auckland');
+  checkEqual('★★★ 有填 ExternalOwner 嘅 Active 主日會加入索引',
+    index['2026-10-04'], '英語堂');
+  check('★ 冇填 ExternalOwner 嘅主日唔會加入索引（呼叫端會退回通用文字，唔會顯示空字串）',
+    !('2026-11-01' in index));
+  check('★★ Active=FALSE 嘅行完全唔計入（同 buildSpecialSundayTitleIndex_() 一致嘅過濾規則）',
+    !('2026-12-06' in index));
+}
+
 console.log('\n=== A2：圖例逐類都有，而且附上本季實際格數 ===');
 {
   const layout = {

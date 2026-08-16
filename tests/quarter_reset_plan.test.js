@@ -210,5 +210,51 @@ console.log('\n=== B2：確認邊啲殘留真係會／唔會影響重新生成 =
     generatorSource.indexOf('historicalCount') !== -1, true);
 }
 
+console.log('\n=== 第十四輪批次階段 E【核心】FineTuneProposals／FineTuneProposals_Archive 按 QuarterID 篩選 ===');
+{
+  // 背景：呢兩張表之前完全唔喺呢個工具嘅掃描範圍入面——主表通常會自然清空
+  // （每次套用新一批就自動搬走舊嘅），但封存表只會不斷累積、需要按季度清。
+  // 呢度移植嘅係「按 QuarterID 篩選」呢個核心邏輯本身，同 QuarterReset.gs
+  // 實際做法一致：兩張表都直接用 QuarterID 相等比對，唔使日期範圍判斷
+  // （唔似 Unavailable 冇 QuarterID 欄要用日期反推）。
+  function planFineTuneProposalSelection(rows, quarterId) {
+    return rows.filter(function (row) { return String(row.quarterId || '').trim() === quarterId; }).length;
+  }
+  const mainRows = [
+    { quarterId: '2026T4', proposalId: 'P1' },
+    { quarterId: '2026T4', proposalId: 'P2' },
+    { quarterId: '2027T1', proposalId: 'P3' } // 另一季，唔應該計入
+  ];
+  const archiveRows = [
+    { quarterId: '2026T4', proposalId: 'P4' },
+    { quarterId: '2026T4', proposalId: 'P5' },
+    { quarterId: '2026T4', proposalId: 'P6' },
+    { quarterId: '2027T1', proposalId: 'P7' }
+  ];
+  check('★★★ 主表只計同一季度嘅行', planFineTuneProposalSelection(mainRows, '2026T4'), 2);
+  check('★★★ 封存表只計同一季度嘅行（呢張表之前完全冇被呢個工具掃描過）',
+    planFineTuneProposalSelection(archiveRows, '2026T4'), 3);
+  check('★ 換一個季度就完全唔計呢啲行（另一季嘅測試殘留唔會被誤刪）',
+    planFineTuneProposalSelection(mainRows, '2099T4'), 0);
+}
+
+console.log('\n=== 第十四輪批次階段 E：真正原始碼有處理 FineTuneProposals／FineTuneProposals_Archive（唔淨係測移植版本）===');
+{
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'QuarterReset.gs'), 'utf8');
+
+  check('★★★★ planQuarterReset_() 會讀 FineTuneProposals（主表）',
+    /plan\.fineTuneProposalRows\s*=\s*readSheet\(SHEETS\.FINE_TUNE_PROPOSALS\)/.test(source), true);
+  check('★★★★ planQuarterReset_() 會讀 FineTuneProposals_Archive（封存表）',
+    /plan\.fineTuneProposalArchiveRows\s*=\s*readSheet\(FINETUNE_ARCHIVE_SHEET\)/.test(source), true);
+  check('★★★★ executeQuarterReset_() 真正刪除主表符合條件嘅行',
+    /result\.fineTuneProposalRowsDeleted\s*=\s*deleteRowsMatching_\(SHEETS\.FINE_TUNE_PROPOSALS/.test(source), true);
+  check('★★★★ executeQuarterReset_() 真正刪除封存表符合條件嘅行（有先檢查表存唔存在）',
+    /getSheetByName\(FINETUNE_ARCHIVE_SHEET\)[\s\S]{0,200}?deleteRowsMatching_\(FINETUNE_ARCHIVE_SHEET/.test(source), true);
+  check('★ 刪除嘅比對條件都係 QuarterID（唔係其他欄，避免刪錯範圍）',
+    (source.match(/COLUMNS\.FINE_TUNE_PROPOSALS\.QUARTER_ID/g) || []).length >= 2, true);
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

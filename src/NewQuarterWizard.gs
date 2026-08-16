@@ -247,8 +247,11 @@ function runNewQuarterWizard_() {
   lines.push(
     '',
     '⚠️ 特別主日（合併崇拜、浸禮、宣教月等）不會自動偵測，以上全部先當成普通主日寫入。'
-      + '寫入之後記得自己到 SpecialSundays 工作表逐一標記特別主日，並視需要把對應主日的'
-      + 'ServiceDates.AutoGenerate 改為 FALSE。',
+      + '寫入之後記得自己到 SpecialSundays 工作表逐一標記特別主日：合堂週通常只需要'
+      + '填 SkipPostIDs（例如只跳過領詩、司琴，其餘崗位照常自動排）；'
+      + '只有「呢一週完全冇崇拜、成個主日所有崗位都唔使排」呢種罕見情況'
+      + '（例如整週外借場地），先需要改 ServiceDates.AutoGenerate=FALSE'
+      + '（呢個係成週停用，唔係「跳過幾個崗位」，唔好同合堂週混用）。',
     '',
     '確定要寫入 Quarters 與 ServiceDates 嗎？'
   );

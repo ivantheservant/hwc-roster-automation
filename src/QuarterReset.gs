@@ -51,6 +51,14 @@ function planQuarterReset_(quarterId, includeV0) {
     pdfFiles: [],          // {id, name, sizeBytes}
     pdfUnrecognised: [],   // 不確定屬於哪個季度的檔案，一律不刪
     quarterStage: '',
+    // 第十四輪批次階段 E【新發現的缺口】：FineTuneProposals（主表，「步驟 3：
+    // 套用修改申報」用嘅暫存區）同 FineTuneProposals_Archive（歷史批次封存表，
+    // 見 archiveOldProposals_()）兩張表都有 QuarterID 欄，但之前呢個工具完全
+    // 冇檢查過。主表通常會自然清空（每次套用新一批就搬走舊嘅），但封存表
+    // 只會不斷累積、永遠唔會自動清，測試季度反覆套用申報留低嘅殘留會一直
+    // 留喺度。
+    fineTuneProposalRows: 0,
+    fineTuneProposalArchiveRows: 0,
     // 第十二輪批次階段 D：呢一季有冇發佈過公開職事表（PublicLinks）。
     // 有嘅話，執行階段會**清空檔案內容**（顯示「已重設」提示）但**唔會
     // 刪除檔案／PublicLinks 紀錄**，理由見 clearPublicRosterOnQuarterReset_()
@@ -238,6 +246,29 @@ function planQuarterReset_(quarterId, includeV0) {
     plan.manualAttention.push('檢查 PublicLinks（公開職事表）失敗，略過：' + err.message);
   }
 
+  // ---- FineTuneProposals（主表）／FineTuneProposals_Archive（第十四輪批次階段 E 新增）----
+  // 兩張表都有 QuarterID 欄，之前呢個工具完全冇檢查過（見上面 fineTuneProposalRows／
+  // fineTuneProposalArchiveRows 嘅欄位說明）。主表通常唔會太大（每次套用新一批就
+  // 自動搬走舊嘅，見 archiveOldProposals_()），但封存表只會不斷累積、需要按季度清。
+  try {
+    const FT = COLUMNS.FINE_TUNE_PROPOSALS;
+    plan.fineTuneProposalRows = readSheet(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
+      return String(row[FT.QUARTER_ID] || '').trim() === quarterId;
+    }).length;
+  } catch (err) {
+    plan.manualAttention.push('檢查 FineTuneProposals 失敗，略過：' + err.message);
+  }
+  try {
+    const ftArchiveSheet = ss.getSheetByName(FINETUNE_ARCHIVE_SHEET);
+    if (ftArchiveSheet) {
+      const FT = COLUMNS.FINE_TUNE_PROPOSALS;
+      plan.fineTuneProposalArchiveRows = readSheet(FINETUNE_ARCHIVE_SHEET).filter(function (row) {
+        return String(row[FT.QUARTER_ID] || '').trim() === quarterId;
+      }).length;
+    }
+  } catch (err) {
+    plan.manualAttention.push('檢查 FineTuneProposals_Archive 失敗，略過：' + err.message);
+  }
   return plan;
 }
 
@@ -257,6 +288,7 @@ function executeQuarterReset_(plan) {
   const result = {
     versionRowsDeleted: 0, versionSheetsDeleted: 0, assignmentRowsDeleted: 0,
     sendLogRowsDeleted: 0, requestRowsDeleted: 0, unavailableRowsDeleted: 0,
+    fineTuneProposalRowsDeleted: 0, fineTuneProposalArchiveRowsDeleted: 0,
     pdfTrashed: 0, stageReset: false, publicRosterCleared: false, errors: []
   };
 
@@ -271,6 +303,8 @@ function executeQuarterReset_(plan) {
       + '　SendLog=' + plan.sendLogRows + ' 行'
       + '　Requests=' + plan.requestRows + ' 行'
       + '　Unavailable(Source=REQUEST)=' + plan.unavailableRequestRows + ' 行'
+      + '　FineTuneProposals=' + plan.fineTuneProposalRows + ' 行'
+      + '　FineTuneProposals_Archive=' + plan.fineTuneProposalArchiveRows + ' 行'
       + '　PDF=' + plan.pdfFiles.length + ' 個',
     newValue: '（全部清除，Stage 重設為 ' + QUARTER_STAGE.DRAFT + '）',
     source: 'MENU',
@@ -313,6 +347,16 @@ function executeQuarterReset_(plan) {
         return !!dateFrom && dateFrom >= quarterStart && dateFrom <= quarterEnd;
       }, result.errors);
     }
+  }
+
+  // ---- FineTuneProposals（主表）／FineTuneProposals_Archive（第十四輪批次階段 E 新增）----
+  result.fineTuneProposalRowsDeleted = deleteRowsMatching_(SHEETS.FINE_TUNE_PROPOSALS, function (record) {
+    return String(record[COLUMNS.FINE_TUNE_PROPOSALS.QUARTER_ID] || '').trim() === plan.quarterId;
+  }, result.errors);
+  if (ss.getSheetByName(FINETUNE_ARCHIVE_SHEET)) {
+    result.fineTuneProposalArchiveRowsDeleted = deleteRowsMatching_(FINETUNE_ARCHIVE_SHEET, function (record) {
+      return String(record[COLUMNS.FINE_TUNE_PROPOSALS.QUARTER_ID] || '').trim() === plan.quarterId;
+    }, result.errors);
   }
 
   // ---- RosterVersions 的登記列 ----

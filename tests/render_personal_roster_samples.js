@@ -91,10 +91,7 @@ const SAMPLE_POSTS = [
   { postId: 'COMMUNION', postNameTC: '聖餐襄禮', slotCount: 1 }
 ];
 const SAMPLE_SPECIAL_TITLES = { '2026-02-01': '浸禮' };
-const SAMPLE_DISPLAY_OPTIONS = {
-  dateFormatPattern: gas.DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT,
-  blankNote: gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE
-};
+const SAMPLE_DISPLAY_OPTIONS = { dateFormatPattern: gas.DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT };
 
 /**
  * 組一份 `buildPersonalRosterPageData_()` 形狀嘅 `data`，做法同正式碼
@@ -130,6 +127,11 @@ function buildPersonalPageData(personId, personName) {
   });
   mySchedule.sort(function (a, b) { return a.serviceDate < b.serviceDate ? -1 : 1; });
 
+  // 第十四輪批次階段 A：同 buildPersonalRosterPageData_() 實際做法一致——
+  // BLANK 崗位（獻花）唔再逐格代入說明文字，改成圖例加一行。
+  const blankEntry = gas.buildBlankRowLegendEntry_(gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE, transposed.blankPendingCount);
+  const legendRows = gas.buildLegendRows_(layout).concat(blankEntry ? [blankEntry] : []);
+
   return {
     quarterId: '2099T1',
     versionNo: 4,
@@ -138,7 +140,7 @@ function buildPersonalPageData(personId, personName) {
     monthGroups: transposed.monthGroups,
     postRows: transposed.postRows,
     mySchedule: mySchedule,
-    legendRows: gas.buildLegendRows_(layout),
+    legendRows: legendRows,
     footerNote: '如對職事表有任何疑問，請聯絡幹事。',
     updatedAt: '2099-01-01 09:00:00'
   };

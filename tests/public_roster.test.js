@@ -124,7 +124,7 @@ console.log('\n=== A【本輪最重要】transposeRosterForPublicView_：崗位�
     { postId: 'COMMUNION', postNameTC: '聖餐襄禮', slotCount: 1 }
   ];
   const specialTitleByDate = { '2026-02-01': '浸禮' };
-  const displayOptions = { dateFormatPattern: '{d}', blankNote: '' };
+  const displayOptions = { dateFormatPattern: '{d}' };
 
   const t = gas.transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
 
@@ -198,6 +198,57 @@ console.log('\n=== A：多 slot 崗位（例如聖餐襄禮 4 個 slot）都會�
     t.postRows.map(function (r) { return r.cells[0].text; }), ['甲', '乙', '丙', '丁']);
   checkEqual('★ 只有第一行 isFirstSlot=true（樣板／寫表只喺呢一行合併顯示崗位名稱）',
     t.postRows.map(function (r) { return r.isFirstSlot; }), [true, false, false, false]);
+}
+
+console.log('\n=== 第十四輪批次階段 A【核心】BLANK 崗位（獻花／翻譯）唔再逐格代入說明文字 ===');
+{
+  const CLASS = gas.GRID_CELL_CLASS;
+  // FLOWER（獻花）兩週都留空（EmptyDisplay=BLANK，text=''），USHER 一格
+  // 係一般 PENDING（text='（待填）'，唔係空字串）——用嚟證明 blankPendingCount
+  // 只計真正空白嘅格，唔會連「（待填）」呢類都計埋。
+  const layout = {
+    headers: ['日期', '週次', '類型', '獻花1', '司事1'],
+    keys: ['_DATE', '_WEEK', '_TYPE', 'FLOWER#1', 'USHER#1'],
+    rows: [
+      ['2026-01-04', 1, '主日崇拜', '', '（待填）'],
+      ['2026-01-11', 2, '主日崇拜', '', '陳大文']
+    ],
+    dates: [
+      { serviceDate: '2026-01-04', weekIndex: 1, serviceType: '主日崇拜' },
+      { serviceDate: '2026-01-11', weekIndex: 2, serviceType: '主日崇拜' }
+    ],
+    cellIndex: {
+      '2026-01-04|FLOWER|1': { row: 3, column: 4, cellClass: CLASS.MANUAL_PENDING },
+      '2026-01-04|USHER|1': { row: 3, column: 5, cellClass: CLASS.MANUAL_PENDING },
+      '2026-01-11|FLOWER|1': { row: 4, column: 4, cellClass: CLASS.MANUAL_PENDING },
+      '2026-01-11|USHER|1': { row: 4, column: 5, cellClass: CLASS.ASSIGNED }
+    }
+  };
+  const posts = [
+    { postId: 'FLOWER', postNameTC: '獻花', slotCount: 1 },
+    { postId: 'USHER', postNameTC: '司事', slotCount: 1 }
+  ];
+  const t = gas.transposeRosterForPublicView_(layout, posts, {}, { dateFormatPattern: '{d}' });
+
+  checkEqual('★★★ 獻花兩格保持真空（唔再代入 blankNote 文字，見 transposeRosterForPublicView_ 檔頭說明）',
+    t.postRows[0].cells.map(function (c) { return c.text; }), ['', '']);
+  checkEqual('★ 司事「（待填）」格保持原文字（呢個唔係 BLANK 情況，唔應該受影響）',
+    t.postRows[1].cells[0].text, '（待填）');
+  checkEqual('★★★ blankPendingCount 準確數到 2（只計真正空白嘅 MANUAL_PENDING 格，'
+    + '唔連「（待填）」呢種非空 MANUAL_PENDING 一齊計）', t.blankPendingCount, 2);
+}
+
+console.log('\n=== 第十四輪批次階段 A【核心】buildBlankRowLegendEntry_：圖例「（空白）」一行 ===');
+{
+  checkEqual('★★ blankNote 有內容時組出正確嘅一行',
+    gas.buildBlankRowLegendEntry_('由會友另行安排，非本系統自動排定', 5),
+    ['（空白）', '由會友另行安排，非本系統自動排定', '5 格']);
+  checkEqual('★ count 係 0 都照樣顯示（同其餘圖例類別一致，「0 格」本身都係資訊）',
+    gas.buildBlankRowLegendEntry_('由會友另行安排，非本系統自動排定', 0),
+    ['（空白）', '由會友另行安排，非本系統自動排定', '0 格']);
+  checkEqual('★★ blankNote 係空字串（幹事喺 Config 清空咗）時回傳 null，呼叫端唔會加呢一行',
+    gas.buildBlankRowLegendEntry_('', 5), null);
+  checkEqual('★ blankNote 淨係空白字元都當作冇設定', gas.buildBlankRowLegendEntry_('   ', 5), null);
 }
 
 console.log('\n=== A1：檔名樣板代入 ===');

@@ -197,17 +197,23 @@ function buildPublicRosterContent_(quarterId, versionNo) {
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const posts = readPostsNormalized();
   const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
-  // 第十三輪批次階段 A4／A6：日期格式與 BLANK 崗位說明文字都可以喺 Config 調，
-  // 見 transposeRosterForPublicView_() 的 displayOptions 說明。
+  // 第十三輪批次階段 A4：日期格式可以喺 Config 調，見
+  // transposeRosterForPublicView_() 的 displayOptions 說明。
   const displayOptions = {
-    dateFormatPattern: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT)),
-    blankNote: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '')
+    dateFormatPattern: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
   };
   const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
 
   const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
   const showLegend = getConfig(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
   const footerNote = String(getConfig(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '');
+  // 第十四輪批次階段 A：BLANK 崗位（獻花／翻譯）嘅說明改成圖例入面加一行，
+  // 唔再逐格重複寫，見 buildBlankRowLegendEntry_() 檔頭說明。
+  const blankNote = String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '');
+  const blankLegendEntry = buildBlankRowLegendEntry_(blankNote, transposed.blankPendingCount);
+  const legendRows = showLegend
+    ? buildLegendRows_(layout).concat(blankLegendEntry ? [blankLegendEntry] : [])
+    : [];
 
   return {
     quarterId: quarterId,
@@ -216,7 +222,7 @@ function buildPublicRosterContent_(quarterId, versionNo) {
     monthGroups: transposed.monthGroups,
     postRows: transposed.postRows,
     gapColor: gapColor,
-    legendRows: showLegend ? buildLegendRows_(layout) : [],
+    legendRows: legendRows,
     footerNote: footerNote,
     updatedAt: nowTimestamp_()
   };

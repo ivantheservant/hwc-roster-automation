@@ -71,11 +71,13 @@ function buildSampleContent(quarterId, versionNo) {
     { postId: 'COMMUNION', postNameTC: '聖餐襄禮', slotCount: 1 }
   ];
   const specialTitleByDate = { '2026-02-01': '浸禮' };
-  const displayOptions = {
-    dateFormatPattern: gas.DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT,
-    blankNote: gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE
-  };
+  const displayOptions = { dateFormatPattern: gas.DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT };
   const transposed = gas.transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
+
+  // 第十四輪批次階段 A：BLANK 崗位（獻花）唔再逐格代入說明文字，改成圖例
+  // 加一行——呢度用真正嘅 buildBlankRowLegendEntry_() 組第三行，貼近
+  // buildPublicRosterContent_() 實際嘅做法。
+  const blankEntry = gas.buildBlankRowLegendEntry_(gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE, transposed.blankPendingCount);
 
   return {
     quarterId: quarterId,
@@ -86,7 +88,8 @@ function buildSampleContent(quarterId, versionNo) {
     gapColor: '#F4CCCC',
     legendRows: [
       ['（姓名）', '系統自動安排，已排定人選', '3 格'],
-      ['（待填）', '此崗位不由系統自動安排', '1 格']
+      ['（待填）', '此崗位不由系統自動安排', '1 格'],
+      blankEntry
     ],
     footerNote: '如有查詢請聯絡幹事。',
     updatedAt: '2099-01-01 12:00:00'
@@ -125,20 +128,24 @@ console.log('\n=== A7【核心】首次發佈：逐格核對最終輸出（唔�
     ['李小明', '王美美']);
   checkEqual('★ C5（待填）', sheet.getRange(5, 3, 1, 1).getValue(), '（待填）');
 
-  checkEqual('★★★ A7「獻花」列＋B7 用通用說明代替空白（第十三輪批次階段 A6 修正）',
+  checkEqual('★★★ A7「獻花」列＋B7 完全留空（第十四輪批次階段 A 修正：唔再逐格'
+    + '代入說明文字，改成圖例加一行，見下面圖例第 3 行嘅斷言）',
     [sheet.getRange(7, 1, 1, 1).getValue(), sheet.getRange(7, 2, 1, 1).getValue()],
-    ['獻花', gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE]);
+    ['獻花', '']);
 
   checkEqual('★ A8「聖餐襄禮」＋非首主日顯示「—」', [sheet.getRange(8, 1, 1, 1).getValue(), sheet.getRange(8, 3, 1, 1).getValue()],
     ['聖餐襄禮', '—']);
 
   // 資料列：dataStartRow=4，postRows.length=5（主席1＋司事2＋獻花1＋聖餐襄禮1）
   // → 佔第 4-8 行。legendTitleRow = 4+5+1 = 10，legendDataRow = 11，
-  // footerRow = 11 + legendRows.length(2) = 13。
+  // footerRow = 11 + legendRows.length(3，第十四輪批次新增「（空白）」一行) = 14。
   checkEqual('★ 圖例標題排喺資料列之後', sheet.getRange(10, 1, 1, 1).getValue(), gas.GRID_LABELS.LEGEND_TITLE);
   checkEqual('★ 圖例內容第一行', sheet.getRange(11, 1, 1, 3).getValues()[0],
     ['（姓名）', '系統自動安排，已排定人選', '3 格']);
-  checkEqual('★ footer 備註排喺圖例之後', sheet.getRange(13, 1, 1, 1).getValue(), '如有查詢請聯絡幹事。');
+  checkEqual('★★★ 圖例第 3 行「（空白）」解釋獻花兩格留空嘅原因（第十四輪批次階段 A 新增）',
+    sheet.getRange(13, 1, 1, 3).getValues()[0],
+    ['（空白）', gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE, '2 格']);
+  checkEqual('★ footer 備註排喺圖例之後', sheet.getRange(14, 1, 1, 1).getValue(), '如有查詢請聯絡幹事。');
 
   check('★★ 凍結首欄', sheet.getFrozenColumns() === 1);
   check('★★ 凍結首 3 行', sheet.getFrozenRows() === 3);

@@ -53,7 +53,7 @@ function onOpen() {
       ui.createMenu('準備工作')
         .addItem('⚠️ 新增季度', 'runNewQuarterWizard_')
         .addItem('⚠️ 計算季度日期', 'runComputeQuarterDates_')
-        .addItem('填寫講員與翻譯', 'runOpenPreacherTranslationFill_')
+        .addItem('填寫講員／翻譯／獻花', 'runOpenPreacherTranslationFill_')
         .addSeparator()
         .addItem('⚠️ 生成職事表', 'runGenerateRoster_')
         .addItem('匯出 PDF', 'runExportPdf_')
@@ -102,6 +102,7 @@ function onOpen() {
     .addSubMenu(
       ui.createMenu('測試工具')
         .addItem('⚠️ 寄送（測試模式）', 'runSendStage_')
+        .addItem('⚠️ 寄送單一 ICS／highlight 測試信', 'runSendIcsTestEmail_')
         .addItem('核對職事表', 'runVerifyRoster_')
         .addItem('自我測試', 'runSelfTest_')
         .addItem('參數掃描', 'runTuneParameters_')
@@ -1950,6 +1951,8 @@ function runResetQuarterTestData_() {
     '　SendLog：' + plan.sendLogRows + ' 行',
     '　Requests：' + plan.requestRows + ' 行',
     '　Unavailable（只限 Source=REQUEST）：' + plan.unavailableRequestRows + ' 行',
+    '　FineTuneProposals（主表）：' + plan.fineTuneProposalRows + ' 行',
+    '　FineTuneProposals_Archive（封存表）：' + plan.fineTuneProposalArchiveRows + ' 行',
     '　RosterPDF：' + plan.pdfFiles.length + ' 個檔案（移到垃圾桶，30 日內可復原）',
     '　Quarters.Stage：重設為 ' + QUARTER_STAGE.DRAFT,
     '',
@@ -2014,7 +2017,8 @@ function runResetQuarterTestData_() {
   }
 
   if (plan.versions.length === 0 && plan.assignmentRows === 0 && plan.sendLogRows === 0
-      && plan.requestRows === 0 && plan.unavailableRequestRows === 0 && plan.pdfFiles.length === 0) {
+      && plan.requestRows === 0 && plan.unavailableRequestRows === 0 && plan.pdfFiles.length === 0
+      && plan.fineTuneProposalRows === 0 && plan.fineTuneProposalArchiveRows === 0) {
     lines.push('', '沒有找到任何可以清理的東西，不需要執行。');
     ui.alert('⚠️⚠️ 重設季度測試資料', lines.join('\n'), ui.ButtonSet.OK);
     return;
@@ -2049,6 +2053,8 @@ function runResetQuarterTestData_() {
       '　SendLog：' + result.sendLogRowsDeleted + ' 行',
       '　Requests：' + result.requestRowsDeleted + ' 行',
       '　Unavailable（Source=REQUEST）：' + result.unavailableRowsDeleted + ' 行',
+      '　FineTuneProposals（主表）：' + result.fineTuneProposalRowsDeleted + ' 行',
+      '　FineTuneProposals_Archive（封存表）：' + result.fineTuneProposalArchiveRowsDeleted + ' 行',
       '　RosterPDF：' + result.pdfTrashed + ' 個已移到垃圾桶',
       '　Quarters.Stage：' + (result.stageReset ? '已重設為 ' + QUARTER_STAGE.DRAFT : '⚠ 重設失敗'),
       '　公開職事表：' + (plan.publicLinkFileUrl
