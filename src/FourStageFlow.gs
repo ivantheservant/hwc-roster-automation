@@ -26,8 +26,10 @@ const STEP3_HARD_VIOLATION_CONSEQUENCE =
   '繼續下去不會立即寄出任何電郵——步驟 3 只是把這一版定案。\n'
   + '但 Stage 會前進到 REQUESTS_APPLIED，「步驟 4：正式發出」就會解鎖，\n'
   + '屆時這些違反規則的安排會原封不動寄給各位義工。\n\n'
-  + '建議先取消，到新版本的工作表人手修正之後再執行一次本步驟\n'
-  + '（新版本已經建立並保留，取消只是令 Stage 不前進，不會令你損失任何東西）。';
+  + '建議先取消，到新版本的工作表直接改那幾格的姓名，再執行一次本步驟。\n'
+  + '系統會讀到你在工作表上的改動、重新檢查規則，並在你確認之後把改動\n'
+  + '寫成一個新版本（原版本保持不變、可以對照）。\n'
+  + '（新版本已經建立並保留，取消只是令 Stage 不前進，不會令你損失任何東西。）';
 
 /**
  * 追加階段 AR／AT：步驟 5 放行硬規則違反時要顯示的後果說明。
@@ -36,8 +38,9 @@ const STEP3_HARD_VIOLATION_CONSEQUENCE =
 const STEP5_HARD_VIOLATION_CONSEQUENCE =
   '繼續下去代表你知情並且決定照樣寄出，\n'
   + '收信人收到的職事表會包含這些違反規則的安排。\n\n'
-  + '建議先取消，到新版本的工作表人手修正之後再執行一次本步驟\n'
-  + '（新版本已經建立、不會消失，取消不會令你損失任何東西）。';
+  + '建議先取消，到新版本的工作表直接改那幾格的姓名，再執行一次本步驟。\n'
+  + '系統會讀到你在工作表上的改動並重新檢查規則。\n'
+  + '（新版本已經建立、不會消失，取消不會令你損失任何東西。）';
 
 /**
  * 步驟 1：生成初稿。要求 Stage = DRAFT 或不存在（getQuarterStage_() 已把「不存在」
@@ -245,6 +248,9 @@ function runFourStageStep3_() {
     '已套用：' + result.appliedCount + ' 筆',
     '已拒絕：' + result.rejectedCount + ' 筆',
     '無法套用：' + result.needsInputCount + ' 筆',
+    // 第十九輪批次階段 G1：上面三行數字唔會講出「其中一筆造成硬規則違反」。
+    '',
+    buildApplySummarySentence_(result),
     '',
     '待補格子（黃底）：' + result.pendingBackfillCount + ' 格',
     '新增 Eligibility：' + result.newEligibilityCount + ' 行',
@@ -267,9 +273,9 @@ function runFourStageStep3_() {
         '新版本 ' + result.sheetName + ' 已建立並保留，申報也已經處理完畢。\n\n'
           + 'Stage 維持「' + planResult.stage + '」，沒有前進到 REQUESTS_APPLIED，\n'
           + '所以「步驟 4：正式發出」暫時執行不到，不會有任何電郵寄出。\n\n'
-          + '請到 ' + result.sheetName + ' 人手修正硬規則違反的格子，\n'
-          + '然後再執行一次本步驟——屆時即使已經沒有待處理的申報，\n'
-          + '系統仍然會重新檢查一次，確認沒問題就會讓 Stage 前進。',
+          + buildManualFixGuidanceText_(result.sheetName) + '\n\n'
+          + '再執行一次本步驟時，即使已經沒有待處理的申報，系統仍然會\n'
+          + '重新檢查一次，確認沒問題就會讓 Stage 前進。',
         ui.ButtonSet.OK
       );
       return;
@@ -327,29 +333,98 @@ function handleStep3NoPendingRequests_(ui, quarterId, planResult) {
   const currentStage = planResult.stage;
   const sheetName = planResult.sheetName;
   const violations = planResult.violations;
+  const manualChanges = planResult.manualChanges || [];
+  const manualUnresolved = planResult.manualUnresolved || [];
+
+  // 第十九輪批次階段 A：人手改動係一等公民，唔可以再靜靜咁忽略。
+  // 認唔到嘅姓名要即刻講，唔好等到寫版本先發現。
+  if (manualUnresolved.length > 0) {
+    ui.alert('步驟 3：套用修改申報（有格認不出姓名）',
+      '在 ' + sheetName + ' 偵測到 ' + manualUnresolved.length + ' 格人手改動，'
+        + '但認不出是哪一位：\n\n'
+        + manualUnresolved.slice(0, 10).map(function (u) {
+          return '　• ' + u.serviceDate + '　' + u.postId + '　填了「' + u.text + '」';
+        }).join('\n')
+        + (manualUnresolved.length > 10 ? '\n　……另有 ' + (manualUnresolved.length - 10) + ' 格' : '')
+        + '\n\n請改用 People 工作表上的正式姓名（或別名），再執行一次本步驟。\n'
+        + '在認得出全部改動之前不會建立新版本，也不會前進 Stage。',
+      ui.ButtonSet.OK);
+    return;
+  }
 
   const lines = [
     quarterId + ' 目前沒有待處理（PENDING）的申報，但 Stage 仍是「' + currentStage + '」，',
     '未前進到 REQUESTS_APPLIED，所以「步驟 4：正式發出」暫時執行不到。',
-    '',
-    '以下是最新版本 ' + sheetName + ' 目前的規則檢查結果（只讀取，沒有改動任何東西）：',
     ''
-  ].concat(buildViolationReportLines_(violations, sheetName));
-  lines.push('', '確認之後就會讓 Stage 前進到 REQUESTS_APPLIED。');
+  ];
+  if (manualChanges.length > 0) {
+    lines.push('偵測到你在 ' + sheetName + ' 上人手改動了 ' + manualChanges.length + ' 格：');
+    manualChanges.slice(0, 10).forEach(function (c) {
+      lines.push('　• ' + c.serviceDate + '　' + c.postId + '　'
+        + (c.originalName || '（空白）') + ' → ' + (c.manualText || '（空白）'));
+    });
+    if (manualChanges.length > 10) lines.push('　……另有 ' + (manualChanges.length - 10) + ' 格');
+    lines.push('');
+    lines.push('以下的規則檢查結果**已經計入這些改動**。');
+  }
+  lines.push('以下是 ' + sheetName + ' 目前的規則檢查結果（只讀取，沒有改動任何東西）：');
+  lines.push('');
+  buildViolationReportLines_(violations, sheetName).forEach(function (l) { lines.push(l); });
+  lines.push('');
+  lines.push(manualChanges.length > 0
+    ? '確認之後會把這 ' + manualChanges.length + ' 格改動寫成一個新版本'
+      + '（原版本保持不變、可以對照），並讓 Stage 前進到 REQUESTS_APPLIED。'
+    : '確認之後就會讓 Stage 前進到 REQUESTS_APPLIED。');
   ui.alert('步驟 3：套用修改申報（重新檢查）', lines.join('\n'), ui.ButtonSet.OK);
 
   if (!confirmHardViolationOverride_(
     ui, quarterId, '步驟 3：套用修改申報', violations, STEP3_HARD_VIOLATION_CONSEQUENCE)) {
     ui.alert('步驟 3：套用修改申報（未前進）',
       'Stage 維持「' + currentStage + '」，「步驟 4：正式發出」仍然執行不到。\n\n'
-        + '請到 ' + sheetName + ' 人手修正之後再執行一次本步驟。', ui.ButtonSet.OK);
+        + buildManualFixGuidanceText_(sheetName), ui.ButtonSet.OK);
     return;
+  }
+
+  // 有人手改動就先 materialise 成新版本，然後先前進 Stage。
+  // 次序唔可以掉轉：Stage 前進之後代表「這一版定案」，如果嗰陣
+  // `RosterAssignments` 仲係舊人名，之後全部讀長表嘅嘢（個人 PDF、
+  // 公開職事表、ICS、hash）都會用舊人名。
+  let materialised = null;
+  if (manualChanges.length > 0) {
+    materialised = materialiseManualEdits_(
+      planResult.context, manualChanges, planResult.manualState, 'step3NoPending');
   }
 
   advanceQuarterStage_(quarterId, QUARTER_STAGE.REQUESTS_APPLIED);
   ui.alert('步驟 3：套用修改申報（完成）',
-    '沒有套用任何申報（本來就沒有待處理的），也沒有建立新版本。\n\n'
-      + 'Stage 已前進到 REQUESTS_APPLIED，「步驟 4：正式發出」現在可以執行。', ui.ButtonSet.OK);
+    (materialised
+      ? '沒有待處理的申報，但你的 ' + materialised.cellCount + ' 格人手改動已經寫成新版本 '
+        + materialised.sheetName + '（v' + materialised.versionNo + '）。\n'
+        + '原版本 ' + sheetName + ' 保持不變，可以對照。\n'
+        + '每一格改動都已記入 AuditLog。\n\n'
+        + '⚠️ 之後的步驟（個人 PDF、正式發出、公開職事表）一律會用新版本 v'
+        + materialised.versionNo + '。\n\n'
+      : '沒有套用任何申報（本來就沒有待處理的），也沒有人手改動，所以沒有建立新版本。\n\n')
+      + 'Stage 已前進到 REQUESTS_APPLIED，「步驟 4：正式發出」現在可以執行。',
+    ui.ButtonSet.OK);
+}
+
+/**
+ * 第十九輪批次階段 A3：「人手修正」嘅正確指引。
+ *
+ * 修正之前全系統得一句「請到 Roster_XXXX_vN 人手修正之後再執行一次本步驟」，
+ * 而嗰陣重跑係讀長表、睇唔到 grid 改動，即係**叫人做一件冇效果嘅事**。
+ * 而家 grid 改動真係會被讀到，所以呢句可以講得出改完會點樣被處理。
+ *
+ * @param {string} sheetName grid 工作表名
+ * @returns {string} 指引文字
+ */
+function buildManualFixGuidanceText_(sheetName) {
+  return '要修正的話：\n'
+    + '　1. 到 ' + sheetName + ' 直接改那幾格的姓名（用 People 工作表上的正式姓名或別名）\n'
+    + '　2. 再執行一次本步驟——系統會讀到你的改動、重新檢查規則，\n'
+    + '　　 並在你確認之後把改動寫成一個新版本（原版本保持不變）。\n\n'
+    + '（改 grid 之後不需要另外做任何事；也不要直接改 RosterAssignments 長表。）';
 }
 
 /**
@@ -436,9 +511,24 @@ function runFourStageStep4_() {
     if (missingCheck.applicable && missingCheck.missing.length > 0) {
       const names = missingCheck.missing.slice(0, 30).map(function (p) { return '　' + p.nameTC + '（' + p.personId + '）'; });
       const extra = missingCheck.missing.length > 30 ? '\n　……另有 ' + (missingCheck.missing.length - 30) + ' 人' : '';
+
+      // 第十九輪批次階段 C1：缺件比例過高就**唔畀揀繼續**。
+      // 之前呢度一律係 YES_NO，於是 57 / 57 全部缺件都可以撳「繼續」，
+      // 結果全體義工冇收到而 Stage 照樣鎖死。
+      if (missingCheck.gate && missingCheck.gate.blocked) {
+        ui.alert('步驟 4：正式發出（已中止）',
+          names.join('\n') + extra + '\n\n' + missingCheck.gate.message,
+          ui.ButtonSet.OK);
+        return;
+      }
+
       const proceed = ui.alert(
         '有 ' + missingCheck.missing.length + ' / ' + missingCheck.total + ' 人缺個人 PDF',
-        names.join('\n') + extra + '\n\n要先取消、去執行「產生個人 PDF」補齊，還是現在繼續？（是＝繼續／否＝取消）',
+        names.join('\n') + extra
+          + '\n\n這幾位會收不到附件（記為 ERROR_PDF_MISSING），其餘的人不受影響。'
+          + '\n缺件比例在容許範圍內（上限 '
+          + (missingCheck.gate.maxRatio * 100).toFixed(0) + '%），所以可以選擇繼續。'
+          + '\n\n要先取消、去執行「產生個人 PDF」補齊，還是現在繼續？（是＝繼續／否＝取消）',
         ui.ButtonSet.YES_NO
       );
       if (proceed !== ui.Button.YES) return;
@@ -481,12 +571,19 @@ function runFourStageStep4_() {
     const result = executeStep4Send_(quarterId);
 
     ui.alert(
-      '步驟 4：正式發出（完成）',
+      result.advanced ? '步驟 4：正式發出（完成）' : '步驟 4：正式發出（未完成）',
       (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
         + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
         + '查無電郵略過：' + result.skipped + '　未變略過：' + result.unchanged + '\n'
         + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '　PDF缺件：' + result.errorPdfMissing + '\n\n'
-        + 'Stage 已前進到 OFFICIAL_SENT。全部記錄已寫入 SendLog。',
+        // C4：數字唔會自己講故事。之前呢度得四行數字，「失敗：0」
+        // 讀落去似乎冇事，但同一屏其實寫住「PDF缺件：57」——
+        // 即係 57 位義工冇收到。結論句要自己講出嚟。
+        + result.outcomeSentence + '\n\n'
+        + (result.advanced
+          ? 'Stage 已前進到 OFFICIAL_SENT。'
+          : result.outcome.message)
+        + '\n\n全部記錄已寫入 SendLog。',
       ui.ButtonSet.OK
     );
   } catch (err) {
@@ -610,6 +707,9 @@ function runFourStageStep5_() {
       '已套用：' + applyResult.appliedCount + ' 筆',
       '已拒絕：' + applyResult.rejectedCount + ' 筆',
       '無法套用：' + applyResult.needsInputCount + ' 筆',
+      // 第十九輪批次階段 G2：步驟 5 用同一段套用邏輯，所以有同一個問題，一併修。
+      '',
+      buildApplySummarySentence_(applyResult),
       '',
       '待補格子（黃底）：' + applyResult.pendingBackfillCount + ' 格',
       ''
@@ -645,6 +745,36 @@ function runFourStageStep5_() {
   // （generateMailAttachment_() 既有的零派工略過附件邏輯會處理，見 Mailer.gs）。
   const anyoneNeedsPdf = changedList.some(function (c) { return c.hasAssignments; });
   if (anyoneNeedsPdf) {
+    // 第十九輪批次階段 D2：事先講清楚會唔會重做、大概幾耐。
+    //
+    // 實測撞到嘅困惑：啱啱先為「產生個人 PDF」做完 57 份，步驟 5 話
+    // 「版本號：v1」，但又再重新產生 57 份——睇落似出咗事。
+    //
+    // 真相係**合理行為**：檔名係
+    // `{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf`，
+    // 版本號嵌喺檔名入面，而「已存在」係按檔名判斷。所以只要期間
+    // 步驟 3 套用申報建立咗新版本，舊版本號嗰批就一定唔算數——
+    // 呢個正正就係版本號放入檔名嘅目的：唔好將舊版本嘅 PDF 當成
+    // 新版本寄出去。
+    //
+    // 所以唔使改行為，改嘅係「事先講」，唔好等人以為系統當咗機。
+    const pdfCount = changedList.filter(function (c) { return c.hasAssignments; }).length;
+    const durationText = estimatePersonalPdfDurationText_(pdfCount);
+    const proceedPdf = ui.alert(
+      '步驟 5：改動後重發（產生個人 PDF）',
+      '本次改動涉及 ' + pdfCount + ' 人的個人 PDF（版本 v' + versionNo + '），'
+        + '預計需時 ' + durationText + '。\n\n'
+        + 'ℹ️ 如果你剛剛才執行過「產生個人 PDF」，這裡仍然可能全部重做一次。\n'
+        + '這不是故障：檔名裡面有版本號'
+        + '（{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf），\n'
+        + '只要期間建立過新版本，舊版本號那一批就不算數——因為新版本的內容\n'
+        + '可能不同，把舊版本的 PDF 當成新版本寄出去才是真正的錯。\n\n'
+        + '想先確認的話，可以取消，改用「微調 ▸ 個人 PDF 版本分佈（唯讀）」看清楚。\n\n'
+        + '要現在開始產生嗎？',
+      ui.ButtonSet.YES_NO
+    );
+    if (proceedPdf !== ui.Button.YES) return;
+
     let pdfResult;
     try {
       SpreadsheetApp.getActiveSpreadsheet().toast('產生個人 PDF 中，請稍候…', '步驟 5：改動後重發', 300);
@@ -834,7 +964,8 @@ function confirmHardViolationOverride_(ui, quarterId, title, violations, consequ
   if (response.getSelectedButton() !== ui.Button.OK) return false;
   if (!resolveHardViolationRelease_(violations, response.getResponseText())) {
     ui.alert(title, '輸入的文字不是「確認放行」，已當作取消，不會寄出任何電郵。\n\n'
-      + '新版本已經建立並保留，你可以人手修正之後再執行一次本步驟。', ui.ButtonSet.OK);
+      + '新版本已經建立並保留。你可以到工作表直接改那幾格的姓名，\n'
+      + '再執行一次本步驟——系統會讀到你的改動並重新檢查。', ui.ButtonSet.OK);
     return false;
   }
   logHardViolationRelease_(quarterId, title, hard);

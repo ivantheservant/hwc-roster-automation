@@ -560,3 +560,182 @@ function buildPdfBatchResult_(progress, done) {
     elapsedMs: Date.now() - progress.startedAtMs
   };
 }
+
+/**
+ * 第十九輪批次階段 D1：個人 PDF 檔案按版本號分佈嘅診斷（唯讀）。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個工具
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 實測見到嘅現象：
+ *   1. 執行「產生個人 PDF」→ 報「已全部完成 57 人，新產生 57 個，
+ *      略過（已存在同版本且大小正常）0 個」
+ *   2. 步驟 5 → 確認畫面顯示「版本號：v1」，但又再重新產生咗 57 份
+ *
+ * 睇落好似 bug——同一個 v1、`PDF_REGENERATE_IF_EXISTS` 又係 FALSE，
+ * 理論上應該全部略過。
+ *
+ * **但機制上呢個係合理行為。** 檔名係
+ * `{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf`，
+ * **版本號嵌喺檔名入面**（`buildAttachmentName_()`，PdfExport.gs）。
+ * 「已存在」嘅判斷係「同一個檔名 + 大小達標」（`generateOnePersonalPdf_()`），
+ * 所以只要版本號唔同，就一定係另一個檔名 ⇒ 一定要重新產生。
+ *
+ * 而「產生個人 PDF」個選單項嘅版本號提示係「留空 = 最新版本」
+ * （`promptQuarterAndVersion_()`）——即係話：**如果產生 PDF 嗰陣最新版本
+ * 係 v0，之後步驟 3 套用申報建立咗 v1，噉步驟 5 為 v1 重做全部 57 份
+ * 係完全正確嘅**，因為 v1 嘅內容可能同 v0 唔同，唔應該把 v0 嘅 PDF
+ * 當成 v1 嘅寄出去。版本號放入檔名，正正就係為咗防止呢件事。
+ *
+ * 呢個工具令上面嗰個推論**由「應該係噉」變成「睇得到」**：
+ * 列出資料夾入面每個版本號各有幾多份，一眼睇得出係咪版本號唔同。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {{quarterId: string, latestVersionNo: number, byVersion: Object[],
+ *   totalFiles: number, folderName: string}}
+ */
+function diagnosePersonalPdfVersions_(quarterId) {
+  const folder = resolveMailAttachmentFolder_();
+  const latestVersionNo = findLatestVersionNo(quarterId);
+
+  // 用一個唔可能出現喺真實姓名入面嘅哨兵字串去反推檔名格式，
+  // 就唔使喺呢度重新拼一次 pattern（重複實作＝遲早分岔）。
+  const counts = {};
+  let totalFiles = 0;
+  const files = folder.getFiles();
+  while (files.hasNext()) {
+    const name = files.next().getName();
+    if (name.indexOf(quarterId) === -1) continue;
+    totalFiles++;
+    const match = /_v(\d+)_/.exec(name);
+    const key = match ? 'v' + match[1] : '（檔名裡看不到版本號）';
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  const byVersion = Object.keys(counts).sort().map(function (k) {
+    return { version: k, count: counts[k] };
+  });
+
+  return {
+    quarterId: quarterId,
+    latestVersionNo: latestVersionNo,
+    byVersion: byVersion,
+    totalFiles: totalFiles,
+    folderName: folder.getName()
+  };
+}
+
+/**
+ * 把 `diagnosePersonalPdfVersions_()` 嘅結果講成人話，並且直接答
+ * 「下一次寄送會唔會重做全部 PDF」。
+ * @param {Object} diag `diagnosePersonalPdfVersions_()` 嘅結果
+ * @returns {string} 報告文字
+ */
+function buildPersonalPdfVersionReport_(diag) {
+  const latestKey = 'v' + diag.latestVersionNo;
+  const latestEntry = diag.byVersion.filter(function (v) { return v.version === latestKey; })[0];
+  const latestCount = latestEntry ? latestEntry.count : 0;
+  const staleCount = diag.totalFiles - latestCount;
+
+  const lines = [
+    diag.quarterId + ' 的個人 PDF 現況（資料夾：' + diag.folderName + '）',
+    '',
+    '　目前最新版本：v' + diag.latestVersionNo,
+    '　資料夾內這一季的檔案：' + diag.totalFiles + ' 個',
+    ''
+  ];
+  diag.byVersion.forEach(function (v) {
+    lines.push('　　' + v.version + '：' + v.count + ' 個'
+      + (v.version === latestKey ? '　← 最新版本' : '　（舊版本）'));
+  });
+
+  lines.push('');
+  if (latestCount === 0 && diag.totalFiles > 0) {
+    lines.push('⚠️ 最新版本 ' + latestKey + ' 一份都沒有——下一次寄送會重新產生全部。');
+    lines.push('');
+    lines.push('這**不是故障**。檔名裡面有版本號'
+      + '（{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf），');
+    lines.push('「已存在」的判斷是「同一個檔名而且大小達標」，所以版本號一變，');
+    lines.push('舊檔就不算數——因為新版本的內容可能不同，把舊版本的 PDF 當成');
+    lines.push('新版本寄出去才是真正的錯。版本號放進檔名正是為了防止這件事。');
+    lines.push('');
+    lines.push('最常見的成因：產生 PDF 的時候最新版本還是舊那個'
+      + '（「產生個人 PDF」的版本號留空 = 當時的最新版本），');
+    lines.push('之後步驟 3 套用申報又建立了新版本。');
+  } else if (staleCount > 0) {
+    lines.push('　最新版本已有 ' + latestCount + ' 個，另有 ' + staleCount
+      + ' 個是舊版本的檔案（不會被寄出，可以用「清理舊 PDF」移除）。');
+  } else {
+    lines.push('✅ 全部檔案都是最新版本，下一次寄送會略過已存在的，不會重做。');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * 選單：個人 PDF 版本分佈（唯讀）。
+ * @returns {void}
+ */
+function runDiagnosePersonalPdfVersions_() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt('個人 PDF 版本分佈（唯讀）',
+    '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+  const quarterId = normalizeIdInput_(response.getResponseText());
+  if (!quarterId) return;
+
+  try {
+    const diag = diagnosePersonalPdfVersions_(quarterId);
+    ui.alert('個人 PDF 版本分佈（唯讀）',
+      buildPersonalPdfVersionReport_(diag) + '\n\n（本工具只讀取，沒有改動任何東西。）',
+      ui.ButtonSet.OK);
+  } catch (err) {
+    ui.alert('個人 PDF 版本分佈（唯讀）', '檢查失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * 第十九輪批次階段 D2：估算一批個人 PDF 要幾耐，用嚟喺對話框先講清楚。
+ *
+ * 數字來源：2026-08-17 嘅 57 份實測——總耗時 530.3 秒，即每份約 9.3 秒
+ * （已包含撞速率限制之後嘅重試等待）。呢個係**實測平均**，唔係理論值。
+ *
+ * @param {number} count 要產生嘅份數
+ * @returns {string} 例如「約 9 分鐘」
+ */
+function estimatePersonalPdfDurationText_(count) {
+  if (!count || count <= 0) return '';
+  const seconds = count * PERSONAL_PDF_SECONDS_PER_FILE;
+  if (seconds < 90) return '約 ' + Math.round(seconds) + ' 秒';
+  return '約 ' + Math.max(1, Math.round(seconds / 60)) + ' 分鐘';
+}
+
+/**
+ * 第十九輪批次階段 E2：睇完一批之後，把「重試次數」翻譯成一句可行動嘅提示。
+ *
+ * 點解要有：實測 57 份撞咗 47 次重試，即係大部分匯出都至少撞過一次
+ * Google 端嘅速率限制，而「重試 47 次」呢五個字本身唔會令人知道
+ * **超過一半嘅總時間係喺度等**（285 / 530 秒），更加唔會令人知道
+ * 呢件事係調得郁嘅。
+ *
+ * ⚠️ 呢一項係優化提示，唔係錯誤。重試機制本身運作正常（最終 57 份
+ * 全部成功、`ERROR_PDF = 0`），唔應該因為呢個提示而去改重試邏輯。
+ *
+ * @param {Object} result `buildPdfBatchResult_()` 嘅結果
+ * @returns {string} 提示文字；唔需要提示時回傳空字串
+ */
+function buildPdfRetryHintText_(result) {
+  const total = Number(result.totalPeople || 0);
+  const retries = Number(result.totalRetries || 0);
+  if (total <= 0 || retries <= 0) return '';
+  const ratio = retries / total;
+  if (ratio < PDF_RETRY_RATIO_HINT_THRESHOLD) return '';
+
+  return '\n\n💡 重試 ' + retries + ' 次 / ' + total + ' 份（'
+    + (ratio * 100).toFixed(0) + '%）——大部分匯出都撞到 Google 端的速率限制，\n'
+    + '而每次重試之前都要等，這些等待時間往往佔總耗時一半以上。\n'
+    + '想快一點的話，可以把 Config 的 ' + CONFIG_KEYS.PDF_EXPORT_PACING_MS
+    + ' 調大（目前預設 ' + DEFAULTS.PDF_EXPORT_PACING_MS + ' ms）：\n'
+    + '每份之間多等一點，反而可能因為不再撞限制而令總時間變短。\n'
+    + '（這不是故障——這一批全部都成功產生了。）';
+}

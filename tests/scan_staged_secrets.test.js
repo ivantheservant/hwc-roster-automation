@@ -76,6 +76,47 @@ console.log('\n=== D4【核心】方向一：假網域一定要捉到 ===');
     JSON.stringify(found[0]));
 }
 
+console.log('\n=== 歧義 TLD：有啲頂層網域同時係常見 JS 屬性名 ===');
+{
+  // 第十九輪批次實測：commit 前掃描被一句拼接檔案路徑嘅程式碼擋住。
+  // 關卡本身運作正常，但係誤判——嗰個屬性名真係一個合法 gTLD。
+  // 同上面嘅網域樣本一樣：呢啲「物件.屬性」形狀本身就係掃描器要判斷嘅
+  // 目標，寫成完整字串會被自己捉到，所以一律執行時拼接。
+  const PROP_A = 'file' + '.na' + 'me';
+  const PROP_B = 'row' + '.da' + 'te';
+  const PROP_C = 'quarter' + '.li' + 'nk';
+
+  const codeLines = [
+    L('tools/x.js', 139, "    report('樣板逃逸', 'src/ui/' + " + PROP_A + ', no, line,'),
+    L('src/A.gs', 10, '  const d = ' + PROP_B + ';'),
+    L('src/B.gs', 20, '  return ' + PROP_C + ';')
+  ];
+  checkEqual('★★★★★ 純程式碼位置嘅「物件.屬性」唔算網域'
+    + '（呢啲結尾真係合法 TLD，攔唔到嘅話每個 JS 檔都會擋 commit）',
+    scanner.scanDomains(codeLines).map(function (f) { return f.match; }), []);
+
+  // ★ 反證：同一批 TLD 出現喺引號入面就要照捉
+  const QUOTED_AMBIGUOUS = 'someorg' + '.na' + 'me';
+  const quotedLines = [L('src/C.gs', 5, "  const url = 'https://" + QUOTED_AMBIGUOUS + "/x';")];
+  checkEqual('★★★★★ 反證：同一個 TLD 出現喺引號入面（＝真係當網域用）就要捉到'
+    + '——降噪唔可以順手放行成個 TLD',
+    scanner.scanDomains(quotedLines).map(function (f) { return f.match; }),
+    [QUOTED_AMBIGUOUS]);
+
+  // ★ 反證二：散文（docs/ 或註釋）入面照捉
+  const proseLines = [L('docs/y.md', 3, '請到 ' + QUOTED_AMBIGUOUS + ' 查看')];
+  checkEqual('★★★★ 反證：docs 散文入面照捉（真網域最常出現喺呢度）',
+    scanner.scanDomains(proseLines).map(function (f) { return f.match; }),
+    [QUOTED_AMBIGUOUS]);
+
+  // ★ 反證三：教會網域用嘅 TLD 唔喺歧義清單，完全唔受影響
+  const CHURCH_LIKE = 'somechurch' + '.o' + 'rg';
+  checkEqual('★★★★★ 反證：`.org` 唔喺歧義清單，即使喺純程式碼位置都照捉'
+    + '——教會網域係 .org／.nz／.com 呢類，唔會因為呢個降噪而漏',
+    scanner.scanDomains([L('src/D.gs', 1, '  const x = ' + CHURCH_LIKE + ';')])
+      .map(function (f) { return f.match; }), [CHURCH_LIKE]);
+}
+
 console.log('\n=== D4：假電郵一定要捉到 ===');
 {
   const lines = [L('docs/y.md', 7, '聯絡 ' + FAKE_EMAIL + ' 查詢')];

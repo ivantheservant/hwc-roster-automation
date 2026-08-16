@@ -156,6 +156,16 @@ function getConfigKeySeeds_() {
         + '會重新產生；寄送前也用這個門檻判斷附件是否完整，不完整記為缺件不寄出。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.STEP4_MAX_MISSING_PDF_RATIO, type: CONFIG_TYPES.DEC, group: 'PDF_EXPORT',
+      defaultValue: String(DEFAULTS.STEP4_MAX_MISSING_PDF_RATIO),
+      description: '第十九輪批次新增。步驟 4「正式發出」容許的個人 PDF 缺件比例上限'
+        + '（0–1，預設 0.2）。缺件人數 ÷ 應收人數超過這個比例就直接中止，'
+        + '不會再提供「現在繼續」的選擇。實測背景：曾經在 57／57 人全部缺件的情況下'
+        + '仍然可以按「繼續」，結果全體義工一個都沒有收到，而 Stage 已經前進到'
+        + ' OFFICIAL_SENT、鎖住了重跑步驟 4 的路。',
+      editable: 'TRUE'
+    },
     // ---- MAIL ----
     {
       key: CONFIG_KEYS.MAIL_ADMIN_NOTIFY, type: CONFIG_TYPES.EMAIL, group: 'MAIL',

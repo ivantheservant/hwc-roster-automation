@@ -143,13 +143,20 @@ function planStep3_(quarterId) {
   if (versionNo < 0) {
     return { mode: 'NO_VERSION', stage: stage, skippedIncompleteCount: plan.skippedIncompleteCount };
   }
-  const violations = recomputeLatestVersionViolations_(quarterId, versionNo);
+  // 第十九輪批次階段 A：呢度而家睇到 grid 上嘅人手改動（之前讀長表，
+  // 所以幹事點改都冇分別）。`manualChanges` 交畀呼叫端，令對話框
+  // 講得出「偵測到 N 格人手改動」，同埋確認之後 materialise 成新版本。
+  const recomputed = recomputeLatestVersionState_(quarterId, versionNo);
   return {
     mode: 'NO_PENDING_NEEDS_ADVANCE',
     stage: stage,
     versionNo: versionNo,
     sheetName: buildRosterSheetName_(quarterId, versionNo),
-    violations: violations,
+    violations: recomputed.violations,
+    manualChanges: recomputed.changes,
+    manualUnresolved: recomputed.unresolved,
+    manualState: recomputed.state,
+    context: recomputed.context,
     skippedIncompleteCount: plan.skippedIncompleteCount
   };
 }
@@ -244,7 +251,11 @@ function planStep4Warnings_(quarterId) {
  */
 function planStep4MissingPdf_(quarterId, versionNo) {
   requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
-  return checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+  const result = checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+  // 第十九輪批次階段 C1：缺件比例過高時 `gate.blocked = true`，
+  // 呼叫端唔應該再畀「現在繼續」呢個選擇。
+  result.gate = evaluateStep4MissingPdfGate_(result);
+  return result;
 }
 
 /**
@@ -276,8 +287,34 @@ function executeStep4Send_(quarterId) {
   requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
+
+  // 第十九輪批次階段 C1：真正寄之前再擋一次。
+  // 唔可以淨係靠對話框——Web UI 每次請求都係獨立嘅，畫面順序攔唔到
+  // 直接呼叫；而且幹事由睇警告到撳確認之間，狀態有可能已經變咗。
+  const gate = evaluateStep4MissingPdfGate_(
+    checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL));
+  if (gate.blocked) {
+    throw new Error('步驟 4：正式發出——因為個人 PDF 缺件太多而中止。\n\n' + gate.message);
+  }
+
   const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
-  advanceQuarterStage_(quarterId, QUARTER_STAGE.OFFICIAL_SENT);
+
+  // 第十九輪批次階段 C2：**寄送結果唔理想就唔前進 Stage。**
+  //
+  // 修正之前呢度係無條件前進。實測後果：57 / 57 人因為缺 PDF 而冇收到，
+  // Stage 照樣去咗 OFFICIAL_SENT，跟住想重跑步驟 4 就被 Stage 檢查拒絕
+  // ——即係「系統話已正式發出、Stage 鎖死，但全體義工冇收到」，
+  // 而且冇任何合法補救途徑，最後係靠步驟 5 嘅副作用救返。
+  //
+  // 劃線準則見 `evaluateStep4SendOutcome_()`：查無電郵唔算未處理
+  // （已知而且無解），其餘「試過但未成功」一律算未處理。
+  const outcome = evaluateStep4SendOutcome_(result);
+  result.outcome = outcome;
+  result.outcomeSentence = buildStep4OutcomeSentence_(result);
+  result.advanced = outcome.ok;
+  if (outcome.ok) {
+    advanceQuarterStage_(quarterId, QUARTER_STAGE.OFFICIAL_SENT);
+  }
   return result;
 }
 
@@ -383,4 +420,155 @@ function planStep5SendPreview_(quarterId, versionNo, context, changedList) {
  */
 function executeStep5Send_(quarterId, versionNo, changedList) {
   return sendResendStage_(quarterId, versionNo, changedList.map(function (c) { return c.personId; }));
+}
+
+/* ============================================================
+ * 第十九輪批次階段 C：步驟 4 缺件保護與 Stage 前進判斷
+ *
+ * 實測撞到嘅事（Ivan 親自行過）：
+ *   1. 未產生個人 PDF 就行步驟 4，系統警告「57 / 57 人缺個人 PDF」，
+ *      但**畀咗「現在繼續」呢個選擇**
+ *   2. 撳「繼續」⇒ 收件人 59、模擬 2、PDF 缺件 57、失敗 0
+ *      —— 57 位義工一個都冇通知到
+ *   3. **但 Stage 照樣前進到 OFFICIAL_SENT**
+ *   4. 補齊 PDF 之後想重跑步驟 4 ⇒ 「需要 Stage 為 REQUESTS_APPLIED」，拒絕
+ *   5. 結果變成：系統話「已正式發出」、Stage 已鎖死，但全體義工冇收到，
+ *      而摘要嗰行「失敗：0」令人以為一切正常
+ *
+ * 換咗 DRY_RUN=FALSE 嘅真實運作，呢個就係一次靜靜噉失敗嘅正式發出。
+ * ============================================================ */
+
+/**
+ * C1：缺件比例過高就唔應該畀人繼續。
+ *
+ * 點解要用**比例**而唔係「有缺件就擋」：少量缺件係合理嘅營運情況
+ * （例如某人姓名有特殊字元令 PDF 匯出失敗，1 / 57），一刀切全擋會令
+ * 幹事為咗一個人卡住成季，噉樣佢就會想辦法繞過個關卡——關卡越嚴，
+ * 被繞過嘅機會越大。所以：少量放行（有警告），大量直接擋。
+ *
+ * 門檻放喺 Config（`STEP4_MAX_MISSING_PDF_RATIO`，預設 0.2），
+ * 有需要可以自己調。57 / 57 = 1.0，遠超門檻，一定擋。
+ *
+ * @param {Object} missingResult `checkMissingPersonalPdfs_()` 嘅結果
+ * @param {number=} maxRatio 容許嘅缺件比例（0–1）；預設讀 Config
+ * @returns {{blocked: boolean, ratio: number, missingCount: number,
+ *   total: number, maxRatio: number, message: string}}
+ */
+function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
+  const limit = typeof maxRatio === 'number'
+    ? maxRatio
+    : Number(getConfig(CONFIG_KEYS.STEP4_MAX_MISSING_PDF_RATIO, DEFAULTS.STEP4_MAX_MISSING_PDF_RATIO));
+
+  if (!missingResult || !missingResult.applicable || !missingResult.total) {
+    return { blocked: false, ratio: 0, missingCount: 0, total: 0, maxRatio: limit, message: '' };
+  }
+
+  const missingCount = missingResult.missing.length;
+  const ratio = missingCount / missingResult.total;
+  if (missingCount === 0 || ratio <= limit) {
+    return {
+      blocked: false, ratio: ratio, missingCount: missingCount,
+      total: missingResult.total, maxRatio: limit, message: ''
+    };
+  }
+
+  return {
+    blocked: true, ratio: ratio, missingCount: missingCount,
+    total: missingResult.total, maxRatio: limit,
+    message: '缺個人 PDF 的人數是 ' + missingCount + ' / ' + missingResult.total
+      + '（' + (ratio * 100).toFixed(1) + '%），超過容許上限 '
+      + (limit * 100).toFixed(0) + '%。\n\n'
+      + '**這一步不能繼續**——照樣寄出的話，這 ' + missingCount
+      + ' 位義工會一個都收不到通知，\n'
+      + '而 Stage 會前進到 OFFICIAL_SENT、鎖住重跑步驟 4 的路。\n\n'
+      + '請先執行「準備工作 ▸ 產生個人 PDF」，補齊之後再回來。\n\n'
+      + '（如果你確定這一季本來就不需要個人 PDF 附件，'
+      + '請改 Email 範本的 AttachType，不要用放行的方式繞過。'
+      + '要調整容許比例的話，改 Config 的 '
+      + CONFIG_KEYS.STEP4_MAX_MISSING_PDF_RATIO + '。）'
+  };
+}
+
+/**
+ * C2：寄送結果算唔算「完成」，即係應唔應該前進 Stage。
+ *
+ * 點樣劃線：
+ *
+ * | 狀態 | 算唔算已處理 | 理由 |
+ * |---|---|---|
+ * | `SENT` | ✅ | 真係寄咗 |
+ * | `DRY_RUN` | ✅ | 演習模式下嘅正常結果 |
+ * | `SKIPPED_NO_EMAIL` | ✅ | **已知而且無解**——本季有 7 位義工本來就冇電郵，唔應該因為呢個卡住成季 |
+ * | `SKIPPED_UNCHANGED` | ✅ | 冇改動、唔使再寄 |
+ * | `FAILED` | ❌ | 寄送失敗，有得補救 |
+ * | `ERROR_PDF` | ❌ | PDF 產生失敗，有得補救 |
+ * | `ERROR_PDF_MISSING` | ❌ | PDF 缺件，有得補救 |
+ *
+ * 原則：**「系統試過但未成功、而且補救得到」嘅一律唔算完成。**
+ * 「無論點做都唔會成功」（冇電郵）就唔應該卡住流程。
+ *
+ * @param {Object} sendResult `sendStage()` 嘅結果
+ * @returns {{ok: boolean, unhandledCount: number, breakdown: Object, message: string}}
+ */
+function evaluateStep4SendOutcome_(sendResult) {
+  const failed = Number(sendResult.failed || 0);
+  const errorPdf = Number(sendResult.errorPdf || 0);
+  const errorPdfMissing = Number(sendResult.errorPdfMissing || 0);
+  const unhandled = failed + errorPdf + errorPdfMissing;
+
+  const breakdown = { failed: failed, errorPdf: errorPdf, errorPdfMissing: errorPdfMissing };
+  if (unhandled === 0) {
+    return { ok: true, unhandledCount: 0, breakdown: breakdown, message: '' };
+  }
+
+  const parts = [];
+  if (errorPdfMissing > 0) parts.push(errorPdfMissing + ' 位因為缺個人 PDF');
+  if (errorPdf > 0) parts.push(errorPdf + ' 位因為個人 PDF 產生失敗');
+  if (failed > 0) parts.push(failed + ' 位因為寄送失敗');
+
+  return {
+    ok: false,
+    unhandledCount: unhandled,
+    breakdown: breakdown,
+    message: '⚠️ 有 ' + unhandled + ' 位義工未收到通知（' + parts.join('、') + '）。\n\n'
+      + 'Stage **維持在 REQUESTS_APPLIED、沒有前進到 OFFICIAL_SENT**，\n'
+      + '所以你補救之後可以再執行一次「步驟 4：正式發出」。\n\n'
+      + '建議做法：\n'
+      + (errorPdfMissing + errorPdf > 0
+        ? '　1. 執行「準備工作 ▸ 產生個人 PDF」補齊缺的檔案\n　2. 再執行一次「步驟 4：正式發出」\n'
+        : '　1. 再執行一次「步驟 4：正式發出」\n')
+      + '\n只想補寄未成功那幾位、不想全部再寄一次的話，\n'
+      + '用「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」先看清楚名單。\n'
+      + '（查無電郵的義工不算未處理——那是已知而且沒有辦法解決的情況，'
+      + '不會因此卡住流程。）'
+  };
+}
+
+/**
+ * C4：把寄送結果嘅數字翻譯成一句結論。
+ *
+ * 點解要有呢句：實測見到嘅摘要係
+ * 「寄出 0　模擬 2　失敗 0　PDF 缺件 57」——每個數字都啱，
+ * 但**讀落去似乎冇事**（「失敗：0」）。57 位義工冇收到通知呢件事，
+ * 要人自己由四個數字入面推出嚟。數字唔會講故事，結論句要自己講。
+ *
+ * @param {Object} sendResult `sendStage()` 嘅結果
+ * @returns {string} 一句結論
+ */
+function buildStep4OutcomeSentence_(sendResult) {
+  const outcome = evaluateStep4SendOutcome_(sendResult);
+  const reached = Number(sendResult.sent || 0) + Number(sendResult.dryRun || 0);
+  const noEmail = Number(sendResult.skipped || 0);
+
+  if (outcome.ok) {
+    return '✅ 結論：' + reached + ' 位義工已'
+      + (sendResult.isDryRun ? '模擬通知（DRY_RUN，沒有真正寄出）' : '收到通知')
+      + (noEmail > 0 ? '；另有 ' + noEmail + ' 位查無電郵，本來就寄不到' : '')
+      + '，沒有任何一位是因為系統出錯而漏掉。';
+  }
+
+  return '⚠️ 結論：' + outcome.unhandledCount + ' 位義工未收到通知。'
+    + (reached > 0 ? '（已' + (sendResult.isDryRun ? '模擬' : '') + '通知 ' + reached + ' 位' : '（')
+    + (noEmail > 0 ? '；另有 ' + noEmail + ' 位查無電郵，本來就寄不到' : '')
+    + '）';
 }

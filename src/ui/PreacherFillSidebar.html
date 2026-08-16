@@ -48,7 +48,25 @@
   <div id="body">載入中…</div>
 
 <script>
-  var QUARTER_ID = <?= JSON.stringify(quarterId) ?>;
+  // ⚠️ 第十九輪批次階段 I：呢度一定要用不轉義嘅輸出標籤，唔可以用會轉義嗰個。
+  //
+  // 會轉義嗰個標籤會做 HTML 轉義，於是 JSON.stringify('2026T4') 出嚟嘅
+  // "2026T4" 會變成 &quot;2026T4&quot;，整句變成
+  //     var QUARTER_ID = &quot;2026T4&quot;;
+  // —— JS 語法錯誤，成個 script 區塊唔會執行，側邊欄直接死。
+  //
+  // 呢個係本輪靜態掃描（tools/scan-static-risks.js）搵返嚟嘅真實 bug，
+  // 唔係假想情境。點解一直冇人發現：呢個選單項一路都喺「未實測」名單
+  // 入面，而離線測試套件唔會執行 HtmlService 樣板——樣板逃逸呢一類問題
+  // 離線係完全睇唔到嘅，一定要喺瀏覽器真係開一次先知。
+  //
+  // ⚠️ 註釋要用 JS 註釋（//），唔可以用 HTML 註釋——呢度已經喺 script
+  // 區塊入面，HTML 註釋喺 JS 裡面係 legacy 語法，唔好靠。
+  //
+  // 安全性：JSON.stringify() 已經處理咗 JS 字串轉義。剩返嘅風險係值入面
+  // 含 script 結束標籤，但 QuarterID 經 normalizeIdInput_() 正規化過，
+  // 唔可能有。其他地方要注入任意字串嘅話，記得另外處理。
+  var QUARTER_ID = <?!= JSON.stringify(quarterId) ?>;
   var PENDING = [];
 
   function load() {

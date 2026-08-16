@@ -276,6 +276,20 @@ const REAL_TLD_PATTERN = new RegExp(
  * 網域：安全清單以外嘅網域一律高風險（教會網域就係靠呢條捉，
  * 唔需要——亦都唔可以——喺呢度寫低佢係咩）。
  */
+/**
+ * 同時係真實頂層網域、又係極常見 JS 屬性名嘅字。
+ * 呢批要出現喺引號入面（或者散文入面）先當成網域——見 scanDomains() 入面嘅說明。
+ */
+const AMBIGUOUS_TLDS = [
+  'name', 'link', 'date', 'page', 'app', 'dev', 'co', 'id', 'info',
+  'email', 'site', 'store', 'blog', 'wiki', 'club', 'online', 'pro'
+];
+
+/** 把字串轉成可以安全放入 RegExp 嘅樣式。 */
+function escapeForRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function scanDomains(lines) {
   const pattern = /\b((?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,24})\b/g;
   const findings = [];
@@ -295,6 +309,29 @@ function scanDomains(lines) {
       if (/\.(js|gs|json|md|html|css|txt|ics|pdf|png|jpg|svg|ya?ml|lock|sh|ts)$/i.test(lower)) continue;
       if (/^\d+(\.\d+)+$/.test(lower)) continue;
       if (/^(e\.g|i\.e|etc|vs|no)\./i.test(lower)) continue;
+
+      // ⚠️ 有一批真實嘅頂層網域同時係極常見嘅 JS 屬性名（見下面
+      // `AMBIGUOUS_TLDS`）。`物件.屬性` 呢種寫法完全符合「網域」嘅形狀，
+      // 而且結尾真係一個合法 TLD，所以上面嗰個 TLD 檢查攔唔到。
+      //
+      // 實測：第十九輪 commit 前掃描被 `tools/scan-static-risks.js` 入面
+      // 一句拼接檔案路徑嘅程式碼擋住——關卡本身運作正常，但係誤判。
+      //
+      // （呢度**特登唔舉完整例子**：寫 `物件.屬性` 呢種完整形狀出嚟，
+      //   會被呢個 script 自己嘅自我檢查捉到。同上面國碼清單同一個道理。）
+      //
+      // 做法：呢批「歧義 TLD」要**出現喺引號入面**先當成網域。
+      // 真正嘅網域喺呢個 repo 出現嘅方式，一係喺字串（URL、設定值），
+      // 一係喺 Markdown 散文——後者亦都當成要報（下面 inProse 嗰個判斷）。
+      //
+      // 代價：一個用歧義 TLD 而且喺純程式碼位置出現嘅真網域會漏。
+      // 教會網域係 `.org`／`.nz`／`.com` 呢類，唔喺呢個清單入面，
+      // 所以實際風險好低。
+      if (AMBIGUOUS_TLDS.some(function (t) { return lower.endsWith('.' + t); })) {
+        const quoted = new RegExp('["\'`][^"\'`]*' + escapeForRegex(domain) + '[^"\'`]*["\'`]');
+        const inProse = /^(?:docs|README)/.test(l.file) || /^\s*(?:\/\/|\*|#)/.test(l.text);
+        if (!quoted.test(l.text) && !inProse) continue;
+      }
 
       const key = l.file + '|' + lower;
       if (seen.has(key)) continue;

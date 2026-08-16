@@ -119,8 +119,10 @@ function applyRequestsValidations_(sheet, quarterId) {
   const personCol = keys.indexOf(COLUMNS.REQUESTS.PERSON_NAME) + 1;
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const dateOptions = readServiceDatesNormalized(quarterId, timezone)
-    .map(function (d) { return d.serviceDate; });
+  // 第十九輪批次階段 F1：`Requests` 係**跨季度共用嘅一張表**，
+  // 但日期下拉選單之前只讀一個季度，所以幹事處理 2026T4 嘅申報嗰陣，
+  // 選單只有 2027T1 嘅日期，要人手打字，打完格右上角出紅色三角。
+  const dateOptions = collectRequestDateOptions_(quarterId, timezone);
   const postOptions = readPostsNormalized().map(function (p) { return p.postNameTC; });
   const personOptions = readPeople().map(function (row) { return row[COLUMNS.NAME_MAPPING.NAME_TC]; });
 
@@ -205,7 +207,8 @@ function resetRequestsValidations_(quarterId) {
 
   return {
     columns: [
-      '日期（顯示警告，對應 ' + quarterId + '）',
+      '日期（顯示警告，涵蓋全部仍然有效的季度'
+        + (quarterId ? '，另外指定納入 ' + quarterId : '') + '）',
       '崗位（顯示警告）',
       '姓名（顯示警告）',
       '類型（拒絕輸入）',
@@ -300,4 +303,89 @@ function cleanRequestsTampering_(plan) {
     }
   });
   return plan.rows.length;
+}
+
+/**
+ * 第十九輪批次階段 F1：`Requests` 日期下拉選單嘅來源。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要跨季度
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `Requests` 唔係逐季一張表，係**跨季度共用嘅一張表**（申報入面有
+ * QuarterID 欄）。但 `applyRequestsValidations_()` 之前用
+ * `readServiceDatesNormalized(quarterId, ...)`，一次只讀一個季度。
+ *
+ * 實測後果：幹事處理 2026T4 嘅申報嗰陣，選單只有 2027T1 嘅日期，
+ * 要人手打字，打完格右上角出紅色三角（驗證警告）。功能上唔擋輸入，
+ * 但每一格都紅一下，令人分唔清邊啲係真問題。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 「有效季度」嘅準則（自己揀嘅，寫低理由）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 納入條件（符合任何一項就納入）：
+ *
+ *   1. **未過期**：`EndDate` 唔早過今日。未來同埋進行中嘅季度都要有，
+ *      因為呢啲先係會有新申報嘅季度。
+ *   2. **指名嗰個季度**：呼叫端傳入嘅 `focusQuarterId` 一律納入，
+ *      即使已經過期。理由：幹事有可能要補做／修正一個已完結季度嘅
+ *      紀錄，唔應該連選單都冇。
+ *
+ * 唔用「未封存」做準則嘅理由：`Quarters.Status` 目前冇一個穩定嘅
+ * 「已封存」值，用一個唔可靠嘅欄位做判斷，只會令選單時多時少而冇人
+ * 知點解。日期係實實在在、每個季度都一定有嘅資料。
+ *
+ * 代價：季度多咗之後選單會長（每季 13 個日期，四季 = 52 個）。
+ * 可接受——Google 試算表嘅清單型驗證本來就支援搵，而且日期有排序，
+ * 比「揀唔到、要打字」好得多。
+ *
+ * @param {string} focusQuarterId 一定要納入嘅季度（通常係幹事而家處理緊嗰個）
+ * @param {string} timezone 時區
+ * @returns {string[]} 排好序、去重之後嘅日期字串
+ */
+function collectRequestDateOptions_(focusQuarterId, timezone) {
+  const todayStr = toDateString(new Date(), timezone);
+  const quarterIds = selectValidQuarterIdsForRequests_(
+    readSheet(SHEETS.QUARTERS), focusQuarterId, todayStr, timezone);
+
+  const seen = {};
+  const dates = [];
+  quarterIds.forEach(function (qid) {
+    readServiceDatesNormalized(qid, timezone).forEach(function (d) {
+      if (!d.serviceDate || seen[d.serviceDate]) return;
+      seen[d.serviceDate] = true;
+      dates.push(d.serviceDate);
+    });
+  });
+
+  dates.sort();
+  return dates;
+}
+
+/**
+ * 揀出「仍然有效」嘅季度 ID。抽做純函式係為咗測得到——
+ * 準則本身係一個判斷，唔應該困喺一個要讀試算表嘅函式入面。
+ *
+ * @param {Array[]} quarterRows `readSheet(SHEETS.QUARTERS)` 嘅結果
+ * @param {string} focusQuarterId 一定要納入嘅季度
+ * @param {string} todayStr 今日（yyyy-MM-dd）
+ * @param {string} timezone 時區
+ * @returns {string[]} 季度 ID，按 QuarterID 排序
+ */
+function selectValidQuarterIdsForRequests_(quarterRows, focusQuarterId, todayStr, timezone) {
+  const picked = {};
+  if (focusQuarterId) picked[focusQuarterId] = true;
+
+  (quarterRows || []).forEach(function (row) {
+    const qid = row[COLUMNS.QUARTERS.QUARTER_ID];
+    if (!qid) return;
+    const endDate = toDateString(row[COLUMNS.QUARTERS.END_DATE], timezone);
+    // 讀唔到 EndDate 就當佢有效——寧可多幾個日期選項，
+    // 都好過因為一格空白而令成個季度喺選單度消失（缺失唔應該
+    // 被當成「已過期」呢個有意義嘅答案，見第十八輪批次）。
+    if (!endDate || endDate >= todayStr) picked[qid] = true;
+  });
+
+  return Object.keys(picked).sort();
 }

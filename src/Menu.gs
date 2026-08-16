@@ -66,6 +66,14 @@ function onOpen() {
         .addSeparator()
         .addItem('檢查改動', 'runDetectChanges_')
         .addItem('⚠️ 套用決定', 'runApplyDecisions_')
+        // 第十九輪批次階段 A2／C3：幹事直接喺 grid 改人名之後嘅合法出口。
+        // 唔受 Stage 限制——Stage 鎖死嗰陣（例如已 OFFICIAL_SENT）一樣用得，
+        // 因為佢淨係開新版本、唔會前進 Stage、唔會寄任何嘢。
+        .addItem('人手改動預覽（唯讀）', 'runManualEditsPreview_')
+        // 第十九輪批次階段 D1：答「點解步驟 5 又要重做全部個人 PDF」——
+        // 列出資料夾入面每個版本號各有幾多份，一眼睇得出係咪版本號唔同。
+        .addItem('個人 PDF 版本分佈（唯讀）', 'runDiagnosePersonalPdfVersions_')
+        .addItem('⚠️ 把工作表的人手改動寫成新版本', 'runMaterialiseManualEdits_')
         .addSeparator()
         .addItem('從 HWCAS 取電郵（產生初稿）', 'runHwcasSync_')
         .addItem('套用 HWCAS 初稿', 'runApplyHwcasDraft_')
@@ -733,10 +741,19 @@ function runCleanRequestsTampering_() {
  */
 function runResetRequestsValidations_() {
   const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt('重設 Requests 驗證規則', '請輸入日期下拉選單要對應的 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
+  // 第十九輪批次階段 F2：日期選單而家涵蓋全部仍然有效嘅季度，
+  // 所以呢度**唔再需要**指定季度先用得。但仍然保留輸入框，
+  // 因為傳入嘅季度會被「一定納入」——幹事想處理一個已經過期嘅季度
+  // （例如補做上一季嘅紀錄）嗰陣，就要靠呢個把佢加返入選單。
+  // 所以提示要講清楚「留空會點」，唔好令人以為唔填就會出事。
+  const response = ui.prompt('重設 Requests 驗證規則',
+    '日期下拉選單會自動涵蓋全部仍然有效（未過期）的季度，通常直接留空就可以。\n\n'
+      + '如果你要處理一個已經過期的季度（例如補做上一季的紀錄），\n'
+      + '請在這裡輸入那個 QuarterID（例如 2026T4），系統會額外把它的日期加入選單：',
+    ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
+  // 留空係合法輸入：代表「淨係要未過期嘅季度」。
   const quarterId = normalizeIdInput_(response.getResponseText());
-  if (!quarterId) return;
 
   try {
     const result = resetRequestsValidations_(quarterId);
@@ -935,6 +952,10 @@ function runGeneratePersonalPdfBatch_() {
       '　呼叫匯出：' + (result.totalExportMs / 1000).toFixed(1) + ' 秒',
       '總耗時（含略過與略過的等待）：' + (result.elapsedMs / 1000).toFixed(1) + ' 秒'
     ];
+    // 第十九輪批次階段 E2：「重試 47 次」本身唔會令人知道超過一半嘅
+    // 總時間係喺度等，更加唔會令人知道呢件事係調得郁嘅。
+    const retryHint = buildPdfRetryHintText_(result);
+    if (retryHint) lines.push(retryHint);
     if (result.recoveredCount > 0) {
       lines.push('', 'ℹ️ 有 ' + result.recoveredCount + ' 個檔案曾經在存檔時拋出暫時性錯誤，'
         + '但核對後確認檔案其實已經正常建立，不算失敗。');

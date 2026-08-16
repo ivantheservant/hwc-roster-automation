@@ -127,6 +127,27 @@ function normalizeCellText_(text) {
  * @returns {{changes: Object[], violations: Object[], manualState: Object[]}} 分析結果
  */
 function analyseManualState_(context) {
+  const overlay = buildGridOverlayState_(context);
+  return {
+    changes: overlay.changes,
+    unresolved: overlay.unresolved,
+    violations: findStateViolations_(overlay.manualState, context),
+    manualState: overlay.manualState
+  };
+}
+
+/**
+ * 把 grid 上嘅人手改動疊加喺 `context.original` 之上，得出「目前真正嘅狀態」。
+ *
+ * 第十九輪批次階段 B：由 `analyseManualState_()` 抽出嚟，因為
+ * `resolveAuthoritativeState_()`（`StateSource.gs`）都要用同一套疊加邏輯。
+ * **疊加邏輯全專案只可以有呢一份**——第十八輪階段 C 就係因為兩個工具
+ * 各自實作同一個收窄邏輯而分岔，唔應該再犯同一個錯。
+ *
+ * @param {Object} context fine-tune 嘅資料集（要有 `original` 同 `gridValues`）
+ * @returns {{changes: Object[], unresolved: Object[], manualState: Object[]}}
+ */
+function buildGridOverlayState_(context) {
   const changes = [];
   const unresolved = [];
 
@@ -169,12 +190,7 @@ function analyseManualState_(context) {
     return Object.assign({}, base, { personId: resolvedId, isManual: true });
   });
 
-  return {
-    changes: changes,
-    unresolved: unresolved,
-    violations: findStateViolations_(manualState, context),
-    manualState: manualState
-  };
+  return { changes: changes, unresolved: unresolved, manualState: manualState };
 }
 
 /**

@@ -309,7 +309,13 @@ function apiStep4GetMissingPdfWarnings(quarterId, versionNo) {
     applicable: missingCheck.applicable,
     total: missingCheck.total,
     missing: missingCheck.missing.slice(0, 30).map(function (p) { return { nameTC: p.nameTC, personId: p.personId }; }),
-    missingTotal: missingCheck.missing.length
+    missingTotal: missingCheck.missing.length,
+    // 第十九輪批次階段 C1：`blocked = true` 時前端唔應該顯示「繼續」按鈕。
+    // 就算前端唔跟，`executeStep4Send_()` 入面仲有一道同樣嘅檢查——
+    // Web UI 每次請求都係獨立嘅，唔可以靠畫面順序做關卡。
+    blocked: !!(missingCheck.gate && missingCheck.gate.blocked),
+    gateMessage: missingCheck.gate ? missingCheck.gate.message : '',
+    maxRatio: missingCheck.gate ? missingCheck.gate.maxRatio : 0
   };
 }
 
@@ -335,7 +341,14 @@ function apiStep4Confirm(quarterId) {
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, unchanged: result.unchanged,
-    failed: result.failed, errorPdf: result.errorPdf, errorPdfMissing: result.errorPdfMissing
+    failed: result.failed, errorPdf: result.errorPdf, errorPdfMissing: result.errorPdfMissing,
+    // 第十九輪批次階段 C2／C4：Stage 有冇前進、同埋一句人睇得明嘅結論。
+    // `advanced = false` 代表有人未收到、Stage 特登冇前進，補救之後
+    // 可以再行一次步驟 4。
+    advanced: !!result.advanced,
+    outcomeSentence: result.outcomeSentence || '',
+    outcomeMessage: result.outcome ? result.outcome.message : '',
+    unhandledCount: result.outcome ? result.outcome.unhandledCount : 0
   };
 }
 

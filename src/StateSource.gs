@@ -1,0 +1,352 @@
+/**
+ * 第十九輪批次階段 B：派工狀態嘅**權威來源**。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個檔案
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 同一個季度嘅同一個版本，系統入面有**兩份**派工資料：
+ *
+ *   1. `RosterAssignments` 長表 —— 程式讀嘅嗰份（`context.original`）
+ *   2. `Roster_XXXXTX_vN` grid 工作表 —— 幹事睇同改嘅嗰份
+ *      （`context.gridValues`，由 `readGridPersonIds_()` 讀入）
+ *
+ * 第十九輪批次撞到嘅 bug：`recomputeLatestVersionViolations_()` 明明拎到
+ * 一個同時有 `original` 同 `gridValues` 嘅 context，但寫住
+ * `context.original.map(...)` 就算，**靜靜咁揀咗其中一份**。
+ *
+ * 實際後果（Ivan 喺真實環境行過三次）：
+ *   • 步驟 3 報 HARD_ROLE_REQUIRED，訊息叫幹事去 grid 人手修正
+ *   • 幹事改咗，grid 顯示新人名
+ *   • 重跑步驟 3 —— **仍然報同一項違反，人名仍然係改之前嗰個**
+ *   • 再改再跑都一樣，唯一出路變成打「確認放行」
+ *
+ * 即係話：**硬規則閘實際上形同虛設**——佢淨係得「放行」一個出口，
+ * 而閘本身係為咗防止硬規則違反流出去而設嘅。
+ *
+ * 呢個係第十八輪嗰個 bug class（「缺失被當成有意義嘅值」）嘅第二個
+ * 變種：**「兩個真相來源，靜靜噉揀錯咗一個」**。兩者嘅共通點都係
+ * ——一個本應該由呼叫端明確表態嘅決定，被一句求其嘅程式碼默默替佢答咗。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 權威來源規則（階段 B1）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * **`RosterAssignments` 係唯一嘅 version of record。**
+ * grid 唔係第二個資料庫，佢係一個**人手改動嘅輸入緩衝區**。
+ *
+ * 由呢個定位推出三條規則：
+ *
+ * | 情境 | 用邊份 | 理由 |
+ * |---|---|---|
+ * | 幹事可能啱啱改咗 grid 之後嘅規則檢查／驗證 | `GRID_OVERLAY` | 幹事嘅人手決定係最新真相，唔睇就等於叫人做無用功 |
+ * | 描述「已經發出咗嘅嘢」（PDF、電郵、公開職事表、ICS、AssignmentHash） | `VERSION_OF_RECORD` | 呢啲嘢對應嘅係一個已定案版本，唔應該被一個未 materialise 嘅草稿改動影響 |
+ * | 歷史統計（`quarterCount`、`lastServed`、歸檔） | `VERSION_OF_RECORD` | 同上 |
+ *
+ * 第三條、亦係最重要嗰條：
+ *
+ * > **人手改動一經被規則檢查採用，就必須喺同一個流程入面
+ * > materialise 成一個新版本。**
+ *
+ * 唔可以出現「規則檢查睇到新人名、但 `RosterAssignments` 仲係舊人名」
+ * 呢個中間狀態——全專案有 26 個地方讀 `RosterAssignments`（個人 PDF、
+ * AssignmentSummary、AssignmentHash、公開職事表、ICS……），留低唔一致
+ * 嘅話，幹事見到嘅同義工收到嘅會唔同，比原本個 bug 更嚴重。
+ * 見 `materialiseManualEdits_()`。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點樣令呢種錯誤日後唔可以靜靜發生（階段 B2）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 規矩：**凡是 context 同時有 `original` 同 `gridValues`，攞派工狀態
+ * 一律要行 `resolveAuthoritativeState_(context, mode)`，`mode` 一定要
+ * 明確傳。** 唔可以再 `context.original.map(...)` 就算。
+ *
+ * `mode` 冇傳／傳錯 ⇒ **拋錯**，唔會靜靜噉揀一個。呢個同第十八輪嘅
+ * `requireRoleContextField_()` 係同一套做法：令「冇表態」變成大聲失敗，
+ * 而唔係悄悄選一個最方便嘅答案。
+ *
+ * `tools/scan-static-risks.js` 會掃全專案，搵返「拎到兩個來源但直接
+ * 攞其中一個」嘅寫法。
+ */
+
+/** 派工狀態嘅來源模式。 */
+const STATE_SOURCE = {
+  /**
+   * `RosterAssignments` 長表——已定案版本嘅權威內容。
+   * 用喺：已發出內容、歷史統計、任何唔應該被未確認草稿改動影響嘅地方。
+   */
+  VERSION_OF_RECORD: 'VERSION_OF_RECORD',
+
+  /**
+   * 以 `RosterAssignments` 為底，疊上 grid 工作表上嘅人手改動。
+   * 用喺：幹事可能啱啱改完 grid 之後跑嘅規則檢查／驗證／套用申報。
+   * 有人手改動嘅格 `isManual = true`。
+   */
+  GRID_OVERLAY: 'GRID_OVERLAY'
+};
+
+/**
+ * 攞一份派工狀態，**由呼叫端明確指定要邊一個來源**。
+ *
+ * @param {Object} context `buildFineTuneContext_()` 嘅結果
+ * @param {string} mode `STATE_SOURCE` 其中一個值（必須明確傳）
+ * @param {string} callerName 呼叫者名（出錯訊息用）
+ * @returns {{state: Object[], changes: Object[], unresolved: Object[]}}
+ *   `state` 逐格派工；`changes`／`unresolved` 只有 GRID_OVERLAY 模式有內容
+ */
+function resolveAuthoritativeState_(context, mode, callerName) {
+  if (mode !== STATE_SOURCE.VERSION_OF_RECORD && mode !== STATE_SOURCE.GRID_OVERLAY) {
+    throw new Error(
+      '取得派工狀態時必須明確指定來源（' + (callerName || '呼叫者不明') + '）。\n\n'
+      + '收到的 mode 是：' + (mode === undefined ? 'undefined（完全沒有傳）' : JSON.stringify(mode)) + '\n\n'
+      + '⚠️ 這個參數**不可以省略，也不會有預設值**。同一個版本有兩份派工資料：\n'
+      + '  • `RosterAssignments` 長表（程式讀的）\n'
+      + '  • `Roster_XXXXTX_vN` grid 工作表（幹事看和改的）\n\n'
+      + '兩者在「幹事剛剛人手改過 grid」的時候並不相同，靜靜挑其中一份\n'
+      + '就是第十九輪批次那個 bug——步驟 3 一直讀長表，所以幹事改幾多次\n'
+      + 'grid 都仍然報同一項違反、人名還是改之前那個，硬規則閘變成只有\n'
+      + '「放行」一個出口。\n\n'
+      + '請明確傳其中一個：\n'
+      + '  • `STATE_SOURCE.GRID_OVERLAY`——幹事可能剛改過 grid 之後的規則檢查／驗證／套用申報\n'
+      + '  • `STATE_SOURCE.VERSION_OF_RECORD`——已發出內容（PDF／電郵／公開職事表／ICS／hash）與歷史統計\n\n'
+      + '判斷準則寫在 `src/StateSource.gs` 檔案開頭，以及\n'
+      + '`docs/系統範圍稽核.md` 第十九輪批次那一節。'
+    );
+  }
+
+  if (mode === STATE_SOURCE.VERSION_OF_RECORD) {
+    return {
+      state: context.original.map(function (a) {
+        return {
+          serviceDateId: a.serviceDateId,
+          serviceDate: a.serviceDate,
+          postId: a.postId,
+          slotIndex: a.slotIndex,
+          personId: a.personId,
+          isManual: false
+        };
+      }),
+      changes: [],
+      unresolved: []
+    };
+  }
+
+  // GRID_OVERLAY：疊加邏輯只有一份實作，就係 analyseManualState_()。
+  // 唔喺呢度重寫一次——第十八輪階段 C 就係因為「兩個工具各自實作同一個
+  // 收窄邏輯」而分岔咗，唔應該再犯。
+  const overlay = buildGridOverlayState_(context);
+  return {
+    state: overlay.manualState,
+    changes: overlay.changes,
+    unresolved: overlay.unresolved
+  };
+}
+
+/**
+ * 把幹事喺 grid 上嘅人手改動 materialise 成一個新版本。
+ *
+ * 階段 A2 嘅決定——完整推導見 `docs/系統範圍稽核.md`。簡述：
+ *
+ * 兩個方向都有代價。**唔寫返**會令 grid 同 `RosterAssignments` 長期
+ * 唔一致，而全專案有 26 個地方讀後者（個人 PDF、AssignmentSummary、
+ * AssignmentHash、公開職事表、ICS……），即係「幹事見到改咗、義工收到
+ * 嘅仲係舊人名」——比原本個 bug 更嚴重、而且更難察覺。
+ *
+ * **寫返**嘅代價係「人手改動繞過版本機制、審計軌跡會斷」。但呢個代價
+ * 可以消除：唔好就地改舊版本嗰啲列，而係**開一個新版本**。噉樣
+ * 版本機制冇被繞過（改動有自己嘅版本號、舊版本原封不動、可以對比），
+ * 審計軌跡亦都完整（逐格寫 AuditLog）。
+ *
+ * 所以揀咗寫返，而且沿用系統本身已經有嘅做法——`applyFineTuneDecisions_()`
+ * 一路以嚟就係噉處理人手改動嘅（`ASSIGN_SOURCE.MANUAL`）。呢度唔係
+ * 發明新機制，係補返一個一直欠咗嘅入口：「淨係有人手改動、冇提案、
+ * 冇待處理申報」嗰條路之前冇人接。
+ *
+ * @param {Object} context `buildFineTuneContext_()` 嘅結果
+ * @param {Object[]} changes `resolveAuthoritativeState_(..., GRID_OVERLAY)` 嘅 changes
+ * @param {Object[]} state 疊加後嘅逐格狀態
+ * @param {string} source 呼叫來源（寫入 AuditLog）
+ * @returns {{versionNo: number, sheetName: string, cellCount: number}}
+ */
+function materialiseManualEdits_(context, changes, state, source) {
+  if (!changes || changes.length === 0) {
+    throw new Error('materialiseManualEdits_() 沒有收到任何人手改動，不應該建立新版本');
+  }
+
+  const originalByKey = {};
+  context.original.forEach(function (a) {
+    originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
+  });
+
+  const assignments = state.map(function (s) {
+    const originalRow = originalByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)] || {};
+    const person = context.peopleById[s.personId];
+    return {
+      serviceDateId: s.serviceDateId,
+      serviceDate: s.serviceDate,
+      postId: s.postId,
+      slotIndex: s.slotIndex,
+      personId: s.personId || '',
+      personName: person ? person.nameTC : '',
+      assignSource: s.personId
+        ? (s.isManual ? ASSIGN_SOURCE.MANUAL : (originalRow.assignSource || ASSIGN_SOURCE.AUTO))
+        : ASSIGN_SOURCE.SKIPPED,
+      ruleFlags: []
+    };
+  });
+
+  const newVersionNo = findLatestVersionNo(context.quarterId) + 1;
+
+  // 逐格寫 AuditLog：邊格、由邊個變邊個。時間同帳戶由 writeAuditLog_() 自己補。
+  changes.forEach(function (c) {
+    writeAuditLog_({
+      action: 'MANUAL_GRID_EDIT_MATERIALISED',
+      targetSheet: buildRosterSheetName_(context.quarterId, context.versionNo),
+      targetKey: cellKey_(c.serviceDate, c.postId, c.slotIndex),
+      oldValue: c.originalName || c.originalPersonId || '（空白）',
+      newValue: c.manualText || '（空白）',
+      source: source,
+      notes: '幹事在 grid 人手改動，已 materialise 為 v' + newVersionNo
+        + '（原版本 v' + context.versionNo + ' 保持不變）'
+    });
+  });
+
+  const sheetName = createRosterSheet(context.quarterId, newVersionNo, assignments, []);
+  writeAssignments(context.quarterId, newVersionNo, assignments);
+
+  return { versionNo: newVersionNo, sheetName: sheetName, cellCount: changes.length };
+}
+
+/**
+ * 選單：人手改動預覽（唯讀）。
+ *
+ * 第十九輪批次階段 A2／C3。用途：喺 grid 改咗人名之後，睇清楚系統認唔認得
+ * 你嘅改動、規則檢查會唔會過，**先唔寫任何嘢**。
+ * @returns {void}
+ */
+function runManualEditsPreview_() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt('人手改動預覽（唯讀）',
+    '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+  const quarterId = normalizeIdInput_(response.getResponseText());
+  if (!quarterId) return;
+
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) {
+    ui.alert('人手改動預覽（唯讀）', '找不到 ' + quarterId + ' 已生成的版本。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const recomputed = recomputeLatestVersionState_(quarterId, versionNo);
+  ui.alert('人手改動預覽（唯讀）',
+    buildManualEditsReportText_(quarterId, versionNo, recomputed)
+      + '\n\n（本工具只讀取，沒有改動任何東西。）',
+    ui.ButtonSet.OK);
+}
+
+/**
+ * 選單：把工作表的人手改動寫成新版本。
+ *
+ * 第十九輪批次階段 A2／C3——「幹事喺 grid 人手改動」嘅唯一合法出口。
+ *
+ * **特登唔檢查 Stage。** Stage 鎖死（例如已經 OFFICIAL_SENT）嗰陣，
+ * 幹事一樣有可能需要修正一格排錯咗嘅安排；如果連呢個都做唔到，
+ * 就會出現第十九輪階段 C 嗰種「冇合法補救途徑、要靠副作用救返」嘅局面。
+ *
+ * 呢個動作本身係安全嘅：只係開一個新版本（舊版本原封不動），
+ * 唔會前進 Stage、唔會產生 PDF、唔會寄任何電郵。
+ * @returns {void}
+ */
+function runMaterialiseManualEdits_() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt('⚠️ 把工作表的人手改動寫成新版本',
+    '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+  const quarterId = normalizeIdInput_(response.getResponseText());
+  if (!quarterId) return;
+
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) {
+    ui.alert('把工作表的人手改動寫成新版本', '找不到 ' + quarterId + ' 已生成的版本。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const recomputed = recomputeLatestVersionState_(quarterId, versionNo);
+
+  if (recomputed.unresolved.length > 0) {
+    ui.alert('把工作表的人手改動寫成新版本（有格認不出姓名）',
+      buildManualEditsReportText_(quarterId, versionNo, recomputed)
+        + '\n\n在認得出全部改動之前不會建立新版本。'
+        + '請改用 People 工作表上的正式姓名（或別名）。', ui.ButtonSet.OK);
+    return;
+  }
+  if (recomputed.changes.length === 0) {
+    ui.alert('把工作表的人手改動寫成新版本',
+      buildRosterSheetName_(quarterId, versionNo)
+        + ' 上沒有偵測到任何人手改動，不需要建立新版本。', ui.ButtonSet.OK);
+    return;
+  }
+
+  const confirm = ui.alert('⚠️ 把工作表的人手改動寫成新版本',
+    buildManualEditsReportText_(quarterId, versionNo, recomputed)
+      + '\n\n按「是」就會把這些改動寫成新版本 v' + (versionNo + 1) + '。\n'
+      + '原版本 v' + versionNo + ' 保持不變，可以對照。\n'
+      + '每一格改動都會記入 AuditLog。\n\n'
+      + '這個動作不會前進 Stage、不會產生 PDF、不會寄出任何電郵。\n'
+      + '⚠️ 但之後的步驟（個人 PDF、正式發出、公開職事表）一律會改用新版本。',
+    ui.ButtonSet.YES_NO);
+  if (confirm !== ui.Button.YES) return;
+
+  const result = materialiseManualEdits_(
+    recomputed.context, recomputed.changes, recomputed.state, 'manualEditsMenu');
+
+  ui.alert('把工作表的人手改動寫成新版本（完成）',
+    '已建立 ' + result.sheetName + '（v' + result.versionNo + '），'
+      + '帶入 ' + result.cellCount + ' 格人手改動。\n'
+      + '原版本 v' + versionNo + ' 保持不變。\n\n'
+      + '如果這一季已經正式發出過，記得跑「步驟 5：改動後重發」'
+      + '通知受影響的義工。', ui.ButtonSet.OK);
+}
+
+/**
+ * 把人手改動的分析結果整理成人看得懂的文字。預覽與寫入前的確認共用。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object} recomputed `recomputeLatestVersionState_()` 的結果
+ * @returns {string} 報告文字
+ */
+function buildManualEditsReportText_(quarterId, versionNo, recomputed) {
+  const sheetName = buildRosterSheetName_(quarterId, versionNo);
+  const lines = [sheetName + ' 目前的狀況：', ''];
+
+  if (recomputed.changes.length === 0) {
+    lines.push('　偵測到的人手改動：0 格');
+  } else {
+    lines.push('　偵測到的人手改動：' + recomputed.changes.length + ' 格');
+    recomputed.changes.slice(0, 15).forEach(function (c) {
+      lines.push('　　• ' + c.serviceDate + '　' + c.postId + '　'
+        + (c.originalName || '（空白）') + ' → ' + (c.manualText || '（空白）'));
+    });
+    if (recomputed.changes.length > 15) {
+      lines.push('　　……另有 ' + (recomputed.changes.length - 15) + ' 格');
+    }
+  }
+
+  if (recomputed.unresolved.length > 0) {
+    lines.push('');
+    lines.push('　⚠️ 認不出是哪一位的格：' + recomputed.unresolved.length + ' 格');
+    recomputed.unresolved.slice(0, 10).forEach(function (u) {
+      lines.push('　　• ' + u.serviceDate + '　' + u.postId + '　填了「' + u.text + '」');
+    });
+  }
+
+  lines.push('');
+  const hard = recomputed.violations.filter(function (v) {
+    return v.severity === RULE_LEVELS.HARD;
+  });
+  lines.push('　計入這些改動之後的規則檢查：硬規則違反 ' + hard.length + ' 項、'
+    + '合計 ' + recomputed.violations.length + ' 項');
+  return lines.join('\n');
+}

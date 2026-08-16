@@ -220,7 +220,15 @@ function validateRequest_(req, context, assignByKey, conflictKeys) {
   const dateText = req.serviceDateText;
   const dateInfo = context.serviceDates.filter(function (d) { return d.serviceDate === dateText; })[0];
   if (!dateInfo) {
-    return { category: 'NEEDS_INPUT', reason: '日期「' + dateText + '」不屬於 ' + context.quarterId + '，或格式無法辨識' };
+    // 第十九輪批次階段 F3：本來兩種完全唔同嘅原因共用同一句，
+    // 幹事睇完唔知係「打錯格式」定係「揀錯季度」。分開講。
+    //
+    // （順帶確認：呢個情況**唔會**被靜靜略過——一律回 NEEDS_INPUT，
+    //  會出現喺步驟 3 嘅驗證結果視窗，亦會寫入 Requests 嘅處理結果欄。）
+    return {
+      category: 'NEEDS_INPUT',
+      reason: describeUnknownRequestDate_(dateText, context.quarterId)
+    };
   }
 
   const post = context.posts.filter(function (p) { return p.postNameTC === req.postNameText; })[0];
@@ -333,17 +341,38 @@ function planApplyRequests_(quarterId) {
 
   const context = buildFineTuneContext_(quarterId, baseVersionNo);
   const ruleFlagsByKey = readVersionRuleFlags_(quarterId, baseVersionNo);
-  const assignByKey = {};
+
+  // ⚠️ 第十九輪批次階段 A：呢度**唔可以**淨係讀 `context.original`。
+  //
+  // 修正之前係讀長表，即係幹事喺 grid 上嘅人手改動會被完全忽略——
+  // 唔單止驗證會用舊人名（例如「指定某人服侍」會拎錯目前係邊個），
+  // 而且下面寫新版本嗰陣係由 `workingByKey` 出嚟，等於**靜靜咁將
+  // 幹事嘅人手改動丟棄**。呢個比 Ivan 報告嗰個症狀更嚴重：改咗、
+  // 跑完步驟 3，改動就冇咗，而且冇任何提示。
+  const resolved = resolveAuthoritativeState_(
+    context, STATE_SOURCE.GRID_OVERLAY, 'planApplyRequests_');
+  const originalByKey = {};
   context.original.forEach(function (a) {
-    const key = cellKey_(a.serviceDate, a.postId, a.slotIndex);
+    originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
+  });
+
+  const assignByKey = {};
+  resolved.state.forEach(function (s) {
+    const key = cellKey_(s.serviceDate, s.postId, s.slotIndex);
+    const originalRow = originalByKey[key] || {};
+    const person = context.peopleById[s.personId];
     assignByKey[key] = {
-      serviceDateId: a.serviceDateId,
-      serviceDate: a.serviceDate,
-      postId: a.postId,
-      slotIndex: a.slotIndex,
-      personId: a.personId,
-      personName: a.personName,
-      assignSource: a.assignSource,
+      serviceDateId: s.serviceDateId,
+      serviceDate: s.serviceDate,
+      postId: s.postId,
+      slotIndex: s.slotIndex,
+      personId: s.personId,
+      personName: person ? person.nameTC : (s.isManual ? '' : originalRow.personName),
+      // 人手改過嘅格記成 MANUAL，令新版本嘅來源欄講得出真相
+      assignSource: s.isManual
+        ? ASSIGN_SOURCE.MANUAL
+        : (originalRow.assignSource || ASSIGN_SOURCE.AUTO),
+      isManual: !!s.isManual,
       ruleFlags: ruleFlagsByKey[key] || []
     };
   });
@@ -358,7 +387,11 @@ function planApplyRequests_(quarterId) {
 
   return {
     quarterId: quarterId, baseVersionNo: baseVersionNo, context: context, assignByKey: assignByKey,
-    results: results, skippedIncompleteCount: pending.skippedIncompleteCount
+    results: results, skippedIncompleteCount: pending.skippedIncompleteCount,
+    // 幹事喺 grid 上嘅人手改動。套用申報建立新版本嗰陣會一併帶落去，
+    // 並且逐格記入 AuditLog（第十九輪批次階段 A2）。
+    manualChanges: resolved.changes,
+    manualUnresolved: resolved.unresolved
   };
 }
 
@@ -458,6 +491,22 @@ function applyRequests_(plan, confirmedSheetRows, basis) {
 
   const newVersionNo = findLatestVersionNo(plan.quarterId) + 1;
   const assignments = Object.keys(workingByKey).map(function (k) { return workingByKey[k]; });
+
+  // 第十九輪批次階段 A2：幹事喺 grid 上嘅人手改動而家會跟住新版本一齊
+  // 寫落 `RosterAssignments`（之前係靜靜咁丟棄）。既然改動會進入
+  // version of record，就一定要有審計軌跡——逐格記低邊格、由邊個變邊個。
+  (plan.manualChanges || []).forEach(function (c) {
+    writeAuditLog_({
+      action: 'MANUAL_GRID_EDIT_CARRIED',
+      targetSheet: buildRosterSheetName_(plan.quarterId, plan.baseVersionNo),
+      targetKey: cellKey_(c.serviceDate, c.postId, c.slotIndex),
+      oldValue: c.originalName || c.originalPersonId || '（空白）',
+      newValue: c.manualText || '（空白）',
+      source: 'applyRequests',
+      notes: '幹事在 grid 人手改動，已隨套用申報帶入 v' + newVersionNo
+        + '（原版本 v' + plan.baseVersionNo + ' 保持不變）'
+    });
+  });
 
   const violationCheckState = assignments.map(function (a) {
     return {
@@ -565,14 +614,38 @@ function decorateViolations_(violations, context) {
  * @returns {Object[]} decorateViolations_() 過的違規清單
  */
 function recomputeLatestVersionViolations_(quarterId, versionNo) {
+  return recomputeLatestVersionState_(quarterId, versionNo).violations;
+}
+
+/**
+ * 第十九輪批次階段 A1：同上，但連「有冇人手改動」一齊回傳。
+ *
+ * ⚠️ **呢度一定要用 `GRID_OVERLAY`。** 修正之前呢個函式讀
+ * `context.original`（`RosterAssignments` 長表），而 UI 就叫幹事去
+ * grid 工作表人手修正——兩者係唔同嘅資料。實測後果：幹事改咗 grid、
+ * 重跑步驟 3，仍然報同一項違反，人名仍然係改之前嗰個；再改再跑都一樣，
+ * 唯一出路變成打「確認放行」，**硬規則閘實際上形同虛設**。
+ *
+ * 呢個函式係「幹事可能啱啱改咗 grid」嘅典型時刻——步驟 3／5 重新檢查、
+ * 寄送之前最後確認——所以權威來源係 grid 疊加後嘅狀態。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {{violations: Object[], changes: Object[], unresolved: Object[],
+ *   state: Object[], context: Object}}
+ */
+function recomputeLatestVersionState_(quarterId, versionNo) {
   const context = buildFineTuneContext_(quarterId, versionNo);
-  const state = context.original.map(function (a) {
-    return {
-      serviceDateId: a.serviceDateId, serviceDate: a.serviceDate, postId: a.postId,
-      slotIndex: a.slotIndex, personId: a.personId, isManual: false
-    };
-  });
-  return decorateViolations_(findStateViolations_(state, context), context);
+  const resolved = resolveAuthoritativeState_(
+    context, STATE_SOURCE.GRID_OVERLAY, 'recomputeLatestVersionState_');
+  return {
+    violations: decorateViolations_(
+      findStateViolations_(resolved.state, context), context),
+    changes: resolved.changes,
+    unresolved: resolved.unresolved,
+    state: resolved.state,
+    context: context
+  };
 }
 
 /**
@@ -1057,4 +1130,77 @@ function recordNeedsInputOutcomes_(plan) {
   if (outcomes.length === 0) return 0;
   writeRequestOutcomes_(outcomes, plan.quarterId);
   return outcomes.length;
+}
+
+/**
+ * 第十九輪批次階段 F3：講清楚一個日期點解對唔上。
+ *
+ * 兩種原因要分開講：
+ *   • 格式唔啱（例如打咗 `2026/11/15` 而唔係 `2026-11-15`）
+ *     ⇒ 講明正確格式，唔好淨係話「無法辨識」
+ *   • 格式啱但唔屬於呢個季度（例如揀錯季度）
+ *     ⇒ 講明係季度唔對，唔好令人以為自己打錯字
+ *
+ * 純函式，測得到。
+ *
+ * @param {string} dateText 幹事填嘅日期文字
+ * @param {string} quarterId 目前處理緊嘅季度
+ * @returns {string} 具體原因
+ */
+function describeUnknownRequestDate_(dateText, quarterId) {
+  const text = String(dateText === null || dateText === undefined ? '' : dateText).trim();
+
+  if (text === '') {
+    return '日期是空白的，請填寫（格式 yyyy-MM-dd，例如 2026-11-15）';
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return '日期「' + text + '」格式正確，但不屬於 ' + quarterId
+      + ' 的任何一個主日——請確認這一筆申報的 QuarterID 填對了沒有，'
+      + '或者這一天本來就不是這一季的服侍日。';
+  }
+  // 常見打法：2026/11/15、15/11/2026、2026.11.15、全形數字
+  return '日期「' + text + '」的格式不正確。請用 yyyy-MM-dd（例如 2026-11-15）——'
+    + '斜線、句點、日月倒轉、全形數字都認不出來。'
+    + '最穩陣的做法是用格內的下拉選單揀，不要自己打字。';
+}
+
+/**
+ * 第十九輪批次階段 G：套用摘要嘅結論句。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 實測見到嘅摘要：
+ *
+ *     已套用：3 筆　已拒絕：0 筆　無法套用：0 筆
+ *
+ * 三個數字都啱，但讀落去似乎三筆都無事——其中一筆造成咗硬規則違反，
+ * 要再往下捲先見到。之後雖然有打字閘攔住、唔會漏，但**呢兩行數字
+ * 本身講緊一個誤導嘅故事**，而摘要就係畀人一眼睇完就走嘅。
+ *
+ * 同階段 C4 係同一個道理：數字唔會自己講故事。
+ *
+ * @param {Object} result `applyRequests_()` 嘅結果
+ * @returns {string} 結論句；完全冇嘢好講嗰陣回傳空字串
+ */
+function buildApplySummarySentence_(result) {
+  const applied = Number(result.appliedCount || 0);
+  const violations = result.violations || [];
+  const hard = violations.filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
+  const semi = violations.filter(function (v) { return v.severity === RULE_LEVELS.SEMI_HARD; });
+
+  if (hard.length === 0 && semi.length === 0) {
+    return applied > 0
+      ? '✅ 結論：' + applied + ' 筆申報都已套用，套用之後沒有造成任何硬規則或準硬規則違反。'
+      : '';
+  }
+
+  const parts = [];
+  if (hard.length > 0) parts.push('硬規則違反 ' + hard.length + ' 項');
+  if (semi.length > 0) parts.push('準硬規則違反 ' + semi.length + ' 項');
+
+  return '⚠️ 結論：套用之後這一版有 ' + parts.join('、') + '（詳情見下面）。\n'
+    + '　　「已套用 ' + applied + ' 筆」不代表沒有問題——'
+    + '申報本身套用成功，但套用的結果違反了規則。';
 }
