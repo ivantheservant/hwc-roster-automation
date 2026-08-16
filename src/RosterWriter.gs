@@ -875,6 +875,45 @@ function findLatestVersionNo(quarterId) {
 }
 
 /**
+ * 第十五輪批次新增：列出 `RosterVersions` 入面實際出現過嘅全部 QuarterID
+ * （去重，由新到舊排）。
+ *
+ * 存在嘅理由：`findLatestVersionNo()` 搵唔到版本時，單單話「找不到 X 已生成
+ * 的版本」冇俾使用者足夠資訊判斷係「呢一季真係未生成」定係「打嘅 QuarterID
+ * 同資料庫入面嘅唔一致」（例如全形字元、隱形字元——見
+ * `normalizeIdInput_()` 檔頭說明）。呼叫端可以將呢個清單接落錯誤訊息，
+ * 令呢類問題一睇就知，唔使好似呢一輪咁樣要逐層追查先搵到。
+ * @returns {string[]} QuarterID 清單，由新到舊（字串排序，跟 QuarterID
+ *   本身「年份+T+季別」嘅寫法剛好等於時間順序）
+ */
+function listKnownQuarterIds_() {
+  const ids = {};
+  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+    const id = String(row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] || '').trim();
+    if (id) ids[id] = true;
+  });
+  return Object.keys(ids).sort().reverse();
+}
+
+/**
+ * 第十五輪批次新增：組出「搵唔到呢個季度已生成嘅版本」嘅錯誤訊息，附上
+ * `RosterVersions` 實際有嘅 QuarterID 清單，令使用者一睇就知係「呢一季
+ * 真係未生成」定係「打嘅字同資料庫入面唔一致」。見 `listKnownQuarterIds_()`
+ * 檔頭說明。
+ * @param {string} quarterId 搵唔到嘅 QuarterID
+ * @returns {string} 完整錯誤訊息
+ */
+function buildQuarterNotFoundMessage_(quarterId) {
+  const known = listKnownQuarterIds_();
+  const knownText = known.length > 0
+    ? '目前已生成過版本的季度：' + known.slice(0, 15).join('、')
+      + (known.length > 15 ? '……等共 ' + known.length + ' 個' : '') + '。'
+      + '如果你輸入嘅同呢個清單入面睇落一樣但揀唔到，可能係全形字元或者複製貼上帶咗隱形字元，請重新逐個字打一次。'
+    : '目前 RosterVersions 完全冇任何已生成嘅版本紀錄。';
+  return '找不到 "' + quarterId + '" 已生成的版本，請先執行「步驟 1：生成初稿」。' + knownText;
+}
+
+/**
  * 追加階段 V 新增的唯讀診斷：統計 RosterAssignments 每個「季度＋版本」實際有幾多行、
  * 幾多行有 PersonID、涉及幾多個不同的人。
  *

@@ -38,6 +38,49 @@ function resolvePersonId(name) {
 }
 
 /**
+ * 第十五輪批次新增：把幹事喺 `ui.prompt()` 輸入嘅識別字串（QuarterID、
+ * PersonID 等）正規化，防止「睇落一模一樣、但 `===` 比對唔到」呢類隱形
+ * 輸入錯誤。
+ *
+ * 背景：全專案有超過 20 個 `ui.prompt()` 輸入點捕捉 QuarterID，全部只做
+ * `.trim()`，冇處理**全形字元**。中文輸入法一旦切咗去全形模式，打「2026T4」
+ * 會變成「２０２６Ｔ４」——喺對話框嘅小字型入面同半形字幾乎睇唔出分別，
+ * 但 `'２０２６Ｔ４' === '2026T4'` 係 `false`。呢類輸入唔會被 `.trim()`
+ * 處理，會令 `findLatestVersionNo()`／`readServiceDates()` 呢類靠嚴格
+ * 相等比對嘅查詢靜靜噉搵唔到、回傳「已存在但你打嘅嗰個字串搵唔到」呢種
+ * 睇落好似資料有問題、其實係輸入有問題嘅假象。
+ *
+ * **唔止 QuarterID**——同一個風險喺任何「人手打字入一個要同資料庫做嚴格
+ * 相等比對嘅識別字串」嘅地方都存在，例如「重新產生單一個人的 token」
+ * 輸入嘅 PersonID（`reissuePersonalLinkToken_()`）。函式名冇叫
+ * `normalizeQuarterId_` 就係刻意留返做通用嘅識別字輸入正規化，唔止服務
+ * QuarterID 一種用途。
+ *
+ * 處理埋兩類人手輸入常見嘅隱形字元問題：
+ * 1. **全形 ASCII**（U+FF01–U+FF5E）轉返半形（U+0021–U+007E，減
+ *    `0xFEE0`）——涵蓋全形數字、全形英文字母、全形符號。
+ * 2. **零闊度字元**（U+200B 零闊度空格、U+FEFF BOM／零闊度不斷行空格、
+ *    U+200C／U+200D）——複製貼上常見嘅隱形殘留，一律移除。
+ *
+ * 刻意**唔轉大小寫**——QuarterID／PersonID 本身有意義嘅大小寫（例如
+ * `2026T4` 嘅 `T` 係大寫），唔應該幫使用者「猜」佢想打乜，只處理呢兩類
+ * 客觀上「睇落一樣、實際上唔一樣」嘅字元差異。
+ *
+ * @param {*} raw 使用者輸入嘅原始文字
+ * @returns {string} 正規化之後嘅字串
+ */
+function normalizeIdInput_(raw) {
+  let text = String(raw === null || raw === undefined ? '' : raw);
+  // 全形 ASCII → 半形
+  text = text.replace(/[！-～]/g, function (ch) {
+    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+  });
+  // 零闊度字元一律移除
+  text = text.replace(/[​‌‍﻿]/g, '');
+  return text.trim();
+}
+
+/**
  * 把 Date 物件格式化為 yyyy-MM-dd 字串，使用 Config 設定的時區（SYS_TIMEZONE）。
  * @param {Date} date 日期物件
  * @returns {string} 格式化後的日期字串

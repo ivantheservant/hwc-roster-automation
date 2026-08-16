@@ -97,5 +97,16 @@ console.log('\n=== PreacherFillSidebar.html：saveAll()（全部儲存）失敗�
     body.indexOf('failed.push') !== -1 && /failed\.length/.test(body));
 }
 
+console.log('\n=== 第十五輪批次階段 A5：側邊欄一直顯示緊「目前嘗試嘅季度」，失敗時都睇得到 ===');
+{
+  // 背景：2026T4 彩排實測撞到側邊欄顯示「找不到已生成的版本」——除咗
+  // 修正正規化本身，仲要令使用者一睇就知道自己實際輸入咗乜（唔使憑
+  // 記憶對），先方便判斷係咪打錯字。
+  check('★★ 有 #quarterHint 呢個常駐元素（唔喺 render() 先出現，失敗時都睇得到）',
+    sidebarHtml.indexOf('id="quarterHint"') !== -1);
+  check('★★ load() 一開始（送出請求之前）就已經寫低嘗試緊嘅季度',
+    /function load\(\)\s*\{[\s\S]{0,200}?quarterHint[\s\S]{0,100}?QUARTER_ID/.test(sidebarHtml));
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

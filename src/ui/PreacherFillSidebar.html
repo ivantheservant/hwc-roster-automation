@@ -41,6 +41,10 @@
     <button id="bulkSaveBtn" onclick="saveAll()" style="display:none">全部儲存已輸入的格子</button>
     <span id="bulkStatus"></span>
   </div>
+  <!-- 第十五輪批次：無論載入成功定失敗都一直顯示緊嘗試緊嘅季度，方便一眼
+       核對「我打嘅同螢幕度顯示嘅係咪一樣」——之前失敗嗰陣完全冇顯示,
+       出錯訊息又冇附上實際打咗乜，好難判斷係咪打錯字。 -->
+  <div class="hint" id="quarterHint"></div>
   <div id="body">載入中…</div>
 
 <script>
@@ -48,6 +52,7 @@
   var PENDING = [];
 
   function load() {
+    document.getElementById('quarterHint').textContent = '目前嘗試嘅季度：' + QUARTER_ID;
     document.getElementById('body').innerHTML = '載入中…';
     document.getElementById('bulkSaveBtn').style.display = 'none';
     document.getElementById('bulkStatus').textContent = '';
@@ -74,9 +79,10 @@
 
   function render(data) {
     PENDING = data.pending;
+    // #quarterHint 已經顯示緊季度本身，呢度唔重複，淨係補充版本／Stage。
+    document.getElementById('quarterHint').textContent =
+      '目前嘗試嘅季度：' + data.quarterId + '　v' + data.versionNo + '　Stage=' + data.stage;
     var html = '';
-    html += '<div class="hint">' + escapeHtml(data.quarterId) + '　v' + data.versionNo
-      + '　Stage=' + escapeHtml(data.stage) + '</div>';
     if (data.officialSentHint) {
       html += '<div class="warn">這一季已經正式發出過。如果這裡填的內容是發出之後才確定的，'
         + '記得回選單執行「步驟 5：改動後重發」通知相關人士。</div>';

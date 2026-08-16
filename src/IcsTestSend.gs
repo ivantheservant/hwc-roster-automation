@@ -149,7 +149,7 @@ function runSendIcsTestEmail_() {
       + '建議挑一個本季有多次服侍、最好有需要提早到場的崗位的人，方便同時驗證多個事件與提早到場時間）：',
     ui.ButtonSet.OK_CANCEL);
   if (personResponse.getSelectedButton() !== ui.Button.OK) return;
-  const personId = personResponse.getResponseText().trim();
+  const personId = normalizeIdInput_(personResponse.getResponseText());
   if (!personId) {
     ui.alert(title, '未輸入 PersonID，已取消。', ui.ButtonSet.OK);
     return;

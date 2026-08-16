@@ -356,7 +356,7 @@ function runFullHealthCheck_() {
     '要一併執行「上線前檢查」的季度是？（例如 2027T1，留空則跳過這一項，'
       + '其餘 8 項全域檢查照常執行）', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
 
   SpreadsheetApp.getActiveSpreadsheet().toast('體檢中，請稍候…', '全面體檢', 60);
 

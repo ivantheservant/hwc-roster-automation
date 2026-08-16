@@ -618,7 +618,7 @@ function runPublishPublicRoster_() {
 
   const response = ui.prompt(title, '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) {
     ui.alert(title, '未輸入 QuarterID，已取消。', ui.ButtonSet.OK);
     return;

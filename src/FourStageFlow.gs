@@ -48,7 +48,7 @@ function runFourStageStep1_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 1：生成初稿', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   try {
@@ -102,7 +102,7 @@ function runFourStageStep2_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 2：寄給堂委審閱', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let preview;
@@ -168,7 +168,7 @@ function runFourStageStep3_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 3：套用修改申報', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let planResult;
@@ -399,7 +399,7 @@ function runFourStageStep4_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 4：正式發出', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let warnings;
@@ -524,7 +524,7 @@ function runFourStageStep5_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 5：改動後重發', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let planResult;

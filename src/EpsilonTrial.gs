@@ -405,7 +405,7 @@ function runEpsilonTrial_Menu_() {
 
   const quarterResponse = ui.prompt(title, '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (quarterResponse.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = quarterResponse.getResponseText().trim();
+  const quarterId = normalizeIdInput_(quarterResponse.getResponseText());
   if (!quarterId) {
     ui.alert(title, '未輸入 QuarterID，已取消。', ui.ButtonSet.OK);
     return;

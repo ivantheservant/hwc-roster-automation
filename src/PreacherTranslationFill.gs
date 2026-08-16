@@ -107,7 +107,7 @@ function apiListPreacherTranslationPending(quarterId) {
   }
 
   const versionNo = findLatestVersionNo(quarterId);
-  if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
+  if (versionNo < 0) throw new Error(buildQuarterNotFoundMessage_(quarterId));
 
   const postNameById = {};
   readPosts().forEach(function (row) {
@@ -185,7 +185,7 @@ function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotInd
   }
 
   const versionNo = findLatestVersionNo(quarterId);
-  if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
+  if (versionNo < 0) throw new Error(buildQuarterNotFoundMessage_(quarterId));
 
   const personId = resolvePersonId(trimmedName) || '';
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
@@ -227,24 +227,34 @@ function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotInd
   if (colIndex[C.UPDATED_BY]) sheet.getRange(targetSheetRow, colIndex[C.UPDATED_BY]).setValue(Session.getActiveUser().getEmail());
 
   // ---- 2. 更新 grid 工作表對應儲存格：填入姓名、清掉「待人手填寫」的底色與備註 ----
+  // ⚠️ 第十五輪批次階段 A3：講員／翻譯／獻花一定係喺 v0 剛生成之後就要填，
+  // 而 v0 一定會被 protectV0() 保護（只留 Config 嘅 SCRIPT_ACCOUNT_EMAIL
+  // 可編輯）——「寫入受保護版本」係呢個工具嘅正常路徑，唔係例外情況。
+  // 試算表擁有者本身唔會被保護擋住（Google 嘅限制：擁有者永遠可編輯），
+  // 但為咗俾任何有權限執行呢個選單嘅人（唔止擁有者）都用得到，呢度做法係
+  // 「暫時解除保護 → 寫入 → 用返原本嘅設定重新保護」，唔會削弱 v0 保護
+  // 本身嘅意義（寫完之後保護狀態同之前一模一樣）。
   const gridSheetName = buildRosterSheetName_(quarterId, versionNo);
   const gridSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(gridSheetName);
+  let wasProtected = false;
   if (gridSheet) {
-    const gridLastRow = gridSheet.getLastRow();
-    const gridLastCol = gridSheet.getLastColumn();
-    const gridKeys = gridSheet.getRange(2, 1, 1, gridLastCol).getValues()[0];
-    const gridDates = gridSheet.getRange(3, 1, Math.max(0, gridLastRow - 2), 1).getValues();
-    let gridRow = -1;
-    for (let i = 0; i < gridDates.length; i++) {
-      if (toDateString(gridDates[i][0], timezone) === serviceDate) { gridRow = i + 3; break; }
-    }
-    const gridCol = gridKeys.indexOf(postId + '#' + slotIndex) + 1;
-    if (gridRow !== -1 && gridCol !== 0) {
-      const range = gridSheet.getRange(gridRow, gridCol);
-      range.setValue(trimmedName);
-      range.setBackground(null);
-      range.setNote('');
-    }
+    wasProtected = writeToPossiblyProtectedGridSheet_(gridSheet, function () {
+      const gridLastRow = gridSheet.getLastRow();
+      const gridLastCol = gridSheet.getLastColumn();
+      const gridKeys = gridSheet.getRange(2, 1, 1, gridLastCol).getValues()[0];
+      const gridDates = gridSheet.getRange(3, 1, Math.max(0, gridLastRow - 2), 1).getValues();
+      let gridRow = -1;
+      for (let i = 0; i < gridDates.length; i++) {
+        if (toDateString(gridDates[i][0], timezone) === serviceDate) { gridRow = i + 3; break; }
+      }
+      const gridCol = gridKeys.indexOf(postId + '#' + slotIndex) + 1;
+      if (gridRow !== -1 && gridCol !== 0) {
+        const range = gridSheet.getRange(gridRow, gridCol);
+        range.setValue(trimmedName);
+        range.setBackground(null);
+        range.setNote('');
+      }
+    });
   }
 
   // ---- 3. AuditLog ----
@@ -255,10 +265,54 @@ function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotInd
     oldValue: '',
     newValue: trimmedName,
     source: 'runOpenPreacherTranslationFill_',
-    notes: personId ? '已連結 NameMapping PersonID=' + personId : '文字快照，未連結 NameMapping'
+    notes: (personId ? '已連結 NameMapping PersonID=' + personId : '文字快照，未連結 NameMapping')
+      + (wasProtected ? '（grid 工作表受保護，已暫時解除並用原設定重新保護）' : '')
   });
 
   return { personId: personId, linkedToNameMapping: !!personId };
+}
+
+/**
+ * 第十五輪批次階段 A3 新增：喺一個「可能已經受保護」嘅 grid 工作表上安全咁
+ * 執行一次寫入——如果冇任何保護，直接執行 `writeFn`；如果有（例如 v0 被
+ * `protectV0()` 保護咗），暫時解除全部工作表級保護、執行 `writeFn`、再用
+ * 原本一模一樣嘅設定（描述、編輯者名單、網域編輯權）重新套用返，執行完
+ * 保護狀態同執行前完全一致，唔會削弱保護本身嘅意義。
+ *
+ * 刻意用 `try/finally`——即使 `writeFn` 中途拋錯，保護都一定會重新套用返，
+ * 唔會令工作表意外變成冇保護嘅狀態遺留低。
+ *
+ * @param {Sheet} sheet 目標工作表
+ * @param {function(): void} writeFn 要執行嘅寫入邏輯
+ * @returns {boolean} 呼叫時工作表是否本身已經受保護（供呼叫端記錄用）
+ */
+function writeToPossiblyProtectedGridSheet_(sheet, writeFn) {
+  const protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  if (!protections || protections.length === 0) {
+    writeFn();
+    return false;
+  }
+
+  const saved = protections.map(function (p) {
+    return {
+      description: p.getDescription(),
+      editors: p.getEditors().map(function (e) { return e.getEmail(); }),
+      domainEdit: p.canDomainEdit()
+    };
+  });
+  protections.forEach(function (p) { p.remove(); });
+
+  try {
+    writeFn();
+  } finally {
+    saved.forEach(function (s) {
+      const restored = sheet.protect().setDescription(s.description);
+      restored.removeEditors(restored.getEditors());
+      s.editors.forEach(function (email) { restored.addEditor(email); });
+      if (!s.domainEdit && restored.canDomainEdit()) restored.setDomainEdit(false);
+    });
+  }
+  return true;
 }
 
 /**
@@ -269,7 +323,7 @@ function runOpenPreacherTranslationFill_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('填寫講員／翻譯／獻花', '請輸入 QuarterID（例如 2027T1）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   const template = HtmlService.createTemplateFromFile('ui/PreacherFillSidebar');

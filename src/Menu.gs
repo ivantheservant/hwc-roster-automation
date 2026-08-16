@@ -648,7 +648,7 @@ function runCreateRequestsSheet_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('建立 Requests 工作表', '請輸入這次要開放申報的 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   try {
@@ -729,7 +729,7 @@ function runResetRequestsValidations_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('重設 Requests 驗證規則', '請輸入日期下拉選單要對應的 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   try {
@@ -754,7 +754,7 @@ function runComputeQuarterDates_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('計算季度日期', '請輸入 QuarterID（例如 2027T1）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let plan;
@@ -800,7 +800,7 @@ function runGenerateRoster_() {
   const response = ui.prompt('生成職事表', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
 
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) {
     ui.alert('生成職事表', '未輸入 QuarterID，已取消。', ui.ButtonSet.OK);
     return;
@@ -864,7 +864,7 @@ function runExportPdf_() {
 
   const personResponse = ui.prompt('匯出 PDF', '請輸入 PersonID（留空 = 整季完整版）：', ui.ButtonSet.OK_CANCEL);
   if (personResponse.getSelectedButton() !== ui.Button.OK) return;
-  const personId = personResponse.getResponseText().trim();
+  const personId = normalizeIdInput_(personResponse.getResponseText());
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('匯出中，請稍候…', '職事表系統', 60);
@@ -958,7 +958,7 @@ function runCleanupOldPdfs_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('清理舊 PDF', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let scan;
@@ -1044,7 +1044,7 @@ function runQuarterPdfCleanup_() {
       + '完全不需要保留任何版本的情境。',
     ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let plan;
@@ -1133,7 +1133,10 @@ function runDeleteSendLogBatch_() {
 
   const response = ui.prompt('清除一批 SendLog 記錄', '請輸入要刪除的批次前綴（完整字串，不是編號）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const prefix = response.getResponseText().trim();
+  // 呢個係複製貼上流程（上面明確要求「請完整複製」），複製貼上正正係
+  // 零闊度字元（BOM／ZWSP）最常見嘅來源，同 normalizeIdInput_() 針對嘅
+  // 風險完全一致，所以呢度都要用佢，唔淨係人手打字嘅 PersonID／QuarterID。
+  const prefix = normalizeIdInput_(response.getResponseText());
   if (!prefix) return;
 
   const match = batches.filter(function (b) { return b.prefix === prefix; })[0];
@@ -1362,7 +1365,7 @@ function runApplyDecisions_() {
   const response = ui.prompt('套用決定', '請輸入批次 ID（BatchID）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
 
-  const batchId = response.getResponseText().trim();
+  const batchId = normalizeIdInput_(response.getResponseText());
   if (!batchId) {
     ui.alert('套用決定', '未輸入批次 ID，已取消。', ui.ButtonSet.OK);
     return;
@@ -1664,7 +1667,7 @@ function runDebugSoftRules_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('診斷 SOFT 規則（唯讀）', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   try {
@@ -1721,7 +1724,7 @@ function runDebugPersonalHighlight_() {
 
   const personResponse = ui.prompt('診斷 highlight（唯讀）', '請輸入 PersonID（例如 P0001）：', ui.ButtonSet.OK_CANCEL);
   if (personResponse.getSelectedButton() !== ui.Button.OK) return;
-  const personId = personResponse.getResponseText().trim();
+  const personId = normalizeIdInput_(personResponse.getResponseText());
   if (!personId) return;
 
   try {
@@ -1765,7 +1768,7 @@ function runCompareMultiRun_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('多次生成比較', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   try {
@@ -1806,7 +1809,7 @@ function runTuneParameters_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('參數掃描', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   try {
@@ -1857,7 +1860,7 @@ function promptQuarterAndVersion_(title) {
   const quarterResponse = ui.prompt(title, '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (quarterResponse.getSelectedButton() !== ui.Button.OK) return null;
 
-  const quarterId = quarterResponse.getResponseText().trim();
+  const quarterId = normalizeIdInput_(quarterResponse.getResponseText());
   if (!quarterId) {
     ui.alert(title, '未輸入 QuarterID，已取消。', ui.ButtonSet.OK);
     return null;
@@ -1916,7 +1919,7 @@ function runResetQuarterTestData_() {
       + '人員資料、資格、Config、範本、崗位、規則一律不碰。',
     ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   const v0Response = ui.alert('⚠️⚠️ 重設季度測試資料',

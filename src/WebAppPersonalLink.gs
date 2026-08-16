@@ -140,7 +140,10 @@ function seedPersonalLinkTokens_(missing) {
  *
  * ⚠️ **本輪唔可以寫入試算表，呢個函式本輪唔會被執行**，只實作好俾之後用。
  *
- * @param {string} personId 要重新產生 token 嘅人
+ * @param {string} personId 要重新產生 token 嘅人。呼叫端（`runReissuePersonalLinkToken_()`）
+ *   已經用 `normalizeIdInput_()` 處理過全形／零闊度字元，呢個函式內部只再做
+ *   `.trim()`（同 `findLatestVersionNo()` 等 QuarterID 查詢一致嘅做法——
+ *   正規化喺輸入捕捉點做一次就夠，唔需要每個讀表比對點都重複做）。
  * @returns {{personId: string, nameTC: string, newToken: string}}
  */
 function reissuePersonalLinkToken_(personId) {
@@ -462,7 +465,7 @@ function runReissuePersonalLinkToken_() {
   const response = ui.prompt(title,
     '請輸入該人的 PersonID（不是姓名，可在 NameMapping 查到）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const personId = response.getResponseText().trim();
+  const personId = normalizeIdInput_(response.getResponseText());
   if (!personId) {
     ui.alert(title, '未輸入 PersonID，已取消。', ui.ButtonSet.OK);
     return;

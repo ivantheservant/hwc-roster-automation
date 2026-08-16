@@ -204,7 +204,7 @@ function runGoLiveWizard_() {
     '體檢要檢查邊一個季度？輸入 QuarterID（留空 = 只做唔需要季度嘅檢查）：',
     ui.ButtonSet.OK_CANCEL);
   if (quarterResponse.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = quarterResponse.getResponseText().trim();
+  const quarterId = normalizeIdInput_(quarterResponse.getResponseText());
 
   let readiness;
   try {

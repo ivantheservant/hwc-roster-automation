@@ -543,7 +543,7 @@ function runPreLaunchChecklist_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('上線前檢查（唯讀）', '請輸入要檢查的 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = response.getResponseText().trim();
+  const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
   let result;
