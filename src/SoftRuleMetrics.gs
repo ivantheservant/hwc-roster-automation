@@ -146,7 +146,7 @@ function listConsecutiveSamePersonViolations_(assignments, posts, sortedDates) {
  * @param {number} minRatio 動用率低於這個值就標為偏低
  * @returns {Object[]} 每個崗位一項，含 usedCount／eligibleCount／ratio／judgement／unusedPeople
  */
-function computePostManpowerUsage_(assignments, posts, eligibleByPost, minRatio) {
+function computePostManpowerUsage_(assignments, posts, eligibleByPost, minRatio, availabilityByPost) {
   const usedByPost = {};
   const assignedSlotsByPost = {};
   assignments.forEach(function (a) {
@@ -156,21 +156,45 @@ function computePostManpowerUsage_(assignments, posts, eligibleByPost, minRatio)
     assignedSlotsByPost[a.postId] = (assignedSlotsByPost[a.postId] || 0) + 1;
   });
 
+  const availability = availabilityByPost || {};
+
   return posts
     .filter(function (post) { return (assignedSlotsByPost[post.postId] || 0) > 0; })
     .map(function (post) {
       const used = usedByPost[post.postId] || {};
       const usedIds = Object.keys(used);
-      const eligible = eligibleByPost[post.postId] || [];
-      const eligibleCount = eligible.length;
+
+      // 收窄之前：Eligibility ∪ 身分持有人（未扣身分／個人排除／請假）
+      const beforeList = eligibleByPost[post.postId] || [];
+
+      // ⚠️ 第十八輪批次階段 C1：分母一定要用**收窄之後**嘅名單。
+      //
+      // 用收窄前嘅話，有身分要求嘅崗位會被算出一個過細嘅動用率而誤報「偏低」
+      // （實測：報告 4/10 ＝ 40% 報偏低，實際 4/6 ＝ 66.7% 唔應該報）。
+      // `availabilityByPost` 由 `computePostAvailability_()` 算出——即係
+      // 「身分規則影響預估」用嘅同一個函式，兩個工具因此保證講同一個數字。
+      //
+      // 算唔到（例如讀表失敗）就退回用收窄前嘅名單，並且 `narrowed=false`
+      // 令報告可以標明「呢個數字未經收窄」，唔會靜靜噉report 一個錯數字。
+      const avail = availability[post.postId];
+      const narrowed = !!avail;
+      const effectiveList = narrowed ? avail.pool : beforeList;
+
+      const eligibleCount = effectiveList.length;
       const ratio = eligibleCount === 0 ? null : usedIds.length / eligibleCount;
-      const unusedPeople = eligible.filter(function (id) { return !used[id]; });
+      const unusedPeople = effectiveList.filter(function (id) { return !used[id]; });
+
       return {
         postId: post.postId,
         postNameTC: post.postNameTC,
         assignedSlots: assignedSlotsByPost[post.postId] || 0,
         usedCount: usedIds.length,
         eligibleCount: eligibleCount,
+        // C2：報告要同時顯示兩個數字，唔好淨係換走一個——幹事要見到
+        // 收窄咗幾多，先知道點解動用率會低。
+        eligibleCountBeforeRules: beforeList.length,
+        narrowedByRoleRules: narrowed && beforeList.length !== eligibleCount,
+        narrowed: narrowed,
         ratio: ratio,
         unusedCount: unusedPeople.length,
         unusedPeople: unusedPeople,
@@ -270,7 +294,44 @@ function measureRolePostFocus_(assignments, posts, roles, focusRoles, focusPostI
  * @param {Object} context `buildVerifyContext_()` 嘅結果
  * @returns {?Object} `buildChairAnnounceBoundFromContext_()` 嘅結果；算唔到時 null
  */
-function measureChairAnnounceCeiling_(context) {
+function measureChairAnnounceCeiling_(context, availabilityByPost) {
+  try {
+    return buildChairAnnounceBoundFromContext_(
+      context.rules, context.posts, availabilityByPost, context.serviceDates);
+  } catch (err) {
+    // 呢一項純粹係解釋用嘅補充資訊，算唔到唔應該令成份量度報告失敗。
+    log_('WARN', 'measureChairAnnounceCeiling_ 失敗，略過理論上限這一項：' + err.message);
+    return null;
+  }
+}
+
+/**
+ * 第十八輪批次階段 C1：由 `buildVerifyContext_()` 嘅 context 算出**逐崗位嘅
+ * 收窄後可用人選**，畀「軟規則實測量度」入面兩項共用。
+ *
+ * ## 點解要抽出嚟
+ *
+ * 呢個計算原本寫死喺 `measureChairAnnounceCeiling_()` 入面，只服務理論上限
+ * 嗰一項。結果崗位動用率（第 5 項）用返 `context.eligibility.byPost`——
+ * 即係**收窄之前**嘅聯集名單，同「身分規則影響預估」講嘅數字對唔上：
+ *
+ * | 崗位 | 影響預估（收窄後） | 量度工具（收窄前） |
+ * |---|---|---|
+ * | 報告 | 6 人 | 10 人 |
+ * | 當值堂委 | 8 人 | 10 人 |
+ *
+ * 後果：動用率用錯分母（4/10 ＝ 40% 報「偏低」），實際應該係 4/6 ＝ 66.7%
+ * 同 4/8 ＝ 50.0%，兩個都唔應該報偏低——7 個「偏低」警告入面有 2 個係假警報。
+ *
+ * 抽出嚟之後，**理論上限同動用率用同一份 availability**，唔會再分岔。
+ * 而且用嘅係 `RoleImpact.gs` 嘅 `computePostAvailability_()`——即係
+ * 「身分規則影響預估」用嘅同一個函式，兩個工具保證講同一件事。
+ *
+ * @param {Object} context `buildVerifyContext_()` 嘅結果
+ * @returns {Object.<string, Object>} {PostID: computePostAvailability_() 結果}；
+ *   算唔到時回傳空物件（呼叫端會退回用收窄前嘅名單並喺報告講明）
+ */
+function buildAvailabilityByPostForMetrics_(context) {
   try {
     const config = readConfig();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
@@ -294,8 +355,12 @@ function measureChairAnnounceCeiling_(context) {
     // context.eligibility.byPost 已經係增補後嘅名單（見 Verify.gs），
     // 所以呢度重組 roleContext 只需要補返 roles／exclusions 兩項。
     const roleContext = {
-      roles: context.roles || [],
-      exclusions: context.personPostExclusions || [],
+      // 第十八輪批次階段 A3：同樣唔可以 `|| []`——`context` 來自
+      // `buildVerifyContext_()`，兩個欄位一定有；如果冇，代表呼叫端換咗
+      // 一個手砌 context，嗰陣寧可拋錯都好過靜靜噉算出一個錯嘅數字。
+      roles: requireRoleContextField_(context, 'roles', 'buildAvailabilityByPostForMetrics_'),
+      exclusions: requireRoleContextField_(
+        context, 'personPostExclusions', 'buildAvailabilityByPostForMetrics_'),
       eligibleByPost: context.eligibility.byPost
     };
 
@@ -307,13 +372,11 @@ function measureChairAnnounceCeiling_(context) {
       availabilityByPost[post.postId] = computePostAvailability_(
         post, applicableDates, roleContext, peopleById, context.unavailable);
     });
-
-    return buildChairAnnounceBoundFromContext_(
-      context.rules, context.posts, availabilityByPost, context.serviceDates);
+    return availabilityByPost;
   } catch (err) {
-    // 呢一項純粹係解釋用嘅補充資訊，算唔到唔應該令成份量度報告失敗。
-    log_('WARN', 'measureChairAnnounceCeiling_ 失敗，略過理論上限這一項：' + err.message);
-    return null;
+    log_('WARN', 'buildAvailabilityByPostForMetrics_ 失敗，'
+      + '崗位動用率會退回用收窄前的名單（報告會標明）：' + err.message);
+    return {};
   }
 }
 
@@ -338,14 +401,22 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
 
   const consecutive = listConsecutiveSamePersonViolations_(
     context.assignments, context.posts, sortedDates);
+
+  // 第十八輪批次階段 C1：收窄後嘅可用人選，動用率同理論上限兩項共用同一份。
+  const availabilityByPost = buildAvailabilityByPostForMetrics_(context);
+
   const manpower = computePostManpowerUsage_(
-    context.assignments, context.posts, context.eligibility.byPost, thresholds.postUsageMinRatio);
+    context.assignments, context.posts, context.eligibility.byPost,
+    thresholds.postUsageMinRatio, availabilityByPost);
 
   // 第十六輪批次階段 C3：規則 4（堂委集中四崗位）嘅實測數字。
   // `buildVerifyContext_()` 已經幫我哋讀好 `context.roles`（見 Verify.gs）。
   const focusRule = context.rules[RULE_IDS.ROLE_POST_FOCUS];
+  // 第十八輪批次階段 A3：漏傳嘅話規則 4 嘅量度會報「0 次超出範圍」，
+  // 睇落好似執行得完美，實際上係一個人都冇被認出係堂委——最誤導嘅失敗方式。
   const roleFocus = measureRolePostFocus_(
-    context.assignments, context.posts, context.roles || [],
+    context.assignments, context.posts,
+    requireRoleContextField_(context, 'roles', 'measureSoftRuleMetrics_'),
     focusRule ? readRoleFocusRoles_(focusRule) : [ROLE_CODES.COMMITTEE],
     focusRule ? splitList_(focusRule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]) : []);
 
@@ -365,7 +436,7 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
   // 判斷改為同**上限**比（見下面 `chairEqJudgement`），上限本身低過
   // 「基準 − 容差」嗰陣報告會明確講出成因。推導見 `RoleImpact.gs` 嘅
   // `computeChairAnnounceUpperBound_()`。
-  const chairEqCeiling = measureChairAnnounceCeiling_(context);
+  const chairEqCeiling = measureChairAnnounceCeiling_(context, availabilityByPost);
 
   // 有上限就同上限比，冇（規則未設定／算唔到）就退回同歷史基準比，
   // 維持加入呢一項之前嘅行為。
@@ -530,13 +601,25 @@ function buildSoftRuleMetricRows_(m) {
       '上一個主日（' + v.previousDate + '）同一崗位已經是此人；AllowConsecutive=' + v.allowConsecutive));
   });
 
-  // ---- 5. 各崗位人手動用率 ----
+  // ---- 5. 各崗位人手動用率（第十八輪批次階段 C：分母改用收窄後名單）----
   m.manpower.forEach(function (p) {
+    // C2：同時顯示收窄前後兩個數字。只換走一個嘅話，幹事會見到分母突然
+    // 變細但唔知點解；見到「6（套用前 10）」就即刻明白係身分規則收窄咗。
+    const eligibleText = p.narrowedByRoleRules
+      ? '合資格 ' + p.eligibleCount + ' 人（套用身分規則後；套用前 ' + p.eligibleCountBeforeRules + ' 人）'
+      : '合資格 ' + p.eligibleCount + ' 人';
+
+    const note = '本季派了 ' + p.assignedSlots + ' 格；判斷：' + p.judgement
+      + (p.unusedCount > 0 ? '　整季未被派到：' + p.unusedCount + ' 人' : '')
+      + (p.narrowedByRoleRules
+        ? '　　※ 分母已扣除身分規則、個人崗位排除與整季不能服侍的人——'
+          + '這個數字跟「查看 ▸ 身分規則影響預估（唯讀）」的「套用後」人數一致'
+        : '')
+      + (p.narrowed ? '' : '　　⚠ 收窄後名單算不出來，這一項用的是**未收窄**的人數，可能偏低');
+
     rows.push(diagRow_('5. 崗位人手動用率', p.postNameTC + '（' + p.postId + '）',
-      '動用 ' + p.usedCount + ' / 合資格 ' + p.eligibleCount + ' 人'
-        + '　＝ ' + formatMetricPercent_(p.ratio),
-      '本季派了 ' + p.assignedSlots + ' 格；判斷：' + p.judgement
-        + (p.unusedCount > 0 ? '　整季未被派到：' + p.unusedCount + ' 人' : '')));
+      '動用 ' + p.usedCount + ' / ' + eligibleText + '　＝ ' + formatMetricPercent_(p.ratio),
+      note));
   });
 
   // ---- 6. 規則 4：指定身分（堂委）集中在指定崗位的程度 ----

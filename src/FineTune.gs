@@ -251,8 +251,11 @@ function findStateViolations_(state, context) {
     // 生成器管唔到，所以只有呢度（步驟 3／5 重跑）同 Verify.gs 捉得到。
     if (post && isRuleEnabledAllowingDefault_(rules, RULE_IDS.ROLE_REQUIRED)) {
       const required = requiredRolesOfPost_(post);
+      // 第十八輪批次階段 A2：`undefined` 一律拋錯，唔可以當成空陣列
       if (required.length > 0
-          && !personHasAnyRoleOn_(context.roles || [], cell.personId, required, cell.serviceDate)) {
+          && !personHasAnyRoleOn_(
+            requireRoleContextField_(context, 'roles', 'findStateViolations_'),
+            cell.personId, required, cell.serviceDate)) {
         // 第十七輪批次階段 D1：訊息由 Roles.gs 嘅共用函式產生，四處一致
         add(cell, RULE_IDS.ROLE_REQUIRED,
           buildRoleRequiredReason_(post, required, cell.serviceDate));
@@ -262,7 +265,8 @@ function findStateViolations_(state, context) {
     // ---- 第十六輪批次階段 B：教會新規則 3（個別人士的崗位限制）----
     if (post && isRuleEnabledAllowingDefault_(rules, RULE_IDS.PERSON_POST_EXCLUDED)) {
       const exclusion = findActivePersonPostExclusion_(
-        context.personPostExclusions || [], cell.personId, cell.postId, cell.serviceDate);
+        requireRoleContextField_(context, 'personPostExclusions', 'findStateViolations_'),
+        cell.personId, cell.postId, cell.serviceDate);
       if (exclusion) {
         add(cell, RULE_IDS.PERSON_POST_EXCLUDED,
           buildPersonPostExcludedReason_(post, exclusion));

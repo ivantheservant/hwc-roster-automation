@@ -486,11 +486,20 @@ function testFineTuneDetection_() {
     return { pass: true, detail: '主日不足 2 週，略過', action: '' };
   }
 
+  // 第十八輪批次階段 A3：呢個都係一個「手砌 context」嘅呼叫點。
+  // 之前漏咗 roles／personPostExclusions——**現有斷言啱巧唔受影響**
+  // （下面兩個 filter 只留 NO_CONSECUTIVE，誤報嘅身分違規被隔走咗），
+  // 但屬於同一個 bug class，而且一旦有人放寬嗰個 filter 就會即刻誤判。
+  // 而家由同一個 buildRoleContext_() 取，唔另外讀一次工作表。
+  const posts = readPostsNormalized();
+  const roleContext = buildRoleContext_(eligibility, posts, timezone);
   const context = {
     rules: rules,
-    posts: readPostsNormalized(),
+    posts: posts,
     serviceDates: serviceDates,
     eligibility: eligibility,
+    roles: roleContext.roles,
+    personPostExclusions: roleContext.exclusions,
     peopleById: indexPeopleById_(),
     unavailable: [],
     maxPerQuarterDefault: DEFAULTS.MAX_PER_QUARTER,

@@ -360,6 +360,12 @@ function computeServiceDistribution_(context) {
  * @returns {{groups: Object[], total: number}} 各項檢查的結果與違反總數
  */
 function checkHardRuleViolations_(context) {
+  // 第十八輪批次階段 A2：`undefined` 唔可以當成「冇人持有任何身分」，
+  // 詳細理由見 `requireRoleContextField_()`（Roles.gs）。
+  const roles = requireRoleContextField_(context, 'roles', 'checkHardRuleViolations_');
+  const exclusions = requireRoleContextField_(
+    context, 'personPostExclusions', 'checkHardRuleViolations_');
+
   const postById = {};
   context.posts.forEach(function (p) { postById[p.postId] = p; });
   const dateInfo = {};
@@ -388,11 +394,11 @@ function checkHardRuleViolations_(context) {
       // 步驟 3／5 重跑檢查、fine-tune 提案四處一模一樣。
       const required = requiredRolesOfPost_(post);
       if (required.length > 0
-          && !personHasAnyRoleOn_(context.roles || [], a.personId, required, a.serviceDate)) {
+          && !personHasAnyRoleOn_(roles, a.personId, required, a.serviceDate)) {
         roleViolations.push(label + '：' + buildRoleRequiredReason_(post, required, a.serviceDate));
       }
       const exclusion = findActivePersonPostExclusion_(
-        context.personPostExclusions || [], a.personId, a.postId, a.serviceDate);
+        exclusions, a.personId, a.postId, a.serviceDate);
       if (exclusion) {
         exclusionViolations.push(label + '：' + buildPersonPostExcludedReason_(post, exclusion));
       }

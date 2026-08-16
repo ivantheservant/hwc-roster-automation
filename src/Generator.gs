@@ -870,8 +870,11 @@ function evaluateViolations_(personId, state) {
   // 唔會將當時合法嘅安排追溯判定為違規。見 Roles.gs 檔頭嘅 A3 說明。
   if (isRuleEnabledAllowingDefault_(rules, RULE_IDS.ROLE_REQUIRED)) {
     const required = requiredRolesOfPost_(post);
+    // 第十八輪批次階段 A2：`undefined` 一律拋錯，唔可以當成空陣列
     if (required.length > 0
-        && !personHasAnyRoleOn_(state.context.roles || [], personId, required, state.serviceDate.serviceDate)) {
+        && !personHasAnyRoleOn_(
+          requireRoleContextField_(state.context, 'roles', 'evaluateViolations_'),
+          personId, required, state.serviceDate.serviceDate)) {
       violations.push(makeViolation_(rules, RULE_IDS.ROLE_REQUIRED,
         buildRoleRequiredReason_(post, required, state.serviceDate.serviceDate)));
     }
@@ -880,7 +883,8 @@ function evaluateViolations_(personId, state) {
   // ---- 第十六輪批次階段 B：教會新規則 3（個別人士的崗位限制）----
   if (isRuleEnabledAllowingDefault_(rules, RULE_IDS.PERSON_POST_EXCLUDED)) {
     const exclusion = findActivePersonPostExclusion_(
-      state.context.personPostExclusions || [], personId, post.postId, state.serviceDate.serviceDate);
+      requireRoleContextField_(state.context, 'personPostExclusions', 'evaluateViolations_'),
+      personId, post.postId, state.serviceDate.serviceDate);
     if (exclusion) {
       violations.push(makeViolation_(rules, RULE_IDS.PERSON_POST_EXCLUDED,
         buildPersonPostExcludedReason_(post, exclusion)));
@@ -1026,7 +1030,12 @@ function evaluateRolePostFocus_(personId, state) {
   if (focusPostIds.indexOf(state.post.postId) !== -1) return null;
 
   const focusRoles = readRoleFocusRoles_(rule);
-  if (!personHasAnyRoleOn_(state.context.roles || [], personId, focusRoles, state.serviceDate.serviceDate)) {
+  // 第十八輪批次階段 A3：同樣唔可以用 `|| []`——規則 4 係軟規則，漏傳嘅話
+  // 唔會爆錯，只會令**每個堂委都被當成「唔係堂委」**，扣分完全唔會觸發，
+  // 靜靜噉令規則 4 失效而冇任何跡象。
+  if (!personHasAnyRoleOn_(
+    requireRoleContextField_(state.context, 'roles', 'evaluateRolePostFocus_'),
+    personId, focusRoles, state.serviceDate.serviceDate)) {
     return null; // 唔係目標身分（例如唔係堂委）＝呢條規則同佢無關
   }
 

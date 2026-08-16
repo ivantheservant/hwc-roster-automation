@@ -325,6 +325,72 @@ function buildRoleContext_(eligibility, posts, timezone) {
 }
 
 /**
+ * 第十八輪批次階段 A2：**分辨「呼叫者冇傳」同「真係冇資料」**。
+ *
+ * ## 呢個函式存在嘅理由（本輪最重要嘅一段）
+ *
+ * 第十八輪撞到嘅 bug：`Tune.gs` 嘅 `countHardViolations_()` 手砌
+ * verifyContext，冇放 `roles`／`personPostExclusions`。當時規則檢查寫嘅係
+ * `context.roles || []`，於是 `undefined` 被靜靜噉當成空陣列，
+ * `personHasAnyRoleOn_([], ...)` 對每一個人都回傳 `false`，
+ * **每一格有身分要求嘅崗位都被當成違規**——參數掃描 12 組全部報
+ * 「硬規則違反 26」，12 行全部標成失敗色，而同一季實際生成出嚟嘅 v0
+ * 其實係 0 違反。
+ *
+ * 問題嘅本質唔係「漏咗一行」，而係**一個缺失被解讀成一個有意義嘅值，
+ * 而且係最壞嗰個方向**：`undefined`（我唔知）被當成 `[]`（我知，而且
+ * 答案係「一個人都冇」）。呢兩件事喺語意上完全唔同：
+ *
+ * | 情況 | `context.roles` | 正確行為 |
+ * |---|---|---|
+ * | `Roles` 工作表未建立（合法，第十六輪刻意支援） | `[]` | 照跑，身分規則自動失效 |
+ * | 呼叫者手砌 context 漏咗呢個欄位（bug） | `undefined` | **拋錯**，唔好扮知道答案 |
+ *
+ * `readRolesSafe_()` 喺工作表唔存在時回傳 `[]`（唔係 `undefined`），
+ * 所以上面第一行永遠係合法路徑；`undefined` 只可能係第二種情況。
+ *
+ * ## 點解揀「拋錯」而唔係「記一句 WARN 然後當空」
+ *
+ * 記 WARN 嘅話，`Tune.gs` 呢個 bug 一樣會發生——參數掃描照樣報 26 項
+ * 違反，而 WARN 埋咗喺執行紀錄入面冇人會睇。呢一類 bug 嘅特徵就係
+ * **靜靜噉出錯而且睇落好合理**（26 = 13 + 13，數字整齊得好似真嘅），
+ * 唯一捉得住嘅方法就係即刻停低。
+ *
+ * 呢個工具全部都係唯讀報告或者記憶體模擬，拋錯嘅代價只係「呢份報告
+ * 出唔到」，遠低於「出咗一份錯嘅報告而冇人知」。
+ *
+ * @param {Object} context 規則檢查用嘅 context
+ * @param {string} fieldName 欄位名（例如 `'roles'`）
+ * @param {string} callerName 需要呢個欄位嘅函式名，寫入錯誤訊息
+ * @returns {Object[]} 該欄位嘅陣列值
+ * @throws {Error} 欄位係 undefined／null／唔係陣列時
+ */
+function requireRoleContextField_(context, fieldName, callerName) {
+  const value = context ? context[fieldName] : undefined;
+  if (Array.isArray(value)) return value;
+
+  const source = fieldName === 'roles'
+    ? 'buildRoleContext_(...).roles'
+    : 'buildRoleContext_(...).exclusions';
+
+  throw new Error(
+    '規則檢查 context 缺少 `' + fieldName + '` 欄位（' + callerName + ' 需要它）。\n\n'
+    + '收到的值是：' + (value === undefined ? 'undefined（欄位完全不存在）'
+      : value === null ? 'null' : '不是陣列（' + typeof value + '）') + '\n\n'
+    + '⚠️ 這個欄位**不可以省略**。空陣列 `[]` 代表「確實沒有任何身分資料」'
+    + '（例如 ' + SHEETS.ROLES + ' 工作表還沒建立），是合法的；\n'
+    + '但 `undefined` 代表呼叫端根本沒有傳，兩者語意完全不同——'
+    + '如果把 undefined 當成空陣列，每一格有身分要求的崗位都會被誤判為違規'
+    + '（第十八輪批次就是這樣，參數掃描 12 組全部誤報 26 項違反）。\n\n'
+    + '修正方法：\n'
+    + '  • 如果你用 buildGeneratorContext_()／buildFineTuneContext_()／'
+    + 'buildVerifyContext_() 取得 context，它們已經放好這個欄位，直接沿用即可；\n'
+    + '  • 如果你自己組 context（例如記憶體模擬），請從 ' + source
+    + ' 取得，不要另外讀一次工作表，也不要填 [] 敷衍過去。'
+  );
+}
+
+/**
  * 第十七輪批次階段 D1：`HARD_ROLE_REQUIRED` 嘅違規訊息。
  *
  * ## 點解要抽出嚟做一個共用函式

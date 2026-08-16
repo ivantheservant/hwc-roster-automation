@@ -282,6 +282,13 @@ function buildGeneratorContextMock(options) {
     peopleById: peopleById,
     unavailable: o.unavailable || [],
     specialByDate: o.specialByDate || {},
+    // 第十八輪批次階段 A3：呢兩個欄位**一定要明確填**，唔可以省略。
+    // 空陣列＝「呢個 fixture 確實冇任何身分資料」，係一個明確嘅宣告；
+    // 省略（undefined）而家會被 requireRoleContextField_() 拋錯——正正就係
+    // 呢一輪要根治嘅 bug class（Tune.gs 漏傳令每格都被誤判為違規）。
+    // 想測身分規則嘅，傳 o.roles／o.personPostExclusions 入嚟。
+    roles: o.roles || [],
+    personPostExclusions: o.personPostExclusions || [],
     rules: rules,
     priorWeeks: o.priorWeeks || [],
     existingAssignments: o.existingAssignments || {},

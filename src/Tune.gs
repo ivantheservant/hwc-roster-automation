@@ -153,7 +153,25 @@ function computeTuneDeviation_(metrics, baseline) {
 
 /**
  * 統計模擬結果違反了多少條 HARD 規則。任何一項不為 0 都代表該組合產生了不合法的職事表。
- * @param {Object} context 排表 context
+ *
+ * ## ⚠️ 第十八輪批次階段 A1 修正：漏傳 roles／personPostExclusions
+ *
+ * 呢個函式手砌一個 verifyContext 畀 `checkHardRuleViolations_()`。第十六輪
+ * 將兩條身分硬規則加入嗰個檢查函式嗰陣，**冇更新呢個呼叫點**，於是
+ * `context.roles` 係 `undefined`，被當時嘅 `|| []` 靜靜噉當成空陣列，
+ * `personHasAnyRoleOn_([], ...)` 對每個人都 false ⇒ **每一格有身分要求嘅
+ * 崗位都被當成違規**。實際後果：參數掃描 12 組全部報「硬規則違反 26」
+ * （＝ 13 個報告格 ＋ 13 個當值堂委格），12 行全部標成失敗色，
+ * 而同一季真正生成出嚟嘅 v0 其實係 0 違反。
+ *
+ * 修正：由 `context` 直接沿用兩個欄位。`context` 來自
+ * `buildGeneratorContext_()`，嗰度已經係用 `buildRoleContext_()` 讀好，
+ * 所以呢度**唔會另外讀一次工作表**，亦都保證同生成器睇到同一份資料。
+ *
+ * 同時 `checkHardRuleViolations_()` 而家會對缺欄位直接拋錯
+ * （見 `requireRoleContextField_()`），所以同類漏傳日後唔可能再靜靜發生。
+ *
+ * @param {Object} context 排表 context（由 buildGeneratorContext_() 產生）
  * @param {{assignments: Object[]}} result buildRoster_() 的結果
  * @returns {number} 硬規則違反總數
  */
@@ -163,9 +181,62 @@ function countHardViolations_(context, result) {
     serviceDates: context.serviceDates,
     eligibility: context.eligibility,
     unavailable: context.unavailable,
+    roles: context.roles,
+    personPostExclusions: context.personPostExclusions,
     assignments: result.assignments
   };
   return checkHardRuleViolations_(verifyContext).total;
+}
+
+/**
+ * 第十八輪批次階段 B：偵測「某個參數喺整個掃描範圍入面完全冇改變過結果」。
+ *
+ * 判斷方法：把結果按**另一個**參數分組，喺每一組入面睇「本參數不同值」
+ * 嘅結果指標係咪完全一樣。全部組都一樣 ⇒ 呢個參數喺呢個取樣範圍飽和咗
+ * （或者根本冇生效），提示幹事試更細嘅值。
+ *
+ * 純函式，方便測試。
+ *
+ * @param {Object[]} rows 掃描結果（每項含 chairDualBonus／historicalWeight 與各指標）
+ * @returns {string[]} 提示文字；冇發現飽和時回傳空陣列
+ */
+function buildTuneSaturationNotes_(rows) {
+  const notes = [];
+  const signature = function (r) {
+    return [r.chairEqRatio, r.announceRatio, r.peopleCount, r.average, r.maxCount, r.deviation].join('|');
+  };
+
+  // CHAIR_DUAL_BONUS：以 historicalWeight 分組
+  const byWeight = {};
+  rows.forEach(function (r) {
+    const key = String(r.historicalWeight);
+    if (!byWeight[key]) byWeight[key] = [];
+    byWeight[key].push(r);
+  });
+
+  const weightKeys = Object.keys(byWeight);
+  const allIdentical = weightKeys.length > 0 && weightKeys.every(function (key) {
+    const group = byWeight[key];
+    if (group.length < 2) return false; // 一組得一個值，比較唔到
+    const first = signature(group[0]);
+    return group.every(function (r) { return signature(r) === first; });
+  });
+
+  if (allIdentical) {
+    const values = rows.map(function (r) { return r.chairDualBonus; })
+      .filter(function (v, i, arr) { return arr.indexOf(v) === i; })
+      .sort(function (a, b) { return a - b; });
+    notes.push('CHAIR_DUAL_BONUS 由 ' + values[0] + ' 到 ' + values[values.length - 1]
+      + ' 之間，全部組合的六項指標完全一樣——代表這個範圍已經**飽和**，'
+      + '再加大改變不到任何排班結果。');
+    notes.push('原因：這個加分是一個固定值，一旦大過候選人之間'
+      + '「選人分數 × SELECTION_WEIGHT」的最大差距，全部雙重合資格的人就已經'
+      + '穩定排在非雙重合資格的人前面，再加大也改變不了次序（門檻型參數，不是連續型）。');
+    notes.push('建議：想比較出分別，試更細的值（例如 0／5／10／15／20）。'
+      + '飽和點會隨候選池大小與歷史次數分佈改變，沒有一個固定數字。');
+  }
+
+  return notes;
 }
 
 /**
@@ -253,6 +324,21 @@ function writeTuneSheet_(quarterId, sortedRows, baseline) {
     return new Array(headers.length).fill(color);
   });
   sheet.getRange(3, 1, backgrounds.length, headers.length).setBackgrounds(backgrounds);
+
+  // 第十八輪批次階段 B：報告要識得自己講「呢個參數喺呢個範圍冇作用」。
+  //
+  // 起因：舊 grid 嘅四個 CHAIR_DUAL_BONUS 值全部落喺飽和區，12 行嘅六項
+  // 指標四位小數完全一樣。當時冇任何提示，睇報告嘅人只會覺得「奇怪」，
+  // 要自己去追先知道係取樣範圍問題而唔係參數失效。而家直接寫出嚟。
+  const notes = buildTuneSaturationNotes_(sortedRows);
+  if (notes.length > 0) {
+    const noteRow = 3 + rows.length + 1;
+    sheet.getRange(noteRow, 1).setValue('⚠️ 參數敏感度提示');
+    sheet.getRange(noteRow, 1).setFontWeight('bold');
+    notes.forEach(function (note, i) {
+      sheet.getRange(noteRow + 1 + i, 1).setValue(note);
+    });
+  }
 
   sheet.setFrozenRows(2);
   sheet.autoResizeColumns(1, headers.length);
