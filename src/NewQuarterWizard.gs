@@ -13,22 +13,66 @@
  * 讓你在真正寫入前有機會發現不對勁並取消。
  */
 
-/** T1～T4 對應的起始月份（1-based），見上方檔頭的決策 AY-1。 */
+/**
+ * T1～T4 對應的起始月份（1-based），見上方檔頭的決策 AY-1。
+ *
+ * 第十七輪批次階段 C：呢個常數而家只係**預設值**——實際生效值由
+ * `readQuarterTermStartMonths_()` 由 Config 嘅 `QUARTER_TERM_START_MONTHS`
+ * 讀返嚟（缺少／格式唔啱時退回呢度）。留返呢個常數係為咗兩件事：
+ * 讀唔到 Config 時嘅安全網，以及畀純函式測試唔使砌 Config 都跑得到。
+ */
 const QUARTER_TERM_START_MONTH = { 1: 1, 2: 4, 3: 7, 4: 10 };
+
+/**
+ * 由 Config 讀出 T1～T4 嘅起始月份。格式係逗號分隔嘅四個月份數字
+ * （預設 `1,4,7,10`）。任何一項唔係 1-12 之間嘅整數，或者唔夠四項，
+ * 一律**整組**退回 `QUARTER_TERM_START_MONTH` 並記一句 WARN——
+ * 半套設定（例如只有三項啱）比完全用預設值更危險，會令某一季嘅日期
+ * 靜靜噉錯開。
+ *
+ * 呢個 Key 喺 ConfigSeed 登記為 `LIST` 型，所以 `readConfig()` 會回傳
+ * **陣列**（`['1','4','7','10']`）而唔係字串。`String(陣列)` 啱啱好就係
+ * 逗號分隔嘅字串，所以下面 `String(...)` 之後再 `splitList_()` 兩種形態
+ * 都處理得到——`getConfig()` 退回 `DEFAULTS`（字串）嗰陣亦都一樣。
+ * @returns {Object.<number, number>} {1: 起始月, 2: …, 3: …, 4: …}
+ */
+function readQuarterTermStartMonths_() {
+  const raw = String(getConfig(CONFIG_KEYS.QUARTER_TERM_START_MONTHS,
+    DEFAULTS.QUARTER_TERM_START_MONTHS) || '').trim();
+  const parts = splitList_(raw).map(function (s) { return Number(s); });
+
+  const valid = parts.length === 4 && parts.every(function (m) {
+    return !isNaN(m) && Number.isInteger(m) && m >= 1 && m <= 12;
+  });
+  if (!valid) {
+    if (raw !== '') {
+      log_('WARN', 'Config 的 ' + CONFIG_KEYS.QUARTER_TERM_START_MONTHS
+        + ' 格式不正確（收到「' + raw + '」，需要是四個 1-12 的月份，逗號分隔），'
+        + '已改用預設值 ' + DEFAULTS.QUARTER_TERM_START_MONTHS);
+    }
+    return QUARTER_TERM_START_MONTH;
+  }
+  return { 1: parts[0], 2: parts[1], 3: parts[2], 4: parts[3] };
+}
 
 /**
  * 依年份與季別算出日曆季度的開始日／結束日（yyyy-MM-dd）。
  * @param {number} year 年份
  * @param {number} term 季別（1-4）
+ * @param {Object.<number, number>=} startMonths 各季起始月份；省略時用
+ *   `QUARTER_TERM_START_MONTH`（呼叫端想用 Config 設定就自己傳
+ *   `readQuarterTermStartMonths_()` 嘅結果進嚟——噉樣呢個函式維持純函式，
+ *   測試唔使砌 Config）
  * @returns {{startDate: string, endDate: string}}
  */
-function computeCalendarQuarterRange_(year, term) {
+function computeCalendarQuarterRange_(year, term, startMonths) {
+  const months = startMonths || QUARTER_TERM_START_MONTH;
   const pad2 = function (n) { return n < 10 ? '0' + n : String(n); };
-  const startMonth = QUARTER_TERM_START_MONTH[term];
+  const startMonth = months[term];
   const startDate = year + '-' + pad2(startMonth) + '-01';
   const nextTerm = term === 4 ? 1 : term + 1;
   const nextYear = term === 4 ? year + 1 : year;
-  const nextStartDate = nextYear + '-' + pad2(QUARTER_TERM_START_MONTH[nextTerm]) + '-01';
+  const nextStartDate = nextYear + '-' + pad2(months[nextTerm]) + '-01';
   return { startDate: startDate, endDate: shiftDateString_(nextStartDate, -1) };
 }
 
@@ -68,7 +112,7 @@ function planNewQuarterWizard_(year, term, customStartDate) {
       + '為免資料衝突，本工具拒絕執行，請自行檢查 ServiceDates 工作表。');
   }
 
-  const calendarRange = computeCalendarQuarterRange_(year, term);
+  const calendarRange = computeCalendarQuarterRange_(year, term, readQuarterTermStartMonths_());
   let startDate = calendarRange.startDate;
   let endDate = calendarRange.endDate;
   let usedCustomStart = false;
@@ -211,7 +255,7 @@ function runNewQuarterWizard_() {
     return;
   }
 
-  const defaultRange = computeCalendarQuarterRange_(year, term);
+  const defaultRange = computeCalendarQuarterRange_(year, term, readQuarterTermStartMonths_());
   const customStartResponse = ui.prompt(
     title,
     '以日曆季度計算，這一季預設是 ' + defaultRange.startDate + ' 至 ' + defaultRange.endDate + '\n'

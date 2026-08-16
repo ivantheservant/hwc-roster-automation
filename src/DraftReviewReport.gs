@@ -36,6 +36,12 @@ function describeRuleForCommittee_(ruleId) {
   map[RULE_IDS.NO_AUTO_GENERATE] = '講員、翻譯、獻花不由系統安排';
   map[RULE_IDS.MUTEX_GROUP] = '同一週不會安排同一個人擔任互相衝突的崗位';
   map[RULE_IDS.NO_CONSECUTIVE] = '同一崗位盡量不連續兩週由同一個人擔任';
+  // 第十七輪批次階段 D2：呢兩條係第十六輪新增嘅教會身分規則。冇加入呢個
+  // 對照表嘅話，堂委報告會顯示一句冇意義嘅「規則檢查」，睇唔出係咩事——
+  // 而呢兩條正正就係最需要解釋清楚嘅（堂委會問「點解呢個人唔見咗」）。
+  map[RULE_IDS.ROLE_REQUIRED] = '某些崗位只由具備相應身分的人擔任（教會規定）';
+  map[RULE_IDS.PERSON_POST_EXCLUDED] = '個別同工按教會安排暫時不擔任某些崗位';
+  map[RULE_IDS.ROLE_POST_FOCUS] = '堂委盡量集中在指定的幾個崗位，避免負擔過重';
   return map[ruleId] || '規則檢查';
 }
 

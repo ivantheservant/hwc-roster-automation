@@ -302,6 +302,17 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.QUARTER_TERM_START_MONTHS, type: CONFIG_TYPES.LIST, group: 'SCHEDULE',
+      defaultValue: DEFAULTS.QUARTER_TERM_START_MONTHS,
+      description: '第十七輪批次新增：T1～T4 各自由哪一個月開始，逗號分隔的四個月份數字。'
+        + '預設 1,4,7,10 就是日曆季度（T1=1-3月、T2=4-6月、T3=7-9月、T4=10-12月），'
+        + '跟這個 Key 加入之前寫死在程式裡的一樣，所以不改也不會有任何行為變化。'
+        + '教會如果用學期制或財政年度等其他劃分，改這裡就可以，不需要改程式。'
+        + '「⚠️ 新增季度」與「⚠️ 產生下一年度四個季度」兩個工具都讀這個值。'
+        + '格式不正確（不是四項、或有值不在 1-12）時會整組退回預設值並記一句 WARN。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.REMIND_UNCONFIRMED_SPECIAL_DAYS, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: String(DEFAULTS.REMIND_UNCONFIRMED_SPECIAL_DAYS),
       description: '第十六輪批次新增（教會規則 5）：距離自動生成日期少於幾天，就開始提醒'

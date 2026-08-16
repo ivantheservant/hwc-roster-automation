@@ -253,9 +253,9 @@ function findStateViolations_(state, context) {
       const required = requiredRolesOfPost_(post);
       if (required.length > 0
           && !personHasAnyRoleOn_(context.roles || [], cell.personId, required, cell.serviceDate)) {
+        // 第十七輪批次階段 D1：訊息由 Roles.gs 嘅共用函式產生，四處一致
         add(cell, RULE_IDS.ROLE_REQUIRED,
-          '違反身分限制：' + post.postNameTC + ' 只可以由' + describeRoleCodes_(required)
-            + '擔任，但此人在 ' + cell.serviceDate + ' 當日並未持有這個身分');
+          buildRoleRequiredReason_(post, required, cell.serviceDate));
       }
     }
 
@@ -265,8 +265,7 @@ function findStateViolations_(state, context) {
         context.personPostExclusions || [], cell.personId, cell.postId, cell.serviceDate);
       if (exclusion) {
         add(cell, RULE_IDS.PERSON_POST_EXCLUDED,
-          '違反個人崗位限制：' + SHEETS.PERSON_POST_EXCLUSIONS + ' 明確排除此人擔任 '
-            + post.postNameTC + '（原因：' + (exclusion.reason || '未填') + '）');
+          buildPersonPostExcludedReason_(post, exclusion));
       }
     }
   });

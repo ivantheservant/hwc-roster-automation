@@ -384,18 +384,17 @@ function checkHardRuleViolations_(context) {
     }
 
     if (post) {
+      // 第十七輪批次階段 D1：訊息由 Roles.gs 嘅共用函式產生，同生成器、
+      // 步驟 3／5 重跑檢查、fine-tune 提案四處一模一樣。
       const required = requiredRolesOfPost_(post);
       if (required.length > 0
           && !personHasAnyRoleOn_(context.roles || [], a.personId, required, a.serviceDate)) {
-        roleViolations.push(label + '：' + post.postNameTC + ' 要求'
-          + describeRoleCodes_(required) + '，但此人當日並未持有這個身分');
+        roleViolations.push(label + '：' + buildRoleRequiredReason_(post, required, a.serviceDate));
       }
       const exclusion = findActivePersonPostExclusion_(
         context.personPostExclusions || [], a.personId, a.postId, a.serviceDate);
       if (exclusion) {
-        exclusionViolations.push(label + '：'
-          + SHEETS.PERSON_POST_EXCLUSIONS + ' 明確排除此人擔任這個崗位（原因：'
-          + (exclusion.reason || '未填') + '）');
+        exclusionViolations.push(label + '：' + buildPersonPostExcludedReason_(post, exclusion));
       }
     }
     if (isPersonUnavailable_(a.personId, a.serviceDate, a.postId, context.unavailable)) {

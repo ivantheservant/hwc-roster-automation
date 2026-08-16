@@ -256,6 +256,68 @@ function measureRolePostFocus_(assignments, posts, roles, focusRoles, focusPostI
 }
 
 /**
+ * 第十七輪批次階段 B2：由 `buildVerifyContext_()` 嘅 context 算出主席兼報告
+ * 嘅本季理論上限。
+ *
+ * **完全重用** `RoleImpact.gs` 嘅 `computePostAvailability_()`／
+ * `buildChairAnnounceBoundFromContext_()`——即係「身分規則影響預估」用嘅
+ * 同一段推導。兩邊各自算會出現「生成前預估話上限 46%、生成後量度話上限
+ * 52%」呢種自打嘴巴嘅情況。
+ *
+ * 讀多兩樣 `buildVerifyContext_()` 冇提供嘅嘢（在職名單、特別主日），
+ * 其餘全部由 context 取。唯讀。
+ *
+ * @param {Object} context `buildVerifyContext_()` 嘅結果
+ * @returns {?Object} `buildChairAnnounceBoundFromContext_()` 嘅結果；算唔到時 null
+ */
+function measureChairAnnounceCeiling_(context) {
+  try {
+    const config = readConfig();
+    const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
+
+    const peopleById = {};
+    readPeople().forEach(function (row) {
+      peopleById[row[COLUMNS.NAME_MAPPING.PERSON_ID]] = true;
+    });
+
+    const specialByDate = {};
+    readSpecialSundays(context.quarterId)
+      .filter(function (row) { return isTrueValue_(row[COLUMNS.SPECIAL_SUNDAYS.ACTIVE]); })
+      .forEach(function (row) {
+        const dateStr = toDateString(row[COLUMNS.SPECIAL_SUNDAYS.SERVICE_DATE], timezone);
+        specialByDate[dateStr] = {
+          skipPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.SKIP_POST_IDS]),
+          lockPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.LOCK_POST_IDS])
+        };
+      });
+
+    // context.eligibility.byPost 已經係增補後嘅名單（見 Verify.gs），
+    // 所以呢度重組 roleContext 只需要補返 roles／exclusions 兩項。
+    const roleContext = {
+      roles: context.roles || [],
+      exclusions: context.personPostExclusions || [],
+      eligibleByPost: context.eligibility.byPost
+    };
+
+    const availabilityByPost = {};
+    context.posts.forEach(function (post) {
+      if (!post.autoGenerate) return;
+      const applicableDates = listApplicableDatesForPost_(
+        post, context.serviceDates, specialByDate, context.rules);
+      availabilityByPost[post.postId] = computePostAvailability_(
+        post, applicableDates, roleContext, peopleById, context.unavailable);
+    });
+
+    return buildChairAnnounceBoundFromContext_(
+      context.rules, context.posts, availabilityByPost, context.serviceDates);
+  } catch (err) {
+    // 呢一項純粹係解釋用嘅補充資訊，算唔到唔應該令成份量度報告失敗。
+    log_('WARN', 'measureChairAnnounceCeiling_ 失敗，略過理論上限這一項：' + err.message);
+    return null;
+  }
+}
+
+/**
  * 量度單一版本的全部軟規則指標。唯讀：只讀工作表，不寫任何東西。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -292,6 +354,25 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
   const chairEqBaseline = chairEq ? chairEq.target : null;
   const announceBaseline = announce ? announce.target : null;
 
+  // 第十七輪批次階段 B2：主席兼報告嘅**本季理論上限**。
+  //
+  // 點解要加呢一項：身分規則收窄咗報告嘅候選池之後，同時具備兩個崗位資格
+  // 嘅人可能得返幾個，63% 呢個歷史基準可能已經**結構上達唔到**。淨係同
+  // 歷史基準比，報告會年年報「偏低」，而幹事冇辦法分辨「排得唔好」同
+  // 「規則造成嘅天花板」——後者調高目標值唔會改善，只會多咗一個永遠
+  // 達唔到嘅數字。
+  //
+  // 判斷改為同**上限**比（見下面 `chairEqJudgement`），上限本身低過
+  // 「基準 − 容差」嗰陣報告會明確講出成因。推導見 `RoleImpact.gs` 嘅
+  // `computeChairAnnounceUpperBound_()`。
+  const chairEqCeiling = measureChairAnnounceCeiling_(context);
+
+  // 有上限就同上限比，冇（規則未設定／算唔到）就退回同歷史基準比，
+  // 維持加入呢一項之前嘅行為。
+  const chairEqReference = (chairEqCeiling && chairEqCeiling.applicable && chairEqCeiling.boundRatio !== null)
+    ? chairEqCeiling.boundRatio
+    : chairEqBaseline;
+
   return {
     quarterId: quarterId,
     versionNo: versionNo,
@@ -299,8 +380,10 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
     weekCount: sortedDates.length,
     chairEq: chairEq,
     chairEqBaseline: chairEqBaseline,
+    chairEqCeiling: chairEqCeiling,
+    chairEqReference: chairEqReference,
     chairEqJudgement: judgeAgainstBaseline_(
-      chairEq ? chairEq.ratio : null, chairEqBaseline, thresholds.ratioTolerance),
+      chairEq ? chairEq.ratio : null, chairEqReference, thresholds.ratioTolerance),
     announce: announce,
     announceBaseline: announceBaseline,
     announceJudgement: judgeAgainstBaseline_(
@@ -362,14 +445,42 @@ function buildSoftRuleMetricRows_(m) {
       + '　崗位動用率下限 ' + (t.postUsageMinRatio * 100).toFixed(0) + '%'
       + '（三者皆可在 Config 調整，見 ' + CONFIG_KEYS.SOFT_METRIC_RATIO_TOLERANCE + ' 等三個 Key）'));
 
-  // ---- 1. 主席與報告同一人 ----
+  // ---- 1. 主席與報告同一人（第十七輪批次階段 B2：改為三欄，跟理論上限比）----
   if (m.chairEq) {
+    const ceiling = m.chairEqCeiling;
+    const hasCeiling = !!(ceiling && ceiling.applicable && ceiling.boundRatio !== null);
+
     rows.push(diagRow_('1. 主席兼報告比例', label,
       '歷史基準 ' + formatMetricPercent_(m.chairEqBaseline)
-        + '　→　本版實測 ' + formatMetricPercent_(m.chairEq.ratio),
+        + '　│　本季理論上限 ' + (hasCeiling ? formatMetricPercent_(ceiling.boundRatio) : '（算不出）')
+        + '　│　本版實測 ' + formatMetricPercent_(m.chairEq.ratio),
       '差距 ' + formatMetricGap_(m.chairEqJudgement.gap, true)
         + '　判斷：' + m.chairEqJudgement.judgement
-        + '　（' + m.chairEq.same + '/' + m.chairEq.weeks + ' 週）'));
+        + '　（' + m.chairEq.same + '/' + m.chairEq.weeks + ' 週）'
+        + '　　※ 判斷是跟'
+        + (hasCeiling ? '**本季理論上限**' : '歷史基準（算不出上限時的退回做法）')
+        + '比，不是跟歷史基準比'));
+
+    if (hasCeiling) {
+      // 上限本身已經低於「歷史基準 − 容差」＝ 63% 結構上達不到，要明確講出成因，
+      // 否則幹事只會見到「偏低」而以為排表出錯。
+      if (!isNaN(ceiling.target) && ceiling.boundRatio < ceiling.target - ceiling.tolerance) {
+        rows.push(diagRow_('1. 主席兼報告比例', '⚠ 天花板說明', '本季理論上限低於歷史基準',
+          buildChairAnnounceCeilingNote_(ceiling)));
+      }
+      // 實測高過上限＝準硬規則被放行咗（見上限推導的假設），係一個訊號唔係計錯數
+      if (m.chairEq.ratio > ceiling.boundRatio + 1e-9) {
+        rows.push(diagRow_('1. 主席兼報告比例', '⚠ 高於理論上限', '請檢查',
+          '本版實測高於本季理論上限。上限的推導假設了準硬規則「同一崗位不可連續兩週」'
+            + '有被遵守（' + RULE_IDS.NO_CONSECUTIVE + ' 是 SEMI_HARD，生成器只重扣分、'
+            + '不會直接排除）。實測超過上限，代表這一版有主席連續兩週由同一人擔任——'
+            + '請看下面第 4 項的準硬規則違反明細。'));
+      }
+      rows.push(diagRow_('1. 主席兼報告比例', '　理論上限的計算依據',
+        ceiling.bound + ' / ' + ceiling.weeksBothPosts + ' 週',
+        '同時具備主席與報告資格的有 ' + ceiling.dualCount + ' 人；'
+          + '完整推導與假設見「查看 ▸ 身分規則影響預估（唯讀）」的第 6 節'));
+    }
   } else {
     rows.push(diagRow_('1. 主席兼報告比例', label, '無法計算',
       'RuleSettings 沒有 ' + RULE_IDS.CHAIR_EQ_ANNOUNCE + '，或該規則的 ScopePostIDs 不足兩個崗位'));

@@ -873,8 +873,7 @@ function evaluateViolations_(personId, state) {
     if (required.length > 0
         && !personHasAnyRoleOn_(state.context.roles || [], personId, required, state.serviceDate.serviceDate)) {
       violations.push(makeViolation_(rules, RULE_IDS.ROLE_REQUIRED,
-        '違反身分限制：' + post.postNameTC + ' 只可以由' + describeRoleCodes_(required)
-          + '擔任，但此人在 ' + state.serviceDate.serviceDate + ' 當日並未持有這個身分'));
+        buildRoleRequiredReason_(post, required, state.serviceDate.serviceDate)));
     }
   }
 
@@ -884,8 +883,7 @@ function evaluateViolations_(personId, state) {
       state.context.personPostExclusions || [], personId, post.postId, state.serviceDate.serviceDate);
     if (exclusion) {
       violations.push(makeViolation_(rules, RULE_IDS.PERSON_POST_EXCLUDED,
-        '違反個人崗位限制：' + SHEETS.PERSON_POST_EXCLUSIONS + ' 明確排除此人擔任 '
-          + post.postNameTC + '（原因：' + (exclusion.reason || '未填') + '）'));
+        buildPersonPostExcludedReason_(post, exclusion)));
     }
   }
 

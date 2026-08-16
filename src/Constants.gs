@@ -957,6 +957,14 @@ const CONFIG_KEYS = {
   // 系統範圍需求第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象改成只提醒
   // 幹事（不是義工），見 docs/系統範圍稽核.md。
   REMIND_DEADLINE_DAYS: 'REMIND_DEADLINE_DAYS',
+  // 第十七輪批次階段 C：T1～T4 各自由邊個月開始（逗號分隔嘅四個月份數字）。
+  //
+  // 點解要放 Config 而唔係寫死：教會嘅季度劃分未必係日曆季度（可能係學期制
+  // 或者財政年度）。原本 `QUARTER_TERM_START_MONTH`（NewQuarterWizard.gs）
+  // 係寫死嘅常數，改一次要改程式、重新 push——而呢個係一個**純粹嘅教會慣例**，
+  // 完全應該由幹事自己喺試算表決定。預設值 `1,4,7,10` 就係原本寫死嗰套
+  // （T1=1-3月、T2=4-6月、T3=7-9月、T4=10-12月），所以唔設定嘅話行為不變。
+  QUARTER_TERM_START_MONTHS: 'QUARTER_TERM_START_MONTHS',
   // 第十六輪批次階段 D：提醒幹事「呢一季仲有未確認日期嘅特殊主日」嘅提前日數。
   // 距離自動生成日期（computeAutomationSchedule_() 算出嘅 generateDate）
   // 仲有唔夠呢個日數、而該季 SpecialSundays 有 Confirmed=FALSE 嘅列，
@@ -1286,6 +1294,8 @@ const DEFAULTS = {
   REMIND_DEADLINE_DAYS: 7,
   // 第十六輪批次階段 D：生成前幾多日開始提醒「仲有未確認日期嘅特殊主日」。
   REMIND_UNCONFIRMED_SPECIAL_DAYS: 7,
+  // 第十七輪批次階段 C：T1～T4 各自嘅起始月份（日曆季度）。
+  QUARTER_TERM_START_MONTHS: '1,4,7,10',
   PDF_MIN_SIZE_BYTES: 10240,
   // 第九輪批次階段 A：軟規則實測量度的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 比例型 ±5 個百分點、次數型 ±20%（沿用 HISTORICAL_BASELINE.PEOPLE_TOLERANCE_RATIO

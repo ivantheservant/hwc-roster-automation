@@ -324,6 +324,123 @@ function buildRoleContext_(eligibility, posts, timezone) {
   };
 }
 
+/**
+ * 第十七輪批次階段 D1：`HARD_ROLE_REQUIRED` 嘅違規訊息。
+ *
+ * ## 點解要抽出嚟做一個共用函式
+ *
+ * 呢句訊息喺**四個地方**出現（生成器嘅警告、步驟 3／5 重跑檢查、核對職事表、
+ * fine-tune 提案嘅 Reason 欄）。之前三處各自砌一次字串，改一處好易漏其餘兩處，
+ * 令幹事喺唔同畫面見到唔同講法。
+ *
+ * ## 訊息要有咩
+ *
+ * 新規則會令幹事見到「點解呢個人唔見咗」。訊息寫得唔清楚，佢會當係 bug 然後
+ * 嚟問——所以三樣嘢缺一不可：
+ * 1. **崗位中文名**（唔可以淨係 PostID，幹事唔記得代號）
+ * 2. **所需身分嘅中文名**（「堂委」而唔係 `COMMITTEE`）
+ * 3. **一句講明呢個係教會規則、唔係系統出錯**
+ *
+ * @param {Object} post 崗位物件（要有 postNameTC）
+ * @param {string[]} requiredRoles 所需身分代號
+ * @param {string} serviceDate 主日日期
+ * @returns {string} 違規原因文字
+ */
+function buildRoleRequiredReason_(post, requiredRoles, serviceDate) {
+  return '違反身分限制：' + post.postNameTC + ' 只可以由' + describeRoleCodes_(requiredRoles)
+    + '擔任，但此人在 ' + serviceDate + ' 當日並未持有這個身分。'
+    + '這是教會規定的排班規則，不是系統錯誤——'
+    + '如果這個人其實已經上任，請到 ' + SHEETS.ROLES + ' 工作表補上或修正生效日期。';
+}
+
+/**
+ * 第十七輪批次階段 D1：`HARD_PERSON_POST_EXCLUDED` 嘅違規訊息。
+ * 同 `buildRoleRequiredReason_()` 一樣係四處共用嘅唯一來源。
+ *
+ * **一定要把 `PersonPostExclusions` 嘅「原因」欄原文帶出嚟**——嗰欄就係
+ * 幹事自己當初寫低「點解唔排佢」嘅地方，唔帶出嚟就等於要佢自己返去查表。
+ *
+ * @param {Object} post 崗位物件（要有 postNameTC）
+ * @param {Object} exclusion `findActivePersonPostExclusion_()` 嘅結果
+ * @returns {string} 違規原因文字
+ */
+function buildPersonPostExcludedReason_(post, exclusion) {
+  return '違反個人崗位限制：' + SHEETS.PERSON_POST_EXCLUSIONS
+    + ' 記錄了此人暫時不擔任 ' + post.postNameTC
+    + '（原因：' + ((exclusion && exclusion.reason) || '未填') + '）。'
+    + '這是教會安排，不是系統錯誤——'
+    + '如果已經解除，請在該工作表填上「解除日」（不要刪除整行，'
+    + '刪除會令舊季度被追溯判定為違規）。';
+}
+
+/**
+ * 第十七輪批次階段 A：算出某個崗位喺某一季**實際可用嘅候選人**，以及每個人
+ * 可以服侍嘅主日數。
+ *
+ * ## 點解一定要住喺呢度、用返同一批 predicate
+ *
+ * 「身分規則影響預估」呢個工具嘅全部價值，就係佢講嘅嘢要同生成器實際會做嘅
+ * 嘢一致。如果另寫一份平行嘅收窄邏輯，兩份遲早會分岔，而分岔嗰陣呢個工具
+ * 就會靜靜噉講大話——幹事信咗佢去做決定，反而比冇呢個工具更差。
+ *
+ * 所以呢個函式**唔會自己判斷任何規則**，只係將生成器逐格逐日用緊嘅同一批
+ * predicate 喺成季掃一次：
+ * - 起點：`roleContext.eligibleByPost`（`buildRoleAugmentedEligibleByPost_()`
+ *   算好嘅聯集，已經扣咗 `explicitlyExcluded`）
+ * - `peopleById`：同 `pickPerson_()` 一樣，只計 NameMapping `Active=TRUE` 嘅人
+ * - `personHasAnyRoleOn_()`：同 `HARD_ROLE_REQUIRED` 一模一樣
+ * - `findActivePersonPostExclusion_()`：同 `HARD_PERSON_POST_EXCLUDED` 一模一樣
+ * - `isPersonUnavailable_()`：同 `HARD_UNAVAILABLE` 一模一樣
+ *
+ * ## 「可用」嘅定義同埋佢嘅限制
+ *
+ * 一個人只要喺**本季任何一個適用主日**通過晒上面全部檢查，就算入池。所以
+ * 「只做得到其中兩三週」嘅人一樣會計入 `poolCount`——單睇 `poolCount` 會
+ * 過分樂觀。呢個係 `usableSlotCount`（全部人可服侍主日數嘅總和）存在嘅
+ * 理由：佢係「呢個崗位喺本季最多可以填幾多格」嘅**硬上界**，直接同
+ * 需要嘅格數比，捉得到「人數睇落夠，但個個都只得幾週得閒」呢種情況。
+ *
+ * @param {Object} post 已正規化嘅崗位物件
+ * @param {Object[]} applicableDates 本季**呢個崗位真係要排**嘅主日（呼叫端已經
+ *   用 `getSkipReason_()` 篩走跳過嘅週）
+ * @param {Object} roleContext `buildRoleContext_()` 嘅結果
+ * @param {Object.<string, Object>} peopleById 在職人員索引
+ * @param {Object[]} unavailable `readUnavailableNormalized()` 嘅結果
+ * @returns {{pool: string[], byPerson: Object.<string, string[]>, usableSlotCount: number}}
+ *   pool＝可服侍至少一個主日嘅 PersonID（已排序）；
+ *   byPerson＝{PersonID: [可服侍嘅日期…]}；
+ *   usableSlotCount＝全部人可服侍主日數嘅總和
+ */
+function computePostAvailability_(post, applicableDates, roleContext, peopleById, unavailable) {
+  const required = requiredRolesOfPost_(post);
+  const candidates = (roleContext.eligibleByPost[post.postId] || [])
+    .filter(function (id) { return !!peopleById[id]; });
+
+  const byPerson = {};
+  let usableSlotCount = 0;
+
+  candidates.forEach(function (personId) {
+    const usableDates = applicableDates.filter(function (d) {
+      if (required.length > 0
+          && !personHasAnyRoleOn_(roleContext.roles, personId, required, d.serviceDate)) return false;
+      if (findActivePersonPostExclusion_(roleContext.exclusions, personId, post.postId, d.serviceDate)) return false;
+      if (isPersonUnavailable_(personId, d.serviceDate, post.postId, unavailable)) return false;
+      return true;
+    }).map(function (d) { return d.serviceDate; });
+
+    if (usableDates.length > 0) {
+      byPerson[personId] = usableDates;
+      usableSlotCount += usableDates.length;
+    }
+  });
+
+  return {
+    pool: Object.keys(byPerson).sort(),
+    byPerson: byPerson,
+    usableSlotCount: usableSlotCount
+  };
+}
+
 // =====================================================================
 // 以下係補建工作表嘅工具（A2）。⚠️ 本輪唔可以寫入試算表，
 // 所以呢啲函式只係實作好，本輪冇執行過。
