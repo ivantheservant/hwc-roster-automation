@@ -21,7 +21,13 @@ function buildFineTuneContext_(quarterId, versionNo) {
         slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID],
         personName: row[C.PERSON_NAME_SNAPSHOT],
-        assignSource: row[C.ASSIGN_SOURCE]
+        assignSource: row[C.ASSIGN_SOURCE],
+        // 第二十輪批次階段 A2：人手改動偵測要算出「呢一格本來應該渲染成
+        // 咩文字」，而 `classifyGridCell_()` 要睇 `ruleFlags` 先分得出
+        // SPECIAL_SKIP／STRUCTURAL_NA／MANUAL_PENDING／GENUINE_GAP。
+        // 之前冇帶呢一欄，所以偵測器只可以「由文字反推人名」——
+        // 見 `renderExpectedGridText_()` 嘅說明。
+        ruleFlags: splitList_(row[C.RULE_FLAGS])
       };
     });
 
@@ -44,6 +50,9 @@ function buildFineTuneContext_(quarterId, versionNo) {
     timezone: timezone,
     original: original,
     gridValues: readGridPersonIds_(quarterId, versionNo, timezone),
+    // 第二十輪批次階段 A2：算「呢一格本來應該渲染成咩」要用嘅三樣嘢
+    // （顯示標籤、逐崗位 EmptyDisplay、逐日期 ExternalOwner）。
+    gridRender: buildGridRenderContext_(quarterId, timezone, posts),
     serviceDates: readServiceDatesNormalized(quarterId, timezone),
     posts: posts,
     eligibility: eligibility,
@@ -148,6 +157,29 @@ function analyseManualState_(context) {
  * @returns {{changes: Object[], unresolved: Object[], manualState: Object[]}}
  */
 function buildGridOverlayState_(context) {
+  // 第二十輪批次階段 A2：`gridRender` 冇傳就拋錯，唔可以靜靜咁當佢空。
+  //
+  // 同第十八輪 `requireRoleContextField_()`、第十九輪
+  // `resolveAuthoritativeState_()` 係同一套做法。呢度特別重要：
+  // 如果冇咗渲染資料就退回「舊嘅反推做法」，個 bug 會靜靜咁復活，
+  // 而且**淨係喺有合堂嘅季度先出現**——最難察覺嗰種。
+  if (!context || !context.gridRender || !context.gridRender.labels) {
+    throw new Error(
+      '人手改動偵測需要 `context.gridRender`（顯示標籤／EmptyDisplay／ExternalOwner）。\n\n'
+      + '收到的值是：' + (context && context.gridRender === undefined
+        ? 'undefined（完全沒有傳）' : JSON.stringify(context && context.gridRender)) + '\n\n'
+      + '⚠️ 這個欄位**不可以省略**。偵測人手改動的方法是「算出這一格本來應該\n'
+      + '渲染成什麼，再跟 grid 實際內容比對」，沒有這份資料就算不出來。\n\n'
+      + '如果退回舊的「由 grid 文字反推人名」做法，「特殊主日」、外部負責單位\n'
+      + '（英語堂／華語堂）、「待確認」這些**顯示用**文字會全部被當成\n'
+      + '「認不出的人手改動」——第二十輪批次就是這樣，只要季度裡有任何合堂，\n'
+      + '「把工作表的人手改動寫成新版本」就完全用不到。\n\n'
+      + '修正方法：context 從 `buildFineTuneContext_()` 取得的話已經放好這個欄位；\n'
+      + '自己組 context（例如測試 fixture）就用 `buildGridRenderContext_()`'
+      + '（RosterWriter.gs）產生，不要自己拼。'
+    );
+  }
+
   const changes = [];
   const unresolved = [];
 
@@ -166,18 +198,57 @@ function buildGridOverlayState_(context) {
       return Object.assign({}, base, { personId: a.personId, isManual: false });
     }
 
-    // 先比文字：兩邊正規化後相同就是沒有改動，直接沿用原本的 PersonID，
-    // 完全不做姓名解析，確保未改動的格在版本之間逐字不變。
+    // ── 第二十輪批次階段 A2：比對方向由「反推」改成「渲染再比對」 ──
+    //
+    // 舊做法係比 `gridText` 同 `a.personName`。噉樣嘅話，任何**唔係人名
+    // 嘅顯示文字**都會同空白嘅 personName 唔同，於是被當成人手改動：
+    // 「特殊主日」、「英語堂」（ExternalOwner）、「⚠ 未能安排」……
+    //
+    // 實測（2026T4）：2026-10-04 合堂，領詩／司琴顯示「特殊主日」，
+    // 令偵測器報 3 格（真改動 1 格 ＋ 誤報 2 格），而且因為嗰兩格
+    // 「認唔出」而整批拒絕建立新版本——**有合堂嘅季度就完全用唔到**。
+    //
+    // 新做法：由 `RosterAssignments` 算出「呢一格本來應該渲染成咩」
+    // （`renderExpectedGridText_()`，重用寫 grid 嗰段程式碼），
+    // 同 grid 實際內容比對。相等就唔係人手改動。
+    // 「特殊主日」對「特殊主日」自然相等，唔需要任何白名單。
     const normalizedGrid = normalizeCellText_(gridText);
-    const normalizedOriginal = normalizeCellText_(a.personName);
-    if (normalizedGrid === normalizedOriginal) {
+    const expectedText = renderExpectedGridText_(
+      a, a.postId, a.serviceDate, context.gridRender);
+    if (normalizedGrid === normalizeCellText_(expectedText)) {
       return Object.assign({}, base, { personId: a.personId, isManual: false });
     }
 
     // 到這裡才是真正的人手改動
     const resolvedId = normalizedGrid === '' ? '' : (resolvePersonId(normalizedGrid) || '');
+
+    // 第二道防線：解析到嘅人同原本一樣 ⇒ 實際上冇改到嘢。
+    //
+    // 用途：幹事重新打咗同一個人（或者佢嘅別名），或者將來多咗一種
+    // 顯示文字而上面嘅渲染比對漏咗——只要最終派工一樣，就唔應該騷擾
+    // 幹事、更加唔應該擋住建立新版本。
+    //
+    // ⚠️ **一定要要求 `resolvedId` 非空**。如果寫成
+    // `resolvedId === (a.personId || '')`，噉一個空格入面打錯字
+    // （解析唔到 ⇒ `resolvedId = ''`，而原本亦係 `''`）就會**靜靜咁
+    // 被當成「冇改動」**，幹事打咗嘅嘢憑空消失而且冇任何提示。
+    // 呢個正正就係第十八輪嗰個 bug class（缺失被當成有意義嘅值），
+    // 唔可以喺修另一個 bug 嘅時候順手種返一個。
+    if (resolvedId && resolvedId === a.personId) {
+      return Object.assign({}, base, { personId: a.personId, isManual: false });
+    }
+    // 空白對空白亦都唔係改動（例如佔位文字被刪走，最終一樣係冇人）
+    if (normalizedGrid === '' && !a.personId) {
+      return Object.assign({}, base, { personId: '', isManual: false });
+    }
+
     if (normalizedGrid !== '' && !resolvedId) {
-      unresolved.push(Object.assign({}, base, { text: normalizedGrid }));
+      unresolved.push(Object.assign({}, base, {
+        text: normalizedGrid,
+        // 階段 C1：訊息要講得出「本來應該係咩」，幹事先知道自己改壞咗乜
+        expectedText: expectedText,
+        originalName: a.personName || ''
+      }));
     }
 
     changes.push(Object.assign({}, base, {

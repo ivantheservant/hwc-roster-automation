@@ -339,14 +339,12 @@ function handleStep3NoPendingRequests_(ui, quarterId, planResult) {
   // 第十九輪批次階段 A：人手改動係一等公民，唔可以再靜靜咁忽略。
   // 認唔到嘅姓名要即刻講，唔好等到寫版本先發現。
   if (manualUnresolved.length > 0) {
+    // 第二十輪批次階段 C1：指引同「把人手改動寫成新版本」共用同一段，
+    // 唔好兩處各自寫一套講法（兩套講法遲早會唔一致）。
     ui.alert('步驟 3：套用修改申報（有格認不出姓名）',
-      '在 ' + sheetName + ' 偵測到 ' + manualUnresolved.length + ' 格人手改動，'
-        + '但認不出是哪一位：\n\n'
-        + manualUnresolved.slice(0, 10).map(function (u) {
-          return '　• ' + u.serviceDate + '　' + u.postId + '　填了「' + u.text + '」';
-        }).join('\n')
-        + (manualUnresolved.length > 10 ? '\n　……另有 ' + (manualUnresolved.length - 10) + ' 格' : '')
-        + '\n\n請改用 People 工作表上的正式姓名（或別名），再執行一次本步驟。\n'
+      '在 ' + sheetName + ' 偵測到人手改動，但有幾格認不出是哪一位。\n\n'
+        + buildUnresolvedGuidanceText_(manualUnresolved)
+        + '\n\n修好之後再執行一次本步驟。'
         + '在認得出全部改動之前不會建立新版本，也不會前進 Stage。',
       ui.ButtonSet.OK);
     return;

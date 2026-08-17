@@ -139,6 +139,51 @@ console.log('\n=== I：規則 4／5 嘅正向驗證（唔可以淨係「掃出 0
     guardSites >= 4, '只搵到 ' + guardSites + ' 個套用點');
 }
 
+console.log('\n=== 規則 6【核心】由渲染輸出反推資料（第二十輪嗰個 bug）===');
+{
+  // 舊寫法：讀 grid 文字 ⇒ 直接查表反推人名。合堂顯示「特殊主日」，
+  // 於是被當成「認唔出嘅人手改動」，令整個功能喺有合堂嘅季度用唔到。
+  const badBody = [
+    'function detect_(context) {',
+    '  const gridText = context.gridValues[key];',
+    '  const id = resolvePersonId(gridText);',
+    '}'
+  ].join('\n');
+  check('★★★★★ 讀 grid 文字之後直接 resolvePersonId ⇒ 要捉到'
+    + '（呢個就係令「把人手改動寫成新版本」喺有合堂嘅季度完全用唔到嗰個寫法）',
+    scanner.shouldFlagReversal('  const id = resolvePersonId(gridText);', badBody));
+
+  // 修正之後：行渲染器比對
+  const goodBody = [
+    'function detect_(context) {',
+    '  const gridText = context.gridValues[key];',
+    '  const expected = renderExpectedGridText_(a, a.postId, a.serviceDate, context.gridRender);',
+    '  const id = resolvePersonId(gridText);',
+    '}'
+  ].join('\n');
+  check('★★★★★ 反向：已經行渲染器比對就唔報'
+    + '（否則修好咗都會一直嘈，冇人會再睇）',
+    !scanner.shouldFlagReversal('  const id = resolvePersonId(gridText);', goodBody));
+
+  // 表單輸入唔應該報——呢個係實測撞到嘅誤報
+  const formBody = [
+    'function saveFill_(quarterId, postId, name) {',
+    '  const trimmedName = String(name).trim();',
+    '  const sheetName = buildRosterSheetName_(quarterId, versionNo);',
+    '  const personId = resolvePersonId(trimmedName) || \'\';',
+    '}'
+  ].join('\n');
+  check('★★★★★ 反向：表單輸入（側邊欄打字）唔報'
+    + '——反推本來就係佢嘅工作。第一版用「有冇掂過 grid」做訊號，'
+    + '就係喺呢度誤報咗（嗰個函式只係之後會**寫入** grid）',
+    !scanner.shouldFlagReversal(
+      '  const personId = resolvePersonId(trimmedName) || \'\';', formBody));
+
+  check('★★★★ 變數名講明係格內容嘅話，即使冇 gridValues 都報',
+    scanner.shouldFlagReversal(
+      '  const id = resolvePersonId(cellText);', 'function f_() {\n  const id = resolvePersonId(cellText);\n}'));
+}
+
 console.log('\n=== I2：報告要寫得成檔案（唔可以淨係印喺 console）===');
 {
   const md = scanner.buildReportMarkdown({

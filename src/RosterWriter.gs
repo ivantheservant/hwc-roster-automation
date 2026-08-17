@@ -982,3 +982,88 @@ function protectV0(sheetName) {
   if (scriptAccount) protection.addEditor(scriptAccount);
   if (protection.canDomainEdit()) protection.setDomainEdit(false);
 }
+
+/**
+ * 第二十輪批次階段 A2：算出「呢一格**本來應該**渲染成咩文字」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個函式
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 「人手改動偵測」（`buildGridOverlayState_()`，FineTune.gs）原本嘅方向係
+ * **由 grid 文字反推 PersonID**：見到一格有字、而 `RosterAssignments`
+ * 嗰格冇人名，就當成「幹事改咗嘢」，再 `resolvePersonId()` 查係邊個。
+ *
+ * 呢個方向有一個根本問題：**grid 上面唔係淨係得人名。** 仲有一批
+ * 「顯示用」嘅文字：
+ *
+ *   • `特殊主日`（`GRID_SPECIAL_SKIP_LABEL`）
+ *   • `英語堂`／`華語堂`（`SpecialSundays.ExternalOwner`）
+ *   • `待確認`／`—`（`Posts.EmptyDisplay` 嘅 PENDING／BLANK）
+ *   • `⚠ 未能安排`（`GRID_GAP_LABEL`）
+ *
+ * 呢啲全部都會被當成「認唔出嘅人手改動」。
+ *
+ * 實測後果（2026T4）：2026-10-04 係合堂，領詩／司琴由英語堂負責，
+ * grid 顯示「特殊主日」。幹事真係改咗一格（SCRIPTURE），
+ * 偵測器報 **3 格**——真嗰格 ＋ 兩格誤報，然後因為兩格誤報「認唔出」
+ * 而**整批拒絕建立新版本**。即係話：**只要季度入面有任何合堂，
+ * 整個「把人手改動寫成新版本」功能就完全用唔到。**
+ * 每年四次合堂，實際上每季都有機會中。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解唔用白名單補鑊
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 最快嘅做法係把「特殊主日」加入 `GRID_PLACEHOLDER_TEXTS`。但噉樣
+ * **下次多一種顯示文字又會再中**——`ExternalOwner` 係幹事自由輸入嘅，
+ * 「英語堂」「華語堂」「青年崇拜」……根本列唔完。
+ *
+ * 所以改變方向：**由 `RosterAssignments` 算出「呢一格本來應該渲染成咩」，
+ * 再同 grid 實際內容比對。相等就唔係人手改動。**
+ * 噉樣「特殊主日」對「特殊主日」自然相等，唔需要任何白名單。
+ *
+ * ⚠️ **本函式唔會自己實作渲染邏輯**，而係呼叫 `classifyGridCell_()` ＋
+ * `resolveGridCellText_()`——即係寫 grid 嗰陣用嘅同一段程式碼
+ * （見 `buildRosterGridData_()`）。兩份平行邏輯遲早分岔，分岔嗰陣
+ * 呢個工具就會講大話；第十八輪階段 C 已經因為同類問題食過一次虧。
+ *
+ * @param {?Object} assignment 該格嘅派工（要有 personId／personName／
+ *   assignSource／ruleFlags）
+ * @param {string} postId 崗位 ID
+ * @param {string} serviceDate 主日日期（yyyy-MM-dd）
+ * @param {Object} renderContext `buildGridRenderContext_()` 嘅結果
+ * @returns {string} 該格應該顯示嘅文字
+ */
+function renderExpectedGridText_(assignment, postId, serviceDate, renderContext) {
+  return resolveGridCellText_(
+    assignment,
+    classifyGridCell_(assignment),
+    renderContext.emptyDisplayByPostId[postId],
+    renderContext.labels,
+    renderContext.externalOwnerByDate[serviceDate]
+  );
+}
+
+/**
+ * 第二十輪批次階段 A2：收齊 `renderExpectedGridText_()` 需要嘅三樣嘢。
+ *
+ * 一次過讀完傳落去，唔好逐格讀——同 `buildRosterGridData_()` 入面
+ * `readGridCellLabels_()` 只讀一次係同一個理由。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @param {Object[]=} posts 已讀好嘅 `readPostsNormalized()` 結果（可選，慳一次讀取）
+ * @returns {{labels: Object, emptyDisplayByPostId: Object, externalOwnerByDate: Object}}
+ */
+function buildGridRenderContext_(quarterId, timezone, posts) {
+  const emptyDisplayByPostId = {};
+  (posts || readPostsNormalized()).forEach(function (p) {
+    emptyDisplayByPostId[p.postId] = p.emptyDisplay;
+  });
+  return {
+    labels: readGridCellLabels_(),
+    emptyDisplayByPostId: emptyDisplayByPostId,
+    externalOwnerByDate: buildSpecialSundayExternalOwnerIndex_(quarterId, timezone)
+  };
+}

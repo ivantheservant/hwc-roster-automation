@@ -31,6 +31,7 @@
  * 3. 讀工作表欄位冇處理「欄唔存在」 —— 第十三輪 first-run 缺欄
  * 4. 手砌 context 傳入規則函式 —— 第十八輪嗰個 bug class 嘅殘餘
  * 5. 同時攞到兩個真相來源但只用其中一個 —— 第十九輪階段 B
+ * 6. 由渲染輸出反推資料 —— 第二十輪階段 A（合堂令新功能完全用唔到）
  */
 
 'use strict';
@@ -331,6 +332,89 @@ function scanDualSourceAmbiguity() {
 }
 
 // =====================================================================
+// 6. 由「渲染輸出」反推資料（第二十輪批次階段 B）
+// =====================================================================
+
+/**
+ * 系統自己寫出嚟畀人睇嘅嘢（grid 格文字），如果又要反推返做資料，
+ * **一定要行渲染器**——唔可以直接攞文字去查表。
+ *
+ * 第二十輪撞到嘅 bug：`buildGridOverlayState_()` 由 grid 文字反推
+ * PersonID，於是「特殊主日」「英語堂」呢類**顯示用**文字全部被當成
+ * 「認唔出嘅人手改動」。後果：只要季度入面有合堂，
+ * 「把人手改動寫成新版本」就完全用唔到。
+ *
+ * ⚠️ 要分清楚兩種情況：
+ *
+ * | 情況 | 反推合唔合法 |
+ * |---|---|
+ * | **表單輸入**（`Requests` 姓名欄、側邊欄輸入框）——人手打入去嘅 | ✅ 合法。反推本來就係佢嘅工作，認唔出就報錯 |
+ * | **渲染輸出**（grid 格文字）——系統寫出嚟畀人睇嘅 | ❌ 一定要經 `renderExpectedGridText_()` 比對，唔可以直接查表 |
+ *
+ * 所以呢條規則只掃「讀 grid 之後攞去 `resolvePersonId()`」，
+ * 唔會掃表單輸入嗰啲。
+ */
+/**
+ * 判斷一句 `resolvePersonId(...)` 算唔算「由渲染輸出反推資料」。
+ * 抽做純函式係為咗**測得到**——一條掃全專案掃出 0 項嘅規則，
+ * 可以係「真係冇問題」，亦可以係「寫壞咗乜都捉唔到」，淨係睇個 0 分唔出。
+ *
+ * @param {string} line 該行原始碼
+ * @param {string} fnBody 所屬函式嘅完整內容
+ * @returns {boolean} true = 要報
+ */
+function shouldFlagReversal(line, fnBody) {
+  const argMatch = /resolvePersonId\(\s*([A-Za-z_$][\w$.]*)/.exec(line);
+  const argName = argMatch ? argMatch[1] : '';
+  const fromGrid = fnBody.indexOf('gridValues') !== -1
+    || /grid|cell|display|rendered/i.test(argName);
+  if (!fromGrid) return false;
+  // 已經行渲染器比對 ⇒ 唔係「直接反推」
+  return fnBody.indexOf('renderExpectedGridText_(') === -1;
+}
+
+function scanDisplayToDataReversal() {
+  const ALLOWED = ['FineTune.gs'];   // 疊加實作本身（已經行渲染器比對）
+  listFiles(SRC_DIR, '.gs').forEach(function (file) {
+    if (ALLOWED.indexOf(file.name) !== -1) return;
+    const text = fs.readFileSync(file.full, 'utf8');
+    const lines = text.split('\n');
+
+    lines.forEach(function (line, i) {
+      if (looksLikeComment(line)) return;
+      if (line.indexOf('resolvePersonId(') === -1) return;
+
+      // ⚠️ 判斷要睇「反推嘅輸入係咪由 grid **讀返嚟**」，
+      // 唔可以睇「呢個函式有冇掂過 grid」。
+      //
+      // 實測：第一版用 `buildRosterSheetName_(` 做訊號，結果報咗
+      // `PreacherTranslationFill.gs`——嗰度 `resolvePersonId(trimmedName)`
+      // 嘅 `trimmedName` 係側邊欄**表單輸入**，個函式只係之後會**寫入**
+      // grid。寫入唔係反推，係誤報。
+      //
+      // 兩個訊號（符合任何一個）：
+      //   1. 函式入面有 `gridValues`——專案入面唯一「grid 格文字讀返嚟」
+      //      嘅表示法
+      //   2. 傳畀 resolvePersonId 嘅變數名本身就講明係 grid／格內容
+      const fnStart = findEnclosingFunctionStart(lines, i);
+      const fnEnd = findNextFunctionStart(lines, i + 1);
+      const fnBody = lines.slice(fnStart, fnEnd).join('\n');
+      if (!shouldFlagReversal(line, fnBody)) return;
+
+      report('顯示層反推', 'src/' + file.name, i + 1, line,
+        '在讀 grid 工作表的函式裡直接用 `resolvePersonId()` 反推人名。\n'
+        + '      grid 上面不是只有人名——還有「特殊主日」、外部負責單位'
+        + '（`ExternalOwner`）、\n'
+        + '      「待確認」、「⚠ 未能安排」這些**顯示用**文字，'
+        + '會全部被當成認不出的人手改動。\n'
+        + '      要比對的話請用 `renderExpectedGridText_()`'
+        + '（RosterWriter.gs）算出「本來應該渲染成什麼」再比，\n'
+        + '      不要加白名單——顯示文字列不完（`ExternalOwner` 是幹事自由輸入的）。');
+    });
+  });
+}
+
+// =====================================================================
 // 輸出
 // =====================================================================
 
@@ -381,6 +465,7 @@ function main() {
   scanUncheckedColumnAccess();
   scanHandBuiltContext();
   scanDualSourceAmbiguity();
+  scanDisplayToDataReversal();
 
   const byKind = {};
   findings.forEach(function (f) {
@@ -418,7 +503,7 @@ if (require.main === module) {
 } else {
   module.exports = {
     scanTemplateEscaping, scanFirstRunAsymmetry, scanUncheckedColumnAccess,
-    scanHandBuiltContext, scanDualSourceAmbiguity,
+    scanHandBuiltContext, scanDualSourceAmbiguity, scanDisplayToDataReversal, shouldFlagReversal,
     checkTemplateLine, buildReportMarkdown,
     _findings: findings, _report: report
   };

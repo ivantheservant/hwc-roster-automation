@@ -278,8 +278,8 @@ function runMaterialiseManualEdits_() {
   if (recomputed.unresolved.length > 0) {
     ui.alert('把工作表的人手改動寫成新版本（有格認不出姓名）',
       buildManualEditsReportText_(quarterId, versionNo, recomputed)
-        + '\n\n在認得出全部改動之前不會建立新版本。'
-        + '請改用 People 工作表上的正式姓名（或別名）。', ui.ButtonSet.OK);
+        + '\n\n' + buildUnresolvedGuidanceText_(recomputed.unresolved),
+      ui.ButtonSet.OK);
     return;
   }
   if (recomputed.changes.length === 0) {
@@ -338,7 +338,8 @@ function buildManualEditsReportText_(quarterId, versionNo, recomputed) {
     lines.push('');
     lines.push('　⚠️ 認不出是哪一位的格：' + recomputed.unresolved.length + ' 格');
     recomputed.unresolved.slice(0, 10).forEach(function (u) {
-      lines.push('　　• ' + u.serviceDate + '　' + u.postId + '　填了「' + u.text + '」');
+      lines.push('　　• ' + u.serviceDate + '　' + u.postId + '　填了「' + u.text + '」'
+        + '（本來應該是「' + (u.expectedText || '（空白）') + '」）');
     });
   }
 
@@ -348,5 +349,69 @@ function buildManualEditsReportText_(quarterId, versionNo, recomputed) {
   });
   lines.push('　計入這些改動之後的規則檢查：硬規則違反 ' + hard.length + ' 項、'
     + '合計 ' + recomputed.violations.length + ' 項');
+  return lines.join('\n');
+}
+
+/**
+ * 第二十輪批次階段 C1：講清楚「認唔出」嗰幾格應該點處理。
+ *
+ * 修正之前得一句「請改用 People 工作表上的正式姓名（或別名）」——
+ * 冇講邊一格、冇講而家格入面係咩、冇講系統喺邊度搵過、亦冇講
+ * 「本來應該係咩」。幹事收到呢句其實唔知道應該做乜。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 階段 C2 嘅決定：**唔容許「跳過認唔出嘅格、只寫其餘改動」**
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 考慮過三個做法：
+ *
+ * | 做法 | 問題 |
+ * |---|---|
+ * | 部分寫入（跳過認唔出嗰幾格） | 幹事以為全部改動都入咗版本，實際上有幾格冇——grid 同版本更加唔一致，而且冇人知邊幾格。呢個正正就係第十九輪要根治嘅嘢 |
+ * | 把認唔出嘅格標色叫人逐個處理 | 要寫入 grid（本輪禁止），而且底色語意撞車喺第八輪已經食過一次虧 |
+ * | **整批拒絕 ＋ 講清楚點修**（採用） | 幹事要多做一步，但狀態永遠一致：「全部認得出」先寫，否則乜都唔寫 |
+ *
+ * 揀第三個嘅理由：**呢個工具嘅賣點就係「grid 同版本會一致」**。
+ * 一個會製造新不一致嘅「方便」，等於把工具本身嘅價值拆咗。
+ * 而且認唔出嘅格通常只有一兩格（打錯字／用咗未登記嘅別名），
+ * 修返嘅成本遠低過「日後發現有幾格冇入版本」嘅代價。
+ *
+ * @param {Object[]} unresolved `buildGridOverlayState_()` 嘅 unresolved
+ * @returns {string} 指引文字
+ */
+function buildUnresolvedGuidanceText_(unresolved) {
+  const lines = [
+    '⚠️ 有 ' + unresolved.length + ' 格認不出是哪一位，所以**整批都不會寫入**：',
+    ''
+  ];
+
+  unresolved.slice(0, 10).forEach(function (u) {
+    lines.push('　• ' + u.serviceDate + '　' + u.postId
+      + (Number(u.slotIndex) > 1 ? '（第 ' + u.slotIndex + ' 位）' : ''));
+    lines.push('　　格內現在是：「' + u.text + '」');
+    lines.push('　　這一格本來應該是：「' + (u.expectedText || '（空白）') + '」');
+  });
+  if (unresolved.length > 10) {
+    lines.push('　……另有 ' + (unresolved.length - 10) + ' 格');
+  }
+
+  lines.push('');
+  lines.push('系統是這樣找的：把格內文字拿去 ' + SHEETS.NAME_MAPPING
+    + ' 工作表比對「姓名」與「別名」兩欄（前後空白會自動去掉，'
+    + '全形字元會自動正規化），找不到就當作認不出。');
+  lines.push('');
+  lines.push('可以這樣修（三選一）：');
+  lines.push('　1. 把那一格改成 ' + SHEETS.NAME_MAPPING + ' 上的正式姓名——最直接；');
+  lines.push('　2. 如果那真的是同一個人的另一個叫法，去 ' + SHEETS.NAME_MAPPING
+    + ' 的「別名」欄加上去，之後這個叫法就一直認得；');
+  lines.push('　3. 如果那一格本來就不該有人（例如你想改回原狀），'
+    + '把它改回上面寫的「本來應該是」那個文字。');
+  lines.push('');
+  lines.push('為什麼是整批拒絕、不是跳過那幾格：這個工具的用途就是'
+    + '「讓 grid 跟版本一致」。');
+  lines.push('如果跳過認不出的格照樣寫入，你會以為全部改動都入了版本，'
+    + '實際上有幾格沒有——');
+  lines.push('那就製造了一個新的、而且沒有人知道的不一致，'
+    + '比多修一格的麻煩嚴重得多。');
   return lines.join('\n');
 }

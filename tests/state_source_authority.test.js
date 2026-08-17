@@ -22,7 +22,7 @@ const mock = require('./helpers/mock_roster_data.js');
 
 // StateSource.gs 要 FineTune.gs 嘅 buildGridOverlayState_()／cellKey_()／
 // normalizeCellText_()，同埋 Constants.gs 嘅 GRID_PLACEHOLDER_TEXTS。
-const gas = loadGasSource(FILES_FOR_GENERATOR.concat(['Verify.gs', 'StateSource.gs']));
+const gas = loadGasSource(FILES_FOR_GENERATOR.concat(['Verify.gs', 'RosterWriter.gs', 'StateSource.gs']));
 
 // ⚠️ 呢個替身**一定要喺 loadGasSource() 之後先設**，唔可以用 overrides 參數。
 // `resolvePersonId` 喺 .gs 入面係一個 top-level `function` 宣告，載入嗰陣
@@ -75,6 +75,19 @@ function buildContext(withGridEdit) {
     versionNo: 1,
     original: original,
     gridValues: gridValues,
+    // 第二十輪批次階段 A2：人手改動偵測改成「算出應該渲染成咩再比對」，
+    // 所以 context 要帶埋渲染資料。冇傳會拋錯（特登嘅——退回舊嘅反推做法
+    // 會令合堂誤報嗰個 bug 靜靜咁復活）。
+    gridRender: {
+      labels: {
+        pending: gas.DEFAULTS.GRID_PENDING_LABEL,
+        na: gas.DEFAULTS.GRID_NOT_APPLICABLE_LABEL,
+        specialSkip: gas.DEFAULTS.GRID_SPECIAL_SKIP_LABEL,
+        gap: gas.DEFAULTS.GRID_GAP_LABEL
+      },
+      emptyDisplayByPostId: { CHAIR: 'PENDING' },
+      externalOwnerByDate: {}
+    },
     peopleById: {
       P9001: { nameTC: '假甲' }, P9002: { nameTC: '假乙' },
       P9003: { nameTC: '假丙' }, P9004: { nameTC: '假丁' }
