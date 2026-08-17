@@ -290,8 +290,18 @@ function testEligibilityCoverage_() {
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testHardRuleViolations_() {
-  const quarterId = SELF_TEST_TARGET.QUARTER_ID;
-  const versionNo = SELF_TEST_TARGET.VERSION_NO;
+  // 第二十一輪批次階段 B：目標唔再寫死。
+  const target = resolveSelfTestTarget_();
+  if (!target) {
+    return {
+      pass: false,
+      detail: '找不到任何已生成版本的季度',
+      action: '請先執行「步驟 1：生成初稿」，或在 Config 設定 '
+        + CONFIG_KEYS.SELF_TEST_QUARTER_ID + ' 指定要驗哪一季'
+    };
+  }
+  const quarterId = target.quarterId;
+  const versionNo = target.versionNo;
   const context = buildVerifyContext_(quarterId, versionNo);
 
   if (context.assignments.length === 0) {
@@ -303,19 +313,73 @@ function testHardRuleViolations_() {
   }
 
   const hard = checkHardRuleViolations_(context);
-  const summary = hard.groups.map(function (g) {
-    return g.label + ' ' + g.items.length;
-  }).join('；');
+  // 第二十一輪批次階段 A：分三類。**只有真違反先算未通過。**
+  //
+  // 實測背景：呢個測試曾經因為「版本生成之後先套用嘅申報寫入咗一行
+  // Unavailable」而報未通過——嗰個版本喺生成當日完全合規，係被後來
+  // 新增嘅資料追溯判定。噉樣報「未通過」會令人以為排表演算法有 bug。
+  const classified = classifyHardViolations_(hard.all,
+    buildHardViolationClassContext_(quarterId, versionNo, context.unavailable));
+
+  const detailParts = [
+    quarterId + ' v' + versionNo + '（' + context.assignments.length + ' 格）',
+    classified.summary.split('
+')[0]
+  ];
+  if (classified.released.length > 0 || classified.lateUnavailable.length > 0) {
+    detailParts.push('（已放行與版本生成後才新增的申報只列出、不判為失敗）');
+  }
 
   return {
-    pass: hard.total === 0,
-    detail: quarterId + ' v' + versionNo + '（' + context.assignments.length + ' 格）：' + summary,
-    action: hard.total > 0
-      ? '這是程式 bug，請看 Verify 工作表第 5 節：' + hard.groups
-        .filter(function (g) { return g.items.length > 0; })
-        .map(function (g) { return g.items[0]; }).join('；')
+    pass: classified.real.length === 0,
+    detail: detailParts.join('　'),
+    action: classified.real.length > 0
+      ? '請看 Verify 工作表第 5 節標示為「' + HARD_VIOLATION_CLASS_LABEL.REAL + '」的項目：'
+        + classified.real.slice(0, 3).map(function (v) { return v.text; }).join('；')
       : ''
   };
+}
+
+/**
+ * 第二十一輪批次階段 B：決定自我測試要驗邊一季、邊個版本。
+ *
+ * 原本寫死 `SELF_TEST_TARGET = { QUARTER_ID: '2026T4', VERSION_NO: 0 }`。
+ * 兩個問題：
+ *
+ * 1. **寫死年份會過期。** 每過一季，呢個測試就係喺驗一個舊季度，
+ *    而唔係驗「而家用緊嗰個」。
+ * 2. **寫死 `VERSION_NO: 0`** 令佢永遠驗初稿。初稿之後嘅版本（套用申報、
+ *    人手改動）先係真正會寄出去嘅嘢，反而冇驗。
+ *
+ * 而家：季度由 Config 讀（冇設定就用最近一個有生成過版本嘅季度），
+ * 版本一律用**該季最新版本**。
+ *
+ * @returns {?{quarterId: string, versionNo: number}} 目標；搵唔到回傳 null
+ */
+function resolveSelfTestTarget_() {
+  const configured = String(getConfig(CONFIG_KEYS.SELF_TEST_QUARTER_ID, '') || '').trim();
+  if (configured) {
+    const versionNo = findLatestVersionNo(configured);
+    if (versionNo >= 0) return { quarterId: configured, versionNo: versionNo };
+    // 設定咗但搵唔到版本：唔好靜靜咁跌返去另一季（噉樣會令人以為
+    // 自己設定嘅嗰季通過咗測試）。直接當搵唔到，訊息會叫人先生成。
+    return null;
+  }
+
+  // 冇設定：揀「最近一個有生成過版本嘅季度」。
+  // 用 RosterVersions 而唔係 Quarters——有季度但未生成過版本嘅話，
+  // 驗佢一定失敗，而嗰個唔係 bug，係未做。
+  const C = COLUMNS.ROSTER_VERSIONS;
+  let best = null;
+  readOptionalSheetRows_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+    const quarterId = String(row[C.QUARTER_ID] || '');
+    if (!quarterId) return;
+    if (!best || quarterId > best) best = quarterId;
+  });
+  if (!best) return null;
+
+  const versionNo = findLatestVersionNo(best);
+  return versionNo >= 0 ? { quarterId: best, versionNo: versionNo } : null;
 }
 
 /**
@@ -481,7 +545,10 @@ function testFineTuneDetection_() {
   }
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const serviceDates = readServiceDatesNormalized(SELF_TEST_TARGET.QUARTER_ID, timezone);
+  // 第二十一輪批次階段 B：目標唔再寫死，改用同一個解析函式。
+  const selfTestTarget = resolveSelfTestTarget_();
+  if (!selfTestTarget) return { pass: true, detail: '找不到已生成版本的季度，略過', action: '' };
+  const serviceDates = readServiceDatesNormalized(selfTestTarget.quarterId, timezone);
   if (serviceDates.length < 2) {
     return { pass: true, detail: '主日不足 2 週，略過', action: '' };
   }
@@ -571,7 +638,11 @@ function testMissingTemplates_() {
   // 確認 sendStage 對缺失範本會給出明確錯誤訊息而非崩潰
   if (missing.length > 0) {
     try {
-      sendStage(SELF_TEST_TARGET.QUARTER_ID, SELF_TEST_TARGET.VERSION_NO, missing[0]);
+      // 第二十一輪批次階段 B：目標唔再寫死。呢度只係想確認「缺範本會唔會
+      // 報一個清楚嘅錯」，用邊一季都得，所以搵唔到就略過呢一小段。
+      const probeTarget = resolveSelfTestTarget_();
+      if (!probeTarget) throw new Error('找不到已生成版本的季度，略過這一項探測');
+      sendStage(probeTarget.quarterId, probeTarget.versionNo, missing[0]);
       problems.push(missing[0] + ' 沒有範本卻沒有報錯');
     } catch (err) {
       if (err.message.indexOf('找不到') === -1) {

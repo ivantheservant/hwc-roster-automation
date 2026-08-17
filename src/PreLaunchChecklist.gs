@@ -368,29 +368,50 @@ function buildPreLaunchChecklist_(quarterId) {
   items.push(buildChecklistItem_('v0 是否仍受保護', v0Ready, v0Value, v0Guidance));
 
   // 10. 最新版本是否仍有未解決的硬規則違反
+  //
+  // 第二十一輪批次階段 A：分三類。「需要處理」只由**真違反**決定
+  // ——已放行同「版本生成後才新增的申報」照樣列出嚟，但唔會令
+  // 上線前檢查（以及消費佢嘅「全面體檢」）報成 MUST。
+  //
+  // ⚠️ 「全面體檢」（FullHealthCheck.gs）唔會自己再判斷一次，
+  // 佢直接消費呢一項嘅 `ready`，所以呢度改好就兩邊都啱——
+  // 兩處各自判斷嘅話遲早分岔。
   let hardViolations = [];
+  let hardClassified = null;
   let violationsError = null;
   if (versionNo >= 0) {
     try {
       hardViolations = recomputeLatestVersionViolations_(quarterId, versionNo)
         .filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
+      hardClassified = classifyHardViolations_(hardViolations,
+        buildHardViolationClassContext_(quarterId, versionNo,
+          readUnavailableNormalized(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE))));
     } catch (err) {
       violationsError = err.message;
     }
   }
+  const hardReady = versionNo >= 0 && !violationsError
+    && hardClassified !== null && !hardClassified.needsAction;
   items.push(buildChecklistItem_(
     '最新版本是否仍有未解決的硬規則違反',
-    versionNo >= 0 && !violationsError && hardViolations.length === 0,
-    versionNo < 0 ? '這一季還沒有生成任何版本' : (violationsError ? '檢查時失敗：' + violationsError : '硬規則違反：' + hardViolations.length + ' 項'),
+    hardReady,
+    versionNo < 0 ? '這一季還沒有生成任何版本'
+      : (violationsError ? '檢查時失敗：' + violationsError : hardClassified.summary),
     versionNo < 0
       ? '請先執行「步驟 1：生成初稿」再回來檢查這一項。'
       : (violationsError
         ? '重新檢查規則時發生錯誤，建議直接執行「步驟 3：套用修改申報」查看詳情。'
-        : (hardViolations.length === 0
-          ? '最新版本（v' + versionNo + '）目前沒有未解決的硬規則違反。'
-          : '最新版本（v' + versionNo + '）仍有以下硬規則違反，正式發出前必須處理或明確放行：')),
-    hardViolations.slice(0, 20).map(function (v) {
-      return v.serviceDate + ' ' + v.postNameTC + '#' + v.slotIndex + ' ' + v.personName + ' ' + v.ruleId + '：' + v.reason;
+        : (hardClassified.real.length === 0
+          ? '最新版本（v' + versionNo + '）沒有需要處理的硬規則違反。'
+            + (hardClassified.items.length > 0
+              ? '下面列出的各項都是已知情況（已放行／版本生成後才新增的申報），保留只為對照。'
+              : '')
+          : '最新版本（v' + versionNo + '）仍有真違反，正式發出前必須處理或明確放行：')),
+    (hardClassified ? hardClassified.items : []).slice(0, 20).map(function (v) {
+      return '［' + v.classLabel + '］' + v.serviceDate + ' '
+        + (v.postNameTC || v.postId) + '#' + v.slotIndex + ' ' + (v.personName || '')
+        + ' ' + v.ruleId + '：' + (v.reason || '')
+        + (v.classNote ? '（' + v.classNote + '）' : '');
     }).concat(hardViolations.length > 20 ? ['……另有 ' + (hardViolations.length - 20) + ' 項'] : [])
   ));
 

@@ -63,7 +63,7 @@ function assessGoLiveState_() {
     description = '測試模式：唔會真正寄出電郵，主旨有前綴「' + subjectPrefix + '」。';
   } else if (dryRunOff && !prefixCleared) {
     phase = 'HALF_LIVE_WITH_PREFIX';
-    description = '⚠️ 改咗一半：已經會**真正寄出**電郵，但主旨仍然有測試前綴「'
+    description = '⚠️ 改咗一半：已經會「真正寄出」電郵，但主旨仍然有測試前綴「'
       + subjectPrefix + '」——收件人會收到真信，但標題掛住測試字樣。';
   } else {
     phase = 'HALF_PREFIX_CLEARED';
@@ -266,7 +266,7 @@ function runGoLiveWizard_() {
   const seg2 = [
     '第 2 段／共 2 段：' + CONFIG_KEYS.DRY_RUN + ' 改為 FALSE',
     '',
-    '⚠️⚠️ 呢一段一完成，系統就會**真正寄出電郵**。',
+    '⚠️⚠️ 呢一段一完成，系統就會真正寄出電郵。',
     '之後任何一次「步驟 2／4／5」或者補寄，收件人都會真係收到信。',
     '',
     '已完成：',

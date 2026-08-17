@@ -82,7 +82,7 @@ console.log('\n=== F3【核心】日期對唔上時要講得出係邊一種原�
   // 格式錯（實測提到嘅例子：打咗 2026/11/15）
   const slash = gas.describeUnknownRequestDate_('2026/11/15', '2026T4');
   check('★★★★★ 斜線格式 ⇒ 明確講格式唔正確、並講出正確格式',
-    slash.indexOf('格式不正確') !== -1 && slash.indexOf('yyyy-MM-dd') !== -1, slash);
+    slash.indexOf('格式認不出來') !== -1 && slash.indexOf('yyyy-MM-dd') !== -1, slash);
   check('★★★★ 建議用下拉選單（治本）', slash.indexOf('下拉選單') !== -1);
 
   // 格式啱但唔屬於呢個季度
@@ -101,7 +101,7 @@ console.log('\n=== F3【核心】日期對唔上時要講得出係邊一種原�
   // 其他常見打法
   ['15/11/2026', '2026.11.15', '２０２６-１１-１５'].forEach(function (t) {
     check('★★★ 「' + t + '」會被判成格式問題',
-      gas.describeUnknownRequestDate_(t, '2026T4').indexOf('格式不正確') !== -1);
+      gas.describeUnknownRequestDate_(t, '2026T4').indexOf('格式認不出來') !== -1);
   });
 }
 

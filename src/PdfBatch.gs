@@ -654,7 +654,7 @@ function buildPersonalPdfVersionReport_(diag) {
   if (latestCount === 0 && diag.totalFiles > 0) {
     lines.push('⚠️ 最新版本 ' + latestKey + ' 一份都沒有——下一次寄送會重新產生全部。');
     lines.push('');
-    lines.push('這**不是故障**。檔名裡面有版本號'
+    lines.push('這不是故障。檔名裡面有版本號'
       + '（{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf），');
     lines.push('「已存在」的判斷是「同一個檔名而且大小達標」，所以版本號一變，');
     lines.push('舊檔就不算數——因為新版本的內容可能不同，把舊版本的 PDF 當成');

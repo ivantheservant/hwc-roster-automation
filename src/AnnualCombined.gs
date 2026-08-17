@@ -177,7 +177,7 @@ function planAnnualCombinedSundays_(year) {
       type: '合堂',
       title: '五月合堂（日期待確認）',
       confirmed: false,
-      notes: '⚠️ 這是「5 月 22 日前後」推算出來的**建議日期**，'
+      notes: '⚠️ 這是「5 月 22 日前後」推算出來的「建議日期」，'
         + '實際日期每年不同，必須向教會確認之後，把日期改成正確的那一天、'
         + '再把 ' + COLUMNS.SPECIAL_SUNDAYS.CONFIRMED + ' 改成 TRUE。'
         + '未確認之前，系統會在生成初稿前一星期主動提醒你。'
@@ -254,7 +254,7 @@ function listUnconfirmedSpecialSundays_(quarterId, timezone) {
  */
 function describeUnconfirmedSpecialSundays_(unconfirmed) {
   if (!unconfirmed || unconfirmed.length === 0) return '';
-  const lines = ['⚠️ 這一季有 ' + unconfirmed.length + ' 個特殊主日的日期**尚未確認**：'];
+  const lines = ['⚠️ 這一季有 ' + unconfirmed.length + ' 個特殊主日的日期「尚未確認」：'];
   unconfirmed.forEach(function (u) {
     lines.push('　' + u.serviceDate + '　' + (u.title || u.type || '（沒有標題）'));
   });

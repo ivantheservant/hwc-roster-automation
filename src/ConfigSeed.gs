@@ -166,6 +166,16 @@ function getConfigKeySeeds_() {
         + ' OFFICIAL_SENT、鎖住了重跑步驟 4 的路。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.SELF_TEST_QUARTER_ID, type: CONFIG_TYPES.STR, group: 'SYSTEM',
+      defaultValue: '',
+      description: '第二十一輪批次新增。「測試工具 ▸ 自我測試」要驗哪一個季度。'
+        + '「留空」是建議做法——留空時系統會自動用「最近一個有生成過版本的季度」，'
+        + '所以不會過期。只有在你想固定驗某一季（例如驗證某個歷史版本）時才填。'
+        + '版本號不用填也不能填：一律驗該季的最新版本'
+        + '（初稿之後的版本才是真正會寄出去的東西）。',
+      editable: 'TRUE'
+    },
     // ---- MAIL ----
     {
       key: CONFIG_KEYS.MAIL_ADMIN_NOTIFY, type: CONFIG_TYPES.EMAIL, group: 'MAIL',

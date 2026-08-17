@@ -135,12 +135,37 @@ function buildVerifyReport_(context) {
     rows.push(makeItemRow_('　服侍 ' + bucket.count + ' 次的人數', bucket.people + ' 人', '', false));
   });
 
+  // 第二十一輪批次階段 A：硬規則違反分三類顯示。
+  // 只有「真違反」先算需要處理——已放行同「版本生成後才新增的申報」
+  // 照樣列出嚟，但唔會被叫做 bug（詳細理由見 HardViolationClass.gs）。
   const hard = checkHardRuleViolations_(context);
-  rows.push(makeSectionRow_('5. 硬規則違反檢查（任何一項不為 0 即是 bug）'));
+  const classified = classifyHardViolations_(
+    hard.all, buildHardViolationClassContext_(
+      context.quarterId, context.versionNo, context.unavailable));
+
+  rows.push(makeSectionRow_('5. 硬規則違反檢查（分三類；只有「真違反」需要處理）'));
+  rows.push(makeItemRow_('　' + HARD_VIOLATION_CLASS_LABEL.REAL,
+    classified.real.length + ' 項', '0 項', classified.real.length > 0));
+  rows.push(makeItemRow_('　' + HARD_VIOLATION_CLASS_LABEL.RELEASED,
+    classified.released.length + ' 項', '', false));
+  rows.push(makeItemRow_('　' + HARD_VIOLATION_CLASS_LABEL.LATE_UNAVAILABLE,
+    classified.lateUnavailable.length + ' 項', '', false));
+
   hard.groups.forEach(function (group) {
-    rows.push(makeItemRow_(group.label, group.items.length + ' 項', '0 項', group.items.length > 0));
-    group.items.forEach(function (detail) {
-      rows.push(makeItemRow_('　' + detail, '', '', true));
+    const classedItems = group.items.map(function (item) {
+      return classified.items.filter(function (c) {
+        return c.violationKey === buildHardViolationKey_(context.quarterId, item);
+      })[0] || item;
+    });
+    const realCount = classedItems.filter(function (c) {
+      return c.violationClass === HARD_VIOLATION_CLASS.REAL;
+    }).length;
+    rows.push(makeItemRow_(group.label, group.items.length + ' 項',
+      '0 項（真違反）', realCount > 0));
+    classedItems.forEach(function (c) {
+      const tag = c.classLabel ? '［' + c.classLabel + '］' : '';
+      rows.push(makeItemRow_('　' + tag + (c.text || ''), '', '',
+        c.violationClass === HARD_VIOLATION_CLASS.REAL));
     });
   });
 
@@ -151,7 +176,8 @@ function buildVerifyReport_(context) {
       chairEq: chairEq,
       announce: announce,
       distribution: dist,
-      hardViolationCount: hard.total
+      hardViolationCount: hard.total,
+      hardViolationClass: classified
     }
   };
 }
@@ -379,14 +405,36 @@ function checkHardRuleViolations_(context) {
   const roleViolations = [];
   const exclusionViolations = [];
 
+  // 第二十一輪批次階段 A：違反項目由「一句字串」改成**結構化物件**。
+  //
+  // 點解要改：分類（真違反／已放行／版本生成後才新增嘅申報）要用明確嘅 key
+  // 比對——季度＋服侍日期＋PostID＋SlotIndex＋PersonID＋RuleID。
+  // 如果項目只係一句 `2026-11-08 ANNOUNCE#1 某某：某某原因`，就只可以靠
+  // 訊息文字比對，而訊息文字係會改嘅（第十七輪就改過一次措辭）——
+  // 一改就會靜靜咁對唔上，然後所有已放行嘅項目都會變返「真違反」。
+  //
+  // `text` 欄保留原本嘅顯示字串，所以顯示層完全唔使改語氣。
+  const mk = function (a, ruleId, reason) {
+    return {
+      serviceDate: a.serviceDate,
+      postId: a.postId,
+      slotIndex: a.slotIndex,
+      personId: a.personId,
+      personName: a.personName || '',
+      ruleId: ruleId,
+      reason: reason,
+      text: a.serviceDate + ' ' + a.postId + '#' + a.slotIndex
+        + ' ' + (a.personName || a.personId) + '：' + reason
+    };
+  };
+
   context.assignments.forEach(function (a) {
     if (!a.personId) return;
     const post = postById[a.postId];
-    const label = a.serviceDate + ' ' + a.postId + '#' + a.slotIndex + ' ' + (a.personName || a.personId);
 
     const pool = context.eligibility.byPost[a.postId] || [];
     if (pool.indexOf(a.personId) === -1) {
-      notEligible.push(label + '：不在 Eligibility 名單內');
+      notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, '不在 Eligibility 名單內'));
     }
 
     if (post) {
@@ -395,25 +443,27 @@ function checkHardRuleViolations_(context) {
       const required = requiredRolesOfPost_(post);
       if (required.length > 0
           && !personHasAnyRoleOn_(roles, a.personId, required, a.serviceDate)) {
-        roleViolations.push(label + '：' + buildRoleRequiredReason_(post, required, a.serviceDate));
+        roleViolations.push(mk(a, RULE_IDS.ROLE_REQUIRED,
+          buildRoleRequiredReason_(post, required, a.serviceDate)));
       }
       const exclusion = findActivePersonPostExclusion_(
         exclusions, a.personId, a.postId, a.serviceDate);
       if (exclusion) {
-        exclusionViolations.push(label + '：' + buildPersonPostExcludedReason_(post, exclusion));
+        exclusionViolations.push(mk(a, RULE_IDS.PERSON_POST_EXCLUDED,
+          buildPersonPostExcludedReason_(post, exclusion)));
       }
     }
     if (isPersonUnavailable_(a.personId, a.serviceDate, a.postId, context.unavailable)) {
-      unavailableHits.push(label + '：該日已表明不能服侍');
+      unavailableHits.push(mk(a, RULE_IDS.UNAVAILABLE, '該日已表明不能服侍'));
     }
     if (post && post.frequency === POST_FREQUENCY.FIRST_SUNDAY) {
       const info = dateInfo[a.serviceDate];
       if (info && !info.isFirstSundayOfMonth) {
-        notFirstSunday.push(label + '：出現在非每月第一主日');
+        notFirstSunday.push(mk(a, RULE_IDS.COMMUNION_FIRST_SUNDAY, '出現在非每月第一主日'));
       }
     }
     if (post && !post.autoGenerate) {
-      autoGenerateHits.push(label + '：AutoGenerate=FALSE 的崗位卻被派人');
+      autoGenerateHits.push(mk(a, RULE_IDS.NO_AUTO_GENERATE, 'AutoGenerate=FALSE 的崗位卻被派人'));
     }
   });
 
@@ -427,7 +477,18 @@ function checkHardRuleViolations_(context) {
       const seen = {};
       people.forEach(function (personId) {
         if (seen[personId]) {
-          duplicates.push(dateStr + ' ' + post.postId + '：同週重複派了 ' + personId);
+          duplicates.push({
+            serviceDate: dateStr,
+            postId: post.postId,
+            // 同週重複係「呢個崗位喺呢一日有兩個人」，唔屬於單一 slot，
+            // slotIndex 留空；分類 key 一樣拼得出，唔會同其他項目撞。
+            slotIndex: '',
+            personId: personId,
+            personName: '',
+            ruleId: RULE_IDS.DISTINCT_SLOT,
+            reason: '同週重複派了 ' + personId,
+            text: dateStr + ' ' + post.postId + '：同週重複派了 ' + personId
+          });
         }
         seen[personId] = true;
       });
@@ -444,7 +505,10 @@ function checkHardRuleViolations_(context) {
     { label: '違反個人崗位限制（規則 3）', items: exclusionViolations }
   ];
   const total = groups.reduce(function (sum, g) { return sum + g.items.length; }, 0);
-  return { groups: groups, total: total };
+  // `all` 係全部項目攤平——分類函式要一次過睇晒，唔應該逐 group 各自分類
+  // （逐 group 分類嘅話，同一項可能喺唔同 group 得到唔同分類）。
+  const all = groups.reduce(function (acc, g) { return acc.concat(g.items); }, []);
+  return { groups: groups, total: total, all: all };
 }
 
 /**

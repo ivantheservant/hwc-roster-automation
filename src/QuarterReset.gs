@@ -191,8 +191,8 @@ function planQuarterReset_(quarterId, includeV0) {
     if (plan.eligibilityRequestRows.length > 0) {
       plan.manualAttention.push('Eligibility 有 ' + plan.eligibilityRequestRows.length
         + ' 行是由「指定服侍」申報自動加入的（Source=REQUEST）。'
-        + 'Eligibility 屬於人員基礎資料，本工具絕對不碰——但這些行**會繼續影響'
-        + '重新生成的結果**（那個人從此對那個崗位算合資格）。'
+        + 'Eligibility 屬於人員基礎資料，本工具絕對不碰——但這些行會繼續影響'
+        + '重新生成的結果（那個人從此對那個崗位算合資格）。'
         + '如果是測試時亂填出來的，請自己到 Eligibility 把該行 Active 改成 FALSE 或刪除；'
         + '如果是真實的資格變更，就保留。下面已逐行列出。');
     }

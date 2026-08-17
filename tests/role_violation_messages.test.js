@@ -177,18 +177,29 @@ console.log('\n=== D2【核心】地方三：核對職事表（checkHardRuleViol
     JSON.stringify(result.groups.map((g) => g.label)));
   check('★★★★ 而且組名講得出係規則 1／2',
     roleGroup && roleGroup.label.indexOf('規則 1') !== -1, roleGroup && roleGroup.label);
+  // 第二十一輪批次階段 A：`items` 由「一句字串」改成**結構化物件**
+  // （要用明確 key 做放行比對），顯示字串搬咗去 `.text`。
   check('★★★★★ 明細帶咗共用訊息（三要素齊）',
     roleGroup && roleGroup.items.length === 1
-    && roleGroup.items[0].indexOf('堂委') !== -1
-    && roleGroup.items[0].indexOf('不是系統錯誤') !== -1,
+    && roleGroup.items[0].text.indexOf('堂委') !== -1
+    && roleGroup.items[0].text.indexOf('不是系統錯誤') !== -1,
     roleGroup && JSON.stringify(roleGroup.items));
   check('★★★★★ 個人排除嗰組帶咗原因原文',
     exclGroup && exclGroup.items.length === 1
-    && exclGroup.items[0].indexOf('按教會安排暫停主席職務') !== -1,
+    && exclGroup.items[0].text.indexOf('按教會安排暫停主席職務') !== -1,
     exclGroup && JSON.stringify(exclGroup.items));
   check('★★★ 明細行頭有日期、崗位、姓名（定位得到係邊一格）',
-    roleGroup && roleGroup.items[0].indexOf('2027-05-02') !== -1
-    && roleGroup.items[0].indexOf('ANNOUNCE') !== -1, roleGroup && roleGroup.items[0]);
+    roleGroup && roleGroup.items[0].text.indexOf('2027-05-02') !== -1
+    && roleGroup.items[0].text.indexOf('ANNOUNCE') !== -1,
+    roleGroup && roleGroup.items[0].text);
+
+  // 第二十一輪批次階段 A：結構化欄位要齊，否則放行比對砌唔出 key
+  check('★★★★★ 每項都有做 key 用嘅六個結構化欄位'
+    + '（季度喺呼叫端補；靠訊息文字比對嘅話，改一次措辭'
+    + '就會令全部舊放行紀錄靜靜失效）',
+    roleGroup && ['serviceDate', 'postId', 'slotIndex', 'personId', 'ruleId']
+      .every(function (f) { return roleGroup.items[0][f] !== undefined; }),
+    roleGroup && JSON.stringify(roleGroup.items[0]));
 }
 
 console.log('\n=== D2【核心】地方四：草稿覆核報告（describeRuleForCommittee_）===');

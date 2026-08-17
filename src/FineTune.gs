@@ -168,10 +168,10 @@ function buildGridOverlayState_(context) {
       '人手改動偵測需要 `context.gridRender`（顯示標籤／EmptyDisplay／ExternalOwner）。\n\n'
       + '收到的值是：' + (context && context.gridRender === undefined
         ? 'undefined（完全沒有傳）' : JSON.stringify(context && context.gridRender)) + '\n\n'
-      + '⚠️ 這個欄位**不可以省略**。偵測人手改動的方法是「算出這一格本來應該\n'
+      + '⚠️ 這個欄位不可以省略。偵測人手改動的方法是「算出這一格本來應該\n'
       + '渲染成什麼，再跟 grid 實際內容比對」，沒有這份資料就算不出來。\n\n'
       + '如果退回舊的「由 grid 文字反推人名」做法，「特殊主日」、外部負責單位\n'
-      + '（英語堂／華語堂）、「待確認」這些**顯示用**文字會全部被當成\n'
+      + '（英語堂／華語堂）、「待確認」這些「顯示用」文字會全部被當成\n'
       + '「認不出的人手改動」——第二十輪批次就是這樣，只要季度裡有任何合堂，\n'
       + '「把工作表的人手改動寫成新版本」就完全用不到。\n\n'
       + '修正方法：context 從 `buildFineTuneContext_()` 取得的話已經放好這個欄位；\n'

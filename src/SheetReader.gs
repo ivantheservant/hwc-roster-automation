@@ -170,7 +170,11 @@ function readUnavailableNormalized(timezone) {
         dateFrom: toDateString(row[COLUMNS.UNAVAILABLE.DATE_FROM], timezone),
         dateTo: toDateString(row[COLUMNS.UNAVAILABLE.DATE_TO], timezone),
         appliesTo: String(row[COLUMNS.UNAVAILABLE.APPLIES_TO] || UNAVAILABLE_VALUES.APPLIES_TO_ALL).toUpperCase(),
-        postIds: splitList_(row[COLUMNS.UNAVAILABLE.POST_IDS])
+        postIds: splitList_(row[COLUMNS.UNAVAILABLE.POST_IDS]),
+        // 第二十一輪批次階段 A：硬規則違反三分類要判斷「呢行申報係咪
+        // 版本生成之後先新增」，所以要帶埋建立時間。原值照傳（唔喺呢度
+        // 格式化）——`toEpochMillis_()` 會處理 Date 物件同字串兩種情況。
+        createdAt: row[COLUMNS.UNAVAILABLE.CREATED_AT]
       };
     });
 }

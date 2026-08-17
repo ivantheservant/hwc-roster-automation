@@ -223,7 +223,9 @@ function runFourStageStep3_() {
   if (confirmList.length > 0) {
     const confirmLines = [
       '以下 ' + confirmList.length + ' 筆「未曾任該崗位」的申報要全部接受嗎？',
-      '（選「否」則全部記為 REJECTED，之後可把該行 Status 清空重新提交）', ''
+      '（選「否」則全部記為 REJECTED。想再提交同一筆的話，'
+      + '把該行的 RequestID 刪走就會重新被當成待處理——'
+      + '清 Status 沒有作用，系統判斷的是 RequestID 是否空白。）', ''
     ];
     confirmList.forEach(function (r) {
       confirmLines.push('　' + r.serviceDateText + ' ' + r.postNameText + ' ' + r.personNameText);
@@ -363,7 +365,7 @@ function handleStep3NoPendingRequests_(ui, quarterId, planResult) {
     });
     if (manualChanges.length > 10) lines.push('　……另有 ' + (manualChanges.length - 10) + ' 格');
     lines.push('');
-    lines.push('以下的規則檢查結果**已經計入這些改動**。');
+    lines.push('以下的規則檢查結果，已經計入這些改動。');
   }
   lines.push('以下是 ' + sheetName + ' 目前的規則檢查結果（只讀取，沒有改動任何東西）：');
   lines.push('');
@@ -678,7 +680,9 @@ function runFourStageStep5_() {
     if (confirmList.length > 0) {
       const confirmLines = [
         '以下 ' + confirmList.length + ' 筆「未曾任該崗位」的申報要全部接受嗎？',
-        '（選「否」則全部記為 REJECTED，之後可把該行 Status 清空重新提交）', ''
+        '（選「否」則全部記為 REJECTED。想再提交同一筆的話，'
+      + '把該行的 RequestID 刪走就會重新被當成待處理——'
+      + '清 Status 沒有作用，系統判斷的是 RequestID 是否空白。）', ''
       ];
       confirmList.forEach(function (r) {
         confirmLines.push('　' + r.serviceDateText + ' ' + r.postNameText + ' ' + r.personNameText);
@@ -983,16 +987,37 @@ function confirmHardViolationOverride_(ui, quarterId, title, violations, consequ
  * @returns {void}
  */
 function logHardViolationRelease_(quarterId, stepLabel, hardViolations) {
+  // ── 第二十一輪批次階段 A：改寫成**機器可讀**嘅 key 清單 ──
+  //
+  // 修正之前只寫一句人類可讀嘅句子，入面冇 PersonID、崗位又可能係中文名，
+  // 所以「核對職事表」之後根本認唔返邊一項已經放行過——結果係幹事明明
+  // 放行咗，報告照樣叫佢做 bug。
+  //
+  // ⚠️ **一定要寫足 6 欄 key**（季度｜日期｜PostID｜SlotIndex｜PersonID｜RuleID）。
+  // 只靠訊息文字比對嘅話，將來改一次措辭就會令全部舊放行紀錄靜靜失效
+  // ——第十七輪就改過一次違規訊息措辭。
+  //
+  // ⚠️ **唔可以截斷。** 舊版只寫頭 10 項（`slice(0, 10)`），第 11 項之後
+  // 嘅放行紀錄就永遠對唔返——放行咗但認唔到，等於冇放行。
+  // 人類可讀嗰段仍然只列頭 10 項（`Notes` 欄要畀人睇），
+  // 但 key 清單一項都唔可以少。
+  const keys = hardViolations.map(function (v) {
+    return buildHardViolationKey_(quarterId, v);
+  });
+  const humanReadable = hardViolations.slice(0, 10).map(function (v) {
+    return v.serviceDate + ' ' + (v.postNameTC || v.postId) + '#' + v.slotIndex
+      + ' ' + (v.personName || '') + ' ' + v.ruleId;
+  }).join('；') + (hardViolations.length > 10
+    ? '；……另有 ' + (hardViolations.length - 10) + ' 項' : '');
+
   writeAuditLog_({
-    action: '硬規則放行',
+    action: HARD_RELEASE_ACTION,
     targetSheet: SHEETS.ROSTER_ASSIGNMENTS,
     targetKey: quarterId,
     oldValue: hardViolations.length + ' 項硬規則違反',
     newValue: '已放行（打字輸入「確認放行」）',
     source: stepLabel,
-    notes: hardViolations.slice(0, 10).map(function (v) {
-      return v.serviceDate + ' ' + (v.postNameTC || v.postId) + '#' + v.slotIndex + ' ' + (v.personName || '') + ' ' + v.ruleId;
-    }).join('；') + (hardViolations.length > 10 ? '；……另有 ' + (hardViolations.length - 10) + ' 項' : '')
+    notes: humanReadable + '\n' + HARD_RELEASE_KEY_PREFIX + keys.join('；')
   });
 }
 

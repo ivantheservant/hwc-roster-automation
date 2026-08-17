@@ -338,7 +338,7 @@ function moveRowsToArchive_(sourceName, archiveName, rowIndexes) {
   const writtenRows = archive.getLastRow() - archiveTarget + 1;
   if (writtenRows < targets.length) {
     throw new Error('封存 ' + sourceName + ' 時，寫入 ' + archiveName + ' 的列數（' + writtenRows
-      + '）少於預期（' + targets.length + '），為安全起見已中止，**沒有刪除原表任何資料**。'
+      + '）少於預期（' + targets.length + '），為安全起見已中止——原表任何資料都沒有刪除。'
       + '請檢查 ' + archiveName + ' 的內容，人手清理之後再重新執行。');
   }
 
@@ -432,7 +432,7 @@ function buildArchivePlanLines_(plan) {
     : plan.assignments.rowsToArchive.length / plan.assignments.totalRows;
   lines.push('', '預計效果：步驟 3／5 與生成初稿每次讀取 RosterAssignments 的資料量'
     + '約減少 ' + Math.round(savedRatio * 100) + '%。');
-  lines.push('封存是**搬移不是刪除**：全部原始列會完整搬到 '
+  lines.push('封存是「搬移」不是「刪除」：全部原始列會完整搬到 '
     + SHEETS.SEND_LOG_ARCHIVE + '／' + SHEETS.ROSTER_ASSIGNMENTS_ARCHIVE
     + ' 兩張表，隨時可以打開查閱。');
 

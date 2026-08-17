@@ -64,12 +64,23 @@ function readPendingRequests_(quarterId) {
     const requestId = String(row[idCol] || '').trim();
     if (requestId !== '') return;
 
-    const dateText = toDateString(row[dateCol], timezone);
+    // 第二十一輪批次階段 C：幹事輸入嘅日期只收兩種寫法
+    // （Date 物件、或者文字 yyyy-MM-dd）。詳細理由見 parseOfficerDateInput_()。
+    //
+    // ⚠️ 認唔到嘅日期**唔可以當成空白略過**——噉樣就變成靜靜咁吞咗
+    // 一筆申報。要照樣傳落去，由 validateRequest_() 報 NEEDS_INPUT
+    // 並寫明原因，令幹事喺驗證結果視窗見得到。
+    const parsedDate = parseOfficerDateInput_(row[dateCol], timezone);
+    const dateText = parsedDate.dateStr;
+    const rawDateText = parsedDate.rawText;
     const postText = String(row[postCol] || '').trim();
     const personText = String(row[personCol] || '').trim();
     const typeText = String(row[typeCol] || '').trim();
-    if (!dateText || !postText || !personText || !typeText) {
-      if (dateText || postText || personText || typeText) skippedIncompleteCount++;
+
+    // 四欄都空 = 空白列，唔算申報；有內容但唔齊 = 不完整，計入略過數。
+    const hasAnyDate = dateText !== '' || rawDateText !== '';
+    if (!hasAnyDate || !postText || !personText || !typeText) {
+      if (hasAnyDate || postText || personText || typeText) skippedIncompleteCount++;
       return;
     }
 
@@ -77,7 +88,10 @@ function readPendingRequests_(quarterId) {
       sheetRow: i + 3,
       requestId: requestId,
       quarterId: quarterId,
-      serviceDateText: dateText,
+      serviceDateText: dateText || rawDateText,
+      // 格式認唔到嗰陣，validateRequest_() 要報得出「格式問題」
+      // 而唔係「唔屬於呢個季度」——兩者嘅修法完全唔同。
+      serviceDateParseFailed: !parsedDate.ok,
       postNameText: postText,
       personNameText: personText,
       requestType: typeText
@@ -1153,15 +1167,34 @@ function describeUnknownRequestDate_(dateText, quarterId) {
   if (text === '') {
     return '日期是空白的，請填寫（格式 yyyy-MM-dd，例如 2026-11-15）';
   }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-    return '日期「' + text + '」格式正確，但不屬於 ' + quarterId
-      + ' 的任何一個主日——請確認這一筆申報的 QuarterID 填對了沒有，'
-      + '或者這一天本來就不是這一季的服侍日。';
+
+  // ⚠️ 「係咪格式問題」直接由文字判斷，**唔靠呼叫端傳參數**。
+  //
+  // 呢個判斷同 `parseOfficerDateInput_()` 接受嘅格式係同一條準則
+  // （嚴格 yyyy-MM-dd）。如果改成由呼叫端傳一個 flag 入嚟，
+  // 就會有兩個地方各自講「乜嘢先算格式啱」——遲早分岔，
+  // 而分岔嘅結果就係「訊息同行為唔一致」，正正就係本階段要修嘅嘢。
+  const parseFailed = !/^\d{4}-\d{2}-\d{2}$/.test(text);
+
+  // 第二十一輪批次階段 C2：訊息必須同**實際接受嘅格式**完全一致。
+  //
+  // 修正之前呢句寫「斜線、句點、日月倒轉、全形數字都認不出來」，
+  // 但當時 toDateString() 其實收斜線同日月倒轉——幹事照住訊息改，
+  // 反而改到一個系統會靜靜猜錯嘅寫法。而家兩邊一致：
+  // 只收「儲存格本身是日期值」同「文字 yyyy-MM-dd」。
+  if (parseFailed) {
+    return '日期「' + text + '」的格式認不出來。只接受兩種寫法：\n'
+      + '　1. 用格內的下拉選單揀（最穩陣，揀完儲存格本身就是日期值）；\n'
+      + '　2. 手打成 yyyy-MM-dd，例如 2026-11-15（月、日都要兩位數）。\n'
+      + '斜線（2026/11/15）、日月倒轉（15/11/2026）、句點、中文年月日、'
+      + '全形數字一律不接受——\n'
+      + '不是認不到，是「05/06」這種寫法沒有辦法確定是 5 月 6 日還是 6 月 5 日，'
+      + '猜錯就會把人排錯主日。';
   }
-  // 常見打法：2026/11/15、15/11/2026、2026.11.15、全形數字
-  return '日期「' + text + '」的格式不正確。請用 yyyy-MM-dd（例如 2026-11-15）——'
-    + '斜線、句點、日月倒轉、全形數字都認不出來。'
-    + '最穩陣的做法是用格內的下拉選單揀，不要自己打字。';
+
+  return '日期「' + text + '」格式正確，但不屬於 ' + quarterId
+    + ' 的任何一個主日——請確認這一筆申報的 QuarterID 填對了沒有，'
+    + '或者這一天本來就不是這一季的服侍日。';
 }
 
 /**

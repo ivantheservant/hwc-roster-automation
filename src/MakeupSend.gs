@@ -305,7 +305,7 @@ function buildMakeupPlanLines_(plan) {
     lines.push('');
   }
 
-  lines.push('這個工具**不會改動流程階段**（Stage 保持不變），純粹補寄。');
+  lines.push('這個工具不會改動流程階段（Stage 保持不變），純粹補寄。');
   return lines;
 }
 

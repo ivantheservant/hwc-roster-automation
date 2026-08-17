@@ -1954,7 +1954,7 @@ function runResetQuarterTestData_() {
   if (!quarterId) return;
 
   const v0Response = ui.alert('⚠️⚠️ 重設季度測試資料',
-    'v0 是自動生成的原始版本，通常已加保護，預設**保留**。\n\n'
+    'v0 是自動生成的原始版本，通常已加保護，預設「保留」。\n\n'
       + '要連 v0 一齊清走嗎？\n\n'
       + '「是」＝連 v0 一齊清（整季由零開始）\n'
       + '「否」＝保留 v0（只清 v1 之後的測試版本）',
@@ -2508,9 +2508,16 @@ function buildVerifySummaryText_(result) {
   lines.push('平均次數：' + dist.average.toFixed(2) + '（基準 ' + dist.averageTarget + '）');
   lines.push('最高次數：' + dist.maxCount + '（基準 ' + dist.maxTarget + '）');
   lines.push('');
-  lines.push(summary.hardViolationCount === 0
-    ? '硬規則違反：0 項 ✓'
-    : '硬規則違反：' + summary.hardViolationCount + ' 項 ← 這是 bug，請查看報告');
+  // 第二十一輪批次階段 A：拿走「← 這是 bug，請查看報告」。
+  //
+  // 原本嗰句對三類項目一視同仁，但其中兩類根本唔係 bug：
+  // 一類係幹事自己打字放行過嘅，一類係版本生成之後先出現嘅申報。
+  // 一句講錯嘅結論，比冇結論更差——實測嗰次就係一項已放行嘅違反
+  // 被叫做 bug，令人以為排表演算法有問題。
+  lines.push(summary.hardViolationClass
+    ? summary.hardViolationClass.summary
+    : buildHardViolationSummary_(summary.hardViolationCount,
+      summary.hardViolationCount, 0, 0));
 
   return lines.join('\n');
 }

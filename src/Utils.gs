@@ -125,6 +125,15 @@ function parseDate(str) {
  * @returns {string} yyyy-MM-dd 格式字串；空值時回傳空字串；無法辨識時回傳原字串
  */
 function toDateString(value, timezone) {
+  // ⚠️ 第二十一輪批次階段 C：呢個函式服務嘅係「**讀系統自己寫入嘅資料**」
+  // （ServiceDates／RosterAssignments／Unavailable／Quarters 等等）。
+  //
+  // **唔可以收緊。** 收緊會令既有資料讀唔到——例如 Requests 有一行歷史
+  // 紀錄係 `2027/05/09`（已 APPLIED），收緊嘅話讀嗰行就會拋錯。
+  //
+  // **幹事輸入嘅日期唔好用呢個。** 佢接受 `dd/MM/yyyy`，即係
+  // `05/06/2027` 一律當 6 月 5 日——無聲噉猜，猜錯就係把人排錯主日。
+  // 幹事輸入路徑一律用 `parseOfficerDateInput_()`（見下面）。
   if (value === null || value === undefined || value === '') return '';
   if (Object.prototype.toString.call(value) === '[object Date]') {
     return Utilities.formatDate(value, timezone, 'yyyy-MM-dd');
@@ -142,6 +151,70 @@ function toDateString(value, timezone) {
   if (dayFirst) return dayFirst[3] + '-' + pad2(dayFirst[2]) + '-' + pad2(dayFirst[1]);
 
   return text;
+}
+
+/**
+ * 第二十一輪批次階段 C：**幹事輸入**嘅日期，只收兩種寫法。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要同 `toDateString()` 分家
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `toDateString()` 服務嘅係「**讀系統自己寫入嘅資料**」——ServiceDates、
+ * RosterAssignments、Unavailable 等等。嗰啲值係系統寫嘅，格式受控，
+ * 寬鬆少少冇問題，而且**唔可以收緊**：收緊會令舊資料讀唔到。
+ *
+ * 但佢同時被用嚟讀**幹事打入去嘅** Requests 日期欄，而嗰邊寬鬆係有害嘅：
+ *
+ * `toDateString()` 會接受 `dd/MM/yyyy`，即係 `05/06/2027` 一律當
+ * **6 月 5 日**。呢個係**無聲噉猜**——猜錯就係把人排錯主日，
+ * 而且冇任何提示。日／月次序喺唔同地方習慣唔同，冇得靠估。
+ *
+ * 而且原本嘅錯誤訊息寫「斜線、句點、日月倒轉、全形數字都認不出來」，
+ * 但實際上斜線同日月倒轉係收嘅——**訊息同行為唔一致**，
+ * 幹事照住訊息改反而改到一個系統會靜靜猜錯嘅寫法。
+ *
+ * 所以：幹事輸入路徑只收兩種，而且錯誤訊息同實際行為完全一致。
+ *
+ * | 輸入 | 收唔收 | 理由 |
+ * |---|---|---|
+ * | 儲存格本身係 Date 物件 | ✅ | 由下拉選單揀嘅一定係噉，最穩陣 |
+ * | 文字 `yyyy-MM-dd` | ✅ | 冇歧義 |
+ * | `2027/05/16` | ❌ | 斜線同 `dd/MM/yyyy` 撞，要靠估 |
+ * | `16/05/2027` | ❌ | 日月次序靠估 |
+ * | `2027.05.16`、`2027年5月16日`、全形數字 | ❌ | 認唔到 |
+ *
+ * @param {*} value 儲存格原始值
+ * @param {string} timezone 時區
+ * @returns {{ok: boolean, dateStr: string, rawText: string}}
+ *   `ok=false` 時 `dateStr` 係空字串，`rawText` 係原本嘅文字（供錯誤訊息回顯）
+ */
+function parseOfficerDateInput_(value, timezone) {
+  if (value === null || value === undefined || value === '') {
+    return { ok: false, dateStr: '', rawText: '' };
+  }
+
+  // 由下拉選單揀入嘅日期，Google 試算表會辨識成真正嘅日期值 ⇒ Date 物件。
+  // 呢個係最穩陣嘅輸入方式，亦係我哋鼓勵嘅做法。
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return {
+      ok: true,
+      dateStr: Utilities.formatDate(value, timezone, 'yyyy-MM-dd'),
+      rawText: ''
+    };
+  }
+
+  const text = String(value).trim();
+  if (text === '') return { ok: false, dateStr: '', rawText: '' };
+
+  // 嚴格 yyyy-MM-dd：月同日一定要兩位數，唔接受 `2027-5-6`。
+  // 唔係吹毛求疵——接受一位數就要決定 `2027-5-6` 係咪等於 `2027-05-06`，
+  // 而嗰個判斷同下拉選單揀出嚟嘅格式又唔一致，徒增一種要維護嘅寫法。
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return { ok: true, dateStr: text, rawText: text };
+  }
+
+  return { ok: false, dateStr: '', rawText: text };
 }
 
 /**

@@ -211,7 +211,7 @@ function buildAnnualQuartersPreview_(year, plans, startMonths) {
     lines.push(p.quarterId + '　' + p.startDate + ' 至 ' + p.endDate);
     lines.push('　　主日 ' + p.weekCount + ' 個　第一個 ' + p.firstSunday + '　最後一個 ' + p.lastSunday);
     if (p.alreadyExists) {
-      lines.push('　　⚠ Quarters 已經有這一季 → **整季略過**，不會覆寫任何既有資料');
+      lines.push('　　⚠ Quarters 已經有這一季 → 整季略過（不會覆寫任何既有資料）');
     } else if (p.skippedServiceDates > 0) {
       lines.push('　　⚠ 其中 ' + p.skippedServiceDates + ' 個主日的 ServiceDateID 已存在 → 那幾行會略過');
     }

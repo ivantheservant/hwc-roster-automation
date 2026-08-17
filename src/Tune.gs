@@ -227,7 +227,7 @@ function buildTuneSaturationNotes_(rows) {
       .filter(function (v, i, arr) { return arr.indexOf(v) === i; })
       .sort(function (a, b) { return a - b; });
     notes.push('CHAIR_DUAL_BONUS 由 ' + values[0] + ' 到 ' + values[values.length - 1]
-      + ' 之間，全部組合的六項指標完全一樣——代表這個範圍已經**飽和**，'
+      + ' 之間，全部組合的六項指標完全一樣——代表這個範圍已經「飽和」，'
       + '再加大改變不到任何排班結果。');
     notes.push('原因：這個加分是一個固定值，一旦大過候選人之間'
       + '「選人分數 × SELECTION_WEIGHT」的最大差距，全部雙重合資格的人就已經'

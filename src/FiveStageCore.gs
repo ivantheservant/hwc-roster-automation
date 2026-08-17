@@ -478,7 +478,7 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
     message: '缺個人 PDF 的人數是 ' + missingCount + ' / ' + missingResult.total
       + '（' + (ratio * 100).toFixed(1) + '%），超過容許上限 '
       + (limit * 100).toFixed(0) + '%。\n\n'
-      + '**這一步不能繼續**——照樣寄出的話，這 ' + missingCount
+      + '⚠️ 這一步不能繼續——照樣寄出的話，這 ' + missingCount
       + ' 位義工會一個都收不到通知，\n'
       + '而 Stage 會前進到 OFFICIAL_SENT、鎖住重跑步驟 4 的路。\n\n'
       + '請先執行「準備工作 ▸ 產生個人 PDF」，補齊之後再回來。\n\n'
@@ -531,7 +531,7 @@ function evaluateStep4SendOutcome_(sendResult) {
     unhandledCount: unhandled,
     breakdown: breakdown,
     message: '⚠️ 有 ' + unhandled + ' 位義工未收到通知（' + parts.join('、') + '）。\n\n'
-      + 'Stage **維持在 REQUESTS_APPLIED、沒有前進到 OFFICIAL_SENT**，\n'
+      + 'Stage 維持在 REQUESTS_APPLIED，沒有前進到 OFFICIAL_SENT——\n'
       + '所以你補救之後可以再執行一次「步驟 4：正式發出」。\n\n'
       + '建議做法：\n'
       + (errorPdfMissing + errorPdf > 0

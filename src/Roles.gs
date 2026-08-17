@@ -377,7 +377,7 @@ function requireRoleContextField_(context, fieldName, callerName) {
     '規則檢查 context 缺少 `' + fieldName + '` 欄位（' + callerName + ' 需要它）。\n\n'
     + '收到的值是：' + (value === undefined ? 'undefined（欄位完全不存在）'
       : value === null ? 'null' : '不是陣列（' + typeof value + '）') + '\n\n'
-    + '⚠️ 這個欄位**不可以省略**。空陣列 `[]` 代表「確實沒有任何身分資料」'
+    + '⚠️ 這個欄位不可以省略。空陣列（[]）代表「確實沒有任何身分資料」'
     + '（例如 ' + SHEETS.ROLES + ' 工作表還沒建立），是合法的；\n'
     + '但 `undefined` 代表呼叫端根本沒有傳，兩者語意完全不同——'
     + '如果把 undefined 當成空陣列，每一格有身分要求的崗位都會被誤判為違規'

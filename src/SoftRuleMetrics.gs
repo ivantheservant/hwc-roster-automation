@@ -529,7 +529,7 @@ function buildSoftRuleMetricRows_(m) {
         + '　判斷：' + m.chairEqJudgement.judgement
         + '　（' + m.chairEq.same + '/' + m.chairEq.weeks + ' 週）'
         + '　　※ 判斷是跟'
-        + (hasCeiling ? '**本季理論上限**' : '歷史基準（算不出上限時的退回做法）')
+        + (hasCeiling ? '「本季理論上限」' : '歷史基準（算不出上限時的退回做法）')
         + '比，不是跟歷史基準比'));
 
     if (hasCeiling) {
@@ -615,7 +615,7 @@ function buildSoftRuleMetricRows_(m) {
         ? '　　※ 分母已扣除身分規則、個人崗位排除與整季不能服侍的人——'
           + '這個數字跟「查看 ▸ 身分規則影響預估（唯讀）」的「套用後」人數一致'
         : '')
-      + (p.narrowed ? '' : '　　⚠ 收窄後名單算不出來，這一項用的是**未收窄**的人數，可能偏低');
+      + (p.narrowed ? '' : '　　⚠ 收窄後名單算不出來，這一項用的是「未收窄」的人數，可能偏低');
 
     rows.push(diagRow_('5. 崗位人手動用率', p.postNameTC + '（' + p.postId + '）',
       '動用 ' + p.usedCount + ' / ' + eligibleText + '　＝ ' + formatMetricPercent_(p.ratio),

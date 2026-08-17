@@ -100,7 +100,7 @@ function resolveAuthoritativeState_(context, mode, callerName) {
     throw new Error(
       '取得派工狀態時必須明確指定來源（' + (callerName || '呼叫者不明') + '）。\n\n'
       + '收到的 mode 是：' + (mode === undefined ? 'undefined（完全沒有傳）' : JSON.stringify(mode)) + '\n\n'
-      + '⚠️ 這個參數**不可以省略，也不會有預設值**。同一個版本有兩份派工資料：\n'
+      + '⚠️ 這個參數不可以省略，也不會有預設值。同一個版本有兩份派工資料：\n'
       + '  • `RosterAssignments` 長表（程式讀的）\n'
       + '  • `Roster_XXXXTX_vN` grid 工作表（幹事看和改的）\n\n'
       + '兩者在「幹事剛剛人手改過 grid」的時候並不相同，靜靜挑其中一份\n'
@@ -381,7 +381,7 @@ function buildManualEditsReportText_(quarterId, versionNo, recomputed) {
  */
 function buildUnresolvedGuidanceText_(unresolved) {
   const lines = [
-    '⚠️ 有 ' + unresolved.length + ' 格認不出是哪一位，所以**整批都不會寫入**：',
+    '⚠️ 有 ' + unresolved.length + ' 格認不出是哪一位，所以整批都不會寫入：',
     ''
   ];
 

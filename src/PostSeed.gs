@@ -232,7 +232,7 @@ function runSeedPostRequiredRoles_() {
     const confirm = ui.alert(title,
       '會在 Posts 工作表最後一欄之後新增 ' + COLUMNS.POSTS.REQUIRED_ROLES + ' 欄'
         + '（目前共 ' + plan.postCount + ' 個崗位）。\n\n'
-        + '⚠️ 只會加欄位本身，**不會填任何一格的值**——\n'
+        + '⚠️ 只會加欄位本身，不會填任何一格的值——\n'
         + '　 「哪個崗位需要哪個身分」是教會的規定，系統不會替你猜，\n'
         + '　 填錯的話那個崗位會直接排不到人。\n\n'
         + '新增之後請自己填：\n'

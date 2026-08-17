@@ -1040,6 +1040,9 @@ const CONFIG_KEYS = {
   PDF_MIN_SIZE_BYTES: 'PDF_MIN_SIZE_BYTES',
   // 第十九輪批次階段 C1：步驟 4 容許嘅個人 PDF 缺件比例上限
   STEP4_MAX_MISSING_PDF_RATIO: 'STEP4_MAX_MISSING_PDF_RATIO',
+  // 第二十一輪批次階段 B：自我測試要驗邊一季。留空 = 用最近一個
+  // 有生成過版本嘅季度（所以唔會過期）。
+  SELF_TEST_QUARTER_ID: 'SELF_TEST_QUARTER_ID',
   PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
   // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
@@ -1276,13 +1279,21 @@ const SELF_TEST_COLORS = {
 };
 
 /**
- * 自我測試中需要實際資料的項目所使用的目標版本。
- * 若日後改用其他季度測試，只需改動此處。
+ * ⚠️ 第二十一輪批次階段 B：`SELF_TEST_TARGET` **已移除**，唔好加返。
+ *
+ * 原本係 `{ QUARTER_ID: '2026T4', VERSION_NO: 0 }`，兩個問題：
+ *
+ * 1. **寫死年份會過期。** 每過一季，自我測試就係喺驗一個舊季度，
+ *    而唔係驗「而家用緊嗰個」。實測就係噉：2026T4 v0 生成之後
+ *    先套用嘅申報寫入咗一行 Unavailable，令測試 7 追溯報失敗，
+ *    但嗰個版本喺生成當日完全合規。
+ * 2. **寫死 `VERSION_NO: 0`** 令佢永遠只驗初稿。初稿之後嘅版本
+ *    （套用申報、人手改動）先係真正會寄出去嘅嘢，反而冇驗。
+ *
+ * 而家由 `resolveSelfTestTarget_()`（SelfTest.gs）決定：
+ * 季度讀 Config 嘅 `SELF_TEST_QUARTER_ID`（冇設定就用最近一個有生成過
+ * 版本嘅季度），版本一律用**該季最新版本**。
  */
-const SELF_TEST_TARGET = {
-  QUARTER_ID: '2026T4',
-  VERSION_NO: 0
-};
 
 /** Config 未設定時程式採用的預設值。 */
 const DEFAULTS = {
