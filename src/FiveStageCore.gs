@@ -74,12 +74,30 @@ function computeFiveStepAvailability_(stage, step1VersionExists) {
  * ============================================================ */
 
 /**
+ * 第二十三輪批次階段 E1（決定 D2）：步驟 2 容許嘅 Stage。
+ *
+ * 「未正式發出之前嘅任何時候」都可以寄審閱本。寫成常數係因為
+ * `planStep2_()` 同 `executeStep2_()` 兩邊都要用同一份清單——
+ * 兩邊各寫一次就係「同一個判斷寫兩次、兩邊漂移」嗰個 bug class。
+ */
+const STEP2_ALLOWED_STAGES_ = [
+  QUARTER_STAGE.DRAFT,
+  QUARTER_STAGE.REVIEW_SENT,
+  QUARTER_STAGE.REQUESTS_APPLIED
+];
+
+/**
  * 步驟 2 的確認資料。純讀取。
  * @param {string} quarterId 季度 ID
  * @returns {{quarterId: string, versionNo: number, recipientCount: number, isDryRun: boolean}}
  */
 function planStep2_(quarterId) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.DRAFT], '步驟 2：寄給堂委審閱');
+  // 第二十三輪批次階段 E1（決定 D2）：由 `[DRAFT]` 放寬成三個 Stage。
+  // 掣 2 開放於「未正式發出之前嘅任何時候」——由 `REQUESTS_APPLIED` 撳
+  // 係合法嘅**第二輪審閱**（堂委提咗意見、幹事改完，想再俾佢哋睇一次）。
+  // 舊寫法只准 `DRAFT`，即係「一季只可以俾堂委睇一次」，
+  // 同實際運作對唔上。
+  requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
   return {
@@ -100,11 +118,17 @@ function planStep2_(quarterId) {
  * @returns {Object} `sendStage()` 的回傳結果
  */
 function executeStep2_(quarterId) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.DRAFT], '步驟 2：寄給堂委審閱');
+  requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
   const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW);
-  advanceQuarterStage_(quarterId, QUARTER_STAGE.REVIEW_SENT);
+
+  // 第二十三輪批次階段 E1（決定 D2）：**一律設為 `REVIEW_SENT`，唔係「前進一格」。**
+  // 由 `REQUESTS_APPLIED` 撳掣 2 係第二輪審閱，Stage 要退回 `REVIEW_SENT`
+  // ——因為而家真係「已寄給堂委、等緊佢哋意見」。
+  // 用 `setQuarterStage_()` 而唔係 `advanceQuarterStage_()`：後者寫入
+  // AuditLog 嘅 action 寫死係「Stage 前進」，退返轉頭嗰陣紀錄會講大話。
+  setQuarterStage_(quarterId, QUARTER_STAGE.REVIEW_SENT, '步驟 2：寄給堂委審閱（第二輪審閱會令 Stage 退回）');
   return result;
 }
 

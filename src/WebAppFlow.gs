@@ -8,6 +8,25 @@
  * 每一個 `api*` 函式開頭都呼叫 `assertWebAppRequestAllowed_()`（`WebApp.gs`），
  * 全部會改動資料的動作都透過 `FiveStageCore.gs` 重新做一次 `requireQuarterStage_()`
  * ——不信任前端傳來的「目前 Stage」，一律由後端重新讀取。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 第二十三輪批次：四區改造之後，呢個檔案入面邊啲仲用緊
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 新 Web UI（幹事介面四區改造）唔再用「五個步驟」呢個框架，改為四粒掣。
+ * 對應關係：
+ *
+ * | 新掣 | 新端點 | 呢個檔案入面被取代嘅 |
+ * |---|---|---|
+ * | 掣 1 儲存並確認 | `apiSaveAndConfirmPlan/Execute`（`WebAppSaveConfirm.gs`）| `apiStep3Plan`／`apiStep3Decline`／`apiStep3Apply`／`apiStep3Release` |
+ * | 掣 2 寄給堂委審閱 | `apiStep2Preview`／`apiStep2Confirm`（沿用，只加咗前置檢查）| — |
+ * | 掣 3 正式發出給全體 | `apiStep4*`（沿用，只加咗兩道防重複）| — |
+ * | 掣 4 改動後重發 | `apiStep5*`（瘦身：套用申報嗰段已歸掣 1）| — |
+ *
+ * ⚠️ **`apiStep3*` 四個保留不刪。** 選單版（`FourStageFlow.gs`）仍然靠同一套
+ * `FiveStageCore.gs` 邏輯，係新 Web UI 出事時嘅安全網。
+ * **但 Web UI 已經唔再呼叫佢哋**——日後改動嗰四個之前，先確認你改緊嘅係
+ * 選單路徑而唔係以為喺改 Web UI。
  */
 
 /**
@@ -174,6 +193,9 @@ function apiStep2Preview(quarterId) {
  */
 function apiStep2Confirm(quarterId) {
   assertWebAppRequestAllowed_();
+  // 第二十三輪批次階段 E2（決定 D5）：掣 2／3／4 永不改動職事表內容，
+  // 所以有未儲存改動時一律拒絕，指去掣 1。
+  assertNoUnsavedChanges_(quarterId, '寄給堂委審閱');
   const result = executeStep2_(quarterId);
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
@@ -337,6 +359,13 @@ function apiStep4GetSendPreview(quarterId, versionNo) {
  */
 function apiStep4Confirm(quarterId) {
   assertWebAppRequestAllowed_();
+  // 第二十三輪批次階段 E2／E3：規格 2.6 三層防重複嘅第 2、3 層。
+  // 第 1 層（Stage）由 executeStep4Send_() 內部嘅 requireQuarterStage_() 負責。
+  //
+  // ⚠️ 次序：先查「已經發出過未」再查「有冇未儲存改動」——
+  // 已經發出過係更根本嘅阻擋理由，先講嗰個對幹事更有用。
+  assertNeverOfficiallySent_(quarterId);
+  assertNoUnsavedChanges_(quarterId, '正式發出給全體');
   const result = executeStep4Send_(quarterId);
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
@@ -363,19 +392,23 @@ function apiStep4Confirm(quarterId) {
  */
 function apiStep5Plan(quarterId) {
   assertWebAppRequestAllowed_();
-  const plan = planStep5_(quarterId);
-  if (plan.mode === 'NO_PENDING') return plan;
 
-  return Object.assign(
-    {
-      mode: 'HAS_PENDING',
-      baseVersionNo: plan.plan.baseVersionNo,
-      nextVersionNo: plan.plan.baseVersionNo + 1,
-      skippedIncompleteCount: plan.plan.skippedIncompleteCount,
-      isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
-    },
-    mapPendingPlanForClient_(plan.plan)
-  );
+  // 第二十三輪批次階段 E5：**瘦身。** 「套用申報」嗰段已經歸咗掣 1
+  // （決定 D1：掣 1 一次過處理人手改動＋申報），所以呢度唔再問
+  // 「有冇待處理申報」——有嘅話係掣 1 嘅責任，而且 `assertNoUnsavedChanges_()`
+  // 已經喺 `apiStep5SendConfirm()` 之前擋住。
+  //
+  // 掣 4 淨低嘅責任只有一樣：**搵出邊幾個人嘅安排改咗。**
+  requireQuarterStage_(quarterId, [QUARTER_STAGE.OFFICIAL_SENT], '步驟 5：改動後重發');
+  const changedPlan = planResendChangedPersons_(quarterId);
+
+  return {
+    mode: changedPlan.changed.length === 0 ? 'NO_CHANGES' : 'HAS_CHANGES',
+    versionNo: changedPlan.versionNo,
+    changed: changedPlan.changed,
+    changedPersonCount: changedPlan.changed.length,
+    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
+  };
 }
 
 /**
@@ -507,6 +540,9 @@ function apiStep5SendPreview(quarterId) {
  */
 function apiStep5SendConfirm(quarterId, releaseText) {
   assertWebAppRequestAllowed_();
+  // 第二十三輪批次階段 E2（決定 D5）：掣 4 一樣唔可以喺有未儲存改動嘅
+  // 情況下寄——否則義工會收到一封「最新安排」，但實際上仲有嘢未儲存。
+  assertNoUnsavedChanges_(quarterId, '改動後重發');
   const changed = planStep5ChangedList_(quarterId);
   const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
   if (!resolveHardViolationRelease_(violations, releaseText)) {

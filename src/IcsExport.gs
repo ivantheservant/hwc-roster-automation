@@ -71,6 +71,24 @@ var ICS_LINE_FOLD_MAX_OCTETS = 75;
 function shiftIcsLocalDateTime_(dateStr, timeStr, minutesEarlier) {
   var dateParts = String(dateStr).split('-').map(Number);
   var timeParts = String(timeStr).split(':').map(Number);
+
+  // 第二十三輪批次階段 A3：**唔可以由得 NaN 流落去。**
+  // 之前呢度冇檢查，一個壞嘅 timeStr（試算表把 `10:45` 存成 Date，
+  // `String()` 出嚟係英文長格式）會令 `Date.UTC(…, NaN, 45)` 得出 NaN，
+  // 然後 `new Date(NaN)` 一路計到最尾，輸出 `NaNNaNNaNTNaNNaN00`
+  // ——**壞值一路無聲無息流到寄出嘅附件入面**，冇任何一步擋過。
+  // 呼叫端應該用 normalizeTimeOfDay_() 先正規化；呢度係最後一道防線，
+  // 寧可拋錯令寄送中止，都好過寄一份時間係 NaN 嘅月曆俾義工。
+  if (dateParts.length !== 3 || dateParts.some(isNaN)) {
+    throw new Error('ICS 日期格式不正確：「' + dateStr + '」，預期 yyyy-MM-dd。');
+  }
+  if (timeParts.length !== 2 || timeParts.some(isNaN)) {
+    throw new Error(
+      'ICS 時間格式不正確：「' + timeStr + '」，預期 HH:mm。\n'
+      + '（如果這看起來像一串英文日期文字，代表 Config 那一格被 Google 試算表'
+      + '存成了日期物件——見 Utils.gs 的 normalizeTimeOfDay_()。）');
+  }
+
   var ms = Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1])
     - (Number(minutesEarlier) || 0) * 60000;
   var dt = new Date(ms);
@@ -247,8 +265,16 @@ function buildIcsAttachmentForPerson_(context, recipient, personAssignments) {
   if (context.stage !== MAIL_STAGES.OFFICIAL && context.stage !== MAIL_STAGES.RESEND) return null;
   if (!personAssignments || personAssignments.length === 0) return null;
 
-  var defaultStart = String(getConfig(CONFIG_KEYS.ICS_SERVICE_START_TIME, DEFAULTS.ICS_SERVICE_START_TIME));
-  var defaultEnd = String(getConfig(CONFIG_KEYS.ICS_SERVICE_END_TIME, DEFAULTS.ICS_SERVICE_END_TIME));
+  // 第二十三輪批次階段 A2：**唔可以用 `String()`**。試算表把 `10:45` 呢類
+  // 「睇落似時間」嘅格自動存成 Date 物件，`String(Date)` 出嚟係成串英文
+  // 長格式，落到 shiftIcsLocalDateTime_() 就會算出 NaN 日期，寄出嘅 ICS
+  // 附件時間全部係壞嘅。詳細成因見 normalizeTimeOfDay_()（Utils.gs）檔頭。
+  var defaultStart = normalizeTimeOfDay_(
+    getConfig(CONFIG_KEYS.ICS_SERVICE_START_TIME, DEFAULTS.ICS_SERVICE_START_TIME),
+    DEFAULTS.ICS_SERVICE_START_TIME);
+  var defaultEnd = normalizeTimeOfDay_(
+    getConfig(CONFIG_KEYS.ICS_SERVICE_END_TIME, DEFAULTS.ICS_SERVICE_END_TIME),
+    DEFAULTS.ICS_SERVICE_END_TIME);
 
   var icsText = buildIcsCalendarText_({
     quarterId: context.quarterId,

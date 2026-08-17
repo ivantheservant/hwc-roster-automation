@@ -255,6 +255,84 @@ function displayCellValue_(value, fallback) {
 }
 
 /**
+ * 第二十三輪批次階段 A1：把「一日之內嘅時間」正規化成 `HH:mm`。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個函式（真實環境爆咗嘅 bug）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Config 嘅 `ICS_SERVICE_START_TIME` 打咗 `10:45` 落去，**Google 試算表
+ * 會自動判斷佢係時間值，儲存格實際存嘅係一個 Date 物件**
+ * （顯示做 `Sat Dec 30 1899 10:45:00 GMT+1130 (...)`），唔係文字 `10:45`。
+ *
+ * 於是原本嘅路徑一路壞落去：
+ *
+ * | 步 | 發生咩事 |
+ * |---|---|
+ * | `convertConfigValue_()` 嘅 `default` 分支 | `String(Date)` ⇒ 成串英文長格式 |
+ * | `shiftIcsLocalDateTime_()` 嘅 `split(':')` | `["…1899 10", "45", "00 GMT+1130 (…)"]` |
+ * | `.map(Number)` | `[NaN, 45, NaN]` |
+ * | `Date.UTC(y, m, d, NaN, 45)` | `NaN` |
+ * | `DTSTART` 輸出 | `NaNNaNNaNTNaNNaN00` |
+ *
+ * **後果：「正式發出」寄出嘅每一份個人 ICS 月曆附件時間都係壞嘅。**
+ * 而當時 62 個離線測試全部餵乾淨字串 `'10:45'`，所以一個都捉唔到——
+ * **測試餵嘅資料同試算表真正俾嘅資料唔一樣。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 認唔出格式一定要拋錯，唔可以靜靜回 fallback
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * ⚠️ 認唔出嗰陣**一定要拋錯**，唔可以靜靜回 `fallback` 或者 `'00:00'`。
+ * 靜靜回一個「睇落合理」嘅值，正正就係本專案已經燒過幾次嘅同一個
+ * bug class：**把「認唔到」當成「冇事」**（第十八輪 `context.roles || []`、
+ * 第二十輪 grid placeholder、第二十二輪 `displayCellValue_`）。
+ * 時間錯咗，義工會喺錯嘅鐘數返到教會——呢個代價唔可以無聲無息。
+ *
+ * 空白（`null`／`undefined`／空字串）先至係合法嘅「冇設定」，回 `fallback`。
+ *
+ * @param {*} value 儲存格原始值：Date 物件、`HH:mm`／`H:mm` 文字、或者空白
+ * @param {string} fallback 值係空白時回傳嘅預設時間（例如 `'10:45'`）
+ * @param {string=} timezone 格式化 Date 物件用嘅時區。**省略時會讀 Config 嘅
+ *   `SYS_TIMEZONE`**——分開一個參數係為咗令呢個函式喺 Node 測試環境
+ *   （冇 Config 可讀）一樣測得到，同 `toDateString()` 一貫做法一致。
+ * @returns {string} `HH:mm`
+ * @throws {Error} 認唔出格式時拋錯，訊息含實際收到嘅值同預期格式
+ */
+function normalizeTimeOfDay_(value, fallback, timezone) {
+  if (value === null || value === undefined || value === '') return fallback;
+
+  // Google 試算表把「睇落似時間」嘅格自動轉成 Date（1899-12-30 當日）。
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    const tz = timezone || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    return Utilities.formatDate(value, tz, 'HH:mm');
+  }
+
+  const text = String(value).trim();
+  if (text === '') return fallback;
+
+  // `H:mm` 同 `HH:mm` 都收，補零之後統一輸出 `HH:mm`。
+  // 唔收 `HH:mm:ss`——本專案冇任何地方需要秒，收咗就要決定秒點處理，
+  // 徒增一種要維護嘅寫法。
+  const m = /^(\d{1,2}):(\d{2})$/.exec(text);
+  if (m) {
+    const hour = Number(m[1]);
+    const minute = Number(m[2]);
+    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+      return (hour < 10 ? '0' + hour : String(hour)) + ':' + m[2];
+    }
+  }
+
+  throw new Error(
+    '認不出這個時間值：「' + text + '」。\n\n'
+    + '預期格式是 HH:mm（24 小時制，例如 10:45 或 09:05）。\n\n'
+    + '⚠️ 如果你在 Config 打的本來就是 10:45，那多數是 Google 試算表把那一格'
+    + '自動當成「時間值」存起來了（儲存格實際存的是日期物件，不是文字）。\n'
+    + '解決方法：選中那一格 → 格式 ▸ 數字 ▸ 純文字，再重新輸入一次。'
+  );
+}
+
+/**
  * 把逗號分隔的字串拆成陣列，並去除前後空白與空項目。
  * @param {*} value 原始儲存格值
  * @returns {string[]} 拆分後的陣列；空值時回傳空陣列

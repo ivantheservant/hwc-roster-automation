@@ -251,5 +251,61 @@ console.log('\n=== Mailer.gs 整合：sendRealEmail_ 支援同時夾 PDF 同 ICS
   check('★ 冇附件時（兩者皆 null）唔會設定 options.attachments', /if \(blobs\.length > 0\) options\.attachments = blobs;/.test(sendRealEmailBody));
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// 第二十三輪批次階段 A：試算表俾嘅係 Date 物件，唔係乾淨字串
+// ─────────────────────────────────────────────────────────────────────
+//
+// 上面全部 case 都餵 `defaultStartTime: '10:45'` 呢種乾淨字串——
+// 而 Config 嗰格試算表實際存嘅係 Date 物件。**呢個落差就係點解
+// 62 個測試全部 PASS，但真實環境寄出嘅每一份月曆附件時間都係壞嘅。**
+console.log('\n=== 第二十三輪階段 A【核心】Date 物件經正規化之後，DTSTART 唔可以含 NaN ===');
+{
+  // Date 物件要經 Utilities.formatDate，換一個確定性替身。
+  const savedUtilities = gas.Utilities;
+  gas.Utilities = {
+    formatDate: function (date, timezone, format) {
+      if (format !== 'HH:mm') throw new Error('測試替身只支援 HH:mm');
+      const p = function (n) { return n < 10 ? '0' + n : String(n); };
+      return p(date.getHours()) + ':' + p(date.getMinutes());
+    }
+  };
+
+  // 試算表把「睇落似時間」嘅格存成 1899-12-30 當日嘅 Date——真實形狀。
+  const startCell = new Date(1899, 11, 30, 10, 45, 0);
+  const endCell = new Date(1899, 11, 30, 12, 0, 0);
+
+  // 這就是修正之後 buildIcsAttachmentForPerson_() 行緊嘅路徑：
+  // 先 normalizeTimeOfDay_()，再入 buildIcsCalendarText_()。
+  const text = gas.buildIcsCalendarText_(Object.assign({}, BASE_OPTS, {
+    defaultStartTime: gas.normalizeTimeOfDay_(startCell, '10:45', 'Pacific/Auckland'),
+    defaultEndTime: gas.normalizeTimeOfDay_(endCell, '12:00', 'Pacific/Auckland')
+  }));
+
+  check('★★★★★ 整份 ICS 完全冇 NaN'
+    + '（未修之前 DTSTART 係 NaNNaNNaNTNaNNaN00，就咁寄咗出去）',
+    text.indexOf('NaN') === -1, text.slice(0, 400));
+  check('★★★★★ 主席（唔提早）DTSTART 係 10:45，同餵乾淨字串嗰陣一模一樣',
+    text.indexOf('DTSTART;TZID=Pacific/Auckland:20990104T104500') !== -1);
+  check('★★★★ 音響（提早 45 分鐘）DTSTART 係 10:00',
+    text.indexOf('DTSTART;TZID=Pacific/Auckland:20990104T100000') !== -1);
+  check('★★★★ DTEND 係 12:00',
+    text.indexOf('DTEND;TZID=Pacific/Auckland:20990104T120000') !== -1);
+
+  // 防禦深度：就算有人繞過正規化直接餵 Date 入去，都一定要拋錯，
+  // 唔可以好似以前噉靜靜輸出一個 NaN 日期。
+  let threw = null;
+  try {
+    gas.buildIcsCalendarText_(Object.assign({}, BASE_OPTS, { defaultStartTime: startCell }));
+  } catch (e) {
+    threw = e;
+  }
+  check('★★★★★ 繞過正規化直接餵 Date ⇒ 拋錯，而唔係靜靜輸出 NaN'
+    + '（階段 A3 嘅最後防線：寧可中止寄送，都好過寄一份時間係 NaN 嘅月曆）',
+    threw !== null && String(threw.message).indexOf('ICS 時間格式不正確') !== -1,
+    threw ? threw.message : '完全冇拋錯');
+
+  gas.Utilities = savedUtilities;
+}
+
 console.log(`\nTOTAL: ${fail === 0 ? 'ALL PASS' : fail + ' FAILURES'}`);
 process.exit(fail === 0 ? 0 : 1);

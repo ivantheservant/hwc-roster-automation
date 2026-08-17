@@ -1,10 +1,55 @@
 /**
+ * 第二十三輪批次階段 C：**只喺明確開啟期間生效**嘅 `readSheet()` 記憶體快取。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有，同埋點解係「opt-in」而唔係一律開
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `apiGetDashboardState()` 要一次過算出成版嘢（四粒掣嘅狀態、未儲存改動、
+ * 區二未做完項數），期間會經過幾個各自 `readSheet()` 嘅既有函式
+ * （`buildFineTuneContext_()`／`buildMailContext_()`／`readPendingRequests_()`…）。
+ * 唔做嘢嘅話，`RosterAssignments`（幾百行）同 `SendLog`（只會單調增長、
+ * 冇歸檔機制）喺同一次呼叫入面會被完整讀幾次——純粹浪費。
+ *
+ * ⚠️ **點解唔一律開快取**：全域快取會令「寫入之後再讀」讀到過時資料。
+ * 本專案好多流程正正係噉（`writeAssignments()` 之後再 `readSheet()` 核對），
+ * 一律開快取就會種一個極難查嘅 bug——而且係「靜靜讀到舊資料」呢一類，
+ * 同本專案已經燒過幾次嘅 bug class 同源。
+ *
+ * 所以：**預設關閉**，只有明確 `beginSheetReadMemo_()` 嗰段先生效，
+ * 而且一定要喺 `finally` 入面 `endSheetReadMemo_()`。
+ * **只可以喺完全冇寫入嘅純讀取流程開。**
+ */
+let SHEET_READ_MEMO_ = null;
+
+/**
+ * 開始 `readSheet()` 快取。**只可以喺完全唔寫入嘅純讀取流程用**，
+ * 而且一定要配 `try/finally` 確保收尾。
+ * @returns {void}
+ */
+function beginSheetReadMemo_() {
+  SHEET_READ_MEMO_ = {};
+}
+
+/**
+ * 結束 `readSheet()` 快取，之後恢復每次都真正讀表。
+ * @returns {void}
+ */
+function endSheetReadMemo_() {
+  SHEET_READ_MEMO_ = null;
+}
+
+/**
  * 通用讀表函式：第 1 行視為說明列自動跳過，第 2 行視為標題列，
  * 從第 3 行起讀取資料，回傳以標題為屬性名稱的物件陣列。
  * @param {string} sheetName 工作表名稱
  * @returns {Object[]} 物件陣列，屬性名稱對應標題列；找不到資料時回傳空陣列
  */
 function readSheet(sheetName) {
+  if (SHEET_READ_MEMO_ && Object.prototype.hasOwnProperty.call(SHEET_READ_MEMO_, sheetName)) {
+    return SHEET_READ_MEMO_[sheetName];
+  }
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) {
     throw new Error('找不到工作表: ' + sheetName);
@@ -31,6 +76,8 @@ function readSheet(sheetName) {
     }
     if (!isEmpty) result.push(obj);
   }
+
+  if (SHEET_READ_MEMO_) SHEET_READ_MEMO_[sheetName] = result;
   return result;
 }
 

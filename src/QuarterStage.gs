@@ -105,6 +105,65 @@ function advanceQuarterStage_(quarterId, newStage) {
   });
 }
 
+/**
+ * 第二十三輪批次階段 E1：**明確設定** Stage，包括合法嘅「退回」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解唔直接用 advanceQuarterStage_()
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `advanceQuarterStage_()` 技術上冇禁止倒退（佢只係 setValue），
+ * 所以「用得到」——但佢寫入 `AuditLog` 嘅 action 係寫死嘅**「Stage 前進」**。
+ * 由 `REQUESTS_APPLIED` 撳掣 2（第二輪審閱，決定 D2）令 Stage 退回
+ * `REVIEW_SENT`，如果用嗰個函式，稽核紀錄就會出現一行
+ * 「Stage 前進：REQUESTS_APPLIED → REVIEW_SENT」——**紀錄本身講咗大話。**
+ *
+ * 稽核紀錄講錯嘢，比冇紀錄更差：日後查「點解呢一季退返去審閱」嗰陣，
+ * 讀嘅人會以為系統壞咗，而唔係「有人有意噉做」。
+ *
+ * 所以分開一個函式，`AuditLog` 誠實記錄方向同原因。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {string} newStage 要設定嘅 Stage
+ * @param {string} reason 點解要噉設（會寫入 AuditLog 嘅 Notes）
+ * @returns {{oldStage: string, newStage: string, movedBackwards: boolean}}
+ */
+function setQuarterStage_(quarterId, newStage, reason) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.QUARTERS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.QUARTERS);
+
+  const info = findQuarterRowInfo_(quarterId);
+  if (!info) throw new Error('Quarters 找不到季度: ' + quarterId);
+
+  const stageCol = info.headers.indexOf(COLUMNS.QUARTERS.STAGE) + 1;
+  if (stageCol === 0) throw new Error('Quarters 缺少 Stage 欄，請先執行「補建 Quarters 欄位」');
+
+  const oldStage = String(info.values[COLUMNS.QUARTERS.STAGE] || '').trim() || QUARTER_STAGE.DRAFT;
+  const oldIndex = QUARTER_STAGE_ORDER.indexOf(oldStage);
+  const newIndex = QUARTER_STAGE_ORDER.indexOf(newStage);
+  const movedBackwards = oldIndex >= 0 && newIndex >= 0 && newIndex < oldIndex;
+
+  sheet.getRange(info.sheetRow, stageCol).setValue(newStage);
+
+  const stageAtCol = info.headers.indexOf(COLUMNS.QUARTERS.STAGE_UPDATED_AT) + 1;
+  if (stageAtCol > 0) {
+    sheet.getRange(info.sheetRow, stageAtCol).setValue(nowTimestamp_());
+    applyTimestampFormat_(sheet, info.headers, [COLUMNS.QUARTERS.STAGE_UPDATED_AT], info.sheetRow, 1);
+  }
+
+  writeAuditLog_({
+    action: movedBackwards ? 'Stage 退回（有意）' : 'Stage 設定',
+    targetSheet: SHEETS.QUARTERS,
+    targetKey: quarterId,
+    oldValue: oldStage,
+    newValue: newStage,
+    source: 'setQuarterStage_',
+    notes: reason || ''
+  });
+
+  return { oldStage: oldStage, newStage: newStage, movedBackwards: movedBackwards };
+}
+
 /* ============================================================
  * 選單「計算季度日期」——追加階段 S 新增
  * ============================================================
