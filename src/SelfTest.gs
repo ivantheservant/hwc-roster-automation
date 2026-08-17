@@ -323,8 +323,7 @@ function testHardRuleViolations_() {
 
   const detailParts = [
     quarterId + ' v' + versionNo + '（' + context.assignments.length + ' 格）',
-    classified.summary.split('
-')[0]
+    classified.summary.split('\n')[0]
   ];
   if (classified.released.length > 0 || classified.lateUnavailable.length > 0) {
     detailParts.push('（已放行與版本生成後才新增的申報只列出、不判為失敗）');
