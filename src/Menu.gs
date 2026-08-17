@@ -47,6 +47,7 @@ function onOpen() {
         .addItem('SOFT 規則與選人加權（唯讀）', 'runDebugSoftRules_')
         .addItem('欄標題對照（唯讀）', 'runDebugGridHeaders_')
         .addItem('個人版 highlight 定位（唯讀）', 'runDebugPersonalHighlight_')
+        .addItem('設定回復檢查（唯讀）', 'runConfigBaselineCheck_')
     )
     .addSubMenu(
       // ⚠️ 標記重新分級（Stage G）：只有 (a) 會寄出電郵、(b) 會不可復原地刪除資料／

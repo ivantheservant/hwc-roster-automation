@@ -218,6 +218,43 @@ function parseOfficerDateInput_(value, timezone) {
 }
 
 /**
+ * 第二十二輪批次階段 B1：把儲存格值轉成報告／確認視窗要顯示嘅文字，
+ * 唔會誤把 `false`、`0` 呢類「有意義嘅假值」當成「冇值」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個 helper（同一個 bug class 已經燒過幾次）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `String(value || '').trim()` 呢種寫法好常見，但 `||` 判斷嘅係 JS 嘅
+ * falsy——`false`、`0`、`''`、`null`、`undefined` 全部一視同仁。
+ * 一格 boolean `false`（例如 Eligibility.Active）經過呢種寫法會變成
+ * `false || '' → ''`，畫面就印出「Active=」而唔係「Active=FALSE」，
+ * 睇落好似個值不見咗，實際上係一個明確嘅假值。
+ *
+ * 第十八輪 `countHardViolations_` 漏傳 `roles`、呢一輪嘅 QuarterReset.gs
+ * B1，都係同一個 bug class：**用 `||` 做預設值，會連「有意義嘅假值」
+ * 一齊吞埋。**
+ *
+ * 呢個 helper 淨係喺 `null`／`undefined`／空字串先用 fallback，
+ * boolean `false` 與數字 `0` 一律照原樣顯示（用 `String()` 轉字串）。
+ *
+ * ⚠️ **呢個係顯示用嘅 helper，唔係讀資料嘅 helper**——只負責「畫面應該
+ * 印咩字」，唔負責判斷業務邏輯（例如「呢一行是否啟用」仍然要用
+ * `isTrueValue_()` 呢類明確嘅判斷式，唔好用呢個 helper 嘅回傳值去做
+ * if 判斷）。
+ *
+ * @param {*} value 儲存格原始值
+ * @param {string=} fallback 值缺失時顯示嘅文字，預設 '（空白）'
+ * @returns {string} 用嚟顯示嘅文字
+ */
+function displayCellValue_(value, fallback) {
+  const fb = fallback === undefined ? '（空白）' : fallback;
+  if (value === null || value === undefined) return fb;
+  if (value === '') return fb;
+  return String(value);
+}
+
+/**
  * 把逗號分隔的字串拆成陣列，並去除前後空白與空項目。
  * @param {*} value 原始儲存格值
  * @returns {string[]} 拆分後的陣列；空值時回傳空陣列

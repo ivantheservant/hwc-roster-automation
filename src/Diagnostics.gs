@@ -237,14 +237,19 @@ function collectKeyStateRows_() {
       if (qa !== qb) return qa < qb ? 1 : -1;
       return Number(b[V.VERSION_NO]) - Number(a[V.VERSION_NO]);
     });
+    // 第二十二輪批次階段 C：呢一行三個位都有同一個 bug class（`|| ''` 吞咗
+    // 有意義嘅假值）——Protected 係 boolean，FALSE 會印成 "Protected="；
+    // ParentVersionNo 係數字，v1 嘅 Parent 係 v0 時（合法值 0）會印成
+    // "Parent=v"；CreatedAt 直接 String(Date) 會印出成串英文長格式，
+    // 唔係 yyyy-MM-dd。三個都改用 B1／B2 建立嘅 helper。
     versions.slice(0, 5).forEach(function (v) {
       rows.push(diagRow_('RosterVersions',
         String(v[V.QUARTER_ID]) + ' v' + v[V.VERSION_NO],
         'Basis=' + String(v[V.BASIS] || ''),
         'WarningCount=' + String(v[V.WARNING_COUNT] || 0)
-          + '　Parent=v' + String(v[V.PARENT_VERSION_NO] || '')
-          + '　Protected=' + String(v[V.PROTECTED] || '')
-          + '　CreatedAt=' + String(v[V.CREATED_AT] || '')));
+          + '　Parent=v' + displayCellValue_(v[V.PARENT_VERSION_NO])
+          + '　Protected=' + displayCellValue_(v[V.PROTECTED])
+          + '　CreatedAt=' + toDateString(v[V.CREATED_AT], timezone)));
     });
   });
 

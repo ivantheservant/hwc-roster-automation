@@ -180,12 +180,18 @@ function planQuarterReset_(quarterId, includeV0) {
     const E = COLUMNS.ELIGIBILITY;
     readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
       if (String(row[E.SOURCE] || '').trim().toUpperCase() !== 'REQUEST') return;
+      // 第二十二輪批次階段 B1／B2：Active 是 boolean，之前用
+      // `String(row[E.ACTIVE] || '').trim()` 會把 `false` 吞成空字串
+      // （`false || '' → ''`），畫面印出「Active=」睇落好似冇值。
+      // AddedAt 是 Date 物件，之前直接 `String(dateObj)` 會印出完整
+      // 帶時區嘅英文長格式；改用 toDateString()（系統寫入嘅資料，
+      // 讀取路徑用寬鬆嘅那個函式，見它自己的檔頭說明）輸出 yyyy-MM-dd。
       plan.eligibilityRequestRows.push({
         eligibilityId: String(row[E.ELIGIBILITY_ID] || '').trim(),
         personId: String(row[E.PERSON_ID] || '').trim(),
         postId: String(row[E.POST_ID] || '').trim(),
-        active: String(row[E.ACTIVE] || '').trim(),
-        addedAt: String(row[E.ADDED_AT] || '').trim()
+        active: displayCellValue_(row[E.ACTIVE]),
+        addedAt: toDateString(row[E.ADDED_AT], timezone)
       });
     });
     if (plan.eligibilityRequestRows.length > 0) {
@@ -201,6 +207,14 @@ function planQuarterReset_(quarterId, includeV0) {
   }
 
   // ---- RosterPDF 資料夾 ----
+  // 第二十二輪批次階段 B3：哪些版本號要清，只信一個來源——上面已經算好的
+  // `versionNosToClear`（已經排除咗 v0＝不清、Protected=TRUE 嘅版本）。
+  // 之前呢度自己重新寫一次 `versionNo === 0 && !plan.includeV0`，完全冇理
+  // Protected，結果係受保護版本嘅版本登記、grid、RosterAssignments 三樣都
+  // 保得住，但佢嘅 PDF 會被當普通版本清走——保護做咗一半。
+  // 同一個判斷寫兩次、兩邊漂移，係本專案已經燒過幾次嘅 bug class
+  // （第十九輪「兩個真相來源」同源），所以呢度改成直接重用
+  // `versionNosToClear`，唔再自己判斷一次。
   try {
     const folder = resolveMailAttachmentFolder_();
     const pattern = new RegExp('^' + escapeRegExp_(quarterId) + '_v(\\d+)');
@@ -211,7 +225,7 @@ function planQuarterReset_(quarterId, includeV0) {
       const match = pattern.exec(name);
       if (!match) continue;                       // 其他季度或不明檔案：不碰
       const versionNo = Number(match[1]);
-      if (versionNo === 0 && !plan.includeV0) continue;
+      if (!versionNosToClear[versionNo]) continue; // v0（未選）或受保護版本：不清
       plan.pdfFiles.push({ id: file.getId(), name: name, sizeBytes: file.getSize() });
     }
   } catch (err) {

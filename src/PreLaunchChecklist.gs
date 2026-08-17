@@ -24,6 +24,22 @@
  */
 
 /**
+ * 各部署實際存取權——**程式讀不到**，只能記錄最後一次人手核實的結果。
+ * 每次 Ivan 親自去 Apps Script 編輯器「管理部署」核實之後，手動更新這裡。
+ * 見 docs/系統範圍稽核.md 第十二節「點樣辨認兩個部署」。
+ */
+const MANUAL_DEPLOYMENT_ACCESS_CHECK_ = {
+  checkedOnDate: '2026-08-17',
+  checkedBy: 'Ivan（Apps Script 編輯器逐個部署核實）',
+  deployments: [
+    { purpose: '義工個人專屬連結', deployLabel: 'Untitled', version: 'Version 4',
+      executeAs: 'Me', whoHasAccess: 'Anyone' },
+    { purpose: '幹事介面', deployLabel: '2026-08-17 第二十一輪…', version: 'Version 4',
+      executeAs: 'Me', whoHasAccess: 'Only myself' }
+  ]
+};
+
+/**
  * 建構單一檢查項目的資料。純資料物件，不涉及 UI。
  * @param {string} label 檢查項目名稱
  * @param {boolean} ready true＝已就緒，false＝需要處理
@@ -122,10 +138,25 @@ function buildPreLaunchChecklist_(quarterId) {
   // 一次過列出，並附上這次程式碼稽核的結論——見 docs/系統範圍稽核.md 階段 D
   // 的完整說明。
   //
-  // 第 1 層（appsscript.json 的 webapp.access）**沒有辦法在執行階段讀取**
-  // ——Apps Script 沒有提供任何 API 讓程式碼在執行時讀到自己的部署清單設定，
-  // 這裡只能顯示這次程式碼稽核當下的靜態事實，不是即時算出來的。
-  // 第 2、3 層（WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）才是可以即時讀 Config 判斷的。
+  // 第 1 層要分兩行講，唔可以合埋一行（第二十二輪修正）：
+  //
+  //   (a) 靜態設定：appsscript.json 的 webapp.access——程式碼讀得到，
+  //       但呢個只係「新增部署時嘅預設值」。
+  //   (b) 各部署實際存取權——**程式讀唔到**。Apps Script 冇提供任何 API
+  //       等程式碼喺執行階段讀到自己嘅部署清單。已部署嘅版本保留住佢
+  //       部署當日設定嘅存取權，同（a）可以完全唔一致。
+  //
+  // 第二十一輪試過將（a）當成（b）嘅實際防護嚟報「已就緒」，
+  // 結果誤導：義工用嘅公開連結部署實際係 access=Anyone，同
+  // appsscript.json 寫嘅 MYSELF 完全唔同。（a）淨係新部署嘅預設值，
+  // 唔可以當成現存部署嘅真實防護嚟判斷「已就緒」。
+  //
+  // （b）必須人手喺「管理部署」逐個核實，程式只可以顯示「最後一次人手
+  // 核實」嘅日期同結果（下面 MANUAL_DEPLOYMENT_ACCESS_CHECK_ 常數），
+  // 唔會自己判斷「已就緒」——呢件事本身冇辦法自動化。
+  //
+  // 第 2、3 層（WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）先係可以即時讀
+  // Config 判斷嘅。
   //
   // 「有沒有任何路徑可以繞過」的稽核結論：逐一檢查 WebApp.gs／WebAppFlow.gs
   // 全部 api* 函式（數量隨版本增減，見 tests/webapp_access_guard.test.js 的
@@ -156,12 +187,20 @@ function buildPreLaunchChecklist_(quarterId) {
       + 'Web UI 操作，第 3 層的白名單設定目前不生效。如果你打算開始使用 Web UI，記得到 Config 把 '
       + 'WEBAPP_ENABLED 改為 TRUE，並設定 WEBAPP_ALLOWED_EMAILS。';
   }
+  const deploymentCheckLines = MANUAL_DEPLOYMENT_ACCESS_CHECK_.deployments.map(function (d) {
+    return '　　' + d.purpose + '（部署名稱「' + d.deployLabel + '」，' + d.version + '）：'
+      + 'Execute as ' + d.executeAs + '　Who has access＝' + d.whoHasAccess;
+  }).join('\n');
   items.push(buildChecklistItem_(
     'Web UI 三層防護（appsscript.json 部署權限／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）',
     webappReady,
-    '第 1 層（部署權限，本次程式碼稽核的靜態事實）：appsscript.json 的 webapp.access='
-      + 'MYSELF（只有部署者本人能開啟網址，適合 Ivan 自己 deploy 自己用；日後交給幹事'
-      + '操作時需要改成 DOMAIN，見 docs/系統範圍稽核.md）\n'
+    '第 1 層分兩行講，唔可以混埋：\n'
+      + '　靜態設定（程式讀得到，但只係新部署嘅預設值）：appsscript.json 的 '
+      + 'webapp.access=MYSELF\n'
+      + '　各部署實際存取權（程式讀唔到，必須人手核實）：\n'
+      + deploymentCheckLines + '\n'
+      + '　　最後一次人手核實：' + MANUAL_DEPLOYMENT_ACCESS_CHECK_.checkedOnDate
+      + '（' + MANUAL_DEPLOYMENT_ACCESS_CHECK_.checkedBy + '）\n'
       + '　第 2 層：WEBAPP_ENABLED=' + (webappEnabled ? 'TRUE' : 'FALSE') + '\n'
       + '　第 3 層：WEBAPP_ALLOWED_EMAILS='
       + (allowedList.length > 0 ? allowedList.join('、') : '（空白）')
@@ -169,7 +208,10 @@ function buildPreLaunchChecklist_(quarterId) {
     webappGuidance + '\n\n程式碼稽核結論：WebApp.gs／WebAppFlow.gs 全部 api* 函式'
       + '（數量隨版本增減，見 tests/webapp_access_guard.test.js 的自動掃描結果）'
       + '第一行都呼叫 assertWebAppRequestAllowed_()，doGet() 渲染介面前也做同樣檢查，'
-      + '沒有發現任何繞過第 2、3 層的路徑。'
+      + '沒有發現任何繞過第 2、3 層的路徑。\n\n'
+      + '⚠️ 上面「各部署實際存取權」是寫死的人手核實紀錄，不會隨部署變動自動更新。'
+      + '如果之後新增、刪除、或重新指定過任何部署的版本／存取權，這裡的紀錄就會過時，'
+      + '記得回來手動更新 MANUAL_DEPLOYMENT_ACCESS_CHECK_（PreLaunchChecklist.gs）。'
   ));
 
   // 4. 是否已安裝自動排程 trigger

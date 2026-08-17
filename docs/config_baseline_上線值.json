@@ -1,0 +1,582 @@
+{
+  "_說明": [
+    "這份快照記錄第二十二輪批次（2026-08-17）當下每一個 Config Key 的值。",
+    "目的：8 月至 11 月中係測試期，Ivan 會為咗配合測試任意調整日期與參數，",
+    "11 月中之前必須全部改回真實值——靠記憶會漏，所以先把「現時值」同",
+    "「上線目標值」都寫死喺呢度，供「設定回復檢查（唯讀）」比對用。",
+    "",
+    "source＝\"已核實的實際值\"：Ivan 喺 2026-08-17 直接提供，可信。",
+    "source＝\"程式碼預設值（試算表現時實際值未核實）\"：呢個 Key 未喺 Ivan",
+    "提供嘅清單入面出現，本文件唯一知道嘅係 ConfigSeed.gs／Constants.gs 的",
+    "程式碼預設值——試算表上實際存住嘅值可能唔同（工作表既有值一律優先於",
+    "程式碼預設值），呢一類 Key「設定回復檢查」比對時只能夠當「未知基準」，",
+    "唔應該假設現時就係程式碼預設值。",
+    "",
+    "launchTargetDiffersFromCurrent＝true 嘅 Key（目前只有 DRY_RUN 同",
+    "MAIL_SUBJECT_PREFIX）：測試期嘅現時值刻意唔同於上線值，11 月中前",
+    "必須改番做 launchTargetValue。"
+  ],
+  "snapshotDate": "2026-08-17",
+  "createdInRound": "第二十二輪批次（housekeeping ＋ 上線值快照）",
+  "configKeys": {
+    "ATTACH_HIGHLIGHT_PERSONAL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "ATTACH"
+    },
+    "ATTACH_NAME_PATTERN": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf",
+      "launchTargetValue": "{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "ATTACH"
+    },
+    "ATTACH_PAGE_ORIENTATION": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "LANDSCAPE",
+      "launchTargetValue": "LANDSCAPE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "ATTACH"
+    },
+    "CARRY_OVER_WEEKS": {
+      "source": "已核實的實際值",
+      "currentValue": "2",
+      "launchTargetValue": "2",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GENERATOR"
+    },
+    "DEFAULT_MAX_PER_QUARTER": {
+      "source": "已核實的實際值",
+      "currentValue": "8",
+      "launchTargetValue": "8",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GENERATOR"
+    },
+    "DRY_RUN": {
+      "source": "已核實的實際值",
+      "currentValue": "TRUE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": true,
+      "group": "SYS"
+    },
+    "FINETUNE_MAX_MOVES": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "6",
+      "launchTargetValue": "6",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "FINETUNE"
+    },
+    "GRID_FOOTER_NOTE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "如未能按上表服侍，請盡早聯絡幹事安排調動。",
+      "launchTargetValue": "如未能按上表服侍，請盡早聯絡幹事安排調動。",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "GRID_GAP_LABEL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "⚠ 未能安排",
+      "launchTargetValue": "⚠ 未能安排",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "GRID_NOT_APPLICABLE_LABEL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "—",
+      "launchTargetValue": "—",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "GRID_PENDING_FILL_COLOR": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "#F4CCCC",
+      "launchTargetValue": "#F4CCCC",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "GRID_PENDING_LABEL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "（待填）",
+      "launchTargetValue": "（待填）",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "GRID_SHOW_LEGEND": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "GRID_SPECIAL_SKIP_LABEL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "特殊主日",
+      "launchTargetValue": "特殊主日",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GRID"
+    },
+    "HWCAS_COL_EMAIL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_COL_LAST_ATTENDANCE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_COL_MEETING_POINT": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_COL_MEMBER_NO": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_COL_NAME": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_CONGREGATION_PREFIXES": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_MEMBERS_SHEET": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "Members",
+      "launchTargetValue": "Members",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_READ_COLUMNS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "HWCAS_SPREADSHEET_ID": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "HWCAS"
+    },
+    "ICS_SERVICE_END_TIME": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "12:00",
+      "launchTargetValue": "12:00",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "ICS"
+    },
+    "ICS_SERVICE_START_TIME": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "10:45",
+      "launchTargetValue": "10:45",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "ICS"
+    },
+    "LEAD_DAYS_GENERATE": {
+      "source": "已核實的實際值",
+      "currentValue": "-35",
+      "launchTargetValue": "-35",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION",
+      "note": "必填，程式碼故意留空不猜。"
+    },
+    "LEAD_DAYS_OFFICIAL": {
+      "source": "已核實的實際值",
+      "currentValue": "-28",
+      "launchTargetValue": "-28",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION",
+      "note": "必填，程式碼故意留空不猜。"
+    },
+    "MAIL_ADMIN_NOTIFY": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "MAIL_REPLY_TO": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "MAIL_SENDER_NAME": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "MAIL_SUBJECT_PREFIX": {
+      "source": "已核實的實際值",
+      "currentValue": "[測試 Testing]",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": true,
+      "group": "MAIL"
+    },
+    "MAIL_SUMMARY_DATE_FORMAT": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "M月d日",
+      "launchTargetValue": "M月d日",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "MAIL_SUMMARY_SEPARATOR": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "；",
+      "launchTargetValue": "；",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "MULTIRUN_ATTEMPTS": {
+      "source": "已核實的實際值",
+      "currentValue": "20",
+      "launchTargetValue": "20",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MULTIRUN"
+    },
+    "PDF_BATCH_SIZE": {
+      "source": "已核實的實際值",
+      "currentValue": "25",
+      "launchTargetValue": "25",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_BATCH"
+    },
+    "PDF_EXPORT_MAX_RETRIES": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "4",
+      "launchTargetValue": "4",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_EXPORT"
+    },
+    "PDF_EXPORT_PACING_MS": {
+      "source": "已核實的實際值",
+      "currentValue": "500",
+      "launchTargetValue": "500",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_EXPORT",
+      "note": "程式碼預設值第十九輪已改成 1500（根據 57 份實測推算）；但 Ivan 已核實嘅現時試算表值係 500——工作表既有值優先於程式碼預設，冇被覆寫。"
+    },
+    "PDF_EXPORT_RETRY_DELAY_MS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "1000",
+      "launchTargetValue": "1000",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_EXPORT"
+    },
+    "PDF_MIN_SIZE_BYTES": {
+      "source": "已核實的實際值",
+      "currentValue": "10240",
+      "launchTargetValue": "10240",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_EXPORT"
+    },
+    "PDF_REGENERATE_IF_EXISTS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_BATCH"
+    },
+    "PUBLIC_ROSTER_BLANK_NOTE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "由會友另行安排，非本系統自動排定",
+      "launchTargetValue": "由會友另行安排，非本系統自動排定",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
+    "PUBLIC_ROSTER_DATE_FORMAT": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "{M}月{d}日",
+      "launchTargetValue": "{M}月{d}日",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
+    "PUBLIC_ROSTER_FILE_NAME_PATTERN": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "{QuarterID} 粵語堂職事表（公開版）",
+      "launchTargetValue": "{QuarterID} 粵語堂職事表（公開版）",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
+    "QUARTER_TERM_START_MONTHS": {
+      "source": "已核實的實際值",
+      "currentValue": "1,4,7,10",
+      "launchTargetValue": "1,4,7,10",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SCHEDULE"
+    },
+    "RANDOM_SEED": {
+      "source": "已核實的實際值",
+      "currentValue": "20260811",
+      "launchTargetValue": "20260811",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GENERATOR"
+    },
+    "REMIND_DEADLINE_DAYS": {
+      "source": "已核實的實際值",
+      "currentValue": "7",
+      "launchTargetValue": "7",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
+    "REMIND_STUCK_DAYS": {
+      "source": "已核實的實際值",
+      "currentValue": "3",
+      "launchTargetValue": "3",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
+    "REMIND_STUCK_MAX_COUNT": {
+      "source": "已核實的實際值",
+      "currentValue": "3",
+      "launchTargetValue": "3",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
+    "REMIND_UNCONFIRMED_SPECIAL_DAYS": {
+      "source": "已核實的實際值",
+      "currentValue": "7",
+      "launchTargetValue": "7",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
+    "RESEND_ONLY_CHANGED": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "ROSTER_DRIVE_FOLDER_ID": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
+    "ROSTER_SPREADSHEET_ID": {
+      "source": "動態值，不比對",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS",
+      "dynamic": true,
+      "note": "安裝時自動偵測填入本試算表自己的 ID，屬於動態值，設定回復檢查工具不會比對這個 Key。"
+    },
+    "SCORE_CHAIR_DUAL_BONUS": {
+      "source": "已核實的實際值",
+      "currentValue": "30",
+      "launchTargetValue": "30",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SCORE"
+    },
+    "SCORE_PREFERENCE_BONUS": {
+      "source": "已核實的實際值",
+      "currentValue": "50",
+      "launchTargetValue": "50",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SCORE"
+    },
+    "SCORE_SELECTION_WEIGHT": {
+      "source": "已核實的實際值",
+      "currentValue": "45",
+      "launchTargetValue": "45",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SCORE"
+    },
+    "SCORE_TIE_EPSILON": {
+      "source": "已核實的實際值",
+      "currentValue": "0",
+      "launchTargetValue": "0",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SCORE",
+      "note": "預設 0＝完全不啟用；改成非零值前建議先用「試算不同 epsilon 的效果（唯讀）」比較。"
+    },
+    "SCRIPT_ACCOUNT_EMAIL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS",
+      "note": "必填，操作者帳號，程式碼故意留空不猜，須由 Ivan 自行填入——本文件不記錄實際電郵。"
+    },
+    "SELECTION_STRATEGY": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "LONGEST_UNSERVED",
+      "launchTargetValue": "LONGEST_UNSERVED",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GENERATOR"
+    },
+    "SELECTION_WEIGHT_HISTORICAL": {
+      "source": "已核實的實際值",
+      "currentValue": "0.5",
+      "launchTargetValue": "0.5",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GENERATOR"
+    },
+    "SELF_TEST_QUARTER_ID": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYSTEM"
+    },
+    "SEND_HOUR_LOCAL": {
+      "source": "已核實的實際值",
+      "currentValue": "9",
+      "launchTargetValue": "9",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
+    "SEND_LOG_FLUSH_BATCH_SIZE": {
+      "source": "已核實的實際值",
+      "currentValue": "15",
+      "launchTargetValue": "15",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_BATCH"
+    },
+    "SEND_WEEKDAY_GUARD": {
+      "source": "已核實的實際值",
+      "currentValue": "NONE",
+      "launchTargetValue": "NONE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
+    "SOFT_METRIC_COUNT_TOLERANCE_RATIO": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "0.2",
+      "launchTargetValue": "0.2",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SOFT_METRIC"
+    },
+    "SOFT_METRIC_POST_USAGE_MIN_RATIO": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "0.5",
+      "launchTargetValue": "0.5",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SOFT_METRIC"
+    },
+    "SOFT_METRIC_RATIO_TOLERANCE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "0.05",
+      "launchTargetValue": "0.05",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SOFT_METRIC"
+    },
+    "STEP4_MAX_MISSING_PDF_RATIO": {
+      "source": "已核實的實際值",
+      "currentValue": "0.2",
+      "launchTargetValue": "0.2",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_EXPORT"
+    },
+    "SYS_CONFIG_CACHE_SECONDS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "300",
+      "launchTargetValue": "300",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
+    "SYS_LOCALE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS",
+      "note": "必填但目前程式碼沒有任何地方實際讀取，語意不明確，程式碼故意留空不猜。"
+    },
+    "SYS_TIMESTAMP_FORMAT": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "yyyy-MM-dd HH:mm:ss",
+      "launchTargetValue": "yyyy-MM-dd HH:mm:ss",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
+    "SYS_TIMEZONE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "Pacific/Auckland",
+      "launchTargetValue": "Pacific/Auckland",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
+    "V0_PROTECT": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "GENERATOR"
+    },
+    "WARN_ON_SEMI_HARD_BREAK": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "FINETUNE"
+    },
+    "WEBAPP_ALLOWED_EMAILS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP",
+      "note": "留空代表只允許 SCRIPT_ACCOUNT_EMAIL 一人，本文件唔記錄實際電郵名單。"
+    },
+    "WEBAPP_ENABLED": {
+      "source": "已核實的實際值",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP",
+      "note": "上線目標本來就應該係 TRUE（Web UI 要啟用），呢個「程式碼預設值」FALSE 只係初次安裝嘅安全預設，唔係「上線值」——Ivan 已核實現時值 TRUE 正確，維持。"
+    }
+  },
+  "quarters": {
+    "2026T4": {
+      "generateOn": "2026-08-30",
+      "officialSendOn": "2026-09-06",
+      "note": "2026T4 是實測驗證基準，本輪未動過任何資料。"
+    },
+    "2027T1": {
+      "generateOn": "2026-11-27",
+      "officialSendOn": "2026-12-04"
+    },
+    "2027T2": {
+      "generateOn": "2027-02-25",
+      "officialSendOn": "2027-03-04"
+    },
+    "2027T3": {
+      "generateOn": "2027-05-27",
+      "officialSendOn": "2027-06-03"
+    },
+    "2027T4": {
+      "generateOn": "",
+      "officialSendOn": "",
+      "note": "未計算——2026-08-17 當時 Ivan 提供嘅清單本身就係空白。"
+    }
+  }
+}
