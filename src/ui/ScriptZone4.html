@@ -1,0 +1,395 @@
+<script>
+  /* ============================================================
+   * 第二十七輪批次階段 F：區四——進階功能
+   * ============================================================
+   *
+   * 對應 docs/幹事介面規格.md 第五節。
+   *
+   * ⚠️ **本輪只搬七個工具上嚟，唔係全部八十幾個選單項目。**
+   * 理由寫喺 docs/系統範圍稽核.md：其餘嗰批係診斷／維護工具，
+   * 使用者係 Ivan 或者 IT，唔係幹事。搬上嚟只會令幹事喺一堆
+   * 佢一世都唔會撳嘅嘢入面搵佢真正要撳嗰粒。
+   */
+
+  function renderZone4(d) {
+    const body = clear(el('zone4Body'));
+
+    body.appendChild(renderRollbackEntry());
+    // 第二十六輪批次階段 A2-4：掣 2 嘅錯誤訊息會指去呢度，所以一定要有。
+    body.appendChild(renderRepublishEntry(d));
+
+    body.appendChild(make('div', { className: 'sec' }, [
+      sectionTitle('職事表工具'),
+      zone4Row('重新生成初稿（覆蓋式）',
+        '重新排一次，會建立一個新版本。現有的人手改動不會保留。',
+        () => openRegenerate(), true),
+      zone4Row('核對職事表',
+        '逐格檢查有沒有違反規則，只看不改。',
+        () => openVerifyRoster(), false),
+      zone4Row('列出待補格子',
+        '列出所有還沒有填人的格子，按崗位分類。',
+        () => openPendingCells(), false),
+      zone4Row('草稿覆核報告（給堂委看）',
+        '產生一份給堂委看的文字報告：這一版排了誰、有什麼要留意。',
+        () => openDraftReviewReport(), false)
+    ]));
+
+    body.appendChild(make('div', { className: 'sec' }, [
+      sectionTitle('PDF 與補寄'),
+      zone4Row('匯出職事表 PDF',
+        '把整季的職事表匯出成一份 PDF。',
+        () => openExportPdf(), false),
+      zone4Row('產生個人 PDF',
+        '為每一位有服侍的人產生一份標示了他名字的 PDF。',
+        () => openPersonalPdf(), false),
+      zone4Row('補寄未收到的人',
+        '上次寄到一半中斷的話，用這個只寄給還沒收到的人。',
+        () => openMakeupSend(), false)
+    ]));
+
+    body.appendChild(make('p', {
+      text: '其餘工具（體檢、上線前檢查、匯出關鍵狀態等）請用試算表上方的選單。',
+      className: 'muted'
+    }));
+  }
+
+  /**
+   * 重新發佈公開連結（第二十六輪批次階段 A2-4 加入，本輪由共通層搬過嚟）。
+   * 掣 2 嘅錯誤訊息會指去呢度，所以一定要有。
+   * @param {?Object} d 狀態快取
+   */
+  function renderRepublishEntry(d) {
+    const box = make('div', { className: 'act' });
+    const link = (d && d.publicLink) || {};
+    // ⚠️ 三種狀態要分得開。`checkFailed`（查不到）**唔可以**寫成
+    // 「還沒有公開連結」——嗰個係一個肯定句，而我哋根本冇查到。
+    const desc = link.checkFailed
+      ? '現在查不到這一季有沒有公開連結。'
+      : (link.hasLink
+        ? '這一季已經有公開連結。內容有改動時，撳這裡可以重新發佈一次。'
+        : '這一季還沒有公開連結。寄給堂委之前一定要先發佈。');
+
+    box.appendChild(make('div', { className: 'act-main' }, [
+      make('div', { text: '重新發佈公開連結', className: 'act-name' }),
+      make('div', { text: desc, className: 'act-desc' })
+    ]));
+    box.appendChild(button('發佈', () => {
+      runAction('發佈公開連結', async () => {
+        const res = await callServerMutating('apiRepublishPublicLink', currentQuarterId);
+        if (!res.ok) { showErrorModal('重新發佈公開連結', new Error(res.message)); return; }
+        setStatus('公開連結已經發佈好了（第 ' + res.versionNo + ' 版）。');
+      });
+    }, ''));
+    return box;
+  }
+
+  /** 區四一行：名、一句說明、右邊一粒掣。 */
+  function zone4Row(name, desc, onClick, danger) {
+    const box = make('div', { className: 'act' });
+    box.appendChild(make('div', { className: 'act-main' }, [
+      make('div', { text: name, className: 'act-name' }),
+      make('div', { text: desc, className: 'act-desc' })
+    ]));
+    box.appendChild(button('開始', onClick, danger ? 'danger' : ''));
+    return box;
+  }
+
+  /* ============================================================
+   * 版本下拉（規格 5.2）
+   * ============================================================ */
+
+  /**
+   * 版本下拉一律寫人話。
+   *
+   * ⚠️ 唔可以寫 `Roster_2026T4_v2`——嗰個係工作表名，唔係幹事嘅語言。
+   * 寫成「第 2 版　2026-12-04 11:20　套用修改申報後」，佢先揀得啱。
+   * @param {Array<Object>} versions `apiListVersionsForZone4()` 回嘅清單
+   * @returns {HTMLSelectElement}
+   */
+  function versionSelect(versions) {
+    const sel = document.createElement('select');
+    (versions || []).forEach((v) => {
+      const o = document.createElement('option');
+      o.value = String(v.versionNo);
+      o.textContent = v.label;
+      sel.appendChild(o);
+    });
+    return sel;
+  }
+
+  /** 開一個「揀版本 → 執行」嘅畫面。 */
+  function openVersionTool(opts) {
+    runAction('讀取版本清單', async () => {
+      const data = await callServer('apiListVersionsForZone4', currentQuarterId);
+      if (!data.ok) { showErrorModal(opts.title, new Error(data.message)); return; }
+      if (data.versions.length === 0) {
+        openModal(opts.title, [
+          para('這一季還沒有任何版本，所以沒有東西可以處理。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      const sel = versionSelect(data.versions);
+      const nodes = [
+        make('div', { className: 'prop-head' }, [make('span', { text: '版本' }), sel])
+      ].concat(opts.bodyNodes || []);
+      openModal(opts.title, nodes, [
+        button(opts.actionLabel || '開始', () => opts.onRun(Number(sel.value)), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /** 把後端回嘅「一節一節」文字報告畫出嚟。 */
+  function renderReportSections(title, res) {
+    if (!res.ok) { showErrorModal(title, new Error(res.message)); return; }
+    const nodes = [];
+    (res.sections || []).forEach((s) => {
+      const box = make('div', { className: 'sec' }, [sectionTitle(s.heading)]);
+      (s.lines || []).forEach((line) => {
+        box.appendChild(make('div', { text: line, className: 'vio-row' }));
+      });
+      if ((s.lines || []).length === 0) {
+        box.appendChild(make('div', { text: '（沒有）', className: 'muted' }));
+      }
+      nodes.push(box);
+    });
+    if (nodes.length === 0) nodes.push(make('div', { text: '沒有內容。', className: 'muted' }));
+    openModal(title, nodes, [button('關閉', () => closeModal(), '')]);
+  }
+
+  /* ── 重新生成初稿（覆蓋式）───────────────────────────────── */
+
+  function openRegenerate() {
+    openConfirm({
+      title: '重新生成初稿（覆蓋式）',
+      bodyNodes: [
+        make('div', { className: 'vio vio-hard' }, [
+          make('div', {
+            text: '這會重新排一次整季，並建立一個新版本。'
+              + '你在表上做過的人手改動，如果還沒有撳「儲存並確認」，就會不見了。',
+            className: 'vio-row'
+          })
+        ]),
+        make('div', { className: 'sec' }, [
+          sectionTitle('會做的事：'),
+          make('div', { text: '・重新排整季，建立一個新版本', className: 'vio-row' }),
+          make('div', { text: '・舊版本原封不動保留，可以用「回到上一個版本」', className: 'vio-row' }),
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會寄出任何電郵', className: 'vio-row' }),
+          make('div', { text: '・不會刪走任何舊版本', className: 'vio-row' })
+        ]),
+        para('如果只是想套用你剛才在表上改的幾格，請用區一的「儲存並確認」，'
+          + '不要用這一個。', 'muted')
+      ],
+      requireTyping: true,
+      confirmLabel: '確定重新生成',
+      danger: true,
+      onConfirm: () => runAction('重新生成中，請稍候', async () => {
+        const res = await callServerMutating('apiGenerateRoster', currentQuarterId);
+        openModal('重新生成完成', [
+          make('div', { text: '已建立第 ' + res.versionNo + ' 版。', className: 'ok-line' }),
+          make('div', {
+            text: '規則違反 ' + (res.violationCount === undefined ? '（未提供）' : res.violationCount) + ' 項。',
+            className: 'ok-line'
+          })
+        ], [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
+
+  /* ── 核對職事表 ─────────────────────────────────────────── */
+
+  function openVerifyRoster() {
+    openVersionTool({
+      title: '核對職事表',
+      actionLabel: '核對',
+      bodyNodes: [para('只看不改，不會寫入任何東西。')],
+      onRun: (versionNo) => runAction('核對中', async () => {
+        const res = await callServer('apiVerifyRosterForZone4', currentQuarterId, versionNo);
+        renderReportSections('核對職事表：第 ' + versionNo + ' 版', res);
+      })
+    });
+  }
+
+  /* ── 列出待補格子 ───────────────────────────────────────── */
+
+  function openPendingCells() {
+    runAction('讀取待補格子', async () => {
+      const res = await callServer('apiListPendingBackfillCellsForZone4', currentQuarterId);
+      renderReportSections('列出待補格子', res);
+    });
+  }
+
+  /* ── 草稿覆核報告 ───────────────────────────────────────── */
+
+  function openDraftReviewReport() {
+    openVersionTool({
+      title: '草稿覆核報告（給堂委看）',
+      actionLabel: '產生報告',
+      bodyNodes: [para('只看不改。產生之後可以整段複製給堂委。')],
+      onRun: (versionNo) => runAction('產生報告中', async () => {
+        const res = await callServer('apiDraftReviewReportForZone4', currentQuarterId, versionNo);
+        renderReportSections('草稿覆核報告：第 ' + versionNo + ' 版', res);
+      })
+    });
+  }
+
+  /* ── 匯出職事表 PDF ─────────────────────────────────────── */
+
+  function openExportPdf() {
+    openVersionTool({
+      title: '匯出職事表 PDF',
+      actionLabel: '匯出',
+      bodyNodes: [para('會在 Drive 的職事表資料夾裡面建立一個 PDF 檔。')],
+      onRun: (versionNo) => runAction('匯出中，請稍候', async () => {
+        const res = await callServerMutating('apiExportRosterPdf', currentQuarterId, versionNo);
+        if (!res.ok) { showErrorModal('匯出職事表 PDF', new Error(res.message)); return; }
+        // 檔案大細一定要顯示——截斷／空白檔會細得好離譜，
+        // 而嗰個係唯一一個喺「已匯出」之外睇得出有問題嘅訊號。
+        const nodes = [
+          make('div', { text: '已匯出：' + res.fileName, className: 'ok-line' }),
+          make('div', {
+            text: '大小 ' + res.fileSize + '　放在 ' + res.folderName,
+            className: 'muted'
+          })
+        ];
+        if (res.fileUrl) {
+          const a = document.createElement('a');
+          a.href = res.fileUrl;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = '開啟這個 PDF';
+          a.className = 'bigLink';
+          nodes.push(a);
+        }
+        openModal('匯出完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
+
+  /* ── 產生個人 PDF ───────────────────────────────────────── */
+
+  function openPersonalPdf() {
+    openVersionTool({
+      title: '產生個人 PDF',
+      actionLabel: '產生',
+      bodyNodes: [
+        para('為每一位有服侍的人產生一份標示了他名字的 PDF。'),
+        para('人數多的時候要跑幾分鐘，而且可能會分幾次跑完——'
+          + '畫面會自己接住跑，不要關掉視窗。', 'muted')
+      ],
+      onRun: (versionNo) => runAction('產生個人 PDF，請稍候', async () => {
+        let guard = 0;
+        let last = null;
+        for (;;) {
+          guard++;
+          if (guard > 40) {
+            throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。'
+              + '請重新整理再試一次。');
+          }
+          last = await callServerMutating('apiGeneratePersonalPdfBatch', currentQuarterId, versionNo);
+          if (!last.ok) { showErrorModal('產生個人 PDF', new Error(last.message)); return; }
+          if (last.done) break;
+          setStatus('產生個人 PDF：' + last.doneCount + ' / ' + last.totalPeople + ' 份…');
+        }
+        openModal('產生完成', [
+          make('div', {
+            text: '已完成 ' + last.doneCount + ' / ' + last.totalPeople + ' 位。',
+            className: 'ok-line'
+          }),
+          // 「略過已存在」一定要出數字。唔出嘅話，幹事會以為
+          // 「明明有 57 人，點解只新產生咗 3 個」。
+          make('div', {
+            text: '新產生 ' + last.generatedCount + ' 份　略過（已經有同一版的檔案）'
+              + last.skippedExistingCount + ' 份',
+            className: 'muted'
+          })
+        ], [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
+
+  /* ── 補寄未收到的人 ─────────────────────────────────────── */
+
+  function openMakeupSend() {
+    runAction('讀取可補寄的階段', async () => {
+      const data = await callServer('apiMakeupSendStages', currentQuarterId);
+      if (!data.ok) { showErrorModal('補寄未收到的人', new Error(data.message)); return; }
+      if (data.stages.length === 0) {
+        openModal('補寄未收到的人', [
+          para('這一季還沒有任何一次寄出紀錄，所以沒有東西可以補寄。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+
+      const sel = document.createElement('select');
+      data.stages.forEach((s) => {
+        const o = document.createElement('option');
+        o.value = s.stage;
+        o.textContent = s.label;
+        sel.appendChild(o);
+      });
+
+      openModal('補寄未收到的人', [
+        para('先看看有誰還沒收到，確認之後才會寄。'),
+        make('div', { className: 'prop-head' }, [make('span', { text: '哪一次' }), sel])
+      ], [
+        button('先看預覽', () => runAction('比對誰未收到', async () => {
+          const plan = await callServer('apiMakeupSendPlan', currentQuarterId, sel.value);
+          renderMakeupPlan(sel.value, plan);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  function renderMakeupPlan(stage, plan) {
+    if (!plan.ok) { showErrorModal('補寄未收到的人', new Error(plan.message)); return; }
+    if (plan.people.length === 0) {
+      openModal('補寄未收到的人', [
+        make('div', { text: '這一次所有人都已經收到了，不用補寄。', className: 'ok-line' })
+      ], [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+
+    const list = make('div', { className: 'sec' }, [
+      sectionTitle('這 ' + plan.people.length + ' 位還沒有收到')
+    ]);
+    plan.people.forEach((p) => {
+      list.appendChild(make('div', {
+        text: p.nameTC + (p.hasEmail ? '' : '（沒有電郵，會略過）'),
+        className: p.hasEmail ? 'vio-row' : 'vio-row muted'
+      }));
+    });
+
+    openConfirm({
+      title: '補寄未收到的人',
+      bodyNodes: [
+        list,
+        make('div', { className: 'sec' }, [
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會再寄給已經收到的人', className: 'vio-row' }),
+          make('div', { text: '・不會改動職事表任何一格', className: 'vio-row' }),
+          make('div', { text: '・不會推前這一季的進度', className: 'vio-row' })
+        ])
+      ],
+      confirmLabel: '確定補寄',
+      onConfirm: () => runAction('寄送中，請稍候', async () => {
+        const res = await callServerMutating('apiMakeupSendExecute', currentQuarterId, stage);
+        if (!res.ok) { showErrorModal('補寄未收到的人', new Error(res.message)); return; }
+        openModal('補寄完成', [
+          make('div', {
+            text: res.isDryRun ? '測試模式：沒有真的寄出任何電郵。' : '已經補寄。',
+            className: 'ok-line'
+          }),
+          make('div', {
+            text: '寄出 ' + res.sent + ' 封　模擬 ' + res.dryRun + ' 封　'
+              + '查無電郵略過 ' + res.skipped + ' 位　失敗 ' + res.failed,
+            className: 'ok-line'
+          })
+        ], [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
+
+</script>

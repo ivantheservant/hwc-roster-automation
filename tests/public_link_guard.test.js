@@ -40,6 +40,8 @@ const guards = read('src/WebAppGuards.gs');
 const dash = read('src/WebAppDashboard.gs');
 const zone1 = read('src/ui/ScriptZone1.html');
 const common = read('src/ui/Script.html');
+// 第二十七輪批次階段 F：區四由共通層搬咗去自己嘅檔案。
+const zone4 = read('src/ui/ScriptZone4.html');
 
 /** 由函式名切出函式本體（到第一個頂層 `\n}` 為止）。 */
 function bodyOf(src, fnName) {
@@ -141,11 +143,12 @@ console.log('\n=== A2-4：區四要有「重新發佈公開連結」 ===');
   check('★★★★★ 冇版本時擋住，唔會發佈一個空嘅嘢',
     body.indexOf('這一季還沒有任何版本，沒有東西可以發佈。') !== -1);
   check('★★★★★ 區四有呢粒掣（掣 2 嘅錯誤訊息指去呢度，所以一定要有）',
-    /function renderRepublishEntry/.test(common)
     // 第二十七輪批次階段 A：狀態改成由參數傳入（唔再喺函式入面自己讀快取）。
-    && /renderZone4[\s\S]{0,400}?renderRepublishEntry\(d\)/.test(common));
+    // 第二十七輪批次階段 F：整個區四由共通層搬咗去 ScriptZone4.html。
+    /function renderRepublishEntry/.test(zone4)
+    && /renderZone4[\s\S]{0,400}?renderRepublishEntry\(d\)/.test(zone4));
   check('★★★★ 而且會按目前狀態講唔同嘅話（有／冇／查唔到）',
-    /link\.checkFailed[\s\S]{0,200}?link\.hasLink/.test(common));
+    /link\.checkFailed[\s\S]{0,200}?link\.hasLink/.test(zone4));
 }
 
 console.log('\n=== A2：dashboard 帶埋公開連結狀態，令前端可以提早講 ===');
