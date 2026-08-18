@@ -32,9 +32,13 @@ const PERSON_POST_WEIGHT_CHOICES = [
  * ⚠️ 只顯示**有排過該崗位或者有該崗位資格**嘅人——
  * 90 × 16 個空下拉對幹事嚟講係一幅噪音，佢會搵唔到想改嗰個人。
  *
+ * @param {string=} quarterId 用嚟計「呢一季已經排咗幾多次」。
+ *   ⚠️ 冇傳、或者嗰季仲未有版本，`quarterLoad` 會係 `null`
+ *   ——即係「查不到」，**唔係「零次」**。前端見到 null 就唔會講
+ *   「他還沒有接近上限」，因為根本冇檢查過。
  * @returns {Object} 見規格 4.6
  */
-function apiGetPersonPostWeightMatrix() {
+function apiGetPersonPostWeightMatrix(quarterId) {
   assertWebAppRequestAllowed_();
 
   beginSheetReadMemo_();
@@ -97,6 +101,9 @@ function apiGetPersonPostWeightMatrix() {
       log_('INFO', 'PersonPostWeight 工作表未建立：' + err.message);
     }
 
+    // 第二十七輪批次階段 B2：呢一季每個人已經排咗幾多次、上限係幾多。
+    const load = readQuarterLoadForWeights_(quarterId);
+
     const byPost = posts.map(function (p) {
       const ids = (eligibleByPost[p.postId] || []).slice().sort(function (a, b) {
         return (nameById[a] || a) < (nameById[b] || b) ? -1 : 1;
@@ -111,7 +118,9 @@ function apiGetPersonPostWeightMatrix() {
             nameTC: nameById[id] || id,
             adjust: hit ? hit.adjust : 0,
             reason: hit ? hit.reason : '',
-            weightId: hit ? hit.weightId : ''
+            weightId: hit ? hit.weightId : '',
+            // null ＝ 查不到（冇季度、冇版本、或者讀取失敗）
+            quarterLoad: load.available ? (load.byPerson[id] || null) : null
           };
         })
       };
@@ -122,10 +131,84 @@ function apiGetPersonPostWeightMatrix() {
       posts: byPost,
       activeCount: active.rows.length,
       invalid: active.invalid,
+      // 前端要靠呢兩個字段分辨「查不到」同「查到但冇人接近上限」。
+      // 兩者睇落一樣（都係冇黃字），但意思完全相反。
+      loadAvailable: load.available,
+      loadUnavailableReason: load.reason,
       history: allRows.filter(function (r) { return r.effectiveTo !== ''; })
     };
   } finally {
     endSheetReadMemo_();
+  }
+}
+
+/**
+ * 第二十七輪批次階段 B2：讀「呢一季每個人已經排咗幾多次、上限係幾多」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 離線驗收顯示：四行偏好之中兩行「冇變」，原因係嗰兩位已經撞到
+ * `MaxPerQuarter` 上限，而偏好係軟嘅，唔會突破上限。機制係啱嘅，
+ * 但**幹事揀咗「多一次」而乜都冇發生，畫面唔會解釋點解**。
+ * 佢只會得出一個結論：「呢個功能壞咗」。
+ *
+ * ⚠️ 回傳一定要分得出「查不到」同「查到，冇人接近上限」。
+ * 兩者喺畫面上睇落一樣（都係冇黃字），但意思完全相反——
+ * 呢個就係本專案撞過好多次嗰個 bug class。
+ *
+ * @param {string=} quarterId
+ * @returns {{available: boolean, reason: string, byPerson: Object}}
+ */
+function readQuarterLoadForWeights_(quarterId) {
+  const none = function (reason) {
+    return { available: false, reason: reason, byPerson: {} };
+  };
+  const id = String(quarterId || '').trim();
+  if (!id) return none('還沒有選季度，所以看不到誰接近每季上限。');
+
+  try {
+    const versionNo = findLatestVersionNo(id);
+    if (versionNo < 0) {
+      return none('這一季還沒有生成過任何版本，所以看不到誰接近每季上限。');
+    }
+
+    const peopleById = indexPeopleById_();
+    // ⚠️ 上限有三層（個人值 ▸ RuleSettings TargetValue ▸ Config 預設）。
+    // 呢度用返同排表一樣嗰個 resolve 函式，唔可以自己再寫一次
+    // ——寫兩次就一定會有一日分岔，而畫面同排表講唔同嘅嘢係最難查嘅一種。
+    const limitContext = {
+      rules: readRules(),
+      defaultLimit:
+        Number(getConfig(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
+        || DEFAULTS.MAX_PER_QUARTER
+    };
+
+    const counts = {};
+    readVersionAssignmentsRaw_(id, versionNo).forEach(function (a) {
+      if (!a.personId) return;
+      counts[a.personId] = (counts[a.personId] || 0) + 1;
+    });
+
+    const byPerson = {};
+    Object.keys(counts).forEach(function (personId) {
+      const limit = resolveWeightQuarterLimit_(peopleById[personId], limitContext);
+      if (limit === null) return;   // 上限查不到 ⇒ 唔擺呢個人，唔擺一個估出嚟嘅值
+      byPerson[personId] = {
+        count: counts[personId],
+        limit: limit,
+        // 「接近」＝ 差一次或以下。差兩次仲有空間，講出嚟只會變成噪音。
+        near: counts[personId] >= limit - 1,
+        atLimit: counts[personId] >= limit
+      };
+    });
+
+    return { available: true, reason: '', byPerson: byPerson };
+  } catch (err) {
+    log_('WARN', '讀不到季度用人量（排表偏好畫面）：' + err.message);
+    return none('讀不到這一季的派工紀錄（' + err.message + '），'
+      + '所以看不到誰接近每季上限。');
   }
 }
 

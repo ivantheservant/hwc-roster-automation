@@ -187,9 +187,13 @@ function readPersonPostCount_(state, personId, postId) {
  * @param {Object} weights `readActivePersonPostWeights_()` 嘅結果
  * @param {Object.<string, Object>} peopleById 人員索引
  * @param {Object.<string, string>} postNames PostID → 崗位名
+ * @param {?{rules: Object, defaultLimit: number}} limitContext 每季上限嘅來源。
+ *   ⚠️ 傳 null／唔傳 ＝ **查不到**，唔係「冇上限」。查不到嗰陣
+ *   「未達標原因」會照樣講明「上限查不到」，唔會扮到已經檢查過。
  * @returns {{lines: string[], rows: Object[]}}
  */
-function buildPersonPostWeightReport_(assignments, weights, peopleById, postNames) {
+function buildPersonPostWeightReport_(assignments, weights, peopleById, postNames,
+  limitContext) {
   const rows = [];
   if (!weights || weights.rows.length === 0) {
     return {
@@ -223,6 +227,18 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
     const average = peopleCount === 0 ? 0 : (perPostTotals[w.postId] || 0) / peopleCount;
     const got = actual[key] || 0;
     const target = average + w.adjust;
+
+    // 第二十七輪批次階段 B2：未達標一定要講得出係邊條規則擋住。
+    //
+    // ⚠️ 「未達標」嘅門檻用 0.5 而唔係 0：目標值本身係一個小數
+    //（平均 ＋ 偏好），差 0.3 次唔算「冇生效」，只係四捨五入。
+    // 用 0 做門檻會令幾乎每一行都報一堆原因，而真正有問題嗰行就淹沒咗。
+    const shortfall = target - got;
+    const personLimit = resolveWeightQuarterLimit_(peopleById[w.personId], limitContext);
+    const explained = shortfall > 0.5
+      ? explainWeightShortfall_(w, Math.round(target), got, assignments, personLimit)
+      : { reasons: [], text: '' };
+
     const row = {
       personId: w.personId,
       nameTC: (peopleById[w.personId] || {}).nameTC || w.personId,
@@ -233,7 +249,10 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
       targetCount: Math.round(target * 10) / 10,
       actualCount: got,
       gap: Math.round((got - target) * 10) / 10,
-      reason: w.reason
+      reason: w.reason,
+      met: shortfall <= 0.5,
+      shortfallReasons: explained.reasons,
+      shortfallText: explained.text
     };
     rows.push(row);
     lines.push('　' + row.nameTC + '　' + row.postNameTC
@@ -242,6 +261,7 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
       + '　目標約 ' + row.targetCount + ' 次'
       + '　實際 ' + row.actualCount + ' 次'
       + '　差 ' + (row.gap > 0 ? '+' : '') + row.gap);
+    if (!row.met) lines.push('　　未達標原因：' + row.shortfallText);
   });
 
   if (weights.invalid.length > 0) {
@@ -256,4 +276,209 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
     + '永遠不會令系統違反任何規則，所以實際次數不會剛好等於目標。）');
 
   return { lines: lines, rows: rows };
+}
+
+/* ============================================================
+ * 第二十七輪批次階段 B1：補建 `PersonPostWeight` 工作表
+ * ============================================================
+ *
+ * ⚠️ 呢張表**現時仲未建立**（connector 核實過）。冇佢嘅時候
+ * `readActivePersonPostWeights_()` 會回空白，系統行為同以前一模一樣
+ * ——所以佢係「可選」嘅，缺咗唔會壞，只係排表偏好用唔到。
+ */
+
+/** 第 1 行（中文標題）。**每一欄都寫明點填**，唔可以淨係寫個機器鍵。 */
+const PERSON_POST_WEIGHT_HEADERS_TC = [
+  'WeightID',
+  'PersonID',
+  '崗位（PostID）',
+  '偏好（-3 到 3 的整數；正數＝多做幾次，負數＝少做幾次，0＝沒有偏好）',
+  '原因（例如：堂委 2026-08 決議；三個月後沒有原因就沒有人記得為什麼）',
+  '生效日（yyyy-MM-dd，留空＝即時生效）',
+  '解除日（yyyy-MM-dd，留空＝仍然生效；日後解除時填這一欄，不要刪除整行）',
+  'Active',
+  '建立時間',
+  '建立者'
+];
+
+/**
+ * 取得第 2 行機器鍵。寫成函式而非頂層 const，理由同 `getRolesHeaderKeys_()`：
+ * 頂層直接引用 `COLUMNS` 會撞到載入次序造成嘅 TDZ。
+ * @returns {string[]}
+ */
+function getPersonPostWeightHeaderKeys_() {
+  const W = COLUMNS.PERSON_POST_WEIGHT;
+  return [
+    W.WEIGHT_ID, W.PERSON_ID, W.POST_ID, W.ADJUST, W.REASON,
+    W.EFFECTIVE_FROM, W.EFFECTIVE_TO, W.ACTIVE, W.CREATED_AT, W.CREATED_BY
+  ];
+}
+
+/**
+ * 建立（若不存在）`PersonPostWeight` 工作表。已存在時**完全唔動**。
+ * 沿用 `ensureSimpleSheet_()`（同 Roles／PersonPostExclusions 一樣）。
+ * @returns {{isNew: boolean}}
+ */
+function ensurePersonPostWeightSheet_() {
+  return ensureSimpleSheet_(
+    SHEETS.PERSON_POST_WEIGHT,
+    PERSON_POST_WEIGHT_HEADERS_TC,
+    getPersonPostWeightHeaderKeys_());
+}
+
+/**
+ * 選單項目「維護 ▸ 補建排表偏好工作表」嘅執行入口。冪等。
+ * @returns {void}
+ */
+function runEnsurePersonPostWeightSheet_() {
+  const ui = SpreadsheetApp.getUi();
+  const title = '補建排表偏好工作表';
+  try {
+    const res = ensurePersonPostWeightSheet_();
+    if (!res.isNew) {
+      ui.alert(title, SHEETS.PERSON_POST_WEIGHT + ' 工作表已經存在，沒有改動任何東西。',
+        ui.ButtonSet.OK);
+      return;
+    }
+    writeAuditLog_({
+      action: title,
+      targetSheet: SHEETS.PERSON_POST_WEIGHT,
+      targetKey: '（建立工作表）',
+      newValue: PERSON_POST_WEIGHT_HEADERS_TC.length + ' 欄',
+      source: 'MENU'
+    });
+    ui.alert(title,
+      '已建立 ' + SHEETS.PERSON_POST_WEIGHT + ' 工作表（第 1 行是說明標題，'
+      + '第 2 行是系統用的欄位鍵，已隱藏）。\n\n'
+      + '之後請用幹事介面「名單維護 ▸ 排表偏好」加內容，不要直接在這張表打字'
+      + '——那個畫面會自動填 WeightID／建立時間，並且寫入稽核紀錄。\n\n'
+      + '⚠️ 解除一筆偏好是填「解除日」，不是刪掉那一行。',
+      ui.ButtonSet.OK);
+  } catch (err) {
+    ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/* ============================================================
+ * 第二十七輪批次階段 B2：偏好未達標時要講得出係邊條規則擋住
+ * ============================================================
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要做呢一段
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 離線驗收：四行偏好之中兩行「冇變」。機制係啱嘅——嗰兩位已經撞到
+ * `MaxPerQuarter` 上限，而偏好係軟嘅，唔會為咗滿足偏好而突破上限。
+ *
+ * 但**幹事揀咗「多一次」而乜都冇發生，畫面唔會解釋點解**。
+ * 佢只會得出一個結論：「呢個功能壞咗」，然後去做一啲更危險嘅嘢
+ * （例如改人哋嘅崗位資格）。
+ *
+ * 所以未達標一定要講得出係邊一條規則擋住，唔可以只寫「未達標」三個字。
+ */
+
+/**
+ * 決定一個人嘅每季上限。
+ *
+ * ⚠️ **一定要重用 `RoleImpact.gs` 嘅 `resolvePersonQuarterLimit_()`。**
+ * 呢度本來寫過一個「個人值 ?? Config 預設值」嘅簡化版，漏咗
+ * `RuleSettings` 嘅 `TargetValue` 覆寫——即係同一個問題會有兩個答案，
+ * 而排表用一個、報告用另一個。全專案已經撞過好多次呢個 bug class
+ * （同一個狀態兩個真相來源），所以呢度只做一件事：把「查不到」
+ * 同「查到」分開。
+ *
+ * @param {?Object} person `indexPeopleById_()` 嘅一項（有 maxPerQuarter）
+ * @param {?{rules: Object, defaultLimit: number}} ctx null ＝ 查不到
+ * @returns {?number} null ＝ 查不到（**唔係「冇上限」**）
+ */
+function resolveWeightQuarterLimit_(person, ctx) {
+  if (!ctx || !ctx.rules || ctx.defaultLimit === null || ctx.defaultLimit === undefined
+    || isNaN(ctx.defaultLimit)) {
+    return null;
+  }
+  const limit = resolvePersonQuarterLimit_(person, ctx.rules, Number(ctx.defaultLimit));
+  return isNaN(limit) ? null : Number(limit);
+}
+
+/**
+ * 分析一項偏好點解未達標。**只用生成結果推**，唔重跑排表。
+ *
+ * @param {Object} w 偏好行 {personId, postId, adjust}
+ * @param {number} targetCount 目標次數
+ * @param {number} actualCount 實際次數
+ * @param {Object[]} assignments 本季全部派工 {personId, postId, serviceDate}
+ * @param {?number} limit 呢個人嘅每季上限（null ＝ 查不到）
+ * @returns {{reasons: string[], text: string}}
+ */
+function explainWeightShortfall_(w, targetCount, actualCount, assignments, limit) {
+  const reasons = [];
+  const list = assignments || [];
+
+  // 呢個人本季總共排咗幾多次（跨全部崗位）
+  let personTotal = 0;
+  const personDates = {};
+  list.forEach(function (a) {
+    if (a.personId !== w.personId) return;
+    personTotal++;
+    personDates[a.serviceDate] = true;
+  });
+
+  // 呢個崗位本季有邊幾日要排（有派工紀錄嘅日子）
+  const postDates = {};
+  list.forEach(function (a) { if (a.postId === w.postId) postDates[a.serviceDate] = true; });
+  const postDateList = Object.keys(postDates).sort();
+
+  // ── 1　撞每季上限 ──────────────────────────────────────────
+  // ⚠️ `limit` 係 null 代表**查不到**，唔係「冇上限」。
+  // 當成「冇上限」就係「缺失被當成正常值靜靜過」嗰個 bug class。
+  if (limit === null || limit === undefined) {
+    reasons.push('每季上限查不到（沒有提供上限資料），所以無法判斷是不是這一條擋住');
+  } else if (personTotal >= limit) {
+    reasons.push('撞到每季上限（' + limit + ' 次，他這一季已經排了 ' + personTotal
+      + ' 次）——偏好是軟的，不會為了滿足它而超出上限');
+  }
+
+  // ── 2　該崗位格數不足 ─────────────────────────────────────
+  if (postDateList.length < targetCount) {
+    reasons.push('這個崗位這一季只有 ' + postDateList.length + ' 個主日要排，'
+      + '排不出 ' + targetCount + ' 次');
+  }
+
+  // ── 3　逐個「排唔到佢」嘅主日，睇下嗰日發生咗咩事 ─────────────
+  let sameDayElsewhere = 0;
+  let consecutiveRisk = 0;
+  let plainCompetition = 0;
+  postDateList.forEach(function (date) {
+    const gotIt = list.some(function (a) {
+      return a.personId === w.personId && a.postId === w.postId && a.serviceDate === date;
+    });
+    if (gotIt) return;
+    if (personDates[date]) { sameDayElsewhere++; return; }
+    // 前後一週有冇服侍——同崗位連續兩週係準硬規則，會被扣好重嘅分
+    const prev = shiftDateString_(date, -7);
+    const next = shiftDateString_(date, 7);
+    const servedAdjacentSamePost = list.some(function (a) {
+      return a.personId === w.personId && a.postId === w.postId
+        && (a.serviceDate === prev || a.serviceDate === next);
+    });
+    if (servedAdjacentSamePost) { consecutiveRisk++; return; }
+    plainCompetition++;
+  });
+
+  if (sameDayElsewhere > 0) {
+    reasons.push('有 ' + sameDayElsewhere + ' 個主日他當天已經在其他崗位服侍');
+  }
+  if (consecutiveRisk > 0) {
+    reasons.push('有 ' + consecutiveRisk + ' 個主日會造成同一崗位連續兩週（準硬規則）');
+  }
+  if (plainCompetition > 0) {
+    reasons.push('有 ' + plainCompetition + ' 個主日是其他人更需要平均（一般的平均分配）');
+  }
+
+  return {
+    reasons: reasons,
+    text: reasons.length === 0
+      ? '沒有找到明顯的原因，請把這一項貼給開發者看'
+      : reasons.join('；')
+  };
 }

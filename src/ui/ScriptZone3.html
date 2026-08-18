@@ -791,7 +791,7 @@
 
   function openWeights() {
     runAction('讀取排表偏好', async () => {
-      weightData = await callServer('apiGetPersonPostWeightMatrix');
+      weightData = await callServer('apiGetPersonPostWeightMatrix', currentQuarterId);
       weightChanges = {};
       weightPostFilter = '';
       renderWeights();
@@ -812,6 +812,16 @@
       para('「多一次」的意思是「這一季比系統原本會派的多大約一次」，'
         + '不是「一定多一次」——系統仍然要先滿足所有規則。', 'muted')
     ];
+
+    // 查不到用人量就講出嚟。唔講嘅話，畫面上「冇黃字」會被理解成
+    // 「檢查過，冇人接近上限」——同「根本冇檢查過」意思完全相反。
+    if (!weightData.loadAvailable) {
+      nodes.push(make('div', {
+        text: weightData.loadUnavailableReason
+          + '（生成初稿之後回來看，這裡就會標出誰加了也不會生效。）',
+        className: 'muted'
+      }));
+    }
 
     if (weightData.invalid && weightData.invalid.length > 0) {
       const box = make('div', { className: 'vio vio-hard' });
@@ -910,6 +920,28 @@
         className: 'muted'
       }));
     }
+
+    // ⚠️ 第二十七輪批次階段 B2：撞到每季上限嘅話，即場講。
+    //
+    // 離線驗收撞到：四行偏好之中兩行「冇變」，因為嗰兩位已經到咗
+    // `MaxPerQuarter`，而偏好係軟嘅，唔會突破上限。機制係啱嘅，
+    // 但幹事揀咗「多一次」而乜都冇發生，佢只會覺得「呢個功能壞咗」，
+    // 然後去做啲更危險嘅嘢（例如去改人哋嘅崗位資格）。
+    //
+    // `quarterLoad` 係 null ＝ **查不到**（未揀季度／未有版本／讀取失敗），
+    // 唔係「冇接近上限」。查不到就唔講——講「他還沒有接近上限」等於
+    // 話「已經檢查過」，而根本冇檢查過。
+    const load = person.quarterLoad;
+    if (load && load.near) {
+      box.appendChild(make('div', {
+        text: load.atLimit
+          ? '這位這一季已經排滿每季上限（' + load.limit + ' 次，已排 ' + load.count
+            + ' 次），加「多一次」不會生效——系統不會為了偏好而超出上限。'
+          : '這位已經接近每季上限（' + load.limit + ' 次，已排 ' + load.count
+            + ' 次），加「多一次」可能不會生效。',
+        className: 'link-warn'
+      }));
+    }
     return box;
   }
 
@@ -983,7 +1015,7 @@
           const res = await callServerMutating('apiSavePersonPostWeightBatch', changes);
           if (!res.ok) { showErrorModal('排表偏好', new Error(res.message || '儲存失敗')); return; }
           setStatus('已新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。');
-          weightData = await callServer('apiGetPersonPostWeightMatrix');
+          weightData = await callServer('apiGetPersonPostWeightMatrix', currentQuarterId);
           weightChanges = {};
           renderWeights();
         });

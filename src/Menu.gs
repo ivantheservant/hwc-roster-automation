@@ -86,6 +86,7 @@ function onOpen() {
         .addItem('補建 Posts 欄位（提早到場分鐘數）', 'runSeedPostEarlyArrivalMinutes_')
         .addItem('補建 Posts 欄位（崗位身分要求）', 'runSeedPostRequiredRoles_')
         .addItem('補建身分名單工作表', 'runEnsureRoleSheets_')
+        .addItem('補建排表偏好工作表', 'runEnsurePersonPostWeightSheet_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')
         .addItem('補建 SpecialSundays 工作表', 'runEnsureSpecialSundaysSheet_')
         .addItem('建立 Requests 工作表', 'runCreateRequestsSheet_')

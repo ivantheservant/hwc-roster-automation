@@ -442,6 +442,47 @@ function collectKeyStateRows_() {
   // getConfig() 取得正確的生效值），但這份報告顯示的內容具誤導性。現在統一
   // 顯示「實際生效的值」，並在使用了程式碼預設值時明確標註，不會再有任何一個
   // 值顯示成 undefined／null／看起來空白卻沒有說明）----
+  // ---- PersonPostWeight：排表偏好（第二十七輪批次階段 B1）----
+  //
+  // ⚠️ 張表未建立係**正常**嘅（可選表），所以要分得出「未建立」同
+  // 「已建立但空白」——前者代表功能未開，後者代表堂委未決定過任何嘢。
+  // 兩者都係「零項生效」，但下一步要做嘅事完全唔同。
+  section('PersonPostWeight', function () {
+    const W = COLUMNS.PERSON_POST_WEIGHT;
+    const exists = !!SpreadsheetApp.getActiveSpreadsheet()
+      .getSheetByName(SHEETS.PERSON_POST_WEIGHT);
+    if (!exists) {
+      rows.push(diagRow_('PersonPostWeight', '（工作表尚未建立）', '',
+        '這是可選的表。未建立時排表結果同加入這個機制之前一模一樣。'
+        + '要用的話：選單「維護 ▸ 補建排表偏好工作表」。'));
+      return;
+    }
+
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    const active = readActivePersonPostWeights_(today, timezone);
+    const all = readOptionalSheet_(SHEETS.PERSON_POST_WEIGHT);
+    rows.push(diagRow_('PersonPostWeight', '（資料列總數）', all.length,
+      '生效中 ' + active.rows.length + ' 項　超出範圍而完全沒有生效 '
+      + active.invalid.length + ' 項'));
+
+    active.rows.forEach(function (w) {
+      rows.push(diagRow_('PersonPostWeight', w.personId + '｜' + w.postId,
+        'Adjust=' + (w.adjust > 0 ? '+' : '') + w.adjust,
+        'Reason=' + (w.reason || '（空白）')));
+    });
+    active.invalid.forEach(function (bad) {
+      rows.push(diagRow_('PersonPostWeight', bad.personId + '｜' + bad.postId,
+        '⚠️ Adjust=' + bad.rawAdjust, bad.reason + '（這一行完全沒有生效）'));
+    });
+    // 已解除嘅只出總數——保留紀錄係為咗日後查「當時點決定」，
+    // 唔係為咗每次都印一次。
+    const released = all.filter(function (row) {
+      return toDateString(row[W.EFFECTIVE_TO], timezone) !== '';
+    });
+    rows.push(diagRow_('PersonPostWeight', '（已解除，保留紀錄）', released.length,
+      '解除＝填了 EffectiveTo，不是刪行'));
+  });
+
   section('Config', function () {
     const config = readConfig();
     const dryRun = describeConfigValue_(config, CONFIG_KEYS.DRY_RUN, true);

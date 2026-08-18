@@ -810,9 +810,18 @@ function runSoftRuleMetrics_() {
     readPosts().forEach(function (row) {
       postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
     });
+    // 第二十七輪批次階段 B2：把每季上限嘅來源一併傳落去，
+    // 令「未達標原因」講得出係咪撞到上限。
+    // ⚠️ 一定要連 `RuleSettings` 一齊傳——上限有三層（個人值 ▸ 規則
+    // TargetValue ▸ Config 預設），只傳最後一層就會同排表本身用嘅值唔同。
     const report = buildPersonPostWeightReport_(
       readVersionAssignmentsRaw_(metrics.quarterId, metrics.versionNo),
-      weights, indexPeopleById_(), postNames);
+      weights, indexPeopleById_(), postNames, {
+        rules: readRules(),
+        defaultLimit:
+          Number(getConfig(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
+          || DEFAULTS.MAX_PER_QUARTER
+      });
     report.lines.forEach(function (l) { lines.push(l); });
     lines.push('');
   } catch (err) {

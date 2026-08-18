@@ -50,6 +50,15 @@ const FRESH_ENV_REQUIRED_SHEETS = [
     sheet: SHEETS.PERSON_POST_EXCLUSIONS,
     note: '個人崗位排除（同上工具一併建立）'
       + '——缺少時不會出錯，但教會規則 3（個別人士的崗位限制）不會生效'
+  },
+  // 第二十七輪批次階段 B1：排表偏好同樣係**可選**嘅。
+  // 未建立時 readActivePersonPostWeights_() 回空白，排表結果同以前
+  // 一模一樣（見 PersonPostWeight.gs 檔頭嗰條安全性質）。
+  {
+    sheet: SHEETS.PERSON_POST_WEIGHT,
+    note: '排表偏好／誰多做誰少做（「補建排表偏好工作表」建立，'
+      + '之後用幹事介面「名單維護 ▸ 排表偏好」填）'
+      + '——缺少時不會出錯，但堂委決定的「某人多做／少做幾次」不會生效'
   }
 ];
 
