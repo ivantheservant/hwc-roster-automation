@@ -244,7 +244,7 @@
       confirmLabel: '確定儲存',
       onConfirm: () => {
         runAction('儲存中', async () => {
-          const res = await callServer('apiSaveUnavailable', payload);
+          const res = await callServerMutating('apiSaveUnavailable', payload);
           if (!res.ok) { showErrorModal('不能服侍的日期', new Error(res.message)); return; }
           setStatus(res.created ? '已加入。' : '已更新。');
           unavailableData = await callServer('apiListUnavailable', currentQuarterId, '');
@@ -420,7 +420,7 @@
       danger: true,
       onConfirm: () => {
         runAction('重新產生中', async () => {
-          const res = await callServer('apiReissueToken', p.personId);
+          const res = await callServerMutating('apiReissueToken', p.personId);
           if (!res.ok) { showErrorModal('重新產生連結', new Error(res.message)); return; }
           setStatus('已為 ' + (res.nameTC || p.nameTC) + ' 產生新連結。');
           peopleData = await callServer('apiListPeople', '');
@@ -449,7 +449,7 @@
     ], [
       button('加入', () => {
         runAction('加入中', async () => {
-          const res = await callServer('apiAddPerson', {
+          const res = await callServerMutating('apiAddPerson', {
             nameTC: nameInput.value.trim(),
             nameEN: enInput.value.trim(),
             memberNo: memberInput.value.trim(),
@@ -524,7 +524,7 @@
           confirmLabel: '確定加入',
           onConfirm: () => {
             runAction('加入中', async () => {
-              const res = await callServer('apiSaveAlias', {
+              const res = await callServerMutating('apiSaveAlias', {
                 alias: alias, personId: personSel.value, active: true
               });
               if (!res.ok) { showErrorModal('別名', new Error(res.message)); return; }
@@ -732,7 +732,7 @@
             const parts = k.split('|');
             return { personId: parts[0], postId: parts[1], eligible: eligChanges[k] };
           });
-          const res = await callServer('apiSaveEligibilityBatch', changes);
+          const res = await callServerMutating('apiSaveEligibilityBatch', changes);
           if (!res.ok) { showErrorModal('崗位資格', new Error(res.message || '儲存失敗')); return; }
           setStatus('已新增 ' + res.added + ' 項、取消 ' + res.removed + ' 項。');
           eligData = await callServer('apiGetEligibilityMatrix');
@@ -752,7 +752,7 @@
    */
   function savePersonWithEmailCheck(payload) {
     runAction('儲存中', async () => {
-      const res = await callServer('apiSavePerson', payload);
+      const res = await callServerMutating('apiSavePerson', payload);
       if (res.ok) {
         setStatus('已儲存。');
         peopleData = await callServer('apiListPeople', '');
@@ -980,7 +980,7 @@
               reason: weightChanges[k].reason || '解除偏好'
             };
           });
-          const res = await callServer('apiSavePersonPostWeightBatch', changes);
+          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes);
           if (!res.ok) { showErrorModal('排表偏好', new Error(res.message || '儲存失敗')); return; }
           setStatus('已新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。');
           weightData = await callServer('apiGetPersonPostWeightMatrix');

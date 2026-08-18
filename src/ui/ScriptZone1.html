@@ -122,7 +122,7 @@
     ], []);
 
     runAction('生成初稿', async () => {
-      const res = await callServer('apiGenerateDraftExecute', currentQuarterId);
+      const res = await callServerMutating('apiGenerateDraftExecute', currentQuarterId);
       renderGenerateResult(res);
     });
   }
@@ -534,7 +534,7 @@
     });
 
     runAction('儲存中，請稍候', async () => {
-      const result = await callServer('apiSaveAndConfirmExecute', currentQuarterId, {
+      const result = await callServerMutating('apiSaveAndConfirmExecute', currentQuarterId, {
         decisions: decisions,
         confirmedRequestRows: confirmedRequestRows,
         releaseText: releaseText
@@ -630,7 +630,14 @@
     ], [
       button('立即發佈', () => {
         runAction('發佈公開連結', async () => {
-          const res = await callServer('apiRepublishPublicLink', currentQuarterId);
+          // ⚠️ 第二十七輪批次階段 A：呢一句本來係 `callServer(...)`，
+          // 之後即刻叫 `openReview()`——而 `openReview()` 讀嘅係
+          // **發佈之前攞落嚟嘅狀態快取**，入面仲寫住「冇連結」，
+          // 所以又跌返入呢個畫面。後端明明已經成功。
+          //
+          // 而家經 `callServerMutating()`，快取即刻變成「過期」，
+          // `openReview()` 入面嗰句 `getDashboard()` 就會先刷新。
+          const res = await callServerMutating('apiRepublishPublicLink', currentQuarterId);
           if (!res.ok) { showErrorModal('發佈公開連結', new Error(res.message)); return; }
           setStatus('公開連結已經發佈好了。');
           // 發佈完自動回到掣 2 嘅流程——唔使幹事自己再撳一次。
@@ -642,13 +649,14 @@
   }
 
   function openReview() {
-    // 前置檢查：dashboard 已經帶咗公開連結狀態返嚟，唔使多打一次伺服器。
-    // ⚠️ `checkFailed` 唔可以當成「有連結」而放行——嗰個係「查不到」，
-    // 唔係「冇問題」。後端仲有一道 assertPublicLinkReady_() 兜底。
-    const link = dashboard && dashboard.publicLink;
-    if (link && !link.hasLink) { renderReviewNeedsPublicLink(); return; }
-
     runAction('讀取確認資料', async () => {
+      // 前置檢查：狀態快取已經帶咗公開連結狀態返嚟，唔使多打一次伺服器。
+      // ⚠️ `checkFailed` 唔可以當成「有連結」而放行——嗰個係「查不到」，
+      // 唔係「冇問題」。後端仲有一道 assertPublicLinkReady_() 兜底。
+      const d = await getDashboard();
+      const link = d && d.publicLink;
+      if (link && !link.hasLink) { renderReviewNeedsPublicLink(); return; }
+
       const preview = await callServer('apiStep2Preview', currentQuarterId);
 
       // 收件人 0 ⇒ **拒絕執行**，唔係警告。
@@ -694,11 +702,11 @@
         ]));
       }
 
-      const last = dashboard.buttons.review.lastSentAt;
+      const last = d.buttons.review.lastSentAt;
       if (last) {
         nodes.push(para('上次在 ' + last + ' 寄過，會再寄一次給同一批人。'));
       }
-      if (dashboard.isDryRun) {
+      if (d.isDryRun) {
         nodes.push(make('div', {
           text: '測試模式：不會真的寄出，只會記錄一次。',
           className: 'badge badge-dryrun inline'
@@ -711,14 +719,17 @@
         bodyNodes: nodes,
         confirmLabel: '確定寄出',
         onConfirm: () => runAction('寄送中，請稍候', async () => {
-          const r = await callServer('apiStep2Confirm', currentQuarterId);
-          renderReviewDone(r);
+          const r = await callServerMutating('apiStep2Confirm', currentQuarterId);
+          await renderReviewDone(r);
         })
       });
     });
   }
 
-  function renderReviewDone(r) {
+  async function renderReviewDone(r) {
+    // ⚠️ 寄咗信之後先讀狀態——`getDashboard()` 見到快取過期會自己刷新。
+    // 讀舊快取嘅話，下面「開季前準備還有 N 項」會係寄信之前嗰個數。
+    const d = await getDashboard();
     const lines = [
       r.isDryRun ? '測試模式：沒有真的寄出任何電郵，只記錄了一次。' : '已經寄出。',
       '寄出 ' + r.sent + ' 封　模擬 ' + r.dryRun + ' 封　查無電郵略過 ' + r.skipped + ' 位',
@@ -727,9 +738,9 @@
     const nodes = lines.map((t) => make('div', { text: t, className: 'ok-line' }));
 
     // 規格 2.5 最後一段：區二未做完 >0 就提一提。
-    const undone = dashboard.preQuarter && dashboard.preQuarter.undoneItemCount;
+    const undone = d.preQuarter && d.preQuarter.undoneItemCount;
     if (undone > 0) {
-      const bits = (dashboard.preQuarter.items || [])
+      const bits = (d.preQuarter.items || [])
         .filter((i) => i.count > 0)
         .map((i) => i.label + ' ' + i.count);
       nodes.push(make('div', { className: 'warnbox' }, [
@@ -749,6 +760,7 @@
 
   function openOfficial() {
     runAction('讀取確認資料', async () => {
+      const d = await getDashboard();
       const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
       const versionNo = warnings.versionNo;
       const missing = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);
@@ -773,7 +785,7 @@
       }
 
       const preview = await callServer('apiStep4GetSendPreview', currentQuarterId, versionNo);
-      const b = dashboard.buttons.official;
+      const b = d.buttons.official;
       const willReceive = b.targetPersonCount - b.noEmailCount;
 
       const nodes = [];
@@ -829,7 +841,7 @@
         }));
       }
       detail.appendChild(make('div', {
-        text: '・同時寄給堂委 ' + dashboard.buttons.review.recipientCount + ' 人',
+        text: '・同時寄給堂委 ' + d.buttons.review.recipientCount + ' 人',
         className: 'vio-row'
       }));
       nodes.push(detail);
@@ -842,7 +854,7 @@
         })
       ]));
 
-      if (dashboard.isDryRun) {
+      if (d.isDryRun) {
         nodes.push(make('div', {
           text: '測試模式：不會真的寄出，只會記錄一次。',
           className: 'badge badge-dryrun inline'
@@ -856,7 +868,7 @@
         confirmLabel: '確定發出',
         danger: true,
         onConfirm: (typed) => runAction('寄送中，請稍候', async () => {
-          const r = await callServer('apiStep4Confirm', currentQuarterId);
+          const r = await callServerMutating('apiStep4Confirm', currentQuarterId);
           renderOfficialDone(r);
         })
       });
@@ -904,6 +916,7 @@
 
   function openResend() {
     runAction('比對有誰的安排改了', async () => {
+      const d = await getDashboard();
       const plan = await callServer('apiStep5Plan', currentQuarterId);
 
       if (plan.mode === 'NO_CHANGES') {
@@ -953,7 +966,7 @@
       });
       nodes.push(list);
 
-      if (dashboard.isDryRun) {
+      if (d.isDryRun) {
         nodes.push(make('div', {
           text: '測試模式：不會真的寄出，只會記錄一次。',
           className: 'badge badge-dryrun inline'
@@ -983,7 +996,7 @@
       guard++;
       if (guard > 40) throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。請重新整理再試一次。');
 
-      const r = await callServer('apiStep5GeneratePdfs', currentQuarterId, releaseText);
+      const r = await callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText);
       if (r.blocked) {
         showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，需要先在「儲存並確認」處理。'));
         return;
@@ -997,7 +1010,7 @@
       setStatus('產生個人 PDF：' + r.doneCount + ' / ' + r.totalPeople + ' 份…');
     }
 
-    const result = await callServer('apiStep5SendConfirm', currentQuarterId, releaseText);
+    const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText);
     if (result.blocked) {
       showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，尚未寄出任何電郵。'));
       return;

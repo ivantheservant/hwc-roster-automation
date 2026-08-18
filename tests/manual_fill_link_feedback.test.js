@@ -101,7 +101,9 @@ console.log('\n=== B3【核心】儲存之後要講「有冇對上名單」 ==='
   check('★★★★★ 前端有 renderLinkFeedback()', /function renderLinkFeedback\(/.test(zone2));
   check('★★★★★ 儲存之後真係攞返個結果嚟用'
     + '（原本嗰句 await 冇收回傳值，即係後端講咗都冇人聽）',
-    /const res = await callServer\('apiWebSavePreacherEntry'/.test(zone2));
+    // 第二十七輪批次階段 A：呢個呼叫會寫入，所以改咗行 callServerMutating()
+    // ——寫完之後狀態快取要標記過期，否則區二嘅「還有 N 項未做」會停喺舊數。
+    /const res = await callServerMutating\('apiWebSavePreacherEntry'/.test(zone2));
   check('★★★★★ 對得上：講明佢會收到通知',
     zone2.indexOf('已對上名單上的「') !== -1 && zone2.indexOf('正式發出時他會收到通知。') !== -1);
   check('★★★★★ 對唔上：講明佢唔會收到，**而且講明外請講員屬正常**'

@@ -142,7 +142,8 @@ console.log('\n=== A2-4：區四要有「重新發佈公開連結」 ===');
     body.indexOf('這一季還沒有任何版本，沒有東西可以發佈。') !== -1);
   check('★★★★★ 區四有呢粒掣（掣 2 嘅錯誤訊息指去呢度，所以一定要有）',
     /function renderRepublishEntry/.test(common)
-    && /renderZone4[\s\S]{0,400}?renderRepublishEntry\(\)/.test(common));
+    // 第二十七輪批次階段 A：狀態改成由參數傳入（唔再喺函式入面自己讀快取）。
+    && /renderZone4[\s\S]{0,400}?renderRepublishEntry\(d\)/.test(common));
   check('★★★★ 而且會按目前狀態講唔同嘅話（有／冇／查唔到）',
     /link\.checkFailed[\s\S]{0,200}?link\.hasLink/.test(common));
 }

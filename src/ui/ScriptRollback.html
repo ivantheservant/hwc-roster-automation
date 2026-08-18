@@ -159,7 +159,7 @@
       confirmLabel: '確定回退',
       danger: true,
       onConfirm: (typed) => runAction('回退中，請稍候', async () => {
-        const r = await callServer('apiRollbackExecute',
+        const r = await callServerMutating('apiRollbackExecute',
           currentQuarterId, plan.targetVersionNo, typed);
         renderRollbackResult(r);
       })

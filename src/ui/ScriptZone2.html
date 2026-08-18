@@ -36,13 +36,23 @@
       setZoneOpen('zone2Head', 'zone2Body', true);
       // `setZoneOpen()` 係直接開，唔會行 `wireZoneToggle()` 嗰條路，
       // 所以要自己標記「已載入」——用同一個 zoneLoadState，唔可以另開旗標。
-      if (!markZoneLoaded('zone2Body')) renderZone2Body();
+      markZoneLoaded('zone2Body');
     }
+
+    // ⚠️ 第二十七輪批次階段 A：**每次都重畫**，唔理之前畫過未。
+    //
+    // 本來寫成「未載入過先至畫」。噉樣區三加咗一筆不能服侍日期之後，
+    // 上面嘅「還有 N 項未做」會變，但下面逐項嘅數字唔會變——
+    // 又係同一個 bug class（同一份資料，一半更新咗一半冇）。
+    //
+    // 呢個函式係純渲染（資料由參數嚟，零伺服器來回），重畫嘅成本近乎零，
+    // 所以冇任何理由保留嗰個「畫過未」嘅分支。
+    renderZone2Body(d);
   }
 
-  function renderZone2Body() {
+  function renderZone2Body(d) {
     const body = clear(el('zone2Body'));
-    const pq = (dashboard && dashboard.preQuarter) || { items: [] };
+    const pq = (d && d.preQuarter) || { items: [] };
 
     // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
     const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
@@ -196,7 +206,7 @@
           active: activeCb.checked
         };
         runAction('儲存中', async () => {
-          const res = await callServer('apiSaveSpecialSunday', payload);
+          const res = await callServerMutating('apiSaveSpecialSunday', payload);
           if (res.warning) setStatus(res.warning, true);
           else setStatus('已儲存。');
           specialData = await callServer('apiListSpecialSundays', currentQuarterId);
@@ -254,7 +264,7 @@
       ],
       confirmLabel: '新增',
       onConfirm: () => runAction('新增中', async () => {
-        const res = await callServer('apiAddSpecialSunday', {
+        const res = await callServerMutating('apiAddSpecialSunday', {
           quarterId: currentQuarterId,
           serviceDate: dateInput.value.trim(),
           type: typeInput.value.trim(),
@@ -390,7 +400,7 @@
           const name = input.value.trim();
           if (!name) { statusSpan.textContent = '姓名不可留空（留空就不用按儲存）。'; return; }
           runAction('儲存中', async () => {
-            const res = await callServer('apiWebSavePreacherEntry',
+            const res = await callServerMutating('apiWebSavePreacherEntry',
               currentQuarterId, c.serviceDate, c.postId, c.slotIndex, name);
             statusSpan.textContent = '已儲存 ✓';
             renderLinkFeedback(linkNote, res, name);

@@ -19,20 +19,139 @@
   /** 打字確認一律呢兩個字（規格 1.4.4）。 */
   const CONFIRM_PHRASE = '確認';
 
-  /** 目前選中嘅季度，同最近一次 apiGetDashboardState 嘅結果。 */
+  /** 目前選中嘅季度。 */
   let currentQuarterId = '';
-  let dashboard = null;
+
+  /* ============================================================
+   * 第二十七輪批次階段 A：狀態快取嘅單一真相來源
+   * ============================================================
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 呢度修緊嘅 bug（Ivan 實測撞到，2027T3）
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 撳「寄給堂委審閱」→ 正確彈出「還沒有公開連結」→ 撳「立即發佈」
+   * → 掣暗一陣 → **彈返同一個畫面**。
+   * 而後端其實成功咗：`PublicLinks` 真係加咗嗰一行。
+   *
+   * 成因：「立即發佈」成功之後即刻叫 `openReview()`，而 `openReview()`
+   * 讀嘅係**發佈之前攞落嚟嘅狀態快取**——入面仍然寫住「冇連結」，
+   * 所以又跌返入同一個分支。
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 點解唔係喺嗰一處補一句刷新
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 呢個 bug class（同一個狀態有兩個真相來源，只更新咗其中一個）
+   * 已經係第三次：
+   *   1. `wireZoneToggle` 兩個載入旗標 ⇒ 換季度顯示上一季數字
+   *   2. 掣 1 預覽過期 ⇒ 已加偵測
+   *   3. 狀態快取 vs 伺服器真實狀態 ⇒ 今次
+   *
+   * 補一句就係第四次嘅溫床。所以改成三條**結構性**規則：
+   *
+   *   1. `dashboardState_` 只可以喺 `loadDashboard()` 入面賦值。
+   *   2. 讀嘅唯一入口係 `getDashboard()`——佢係 async，過期會自己刷新。
+   *      其餘檔案**完全唔可以直接寫個變數名**（測試會掃）。
+   *   3. `callServer()` 係**預設拒絕**：唔喺 `READ_ONLY_APIS` 白名單
+   *      嘅一律當成會寫入，要用 `callServerMutating()`。
+   *
+   * 第 3 條係關鍵。方向特登揀成「白名單唯讀」而唔係「黑名單寫入」：
+   * 將來有人加一個新嘅寫入 api，佢**唔使記得**做任何嘢——唔加入白名單
+   * 就一定行 `callServerMutating()`，而嗰度會自動標記快取過期。
+   * 估錯嘅代價唔對稱：把一個唯讀 api 當成會寫入，代價只係多一次刷新；
+   * 反過嚟就係今次呢個 bug。
+   */
+
+  /**
+   * 最近一次 `apiGetDashboardState` 嘅結果。
+   * ⚠️ **只可以喺 `loadDashboard()` 入面賦值，只可以經 `getDashboard()` 讀。**
+   */
+  let dashboardState_ = null;
+
+  /** 有寫入動作跑過但未刷新。`getDashboard()` 見到就會先刷新。 */
+  let dashboardStale_ = false;
+
+  /**
+   * 唯讀 api* 白名單。
+   *
+   * ⚠️ **新增一個 api 而唔加入呢度，系統就會當佢會寫入。** 呢個方向係
+   * 特登嘅（見上面）。加入之前請自己確認：佢真係一格都唔會寫。
+   */
+  const READ_ONLY_APIS = [
+    'apiListQuarters',
+    'apiGetDashboardState',
+    'apiGetThemePreference',
+    'apiGenerateDraftPlan',
+    'apiSaveAndConfirmPlan',
+    'apiStep2Preview',
+    'apiStep4GetPendingWarnings',
+    'apiStep4GetMissingPdfWarnings',
+    'apiStep4GetSendPreview',
+    'apiStep5Plan',
+    'apiListVersionsForRollback',
+    'apiRollbackPlan',
+    'apiListSpecialSundays',
+    'apiWebListPreacherPending',
+    'apiGetPreQuarterChecklist',
+    'apiListUnavailable',
+    'apiPreviewUnavailableImpact',
+    'apiListPeople',
+    'apiListAliases',
+    'apiGetEligibilityMatrix',
+    'apiGetPersonPostWeightMatrix'
+  ];
 
   // ── 伺服器呼叫 ───────────────────────────────────────────────
 
-  /** 把 google.script.run 包成 Promise。 */
-  function callServer(fnName, ...args) {
+  /**
+   * 把 google.script.run 包成 Promise。
+   * ⚠️ **全前端只有呢一個函式可以掂 `google.script.run`。**
+   * 其餘一律經 `callServer()`／`callServerMutating()`，
+   * 否則就繞過咗上面嗰道白名單關卡。
+   */
+  function callServerRaw_(fnName, ...args) {
     return new Promise((resolve, reject) => {
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler((err) => reject(new Error(err && err.message ? err.message : String(err))))
         [fnName](...args);
     });
+  }
+
+  /** 唯讀呼叫。唔喺白名單就即刻拒絕——呢個係一個程式錯誤，唔係使用者錯。 */
+  function callServer(fnName, ...args) {
+    if (READ_ONLY_APIS.indexOf(fnName) === -1) {
+      return Promise.reject(new Error(
+        '程式錯誤：「' + fnName + '」不在唯讀白名單裡面。'
+        + '會改動資料的呼叫要用 callServerMutating()（它會自動把狀態快取標記為過期）；'
+        + '如果它真的一格都不會寫，請把它加入 READ_ONLY_APIS。'));
+    }
+    return callServerRaw_(fnName, ...args);
+  }
+
+  /**
+   * 會改變伺服器狀態嘅呼叫。**成功之後即刻標記快取過期。**
+   *
+   * 唔喺呢度即場刷新，係因為有啲流程會連續叫幾十次（例如分批產生
+   * 個人 PDF），每次都刷新就係幾十次多餘嘅來回。改成「標記過期」：
+   *   ・`getDashboard()` 一讀就會先刷新（所以判斷永遠用新資料）
+   *   ・`runAction()` 做完會刷新一次（所以畫面永遠跟住變）
+   * 兩邊都係自動嘅，呼叫端唔使記得任何嘢。
+   */
+  async function callServerMutating(fnName, ...args) {
+    const result = await callServerRaw_(fnName, ...args);
+    dashboardStale_ = true;
+    return result;
+  }
+
+  /**
+   * 讀狀態快取嘅**唯一**入口。過期就先刷新再回。
+   * @returns {Promise<?Object>} 未揀季度時會係 null
+   */
+  async function getDashboard() {
+    if (dashboardStale_ || !dashboardState_) await loadDashboard({ keepModal: true });
+    return dashboardState_;
   }
 
   function setStatus(message, isError) {
@@ -72,6 +191,18 @@
       showErrorModal(label + '失敗', err);
       setStatus('');
     } finally {
+      // 階段 A：呢個動作期間有冇寫過嘢？有嘅話畫面（狀態卡、區一四粒掣、
+      // 區二「還有 N 項未做」）一定要跟住變。
+      //
+      // 擺喺 `finally` 而唔係成功路徑：拋錯唔代表冇寫入——好多動作係
+      // 「寫咗一半先失敗」。嗰種情況下畫面更加需要係最新嘅。
+      //
+      // 刷新自己失敗唔可以蓋過原本嗰個錯（幹事會見到一個同佢做過嘅事
+      // 完全無關嘅訊息）。所以只寫一句灰字，唔開第二個彈窗。
+      if (dashboardStale_) {
+        try { await loadDashboard({ keepModal: true }); }
+        catch (e) { setStatus('畫面上的數字可能不是最新的，請撳「重新整理」。', true); }
+      }
       setBusy(false);
     }
   }
@@ -381,15 +512,23 @@
     await loadDashboard();
   }
 
-  /** 全頁唯一嘅狀態來源。**唔可以逐粒掣各自打後端。** */
-  async function loadDashboard() {
+  /**
+   * 全頁唯一嘅狀態來源。**唔可以逐粒掣各自打後端。**
+   *
+   * ⚠️ 階段 A：全前端**只有呢一個函式**可以賦值畀狀態快取。
+   * @param {{keepModal: (boolean|undefined)}=} opts
+   *   `keepModal` ＝ 唔好關現有彈窗。寫入動作之後嘅自動刷新會用，
+   *   因為嗰陣時幹事仲喺一個畫面入面做緊嘢，關咗就等於打斷佢。
+   */
+  async function loadDashboard(opts) {
     if (!currentQuarterId) return;
-    closeModal();
-    dashboard = await callServer('apiGetDashboardState', currentQuarterId);
-    renderTop(dashboard);
-    renderZone1(dashboard);
-    renderZone2Head(dashboard);
-    renderZone4();
+    if (!(opts && opts.keepModal)) closeModal();
+    dashboardState_ = await callServer('apiGetDashboardState', currentQuarterId);
+    dashboardStale_ = false;
+    renderTop(dashboardState_);
+    renderZone1(dashboardState_);
+    renderZone2Head(dashboardState_);
+    renderZone4(dashboardState_);
   }
 
   function renderTop(d) {
@@ -427,11 +566,17 @@
     badge.className = 'badge badge-dryrun';
   }
 
-  function renderZone4() {
+  /**
+   * 區四內容。
+   * ⚠️ 階段 F 會把佢搬去 `ScriptZone4.html` 並且擴充成七個工具，
+   * 到時**要記得刪走呢一份**——兩份同名函式喺 GAS 嘅單一全域作用域
+   * 入面，後載入嗰份會靜靜蓋過前面嗰份。
+   */
+  function renderZone4(d) {
     const body = clear(el('zone4Body'));
     body.appendChild(renderRollbackEntry());
     // 第二十六輪批次階段 A2-4：掣 2 嘅錯誤訊息會指去呢度，所以一定要有。
-    body.appendChild(renderRepublishEntry());
+    body.appendChild(renderRepublishEntry(d));
     body.appendChild(make('p', {
       text: '其餘工具暫時請用試算表上方的選單，下一輪會搬上來。',
       className: 'muted'
@@ -439,9 +584,9 @@
   }
 
   /** 階段 A2-4：重新發佈公開連結。 */
-  function renderRepublishEntry() {
+  function renderRepublishEntry(d) {
     const box = make('div', { className: 'act' });
-    const link = (dashboard && dashboard.publicLink) || {};
+    const link = (d && d.publicLink) || {};
     const desc = link.checkFailed
       ? '現在查不到這一季有沒有公開連結。'
       : (link.hasLink
@@ -454,10 +599,9 @@
     ]));
     box.appendChild(button('發佈', () => {
       runAction('發佈公開連結', async () => {
-        const res = await callServer('apiRepublishPublicLink', currentQuarterId);
+        const res = await callServerMutating('apiRepublishPublicLink', currentQuarterId);
         if (!res.ok) { showErrorModal('重新發佈公開連結', new Error(res.message)); return; }
         setStatus('公開連結已經發佈好了（第 ' + res.versionNo + ' 版）。');
-        await loadDashboard();
       });
     }, ''));
     return box;
@@ -531,7 +675,10 @@
       // 用 bodyId 做 key——每個區天然唯一，唔使另外維護一份區名清單。
       if (willOpen && !zoneLoadState[bodyId] && onOpen) {
         zoneLoadState[bodyId] = true;
-        onOpen();
+        // ⚠️ 一定要包 `runAction()`：`onOpen` 可以係 async（要 await
+        // `getDashboard()`）。唔包嘅話失敗會變成一個冇人處理嘅 rejected
+        // promise——區展開咗但係空白，冇任何錯誤訊息。
+        runAction('載入', async () => { await onOpen(); });
       }
     });
   }
@@ -582,7 +729,10 @@
         try { window.localStorage.setItem(THEME_STORAGE_KEY, next); return; }
         catch (e) { themeLocalStorageOk = false; }
       }
-      callServer('apiSetThemePreference', next).catch(() => {});
+      // 佢寫 UserProperties（唔係試算表），但一樣要行 mutating 呢條路——
+      // 白名單嘅意思係「保證一格都唔會寫」，唔係「寫嘅嘢唔重要」。
+      // 破一次例，下一個人就會覺得自己嗰個都可以破。
+      callServerMutating('apiSetThemePreference', next).catch(() => {});
     });
   }
 </script>

@@ -38,7 +38,9 @@
   });
 
   // 收摺區
-  wireZoneToggle('zone2Head', 'zone2Body', renderZone2Body);
+  // ⚠️ 階段 A：區二身係由狀態快取畫出嚟嘅，所以要經 `getDashboard()` 攞
+  // ——直接讀個變數就係「快取可能過期」嗰個 bug class 嘅入口。
+  wireZoneToggle('zone2Head', 'zone2Body', async () => renderZone2Body(await getDashboard()));
   wireZoneToggle('zone3Head', 'zone3Body', renderZone3);
   wireZoneToggle('zone4Head', 'zone4Body', null);
 
