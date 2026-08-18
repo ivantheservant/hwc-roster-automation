@@ -21,12 +21,9 @@
       button('人員與電郵', () => openPeople(), ''),
       button('崗位資格', () => openEligibility(), ''),
       button('排表偏好', () => openWeights(), ''),
-      button('身分（堂委／執事）', () => openRoles(), '')
+      button('身分（堂委／執事）', () => openRoles(), ''),
+      button('暫時不做某崗位', () => openExclusions(), '')
     ]));
-    body.appendChild(make('p', {
-      text: '個人崗位排除這個畫面下一個階段會搬上來，暫時請用試算表上方的選單。',
-      className: 'muted'
-    }));
   }
 
   /* ============================================================
@@ -1416,6 +1413,303 @@
         }));
       });
     });
+  }
+
+
+  /* ============================================================
+   * 畫面六：暫時不做某崗位（規格 4.5，第二十七輪批次階段 D）
+   * ============================================================ */
+
+  let exclusionData = null;
+
+  function openExclusions(keyword) {
+    runAction('讀取個人崗位限制', async () => {
+      exclusionData = await callServer('apiListExclusions', keyword || '');
+      renderExclusions(keyword || '');
+    });
+  }
+
+  function renderExclusions(keyword) {
+    const nodes = [];
+
+    if (!exclusionData.sheetExists) {
+      nodes.push(make('div', { className: 'vio vio-hard' }, [
+        make('div', {
+          text: '個人崗位排除（PersonPostExclusions）這張工作表還沒有建立。',
+          className: 'vio-head'
+        }),
+        make('div', {
+          text: '請先用試算表選單「維護 ▸ 補建身分名單工作表」（它會一併建立這一張）。',
+          className: 'vio-row'
+        })
+      ]));
+    }
+
+    // 規格 4.5：呢兩句一定要有，而且要逐字照抄。
+    //
+    // 混淆呢兩件事嘅後果：幹事想「呢半年唔好排佢做主席」，
+    // 就會去取消佢主席嘅資格——而嗰個係「以後永遠唔會排佢」，
+    // 而且日後想恢復嗰陣，「佢做過幾多次」呢個歷史已經斷咗。
+    nodes.push(make('div', { className: 'warnbox' }, [
+      make('div', { text: '崗位資格 = 這個人從來沒做過這個崗位。', className: 'warn-head' }),
+      make('div', { text: '暫時不做 = 這個人做得到，但這一段時間不排他。', className: 'warn-head' })
+    ]));
+
+    nodes.push(row([
+      button('＋ 新增一條', () => openExclusionEditor(null), '')
+    ], 'row-right'));
+    nodes.push(peopleSearchBox(keyword, (k) => openExclusions(k)));
+
+    if (exclusionData.current.length === 0) {
+      nodes.push(make('div', { text: '目前沒有生效中的限制。', className: 'muted' }));
+    } else {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('生效中（' + exclusionData.current.length + ' 條）')
+      ]);
+      exclusionData.current.forEach((r) => box.appendChild(exclusionRow(r, false)));
+      nodes.push(box);
+    }
+
+    // 已解除嘅摺入一節，**唔刪**——要睇得返「嗰段時間確實生效過」。
+    if (exclusionData.lifted.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('已解除（' + exclusionData.lifted.length + ' 條，保留紀錄，不會刪走）')
+      ]);
+      exclusionData.lifted.forEach((r) => box.appendChild(exclusionRow(r, true)));
+      nodes.push(box);
+    }
+
+    openModal('暫時不做某崗位', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+  }
+
+  function exclusionRow(r, isLifted) {
+    const box = make('div', { className: 'prop' + (isLifted ? ' is-off' : '') });
+    const head = make('div', { className: 'prop-head' });
+    head.appendChild(make('span', { text: r.nameTC }));
+    head.appendChild(make('span', { text: '　' + r.postNameTC }));
+    if (r.unknownPost) {
+      // 崗位表冇呢個代號 ⇒ 呢條限制根本唔會生效，而畫面睇落完全正常。
+      head.appendChild(make('span', {
+        text: '崗位表沒有這個代號，這一條不會生效', className: 'tag tag-bad'
+      }));
+    }
+    if (!r.active) head.appendChild(make('span', { text: '已停用', className: 'tag' }));
+    box.appendChild(head);
+
+    box.appendChild(make('div', {
+      text: (r.effectiveFrom || '（即時生效）') + ' 至 '
+        + (r.effectiveTo || '仍然生效') + '　原因：' + r.reason,
+      className: 'muted'
+    }));
+
+    const slot = make('div', {});
+    box.appendChild(slot);
+
+    const buttons = [button('修改', () => {
+      if (slot.firstChild) { clear(slot); return; }
+      slot.appendChild(exclusionEditorFields(r));
+    }, 'link')];
+    // 已解除嘅唔會再有「解除」掣——按落去只會令人以為要再解除一次。
+    if (!isLifted) buttons.unshift(button('解除限制', () => openLiftExclusion(r), ''));
+    box.appendChild(row(buttons, 'row-right'));
+    return box;
+  }
+
+  /** 解除：直接彈日期選擇，預設今日（規格 4.5）。 */
+  function openLiftExclusion(r) {
+    const dateIn = dateInput(exclusionData.today);
+    openModal('解除限制', [
+      para('解除的意思是「由這一日起，可以再排他做這個崗位」。'),
+      make('div', { className: 'sec' }, [
+        make('div', { text: r.nameTC + '　' + r.postNameTC, className: 'vio-row' }),
+        make('div', { text: '原因：' + r.reason, className: 'vio-row' }),
+        make('div', {
+          text: '生效期間：' + (r.effectiveFrom || '（即時生效）') + ' 至 仍然生效',
+          className: 'vio-row'
+        })
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '解除日' }), dateIn
+      ]),
+      // 解除做成「填日期」而唔係「刪行」／「取消啟用」嘅原因，一定要講。
+      // 唔講嘅話，下一個人會覺得「刪咗佢乾淨啲」。
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '系統只會填上「解除日」，不會刪走這一行，也不會把它設成停用。',
+          className: 'warn-head'
+        }),
+        make('div', {
+          text: '這樣舊季度的職事表仍然看得出「那一段時間確實不應該排他」。'
+            + '如果刪走或者停用，舊季度就會變成「當時本來可以排他」，那是錯的。',
+          className: 'lines'
+        })
+      ])
+    ], [
+      button('確定解除', () => {
+        openConfirm({
+          title: '確定要解除嗎',
+          bodyNodes: [
+            para('會改動 1 行：' + r.nameTC + '　' + r.postNameTC + '。'),
+            para('「解除日」會填成 ' + (dateIn.value.trim() || '（空白）')
+              + '，其餘欄位一格都不會改。')
+          ],
+          confirmLabel: '確定解除',
+          onConfirm: () => runAction('解除中', async () => {
+            const res = await callServerMutating('apiLiftExclusion',
+              r.exclusionId, dateIn.value.trim());
+            if (!res.ok) { showErrorModal('解除限制', new Error(res.message)); return; }
+            setStatus('已解除（解除日 ' + res.effectiveTo + '）。');
+            openExclusions('');
+          })
+        });
+      }, ''),
+      button('取消', () => renderExclusions(''), 'secondary')
+    ]);
+  }
+
+  /** 撳「修改」之後先展開嘅欄位。 */
+  function exclusionEditorFields(r) {
+    const box = make('div', { className: 'prop-opts' });
+
+    const postSel = document.createElement('select');
+    exclusionData.posts.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.postId;
+      o.textContent = p.postNameTC;
+      if (r.postId === p.postId) o.selected = true;
+      postSel.appendChild(o);
+    });
+
+    const reasonInput = textField(r.reason, '原因（必填）');
+    const fromInput = dateInput(r.effectiveFrom || '');
+    const toInput = dateInput(r.effectiveTo || '');
+    const notesInput = textField(r.notes, '備註（可留空）');
+
+    const activeCb = document.createElement('input');
+    activeCb.type = 'checkbox';
+    activeCb.checked = r.active !== false;
+    const activeLabel = make('label', { className: 'check-row' });
+    activeLabel.appendChild(activeCb);
+    activeLabel.appendChild(make('span', {
+      text: '啟用（取消勾選＝這一行由頭到尾都不算數；只是解除的話請用「解除限制」）'
+    }));
+
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '崗位' }), postSel,
+      make('span', { text: '原因' }), reasonInput
+    ]));
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '生效日' }), fromInput,
+      make('span', { text: '解除日' }), toInput,
+      make('span', { text: '備註' }), notesInput
+    ]));
+    box.appendChild(activeLabel);
+
+    box.appendChild(row([button('儲存這一條', () => {
+      const payload = {
+        exclusionId: r.exclusionId,
+        personId: r.personId,
+        postId: postSel.value,
+        reason: reasonInput.value.trim(),
+        effectiveFrom: fromInput.value.trim(),
+        effectiveTo: toInput.value.trim(),
+        notes: notesInput.value.trim(),
+        active: activeCb.checked
+      };
+      const warn = [];
+      if (r.active !== false && !activeCb.checked) {
+        warn.push('取消「啟用」＝這一行由頭到尾都不算數（連過去的季度也會變成'
+          + '「當時本來可以排他」）。如果只是想解除，請用「解除限制」填日期。');
+      }
+      openConfirm({
+        title: '確定要儲存嗎',
+        bodyNodes: [para('會改動 1 行：' + r.nameTC + '　'
+          + postSel.options[postSel.selectedIndex].textContent + '。')]
+          .concat(warn.map((w) => make('div', { text: w, className: 'vio vio-warn' }))),
+        confirmLabel: '確定儲存',
+        onConfirm: () => runAction('儲存中', async () => {
+          const res = await callServerMutating('apiSaveExclusion', payload);
+          if (!res.ok) { showErrorModal('暫時不做某崗位', new Error(res.message)); return; }
+          setStatus('已儲存。');
+          openExclusions('');
+        })
+      });
+    }, '')], 'row-right'));
+
+    return box;
+  }
+
+  /** 新增一條。 */
+  function openExclusionEditor() {
+    const personSel = document.createElement('select');
+    exclusionData.people.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.personId;
+      o.textContent = p.nameTC;
+      personSel.appendChild(o);
+    });
+
+    const postSel = document.createElement('select');
+    exclusionData.posts.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.postId;
+      o.textContent = p.postNameTC;
+      postSel.appendChild(o);
+    });
+
+    const reasonInput = textField('', '原因（必填，例如：膝傷，暫時不能站）');
+    const fromInput = dateInput('');
+    const toInput = dateInput('');
+
+    openModal('新增一條限制', [
+      make('div', { className: 'warnbox' }, [
+        make('div', { text: '崗位資格 = 這個人從來沒做過這個崗位。', className: 'warn-head' }),
+        make('div', { text: '暫時不做 = 這個人做得到，但這一段時間不排他。', className: 'warn-head' })
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '誰' }), personSel,
+        make('span', { text: '崗位' }), postSel
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '原因' }), reasonInput
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '生效日' }), fromInput,
+        make('span', { text: '解除日' }), toInput
+      ]),
+      para('「生效日」留空＝即時生效。「解除日」留空＝暫時無限期'
+        + '（日後解除時再填，不要刪除整行）。', 'muted'),
+      para('原因一定要填。三個月之後，沒有原因的限制沒有人記得為什麼，'
+        + '也就沒有人夠膽解除它。', 'muted')
+    ], [
+      button('加入', () => {
+        const name = personSel.options[personSel.selectedIndex].textContent;
+        const post = postSel.options[postSel.selectedIndex].textContent;
+        openConfirm({
+          title: '確定要加入嗎',
+          bodyNodes: [
+            para('會加入 1 行：這一段時間不排 ' + name + ' 做「' + post + '」。'),
+            para('生效日：' + (fromInput.value.trim() || '（留空＝即時生效）')
+              + '　解除日：' + (toInput.value.trim() || '（留空＝暫時無限期）')),
+            para('已經生成的職事表不會自己改。要撳「儲存並確認」系統才會重新檢查。', 'muted')
+          ],
+          confirmLabel: '確定加入',
+          onConfirm: () => runAction('加入中', async () => {
+            const res = await callServerMutating('apiAddExclusion', {
+              personId: personSel.value,
+              postId: postSel.value,
+              reason: reasonInput.value.trim(),
+              effectiveFrom: fromInput.value.trim(),
+              effectiveTo: toInput.value.trim()
+            });
+            if (!res.ok) { showErrorModal('暫時不做某崗位', new Error(res.message)); return; }
+            setStatus('已加入。');
+            openExclusions('');
+          })
+        });
+      }, ''),
+      button('取消', () => renderExclusions(''), 'secondary')
+    ]);
   }
 
   /* ============================================================
