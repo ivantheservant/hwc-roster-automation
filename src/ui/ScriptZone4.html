@@ -47,6 +47,19 @@
         () => openMakeupSend(), false)
     ]));
 
+    body.appendChild(make('div', { className: 'sec' }, [
+      sectionTitle('規則審閱'),
+      make('div', {
+        text: '把系統現時的規則設定變成一份人看得懂的試算表，'
+          + '給堂委逐條決定；他們填好之後再匯入。',
+        className: 'muted'
+      }),
+      zone4Row('匯出規則審閱表', '產生一份新的試算表，放在 Drive 的 RuleReview 資料夾。',
+        () => openRuleExport(), false),
+      zone4Row('匯入規則審閱表', '讀回堂委填好的那一份，逐條給你接受或拒絕。',
+        () => openRuleImport(), false)
+    ]));
+
     body.appendChild(make('p', {
       text: '其餘工具（體檢、上線前檢查、匯出關鍵狀態等）請用試算表上方的選單。',
       className: 'muted'
@@ -392,4 +405,163 @@
     });
   }
 
+  /* ============================================================
+   * 規則審閱表匯出／匯入（規格 5.4，階段 G2）
+   * ============================================================ */
+
+  function openRuleExport() {
+    openConfirm({
+      title: '匯出規則審閱表',
+      bodyNodes: [
+        para('會在 Drive 的 RuleReview 資料夾建立一份新的試算表。'),
+        make('div', { className: 'sec' }, [
+          sectionTitle('那份表裡面：'),
+          make('div', { text: '・每一條規則一行，用一句人話說明它在做什麼', className: 'vio-row' }),
+          make('div', { text: '・小數一律換算成「13 個主日之中大約幾多次」', className: 'vio-row' }),
+          make('div', { text: '・堂委只需要填黃色那兩欄：「堂委決定」和「備註」', className: 'vio-row' }),
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會改動系統現時任何一條規則', className: 'vio-row' })
+        ])
+      ],
+      confirmLabel: '確定匯出',
+      onConfirm: () => runAction('匯出中', async () => {
+        const res = await callServerMutating('apiExportRuleReviewSheet');
+        if (!res.ok) { showErrorModal('匯出規則審閱表', new Error(res.message)); return; }
+        const nodes = [
+          make('div', { text: '已建立：' + res.fileName, className: 'ok-line' }),
+          make('div', { text: '共 ' + res.ruleCount + ' 條規則。', className: 'lines' })
+        ];
+        if (res.fileUrl) {
+          const a = document.createElement('a');
+          a.href = res.fileUrl;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = '開啟這份審閱表';
+          a.className = 'bigLink';
+          nodes.push(a);
+        }
+        nodes.push(para('把這條連結給堂委。他們填好之後，回來撳「匯入規則審閱表」。'));
+        openModal('匯出完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
+
+  /** 匯入：三欄對照，逐條接受或拒絕（同掣 1 同一個模式）。 */
+  let ruleImportDecisions = {};
+
+  function openRuleImport() {
+    runAction('讀取審閱表', async () => {
+      const data = await callServer('apiListRuleReviewSheets');
+      if (!data.ok) { showErrorModal('匯入規則審閱表', new Error(data.message)); return; }
+      if (data.files.length === 0) {
+        openModal('匯入規則審閱表', [
+          para('RuleReview 資料夾裡面還沒有任何審閱表。請先撳「匯出規則審閱表」。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      const sel = document.createElement('select');
+      data.files.forEach((f) => {
+        const o = document.createElement('option');
+        o.value = f.fileId;
+        o.textContent = f.label;
+        sel.appendChild(o);
+      });
+      openModal('匯入規則審閱表', [
+        para('只會讀「堂委決定」和「備註」兩欄，其餘一律忽略——'
+          + '就算他們在表上改了規則名或者現時設定，也不會進入系統。'),
+        make('div', { className: 'prop-head' }, [make('span', { text: '哪一份' }), sel])
+      ], [
+        button('讀入並比對', () => runAction('比對中', async () => {
+          const plan = await callServer('apiRuleReviewImportPlan', sel.value);
+          renderRuleImportPlan(sel.value, plan);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  function renderRuleImportPlan(fileId, plan) {
+    if (!plan.ok) { showErrorModal('匯入規則審閱表', new Error(plan.message)); return; }
+    ruleImportDecisions = {};
+
+    const nodes = [];
+
+    // 硬規則：只記錄，永不改。呢個係一條**唔可以由堂委表改動**嘅界線。
+    if (plan.hardNotes.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('一定要遵守的規則（' + plan.hardNotes.length + ' 條有意見）'),
+        make('div', {
+          text: '這一組不會被匯入改動，系統只會把堂委的意見記進紀錄。'
+            + '要改的話，要另外開會決定，然後由開發者改。',
+          className: 'muted'
+        })
+      ]);
+      plan.hardNotes.forEach((h) => {
+        box.appendChild(make('div', {
+          text: h.ruleId + '　' + h.ruleText + '　堂委：' + h.decision
+            + (h.note ? '（' + h.note + '）' : ''),
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    if (plan.changes.length === 0) {
+      nodes.push(make('div', {
+        text: '沒有任何一條目標值需要改動。', className: 'ok-line'
+      }));
+      openModal('匯入規則審閱表', nodes, [button('關閉', () => closeModal(), '')]);
+      return;
+    }
+
+    const list = make('div', { className: 'sec' }, [
+      sectionTitle('這 ' + plan.changes.length + ' 條目標值有改動'),
+      make('div', {
+        text: '逐條決定要不要接受。預設全部不接受——你要主動勾。',
+        className: 'muted'
+      })
+    ]);
+    plan.changes.forEach((c) => {
+      const key = c.ruleId;
+      ruleImportDecisions[key] = false;
+      const box = make('div', { className: 'prop' });
+      box.appendChild(make('div', { text: c.ruleText, className: 'prop-head' }));
+      box.appendChild(make('div', { text: '現時：' + c.currentText, className: 'vio-row' }));
+      box.appendChild(make('div', { text: '堂委決定：' + c.decisionText, className: 'vio-row' }));
+      box.appendChild(make('div', {
+        text: '換算成系統的值：' + c.currentValue + ' → ' + c.newValue,
+        className: 'vio-row muted'
+      }));
+      if (c.note) box.appendChild(make('div', { text: '備註：' + c.note, className: 'muted' }));
+
+      const label = make('label', { className: 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.addEventListener('change', () => { ruleImportDecisions[key] = cb.checked; });
+      label.appendChild(cb);
+      label.appendChild(make('span', { text: '接受這一條' }));
+      box.appendChild(label);
+      list.appendChild(box);
+    });
+    nodes.push(list);
+
+    openConfirm({
+      title: '匯入規則審閱表',
+      bodyNodes: nodes,
+      confirmLabel: '套用我勾了的',
+      onConfirm: () => runAction('套用中', async () => {
+        const accepted = Object.keys(ruleImportDecisions).filter((k) => ruleImportDecisions[k]);
+        const res = await callServerMutating('apiRuleReviewImportExecute', fileId, accepted);
+        if (!res.ok) { showErrorModal('匯入規則審閱表', new Error(res.message)); return; }
+        openModal('匯入完成', [
+          make('div', { text: '改了 ' + res.applied + ' 條規則設定。', className: 'ok-line' }),
+          make('div', {
+            text: '另外記錄了 ' + res.notedOnly + ' 條意見（一定要遵守的規則，不會自動改）。',
+            className: 'ok-line'
+          }),
+          para('改動要下一次生成初稿才會生效，現有的職事表不會自己變。')
+        ], [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
 </script>

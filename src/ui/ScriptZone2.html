@@ -280,14 +280,166 @@
     });
   }
 
-  /** 年度工具本輪唔搬上 Web，指返選單（避免喺呢一輪加多兩個未測過嘅寫入路徑）。 */
+  /**
+   * 年度工具（第二十七輪批次階段 G1）。
+   *
+   * 兩個都係**寫入動作**：先預覽 → 打字確認 → 執行 → 寫紀錄。
+   * 一年做一次，所以寧可慢一步都要睇清楚。
+   */
   function openAnnualTool(which) {
-    const name = which === 'quarters' ? '產生下一年度四個季度' : '產生年度合堂建議';
+    const isQuarters = which === 'quarters';
+    const name = isQuarters ? '產生下一年度四個季度' : '產生年度合堂建議';
+    const yearInput = textField('', '年份（例如 2027）');
+
     openModal(name, [
-      para('這個工具本輪還沒有搬上網頁。'),
-      para('請用試算表上方的選單：準備工作 ▸ ' + name + '。'
-        + '它本來就會先給你看預覽，確認之後才寫入。')
-    ], [button('知道了', () => closeModal(), '')]);
+      para(isQuarters
+        ? '會一次過算好那一年四個季度的起訖日與全部主日。'
+        : '會按教會年曆算出那一年建議的合堂主日（復活節、聖誕等）。'),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '年份' }), yearInput
+      ]),
+      para('下一步會列出全部會新增的行，讓你逐行看過再決定。', 'muted')
+    ], [
+      button('看看會加什麼', () => runAction('計算中', async () => {
+        const api = isQuarters ? 'apiAnnualQuartersPlan' : 'apiAnnualCombinedPlan';
+        const plan = await callServer(api, yearInput.value.trim());
+        if (!plan.ok) { showErrorModal(name, new Error(plan.message)); return; }
+        if (isQuarters) renderAnnualQuartersPlan(plan);
+        else renderAnnualCombinedPlan(plan);
+      }), ''),
+      button('取消', () => renderSpecialSundays(), 'secondary')
+    ]);
+  }
+
+  function renderAnnualQuartersPlan(plan) {
+    const willWrite = plan.rows.filter((r) => !r.alreadyExists);
+    const list = make('div', { className: 'sec' }, [
+      sectionTitle(plan.year + ' 年四個季度')
+    ]);
+    plan.rows.forEach((r) => {
+      list.appendChild(make('div', {
+        text: r.quarterId + '　' + r.startDate + ' 至 ' + r.endDate
+          + '　主日 ' + r.weekCount + ' 個'
+          + (r.alreadyExists
+            ? '　⚠ 已經存在，整季略過'
+            : '　會新增 ' + r.newServiceDateCount + ' 行主日'
+              + (r.skippedServiceDates > 0
+                ? '（其中 ' + r.skippedServiceDates + ' 行已存在，會略過）' : '')),
+        className: r.alreadyExists ? 'vio-row muted' : 'vio-row'
+      }));
+    });
+
+    if (willWrite.length === 0) {
+      openModal('產生下一年度四個季度', [
+        list,
+        para('這一年的四個季度都已經存在，沒有東西要新增。')
+      ], [button('知道了', () => renderSpecialSundays(), '')]);
+      return;
+    }
+
+    openConfirm({
+      title: '產生 ' + plan.year + ' 年四個季度',
+      bodyNodes: [
+        list,
+        make('div', { className: 'sec' }, [
+          sectionTitle('會做的事：'),
+          make('div', { text: '・新增 ' + willWrite.length + ' 個季度', className: 'vio-row' }),
+          make('div', {
+            text: '・新增 ' + willWrite.reduce((n, r) => n + r.newServiceDateCount, 0) + ' 行主日日期',
+            className: 'vio-row'
+          }),
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會覆寫任何一格既有資料', className: 'vio-row' }),
+          make('div', { text: '・不會產生任何職事表', className: 'vio-row' }),
+          make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
+        ]),
+        para('寫入之後，每一季還要用選單的「準備工作 ▸ 計算季度日期」補上'
+          + '「什麼時候生成」和「什麼時候正式發出」——那兩格這裡不會填。', 'muted')
+      ],
+      requireTyping: true,
+      confirmLabel: '確定寫入',
+      danger: true,
+      onConfirm: (typed) => runAction('寫入中', async () => {
+        const res = await callServerMutating('apiAnnualQuartersExecute', plan.year, typed);
+        if (!res.ok) { showErrorModal('產生下一年度四個季度', new Error(res.message)); return; }
+        openModal('完成', [
+          make('div', {
+            text: '已新增 ' + res.quartersWritten + ' 個季度、'
+              + res.serviceDatesWritten + ' 行主日日期。',
+            className: 'ok-line'
+          }),
+          make('div', {
+            text: res.skipped.length > 0
+              ? '略過 ' + res.skipped.length + ' 個已經存在的季度。' : '',
+            className: 'muted'
+          })
+        ], [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
+  }
+
+  function renderAnnualCombinedPlan(plan) {
+    const willWrite = plan.rows.filter((r) => r.willWrite);
+    const list = make('div', { className: 'sec' }, [
+      sectionTitle(plan.year + ' 年建議的合堂主日')
+    ]);
+    plan.rows.forEach((r) => {
+      // 冇 QuarterID 嘅行寫落去等於垃圾行（全系統都讀唔到），
+      // 所以喺預覽就要講清楚會略過，唔可以寫完先發現。
+      const why = r.alreadyExists
+        ? '　⚠ 已經有這一日，略過'
+        : (!r.quarterId ? '　⚠ 找不到對應的季度（那一季還沒有建立），略過' : '');
+      list.appendChild(make('div', {
+        text: r.serviceDate + '　' + r.title + (r.quarterId ? '　' + r.quarterId : '') + why,
+        className: why ? 'vio-row muted' : 'vio-row'
+      }));
+    });
+
+    if (willWrite.length === 0) {
+      openModal('產生年度合堂建議', [
+        list,
+        para('沒有任何一行可以新增。')
+      ], [button('知道了', () => renderSpecialSundays(), '')]);
+      return;
+    }
+
+    openConfirm({
+      title: '產生 ' + plan.year + ' 年合堂建議',
+      bodyNodes: [
+        list,
+        make('div', { className: 'sec' }, [
+          sectionTitle('會做的事：'),
+          make('div', { text: '・新增 ' + willWrite.length + ' 行特別主日', className: 'vio-row' }),
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會覆寫已經存在的那幾日', className: 'vio-row' }),
+          make('div', { text: '・「這一週哪些崗位不用排」一律留空，要你自己填', className: 'vio-row' }),
+          make('div', { text: '・不會產生任何職事表，也不會寄出任何電郵', className: 'vio-row' })
+        ]),
+        para('這些只是「建議」。日期要不要用、哪些崗位不用排，都由你決定。')
+      ],
+      requireTyping: true,
+      confirmLabel: '確定寫入',
+      danger: true,
+      onConfirm: (typed) => runAction('寫入中', async () => {
+        const res = await callServerMutating('apiAnnualCombinedExecute', plan.year, typed);
+        if (!res.ok) { showErrorModal('產生年度合堂建議', new Error(res.message)); return; }
+        const nodes = [
+          make('div', { text: '已新增 ' + res.written + ' 行。', className: 'ok-line' })
+        ];
+        if (res.skipped.length > 0) {
+          const box = make('div', { className: 'warnbox' }, [
+            make('div', { text: '略過 ' + res.skipped.length + ' 行：', className: 'warn-head' })
+          ]);
+          res.skipped.forEach((s) => box.appendChild(make('div', {
+            text: (s.serviceDate || '') + '　' + (s.reason || s.title || ''),
+            className: 'lines'
+          })));
+          nodes.push(box);
+        }
+        nodes.push(para('記得逐一填「這一週哪些崗位不用排」，然後勾「日期已確認」。'));
+        openModal('完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    });
   }
 
   /* ============================================================

@@ -176,6 +176,19 @@ function checkTemplateLine(file, line, no, inScript) {
 const STRUCTURE_CALLS = ['insertSheet(', 'setFrozenColumns(', 'setFrozenRows(', 'merge('];
 const EXISTENCE_HINTS = ['getSheetByName(', 'deleteSheet(', 'breakApart(', 'clearContents(', 'clear('];
 
+/**
+ * 第二十七輪批次階段 G：**喺一個全新建立嘅試算表上面做結構** 唔算不對稱。
+ *
+ * `SpreadsheetApp.create()` 出嚟嘅試算表一定係空嘅，佢嗰張預設工作表
+ * 一定存在而且一定係新嘅——「第一次跑」同「第二次跑」根本唔存在，
+ * 因為每次都係一個新檔案。
+ *
+ * ⚠️ 呢個唔係把掃描器改鬆：原本嗰條規則講嘅係「同一張表可能已經存在」，
+ * 而呢種情況**結構上**唔可能發生。加一個會令規則失效嘅例外（例如
+ * 「有 try/catch 就當處理咗」）先至係改鬆。
+ */
+const BRAND_NEW_SPREADSHEET_HINTS = ['SpreadsheetApp.create('];
+
 function scanFirstRunAsymmetry() {
   listFiles(SRC_DIR, '.gs').forEach(function (file) {
     const text = fs.readFileSync(file.full, 'utf8');
@@ -214,6 +227,12 @@ function checkFunctionBlock(file, fnName, blockLines, offset, fileBody) {
   const scope = fileBody || body;
   const hasExistenceHint = EXISTENCE_HINTS.some(function (c) { return scope.indexOf(c) !== -1; });
   if (hasExistenceHint) return;
+
+  // 全新建立嘅試算表：「已經存在」呢件事結構上唔可能發生（見上面說明）。
+  // ⚠️ 呢個判斷只睇**呢個函式**（`body`），唔睇成個檔案——
+  // 睇成個檔案嘅話，一個檔案入面只要有任何一處 create()，
+  // 其餘真正有風險嘅函式就會一齊被豁免。
+  if (BRAND_NEW_SPREADSHEET_HINTS.some(function (c) { return body.indexOf(c) !== -1; })) return;
 
   const idx = blockLines.findIndex(function (l) {
     return !looksLikeComment(l) && STRUCTURE_CALLS.some(function (c) { return l.indexOf(c) !== -1; });
