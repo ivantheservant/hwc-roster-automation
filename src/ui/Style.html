@@ -15,6 +15,8 @@
     --card: #ffffff;
     --card-off: #f6f7f9;
     /* 第二十五輪批次階段 B5：禁用掣專用嘅三隻色。見下面 button:disabled。 */
+    /* 第二十五輪階段 B3：「對唔上名單」用嘅琥珀色。唔用紅——對唔上唔一定係錯。 */
+    --warn-fg: #8a6100;
     --disabled-bg: #e9ebee;
     --disabled-fg: #9aa0a6;
     --disabled-border: #d0d4d9;
@@ -227,6 +229,21 @@
   }
   .ok-head { font-size: 16px; font-weight: 600; color: var(--ok); margin-bottom: 6px; }
 
+  /* 第二十五輪批次階段 B3：「有冇對上名單」嘅回饋。
+     兩種都唔係錯誤（外請講員對唔上係正常），所以用綠／琥珀，唔用紅。 */
+  .link-ok { font-size: 13px; color: var(--ok); margin-top: 4px; }
+  .link-warn { font-size: 13px; color: var(--warn-fg); margin-top: 4px; }
+
+  /* 第二十五輪批次階段 E：區三名單維護 */
+  .idtag {
+    font-size: 11px; color: var(--muted); background: var(--card-off);
+    border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
+  }
+  .tag-bad { background: #fce8e6; border-color: #f5c2bd; color: #a1160a; }
+  .check-row.inline { display: inline-flex; margin-right: 12px; }
+  .prop.is-off { opacity: .6; }
+  .inp-date { max-width: 130px; }
+
   /* ── 深色模式 ─────────────────────────────────────────── */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -234,6 +251,7 @@
       --card: #1c1f26; --card-off: #22262e; --warn-bg: #3a2f10; --warn-border: #7a6420;
       --danger: #f2867c; --ok: #6cc07f;
       --disabled-bg: #24282f; --disabled-fg: #6a7078; --disabled-border: #343a42;
+      --warn-fg: #d8a838;
     }
   }
   :root[data-theme="dark"] {
@@ -241,5 +259,6 @@
     --card: #1c1f26; --card-off: #22262e; --warn-bg: #3a2f10; --warn-border: #7a6420;
     --danger: #f2867c; --ok: #6cc07f;
     --disabled-bg: #24282f; --disabled-fg: #6a7078; --disabled-border: #343a42;
+    --warn-fg: #d8a838;
   }
 </style>

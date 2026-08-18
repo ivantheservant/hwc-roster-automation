@@ -331,6 +331,14 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.WEBAPP_STEWARD_URL, type: CONFIG_TYPES.STR, group: 'AUTOMATION',
+      defaultValue: '',
+      description: '幹事介面的網址。部署之後由管理員貼一次。留空時提醒信不附連結。'
+        + '不可以由程式自己猜——這個專案有兩個部署，猜出來的可能是另一個，'
+        + '而一條打不開的連結比沒有連結更差。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.QUARTER_TERM_START_MONTHS, type: CONFIG_TYPES.LIST, group: 'SCHEDULE',
       defaultValue: DEFAULTS.QUARTER_TERM_START_MONTHS,
       description: '第十七輪批次新增：T1～T4 各自由哪一個月開始，逗號分隔的四個月份數字。'

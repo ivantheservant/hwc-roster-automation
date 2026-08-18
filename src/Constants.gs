@@ -1005,6 +1005,15 @@ const CONFIG_KEYS = {
   // 失去嘅安全網（幹事放假／病咗就冇人生成）由提醒 trigger 補返：
   // GenerateOn 到期而仍然冇任何版本，會每日提醒幹事去撳掣，見 Trigger.gs。
   TRIGGER_AUTO_GENERATE: 'TRIGGER_AUTO_GENERATE',
+  // 第二十五輪批次階段 D：幹事介面嘅網址，供提醒信附連結用。
+  //
+  // 點解要一個 Config key 而唔係喺程式碼度問：呢個專案有兩個部署
+  // （義工個人連結、幹事介面），`ScriptApp.getService().getUrl()` 只會回
+  // 其中一個，而且喺 trigger 執行環境回嘅可能係 head 部署。
+  // **一條打唔開嘅連結對一個唔識電腦嘅人比冇連結更差**——佢會以為系統壞咗。
+  //
+  // 所以唔靠估：由管理員部署完之後貼一次。留空就唔附連結（只附試算表）。
+  WEBAPP_STEWARD_URL: 'WEBAPP_STEWARD_URL',
   // 第十七輪批次階段 C：T1～T4 各自由邊個月開始（逗號分隔嘅四個月份數字）。
   //
   // 點解要放 Config 而唔係寫死：教會嘅季度劃分未必係日曆季度（可能係學期制
@@ -1395,6 +1404,9 @@ const DEFAULTS = {
   // 第二十五輪批次階段 A：到期自動生成初稿。預設 false＝關閉，初稿一律由
   // 幹事在網頁上自己撳掣生成。見 CONFIG_KEYS.TRIGGER_AUTO_GENERATE 嘅說明。
   TRIGGER_AUTO_GENERATE: false,
+  // 第二十五輪批次階段 D：留空＝提醒信唔附幹事介面連結。
+  // 見 CONFIG_KEYS.WEBAPP_STEWARD_URL 嘅說明。
+  WEBAPP_STEWARD_URL: '',
   // 第十六輪批次階段 D：生成前幾多日開始提醒「仲有未確認日期嘅特殊主日」。
   REMIND_UNCONFIRMED_SPECIAL_DAYS: 7,
   // 第十七輪批次階段 C：T1～T4 各自嘅起始月份（日曆季度）。

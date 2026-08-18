@@ -67,37 +67,35 @@ function findPreacherTranslationPostIds_() {
   return { preacherPostId: preacherPostId, translationPostId: translationPostId, flowerPostId: flowerPostId };
 }
 
-/**
- * 統計某崗位歷史上（全部季度）出現過的姓名快照，依次數由多到少排序。
- * 用 RosterAssignments 的 PersonNameSnapshot，不要求對應到 NameMapping——
- * 講員可能從來不在 NameMapping 裡。
- * @param {string} postId 崗位 ID
- * @param {number} limit 最多回傳幾個建議
- * @returns {string[]} 建議名單，由常見到罕見排序
- */
-function suggestHistoricalNames_(postId, limit) {
-  if (!postId) return [];
-  const counts = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
-    if (row[COLUMNS.ROSTER_ASSIGNMENTS.POST_ID] !== postId) return;
-    const name = String(row[COLUMNS.ROSTER_ASSIGNMENTS.PERSON_NAME_SNAPSHOT] || '').trim();
-    if (!name) return;
-    counts[name] = (counts[name] || 0) + 1;
-  });
-  return Object.keys(counts)
-    .sort(function (a, b) { return counts[b] - counts[a]; })
-    .slice(0, limit || 8);
-}
 
 /**
- * 側邊欄用：列出指定季度最新版本目前還空著的講員／翻譯／獻花格子，附上建議
- * 名單與 Stage 提示。純讀取。
+ * 列出指定季度最新版本目前還空著的講員／翻譯／獻花格子。純讀取。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 第二十五輪批次階段 B：**拆走咗「歷史建議名單」。**
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 本來會回三條建議名單（由一個統計 RosterAssignments 歷史姓名快照嘅
+ * helper 產生，連個 helper 都一併刪咗）。
+ * 拆走嘅理由**唔係實作有問題，係呢個功能本身冇用**：
+ *
+ *   講員　多數係外請或客席，每季都有全新面孔
+ *   翻譯　視乎該週講員嘅語言需要臨時決定
+ *   獻花　由會友認獻，幾乎每次都唔同人
+ *
+ * 用歷史記錄去猜，命中率極低，反而阻住幹事打字。
+ * 而且實際上**根本冇資料**——呢三個崗位喺 `RosterAssignments` 從來冇填過
+ * 一次，所以嗰個函式永遠回空陣列，即係畫面上一直都係得個名。
+ *
+ * 取而代之嘅係**儲存之後嘅回饋**：`apiSavePreacherTranslationEntry()`
+ * 回嘅 `linkedToNameMapping` 而家會顯示喺畫面上（見規格 3.3）。
+ * 嗰個先係真正擋到風險嘅資訊——翻譯打錯一個字，嗰位弟兄姊妹就永遠
+ * 收唔到通知，而畫面睇落完全正常。
+ *
  * @param {string} quarterId 季度 ID
  * @returns {{quarterId: string, versionNo: number, stage: string,
- *   officialSentHint: boolean, preacherSuggestions: string[],
- *   translationSuggestions: string[], flowerSuggestions: string[],
- *   pending: Object[]}} `pending` 每項另有 `optional: boolean`（獻花為
- *   `true`——留空唔填係正常情況，唔係漏做）
+ *   officialSentHint: boolean, pending: Object[]}} `pending` 每項另有
+ *   `optional: boolean`（獻花為 `true`——留空唔填係正常情況，唔係漏做）
  */
 function apiListPreacherTranslationPending(quarterId) {
   const ids = findPreacherTranslationPostIds_();
@@ -146,36 +144,12 @@ function apiListPreacherTranslationPending(quarterId) {
     return a.postId < b.postId ? -1 : 1;
   });
 
-  const preacherSuggestions = suggestHistoricalNames_(ids.preacherPostId, 8);
-  const translationSuggestions = suggestHistoricalNames_(ids.translationPostId, 8);
-  const flowerSuggestions = suggestHistoricalNames_(ids.flowerPostId, 8);
-
-  // 第二十五輪批次階段 C：**逐個 PostID 索引嘅建議名單。**
-  //
-  // 點解要加呢個：三條建議名單本來只喺頂層，用三個唔同嘅欄名。前端要
-  // 知道「呢一格屬於邊條名單」就只能靠崗位名稱做字串比對
-  // （`postName === '講員'` 之類）——而崗位名稱係幹事可以喺 Posts
-  // 工作表自由改嘅，改一次就會靜靜咁令全部建議下拉變空白，
-  // **而且畫面唔會報錯**，只係「冇建議」，睇落好似本來就係噉。
-  //
-  // 用 PostID 做 key 就冇呢個問題：前端寫 `suggestionsByPostId[cell.postId]`，
-  // 而 `postId` 本身就係後端逐格畀嘅，兩邊講緊同一樣嘢。
-  //
-  // 三個舊欄位冇刪——側邊欄（PreacherFillSidebar.html）仲用緊。
-  const suggestionsByPostId = {};
-  if (ids.preacherPostId) suggestionsByPostId[ids.preacherPostId] = preacherSuggestions;
-  if (ids.translationPostId) suggestionsByPostId[ids.translationPostId] = translationSuggestions;
-  if (ids.flowerPostId) suggestionsByPostId[ids.flowerPostId] = flowerSuggestions;
 
   return {
     quarterId: quarterId,
     versionNo: versionNo,
     stage: getQuarterStage_(quarterId),
     officialSentHint: getQuarterStage_(quarterId) === QUARTER_STAGE.OFFICIAL_SENT,
-    preacherSuggestions: preacherSuggestions,
-    translationSuggestions: translationSuggestions,
-    flowerSuggestions: flowerSuggestions,
-    suggestionsByPostId: suggestionsByPostId,
     pending: pending
   };
 }

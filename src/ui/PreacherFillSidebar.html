@@ -15,11 +15,6 @@
     border-radius: 8px; padding: 1px 6px; margin-left: 6px;
   }
   .cell input[type=text] { width: 100%; box-sizing: border-box; padding: 4px; margin-bottom: 4px; }
-  .cell .suggestions { margin-bottom: 6px; }
-  .cell .suggestions button {
-    font-size: 11px; margin: 0 4px 4px 0; padding: 2px 6px; border: 1px solid #ccc;
-    border-radius: 10px; background: #f1f3f4; cursor: pointer;
-  }
   .cell .save-btn { padding: 4px 10px; cursor: pointer; }
   .cell .status { font-size: 11px; margin-left: 6px; }
   .empty { color: #555; padding: 12px 0; }
@@ -88,12 +83,6 @@
     });
   }
 
-  function suggestionsFor(data, postName) {
-    if (postName === '講員') return data.preacherSuggestions;
-    if (postName === '翻譯') return data.translationSuggestions;
-    if (postName === '獻花') return data.flowerSuggestions;
-    return [];
-  }
 
   function render(data) {
     PENDING = data.pending;
@@ -109,19 +98,11 @@
       html += '<div class="empty">目前沒有還空著的講員／翻譯／獻花格子。</div>';
     } else {
       data.pending.forEach(function (p, i) {
-        var suggestions = suggestionsFor(data, p.postName);
         var cellId = 'cell_' + i;
         html += '<div class="cell' + (p.optional ? ' optional' : '') + '" id="' + cellId + '">';
         html += '<div class="label">第 ' + p.weekIndex + ' 週　' + escapeHtml(p.serviceDate) + '　' + escapeHtml(p.postName)
           + (p.optional ? '<span class="optional-badge">可留空</span>' : '') + '</div>';
-        if (suggestions && suggestions.length > 0) {
-          html += '<div class="suggestions">';
-          suggestions.forEach(function (name) {
-            html += '<button type="button" onclick="fillSuggestion(\'' + cellId + '\', ' + JSON.stringify(name) + ')">' + escapeHtml(name) + '</button>';
-          });
-          html += '</div>';
-        }
-        html += '<input type="text" id="' + cellId + '_input" placeholder="' + (p.optional ? '輸入姓名（沒有人認獻可以留空）' : '輸入姓名') + '">';
+        html += '<input type="text" autocomplete="off" name="hwc-person-free-text" id="' + cellId + '_input" placeholder="' + (p.optional ? '輸入姓名（沒有人認獻可以留空）' : '輸入姓名') + '">';
         html += '<button class="save-btn" onclick="save(\'' + cellId + '\', '
           + JSON.stringify(p.serviceDate) + ', ' + JSON.stringify(p.postId) + ', ' + p.slotIndex + ')">儲存</button>';
         html += '<span class="status" id="' + cellId + '_status"></span>';
@@ -132,9 +113,6 @@
     document.getElementById('body').innerHTML = html;
   }
 
-  function fillSuggestion(cellId, name) {
-    document.getElementById(cellId + '_input').value = name;
-  }
 
   /**
    * 送出單一格子的儲存請求，回傳一個 Promise（google.script.run 本身唔支援

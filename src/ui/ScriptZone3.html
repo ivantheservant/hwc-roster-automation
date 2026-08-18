@@ -1,0 +1,769 @@
+<script>
+  /* ============================================================
+   * 第二十五輪批次階段 E：區三——名單維護
+   * ============================================================
+   *
+   * 對應 docs/幹事介面規格.md 第四節。本輪做三個畫面，
+   * 按幹事實際使用頻率排：不能服侍日期 > 人員與電郵 > 崗位資格。
+   * 身分／個人崗位排除留下一輪。
+   *
+   * ⚠️ 呢一區係第一次由 Web 介面寫入**真實會友資料**。
+   * 之前全部寫入都只碰職事表（可以重新生成）；名單改壞咗係改壞真人資料。
+   * 所以每一個寫入動作前面都有一個確認畫面，列明「會改動幾多行」。
+   */
+
+  function renderZone3() {
+    const body = clear(el('zone3Body'));
+    body.appendChild(para('這裡改的是真實的會友資料。每一個改動都會記錄下來，'
+      + '而且系統不會刪走任何一行——不再服侍的人是「停用」，不是刪除。'));
+    body.appendChild(row([
+      button('不能服侍的日期', () => openUnavailable(), ''),
+      button('人員與電郵', () => openPeople(), ''),
+      button('崗位資格', () => openEligibility(), '')
+    ]));
+    body.appendChild(make('p', {
+      text: '身分（堂委／執事）與個人崗位排除這兩個畫面下一輪會搬上來，'
+        + '暫時請用試算表上方的選單。',
+      className: 'muted'
+    }));
+  }
+
+  /* ============================================================
+   * 畫面一：不能服侍的日期（規格 4.1）
+   * ============================================================ */
+
+  let unavailableData = null;
+
+  function openUnavailable(keyword) {
+    runAction('讀取不能服侍的日期', async () => {
+      unavailableData = await callServer('apiListUnavailable', currentQuarterId, keyword || '');
+      renderUnavailable(keyword || '');
+    });
+  }
+
+  function renderUnavailable(keyword) {
+    const nodes = [
+      // 規格 4.1：呢句一定要有。唔講嘅話幹事會以為填個時間就得。
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '系統沒有「上半場不在」這種概念。填了就代表整日不能服侍。',
+          className: 'warn-head'
+        })
+      ]),
+      peopleSearchBox(keyword, (k) => openUnavailable(k))
+    ];
+
+    nodes.push(row([button('＋ 新增一筆', () => openUnavailableEditor(null), '')], 'row-right'));
+
+    if (unavailableData.current.length === 0) {
+      nodes.push(make('div', { text: '目前沒有生效中的紀錄。', className: 'muted' }));
+    } else {
+      const box = make('div', { className: 'sec' }, [sectionTitle('生效中')]);
+      unavailableData.current.forEach((r) => box.appendChild(unavailableRow(r)));
+      nodes.push(box);
+    }
+
+    // 過期嘅摺埋，**唔刪**——刪咗就冇咗紀錄。
+    if (unavailableData.past.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('已過去（' + unavailableData.past.length + ' 筆，保留紀錄，不會刪走）')
+      ]);
+      unavailableData.past.forEach((r) => {
+        const line = unavailableRow(r);
+        line.className += ' is-off';
+        box.appendChild(line);
+      });
+      nodes.push(box);
+    }
+
+    openModal('不能服侍的日期', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+  }
+
+  function unavailableRow(r) {
+    const box = make('div', { className: 'prop' });
+    box.appendChild(make('div', {
+      text: r.personName + '　' + r.dateFrom + ' 至 ' + r.dateTo
+        + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + r.postIds.join('、')),
+      className: 'prop-head'
+    }));
+    if (r.reason) box.appendChild(make('div', { text: '原因：' + r.reason, className: 'muted' }));
+    box.appendChild(row([button('修改', () => openUnavailableEditor(r), 'link')], 'row-right'));
+    return box;
+  }
+
+  /** 新增／修改嘅編輯畫面。`existing` 為 null 就係新增。 */
+  function openUnavailableEditor(existing) {
+    const e = existing || {};
+
+    const personSel = document.createElement('select');
+    unavailableData.people.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.personId;
+      o.textContent = p.nameTC;
+      if (e.personId === p.personId) o.selected = true;
+      personSel.appendChild(o);
+    });
+
+    const fromInput = dateInput(e.dateFrom || '');
+    const toInput = dateInput(e.dateTo || '');
+
+    const appliesSel = document.createElement('select');
+    [['ALL', '全部崗位'], ['POSTS', '指定崗位']].forEach(([v, t]) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = t;
+      if ((e.appliesTo || 'ALL') === v) o.selected = true;
+      appliesSel.appendChild(o);
+    });
+
+    const postBox = make('div', { className: 'prop-opts' });
+    const postInputs = [];
+    unavailableData.posts.forEach((p) => {
+      const label = make('label', { className: 'check-row inline' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = (e.postIds || []).indexOf(p.postId) !== -1;
+      cb.dataset.postId = p.postId;
+      postInputs.push(cb);
+      label.appendChild(cb);
+      label.appendChild(make('span', { text: p.postNameTC }));
+      postBox.appendChild(label);
+    });
+    // 只有揀「指定崗位」先開放勾——揀「全部崗位」時仲勾住幾個，
+    // 幹事會以為嗰幾個有特別意思。
+    const syncPostBox = () => { postBox.hidden = appliesSel.value !== 'POSTS'; };
+    appliesSel.addEventListener('change', syncPostBox);
+    syncPostBox();
+
+    const reasonInput = document.createElement('input');
+    reasonInput.type = 'text';
+    reasonInput.autocomplete = 'off';
+    reasonInput.value = e.reason || '';
+    reasonInput.placeholder = '原因（例如：外遊）';
+
+    const impactBox = make('div', { className: 'sec' });
+
+    const collect = () => ({
+      unavailableId: e.unavailableId || '',
+      quarterId: currentQuarterId,
+      personId: personSel.value,
+      dateFrom: fromInput.value.trim(),
+      dateTo: toInput.value.trim(),
+      appliesTo: appliesSel.value,
+      postIds: postInputs.filter((c) => c.checked).map((c) => c.dataset.postId),
+      reason: reasonInput.value.trim()
+    });
+
+    const nodes = [
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '誰' }), personSel,
+        make('span', { text: '由' }), fromInput,
+        make('span', { text: '至' }), toInput
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '適用於' }), appliesSel
+      ]),
+      postBox,
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '原因' }), reasonInput
+      ]),
+      para('日期請用 2026-11-08 這種寫法（年-月-日）。'
+        + '「11/8」這種寫法系統不接受——因為分不出是 11 月 8 日還是 8 月 11 日。', 'muted'),
+      impactBox
+    ];
+
+    openModal(existing ? '修改不能服侍的日期' : '新增不能服侍的日期', nodes, [
+      button('先看影響', () => {
+        runAction('計算影響', async () => {
+          const res = await callServer('apiPreviewUnavailableImpact', collect());
+          renderUnavailableImpact(impactBox, res);
+        });
+      }, 'secondary'),
+      button('儲存', () => {
+        runAction('計算影響', async () => {
+          const preview = await callServer('apiPreviewUnavailableImpact', collect());
+          if (!preview.ok) { showErrorModal('不能服侍的日期', new Error(preview.message)); return; }
+          confirmSaveUnavailable(collect(), preview, personSel.options[personSel.selectedIndex].textContent);
+        });
+      }, ''),
+      button('取消', () => renderUnavailable(''), 'secondary')
+    ]);
+  }
+
+  function renderUnavailableImpact(node, res) {
+    clear(node);
+    if (!res.ok) {
+      node.appendChild(make('div', { text: res.message, className: 'vio vio-hard' }));
+      return;
+    }
+    node.appendChild(make('div', {
+      text: res.coveredDates.length === 0
+        ? '這個日期範圍沒有蓋住本季任何一個主日。'
+        : '這個日期範圍蓋住本季 ' + res.coveredDates.length + ' 個主日：'
+          + res.coveredDates.join('、'),
+      className: 'lines'
+    }));
+
+    // 規格 4.1：已經被排咗嘅話要紅字，而且要講明「加咗都唔會自動改」。
+    if (res.conflicts.length > 0) {
+      const box = make('div', { className: 'vio vio-hard' });
+      box.appendChild(make('div', { text: '他在這幾格已經被排了：', className: 'vio-head' }));
+      res.conflicts.forEach((c) => {
+        box.appendChild(make('div', {
+          text: c.serviceDate + '　' + c.postNameTC, className: 'vio-row'
+        }));
+      });
+      box.appendChild(make('div', {
+        text: '加了這一筆之後，現有的職事表不會自己改。'
+          + '要撳「儲存並確認」系統才會重新檢查。',
+        className: 'vio-row'
+      }));
+      node.appendChild(box);
+    }
+  }
+
+  function confirmSaveUnavailable(payload, preview, personName) {
+    const bodyNodes = [
+      para('會改動 1 行。'),
+      make('div', { className: 'sec' }, [
+        make('div', { text: personName + '　' + preview.dateFrom + ' 至 ' + preview.dateTo, className: 'vio-row' }),
+        make('div', {
+          text: payload.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + payload.postIds.join('、'),
+          className: 'vio-row'
+        }),
+        make('div', {
+          text: '蓋住本季 ' + preview.coveredDates.length + ' 個主日'
+            + (preview.conflicts.length > 0 ? '，其中 ' + preview.conflicts.length + ' 格他已經被排了' : ''),
+          className: 'vio-row'
+        })
+      ])
+    ];
+    openConfirm({
+      title: '確定要儲存嗎',
+      bodyNodes: bodyNodes,
+      confirmLabel: '確定儲存',
+      onConfirm: () => {
+        runAction('儲存中', async () => {
+          const res = await callServer('apiSaveUnavailable', payload);
+          if (!res.ok) { showErrorModal('不能服侍的日期', new Error(res.message)); return; }
+          setStatus(res.created ? '已加入。' : '已更新。');
+          unavailableData = await callServer('apiListUnavailable', currentQuarterId, '');
+          renderUnavailable('');
+        });
+      }
+    });
+  }
+
+  /* ============================================================
+   * 畫面二：人員與電郵（規格 4.2）
+   * ============================================================ */
+
+  let peopleData = null;
+
+  function openPeople(keyword) {
+    runAction('讀取名單', async () => {
+      peopleData = await callServer('apiListPeople', keyword || '');
+      renderPeople(keyword || '');
+    });
+  }
+
+  function renderPeople(keyword) {
+    const nodes = [
+      peopleSearchBox(keyword, (k) => openPeople(k)),
+      para('停用一個人不會刪走他，也不會影響已經排好的職事表——'
+        + '只是之後不會再被自動排入。'),
+      // HWCAS 補電郵本輪唔做（配對錯就寄錯人，要完整嘅預覽差異流程）。
+      make('div', {
+        text: '「從出席系統補電郵」暫時請用試算表上方的選單。'
+          + '那個動作要逐行核對過才可以套用，下一輪才會搬上來。',
+        className: 'muted'
+      })
+    ];
+
+    nodes.push(row([
+      button('＋ 新增一位', () => openAddPerson(), ''),
+      button('別名', () => openAliases(), 'secondary')
+    ], 'row-right'));
+
+    nodes.push(make('div', {
+      text: '共 ' + peopleData.total + ' 位' + (keyword ? '（符合搜尋）' : ''),
+      className: 'muted'
+    }));
+    peopleData.people.forEach((p) => nodes.push(personRow(p)));
+
+    openModal('人員與電郵', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+  }
+
+  function personRow(p) {
+    const box = make('div', { className: 'prop' + (p.active ? '' : ' is-off') });
+
+    const head = make('div', { className: 'prop-head' });
+    head.appendChild(make('span', { text: p.nameTC || '（沒有中文名）' }));
+    // PersonID 顯示做灰字，唔係輸入格——佢係全系統嘅外鍵，改一個就會
+    // 令嗰個人喺歷史紀錄入面「消失」。
+    head.appendChild(make('span', { text: p.personId, className: 'idtag' }));
+    if (!p.hasEmail) {
+      head.appendChild(make('span', { text: '沒有電郵，正式發出會略過', className: 'tag tag-bad' }));
+    }
+    if (p.duplicateNameCount > 1) {
+      // ⚠️ 只提示，唔會自動合併。名單入面真係有兩位姓名只差最尾一個
+      // 同音字嘅弟兄姊妹，佢哋係兩個唔同嘅人（唔舉真實例子——公開 repo）。
+      head.appendChild(make('span', { text: '名單上有 ' + p.duplicateNameCount + ' 個同名', className: 'tag' }));
+    }
+    box.appendChild(head);
+
+    const nameInput = textField(p.nameTC, '中文名');
+    const enInput = textField(p.nameEN, '英文名');
+    const memberInput = textField(p.memberNo, '會友編號（5 位數字）');
+    const emailInput = textField(p.email, '電郵');
+    const maxInput = textField(p.maxPerQuarter, '每季上限（可留空）');
+
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '中文名' }), nameInput,
+      make('span', { text: '英文名' }), enInput
+    ]));
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '會友編號' }), memberInput,
+      make('span', { text: '電郵' }), emailInput,
+      make('span', { text: '每季上限' }), maxInput
+    ]));
+    if (p.emailSource) {
+      box.appendChild(make('div', {
+        text: '電郵來源：' + p.emailSource + (p.emailVerifiedAt ? '（' + p.emailVerifiedAt + '）' : ''),
+        className: 'muted'
+      }));
+    }
+
+    const activeCb = document.createElement('input');
+    activeCb.type = 'checkbox';
+    activeCb.checked = p.active;
+    const activeLabel = make('label', { className: 'check-row' });
+    activeLabel.appendChild(activeCb);
+    activeLabel.appendChild(make('span', { text: '啟用' }));
+    box.appendChild(activeLabel);
+
+    box.appendChild(row([
+      button('儲存這一位', () => {
+        const payload = {
+          personId: p.personId,
+          nameTC: nameInput.value.trim(),
+          nameEN: enInput.value.trim(),
+          memberNo: memberInput.value.trim(),
+          email: emailInput.value.trim(),
+          maxPerQuarter: maxInput.value.trim(),
+          active: activeCb.checked
+        };
+        const warn = [];
+        if (p.active && !activeCb.checked) {
+          warn.push('設為停用之後，這個人不會再被自動排入職事表。'
+            + '已經排好的職事表不受影響。');
+        }
+        if (p.email && payload.email !== p.email) {
+          warn.push('電郵由「' + p.email + '」改成「' + (payload.email || '（空白）') + '」。');
+        }
+        if (!p.email && payload.email) warn.push('補上了電郵，之後正式發出會寄給他。');
+
+        openConfirm({
+          title: '確定要儲存嗎',
+          bodyNodes: [para('會改動 1 行：' + (payload.nameTC || p.personId) + '。')]
+            .concat(warn.map((w) => make('div', { text: w, className: 'vio vio-warn' }))),
+          confirmLabel: '確定儲存',
+          onConfirm: () => {
+            runAction('儲存中', async () => {
+              const res = await callServer('apiSavePerson', payload);
+              if (!res.ok) { showErrorModal('人員與電郵', new Error(res.message)); return; }
+              setStatus('已儲存。');
+              peopleData = await callServer('apiListPeople', '');
+              renderPeople('');
+            });
+          }
+        });
+      }, ''),
+      button('重新產生連結', () => confirmReissueToken(p), 'secondary')
+    ], 'row-right'));
+
+    return box;
+  }
+
+  function confirmReissueToken(p) {
+    openConfirm({
+      title: '重新產生個人專屬連結',
+      bodyNodes: [
+        para('會改動 1 行：' + p.nameTC + '。'),
+        make('div', { className: 'vio vio-hard' }, [
+          make('div', {
+            text: '他手上那條舊連結會即刻失效，打不開。'
+              + '要等下一次正式發出（或者改動後重發）他才會收到新連結。',
+            className: 'vio-row'
+          })
+        ])
+      ],
+      requireTyping: true,
+      typingHint: '這個動作不可逆，舊連結無法復原。確定的話，請在下面輸入「'
+        + CONFIRM_PHRASE + '」兩個字：',
+      confirmLabel: '確定重新產生',
+      danger: true,
+      onConfirm: () => {
+        runAction('重新產生中', async () => {
+          const res = await callServer('apiReissueToken', p.personId);
+          if (!res.ok) { showErrorModal('重新產生連結', new Error(res.message)); return; }
+          setStatus('已為 ' + (res.nameTC || p.nameTC) + ' 產生新連結。');
+          peopleData = await callServer('apiListPeople', '');
+          renderPeople('');
+        });
+      }
+    });
+  }
+
+  function openAddPerson() {
+    const nameInput = textField('', '中文名（必填）');
+    const enInput = textField('', '英文名');
+    const memberInput = textField('', '會友編號（5 位數字，可留空）');
+    const emailInput = textField('', '電郵（可留空）');
+
+    openModal('新增一位', [
+      para('編號由系統自動編，不用你填。'),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '中文名' }), nameInput,
+        make('span', { text: '英文名' }), enInput
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '會友編號' }), memberInput,
+        make('span', { text: '電郵' }), emailInput
+      ])
+    ], [
+      button('加入', () => {
+        runAction('加入中', async () => {
+          const res = await callServer('apiAddPerson', {
+            nameTC: nameInput.value.trim(),
+            nameEN: enInput.value.trim(),
+            memberNo: memberInput.value.trim(),
+            email: emailInput.value.trim()
+          });
+          if (!res.ok) { showErrorModal('新增人員', new Error(res.message)); return; }
+          setStatus('已加入 ' + res.nameTC + '（' + res.personId + '）。');
+          if (res.duplicateWarning) setStatus(res.duplicateWarning, true);
+          peopleData = await callServer('apiListPeople', '');
+          renderPeople('');
+        });
+      }, ''),
+      button('取消', () => renderPeople(''), 'secondary')
+    ]);
+  }
+
+  /* ── 別名（NameAlias）───────────────────────────────────── */
+
+  function openAliases() {
+    runAction('讀取別名', async () => {
+      const data = await callServer('apiListAliases');
+      renderAliases(data);
+    });
+  }
+
+  function renderAliases(data) {
+    const nodes = [
+      para('同一個人因為異體字或者輸入法寫成兩個名（例如「恒」與「恆」），'
+        + '在這裡告訴系統它們是同一個人。'),
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '名字相似不代表是同一個人。只有你確定是同一位，才在這裡加。',
+          className: 'warn-head'
+        })
+      ])
+    ];
+
+    (data.aliases || []).forEach((a) => {
+      nodes.push(make('div', { className: 'prop' + (a.active ? '' : ' is-off') }, [
+        make('div', { text: '「' + a.alias + '」＝ ' + a.personName, className: 'prop-head' })
+      ]));
+    });
+    if ((data.aliases || []).length === 0) {
+      nodes.push(make('div', { text: '目前沒有登記任何別名。', className: 'muted' }));
+    }
+
+    const aliasInput = textField('', '別名（另一種寫法）');
+    const personSel = document.createElement('select');
+    (peopleData ? peopleData.people : []).forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.personId;
+      o.textContent = p.nameTC;
+      personSel.appendChild(o);
+    });
+
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('新增一個別名'),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '別名' }), aliasInput,
+        make('span', { text: '＝' }), personSel
+      ])
+    ]));
+
+    openModal('別名', nodes, [
+      button('加入別名', () => {
+        const alias = aliasInput.value.trim();
+        if (!alias) { setStatus('請先填別名。', true); return; }
+        openConfirm({
+          title: '確定要加入嗎',
+          bodyNodes: [para('會改動 1 行：「' + alias + '」＝ '
+            + personSel.options[personSel.selectedIndex].textContent + '。')],
+          confirmLabel: '確定加入',
+          onConfirm: () => {
+            runAction('加入中', async () => {
+              const res = await callServer('apiSaveAlias', {
+                alias: alias, personId: personSel.value, active: true
+              });
+              if (!res.ok) { showErrorModal('別名', new Error(res.message)); return; }
+              setStatus('已加入。');
+              openAliases();
+            });
+          }
+        });
+      }, ''),
+      button('返回', () => renderPeople(''), 'secondary')
+    ]);
+  }
+
+  /* ============================================================
+   * 畫面三：崗位資格矩陣（規格 4.4）
+   * ============================================================ */
+
+  let eligData = null;
+  let eligChanges = {};      // `personId|postId` → true/false
+  let eligPostFilter = '';   // 空 = 全部崗位
+
+  function openEligibility() {
+    runAction('讀取崗位資格', async () => {
+      eligData = await callServer('apiGetEligibilityMatrix');
+      eligChanges = {};
+      eligPostFilter = '';
+      renderEligibility('');
+    });
+  }
+
+  /**
+   * ⚠️ 渲染策略（約 90 人 × 16 崗位 = 1440 格）
+   *
+   * **一次過畫 1440 個 checkbox 太笨重**（DOM 好慢，而且幹事要橫向捲
+   * 十幾欄先搵到一個崗位）。所以預設**按崗位分頁**：一次睇一個崗位嘅
+   * 全部人，再加姓名搜尋。
+   *
+   * 但**統計數字一律用後端喺完整資料上面計嗰個**——分頁只影響畫幾多格，
+   * 唔會影響「合資格 N 人」。如果統計跟住分頁走，個數字就會係
+   * 「當前頁嘅 N 人」，即係一個錯數，而幹事完全睇唔出。
+   */
+  function renderEligibility(keyword) {
+    const nodes = [
+      // 規格 4.4：呢句一定要有。
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '系統只會排曾任該崗位的人。新人一定要在這裡加，系統不會自己擴充。',
+          className: 'warn-head'
+        })
+      ])
+    ];
+
+    // 崗位選擇：兼顧「搵得到」同「唔好一次畫晒」。
+    const postSel = document.createElement('select');
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = '── 揀一個崗位 ──';
+    postSel.appendChild(allOpt);
+    eligData.posts.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.postId;
+      o.textContent = p.postNameTC + '（合資格 ' + p.eligibleCount + ' 人'
+        + (p.thin ? '，太少' : '') + '）';
+      if (eligPostFilter === p.postId) o.selected = true;
+      postSel.appendChild(o);
+    });
+    postSel.addEventListener('change', () => {
+      eligPostFilter = postSel.value;
+      renderEligibility(keyword);
+    });
+
+    nodes.push(make('div', { className: 'prop-head' }, [
+      make('span', { text: '崗位' }), postSel
+    ]));
+
+    // 人數太少嘅崗位一覽——**唔理揀咗邊個崗位都顯示**，
+    // 因為呢個係「成盤數有冇問題」嘅訊號，唔應該要逐個崗位撳先見到。
+    const thin = eligData.posts.filter((p) => p.thin);
+    if (thin.length > 0) {
+      const box = make('div', { className: 'vio vio-hard' });
+      box.appendChild(make('div', {
+        text: '有 ' + thin.length + ' 個崗位的合資格人數少於 '
+          + eligData.thinThreshold + ' 人：',
+        className: 'vio-head'
+      }));
+      thin.forEach((p) => box.appendChild(make('div', {
+        text: p.postNameTC + '：' + p.eligibleCount + ' 人', className: 'vio-row'
+      })));
+      nodes.push(box);
+    }
+
+    if (!eligPostFilter) {
+      nodes.push(make('div', {
+        text: '揀一個崗位，就會列出全部人，逐個勾。',
+        className: 'muted'
+      }));
+    } else {
+      nodes.push(peopleSearchBox(keyword, (k) => renderEligibility(k)));
+      const post = eligData.posts.filter((p) => p.postId === eligPostFilter)[0];
+      const list = make('div', { className: 'sec' }, [
+        sectionTitle(post.postNameTC + '：現時合資格 ' + post.eligibleCount + ' 人')
+      ]);
+
+      const k = String(keyword || '').trim().toLowerCase();
+      eligData.people.forEach((person) => {
+        if (k && (person.nameTC + ' ' + person.nameEN + ' ' + person.personId)
+          .toLowerCase().indexOf(k) === -1) return;
+
+        const key = person.personId + '|' + eligPostFilter;
+        const cell = eligData.cells[key] || { eligible: false, historicalCount: 0 };
+        const current = Object.prototype.hasOwnProperty.call(eligChanges, key)
+          ? eligChanges[key] : cell.eligible;
+
+        const label = make('label', { className: 'check-row' });
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = current;
+        cb.addEventListener('change', () => {
+          // 改返做原本嘅值就當冇改過——確認畫面唔應該報一個
+          // 「勾咗再取消勾」嘅假改動。
+          if (cb.checked === cell.eligible) delete eligChanges[key];
+          else eligChanges[key] = cb.checked;
+          renderEligibilityFooter();
+        });
+        label.appendChild(cb);
+        label.appendChild(make('span', {
+          text: person.nameTC + (person.active ? '' : '（已停用）')
+        }));
+        label.appendChild(make('span', {
+          text: cell.historicalCount > 0 ? '做過 ' + cell.historicalCount + ' 次' : '未做過',
+          className: 'muted'
+        }));
+        label.appendChild(make('span', {
+          text: '合共 ' + person.postCount + ' 個崗位', className: 'muted'
+        }));
+        list.appendChild(label);
+      });
+      nodes.push(list);
+    }
+
+    nodes.push(make('div', { id: 'eligFooter', className: 'sec' }));
+
+    openModal('崗位資格', nodes, [
+      button('儲存改動', () => confirmEligibilityBatch(), ''),
+      button('關閉', () => closeModalAndRefresh(), 'secondary')
+    ]);
+    renderEligibilityFooter();
+  }
+
+  function renderEligibilityFooter() {
+    const node = el('eligFooter');
+    if (!node) return;
+    clear(node);
+    const summary = summariseEligChanges();
+    node.appendChild(make('div', {
+      text: summary.total === 0
+        ? '未有任何改動。'
+        : '未儲存的改動：新增 ' + summary.added + ' 項資格、取消 ' + summary.removed + ' 項資格。',
+      className: summary.total === 0 ? 'muted' : 'ok-line strong'
+    }));
+  }
+
+  function summariseEligChanges() {
+    let added = 0;
+    let removed = 0;
+    Object.keys(eligChanges).forEach((k) => {
+      if (eligChanges[k]) added++; else removed++;
+    });
+    return { added: added, removed: removed, total: added + removed };
+  }
+
+  function confirmEligibilityBatch() {
+    const summary = summariseEligChanges();
+    if (summary.total === 0) { setStatus('未有任何改動。'); return; }
+
+    const nameById = {};
+    eligData.people.forEach((p) => { nameById[p.personId] = p.nameTC; });
+    const postById = {};
+    eligData.posts.forEach((p) => { postById[p.postId] = p.postNameTC; });
+
+    const list = make('div', { className: 'sec' });
+    Object.keys(eligChanges).forEach((k) => {
+      const parts = k.split('|');
+      list.appendChild(make('div', {
+        text: (eligChanges[k] ? '＋ ' : '－ ') + (nameById[parts[0]] || parts[0])
+          + '　' + (postById[parts[1]] || parts[1]),
+        className: 'vio-row'
+      }));
+    });
+
+    openConfirm({
+      title: '確定要儲存嗎',
+      bodyNodes: [
+        para('會新增 ' + summary.added + ' 項資格、取消 ' + summary.removed + ' 項資格。'),
+        list,
+        para('取消資格不會刪走那一行，做過的次數會保留。', 'muted')
+      ],
+      confirmLabel: '確定儲存',
+      onConfirm: () => {
+        runAction('儲存中', async () => {
+          const changes = Object.keys(eligChanges).map((k) => {
+            const parts = k.split('|');
+            return { personId: parts[0], postId: parts[1], eligible: eligChanges[k] };
+          });
+          const res = await callServer('apiSaveEligibilityBatch', changes);
+          if (!res.ok) { showErrorModal('崗位資格', new Error(res.message || '儲存失敗')); return; }
+          setStatus('已新增 ' + res.added + ' 項、取消 ' + res.removed + ' 項。');
+          eligData = await callServer('apiGetEligibilityMatrix');
+          eligChanges = {};
+          renderEligibility('');
+        });
+      }
+    });
+  }
+
+  /* ============================================================
+   * 區三共用小元件
+   * ============================================================ */
+
+  /** 搜尋格（中文名／英文名／PersonID）。 */
+  function peopleSearchBox(keyword, onSearch) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.autocomplete = 'off';
+    input.value = keyword || '';
+    input.placeholder = '搜尋姓名或編號';
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') onSearch(input.value.trim());
+    });
+    return make('div', { className: 'prop-head' }, [
+      make('span', { text: '搜尋' }), input,
+      button('搜尋', () => onSearch(input.value.trim()), 'secondary'),
+      button('全部', () => onSearch(''), 'link')
+    ]);
+  }
+
+  function textField(value, placeholder) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    // 姓名／電郵格一律關掉瀏覽器自動填充——唔關嘅話 Chrome 會彈出
+    // 使用者自己嘅通訊錄，幹事會以為係系統建議（見階段 B2）。
+    input.autocomplete = 'off';
+    input.name = 'hwc-roster-field';
+    input.value = value || '';
+    input.placeholder = placeholder || '';
+    return input;
+  }
+
+  function dateInput(value) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.autocomplete = 'off';
+    input.className = 'inp-date';
+    input.value = value || '';
+    input.placeholder = 'yyyy-MM-dd';
+    return input;
+  }
+</script>

@@ -18,7 +18,16 @@
     closeModal();
     runAction('載入季度', async () => {
       currentQuarterId = el('quarter').value;
-      zone2Loaded = false;
+      // ⚠️ 第二十五輪批次階段 A：**一句過清走全部區嘅載入狀態。**
+      //
+      // 呢度本來係逐個區列名重設（區二嗰個旗標設返 false）。
+      // 問題唔係「漏咗邊個區」，而係**呢種寫法本身**：
+      // 每次加一個新區都要記得返嚟改呢一行，而漏改嘅後果係
+      // 「畫面顯示上一個季度嘅數字，但睇落完全正常」，冇任何訊號。
+      //
+      // 所以 `resetAllZoneLoadState()` 係整個物件掉走。加區三、區四
+      // 內容嗰陣，**呢一行唔使改**。
+      resetAllZoneLoadState();
       await loadDashboard();
     });
   });
@@ -30,7 +39,7 @@
 
   // 收摺區
   wireZoneToggle('zone2Head', 'zone2Body', renderZone2Body);
-  wireZoneToggle('zone3Head', 'zone3Body', null);
+  wireZoneToggle('zone3Head', 'zone3Body', renderZone3);
   wireZoneToggle('zone4Head', 'zone4Body', null);
 
   // 撳背景關彈窗（但唔可以撳彈窗本身就關——會誤觸）

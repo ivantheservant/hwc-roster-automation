@@ -1169,24 +1169,43 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
 /**
  * 提醒信尾附的連結。
  *
- * ⚠️ 幹事介面嘅網址**攞唔到可靠嘅值**：呢個專案有兩個部署（義工個人連結、
- * 幹事介面），`ScriptApp.getService().getUrl()` 只會回其中一個，而且喺
- * trigger 執行環境回嘅可能係 head 部署而唔係幹事日常用嗰個。
+ * ─────────────────────────────────────────────────────────────────────
+ * 第二十五輪批次階段 D：由「唔附連結」改成「可配置」
+ * ─────────────────────────────────────────────────────────────────────
  *
- * 所以**唔會憑估砌一條連結**——一條打唔開嘅連結對一個唔識電腦嘅人嚟講，
- * 比冇連結更差：佢會以為系統壞咗，而唔會諗到「應該用返自己收藏嗰條」。
- * 試算表網址係攞得到嘅可靠值，就淨係俾試算表。
+ * ⚠️ 幹事介面嘅網址**程式自己攞唔到可靠嘅值**：呢個專案有兩個部署
+ * （義工個人連結、幹事介面），`ScriptApp.getService().getUrl()` 只會回
+ * 其中一個，而且喺 trigger 執行環境回嘅可能係 head 部署。
+ *
+ * 上一輪嘅結論係「噉就唔附連結」——理由成立，但**對一個唔識電腦嘅幹事
+ * 係倒退**：佢唔會自己記得個網址，「請用你自己收藏嗰條」等於冇講。
+ *
+ * 正確做法唔係揀「猜」定「唔講」，而係**唔好靠猜**：
+ * 由管理員部署完之後喺 Config 貼一次（`WEBAPP_STEWARD_URL`）。
+ * 有值就附，空白就只附試算表——**任何情況都唔會附一條猜出嚟嘅連結**。
  * @returns {string} 附在提醒信尾的連結段落
  */
 function buildAdminConsoleLinkText_() {
+  const lines = [];
+
+  const stewardUrl = String(getConfig(
+    CONFIG_KEYS.WEBAPP_STEWARD_URL, DEFAULTS.WEBAPP_STEWARD_URL) || '').trim();
+  if (stewardUrl) {
+    lines.push('幹事介面：' + stewardUrl);
+  } else {
+    // 冇設定就誠實講「未設定」，唔好扮到有連結。順帶話俾管理員知點補。
+    lines.push('幹事介面：請用你自己收藏的那條網址開啟。'
+      + '（管理員把網址填入 Config 的 WEBAPP_STEWARD_URL 之後，這裡就會直接附上連結。）');
+  }
+
   let sheetUrl = '';
   try {
     sheetUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
   } catch (err) {
     log_('WARN', 'buildAdminConsoleLinkText_ 取不到試算表網址：' + err.message);
   }
-  const lines = ['幹事介面：請用你自己收藏的那條網址開啟。'];
   if (sheetUrl) lines.push('職事表試算表：' + sheetUrl);
+
   return lines.join('\n');
 }
 

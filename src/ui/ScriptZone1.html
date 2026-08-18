@@ -145,6 +145,7 @@
       })
     ];
 
+    // -1 ＝ 算唔到。唔可以當成 0（0 等於話「檢查過，冇嘢要填」）。
     if (res.manualPendingCount > 0) {
       nodes.push(make('div', {
         text: '另有 ' + res.manualPendingCount + ' 格是要你人手填的（講員、翻譯、獻花），'

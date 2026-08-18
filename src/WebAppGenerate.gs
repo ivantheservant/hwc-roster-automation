@@ -170,7 +170,17 @@ function apiGenerateDraftExecute(quarterId) {
     // 「有 N 格未能安排」只計真正排唔到嗰種，唔計「這一週不用排」
     // 同「要人手填」——後兩者唔係問題，混埋一齊報會嚇親幹事。
     genuineGapCount: result.blankBreakdown ? result.blankBreakdown.genuineGapCount : result.blank,
-    manualPendingCount: result.blankBreakdown ? result.blankBreakdown.manualPendingCount : 0,
+    // ⚠️ 第二十五輪批次階段 C：**呢個數字要同區二用同一個判斷。**
+    //
+    // 本來用生成結果嗰個 blank 分類統計入面嘅「要人手填」數，
+    // 即係「三個崗位全部空格」＝ 13×3 = 39。但區二寫「翻譯未填：0 項（做好了）」，
+    // 因為嗰一季根本冇一日需要翻譯。**兩個數字用緊兩套定義**，
+    // 幹事見到「39 格要人手填」但區二話做好晒，就會撞板。
+    //
+    // 而家改為直接由 `planPreQuarterChecklist_()` 嘅結果加總——
+    // 即係**同一個函式**，唔係「兩邊各寫一次一樣嘅判斷」。
+    // 兩邊各寫一次就一定會有一日分岔（本專案燒過好多次）。
+    manualPendingCount: sumManualFillItems_(preQuarter),
     attemptsRun: result.attemptsRun,
     attemptsPlanned: result.attemptsPlanned,
     // 階段 A7：跑少咗次數一定要講出嚟，唔可以靜靜接受一個較差嘅結果。
@@ -179,6 +189,25 @@ function apiGenerateDraftExecute(quarterId) {
     unconfirmedSpecials: result.unconfirmedSpecials || [],
     versionExistsInRegistry: !!versionRow
   };
+}
+
+/**
+ * 由 `planPreQuarterChecklist_()` 嘅結果加總「真正仲要人手填幾多格」。
+ *
+ * 只計講員／翻譯／獻花三項——特別主日確認、合堂跳過崗位嗰兩項唔係「格」，
+ * 加埋落去個數字就會冇意思。
+ *
+ * 算唔到（`undoneItemCount === -1`）時回 -1，呼叫端要當成「查不到」
+ * 而唔係 0。**唔可以回 0**——0 等於話「檢查過，冇嘢要填」。
+ * @param {Object} preQuarter `planPreQuarterChecklist_()` 嘅結果
+ * @returns {number} 待填格數；算唔到時 -1
+ */
+function sumManualFillItems_(preQuarter) {
+  if (!preQuarter || preQuarter.undoneItemCount === -1) return -1;
+  const MANUAL_FILL_ITEM_IDS = ['preacherEmpty', 'translationEmpty', 'flowerEmpty'];
+  return (preQuarter.items || []).reduce(function (sum, item) {
+    return MANUAL_FILL_ITEM_IDS.indexOf(item.id) === -1 ? sum : sum + (item.count || 0);
+  }, 0);
 }
 
 /**

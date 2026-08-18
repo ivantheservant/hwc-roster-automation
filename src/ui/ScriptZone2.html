@@ -9,7 +9,12 @@
    * 五項未做完**唔阻擋任何一粒掣**——只係「表會有空格」嘅提醒。
    */
 
-  let zone2Loaded = false;
+  // ⚠️ 第二十五輪批次階段 A：呢度本來有個 `zone2Loaded`，
+  // 而 `wireZoneToggle()` 內部另外有個 `loaded`——**同一個狀態兩個旗標**，
+  // 換季度只重設咗其中一個，結果區二一直顯示上一個季度嘅數字。
+  //
+  // 而家「呢個區載入咗未」統一由 `Script.html` 嘅 `zoneLoadState` 保管，
+  // **呢個檔案唔可以再自己開一個旗標**。要重新載入就叫 `markZoneNeedsReload()`。
 
   /** 區頭嘅「還有 N 項未做」。N=0 時整區收摺。 */
   function renderZone2Head(d) {
@@ -29,7 +34,9 @@
       countNode.textContent = '還有 ' + pq.undoneItemCount + ' 項未做';
       countNode.className = 'zone-count warn';
       setZoneOpen('zone2Head', 'zone2Body', true);
-      if (!zone2Loaded) { zone2Loaded = true; renderZone2Body(); }
+      // `setZoneOpen()` 係直接開，唔會行 `wireZoneToggle()` 嗰條路，
+      // 所以要自己標記「已載入」——用同一個 zoneLoadState，唔可以另開旗標。
+      if (!markZoneLoaded('zone2Body')) renderZone2Body();
     }
   }
 
@@ -284,6 +291,38 @@
     });
   }
 
+  /**
+   * 第二十五輪批次階段 B3：儲存之後講「呢個名有冇對上名單」。
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 點解呢一句字比建議下拉重要好多
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 翻譯打錯一個字（例如異體字寫錯咗），嗰位弟兄姊妹就**永遠收唔到通知**
+   * ——正式發出嗰陣佢唔喺收件名單入面。而畫面上完全睇唔出：
+   * 職事表照樣印住個名，PDF 照樣有佢，一切正常。
+   *
+   * 呢一句字係唯一一個會即刻話你知嘅位。
+   *
+   * ⚠️ 對唔上**唔一定係錯**——外請講員本來就唔喺名單入面，
+   * 所以文案要講清楚「外請講員屬正常」，唔可以寫成一個錯誤。
+   * 寫成錯誤嘅話幹事會去「修正」一個根本冇問題嘅嘢。
+   * @param {HTMLElement} node 要寫入嘅元素
+   * @param {Object} res `apiSavePreacherTranslationEntry()` 嘅回傳
+   * @param {string} typedName 幹事打嘅名
+   */
+  function renderLinkFeedback(node, res, typedName) {
+    clear(node);
+    if (!res) { node.className = 'muted'; return; }
+    if (res.linkedToNameMapping) {
+      node.className = 'link-ok';
+      node.textContent = '已對上名單上的「' + typedName + '」，正式發出時他會收到通知。';
+    } else {
+      node.className = 'link-warn';
+      node.textContent = '名單上沒有這個名字，正式發出時不會寄給他。外請講員屬正常。';
+    }
+  }
+
   function renderPreacherFill(data) {
     const nodes = [
       para('這三個崗位系統不會自動排，一定要人手填。'),
@@ -313,11 +352,6 @@
     // 就係掃呢個檔案有冇出現過嗰串字——寫喺註解都會被捉到。）
     const cells = data.pending || [];
 
-    // 建議名單用 PostID 索引（後端新加嘅 suggestionsByPostId）。
-    // ⚠️ **唔可以用崗位名稱做字串比對**——崗位名係幹事可以喺 Posts
-    // 工作表自由改嘅，改一次就會靜靜咁令全部建議消失而唔報錯。
-    const suggestionsByPostId = data.suggestionsByPostId || {};
-
     if (cells.length === 0) {
       nodes.push(make('div', { text: '這一季沒有待填的格子。', className: 'ok-line' }));
     }
@@ -333,32 +367,38 @@
       input.type = 'text';
       input.value = c.currentName || '';
       input.placeholder = '姓名';
+      // ⚠️ 第二十五輪批次階段 B2：一定要關掉瀏覽器自動填充。
+      //
+      // 冇設 autocomplete 嘅話，Chrome 會當呢格係聯絡人欄位，
+      // 彈出**使用者自己嘅通訊錄**（Ivan 實測見到自己個名同
+      // 「Manage addresses…」）。幹事會以為嗰啲係系統畀嘅建議名單，
+      // 撳落去就填咗一個完全唔相干嘅人。
+      //
+      // `name` 用一個 Chrome 認唔出嘅自訂值——單靠 `autocomplete="off"`
+      // Chrome 有時會照樣無視。
+      input.autocomplete = 'off';
+      input.name = 'hwc-person-free-text';
       box.appendChild(input);
 
-      const suggestions = suggestionsByPostId[c.postId] || [];
-      if (suggestions.length > 0) {
-        const sug = make('div', { className: 'prop-opts' }, [
-          make('div', { text: '以前做過這個崗位的：', className: 'muted' })
-        ]);
-        suggestions.forEach((name) => {
-          sug.appendChild(button(name, () => { input.value = name; }, 'chip'));
-        });
-        box.appendChild(sug);
-      }
-
       const statusSpan = make('span', { text: '', className: 'muted' });
+      // 「有冇對上名單」嘅回饋（規格 3.3）。獨立一行，唔同 statusSpan 混埋——
+      // 前者係「儲存咗未」，後者係「呢個人收唔收到通知」，兩件唔同嘅事。
+      const linkNote = make('div', { text: '', className: 'muted' });
+
       box.appendChild(row([
         button('儲存', () => {
           const name = input.value.trim();
           if (!name) { statusSpan.textContent = '姓名不可留空（留空就不用按儲存）。'; return; }
           runAction('儲存中', async () => {
-            await callServer('apiWebSavePreacherEntry',
+            const res = await callServer('apiWebSavePreacherEntry',
               currentQuarterId, c.serviceDate, c.postId, c.slotIndex, name);
             statusSpan.textContent = '已儲存 ✓';
+            renderLinkFeedback(linkNote, res, name);
           });
         }, ''),
         statusSpan
       ], 'row-right'));
+      box.appendChild(linkNote);
 
       nodes.push(box);
     });
@@ -379,12 +419,18 @@
         para('這幾項跟人不跟季，所以不算入上面的「還有 N 項未做」。')
       ];
 
-      // 「去處理」本輪指返試算表——區三下一輪先搬上嚟。
+      // 第二十五輪批次階段 E4：頭兩項同最後一項已經有區三畫面，
+      // 「去處理」直接開嗰個畫面，唔使幹事自己去試算表搵。
+      //
+      // 身分（Roles）嗰項仲未有畫面，繼續指返試算表——
+      // **唔可以扮到有得撳**，撳完乜都冇發生比指返選單更差。
+      const openIn = {
+        noEmail: function () { openPeople(); },
+        notInNameList: function () { openPeople(); },
+        thinEligibility: function () { openEligibility(); }
+      };
       const where = {
-        noEmail: 'NameMapping 工作表，填該人的 Email 欄',
-        notInNameList: 'NameMapping 工作表，新增該人（PersonID 要跟現有格式）',
-        expiredRole: 'Roles 工作表，檢查 EffectiveTo 欄；換屆不要刪行，只填卸任日期',
-        thinEligibility: 'Eligibility 工作表，為該崗位加合資格的人'
+        expiredRole: 'Roles 工作表，檢查 EffectiveTo 欄；換屆不要刪行，只填卸任日期'
       };
 
       hints.forEach((h) => {
@@ -401,10 +447,18 @@
         // 本身就係真嘅頂層網域，點號寫法喺敏感資料掃描眼中形狀同網域
         // 一模一樣，會誤報。（第二十二輪喺 PreLaunchChecklist 撞過同一件事。）
         // 呢度特登唔喺註解舉完整例子——寫出嚟一樣會被自己個掃描器捉到。
-        const whereText = where[h['id']] || '';
-        if (h.count > 0 && whereText) {
+        const hintId = h['id'];
+        if (h.count > 0 && openIn[hintId]) {
+          box.appendChild(row([button('去處理', () => {
+            // 開區三之前先展開嗰一區，否則關咗彈窗之後幹事會搵唔返。
+            setZoneOpen('zone3Head', 'zone3Body', true);
+            markZoneLoaded('zone3Body');
+            renderZone3();
+            openIn[hintId]();
+          }, 'link')], 'row-right'));
+        } else if (h.count > 0 && where[hintId]) {
           box.appendChild(make('div', {
-            text: '去處理：試算表的 ' + whereText + '。改完回來重新整理這一頁。',
+            text: '去處理：試算表的 ' + where[hintId] + '。改完回來重新整理這一頁。',
             className: 'muted'
           }));
         }

@@ -98,6 +98,9 @@ function getConfigBaselineSnapshot_() {
       // 第二十五輪批次新增。上線目標值＝FALSE（初稿由幹事人手撳掣生成）。
       // 試算表現時未有這一列——Config 的自動補建會在下次執行時加入。
       TRIGGER_AUTO_GENERATE: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      // 第二十五輪批次新增。上線目標值刻意係空白——網址由管理員部署完先貼，
+      // 寫一個具體網址落呢度就等於把一個環境專屬嘅值寫死喺公開 repo。
+      WEBAPP_STEWARD_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       RESEND_ONLY_CHANGED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROSTER_DRIVE_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 動態值：安裝時自動偵測填入本試算表自己的 ID，唔可能有固定嘅「上線目標值」，

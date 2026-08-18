@@ -438,16 +438,73 @@
 
   // ── 收摺區 ───────────────────────────────────────────────────
 
-  function wireZoneToggle(headId, bodyId, onFirstOpen) {
-    let loaded = false;
+  /**
+   * 第二十五輪批次階段 A：**「呢個區載入咗未」嘅唯一真相來源。**
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 呢度修緊嘅 bug（Ivan 實測撞到）
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 換季度之後，區二嘅標題（「還有 N 項未做」）正確更新咗，
+   * 但下面五項清單仍然顯示上一個季度嘅數字。
+   *
+   * 成因：**同一個狀態有兩個旗標，換季度只重設咗其中一個。**
+   *   `wireZoneToggle()` 內部有個 closure 變數 `loaded`
+   *   `ScriptZone2.html` 另外有個 `zone2Loaded`
+   * 換季度只重設咗後者，所以區二一開過之後，`onFirstOpen` 永遠唔會再叫。
+   *
+   * 呢個係本專案最危險嗰類 bug：**畫面顯示上一個季度嘅數字，
+   * 但睇落完全正常**——冇錯誤、冇空白、冇任何訊號。
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 點解係一個物件而唔係「每次展開都重新攞」
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 「每次展開都重新攞」都解決到呢個 bug，但會令幹事每次摺埋再打開
+   * 都等一次伺服器來回。保留快取、但令「清走快取」係**一個動作**，
+   * 先係兩邊都啱。
+   *
+   * ⚠️ 關鍵設計：`resetAllZoneLoadState()` 係**整個物件掉走**，
+   * 唔係逐個區列名重設。所以將來加區三、區四內容嗰陣，
+   * **唔使記得去改重設嗰段**——漏改就係呢個 bug 再中一次。
+   */
+  let zoneLoadState = {};
+
+  /** 換季度時叫。整個掉走，唔逐個列名——列名就會有漏。 */
+  function resetAllZoneLoadState() {
+    zoneLoadState = {};
+  }
+
+  /**
+   * 標記一個區「已載入」，回傳**之前**係咪已經載入過。
+   *
+   * 俾唔行 `wireZoneToggle()` 嗰條路嘅情況用（例如 `setZoneOpen()`
+   * 直接展開）。一律經呢度，就唔會有人喺自己個檔案另開一個旗標。
+   * @param {string} bodyId 區身元素 id
+   * @returns {boolean} true ＝ 之前已經載入過，唔使再做
+   */
+  function markZoneLoaded(bodyId) {
+    const was = !!zoneLoadState[bodyId];
+    zoneLoadState[bodyId] = true;
+    return was;
+  }
+
+  /**
+   * 接一個收摺區嘅開關。
+   * @param {string} headId 區頭元素 id
+   * @param {string} bodyId 區身元素 id
+   * @param {?function()} onOpen 第一次展開（或者換季度之後第一次展開）時做嘅嘢
+   */
+  function wireZoneToggle(headId, bodyId, onOpen) {
     el(headId).addEventListener('click', () => {
       const body = el(bodyId);
       const willOpen = body.hidden;
       body.hidden = !willOpen;
       el(headId).setAttribute('aria-expanded', String(willOpen));
-      if (willOpen && !loaded && onFirstOpen) {
-        loaded = true;
-        onFirstOpen();
+      // 用 bodyId 做 key——每個區天然唯一，唔使另外維護一份區名清單。
+      if (willOpen && !zoneLoadState[bodyId] && onOpen) {
+        zoneLoadState[bodyId] = true;
+        onOpen();
       }
     });
   }
