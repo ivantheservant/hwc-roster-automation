@@ -20,11 +20,11 @@
       button('不能服侍的日期', () => openUnavailable(), ''),
       button('人員與電郵', () => openPeople(), ''),
       button('崗位資格', () => openEligibility(), ''),
-      button('排表偏好', () => openWeights(), '')
+      button('排表偏好', () => openWeights(), ''),
+      button('身分（堂委／執事）', () => openRoles(), '')
     ]));
     body.appendChild(make('p', {
-      text: '身分（堂委／執事）與個人崗位排除這兩個畫面下一輪會搬上來，'
-        + '暫時請用試算表上方的選單。',
+      text: '個人崗位排除這個畫面下一個階段會搬上來，暫時請用試算表上方的選單。',
       className: 'muted'
     }));
   }
@@ -1020,6 +1020,401 @@
           renderWeights();
         });
       }
+    });
+  }
+
+
+  /* ============================================================
+   * 畫面五：身分（堂委／執事）（規格 4.3，第二十七輪批次階段 C）
+   * ============================================================
+   *
+   * ⚠️ 呢個畫面平時幾乎唔會用。真正會用到嘅時刻只有一個：**換屆**。
+   * 所以整個畫面嘅重心係嗰粒「換屆」掣，唔係逐行編輯。
+   */
+
+  let rolesData = null;
+
+  function openRoles(keyword) {
+    runAction('讀取身分名單', async () => {
+      rolesData = await callServer('apiListRoles', keyword || '');
+      renderRoles(keyword || '');
+    });
+  }
+
+  function renderRoles(keyword) {
+    const nodes = [];
+
+    if (!rolesData.sheetExists) {
+      nodes.push(make('div', { className: 'vio vio-hard' }, [
+        make('div', {
+          text: '身分名單（Roles）這張工作表還沒有建立，所以現在沒有任何人有身分。',
+          className: 'vio-head'
+        }),
+        make('div', {
+          text: '請先用試算表選單「維護 ▸ 補建身分名單工作表」。'
+            + '在建立之前，「報告限堂委」「當值堂委限堂委或執事」這兩條規則不會生效。',
+          className: 'vio-row'
+        })
+      ]));
+    }
+
+    // 規格 4.3：呢段字逐字照抄，唔可以改寫成「摘要版」。
+    // 換屆做錯嘅後果係**追溯**性嘅——舊季度嘅職事表會突然變成違規，
+    // 而嗰啲季度早就寄咗信、印咗 PDF。所以要把「點解」寫足。
+    nodes.push(make('div', { className: 'warnbox' }, [
+      make('div', { text: '換屆時不要刪除舊的行。', className: 'warn-head' }),
+      make('div', {
+        text: '撳「換屆」，輸入卸任日期，系統會把所有現任的行填上「生效至」＝卸任日期，'
+          + '然後你再逐個加入新一屆。',
+        className: 'lines'
+      }),
+      make('div', {
+        text: '這樣做的原因：舊季度的職事表不會因為今日換屆而被追溯判成違規。',
+        className: 'lines'
+      })
+    ]));
+
+    nodes.push(row([
+      button('換屆', () => openTermChange(), 'danger'),
+      button('＋ 新增一行', () => openRoleEditor(), '')
+    ], 'row-right'));
+
+    nodes.push(peopleSearchBox(keyword, (k) => openRoles(k)));
+    nodes.push(make('div', {
+      text: '目前在任共 ' + rolesData.currentCount + ' 項身分（判斷基準日：' + rolesData.today + '）。',
+      className: 'muted'
+    }));
+
+    if (rolesData.people.length === 0) {
+      nodes.push(make('div', {
+        text: keyword ? '沒有符合搜尋的人。' : '名單上還沒有任何身分紀錄。',
+        className: 'muted'
+      }));
+    }
+    // 按人分組——一個人可以同時是堂委又是執事，或者卸任後再連任。
+    rolesData.people.forEach((p) => nodes.push(rolePersonRow(p)));
+
+    nodes.push(make('div', { id: 'roleOverview', className: 'sec' }));
+
+    openModal('身分（堂委／執事）', nodes, [
+      button('檢查名單', () => loadRoleOverview(), 'secondary'),
+      button('關閉', () => closeModalAndRefresh(), '')
+    ]);
+  }
+
+  /** 一個人一行，下面列出佢全部身分行。同「不能服侍的日期」一樣嘅精簡清單風格。 */
+  function rolePersonRow(p) {
+    const box = make('div', { className: 'prop' });
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: p.nameTC }),
+      make('span', { text: p.personId, className: 'idtag' })
+    ]));
+
+    p.rows.forEach((r) => {
+      const line = make('div', { className: 'prop-opts' + (r.current ? '' : ' is-off') });
+      const head = make('div', {});
+      head.appendChild(make('span', { text: r.roleLabel }));
+      if (r.unknownRoleCode) {
+        // 認唔出嘅身分代號**一定要標出嚟**：打錯字嘅話，
+        // 嗰條規則會靜靜失效，而畫面上睇落完全正常。
+        head.appendChild(make('span', {
+          text: '這個身分代號系統不認得，等於沒有身分', className: 'tag tag-bad'
+        }));
+      }
+      head.appendChild(make('span', {
+        text: '　' + (r.effectiveFrom || '（一直以來）') + ' 至 '
+          + (r.effectiveTo || '現在'),
+        className: 'muted'
+      }));
+      head.appendChild(make('span', {
+        text: r.current ? '在任' : '已卸任／未生效', className: 'tag'
+      }));
+      if (!r.active) head.appendChild(make('span', { text: '已停用', className: 'tag' }));
+      line.appendChild(head);
+      if (r.notes) line.appendChild(make('div', { text: '備註：' + r.notes, className: 'muted' }));
+
+      const slot = make('div', {});
+      line.appendChild(slot);
+      line.appendChild(row([button('修改', () => {
+        if (slot.firstChild) { clear(slot); return; }   // 再撳一次收埋
+        slot.appendChild(roleEditorFields(p, r));
+      }, 'link')], 'row-right'));
+      box.appendChild(line);
+    });
+
+    return box;
+  }
+
+  /** 撳「修改」之後先展開嘅欄位。 */
+  function roleEditorFields(person, existing) {
+    const e = existing || {};
+    const box = make('div', { className: 'prop-opts' });
+
+    const roleSel = document.createElement('select');
+    rolesData.roleChoices.forEach((c) => {
+      const o = document.createElement('option');
+      o.value = c.roleCode;
+      // ⚠️ 畫面永遠顯示中文，`value` 先係英文碼。幹事唔應該見到英文代號。
+      o.textContent = c.label;
+      if (e.roleCode === c.roleCode) o.selected = true;
+      roleSel.appendChild(o);
+    });
+
+    const fromInput = dateInput(e.effectiveFrom || '');
+    const toInput = dateInput(e.effectiveTo || '');
+    const notesInput = textField(e.notes, '備註（可留空）');
+
+    const activeCb = document.createElement('input');
+    activeCb.type = 'checkbox';
+    activeCb.checked = e.active !== false;
+    const activeLabel = make('label', { className: 'check-row' });
+    activeLabel.appendChild(activeCb);
+    activeLabel.appendChild(make('span', { text: '啟用（取消勾選＝這一行不算數；不會刪除）' }));
+
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '身分' }), roleSel,
+      make('span', { text: '生效日' }), fromInput,
+      make('span', { text: '生效至' }), toInput
+    ]));
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '備註' }), notesInput
+    ]));
+    box.appendChild(activeLabel);
+    box.appendChild(make('div', {
+      text: '「生效日」留空＝一直以來都是。「生效至」留空＝仍然在任。'
+        + '卸任時填「生效至」，不要刪除整行。',
+      className: 'muted'
+    }));
+
+    box.appendChild(row([button('儲存這一行', () => {
+      const payload = {
+        roleAssignmentId: e.roleAssignmentId,
+        personId: person.personId,
+        roleCode: roleSel.value,
+        effectiveFrom: fromInput.value.trim(),
+        effectiveTo: toInput.value.trim(),
+        notes: notesInput.value.trim(),
+        active: activeCb.checked
+      };
+      const label = roleSel.options[roleSel.selectedIndex].textContent;
+      const warn = [];
+      if (!e.effectiveTo && payload.effectiveTo) {
+        warn.push('填了「生效至」＝ ' + payload.effectiveTo
+          + '，代表他在那一日之後不再是' + label + '。那一日之前的職事表不受影響。');
+      }
+      if (e.active !== false && !activeCb.checked) {
+        warn.push('取消「啟用」＝這一行完全不算數（連過去也不算）。'
+          + '如果只是卸任，應該填「生效至」而不是取消啟用。');
+      }
+      openConfirm({
+        title: '確定要儲存嗎',
+        bodyNodes: [para('會改動 1 行：' + person.nameTC + '　' + label + '。')]
+          .concat(warn.map((w) => make('div', { text: w, className: 'vio vio-warn' }))),
+        confirmLabel: '確定儲存',
+        onConfirm: () => runAction('儲存中', async () => {
+          const res = await callServerMutating('apiSaveRole', payload);
+          if (!res.ok) { showErrorModal('身分', new Error(res.message)); return; }
+          setStatus('已儲存。');
+          openRoles('');
+        })
+      });
+    }, '')], 'row-right'));
+
+    return box;
+  }
+
+  /** 新增一行（要先揀人）。 */
+  function openRoleEditor() {
+    const personSel = document.createElement('select');
+    rolesData.allPeople.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.personId;
+      o.textContent = p.nameTC;
+      personSel.appendChild(o);
+    });
+
+    const roleSel = document.createElement('select');
+    rolesData.roleChoices.forEach((c) => {
+      const o = document.createElement('option');
+      o.value = c.roleCode;
+      o.textContent = c.label;
+      roleSel.appendChild(o);
+    });
+
+    const fromInput = dateInput('');
+    const toInput = dateInput('');
+    const notesInput = textField('', '備註（可留空）');
+
+    openModal('新增一行身分', [
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '誰' }), personSel,
+        make('span', { text: '身分' }), roleSel
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '生效日' }), fromInput,
+        make('span', { text: '生效至' }), toInput,
+        make('span', { text: '備註' }), notesInput
+      ]),
+      para('新一屆通常只需要填「生效日」（就職日），「生效至」留空。', 'muted'),
+      para('日期請用 2026-11-08 這種寫法（年-月-日）。', 'muted')
+    ], [
+      button('加入', () => {
+        const name = personSel.options[personSel.selectedIndex].textContent;
+        const label = roleSel.options[roleSel.selectedIndex].textContent;
+        openConfirm({
+          title: '確定要加入嗎',
+          bodyNodes: [
+            para('會加入 1 行：' + name + '　' + label + '。'),
+            para('生效日：' + (fromInput.value.trim() || '（留空＝一直以來都是）')
+              + '　生效至：' + (toInput.value.trim() || '（留空＝仍然在任）'))
+          ],
+          confirmLabel: '確定加入',
+          onConfirm: () => runAction('加入中', async () => {
+            const res = await callServerMutating('apiAddRole', {
+              personId: personSel.value,
+              roleCode: roleSel.value,
+              effectiveFrom: fromInput.value.trim(),
+              effectiveTo: toInput.value.trim(),
+              notes: notesInput.value.trim()
+            });
+            if (!res.ok) { showErrorModal('身分', new Error(res.message)); return; }
+            setStatus('已加入 ' + res.nameTC + '　' + res.roleLabel + '。');
+            openRoles('');
+          })
+        });
+      }, ''),
+      button('取消', () => renderRoles(''), 'secondary')
+    ]);
+  }
+
+  /* ── 換屆（批次動作）───────────────────────────────────── */
+
+  function openTermChange() {
+    const dateIn = dateInput('');
+    openModal('換屆', [
+      make('div', { className: 'warnbox' }, [
+        make('div', { text: '換屆時不要刪除舊的行。', className: 'warn-head' }),
+        make('div', {
+          text: '撳「換屆」，輸入卸任日期，系統會把所有現任的行填上「生效至」＝卸任日期，'
+            + '然後你再逐個加入新一屆。',
+          className: 'lines'
+        }),
+        make('div', {
+          text: '這樣做的原因：舊季度的職事表不會因為今日換屆而被追溯判成違規。',
+          className: 'lines'
+        })
+      ]),
+      make('div', { className: 'prop-head' }, [
+        make('span', { text: '卸任日期' }), dateIn
+      ]),
+      para('下一步會列出全部會被填上「生效至」的行，讓你逐個看過再決定。', 'muted')
+    ], [
+      button('看看會改哪幾行', () => runAction('計算中', async () => {
+        const plan = await callServer('apiRolesTermChangePlan', dateIn.value.trim());
+        renderTermChangePlan(plan);
+      }), ''),
+      button('取消', () => renderRoles(''), 'secondary')
+    ]);
+  }
+
+  function renderTermChangePlan(plan) {
+    if (!plan.ok || plan.blocked) {
+      showErrorModal('換屆', new Error(plan.message));
+      return;
+    }
+    if (plan.rows.length === 0) {
+      openModal('換屆', [
+        para('沒有任何現任的身分行需要處理——每一行都已經有「生效至」了。'),
+        para('如果這一屆已經換過，直接用「＋ 新增一行」加入新一屆就可以。', 'muted')
+      ], [button('知道了', () => renderRoles(''), '')]);
+      return;
+    }
+
+    // 規格 4.3：**逐行列出全部**，唔可以只講數目。
+    // 呢一步係幹事唯一一次可以用人眼確認「係咪真係想改咁多人」嘅關口。
+    const list = make('div', { className: 'sec' }, [
+      sectionTitle('這 ' + plan.rows.length + ' 行會填上「生效至」＝ ' + plan.endDate)
+    ]);
+    plan.rows.forEach((r) => {
+      list.appendChild(make('div', {
+        text: r.nameTC + '　' + r.roleLabel + '　'
+          + (r.effectiveFrom ? '由 ' + r.effectiveFrom + ' 起' : '（一直以來）'),
+        className: 'vio-row'
+      }));
+    });
+
+    openConfirm({
+      title: '換屆（會改動 ' + plan.rows.length + ' 行）',
+      bodyNodes: [
+        list,
+        make('div', { className: 'sec' }, [
+          sectionTitle('會做的事：'),
+          make('div', {
+            text: '・把上面 ' + plan.rows.length + ' 行的「生效至」填成 ' + plan.endDate,
+            className: 'vio-row'
+          }),
+          make('div', { text: '・逐行記入紀錄（誰、什麼身分、哪一日卸任）', className: 'vio-row' }),
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會刪除任何一行', className: 'vio-row' }),
+          make('div', { text: '・不會加入新一屆（那一步要你逐個加）', className: 'vio-row' }),
+          make('div', { text: '・不會改動任何已經生成的職事表', className: 'vio-row' })
+        ]),
+        para('那一日之前的職事表完全不受影響——這正是不刪行的原因。')
+      ],
+      requireTyping: true,
+      typingHint: '這個動作會一次改動 ' + plan.rows.length + ' 行。確定的話，'
+        + '請在下面輸入「' + CONFIRM_PHRASE + '」兩個字：',
+      confirmLabel: '確定換屆',
+      danger: true,
+      onConfirm: (typed) => runAction('換屆中', async () => {
+        const res = await callServerMutating('apiRolesTermChangeExecute', plan.endDate, typed);
+        if (!res.ok) { showErrorModal('換屆', new Error(res.message)); return; }
+        const nodes = [
+          make('div', {
+            text: '已把 ' + res.written + ' 行的「生效至」填成 ' + res.endDate + '。',
+            className: 'ok-line'
+          })
+        ];
+        // 搵唔返嗰啲一定要報出嚟——靜靜略過就係「做咗一半但報告話全部成功」。
+        if (res.failed.length > 0) {
+          nodes.push(make('div', { className: 'warnbox' }, [
+            make('div', {
+              text: '有 ' + res.failed.length + ' 行找不到，沒有改到：',
+              className: 'warn-head'
+            }),
+            make('div', { text: res.failed.join('、'), className: 'lines' }),
+            make('div', {
+              text: '可能是剛才有人在試算表改動過。請重新整理再看一次。',
+              className: 'lines'
+            })
+          ]));
+        }
+        nodes.push(para('下一步：用「＋ 新增一行」逐個加入新一屆。'));
+        openModal('換屆完成', nodes, [button('完成', () => openRoles(''), '')]);
+      })
+    });
+  }
+
+  /* ── 唯讀提示：身分總覽 ─────────────────────────────────── */
+
+  function loadRoleOverview() {
+    runAction('檢查名單', async () => {
+      const res = await callServer('apiRoleOverview');
+      const node = el('roleOverview');
+      if (!node) return;
+      clear(node);
+      if (!res.ok) {
+        node.appendChild(make('div', { text: res.message, className: 'err-text' }));
+        return;
+      }
+      node.appendChild(sectionTitle('名單檢查（唯讀）'));
+      res.rows.forEach((r) => {
+        node.appendChild(make('div', {
+          text: r.section + '　' + r.item + '　' + r.value
+            + (r.note ? '　（' + r.note + '）' : ''),
+          className: 'vio-row'
+        }));
+      });
     });
   }
 
