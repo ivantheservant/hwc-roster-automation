@@ -209,8 +209,13 @@ console.log('\n=== E2 畫面文案 ===');
     zone3.indexOf('沒有電郵，正式發出會略過') !== -1);
   check('★★★★★ 重發 token 要打字確認（不可逆）',
     /requireTyping: true/.test(zone3));
-  check('★★★★ HWCAS 補電郵本輪唔做，畫面上指返選單',
-    zone3.indexOf('「從出席系統補電郵」暫時請用試算表上方的選單。') !== -1);
+  // 第二十七輪批次階段 E：HWCAS 補電郵搬咗上嚟，做成
+  // 「預覽差異 → 逐行勾選 → 套用」。原本嗰句「暫時請用選單」已經拆走。
+  // 完整嘅斷言喺 tests/hwcas_web_apply.test.js；呢度只確認入口存在，
+  // 同埋「預設全部不勾」呢句一定要留喺畫面上。
+  check('★★★★ HWCAS 補電郵有入口，而且畫面講明預設不勾',
+    /button\('從出席系統補電郵', \(\) => openHwcas\(\), 'secondary'\)/.test(zone3)
+    && zone3.indexOf('預設全部不勾') !== -1);
   check('★★★★★ 別名畫面有講「名字相似不代表是同一個人」',
     zone3.indexOf('名字相似不代表是同一個人。') !== -1);
 }

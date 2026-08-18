@@ -269,17 +269,18 @@
       peopleSearchBox(keyword, (k) => openPeople(k)),
       para('停用一個人不會刪走他，也不會影響已經排好的職事表——'
         + '只是之後不會再被自動排入。'),
-      // HWCAS 補電郵本輪唔做（配對錯就寄錯人，要完整嘅預覽差異流程）。
+      // 第二十七輪批次階段 E：HWCAS 補電郵搬咗上嚟，做成
+      // 「預覽差異 → 逐行勾選 → 套用」。**絕對唔可以整批自動套用。**
       make('div', {
-        text: '「從出席系統補電郵」暫時請用試算表上方的選單。'
-          + '那個動作要逐行核對過才可以套用，下一輪才會搬上來。',
+        text: '「從出席系統補電郵」會先給你看差異，逐行勾選之後才寫入。預設全部不勾。',
         className: 'muted'
       })
     ];
 
     nodes.push(row([
       button('＋ 新增一位', () => openAddPerson(), ''),
-      button('別名', () => openAliases(), 'secondary')
+      button('別名', () => openAliases(), 'secondary'),
+      button('從出席系統補電郵', () => openHwcas(), 'secondary')
     ], 'row-right'));
 
     // 「共 N 位」要保留——幹事用嚟核對人數。
@@ -1710,6 +1711,226 @@
       }, ''),
       button('取消', () => renderExclusions(''), 'secondary')
     ]);
+  }
+
+
+  /* ============================================================
+   * 從出席系統補電郵（規格 4.2，第二十七輪批次階段 E）
+   * ============================================================
+   *
+   * ⚠️⚠️ **預設全部唔勾。** 配對錯咗嘅後果係把甲嘅電郵寫入乙嘅資料，
+   * 之後乙收到甲嘅職事表，而甲永遠收唔到——而畫面上完全睇唔出。
+   */
+
+  let hwcasData = null;
+  let hwcasChecked = {};
+
+  function openHwcas() {
+    runAction('讀取出席系統資料', async () => {
+      hwcasData = await callServer('apiHwcasPreview');
+      hwcasChecked = {};
+      renderHwcas();
+    });
+  }
+
+  function renderHwcas() {
+    // Config 未設定：講人話，唔可以彈一個「Config 的 X 未設定」出嚟。
+    if (!hwcasData.ok && hwcasData.notConfigured) {
+      openModal('從出席系統補電郵', [
+        make('div', { className: 'warnbox' }, [
+          make('div', { text: hwcasData.message, className: 'warn-head' })
+        ]),
+        para('設定好之後回來重新整理這一頁。', 'muted')
+      ], [button('知道了', () => renderPeople(''), '')]);
+      return;
+    }
+    if (!hwcasData.ok) {
+      showErrorModal('從出席系統補電郵', new Error(hwcasData.message));
+      return;
+    }
+
+    const nodes = [
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '出席系統是靠姓名對人的。對錯了就會把甲的電郵寫進乙的資料，'
+            + '之後乙收到甲的職事表，而甲永遠收不到。',
+          className: 'warn-head'
+        }),
+        make('div', {
+          text: '所以這裡預設全部不勾。請逐個看過再勾。',
+          className: 'lines'
+        })
+      ]),
+      make('div', {
+        text: '共 ' + hwcasData.counts.total + ' 行　可以套用 '
+          + hwcasData.counts.canApply + ' 行　需要特別小心 '
+          + hwcasData.counts.needsCare + ' 行　沒有改動 '
+          + hwcasData.counts.noChange + ' 行',
+        className: 'muted'
+      })
+    ];
+
+    const applicable = hwcasData.rows.filter((r) => r.canApply);
+    const risky = hwcasData.rows.filter((r) => !r.canApply && r.riskLevel === 'HIGH');
+    const nothing = hwcasData.rows.filter((r) => !r.canApply && r.riskLevel !== 'HIGH');
+
+    if (applicable.length === 0) {
+      nodes.push(make('div', { text: '沒有任何一行可以套用。', className: 'muted' }));
+    } else {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('可以套用（' + applicable.length + ' 行）'),
+        make('div', {
+          text: '勾了才會寫入。不勾就完全不動。',
+          className: 'muted'
+        })
+      ]);
+      applicable.forEach((r) => box.appendChild(hwcasRow(r, true)));
+      nodes.push(box);
+    }
+
+    if (risky.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('系統不敢自己決定（' + risky.length + ' 行，不能勾）'),
+        make('div', {
+          text: '這幾行要你自己在名單裡處理：加別名、新增人員，或者確認是不是同一位。',
+          className: 'muted'
+        })
+      ]);
+      risky.forEach((r) => box.appendChild(hwcasRow(r, false)));
+      nodes.push(box);
+    }
+
+    if (nothing.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('沒有改動（' + nothing.length + ' 行）')
+      ]);
+      nothing.forEach((r) => {
+        box.appendChild(make('div', {
+          text: r.rosterName + '　' + (r.noChange ? '電郵跟現在的一樣' : '出席系統那邊沒有電郵'),
+          className: 'vio-row muted'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    nodes.push(make('div', { id: 'hwcasFooter', className: 'sec' }));
+
+    openModal('從出席系統補電郵', nodes, [
+      button('套用勾了的', () => confirmHwcasApply(), ''),
+      button('返回', () => renderPeople(''), 'secondary')
+    ]);
+    renderHwcasFooter();
+  }
+
+  function hwcasRow(r, selectable) {
+    const box = make('div', { className: 'prop' + (selectable ? '' : ' is-off') });
+
+    const head = make('div', { className: 'prop-head' });
+    if (selectable) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      // ⚠️ **預設唔勾。** 呢一行係整個畫面最重要嘅一行。
+      cb.checked = false;
+      cb.addEventListener('change', () => {
+        if (cb.checked) hwcasChecked[r.personId] = true;
+        else delete hwcasChecked[r.personId];
+        renderHwcasFooter();
+      });
+      head.appendChild(cb);
+    }
+    head.appendChild(make('span', { text: r.rosterName || '（名單上沒有對應的人）' }));
+    head.appendChild(make('span', { text: '　出席系統：' + r.hwcasName, className: 'muted' }));
+    if (r.memberNo) head.appendChild(make('span', { text: '　編號 ' + r.memberNo, className: 'muted' }));
+    box.appendChild(head);
+
+    box.appendChild(make('div', {
+      text: '出席系統的電郵：' + (r.hwcasEmail || '（空白）'),
+      className: 'vio-row'
+    }));
+    box.appendChild(make('div', {
+      text: '現在系統裡的電郵：' + (r.existingEmail || '（空白）'),
+      className: 'vio-row'
+    }));
+
+    // 名字相似但唔同人 ⇒ 紅色警告（規格 4.2）。
+    if (r.riskLevel === 'HIGH') {
+      const warn = make('div', { className: 'vio vio-hard' });
+      r.warnings.forEach((w) => warn.appendChild(make('div', { text: w, className: 'vio-row' })));
+      box.appendChild(warn);
+    } else if (r.warnings.length > 0) {
+      r.warnings.forEach((w) => box.appendChild(make('div', { text: w, className: 'link-warn' })));
+    }
+    if (r.note) box.appendChild(make('div', { text: r.note, className: 'muted' }));
+
+    return box;
+  }
+
+  function renderHwcasFooter() {
+    const node = el('hwcasFooter');
+    if (!node) return;
+    clear(node);
+    const n = Object.keys(hwcasChecked).length;
+    node.appendChild(make('div', {
+      text: n === 0 ? '未勾任何一行。' : '已勾 ' + n + ' 行。',
+      className: n === 0 ? 'muted' : 'ok-line strong'
+    }));
+  }
+
+  function confirmHwcasApply() {
+    const ids = Object.keys(hwcasChecked);
+    if (ids.length === 0) { setStatus('未勾任何一行。', true); return; }
+
+    const byId = {};
+    hwcasData.rows.forEach((r) => { byId[r.personId] = r; });
+
+    const list = make('div', { className: 'sec' });
+    ids.forEach((id) => {
+      const r = byId[id];
+      if (!r) return;
+      list.appendChild(make('div', {
+        text: r.rosterName + '　' + (r.existingEmail || '（空白）') + ' → ' + r.hwcasEmail,
+        className: 'vio-row'
+      }));
+    });
+
+    openConfirm({
+      title: '確定要套用嗎',
+      bodyNodes: [
+        para('會改動 ' + ids.length + ' 行。'),
+        list,
+        make('div', { className: 'sec' }, [
+          sectionTitle('會做的事：'),
+          make('div', { text: '・寫入電郵，並記下來源是出席系統、核對日期是今日', className: 'vio-row' }),
+          make('div', { text: '・逐行記入紀錄', className: 'vio-row' }),
+          sectionTitle('不會做的事：'),
+          make('div', { text: '・不會改動出席系統（那邊一律唯讀）', className: 'vio-row' }),
+          make('div', { text: '・不會動你沒有勾的行', className: 'vio-row' }),
+          make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
+        ])
+      ],
+      confirmLabel: '確定套用',
+      onConfirm: () => runAction('套用中', async () => {
+        const res = await callServerMutating('apiHwcasApplySelected', ids);
+        if (!res.ok) { showErrorModal('從出席系統補電郵', new Error(res.message)); return; }
+        const nodes = [
+          make('div', { text: '已寫入 ' + res.written + ' 行。', className: 'ok-line' })
+        ];
+        // 略過嘅一定要講——「勾咗 10 個，寫咗 7 個，冇人知」係最差嘅結果。
+        if (res.skipped.length > 0) {
+          const box = make('div', { className: 'warnbox' }, [
+            make('div', {
+              text: '有 ' + res.skipped.length + ' 行沒有寫入：',
+              className: 'warn-head'
+            })
+          ]);
+          res.skipped.forEach((s) => box.appendChild(make('div', {
+            text: (s.nameTC || s.personId) + '：' + s.reason, className: 'lines'
+          })));
+          nodes.push(box);
+        }
+        openModal('套用完成', nodes, [button('完成', () => openPeople(''), '')]);
+      })
+    });
   }
 
   /* ============================================================
