@@ -82,14 +82,58 @@ console.log('\n=== 正向驗證：真係有語法錯誤嘅話一定要捉到 ===
   check('★★★★ 反向：正常嘅 \\n escape 唔會被誤報', ok);
 }
 
-console.log('\n=== 順帶：ui/*.html 入面嘅 <script> 唔喺呢個測試範圍 ===');
+console.log('\n=== 第二十七輪批次階段 H4：ui/*.html 嘅 <script> 要 parse 得到 ===');
 {
-  // 講清楚界線，唔好令人以為呢個測試覆蓋咗 HTML。
-  // HTML 樣板要 Google 嘅樣板引擎先跑得到，離線 parse 唔到——
-  // 嗰邊靠 tools/scan-static-risks.js 嘅規則 1（樣板逃逸）。
+  /*
+   * 呢一段本來寫住「HTML 唔喺呢個測試範圍」。第二十七輪批次改咗。
+   *
+   * 點解改：第二十五輪有一次 `Index.html` 出問題，令**整個幹事介面
+   * 完全開唔到**（SyntaxError，一片白）。而本輪一次過改咗六個
+   * `src/ui/*.html`、新增咗兩個，同類問題只會更難定位。
+   *
+   * 可以離線 parse 嘅前提：`<script>` 入面係純 JavaScript，
+   * 樣板標籤（`<? … ?>`）只出現喺 `<script>` 之外——嗰一點由下面
+   * 「非法 scriptlet」嗰節守住。所以抽出 `<script>` 內容之後
+   * 直接 `new vm.Script()` 就試得到。
+   */
   const uiDir = path.join(SRC_DIR, 'ui');
-  check('★★★ ui/ 存在（提醒：HTML 由靜態掃描規則 1 負責，唔喺呢度）',
-    fs.existsSync(uiDir));
+  check('★★★ ui/ 存在', fs.existsSync(uiDir));
+
+  fs.readdirSync(uiDir).filter((f) => f.endsWith('.html')).forEach((name) => {
+    const text = fs.readFileSync(path.join(uiDir, name), 'utf8');
+    const opens = (text.match(/<script>/g) || []).length;
+    const closes = (text.match(/<\/script>/g) || []).length;
+    check('★★★★★ ' + name + ' 嘅 <script> 開合對稱（' + opens + ' 開 / ' + closes + ' 閉）',
+      opens === closes);
+    if (opens === 0) return;
+
+    const m = text.match(/<script>([\s\S]*)<\/script>/);
+    // ⚠️ 有樣板標籤嘅 HTML（例如個人專屬連結頁）唔試 parse——
+    // 嗰啲要 Google 嘅樣板引擎行完先係合法 JS。
+    if (!m || /<\?/.test(m[1])) return;
+    let ok = true;
+    let err = '';
+    try { new vm.Script(m[1], { filename: name }); }
+    catch (e) { ok = false; err = e.message; }
+    check('★★★★★ ' + name + ' 嘅 <script> 內容 parse 得到'
+      + '——上一次一個檔案出問題，令整個幹事介面一片白',
+      ok, err);
+  });
+}
+
+console.log('\n=== 階段 H4：Index.html 每個 includeHtml 引用嘅檔案都要存在 ===');
+{
+  // 引用一個唔存在嘅檔案，HtmlService 會喺**執行時**先至爆，
+  // 而爆嘅時候係整頁開唔到——同上面嗰種失敗一模一樣咁難查。
+  const uiDir = path.join(SRC_DIR, 'ui');
+  const index = fs.readFileSync(path.join(uiDir, 'Index.html'), 'utf8');
+  const refs = (index.match(/includeHtml\('ui\/([A-Za-z0-9]+)'\)/g) || [])
+    .map((s) => s.replace(/.*'ui\//, '').replace(/'\)/, ''));
+  check('★★★★ Index.html 真係有 includeHtml 引用', refs.length >= 6, refs.join('、'));
+  refs.forEach((name) => {
+    check('★★★★★ ui/' + name + '.html 存在',
+      fs.existsSync(path.join(uiDir, name + '.html')));
+  });
 }
 
 console.log('\n=== 第二十四輪紅線（第二十五輪改寫）：ui/*.html 唔可以有非法嘅 <? …scriptlet ===');
