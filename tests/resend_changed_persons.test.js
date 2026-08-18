@@ -131,12 +131,30 @@ console.log('\n=== E4：planResendChangedPersons_ 嘅結構性要求（靜態檢
     /computeResendDiff_\(context\)/.test(fnBody));
   check('★★★★ 逐個人回傳中文名同有冇電郵（規格 2.7：確認畫面唔可以只寫數字）',
     /nameTC:/.test(fnBody) && /hasEmail:/.test(fnBody));
-  check('★★★★★ 「原本係咩」攞唔到時 previousSummary 留空，'
-    + '**唔可以靜靜擺一個似層層嘅值落去**'
+  // 第二十五輪批次階段 D 改寫：「原本係咩」由「一律空字串」變成
+  // 「真係去 SendLog 攞」。原本嗰兩條斷言鎖住嘅係「攞唔到」呢個當時嘅
+  // 事實，而唔係一條該永久成立嘅規則——**要保留嘅意圖係
+  // 「攞唔到就要留空，唔可以擺假值」**，而唔係「永遠攞唔到」。
+  check('★★★★★ previousSummary 由 context.lastSummaryByPerson 攞（真值，唔再一律空白）',
+    /previousSummary:\s*\(context\.lastSummaryByPerson \|\| \{\}\)\[c\.personId\]/.test(fnBody));
+  check('★★★★★ 攞唔到時 fallback 係空字串，'
+    + '**唔可以靜靜擺一個似層層嘅值落去**（例如攞現在嗰個當原本）'
     + '——擺個假值落去，幹事會以為自己核對緊真嘢',
-    /previousSummary: ''/.test(fnBody));
-  check('★★★★★ 而且要喺註解講明點解攞唔到、下一輪點樣先做到',
-    /lastSummaryByPerson/.test(fnBody) && /hash 係單向嘅/.test(fnBody));
+    /\[c\.personId\] \|\| ''/.test(fnBody)
+    && !/previousSummary:[^\n]*currentSummary/.test(fnBody));
+  check('★★★★★ 而且要喺註解講明「攞唔到」同「上次冇安排」係兩件事',
+    /冇記錄/.test(fnBody));
+
+  const mailer = fs.readFileSync(path.join(__dirname, '..', 'src', 'Mailer.gs'), 'utf8');
+  check('★★★★★ buildMailContext_() 有提供 lastSummaryByPerson',
+    /lastSummaryByPerson: readLastSummaryByPerson_\(quarterId\)/.test(mailer));
+  {
+    const readerFn = mailer.slice(mailer.indexOf('function readLastSummaryByPerson_'));
+    const body = readerFn.slice(0, readerFn.indexOf('\n}\n') + 3);
+    check('★★★★★ 舊紀錄冇填 summary 嗰啲**唔會出現喺物件入面**'
+      + '——擺個空字串入去就分唔到「上次冇安排」同「冇記錄」',
+      /if \(records\[id\]\.summary !== ''\)/.test(body));
+  }
 
   const flow = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppFlow.gs'), 'utf8');
   const step5Plan = flow.slice(flow.indexOf('function apiStep5Plan('), flow.indexOf('function apiStep5Plan(') + 1400);

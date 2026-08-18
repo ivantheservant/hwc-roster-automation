@@ -213,6 +213,8 @@ function buildMailContext_(quarterId, versionNo, stage) {
     replyTo: String(config[CONFIG_KEYS.MAIL_REPLY_TO] || ''),
     adminEmail: String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || ''),
     lastHashByPerson: readLastHashByPerson_(quarterId),
+    // 第二十五輪批次階段 D：掣 4 嘅「原本係咩」。見 readLastSummaryByPerson_()。
+    lastSummaryByPerson: readLastSummaryByPerson_(quarterId),
     // 追加階段 AO：只有步驟 5 的 computeResendDiff_() 會用到，OFFICIAL／其他階段
     // 多讀這一份小資料的成本可忽略，不特地依 stage 條件略過，維持 context 建構邏輯單純。
     lastStatusByPerson: readLastStatusByPerson_(quarterId),
@@ -778,8 +780,34 @@ function readLastSendRecordByPerson_(quarterId) {
   rows.forEach(function (row) {
     result[row[C.PERSON_ID]] = {
       hash: String(row[C.ASSIGNMENT_HASH] || ''),
-      status: String(row[C.STATUS] || '').toUpperCase()
+      status: String(row[C.STATUS] || '').toUpperCase(),
+      // 第二十五輪批次階段 D：上次寄出時嗰個人嘅安排摘要文字。
+      //
+      // `hash` 係單向嘅，還原唔到內容——所以掣 4 嘅「原本係咩」一直
+      // 都係空白。但 `AssignmentSummary` 呢一欄本身**一直都有寫入**
+      // （見 `appendSendLog_()`），只係從來冇讀返出嚟。加呢一行就夠。
+      summary: String(row[C.ASSIGNMENT_SUMMARY] || '')
     };
+  });
+  return result;
+}
+
+/**
+ * 第二十五輪批次階段 D：從 SendLog 讀出每個人最後一次寄出時嘅安排摘要。
+ * 供掣 4「改動後重發」嘅確認畫面做「原本／現在」並排比較（規格 2.7）。
+ *
+ * ⚠️ **攞唔到嗰啲一律唔會出現喺回傳物件入面**（key 唔存在），
+ * 唔會擺一個空字串扮到「上次係冇安排」。呼叫端要靠 key 存唔存在
+ * 去分辨「上次冇安排」同「冇記錄」——呢兩件事對幹事嚟講完全唔同。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object.<string, string>} {PersonID: 上次嘅安排摘要}
+ */
+function readLastSummaryByPerson_(quarterId) {
+  const records = readLastSendRecordByPerson_(quarterId);
+  const result = {};
+  Object.keys(records).forEach(function (id) {
+    // 舊紀錄（本輪之前寄嘅）可能真係冇填 summary，噉就當冇記錄。
+    if (records[id].summary !== '') result[id] = records[id].summary;
   });
   return result;
 }
@@ -1082,6 +1110,12 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   const nextActionText = nextAction ? '「職事表系統 → ' + nextAction + '」' : '登入試算表查看目前狀態';
 
   const reasonLines = [];
+  // 第二十五輪批次階段 A2：自動生成已經關閉，所以「到期咗仲未生成」
+  // 唔再係「等系統做」，而係「等你去撳掣」——文案一定要講到係幹事要做。
+  if (judgment.reasons.indexOf('NOT_GENERATED') !== -1) {
+    reasonLines.push('　• 原定 ' + (judgment.generateDueDate || '（未設定日期）')
+      + ' 生成初稿，已經過了 ' + judgment.daysSinceGenerateDue + ' 天，但這一季還沒有任何版本');
+  }
   if (judgment.reasons.indexOf('STUCK') !== -1) {
     reasonLines.push('　• 已經停留在「' + judgment.stage + '」' + judgment.daysStuck + ' 天（門檻 ' + judgment.stuckDays + ' 天）');
   }
@@ -1103,16 +1137,57 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
     specialSection = '\n' + describeUnconfirmedSpecialSundays_(judgment.unconfirmedSpecials) + '\n';
   }
 
-  const subject = prefix + quarterId + ' 職事表停留在「' + judgment.stage + '」，請跟進';
+  const notGenerated = judgment.reasons.indexOf('NOT_GENERATED') !== -1;
+
+  // 第二十五輪批次階段 A2：完全沒有版本時，「下一步」不是 Stage 對照表那一項，
+  // 而是去撳「生成初稿」。照用 STAGE_NEXT_ACTION 會叫幹事去做一件他做不到的事
+  // （沒有版本，那些掣全部是灰的）。
+  const nextStepText = notGenerated
+    ? '請開啟幹事介面，撳「生成初稿」。系統不會自己生成——一定要你撳。'
+    : '下一步請執行' + nextActionText + '。';
+
+  const countText = notGenerated
+    ? '這一項提醒不設次數上限，會每天提醒一次，直到你生成了初稿為止。\n'
+      + '如果這一季其實不需要再排（例如只是用來測試或培訓），'
+      + '請把 Quarters 工作表上這一季的 GenerateOn 清空，就不會再收到這封信。'
+    : '這是第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次提醒'
+      + '（同一個 Stage 達到上限後不會再提醒，前進到下一個 Stage 之後次數會重新計算）。';
+
+  const subject = prefix + quarterId
+    + (notGenerated ? ' 還沒有生成初稿，請跟進' : ' 職事表停留在「' + judgment.stage + '」，請跟進');
   const body = quarterId + ' 的職事表目前 Stage 是「' + judgment.stage + '」，尚未進入下一步。\n\n'
     + '提醒原因：\n' + reasonLines.join('\n') + '\n'
     + specialSection + '\n'
-    + '這是第 ' + (judgment.reminderCount + 1) + ' / ' + judgment.maxCount + ' 次提醒'
-    + '（同一個 Stage 達到上限後不會再提醒，前進到下一個 Stage 之後次數會重新計算）。\n\n'
-    + '下一步請執行' + nextActionText + '。\n\n'
+    + countText + '\n\n'
+    + nextStepText + '\n'
+    + buildAdminConsoleLinkText_() + '\n\n'
     + '（本通知只寄給你，不會寄給堂委或義工——義工收到的第一封信永遠是'
     + '「步驟 4：正式發出」那一封。）';
   notifyAdmin_(subject, body, adminEmail, isDryRun);
+}
+
+/**
+ * 提醒信尾附的連結。
+ *
+ * ⚠️ 幹事介面嘅網址**攞唔到可靠嘅值**：呢個專案有兩個部署（義工個人連結、
+ * 幹事介面），`ScriptApp.getService().getUrl()` 只會回其中一個，而且喺
+ * trigger 執行環境回嘅可能係 head 部署而唔係幹事日常用嗰個。
+ *
+ * 所以**唔會憑估砌一條連結**——一條打唔開嘅連結對一個唔識電腦嘅人嚟講，
+ * 比冇連結更差：佢會以為系統壞咗，而唔會諗到「應該用返自己收藏嗰條」。
+ * 試算表網址係攞得到嘅可靠值，就淨係俾試算表。
+ * @returns {string} 附在提醒信尾的連結段落
+ */
+function buildAdminConsoleLinkText_() {
+  let sheetUrl = '';
+  try {
+    sheetUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+  } catch (err) {
+    log_('WARN', 'buildAdminConsoleLinkText_ 取不到試算表網址：' + err.message);
+  }
+  const lines = ['幹事介面：請用你自己收藏的那條網址開啟。'];
+  if (sheetUrl) lines.push('職事表試算表：' + sheetUrl);
+  return lines.join('\n');
 }
 
 /**

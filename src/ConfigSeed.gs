@@ -322,6 +322,15 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.TRIGGER_AUTO_GENERATE, type: CONFIG_TYPES.BOOL, group: 'AUTOMATION',
+      defaultValue: BOOLEAN_TEXT.FALSE,
+      description: '到期自動生成初稿。預設關閉——初稿一律由幹事在網頁上自己撳掣生成。'
+        + '關閉之後系統不會自己動任何東西，全部行動由幹事發起；'
+        + '「到期了還沒生成」改為由提醒信通知幹事，不會代替幹事生成。'
+        + '改成 TRUE 就會回復成到期自動生成（那條程式碼路徑一直保留著）。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.QUARTER_TERM_START_MONTHS, type: CONFIG_TYPES.LIST, group: 'SCHEDULE',
       defaultValue: DEFAULTS.QUARTER_TERM_START_MONTHS,
       description: '第十七輪批次新增：T1～T4 各自由哪一個月開始，逗號分隔的四個月份數字。'

@@ -401,6 +401,26 @@
       ? ('目前第 ' + v.versionNo + ' 版　' + (v.createdAt || '') + '　' + (v.basisText || ''))
       : '這一季還沒有任何版本。';
 
+    // 第二十五輪批次階段 A6：常駐「開啟職事表」連結。
+    // 後端攞唔到工作表就會回空字串——**噉就唔畫個連結**，
+    // 唔可以畫一條開唔到嘅連結出嚟（見 buildGridSheetUrl_() 嘅說明）。
+    const linkBox = clear(el('statusLink'));
+    if (v && v.sheetUrl) {
+      const a = document.createElement('a');
+      a.href = v.sheetUrl;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = '開啟職事表';
+      a.className = 'sheetlink';
+      linkBox.appendChild(a);
+      linkBox.appendChild(make('span', {
+        text: '（在新分頁打開，可以直接改格子）', className: 'muted'
+      }));
+      linkBox.hidden = false;
+    } else {
+      linkBox.hidden = true;
+    }
+
     const badge = el('dryRunBadge');
     badge.hidden = !d.isDryRun;
     badge.textContent = '測試模式：不會真的寄出任何電郵';

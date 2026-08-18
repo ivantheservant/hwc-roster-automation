@@ -146,14 +146,36 @@ function apiListPreacherTranslationPending(quarterId) {
     return a.postId < b.postId ? -1 : 1;
   });
 
+  const preacherSuggestions = suggestHistoricalNames_(ids.preacherPostId, 8);
+  const translationSuggestions = suggestHistoricalNames_(ids.translationPostId, 8);
+  const flowerSuggestions = suggestHistoricalNames_(ids.flowerPostId, 8);
+
+  // 第二十五輪批次階段 C：**逐個 PostID 索引嘅建議名單。**
+  //
+  // 點解要加呢個：三條建議名單本來只喺頂層，用三個唔同嘅欄名。前端要
+  // 知道「呢一格屬於邊條名單」就只能靠崗位名稱做字串比對
+  // （`postName === '講員'` 之類）——而崗位名稱係幹事可以喺 Posts
+  // 工作表自由改嘅，改一次就會靜靜咁令全部建議下拉變空白，
+  // **而且畫面唔會報錯**，只係「冇建議」，睇落好似本來就係噉。
+  //
+  // 用 PostID 做 key 就冇呢個問題：前端寫 `suggestionsByPostId[cell.postId]`，
+  // 而 `postId` 本身就係後端逐格畀嘅，兩邊講緊同一樣嘢。
+  //
+  // 三個舊欄位冇刪——側邊欄（PreacherFillSidebar.html）仲用緊。
+  const suggestionsByPostId = {};
+  if (ids.preacherPostId) suggestionsByPostId[ids.preacherPostId] = preacherSuggestions;
+  if (ids.translationPostId) suggestionsByPostId[ids.translationPostId] = translationSuggestions;
+  if (ids.flowerPostId) suggestionsByPostId[ids.flowerPostId] = flowerSuggestions;
+
   return {
     quarterId: quarterId,
     versionNo: versionNo,
     stage: getQuarterStage_(quarterId),
     officialSentHint: getQuarterStage_(quarterId) === QUARTER_STAGE.OFFICIAL_SENT,
-    preacherSuggestions: suggestHistoricalNames_(ids.preacherPostId, 8),
-    translationSuggestions: suggestHistoricalNames_(ids.translationPostId, 8),
-    flowerSuggestions: suggestHistoricalNames_(ids.flowerPostId, 8),
+    preacherSuggestions: preacherSuggestions,
+    translationSuggestions: translationSuggestions,
+    flowerSuggestions: flowerSuggestions,
+    suggestionsByPostId: suggestionsByPostId,
     pending: pending
   };
 }

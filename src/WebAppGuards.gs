@@ -144,17 +144,15 @@ function planResendChangedPersons_(quarterId) {
       // 規格 2.7：確認畫面要列得出「改了哪幾格」，唔可以只寫數字——
       // 呢個係幹事唯一一次可以人眼睇出「係咪真係想改咁多人」嘅關口。
       //
-      // ⚠️ **「原本係咩」目前攞唔到。** `buildMailContext_()` 只保留咗
-      // 上次寄出嘅 `AssignmentHash`（`lastHashByPerson`），冇保留當時嘅
-      // 摘要文字——hash 係單向嘅，還原唔到內容。SendLog 本身有
-      // `AssignmentSummary` 欄，但 mail context 冇讀入嚟。
+      // 第二十五輪批次階段 D：「原本係咩」而家攞到喇。
+      // `buildMailContext_()` 加咗 `lastSummaryByPerson`，讀 SendLog 嘅
+      // `AssignmentSummary` 欄——嗰欄一直都有寫入，只係從來冇讀返出嚟。
       //
-      // 所以呢度只回傳「而家係咩」，`previousSummary` 一律空字串，
-      // **而唔係靜靜擺一個似層層嘅值落去**。前端應該顯示「（上次的安排
-      // 未有記錄）」而唔係扮到有得比較。
-      // 要真正做到並排比較，下一輪要喺 `buildMailContext_()` 加一個
-      // `lastSummaryByPerson`（讀 SendLog 嘅 `AssignmentSummary`）。
-      previousSummary: '',
+      // ⚠️ 攞唔到嗰啲（第一次收信、或者舊紀錄冇填 summary）**一律
+      // 保持空字串，唔會擺一個似層層嘅值落去**（例如攞現在嗰個當原本、
+      // 或者寫「無」）。前端見到空字串會顯示「（上次的安排沒有記錄）」
+      // ——講「冇記錄」係誠實嘅，扮到有得比較就會令幹事以為自己核對過。
+      previousSummary: (context.lastSummaryByPerson || {})[c.personId] || '',
       currentSummary: (c.assignments || []).map(function (a) {
         return a.serviceDate + '　' + (context.postNames[a.postId] || a.postId);
       }).join('；')

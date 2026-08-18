@@ -19,6 +19,32 @@
 
   function renderZone1(d) {
     const body = clear(el('zone1Body'));
+
+    // ── 第二十五輪批次階段 A4：區一有**兩種形態** ─────────────────
+    //
+    // 未有版本 ⇒ 只顯示「生成初稿」，四粒日常掣完全唔出現。
+    //
+    // 點解唔係「一粒生得、四粒變灰」：對幹事嚟講，四粒撳唔到嘅掣係噪音。
+    // 佢要做嘅嘢只有一件，畫面就應該只有一件。四粒灰掣只會令佢問
+    //「係咪壞咗」，而唔會令佢更快搵到應該撳邊粒。
+    //
+    // 已有版本 ⇒「生成初稿」消失，四粒日常掣出現。
+    // 重新生成（覆蓋式）唔喺呢度，留喺區四「進階功能」——嗰個係
+    // 會覆蓋現有安排嘅動作，唔應該同日常操作擺埋一齊。
+    if (!d.latestVersion) {
+      const g = (d.buttons && d.buttons.generate) || {};
+      body.appendChild(bigButton({
+        buttonName: '生成初稿',
+        dynamicText: g.dynamicText,
+        disabledReason: g.disabledReason,
+        enabled: g.enabled !== false,
+        buttonLabel: '生成',
+        danger: false,
+        onClick: openGenerateDraft
+      }));
+      return;
+    }
+
     const handlers = {
       save: openSaveAndConfirm,
       review: openReview,
@@ -37,6 +63,144 @@
         onClick: handlers[b.key]
       }));
     });
+  }
+
+  /* ============================================================
+   * 掣 0：生成初稿（規格 2.1，第二十五輪批次階段 A5）
+   * ============================================================ */
+
+  function openGenerateDraft() {
+    runAction('讀取資料', async () => {
+      const plan = await callServer('apiGenerateDraftPlan', currentQuarterId);
+      if (plan.blocked) {
+        showErrorModal('生成初稿', new Error(plan.message || plan.blockReason));
+        return;
+      }
+      renderGenerateConfirm(plan);
+    });
+  }
+
+  function renderGenerateConfirm(plan) {
+    const facts = make('div', { className: 'sec' }, [
+      sectionTitle('會做的事：'),
+      make('div', {
+        text: '・' + plan.serviceDateCount + ' 個主日、' + plan.postCount + ' 個崗位',
+        className: 'vio-row'
+      }),
+      make('div', {
+        text: '・系統會試 ' + plan.attemptsPlanned + ' 次不同排法，揀最平均那一次',
+        className: 'vio-row'
+      }),
+      make('div', {
+        text: '・講員、翻譯、獻花不會自動排，要你之後人手填',
+        className: 'vio-row'
+      }),
+      make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
+    ]);
+
+    // 生成係**可逆**嘅：唔會寄信、唔會覆蓋任何嘢（冇版本先撳得到）。
+    // 所以唔需要打字確認——打字確認留返俾真正不可逆嘅動作（掣 3／掣 4）。
+    // 每個動作都要打字，打字就會變成一個機械動作，到真正危險嗰次就冇咗作用。
+    openConfirm({
+      title: '生成 ' + (plan.quarterLabel || plan.quarterId) + ' 的初稿',
+      bodyNodes: [
+        facts,
+        para('可能需要一至數分鐘，過程中不要關掉這個視窗。')
+      ],
+      confirmLabel: '開始生成',
+      onConfirm: () => executeGenerateDraft()
+    });
+  }
+
+  function executeGenerateDraft() {
+    // 執行中：整頁掣停用（runAction 嘅 setBusy 已經做咗），
+    // 再加一個明確嘅「已經開始」訊息——生成要跑幾分鐘，冇呢句嘅話
+    // 幹事會以為撳咗冇反應，而去撳多次或者重新整理。
+    openModal('正在生成初稿', [
+      para('正在生成……已經開始，請不要關掉視窗或重新整理。'),
+      para('這一步要跑幾分鐘。完成之後這個視窗會自動變成結果畫面。', 'muted')
+    ], []);
+
+    runAction('生成初稿', async () => {
+      const res = await callServer('apiGenerateDraftExecute', currentQuarterId);
+      renderGenerateResult(res);
+    });
+  }
+
+  function renderGenerateResult(res) {
+    if (!res.ok) {
+      showErrorModal('生成初稿', new Error(res.message || '生成失敗'));
+      return;
+    }
+
+    const nodes = [
+      make('div', {
+        text: '已生成初稿（第 ' + res.versionNo + ' 版）',
+        className: 'ok-head'
+      }),
+      make('div', {
+        text: res.serviceDateCount + ' 個主日、' + res.postCount + ' 個崗位'
+          + (res.genuineGapCount > 0 ? '、有 ' + res.genuineGapCount + ' 格未能安排' : ''),
+        className: 'lines'
+      })
+    ];
+
+    if (res.manualPendingCount > 0) {
+      nodes.push(make('div', {
+        text: '另有 ' + res.manualPendingCount + ' 格是要你人手填的（講員、翻譯、獻花），'
+          + '這不算問題。',
+        className: 'muted'
+      }));
+    }
+
+    // 階段 A7：跑少咗次數一定要講出嚟。**唔可以靜靜接受一個較差嘅結果**
+    // ——排表品質下降而幹事完全唔知，係最差嘅一種失敗。
+    if (res.stoppedByTime) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這次只試了 ' + res.attemptsRun + ' 次（原定 ' + res.attemptsPlanned
+            + ' 次），因為時間快要不夠。',
+          className: 'warn-head'
+        }),
+        make('div', {
+          text: '初稿仍然可以用，只是「揀最平均那一次」的挑選範圍比平時窄。'
+            + '如果想試足全部次數，請用試算表選單的「生成職事表」重做一次。',
+          className: 'lines'
+        })
+      ]));
+    }
+
+    if (res.sheetUrl) {
+      const a = document.createElement('a');
+      a.href = res.sheetUrl;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = '開啟職事表檢查同修改';
+      a.className = 'bigLink';
+      nodes.push(a);
+    }
+    nodes.push(para('在試算表直接改格子，改完回來撳「儲存並確認」。'));
+
+    // 「還有 N 項未做」——真數字，唔係寫死。
+    const pq = res.preQuarter || {};
+    if (pq.undoneItemCount === -1) {
+      nodes.push(make('div', {
+        text: '「開季前準備」還有多少項未做，暫時查不到。開回主畫面看看。',
+        className: 'muted'
+      }));
+    } else if (pq.undoneItemCount > 0) {
+      const detail = (pq.items || [])
+        .filter((i) => i.count > 0)
+        .map((i) => i.label + ' ' + i.count)
+        .join('、');
+      nodes.push(make('div', {
+        text: '另外「開季前準備」還有 ' + pq.undoneItemCount + ' 項未做'
+          + (detail ? '（' + detail + '）' : '') + '。',
+        className: 'lines'
+      }));
+    }
+
+    openModal('生成完成', nodes, [button('知道了', () => closeModalAndRefresh(), '')]);
   }
 
   /* ============================================================
@@ -662,7 +826,10 @@
     if (!r.advanced) {
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '有人未收到，所以這一季的進度**沒有**推前——補救之後可以再撳一次這一粒。'
+          // 第二十五輪批次階段 B4：清走字面上嘅 `**`。
+          // Markdown 粗體語法喺畫面上只會顯示成兩粒星，幹事會問「呢兩粒星係咩」。
+          // （第二十一輪已經喺選單版清過一次同類問題。）
+          text: '有人未收到，所以這一季的進度沒有推前。補救之後可以再撳一次這一粒。'
             .replace(/\*\*/g, ''),
           className: 'err-text'
         }),
@@ -709,15 +876,19 @@
         if (!c.hasEmail) head.appendChild(make('span', { text: '沒有電郵，無法通知', className: 'tag tag-bad' }));
         item.appendChild(head);
 
+        // 第二十五輪批次階段 D：「原本」而家真係攞到（由 SendLog 嘅
+        // AssignmentSummary），所以**原本擺上面、現在擺下面**——
+        // 人眼由上而下讀，「舊 → 新」先讀得出改咗啲乜。
+        //
+        // ⚠️ 攞唔到嗰啲仍然誠實講「沒有記錄」，唔會擺個假值扮到有得比較。
+        // 「第一次收信」同「舊紀錄冇留底」都會落呢一格。
+        item.appendChild(make('div', {
+          text: '原本：' + (c.previousSummary || '（上次的安排沒有記錄，無法對照）'),
+          className: c.previousSummary ? 'vio-row' : 'vio-row muted'
+        }));
         item.appendChild(make('div', {
           text: '現在：' + (c.currentSummary || '（這一季沒有安排）'),
           className: 'vio-row'
-        }));
-        // ⚠️ 「原本係咩」後端目前攞唔到（上次寄出只保留咗 hash，還原唔到內容）。
-        // 唔可以扮到有得比較——誠實講明。
-        item.appendChild(make('div', {
-          text: '原本：' + (c.previousSummary || '（上次寄出的安排系統沒有留底，無法對照）'),
-          className: 'vio-row muted'
         }));
         list.appendChild(item);
       });

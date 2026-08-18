@@ -365,6 +365,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "AUTOMATION"
     },
+    "TRIGGER_AUTO_GENERATE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "（第二十五輪新增，試算表現時未有這一列）",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "AUTOMATION"
+    },
     "RESEND_ONLY_CHANGED": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "TRUE",

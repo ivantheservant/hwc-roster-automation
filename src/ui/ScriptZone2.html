@@ -290,7 +290,34 @@
       para('改完即刻儲存，不需要另外按確認。')
     ];
 
-    const cells = data.cells || data.pending || [];
+    // 第二十五輪批次階段 C：這一季已經正式發出過的話，改動之後要重發。
+    // 後端一直都有回 officialSentHint，只係從來冇用到。
+    if (data.officialSentHint) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一季已經正式發出，改動之後記得用「改動後重發」通知受影響的人。',
+          className: 'warn-head'
+        })
+      ]));
+    }
+
+    // ⚠️ 第二十五輪批次階段 C：**收窄成單一欄名。**
+    //
+    // 原本寫成「A 欄唔存在就用 B 欄」嗰種兩選一寫法，而後端由頭到尾
+    // 只有其中一個欄名。呢種 fallback 睇落係「穩陣啲」，實際上係一個
+    // **會遮蓋結構不符嘅陷阱**：兩個名都唔啱嘅話，畫面只會空白，
+    // 唔會報錯，而空白同「真係冇嘢要填」睇落一模一樣。
+    // 收窄成一個名之後，後端結構一有變就即刻睇得出。
+    //
+    // （呢段特登唔寫出嗰個舊寫法嘅字面樣，因為 tests/ 有一條斷言
+    // 就係掃呢個檔案有冇出現過嗰串字——寫喺註解都會被捉到。）
+    const cells = data.pending || [];
+
+    // 建議名單用 PostID 索引（後端新加嘅 suggestionsByPostId）。
+    // ⚠️ **唔可以用崗位名稱做字串比對**——崗位名係幹事可以喺 Posts
+    // 工作表自由改嘅，改一次就會靜靜咁令全部建議消失而唔報錯。
+    const suggestionsByPostId = data.suggestionsByPostId || {};
+
     if (cells.length === 0) {
       nodes.push(make('div', { text: '這一季沒有待填的格子。', className: 'ok-line' }));
     }
@@ -308,9 +335,12 @@
       input.placeholder = '姓名';
       box.appendChild(input);
 
-      if (c.suggestions && c.suggestions.length > 0) {
-        const sug = make('div', { className: 'prop-opts' });
-        c.suggestions.forEach((name) => {
+      const suggestions = suggestionsByPostId[c.postId] || [];
+      if (suggestions.length > 0) {
+        const sug = make('div', { className: 'prop-opts' }, [
+          make('div', { text: '以前做過這個崗位的：', className: 'muted' })
+        ]);
+        suggestions.forEach((name) => {
           sug.appendChild(button(name, () => { input.value = name; }, 'chip'));
         });
         box.appendChild(sug);

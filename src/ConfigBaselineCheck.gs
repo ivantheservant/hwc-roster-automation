@@ -95,6 +95,9 @@ function getConfigBaselineSnapshot_() {
       REMIND_STUCK_DAYS: { launchTargetValue: '3', source: '已核實的實際值' },
       REMIND_STUCK_MAX_COUNT: { launchTargetValue: '3', source: '已核實的實際值' },
       REMIND_UNCONFIRMED_SPECIAL_DAYS: { launchTargetValue: '7', source: '已核實的實際值' },
+      // 第二十五輪批次新增。上線目標值＝FALSE（初稿由幹事人手撳掣生成）。
+      // 試算表現時未有這一列——Config 的自動補建會在下次執行時加入。
+      TRIGGER_AUTO_GENERATE: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
       RESEND_ONLY_CHANGED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROSTER_DRIVE_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 動態值：安裝時自動偵測填入本試算表自己的 ID，唔可能有固定嘅「上線目標值」，

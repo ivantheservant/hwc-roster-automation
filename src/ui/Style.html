@@ -14,6 +14,10 @@
     --ok: #1e7e34;
     --card: #ffffff;
     --card-off: #f6f7f9;
+    /* 第二十五輪批次階段 B5：禁用掣專用嘅三隻色。見下面 button:disabled。 */
+    --disabled-bg: #e9ebee;
+    --disabled-fg: #9aa0a6;
+    --disabled-border: #d0d4d9;
   }
 
   * { box-sizing: border-box; }
@@ -66,7 +70,19 @@
     background: var(--card-off); color: var(--fg); border: 1px solid var(--border);
     font-size: 12px; padding: 2px 8px; border-radius: 999px; margin: 0 4px 4px 0;
   }
-  button:disabled { opacity: .45; cursor: not-allowed; }
+  /* 第二十五輪批次階段 B5：禁用掣唔可以只靠透明度。
+     藍底掣半透明之後仍然係藍色，喺非技術使用者眼中「淺藍」同「藍」
+     都係「可以撳」——分唔到就會一直撳，撳完冇反應就以為壞咗。
+     所以改成**換色相**：灰底、灰字、灰邊框，同啟用態係兩種顏色，
+     唔係同一種顏色嘅兩個濃度。`!important` 係因為要蓋過
+     .danger／.secondary 各自嘅底色。 */
+  button:disabled {
+    background: var(--disabled-bg) !important;
+    color: var(--disabled-fg) !important;
+    border: 1px solid var(--disabled-border) !important;
+    cursor: not-allowed;
+    opacity: 1;
+  }
 
   .badge {
     font-size: 12px; padding: 3px 10px; border-radius: 999px;
@@ -201,17 +217,29 @@
     padding: 10px 12px; margin-top: 14px;
   }
 
+  /* 第二十五輪批次階段 A5／A6：生成流程同常駐職事表連結 */
+  .statuscard-link { margin-top: 6px; font-size: 13px; }
+  .sheetlink { color: var(--accent); font-weight: 600; margin-right: 6px; }
+  .bigLink {
+    display: inline-block; margin: 10px 0; padding: 10px 16px;
+    background: var(--accent); color: #fff; border-radius: 6px;
+    text-decoration: none; font-weight: 600;
+  }
+  .ok-head { font-size: 16px; font-weight: 600; color: var(--ok); margin-bottom: 6px; }
+
   /* ── 深色模式 ─────────────────────────────────────────── */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
       --card: #1c1f26; --card-off: #22262e; --warn-bg: #3a2f10; --warn-border: #7a6420;
       --danger: #f2867c; --ok: #6cc07f;
+      --disabled-bg: #24282f; --disabled-fg: #6a7078; --disabled-border: #343a42;
     }
   }
   :root[data-theme="dark"] {
     --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
     --card: #1c1f26; --card-off: #22262e; --warn-bg: #3a2f10; --warn-border: #7a6420;
     --danger: #f2867c; --ok: #6cc07f;
+    --disabled-bg: #24282f; --disabled-fg: #6a7078; --disabled-border: #343a42;
   }
 </style>

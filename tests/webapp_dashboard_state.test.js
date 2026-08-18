@@ -49,11 +49,22 @@ function facts(overrides) {
 
 console.log('\n=== 規格 1.2【核心】狀態卡文字，逐個 Stage ===');
 {
-  checkEqual('★★★★★ DRAFT 無版本 ⇒ 講幾時自動生成',
+  // 第二十五輪批次階段 A3 改寫：自動生成關咗，「系統會在 X 自動生成」
+  // 會令幹事等一個永遠唔會嚟嘅日子。要保留嘅意圖係
+  // 「有日期就講日期、冇日期唔可以砌一個出嚟」，而唔係嗰句具體文案。
+  checkEqual('★★★★★ DRAFT 無版本 ⇒ 講建議幾時生成，而且要叫佢自己撳掣'
+    + '（唔可以再講「系統會自動生成」——自動生成已經關咗）',
     gas.buildDashboardStatusText_(S.DRAFT, false, '11月27日'),
-    '還未生成初稿。系統會在 11月27日 自動生成。');
+    '還未生成初稿。建議在 11月27日 之後生成，撳下面的「生成初稿」。');
   checkEqual('★★★★ DRAFT 無版本、又冇生成日期 ⇒ 唔可以硬砌一個日期出嚟',
-    gas.buildDashboardStatusText_(S.DRAFT, false, ''), '還未生成初稿。');
+    gas.buildDashboardStatusText_(S.DRAFT, false, ''),
+    '還未生成初稿。撳下面的「生成初稿」。');
+  check('★★★★★ 全部狀態卡文案都唔可以再出現「自動生成」'
+    + '——系統唔會自己動任何嘢，講咗就係講一件唔會發生嘅事',
+    [gas.buildDashboardStatusText_(S.DRAFT, false, '11月27日'),
+      gas.buildDashboardStatusText_(S.DRAFT, false, ''),
+      gas.buildDashboardStatusText_(S.DRAFT, true, '11月27日')]
+      .every(function (s) { return s.indexOf('自動') === -1; }));
   checkEqual('★★★★★ DRAFT 有版本', gas.buildDashboardStatusText_(S.DRAFT, true, ''),
     '初稿已生成，未寄給堂委。');
   checkEqual('★★★★★ REVIEW_SENT', gas.buildDashboardStatusText_(S.REVIEW_SENT, true, ''),
@@ -227,11 +238,32 @@ console.log('\n=== 規格 1.1／5.1：季度與版本一律寫人話 ===');
     gas.buildQuarterLabel_('唔知咩'), '唔知咩');
   gas.getConfig = savedGetConfig;
 
-  checkEqual('★★★★ 版本描述由 Basis ＋ Notes 組成',
-    gas.buildVersionBasisText_('FINE_TUNE', '套用堂委意見後'), 'FINE_TUNE　套用堂委意見後');
-  checkEqual('★★★★★ 兩者都空白 ⇒「（沒有說明）」，唔可以留空令畫面得個版本號',
-    gas.buildVersionBasisText_('', ''), '（沒有說明）');
-  checkEqual('★★★ 只有一項有值', gas.buildVersionBasisText_('', '回到第 2 版'), '回到第 2 版');
+  // ── 第二十五輪批次階段 B1：Basis 內部代號唔可以漏落畫面 ──────────
+  //
+  // Ivan 實測撞到：狀態卡寫住 `目前第 1 版　2026-08-17　REQUESTS_APPLIED`。
+  // 而且 v0 嘅 Notes 存住 seed／偏差／百分比，駁埋之後成句變成技術數字。
+  checkEqual('★★★★★ Basis 譯成人話，唔可以照印內部代號',
+    gas.buildVersionBasisText_('REQUESTS_APPLIED'), '套用修改申報後');
+  checkEqual('★★★★★ AUTO_GENERATE', gas.buildVersionBasisText_('AUTO_GENERATE'), '系統生成');
+  checkEqual('★★★★ FINE_TUNE', gas.buildVersionBasisText_('FINE_TUNE'), '人手調整後');
+  checkEqual('★★★★ RESEND', gas.buildVersionBasisText_('RESEND'), '改動後重發時建立');
+  checkEqual('★★★★★ 空白 ⇒「（沒有說明）」，唔可以留空令畫面得個版本號',
+    gas.buildVersionBasisText_(''), '（沒有說明）');
+  checkEqual('★★★★★ 對照表冇嘅內部代號**唔可以照印**，'
+    + '要顯示「（沒有說明）」——照印就係本身要修嗰個 bug',
+    gas.buildVersionBasisText_('SOME_FUTURE_CODE'), '（沒有說明）');
+  checkEqual('★★★★★ 但本身已經係中文嘅（回退版本寫嘅）就照用，唔好蓋走',
+    gas.buildVersionBasisText_('回到第 2 版'), '回到第 2 版');
+
+  {
+    // v0 嘅 Notes 真實樣本（`buildSeedNote_()` 寫入嗰種）。
+    const v0Notes = 'seed=20260813　第 3 / 20 次　總偏差 0.6033　主席兼報告 46.2%';
+    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppDashboard.gs'), 'utf8');
+    const fn = src.slice(src.indexOf('function buildVersionBasisText_'));
+    check('★★★★★ 狀態卡**唔會**再讀 Notes——技術統計數字唔應該出現喺主畫面',
+      fn.slice(0, 400).indexOf('NOTES') === -1
+      && gas.buildVersionBasisText_('AUTO_GENERATE', v0Notes).indexOf('seed=') === -1);
+  }
 }
 
 console.log('\n=== 結構性要求（靜態檢查正式碼）===');

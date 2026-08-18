@@ -176,7 +176,8 @@ function reissuePersonalLinkToken_(personId) {
       newToken: newToken
     };
   }
-  throw new Error('NameMapping 找不到 PersonID=' + personId + '（或者呢個人 Active 唔係 TRUE）。');
+  // 第二十五輪批次階段 B4：畫面文案一律書面語繁中（程式碼註解不用改）。
+  throw new Error('NameMapping 找不到 PersonID=' + personId + '（或者這個人的 Active 不是 TRUE）。');
 }
 
 /**

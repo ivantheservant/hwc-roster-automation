@@ -1,4 +1,21 @@
 /**
+ * ⚠️ 第二十五輪批次階段 A 改動：**自動生成初稿預設已經關閉**
+ * （Config 的 `TRIGGER_AUTO_GENERATE`，預設 FALSE）。
+ *
+ * 下面整段關於「GENERATE 自動生成」的說明，只在那個開關改成 TRUE 時才成立。
+ * 開關是 FALSE 時（現時的上線設定），`judgeGenerateAction_()` 會在最前面
+ * 就回傳 `SKIPPED_MANUAL_MODE`，**整個系統不會自己做任何動作**，
+ * 這個每日檢查唯一會做的事就是「提醒幹事」。
+ *
+ * 為什麼改：真正操作系統的人不懂電腦。「系統靜靜幫你做了一件事」
+ * 比「你撳個掣才會發生」難教很多。改成人手撳之後，失去的安全網
+ * （幹事放假／病了就沒人做）由提醒維度四 `NOT_GENERATED` 補回——
+ * 見 `judgeRemindAction_()`，那一個維度**不受提醒次數上限限制**。
+ *
+ * 自動生成那條程式碼路徑一行都沒有刪，只是在入口加了一道開關檢查。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ *
  * 自動排程：每日檢查一次。追加階段 N 當時設計——四階段流程之下，
  * 只有「步驟 1：生成初稿」應該自動執行，步驟 2／3／4 一律要幹事人手覆核後按掣，
  * 所以這裡的自動化範圍是兩件事：
@@ -237,6 +254,22 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
   const action = AUTOMATION_ACTIONS.GENERATE;
   const base = { quarterId: quarterId, action: action, targetDate: targetDate || '' };
 
+  // 第二十五輪批次階段 A：總開關。預設 FALSE ⇒ 永遠唔會自動生成。
+  //
+  // ⚠️ 呢道檢查特登擺喺**最前面**，喺任何其他判斷之前。
+  // 如果擺喺後面（例如日期檢查之後），「開關關咗」就會變成一個
+  // 罕有嘅 outcome——只有喺剛好到期嗰日先見得到；平時檢查報告顯示
+  // 「尚未到期」，幹事會以為「到咗期就會自己生成」，直到嗰日先發現唔會。
+  // 擺喺最前面，`SKIPPED_MANUAL_MODE` 就係**每一日**嘅答案，
+  // 唯讀檢查報告任何時候睇都講同一件事。
+  if (getConfig(CONFIG_KEYS.TRIGGER_AUTO_GENERATE, DEFAULTS.TRIGGER_AUTO_GENERATE) !== true) {
+    return Object.assign({}, base, {
+      outcome: 'SKIPPED_MANUAL_MODE',
+      detail: '自動生成已關閉（Config 的 TRIGGER_AUTO_GENERATE＝FALSE），'
+        + '改為提醒幹事自己生成——初稿一律由幹事在網頁上撳「生成初稿」'
+    });
+  }
+
   if (!targetDate) {
     return Object.assign({}, base, { outcome: 'SKIPPED_NO_DATE', detail: '沒有可用的日期（Quarters 未填且 Config 的 LEAD_DAYS_GENERATE 推算不出來）' });
   }
@@ -357,8 +390,27 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const reminderLog = readReminderLog_(quarterId, stage, timezone);
   const reminderCount = reminderLog.length;
+  const schedulePeek = computeAutomationSchedule_(quarterRow, config);
 
-  if (reminderCount >= maxCount) {
+  // ── 維度四（第二十五輪批次階段 A2）：到期咗但仍然完全冇版本 ──────
+  //
+  // 自動生成關咗之後，「幹事放假／病咗／唔記得」就冇任何安全網——
+  // 一季會靜靜咁完全冇人排。呢個維度就係嗰道網。
+  //
+  // ⚠️ **呢一個維度特登唔受 maxCount 上限限制**，同其餘三個唔同。
+  // 理由：其餘三個維度講嘅係「你慢咗」——提三次之後幹事已經知道，
+  // 再提落去只係嘈。呢個維度講嘅係「**完全冇人做過呢件事**」，
+  // 而家連自動生成都關咗，冇咗呢個提醒就真係冇任何嘢會發生。
+  // 一封唔停嘅提醒信好煩，但「成季冇職事表而冇人知」係災難。
+  //
+  // 停止條件係「生成咗」——唔係「提夠次數」。幹事撳一次掣就永遠唔會再收。
+  // 如果係一個唔會再用嘅舊季度（例如培訓用嘅），就清空佢嘅 GenerateOn，
+  // 呢個維度即刻唔會再觸發（見 HANDOFF.md 上線前檢查）。
+  const notGeneratedTriggered = !!schedulePeek.generateDate
+    && today >= schedulePeek.generateDate
+    && findLatestVersionNo(quarterId) < 0;
+
+  if (!notGeneratedTriggered && reminderCount >= maxCount) {
     return Object.assign({}, base, {
       outcome: 'SKIPPED_MAX_REACHED',
       detail: '目前 Stage「' + stage + '」已提醒 ' + reminderCount + ' 次，達到上限 ' + maxCount + ' 次，不再提醒',
@@ -418,7 +470,11 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
     }
   }
 
+  const daysSinceGenerateDue = notGeneratedTriggered
+    ? daysBetween_(schedulePeek.generateDate, today) : null;
+
   const reasons = [];
+  if (notGeneratedTriggered) reasons.push('NOT_GENERATED');
   if (stuckTriggered) reasons.push('STUCK');
   if (deadlineTriggered) reasons.push('DEADLINE');
   if (unconfirmedTriggered) reasons.push('UNCONFIRMED_SPECIAL');
@@ -434,24 +490,36 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
       ? '距離生成日期 ' + daysUntilGenerate + ' 天（門檻 ' + unconfirmedLeadDays
         + ' 天），未確認的特殊主日 ' + unconfirmedSpecials.length + ' 個'
       : '沒有可用的生成日期，未確認特殊主日維度無法判斷';
+    const notGeneratedDetail = schedulePeek.generateDate
+      ? '生成日期 ' + schedulePeek.generateDate + '（'
+        + (today >= schedulePeek.generateDate ? '已到期，但已經有版本' : '未到期') + '）'
+      : '沒有可用的生成日期，未生成初稿維度無法判斷';
     return Object.assign({}, base, {
       outcome: 'SKIPPED_NOT_DUE',
-      detail: '目前 Stage「' + stage + '」：' + stuckDetail + '；' + deadlineDetail
-        + '；' + unconfirmedDetail,
+      detail: '目前 Stage「' + stage + '」：' + notGeneratedDetail + '；'
+        + stuckDetail + '；' + deadlineDetail + '；' + unconfirmedDetail,
       reasons: [], reminderCount: reminderCount, maxCount: maxCount,
       daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline,
-      daysUntilGenerate: daysUntilGenerate, unconfirmedSpecials: unconfirmedSpecials
+      daysUntilGenerate: daysUntilGenerate, unconfirmedSpecials: unconfirmedSpecials,
+      daysSinceGenerateDue: null
     });
   }
 
   return Object.assign({}, base, {
     outcome: 'WOULD_RUN',
-    detail: '第 ' + (reminderCount + 1) + ' / ' + maxCount + ' 次提醒（' + reasons.join('＋') + '）',
+    detail: notGeneratedTriggered
+      // 呢個維度冇上限，所以唔可以寫「第 N / M 次」——寫咗就係講緊
+      // 一個唔存在嘅上限，幹事會以為「再等幾日就唔會再嘈」。
+      ? '第 ' + (reminderCount + 1) + ' 次提醒（' + reasons.join('＋')
+        + '；未生成初稿這一項沒有次數上限，直到生成為止）'
+      : '第 ' + (reminderCount + 1) + ' / ' + maxCount + ' 次提醒（' + reasons.join('＋') + '）',
     reasons: reasons, reminderCount: reminderCount, maxCount: maxCount,
     daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline, stuckDays: stuckDays,
     deadlineDays: deadlineDays,
     daysUntilGenerate: daysUntilGenerate, unconfirmedLeadDays: unconfirmedLeadDays,
-    unconfirmedSpecials: unconfirmedSpecials
+    unconfirmedSpecials: unconfirmedSpecials,
+    generateDueDate: schedulePeek.generateDate || '',
+    daysSinceGenerateDue: daysSinceGenerateDue
   });
 }
 
@@ -548,10 +616,25 @@ function buildAutomationCheckReport_() {
   lines.push('DRY_RUN：' + (isDryRun ? 'TRUE（今天若執行，不會真正寄出電郵）' : 'FALSE（今天若執行，會真正寄出電郵！）'));
   lines.push('幹事通知信箱（MAIL_ADMIN_NOTIFY）：' + (adminEmail || '⚠ 未設定，通知只會寫入 Logger，不會有人收到'));
   lines.push('');
-  lines.push('自動排程只做兩件事：到期自動生成初稿（只通知幹事）、'
-    + 'Stage 停滯或死線接近時提醒幹事（只通知幹事，涵蓋 DRAFT／REVIEW_SENT／'
-    + 'REQUESTS_APPLIED 三種情況）。'
-    + '正式發出永遠不會由這裡觸發，一律要幹事在「步驟 4」手動執行。');
+  // 第二十五輪批次階段 A2：呢句話原本寫死咗「自動排程會生成初稿」。
+  // 開關關咗之後嗰句就係假嘅——而呢份報告嘅**唯一用途**就係
+  // 「話俾幹事知系統會自己做啲乜」，講錯咗等於報告冇咗價值。
+  const autoGenerateOn = getConfig(
+    CONFIG_KEYS.TRIGGER_AUTO_GENERATE, DEFAULTS.TRIGGER_AUTO_GENERATE) === true;
+  lines.push('自動生成初稿（TRIGGER_AUTO_GENERATE）：'
+    + (autoGenerateOn
+      ? 'TRUE（開啟——到期會自動生成，只通知幹事）'
+      : 'FALSE（關閉——系統不會自己生成任何初稿，一律要幹事在幹事介面撳「生成初稿」）'));
+  lines.push('');
+  lines.push(autoGenerateOn
+    ? '自動排程只做兩件事：到期自動生成初稿（只通知幹事）、'
+      + 'Stage 停滯或死線接近時提醒幹事（只通知幹事，涵蓋 DRAFT／REVIEW_SENT／'
+      + 'REQUESTS_APPLIED 三種情況）。'
+      + '正式發出永遠不會由這裡觸發，一律要幹事在「步驟 4」手動執行。'
+    : '自動排程只做一件事：提醒幹事（只通知幹事，不會代替幹事做任何動作）。'
+      + '提醒的情況包括：到期了還沒生成初稿、Stage 停滯、死線接近、'
+      + '還有未確認日期的特殊主日。'
+      + '生成初稿與正式發出都一律要幹事自己撳掣。');
   lines.push('');
 
   let anyWouldRun = false;
@@ -574,6 +657,8 @@ function buildAutomationCheckReport_() {
     if (generateJudgment.outcome === 'WOULD_RUN') {
       anyWouldRun = true;
       genLine += '　→ 今天執行檢查會觸發';
+    } else if (generateJudgment.outcome === 'SKIPPED_MANUAL_MODE') {
+      genLine += '　（自動生成已關閉，一律由幹事自己撳掣）';
     } else if (generateJudgment.outcome === 'SKIPPED_STAGE' || generateJudgment.outcome === 'SKIPPED_HAS_VERSION') {
       genLine += '　（已生成過或已進入後續流程）';
     } else if (generateJudgment.outcome === 'SKIPPED_NOT_DUE') {

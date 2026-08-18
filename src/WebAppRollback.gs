@@ -70,7 +70,7 @@ function apiListVersionsForRollback(quarterId) {
       return {
         versionNo: versionNo,
         createdAt: toDateString(row[V.CREATED_AT], timezone),
-        basisText: buildVersionBasisText_(row[V.BASIS], row[V.NOTES]),
+        basisText: buildVersionBasisText_(row[V.BASIS]),
         isCurrent: versionNo === latestVersionNo,
         isProtected: isTrueValue_(row[V.PROTECTED])
       };

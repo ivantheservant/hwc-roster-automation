@@ -52,16 +52,20 @@ function buildQuarterLabel_(quarterId) {
 
 /**
  * 規格 1.2：狀態卡嗰句人話。
+ *
+ * 第二十五輪批次階段 A3：「系統會在 X 自動生成」呢句已經唔啱——
+ * 自動生成預設關咗，初稿一律由幹事撳掣。呢句留住嘅話，幹事會等一個
+ * 永遠唔會嚟嘅日子。
  * @param {string} stage 內部 Stage
  * @param {boolean} versionExists 有冇版本
- * @param {string} generateOnText 自動生成日期（人話），冇就傳空字串
+ * @param {string} generateOnText 建議生成日期（Quarters.GenerateOn），冇就傳空字串
  * @returns {string}
  */
 function buildDashboardStatusText_(stage, versionExists, generateOnText) {
   if (stage === QUARTER_STAGE.DRAFT && !versionExists) {
     return generateOnText
-      ? '還未生成初稿。系統會在 ' + generateOnText + ' 自動生成。'
-      : '還未生成初稿。';
+      ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，撳下面的「生成初稿」。'
+      : '還未生成初稿。撳下面的「生成初稿」。';
   }
   if (stage === QUARTER_STAGE.DRAFT) return '初稿已生成，未寄給堂委。';
   if (stage === QUARTER_STAGE.REVIEW_SENT) return '已寄給堂委，等他們的意見。';
@@ -71,15 +75,102 @@ function buildDashboardStatusText_(stage, versionExists, generateOnText) {
 }
 
 /**
- * 規格 5.1：版本描述一律寫人話，永不淨寫 `v2`。
- * @param {string} basis `RosterVersions.Basis`
- * @param {string} notes `RosterVersions.Notes`
- * @returns {string} 兩者都空白時回傳「（沒有說明）」
+ * `RosterVersions.Basis` 嘅內部代號 → 人話。
+ *
+ * ⚠️ 第二十五輪批次階段 B1 修：呢個對照表以前唔存在，`Basis` 係原封不動
+ * 印上狀態卡嘅，幹事見到嘅係 `REQUESTS_APPLIED` 呢種內部代號（違反規格 1.3）。
+ *
+ * 全專案掃過一次，`registerVersion()` 嘅 basis 參數一共有五個來源：
+ *   `VERSION_VALUES.BASIS_AUTO_GENERATE`／`BASIS_FINE_TUNE`／
+ *   `BASIS_REQUESTS_APPLIED`／`BASIS_RESEND`（Constants.gs），
+ *   以及 `WebAppRollback.gs` 傳入嘅「回到第 N 版」——後者本身已經係人話，
+ *   對照表查唔到會原樣顯示咩？**唔會**，見 `translateVersionBasis_()`。
  */
-function buildVersionBasisText_(basis, notes) {
-  const parts = [String(basis || '').trim(), String(notes || '').trim()]
-    .filter(function (s) { return s !== ''; });
-  return parts.length > 0 ? parts.join('　') : '（沒有說明）';
+const VERSION_BASIS_LABELS = {
+  AUTO_GENERATE: '系統生成',
+  FINE_TUNE: '人手調整後',
+  REQUESTS_APPLIED: '套用修改申報後',
+  RESEND: '改動後重發時建立',
+  VERSION_ROLLBACK: '回到舊版本'
+};
+
+/**
+ * 把 `Basis` 譯成人話。
+ *
+ * 對照表查唔到嘅值**唔會照印**——照印就係把內部代號漏落畫面，
+ * 亦即係呢一條要修嘅嘢本身。但有一個例外：回退版本嗰個 Basis
+ * （`WebAppRollback.gs` 寫嘅「回到第 N 版」）本身就已經係中文人話，
+ * 冇必要當成未知值蓋走。判斷準則係「有冇中文字」——內部代號一律
+ * 係全大楷英文加底線，唔會含中文。
+ * @param {*} basis `RosterVersions.Basis` 原始值
+ * @returns {string} 人話；認唔出而且唔似人話就回「（沒有說明）」
+ */
+function translateVersionBasis_(basis) {
+  const raw = String(basis === null || basis === undefined ? '' : basis).trim();
+  if (raw === '') return '';
+  if (VERSION_BASIS_LABELS[raw]) return VERSION_BASIS_LABELS[raw];
+  // 已經係中文（例如回退寫嘅「回到第 3 版」）就照用。
+  if (/[一-鿿]/.test(raw)) return raw;
+  return '（沒有說明）';
+}
+
+/**
+ * 規格 5.1：版本描述一律寫人話，永不淨寫 `v2`。
+ *
+ * ⚠️ 第二十五輪批次階段 B1 修：呢個函式以前會把 `Basis` 同 `Notes` 駁埋。
+ * 問題係 v0 嘅 `Notes` 存住嘅係 seed／偏差／百分比呢類**技術統計數字**
+ * （`buildSeedNote_()` 寫入），駁埋之後狀態卡會變成一大段幹事完全睇唔明
+ * 嘅嘢。技術數字唔應該喺主畫面出現——要睇就去區四「核對職事表」。
+ *
+ * 所以而家**只用 Basis**，`Notes` 唔再入狀態卡。
+ * @param {*} basis `RosterVersions.Basis`
+ * @returns {string} 空白時回傳「（沒有說明）」
+ */
+function buildVersionBasisText_(basis) {
+  const text = translateVersionBasis_(basis);
+  return text === '' ? '（沒有說明）' : text;
+}
+
+/**
+ * 把 `SendLog.SentAt` 呢類時間戳正規化成**可以排序嘅數字**同**可以睇嘅文字**。
+ *
+ * ⚠️ 第二十五輪批次階段 B2：呢個係同一個 bug class 嘅**第三次**——
+ * 「從工作表讀出嚟嘅值未經格式化就送去畫面」。
+ *   第二十二輪：`QuarterReset.gs` 嘅「加入於」
+ *   第二十三輪：`ICS_SERVICE_START_TIME`
+ *   第二十五輪（今次）：`SendLog.SentAt`
+ * 幹事見到嘅係 `Mon Aug 17 2026 04:35:09 GMT+1200 (New Zealand Standard Time)`。
+ *
+ * 而喺呢一次入面仲有**第二個、更難察覺嘅 bug**：舊寫法用
+ * `String(sentAt) > String(lastSentAt)` 嚟揀最新一筆。Date 物件
+ * `String()` 出嚟係 `Mon Aug 17 ...`／`Sun Sep 01 ...` 呢種格式，
+ * 字串比大細係**逐個字母比**——`'M' < 'S'`，所以九月會被當成「大過」
+ * 八月純屬巧合，換成 `Fri`／`Wed` 就會揀錯。要排序就一定要用
+ * 真正嘅時間值，唔可以用顯示文字。
+ *
+ * @param {*} value `SendLog.SentAt` 原始值（可能係 Date、可能係文字）
+ * @param {string} timezone 時區
+ * @returns {?{sortKey: number, text: string}} 認唔出就回 null
+ */
+function normalizeSentAt_(value, timezone) {
+  if (value === null || value === undefined || value === '') return null;
+
+  if (value instanceof Date || (value && typeof value.getTime === 'function')) {
+    const ms = value.getTime();
+    if (isNaN(ms)) return null;
+    return { sortKey: ms, text: Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm') };
+  }
+
+  const raw = String(value).trim();
+  if (raw === '') return null;
+  const parsed = new Date(raw);
+  if (!isNaN(parsed.getTime())) {
+    return { sortKey: parsed.getTime(), text: Utilities.formatDate(parsed, timezone, 'yyyy-MM-dd HH:mm') };
+  }
+  // 認唔出嘅格式：**照原文顯示，但排序權重設成 0**。
+  // 唔可以靜靜丟掉（會令「上次幾時寄」變成空白，睇落好似冇寄過），
+  // 亦唔可以當成最新（會令一個爛值蓋過真正嘅最新一筆）。
+  return { sortKey: 0, text: raw };
 }
 
 /**
@@ -89,13 +180,18 @@ function buildVersionBasisText_(basis, notes) {
  * 只要有任何 `OFFICIAL` 紀錄就當已經正式發出過。所以唔可以只睇最新版本。
  *
  * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
  * @returns {{lastSentAt: Object.<string, ?string>, hasOfficialRecord: boolean}}
+ *   `lastSentAt` 嘅值係**已經格式化好嘅顯示文字**（yyyy-MM-dd HH:mm），
+ *   唔係 Date 物件——前端會原封不動貼上畫面。
  */
-function readSendLogSummaryForDashboard_(quarterId) {
+function readSendLogSummaryForDashboard_(quarterId, timezone) {
   const C = COLUMNS.SEND_LOG;
+  const tz = timezone || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stages = [MAIL_STAGES.REVIEW, MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND];
   const lastSentAt = {};
-  stages.forEach(function (s) { lastSentAt[s] = null; });
+  const bestSortKey = {};
+  stages.forEach(function (s) { lastSentAt[s] = null; bestSortKey[s] = null; });
   let hasOfficialRecord = false;
 
   readSheet(SHEETS.SEND_LOG).forEach(function (row) {
@@ -103,8 +199,14 @@ function readSendLogSummaryForDashboard_(quarterId) {
     const stage = String(row[C.STAGE] || '').trim();
     if (stage === MAIL_STAGES.OFFICIAL) hasOfficialRecord = true;
     if (stages.indexOf(stage) === -1) return;
-    const sentAt = String(row[C.SENT_AT] || '');
-    if (sentAt && (!lastSentAt[stage] || sentAt > lastSentAt[stage])) lastSentAt[stage] = sentAt;
+
+    const sentAt = normalizeSentAt_(row[C.SENT_AT], tz);
+    if (!sentAt) return;
+    // 比大細用 sortKey（真正嘅時間值），顯示用 text（已格式化）。
+    if (bestSortKey[stage] === null || sentAt.sortKey > bestSortKey[stage]) {
+      bestSortKey[stage] = sentAt.sortKey;
+      lastSentAt[stage] = sentAt.text;
+    }
   });
 
   return { lastSentAt: lastSentAt, hasOfficialRecord: hasOfficialRecord };
@@ -126,11 +228,26 @@ function computeDashboardButtons_(s) {
   const unsaved = s.unsaved;
   const buttons = {};
 
+  // ── 掣 0：生成初稿（第二十五輪批次階段 A4 新增）────────────────
+  //
+  // 只喺**完全冇版本**時存在。有版本之後前端唔會畫佢——重新生成
+  // （覆蓋式）留喺區四「進階功能」，唔應該同日常四粒掣擺埋一齊。
+  buttons.generate = {
+    enabled: !s.versionExists,
+    disabledReason: s.versionExists
+      ? '這一季已經有初稿了。如果要重新生成，請去「進階功能」。' : '',
+    dynamicText: buildGenerateButtonText_(s)
+  };
+
   // ── 掣 1：儲存並確認 ──────────────────────────────────────────
   // 規格 2.2：有版本就任何 Stage 都撳得到（佢係唯一會改內容嘅掣）。
+  //
+  // 第二十五輪批次階段 B4：措辭由「要等系統生成咗初稿」改成
+  // 「要先生成初稿」——一來自動生成關咗，「等」係錯嘅；
+  // 二來原本嗰句係口語（「咗」），畫面文案一律書面語。
   buttons.save = {
     enabled: s.versionExists,
-    disabledReason: s.versionExists ? '' : '要等系統生成咗初稿，這一粒才會著。',
+    disabledReason: s.versionExists ? '' : '要先生成初稿，這一粒才會著。',
     dynamicText: buildSaveButtonText_(s)
   };
 
@@ -140,7 +257,7 @@ function computeDashboardButtons_(s) {
   buttons.review = {
     enabled: reviewStageOk && !unsaved.hasAny,
     disabledReason: !s.versionExists
-      ? '要等系統生成咗初稿，這一粒才會著。'
+      ? '要先生成初稿，這一粒才會著。'
       : (s.stage === QUARTER_STAGE.OFFICIAL_SENT
         ? '這一季已經正式發出給全體，不會再寄審閱本。之後有改動請用「改動後重發」。'
         : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : '')),
@@ -183,6 +300,33 @@ function computeDashboardButtons_(s) {
   return buttons;
 }
 
+/**
+ * 掣 0 嘅動態文字（規格 2.1，第二十五輪批次階段 A4 改寫）。
+ *
+ * 三種情況分開講，因為幹事真正想知嘅係「而家撳係咪太早」：
+ *   未到建議日期 ⇒ 講埋「現在就生成也可以」，唔好令佢以為要等
+ *   已過建議日期 ⇒ 講過咗幾多日，呢個先係催佢嘅訊號
+ *   冇設定日期　 ⇒ 唔可以扮有日期
+ * @param {Object} s 已經算好嘅事實
+ * @returns {string}
+ */
+function buildGenerateButtonText_(s) {
+  if (s.versionExists) return '這一季已經有初稿了。';
+  if (!s.generateOnText) return '隨時可以生成。';
+  if (s.daysUntilGenerateOn === null || s.daysUntilGenerateOn === undefined) {
+    return '建議在 ' + s.generateOnText + ' 之後生成。現在就生成也可以。';
+  }
+  if (s.daysUntilGenerateOn > 0) {
+    return '建議在 ' + s.generateOnText + ' 之後生成，那時距離季初大約五個星期。'
+      + '現在就生成也可以。';
+  }
+  if (s.daysUntilGenerateOn === 0) {
+    return '原定 ' + s.generateOnText + ' 生成，就是今天。';
+  }
+  return '原定 ' + s.generateOnText + ' 生成，已經過了 '
+    + Math.abs(s.daysUntilGenerateOn) + ' 天。';
+}
+
 /** 規格 2.3 掣 1 嘅動態文字。 */
 function buildSaveButtonText_(s) {
   const u = s.unsaved;
@@ -214,6 +358,13 @@ function buildReviewButtonText_(s) {
 
 /** 規格 2.3 掣 3 嘅動態文字。 */
 function buildOfficialButtonText_(s) {
+  // 第二十五輪批次階段 B3：冇版本嘅時候唔可以報一個「0」。
+  //
+  // 舊寫法會顯示「會寄給表上 0 個人」——嗰個 0 唔係「數過，係零」，
+  // 而係「根本未有表可以數」。呢個係本專案一路燒緊嘅同一個 bug class：
+  // **把「查不到」講成一個具體數字**。零同未知係兩件事，
+  // 「0 個人」會令幹事以為名單有問題，去搵一個唔存在嘅錯。
+  if (!s.versionExists) return '還未生成初稿，未知會寄給哪幾位。';
   if (s.hasOfficialRecord) {
     const last = s.lastSentAt[MAIL_STAGES.OFFICIAL];
     return '已在 ' + (last || '之前') + ' 正式發出過。之後有改動請用「改動後重發」。';
@@ -279,6 +430,8 @@ function buildDashboardState_(quarterId) {
   const quarterRow = findQuarter_(quarterId);
   const generateOnText = quarterRow
     ? toDateString(quarterRow[COLUMNS.QUARTERS.GENERATE_ON], timezone) : '';
+  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const daysUntilGenerateOn = generateOnText ? daysBetween_(today, generateOnText) : null;
 
   // ── 最新版本資料 ─────────────────────────────────────────────
   let latestVersion = null;
@@ -292,7 +445,10 @@ function buildDashboardState_(quarterId) {
       versionNo: versionNo,
       // ⚠️ 唔可以 String(Date)——第二十二輪已經喺 Diagnostics 修過同一個位。
       createdAt: row ? toDateString(row[V.CREATED_AT], timezone) : '',
-      basisText: row ? buildVersionBasisText_(row[V.BASIS], row[V.NOTES]) : '（沒有說明）'
+      basisText: row ? buildVersionBasisText_(row[V.BASIS]) : '（沒有說明）',
+      // A6：常駐「開啟職事表」連結。搵唔到嗰張工作表就係空字串——
+      // 前端見到空字串就唔會畫個連結出嚟。
+      sheetUrl: row ? buildGridSheetUrl_(row[V.SHEET_NAME]) : ''
     };
   }
 
@@ -300,7 +456,7 @@ function buildDashboardState_(quarterId) {
   const unsaved = readDashboardUnsavedState_(quarterId, versionNo);
 
   // ── SendLog（整張表只讀一次，同時算齊三個階段 + 有冇 OFFICIAL 紀錄）──
-  const sendLog = readSendLogSummaryForDashboard_(quarterId);
+  const sendLog = readSendLogSummaryForDashboard_(quarterId, timezone);
 
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
   const officialCounts = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);
@@ -311,6 +467,8 @@ function buildDashboardState_(quarterId) {
   const facts = {
     stage: stage,
     versionExists: versionExists,
+    generateOnText: generateOnText,
+    daysUntilGenerateOn: daysUntilGenerateOn,
     unsaved: unsaved,
     reviewerCount: safeCountReviewers_(),
     officialTargetCount: officialCounts.total,
@@ -434,6 +592,34 @@ function countDashboardChangedPersons_(quarterId, versionNo) {
   } catch (err) {
     log_('WARN', 'countDashboardChangedPersons_ 失敗：' + err.message);
     return 0;
+  }
+}
+
+/**
+ * A6：砌一條直接跳到某張 grid 工作表嘅網址。
+ *
+ * 試算表 ID 同工作表 gid **兩樣都係實時問返嚟嘅**，一個都冇寫死——
+ * 寫死試算表 ID 會令呢個 repo 洩漏一個真實 ID（本專案硬規則），
+ * 而且日後換試算表就會靜靜咁指去舊嗰個。
+ *
+ * 搵唔到嗰張工作表就回空字串。**唔會回一條「大概啱」嘅連結**——
+ * 一條打開之後去錯地方（或者開唔到）嘅連結，對一個唔識電腦嘅人嚟講
+ * 比冇連結更差：佢會以為自己撳錯咗，而唔會諗到係連結本身有問題。
+ * @param {*} sheetName grid 工作表名
+ * @returns {string} 網址；攞唔到時回空字串
+ */
+function buildGridSheetUrl_(sheetName) {
+  const name = String(sheetName || '').trim();
+  if (name === '') return '';
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return '';
+    return 'https://docs.google.com/spreadsheets/d/' + ss.getId()
+      + '/edit#gid=' + sheet.getSheetId();
+  } catch (err) {
+    log_('WARN', 'buildGridSheetUrl_ 取不到工作表網址：' + err.message);
+    return '';
   }
 }
 
