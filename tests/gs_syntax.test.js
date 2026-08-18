@@ -92,24 +92,28 @@ console.log('\n=== 順帶：ui/*.html 入面嘅 <script> 唔喺呢個測試範�
     fs.existsSync(uiDir));
 }
 
-console.log('\n=== 第二十四輪新增紅線：`<?= JSON.stringify(…) ?>` 一定唔可以出現 ===');
+console.log('\n=== 第二十四輪紅線（第二十五輪改寫）：ui/*.html 唔可以有非法嘅 <? …scriptlet ===');
 {
   // ─────────────────────────────────────────────────────────────
-  // 點解呢個要用測試鎖死
+  // 點解由「剝註解再掃 JSON.stringify」改成「白名單制」
   // ─────────────────────────────────────────────────────────────
   //
-  // HtmlService 有兩個輸出標籤：
-  //   `<?= x ?>`   會做 HTML 轉義
-  //   `<?!= x ?>`  原樣輸出
+  // 第二十四輪嘅版本用「剝走 HTML/JS 註解，先喺剩低嘅文字度搵
+  // `<?= …JSON.stringify` 」嚟捉。前提係「註解入面嘅嘢係死嘅」。
   //
-  // `JSON.stringify('2026T4')` 出嚟係 `"2026T4"`（帶雙引號）。
-  // 用會轉義嗰個標籤，雙引號會變成 `&quot;`，於是
-  //     var QUARTER_ID = &quot;2026T4&quot;;
-  // ——**JS 語法錯誤，成個 script 區塊唔會執行，畫面直接死。**
+  // 呢個前提喺 HtmlService **唔成立**：樣板引擎編譯成個檔案
+  // 嗰陣，完全唔知道、亦唔理會咩係 HTML 註解——`<!-- <?= x ?> -->`
+  // 一樣會編譯，`<?= ?>` 呢種空運算式一樣會變成語法錯誤。
   //
-  // 呢個係第十九輪喺 PreacherFillSidebar.html 真實撞到嘅 bug，
-  // 而且**離線完全睇唔到**（樣板要 Google 嘅引擎先跑得到），
-  // 要喺瀏覽器開一次先知。所以用測試鎖死呢條紅線。
+  // 第二十五輪實測撞到：Index.html 第 12 行嘅 HTML 註解入面寫住
+  // 字面上嘅 `<?= ?>` 同 `<?= JSON.stringify(x) ?>` 做警告文字，
+  // 令成個樣板編譯失敗——`WebApp.gs` 嘅 `.evaluate()` 拋
+  // `SyntaxError: Unexpected token ';'`，幹事介面完全開唔到。
+  //
+  // 所以呢度改成**白名單制**：唔理係咪註解，掃全個檔案入面
+  // **任何**一個 `<?` scriptlet，逐個同「已知安全嘅形狀」比對，
+  // 唔喺白名單入面就算違反。呢個做法唔會有「前提喺呢個環境唔成立」
+  // 嘅問題——因為佢冇假設邊度嘅文字係死嘅。
   const uiDir = path.join(SRC_DIR, 'ui');
   const htmlFiles = fs.existsSync(uiDir)
     ? fs.readdirSync(uiDir).filter(function (f) { return f.endsWith('.html'); })
@@ -118,43 +122,58 @@ console.log('\n=== 第二十四輪新增紅線：`<?= JSON.stringify(…) ?>` �
   check('★★★ 搵到一批 ui/*.html（防止路徑寫錯令測試變成空跑）',
     htmlFiles.length >= 3, '只搵到 ' + htmlFiles.length + ' 個');
 
-  // ⚠️ 一定要先剝走註解先掃。呢幾個檔案嘅註解**特登**寫住
-  // 「唔可以用 `<?= JSON.stringify(x) ?>`」做反面教材——
-  // 唔剝註解就會捉住自己嘅警告，而真正嘅修法會變成「刪走個警告」，
-  // 恰恰相反。
-  const stripComments = function (text) {
-    return text
-      .replace(/<!--[\s\S]*?-->/g, '')          // HTML 註解
-      .replace(/\/\*[\s\S]*?\*\//g, '')         // JS 區塊註解
-      .split('\n')
-      .map(function (l) { return l.replace(/\/\/.*$/, ''); })   // JS 行註解
-      .join('\n');
+  // PersonalRoster.html 係真正嘅資料樣板（義工個人專屬連結頁面），
+  // 大量合法 scriptlet（迴圈、if、輸出欄位），唔喺呢條紅線範圍內。
+  const REAL_TEMPLATE_FILES = ['PersonalRoster.html'];
+
+  // 幹事介面呢批檔案（Index/Script/ScriptZone1/ScriptZone2/
+  // ScriptRollback/ScriptBoot）淨係容許用嚟拆檔嘅 includeHtml()，
+  // 同 PreacherFillSidebar.html 淨係容許一個固定嘅 quarterId 注入。
+  // 呢兩種以外嘅任何 `<?` 都算違反——包括出現喺 HTML/JS 註解入面。
+  const isAllowed = function (snippet) {
+    if (/^<\?!=\s*includeHtml\('ui\/[A-Za-z0-9]+'\)\s*\?>$/.test(snippet)) return true;
+    if (/^<\?!=\s*JSON\.stringify\(quarterId\)\s*\?>$/.test(snippet)) return true;
+    return false;
   };
 
   const offenders = [];
   htmlFiles.forEach(function (f) {
-    const lines = stripComments(fs.readFileSync(path.join(uiDir, f), 'utf8')).split('\n');
-    lines.forEach(function (line, i) {
-      // 只捉會轉義嗰個標籤（`<?=`），唔捉 `<?!=`。
-      // `<?!=` 入面嘅 `!` 喺 `?` 之後，所以 `<\?=` 本身已經分得開。
-      if (/<\?=\s*[^?]*JSON\.stringify/.test(line)) {
-        offenders.push(f + ':' + (i + 1) + '　' + line.trim().slice(0, 90));
+    if (REAL_TEMPLATE_FILES.indexOf(f) !== -1) return;
+    const text = fs.readFileSync(path.join(uiDir, f), 'utf8');
+    const scriptlets = text.match(/<\?[\s\S]*?\?>/g) || [];
+    scriptlets.forEach(function (snippet) {
+      if (!isAllowed(snippet)) {
+        const lineNo = text.slice(0, text.indexOf(snippet)).split('\n').length;
+        offenders.push(f + ':' + lineNo + '　' + snippet.replace(/\s+/g, ' ').slice(0, 90));
       }
     });
   });
 
-  check('★★★★★ 冇任何一處用會轉義嘅 `<?=` 配 JSON.stringify'
-    + '——會令注入嘅字串變成 &quot;…&quot;，成個 script 區塊語法錯誤而唔執行。'
-    + '要注入資料一律用 `<?!= ?>`，或者索性改由 google.script.run 攞',
+  check('★★★★★ 冇任何一個 <? scriptlet 唔喺白名單入面'
+    + '——**唔理係咪出現喺 HTML／JS 註解入面**，HtmlService 一律照樣編譯。'
+    + '要注入資料一律用 google.script.run，唔可以喺呢批檔案寫任何字面上嘅 <? ?>'
+    + '（包括喺註解入面解釋呢條規則），連空運算式 <?= ?> 都會令成個樣板編譯失敗',
     offenders.length === 0, offenders.join('\n      '));
 
-  // 正向驗證：規則真係捉得到，唔係寫壞咗永遠 0 項。
-  const probeBad = 'var X = <?= JSON.stringify(quarterId) ?>;';
-  const probeGood = 'var X = <?!= JSON.stringify(quarterId) ?>;';
-  check('★★★★★ 正向樣本：壞寫法一定捉得到',
-    /<\?=\s*[^?]*JSON\.stringify/.test(probeBad));
-  check('★★★★★ 反向樣本：正確嘅 `<?!=` 唔會被誤報',
-    !/<\?=\s*[^?]*JSON\.stringify/.test(probeGood));
+  // 正向驗證：規則真係捉得到，唔係寫壞咗永遠 0 項。三個必中樣本：
+  //   1. 會轉義嗰個標籤配 JSON.stringify（第十九輪撞過）
+  //   2. 空運算式（第二十五輪撞過，會令整個樣板 SyntaxError）
+  //   3. 藏喺 HTML 註解入面（第二十五輪撞過嘅正正係呢種）
+  check('★★★★★ 正向樣本一：`<?= JSON.stringify(x) ?>` 一定捉得到',
+    !isAllowed('<?= JSON.stringify(x) ?>'));
+  check('★★★★★ 正向樣本二：空運算式 `<?= ?>` 一定捉得到',
+    !isAllowed('<?= ?>'));
+  {
+    const probeCommented = '<!-- 唔好用 <?= ?> -->';
+    const found = (probeCommented.match(/<\?[\s\S]*?\?>/g) || []);
+    check('★★★★★ 正向樣本三：藏喺 HTML 註解入面一樣捉得到'
+      + '（呢個測試本身唔剝註解，所以正則直接喺原文掃到）',
+      found.length === 1 && !isAllowed(found[0]));
+  }
+  check('★★★★ 反向樣本：白名單入面嘅 includeHtml() 唔會被誤報',
+    isAllowed("<?!= includeHtml('ui/Style') ?>"));
+  check('★★★★ 反向樣本：白名單入面嘅 quarterId 注入唔會被誤報',
+    isAllowed('<?!= JSON.stringify(quarterId) ?>'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
