@@ -303,7 +303,12 @@ function buildGeneratorContextMock(options) {
     scoreTieEpsilon: o.scoreTieEpsilon === undefined ? 0 : o.scoreTieEpsilon,
     // findStateViolations_()（FineTune.gs）額外需要的兩個欄位——測試的斷言
     // 直接重用那個函式，所以 context 要同時滿足兩邊的需求
-    warnOnSemiHard: o.warnOnSemiHard === undefined ? true : o.warnOnSemiHard
+    warnOnSemiHard: o.warnOnSemiHard === undefined ? true : o.warnOnSemiHard,
+    // 第二十六輪批次階段 C：排表偏好。
+    // ⚠️ 預設係**空**（byKey 冇任何 key）——所以全部既有測試嘅期望值
+    // 一個都唔使改，而嗰件事本身就係「張表空嘅時候結果一模一樣」
+    // 呢條安全性質嘅最直接證明。
+    personPostWeights: o.personPostWeights || { byKey: {}, rows: [], invalid: [] }
   };
 
   // quotaByPerson 用正式碼的 computePersonQuotas_() 計算（由呼叫端注入 gas 沙箱），

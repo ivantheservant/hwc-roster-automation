@@ -143,6 +143,20 @@ function apiGenerateDraftExecute(quarterId) {
     };
   }
 
+  // ⚠️ 第二十六輪批次階段 A2-1：生成成功之後**順手發佈公開連結**。
+  //
+  // 點解要喺呢度加：舊選單流程有一步「準備工作 ▸ 發佈公開職事表」，
+  // 由幹事自己撳。改成四粒掣之後，**嗰一步冇人接手**——
+  // 生成初稿唔發佈、掣 1 喺零改動時唔發佈、掣 2 唔發佈亦唔檢查。
+  // 結果就係最自然嗰個次序（生成 → 寄給堂委）會寄出一封冇連結嘅信。
+  //
+  // 教訓：**每次拆走一個人手步驟，都要問一句「嗰一步本來做緊乜？
+  // 而家邊個做？」**
+  //
+  // 發佈失敗**唔可以**當成生成失敗——版本已經真係建立咗。
+  // 照掣 1 嘅做法分開報（見下面 `publishFailed`）。
+  const publish = tryPublishPublicRoster_(quarterId);
+
   // 生成之後嘅「還有 N 項未做」——**一定要真係去問**，唔可以寫死。
   let preQuarter = { undoneItemCount: -1, items: [] };
   try {
@@ -187,7 +201,10 @@ function apiGenerateDraftExecute(quarterId) {
     stoppedByTime: !!result.stoppedByTime,
     preQuarter: preQuarter,
     unconfirmedSpecials: result.unconfirmedSpecials || [],
-    versionExistsInRegistry: !!versionRow
+    versionExistsInRegistry: !!versionRow,
+    // 階段 A2-1：發佈失敗係**黃色警告**，唔係紅色錯誤——版本真係建立咗。
+    publishFailed: publish.failed,
+    publishFailMessage: publish.message
   };
 }
 

@@ -45,6 +45,12 @@ const FILES_FOR_GENERATOR = [
   // 所以生成器測試一定要載入佢。檔案入面碰試算表嘅只有 readOptionalSheet_()
   // 同幾個 ensure*Sheet_() 建表工具，測試路徑唔會行到嗰度。
   'Roles.gs',
+  // 第二十六輪批次階段 C：排表偏好。`computeBonus_()` 會叫呢度嘅
+  // `computePersonPostWeightBonus_()`，所以生成器測試一定要載入。
+  // ⚠️ 檔案入面碰試算表嘅只有 `readActivePersonPostWeights_()`，
+  // 而佢喺 `buildGeneratorContext_()` 度叫（唔喺純運算路徑），
+  // 所以載入佢唔會令測試沙箱嘅 GAS stub 被觸發。
+  'PersonPostWeight.gs',
   'Generator.gs',   // 排表生成器本身（本輪測試的主角）
   'FineTune.gs'     // findStateViolations_（重跑規則檢查，斷言直接重用它）
 ];

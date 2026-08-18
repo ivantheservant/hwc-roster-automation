@@ -196,6 +196,8 @@ function apiStep2Confirm(quarterId) {
   // 第二十三輪批次階段 E2（決定 D5）：掣 2／3／4 永不改動職事表內容，
   // 所以有未儲存改動時一律拒絕，指去掣 1。
   assertNoUnsavedChanges_(quarterId, '寄給堂委審閱');
+  // 第二十六輪批次階段 A2-2：冇公開連結就唔好寄。見 assertPublicLinkReady_()。
+  assertPublicLinkReady_(quarterId);
   const result = executeStep2_(quarterId);
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,

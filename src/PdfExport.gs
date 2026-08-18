@@ -673,17 +673,20 @@ function scanNonLatestPdfs_(quarterId) {
   const unrecognized = [];
   let totalFileCount = 0;
 
-  const files = folder.getFiles();
-  while (files.hasNext()) {
-    const file = files.next();
+  // ⚠️ 第二十六輪批次階段 B：經共用入口，根資料夾同「季度 ▸ 版本」
+  // 子資料夾都會掃到。逐個工具自己列根資料夾嘅話會**只睇到一半檔案**，
+  // 而且唔會報錯，只會少報——清理少報可接受，但缺件檢查少報就會變成
+  // 「報告話缺、實際檔案喺度」，嗰種更難查。所以全部工具一律經同一個入口。
+  // （呢段特登唔寫出嗰個舊寫法嘅字面樣——tests/ 有一條斷言就係掃佢。）
+  listRosterPdfFilesForQuarter_(quarterId).forEach(function (file) {
     totalFileCount++;
-    const match = pattern.exec(file.getName());
+    const match = pattern.exec(file.name);
     if (match) {
-      recognized.push({ id: file.getId(), name: file.getName(), versionNo: Number(match[1]), identity: match[2] });
+      recognized.push({ id: file.id, name: file.name, versionNo: Number(match[1]), identity: match[2] });
     } else {
-      unrecognized.push({ id: file.getId(), name: file.getName() });
+      unrecognized.push({ id: file.id, name: file.name });
     }
-  }
+  });
 
   const maxVersionByIdentity = {};
   recognized.forEach(function (f) {
@@ -791,16 +794,19 @@ function planQuarterPdfCleanup_(quarterId) {
   const pattern = new RegExp('^' + escapeRegExp_(quarterId) + '_v(\\d+)');
   const files = [];
   let totalSizeBytes = 0;
-  const iter = folder.getFiles();
-  while (iter.hasNext()) {
-    const file = iter.next();
-    const match = pattern.exec(file.getName());
-    if (!match) continue;
-    const size = file.getSize();
-    totalSizeBytes += size;
-    files.push({ id: file.getId(), name: file.getName(), sizeBytes: size, versionNo: Number(match[1]) });
-  }
-  return { folderName: folder.getName(), files: files, totalSizeBytes: totalSizeBytes };
+  // 第二十六輪批次階段 B：經共用入口（見 scanNonLatestPdfs_ 嘅說明）。
+  listRosterPdfFilesForQuarter_(quarterId).forEach(function (file) {
+    const match = pattern.exec(file.name);
+    if (!match) return;
+    totalSizeBytes += file.sizeBytes;
+    files.push({ id: file.id, name: file.name, sizeBytes: file.sizeBytes, versionNo: Number(match[1]) });
+  });
+  // quarterId 帶落 plan：executeQuarterPdfCleanup_() 清完之後要用佢
+  // 收拾空咗嘅版本資料夾。
+  return {
+    quarterId: quarterId, folderName: folder.getName(),
+    files: files, totalSizeBytes: totalSizeBytes
+  };
 }
 
 /**
@@ -811,7 +817,18 @@ function planQuarterPdfCleanup_(quarterId) {
  * @returns {number} 移到垃圾桶的檔案數
  */
 function executeQuarterPdfCleanup_(plan) {
-  return trashFiles_(plan.files.map(function (f) { return f.id; }));
+  const count = trashFiles_(plan.files.map(function (f) { return f.id; }));
+  // 第二十六輪批次階段 B：清完之後把**空咗嘅**版本資料夾收走，
+  // 唔好留一堆空 `v0`／`v1`。只刪真係空嘅，入面有嘢一律唔掂
+  // （見 removeEmptyVersionFolders_()）。
+  // 包 try/catch：收唔到空資料夾唔應該令一次成功嘅清理變成失敗。
+  try {
+    plan.emptyFoldersRemoved = removeEmptyVersionFolders_(plan.quarterId || '');
+  } catch (err) {
+    log_('WARN', 'executeQuarterPdfCleanup_ 收拾空資料夾失敗（檔案已清）：' + err.message);
+    plan.emptyFoldersRemoved = [];
+  }
+  return count;
 }
 
 /**

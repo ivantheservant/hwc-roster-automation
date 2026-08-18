@@ -42,8 +42,16 @@ gas.Session = { getActiveUser: function () { return { getEmail: function () { re
 function personRow(id, name) {
   const r = {}; r[M.PERSON_ID] = id; r[M.NAME_TC] = name; r[M.ACTIVE] = 'TRUE'; return r;
 }
-function postRow(id, name) {
-  const r = {}; r[P.POST_ID] = id; r[P.POST_NAME_TC] = name; return r;
+// ⚠️ 第二十六輪批次階段 D1：`AutoGenerate` **一定要明確填**。
+// 唔填嘅話 `isTrueValue_()` 會當成 FALSE，即係「唔自動排」，
+// 而唔自動排嘅崗位永遠唔會被標成「合資格人數太少」——
+// 呢個 mock 就會靜靜咁令下面嗰條斷言測唔到嘢。
+function postRow(id, name, autoGenerate) {
+  const r = {};
+  r[P.POST_ID] = id;
+  r[P.POST_NAME_TC] = name;
+  r[P.AUTO_GENERATE] = autoGenerate === false ? 'FALSE' : 'TRUE';
+  return r;
 }
 function eligRow(o) {
   const r = {};

@@ -458,6 +458,10 @@ function buildDashboardState_(quarterId) {
   // ── SendLog（整張表只讀一次，同時算齊三個階段 + 有冇 OFFICIAL 紀錄）──
   const sendLog = readSendLogSummaryForDashboard_(quarterId, timezone);
 
+  // 第二十六輪批次階段 A2：公開連結狀態。前端用嚟喺掣 2 旁邊提早講，
+  // 唔使等幹事撳落去先發現。
+  const publicLink = readPublicLinkState_(quarterId);
+
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
   const officialCounts = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);
   const changedPersonCount = stage === QUARTER_STAGE.OFFICIAL_SENT
@@ -498,7 +502,8 @@ function buildDashboardState_(quarterId) {
     isDryRun: isDryRun,
     unsaved: unsaved,
     buttons: computeDashboardButtons_(facts),
-    preQuarter: preQuarter
+    preQuarter: preQuarter,
+    publicLink: publicLink
   };
 }
 

@@ -109,6 +109,15 @@ function sendStage(quarterId, versionNo, stage) {
   if (needsFolder) resolveMailAttachmentFolder_();
 
   const context = buildMailContext_(quarterId, versionNo, stage);
+
+  // ⚠️ 第二十六輪批次階段 A2-3：範本要用公開連結但根本冇連結 ⇒ 一封都唔寄。
+  //
+  // 擺喺 `listRecipients_()` 之前，即係**一封都未寄之前**就拋。
+  // 擺後面嘅話會變成「寄咗一半先發現」，而已經寄出嗰啲收唔返。
+  assertPublicRosterUrlAvailableForStage_(
+    quarterId, [templates.person, templates.list],
+    context.placeholders ? context.placeholders.PublicRosterUrl : null);
+
   const outcomes = [];
 
   // 階段 G 新增：原本 SendLog 只在整批寄完之後才一次寫入——如果 Apps Script
@@ -244,18 +253,77 @@ function buildMailContext_(quarterId, versionNo, stage) {
 
 /**
  * 供 {PublicRosterUrl} placeholder 使用：查 `PublicLinks` 拿呢一季嘅公開連結。
- * 查不到（未發佈過、或工作表都未建立）一律回傳空字串，唔會令寄信流程失敗
- * ——第一次啟用呢個功能之前寄出嘅信，呢個位置本來就應該係冇連結可以放。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第二十六輪批次階段 A2-3：**查唔到而家回 `null`，唔再回空字串。**
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 舊版查唔到回空字串，註解仲寫明「唔會令寄信流程失敗」。呢個係整條鏈
+ * **最深嗰個問題**：一個「查唔到」被包裝成一個「正常結果」。
+ *
+ * 後果：`applyPlaceholders_()` 把 `{PublicRosterUrl}` 換成空字串，
+ * 信照樣寄出，內文變成「公開版連結：」後面乜都冇。
+ * 而上面每一層都以為冇事——冇拋錯、冇 log、畫面上零訊號。
+ *
+ * 空字串同 `null` 喺 JS 都係 falsy，所以「回空字串」呢個決定**令呼叫方
+ * 冇可能分辨「未發佈」同「發佈咗但網址係空」**。回 `null` 就分得到，
+ * 而且逼呼叫方要明確處理。
+ *
+ * 邊個階段真係需要呢條連結，唔係喺呢度寫死——見
+ * `assertPublicRosterUrlAvailableForStage_()`，佢係睇**實際會用到嗰個
+ * 範本嘅文字**有冇呢個 placeholder。幹事改得範本，所以唯一可靠嘅答案
+ * 喺範本本身，唔喺程式碼入面一個寫死嘅階段清單。
+ *
  * @param {string} quarterId 季度 ID
- * @returns {string} 公開連結網址；查不到回傳空字串
+ * @returns {?string} 公開連結網址；**查不到回傳 `null`**（明確嘅缺失標記）
  */
 function resolvePublicRosterUrlForPlaceholder_(quarterId) {
   try {
     const row = findPublicLinkRow_(quarterId);
-    return (row && row.fileUrl) ? row.fileUrl : '';
+    return (row && row.fileUrl) ? row.fileUrl : null;
   } catch (err) {
-    return '';
+    log_('WARN', 'resolvePublicRosterUrlForPlaceholder_ 讀不到 PublicLinks：' + err.message);
+    return null;
   }
+}
+
+/**
+ * 第二十六輪批次階段 A2-3：寄信之前擋住「範本要用公開連結、但根本冇連結」。
+ *
+ * ⚠️ **判斷準則係實際範本嘅文字，唔係一個寫死嘅階段清單。**
+ *
+ * 點解：範本（`EmailTemplates` 工作表）幹事改得。種子檔案入面
+ * `TPL_REVIEW_TC` 唔用 `{PublicRosterUrl}`、`TPL_OFFICIAL_TC` 用，
+ * 但試算表上實際嗰版可以完全唔同——第十一輪就人手貼過新內容。
+ * 寫死一個「REVIEW 唔使檢查」嘅清單，就會喺幹事把連結加入審閱信之後
+ * 靜靜失效，而且**冇任何人會發現**，因為冇咗嘅只係一條連結。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {Object[]} templates 今次會用到嘅範本（person／list，可能有 null）
+ * @param {?string} publicRosterUrl `resolvePublicRosterUrlForPlaceholder_()` 嘅結果
+ * @returns {void} 缺連結而範本又需要時拋出三段式錯誤
+ */
+function assertPublicRosterUrlAvailableForStage_(quarterId, templates, publicRosterUrl) {
+  if (publicRosterUrl) return;   // 有連結，乜都唔使做
+
+  const needing = (templates || []).filter(function (t) {
+    if (!t) return false;
+    return [t.subject, t.bodyHtml, t.bodyPlain].some(function (part) {
+      return String(part || '').indexOf('{PublicRosterUrl}') !== -1;
+    });
+  });
+  // 冇一個範本用到 ⇒ 呢個階段真係唔需要公開連結，正常繼續。
+  if (needing.length === 0) return;
+
+  throw new Error(buildThreePartMessage_(
+    '這一季（' + quarterId + '）還沒有公開連結，但要寄的信裡面有一個放連結的位置。',
+    '一封都沒有寄出。如果照樣寄，收信的人會看到「公開版連結：」後面一片空白。',
+    [
+      '去「進階功能 ▸ 重新發佈公開連結」發佈一次，然後回來再撳',
+      '或者在試算表選單「準備工作 ▸ 發佈公開職事表」發佈',
+      '如果這一封信本來就不應該有連結，請在 EmailTemplates 把 '
+        + '{PublicRosterUrl} 這一段刪走'
+    ]));
 }
 
 /**
@@ -593,18 +661,18 @@ function generateMailAttachment_(template, context, recipient) {
  * @returns {{blob: Blob, fileName: string, fileId: string, folderName: string, sizeBytes: number, retries: number}}
  */
 function lookupExistingPersonalPdf_(context, recipient) {
-  const folder = resolveMailAttachmentFolderCached_(context);
   const personName = lookupPersonName_(recipient.personId);
   const fileName = buildAttachmentName_(context.quarterId, context.versionNo, personName);
 
-  const found = folder.getFilesByName(fileName);
-  if (!found.hasNext()) {
+  // ⚠️ 第二十六輪批次階段 B：**新舊兩處都要搵。**
+  // 呢一輪之前生成嘅 PDF 平舖喺根資料夾，一個都冇搬。
+  // 淨係搵新嘅子資料夾，重發舊季度就會全部變成「缺件」而寄唔出。
+  const file = findRosterPdfFile_(context.quarterId, context.versionNo, fileName);
+  if (!file) {
     const error = new Error('請先執行『產生個人 PDF』（找不到 ' + fileName + '）');
     error.missing = true;
     throw error;
   }
-
-  const file = found.next();
   const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
   const sizeBytes = file.getSize();
   if (sizeBytes < minBytes) {
@@ -635,7 +703,10 @@ function buildFullRosterAttachmentCached_(context) {
   if (!context._fullRosterAttachment) {
     applyExportPacing_(context);
     const built = buildFullRosterPdfBlob_(context.quarterId, context.versionNo);
-    const folder = resolveMailAttachmentFolderCached_(context);
+    // 第二十六輪批次階段 B：完整版同個人版一齊放喺版本資料夾。
+    // 一次寄送只會建立一份完整版（見 _fullRosterAttachment 快取），
+    // 所以呢度叫一次 getOrCreateRosterSubfolder_() 唔會有效能問題。
+    const folder = getOrCreateRosterSubfolder_(context.quarterId, context.versionNo);
     const file = saveOrOverwriteFile_(folder, built.fileName, built.blob);
     context._fullRosterAttachment = {
       blob: built.blob,
@@ -968,7 +1039,15 @@ function htmlToPlainText_(html) {
 function applyPlaceholders_(text, placeholders, recipient, summary) {
   let result = String(text || '');
   Object.keys(placeholders).forEach(function (key) {
-    result = result.split('{' + key + '}').join(placeholders[key]);
+    // ⚠️ 第二十六輪批次階段 A2-3：`null` 代表「查唔到」（例如未發佈公開連結）。
+    // 呢度轉成空字串**只係安全嘅**，因為
+    // `assertPublicRosterUrlAvailableForStage_()` 已經喺 `sendStage()` 入面
+    // 擋咗「範本要用但冇值」嗰種情況——即係行到呢度嘅 `null`，
+    // 一定係「呢個範本根本冇用到嗰個 placeholder」。
+    // 冇咗嗰道關卡嘅話，呢一行就會變成「靜靜把缺失變成空白」。
+    const value = placeholders[key] === null || placeholders[key] === undefined
+      ? '' : placeholders[key];
+    result = result.split('{' + key + '}').join(value);
   });
   result = result.split('{PersonName}').join(recipient.displayName || '');
   result = result.split('{AssignmentSummary}').join(summary || '');

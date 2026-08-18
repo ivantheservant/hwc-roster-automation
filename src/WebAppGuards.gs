@@ -129,6 +129,105 @@ function assertNeverOfficiallySent_(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {{versionNo: number, changed: Object[], context: Object}}
  */
+/**
+ * 第二十六輪批次階段 A2-2：呢一季有冇公開連結。**純讀取。**
+ *
+ * ⚠️ 呢個係「唔好靜靜滑過去」嘅一個具體實作：查唔到就要有一個
+ * **明確嘅缺失狀態**回出去，唔係一個空字串。呼叫方（掣 2 嘅前置檢查、
+ * 前端）憑呢個決定擋唔擋。
+ * @param {string} quarterId 季度 ID
+ * @returns {{hasLink: boolean, fileUrl: string, checkFailed: boolean, error: string}}
+ */
+function readPublicLinkState_(quarterId) {
+  try {
+    const row = findPublicLinkRow_(quarterId);
+    const url = row && row.fileUrl ? String(row.fileUrl).trim() : '';
+    return { hasLink: url !== '', fileUrl: url, checkFailed: false, error: '' };
+  } catch (err) {
+    // ⚠️ 讀唔到 ≠ 冇連結。**唔可以當成「冇連結」**（會無謂擋住幹事），
+    // 亦**唔可以當成「有連結」**（會放行一封空連結嘅信）。
+    // 所以另開一個 `checkFailed` 狀態，由呼叫方誠實顯示「查不到」。
+    log_('WARN', 'readPublicLinkState_ 讀不到 PublicLinks：' + err.message);
+    return { hasLink: false, fileUrl: '', checkFailed: true, error: err.message };
+  }
+}
+
+/**
+ * 掣 2「寄給堂委審閱」嘅前置檢查：冇公開連結就拒絕執行。
+ *
+ * ⚠️ 呢道關卡同 `Mailer.gs` 嗰道（`assertPublicRosterUrlAvailableForStage_()`）
+ * **唔係重複**，兩道嘅角色唔同：
+ *   呢一道　早，畀到一個有用嘅畫面（附「立即發佈」掣），
+ *          而且喺撳確認之前就講，唔使幹事行完成個流程先撞板
+ *   嗰一道　深，喺真正寄信之前最後一刻擋，涵蓋選單版同任何其他呼叫端
+ *
+ * 只有前者嘅話，選單版仍然會寄出空連結；只有後者嘅話，幹事會喺確認畫面
+ * 之後先見到錯誤，而且冇一粒掣可以即刻補救。
+ * @param {string} quarterId 季度 ID
+ * @returns {void} 缺連結時拋出三段式錯誤
+ */
+function assertPublicLinkReady_(quarterId) {
+  const state = readPublicLinkState_(quarterId);
+  if (state.hasLink) return;
+
+  if (state.checkFailed) {
+    throw new Error(buildThreePartMessage_(
+      '查不到這一季有沒有公開連結（' + state.error + '）。',
+      '一封都沒有寄出。這不代表沒有連結，只代表系統現在看不到。',
+      [
+        '重新整理這一頁再試一次',
+        '如果一直查不到，去「進階功能 ▸ 重新發佈公開連結」發佈一次'
+      ]));
+  }
+
+  throw new Error(buildThreePartMessage_(
+    '這一季（' + quarterId + '）還沒有公開連結。',
+    '一封都沒有寄出。如果照樣寄，堂委會收到一封連結是空白的信，'
+      + '而畫面上不會有任何提示。',
+    [
+      '撳下面的「立即發佈」，發佈好之後會自動回到這裡',
+      '或者去「進階功能 ▸ 重新發佈公開連結」'
+    ]));
+}
+
+/**
+ * 階段 A2-4：重新發佈公開連結。**會寫入**（建立／更新公開試算表）。
+ *
+ * 本來只有試算表選單有。掣 2 嘅錯誤訊息指去呢度，所以呢一輪一定要有。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object}
+ */
+function apiRepublishPublicLink(quarterId) {
+  assertWebAppRequestAllowed_();
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) {
+    return {
+      ok: false,
+      message: buildThreePartMessage_(
+        '這一季還沒有任何版本，沒有東西可以發佈。',
+        '什麼都沒有改動。',
+        ['先撳「生成初稿」'])
+    };
+  }
+  try {
+    publishPublicRoster_(quarterId);
+    const state = readPublicLinkState_(quarterId);
+    return { ok: true, fileUrl: state.fileUrl, versionNo: versionNo };
+  } catch (err) {
+    return {
+      ok: false,
+      message: buildThreePartMessage_(
+        '發佈公開連結失敗（' + err.message + '）。',
+        '職事表本身沒有受影響，只是公開連結沒有更新。',
+        [
+          '重新整理這一頁再試一次',
+          '或者用試算表選單「準備工作 ▸ 發佈公開職事表」',
+          '如果一直失敗，把這句錯誤訊息交給開發者'
+        ])
+    };
+  }
+}
+
 function planResendChangedPersons_(quarterId) {
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');

@@ -793,6 +793,33 @@ function runSoftRuleMetrics_() {
     lines.push('跟 v0 比較：準硬規則違反 ' + baseMetrics.consecutive.count + ' → ' + metrics.consecutive.count + ' 項');
     lines.push('');
   }
+
+  // 第二十六輪批次階段 C：排表偏好一節。
+  //
+  // ⚠️ **唔可以只改行為而唔顯示結果。** 一個「軟」機制冇量度嘅話，
+  // 幹事同堂委都冇辦法知道「究竟有冇用」——下次開會就會憑感覺再調，
+  // 而唔係睇住數字調。包 try/catch：呢一節係附加資訊，
+  // 讀唔到唔應該令整份量度報告失敗。
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const quarterRow = findQuarter_(metrics.quarterId);
+    const refDate = quarterRow
+      ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+    const weights = readActivePersonPostWeights_(refDate, timezone);
+    const postNames = {};
+    readPosts().forEach(function (row) {
+      postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
+    });
+    const report = buildPersonPostWeightReport_(
+      readVersionAssignmentsRaw_(metrics.quarterId, metrics.versionNo),
+      weights, indexPeopleById_(), postNames);
+    report.lines.forEach(function (l) { lines.push(l); });
+    lines.push('');
+  } catch (err) {
+    lines.push('排表偏好：讀不到（' + err.message + '）。這一節查不到，'
+      + '不代表沒有偏好生效。');
+    lines.push('');
+  }
   if (flagged.length > 0) {
     lines.push('需要留意：');
     flagged.forEach(function (f) { lines.push('　• ' + f); });

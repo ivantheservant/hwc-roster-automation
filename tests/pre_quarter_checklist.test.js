@@ -4,7 +4,10 @@
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'AnnualCombined.gs', 'WebAppPreQuarter.gs'
+  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'AnnualCombined.gs',
+  // 第二十六輪批次階段 D3：名單檢查新增「電郵格式唔對」一項，
+  // 而個判斷函式住喺 WebAppPeople.gs。
+  'WebAppPeople.gs', 'WebAppPreQuarter.gs'
 ]);
 
 let fail = 0;
@@ -195,7 +198,13 @@ console.log('\n=== 規格 3.4：名單提示（唔計入 N）===');
     + '（過期但唔喺本季表上嘅唔算——同本季無關）', byId.expiredRole, 1);
   checkEqual('★★★★ 合資格少於 3 人嘅崗位：1 個（PIANO=2；AUDIO=3 啱好唔算）',
     byId.thinEligibility, 1);
-  checkEqual('★★★★ 四條提示全部回傳', hints.length, 4);
+  // 第二十六輪批次階段 D3 新增第五條：「有人的電郵格式看起來不對」。
+  // ⚠️ 同「冇電郵」係兩件唔同嘅事：冇電郵嘅人，系統知道佢收唔到；
+  // 格式錯嘅人，**系統以為佢收到**——寄出去靜靜失敗，冇人會覺得有問題。
+  checkEqual('★★★★ 五條提示全部回傳', hints.length, 5);
+  check('★★★★★ 有「電郵格式看起來不對」呢一條',
+    hints.some(function (h) { return h.id === 'badEmailFormat'; }),
+    JSON.stringify(hints.map(function (h) { return h.id; })));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

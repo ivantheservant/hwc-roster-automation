@@ -430,10 +430,37 @@
   function renderZone4() {
     const body = clear(el('zone4Body'));
     body.appendChild(renderRollbackEntry());
+    // 第二十六輪批次階段 A2-4：掣 2 嘅錯誤訊息會指去呢度，所以一定要有。
+    body.appendChild(renderRepublishEntry());
     body.appendChild(make('p', {
       text: '其餘工具暫時請用試算表上方的選單，下一輪會搬上來。',
       className: 'muted'
     }));
+  }
+
+  /** 階段 A2-4：重新發佈公開連結。 */
+  function renderRepublishEntry() {
+    const box = make('div', { className: 'act' });
+    const link = (dashboard && dashboard.publicLink) || {};
+    const desc = link.checkFailed
+      ? '現在查不到這一季有沒有公開連結。'
+      : (link.hasLink
+        ? '這一季已經有公開連結。內容有改動時，撳這裡可以重新發佈一次。'
+        : '這一季還沒有公開連結。寄給堂委之前一定要先發佈。');
+
+    box.appendChild(make('div', { className: 'act-main' }, [
+      make('div', { text: '重新發佈公開連結', className: 'act-name' }),
+      make('div', { text: desc, className: 'act-desc' })
+    ]));
+    box.appendChild(button('發佈', () => {
+      runAction('發佈公開連結', async () => {
+        const res = await callServer('apiRepublishPublicLink', currentQuarterId);
+        if (!res.ok) { showErrorModal('重新發佈公開連結', new Error(res.message)); return; }
+        setStatus('公開連結已經發佈好了（第 ' + res.versionNo + ' 版）。');
+        await loadDashboard();
+      });
+    }, ''));
+    return box;
   }
 
   // ── 收摺區 ───────────────────────────────────────────────────

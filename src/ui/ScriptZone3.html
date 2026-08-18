@@ -19,7 +19,8 @@
     body.appendChild(row([
       button('不能服侍的日期', () => openUnavailable(), ''),
       button('人員與電郵', () => openPeople(), ''),
-      button('崗位資格', () => openEligibility(), '')
+      button('崗位資格', () => openEligibility(), ''),
+      button('排表偏好', () => openWeights(), '')
     ]));
     body.appendChild(make('p', {
       text: '身分（堂委／執事）與個人崗位排除這兩個畫面下一輪會搬上來，'
@@ -284,33 +285,56 @@
       button('別名', () => openAliases(), 'secondary')
     ], 'row-right'));
 
+    // 「共 N 位」要保留——幹事用嚟核對人數。
     nodes.push(make('div', {
       text: '共 ' + peopleData.total + ' 位' + (keyword ? '（符合搜尋）' : ''),
       className: 'muted'
     }));
-    peopleData.people.forEach((p) => nodes.push(personRow(p)));
+    // ⚠️ 第二十六輪批次階段 D2：一開畫面**唔再**把 89 位全部展開成編輯卡。
+    //
+    // Ivan 實測：想改一個人嘅電郵，要碌過 89 張卡。
+    // 而且同「不能服侍的日期」風格唔一致——嗰個畫面用精簡清單 ＋
+    // 「修改」連結，撳咗先展開，做得啱。呢度跟返同一個模式。
+    peopleData.people.forEach((p) => nodes.push(personSummaryRow(p)));
 
     openModal('人員與電郵', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
   }
 
-  function personRow(p) {
+  /** 精簡一行：名、編號、英文名、電郵、右邊一條「修改」。 */
+  function personSummaryRow(p) {
     const box = make('div', { className: 'prop' + (p.active ? '' : ' is-off') });
-
     const head = make('div', { className: 'prop-head' });
     head.appendChild(make('span', { text: p.nameTC || '（沒有中文名）' }));
-    // PersonID 顯示做灰字，唔係輸入格——佢係全系統嘅外鍵，改一個就會
-    // 令嗰個人喺歷史紀錄入面「消失」。
     head.appendChild(make('span', { text: p.personId, className: 'idtag' }));
-    if (!p.hasEmail) {
+    if (p.nameEN) head.appendChild(make('span', { text: p.nameEN, className: 'muted' }));
+    if (p.hasEmail) {
+      head.appendChild(make('span', { text: p.email, className: 'muted' }));
+    } else {
       head.appendChild(make('span', { text: '沒有電郵，正式發出會略過', className: 'tag tag-bad' }));
     }
+    if (!p.active) head.appendChild(make('span', { text: '已停用', className: 'tag' }));
     if (p.duplicateNameCount > 1) {
-      // ⚠️ 只提示，唔會自動合併。名單入面真係有兩位姓名只差最尾一個
-      // 同音字嘅弟兄姊妹，佢哋係兩個唔同嘅人（唔舉真實例子——公開 repo）。
       head.appendChild(make('span', { text: '名單上有 ' + p.duplicateNameCount + ' 個同名', className: 'tag' }));
     }
     box.appendChild(head);
 
+    const slot = make('div', {});
+    box.appendChild(slot);
+    box.appendChild(row([button('修改', () => {
+      if (slot.firstChild) { clear(slot); return; }   // 再撳一次收埋
+      slot.appendChild(personEditor(p));
+    }, 'link')], 'row-right'));
+    return box;
+  }
+
+  /** 撳「修改」之後先展開嘅編輯欄位。 */
+  function personEditor(p) {
+    const box = make('div', { className: 'prop-opts' });
+
+    // ⚠️ 標題（名／PersonID／標籤）已經喺 personSummaryRow() 顯示咗，
+    // 呢度唔重複——重複嘅話幹事會以為展開咗第二個人。
+    // PersonID 由頭到尾都係灰字標籤，唔係輸入格：佢係全系統嘅外鍵，
+    // 改一個就會令嗰個人喺歷史紀錄入面「消失」。
     const nameInput = textField(p.nameTC, '中文名');
     const enInput = textField(p.nameEN, '英文名');
     const memberInput = textField(p.memberNo, '會友編號（5 位數字）');
@@ -367,15 +391,7 @@
           bodyNodes: [para('會改動 1 行：' + (payload.nameTC || p.personId) + '。')]
             .concat(warn.map((w) => make('div', { text: w, className: 'vio vio-warn' }))),
           confirmLabel: '確定儲存',
-          onConfirm: () => {
-            runAction('儲存中', async () => {
-              const res = await callServer('apiSavePerson', payload);
-              if (!res.ok) { showErrorModal('人員與電郵', new Error(res.message)); return; }
-              setStatus('已儲存。');
-              peopleData = await callServer('apiListPeople', '');
-              renderPeople('');
-            });
-          }
+          onConfirm: () => { savePersonWithEmailCheck(payload); }
         });
       }, ''),
       button('重新產生連結', () => confirmReissueToken(p), 'secondary')
@@ -570,8 +586,11 @@
     eligData.posts.forEach((p) => {
       const o = document.createElement('option');
       o.value = p.postId;
+      // 第二十六輪批次階段 D1：thin 由後端計，而後端已經排除咗唔自動排
+      // 嘅崗位（講員／翻譯／獻花）——嗰幾個合資格 0 人係正常而且正確。
       o.textContent = p.postNameTC + '（合資格 ' + p.eligibleCount + ' 人'
-        + (p.thin ? '，太少' : '') + '）';
+        + (p.thin ? '，太少' : '')
+        + (p.autoAssigned === false ? '，不自動排' : '') + '）';
       if (eligPostFilter === p.postId) o.selected = true;
       postSel.appendChild(o);
     });
@@ -719,6 +738,254 @@
           eligData = await callServer('apiGetEligibilityMatrix');
           eligChanges = {};
           renderEligibility('');
+        });
+      }
+    });
+  }
+
+  /**
+   * 第二十六輪批次階段 D3：儲存人員資料，電郵格式唔啱就再確認一次。
+   *
+   * ⚠️ **唔阻擋**——世上有奇怪但合法嘅地址，擋錯咗幹事就完全入唔到。
+   * 但要有一個位攔一攔：實測撞到一個結尾多咗句號嘅電郵，
+   * 嗰位弟兄姊妹**永遠收唔到通知**，而畫面睇落完全正常。
+   */
+  function savePersonWithEmailCheck(payload) {
+    runAction('儲存中', async () => {
+      const res = await callServer('apiSavePerson', payload);
+      if (res.ok) {
+        setStatus('已儲存。');
+        peopleData = await callServer('apiListPeople', '');
+        renderPeople('');
+        return;
+      }
+      if (!res.needsEmailConfirm) {
+        showErrorModal('人員與電郵', new Error(res.message));
+        return;
+      }
+      openConfirm({
+        title: '電郵格式看起來不對',
+        bodyNodes: [
+          make('div', { className: 'warnbox' }, [
+            make('div', { text: res.message, className: 'warn-head' }),
+            make('div', { text: '你填的是：' + res.email, className: 'lines' })
+          ]),
+          para('常見的打錯：結尾多了一個句號、中間有兩個句號、有多餘的空格。', 'muted')
+        ],
+        confirmLabel: '仍然儲存',
+        onConfirm: () => {
+          // 帶住 confirmedBadEmail 再送一次——後端見到就唔會再攔。
+          savePersonWithEmailCheck(Object.assign({}, payload, { confirmedBadEmail: true }));
+        }
+      });
+    });
+  }
+
+  /* ============================================================
+   * 畫面四：排表偏好（規格 4.6，第二十六輪批次階段 C4）
+   * ============================================================ */
+
+  let weightData = null;
+  let weightChanges = {};
+  let weightPostFilter = '';
+
+  function openWeights() {
+    runAction('讀取排表偏好', async () => {
+      weightData = await callServer('apiGetPersonPostWeightMatrix');
+      weightChanges = {};
+      weightPostFilter = '';
+      renderWeights();
+    });
+  }
+
+  function renderWeights() {
+    const nodes = [
+      // 規格 4.6：呢句一定要有。冇咗嘅話，幹事會以為「少一次」＝「唔俾佢做」，
+      // 然後去取消佢嘅資格——嗰個係一件完全唔同、而且好難復原嘅事。
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這裡只影響「誰做多少次」。不會影響誰有資格做，'
+            + '也不會令系統違反任何規則。',
+          className: 'warn-head'
+        })
+      ]),
+      para('「多一次」的意思是「這一季比系統原本會派的多大約一次」，'
+        + '不是「一定多一次」——系統仍然要先滿足所有規則。', 'muted')
+    ];
+
+    if (weightData.invalid && weightData.invalid.length > 0) {
+      const box = make('div', { className: 'vio vio-hard' });
+      box.appendChild(make('div', {
+        text: '有 ' + weightData.invalid.length + ' 行的數值超出範圍，這幾行完全沒有生效：',
+        className: 'vio-head'
+      }));
+      weightData.invalid.forEach((b) => box.appendChild(make('div', {
+        text: b.personId + '　' + b.postId + '　' + b.reason, className: 'vio-row'
+      })));
+      nodes.push(box);
+    }
+
+    const postSel = document.createElement('select');
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = '── 揀一個崗位 ──';
+    postSel.appendChild(allOpt);
+    weightData.posts.forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.postId;
+      o.textContent = p.postNameTC + '（' + p.people.length + ' 人有資格）';
+      if (weightPostFilter === p.postId) o.selected = true;
+      postSel.appendChild(o);
+    });
+    postSel.addEventListener('change', () => {
+      weightPostFilter = postSel.value;
+      renderWeights();
+    });
+    nodes.push(make('div', { className: 'prop-head' }, [
+      make('span', { text: '崗位' }), postSel
+    ]));
+
+    if (!weightPostFilter) {
+      nodes.push(make('div', {
+        text: '揀一個崗位，就會列出有資格做那個崗位的人。',
+        className: 'muted'
+      }));
+    } else {
+      const post = weightData.posts.filter((p) => p.postId === weightPostFilter)[0];
+      const list = make('div', { className: 'sec' }, [sectionTitle(post.postNameTC)]);
+      // ⚠️ 只列**有該崗位資格**嘅人（後端已經篩好）——
+      // 90 × 16 個空下拉係一幅噪音，幹事會搵唔到想改嗰個。
+      if (post.people.length === 0) {
+        list.appendChild(make('div', {
+          text: '這個崗位還沒有任何人有資格。要先去「崗位資格」加人。',
+          className: 'muted'
+        }));
+      }
+      post.people.forEach((person) => list.appendChild(weightRow(post, person)));
+      nodes.push(list);
+    }
+
+    nodes.push(make('div', { id: 'weightFooter', className: 'sec' }));
+    openModal('排表偏好', nodes, [
+      button('儲存改動', () => confirmWeightBatch(), ''),
+      button('關閉', () => closeModalAndRefresh(), 'secondary')
+    ]);
+    renderWeightFooter();
+  }
+
+  function weightRow(post, person) {
+    const key = person.personId + '|' + post.postId;
+    const box = make('div', { className: 'prop' });
+    box.appendChild(make('div', { text: person.nameTC, className: 'prop-head' }));
+
+    // ⚠️ 下拉用人話，**唔俾幹事打數字**——打錯一個負號就完全相反，
+    // 而「多一次」同「少一次」睇落只差一個字。
+    const sel = document.createElement('select');
+    weightData.choices.forEach((c) => {
+      const o = document.createElement('option');
+      o.value = String(c.adjust);
+      o.textContent = c.label;
+      if (c.adjust === person.adjust) o.selected = true;
+      sel.appendChild(o);
+    });
+
+    const reasonInput = textField(person.reason, '原因（必填，例如：堂委 2026-08 決議）');
+
+    const sync = () => {
+      const adjust = Number(sel.value);
+      if (adjust === person.adjust) delete weightChanges[key];
+      else weightChanges[key] = { adjust: adjust, reason: reasonInput.value.trim() };
+      renderWeightFooter();
+    };
+    sel.addEventListener('change', sync);
+    reasonInput.addEventListener('input', sync);
+
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '偏好' }), sel,
+      make('span', { text: '原因' }), reasonInput
+    ]));
+    if (person.adjust !== 0) {
+      box.appendChild(make('div', {
+        text: '目前生效中。揀「一般（預設）」就會解除（記錄會保留，不會刪走）。',
+        className: 'muted'
+      }));
+    }
+    return box;
+  }
+
+  function renderWeightFooter() {
+    const node = el('weightFooter');
+    if (!node) return;
+    clear(node);
+    const summary = summariseWeightChanges();
+    node.appendChild(make('div', {
+      text: summary.total === 0
+        ? '未有任何改動。'
+        : '未儲存的改動：新增 ' + summary.added + ' 項偏好、解除 ' + summary.released + ' 項偏好。',
+      className: summary.total === 0 ? 'muted' : 'ok-line strong'
+    }));
+  }
+
+  function summariseWeightChanges() {
+    let added = 0;
+    let released = 0;
+    Object.keys(weightChanges).forEach((k) => {
+      if (weightChanges[k].adjust === 0) released++; else added++;
+    });
+    return { added: added, released: released, total: added + released };
+  }
+
+  function confirmWeightBatch() {
+    const summary = summariseWeightChanges();
+    if (summary.total === 0) { setStatus('未有任何改動。'); return; }
+
+    // 每一項偏好都要填原因——三個月之後，冇原因嘅偏好冇人記得點解。
+    const missing = Object.keys(weightChanges).filter((k) => {
+      return weightChanges[k].adjust !== 0 && !weightChanges[k].reason;
+    });
+    if (missing.length > 0) {
+      setStatus('有 ' + missing.length + ' 項未填原因。每一項偏好都要填原因才可以儲存。', true);
+      return;
+    }
+
+    const list = make('div', { className: 'sec' });
+    Object.keys(weightChanges).forEach((k) => {
+      const parts = k.split('|');
+      const c = weightChanges[k];
+      const choice = weightData.choices.filter((x) => x.adjust === c.adjust)[0];
+      list.appendChild(make('div', {
+        text: parts[0] + '　' + parts[1] + '　→ ' + (choice ? choice.label : c.adjust)
+          + (c.reason ? '（' + c.reason + '）' : ''),
+        className: 'vio-row'
+      }));
+    });
+
+    openConfirm({
+      title: '確定要儲存嗎',
+      bodyNodes: [
+        para('會新增 ' + summary.added + ' 項偏好、解除 ' + summary.released + ' 項偏好。'),
+        list,
+        para('解除不會刪走那一行——系統只是記下「由今天起不再生效」，'
+          + '之後仍然查得到當時是怎樣決定的。', 'muted')
+      ],
+      confirmLabel: '確定儲存',
+      onConfirm: () => {
+        runAction('儲存中', async () => {
+          const changes = Object.keys(weightChanges).map((k) => {
+            const parts = k.split('|');
+            return {
+              personId: parts[0], postId: parts[1],
+              adjust: weightChanges[k].adjust,
+              // 解除唔需要新原因（原本嗰行嘅原因照樣留喺表上）
+              reason: weightChanges[k].reason || '解除偏好'
+            };
+          });
+          const res = await callServer('apiSavePersonPostWeightBatch', changes);
+          if (!res.ok) { showErrorModal('排表偏好', new Error(res.message || '儲存失敗')); return; }
+          setStatus('已新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。');
+          weightData = await callServer('apiGetPersonPostWeightMatrix');
+          weightChanges = {};
+          renderWeights();
         });
       }
     });

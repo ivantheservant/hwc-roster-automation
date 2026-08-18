@@ -396,14 +396,45 @@ console.log('\n=== A4：範本 placeholder 一致性（同 A4 相關的 4 個範
   });
 }
 
-console.log('\n=== A4：placeholder 解析函式有 try/catch，一個季度未發佈唔會累街坊 ===');
+console.log('\n=== A4（第二十六輪階段 A2-3 改寫）：查唔到要回 null，唔可以回空字串 ===');
 {
+  // ─────────────────────────────────────────────────────────────
+  // 點解要改呢一條
+  // ─────────────────────────────────────────────────────────────
+  //
+  // 呢條斷言原本鎖住「查唔到就回空字串，唔會拋錯打斷寄信流程」。
+  // 嗰個當時嘅理由係啱嘅（唔想一個顯示用小欄位打斷成個寄信），
+  // 但第二十六輪實測撞到後果：
+  //
+  //   生成初稿 → 寄給堂委 ⇒ 寄出一封**連結係空白**嘅信，畫面零訊號。
+  //
+  // 「查唔到」被包裝成一個「正常結果」，而上面每一層都以為冇事。
+  //
+  // ⚠️ 保留嘅意圖係「一個顯示用欄位唔應該無故打斷寄信」——
+  // 而家嘅做法係：**查唔到回 `null`（明確缺失標記）**，
+  // 由 `assertPublicRosterUrlAvailableForStage_()` 睇「呢個範本到底使唔使
+  // 呢條連結」先決定擋唔擋。唔使嘅階段照樣唔會被打斷。
   const mailerSource = fs.readFileSync(path.join(SRC, 'Mailer.gs'), 'utf8');
   const start = mailerSource.indexOf('function resolvePublicRosterUrlForPlaceholder_');
   const end = mailerSource.indexOf('\n}', start);
   const body = mailerSource.slice(start, end);
-  check('★★ 有 try/catch，查唔到就回傳空字串，唔會拋錯打斷寄信流程',
-    body.indexOf('try') !== -1 && body.indexOf('catch') !== -1 && /return\s+'';/.test(body));
+
+  check('★★★ 仍然有 try/catch（讀表出錯唔應該直接拋去畫面）',
+    body.indexOf('try') !== -1 && body.indexOf('catch') !== -1);
+  check('★★★★★ 查唔到回 `null`，**唔可以回空字串**'
+    + '——空字串同 null 喺 JS 都係 falsy，回空字串就令呼叫方冇可能分辨'
+    + '「未發佈」同「發佈咗但網址係空」',
+    /return null;/.test(body) && !/return\s+'';/.test(body));
+
+  check('★★★★★ 有一道關卡按**範本實際文字**決定使唔使擋'
+    + '（唔係一個寫死嘅階段清單——範本幹事改得）',
+    /function assertPublicRosterUrlAvailableForStage_/.test(mailerSource)
+    && /indexOf\('\{PublicRosterUrl\}'\)/.test(mailerSource));
+
+  check('★★★★★ sendStage() 喺**寄第一封之前**就叫嗰道關卡'
+    + '——擺後面會變成「寄咗一半先發現」，而已經寄出嗰啲收唔返',
+    mailerSource.indexOf('assertPublicRosterUrlAvailableForStage_(')
+      < mailerSource.indexOf('listRecipients_(stage, context).forEach'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

@@ -34,6 +34,48 @@
 const ELIGIBILITY_THIN_THRESHOLD = 3;
 
 /**
+ * 第二十六輪批次階段 D1：列出**唔會自動排**嘅崗位。
+ *
+ * 兩個來源，兩個都要睇：
+ *   `Posts.AutoGenerate = FALSE`
+ *   `HARD_NO_AUTO_PREACHER` 規則嘅 `ScopePostIDs`
+ *
+ * ⚠️ **唔寫死崗位代碼。** 講員／翻譯／獻花嘅 PostID 喺唔同試算表可能唔同，
+ * 寫死就會喺換咗代碼之後靜靜失效——而失效嘅表現係「警告又出返」，
+ * 一個睇落好似冇壞嘅退步。
+ *
+ * @returns {string[]} PostID 清單
+ */
+function listNoAutoAssignPostIds_() {
+  const ids = {};
+
+  try {
+    readPosts().forEach(function (row) {
+      if (isTrueValue_(row[COLUMNS.POSTS.AUTO_GENERATE])) return;
+      const id = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
+      if (id) ids[id] = true;
+    });
+  } catch (err) {
+    log_('WARN', 'listNoAutoAssignPostIds_ 讀不到 Posts：' + err.message);
+  }
+
+  try {
+    const rules = readRules();
+    const rule = rules[RULE_IDS.NO_AUTO_GENERATE];
+    if (rule) {
+      splitList_(rule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]).forEach(function (id) {
+        const trimmed = String(id || '').trim();
+        if (trimmed) ids[trimmed] = true;
+      });
+    }
+  } catch (err) {
+    log_('WARN', 'listNoAutoAssignPostIds_ 讀不到 RuleSettings：' + err.message);
+  }
+
+  return Object.keys(ids);
+}
+
+/**
  * 攞整個資格矩陣。**純讀取。**
  * @returns {Object} 見規格 4.4
  */
@@ -45,10 +87,28 @@ function apiGetEligibilityMatrix() {
     const E = COLUMNS.ELIGIBILITY;
     const M = COLUMNS.NAME_MAPPING;
 
+    // ⚠️ 第二十六輪批次階段 D1：邊啲崗位**唔應該計入「合資格人數太少」警告**。
+    //
+    // Ivan 實測見到紅框：「有 2 個崗位的合資格人數少於 3 人：講員 0／翻譯 0」。
+    // **呢個警告係錯嘅。** 講員／翻譯／獻花由 `HARD_NO_AUTO_PREACHER` 規定
+    // 一律留空、永不自動排，所以合資格 0 人係**正常而且正確**。
+    // 呢個警告每次開畫面都會出，令幹事以為有嘢未做好，而實際上冇嘢要做。
+    //
+    // 同上一輪嘅「39 格」係同一個 bug class：
+    // **一個數字計嗰陣冇理會「呢個崗位到底使唔使排」。**
+    //
+    // 判斷一律由資料讀出——`Posts.AutoGenerate` ＋ 規則嘅 `ScopePostIDs`，
+    // **唔寫死崗位代碼**（崗位代碼喺唔同試算表可能唔同，寫死就會靜靜失效）。
+    const noAutoPostIds = listNoAutoAssignPostIds_();
+
     const posts = readPosts().map(function (row) {
+      const postId = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
       return {
-        postId: String(row[COLUMNS.POSTS.POST_ID] || '').trim(),
-        postNameTC: String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim()
+        postId: postId,
+        postNameTC: String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim(),
+        // 唔自動排 ⇒ 唔計入「人數太少」警告（但格子照樣顯示，
+        // 幹事仍然可以喺呢度加資格——只係唔會被當成問題）
+        autoAssigned: noAutoPostIds.indexOf(postId) === -1
       };
     }).filter(function (p) { return p.postId !== ''; });
 
@@ -102,7 +162,9 @@ function apiGetEligibilityMatrix() {
           postId: p.postId,
           postNameTC: p.postNameTC,
           eligibleCount: perPost[p.postId],
-          thin: perPost[p.postId] < ELIGIBILITY_THIN_THRESHOLD
+          autoAssigned: p.autoAssigned,
+          // ⚠️ 唔自動排嘅崗位**永遠唔會**標成 thin——0 人係正常。
+          thin: p.autoAssigned && perPost[p.postId] < ELIGIBILITY_THIN_THRESHOLD
         };
       }),
       people: people.map(function (person) {

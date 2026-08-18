@@ -116,11 +116,19 @@ function apiSavePerson(payload) {
   }
 
   const emailRaw = String(p.email || '').trim();
-  if (emailRaw && !isPlausibleEmail_(emailRaw)) {
-    return { ok: false, message: buildThreePartMessage_(
-      '電郵「' + emailRaw + '」看起來不像一個電郵地址。',
-      '什麼都沒有改動。',
-      ['檢查有沒有打漏 @ 或者網域', '如果暫時沒有電郵，把這一格留空就可以']) };
+  // ⚠️ 第二十六輪批次階段 D3：格式唔啱**唔阻擋儲存**，改為要幹事再確認一次。
+  //
+  // 點解唔阻擋：世上有奇怪但合法嘅地址，一條 regex 擋錯咗就會令幹事
+  // 完全入唔到一個真實存在嘅電郵，而佢冇任何辦法繞過。
+  // 點解要確認：實測撞到一個結尾多咗句號嘅電郵——嗰位弟兄姊妹
+  // **永遠收唔到通知**，而畫面睇落完全正常。要有一個位攔一攔。
+  if (emailRaw && !isPlausibleEmail_(emailRaw) && p.confirmedBadEmail !== true) {
+    return {
+      ok: false,
+      needsEmailConfirm: true,
+      email: emailRaw,
+      message: '這個電郵格式看起來不對，寄出時可能會失敗。確定要儲存嗎？'
+    };
   }
 
   const memberNo = normalizeMemberNo_(p.memberNo);
@@ -409,13 +417,45 @@ function normalizeMemberNo_(raw) {
 }
 
 /**
- * 基本電郵格式檢查。**刻意寬鬆**——嚴格嘅 RFC 檢查會擋住合法但罕見嘅地址，
- * 而我哋要擋嘅只係「明顯打漏咗嘢」（冇 @、冇網域）。
+ * 電郵格式檢查。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第二十六輪批次階段 D3：收緊咗
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Ivan 實測撞到：名單上有一位嘅電郵**結尾多咗一個句號**，
+ * 舊嗰條 regex（`[^\s@]+@[^\s@]+\.[^\s@]+`）放行咗——因為
+ * `example.com.` 入面「`.` 之後仲有 `com.`」呢個條件係成立嘅。
+ *
+ * 呢種錯會令嗰位弟兄姊妹**永遠收唔到通知**，而畫面睇落完全正常。
+ *
+ * 收緊咗五樣（每一樣都對應一種真實會打錯嘅方式）：
+ *   `@` 前後都要有嘢
+ *   `@` 之後要有至少一個 `.`
+ *   **結尾唔可以係 `.`**（實測撞到嗰種）
+ *   唔可以有連續兩個 `.`（打字手快撳兩次）
+ *   唔可以有空白（複製貼上帶咗尾隨空格）
+ *
+ * ⚠️ 仍然**唔會阻擋儲存**——世上有奇怪但合法嘅地址，而我哋唔想因為
+ * 一條 regex 而令幹事完全入唔到一個真實存在嘅電郵。改為黃色警告 ＋
+ * 要幹事再撳一次確認（見前端 `confirmEmailFormat()`）。
+ *
  * @param {string} email 電郵
- * @returns {boolean}
+ * @returns {boolean} 格式睇落啱唔啱
  */
 function isPlausibleEmail_(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+  const value = String(email || '').trim();
+  if (value === '') return false;
+  if (/\s/.test(value)) return false;            // 任何空白
+  if (value.indexOf('..') !== -1) return false;  // 連續兩個點
+  if (value.charAt(value.length - 1) === '.') return false;   // 結尾句號（實測撞到）
+
+  const at = value.split('@');
+  if (at.length !== 2) return false;             // 冇 @ 或者多過一個
+  if (at[0].length === 0 || at[1].length === 0) return false;
+  if (at[1].indexOf('.') === -1) return false;   // 網域冇點
+  if (at[1].charAt(0) === '.' || at[1].charAt(0) === '-') return false;
+  return true;
 }
 
 /**

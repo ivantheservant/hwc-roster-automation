@@ -285,3 +285,80 @@ function seedPostEarlyArrivalMinutes_(plan) {
 
   return plan.rows.length;
 }
+
+/* ============================================================
+ * 第二十六輪批次階段 C5：CHAIR × COMMUNION 互斥組
+ * ============================================================ */
+
+/**
+ * 主席同聖餐襄禮嘅互斥組名。兩個崗位嘅 `MutexGroup` 填同一個值，
+ * `HARD_MUTEX_GROUP` 就會擋住「同一日、同一個人做主席兼襄禮」。
+ *
+ * ⚠️ 呢個唔係新規則——`HARD_MUTEX_GROUP` 早就實作好（`Generator.gs`），
+ * **只係一直冇任何一組資料**（`RuleSettings` 嗰行嘅說明仲寫住「現時無任何組」）。
+ * 所以呢度**只需要種子資料，唔使改任何邏輯**。
+ *
+ * 點解要設：聖餐主日嘅主席唔做襄禮，十八個月歷史零例外——
+ * 即係一條**實際存在但從來冇寫低**嘅規則。2026T4 系統初稿就喺
+ * 10 月 4 日排咗同一個人做主席兼襄禮，堂委要人手改返。
+ */
+const POST_MUTEX_GROUP_CHAIR_COMMUNION = 'CHAIR_COMMUNION';
+
+/**
+ * 應該設互斥組嘅崗位（用 `PostName_TC` 精確比對，同呢個檔案其他
+ * override map 一致——`PostID` 喺唔同試算表可能唔同，崗位中文名比較穩定）。
+ * @returns {Object.<string, string>} {PostName_TC: MutexGroup 值}
+ */
+function getPostMutexGroupOverrides_() {
+  const overrides = {};
+  overrides['主席'] = POST_MUTEX_GROUP_CHAIR_COMMUNION;
+  overrides['聖餐襄禮'] = POST_MUTEX_GROUP_CHAIR_COMMUNION;
+  return overrides;
+}
+
+/**
+ * **唯讀**：報告 `Posts.MutexGroup` 現時同建議值差幾多。
+ *
+ * ⚠️ 呢個函式**一格都唔會寫**。第二十六輪特登只做唯讀報告——
+ * 呢兩格係幹事自己喺試算表改（見 `docs/系統範圍稽核.md` 第二十六輪）。
+ *
+ * 點解唔順手寫入：`MutexGroup` 一填落去，排表就會即刻多咗一條硬規則。
+ * 一條硬規則應該由人明確開啟，唔應該喺一次「補建欄位」嘅維護動作入面
+ * 順手生效——嗰種「順手」正正就係本專案一直提防嘅
+ * 「系統靜靜幫你做咗一件事」。
+ *
+ * @returns {{columnExists: boolean, rows: Object[], needsChange: Object[]}}
+ */
+function planPostMutexGroupSeed_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.POSTS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.POSTS);
+
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  const headers = lastCol > 0 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : [];
+  const mutexIndex = headers.indexOf(COLUMNS.POSTS.MUTEX_GROUP);
+  const nameIndex = headers.indexOf(COLUMNS.POSTS.POST_NAME_TC);
+  if (mutexIndex === -1 || nameIndex === -1 || lastRow < 3) {
+    return { columnExists: mutexIndex !== -1, rows: [], needsChange: [] };
+  }
+
+  const overrides = getPostMutexGroupOverrides_();
+  const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  const rows = [];
+  const needsChange = [];
+  values.forEach(function (row, i) {
+    const name = String(row[nameIndex] || '').trim();
+    if (!Object.prototype.hasOwnProperty.call(overrides, name)) return;
+    const current = String(row[mutexIndex] || '').trim();
+    const entry = {
+      postNameTC: name,
+      sheetRow: i + 3,
+      columnIndex: mutexIndex + 1,
+      currentValue: current,
+      suggestedValue: overrides[name]
+    };
+    rows.push(entry);
+    if (current !== overrides[name]) needsChange.push(entry);
+  });
+  return { columnExists: true, rows: rows, needsChange: needsChange };
+}

@@ -216,18 +216,17 @@ function planQuarterReset_(quarterId, includeV0) {
   // （第十九輪「兩個真相來源」同源），所以呢度改成直接重用
   // `versionNosToClear`，唔再自己判斷一次。
   try {
-    const folder = resolveMailAttachmentFolder_();
     const pattern = new RegExp('^' + escapeRegExp_(quarterId) + '_v(\\d+)');
-    const files = folder.getFiles();
-    while (files.hasNext()) {
-      const file = files.next();
-      const name = file.getName();
-      const match = pattern.exec(name);
-      if (!match) continue;                       // 其他季度或不明檔案：不碰
+    // 第二十六輪批次階段 B：經共用入口，根資料夾同「季度 ▸ 版本」子資料夾
+    // 都會掃到。自己 getFiles() 嘅話會漏掉子資料夾入面嗰批，
+    // 而重設之後嗰啲舊 PDF 仍然留喺度，下一次生成就會撈亂新舊。
+    listRosterPdfFilesForQuarter_(quarterId).forEach(function (file) {
+      const match = pattern.exec(file.name);
+      if (!match) return;                          // 其他季度或不明檔案：不碰
       const versionNo = Number(match[1]);
-      if (!versionNosToClear[versionNo]) continue; // v0（未選）或受保護版本：不清
-      plan.pdfFiles.push({ id: file.getId(), name: name, sizeBytes: file.getSize() });
-    }
+      if (!versionNosToClear[versionNo]) return;   // v0（未選）或受保護版本：不清
+      plan.pdfFiles.push({ id: file.id, name: file.name, sizeBytes: file.sizeBytes });
+    });
   } catch (err) {
     plan.manualAttention.push('無法開啟 RosterPDF 資料夾，PDF 完全不清：' + err.message
       + '（如果 Config 的 ROSTER_DRIVE_FOLDER_ID 未設定，這是預期行為）');

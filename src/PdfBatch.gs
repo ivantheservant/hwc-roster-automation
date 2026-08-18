@@ -32,8 +32,11 @@
  *   errors: Object[], elapsedMs: number}} 進度或最終結果
  */
 function generatePersonalPdfBatch_(quarterId, versionNo) {
-  // 需求 3：一開始就檢查資料夾，無效就立即中止，不要處理到一半才發現沒地方存
-  const folder = resolveMailAttachmentFolder_();
+  // 需求 3：一開始就檢查資料夾，無效就立即中止，不要處理到一半才發現沒地方存。
+  // 第二十六輪批次階段 B：改用「季度 ▸ 版本」子資料夾。
+  // ⚠️ **一批只解析一次**——嗰個函式要攞 LockService 鎖，逐個檔叫一次
+  // 就係 58 次攞鎖，慢到冇朋友。
+  const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);
 
   const progress = loadPdfBatchProgress_(quarterId, versionNo);
   const forceRegenerate = getConfig(CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, false) === true;
@@ -174,7 +177,8 @@ function runPersonalPdfBatchLoopInner_(
  *   errors: Object[], elapsedMs: number}} 進度或最終結果
  */
 function generatePersonalPdfBatchForPeople_(quarterId, versionNo, personIds) {
-  const folder = resolveMailAttachmentFolder_();
+  // 第二十六輪批次階段 B：同上，一批只解析一次。
+  const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);
 
   const progress = loadPdfResendBatchProgress_(quarterId, versionNo, personIds);
   const forceRegenerate = getConfig(CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, false) === true;
@@ -333,10 +337,13 @@ function generateOnePersonalPdf_(
  *   missing／tooSmall 每項為 {personId, nameTC, fileName}（tooSmall 另含 sizeBytes）
  */
 function planPersonalPdfIntegrityCheck_(quarterId, versionNo) {
-  const folder = resolveMailAttachmentFolder_();
   const people = listPeopleNeedingPersonalPdf_(quarterId, versionNo);
   const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
-  const existingFileSizes = listExistingFileSizes_(folder);
+  // ⚠️ 第二十六輪批次階段 B：**一定要新舊兩處都睇。**
+  // 淨係睇子資料夾嘅話，舊季度（檔案平舖喺根）會全部報「缺件」——
+  // 而檔案其實好地地喺度。呢種「報告話缺，實際唔缺」比漏報更難查。
+  const folder = { getName: function () { return resolveMailAttachmentFolder_().getName(); } };
+  const existingFileSizes = listRosterPdfSizesForQuarter_(quarterId);
 
   const missing = [];
   const tooSmall = [];
@@ -409,13 +416,13 @@ function checkMissingPersonalPdfs_(quarterId, versionNo, stage) {
     return { applicable: false, missing: [], total: 0 };
   }
 
-  const folder = resolveMailAttachmentFolder_();
   const people = listPeopleNeedingPersonalPdf_(quarterId, versionNo);
   // 跟 generateOnePersonalPdf_() 同一個效能理由：一次列出資料夾內容，
   // 不要對每個人各自查詢一次 Drive（見 listExistingFileSizes_()）。
   // 追加階段 AG：大小不足門檻的檔案也算缺件——0 bytes 的檔案存在不代表可用。
+  // 第二十六輪批次階段 B：新舊兩處都睇（見 planPersonalPdfIntegrityCheck_ 嘅說明）。
   const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
-  const existingFileSizes = listExistingFileSizes_(folder);
+  const existingFileSizes = listRosterPdfSizesForQuarter_(quarterId);
   const missing = people.filter(function (p) {
     const fileName = buildAttachmentName_(quarterId, versionNo, p.nameTC);
     const size = existingFileSizes.get(fileName);
@@ -598,20 +605,20 @@ function buildPdfBatchResult_(progress, done) {
 function diagnosePersonalPdfVersions_(quarterId) {
   const folder = resolveMailAttachmentFolder_();
   const latestVersionNo = findLatestVersionNo(quarterId);
+  // 第二十六輪批次階段 B：經共用入口，新舊兩處都會計到。
 
   // 用一個唔可能出現喺真實姓名入面嘅哨兵字串去反推檔名格式，
   // 就唔使喺呢度重新拼一次 pattern（重複實作＝遲早分岔）。
   const counts = {};
   let totalFiles = 0;
-  const files = folder.getFiles();
-  while (files.hasNext()) {
-    const name = files.next().getName();
-    if (name.indexOf(quarterId) === -1) continue;
+  listRosterPdfFilesForQuarter_(quarterId).forEach(function (f) {
+    const name = f.name;
+    if (name.indexOf(quarterId) === -1) return;
     totalFiles++;
     const match = /_v(\d+)_/.exec(name);
     const key = match ? 'v' + match[1] : '（檔名裡看不到版本號）';
     counts[key] = (counts[key] || 0) + 1;
-  }
+  });
 
   const byVersion = Object.keys(counts).sort().map(function (k) {
     return { version: k, count: counts[k] };

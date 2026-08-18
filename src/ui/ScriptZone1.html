@@ -171,6 +171,24 @@
       ]));
     }
 
+    // 階段 A2-1：發佈失敗係**黃色**唔係紅色——版本真係建立咗。
+    // 而且要明確講「寄給堂委之前要先補返」，否則幹事會直接撳掣 2
+    // 而寄出一封冇連結嘅信。
+    if (res.publishFailed) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '初稿已經生成好（第 ' + res.versionNo + ' 版）。'
+            + '但公開連結未能建立（原因：' + (res.publishFailMessage || '不明') + '）。',
+          className: 'warn-head'
+        }),
+        make('div', {
+          text: '在寄給堂委之前，請去「進階功能 ▸ 重新發佈公開連結」再試一次。'
+            + '沒有公開連結的話，「寄給堂委審閱」會拒絕執行。',
+          className: 'lines'
+        })
+      ]));
+    }
+
     if (res.sheetUrl) {
       const a = document.createElement('a');
       a.href = res.sheetUrl;
@@ -589,7 +607,47 @@
    * 掣 2：寄給堂委審閱（規格 2.5）
    * ============================================================ */
 
+  /**
+   * 階段 A2-2：冇公開連結就唔好去到確認畫面。
+   *
+   * ⚠️ 呢個畫面**唔止係報錯，仲要有一粒即刻解決到嘅掣**。
+   * 淨係話「去進階功能發佈」嘅話，幹事要摺埋呢個彈窗、
+   * 展開區四、搵嗰粒掣、發佈、再返嚟撳掣 2——五步。
+   * 而佢本來只係想寄封信。
+   */
+  function renderReviewNeedsPublicLink() {
+    openModal('寄給堂委審閱：還沒有公開連結', [
+      errorPart('發生了什麼', '這一季還沒有公開連結。堂委收到的信裡面有一條'
+        + '「唯讀連結」，而那條連結現在是空的。'),
+      errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
+      make('div', { className: 'err-part' }, [
+        make('div', { text: '你可以怎樣做', className: 'err-label' }),
+        make('div', {
+          text: '撳下面的「立即發佈」。發佈好之後會自動回到寄出的確認畫面。',
+          className: 'err-text'
+        })
+      ])
+    ], [
+      button('立即發佈', () => {
+        runAction('發佈公開連結', async () => {
+          const res = await callServer('apiRepublishPublicLink', currentQuarterId);
+          if (!res.ok) { showErrorModal('發佈公開連結', new Error(res.message)); return; }
+          setStatus('公開連結已經發佈好了。');
+          // 發佈完自動回到掣 2 嘅流程——唔使幹事自己再撳一次。
+          openReview();
+        });
+      }, ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
   function openReview() {
+    // 前置檢查：dashboard 已經帶咗公開連結狀態返嚟，唔使多打一次伺服器。
+    // ⚠️ `checkFailed` 唔可以當成「有連結」而放行——嗰個係「查不到」，
+    // 唔係「冇問題」。後端仲有一道 assertPublicLinkReady_() 兜底。
+    const link = dashboard && dashboard.publicLink;
+    if (link && !link.hasLink) { renderReviewNeedsPublicLink(); return; }
+
     runAction('讀取確認資料', async () => {
       const preview = await callServer('apiStep2Preview', currentQuarterId);
 

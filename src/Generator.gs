@@ -82,7 +82,14 @@ function buildGeneratorContext_(quarterId) {
     // 第九輪批次階段 B：分數容差。負數一律當 0（不啟用），避免打錯符號時
     // 產生無法預期的比較行為。見 compareCandidates_()／pickEpsilonWinner_()。
     scoreTieEpsilon: Math.max(0,
-      readNumericConfig_(config, CONFIG_KEYS.SCORE_TIE_EPSILON, DEFAULTS.SCORE_TIE_EPSILON))
+      readNumericConfig_(config, CONFIG_KEYS.SCORE_TIE_EPSILON, DEFAULTS.SCORE_TIE_EPSILON)),
+    // 第二十六輪批次階段 C：排表偏好。
+    // ⚠️ 張表空／未建立 ⇒ byKey 係 {} ⇒ 每次加 0 ⇒ **排表結果同以前
+    // 逐個位元一樣**（見 PersonPostWeight.gs 檔頭嘅安全性質）。
+    // 參考日期用季初：一筆偏好生唔生效，應該睇「呢一季開始嗰陣」，
+    // 唔係「今日執行生成嗰陣」——後者會令同一季喺唔同日重跑出唔同結果。
+    personPostWeights: readActivePersonPostWeights_(
+      toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone), timezone)
   };
 }
 
@@ -305,6 +312,9 @@ function buildRoster_(context) {
 
   /** @type {Object.<string, number>} 每人本季已派次數 */
   const quarterCount = {};
+  // 第二十六輪批次階段 C：逐個 (人|崗位) 數本季已排幾多次，
+  // 供排表偏好嘅「遞減加分」用（見 computePersonPostWeightBonus_()）。
+  const postCount = {};
   /** @type {Object.<string, string>} 每人最後一次服侍的日期（yyyy-MM-dd） */
   const lastServed = {};
 
@@ -362,7 +372,7 @@ function buildRoster_(context) {
           if (!lockedPersonId) {
             warnings.push(makeWarning_(baseRow, '', '此崗位在該特別主日被 LockPostIDs 鎖定，但沒有現有人選可保留，需人手填寫'));
           } else {
-            registerAssigned_(lockedPersonId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed);
+            registerAssigned_(lockedPersonId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed, postCount);
           }
           continue;
         }
@@ -376,6 +386,7 @@ function buildRoster_(context) {
           weekByPerson: weekByPerson,
           previousWeek: previousWeek,
           quarterCount: quarterCount,
+          postCount: postCount,
           lastServed: lastServed,
           ratioState: ratioState,
           random: random
@@ -403,7 +414,7 @@ function buildRoster_(context) {
           warnings.push(makeWarning_(baseRow, v.ruleId, v.reason));
         });
 
-        registerAssigned_(outcome.personId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed);
+        registerAssigned_(outcome.personId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed, postCount);
         updateRatioState_(post, outcome.personId, weekByPost, previousWeek, rules, ratioState, context.eligibility);
       }
     }
@@ -715,7 +726,12 @@ function normalizeValues_(values) {
 function computeBonus_(personId, state) {
   return computeChairEqAnnounceBonus_(personId, state)
     + computeAnnounceReliefBonus_(personId, state)
-    + computeChairPreferDualBonus_(personId, state);
+    + computeChairPreferDualBonus_(personId, state)
+    // 第二十六輪批次階段 C：排表偏好。
+    // ⚠️ 冇對應偏好行 ⇒ 回 0 ⇒ 加落去係恆等元 ⇒ 分數逐個位元不變。
+    // 而且**結構上唔可能壓過硬規則**：pickPerson_() 係先隔走
+    // hasHard 嘅候選人，之後先比分數（見 PersonPostWeight.gs 檔頭）。
+    + computePersonPostWeightBonus_(personId, state);
 }
 
 /**
@@ -1192,13 +1208,18 @@ function updateRatioState_(post, personId, weekByPost, previousWeek, rules, rati
  * @param {Object.<string, string>} lastServed 每人最後服侍日期，會就地更新
  * @returns {void}
  */
-function registerAssigned_(personId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed) {
+function registerAssigned_(personId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed, postCount) {
   if (!weekByPost[post.postId]) weekByPost[post.postId] = [];
   weekByPost[post.postId].push(personId);
   if (!weekByPerson[personId]) weekByPerson[personId] = [];
   weekByPerson[personId].push(post.postId);
   quarterCount[personId] = (quarterCount[personId] || 0) + 1;
   lastServed[personId] = serviceDate.serviceDate;
+  // 第二十六輪批次階段 C：postCount 係選填參數——舊呼叫端唔傳都唔會爆。
+  if (postCount) {
+    const key = personId + '|' + post.postId;
+    postCount[key] = (postCount[key] || 0) + 1;
+  }
 }
 
 /**

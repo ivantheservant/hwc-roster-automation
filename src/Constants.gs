@@ -39,7 +39,9 @@ const SHEETS = {
   // 兩張表都是**可選的**——不存在時 readRolesSafe_()／readPersonPostExclusionsSafe_()
   // 回傳空陣列，全部相關規則自動失效，舊環境完全不受影響。見 Roles.gs 檔頭。
   ROLES: 'Roles',
-  PERSON_POST_EXCLUSIONS: 'PersonPostExclusions'
+  PERSON_POST_EXCLUSIONS: 'PersonPostExclusions',
+  // 第二十六輪批次階段 C：排表偏好（某人 × 某崗位 → 比平均多／少 N 次）。
+  PERSON_POST_WEIGHT: 'PersonPostWeight'
 };
 
 /**
@@ -289,6 +291,28 @@ const COLUMNS = {
     EFFECTIVE_TO: 'EffectiveTo',
     ACTIVE: 'Active',
     NOTES: 'Notes'
+  },
+
+  /**
+   * 第二十六輪批次階段 C：排表偏好。
+   *
+   * 一個機制搞掂堂委三條規則（「某人多做／少做某崗位幾次」）——
+   * 佢哋形狀完全一樣，唔使三套邏輯。
+   *
+   * ⚠️ **解除一筆偏好＝填 `EffectiveTo`，唔係刪行、唔係設 Active=FALSE。**
+   * 同 PersonPostExclusions 一致：要睇得返「嗰陣時係點決定嘅」。
+   */
+  PERSON_POST_WEIGHT: {
+    WEIGHT_ID: 'WeightID',
+    PERSON_ID: 'PersonID',
+    POST_ID: 'PostID',
+    ADJUST: 'Adjust',
+    REASON: 'Reason',
+    EFFECTIVE_FROM: 'EffectiveFrom',
+    EFFECTIVE_TO: 'EffectiveTo',
+    ACTIVE: 'Active',
+    CREATED_AT: 'CreatedAt',
+    CREATED_BY: 'CreatedBy'
   },
   SERVICE_DATES: {
     SERVICE_DATE_ID: 'ServiceDateID',
@@ -712,6 +736,24 @@ const SCORE_DEFAULTS = {
   PREFERENCE_BONUS: 50,
   SELECTION_WEIGHT: 45
 };
+
+/**
+ * 第二十六輪批次階段 C：排表偏好每一級（`Adjust` 每 ±1）嘅分數量級。
+ *
+ * 量級點揀：同 `SELECTION_WEIGHT`（45）同一個數量級，令一級偏好大致等於
+ * 「壓過一次選人偏好」，即係大約一次派工嘅分別。太細（例如 5）幾乎冇效果、
+ * 太大（例如 500）就會變成一條實際上唔可以違反嘅硬規則——而
+ * `Adjust` **設計上係 soft**，永遠唔可以壓過硬規則。
+ *
+ * ⚠️ 就算調到好大都**唔可能**壓過硬規則：硬規則係喺
+ * `clean = scored.filter(!hasHard)` 嗰度**先隔走**候選人，
+ * 之後先比分數。所以呢個數字只影響「合規嘅人之間邊個優先」。
+ */
+const PERSON_POST_WEIGHT_STEP = 45;
+
+/** `Adjust` 容許嘅範圍。超出範圍嘅行會被當成資料錯誤，唔會靜靜夾到範圍內。 */
+const PERSON_POST_WEIGHT_MIN = -3;
+const PERSON_POST_WEIGHT_MAX = 3;
 
 /** 診斷用的 trace 每格最多記錄多少個候選人。 */
 const TRACE_CANDIDATE_LIMIT = 6;

@@ -122,6 +122,19 @@ function planPreQuarterPeopleHints_(input) {
 
   const notInNameList = usedIdList.filter(function (id) { return !peopleById[id]; }).length;
 
+  // 第二十六輪批次階段 D3：電郵格式睇落唔對。
+  //
+  // ⚠️ 呢個同「冇電郵」係兩件唔同嘅事：冇電郵嘅人，系統知道佢收唔到；
+  // **格式錯嘅人，系統以為佢收到**——寄出去會靜靜失敗，
+  // 而 SendLog 只會記一個技術錯誤，冇人會覺得有問題。
+  const badEmailPeople = usedIdList.filter(function (id) {
+    const p = peopleById[id];
+    const email = p ? String(p.email || '').trim() : '';
+    return email !== '' && !isPlausibleEmail_(email);
+  }).map(function (id) {
+    return { personId: id, nameTC: (peopleById[id] || {}).nameTC || id };
+  });
+
   const R = COLUMNS.ROLES;
   const expiredRoles = (input.roleRows || []).filter(function (row) {
     if (!isTrueValue_(row[R.ACTIVE])) return false;
@@ -137,6 +150,13 @@ function planPreQuarterPeopleHints_(input) {
 
   return [
     { id: 'noEmail', label: '表上有人沒有電郵，正式發出時會略過', count: noEmail },
+    {
+      id: 'badEmailFormat',
+      label: '有人的電郵格式看起來不對',
+      count: badEmailPeople.length,
+      // 逐個列出——只講數字嘅話，幹事要自己喺 89 個人入面搵。
+      people: badEmailPeople
+    },
     { id: 'notInNameList', label: '表上有名字不在人員名單', count: notInNameList },
     { id: 'expiredRole', label: '有人的堂委／執事身分已過期', count: expiredRoles },
     { id: 'thinEligibility', label: '有崗位的合資格人數少於 3 人', count: thinPosts }

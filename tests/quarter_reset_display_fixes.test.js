@@ -109,8 +109,15 @@ console.log('\n=== B3：正式碼 PDF 段落真係改用 versionNosToClear，唔
   const source = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'QuarterReset.gs'), 'utf8');
 
+  // 第二十六輪批次階段 B：迴圈由 `while + continue` 改成
+  // `listRosterPdfFilesForQuarter_().forEach + return`（要掃埋子資料夾）。
+  // 保留嘅意圖係「用同一個 versionNosToClear，唔自己再判斷一次」，
+  // 唔係「一定要用 continue」——所以斷言唔再鎖死跳出方式。
   check('★★★★★ PDF 篩選改用 versionNosToClear[versionNo]',
-    /if \(!versionNosToClear\[versionNo\]\) continue;/.test(source), source);
+    /if \(!versionNosToClear\[versionNo\]\) (continue|return);/.test(source), source);
+  check('★★★★★ 而且經共用入口掃檔（根資料夾＋季度/版本子資料夾都要計）'
+    + '——自己 getFiles() 就會漏掉子資料夾嗰批，重設之後舊 PDF 會留低',
+    /listRosterPdfFilesForQuarter_\(quarterId\)/.test(source));
 
   // versionNosToClear 喺 PDF 段落之前已經宣告過一次（版本篩選果度），
   // 呢個 regex 確保成個函式入面淨係得一句 `const versionNosToClear = {}`——
