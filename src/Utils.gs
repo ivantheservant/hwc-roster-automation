@@ -251,6 +251,17 @@ function displayCellValue_(value, fallback) {
   const fb = fallback === undefined ? '（空白）' : fallback;
   if (value === null || value === undefined) return fb;
   if (value === '') return fb;
+
+  // 第二十四輪批次階段 A3：boolean 一律顯示做 `TRUE`／`FALSE`（全大楷），
+  // **唔可以用 `String(false)` 出嚟嗰個細楷 `false`。**
+  //
+  // 理由：幹事喺試算表格入面睇到嘅係 `FALSE`（Google 試算表 checkbox／
+  // boolean 格就係噉顯示）。報告寫 `Active=false` 而格入面係 `FALSE`，
+  // 佢要停低諗一秒「係咪同一件事」——每一次微小嘅唔一致都係認知負擔，
+  // 而呢個系統嘅使用者係一個唔識電腦嘅幹事。
+  if (value === true) return BOOLEAN_TEXT.TRUE;
+  if (value === false) return BOOLEAN_TEXT.FALSE;
+
   return String(value);
 }
 

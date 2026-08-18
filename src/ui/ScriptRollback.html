@@ -1,0 +1,221 @@
+<script>
+  /* ============================================================
+   * 第二十四輪批次階段 E2：回到上一個版本（區四）
+   * ============================================================
+   *
+   * 對應 docs/幹事介面規格.md 第 5.3 節。
+   *
+   * ⚠️ 語意好容易被誤會：呢個動作**唔會刪任何版本**，
+   * 而係新增一個內容取自舊版本嘅新版本。畫面每一步都要講清楚。
+   */
+
+  function renderRollbackEntry() {
+    const box = make('div', { className: 'act act-on' });
+    box.appendChild(make('div', { className: 'act-main' }, [
+      make('div', { text: '回到上一個版本', className: 'act-name' }),
+      make('div', {
+        text: '把職事表的內容還原成之前某一版。舊版本一個都不會刪。',
+        className: 'act-desc'
+      })
+    ]));
+    box.appendChild(button('開始', openRollback, ''));
+    return box;
+  }
+
+  function openRollback() {
+    runAction('讀取版本清單', async () => {
+      const data = await callServer('apiListVersionsForRollback', currentQuarterId);
+      if (!data.versions || data.versions.length < 2) {
+        openModal('回到上一個版本', [
+          para('這一季只有一個版本，沒有可以回去的舊版本。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      renderRollbackPicker(data);
+    });
+  }
+
+  function renderRollbackPicker(data) {
+    const select = document.createElement('select');
+    data.versions.forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = String(v.versionNo);
+      // 規格 5.1：版本一律寫人話，永不淨寫 v2
+      opt.textContent = '第 ' + v.versionNo + ' 版　' + (v.createdAt || '')
+        + '　' + v.basisText + (v.isCurrent ? '（目前）' : '');
+      opt.disabled = v.isCurrent;   // 最新嗰個禁選
+      select.appendChild(opt);
+    });
+    // 預設選中 N-1
+    const defaultTarget = data.versions.filter((v) => !v.isCurrent)[0];
+    if (defaultTarget) select.value = String(defaultTarget.versionNo);
+
+    openModal('回到上一個版本', [
+      para('揀一個版本，系統會先給你看預覽，確認之後才寫入。'),
+      make('div', { className: 'prop-head' }, [make('span', { text: '回到' }), select]),
+      buildSheetsHistoryWarning('')
+    ], [
+      button('看預覽', () => {
+        const target = Number(select.value);
+        runAction('比對兩個版本', async () => {
+          const plan = await callServer('apiRollbackPlan', currentQuarterId, target);
+          if (plan.blocked) {
+            showErrorModal('回到上一個版本', new Error(plan.message));
+            return;
+          }
+          renderRollbackPreview(plan);
+        });
+      }, ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  /**
+   * 規格 5.3：**呢段字一定要出現喺畫面上，逐字照抄。**
+   * 幹事一定會問「點解唔用 Google 試算表本身嘅版本記錄」，
+   * 而佢自己去用嘅後果係災難性但唔明顯嘅。
+   * 文字由後端常數 `ROLLBACK_SHEETS_HISTORY_WARNING` 供應——
+   * 唔喺前端另抄一份，否則有人改咗一邊就會失去力度。
+   */
+  function buildSheetsHistoryWarning(text) {
+    const box = make('div', { className: 'warnbox' });
+    (text || '').split('\n').forEach((line) => {
+      if (line.trim()) box.appendChild(make('div', { text: line, className: 'err-text' }));
+    });
+    if (!text) {
+      box.appendChild(make('div', {
+        text: '（載入預覽時會顯示關於 Google 試算表版本記錄的重要提醒）',
+        className: 'muted'
+      }));
+    }
+    return box;
+  }
+
+  function renderRollbackPreview(plan) {
+    const nodes = [];
+
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('會改回 ' + plan.cellChangeCount + ' 格'),
+      make('div', {
+        text: '內容取自第 ' + plan.targetVersionNo + ' 版，會建立成第 '
+          + plan.newVersionNo + ' 版。',
+        className: 'muted'
+      })
+    ]));
+
+    if (plan.cellChangeCount === 0) {
+      nodes.push(make('div', {
+        text: '第 ' + plan.targetVersionNo + ' 版同目前這一版的內容完全一樣，'
+          + '回退不會改變任何一格。',
+        className: 'ok-line'
+      }));
+    } else {
+      const list = make('div', { className: 'sec' }, [sectionTitle('逐格對照：')]);
+      plan.cellChanges.forEach((c) => {
+        list.appendChild(make('div', {
+          text: c.serviceDate + '　' + c.postNameTC + '#' + c.slotIndex
+            + '　目前是「' + c.currentName + '」　會變回「' + c.willBecome + '」',
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(list);
+    }
+
+    // 目標版本要用**今日嘅規則**重新檢查——規則可能自嗰陣起改過
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('第 ' + plan.targetVersionNo + ' 版用今日的規則重新檢查'),
+      plan.violationCheckFailed
+        ? make('div', {
+          text: '⚠️ 這一次檢查不到（' + plan.violationCheckFailed
+            + '）。不是「沒有問題」，是「查不到」——請自己留意。',
+          className: 'err-text'
+        })
+        : renderViolations(plan.violations)
+    ]));
+
+    // 規格「與 Stage 的互動」
+    const stageNote = rollbackStageNote(plan);
+    if (stageNote) nodes.push(make('div', { className: 'warnbox' }, [
+      make('div', { text: stageNote, className: 'err-text' })
+    ]));
+
+    // 規格 5.3 步 4：確認畫面必須寫齊呢四句
+    nodes.push(make('div', { className: 'sec sec-summary' }, [
+      sectionTitle('確認之後會發生的事：'),
+      make('div', { text: '・會建立第 ' + plan.newVersionNo + ' 版，內容與第 '
+        + plan.targetVersionNo + ' 版相同。', className: 'vio-row' }),
+      make('div', { text: '・第 ' + plan.currentVersionNo
+        + ' 版不會被刪除，仍然可以查看和再回去。', className: 'vio-row' }),
+      make('div', { text: '・會重新發佈公開連結。', className: 'vio-row' }),
+      make('div', { text: '・不會寄出任何電郵、不會改變這一季的進度。', className: 'vio-row' })
+    ]));
+
+    nodes.push(buildSheetsHistoryWarning(plan.sheetsHistoryWarning));
+
+    openConfirm({
+      title: '回到第 ' + plan.targetVersionNo + ' 版',
+      bodyNodes: nodes,
+      requireTyping: true,
+      confirmLabel: '確定回退',
+      danger: true,
+      onConfirm: (typed) => runAction('回退中，請稍候', async () => {
+        const r = await callServer('apiRollbackExecute',
+          currentQuarterId, plan.targetVersionNo, typed);
+        renderRollbackResult(r);
+      })
+    });
+  }
+
+  /** 規格「與 Stage 的互動」表。`OFFICIAL_SENT` 嗰句最重要。 */
+  function rollbackStageNote(plan) {
+    if (plan.stage === 'OFFICIAL_SENT') {
+      return '⚠️ 這一季已經正式發出過了。義工手上那份 PDF 和信件是回退之前的內容。'
+        + '回退之後要撳「改動後重發」，受影響的人才會知道。'
+        + '這次回退會影響 ' + plan.outdatedPersonCount + ' 個人的安排。';
+    }
+    if (plan.stage === 'REVIEW_SENT' || plan.stage === 'REQUESTS_APPLIED') {
+      return '⚠️ 堂委已經收過連結。回退之後他們現在開連結，會看到回退後的內容。';
+    }
+    return '';
+  }
+
+  function renderRollbackResult(r) {
+    if (!r.ok) {
+      showErrorModal('回到上一個版本', new Error(r.message || '回退失敗。'));
+      return;
+    }
+
+    if (r.publishFailed) {
+      openModal('已回退，但公開連結未更新', [
+        make('div', {
+          text: '第 ' + r.newVersionNo + ' 版已經建立好了（內容取自第 '
+            + r.targetVersionNo + ' 版）。',
+          className: 'ok-line'
+        }),
+        make('div', { className: 'warnbox' }, [
+          make('div', { text: '但公開連結未能更新。', className: 'err-label' }),
+          make('div', {
+            text: '堂委現在開連結會看到回退之前的內容。沒有寄出任何電郵。'
+              + '請用試算表選單「準備工作 ▸ 發佈公開職事表」再試一次。',
+            className: 'err-text'
+          })
+        ]),
+        buildTechDetails(r.publishError || '')
+      ], [button('知道了', () => closeModalAndRefresh(), '')]);
+      return;
+    }
+
+    const lines = [
+      '已建立第 ' + r.newVersionNo + ' 版，內容取自第 ' + r.targetVersionNo + ' 版。',
+      '改回了 ' + r.cellChangeCount + ' 格。',
+      '第 ' + r.previousVersionNo + ' 版沒有被刪除，仍然可以查看和再回去。',
+      '公開連結已更新。這一季的進度沒有改變。'
+    ];
+    if (r.stage === 'OFFICIAL_SENT' && r.outdatedPersonCount > 0) {
+      lines.push('⚠️ 有 ' + r.outdatedPersonCount + ' 個人手上那份是舊的。'
+        + '記得撳「改動後重發」通知他們。');
+    }
+    openModal('回退完成', lines.map((t) => make('div', { text: t, className: 'ok-line' })),
+      [button('完成', () => closeModalAndRefresh(), '')]);
+  }
+</script>

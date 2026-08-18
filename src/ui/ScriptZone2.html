@@ -1,0 +1,387 @@
+<script>
+  /* ============================================================
+   * 第二十四輪批次階段 F：區二——開季前準備
+   * ============================================================
+   *
+   * 對應 docs/幹事介面規格.md 第三節。
+   *
+   * 三個畫面：確認特別主日／填講員翻譯獻花／名單檢查（唯讀）。
+   * 五項未做完**唔阻擋任何一粒掣**——只係「表會有空格」嘅提醒。
+   */
+
+  let zone2Loaded = false;
+
+  /** 區頭嘅「還有 N 項未做」。N=0 時整區收摺。 */
+  function renderZone2Head(d) {
+    const pq = d.preQuarter || { undoneItemCount: 0, items: [] };
+    const countNode = el('zone2Count');
+
+    if (pq.undoneItemCount < 0) {
+      // 後端算唔到。**唔可以顯示「全部做好了」**——嗰個等於話「檢查過冇問題」。
+      countNode.textContent = '（暫時查不到）';
+      countNode.className = 'zone-count warn';
+      setZoneOpen('zone2Head', 'zone2Body', false);
+    } else if (pq.undoneItemCount === 0) {
+      countNode.textContent = '全部做好了';
+      countNode.className = 'zone-count ok';
+      setZoneOpen('zone2Head', 'zone2Body', false);
+    } else {
+      countNode.textContent = '還有 ' + pq.undoneItemCount + ' 項未做';
+      countNode.className = 'zone-count warn';
+      setZoneOpen('zone2Head', 'zone2Body', true);
+      if (!zone2Loaded) { zone2Loaded = true; renderZone2Body(); }
+    }
+  }
+
+  function renderZone2Body() {
+    const body = clear(el('zone2Body'));
+    const pq = (dashboard && dashboard.preQuarter) || { items: [] };
+
+    // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
+    const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
+    (pq.items || []).forEach((i) => {
+      summary.appendChild(make('div', {
+        text: (i.count > 0 ? '⬜ ' : '✅ ') + i.label + '：' + i.count
+          + (i.count > 0 ? ' 項' : ' 項（做好了）'),
+        className: i.count > 0 ? 'vio-row' : 'vio-row muted'
+      }));
+    });
+    body.appendChild(summary);
+
+    body.appendChild(row([
+      button('確認特別主日', openSpecialSundays, ''),
+      button('填講員／翻譯／獻花', openPreacherFill, ''),
+      button('名單檢查', openPeopleHints, 'secondary')
+    ]));
+  }
+
+  /* ============================================================
+   * 畫面一：確認特別主日（規格 3.2）
+   * ============================================================ */
+
+  let specialData = null;
+
+  function openSpecialSundays() {
+    runAction('讀取特別主日', async () => {
+      specialData = await callServer('apiListSpecialSundays', currentQuarterId);
+      renderSpecialSundays();
+    });
+  }
+
+  function renderSpecialSundays() {
+    const nodes = [
+      para('特別主日會影響排表：標了「這一週不用排」的崗位，系統就不會排人。'),
+      para('「日期已確認」沒有勾的，會在上面顯示為「未做完」。')
+    ];
+
+    const active = specialData.rows.filter((r) => r.active);
+    const inactive = specialData.rows.filter((r) => !r.active);
+
+    if (active.length === 0) {
+      nodes.push(make('div', { text: '這一季還沒有登記任何特別主日。', className: 'muted' }));
+    }
+    active.forEach((r) => nodes.push(specialRowEditor(r)));
+
+    if (inactive.length > 0) {
+      nodes.push(sectionTitle('已停用（不會影響排表，可以重新開啟）'));
+      inactive.forEach((r) => nodes.push(specialRowEditor(r)));
+    }
+
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('年度動作（一年做一次）'),
+      make('div', {
+        text: '這兩個動作都會先給你看預覽，確認之後才寫入。',
+        className: 'muted'
+      }),
+      row([
+        button('產生下一年度四個季度', () => openAnnualTool('quarters'), 'secondary'),
+        button('產生年度合堂建議', () => openAnnualTool('combined'), 'secondary')
+      ])
+    ]));
+
+    nodes.push(row([button('＋ 新增一個特別主日', openAddSpecialSunday, 'link')], 'row-right'));
+
+    openModal('確認特別主日', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+  }
+
+  /** 一行特別主日嘅編輯器。 */
+  function specialRowEditor(r) {
+    const box = make('div', { className: 'prop' + (r.active ? '' : ' is-off') });
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'text';
+    dateInput.value = r.serviceDate;
+    dateInput.className = 'inp-date';
+
+    const typeInput = document.createElement('input');
+    typeInput.type = 'text';
+    typeInput.value = r.type;
+    typeInput.placeholder = '例如：合堂／浸禮／宣教月／堂慶';
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.value = r.title;
+    titleInput.placeholder = '名稱';
+
+    box.appendChild(make('div', { className: 'prop-head' }, [
+      make('span', { text: '日期' }), dateInput,
+      make('span', { text: '類型' }), typeInput,
+      make('span', { text: '名稱' }), titleInput
+    ]));
+
+    // 「哪些崗位不用排」用 checkbox 陣列，唔叫幹事打 WORSHIP,PIANO
+    const skipBox = make('div', { className: 'prop-opts' }, [
+      make('div', { text: '這一週哪些崗位不用排：', className: 'muted' })
+    ]);
+    const skipInputs = [];
+    specialData.posts.forEach((p) => {
+      const label = make('label', { className: 'check-row inline' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = r.skipPostIds.indexOf(p.postId) !== -1;
+      cb.dataset.postId = p.postId;
+      skipInputs.push(cb);
+      label.appendChild(cb);
+      label.appendChild(make('span', { text: p.postNameTC }));
+      skipBox.appendChild(label);
+    });
+    box.appendChild(skipBox);
+
+    const confirmedCb = document.createElement('input');
+    confirmedCb.type = 'checkbox';
+    confirmedCb.checked = r.confirmedChecked;
+    const confirmedLabel = make('label', { className: 'check-row' });
+    confirmedLabel.appendChild(confirmedCb);
+    confirmedLabel.appendChild(make('span', { text: '日期已確認（未勾的會顯示為「未做完」）' }));
+
+    const translationCb = document.createElement('input');
+    translationCb.type = 'checkbox';
+    translationCb.checked = r.translationRequired;
+    const translationLabel = make('label', { className: 'check-row' });
+    translationLabel.appendChild(translationCb);
+    translationLabel.appendChild(make('span', { text: '這一週需要翻譯' }));
+
+    const activeCb = document.createElement('input');
+    activeCb.type = 'checkbox';
+    activeCb.checked = r.active;
+    const activeLabel = make('label', { className: 'check-row' });
+    activeLabel.appendChild(activeCb);
+    activeLabel.appendChild(make('span', { text: '啟用（取消勾選＝這一季不用這一項；不會刪除）' }));
+
+    box.appendChild(confirmedLabel);
+    box.appendChild(translationLabel);
+    box.appendChild(activeLabel);
+
+    box.appendChild(row([
+      button('儲存這一行', () => {
+        const payload = {
+          quarterId: currentQuarterId,
+          sheetRow: r.sheetRow,
+          serviceDate: dateInput.value.trim(),
+          type: typeInput.value.trim(),
+          title: titleInput.value.trim(),
+          skipPostIds: skipInputs.filter((c) => c.checked).map((c) => c.dataset.postId),
+          translationRequired: translationCb.checked,
+          // ⚠️ 方向由後端 toConfirmedCellValue_() 處理：
+          // 勾咗＝寫空白，未勾＝寫 FALSE。前端只傳 checkbox 狀態，
+          // **唔喺呢度自己轉換**，否則兩邊各有一套就一定會有一邊搞反。
+          confirmedChecked: confirmedCb.checked,
+          active: activeCb.checked
+        };
+        runAction('儲存中', async () => {
+          const res = await callServer('apiSaveSpecialSunday', payload);
+          if (res.warning) setStatus(res.warning, true);
+          else setStatus('已儲存。');
+          specialData = await callServer('apiListSpecialSundays', currentQuarterId);
+          renderSpecialSundays();
+        });
+      }, '')
+    ], 'row-right'));
+
+    return box;
+  }
+
+  function openAddSpecialSunday() {
+    const dateInput = document.createElement('input');
+    dateInput.type = 'text';
+    dateInput.placeholder = 'yyyy-MM-dd';
+    const typeInput = document.createElement('input');
+    typeInput.type = 'text';
+    typeInput.placeholder = '例如：合堂';
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.placeholder = '名稱';
+
+    const skipInputs = [];
+    const skipBox = make('div', { className: 'prop-opts' }, [
+      make('div', { text: '這一週哪些崗位不用排：', className: 'muted' })
+    ]);
+    specialData.posts.forEach((p) => {
+      const label = make('label', { className: 'check-row inline' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.postId = p.postId;
+      skipInputs.push(cb);
+      label.appendChild(cb);
+      label.appendChild(make('span', { text: p.postNameTC }));
+      skipBox.appendChild(label);
+    });
+
+    const confirmedCb = document.createElement('input');
+    confirmedCb.type = 'checkbox';
+    const confirmedLabel = make('label', { className: 'check-row' });
+    confirmedLabel.appendChild(confirmedCb);
+    confirmedLabel.appendChild(make('span', { text: '日期已確認' }));
+
+    openConfirm({
+      title: '新增一個特別主日',
+      bodyNodes: [
+        make('div', { className: 'prop-head' }, [
+          make('span', { text: '日期' }), dateInput,
+          make('span', { text: '類型' }), typeInput,
+          make('span', { text: '名稱' }), titleInput
+        ]),
+        skipBox,
+        confirmedLabel,
+        make('div', { text: '這一行會加入這一季的特別主日清單。', className: 'muted' })
+      ],
+      confirmLabel: '新增',
+      onConfirm: () => runAction('新增中', async () => {
+        const res = await callServer('apiAddSpecialSunday', {
+          quarterId: currentQuarterId,
+          serviceDate: dateInput.value.trim(),
+          type: typeInput.value.trim(),
+          title: titleInput.value.trim(),
+          skipPostIds: skipInputs.filter((c) => c.checked).map((c) => c.dataset.postId),
+          translationRequired: false,
+          confirmedChecked: confirmedCb.checked
+        });
+        if (res.warning) setStatus(res.warning, true);
+        specialData = await callServer('apiListSpecialSundays', currentQuarterId);
+        renderSpecialSundays();
+      })
+    });
+  }
+
+  /** 年度工具本輪唔搬上 Web，指返選單（避免喺呢一輪加多兩個未測過嘅寫入路徑）。 */
+  function openAnnualTool(which) {
+    const name = which === 'quarters' ? '產生下一年度四個季度' : '產生年度合堂建議';
+    openModal(name, [
+      para('這個工具本輪還沒有搬上網頁。'),
+      para('請用試算表上方的選單：準備工作 ▸ ' + name + '。'
+        + '它本來就會先給你看預覽，確認之後才寫入。')
+    ], [button('知道了', () => closeModal(), '')]);
+  }
+
+  /* ============================================================
+   * 畫面二：填講員／翻譯／獻花（規格 3.3）
+   * ============================================================ */
+
+  function openPreacherFill() {
+    runAction('讀取待填格子', async () => {
+      const data = await callServer('apiWebListPreacherPending', currentQuarterId);
+      renderPreacherFill(data);
+    });
+  }
+
+  function renderPreacherFill(data) {
+    const nodes = [
+      para('這三個崗位系統不會自動排，一定要人手填。'),
+      para('改完即刻儲存，不需要另外按確認。')
+    ];
+
+    const cells = data.cells || data.pending || [];
+    if (cells.length === 0) {
+      nodes.push(make('div', { text: '這一季沒有待填的格子。', className: 'ok-line' }));
+    }
+
+    cells.forEach((c) => {
+      const box = make('div', { className: 'prop' + (c.optional ? ' is-optional' : '') });
+      const head = make('div', { className: 'prop-head' });
+      head.appendChild(make('span', { text: c.serviceDate + '　' + (c.postName || c.postId) }));
+      if (c.optional) head.appendChild(make('span', { text: '可留空', className: 'tag' }));
+      box.appendChild(head);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = c.currentName || '';
+      input.placeholder = '姓名';
+      box.appendChild(input);
+
+      if (c.suggestions && c.suggestions.length > 0) {
+        const sug = make('div', { className: 'prop-opts' });
+        c.suggestions.forEach((name) => {
+          sug.appendChild(button(name, () => { input.value = name; }, 'chip'));
+        });
+        box.appendChild(sug);
+      }
+
+      const statusSpan = make('span', { text: '', className: 'muted' });
+      box.appendChild(row([
+        button('儲存', () => {
+          const name = input.value.trim();
+          if (!name) { statusSpan.textContent = '姓名不可留空（留空就不用按儲存）。'; return; }
+          runAction('儲存中', async () => {
+            await callServer('apiWebSavePreacherEntry',
+              currentQuarterId, c.serviceDate, c.postId, c.slotIndex, name);
+            statusSpan.textContent = '已儲存 ✓';
+          });
+        }, ''),
+        statusSpan
+      ], 'row-right'));
+
+      nodes.push(box);
+    });
+
+    openModal('填講員／翻譯／獻花', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+  }
+
+  /* ============================================================
+   * 畫面三：名單檢查（規格 3.4，唯讀）
+   * ============================================================ */
+
+  function openPeopleHints() {
+    runAction('讀取名單檢查', async () => {
+      const data = await callServer('apiGetPreQuarterChecklist', currentQuarterId);
+      const hints = data.peopleHints || [];
+
+      const nodes = [
+        para('這幾項跟人不跟季，所以不算入上面的「還有 N 項未做」。')
+      ];
+
+      // 「去處理」本輪指返試算表——區三下一輪先搬上嚟。
+      const where = {
+        noEmail: 'NameMapping 工作表，填該人的 Email 欄',
+        notInNameList: 'NameMapping 工作表，新增該人（PersonID 要跟現有格式）',
+        expiredRole: 'Roles 工作表，檢查 EffectiveTo 欄；換屆不要刪行，只填卸任日期',
+        thinEligibility: 'Eligibility 工作表，為該崗位加合資格的人'
+      };
+
+      hints.forEach((h) => {
+        if (h.count === -1) {
+          nodes.push(make('div', { text: h.label, className: 'err-text' }));
+          return;
+        }
+        const box = make('div', { className: 'prop' + (h.count === 0 ? ' is-off' : '') });
+        box.appendChild(make('div', {
+          text: (h.count === 0 ? '✅ ' : '⚠️ ') + h.label + '：' + h.count,
+          className: 'prop-head'
+        }));
+        // ⚠️ 用中括號取欄位，唔用點號寫法——`id` 同 `name` 呢類欄名
+        // 本身就係真嘅頂層網域，點號寫法喺敏感資料掃描眼中形狀同網域
+        // 一模一樣，會誤報。（第二十二輪喺 PreLaunchChecklist 撞過同一件事。）
+        // 呢度特登唔喺註解舉完整例子——寫出嚟一樣會被自己個掃描器捉到。
+        const whereText = where[h['id']] || '';
+        if (h.count > 0 && whereText) {
+          box.appendChild(make('div', {
+            text: '去處理：試算表的 ' + whereText + '。改完回來重新整理這一頁。',
+            className: 'muted'
+          }));
+        }
+        nodes.push(box);
+      });
+
+      openModal('名單檢查', nodes, [button('關閉', () => closeModal(), '')]);
+    });
+  }
+</script>

@@ -40,6 +40,50 @@ function endSheetReadMemo_() {
 }
 
 /**
+ * 第二十四輪批次階段 A1：由快取攞資料嗰陣**回傳淺複本**，唔回傳快取本身。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要複本，同埋點解揀複本而唔揀 Object.freeze()
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 冇複本嘅話，快取存嘅係陣列 reference。快取開啟期間如果有人 mutate 咗
+ * 攞返嚟嘅陣列或者入面嘅 row（`.sort()`／`.push()`／改 property），
+ * 同一次呼叫之後再讀同一張表就會攞到**被改過嘅資料**。
+ *
+ * 逐個 `readSheet()` 呼叫點掃描過（第二十四輪階段 A1）：
+ * - 全部 `record[C.X] = …` 嘅賦值都係喺**新建嘅 `{}`** 上面，唔係 readSheet 出嚟嘅 row
+ * - 四處 `.sort()` 全部喺 `.filter()`／`.map()` **之後**先排（嗰啲已經係新陣列）
+ *
+ * 所以**目前冇任何一處會 mutate**——呢個係將來風險，唔係現有 bug。
+ *
+ * **點解揀淺複本，唔揀 `Object.freeze()`：**
+ *
+ * | 做法 | 有人 mutate 時會點 |
+ * |---|---|
+ * | `Object.freeze()` | 非嚴格模式下**靜靜失敗**——改動消失，程式繼續行落去 |
+ * | 淺複本（採用）| 改動只影響呼叫者自己嗰份，快取保持乾淨 |
+ *
+ * ⚠️ **靜靜失敗正正就係本專案已經燒過幾次嘅 bug class。** 但更決定性嘅
+ * 理由係**語意一致**：冇快取嗰陣，每次 `readSheet()` 都回傳全新物件。
+ * 淺複本令**有快取同冇快取嘅行為完全一樣**；freeze 就會令兩者唔同
+ * ——而且個分別只會喺「有開快取」嗰條路徑先浮現，即係
+ * **測試全綠、偏偏就係實際會行嗰條路出事**。
+ *
+ * 成本：每次快取命中複製 N 個物件。相對於一次 `getValues()` 來回，
+ * 呢個成本可以忽略。
+ *
+ * @param {Object[]} rows 快取入面嘅資料
+ * @returns {Object[]} 淺複本（外層陣列同每一行都係新物件）
+ */
+function cloneMemoRows_(rows) {
+  return rows.map(function (row) {
+    const copy = {};
+    Object.keys(row).forEach(function (k) { copy[k] = row[k]; });
+    return copy;
+  });
+}
+
+/**
  * 通用讀表函式：第 1 行視為說明列自動跳過，第 2 行視為標題列，
  * 從第 3 行起讀取資料，回傳以標題為屬性名稱的物件陣列。
  * @param {string} sheetName 工作表名稱
@@ -47,7 +91,7 @@ function endSheetReadMemo_() {
  */
 function readSheet(sheetName) {
   if (SHEET_READ_MEMO_ && Object.prototype.hasOwnProperty.call(SHEET_READ_MEMO_, sheetName)) {
-    return SHEET_READ_MEMO_[sheetName];
+    return cloneMemoRows_(SHEET_READ_MEMO_[sheetName]);
   }
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);

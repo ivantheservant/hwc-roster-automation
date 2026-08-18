@@ -42,17 +42,18 @@ function checkEqual(label, actual, expected) {
 
 console.log('\n=== B1【核心】displayCellValue_：boolean false／數字 0 唔可以同「冇值」混埋 ===');
 {
-  checkEqual('★★★★★ boolean false ⇒ 顯示 "false"，唔係空字串'
-    + '（實測撞到：Eligibility.Active=FALSE 畫面印出「Active=」，睇落好似冇值）',
-    gas.displayCellValue_(false), 'false');
+  checkEqual('★★★★★ boolean false ⇒ 顯示 "FALSE"，唔係空字串'
+    + '（實測撞到：Eligibility.Active=FALSE 畫面印出「Active=」，睇落好似冇值）'
+    + '。第二十四輪再改成全大楷，同幹事喺試算表格入面睇到嘅一致',
+    gas.displayCellValue_(false), 'FALSE');
   checkEqual('★★★★ 數字 0 ⇒ 顯示 "0"，唔係空字串（同一個 bug class：0 都係有意義嘅假值）',
     gas.displayCellValue_(0), '0');
   checkEqual('★★★★★ 空字串 ⇒ 用 fallback（呢個先係真係「冇值」）',
     gas.displayCellValue_(''), '（空白）');
   checkEqual('★★★★ null ⇒ 用 fallback', gas.displayCellValue_(null), '（空白）');
   checkEqual('★★★ undefined ⇒ 用 fallback', gas.displayCellValue_(undefined), '（空白）');
-  checkEqual('★★★ boolean true ⇒ 顯示 "true"（反向：唔可以因為修 false 而搞埋 true）',
-    gas.displayCellValue_(true), 'true');
+  checkEqual('★★★ boolean true ⇒ 顯示 "TRUE"（反向：唔可以因為修 false 而搞埋 true）',
+    gas.displayCellValue_(true), 'TRUE');
   checkEqual('★★★ 自訂 fallback 文字', gas.displayCellValue_(null, '（未設定）'), '（未設定）');
   checkEqual('★★ 非空字串照原樣顯示', gas.displayCellValue_('COMMITTEE'), 'COMMITTEE');
 }

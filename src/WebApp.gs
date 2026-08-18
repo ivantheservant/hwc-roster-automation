@@ -171,6 +171,10 @@ function apiListQuarters() {
     const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
     return {
       quarterId: quarterId,
+      // 第二十四輪批次階段 B3（規格 1.1）：季度下拉一律寫人話
+      // （`2026年10-12月`），**唔可以寫 `2026T4`**——`T4` 對幹事嚟講
+      // 冇任何意義，佢腦入面嗰個概念係「十月至十二月嗰季」。
+      label: buildQuarterLabel_(quarterId),
       status: row[COLUMNS.QUARTERS.STATUS],
       startDate: toDateString(row[COLUMNS.QUARTERS.START_DATE], timezone),
       endDate: toDateString(row[COLUMNS.QUARTERS.END_DATE], timezone),

@@ -92,5 +92,70 @@ console.log('\n=== 順帶：ui/*.html 入面嘅 <script> 唔喺呢個測試範�
     fs.existsSync(uiDir));
 }
 
+console.log('\n=== 第二十四輪新增紅線：`<?= JSON.stringify(…) ?>` 一定唔可以出現 ===');
+{
+  // ─────────────────────────────────────────────────────────────
+  // 點解呢個要用測試鎖死
+  // ─────────────────────────────────────────────────────────────
+  //
+  // HtmlService 有兩個輸出標籤：
+  //   `<?= x ?>`   會做 HTML 轉義
+  //   `<?!= x ?>`  原樣輸出
+  //
+  // `JSON.stringify('2026T4')` 出嚟係 `"2026T4"`（帶雙引號）。
+  // 用會轉義嗰個標籤，雙引號會變成 `&quot;`，於是
+  //     var QUARTER_ID = &quot;2026T4&quot;;
+  // ——**JS 語法錯誤，成個 script 區塊唔會執行，畫面直接死。**
+  //
+  // 呢個係第十九輪喺 PreacherFillSidebar.html 真實撞到嘅 bug，
+  // 而且**離線完全睇唔到**（樣板要 Google 嘅引擎先跑得到），
+  // 要喺瀏覽器開一次先知。所以用測試鎖死呢條紅線。
+  const uiDir = path.join(SRC_DIR, 'ui');
+  const htmlFiles = fs.existsSync(uiDir)
+    ? fs.readdirSync(uiDir).filter(function (f) { return f.endsWith('.html'); })
+    : [];
+
+  check('★★★ 搵到一批 ui/*.html（防止路徑寫錯令測試變成空跑）',
+    htmlFiles.length >= 3, '只搵到 ' + htmlFiles.length + ' 個');
+
+  // ⚠️ 一定要先剝走註解先掃。呢幾個檔案嘅註解**特登**寫住
+  // 「唔可以用 `<?= JSON.stringify(x) ?>`」做反面教材——
+  // 唔剝註解就會捉住自己嘅警告，而真正嘅修法會變成「刪走個警告」，
+  // 恰恰相反。
+  const stripComments = function (text) {
+    return text
+      .replace(/<!--[\s\S]*?-->/g, '')          // HTML 註解
+      .replace(/\/\*[\s\S]*?\*\//g, '')         // JS 區塊註解
+      .split('\n')
+      .map(function (l) { return l.replace(/\/\/.*$/, ''); })   // JS 行註解
+      .join('\n');
+  };
+
+  const offenders = [];
+  htmlFiles.forEach(function (f) {
+    const lines = stripComments(fs.readFileSync(path.join(uiDir, f), 'utf8')).split('\n');
+    lines.forEach(function (line, i) {
+      // 只捉會轉義嗰個標籤（`<?=`），唔捉 `<?!=`。
+      // `<?!=` 入面嘅 `!` 喺 `?` 之後，所以 `<\?=` 本身已經分得開。
+      if (/<\?=\s*[^?]*JSON\.stringify/.test(line)) {
+        offenders.push(f + ':' + (i + 1) + '　' + line.trim().slice(0, 90));
+      }
+    });
+  });
+
+  check('★★★★★ 冇任何一處用會轉義嘅 `<?=` 配 JSON.stringify'
+    + '——會令注入嘅字串變成 &quot;…&quot;，成個 script 區塊語法錯誤而唔執行。'
+    + '要注入資料一律用 `<?!= ?>`，或者索性改由 google.script.run 攞',
+    offenders.length === 0, offenders.join('\n      '));
+
+  // 正向驗證：規則真係捉得到，唔係寫壞咗永遠 0 項。
+  const probeBad = 'var X = <?= JSON.stringify(quarterId) ?>;';
+  const probeGood = 'var X = <?!= JSON.stringify(quarterId) ?>;';
+  check('★★★★★ 正向樣本：壞寫法一定捉得到',
+    /<\?=\s*[^?]*JSON\.stringify/.test(probeBad));
+  check('★★★★★ 反向樣本：正確嘅 `<?!=` 唔會被誤報',
+    !/<\?=\s*[^?]*JSON\.stringify/.test(probeGood));
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

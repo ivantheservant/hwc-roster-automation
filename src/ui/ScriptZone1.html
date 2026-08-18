@@ -1,0 +1,788 @@
+<script>
+  /* ============================================================
+   * 第二十四輪批次階段 C／D：區一——日常四個掣
+   * ============================================================
+   *
+   * 對應 docs/幹事介面規格.md 第二節。
+   *
+   * 一條總原則（規格 1.7）：
+   *   **掣 1 係唯一會改動職事表內容嘅掣。掣 2／3／4 只寄信，永不改內容。**
+   */
+
+  /** 規格 2.2：四粒掣嘅名。 */
+  const ZONE1_BUTTONS = [
+    { key: 'save', name: '儲存並確認', label: '開始', danger: false },
+    { key: 'review', name: '寄給堂委審閱', label: '寄出', danger: false },
+    { key: 'official', name: '正式發出給全體', label: '發出', danger: true },
+    { key: 'resend', name: '改動後重發', label: '重發', danger: true }
+  ];
+
+  function renderZone1(d) {
+    const body = clear(el('zone1Body'));
+    const handlers = {
+      save: openSaveAndConfirm,
+      review: openReview,
+      official: openOfficial,
+      resend: openResend
+    };
+    ZONE1_BUTTONS.forEach((b) => {
+      const state = (d.buttons && d.buttons[b.key]) || {};
+      body.appendChild(bigButton({
+        buttonName: b.name,
+        dynamicText: state.dynamicText,
+        disabledReason: state.disabledReason,
+        enabled: !!state.enabled,
+        buttonLabel: b.label,
+        danger: b.danger,
+        onClick: handlers[b.key]
+      }));
+    });
+  }
+
+  /* ============================================================
+   * 掣 1：儲存並確認（規格 2.4）
+   * ============================================================ */
+
+  /** 掣 1 嘅暫存狀態：由 plan 攞返嚟，逐格決定存喺呢度。 */
+  let savePlan = null;
+  let saveDecisions = {};
+
+  function openSaveAndConfirm() {
+    runAction('讀取改動', async () => {
+      savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
+      saveDecisions = {};
+
+      if (savePlan.blocked) return renderSaveBlocked(savePlan);
+      if (savePlan.zeroChange) return renderSaveZeroChange(savePlan);
+      renderSaveMain(savePlan);
+    });
+  }
+
+  /* ── C1：三種阻擋 ────────────────────────────────────────── */
+
+  function renderSaveBlocked(plan) {
+    // 認唔出姓名：**只顯示呢一件事，唔顯示之後任何嘢。**
+    // 唔提供「略過繼續」——認唔出就係認唔出，猜就係 bug 嘅溫床。
+    if (plan.blockReason === 'UNRESOLVED_NAMES') {
+      const nodes = [
+        make('div', {
+          text: '有 ' + plan.unresolved.length + ' 格的文字，系統認不出是誰。',
+          className: 'err-label'
+        }),
+        para('在處理好這幾格之前，不會儲存任何東西，也不會建立新版本。'
+          + '職事表現在完全沒有被改動。')
+      ];
+
+      const list = make('div', { className: 'sec' }, [sectionTitle('是這幾格：')]);
+      plan.unresolved.forEach((u) => {
+        list.appendChild(make('div', {
+          text: u.serviceDate + '　' + (u.postNameTC || '') + '#' + u.slotIndex
+            + '　你打了：「' + (u.rawText || '（空白）') + '」',
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(list);
+
+      const how = make('div', { className: 'sec' }, [sectionTitle('每一格可以這樣處理：')]);
+      const ul = make('ul', { className: 'err-list' });
+      ul.appendChild(make('li', { text: '如果打錯字，回到職事表把那一格改回正確的名字' }));
+      ul.appendChild(make('li', { text: '如果是同一個人的另一種寫法，去「名單維護 ▸ 人員與電郵 ▸ 別名」加別名（下一輪才搬上來，暫時請用試算表的 NameAlias 工作表）' }));
+      ul.appendChild(make('li', { text: '如果是新人，去試算表的 NameMapping 工作表新增' }));
+      how.appendChild(ul);
+      nodes.push(how);
+
+      openModal('儲存並確認：有名字認不出', nodes, [
+        button('知道了，我去改', () => closeModal(), '')
+      ]);
+      return;
+    }
+
+    // NO_VERSION／GRID_SHEET_MISSING：後端已經俾咗三段式訊息。
+    showErrorModal('儲存並確認', new Error(plan.message || plan.blockReason));
+  }
+
+  /* ── D4／零改動兩種路徑 ─────────────────────────────────── */
+
+  function renderSaveZeroChange(plan) {
+    if (plan.zeroChangeAction === 'ADVANCE_STAGE_ONLY') {
+      openConfirm({
+        title: '儲存並確認：堂委沒有提出改動',
+        bodyNodes: [
+          para('堂委沒有提出改動。撳下去就當作意見已收齊，'
+            + '「正式發出給全體」會亮起。職事表內容不會改變。'),
+          make('div', { className: 'sec' }, [
+            sectionTitle('會做的事：'),
+            make('div', { text: '・把這一季的進度推前到「意見已收齊」', className: 'vio-row' }),
+            make('div', { text: '・重新發佈公開連結（連結地址不變）', className: 'vio-row' }),
+            sectionTitle('不會做的事：'),
+            make('div', { text: '・不會建立新版本', className: 'vio-row' }),
+            make('div', { text: '・不會改動職事表任何一格', className: 'vio-row' }),
+            make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
+          ])
+        ],
+        confirmLabel: '確定，意見已收齊',
+        onConfirm: () => executeSaveAndConfirm('')
+      });
+      return;
+    }
+
+    openModal('儲存並確認', [
+      para('沒有偵測到任何改動，不需要儲存。'
+        + (plan.stage === 'REQUESTS_APPLIED' ? '可以撳「正式發出給全體」了。' : '')
+        + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : ''))
+    ], [button('知道了', () => closeModal(), '')]);
+  }
+
+  /* ── C2：正常流程（一個彈窗，由上而下五節）────────────────── */
+
+  function renderSaveMain(plan) {
+    const nodes = [];
+
+    // 1　待處理申報
+    if (plan.requests.apply.length > 0) {
+      nodes.push(listSection('會自動套用的修改申報（' + plan.requests.apply.length + ' 筆）',
+        plan.requests.apply, requestRow));
+    }
+    if (plan.requests.confirm.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('需要你逐筆確認（' + plan.requests.confirm.length + ' 筆）'),
+        make('div', {
+          text: '這幾位以前未做過該崗位。勾了才會套用；不勾就會記為「已拒絕」。',
+          className: 'muted'
+        })
+      ]);
+      plan.requests.confirm.forEach((r) => {
+        const line = make('label', { className: 'check-row' });
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.sheetRow = String(r.sheetRow);
+        cb.className = 'req-confirm';
+        line.appendChild(cb);
+        line.appendChild(make('span', {
+          text: r.serviceDateText + '　' + r.postNameText + '　' + r.personNameText
+            + (r.reason ? '（' + r.reason + '）' : '')
+        }));
+        box.appendChild(line);
+      });
+      nodes.push(box);
+    }
+    if (plan.requests.needsInput.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('系統看不懂的申報（' + plan.requests.needsInput.length + ' 筆）'),
+        make('div', {
+          text: '這幾筆會原封不動留在申報表，你可以之後自己處理。不會阻擋這次儲存。',
+          className: 'muted'
+        })
+      ]);
+      plan.requests.needsInput.forEach((r) => box.appendChild(requestRow(r)));
+      nodes.push(box);
+    }
+
+    // 2　重疊格（grid 贏）
+    if (plan.overlaps && plan.overlaps.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('以下 ' + plan.overlaps.length + ' 格你在表上改過，同時亦有修改申報'),
+        make('div', { text: '系統會以你表上的為準：', className: 'muted' })
+      ]);
+      plan.overlaps.forEach((o) => {
+        box.appendChild(make('div', {
+          text: o.serviceDate + '　' + o.postNameTC + '#' + o.slotIndex
+            + '　申報想改成「' + (o.requestWants || '（空白）') + '」'
+            + '　你表上是「' + o.gridHas + '」',
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    // 3　規則檢查
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('規則檢查'),
+      renderViolations(plan.violations)
+    ]));
+
+    // 4　三欄對照
+    if (plan.proposals && plan.proposals.length > 0) {
+      nodes.push(renderProposalTable(plan.proposals));
+    }
+
+    // 5　確認畫面（規格步 1.7）
+    nodes.push(buildSaveSummary(plan));
+
+    const bodyNodes = nodes;
+    if (plan.needsRelease) {
+      openConfirm({
+        title: '儲存成第 ' + plan.targetVersionNo + ' 版',
+        bodyNodes: bodyNodes,
+        requireTyping: true,
+        typingHint: '上面有 ' + plan.violations.real.length
+          + ' 格違反了一定要遵守的規則。如果這是正確的（例如名單還未更新），'
+          + '請在下面輸入「' + CONFIRM_PHRASE + '」放行。'
+          + '放行之後這幾格會照樣儲存，並記入紀錄。',
+        confirmLabel: '放行並儲存',
+        danger: true,
+        onConfirm: (typed) => executeSaveAndConfirm(typed)
+      });
+    } else {
+      openConfirm({
+        title: '儲存成第 ' + plan.targetVersionNo + ' 版',
+        bodyNodes: bodyNodes,
+        confirmLabel: '確定儲存',
+        onConfirm: () => executeSaveAndConfirm('')
+      });
+    }
+  }
+
+  function requestRow(r) {
+    return make('div', {
+      text: r.serviceDateText + '　' + r.postNameText + '　' + r.personNameText
+        + (r.reason ? '：' + r.reason : ''),
+      className: 'vio-row'
+    });
+  }
+
+  /**
+   * 規格步 1.6：三欄對照。**預設一定係「用我改的」**——
+   * 幹事嘅決定係最新真相，系統唔應該替佢揀。
+   */
+  function renderProposalTable(proposals) {
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle('這幾格要怎樣處理（' + proposals.length + ' 格）')
+    ]);
+
+    box.appendChild(row([
+      button('全部用我改的', () => {
+        proposals.forEach((p) => {
+          const key = proposalKey(p);
+          saveDecisions[key] = 'MANUAL';
+          const radio = document.querySelector('input[name="' + cssEscape(key) + '"][value="MANUAL"]');
+          if (radio) radio.checked = true;
+        });
+      }, 'link')
+    ], 'row-right'));
+
+    proposals.forEach((p) => {
+      const key = proposalKey(p);
+      saveDecisions[key] = 'MANUAL';   // 預設
+
+      const line = make('div', { className: 'prop' });
+      line.appendChild(make('div', {
+        text: p.serviceDate + '　' + p.postNameTC + '#' + p.slotIndex
+          + (p.reason ? '　（' + p.reason + '）' : ''),
+        className: 'prop-head'
+      }));
+
+      const opts = make('div', { className: 'prop-opts' });
+      opts.appendChild(radioOption(key, 'MANUAL', '用我改的：' + (p.manual || '（空白）'), true, false));
+      if (p.suggested) {
+        opts.appendChild(radioOption(key, 'SUGGESTED', '用系統建議：' + p.suggested, false, false));
+      }
+      // 原本係空白就唔可以「改回原本」——applyDecisions() 本身有呢道保護，
+      // 前端要同步變灰並寫明原因，唔好俾人撳完先發現唔得。
+      opts.appendChild(radioOption(
+        key, 'ORIGINAL',
+        p.canRevertToOriginal
+          ? ('改回原本：' + p.original)
+          : '改回原本（原本這一格是空白，不能改回）',
+        false, !p.canRevertToOriginal));
+      line.appendChild(opts);
+      box.appendChild(line);
+    });
+    return box;
+  }
+
+  function proposalKey(p) { return p.serviceDate + '|' + p.postId + '|' + p.slotIndex; }
+
+  /** name 屬性會入 CSS selector，簡單轉義一下。 */
+  function cssEscape(s) { return s.replace(/[|]/g, '\\|'); }
+
+  function radioOption(name, value, labelText, checked, disabled) {
+    const label = make('label', { className: 'radio-row' + (disabled ? ' is-off' : '') });
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = name;
+    input.value = value;
+    input.checked = !!checked;
+    input.disabled = !!disabled;
+    input.addEventListener('change', () => { if (input.checked) saveDecisions[name] = value; });
+    label.appendChild(input);
+    label.appendChild(make('span', { text: labelText }));
+    return label;
+  }
+
+  /** 規格步 1.7：「會做的事」同「不會做的事」兩節都要有。 */
+  function buildSaveSummary(plan) {
+    const box = make('div', { className: 'sec sec-summary' }, [sectionTitle('這一次會做的事：')]);
+    const willDo = [];
+    if (plan.gridChanges.length > 0) willDo.push('套用你在表上改的 ' + plan.gridChanges.length + ' 格');
+    if (plan.requests.apply.length > 0) willDo.push('套用 ' + plan.requests.apply.length + ' 筆修改申報');
+    if (plan.requests.confirm.length > 0) willDo.push('你剛才勾選確認的申報會一併套用');
+    if (plan.requests.needsInput.length > 0) {
+      willDo.push(plan.requests.needsInput.length + ' 筆申報系統看不懂，會留在申報表不動');
+    }
+    if (plan.needsRelease) willDo.push('放行 ' + plan.violations.real.length + ' 項規則違反（你需要打字確認）');
+    willDo.push('儲存成第 ' + plan.targetVersionNo + ' 版。第 ' + plan.baseVersionNo
+      + ' 版原封不動保留，可以對照');
+    if (plan.stage === 'REVIEW_SENT') willDo.push('把這一季的進度推前到「意見已收齊」');
+    willDo.push('重新發佈公開連結（連結地址不變）');
+    willDo.forEach((t) => box.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
+
+    box.appendChild(sectionTitle('不會做的事：'));
+    ['不會寄出任何電郵', '不會產生任何 PDF'].forEach((t) => {
+      box.appendChild(make('div', { text: '・' + t, className: 'vio-row' }));
+    });
+    return box;
+  }
+
+  /* ── C3：執行 ＋ 三種結果 ────────────────────────────────── */
+
+  function executeSaveAndConfirm(releaseText) {
+    const confirmedRequestRows = Array.prototype.slice
+      .call(document.querySelectorAll('input.req-confirm'))
+      .filter((cb) => cb.checked)
+      .map((cb) => Number(cb.dataset.sheetRow));
+
+    const decisions = Object.keys(saveDecisions).map((key) => {
+      const parts = key.split('|');
+      return {
+        serviceDate: parts[0], postId: parts[1], slotIndex: Number(parts[2]),
+        choice: saveDecisions[key]
+      };
+    });
+
+    runAction('儲存中，請稍候', async () => {
+      const result = await callServer('apiSaveAndConfirmExecute', currentQuarterId, {
+        decisions: decisions,
+        confirmedRequestRows: confirmedRequestRows,
+        releaseText: releaseText
+      });
+      renderSaveResult(result);
+    });
+  }
+
+  function renderSaveResult(result) {
+    // ── 完全失敗（後端回 ok:false，唔係拋錯）────────────────
+    if (!result.ok) {
+      showErrorModal('儲存並確認', new Error(result.message || '儲存失敗。'));
+      return;
+    }
+
+    // ── 零改動路徑 ─────────────────────────────────────────
+    if (result.zeroChange) {
+      openModal('儲存並確認', [
+        make('div', { text: result.message, className: 'ok-line' })
+      ], [button('完成', () => closeModalAndRefresh(), '')]);
+      return;
+    }
+
+    // ── 版本成功但發佈失敗：**黃色，唔係紅色** ───────────────
+    // 版本真係儲存咗。當成失敗會令幹事以為要重做，就會建立第二個
+    // 內容一樣嘅版本。
+    if (result.publishFailed) {
+      const parsed = parseThreePartMessage(result.message || '');
+      const nodes = [
+        make('div', {
+          text: '第 ' + result.versionNo + ' 版已經儲存好了。',
+          className: 'ok-line'
+        }),
+        make('div', { className: 'warnbox' }, [
+          make('div', { text: '但公開連結未能更新。', className: 'err-label' }),
+          make('div', {
+            text: parsed ? parsed.state
+              : '堂委現在開連結會看到舊內容。沒有寄出任何電郵。',
+            className: 'err-text'
+          }),
+          make('div', {
+            text: '請去試算表選單「準備工作 ▸ 發佈公開職事表」再試一次。'
+              + '在成功之前，先不要撳「寄給堂委審閱」，否則他們會看到舊版本。',
+            className: 'err-text'
+          })
+        ]),
+        buildTechDetails(result.publishError || '')
+      ];
+      openModal('已儲存，但公開連結未更新', nodes, [
+        button('知道了', () => closeModalAndRefresh(), '')
+      ]);
+      return;
+    }
+
+    // ── 完全成功 ───────────────────────────────────────────
+    const lines = ['已儲存成第 ' + result.versionNo + ' 版，公開連結已更新。'];
+    if (result.cellCount > 0) lines.push('套用了 ' + result.cellCount + ' 格改動。');
+    if (result.appliedRequestCount > 0) lines.push('套用了 ' + result.appliedRequestCount + ' 筆修改申報。');
+    if (result.needsInputCount > 0) {
+      lines.push(result.needsInputCount + ' 筆系統看不懂的申報留在申報表，沒有動過。');
+    }
+    if (result.stageAdvanced) lines.push('「正式發出給全體」現在可以撳了。');
+    lines.push('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。');
+
+    openModal('儲存完成', lines.map((t) => make('div', { text: t, className: 'ok-line' })),
+      [button('完成', () => closeModalAndRefresh(), '')]);
+  }
+
+  /* ============================================================
+   * 掣 2：寄給堂委審閱（規格 2.5）
+   * ============================================================ */
+
+  function openReview() {
+    runAction('讀取確認資料', async () => {
+      const preview = await callServer('apiStep2Preview', currentQuarterId);
+
+      // 收件人 0 ⇒ **拒絕執行**，唔係警告。
+      // 寄一封冇人收到嘅信，畫面仲會顯示「已寄出」——比唔寄更差。
+      if (preview.recipientCount === 0) {
+        openModal('寄給堂委審閱：沒有收件人', [
+          errorPart('發生了什麼', '現時沒有登記任何堂委電郵。'),
+          errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
+          make('div', { className: 'err-part' }, [
+            make('div', { text: '你可以怎樣做', className: 'err-label' }),
+            make('div', {
+              text: '去試算表的 EmailRecipients 工作表，加入堂委的電郵，'
+                + 'Role 欄填 REVIEWER，Active 欄填 TRUE。加好之後重新整理這一頁。',
+              className: 'err-text'
+            })
+          ])
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+
+      const nodes = [
+        make('div', { className: 'sec' }, [
+          sectionTitle('會寄給這 ' + preview.recipientCount + ' 位'),
+          make('div', {
+            text: '他們會收到一條唯讀連結，可以看到目前第 ' + preview.versionNo + ' 版的職事表。',
+            className: 'muted'
+          })
+        ])
+      ];
+
+      if (preview.alreadySentCount > 0) {
+        nodes.push(make('div', { className: 'warnbox' }, [
+          make('div', {
+            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'
+              + '很可能是上次寄到一半中斷了。',
+            className: 'err-text'
+          }),
+          make('div', {
+            text: '如果只想補寄未收到的人，請取消，改用試算表選單'
+              + '「四階段流程 ▸ 補寄未收到的人」。',
+            className: 'err-text'
+          })
+        ]));
+      }
+
+      const last = dashboard.buttons.review.lastSentAt;
+      if (last) {
+        nodes.push(para('上次在 ' + last + ' 寄過，會再寄一次給同一批人。'));
+      }
+      if (dashboard.isDryRun) {
+        nodes.push(make('div', {
+          text: '測試模式：不會真的寄出，只會記錄一次。',
+          className: 'badge badge-dryrun inline'
+        }));
+      }
+
+      // 規格 2.5：可重複、可逆、對象只有堂委 ⇒ 唔需要打字確認。
+      openConfirm({
+        title: '寄給堂委審閱',
+        bodyNodes: nodes,
+        confirmLabel: '確定寄出',
+        onConfirm: () => runAction('寄送中，請稍候', async () => {
+          const r = await callServer('apiStep2Confirm', currentQuarterId);
+          renderReviewDone(r);
+        })
+      });
+    });
+  }
+
+  function renderReviewDone(r) {
+    const lines = [
+      r.isDryRun ? '測試模式：沒有真的寄出任何電郵，只記錄了一次。' : '已經寄出。',
+      '寄出 ' + r.sent + ' 封　模擬 ' + r.dryRun + ' 封　查無電郵略過 ' + r.skipped + ' 位',
+      '這一季的進度現在是「已寄給堂委，等他們的意見」。'
+    ];
+    const nodes = lines.map((t) => make('div', { text: t, className: 'ok-line' }));
+
+    // 規格 2.5 最後一段：區二未做完 >0 就提一提。
+    const undone = dashboard.preQuarter && dashboard.preQuarter.undoneItemCount;
+    if (undone > 0) {
+      const bits = (dashboard.preQuarter.items || [])
+        .filter((i) => i.count > 0)
+        .map((i) => i.label + ' ' + i.count);
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '提提你：開季前準備還有 ' + undone + ' 項未做（' + bits.join('、') + '）。'
+            + '堂委看到的表會有空格。',
+          className: 'err-text'
+        })
+      ]));
+    }
+    openModal('寄給堂委審閱：完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
+  }
+
+  /* ============================================================
+   * 掣 3：正式發出給全體（規格 2.6）
+   * ============================================================ */
+
+  function openOfficial() {
+    runAction('讀取確認資料', async () => {
+      const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
+      const versionNo = warnings.versionNo;
+      const missing = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);
+
+      // 個人 PDF 缺件超過上限 ⇒ 保留現有阻擋（第十九輪嘅關卡）。
+      if (missing.blocked) {
+        openModal('正式發出：已中止', [
+          errorPart('發生了什麼',
+            '有 ' + missing.missingTotal + ' / ' + missing.total + ' 人還沒有個人 PDF，'
+            + '超過了容許的缺件上限。'),
+          errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
+          make('div', { className: 'err-part' }, [
+            make('div', { text: '你可以怎樣做', className: 'err-label' }),
+            make('div', {
+              text: '先去試算表選單「準備工作 ▸ 產生個人 PDF」，把缺的補齊，再回來撳這一粒。',
+              className: 'err-text'
+            })
+          ]),
+          buildTechDetails(missing.gateMessage || '')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+
+      const preview = await callServer('apiStep4GetSendPreview', currentQuarterId, versionNo);
+      const b = dashboard.buttons.official;
+      const willReceive = b.targetPersonCount - b.noEmailCount;
+
+      const nodes = [];
+
+      if (warnings.pendingRequests.length > 0 || warnings.pendingCellsTotal > 0) {
+        const box = make('div', { className: 'warnbox' });
+        if (warnings.pendingRequests.length > 0) {
+          box.appendChild(make('div', {
+            text: '仍然有 ' + warnings.pendingRequests.length + ' 筆修改申報未處理。',
+            className: 'err-text'
+          }));
+        }
+        if (warnings.pendingCellsTotal > 0) {
+          box.appendChild(make('div', {
+            text: '仍然有 ' + warnings.pendingCellsTotal + ' 格待補（黃底）。',
+            className: 'err-text'
+          }));
+        }
+        box.appendChild(make('div', {
+          text: '這些不會阻擋你發出，但義工收到的表會有空格。',
+          className: 'err-text'
+        }));
+        nodes.push(box);
+      }
+
+      if (preview.alreadySentCount > 0) {
+        nodes.push(make('div', { className: 'warnbox' }, [
+          make('div', {
+            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'
+              + '很可能是上次寄到一半中斷了。',
+            className: 'err-text'
+          }),
+          make('div', {
+            text: '如果只想補寄未收到的人，請取消，改用試算表選單'
+              + '「四階段流程 ▸ 補寄未收到的人」。',
+            className: 'err-text'
+          })
+        ]));
+      }
+
+      const detail = make('div', { className: 'sec' }, [
+        sectionTitle('會寄給表上 ' + b.targetPersonCount + ' 個人中的 ' + willReceive + ' 人')
+      ]);
+      [
+        '每人一封信，附自己那份標示了名字的 PDF',
+        '附月曆檔（.ics），紐西蘭時間，已計夏令時間',
+        '附個人專屬連結（永遠顯示最新安排）'
+      ].forEach((t) => detail.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
+      if (b.noEmailCount > 0) {
+        detail.appendChild(make('div', {
+          text: '・' + b.noEmailCount + ' 人沒有電郵，會略過',
+          className: 'vio-row'
+        }));
+      }
+      detail.appendChild(make('div', {
+        text: '・同時寄給堂委 ' + dashboard.buttons.review.recipientCount + ' 人',
+        className: 'vio-row'
+      }));
+      nodes.push(detail);
+
+      nodes.push(make('div', { className: 'sec sec-warn' }, [
+        make('div', {
+          text: '寄出之後這一季就定稿了。之後有改動只能用「改動後重發」，'
+            + '只會寄給有改動的人。',
+          className: 'err-text'
+        })
+      ]));
+
+      if (dashboard.isDryRun) {
+        nodes.push(make('div', {
+          text: '測試模式：不會真的寄出，只會記錄一次。',
+          className: 'badge badge-dryrun inline'
+        }));
+      }
+
+      openConfirm({
+        title: '正式發出給全體（不可逆）',
+        bodyNodes: nodes,
+        requireTyping: true,
+        confirmLabel: '確定發出',
+        danger: true,
+        onConfirm: (typed) => runAction('寄送中，請稍候', async () => {
+          const r = await callServer('apiStep4Confirm', currentQuarterId);
+          renderOfficialDone(r);
+        })
+      });
+    });
+  }
+
+  function renderOfficialDone(r) {
+    const nodes = [
+      make('div', {
+        text: r.isDryRun ? '測試模式：沒有真的寄出任何電郵。' : '已經正式發出。',
+        className: 'ok-line'
+      }),
+      make('div', {
+        text: '寄出 ' + r.sent + ' 封　模擬 ' + r.dryRun + ' 封　'
+          + '查無電郵略過 ' + r.skipped + ' 位　未變略過 ' + r.unchanged + ' 位',
+        className: 'ok-line'
+      }),
+      make('div', {
+        text: '失敗 ' + r.failed + '　PDF 失敗 ' + r.errorPdf + '　PDF 缺件 ' + r.errorPdfMissing,
+        className: 'ok-line'
+      })
+    ];
+    if (r.outcomeSentence) {
+      nodes.push(make('div', { text: r.outcomeSentence, className: 'ok-line strong' }));
+    }
+    if (!r.advanced) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '有人未收到，所以這一季的進度**沒有**推前——補救之後可以再撳一次這一粒。'
+            .replace(/\*\*/g, ''),
+          className: 'err-text'
+        }),
+        make('div', { text: r.outcomeMessage || '', className: 'err-text' })
+      ]));
+    }
+    openModal('正式發出：完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
+  }
+
+  /* ============================================================
+   * 掣 4：改動後重發（規格 2.7）
+   * ============================================================ */
+
+  function openResend() {
+    runAction('比對有誰的安排改了', async () => {
+      const plan = await callServer('apiStep5Plan', currentQuarterId);
+
+      if (plan.mode === 'NO_CHANGES') {
+        openModal('改動後重發', [
+          para('自上次發出之後沒有人的安排改過，不需要重發。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+
+      // 規格 2.7：**逐個列出**有改動的人，唔可以淨係寫數字。
+      // 呢度係幹事唯一一次可以人眼睇出「係咪真係想改咁多人」嘅關口。
+      const nodes = [
+        make('div', { className: 'sec' }, [
+          sectionTitle('自上次發出之後，這 ' + plan.changed.length + ' 個人的安排改了'),
+          make('div', {
+            text: '只會寄給這幾位和堂委。請逐個看一次，確認是不是真的想改這麼多人。',
+            className: 'muted'
+          })
+        ])
+      ];
+
+      const list = make('div', { className: 'sec' });
+      plan.changed.forEach((c) => {
+        const item = make('div', { className: 'prop' });
+        const head = make('div', { className: 'prop-head' });
+        head.appendChild(make('span', { text: c.nameTC }));
+        if (!c.hasAssignments) head.appendChild(make('span', { text: '本季已無服侍安排', className: 'tag' }));
+        if (c.firstNotifyDueToEmail) head.appendChild(make('span', { text: '首次通知（之前沒有電郵）', className: 'tag' }));
+        if (!c.hasEmail) head.appendChild(make('span', { text: '沒有電郵，無法通知', className: 'tag tag-bad' }));
+        item.appendChild(head);
+
+        item.appendChild(make('div', {
+          text: '現在：' + (c.currentSummary || '（這一季沒有安排）'),
+          className: 'vio-row'
+        }));
+        // ⚠️ 「原本係咩」後端目前攞唔到（上次寄出只保留咗 hash，還原唔到內容）。
+        // 唔可以扮到有得比較——誠實講明。
+        item.appendChild(make('div', {
+          text: '原本：' + (c.previousSummary || '（上次寄出的安排系統沒有留底，無法對照）'),
+          className: 'vio-row muted'
+        }));
+        list.appendChild(item);
+      });
+      nodes.push(list);
+
+      if (dashboard.isDryRun) {
+        nodes.push(make('div', {
+          text: '測試模式：不會真的寄出，只會記錄一次。',
+          className: 'badge badge-dryrun inline'
+        }));
+      }
+
+      openConfirm({
+        title: '改動後重發（不可逆）',
+        bodyNodes: nodes,
+        requireTyping: true,
+        confirmLabel: '確定重發',
+        danger: true,
+        onConfirm: () => runAction('產生 PDF 並寄送，請稍候', async () => {
+          await resendGeneratePdfsThenSend('');
+        })
+      });
+    });
+  }
+
+  /**
+   * 產生 PDF 可能要分批（接近單次執行時間上限會自動停），所以要重複呼叫。
+   * 放行文字全程帶住——後端每次都會用「目前最新版本」重新驗一次。
+   */
+  async function resendGeneratePdfsThenSend(releaseText) {
+    let guard = 0;
+    for (;;) {
+      guard++;
+      if (guard > 40) throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。請重新整理再試一次。');
+
+      const r = await callServer('apiStep5GeneratePdfs', currentQuarterId, releaseText);
+      if (r.blocked) {
+        showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，需要先在「儲存並確認」處理。'));
+        return;
+      }
+      if (r.noChanges) {
+        openModal('改動後重發', [para('沒有改動需要重發。')],
+          [button('關閉', () => closeModalAndRefresh(), '')]);
+        return;
+      }
+      if (r.done) break;
+      setStatus('產生個人 PDF：' + r.doneCount + ' / ' + r.totalPeople + ' 份…');
+    }
+
+    const result = await callServer('apiStep5SendConfirm', currentQuarterId, releaseText);
+    if (result.blocked) {
+      showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，尚未寄出任何電郵。'));
+      return;
+    }
+    openModal('改動後重發：完成', [
+      make('div', {
+        text: result.isDryRun ? '測試模式：沒有真的寄出任何電郵。' : '已經重發。',
+        className: 'ok-line'
+      }),
+      make('div', {
+        text: '寄出 ' + result.sent + ' 封　模擬 ' + result.dryRun + ' 封　'
+          + '查無電郵略過 ' + result.skipped + ' 位',
+        className: 'ok-line'
+      }),
+      make('div', { text: '這一季的進度不變，仍然是「已正式發出給全體」。', className: 'ok-line' })
+    ], [button('完成', () => closeModalAndRefresh(), '')]);
+  }
+</script>

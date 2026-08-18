@@ -1,0 +1,46 @@
+<script>
+  /* ============================================================
+   * 第二十四輪批次階段 B：開機 bootstrap
+   * ============================================================
+   *
+   * ⚠️ 呢個檔案一定要**排最後**（見 Index.html）——佢會叫
+   * ScriptZone1／ScriptZone2／ScriptRollback 入面定義嘅函式
+   * （renderZone1／renderZone2Head／renderRollbackEntry），
+   * 排前面嘅話嗰啲函式仲未定義。
+   */
+
+  // 換季度 ＝ 整頁重新載入狀態，任何已開嘅確認畫面即刻關閉（規格 1.1）。
+  //
+  // 點解要即刻關：彈窗入面嘅數字係上一個季度嘅。唔關嘅話，幹事會
+  // 對住「2026T4 嘅確認畫面」但頂部已經揀咗 2027T1，撳落去就會
+  // 對錯季度做嘢——而畫面睇落完全正常。
+  el('quarter').addEventListener('change', () => {
+    closeModal();
+    runAction('載入季度', async () => {
+      currentQuarterId = el('quarter').value;
+      zone2Loaded = false;
+      await loadDashboard();
+    });
+  });
+
+  el('btnRefresh').addEventListener('click', () => {
+    closeModal();
+    runAction('重新整理', loadDashboard);
+  });
+
+  // 收摺區
+  wireZoneToggle('zone2Head', 'zone2Body', renderZone2Body);
+  wireZoneToggle('zone3Head', 'zone3Body', null);
+  wireZoneToggle('zone4Head', 'zone4Body', null);
+
+  // 撳背景關彈窗（但唔可以撳彈窗本身就關——會誤觸）
+  el('modalBackdrop').addEventListener('click', (e) => {
+    if (e.target === el('modalBackdrop')) closeModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOpen) closeModal();
+  });
+
+  initThemeToggle();
+  runAction('載入中', loadQuarters);
+</script>

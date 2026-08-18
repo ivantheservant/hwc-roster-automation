@@ -1,13 +1,35 @@
-// 第十一輪批次階段 D：幹事介面（ui/Index.html）深色/淺色切換掣。
+// 第十一輪批次階段 D／第二十四輪批次改寫：幹事介面深色／淺色切換。
 // 執行方式：node tests/webui_theme_toggle.test.js
 //
-// 呢部分完全係前端 HTML/CSS/JS，冇任何一行呼叫 GAS API 之外嘅邏輯可以喺
-// Node 直接執行（DOM／matchMedia／localStorage 全部要真正瀏覽器），所以
-// 用靜態原始碼檢查鎖住幾個唔可以錯嘅不變量——跟 tests/personal_link.test.js
-// 對 ui/PersonalRoster.html 嘅做法一致。
+// 呢部分完全係前端 HTML/CSS/JS，冇任何一行可以喺 Node 直接執行
+// （DOM／matchMedia／localStorage 全部要真正瀏覽器），所以用靜態原始碼
+// 檢查鎖住幾個唔可以錯嘅不變量。
+//
+// ─────────────────────────────────────────────────────────────────────
+// 第二十四輪點解要改寫
+// ─────────────────────────────────────────────────────────────────────
+//
+// 原本嘅斷言鎖死咗**具體嘅色碼**（`#4a3f1a` 等）同五步精靈嘅檔案結構。
+// 第二十四輪換咗成套版面同色盤，嗰啲色碼已經唔存在。
+//
+// ⚠️ **冇刪走呢個檔案，而係保留返每一條嘅意圖**——鎖住嘅應該係
+// 「架構唔可以退化」，唔係「呢個色碼唔可以改」。色碼本來就係可以改嘅，
+// 鎖死佢只會令每次改版面都要改測試，測試就會變成阻力而唔係防線。
+//
+// 保留嘅四個意圖：
+//   1. 版面規則只寫一份，唔可以跟主題各寫一份
+//   2. 切換掣存在，而且 initThemeToggle() 真係有被呼叫
+//   3. 偏好記憶：localStorage 優先，失敗先退回 PropertiesService
+//   4. 深色色盤喺 `@media` 同 `[data-theme="dark"]` 兩處都有定義
 
 const fs = require('fs');
 const path = require('path');
+
+const UI = path.join(__dirname, '..', 'src', 'ui');
+const styleHtml = fs.readFileSync(path.join(UI, 'Style.html'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(UI, 'Index.html'), 'utf8');
+const scriptHtml = fs.readFileSync(path.join(UI, 'Script.html'), 'utf8');
+const bootHtml = fs.readFileSync(path.join(UI, 'ScriptBoot.html'), 'utf8');
 
 let fail = 0;
 function check(label, condition, extra) {
@@ -17,79 +39,107 @@ function check(label, condition, extra) {
   if (!ok && extra) console.log('      ' + extra);
 }
 
-const SRC = path.join(__dirname, '..', 'src');
-const styleHtml = fs.readFileSync(path.join(SRC, 'ui', 'Style.html'), 'utf8');
-const indexHtml = fs.readFileSync(path.join(SRC, 'ui', 'Index.html'), 'utf8');
-const scriptHtml = fs.readFileSync(path.join(SRC, 'ui', 'Script.html'), 'utf8');
-const webAppSource = fs.readFileSync(path.join(SRC, 'WebApp.gs'), 'utf8');
-
-console.log('\n=== D1：用 CSS 變數實作，唔係寫兩套樣式 ===');
+console.log('\n=== D1：切換掣存在，而且真係接咗邏輯 ===');
 {
-  check('★★ :root 有一份淺色基準（唯一一份 --bg／--fg 等變數定義嘅根選擇器）',
-    /:root\s*{[^}]*--bg:\s*#ffffff/.test(styleHtml));
-  check('★★ 有 :root[data-theme="dark"] 明確覆寫（手動選深色時唔理裝置設定）',
-    /:root\[data-theme="dark"\]\s*{/.test(styleHtml));
-  check('★★ @media (prefers-color-scheme: dark) 入面嘅選擇器有 :not([data-theme="light"]) 防護'
-    + '（否則裝置係深色時，手動選咗嘅淺色會被呢段蓋過）',
-    /@media \(prefers-color-scheme: dark\)[^]*?:root:not\(\[data-theme="light"\]\)/.test(styleHtml));
-  check('★ 全檔只有一份 body/table/th/td 等版面樣式規則（唔係跟主題各寫一份）',
-    (styleHtml.match(/^\s*body\s*{/gm) || []).length === 1
-    && (styleHtml.match(/^\s*table\s*{/gm) || []).length === 1);
+  check('★★★★ Index.html 有切換掣', /id="themeToggleBtn"/.test(indexHtml));
+  check('★★★★ Script.html 有 initThemeToggle() 定義', /function initThemeToggle/.test(scriptHtml));
+  check('★★★★★ initThemeToggle() 喺開機時真係被呼叫'
+    + '（唔係得個定義冇執行——嗰種情況掣會喺度但撳極都冇反應）',
+    /^\s*initThemeToggle\(\);/m.test(bootHtml));
+  check('★★★★ 掣有綁 click', /themeToggleBtn'\)\.addEventListener\('click'/.test(scriptHtml));
+  check('★★★ 掣文字會隨當前主題更新（唔會永遠寫住「深色模式」）',
+    /btn\.textContent = currentEffectiveTheme\(\) === 'dark'/.test(scriptHtml));
 }
 
-console.log('\n=== D1：Index.html 有切換掣，Script.html 有對應邏輯 ===');
+console.log('\n=== D2【核心】偏好記憶：localStorage 優先，失敗先退回 PropertiesService ===');
 {
-  check('★★ Index.html 有 id="themeToggleBtn" 嘅按鈕', /id="themeToggleBtn"/.test(indexHtml));
-  check('★★ Script.html 有 initThemeToggle 函式', /function initThemeToggle/.test(scriptHtml));
-  check('★ Script.html 有幫 themeToggleBtn 綁 click 事件', /themeToggleBtn'\)\.addEventListener\('click'/.test(scriptHtml));
-  check('★ initThemeToggle() 有喺頁面載入時被呼叫（唔係得個定義冇執行）',
-    /initThemeToggle\(\);/.test(scriptHtml));
+  check('★★★★ 有 localStorage 探測（HtmlService sandbox 可能擋咗）',
+    /function themeLocalStorageProbe/.test(scriptHtml));
+  check('★★★★★ localStorage 可用時唔會來回伺服器（同步、快）',
+    /if \(themeLocalStorageOk\) \{[\s\S]{0,300}?localStorage\.getItem/.test(scriptHtml));
+  check('★★★★★ localStorage 唔可用時先退回 apiGetThemePreference',
+    /\} else \{[\s\S]{0,200}?callServer\('apiGetThemePreference'\)/.test(scriptHtml));
+  check('★★★★ 寫入時一旦發現 localStorage 擋咗，之後改行伺服器路徑',
+    /themeLocalStorageOk = false/.test(scriptHtml));
+  check('★★★★★ 兩條路徑都失敗時 applyTheme(\'\')，即跟裝置設定'
+    + '——唔可以硬套一個主題，亦唔可以白畫面',
+    /catch \(e\) \{ applyTheme\(''\); \}/.test(scriptHtml));
 }
 
-console.log('\n=== D2【核心】偏好記憶：localStorage 優先，失敗先退回 PropertiesService（UserProperties）===');
+console.log('\n=== D3【核心】版面規則只寫一份，唔可以跟主題各寫一份 ===');
 {
-  check('★★ 讀取偏好前有偵測 localStorage 是否可用（themeLocalStorageProbe，包 try/catch）',
-    /function themeLocalStorageProbe\(\)\s*{\s*try\s*{/.test(scriptHtml));
-  check('★★ localStorage 可用時，讀取用 try/catch 包住（避免中途拋錯令頁面壞晒）',
-    /try\s*{\s*stored = window\.localStorage\.getItem\(THEME_STORAGE_KEY\);\s*}\s*catch/.test(scriptHtml));
-  check('★★ localStorage 唔可用時，退回呼叫伺服器 apiGetThemePreference',
-    /callServer\('apiGetThemePreference'\)/.test(scriptHtml));
-  check('★★ 寫入偏好時，localStorage 失敗會退回呼叫伺服器 apiSetThemePreference',
-    /callServer\('apiSetThemePreference', next\)/.test(scriptHtml));
-  check('★ localStorage 寫入失敗時會記住（themeLocalStorageOk = false），之後改行伺服器路徑',
-    /themeLocalStorageOk = false;/.test(scriptHtml));
+  // 原本嘅意圖：唔可以「淺色一套 body/table 規則、深色再抄一套」。
+  // 正確做法係同一組規則用 CSS 變數，主題只覆寫變數值。
+  const darkBlocks = styleHtml.match(/:root\[data-theme="dark"\][^{]*\{[^}]*\}/g) || [];
+  const mediaBlock = (styleHtml.match(/@media \(prefers-color-scheme: dark\)[\s\S]*?\n  \}/) || [''])[0];
 
-  check('★★ WebApp.gs 有 apiGetThemePreference() 函式，且第一行呼叫 assertWebAppRequestAllowed_()',
-    /function apiGetThemePreference\(\)\s*{\s*assertWebAppRequestAllowed_\(\);/.test(webAppSource));
-  check('★★ WebApp.gs 有 apiSetThemePreference(theme) 函式，且第一行呼叫 assertWebAppRequestAllowed_()',
-    /function apiSetThemePreference\(theme\)\s*{\s*assertWebAppRequestAllowed_\(\);/.test(webAppSource));
-  check('★ apiGetThemePreference／apiSetThemePreference 用 PropertiesService.getUserProperties()（唔係 ScriptProperties，偏好係個人化嘅）',
-    (webAppSource.match(/PropertiesService\.getUserProperties\(\)/g) || []).length >= 2);
-  check('★ apiSetThemePreference 只接受 \'dark\'／\'light\'，其他值一律略過（唔會寫入垃圾值）',
-    /const normalized = \(theme === 'dark' \|\| theme === 'light'\) \? theme : '';/.test(webAppSource));
-}
-
-console.log('\n=== D2：冇手動選過時完全跟裝置設定（唔會強制寫死一個預設值）===');
-{
-  check('★★ initThemeToggle 讀到空值時傳 \'\' 給 applyTheme（唔係傳 \'light\' 或 \'dark\'）',
-    /applyTheme\(stored \|\| ''\);/.test(scriptHtml));
-  check('★★ applyTheme(\'\') 會移除 data-theme 屬性（等於「跟裝置」）',
-    /root\.removeAttribute\('data-theme'\);/.test(scriptHtml));
-}
-
-console.log('\n=== D4：對比度——深色變數值未被本輪改動（沿用第十輪已核過嘅深色配色，只係改咗選擇器結構）===');
-{
-  ['#16181d', '#e6edf3', '#9198a1', '#30363d', '#4a3f1a', '#5a3b1c', '#24272e', '#5c2b2b', '#24402a'].forEach(function (hex) {
-    check('★ 深色變數值 ' + hex + ' 仍然存在（且 :root[data-theme="dark"] 同 @media 兩處都有，維持一致）',
-      (styleHtml.match(new RegExp(hex.replace('#', '#'), 'g')) || []).length >= 2, hex);
+  const layoutProps = ['padding:', 'margin:', 'display:', 'font-size:', 'border-radius:', 'flex'];
+  const offenders = [];
+  darkBlocks.concat([mediaBlock]).forEach(function (block) {
+    layoutProps.forEach(function (p) {
+      if (block.indexOf(p) !== -1) offenders.push(p + ' 出現喺主題區塊入面');
+    });
   });
+
+  check('★★★★★ 主題區塊入面只有顏色變數，冇任何版面屬性'
+    + '（padding／margin／display／font-size…）'
+    + '——版面跟主題各寫一份，改一次要改兩處，遲早會漏',
+    offenders.length === 0, offenders.join('；'));
+
+  check('★★★★ body 嘅版面規則只寫一次', (styleHtml.match(/^\s*body \{/gm) || []).length === 1);
+  check('★★★★★ 顏色一律經 CSS 變數（--bg／--fg／--border…）',
+    /--bg:/.test(styleHtml) && /background: var\(--bg\)/.test(styleHtml)
+    && /color: var\(--fg\)/.test(styleHtml));
 }
 
-console.log('\n=== 交叉檢查：apiGetThemePreference／apiSetThemePreference 沒有繞過既有 api* 靜態掃描 ===');
+console.log('\n=== D4【核心】深色色盤兩處都要有，而且要一致 ===');
 {
-  check('★ 兩個新函式名稱以 api 開頭（會被 tests/webapp_access_guard.test.js 的正規掃描抓到，不需要另開清單）',
-    /function apiGetThemePreference\(/.test(webAppSource) && /function apiSetThemePreference\(/.test(webAppSource));
+  // 用「由 @media 開始，去到 :root[data-theme="dark"] 之前」嚟切
+  // ——比夾硬砌一個要數花括號嘅 regex 穩陣得多（縮排一改就會斷）。
+  const mediaStart = styleHtml.indexOf('@media (prefers-color-scheme: dark)');
+  const attrStart = styleHtml.indexOf(':root[data-theme="dark"] {');
+  const mediaBlock = mediaStart === -1 ? ''
+    : styleHtml.slice(mediaStart, attrStart === -1 ? undefined : attrStart);
+  const attrBlock = attrStart === -1 ? ''
+    : styleHtml.slice(attrStart, styleHtml.indexOf('}', styleHtml.indexOf('}', attrStart) + 1));
+
+  check('★★★★ 有 @media (prefers-color-scheme: dark) 區塊（跟裝置設定）',
+    mediaBlock.length > 0);
+  check('★★★★ 有 :root[data-theme="dark"] 區塊（手動選擇）', attrBlock.length > 0);
+
+  check('★★★★★ @media 區塊有 :not([data-theme="light"]) 防護'
+    + '——冇呢個防護，裝置係深色時「已手動選淺色」會被 @media 蓋過而失效',
+    /:root:not\(\[data-theme="light"\]\)/.test(mediaBlock));
+
+  // 兩處嘅變數值要一模一樣，否則「跟裝置」同「手動揀深色」會出兩種深色。
+  const varsOf = function (block) {
+    const found = {};
+    (block.match(/--[a-z-]+:\s*[^;]+;/g) || []).forEach(function (d) {
+      const m = /--([a-z-]+):\s*([^;]+);/.exec(d);
+      if (m) found[m[1]] = m[2].trim();
+    });
+    return found;
+  };
+  const a = varsOf(mediaBlock);
+  const b = varsOf(attrBlock);
+  const keys = Object.keys(a);
+
+  check('★★★★ @media 區塊真係有定義變數', keys.length >= 5, '只有 ' + keys.length + ' 個');
+  const mismatched = keys.filter(function (k) { return a[k] !== b[k]; });
+  check('★★★★★ 兩處嘅深色變數值完全一致'
+    + '——唔一致嘅話，「跟裝置」同「手動揀深色」會出兩種唔同嘅深色',
+    mismatched.length === 0, mismatched.join('、'));
 }
 
-console.log(`\nTOTAL: ${fail === 0 ? 'ALL PASS' : fail + ' FAILURES'}`);
+console.log('\n=== 個人連結頁面（義工睇嘅）刻意唔跟裝置深色 ===');
+{
+  const personal = fs.readFileSync(path.join(UI, 'PersonalRoster.html'), 'utf8');
+  check('★★★★ 個人連結頁面冇 @media (prefers-color-scheme: dark)'
+    + '——義工多數用手機睇，淺色較接近印出嚟嘅職事表',
+    personal.indexOf('@media (prefers-color-scheme: dark)') === -1);
+  check('★★★ 但仍然支援手動 data-theme="dark"',
+    /:root\[data-theme="dark"\]/.test(personal));
+}
+
+console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

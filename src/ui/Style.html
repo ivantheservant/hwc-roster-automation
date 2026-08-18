@@ -1,211 +1,217 @@
 <style>
+  /* 第二十四輪批次階段 B：幹事介面四區改造嘅樣式。
+     深色／淺色沿用第十一輪嘅架構：同一組 CSS 變數，
+     分別只在於邊個選擇器生效（跟裝置設定 vs 手動選擇）。 */
   :root {
     --bg: #ffffff;
     --fg: #1f2328;
     --muted: #6b7280;
     --border: #d0d7de;
     --accent: #1a73e8;
-    --ok: #ffffff;
-    --warning: #fff2cc;
-    --forced: #f9cb9c;
-    --skipped: #efefef;
-    /* 第十輪批次階段 A：「系統應該排但排不出」專用色，跟 grid 工作表的
-       GRID_PENDING_FILL_COLOR 同一隻粉紅——一種顏色一個意思。 */
-    --gap: #f4cccc;
-    --header: #d9ead3;
+    --danger: #b3261e;
+    --warn-bg: #fff8e1;
+    --warn-border: #e8c61a;
+    --ok: #1e7e34;
+    --card: #ffffff;
+    --card-off: #f6f7f9;
   }
 
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    padding: 24px;
+    padding: 20px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
     font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
     color: var(--fg);
     background: var(--bg);
-    line-height: 1.6;
+    line-height: 1.65;
+    font-size: 15px;
   }
 
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0 0 12px; }
-  .subtitle { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  h1 { font-size: 20px; margin: 0; }
 
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    align-items: center;
-    padding: 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 18px;
+  /* ── 頂部 ─────────────────────────────────────────────── */
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    align-items: flex-start; justify-content: space-between;
+    padding-bottom: 12px; margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
   }
+  .quarter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+  .quarter-row label { font-size: 13px; color: var(--muted); }
+  .topbar-actions { display: flex; gap: 8px; }
 
-  label { font-size: 13px; color: var(--muted); }
-
-  select, button {
-    font: inherit;
-    padding: 7px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    background: #fff;
+  select, input[type=text] {
+    font: inherit; padding: 6px 10px;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); color: var(--fg);
   }
+  input[type=text] { min-width: 140px; }
 
   button {
-    cursor: pointer;
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
+    font: inherit; padding: 7px 14px; border-radius: 6px;
+    cursor: pointer; background: var(--accent); color: #fff;
+    border: 1px solid var(--accent);
   }
-  button.secondary { background: #fff; color: var(--fg); border-color: var(--border); }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-
-  .status {
-    min-height: 22px;
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 14px;
+  button.secondary { background: var(--card); color: var(--fg); border-color: var(--border); }
+  button.danger { background: var(--danger); border-color: var(--danger); }
+  button.link {
+    background: none; border: none; color: var(--accent);
+    padding: 2px 4px; text-decoration: underline;
   }
-  .status.error { color: #b3261e; }
-
-  .panel {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 18px;
+  button.chip {
+    background: var(--card-off); color: var(--fg); border: 1px solid var(--border);
+    font-size: 12px; padding: 2px 8px; border-radius: 999px; margin: 0 4px 4px 0;
   }
-  .panel[hidden] { display: none; }
-
-  .scroll { overflow-x: auto; }
-
-  table { border-collapse: collapse; font-size: 13px; width: 100%; }
-  th, td {
-    border: 1px solid var(--border);
-    padding: 5px 8px;
-    text-align: left;
-    white-space: nowrap;
-  }
-  thead th { background: var(--header); position: sticky; top: 0; }
-
-  td.warning { background: var(--warning); }
-  td.forced  { background: var(--forced); }
-  td.skipped { background: var(--skipped); color: var(--muted); }
-  /* 第十輪批次階段 A：排唔出嘅格唔用灰色淡字——佢係唯一真正要人跟進嘅一類，
-     要突出，唔係要淡化。 */
-  td.gap     { background: var(--gap); font-weight: 600; }
-  td.meta    { color: var(--muted); }
-
-  tr.section td { background: #d9d9d9; font-weight: 600; }
-  tr.deviates td { background: var(--warning); }
-
-  .summary {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 12px;
-    font-size: 13px;
-  }
-  .summary span { padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; }
-  .summary span.bad { background: #fce8e6; border-color: #f5c2bd; }
-  .summary span.good { background: #e6f4ea; border-color: #b7e1c1; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
 
   .badge {
-    font-size: 12px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: #fff;
+    font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card);
   }
-  .badge.stage { background: #e8f0fe; border-color: #c6dafc; }
-  .badge.dryrun-on { background: #e6f4ea; border-color: #b7e1c1; }
-  .badge.dryrun-off { background: #fce8e6; border-color: #f5c2bd; font-weight: 600; }
-
-  .steps { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
-
-  .step-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+  .badge-dryrun {
+    background: #fce8e6; border-color: #f5c2bd; color: #a1160a; font-weight: 600;
   }
-  .step-card.locked { opacity: .55; }
-  .step-card.available { border-color: var(--accent); }
-  .step-card.done { background: #e6f4ea11; }
+  .badge.inline { display: inline-block; margin-top: 8px; }
 
-  .step-title { font-weight: 600; font-size: 14px; }
-  .step-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .step-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .status { min-height: 20px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .status.error { color: var(--danger); }
 
-  .wizard-title { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
-  .wizard-lines { font-size: 13px; white-space: pre-wrap; margin: 0 0 14px; line-height: 1.7; }
-  .wizard-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-
-  .violation-block { border-left: 3px solid var(--border); padding: 8px 12px; margin: 10px 0; font-size: 13px; }
-  .violation-block.hard { border-color: #b3261e; background: #fce8e611; }
-  .violation-block.other { border-color: #c88a00; background: #fff2cc11; }
-  .violation-row { padding: 2px 0; }
-  .tag { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); margin-left: 6px; }
-  .tag.no-email { background: #fce8e6; border-color: #f5c2bd; }
-  .tag.first-notify { background: #e8f0fe; border-color: #c6dafc; }
-  .tag.no-assign { background: #efefef; }
-
-  .release-box {
-    border: 1px solid #b3261e;
-    background: #fce8e611;
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin: 12px 0;
+  /* ── 狀態卡（規格 1.2）────────────────────────────────── */
+  .statuscard {
+    border: 1px solid var(--border); border-left: 4px solid var(--accent);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; background: var(--card);
   }
-  .release-box input { font: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); width: 220px; }
+  .statuscard-title { font-size: 16px; font-weight: 600; }
+  .statuscard-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-  /* 第十一輪批次階段 D：深色/淺色切換掣。
-     架構：跟裝置設定自動切換（@media）與幹事手動選擇（[data-theme]）用同一組
-     CSS 變數值，唔另外寫第二套樣式——分別只在於邊個選擇器生效：
-     - 冇手動選過（root 冇 data-theme）：跟裝置設定，用 @media 那段。
-     - 手動選過「深色」：:root[data-theme="dark"]，唔理裝置設定點樣都係深色。
-     - 手動選過「淺色」：:root[data-theme="light"]，唔理裝置設定點樣都係淺色
-       （下面淺色選擇器故意留空/沿用 :root 頂層已經係淺色值，唔需要覆寫；但
-       要喺 @media 那段加 :not([data-theme="light"]) 防護，否則裝置係深色時
-       「已手動選淺色」會被 @media 選擇器蓋過——屬性選擇器嘅特異性一定夠贏
-       純 :root，但 @media 區塊入面嘅 :root 若果冇呢個防護，兩者特異性一樣，
-       CSS 就會用「原始碼排喺後面嗰條」，@media 排喺後面就會贏，令淺色選擇失效）。
-     切換邏輯與偏好記憶見 ui/Script.html。 */
+  /* ── 四區 ─────────────────────────────────────────────── */
+  .zone { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .zone-primary { border-color: var(--accent); }
+  .zone-head {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; background: var(--card-off); border: none;
+    color: var(--fg); cursor: pointer; text-align: left; border-radius: 0;
+  }
+  .zone-head.static { cursor: default; }
+  .zone-title { font-weight: 600; font-size: 14px; flex: 1; }
+  .zone-count { font-size: 12px; }
+  .zone-count.warn { color: #a15c00; font-weight: 600; }
+  .zone-count.ok { color: var(--ok); }
+  .zone-caret { color: var(--muted); font-size: 12px; }
+  .zone-body { padding: 12px 14px; }
+  .zone-body[hidden] { display: none; }
+
+  /* ── 區一：一粒掣一張卡 ───────────────────────────────── */
+  .act {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 10px; background: var(--card);
+  }
+  .act-off { background: var(--card-off); }
+  .act-on { border-color: var(--accent); }
+  .act-main { flex: 1; min-width: 0; }
+  .act-name { font-weight: 600; font-size: 15px; }
+  .act-desc { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .act-why { font-size: 12px; color: #a15c00; margin-top: 5px; }
+
+  /* ── 彈窗 ─────────────────────────────────────────────── */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 30px 16px; z-index: 100; overflow-y: auto;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    background: var(--bg); border-radius: 10px; max-width: 720px; width: 100%;
+    box-shadow: 0 10px 40px rgba(0,0,0,.3); display: flex; flex-direction: column;
+    max-height: calc(100vh - 60px);
+  }
+  .modal-title {
+    font-size: 17px; font-weight: 600; padding: 16px 20px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+  .modal-actions {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+
+  /* ── 內容元件 ─────────────────────────────────────────── */
+  .lines { font-size: 14px; margin: 0 0 12px; white-space: pre-wrap; }
+  .muted { font-size: 13px; color: var(--muted); }
+  .sec { margin: 14px 0; }
+  .sec-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .sec-warn { border-left: 3px solid var(--warn-border); padding-left: 10px; }
+  .sec-summary { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .row-right { justify-content: flex-end; }
+
+  .vio { border-left: 3px solid var(--border); padding: 8px 12px; margin: 10px 0; font-size: 13px; }
+  .vio-hard { border-color: var(--danger); background: #fce8e611; }
+  .vio-warn { border-color: var(--warn-border); background: #fff8e111; }
+  .vio-info { border-color: var(--accent); background: #e8f0fe11; }
+  .vio-head { font-weight: 600; margin-bottom: 4px; }
+  .vio-row { padding: 2px 0; font-size: 13px; }
+  .ok-line { font-size: 14px; padding: 3px 0; }
+  .ok-line.strong { font-weight: 600; }
+
+  .warnbox {
+    border: 1px solid var(--warn-border); background: var(--warn-bg);
+    border-radius: 6px; padding: 10px 12px; margin: 12px 0;
+  }
+  :root[data-theme="dark"] .warnbox { background: #3a2f10; }
+
+  .err-part { margin-bottom: 12px; }
+  .err-label { font-weight: 600; font-size: 13px; color: var(--muted); }
+  .err-text { font-size: 14px; white-space: pre-wrap; }
+  .err-list { margin: 4px 0 0; padding-left: 22px; font-size: 14px; }
+  .err-list li { margin: 3px 0; }
+
+  .tech { margin-top: 14px; }
+  .tech-pre {
+    background: var(--card-off); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px; font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    max-height: 200px; overflow-y: auto;
+  }
+
+  .prop { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
+  .prop.is-off { background: var(--card-off); opacity: .75; }
+  .prop.is-optional { border-style: dashed; }
+  .prop-head { font-weight: 600; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .prop-opts { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+
+  .radio-row, .check-row {
+    display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 2px 0;
+  }
+  .check-row.inline { display: inline-flex; margin-right: 12px; }
+  .radio-row.is-off { color: var(--muted); cursor: not-allowed; }
+
+  .tag {
+    font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-off); font-weight: normal;
+  }
+  .tag-bad { background: #fce8e6; border-color: #f5c2bd; }
+
+  .confirm-typing {
+    border: 1px solid var(--danger); border-radius: 6px;
+    padding: 10px 12px; margin-top: 14px;
+  }
+
+  /* ── 深色模式 ─────────────────────────────────────────── */
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
-      --ok: #16181d; --warning: #4a3f1a; --forced: #5a3b1c; --skipped: #24272e;
-      --gap: #5c2b2b;
-      --header: #24402a;
+      --card: #1c1f26; --card-off: #22262e; --warn-bg: #3a2f10; --warn-border: #7a6420;
+      --danger: #f2867c; --ok: #6cc07f;
     }
-    :root:not([data-theme="light"]) select,
-    :root:not([data-theme="light"]) button.secondary { background: #1f232b; color: var(--fg); }
-    :root:not([data-theme="light"]) tr.section td { background: #2a2f37; }
-    :root:not([data-theme="light"]) .badge,
-    :root:not([data-theme="light"]) .badge.stage,
-    :root:not([data-theme="light"]) .badge.dryrun-on,
-    :root:not([data-theme="light"]) .badge.dryrun-off { background: #1f232b; }
-    :root:not([data-theme="light"]) .violation-block.hard,
-    :root:not([data-theme="light"]) .violation-block.other,
-    :root:not([data-theme="light"]) .release-box { background: transparent; }
   }
-
   :root[data-theme="dark"] {
     --bg: #16181d; --fg: #e6edf3; --muted: #9198a1; --border: #30363d;
-    --ok: #16181d; --warning: #4a3f1a; --forced: #5a3b1c; --skipped: #24272e;
-    --gap: #5c2b2b;
-    --header: #24402a;
+    --card: #1c1f26; --card-off: #22262e; --warn-bg: #3a2f10; --warn-border: #7a6420;
+    --danger: #f2867c; --ok: #6cc07f;
   }
-  :root[data-theme="dark"] select,
-  :root[data-theme="dark"] button.secondary { background: #1f232b; color: var(--fg); }
-  :root[data-theme="dark"] tr.section td { background: #2a2f37; }
-  :root[data-theme="dark"] .badge,
-  :root[data-theme="dark"] .badge.stage,
-  :root[data-theme="dark"] .badge.dryrun-on,
-  :root[data-theme="dark"] .badge.dryrun-off { background: #1f232b; }
-  :root[data-theme="dark"] .violation-block.hard,
-  :root[data-theme="dark"] .violation-block.other,
-  :root[data-theme="dark"] .release-box { background: transparent; }
 </style>

@@ -1,34 +1,67 @@
 <script>
+  /* ============================================================
+   * 第二十四輪批次階段 B：共通層
+   * ============================================================
+   *
+   * 呢個檔案只放**全部區共用**嘅嘢。逐區嘅畫面喺
+   * ScriptZone1／ScriptZone2／ScriptRollback。
+   *
+   * ⚠️ 載入次序：呢個檔案一定要喺其餘三個之前（見 Index.html）。
+   *
+   * 保留咗第十一輪起一路用嘅三樣做法（第二十四輪特登冇推倒）：
+   *   1. 全部資料經 google.script.run 攞，零樣板注入
+   *   2. callServer() 嘅 Promise 包裝、runAction() 嘅忙碌／錯誤處理
+   *   3. includeHtml() 拆檔
+   */
+
   const el = (id) => document.getElementById(id);
-  const RELEASE_PHRASE = '確認放行';
 
-  /** 目前選取的季度與最近一次取得的流程狀態。 */
+  /** 打字確認一律呢兩個字（規格 1.4.4）。 */
+  const CONFIRM_PHRASE = '確認';
+
+  /** 目前選中嘅季度，同最近一次 apiGetDashboardState 嘅結果。 */
   let currentQuarterId = '';
-  let currentFlowState = null;
+  let dashboard = null;
 
-  /** 顯示狀態訊息；isError 為 true 時用紅色。 */
+  // ── 伺服器呼叫 ───────────────────────────────────────────────
+
+  /** 把 google.script.run 包成 Promise。 */
+  function callServer(fnName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((err) => reject(new Error(err && err.message ? err.message : String(err))))
+        [fnName](...args);
+    });
+  }
+
   function setStatus(message, isError) {
     const node = el('status');
     node.textContent = message || '';
     node.className = isError ? 'status error' : 'status';
   }
 
-  /** 執行期間停用所有按鈕，避免重複點擊。 */
   function setBusy(busy) {
-    document.querySelectorAll('button').forEach((b) => { b.disabled = busy; });
-  }
-
-  /** 把 google.script.run 包成 Promise，方便用 async/await。 */
-  function callServer(fnName, ...args) {
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler((err) => reject(new Error(err.message || String(err))))
-        [fnName](...args);
+    document.querySelectorAll('button').forEach((b) => {
+      if (busy) {
+        if (!b.disabled) b.dataset.busyDisabled = '1';
+        b.disabled = true;
+      } else if (b.dataset.busyDisabled === '1') {
+        // 只解除「因為忙碌而停用」嗰啲，唔可以把本身就應該變灰嘅掣着返
+        // ——否則跑完一個動作之後，唔夠條件撳嘅掣會突然變成可撳。
+        delete b.dataset.busyDisabled;
+        b.disabled = false;
+      }
     });
   }
 
-  /** 包住每個動作的共同流程：忙碌狀態、錯誤處理。 */
+  /**
+   * 包住每個會呼叫伺服器嘅動作：忙碌狀態＋錯誤處理。
+   *
+   * ⚠️ **全部** async 動作都一定要包一層。冇包嘅話，失敗會變成一個
+   * 冇人處理嘅 rejected promise——畫面毫無反應、亦冇錯誤訊息，
+   * 幹事只會見到「撳咗冇反應」。
+   */
   async function runAction(label, action) {
     setBusy(true);
     setStatus(label + '…');
@@ -36,772 +69,416 @@
       await action();
       setStatus('');
     } catch (err) {
-      setStatus(err.message, true);
+      showErrorModal(label + '失敗', err);
+      setStatus('');
     } finally {
       setBusy(false);
     }
   }
 
-  // ── 小型 DOM 建構工具 ─────────────────────────────────────────────
+  // ── 細小 DOM 工具 ────────────────────────────────────────────
+
   function make(tag, opts, children) {
     const node = document.createElement(tag);
     opts = opts || {};
+    // ⚠️ 一律用 textContent，唔用 innerHTML——人名／備註都係使用者輸入，
+    // 用 innerHTML 就係開咗一條 XSS 路。
     if (opts.text !== undefined) node.textContent = opts.text;
     if (opts.className) node.className = opts.className;
-    if (opts.html !== undefined) node.innerHTML = opts.html;
+    if (opts.id) node.id = opts.id;
+    if (opts.title) node.title = opts.title;
     (children || []).forEach((c) => { if (c) node.appendChild(c); });
     return node;
   }
   function button(label, onClick, className) {
     const b = make('button', { text: label, className: className || '' });
+    b.type = 'button';
     b.addEventListener('click', onClick);
     return b;
   }
-  function para(text, className) { return make('p', { text: text, className: className || 'wizard-lines' }); }
-  function title(text) { return make('p', { text: text, className: 'wizard-title' }); }
-  function actionsRow(nodes) { return make('div', { className: 'wizard-actions' }, nodes); }
+  function para(text, className) {
+    return make('p', { text: text, className: className || 'lines' });
+  }
+  function sectionTitle(text) { return make('div', { text: text, className: 'sec-title' }); }
+  function row(nodes, className) { return make('div', { className: className || 'row' }, nodes); }
 
-  function renderWizard(nodes) {
-    const body = el('wizardBody');
-    body.innerHTML = '';
-    nodes.forEach((n) => { if (n) body.appendChild(n); });
-    el('wizardPanel').hidden = false;
-    el('wizardPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  /** 一個唔會被 innerHTML 影響嘅清空。 */
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+    return node;
   }
-  function closeWizard() {
-    el('wizardPanel').hidden = true;
-    el('wizardBody').innerHTML = '';
-  }
+
+  // ── 彈窗（規格 1.4）────────────────────────────────────────
+
+  let modalOpen = false;
+
   /**
-   * 階段 B（收尾輪）修正：原本直接 `await loadFlowState()`，完全沒有包
-   * `runAction()`。`loadFlowState()` 本身也沒有 try/catch——如果這時 `apiGetFlowState`
-   * 失敗（例如 Stage 剛好被其他分頁改動、暫時性網路錯誤、`WEBAPP_ENABLED`
-   * 這時被關閉），會變成一個沒有任何處理的 rejected promise：畫面上唯一可見的
-   * 後果是精靈視窗關閉了，狀態卻完全沒有刷新、也沒有任何錯誤提示——使用者會
-   * 以為操作完成了，其實看到的是舊資料。這是全部五個步驟的「取消／完成／關閉」
-   * 按鈕共用的同一個函式，這裡修好一次全部步驟都受益，不需要逐一步驟改。
+   * 開一個彈窗。**一個動作只有一個確認畫面。**
+   * @param {string} title 標題
+   * @param {Node[]} bodyNodes 內容
+   * @param {Node[]} actionNodes 底部掣
    */
-  async function closeWizardAndRefresh() {
-    closeWizard();
-    await runAction('重新整理狀態', loadFlowState);
+  function openModal(title, bodyNodes, actionNodes) {
+    el('modalTitle').textContent = title;
+    const body = clear(el('modalBody'));
+    (bodyNodes || []).forEach((n) => { if (n) body.appendChild(n); });
+    const actions = clear(el('modalActions'));
+    (actionNodes || []).forEach((n) => { if (n) actions.appendChild(n); });
+    el('modalBackdrop').hidden = false;
+    modalOpen = true;
+    body.scrollTop = 0;
   }
 
-  /** 違規清單，硬規則與準硬規則分開兩節顯示，內容對應 buildViolationReportLines_()。 */
-  function renderViolations(violations) {
-    if (!violations || violations.length === 0) {
-      return para('重跑規則檢查：沒有發現任何違反 ✓');
-    }
-    const hard = violations.filter((v) => v.severity === 'HARD');
-    const others = violations.filter((v) => v.severity !== 'HARD');
-    const nodes = [make('p', { text: '重跑規則檢查，共 ' + violations.length + ' 項違反：', className: 'wizard-lines' })];
+  function closeModal() {
+    el('modalBackdrop').hidden = true;
+    clear(el('modalBody'));
+    clear(el('modalActions'));
+    modalOpen = false;
+  }
 
-    const describe = (v) => v.serviceDate + '　' + v.postNameTC + '#' + v.slotIndex + '　' + v.personName + '　' + v.ruleId + '：' + v.reason;
-    if (hard.length > 0) {
-      const block = make('div', { className: 'violation-block hard' });
-      block.appendChild(make('div', { text: '⚠️ 硬規則違反：' + hard.length + ' 項（本系統的原則是硬規則絕不自動違反）' }));
-      hard.forEach((v) => block.appendChild(make('div', { text: describe(v), className: 'violation-row' })));
-      nodes.push(block);
-    }
-    if (others.length > 0) {
-      const block = make('div', { className: 'violation-block other' });
-      block.appendChild(make('div', { text: '準硬規則／其他提示：' + others.length + ' 項' }));
-      others.forEach((v) => block.appendChild(make('div', { text: describe(v), className: 'violation-row' })));
-      nodes.push(block);
-    }
-    return make('div', {}, nodes);
+  /** 關彈窗＋重新載入整頁狀態。動作完成／取消一律行呢個。 */
+  async function closeModalAndRefresh() {
+    closeModal();
+    await runAction('重新整理', loadDashboard);
   }
 
   /**
-   * 硬規則放行輸入框，對應選單版本要求逐字輸入「確認放行」的打字關卡。
-   * onSubmit(text) 由呼叫端決定文字對不對之後要做什麼——後端一律會重新驗證，
-   * 這裡的檢查只是提早給使用者回饋，不是唯一防線。
+   * 規格 1.4：確認畫面。
+   *
+   * @param {Object} opts
+   *   `title` 標題／`bodyNodes` 內容（**一定要有數字**）／
+   *   `confirmLabel` 確認掣文字／`onConfirm` 確認之後做咩／
+   *   `requireTyping` 係咪要打字確認（只有不可逆動作先用）／
+   *   `typingHint` 打字格上面嗰句提示
    */
-  function renderReleaseBox(consequenceText, onSubmit) {
-    const box = make('div', { className: 'release-box' });
-    box.appendChild(make('p', { text: '需要明確放行：', className: 'wizard-lines' }));
-    box.appendChild(make('p', { text: consequenceText, className: 'wizard-lines' }));
-    box.appendChild(make('p', { text: '確定要放行的話，請輸入「' + RELEASE_PHRASE + '」四個字：', className: 'wizard-lines' }));
-    const input = make('input', {});
-    input.type = 'text';
-    input.placeholder = RELEASE_PHRASE;
-    box.appendChild(input);
-    box.appendChild(actionsRow([
-      button('放行並繼續', () => onSubmit(input.value), ''),
-      button('取消', () => closeWizardAndRefresh(), 'secondary')
-    ]));
+  function openConfirm(opts) {
+    const body = (opts.bodyNodes || []).slice();
+    let input = null;
+
+    if (opts.requireTyping) {
+      const box = make('div', { className: 'confirm-typing' });
+      box.appendChild(make('p', {
+        text: opts.typingHint || '這個動作不可逆。確定的話，請在下面輸入「' + CONFIRM_PHRASE + '」兩個字：',
+        className: 'lines'
+      }));
+      input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = CONFIRM_PHRASE;
+      input.autocomplete = 'off';
+      box.appendChild(input);
+      body.push(box);
+    }
+
+    const confirmBtn = button(opts.confirmLabel || '確定', () => {
+      const typed = input ? input.value.trim() : '';
+      if (opts.requireTyping && typed !== CONFIRM_PHRASE) {
+        // 前端呢層只係提早俾回饋；後端一樣會再驗一次，唔靠畫面做關卡。
+        setStatus('請輸入「' + CONFIRM_PHRASE + '」兩個字才可以繼續。', true);
+        if (input) input.focus();
+        return;
+      }
+      setStatus('');
+      opts.onConfirm(typed);
+    }, opts.danger ? 'danger' : '');
+
+    // 規格 1.4.5：確認畫面永遠有「取消」，取消＝零改動、零寄出。
+    openModal(opts.title, body, [
+      confirmBtn,
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+    if (input) input.focus();
+  }
+
+  // ── 錯誤顯示（規格 1.5）──────────────────────────────────────
+
+  /**
+   * 三段式錯誤。後端拋嘅訊息本身已經係三段式（`buildThreePartMessage_()`），
+   * 所以呢度會嘗試拆返出嚟排靚；拆唔到就原文顯示。
+   *
+   * ⚠️ exception 原文唔會直接貼上畫面——收埋喺「複製技術詳情」後面。
+   * 幹事睇到一串英文 stack trace 只會驚，幫唔到佢。
+   */
+  function showErrorModal(title, err) {
+    const raw = err && err.message ? err.message : String(err);
+    const nodes = [];
+    const parsed = parseThreePartMessage(raw);
+
+    if (parsed) {
+      nodes.push(errorPart('發生了什麼', parsed.what));
+      nodes.push(errorPart('現在的情況', parsed.state));
+      const doBox = make('div', { className: 'err-part' });
+      doBox.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
+      const ul = make('ul', { className: 'err-list' });
+      parsed.actions.forEach((a) => ul.appendChild(make('li', { text: a })));
+      doBox.appendChild(ul);
+      nodes.push(doBox);
+    } else {
+      // 拆唔到三段：唔好扮到有三段。誠實顯示原文，但仍然俾一條出路。
+      nodes.push(errorPart('發生了什麼', raw));
+      nodes.push(errorPart('現在的情況',
+        '這個動作沒有完成。系統沒有寄出任何電郵。'
+        + '職事表有沒有被改動，要看下面的技術詳情或者去「檢查各版本派工紀錄」核對。'));
+      const doBox = make('div', { className: 'err-part' });
+      doBox.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
+      const ul = make('ul', { className: 'err-list' });
+      ul.appendChild(make('li', { text: '重新整理再試一次' }));
+      ul.appendChild(make('li', { text: '如果一直失敗，把下面的技術詳情複製給開發者' }));
+      doBox.appendChild(ul);
+      nodes.push(doBox);
+    }
+
+    nodes.push(buildTechDetails(raw));
+    openModal(title, nodes, [button('知道了', () => closeModal(), '')]);
+  }
+
+  function errorPart(label, text) {
+    return make('div', { className: 'err-part' }, [
+      make('div', { text: label, className: 'err-label' }),
+      make('div', { text: text, className: 'err-text' })
+    ]);
+  }
+
+  /** 把後端 `buildThreePartMessage_()` 出嚟嘅字串拆返三段。 */
+  function parseThreePartMessage(raw) {
+    if (raw.indexOf('發生了什麼：') === -1 || raw.indexOf('現在的情況：') === -1) return null;
+    const whatStart = raw.indexOf('發生了什麼：') + '發生了什麼：'.length;
+    const stateIdx = raw.indexOf('現在的情況：');
+    const doIdx = raw.indexOf('你可以怎樣做：');
+    const what = raw.slice(whatStart, stateIdx).trim();
+    const state = raw.slice(stateIdx + '現在的情況：'.length, doIdx === -1 ? undefined : doIdx).trim();
+    const actions = doIdx === -1 ? [] : raw.slice(doIdx + '你可以怎樣做：'.length)
+      .split('\n')
+      .map((s) => s.replace(/^[\s　]*[・·]\s*/, '').trim())
+      .filter((s) => s !== '');
+    return { what: what, state: state, actions: actions };
+  }
+
+  /** 「複製技術詳情」——預設收埋。 */
+  function buildTechDetails(raw) {
+    const wrap = make('div', { className: 'tech' });
+    const btn = button('複製技術詳情', () => {
+      const ta = document.createElement('textarea');
+      ta.value = raw;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); setStatus('技術詳情已複製。'); }
+      catch (e) { setStatus('複製不到，請自己選取下面的文字。', true); }
+      document.body.removeChild(ta);
+      pre.hidden = false;
+    }, 'link');
+    const pre = make('pre', { text: raw, className: 'tech-pre' });
+    pre.hidden = true;
+    wrap.appendChild(btn);
+    wrap.appendChild(pre);
+    return wrap;
+  }
+
+  // ── 共用小元件 ───────────────────────────────────────────────
+
+  /** 一粒區一嘅大掣。變灰時下面一行灰字寫「怎樣才撳得到」（規格 1.6）。 */
+  function bigButton(opts) {
+    const card = make('div', { className: 'act ' + (opts.enabled ? 'act-on' : 'act-off') });
+    const left = make('div', { className: 'act-main' }, [
+      make('div', { text: opts.buttonName, className: 'act-name' }),
+      make('div', { text: opts.dynamicText || '', className: 'act-desc' })
+    ]);
+    if (!opts.enabled && opts.disabledReason) {
+      left.appendChild(make('div', { text: opts.disabledReason, className: 'act-why' }));
+    }
+    card.appendChild(left);
+
+    const b = button(opts.buttonLabel || '開始', opts.onClick, opts.danger ? 'danger' : '');
+    b.disabled = !opts.enabled;
+    card.appendChild(b);
+    return card;
+  }
+
+  /** 一節清單（有標題＋逐行）。空嘅時候唔顯示，避免畫面塞滿「0 筆」。 */
+  function listSection(title, items, renderItem, emptyText) {
+    if ((!items || items.length === 0) && !emptyText) return null;
+    const box = make('div', { className: 'sec' }, [sectionTitle(title)]);
+    if (!items || items.length === 0) {
+      box.appendChild(make('div', { text: emptyText, className: 'muted' }));
+      return box;
+    }
+    items.forEach((it) => box.appendChild(renderItem(it)));
     return box;
   }
 
-  // ── 步驟卡片渲染 ─────────────────────────────────────────────────
-  const STEP_META = {
-    2: { name: '步驟 2：寄給堂委審閱', desc: 'Stage=DRAFT 時可執行；寄出後 Stage → REVIEW_SENT。' },
-    3: { name: '步驟 3：套用修改申報', desc: 'Stage=REVIEW_SENT 或 REQUESTS_APPLIED 時可執行，可重複執行。' },
-    4: { name: '步驟 4：正式發出', desc: 'Stage=REQUESTS_APPLIED 時可執行；寄出後 Stage → OFFICIAL_SENT。' },
-    5: { name: '步驟 5：改動後重發', desc: 'Stage=OFFICIAL_SENT 時可執行，可重複執行、無次數限制。' }
-  };
+  /** 顯示規則違反四組（規格步 1.5）。 */
+  function renderViolations(v) {
+    const nodes = [];
+    const describe = (x) => x.serviceDate + '　' + (x.postNameTC || x.postId)
+      + '#' + x.slotIndex + '　' + (x.personName || '')
+      + '　' + (x.reason || x.ruleId || '');
 
-  function renderSteps(state) {
-    const container = el('steps');
-    container.innerHTML = '';
-
-    // 步驟 1：一律唯讀顯示，Web UI 不提供人手入口（由自動排程執行）。
-    const s1 = make('div', { className: 'step-card ' + (state.step1.versionExists ? 'done' : 'locked') });
-    const s1left = make('div', {}, [
-      make('div', { text: '步驟 1：生成初稿（唯讀顯示）', className: 'step-title' }),
-      make('div', { text: '由自動排程執行，Web UI 沒有人手入口。', className: 'step-desc' }),
-      make('div', {
-        text: state.step1.versionExists
-          ? '目前最新版本：' + state.step1.sheetName + (state.step1.createdAt ? '　建立時間：' + state.step1.createdAt : '')
-          : '這一季尚未生成任何版本。',
-        className: 'step-meta'
-      })
-    ]);
-    s1.appendChild(s1left);
-    container.appendChild(s1);
-
-    [2, 3, 4, 5].forEach((n) => {
-      const s = state['step' + n];
-      const meta = STEP_META[n];
-      const cls = s.available ? 'available' : (s.done ? 'done' : 'locked');
-      const card = make('div', { className: 'step-card ' + cls });
-      const left = make('div', {}, [
-        make('div', { text: meta.name, className: 'step-title' }),
-        make('div', { text: meta.desc, className: 'step-desc' }),
-        make('div', {
-          text: s.available
-            ? '現在可以執行。'
-            : (s.done !== undefined && s.done && n !== 5 ? '已完成。' : '目前鎖定——現在 Stage 是「' + state.stage + '」。')
-            + (s.lastSentAt ? '　最後一次執行：' + s.lastSentAt : ''),
-          className: 'step-meta'
-        })
-      ]);
-      card.appendChild(left);
-      if (s.available) {
-        card.appendChild(button('開始', () => openStep(n), ''));
-      }
-      container.appendChild(card);
-    });
-  }
-
-  function openStep(n) {
-    if (n === 2) return openStep2();
-    if (n === 3) return openStep3();
-    if (n === 4) return openStep4();
-    if (n === 5) return openStep5();
-  }
-
-  // ── 步驟 2：寄給堂委審閱 ─────────────────────────────────────────
-  async function openStep2() {
-    await runAction('讀取確認資料', async () => {
-      const preview = await callServer('apiStep2Preview', currentQuarterId);
-      renderWizard([
-        title('步驟 2：寄給堂委審閱（確認）'),
-        para(
-          'QuarterID：' + preview.quarterId + '\n'
-            + '版本號：v' + preview.versionNo + '\n'
-            + '收件人數（Role=REVIEWER）：' + preview.recipientCount + '\n'
-            + '附件數量：1（完整版 PDF，若不存在會自動匯出一次）\n'
-            + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
-            + (preview.recipientCount === 0
-              ? '\n\n⚠ 目前沒有 Role=REVIEWER 的收件人，寄出後不會有任何人收到。'
-              : '')
-            // 階段 A（收尾輪）新增：跟選單版本同步顯示已寄紀錄警告，見
-            // FiveStageCore.gs 的 planStep2_()／Mailer.gs 的 countAlreadySentForStage_()。
-            + (preview.alreadySentCount > 0
-              ? '\n\n⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
-                + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。\n'
-                + '👉 建議先取消，改用試算表選單「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」，'
-                + '只補寄真正未收到的人，不會令已收信的人重複收到。'
-              : '')
-        ),
-        actionsRow([
-          button('確定寄出', () => confirmStep2(), ''),
-          button('取消', () => closeWizard(), 'secondary')
-        ])
-      ]);
-    });
-  }
-  async function confirmStep2() {
-    await runAction('寄送中，請稍候', async () => {
-      const result = await callServer('apiStep2Confirm', currentQuarterId);
-      renderWizard([
-        title('步驟 2：寄給堂委審閱（完成）'),
-        para(
-          (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
-            + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
-            + '查無電郵略過：' + result.skipped + '\n'
-            + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '\n\n'
-            + 'Stage 已前進到 REVIEW_SENT。'
-        ),
-        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
-      ]);
-    });
-  }
-
-  // ── 步驟 3：套用修改申報 ─────────────────────────────────────────
-  function renderRequestList(labelText, items) {
-    const nodes = [make('p', { text: labelText + '：' + items.length + ' 筆', className: 'wizard-lines' })];
-    items.forEach((r) => {
-      nodes.push(make('div', {
-        text: r.serviceDateText + ' ' + r.postNameText + ' ' + r.personNameText
-          + (r.reason ? '：' + r.reason : '（' + r.requestType + '）'),
-        className: 'violation-row'
+    if (v.real && v.real.length > 0) {
+      const box = make('div', { className: 'vio vio-hard' });
+      box.appendChild(make('div', {
+        text: '⚠️ 違反了一定要遵守的規則：' + v.real.length + ' 格',
+        className: 'vio-head'
       }));
-    });
+      v.real.forEach((x) => box.appendChild(make('div', { text: describe(x), className: 'vio-row' })));
+      nodes.push(box);
+    }
+    if (v.released && v.released.length > 0) {
+      const box = make('div', { className: 'vio vio-info' });
+      box.appendChild(make('div', {
+        text: 'ℹ️ 你之前已經放行過，或者是版本生成之後才新增的申報：'
+          + v.released.length + ' 格（不用再處理）',
+        className: 'vio-head'
+      }));
+      v.released.forEach((x) => box.appendChild(make('div', { text: describe(x), className: 'vio-row' })));
+      nodes.push(box);
+    }
+    if (v.structural && v.structural.length > 0) {
+      const box = make('div', { className: 'vio vio-info' });
+      box.appendChild(make('div', {
+        text: 'ℹ️ 這一週結構上本來就不適用：' + v.structural.length + ' 格（不用處理）',
+        className: 'vio-head'
+      }));
+      nodes.push(box);
+    }
+    if (v.semiHard && v.semiHard.length > 0) {
+      const box = make('div', { className: 'vio vio-warn' });
+      box.appendChild(make('div', {
+        text: '提示：' + v.semiHard.length + ' 格觸發了「盡量避免」的規則（例如連續兩週），'
+          + '不會阻擋你繼續。',
+        className: 'vio-head'
+      }));
+      v.semiHard.forEach((x) => box.appendChild(make('div', { text: describe(x), className: 'vio-row' })));
+      nodes.push(box);
+    }
+    if (nodes.length === 0) {
+      nodes.push(make('div', { text: '規則檢查：沒有發現任何問題 ✓', className: 'ok-line' }));
+    }
     return make('div', {}, nodes);
   }
 
-  async function openStep3() {
-    await runAction('讀取驗證結果', async () => {
-      const plan = await callServer('apiStep3Plan', currentQuarterId);
-      renderStep3Plan(plan);
-    });
-  }
+  // ── 頂部：季度、狀態卡 ───────────────────────────────────────
 
-  function renderStep3Plan(plan) {
-    if (plan.mode === 'NO_PENDING_DONE') {
-      renderWizard([
-        title('步驟 3：套用修改申報'),
-        para(currentQuarterId + ' 目前沒有待處理（PENDING）的申報。'),
-        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-      ]);
-      return;
-    }
-    if (plan.mode === 'NO_VERSION') {
-      renderWizard([
-        title('步驟 3：套用修改申報'),
-        para('找不到 ' + currentQuarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。'),
-        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-      ]);
-      return;
-    }
-    if (plan.mode === 'NO_PENDING_NEEDS_ADVANCE') {
-      const nodes = [
-        title('步驟 3：套用修改申報（重新檢查）'),
-        para(
-          currentQuarterId + ' 目前沒有待處理的申報，但 Stage 仍是「' + plan.stage + '」，'
-            + '未前進到 REQUESTS_APPLIED，所以「步驟 4：正式發出」暫時執行不到。\n\n'
-            + '以下是最新版本 ' + plan.sheetName + ' 目前的規則檢查結果（只讀取，沒有改動任何東西）：'
-        ),
-        renderViolations(plan.violations)
-      ];
-      if (plan.requiresRelease) {
-        nodes.push(renderReleaseBox(STEP3_CONSEQUENCE, (text) => step3Release(text)));
-      } else {
-        nodes.push(actionsRow([
-          button('確認前進', () => step3Release(''), ''),
-          button('取消', () => closeWizard(), 'secondary')
-        ]));
-      }
-      renderWizard(nodes);
-      return;
-    }
-
-    // mode === 'HAS_PENDING'：對應選單版本 1/3
-    const nodes = [title('步驟 3：套用修改申報（1/3，驗證結果）')];
-    if (plan.skippedIncompleteCount > 0) {
-      nodes.push(para('已略過 ' + plan.skippedIncompleteCount + ' 行不完整申報（日期／崗位／姓名／類型未填滿四欄）'));
-    }
-    nodes.push(renderRequestList('可直接套用', plan.applyList));
-    nodes.push(renderRequestList('需要你確認（未曾任該崗位，屬硬規則）', plan.confirmList));
-    nodes.push(renderRequestList('無法套用（記為 NEEDS_INPUT）', plan.needsInputList));
-    nodes.push(actionsRow([
-      button('繼續', () => step3ContinueAfterPlan(plan), ''),
-      button('取消', () => step3Decline(), 'secondary')
-    ]));
-    renderWizard(nodes);
-  }
-
-  async function step3Decline() {
-    await runAction('取消中', async () => {
-      const result = await callServer('apiStep3Decline', currentQuarterId);
-      renderWizard([
-        title('步驟 3：套用修改申報'),
-        para('已取消，沒有套用任何申報、沒有建立新版本。'
-          + (result.recorded > 0
-            ? '\n\n不過其中 ' + result.recorded + ' 筆「無法套用」的申報，已經把攔截原因寫回 Requests 工作表。'
-            : '')),
-        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-      ]);
-    });
-  }
-
-  function step3ContinueAfterPlan(plan) {
-    if (plan.confirmList.length > 0) {
-      renderWizard([
-        title('確認「未曾任該崗位」的申報'),
-        renderRequestList('以下申報要全部接受嗎（選「否」則全部記為 REJECTED）', plan.confirmList),
-        actionsRow([
-          button('是，全部接受', () => step3Apply(true), ''),
-          button('否，全部拒絕', () => step3Apply(false), 'secondary')
-        ])
-      ]);
-    } else {
-      step3Apply(false);
-    }
-  }
-
-  async function step3Apply(acceptConfirmList) {
-    await runAction('套用中，請稍候', async () => {
-      const result = await callServer('apiStep3Apply', currentQuarterId, acceptConfirmList);
-      const nodes = [
-        title('步驟 3：套用修改申報（套用完成）'),
-        para(
-          '已建立新版本 ' + result.sheetName + '（底本 v' + result.baseVersionNo + '）\n\n'
-            + '已套用：' + result.appliedCount + ' 筆\n'
-            + '已拒絕：' + result.rejectedCount + ' 筆\n'
-            + '無法套用：' + result.needsInputCount + ' 筆\n\n'
-            + '待補格子（黃底）：' + result.pendingBackfillCount + ' 格'
-        ),
-        renderViolations(result.violations)
-      ];
-      if (result.advanced) {
-        nodes.push(para('Stage 已前進到 REQUESTS_APPLIED（可重複執行此步驟繼續處理新的申報）。'));
-        nodes.push(actionsRow([button('完成', () => closeWizardAndRefresh(), '')]));
-      } else {
-        nodes.push(renderReleaseBox(STEP3_CONSEQUENCE, (text) => step3Release(text)));
-      }
-      renderWizard(nodes);
-    });
-  }
-
-  async function step3Release(text) {
-    await runAction('確認中', async () => {
-      const result = await callServer('apiStep3Release', currentQuarterId, text);
-      if (result.alreadyAdvanced) {
-        renderWizard([
-          title('步驟 3：套用修改申報'),
-          para('Stage 已經是 REQUESTS_APPLIED，不需要再前進。'),
-          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-        ]);
-        return;
-      }
-      if (!result.advanced) {
-        renderWizard([
-          title('步驟 3：套用修改申報'),
-          para('輸入的文字不是「' + RELEASE_PHRASE + '」，已當作取消，Stage 未前進。\n\n'
-            + '新版本已經建立並保留。你可以到工作表直接改那幾格的姓名，再執行一次本步驟'
-            + '——系統會讀到你的改動、重新檢查規則，並在你確認之後把改動寫成一個新版本。'),
-          renderViolations(result.violations),
-          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-        ]);
-        return;
-      }
-      renderWizard([
-        title('步驟 3：套用修改申報（完成）'),
-        para('Stage 已前進到 REQUESTS_APPLIED。'),
-        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
-      ]);
-    });
-  }
-
-  const STEP3_CONSEQUENCE =
-    '繼續下去不會立即寄出任何電郵——步驟 3 只是把這一版定案。\n'
-    + '但 Stage 會前進到 REQUESTS_APPLIED，「步驟 4：正式發出」就會解鎖，屆時這些違反規則的安排會原封不動寄給各位義工。\n\n'
-    + '建議先取消，到新版本的工作表直接改那幾格的姓名，再執行一次本步驟。系統會讀到你的改動、重新檢查規則，'
-    + '並在你確認之後把改動寫成一個新版本（原版本保持不變）。（新版本已經建立並保留，取消不會令你損失任何東西。）';
-  const STEP5_CONSEQUENCE =
-    '繼續下去代表你知情並且決定照樣寄出，收信人收到的職事表會包含這些違反規則的安排。\n\n'
-    + '建議先取消，到新版本的工作表直接改那幾格的姓名，再執行一次本步驟。系統會讀到你的改動並重新檢查規則。'
-    + '（新版本已經建立、不會消失。）';
-
-  // ── 步驟 4：正式發出 ─────────────────────────────────────────────
-  async function openStep4() {
-    await runAction('讀取確認資料', async () => {
-      const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
-      if (warnings.pendingRequests.length > 0 || warnings.pendingCellsTotal > 0) {
-        const nodes = [title('有未完成事項')];
-        if (warnings.pendingRequests.length > 0) {
-          nodes.push(renderRequestList('仍有 PENDING 的申報（建議先執行「步驟 3」）', warnings.pendingRequests));
-        }
-        if (warnings.pendingCellsTotal > 0) {
-          nodes.push(para('仍有 ' + warnings.pendingCellsTotal + ' 格待補（黃底，建議先人手處理）'
-            + (warnings.pendingCells.length < warnings.pendingCellsTotal
-              ? '，只顯示前 ' + warnings.pendingCells.length + ' 格' : '')));
-        }
-        nodes.push(actionsRow([
-          // 階段 B（收尾輪）修正：原本直接 `() => step4CheckMissingPdf(...)`，
-          // 呼叫的是一個沒有自己包 runAction() 的函式，而這個按鈕本身是精靈
-          // 視窗裡的一顆按鈕（點擊時已經不在最外層 openStep4() 的 runAction()
-          // 範圍內）——如果 apiStep4GetMissingPdfWarnings 這時失敗，會變成一個
-          // 完全沒有處理的 rejected promise：按鈕點咗，畫面卻毫無反應，也沒有
-          // 任何錯誤訊息，使用者會以為系統卡住。包一層 runAction() 之後，失敗時
-          // 會用返 setStatus() 顯示紅色錯誤文字，跟其他步驟一致。
-          button('繼續', () => runAction('讀取確認資料', () => step4CheckMissingPdf(warnings.versionNo)), ''),
-          button('取消，先處理', () => closeWizard(), 'secondary')
-        ]));
-        renderWizard(nodes);
-        return;
-      }
-      await step4CheckMissingPdf(warnings.versionNo);
-    });
-  }
-
-  async function step4CheckMissingPdf(versionNo) {
-    const missingCheck = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);
-    if (missingCheck.applicable && missingCheck.missingTotal > 0) {
-      renderWizard([
-        title('有 ' + missingCheck.missingTotal + ' / ' + missingCheck.total + ' 人缺個人 PDF'),
-        para(missingCheck.missing.map((p) => p.nameTC + '（' + p.personId + '）').join('\n')
-          + (missingCheck.missing.length < missingCheck.missingTotal
-            ? '\n……另有 ' + (missingCheck.missingTotal - missingCheck.missing.length) + ' 人' : '')),
-        actionsRow([
-          // 同上一個「繼續」按鈕的修正理由：step4SendPreview 本身沒有包 runAction()，
-          // 這裡是精靈視窗裡的按鈕，不在任何外層 runAction() 範圍內。
-          button('繼續', () => runAction('讀取確認資料', () => step4SendPreview(versionNo)), ''),
-          button('取消，先產生 PDF', () => closeWizard(), 'secondary')
-        ])
-      ]);
-      return;
-    }
-    await step4SendPreview(versionNo);
-  }
-
-  async function step4SendPreview(versionNo) {
-    const preview = await callServer('apiStep4GetSendPreview', currentQuarterId, versionNo);
-    renderWizard([
-      title('步驟 4：正式發出（確認）'),
-      para(
-        'QuarterID：' + currentQuarterId + '\n'
-          + '版本號：v' + versionNo + '\n'
-          + '收件人數：' + preview.recipientCount + '\n'
-          + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
-          // 階段 A（收尾輪）新增：步驟 4 收件人多（約六十人），比步驟 2 更容易
-          // 撞到 Apps Script 執行逾時，這個警告更重要。
-          + (preview.alreadySentCount > 0
-            ? '\n\n⚠️ 偵測到這個版本已經有 ' + preview.alreadySentCount + ' 位收件人在 SendLog 有'
-              + '寄出／模擬紀錄，可能是上次執行到一半中斷後現在重新執行。\n'
-              + '👉 建議先取消，改用試算表選單「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」，'
-              + '只補寄真正未收到的人，不會令已收信的人重複收到。'
-            : '')
-      ),
-      actionsRow([
-        button('確定要正式發出', () => step4Confirm(), ''),
-        button('取消', () => closeWizard(), 'secondary')
-      ])
-    ]);
-  }
-
-  async function step4Confirm() {
-    await runAction('寄送中，請稍候', async () => {
-      const result = await callServer('apiStep4Confirm', currentQuarterId);
-      renderWizard([
-        title('步驟 4：正式發出（完成）'),
-        para(
-          (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
-            + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
-            + '查無電郵略過：' + result.skipped + '　未變略過：' + result.unchanged + '\n'
-            + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '　PDF缺件：' + result.errorPdfMissing + '\n\n'
-            + 'Stage 已前進到 OFFICIAL_SENT。'
-        ),
-        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
-      ]);
-    });
-  }
-
-  // ── 步驟 5：改動後重發 ───────────────────────────────────────────
-  async function openStep5() {
-    await runAction('讀取狀態', async () => {
-      const plan = await callServer('apiStep5Plan', currentQuarterId);
-      if (plan.mode === 'NO_PENDING') {
-        await step5GeneratePdfs('');
-        return;
-      }
-      renderStep5Plan(plan);
-    });
-  }
-
-  function renderStep5Plan(plan) {
-    const nodes = [title('步驟 5：改動後重發（套用申報，1/3）')];
-    if (plan.skippedIncompleteCount > 0) {
-      nodes.push(para('已略過 ' + plan.skippedIncompleteCount + ' 行不完整申報'));
-    }
-    nodes.push(para('目前版本號：v' + plan.baseVersionNo + '　即將建立的新版本號：v' + plan.nextVersionNo
-      + '\nDRY_RUN：' + (plan.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')));
-    nodes.push(renderRequestList('可直接套用', plan.applyList));
-    nodes.push(renderRequestList('需要你確認（未曾任該崗位，屬硬規則）', plan.confirmList));
-    nodes.push(renderRequestList('無法套用（記為 NEEDS_INPUT）', plan.needsInputList));
-    nodes.push(actionsRow([
-      button('繼續', () => step5ContinueAfterPlan(plan), ''),
-      button('取消', () => step5Decline(), 'secondary')
-    ]));
-    renderWizard(nodes);
-  }
-
-  async function step5Decline() {
-    await runAction('取消中', async () => {
-      const result = await callServer('apiStep5Decline', currentQuarterId);
-      renderWizard([
-        title('步驟 5：改動後重發'),
-        para('已取消，沒有套用任何申報、沒有建立新版本。'
-          + (result.recorded > 0
-            ? '\n\n不過其中 ' + result.recorded + ' 筆「無法套用」的申報，已經把攔截原因寫回 Requests 工作表。'
-            : '')),
-        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-      ]);
-    });
-  }
-
-  function step5ContinueAfterPlan(plan) {
-    if (plan.confirmList.length > 0) {
-      renderWizard([
-        title('確認「未曾任該崗位」的申報'),
-        renderRequestList('以下申報要全部接受嗎（選「否」則全部記為 REJECTED）', plan.confirmList),
-        actionsRow([
-          button('是，全部接受', () => step5Apply(true), ''),
-          button('否，全部拒絕', () => step5Apply(false), 'secondary')
-        ])
-      ]);
-    } else {
-      step5Apply(false);
-    }
-  }
-
-  async function step5Apply(acceptConfirmList) {
-    await runAction('套用中，請稍候', async () => {
-      const result = await callServer('apiStep5Apply', currentQuarterId, acceptConfirmList);
-      const nodes = [
-        title('步驟 5：改動後重發（套用申報完成，2/3）'),
-        para(
-          '已建立新版本 ' + result.sheetName + '（底本 v' + result.baseVersionNo + '）\n\n'
-            + '已套用：' + result.appliedCount + ' 筆\n'
-            + '已拒絕：' + result.rejectedCount + ' 筆\n'
-            + '無法套用：' + result.needsInputCount + ' 筆\n\n'
-            + '待補格子（黃底）：' + result.pendingBackfillCount + ' 格'
-        ),
-        renderViolations(result.violations)
-      ];
-      if (result.requiresAck) {
-        nodes.push(renderReleaseBox(STEP5_CONSEQUENCE, (text) => step5GeneratePdfs(text)));
-      } else {
-        nodes.push(para('接下來會比對這一版跟上次寄出時的差異，決定要通知誰。'));
-        nodes.push(actionsRow([button('繼續', () => step5GeneratePdfs(''), '')]));
-      }
-      renderWizard(nodes);
-    });
-  }
-
-  /**
-   * 產生 PDF，可能要按時間預算分批、重複呼叫。releaseText 全程帶著，
-   * 每次呼叫後端都會用「目前最新版本」重新驗證一次，不是只信任第一次的結果。
-   */
-  async function step5GeneratePdfs(releaseText) {
-    await runAction('產生個人 PDF 中，請稍候', async () => {
-      const result = await callServer('apiStep5GeneratePdfs', currentQuarterId, releaseText);
-      if (result.blocked) {
-        renderWizard([
-          title('步驟 5：改動後重發'),
-          para('放行文字不正確，或尚未輸入。'),
-          renderViolations(result.violations),
-          renderReleaseBox(STEP5_CONSEQUENCE, (text) => step5GeneratePdfs(text))
-        ]);
-        return;
-      }
-      if (result.noChanges) {
-        renderWizard([
-          title('步驟 5：改動後重發'),
-          para(currentQuarterId + ' 沒有改動需要重發。'),
-          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-        ]);
-        return;
-      }
-      if (!result.done) {
-        renderWizard([
-          title('步驟 5：改動後重發（PDF 尚未完成）'),
-          para('這次先完成了 ' + result.doneCount + ' / ' + result.totalPeople + ' 人（接近單次執行時間上限自動停下）。'),
-          actionsRow([button('繼續產生', () => step5GeneratePdfs(releaseText), '')])
-        ]);
-        return;
-      }
-      await step5SendPreview(releaseText);
-    });
-  }
-
-  async function step5SendPreview(releaseText) {
-    const preview = await callServer('apiStep5SendPreview', currentQuarterId);
-    if (preview.mode === 'NO_CHANGES') {
-      renderWizard([
-        title('步驟 5：改動後重發'),
-        para(currentQuarterId + ' 沒有改動需要重發。'),
-        actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-      ]);
-      return;
-    }
-
-    const nodes = [
-      title('步驟 5：改動後重發（確認寄送，3/3）'),
-      para('版本號：v' + preview.versionNo + '\n這一輪有改動、需要通知的人共 ' + preview.changedList.length + ' 位：')
-    ];
-    const list = make('div', {});
-    preview.changedList.forEach((c) => {
-      const row = make('div', { className: 'violation-row' });
-      row.appendChild(document.createTextNode(c.nameTC));
-      if (!c.hasAssignments) row.appendChild(make('span', { text: '本季已無服侍安排', className: 'tag no-assign' }));
-      if (c.firstNotifyDueToEmail) row.appendChild(make('span', { text: '首次通知，之前無電郵', className: 'tag first-notify' }));
-      if (!c.hasEmail) row.appendChild(make('span', { text: '無電郵無法通知', className: 'tag no-email' }));
-      list.appendChild(row);
-    });
-    nodes.push(list);
-    nodes.push(para(
-      '即將寄出的信件數：' + (preview.personSendableCount + preview.listRecipientCount)
-        + '（個人通知 ' + preview.personSendableCount + ' 封 ＋ LIST 摘要 ' + preview.listRecipientCount + ' 封）\n'
-        + 'DRY_RUN：' + (preview.isDryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出！）')
-    ));
-    nodes.push(actionsRow([
-      button('確定要繼續', () => step5SendConfirm(releaseText), ''),
-      button('取消（新版本會保留）', () => closeWizardAndRefresh(), 'secondary')
-    ]));
-    renderWizard(nodes);
-  }
-
-  async function step5SendConfirm(releaseText) {
-    await runAction('寄送中，請稍候', async () => {
-      const result = await callServer('apiStep5SendConfirm', currentQuarterId, releaseText);
-      if (result.blocked) {
-        renderWizard([
-          title('步驟 5：改動後重發'),
-          para('放行文字不正確，或尚未輸入，尚未寄出任何電郵。'),
-          renderViolations(result.violations),
-          renderReleaseBox(STEP5_CONSEQUENCE, (text) => step5SendConfirm(text))
-        ]);
-        return;
-      }
-      if (result.noChanges) {
-        renderWizard([
-          title('步驟 5：改動後重發'),
-          para(currentQuarterId + ' 沒有改動需要重發。'),
-          actionsRow([button('關閉', () => closeWizardAndRefresh(), '')])
-        ]);
-        return;
-      }
-      renderWizard([
-        title('步驟 5：改動後重發（完成）'),
-        para(
-          (result.isDryRun ? '模式：DRY_RUN（沒有真正寄出任何電郵）' : '模式：正式寄出') + '\n\n'
-            + '寄出：' + result.sent + '　模擬：' + result.dryRun + '\n'
-            + '查無電郵略過：' + result.skipped + '\n'
-            + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '　PDF缺件：' + result.errorPdfMissing + '\n\n'
-            + 'Stage 維持 OFFICIAL_SENT。'
-        ),
-        actionsRow([button('完成', () => closeWizardAndRefresh(), '')])
-      ]);
-    });
-  }
-
-  // ── 季度切換與初始化 ─────────────────────────────────────────────
   async function loadQuarters() {
     const quarters = await callServer('apiListQuarters');
-    const select = el('quarter');
-    select.innerHTML = '';
+    const select = clear(el('quarter'));
+
+    if (!quarters || quarters.length === 0) {
+      el('statusCard').hidden = true;
+      setStatus('Quarters 工作表沒有任何季度資料。請先在試算表建立季度，'
+        + '或用選單「準備工作 ▸ 新增季度」。', true);
+      return;
+    }
+
     quarters.forEach((q) => {
       const option = document.createElement('option');
       option.value = q.quarterId;
-      option.textContent = `${q.quarterId}（${q.startDate} 至 ${q.endDate}）`;
+      // 規格 1.1：寫人話，唔寫 2026T4
+      option.textContent = (q.label || q.quarterId)
+        + (q.startDate ? '（' + q.startDate + ' 開始）' : '');
       select.appendChild(option);
     });
-    if (quarters.length > 0) {
-      currentQuarterId = select.value;
-      await loadFlowState();
-    } else {
-      // 階段 B（收尾輪）修正：原本 Quarters 完全沒有資料時，這裡什麼都不做，
-      // 頁面只剩標題與一個空白下拉選單，看落好似壞咗（白畫面），使用者無法
-      // 判斷是「系統壞咗」還是「本來就未有資料」。明確顯示一句說明。
-      el('stageBadge').textContent = '';
-      el('dryRunBadge').textContent = '';
-      el('steps').innerHTML = '';
-      setStatus('目前 Quarters 工作表沒有任何季度資料，請先在試算表建立季度、'
-        + '或執行選單「準備工作 ▸ ⚠️ 新增季度」。', false);
-    }
+
+    currentQuarterId = select.value;
+    await loadDashboard();
   }
 
-  async function loadFlowState() {
+  /** 全頁唯一嘅狀態來源。**唔可以逐粒掣各自打後端。** */
+  async function loadDashboard() {
     if (!currentQuarterId) return;
-    closeWizard();
-    const state = await callServer('apiGetFlowState', currentQuarterId);
-    currentFlowState = state;
-    el('stageBadge').textContent = 'Stage: ' + state.stage;
-    el('stageBadge').className = 'badge stage';
-    el('dryRunBadge').textContent = 'DRY_RUN: ' + (state.isDryRun ? 'TRUE' : 'FALSE');
-    el('dryRunBadge').className = 'badge ' + (state.isDryRun ? 'dryrun-on' : 'dryrun-off');
-    renderSteps(state);
+    closeModal();
+    dashboard = await callServer('apiGetDashboardState', currentQuarterId);
+    renderTop(dashboard);
+    renderZone1(dashboard);
+    renderZone2Head(dashboard);
+    renderZone4();
   }
 
-  // ── 第十一輪批次階段 D：深色/淺色切換 ────────────────────────────
-  // 偏好記憶策略：優先用瀏覽器 localStorage（同步、免來回伺服器）；只有
-  // localStorage 讀寫失敗（例如 HtmlService sandbox 擋咗）先會退回用
-  // PropertiesService 嘅 UserProperties（見 WebApp.gs 嘅
-  // apiGetThemePreference()／apiSetThemePreference()，要來回伺服器）。
-  // 冇手動選過（stored 係空）時完全唔設 data-theme，跟裝置設定
-  // （ui/Style.html 嘅 @media (prefers-color-scheme: dark) 那段）。
+  function renderTop(d) {
+    el('statusCard').hidden = false;
+    el('statusText').textContent = d.statusText || '';
+
+    const v = d.latestVersion;
+    el('statusVersion').textContent = v
+      ? ('目前第 ' + v.versionNo + ' 版　' + (v.createdAt || '') + '　' + (v.basisText || ''))
+      : '這一季還沒有任何版本。';
+
+    const badge = el('dryRunBadge');
+    badge.hidden = !d.isDryRun;
+    badge.textContent = '測試模式：不會真的寄出任何電郵';
+    badge.className = 'badge badge-dryrun';
+  }
+
+  function renderZone4() {
+    const body = clear(el('zone4Body'));
+    body.appendChild(renderRollbackEntry());
+    body.appendChild(make('p', {
+      text: '其餘工具暫時請用試算表上方的選單，下一輪會搬上來。',
+      className: 'muted'
+    }));
+  }
+
+  // ── 收摺區 ───────────────────────────────────────────────────
+
+  function wireZoneToggle(headId, bodyId, onFirstOpen) {
+    let loaded = false;
+    el(headId).addEventListener('click', () => {
+      const body = el(bodyId);
+      const willOpen = body.hidden;
+      body.hidden = !willOpen;
+      el(headId).setAttribute('aria-expanded', String(willOpen));
+      if (willOpen && !loaded && onFirstOpen) {
+        loaded = true;
+        onFirstOpen();
+      }
+    });
+  }
+
+  function setZoneOpen(headId, bodyId, open) {
+    el(bodyId).hidden = !open;
+    el(headId).setAttribute('aria-expanded', String(open));
+  }
+
+  // ── 深色／淺色（沿用第十一輪嘅做法）──────────────────────────
+
   const THEME_STORAGE_KEY = 'hwcRosterTheme';
   let themeLocalStorageOk = true;
 
   function themeLocalStorageProbe() {
     try {
-      const testKey = '__hwcRosterThemeProbe__';
-      window.localStorage.setItem(testKey, '1');
-      window.localStorage.removeItem(testKey);
+      window.localStorage.setItem('__hwcProbe__', '1');
+      window.localStorage.removeItem('__hwcProbe__');
       return true;
-    } catch (err) {
-      return false;
-    }
+    } catch (err) { return false; }
   }
-
-  /** 目前實際生效嘅主題（已手動選過就用嗰個，否則睇裝置設定）。 */
   function currentEffectiveTheme() {
     const explicit = document.documentElement.getAttribute('data-theme');
     if (explicit === 'dark' || explicit === 'light') return explicit;
     return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   }
-
   function applyTheme(theme) {
     const root = document.documentElement;
-    if (theme === 'dark' || theme === 'light') {
-      root.setAttribute('data-theme', theme);
-    } else {
-      root.removeAttribute('data-theme');
-    }
+    if (theme === 'dark' || theme === 'light') root.setAttribute('data-theme', theme);
+    else root.removeAttribute('data-theme');
     const btn = el('themeToggleBtn');
     if (btn) btn.textContent = currentEffectiveTheme() === 'dark' ? '☀️ 淺色模式' : '🌙 深色模式';
   }
-
   async function initThemeToggle() {
     themeLocalStorageOk = themeLocalStorageProbe();
-
     if (themeLocalStorageOk) {
       let stored = null;
-      try { stored = window.localStorage.getItem(THEME_STORAGE_KEY); } catch (err) { stored = null; }
+      try { stored = window.localStorage.getItem(THEME_STORAGE_KEY); } catch (e) { stored = null; }
       applyTheme(stored || '');
     } else {
-      try {
-        const stored = await callServer('apiGetThemePreference');
-        applyTheme(stored || '');
-      } catch (err) {
-        applyTheme('');
-      }
+      try { applyTheme((await callServer('apiGetThemePreference')) || ''); }
+      catch (e) { applyTheme(''); }
     }
-
     el('themeToggleBtn').addEventListener('click', () => {
       const next = currentEffectiveTheme() === 'dark' ? 'light' : 'dark';
       applyTheme(next);
       if (themeLocalStorageOk) {
-        try {
-          window.localStorage.setItem(THEME_STORAGE_KEY, next);
-          return;
-        } catch (err) {
-          themeLocalStorageOk = false; // 寫入先發現擋咗，之後都改行伺服器路徑
-        }
+        try { window.localStorage.setItem(THEME_STORAGE_KEY, next); return; }
+        catch (e) { themeLocalStorageOk = false; }
       }
       callServer('apiSetThemePreference', next).catch(() => {});
     });
   }
-
-  el('quarter').addEventListener('change', () => runAction('載入狀態', async () => {
-    currentQuarterId = el('quarter').value;
-    await loadFlowState();
-  }));
-  el('btnRefresh').addEventListener('click', () => runAction('重新整理狀態', loadFlowState));
-
-  initThemeToggle();
-  runAction('初始化', loadQuarters);
 </script>

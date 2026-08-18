@@ -5,26 +5,97 @@
   <?!= includeHtml('ui/Style') ?>
 </head>
 <body>
-  <h1>粵語堂職事表系統</h1>
-  <p class="subtitle">五階段流程 Web UI——每一步的規則、確認方式與選單版本完全一致，這裡不能編輯職事表格子。</p>
+  <!--
+    第二十四輪批次階段 B：幹事介面四區改造。
+    對應 docs/幹事介面規格.md 第 1.1 節嘅頁面骨架。
 
-  <div class="toolbar">
-    <label for="quarter">季度</label>
-    <select id="quarter"></select>
-    <span class="badge" id="stageBadge"></span>
-    <span class="badge" id="dryRunBadge"></span>
-    <button id="btnRefresh" class="secondary">重新整理狀態</button>
-    <button id="themeToggleBtn" class="secondary" type="button">🌙 深色模式</button>
-  </div>
+    ⚠️ 呢個檔案**完全冇任何資料注入**（冇 <?= ?>）。
+    全部資料一律經 google.script.run 攞——`<?= JSON.stringify(x) ?>`
+    會令前端收到帶引號嘅字串，係本專案已知嘅紅線（第十九輪撞過）。
+    新增畫面一律沿用 callServer()。
+  -->
+
+  <header class="topbar">
+    <div class="topbar-main">
+      <h1>粵語堂職事表</h1>
+      <div class="quarter-row">
+        <label for="quarter">季度</label>
+        <select id="quarter"></select>
+        <span class="badge" id="dryRunBadge" hidden></span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button id="btnRefresh" class="secondary" type="button">重新整理</button>
+      <button id="themeToggleBtn" class="secondary" type="button">🌙 深色模式</button>
+    </div>
+  </header>
 
   <div class="status" id="status"></div>
 
-  <div class="steps" id="steps"></div>
+  <!-- 狀態卡：一句人話 ＋ 第二行細字寫版本（規格 1.2） -->
+  <section class="statuscard" id="statusCard" hidden>
+    <div class="statuscard-title" id="statusText"></div>
+    <div class="statuscard-sub" id="statusVersion"></div>
+  </section>
 
-  <div class="panel" id="wizardPanel" hidden>
-    <div id="wizardBody"></div>
+  <!-- 區二：開季前準備（未做完 >0 時展開） -->
+  <section class="zone" id="zone2">
+    <button class="zone-head" id="zone2Head" type="button" aria-expanded="false">
+      <span class="zone-title">區二　開季前準備</span>
+      <span class="zone-count" id="zone2Count"></span>
+      <span class="zone-caret">▾</span>
+    </button>
+    <div class="zone-body" id="zone2Body" hidden></div>
+  </section>
+
+  <!-- 區一：日常四個掣（永遠展開、永遠最當眼） -->
+  <section class="zone zone-primary" id="zone1">
+    <div class="zone-head static">
+      <span class="zone-title">區一　日常</span>
+    </div>
+    <div class="zone-body" id="zone1Body"></div>
+  </section>
+
+  <!-- 區三：名單維護（本輪未做） -->
+  <section class="zone" id="zone3">
+    <button class="zone-head" id="zone3Head" type="button" aria-expanded="false">
+      <span class="zone-title">區三　名單維護</span>
+      <span class="zone-caret">▾</span>
+    </button>
+    <div class="zone-body" id="zone3Body" hidden>
+      <p class="muted">
+        人員與電郵、崗位資格、身分、不能服侍的日期、暫時不做某崗位——
+        這五個畫面下一輪會搬上來。暫時請用試算表上方的選單。
+      </p>
+    </div>
+  </section>
+
+  <!-- 區四：進階功能（本輪只有「回到上一個版本」） -->
+  <section class="zone" id="zone4">
+    <button class="zone-head" id="zone4Head" type="button" aria-expanded="false">
+      <span class="zone-title">區四　進階功能</span>
+      <span class="zone-caret">▾</span>
+    </button>
+    <div class="zone-body" id="zone4Body" hidden></div>
+  </section>
+
+  <!-- 共用彈窗容器：一個動作只有一個確認畫面（規格 1.4） -->
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-title" id="modalTitle"></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
   </div>
 
+  <!--
+    ⚠️ 載入次序：共通嗰個一定要行先——後面三個檔案會用到
+    callServer()／runAction()／openModal() 等共通函式。
+  -->
   <?!= includeHtml('ui/Script') ?>
+  <?!= includeHtml('ui/ScriptZone1') ?>
+  <?!= includeHtml('ui/ScriptZone2') ?>
+  <?!= includeHtml('ui/ScriptRollback') ?>
+  <?!= includeHtml('ui/ScriptBoot') ?>
 </body>
 </html>
