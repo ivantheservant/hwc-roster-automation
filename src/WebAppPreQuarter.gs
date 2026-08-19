@@ -127,7 +127,23 @@ function planPreQuarterPeopleHints_(input) {
   // ⚠️ 呢個同「冇電郵」係兩件唔同嘅事：冇電郵嘅人，系統知道佢收唔到；
   // **格式錯嘅人，系統以為佢收到**——寄出去會靜靜失敗，
   // 而 SendLog 只會記一個技術錯誤，冇人會覺得有問題。
-  const badEmailPeople = usedIdList.filter(function (id) {
+  //
+  // ⚠️ 第二十八輪批次階段 C2：**檢查範圍由「本季表上嘅人」改成
+  // 「名單上全部在職嘅人」。**
+  //
+  // Ivan 實測：名單上有一位嘅電郵結尾多咗一個句號，但呢一項報 0。
+  // 格式檢查本身係啱嘅（`isPlausibleEmail_()` 捉得到），
+  // 問題係**檢查範圍**——嗰位本季啱啱冇被排到，所以完全冇被檢查過。
+  //
+  // 呢一節嘅框架本來就係「跟人不跟季」（見畫面上嗰句），
+  // 而一個打錯咗嘅電郵係一個**同季度無關**嘅資料錯誤：
+  // 佢會喺嗰個人下一次被排到嗰陣先靜靜失敗，而嗰陣先發現就太遲。
+  //
+  // `noEmail` 冇一齊改：嗰一項嘅意思真係「**本季表上**有人會被略過」，
+  // 範圍係本季，改咗就變成另一件事。
+  const emailCheckIds = (input.allActivePersonIds && input.allActivePersonIds.length > 0)
+    ? input.allActivePersonIds : usedIdList;
+  const badEmailPeople = emailCheckIds.filter(function (id) {
     const p = peopleById[id];
     const email = p ? String(p.email || '').trim() : '';
     return email !== '' && !isPlausibleEmail_(email);
@@ -152,7 +168,9 @@ function planPreQuarterPeopleHints_(input) {
     { id: 'noEmail', label: '表上有人沒有電郵，正式發出時會略過', count: noEmail },
     {
       id: 'badEmailFormat',
-      label: '有人的電郵格式看起來不對',
+      // 講明範圍係「名單上」而唔係「表上」——兩者喺呢一頁上面同時出現，
+      // 唔講清楚嘅話幹事會以為兩項數字應該一致。
+      label: '名單上有人的電郵格式看起來不對',
       count: badEmailPeople.length,
       // 逐個列出——只講數字嘅話，幹事要自己喺 89 個人入面搵。
       people: badEmailPeople
@@ -281,9 +299,19 @@ function buildPreQuarterPeopleHintInputs_(quarterId, baseInputs) {
     eligibleCountByPost[postId] = (eligibility.byPost[postId] || []).length;
   });
 
+  // 第二十八輪批次階段 C2：電郵格式檢查要看**全部在職嘅人**，唔止本季表上嗰批。
+  // ⚠️ 已停用嘅人唔檢查——佢哋唔會再被排，個電郵冇機會用到，
+  // 而報一堆已停用嘅人只會令真正要處理嗰幾個淹沒咗。
+  const M = COLUMNS.NAME_MAPPING;
+  const allActivePersonIds = readSheet(SHEETS.NAME_MAPPING)
+    .filter(function (row) { return isTrueValue_(row[M.ACTIVE]); })
+    .map(function (row) { return String(row[M.PERSON_ID] || '').trim(); })
+    .filter(function (id) { return id !== ''; });
+
   return {
     assignments: assignments,
     peopleById: peopleById,
+    allActivePersonIds: allActivePersonIds,
     roleRows: readOptionalSheetRows_(SHEETS.ROLES),
     quarterStartDate: quarterStartDate,
     eligibleCountByPost: eligibleCountByPost

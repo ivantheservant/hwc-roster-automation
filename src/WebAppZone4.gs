@@ -158,20 +158,83 @@ function apiListPendingBackfillCellsForZone4(quarterId) {
       }]);
     }
     const cells = listPendingBackfillCells_(id, versionNo);
-    if (cells.length === 0) {
-      return zone4Report_([{
-        heading: '第 ' + versionNo + ' 版：沒有待補格子',
-        lines: ['全部格子都有人了。']
-      }]);
+
+    /*
+     * ⚠️ 第二十八輪批次階段 C1：**兩件事要分開講。**
+     *
+     * Ivan 實測（2027T4 v1）：講員 13 格、獻花 13 格全部空白，
+     * 生成完成畫面自己講「另有 26 格是要你人手填的」，
+     * 但呢個工具報「沒有待補格子／全部格子都有人了」。
+     * **兩個工具對住同一件事講咗相反嘅嘢。**
+     *
+     * 兩者其實問緊唔同嘅嘢：
+     *   `listPendingBackfillCells_()` 只數「系統試過排但排唔到」嗰啲
+     *   （`ASSIGN_SOURCE.SKIPPED` ＋ 合資格規則旗標）
+     *   而講員／翻譯／獻花係**系統本來就唔會排**嘅崗位，
+     *   永遠唔會出現喺嗰個清單入面
+     *
+     * 所以「0」係對嘅，但「全部格子都有人了」係錯嘅。
+     * 呢個係同一個 bug class 嘅第四、第五次：
+     * **計數同文案冇分開「系統要排」同「唔自動排」。**
+     */
+    const manual = readManualFillSummaryForZone4_(id);
+
+    const sections = [{
+      heading: '第 ' + versionNo + ' 版',
+      lines: ['系統排不到的格子：' + cells.length]
+        .concat(manual.available
+          ? ['另有要你人手填的：' + (manual.text || '沒有')]
+          : ['另有要你人手填的：' + manual.reason])
+    }];
+
+    if (cells.length > 0) {
+      sections.push({
+        heading: '系統排不到的格子（' + cells.length + ' 格）',
+        lines: cells.map(function (c) {
+          return c.serviceDate + '　' + c.key + '　' + c.note;
+        })
+      });
     }
-    return zone4Report_([{
-      heading: '第 ' + versionNo + ' 版　共 ' + cells.length + ' 格待補',
-      lines: cells.map(function (c) {
-        return c.serviceDate + '　' + c.key + '　' + c.note;
-      })
-    }]);
+    return zone4Report_(sections);
   } catch (err) {
     return zone4Failure_('列出待補格子', err);
+  }
+}
+
+/**
+ * 第二十八輪批次階段 C1：「要你人手填的」逐項數字。
+ *
+ * ⚠️ **一定要用同區二一模一樣嘅判斷**（`planPreQuarterChecklist_()`），
+ * 唔可以喺呢度另寫一次。特別係**翻譯只計 `TranslationRequired = TRUE`
+ * 嘅主日**——另寫一次就一定會有一日兩邊講唔同嘅數字，
+ * 而呢一輪出事嘅正正就係「兩個工具對同一件事講咗相反嘅嘢」。
+ *
+ * @param {string} quarterId
+ * @returns {{available: boolean, text: string, reason: string, items: Object[]}}
+ */
+function readManualFillSummaryForZone4_(quarterId) {
+  try {
+    const checklist = apiGetPreQuarterChecklist(quarterId);
+    const MANUAL_FILL_ITEM_IDS = ['preacherEmpty', 'translationEmpty', 'flowerEmpty'];
+    const items = (checklist.items || []).filter(function (i) {
+      return MANUAL_FILL_ITEM_IDS.indexOf(i.id) !== -1 && i.count > 0;
+    });
+    return {
+      available: true,
+      // 「講員 13、獻花 13」——逐項有數字，唔係一個加埋嘅總數。
+      // 加埋一個總數，幹事就要自己拆返出嚟先知去邊度填。
+      text: items.map(function (i) {
+        return String(i.label).replace(/未填$/, '') + ' ' + i.count;
+      }).join('、'),
+      reason: '',
+      items: items
+    };
+  } catch (err) {
+    log_('WARN', '列出待補格子讀不到人手填項目：' + err.message);
+    // ⚠️ 查不到就講查不到。回一個 0 或者空白會令幹事以為「冇嘢要填」。
+    return {
+      available: false, text: '', reason: '查不到（' + err.message + '）', items: []
+    };
   }
 }
 

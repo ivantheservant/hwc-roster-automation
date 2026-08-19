@@ -25,7 +25,21 @@
   function openRollback() {
     runAction('讀取版本清單', async () => {
       const data = await callServer('apiListVersionsForRollback', currentQuarterId);
-      if (!data.versions || data.versions.length < 2) {
+      const count = (data.versions || []).length;
+      // ⚠️ 第二十八輪批次階段 C3：**三種情況要分開講。**
+      //
+      // Ivan 實測：2027T1 一個版本都冇，但彈出嘅係
+      // 「這一季只有一個版本」——一句同事實相反嘅話。
+      // 舊寫法用 `< 2` 一次過蓋住 0 同 1，而 0 同 1 對幹事嚟講
+      // 下一步完全唔同：一個係「去撳生成初稿」，一個係「等下一版」。
+      if (count === 0) {
+        openModal('回到上一個版本', [
+          para('這一季還沒有生成初稿。'),
+          para('先在上面撳「生成初稿」，之後才會有版本可以回去。', 'muted')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      if (count === 1) {
         openModal('回到上一個版本', [
           para('這一季只有一個版本，沒有可以回去的舊版本。')
         ], [button('知道了', () => closeModal(), '')]);

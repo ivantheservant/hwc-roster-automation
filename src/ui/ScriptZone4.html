@@ -199,13 +199,28 @@
       danger: true,
       onConfirm: () => runAction('重新生成中，請稍候', async () => {
         const res = await callServerMutating('apiGenerateRoster', currentQuarterId);
-        openModal('重新生成完成', [
-          make('div', { text: '已建立第 ' + res.versionNo + ' 版。', className: 'ok-line' }),
-          make('div', {
-            text: '規則違反 ' + (res.violationCount === undefined ? '（未提供）' : res.violationCount) + ' 項。',
-            className: 'ok-line'
-          })
-        ], [button('完成', () => closeModalAndRefresh(), '')]);
+        // ⚠️ 第二十八輪批次階段 C4：本來寫 `res.violationCount`，
+        // 而 `apiGenerateRoster()` 根本冇呢個欄位——畫面永遠印
+        // 「規則違反（未提供）項」。
+        // 冇假造一個 0 係啱嘅，但個數字其實攞得到（`warnings`），
+        // 所以應該攞返，唔係留一句幹事睇唔明嘅話。
+        const nodes = [
+          make('div', { text: '已建立第 ' + res.versionNo + ' 版。', className: 'ok-line' })
+        ];
+        nodes.push(make('div', {
+          text: typeof res.warnings === 'number'
+            ? ('規則提示 ' + res.warnings + ' 項。')
+            : '規則違反：稍後可用「核對職事表」查看。',
+          className: 'ok-line'
+        }));
+        if (res.blank !== undefined) {
+          nodes.push(make('div', {
+            text: '已排 ' + res.assigned + ' 格，留空 ' + res.blank + ' 格'
+              + '（留空包括講員／翻譯／獻花這些要你人手填的）。',
+            className: 'muted'
+          }));
+        }
+        openModal('重新生成完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
       })
     });
   }
