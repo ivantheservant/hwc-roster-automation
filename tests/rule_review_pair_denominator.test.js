@@ -107,16 +107,25 @@ console.log('\n=== D2 選項亦跟新分母 ===');
     }), choices.map(function (c) { return c.label + '=' + c.value; }).join(' ｜ '));
 }
 
-console.log('\n=== D2 仲未解決嗰個分歧要留低紀錄 ===');
+console.log('\n=== C′3【核心】嗰個分歧已經拍板，唔可以再留「未解決」 ===');
 {
-  // ⚠️ 排表引擎嘅**進度控制**仍然用 `weeksCounted`（＝ 13），
-  // 所以佢實際會排到約 4 對而唔係 3 對。改引擎會改動每一季嘅排表結果，
-  // 屬行為改動，本輪冇做——但一定要有紀錄，唔可以當唔存在。
+  // ⚠️ 第三十二輪批次階段 C′：第三十輪留低嘅「未解決分歧」已經拍板。
+  //
+  // 引擎嘅進度控制（`isBehindTargetPace_()`）繼續用 `weeksCounted`，
+  // **呢個係決定，唔係遺漏**：實測改咗會令每一季排表結果全部改變
+  // 而目標指標零改善，而現場 20/23 個版本已經排到 3 對（25%），
+  // 目標 3.24 對——已經命中。
+  //
+  // 舊版斷言要求註解寫住「未解決」。而家反過嚟：**唔准再有**
+  // ——留住嘅話下一輪一定有人再提一次。
   const src = read('src/RuleReview.gs');
-  check('★★★★★ `RULE_REVIEW_UNITS` 嘅註解明講咗呢個未解決嘅分歧',
-    src.indexOf('仲有一個**未解決**嘅分歧要記低') !== -1);
-  check('★★★★★ 而且講明「改引擎會改動每一季嘅排表結果，本輪冇做」',
-    src.indexOf('屬行為改動') !== -1);
+  check('★★★★★ **冇「未解決」／「等 Ivan 拍板」呢類字眼**',
+    src.indexOf('未解決') === -1 && src.indexOf('等 Ivan 拍板') === -1);
+  check('★★★★★ 改成明寫「已經拍板」，而且指返去 `isBehindTargetPace_()`',
+    src.indexOf('已經拍板') !== -1 && src.indexOf('isBehindTargetPace_()') !== -1);
+  check('★★★★★ 而引擎嗰邊真係有寫低理由'
+    + '——一個冇解釋嘅刻意唔一致，下一輪一定有人「順手修好」',
+    read('src/Generator.gs').indexOf('greedy pass 內部的「節流參數」，不是量度') !== -1);
   check('★★★★ 稽核文件亦有寫',
     read('docs/系統範圍稽核.md').indexOf('measureAnnounceRelief_') !== -1);
 }

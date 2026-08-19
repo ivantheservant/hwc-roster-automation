@@ -32,6 +32,10 @@ const gas = loadGasSource([
   'Roles.gs', 'RoleImpact.gs', 'HardViolationClass.gs',
   'Generator.gs', 'FineTune.gs', 'StateSource.gs',
   'WebAppGuards.gs', 'WebAppFlow.gs',
+  // 第三十二輪批次階段 D4：步驟 2 嘅端點 `apiStep2Preview()` 只係一層薄殼，
+  // 真正做嘢嘅係 `FiveStageCore.gs` 嘅 `planStep2_()`／`executeStep2_()`。
+  // 唔載入佢就會 `planStep2_ is not defined`——而嗰個錯**唔係**測試想證嘅嘢。
+  'FiveStageCore.gs',
   'WebAppSaveConfirm.gs', 'WebAppRollback.gs'
 ]);
 
@@ -222,6 +226,130 @@ console.log('\n=== A3【核心】「回到上一個版本」預覽由端點入�
   check('★★★★ 逐格比對有結果（第 1 版同第 2 版有一格唔同）',
     result !== null && Array.isArray(result.cellChanges) && result.cellChanges.length === 1,
     JSON.stringify(result && result.cellChanges));
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * 第三十二輪批次階段 D4：**步驟 2 係五步入面唯一冇真入口測試嗰步**
+ * ══════════════════════════════════════════════════════════════
+ *
+ * `tools/lint-entry-coverage.js` 掃出嚟嘅結果：
+ *
+ *   步驟 1 生成初稿　　`apiGenerateRoster`　　　✅（rollback_zero_version）
+ *   步驟 2 寄給堂委　　`apiStep2Preview/Confirm`　❌ **冇**
+ *   步驟 3 儲存並確認　`apiSaveAndConfirmPlan`　✅（呢一份上面）
+ *   步驟 4 正式發出　　`apiStep4Confirm`　　　　✅（unsaved_changes_guard）
+ *   步驟 5 改動後重發　`apiStep5Plan`　　　　　✅（resend_changed_persons）
+ *
+ * 所以只補呢一步，**唔為咗湊夠五個而重複寫**。
+ */
+
+console.log('\n=== D4【核心】步驟 2「寄給堂委審閱」由端點入口行一次 ===');
+{
+  stubIo({
+    countReviewerRecipients_: function () { return 4; },
+    countAlreadySentForStage_: function () { return 0; }
+  });
+
+  let result = null;
+  let thrown = null;
+  try {
+    result = gas.apiStep2Preview('2027T4');
+  } catch (err) {
+    thrown = err;
+  }
+
+  check('★★★★★ **`apiStep2Preview()` 唔會拋錯**'
+    + '——由端點到 IO 之間每一行都真正行過，包括 `requireQuarterStage_()`'
+    + '同 `findLatestVersionNo()` 嘅回傳點樣被用',
+    thrown === null, thrown && (thrown.message + '\n' + thrown.stack));
+  check('★★★★★ 而且真係攞到收件人數同版本號',
+    result !== null && result.recipientCount === 4 && result.versionNo === 1,
+    JSON.stringify(result));
+  check('★★★★ `isDryRun` 有講（呢個欄位決定確認畫面寫「會唔會真係寄」）',
+    result !== null && typeof result.isDryRun === 'boolean', JSON.stringify(result));
+}
+
+console.log('\n=== D4 步驟 2 嘅 Stage 閘門由入口叫都要生效 ===');
+{
+  // ⚠️ 第二十五輪把步驟 2 放寬到三個 Stage。`OFFICIAL_SENT` 唔喺入面——
+  // 一季已經正式發出咗之後，唔應該再「寄審閱本」。
+  stubIo({
+    countReviewerRecipients_: function () { return 4; },
+    countAlreadySentForStage_: function () { return 0; },
+    getQuarterStage_: function () { return gas.QUARTER_STAGE.OFFICIAL_SENT; }
+  });
+  let thrown = null;
+  try { gas.apiStep2Preview('2027T4'); } catch (err) { thrown = err; }
+  check('★★★★★ `OFFICIAL_SENT` ⇒ 由入口叫都會被擋'
+    + '——閘門唔可以只喺內部函式生效',
+    thrown !== null, '完全冇拋錯');
+  check('★★★★ 而且訊息講得出係邊一步同而家係咩 Stage',
+    thrown !== null && thrown.message.indexOf('步驟 2') !== -1
+    && thrown.message.indexOf('OFFICIAL_SENT') !== -1, thrown && thrown.message);
+}
+
+console.log('\n=== D4 步驟 2 冇版本 ⇒ 要講「請先生成初稿」，唔可以靜靜過 ===');
+{
+  stubIo({
+    countReviewerRecipients_: function () { return 4; },
+    countAlreadySentForStage_: function () { return 0; },
+    findLatestVersionNo: function () { return -1; }
+  });
+  let thrown = null;
+  try { gas.apiStep2Preview('2027T4'); } catch (err) { thrown = err; }
+  check('★★★★★ 冇版本 ⇒ 拋錯'
+    + '——`-1` 係「冇版本」嘅記號，唔可以被當成一個版本號用落去',
+    thrown !== null, '完全冇拋錯');
+  check('★★★★★ 而且明確叫人去撳「步驟 1：生成初稿」',
+    thrown !== null && thrown.message.indexOf('生成初稿') !== -1,
+    thrown && thrown.message);
+}
+
+console.log('\n=== D4 步驟 2 執行前一定要行埋兩道前置檢查 ===');
+{
+  // 掣 2 永不改動職事表內容，所以有未儲存改動時一律拒絕；
+  // 冇公開連結亦唔應該寄（堂委收到嘅信入面嗰條連結會係死嘅）。
+  let calledUnsaved = 0;
+  let calledPublicLink = 0;
+  let calledExecute = 0;
+  stubIo({
+    assertNoUnsavedChanges_: function () { calledUnsaved++; },
+    assertPublicLinkReady_: function () { calledPublicLink++; },
+    executeStep2_: function () {
+      calledExecute++;
+      return { isDryRun: true, sent: 0, dryRun: 4, skipped: 0, failed: 0, errorPdf: 0 };
+    }
+  });
+
+  const out = gas.apiStep2Confirm('2027T4');
+  check('★★★★★ `assertNoUnsavedChanges_()` 有被叫'
+    + '——冇呢道檢查，堂委會收到一條指向舊版本嘅連結，'
+    + '而幹事以為佢哋睇緊啱啱改完嗰版',
+    calledUnsaved === 1, String(calledUnsaved));
+  check('★★★★★ `assertPublicLinkReady_()` 有被叫', calledPublicLink === 1,
+    String(calledPublicLink));
+  check('★★★★★ 而且真係行到 `executeStep2_()`', calledExecute === 1, String(calledExecute));
+  check('★★★★ 回傳六個欄位齊全（前端靠佢哋砌完成畫面）',
+    out && typeof out.isDryRun === 'boolean' && out.dryRun === 4
+    && out.sent === 0 && out.skipped === 0 && out.failed === 0 && out.errorPdf === 0,
+    JSON.stringify(out));
+}
+
+console.log('\n=== D4 反面：前置檢查拋錯 ⇒ 一定唔可以寄出去 ===');
+{
+  // ⚠️ 呢一段先係重點：證明個閘真係擋得住，唔係「叫咗但冇用」。
+  let calledExecute = 0;
+  stubIo({
+    assertNoUnsavedChanges_: function () { throw new Error('有未儲存的改動'); },
+    assertPublicLinkReady_: function () {},
+    executeStep2_: function () { calledExecute++; return {}; }
+  });
+  let thrown = null;
+  try { gas.apiStep2Confirm('2027T4'); } catch (err) { thrown = err; }
+  check('★★★★★ 拋咗錯', thrown !== null);
+  check('★★★★★ **而且一封信都冇寄**'
+    + '——「檢查有叫到」同「檢查真係擋到」係兩件事，只測前者等於冇測',
+    calledExecute === 0, String(calledExecute));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

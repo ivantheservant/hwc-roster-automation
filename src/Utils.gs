@@ -692,3 +692,95 @@ function toFiniteNumberOrNull_(value) {
   const n = Number(value);
   return isFinite(n) ? n : null;
 }
+
+/**
+ * 「相鄰對」嘅數目：`N` 個主日之間有 `N − 1` 對相鄰。
+ *
+ * ⚠️⚠️ **排表引擎刻意唔用呢個函式。** 見 `Generator.gs` 嘅
+ * `isBehindTargetPace_()` 註解——嗰個係 greedy pass 內部嘅節流參數，
+ * 唔係量度。第三十二輪實測過改佢嘅代價，決定保留現狀。
+ *
+ * **呢個函式係俾量度介面用嘅**：
+ *   `Verify.gs` 品質統計（目標嗰邊）
+ *   `RuleReview.gs` 規則審閱表
+ * 兩者一定要一致，而且已經一致。
+ *
+ * ⚠️ 只適用於「報告連續」（相鄰兩週同一人）。
+ * 「主席兼報告」量嘅係每一週，分母本來就係全部週數。
+ *
+ * @param {number} weeksCounted 主日數
+ * @returns {number} 相鄰對數；**唔會回負數**
+ */
+function adjacentPairCount_(weeksCounted) {
+  const n = toFiniteNumberOrNull_(weeksCounted);
+  // 算唔到就當 0 對。0 對嘅話呼叫端會走「換算唔到」嗰條路，
+  // 而唔會印一句「0 對相鄰的主日之中約 0 對」。
+  if (n === null) return 0;
+  // ⚠️ 第一週不可能有「連續兩週」，所以 1 個主日 ⇒ 0 對。
+  // `Math.max` 唔係多餘：`weeksCounted` 係 0 嗰陣 `0 - 1 = -1`，
+  // 而負數會靜靜流落去做分母。
+  return Math.max(0, n - 1);
+}
+
+/**
+ * 「報告連續」目標嘅人話講法。**對數係主角，百分比放括號。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第三十二輪批次階段 C′4：點解要噉講
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 只講百分比會令人以為系統做錯咗嘢。實情係：
+ * 13 個主日只有 12 對相鄰，而 `0.27 × 12 = 3.24` 對——
+ * **3.24 對只可以實現為 3 對或者 4 對**，即 25.0% 或者 33.3%。
+ * 兩者都係「命中 27%」喺呢個粒度下嘅唯一可能結果。
+ *
+ * 現場實測：所有已生成版本之中 25.0% 出現 20 次、33.3% 出現 3 次，
+ * 平均 3.13 對——正正就係圍住 3.24 上落。**系統一直冇做錯。**
+ *
+ * ⚠️ 週數唔係 13 嗰陣要自動換算，**唔可以寫死 12 或者 3**。
+ *
+ * @param {number} target 目標比例（0–1）
+ * @param {?number} weeks 一季有幾多個主日
+ * @returns {{ok: boolean, pairs: number, text: string, note: string}}
+ *   `ok` false ＝ 換算唔到（呼叫端應該改講百分比，唔好硬砌）
+ */
+function describeAdjacentPairTarget_(target, weeks) {
+  const t = toFiniteNumberOrNull_(target);
+  const pairs = adjacentPairCount_(weeks);
+  if (t === null || pairs < 1) {
+    return { ok: false, pairs: pairs, text: '', note: '' };
+  }
+
+  const exact = t * pairs;
+  const low = Math.floor(exact);
+  const high = Math.ceil(exact);
+  const pct = function (n) { return (n / pairs * 100).toFixed(1) + '%'; };
+
+  const text = pairs + ' 對相鄰主日之中約 ' + Math.round(exact) + ' 對'
+    + '（' + (t * 100).toFixed(0) + '%）';
+
+  // 剛好整除 ⇒ 冇「兩者都算命中」呢回事，唔好講多餘嘢。
+  const note = (low === high)
+    ? ('因為只得 ' + pairs + ' 對，' + low + ' 對（' + pct(low) + '）就是剛好命中。')
+    : ('因為只得 ' + pairs + ' 對，實際會落在 ' + low + ' 對（' + pct(low) + '）或 '
+      + high + ' 對（' + pct(high) + '），兩者都算命中。');
+
+  return { ok: true, pairs: pairs, text: text, note: note };
+}
+
+/**
+ * 「報告連續」實測嘅人話講法。同上，對數做主角。
+ *
+ * @param {number} repeats 實際連續咗幾多對
+ * @param {number} pairs 實際數到幾多對相鄰（**唔一定係 `週數 − 1`**——
+ *   有啲週可能完全冇排到人，嗰啲 pair 唔算數）
+ * @returns {string}
+ */
+function describeAdjacentPairActual_(repeats, pairs) {
+  const r = toFiniteNumberOrNull_(repeats);
+  const p = toFiniteNumberOrNull_(pairs);
+  // ⚠️ 算唔到就要講，唔可以印「0 對（0.0%）」——嗰個係一個
+  // 睇落完全正常、但意思完全唔同嘅答案。
+  if (r === null || p === null || p < 1) return '（算不出來）';
+  return r + ' 對（' + (r / p * 100).toFixed(1) + '%）';
+}

@@ -121,12 +121,16 @@ const RULE_REVIEW_FIELD = { TARGET: 'TARGET_VALUE', ENABLED: 'ENABLED' };
  * 所以：**量詞、母體、換算分母三樣都跟單位**，全部係 `weeks - 1`。
  * `0.27 × 12 = 3.24` ⇒ 「12 對相鄰的主日之中約 3 對」。
  *
- * ⚠️ 仲有一個**未解決**嘅分歧要記低：排表引擎嘅**進度控制**
- * （`isBehindTargetPace_()`）仍然用 `weeksCounted`（＝ 13），
- * 所以佢實際會排到約 4 對，而唔係 3 對。
- * 換言之：審閱表同品質統計而家一致（分母 12），但引擎自己嘅
- * 進度控制多數一格。改引擎會改動每一季嘅排表結果，屬行為改動，
- * 本輪冇做——寫入 `docs/系統範圍稽核.md` 等 Ivan 拍板。
+ * ⚠️⚠️ **第三十二輪批次階段 C′：引擎嗰邊刻意保留唔一致，已經拍板。**
+ *
+ * 排表引擎嘅進度控制（`Generator.gs` 嘅 `isBehindTargetPace_()`）
+ * 繼續用 `weeksCounted`（＝ 13）。**呢個係決定，唔係遺漏。**
+ * 完整理由寫喺 `isBehindTargetPace_()` 嘅註解，簡短版：
+ * 引擎嗰個係 greedy pass 內部嘅節流參數，唔係量度；
+ * 實測改咗會令每一季排表結果全部改變而目標指標零改善；
+ * 而現場 20/23 個版本已經排到 3 對（25%），目標 3.24 對——已經命中。
+ *
+ * **量度介面呢邊（審閱表、品質統計）一律用 `adjacentPairCount_()`。**
  */
 const RULE_REVIEW_UNITS = {
   PER_SUNDAY: {
@@ -139,9 +143,10 @@ const RULE_REVIEW_UNITS = {
   },
   ADJACENT_PAIR: {
     id: 'ADJACENT_PAIR',
-    population: function (weeks) { return weeks - 1; },
-    // ⚠️ 同 `Verify.gs` 嘅 `measureAnnounceRelief_()` 一樣：13 個主日 ⇒ 12 對。
-    ratioDenominator: function (weeks) { return weeks - 1; },
+    // ⚠️ 第三十二輪批次階段 C′2：兩個都叫 `adjacentPairCount_()`。
+    // 同一條式喺呢度同 `Verify.gs` 各寫一次就係兩個真相來源。
+    population: function (weeks) { return adjacentPairCount_(weeks); },
+    ratioDenominator: function (weeks) { return adjacentPairCount_(weeks); },
     describe: function (population, count) {
       return population + ' 對相鄰的主日之中約 ' + count + ' 對';
     }
@@ -661,6 +666,20 @@ function describeRuleForReview_(rule, level, weeks, ctx) {
   if (plain.current) currentText = resolve(plain.current);
   else if (level === RULE_LEVELS.SOFT) currentText = describeRuleValue_(target, weeks, unitId);
   else currentText = enabled ? '有生效' : '已關掉';
+
+  // ⚠️ 第三十二輪批次階段 C′4：相鄰對嘅規則要補一句「兩者都算命中」。
+  //
+  // `0.27 × 12 = 3.24` 對，而 3.24 對只可以實現為 3 對或者 4 對
+  //（25.0% ／ 33.3%）。冇呢句嘅話，堂委見到審閱表寫「約 3 對」、
+  // 事後品質統計見到「4 對」，會以為系統冇跟佢哋批准嗰個數。
+  //
+  // ⚠️ 用返 `describeAdjacentPairTarget_()`——同 `Verify.gs` 品質統計
+  // 同一個函式。兩邊各寫一次就會漂移，而漂移嘅後果係
+  // 堂委見到嘅數同幹事事後見到嘅數唔同。
+  if (unitId === RULE_REVIEW_UNITS.ADJACENT_PAIR.id && level === RULE_LEVELS.SOFT) {
+    const goal = describeAdjacentPairTarget_(target, weeks);
+    if (goal.ok) currentText = currentText + '\n' + goal.note;
+  }
 
   let choices;
   if (level !== RULE_LEVELS.SOFT) {

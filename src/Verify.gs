@@ -113,10 +113,23 @@ function buildVerifyReport_(context) {
   const announce = computeAnnounceConsecutiveRatio_(context);
   rows.push(makeSectionRow_('3. 報告連續兩週同一人的相鄰 pair 比例'));
   if (announce) {
+    // ⚠️ 第三十二輪批次階段 C′4：**對數做主角，百分比放括號。**
+    //
+    // 舊寫法係 `25.0%　3/12 對　目標 27.0% ± …`，睇落好似差咗 2 個百分點。
+    // 實情係 `0.27 × 12 = 3.24` 對，而 3.24 對只可以實現為 3 對或者 4 對
+    // ——25.0% 已經係命中。只講百分比會令人以為系統做錯咗嘢。
+    //
+    // ⚠️ 目標嗰邊用 `adjacentPairCount_(週數)`（理論上限），
+    // 實測嗰邊用 `announce.pairs`（**實際數到幾多對**——有啲週可能
+    // 完全冇排到人，嗰啲 pair 唔算數）。兩個數唔一定一樣，
+    // 而夾硬當佢哋一樣就會令實測比例失真。
+    const goal = describeAdjacentPairTarget_(announce.target, context.serviceDates.length);
     rows.push(makeItemRow_(
       '相鄰 pair 重複比例',
-      formatPercent_(announce.ratio) + '　' + announce.repeats + '/' + announce.pairs + ' 對',
-      formatPercent_(announce.target) + ' ± ' + formatPercent_(announce.tolerance),
+      describeAdjacentPairActual_(announce.repeats, announce.pairs),
+      goal.ok
+        ? (goal.text + '　' + goal.note)
+        : (formatPercent_(announce.target) + ' ± ' + formatPercent_(announce.tolerance)),
       announce.deviates
     ));
   } else {
