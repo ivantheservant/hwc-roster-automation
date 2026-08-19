@@ -224,8 +224,11 @@ function getOrCreateRuleReviewFolder_() {
 function buildRuleReviewContext_() {
   const mutexByGroup = {};
   const gatedPosts = [];
+  // 第二十九輪批次階段 A4：`ScopePostIDs` 要譯成中文崗位名先講得出人話。
+  const postNameById = {};
   try {
     readPostsNormalized().forEach(function (p) {
+      postNameById[p.postId] = p.postNameTC || p.postId;
       const group = String(p.mutexGroup || '').trim();
       if (group) {
         if (!mutexByGroup[group]) mutexByGroup[group] = [];
@@ -250,7 +253,8 @@ function buildRuleReviewContext_() {
     mutexGroups: Object.keys(mutexByGroup).sort().map(function (g) {
       return { group: g, postNames: mutexByGroup[g] };
     }),
-    gatedPosts: gatedPosts
+    gatedPosts: gatedPosts,
+    postNameById: postNameById
   };
 }
 

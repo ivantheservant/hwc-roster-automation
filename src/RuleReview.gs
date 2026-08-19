@@ -81,6 +81,108 @@ const RULE_REVIEW_COLUMN_WIDTHS = [50, 260, 380, 220, 260, 200, 260];
 const RULE_REVIEW_FIELD = { TARGET: 'TARGET_VALUE', ENABLED: 'ENABLED' };
 
 /**
+ * 第二十九輪批次階段 A2：**比例型規則有兩種單位。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Ivan 實測
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 第 9 條（報告可以連續兩週）匯出成 `13 個主日之中約 4 個`。
+ * 但呢條規則數嘅唔係「主日」，係「**相鄰嘅兩個主日**」——
+ * 13 個主日之間只有 12 對相鄰。用「個主日」做量詞根本講唔通。
+ *
+ * ⚠️ **唔可以寫死邊條用邊個單位。** 單位係規則自己嘅屬性，
+ * 要寫喺規則定義表（`ruleReviewPlainEntry_()`）入面，
+ * 換算同顯示兩邊都讀同一個欄位。將來加新規則時唔會再中同一個陷阱。
+ *
+ * 每個單位要講三件事：
+ *
+ * | 欄位 | 意思 | 點解要分開 |
+ * |---|---|---|
+ * | `population(weeks)` | 講俾堂委聽嗰個「總數」 | 相鄰對數係 `weeks - 1` |
+ * | `ratioDenominator(weeks)` | **排表引擎真正乘嗰個數** | 見下面嘅警告 |
+ * | `describe(pop, count)` | 一句人話 | 量詞唔同（個／對） |
+ *
+ * ⚠️⚠️ **`population` 同 `ratioDenominator` 特登係兩件事。**
+ * 排表引擎入面 `isBehindTargetPace_(count, weeksCounted, target)`
+ * 用嘅係 `count < target × weeksCounted`，而 `weeksCounted` 數嘅係
+ * **全部主日**（連第一週都數，雖然第一週唔可能有「連續」）。
+ * 所以第 9 條實際跑出嚟嘅對數係 `target × weeks`，唔係 `target × (weeks - 1)`。
+ *
+ * 如果呢度改用 `weeks - 1` 做換算分母，份表就會寫住「約 3 對」，
+ * 而系統實際會排到約 4 對——**份表同系統講唔同嘅嘢**，
+ * 亦即係本專案第 6 類 bug（同一條規則喺唔同地方用咗唔同分母）。
+ * 所以：**量詞同母體跟單位，換算分母跟引擎。**
+ *
+ * 呢個分歧本身係一個要 Ivan 拍板嘅設計問題（見 `docs/系統範圍稽核.md`）：
+ * 要就改引擎行 `weeks - 1`，要就接受「4 對出自 12 對」。
+ * 喺佢決定之前，**份表講嘅一定要係系統真正會做嗰件事**。
+ */
+const RULE_REVIEW_UNITS = {
+  PER_SUNDAY: {
+    id: 'PER_SUNDAY',
+    population: function (weeks) { return weeks; },
+    ratioDenominator: function (weeks) { return weeks; },
+    describe: function (population, count) {
+      return population + ' 個主日之中約 ' + count + ' 個';
+    }
+  },
+  ADJACENT_PAIR: {
+    id: 'ADJACENT_PAIR',
+    population: function (weeks) { return weeks - 1; },
+    // ⚠️ 特登**唔係** `weeks - 1`。見上面。
+    ratioDenominator: function (weeks) { return weeks; },
+    describe: function (population, count) {
+      return population + ' 對相鄰的主日之中約 ' + count + ' 對';
+    }
+  }
+};
+
+/** 冇標明單位嗰陣用邊個。逐個主日係大多數。 */
+const RULE_REVIEW_DEFAULT_UNIT = 'PER_SUNDAY';
+
+/**
+ * 攞一個單位定義。
+ *
+ * 認唔出嘅單位代號 ⇒ **拋錯**，唔可以靜靜退回預設。
+ * 靜靜退回嘅話，打錯一個字就會令一條規則用錯分母，
+ * 而份表睇落完全正常——而堂委會照住嗰個錯數做決定。
+ *
+ * @param {?string} unitId
+ * @returns {Object}
+ */
+function ruleReviewUnit_(unitId) {
+  const id = String(unitId || RULE_REVIEW_DEFAULT_UNIT).trim();
+  const unit = RULE_REVIEW_UNITS[id];
+  if (!unit) {
+    throw new Error('規則審閱表：認不出的單位代號「' + id + '」。'
+      + '可用的是：' + Object.keys(RULE_REVIEW_UNITS).join('、') + '。');
+  }
+  return unit;
+}
+
+/**
+ * 一個單位喺呢個季度可唔可以換算。
+ *
+ * 相鄰對數喺得一個主日嘅季度係 0——0 做分母／母體都冇意思，
+ * 呢種情況一律當「查不到」處理（改講百分比），
+ * **唔可以印一句「0 對相鄰的主日之中約 0 對」**。
+ *
+ * @param {Object} unit
+ * @param {?number} weeks
+ * @returns {?{population: number, denominator: number}} null ＝ 換算唔到
+ */
+function ruleReviewUnitScale_(unit, weeks) {
+  if (weeks === null || weeks === undefined) return null;
+  const w = Number(weeks);
+  if (isNaN(w) || w < 1) return null;
+  const population = unit.population(w);
+  const denominator = unit.ratioDenominator(w);
+  if (population < 1 || denominator < 1) return null;
+  return { population: population, denominator: denominator };
+}
+
+/**
  * 一季有幾多個主日。
  *
  * ⚠️ **唔可以寫死 13。** 有啲季度係 12 或者 14 個主日，
@@ -112,57 +214,141 @@ function resolveRuleReviewWeeks_(timezone) {
 }
 
 /**
- * 把一個比例值換成「N 個主日之中約 M 個」。
+ * 把一個比例值換成人話，量詞同母體跟規則自己嘅單位。
+ *
  * @param {*} value
  * @param {?number} weeks
+ * @param {?string} unitId 見 `RULE_REVIEW_UNITS`；唔傳 ＝ 逐個主日
  * @returns {string}
  */
-function describeRuleValue_(value, weeks) {
+function describeRuleValue_(value, weeks, unitId) {
   if (value === '' || value === null || value === undefined) return '（沒有設定）';
   const num = Number(value);
   if (isNaN(num)) return String(value);
+  if (!(num > 0 && num < 1)) return String(num);
 
-  if (num > 0 && num < 1) {
-    if (weeks === null || weeks === undefined) {
-      // ⚠️ 查不到主日數就**唔換算**。硬用 13 換算出嚟嘅數字睇落好確定，
-      // 但可能係錯嘅——而堂委會照住嗰個錯數做決定。
-      return '大約 ' + Math.round(num * 100) + '％的主日（查不到一季有幾多個主日，無法換算成次數）';
-    }
-    return weeks + ' 個主日之中約 ' + Math.round(num * weeks) + ' 個';
+  const unit = ruleReviewUnit_(unitId);
+  const scale = ruleReviewUnitScale_(unit, weeks);
+  if (!scale) {
+    // ⚠️ 查不到主日數就**唔換算**。硬用 13 換算出嚟嘅數字睇落好確定，
+    // 但可能係錯嘅——而堂委會照住嗰個錯數做決定。
+    return '大約 ' + Math.round(num * 100) + '％的主日（查不到一季有幾多個主日，無法換算成次數）';
   }
-  return String(num);
+  return unit.describe(scale.population, Math.round(num * scale.denominator));
 }
 
 /**
  * 比例型規則嘅選項（2–5 個），**每個選項自己帶住要寫入嘅值**。
+ *
  * @param {number} current 現時值（0–1）
  * @param {?number} weeks
+ * @param {?string} unitId 見 `RULE_REVIEW_UNITS`
  * @returns {Array<{label: string, value: number, field: string}>}
  */
-function buildRuleReviewRatioChoices_(current, weeks) {
+function buildRuleReviewRatioChoices_(current, weeks, unitId) {
   const num = Number(current);
-  if (isNaN(num) || num <= 0 || num >= 1 || weeks === null || weeks === undefined) {
-    return [{ label: '維持現狀', value: num, field: RULE_REVIEW_FIELD.TARGET }];
-  }
+  const unit = ruleReviewUnit_(unitId);
+  const scale = ruleReviewUnitScale_(unit, weeks);
+  const keepOnly = [{ label: '維持現狀', value: num, field: RULE_REVIEW_FIELD.TARGET }];
+  if (isNaN(num) || num <= 0 || num >= 1 || !scale) return keepOnly;
 
-  const currentCount = Math.round(num * weeks);
+  const currentCount = Math.round(num * scale.denominator);
+  // 現時嘅設定細到連一次都唔夠 ⇒ 冇一組「多一次／少一次」問得出口。
+  // 硬砌一堆選項出嚟，「維持現狀」就會落喺一個唔等於原值嘅次數上面。
+  if (currentCount < 1) return keepOnly;
+
+  // ⚠️ 上限唔止係母體，仲要令換算出嚟嘅值**細過 1**。
+  // `c === denominator` 換算出嚟就係 1.0，而 1.0 已經唔再係一個 0–1 之間
+  // 嘅比例：下一次匯出會原樣印「1」，同上面 0 嗰個問題一模一樣。
+  // 而且「每一個主日都要」係一條硬規則，唔係一個目標值。
+  const maxCount = Math.min(scale.population, scale.denominator - 1);
+  // 現時嘅設定已經高過上限（例如 0.99 × 13 ≈ 13 對）⇒ 同上面 `< 1` 一樣，
+  // 砌唔出一組「維持現狀」落得正嘅選項，一律只留原值。
+  if (currentCount > maxCount) return keepOnly;
+
   const counts = [];
   [-2, -1, 0, 1, 2].forEach(function (delta) {
     const c = currentCount + delta;
-    if (c < 0 || c > weeks) return;
+    // ⚠️ **由 1 開始，唔要 0。**
+    //   1. `0` 存入 `TargetValue` 之後唔再係一個 0–1 之間嘅比例，
+    //      下一次匯出會原樣印「0」而唔係「N 個之中約 0 個」——
+    //      即係一個換算來回唔一致嘅值（見 rule_review_roundtrip 測試）。
+    //   2. 而且「一次都唔好」根本唔係一個目標值，係「關掉呢條規則」，
+    //      應該行 `ENABLED` 嗰欄，唔係喺目標值度填 0。
+    //      對第 9 條（洩壓閥）嚟講，「0 對」正正就係封死逃生口——
+    //      唔應該做成一個一撳就揀到嘅下拉選項。
+    if (c < 1 || c > maxCount) return;
     if (counts.indexOf(c) === -1) counts.push(c);
   });
 
   return counts.map(function (c) {
     return {
-      label: weeks + ' 個主日之中約 ' + c + ' 個' + (c === currentCount ? '（維持現狀）' : ''),
+      label: unit.describe(scale.population, c) + (c === currentCount ? '（維持現狀）' : ''),
       // ⚠️ 值由**次數直接算**，唔係由顯示文字反推。
       // 而且「維持現狀」直接沿用原值，唔會經過一次來回換算——
       // 上一輪就係因為 8 ÷ 13 反推回 0.62 而令「維持現狀」靜靜改咗值。
-      value: c === currentCount ? num : Math.round((c / weeks) * 100) / 100,
+      value: c === currentCount ? num : Math.round((c / scale.denominator) * 100) / 100,
       field: RULE_REVIEW_FIELD.TARGET
     };
   });
+}
+
+/**
+ * 第二十九輪批次階段 B：互斥組要**逐組列出全部成員**。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Ivan 實測
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 匯出寫住 `現時有 1 組：主席。`
+ * 堂委睇到「1 組：主席」，完全唔知主席係同咩衝突——
+ * **一句講唔出對手係邊個嘅衝突規則，等於冇講。**
+ *
+ * ⚠️ 順帶捉埋一個配置錯誤：**得一個成員嘅組完全冇作用。**
+ * 「同一個人唔可以同一週做同一組入面兩個崗位」——組入面得一個崗位嘅話，
+ * 呢句話永遠成立，即係嗰條規則對嗰一組完全冇擋過任何嘢。
+ * 呢個要明講出嚟，唔可以印一句睇落正常嘅「現時有 1 組：主席」——
+ * 嗰句會令人以為條規則喺度做緊嘢（bug class 2）。
+ *
+ * @param {Array<{group: string, postNames: string[]}>} groups
+ * @returns {string}
+ */
+function describeMutexGroupsForReview_(groups) {
+  const list = groups || [];
+  if (list.length === 0) {
+    return '現時沒有設定任何互斥組合，所以這一條實際上不會擋住任何安排。';
+  }
+
+  const lines = list.map(function (g) {
+    const names = (g.postNames || []).slice();
+    if (names.length < 2) {
+      return '　・' + (names[0] || '（沒有崗位）')
+        + '（這一組只有一個崗位，所以實際上不會擋住任何安排——'
+        + '請檢查是不是漏了設定另一個崗位）';
+    }
+    return '　・' + names.join(' ＋ ');
+  });
+
+  // 多過一組時逐組一行——串埋一行嘅話，堂委要自己數返邊個同邊個一組。
+  return '現時有 ' + list.length + ' 組：\n' + lines.join('\n')
+    + '\n同一週之內，同一個人不會同時擔任同一組裡面的崗位。';
+}
+
+/**
+ * 第二十九輪批次階段 A4：把一條規則嘅 `ScopePostIDs` 譯成中文崗位名。
+ *
+ * ⚠️ 攞唔到中文名嘅時候回**原本嗰個代號**，唔可以靜靜略過——
+ * 略過嘅話，一個打錯咗嘅 PostID 就會喺份表上面完全消失，
+ * 而嗰條規則對嗰個崗位根本冇生效過。
+ *
+ * @param {Object} rule `RuleSettings` 一行
+ * @param {?Object} ctx `{postNameById}`
+ * @returns {string[]} 空陣列 ＝ 一個崗位都冇填
+ */
+function describeScopePostNames_(rule, ctx) {
+  const ids = splitList_(rule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]);
+  const names = (ctx && ctx.postNameById) || {};
+  return ids.map(function (id) { return names[id] || id; });
 }
 
 /**
@@ -228,13 +414,7 @@ function ruleReviewPlainEntry_(ruleId) {
     text: '同一週不會安排同一個人擔任互相衝突的崗位',
     // ⚠️ B3：**讀實際資料**，唔可以寫死。
     what: function (rule, ctx) {
-      const groups = (ctx && ctx.mutexGroups) || [];
-      if (groups.length === 0) {
-        return '哪些崗位算「互相衝突」由設定決定。現時一組都沒有設，所以這一條實際上不會擋住任何安排。';
-      }
-      return '現時有 ' + groups.length + ' 組：'
-        + groups.map(function (g) { return g.postNames.join(' ＋ '); }).join('；')
-        + '。同一週之內，同一個人不會同時擔任同一組裡面的崗位。';
+      return describeMutexGroupsForReview_((ctx && ctx.mutexGroups) || []);
     }
   };
   table[RULE_IDS.ROLE_REQUIRED] = {
@@ -257,7 +437,13 @@ function ruleReviewPlainEntry_(ruleId) {
   // ── 盡量遵守（準硬規則）────────────────────────────────────
   table[RULE_IDS.NO_CONSECUTIVE] = {
     text: '同一個崗位盡量不要連續兩週由同一個人擔任',
-    what: '違反了系統仍然會排，但會在核對報告標出來讓你看到。',
+    // ⚠️ 第二十九輪批次階段 A4：**呢一條唔係對每個崗位都成立。**
+    // `Generator.gs` 只喺 `post.allowConsecutive !== ALLOW` 嗰陣先檢查，
+    // 而報告正正就係一個 `ALLOW` 嘅崗位（洩壓閥）。
+    // 唔講嘅話，堂委喺同一份表上面會見到呢一條同「報告可以連續兩週」
+    // 直接打架，然後唔知信邊條。
+    what: '違反了系統仍然會排，但會在核對報告標出來讓你看到。'
+      + '個別崗位可以豁免——報告就是豁免的，見下面「報告可以連續兩週」那一條。',
     current: onOff(''),
     choices: onOffChoices('有生效')
   };
@@ -289,6 +475,12 @@ function ruleReviewPlainEntry_(ruleId) {
   table[RULE_IDS.QUARTER_DISTRIBUTION] = {
     text: '每季次數分佈盡量貼近以往',
     what: '避免出現「幾個人做很多、其他人幾乎沒有」的情況。',
+    // ⚠️ 第二十九輪批次階段 A4：**呢兩條係二選一，唔係兩條各自生效。**
+    // `Generator.gs`：`if (PERSONAL_QUOTA 開) { … } else if (QUARTER_DISTRIBUTION 開) { … }`
+    // 「每個人的份額按他一向的服侍量分配」開住嗰陣，呢一條**完全冇行過**。
+    // 唔講嘅話，堂委會喺呢一條上面花時間調一個唔會有任何效果嘅數字。
+    note: '這一條只在「每個人的份額按他一向的服侍量分配」關掉時才會生效。'
+      + '那一條開着的時候，這裏改什麼都不會有分別。',
     current: function (rule) {
       const v = Number(rule[COLUMNS.RULE_SETTINGS.TARGET_VALUE]);
       return isNaN(v) ? '（沒有設定）' : ('平均每人每季約 ' + v + ' 次');
@@ -314,9 +506,24 @@ function ruleReviewPlainEntry_(ruleId) {
   };
   table[RULE_IDS.ROLE_POST_FOCUS] = {
     text: '堂委盡量集中在指定的幾個崗位',
-    what: '堂委被排到指定崗位以外的崗位時會扣分（仍然排得到，只是排後一點）。',
-    current: function (rule) {
+    // ⚠️ 第二十九輪批次階段 A4：**要讀實際嘅集中崗位清單**，唔可以只寫一句抽象嘅話。
+    // 而且 `evaluateRolePostFocus_()` 喺 `ScopePostIDs` 一個崗位都冇填嗰陣
+    // 會**直接當規則未生效**（因為「唔喺白名單」永遠成立，扣到成份表都歪）。
+    // 嗰種情況下印一句「有生效（其他崗位扣分，強度 2）」就係一句大話。
+    what: function (rule, ctx) {
+      const posts = describeScopePostNames_(rule, ctx);
+      if (posts.length === 0) {
+        return '本來的意思是：堂委被排到指定崗位以外的崗位時會扣分。'
+          + '但現時一個「指定崗位」都沒有設，所以這一條實際上完全沒有作用。';
+      }
+      return '指定崗位是：' + posts.join('、')
+        + '。堂委被排到這幾個以外的崗位時會扣分（仍然排得到，只是排後一點）。';
+    },
+    current: function (rule, ctx) {
       if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      if (describeScopePostNames_(rule, ctx).length === 0) {
+        return '開着，但沒有設定指定崗位，所以實際上沒有作用';
+      }
       const v = Number(rule[COLUMNS.RULE_SETTINGS.TARGET_VALUE]);
       return '有生效（其他崗位扣分' + (isNaN(v) ? '' : '，強度 ' + v) + '）';
     },
@@ -335,15 +542,42 @@ function ruleReviewPlainEntry_(ruleId) {
   };
   table[RULE_IDS.CHAIR_EQ_ANNOUNCE] = {
     text: '主席和報告盡量由同一位擔任',
-    what: '同一個主日的主席和報告由同一個人做，會少一個人要早到。'
+    what: '同一個主日的主席和報告由同一個人做，會少一個人要早到。',
+    unit: 'PER_SUNDAY'
   };
   table[RULE_IDS.CHAIR_PREFER_DUAL] = {
     text: '優先揀「主席和報告都做得到」的人',
-    what: '這樣上面那一條比較容易做到。'
+    // ⚠️ 第二十九輪批次階段 A4：呢一條個數字量嘅唔係「主日」，
+    // 而係「**排主席嗰陣**，有幾多次揀咗一個兩邊都做得到嘅人」
+    //（`computeChairPreferDualBonus_()` 嘅分母係 `dualAssigned + 1`）。
+    // 每個主日排一次主席，所以數字上同主日數幾乎一樣，
+    // 但一句唔講清楚，堂委會以為個數字係「有幾多個主日兼任咗」——
+    // 而嗰個係上面另一條規則。
+    what: '排主席的時候，同樣合適的人之中先揀「主席和報告都做得到」那一位。'
+      + '這樣上面那一條比較容易做到。'
+      + '下面的數字是「排主席的時候有多少次揀了兩邊都做得到的人」，'
+      + '不是「有多少個主日真的兼任了」。',
+    unit: 'PER_SUNDAY'
   };
+  // ⚠️⚠️ 第二十九輪批次階段 A1：**呢一條原本寫反咗。**
+  //
+  // 舊文字：「報告盡量**不要**連續兩週由同一個人擔任」
+  //         「報告要預備內容，連兩週會比較辛苦。」
+  //
+  // 但呢條規則喺系統入面嘅角色**啱啱相反**：佢係洩壓閥。
+  // 排唔出人嗰陣，系統靠「容許報告連續」嚟解開嗰一週。
+  //（`Generator.gs` 嘅 `computeAnnounceReliefBonus_()`：
+  //  連續比例落後於目標進度時，上週嘅報告人**攞獎勵分**。）
+  //
+  // 寫反咗嘅後果唔係「文案唔靚」：如果堂委好心揀「約 2 對」，
+  // 佢實際上係封咗系統唯一嘅逃生口，結果會令某些週完全排不出來。
+  // **系統會忠實執行嗰個錯決定。**
   table[RULE_IDS.ANNOUNCE_RELIEF] = {
-    text: '報告盡量不要連續兩週由同一個人擔任',
-    what: '報告要預備內容，連兩週會比較辛苦。'
+    text: '報告可以連續兩週由同一個人擔任',
+    what: '這是系統的洩壓閥。某一週怎樣都排不出來時，'
+      + '系統會優先讓報告連續。收得太緊會令某些週排不出來。',
+    // 呢一條數嘅係「相鄰嘅兩個主日」，唔係「主日」。
+    unit: 'ADJACENT_PAIR'
   };
 
   return table[ruleId] || null;
@@ -377,19 +611,26 @@ function describeRuleForReview_(rule, level, weeks, ctx) {
       text: String(rule[R.RULE_NAME] || ruleId),
       what: String(rule[R.DESCRIPTION] || '').trim()
         || '（這一條還沒有寫給堂委看的說明，請問開發者）',
+      // 冇人話表嘅規則一律當「逐個主日」——但佢已經被標成 `usedFallback`，
+      // 呼叫端會列出佢個 RuleID 叫人去補人話同單位。
       currentText: level === RULE_LEVELS.SOFT
-        ? describeRuleValue_(target, weeks) : (enabled ? '有生效' : '已關掉'),
+        ? describeRuleValue_(target, weeks, RULE_REVIEW_DEFAULT_UNIT)
+        : (enabled ? '有生效' : '已關掉'),
       choices: level === RULE_LEVELS.SOFT
-        ? buildRuleReviewRatioChoices_(target, weeks)
+        ? buildRuleReviewRatioChoices_(target, weeks, RULE_REVIEW_DEFAULT_UNIT)
         : RULE_REVIEW_HARD_CHOICES.map(function (c) { return { label: c, value: null }; }),
       note: '',
       usedFallback: true
     };
   }
 
+  // ⚠️ 單位由規則定義表話事，換算同顯示兩邊讀**同一個**欄位。
+  // 兩邊各讀一次就係「同一件事兩個真相來源」。
+  const unitId = plain.unit || RULE_REVIEW_DEFAULT_UNIT;
+
   let currentText;
   if (plain.current) currentText = resolve(plain.current);
-  else if (level === RULE_LEVELS.SOFT) currentText = describeRuleValue_(target, weeks);
+  else if (level === RULE_LEVELS.SOFT) currentText = describeRuleValue_(target, weeks, unitId);
   else currentText = enabled ? '有生效' : '已關掉';
 
   let choices;
@@ -398,7 +639,7 @@ function describeRuleForReview_(rule, level, weeks, ctx) {
   } else if (plain.choices) {
     choices = resolve(plain.choices);
   } else {
-    choices = buildRuleReviewRatioChoices_(target, weeks);
+    choices = buildRuleReviewRatioChoices_(target, weeks, unitId);
   }
 
   return {
@@ -450,7 +691,7 @@ function buildRuleReviewSheetRows_(ruleRows, weeks, ctx) {
         d.what + (d.note ? '\n⚠️ ' + d.note : ''),
         d.currentText,
         // ⚠️ B5：一個選項一行。用「／」串埋一行會排到好長，
-        // 而堂委係喺會議上面對住張表逐條揀。
+        // 而堂委係喺會議上面對住份表逐條揀。
         d.choices.map(function (c) { return c.label; }).join('\n'),
         '',   // 堂委決定：留空，黃底，有下拉
         ''    // 備註

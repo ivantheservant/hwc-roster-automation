@@ -45,12 +45,17 @@ function ruleRow(id, level, target, opts) {
   // ⚠️ 特登餵一段**含內部術語**嘅說明，證明匯出唔會用佢。
   row[R.DESCRIPTION] = (opts && opts.description !== undefined)
     ? opts.description : '由 Posts 的 MutexGroup 驅動，讀 Eligibility 與 NameMapping';
+  // 第二十九輪批次階段 A4：`SOFT_ROLE_POST_FOCUS` 而家要讀實際嘅集中崗位清單
+  //（一個都冇填嘅話規則靜靜失效，唔可以寫「有生效」）。
+  row[R.SCOPE_POST_IDS] = (opts && opts.scopePostIds !== undefined)
+    ? opts.scopePostIds : 'CHAIR,ANNOUNCE';
   return row;
 }
 
 const CTX = {
   mutexGroups: [{ group: 'CHAIR_COMMUNION', postNames: ['主席', '聖餐襄禮'] }],
-  gatedPosts: [{ postId: 'ANNOUNCE', postNameTC: '報告', requiredText: '「堂委」' }]
+  gatedPosts: [{ postId: 'ANNOUNCE', postNameTC: '報告', requiredText: '「堂委」' }],
+  postNameById: { CHAIR: '主席', ANNOUNCE: '報告' }
 };
 
 /* ══════════════════════════════════════════════════════════════
@@ -124,9 +129,12 @@ console.log('\n=== B3【核心】互斥組同身分要求：讀實際資料，�
 {
   const withGroups = gas.describeRuleForReview_(
     ruleRow(ID.MUTEX_GROUP, 'HARD', ''), gas.RULE_LEVELS.HARD, 13, CTX);
+  // 第二十九輪批次階段 B：組員而家逐組一行（`現時有 N 組：\n　・A ＋ B`），
+  // 所以唔再係一句連住嘅字串——但「講得出係邊幾個崗位」呢個要求不變。
   check('★★★★★ 有設組 ⇒ 講得出係邊幾個崗位'
     + '——舊版寫住「現時無任何組」，而嗰句係試算表上一句寫死嘅字',
-    withGroups.what.indexOf('現時有 1 組：主席 ＋ 聖餐襄禮') !== -1, withGroups.what);
+    withGroups.what.indexOf('現時有 1 組') === 0
+    && withGroups.what.indexOf('主席 ＋ 聖餐襄禮') !== -1, withGroups.what);
 
   const noGroups = gas.describeRuleForReview_(
     ruleRow(ID.MUTEX_GROUP, 'HARD', ''), gas.RULE_LEVELS.HARD, 13,
