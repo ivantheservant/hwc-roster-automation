@@ -226,14 +226,40 @@ function buildRuleReviewContext_() {
   const gatedPosts = [];
   // 第二十九輪批次階段 A4：`ScopePostIDs` 要譯成中文崗位名先講得出人話。
   const postNameById = {};
+
+  // ⚠️ 第三十輪批次階段 D1：**互斥組要由「未過濾」嘅 Posts 讀。**
+  //
+  // 實測：`Posts` 入面 `CHAIR` 同 `COMMUNION` 兩行都有 `CHAIR_COMMUNION`，
+  // 但匯出只列到「主席」一個。
+  //
+  // `readPostsNormalized()` → `readPosts()` 會 `filter(Active=TRUE)`。
+  // 一個 `Active=FALSE` 嘅組員就會靜靜消失，而畫面上剩返一個成員嘅組
+  // 睇落同「配置漏咗」一模一樣——兩件完全唔同嘅事。
+  //
+  // 所以組員一律由**原始行**讀，並且逐個標返 `active`：
+  // 停用嘅照樣列出，但明講佢停用咗。
+  //（其餘用途——`postNameById`、身分要求——照舊用已過濾嗰個，
+  //  因為嗰兩樣講嘅係「而家生效嘅崗位」。）
+  try {
+    readSheet(SHEETS.POSTS).forEach(function (row) {
+      const postId = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
+      if (!postId) return;
+      const group = String(row[COLUMNS.POSTS.MUTEX_GROUP] || '').trim();
+      if (!group) return;
+      if (!mutexByGroup[group]) mutexByGroup[group] = [];
+      mutexByGroup[group].push({
+        postId: postId,
+        postNameTC: String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim() || postId,
+        active: isTrueValue_(row[COLUMNS.POSTS.ACTIVE])
+      });
+    });
+  } catch (err) {
+    log_('WARN', '規則審閱表讀不到 Posts 原始行，互斥組會顯示為「沒有設」：' + err.message);
+  }
+
   try {
     readPostsNormalized().forEach(function (p) {
       postNameById[p.postId] = p.postNameTC || p.postId;
-      const group = String(p.mutexGroup || '').trim();
-      if (group) {
-        if (!mutexByGroup[group]) mutexByGroup[group] = [];
-        mutexByGroup[group].push(p.postNameTC || p.postId);
-      }
       const required = p.requiredRoles || [];
       if (required.length > 0) {
         gatedPosts.push({
@@ -250,8 +276,16 @@ function buildRuleReviewContext_() {
   }
 
   return {
+    // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然
+    // 回一個純字串陣列（停用嘅標返「（已停用）」），令舊呼叫端唔使改。
     mutexGroups: Object.keys(mutexByGroup).sort().map(function (g) {
-      return { group: g, postNames: mutexByGroup[g] };
+      return {
+        group: g,
+        members: mutexByGroup[g],
+        postNames: mutexByGroup[g].map(function (m) {
+          return m.postNameTC + (m.active ? '' : '（已停用）');
+        })
+      };
     }),
     gatedPosts: gatedPosts,
     postNameById: postNameById

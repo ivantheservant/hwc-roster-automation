@@ -103,20 +103,30 @@ const RULE_REVIEW_FIELD = { TARGET: 'TARGET_VALUE', ENABLED: 'ENABLED' };
  * | `ratioDenominator(weeks)` | **排表引擎真正乘嗰個數** | 見下面嘅警告 |
  * | `describe(pop, count)` | 一句人話 | 量詞唔同（個／對） |
  *
- * ⚠️⚠️ **`population` 同 `ratioDenominator` 特登係兩件事。**
- * 排表引擎入面 `isBehindTargetPace_(count, weeksCounted, target)`
- * 用嘅係 `count < target × weeksCounted`，而 `weeksCounted` 數嘅係
- * **全部主日**（連第一週都數，雖然第一週唔可能有「連續」）。
- * 所以第 9 條實際跑出嚟嘅對數係 `target × weeks`，唔係 `target × (weeks - 1)`。
+ * ⚠️⚠️ **第三十輪批次階段 D2：`ratioDenominator` 改返 `weeks - 1`。**
  *
- * 如果呢度改用 `weeks - 1` 做換算分母，份表就會寫住「約 3 對」，
- * 而系統實際會排到約 4 對——**份表同系統講唔同嘅嘢**，
- * 亦即係本專案第 6 類 bug（同一條規則喺唔同地方用咗唔同分母）。
- * 所以：**量詞同母體跟單位，換算分母跟引擎。**
+ * 上一輪為咗「跟排表引擎」而用咗 `weeks`（因為
+ * `isBehindTargetPace_(count, weeksCounted, target)` 嘅 `weeksCounted`
+ * 數埋第一週）。**嗰個決定係錯嘅**——因為系統自己**量度**嗰邊
+ * 用嘅係 `weeks - 1`：
  *
- * 呢個分歧本身係一個要 Ivan 拍板嘅設計問題（見 `docs/系統範圍稽核.md`）：
- * 要就改引擎行 `weeks - 1`，要就接受「4 對出自 12 對」。
- * 喺佢決定之前，**份表講嘅一定要係系統真正會做嗰件事**。
+ *   `Verify.gs` 嘅 `measureAnnounceRelief_()`：
+ *     `for (let i = 1; i < dates.length; i++) pairs++;`  ⇒ 12 對
+ *   出嚟嘅品質統計就係 `報告（ANNOUNCE）洩壓閥　25.0%　3/12 對`
+ *
+ * 而堂委睇到嘅數字、同幹事事後喺品質統計見到嘅數字，**一定要同一個分母**。
+ * 兩個唔同就係「同一件事兩個真相來源」嘅另一個形狀，
+ * 而今次錯嗰邊係俾堂委睇嗰一份。
+ *
+ * 所以：**量詞、母體、換算分母三樣都跟單位**，全部係 `weeks - 1`。
+ * `0.27 × 12 = 3.24` ⇒ 「12 對相鄰的主日之中約 3 對」。
+ *
+ * ⚠️ 仲有一個**未解決**嘅分歧要記低：排表引擎嘅**進度控制**
+ * （`isBehindTargetPace_()`）仍然用 `weeksCounted`（＝ 13），
+ * 所以佢實際會排到約 4 對，而唔係 3 對。
+ * 換言之：審閱表同品質統計而家一致（分母 12），但引擎自己嘅
+ * 進度控制多數一格。改引擎會改動每一季嘅排表結果，屬行為改動，
+ * 本輪冇做——寫入 `docs/系統範圍稽核.md` 等 Ivan 拍板。
  */
 const RULE_REVIEW_UNITS = {
   PER_SUNDAY: {
@@ -130,8 +140,8 @@ const RULE_REVIEW_UNITS = {
   ADJACENT_PAIR: {
     id: 'ADJACENT_PAIR',
     population: function (weeks) { return weeks - 1; },
-    // ⚠️ 特登**唔係** `weeks - 1`。見上面。
-    ratioDenominator: function (weeks) { return weeks; },
+    // ⚠️ 同 `Verify.gs` 嘅 `measureAnnounceRelief_()` 一樣：13 個主日 ⇒ 12 對。
+    ratioDenominator: function (weeks) { return weeks - 1; },
     describe: function (population, count) {
       return population + ' 對相鄰的主日之中約 ' + count + ' 對';
     }
@@ -321,6 +331,25 @@ function describeMutexGroupsForReview_(groups) {
 
   const lines = list.map(function (g) {
     const names = (g.postNames || []).slice();
+    // ⚠️ 第三十輪批次階段 D1：**「只有一個崗位」同「有兩個但其中一個停用」
+    // 係兩件完全唔同嘅事**，唔可以講同一句。
+    //
+    // 實測：`Posts` 入面 `CHAIR` 同 `COMMUNION` 兩行都有 `CHAIR_COMMUNION`，
+    // 但匯出只列到「主席」——因為讀組員嗰段行咗
+    // `readPostsNormalized()`（會 filter `Active=TRUE`）。
+    // 一個停用嘅組員靜靜消失之後，畫面上剩返一個成員嘅組
+    // 睇落同「配置漏咗」一模一樣，而正確嘅下一步完全唔同。
+    const members = g.members || null;
+    if (members) {
+      const active = members.filter(function (m) { return m.active; });
+      const inactive = members.filter(function (m) { return !m.active; });
+      if (members.length >= 2 && active.length < 2) {
+        return '　・' + names.join(' ＋ ')
+          + '（這一組有 ' + members.length + ' 個崗位，但其中 ' + inactive.length
+          + ' 個已停用，所以實際上不會擋住任何安排——'
+          + '要它生效的話，把停用的那個改回啟用）';
+      }
+    }
     if (names.length < 2) {
       return '　・' + (names[0] || '（沒有崗位）')
         + '（這一組只有一個崗位，所以實際上不會擋住任何安排——'

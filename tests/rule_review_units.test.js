@@ -98,7 +98,7 @@ console.log('\n=== A2【核心】量詞同母體跟單位 ===');
     gas.describeRuleValue_(0.63, 13, 'PER_SUNDAY') === '13 個主日之中約 8 個',
     gas.describeRuleValue_(0.63, 13, 'PER_SUNDAY'));
   check('★★★★★ 相鄰對：母體係 **12 對**，量詞係「對」，唔再係「個主日」',
-    gas.describeRuleValue_(0.27, 13, 'ADJACENT_PAIR') === '12 對相鄰的主日之中約 4 對',
+    gas.describeRuleValue_(0.27, 13, 'ADJACENT_PAIR') === '12 對相鄰的主日之中約 3 對',
     gas.describeRuleValue_(0.27, 13, 'ADJACENT_PAIR'));
   check('★★★★★ **舊嗰句「13 個主日之中約 4 個」唔會再出現**'
     + '——「個」乜嘢？呢條規則數嘅係相鄰嘅一對主日',
@@ -109,41 +109,9 @@ console.log('\n=== A2【核心】量詞同母體跟單位 ===');
     gas.describeRuleValue_(0.63, 13) === '13 個主日之中約 8 個');
 }
 
-console.log('\n=== A2【最重要】換算分母要同排表引擎一致 ===');
-{
-  // ⚠️ 呢個 check 就係本專案第 6 類 bug 嘅防線：
-  // 同一條規則喺唔同地方用咗唔同分母。
-  //
-  // `isBehindTargetPace_(count, weeksCounted, target)` ＝ `count < target × weeksCounted`，
-  // 而 `weeksCounted` 數嘅係**全部主日**（連第一週都數）。
-  // 所以第 9 條實際跑出嚟嘅對數係 `target × weeks`，唔係 `target × (weeks − 1)`。
-  //
-  // 如果份表寫「約 3 對」而系統排到約 4 對，就係份表同系統講唔同嘅嘢。
-  const gen = read('src/Generator.gs');
-  check('★★★★★ 引擎嘅分母的確係 `weeksCounted`（＝全部主日）',
-    /function isBehindTargetPace_\(count, weeksCounted, target\) \{\s*return count < target \* weeksCounted;/
-      .test(gen));
-  check('★★★★★ 而 `weeksCounted` 每一個主日都加一次（第一週都數）',
-    /ratioState\.weeksCounted\+\+;/.test(gen));
-
-  const unit = gas.RULE_REVIEW_UNITS.ADJACENT_PAIR;
-  check('★★★★★ 所以相鄰對嘅**換算分母**係 weeks（跟引擎），'
-    + '而**母體**先係 weeks − 1（跟量詞）',
-    unit.ratioDenominator(13) === 13 && unit.population(13) === 12);
-
-  // 用引擎自己嗰條式模擬一次，睇下實際會排到幾多對。
-  const simulate = function (weeks, target) {
-    let count = 0;
-    for (let w = 2; w <= weeks; w++) {
-      if (count < target * w) count++;   // isBehindTargetPace_ 嘅式
-    }
-    return count;
-  };
-  const shown = Math.round(0.27 * unit.ratioDenominator(13));
-  check('★★★★★ 份表寫嘅對數 ＝ 引擎實際排到嘅對數（13 個主日、目標 0.27）'
-    + '——寫 3 對而系統排 4 對就係第 6 類 bug 嘅新一次',
-    shown === simulate(13, 0.27), '份表 ' + shown + ' 對，模擬 ' + simulate(13, 0.27) + ' 對');
-}
+// ⚠️ 第三十輪批次階段 D2：「換算分母」嗰一段搬咗去
+// tests/rule_review_pair_denominator.test.js——因為正確嘅對照對象
+// 唔係排表引擎嘅進度控制，而係 Verify.gs 嘅品質統計（兩者分母唔同）。
 
 console.log('\n=== A2 邊界：一個主日嘅季度冇「相鄰對」 ===');
 {
