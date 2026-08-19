@@ -111,6 +111,8 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     const baselineData = buildWeightBaselineDataSafely_(quarterId);
     // 本季已經排咗幾多次（逐個崗位）——同「上一季幾多次」擺埋一齊睇先有意思。
     const thisQuarterByKey = readThisQuarterPostCounts_(quarterId);
+    // 第二十九輪批次階段 C：實際次數同目標對唔上嗰陣，喺呢一頁講返點解。
+    const gapByKey = readWeightGapTextByKey_(quarterId, active, nameById, posts);
 
     const byPost = posts.map(function (p) {
       const ids = (eligibleByPost[p.postId] || []).slice().sort(function (a, b) {
@@ -139,6 +141,14 @@ function apiGetPersonPostWeightMatrix(quarterId) {
             // null ＝ 查不到（呢一季未有版本）。**唔係 0 次。**
             thisQuarterCount: thisQuarterByKey
               ? (thisQuarterByKey[id + '|' + p.postId] || 0) : null,
+            // 第二十九輪批次階段 C：實際 ≠ 目標嗰陣嘅一句原因。
+            // ⚠️ 由 `buildPersonPostWeightReport_()` 算，**唔喺前端另寫一套判斷**。
+            // 空字串 ＝ 冇嘢要講（啱啱好、或者根本冇設偏好）。
+            gapText: gapByKey ? (gapByKey[id + '|' + p.postId] || '') : '',
+            // null ＝ 連「有冇差距」都查不到（未有版本／讀取失敗）。
+            // **唔可以同「查到，而且啱啱好」混做一樣**——前者係冇資料，
+            // 後者係一個結論。
+            gapAvailable: gapByKey !== null,
             // null ＝ 查不到（冇季度、冇版本、或者讀取失敗）
             quarterLoad: load.available ? (load.byPerson[id] || null) : null
           };
@@ -193,6 +203,96 @@ function buildWeightBaselineDataSafely_(quarterId) {
  * @param {string} quarterId
  * @returns {?Object.<string, number>}
  */
+/**
+ * 第二十九輪批次階段 C：逐個 (人, 崗位) 嘅「點解同目標對唔上」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢個
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 「排表偏好」畫面已經顯示 `上一季 N 次　→　今季目標 M 次　今季已排 K 次`。
+ * 但 `K ≠ M` 嗰陣完全冇講點解。原因本來收咗喺選單「軟規則實測量度」，
+ * 而幹事根本唔會去嗰度——佢只會喺呢一頁得出一個結論：「呢個功能壞咗」。
+ *
+ * ⚠️ **唔可以喺呢度另寫一套判斷。** 一律行 `buildPersonPostWeightReport_()`，
+ * 同 `Diagnostics` 嗰一節、同選單版嗰個工具用嘅係同一份計算。
+ * 另寫一次就係「同一件事兩個真相來源」——本專案撞過最多次嗰類問題。
+ *
+ * @param {string} quarterId
+ * @param {Object} active `readActivePersonPostWeights_()` 嘅結果
+ * @param {Object.<string, string>} nameById PersonID → 中文名
+ * @param {Array<{postId: string, postNameTC: string}>} posts
+ * @returns {?Object.<string, string>} null ＝ **查不到**（未有版本／讀取失敗），
+ *   唔係「查到而且個個都啱啱好」
+ */
+function readWeightGapTextByKey_(quarterId, active, nameById, posts) {
+  const id = String(quarterId || '').trim();
+  if (!id) return null;
+  if (!active || !active.rows || active.rows.length === 0) {
+    // 一條偏好都冇 ⇒ 冇嘢要解釋，但**係查得到嘅**（回空 map，唔係 null）。
+    return {};
+  }
+  try {
+    const versionNo = findLatestVersionNo(id);
+    if (versionNo < 0) return null;
+
+    const A = COLUMNS.ROSTER_ASSIGNMENTS;
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const assignments = readVersionAssignmentsRaw_(id, versionNo).map(function (row) {
+      return {
+        personId: String(row[A.PERSON_ID] || '').trim(),
+        postId: String(row[A.POST_ID] || '').trim(),
+        // ⚠️ 由工作表讀出嚟嘅日期可能係 Date 物件，唔可以直接當字串用
+        //（`explainWeightShortfall_()` 會拎佢嚟做前後一週嘅比較）。
+        serviceDate: toDateString(row[A.SERVICE_DATE], timezone)
+      };
+    });
+
+    const postNames = {};
+    (posts || []).forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+    const peopleById = {};
+    Object.keys(nameById || {}).forEach(function (pid) {
+      peopleById[pid] = { personId: pid, nameTC: nameById[pid] };
+    });
+
+    const report = buildPersonPostWeightReport_(
+      assignments, active, peopleById, postNames,
+      // 每季上限：傳 null ＝ 查不到，報告會照樣講明「上限查不到」，
+      // 唔會扮到已經檢查過。呢一頁本來就冇讀 RuleSettings。
+      buildWeightLimitContextSafely_());
+
+    const byKey = {};
+    report.rows.forEach(function (r) {
+      if (r.gapText) byKey[r.personId + '|' + r.postId] = r.gapText;
+    });
+    return byKey;
+  } catch (err) {
+    log_('WARN', '排表偏好畫面算不到「同目標的差距」：' + err.message);
+    return null;
+  }
+}
+
+/**
+ * 每季上限嘅來源。讀唔到就回 `null`——**唔係當「冇上限」**。
+ * 「查不到上限」同「上限查到而且佢未到」係兩件完全唔同嘅事，
+ * 而「撞到上限」正正就係偏好未達標最常見嘅原因。
+ * @returns {?{rules: Object, defaultLimit: number}}
+ */
+function buildWeightLimitContextSafely_() {
+  try {
+    const rules = readRules();
+    const config = readConfig();
+    const fallback = Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]);
+    return {
+      rules: rules,
+      defaultLimit: isNaN(fallback) ? DEFAULTS.MAX_PER_QUARTER : fallback
+    };
+  } catch (err) {
+    log_('WARN', '排表偏好畫面讀不到每季上限設定：' + err.message);
+    return null;
+  }
+}
+
 function readThisQuarterPostCounts_(quarterId) {
   const id = String(quarterId || '').trim();
   if (!id) return null;

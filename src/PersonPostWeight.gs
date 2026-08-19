@@ -472,6 +472,12 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
     const explained = shortfall > 0
       ? explainWeightShortfall_(w, target, got, assignments, personLimit)
       : { reasons: [], text: '' };
+    // 第二十九輪批次階段 C：**超標亦要解釋。**
+    // 「今季目標 2 次　今季已排 3 次」而冇下文，幹事一樣冇辦法知道
+    // 呢個係機制壞咗定係正常——而佢會估係前者。
+    const over = shortfall < 0
+      ? explainWeightOvershoot_(w, target, got, assignments)
+      : { reasons: [], text: '' };
 
     const row = {
       personId: w.personId,
@@ -489,7 +495,18 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
       reason: w.reason,
       met: shortfall <= 0,
       shortfallReasons: explained.reasons,
-      shortfallText: explained.text
+      shortfallText: explained.text,
+      overshootReasons: over.reasons,
+      overshootText: over.text,
+      // 第二十九輪批次階段 C：畫面**只讀呢一個欄位**。
+      // 前端自己判斷「差咗定多咗」再揀讀邊個欄位，就係同一件事
+      // 兩個真相來源——本專案撞過最多次嗰類問題。
+      // 空字串 ＝ 啱啱好等於目標，冇嘢要解釋。
+      gapText: shortfall > 0
+        ? ('未達標：' + explained.text)
+        : (shortfall < 0
+          ? ('比目標多 ' + (got - target) + ' 次：' + over.text)
+          : '')
     };
     rows.push(row);
     lines.push('　' + row.nameTC + '　' + row.postNameTC
@@ -498,7 +515,7 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
       + '　今季目標 ' + row.targetCount + ' 次'
       + '　實際 ' + row.actualCount + ' 次'
       + '　差 ' + (row.gap > 0 ? '+' : '') + row.gap);
-    if (!row.met) lines.push('　　未達標原因：' + row.shortfallText);
+    if (row.gapText) lines.push('　　' + row.gapText);
   });
 
   if (weights.invalid.length > 0) {
@@ -647,6 +664,52 @@ function resolveWeightQuarterLimit_(person, ctx) {
  * @param {?number} limit 呢個人嘅每季上限（null ＝ 查不到）
  * @returns {{reasons: string[], text: string}}
  */
+/**
+ * 第二十九輪批次階段 C：**排到多過目標**嘅原因。
+ *
+ * ⚠️ 未達標同超標都要講。「今季目標 2 次　今季已排 3 次」而冇下文，
+ * 幹事得出嘅結論同「乜都冇發生」一樣：「呢個功能壞咗」。
+ *
+ * ⚠️ 呢度只用派工紀錄推得出嚟嘅嘢。**唔會估。**
+ * 講唔出具體原因嗰陣，至少要講返個機制本身係點——
+ * 因為「軟偏好排夠目標之後唔會擋住佢再被排到」呢一點，
+ * 本身就係最常見嘅正解，而幹事唔會自己知。
+ *
+ * @param {Object} w 一行偏好
+ * @param {number} targetCount 目標次數
+ * @param {number} actualCount 實際次數
+ * @param {Object[]} assignments 生成結果
+ * @returns {{reasons: string[], text: string}}
+ */
+function explainWeightOvershoot_(w, targetCount, actualCount, assignments) {
+  const reasons = [];
+  const list = assignments || [];
+
+  // 呢個崗位本季有幾多位唔同嘅人被排到、共幾多個主日。
+  const peopleOnPost = {};
+  const postDates = {};
+  list.forEach(function (a) {
+    if (a.postId !== w.postId || !a.personId) return;
+    peopleOnPost[a.personId] = true;
+    postDates[a.serviceDate] = true;
+  });
+  const poolSize = Object.keys(peopleOnPost).length;
+  const dateCount = Object.keys(postDates).length;
+
+  // 人少格多 ⇒ 佢無論如何都會被排到多過目標。
+  if (poolSize > 0 && dateCount > poolSize) {
+    reasons.push('這個崗位這一季有 ' + dateCount + ' 個主日要排，'
+      + '但整季只有 ' + poolSize + ' 位不同的人被排到——'
+      + '合資格而又有空的人不多，那幾週沒有其他人可以排');
+  }
+
+  // ⚠️ 呢句永遠成立，而且係最常見嘅正解，所以一定要出。
+  reasons.push('偏好是「軟」的：排夠目標之後系統只是不再為他加分，'
+    + '並不會擋住他再被排到');
+
+  return { reasons: reasons, text: reasons.join('；') };
+}
+
 function explainWeightShortfall_(w, targetCount, actualCount, assignments, limit) {
   const reasons = [];
   const list = assignments || [];

@@ -215,9 +215,12 @@ console.log('\n=== B2 報告：達標嘅唔加噪音，未達標嘅一定有原�
   for (let i = 0; i < 8; i++) busy.push(A('P9001', 'USHER', '2027-01-0' + (i + 1)));
   ['2027-02-07', '2027-02-14', '2027-02-21'].forEach((d) => busy.push(A('P9002', 'CHAIR', d)));
 
+  // 第二十九輪批次階段 C：行首由「未達標原因：」改成「未達標：」
+  //（同一句字而家亦要俾畫面用，所以擺埋落 `gapText`，而超標嗰邊
+  // 對應嘅係「比目標多 N 次：」）。要求不變：講得出係每季上限。
   const short = gas.buildPersonPostWeightReport_(busy, weights, people, postNames, ctx);
-  check('★★★★★ 未達標嗰行有「未達標原因」，而且講得出係每季上限',
-    short.lines.some((l) => l.indexOf('未達標原因') !== -1 && l.indexOf('每季上限') !== -1),
+  check('★★★★★ 未達標嗰行有原因，而且講得出係每季上限',
+    short.lines.some((l) => l.indexOf('未達標：') !== -1 && l.indexOf('每季上限') !== -1),
     short.lines.join('\n'));
   check('★★★★ rows 入面有 met=false 同 shortfallReasons',
     short.rows[0].met === false && short.rows[0].shortfallReasons.length > 0);
@@ -232,7 +235,7 @@ console.log('\n=== B2 報告：達標嘅唔加噪音，未達標嘅一定有原�
     + '——目標值本身係小數，差 0.3 次唔算「冇生效」，'
     + '每行都報一堆原因只會令真正有問題嗰行淹沒咗',
     okReport.rows[0].met === true
-      && !okReport.lines.some((l) => l.indexOf('未達標原因') !== -1),
+      && !okReport.lines.some((l) => l.indexOf('未達標：') !== -1),
     JSON.stringify(okReport.rows[0]));
 }
 

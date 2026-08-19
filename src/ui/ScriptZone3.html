@@ -901,6 +901,20 @@
     }
     box.appendChild(targetLine);
 
+    // ⚠️ 第二十九輪批次階段 C：實際次數同目標對唔上嗰陣，**喺呢一頁講返點解**。
+    //
+    // 原本個原因收咗喺選單「軟規則實測量度」入面，而幹事根本唔會去嗰度。
+    // 佢喺呢一頁見到「今季目標 2 次　今季已排 1 次」而冇下文，
+    // 只會得出一個結論：「呢個功能壞咗」。
+    //
+    // 呢句字由後端 `buildPersonPostWeightReport_()` 算——同 `Diagnostics`
+    // 嗰一節、同選單版嗰個工具用嘅係同一份計算。
+    // **前端唔可以自己判斷「差咗定多咗」再砌一句**：另寫一套就係
+    // 同一件事兩個真相來源。
+    if (person.gapText) {
+      box.appendChild(make('div', { text: '⚠ ' + person.gapText, className: 'link-warn' }));
+    }
+
     // ⚠️ 下拉用人話，**唔俾幹事打數字**——打錯一個負號就完全相反，
     // 而「多一次」同「少一次」睇落只差一個字。
     const sel = document.createElement('select');
