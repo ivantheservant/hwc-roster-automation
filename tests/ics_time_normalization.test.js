@@ -102,10 +102,16 @@ console.log('\n=== A1【核心】認唔出 ⇒ 拋錯，唔可以靜靜回 fallb
   checkThrows('★★★★★ 亂文字 ⇒ 拋錯（唔可以靜靜當成 fallback）',
     function () { gas.normalizeTimeOfDay_('唔知咩時間', '10:45', TZ); }, '認不出這個時間值');
 
-  checkThrows('★★★★★ 未修之前嗰個真實壞值（String(Date) 出嚟嘅英文長格式）⇒ 拋錯',
-    function () {
-      gas.normalizeTimeOfDay_('Sat Dec 30 1899 10:45:00 GMT+1130 (New Zealand Daylight Time)', '10:45', TZ);
-    }, '認不出這個時間值');
+  // ⚠️⚠️ 第三十一輪批次階段 A2：**呢一條本來寫反咗，而且就係佢鎖死咗個 bug。**
+  //
+  // 舊斷言要求「String(Date) 出嚟嘅英文長格式 ⇒ 拋錯」，
+  // 但嗰個字串正正就係**真實環境每一次都會收到**嘅值
+  //（`convertConfigValue_()` 對 STR 型別會 `String(rawValue).trim()`）。
+  // 換言之：第二十三輪嘅「修正」由頭到尾冇生效過，
+  // 而呢一條測試把「唔生效」寫成咗預期行為。
+  //
+  // 正解喺 `tests/ics_time_from_stringified_date.test.js`：
+  // 呢個值要得出 `10:45`，唔係拋錯。
 
   checkThrows('★★★★ 鐘數超出範圍（25:00）⇒ 拋錯，唔可以當成合法',
     function () { gas.normalizeTimeOfDay_('25:00', '10:45', TZ); }, '認不出這個時間值');

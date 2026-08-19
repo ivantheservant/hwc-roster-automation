@@ -325,12 +325,50 @@ function normalizeTimeOfDay_(value, fallback, timezone) {
   // `H:mm` 同 `HH:mm` 都收，補零之後統一輸出 `HH:mm`。
   // 唔收 `HH:mm:ss`——本專案冇任何地方需要秒，收咗就要決定秒點處理，
   // 徒增一種要維護嘅寫法。
+  //
+  // ⚠️ 呢一段一定要行喺下面「已經被 String() 化嘅 Date」之前：
+  // `new Date('10:45')` 喺某啲引擎會 parse 得到，唔想 `10:45` 呢種
+  // 正常輸入行去一條完全唔需要嘅路。
   const m = /^(\d{1,2}):(\d{2})$/.exec(text);
   if (m) {
     const hour = Number(m[1]);
     const minute = Number(m[2]);
     if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
       return (hour < 10 ? '0' + hour : String(hour)) + ':' + m[2];
+    }
+  }
+
+  // ⚠️⚠️ 第三十一輪批次階段 A2：**已經被 `String()` 化咗嘅 Date。**
+  //
+  // 第二十三輪加咗上面嗰個 `[object Date]` 分支，以為搞掂——但佢由頭到尾
+  // 冇生效過。原因係中間仲有一層：`Config.gs` 嘅 `convertConfigValue_()`
+  // 對 `STR` 型別會做 `String(rawValue).trim()`，所以 Date 物件喺到達
+  // 呢度之前已經變成
+  //
+  //   `Sat Dec 30 1899 10:45:00 GMT+1130 (New Zealand Daylight Time)`
+  //
+  // 而上面嗰個 `[object Date]` 檢查永遠唔會中。
+  // 演練報告嗰句 `ICS 附件 | 查不到 | 認不出這個時間值：「Sat Dec 30 1899 …」`
+  // 就係呢個。
+  //
+  // ⚠️ 第二十三輪嘅測試「證明」咗修正有效，係因為佢**直接餵一個 Date 物件
+  // 落純函式**——冇經過 `getConfig()` → `convertConfigValue_()` 嗰一層。
+  // 呢個星期同一個形狀出現咗三次。
+  //
+  // ⚠️ 判斷特登收得好窄：**一定要有 `時:分:秒` 呢個形狀**才嘗試 parse。
+  // 嗰個係 `String(Date)` 嘅特徵（`… 10:45:00 GMT+1130 …`）。
+  //
+  // 唔收窄嘅話會靜靜出事——實測 `new Date()` 嘅行為：
+  //   `'2027'`  → 2027-01-01（當成年份）  ⇒ 會變成 `00:00`
+  //   `'1045'`  → 1045-01-01（當成年份）  ⇒ 會變成 `00:00`
+  //   `'10:75'` → 1974-12-31（當成年份 ＋ 亂七八糟）⇒ 會變成一個亂數時間
+  // 三個都係「認唔出被當成一個有意義嘅值」嗰個 bug class，
+  // 而且後果係義工喺錯嘅鐘數返到教會。加咗秒之後三個都會落去拋錯。
+  if (/\d{1,2}:\d{2}:\d{2}/.test(text)) {
+    const parsed = new Date(text);
+    if (!isNaN(parsed.getTime())) {
+      const tz2 = timezone || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+      return Utilities.formatDate(parsed, tz2, 'HH:mm');
     }
   }
 
