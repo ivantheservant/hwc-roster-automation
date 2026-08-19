@@ -115,6 +115,91 @@ function classifyConfigRowHealth_(audit) {
 }
 
 /**
+ * 2b. Config 值型別檢查（第三十二輪批次階段 A4 新增）。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 點解要有呢一節
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 階段 A1 令 `convertConfigValue_()` 認唔出就拋錯。但拋錯**只喺嗰個
+ * 功能真係被叫到嗰陣**先出現——即係幹事可能喺 12 月 4 日撳「正式發出」
+ * 嗰一刻先發現 `DRY_RUN` 嗰格壞咗。
+ *
+ * 呢一節就係要喺上線之前，一次過見晒全部問題。
+ *
+ * ⚠️ **分級刻意唔一致**：`BOOL` 出事一律 MUST，其餘 SHOULD。
+ * 因為 `DRY_RUN` 係 BOOL，而佢壞咗嘅後果（真係寄信）同其他參數
+ * 唔係同一個量級。
+ *
+ * @param {Object[]} rows Config 工作表的原始列（`readSheet(SHEETS.CONFIG)`）
+ * @returns {Object} healthItem_() 的結果
+ */
+function classifyConfigValueTypeHealth_(rows) {
+  const results = auditConfigValueTypes_(rows);
+  const bad = results.problems;
+  const hasBool = bad.some(function (p) { return p.type === CONFIG_TYPES.BOOL; });
+
+  if (bad.length === 0) {
+    return healthItem_('Config 值型別', HEALTH_SEVERITY.INFO, 'Config 值型別檢查',
+      results.checked + ' 個參數全部正常',
+      '每個參數都照它宣告的型別試轉了一次，全部認得出來。', []);
+  }
+
+  const details = bad.map(function (p) {
+    return p.key + '（' + p.type + '）：讀到「' + p.rawText + '」\n'
+      + '　　修法：Config 工作表選中這一格 ▸ 格式 ▸ 數字 ▸ 純文字 ▸ 重新輸入一次'
+      + (p.type === CONFIG_TYPES.BOOL
+        ? '\n　　⚠️ 這是 BOOL。DRY_RUN 也是 BOOL——BOOL 認不出時舊版會靜靜當成 FALSE，'
+          + '而 DRY_RUN=FALSE 代表信會真的寄出去。'
+        : '');
+  });
+
+  return healthItem_('Config 值型別',
+    hasBool ? HEALTH_SEVERITY.MUST : HEALTH_SEVERITY.SHOULD,
+    'Config 值型別檢查', bad.length + ' 個參數的值認不出來',
+    hasBool
+      ? '⚠️ 其中有 BOOL 型別的參數。BOOL 控制的是開關（例如 DRY_RUN 決定信會不會'
+        + '真的寄出去），必須先處理再做任何寄送動作。'
+      : '以下參數的值認不出來，它們設定的東西目前沒有生效（系統會用程式碼的預設值）：',
+    details);
+}
+
+/**
+ * 逐個 Config 參數試轉一次型，回報邊啲會拋錯。**純函式**，可離線測。
+ *
+ * ⚠️ 特登唔用 `readConfig()`——嗰邊會把失敗變成 marker 然後快取。
+ * 呢度要見到「試轉」嘅原始結果，而且要連原值一齊報返出嚟。
+ *
+ * @param {Object[]} rows `readSheet(SHEETS.CONFIG)` 的結果
+ * @returns {{checked: number, problems: Object[]}}
+ */
+function auditConfigValueTypes_(rows) {
+  const C = COLUMNS.CONFIG;
+  const problems = [];
+  let checked = 0;
+
+  (rows || []).forEach(function (row) {
+    const key = row[C.KEY];
+    if (!key) return;
+    checked++;
+    const raw = row[C.VALUE];
+    try {
+      convertConfigValue_(raw, row[C.TYPE], key);
+    } catch (err) {
+      problems.push({
+        key: String(key),
+        type: String(row[C.TYPE]),
+        // ⚠️ 原值要逐字報返出嚟。淨係講「認不出」，幹事望住個格
+        // 見到「10:45」會完全唔明發生咩事。
+        rawText: (raw === null || raw === undefined) ? '（空白）' : String(raw),
+        message: err.message
+      });
+    }
+  });
+  return { checked: checked, problems: problems };
+}
+
+/**
  * 3. 各版本派工紀錄——純資訊，沒有「異常」的判斷標準（哪個版本該有幾多行
  * 完全視實際排班情況而定，無法憑空判斷合理與否），一律 INFO。
  * @param {Object} result summariseAssignmentVersions_() 的回傳值
@@ -303,6 +388,7 @@ function buildFullHealthCheckReport_(quarterId) {
 
   run(function () { return classifySetupHealth_(validateSetup()); });
   run(function () { return classifyConfigRowHealth_(planConfigRowAudit_()); });
+  run(function () { return classifyConfigValueTypeHealth_(readSheet(SHEETS.CONFIG)); });
   run(function () { return classifyAssignmentVersionsHealth_(summariseAssignmentVersions_()); });
   run(function () { return classifyEmailTemplatesHealth_(buildEmailTemplateSelfCheckReport_()); });
   run(function () { return classifyAuditLogHealth_(buildAuditLogSummaryReport_(200)); });
