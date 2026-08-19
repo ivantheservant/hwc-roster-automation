@@ -169,3 +169,37 @@ function matchesPeopleSearch_(keyword, haystack) {
     return String(v === null || v === undefined ? '' : v).toLowerCase().indexOf(k) !== -1;
   });
 }
+
+/**
+ * 區三共用：一個備註值值唔值得顯示。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 第二十八輪批次階段 E1：Ivan 實測
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `Roles` 同 `PersonPostExclusions` 好多行嘅 `Notes` 就係嗰個人自己個名
+ *（當初匯入資料嗰陣順手填落去嘅）。畫面上就會變成
+ *
+ *   當值堂委　2026-01-01 至 現在　在任
+ *   備註：（同一個名，而個名已經喺上面一行）
+ *
+ * 每一行都多一行冇資訊嘅字。
+ *
+ * ⚠️ **呢度只改顯示，唔改試算表。** 試算表入面嗰啲值照舊——
+ * 一個「順手幫你清理資料」嘅動作，係喺幹事冇要求、冇確認、
+ * 冇得反悔嘅情況下改人哋啲資料。
+ *
+ * 判斷特登收窄：**淨係**個備註剝走前後空白之後同個名一模一樣先當成雜訊。
+ * 「陳大文（暫代）」呢類含住名但另有資訊嘅，照樣顯示。
+ *
+ * @param {*} notes 試算表讀出嚟嗰個 Notes 值
+ * @param {string} nameTC 同一行嗰個人嘅中文名
+ * @returns {string} 值得顯示就回原值（已剝走前後空白），否則回空字串
+ */
+function displayableNote_(notes, nameTC) {
+  const text = String(notes === null || notes === undefined ? '' : notes).trim();
+  if (text === '') return '';
+  const name = String(nameTC === null || nameTC === undefined ? '' : nameTC).trim();
+  if (name !== '' && text === name) return '';
+  return text;
+}

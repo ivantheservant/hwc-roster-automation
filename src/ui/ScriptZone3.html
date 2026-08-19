@@ -1144,7 +1144,12 @@
       }));
       if (!r.active) head.appendChild(make('span', { text: '已停用', className: 'tag' }));
       line.appendChild(head);
-      if (r.notes) line.appendChild(make('div', { text: '備註：' + r.notes, className: 'muted' }));
+      // ⚠️ 顯示用 `notesDisplay`（備註同個名一樣就唔顯示——見
+      // `displayableNote_()`），「修改」欄位用返 `notes` 原值。
+      // 兩個混咗嘅話，幹事一撳「儲存」就會把試算表嗰個備註抹咗。
+      if (r.notesDisplay) {
+        line.appendChild(make('div', { text: '備註：' + r.notesDisplay, className: 'muted' }));
+      }
 
       const slot = make('div', {});
       line.appendChild(slot);

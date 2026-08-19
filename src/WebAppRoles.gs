@@ -105,7 +105,11 @@ function apiListRoles(keyword) {
         effectiveFrom: from,
         effectiveTo: to,
         active: active,
+        // ⚠️ `notes` 係**原值**，畀「修改」欄位用。唔可以喺呢度清走——
+        // 清走嘅話幹事一撳「儲存」就會把試算表嗰個值抹咗。
         notes: String(row[R.NOTES] || '').trim(),
+        // `notesDisplay` 先係畫面用嗰個（階段 E1：備註同個名一樣就唔顯示）。
+        notesDisplay: displayableNote_(row[R.NOTES], nameTC),
         // 「現任」＝ Active 而且今日喺生效期內
         current: active && (!from || from <= today) && (!to || to >= today)
       });
