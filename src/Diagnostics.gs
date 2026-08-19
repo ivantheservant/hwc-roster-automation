@@ -152,12 +152,30 @@ function writeDiagnosticsReport_(reportName, rows) {
  * @returns {boolean} 是否成功寫入
  */
 function tryWriteDiagnostics_(reportName, rows) {
+  return tryWriteDiagnosticsDetailed_(reportName, rows).ok;
+}
+
+/**
+ * 同 `tryWriteDiagnostics_()`，但**把失敗原因帶返出嚟**。
+ *
+ * ⚠️ 第三十輪批次階段 C2-2：實測撞到「對話框話已寫入 Diagnostics，
+ * 但嗰張表根本冇嗰份報告」。真正原因喺 `Logger`，而
+ * **Ivan 讀唔到 `Logger`**——要走去 Apps Script 執行記錄先搵到。
+ *
+ * 一個「失敗咗但唔講原因」嘅包裝，等於把問題藏起嚟。
+ * 呼叫端想講返原因就用呢個；只想知成唔成功就用上面嗰個。
+ *
+ * @param {string} reportName
+ * @param {Object[]} rows
+ * @returns {{ok: boolean, error: string}}
+ */
+function tryWriteDiagnosticsDetailed_(reportName, rows) {
   try {
     writeDiagnosticsReport_(reportName, rows);
-    return true;
+    return { ok: true, error: '' };
   } catch (err) {
     log_('WARN', 'writeDiagnosticsReport_(' + reportName + ') 失敗（不影響工具本身）：' + err.message);
-    return false;
+    return { ok: false, error: err.message };
   }
 }
 

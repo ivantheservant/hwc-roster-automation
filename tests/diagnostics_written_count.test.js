@@ -94,12 +94,20 @@ console.log('\n=== C1：已知嘅四個呼叫點都已經改用 rows.length（�
 
 console.log('\n=== C1：tryWriteDiagnostics_() 本身嘅回傳型別冇變（確認係布林值，唔係我哋呢度理解錯咗）===');
 {
+  // 第三十輪批次階段 C2-2：`tryWriteDiagnostics_()` 而家係一個薄殼，
+  // 真正嘅 try/catch 搬咗落 `tryWriteDiagnosticsDetailed_()`（佢會**帶埋
+  // 失敗原因返出嚟**——舊寫法只寫入 Logger，而 Ivan 讀唔到 Logger）。
+  // 要求不變：成功回 true、失敗回 false。
   const diagnosticsSource = fs.readFileSync(path.join(SRC, 'Diagnostics.gs'), 'utf8');
-  const start = diagnosticsSource.indexOf('function tryWriteDiagnostics_');
+  const start = diagnosticsSource.indexOf('function tryWriteDiagnosticsDetailed_');
   const end = diagnosticsSource.indexOf('\n}', start);
   const body = diagnosticsSource.slice(start, end);
-  check('★ tryWriteDiagnostics_() 成功時 return true', /return true;/.test(body));
-  check('★ tryWriteDiagnostics_() 失敗時 return false（catch 區塊入面）', /return false;/.test(body));
+  check('★ 成功時 ok: true', /return \{ ok: true, error: '' \};/.test(body));
+  check('★ 失敗時 ok: false（catch 區塊入面），而且帶埋 error',
+    /return \{ ok: false, error: err\.message \};/.test(body));
+  check('★★★★ 而 `tryWriteDiagnostics_()` 仍然係 boolean（其餘 20 幾個呼叫點冇改）',
+    /function tryWriteDiagnostics_\(reportName, rows\) \{\s*\n\s*return tryWriteDiagnosticsDetailed_\(reportName, rows\)\.ok;/
+      .test(diagnosticsSource));
 }
 
 console.log(`\nTOTAL: ${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

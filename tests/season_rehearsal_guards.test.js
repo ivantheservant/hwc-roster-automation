@@ -152,9 +152,9 @@ console.log('\n=== D2 受保護清單：Config 讀唔到唔等於冇保護 ===')
 console.log('\n=== D3【核心】一步失敗要繼續行落去 ===');
 {
   const log = [];
-  gas.runRehearsalStep_(log, '第一步', function () { return { a: 1 }; });
-  gas.runRehearsalStep_(log, '第二步', function () { throw new Error('故意炸'); });
-  const third = gas.runRehearsalStep_(log, '第三步', function () { return { c: 3 }; });
+  gas.runRehearsalStep_(log, '第一步', null, function () { return { a: 1 }; });
+  gas.runRehearsalStep_(log, '第二步', null, function () { throw new Error('故意炸'); });
+  const third = gas.runRehearsalStep_(log, '第三步', null, function () { return { c: 3 }; });
 
   check('★★★★★ 中間一步炸咗，第三步照樣行'
     + '——中途 throw 就見唔到後面幾步嘅問題，而「串起嚟」嗰層'
@@ -261,15 +261,28 @@ console.log('\n=== D5【核心】工具唔會自動清理 ===');
     quarterId: '2027T4',
     baseline: { stage: 'DRAFT', latestVersionNo: -1, sendLogRows: 0, pdfFileCount: 0 },
     after: { stage: 'OFFICIAL_SENT', latestVersionNo: 1, sendLogRows: 62, pdfFileCount: 58 },
+    created: { versions: [0, 1], pdfPaths: [] },
     steps: [], pdfFiles: { available: false, reason: 'x' },
     ics: { available: false, reason: 'x' }, highlight: { available: false, reason: 'x' }
   });
   const cleanup = rows.filter(function (r) { return r.section === '清理'; });
-  check('★★★★★ 列出呢次演練建立咗乜（版本／SendLog／PDF 各自由幾多變到幾多）',
+  // 第三十輪批次階段 C3：2027T4 已經累積咗 9 個版本（演練跑過兩次）。
+  // 只講「由 N 變到 M」唔夠——要逐個列出**呢一次**建立咗邊幾個。
+  check('★★★★★ 逐個列出呢次演練建立咗邊幾個版本（唔止講「由 N 變到 M」）',
     cleanup.some(function (r) {
-      return String(r.value).indexOf('版本 -1 → 1') !== -1
-        && String(r.value).indexOf('SendLog 0 → 62') !== -1
-        && String(r.value).indexOf('PDF 0 → 58') !== -1;
+      return r.item === '這次演練建立的版本' && String(r.value) === 'v0、v1'
+        && String(r.note).indexOf('版本 -1 → 1') !== -1;
+    }), JSON.stringify(cleanup));
+  check('★★★★★ SendLog 講「新增咗幾多行」，唔止講前後兩個數',
+    cleanup.some(function (r) {
+      return r.item === '這次演練新增的 SendLog 行數' && String(r.value) === '62'
+        && String(r.note).indexOf('由 0 變成 62') !== -1;
+    }), JSON.stringify(cleanup));
+  check('★★★★★ 冇標到「呢次新建」嘅 PDF ⇒ 明講「查不到」，'
+    + '**唔可以報一個 0**（0 會令人以為確認過一份都冇新建）',
+    cleanup.some(function (r) {
+      return r.item === '這次演練新建立的 PDF'
+        && String(r.value).indexOf('查不到') !== -1;
     }), JSON.stringify(cleanup));
   check('★★★★★ 講明點清（指去「重設季度測試資料」）',
     cleanup.some(function (r) {
@@ -293,8 +306,16 @@ console.log('\n=== D5【核心】工具唔會自動清理 ===');
 
 console.log('\n=== D 報告去 Diagnostics，唔係塞落 ui.alert() ===');
 {
-  check('★★★★★ 行 `tryWriteDiagnostics_()` 寫 Diagnostics',
-    /tryWriteDiagnostics_\(SEASON_REHEARSAL_REPORT, rows\)/.test(src));
+  // 第三十輪批次階段 C2-2：改用 `tryWriteDiagnosticsDetailed_()`，
+  // 因為要把失敗原因帶返出嚟（Ivan 讀唔到 Logger）。
+  check('★★★★★ 行 `tryWriteDiagnosticsDetailed_()` 寫 Diagnostics',
+    /tryWriteDiagnosticsDetailed_\(SEASON_REHEARSAL_REPORT, rows\)/.test(src));
+  check('★★★★★ 寫唔入嗰陣把 `err.message` 印落對話框'
+    + '——舊寫法只講「見執行記錄」，而 Ivan 讀唔到 Logger，'
+    + '等於冇講',
+    /原因：'\s*\n?\s*\+ wrote\.error/.test(src)
+    || src.indexOf("'\\n原因：' + wrote.error") !== -1
+    || /\+ wrote\.error/.test(src), src.slice(src.indexOf('wroteOk ?'), src.indexOf('wroteOk ?') + 300));
   check('★★★★★ `ui.alert()` 只講幾個關鍵數字同「去邊度睇」，唔會逐行塞'
     + '——一個對話框裝唔落，而 Diagnostics 先係 connector 讀得返嗰一份表',
     /完整報告已寫入 ' \+ SHEETS\.DIAGNOSTICS/.test(src)
@@ -312,7 +333,14 @@ console.log('\n=== D1 放試算表選單，唔搬上 Web ===');
     /⚠️⚠️ 全季流程演練/.test(menu));
   check('★★★★★ **冇任何 `api*` 端點**——呢個係測試工具，'
     + '使用者係 Ivan 唔係幹事，搬上 Web 只會令幹事撳錯',
-    !/function api[A-Z]/.test(src));
+    // `apiSaveAndConfirmExecuteForRehearsal_()` 名以 `_` 結尾，
+    // 唔係一個 Web 端點（Web 端點嘅特徵係名**冇** `_` 結尾，
+    // 而且第一行有一個 Web 請求關卡）。
+    //
+    // ⚠️ 要剝走註解先掃——解釋「唔可以叫嗰個關卡」嘅註解本身就含住
+    // 個關卡名。本專案已經撞過幾次呢個自我指涉陷阱。
+    !/^function api[A-Za-z]+[^_\s(]\s*\(/m.test(stripComments(src))
+    && stripComments(src).indexOf('assertWebAppRequestAllowed_') === -1);
   check('★★★★★ 而且冇註冊落 Web 嘅唯讀白名單',
     !/SeasonRehearsal|runSeasonRehearsal_|apiSeasonRehearsal/
       .test(read('src/ui/Script.html')));

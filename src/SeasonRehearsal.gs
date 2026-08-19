@@ -171,22 +171,80 @@ function readSeasonRehearsalBaseline_(quarterId) {
  * @param {function(): Object} fn 實際做嘅嘢，回一個 `{}` 記落報告
  * @returns {?Object} 成功回 fn 嘅結果，失敗回 null
  */
-function runRehearsalStep_(log, name, fn) {
+function runRehearsalStep_(log, name, opts, fn) {
+  const o = opts || {};
+  // ⚠️ 第三十輪批次階段 C1：**每一步都要記低前置條件同有冇滿足。**
+  //
+  // 上一版嘅次序排錯咗（儲存並確認排咗喺寄審閱之前），結果係
+  // 步驟 4 因為 Stage 停喺 `REVIEW_SENT` 而失敗——但報告只寫住
+  // 「步驟 4 失敗」，睇唔出係「真失敗」定係「前一步冇行到所以連鎖」。
+  //
+  // 記低之後，下次一眼睇得出。
+  let preconditionText = '（沒有前置條件）';
+  let preconditionMet = true;
+  if (o.requiresStage) {
+    let actual;
+    try { actual = getQuarterStage_(o.quarterId); } catch (err) { actual = '（查不到：' + err.message + '）'; }
+    preconditionMet = actual === o.requiresStage;
+    preconditionText = 'Stage 要係 ' + o.requiresStage + '，實際係 ' + actual
+      + (preconditionMet ? '　✅' : '　⚠️ 不符合——下面的失敗很可能是連鎖，不是這一步本身');
+  }
+
   const startedAt = Date.now();
   try {
     const detail = fn();
     log.push({
       name: name, ok: true, seconds: Math.round((Date.now() - startedAt) / 100) / 10,
+      preconditionText: preconditionText, preconditionMet: preconditionMet,
       detail: detail || {}, error: ''
     });
     return detail;
   } catch (err) {
     log.push({
       name: name, ok: false, seconds: Math.round((Date.now() - startedAt) / 100) / 10,
+      preconditionText: preconditionText, preconditionMet: preconditionMet,
       detail: {}, error: err.message
     });
     log_('WARN', '全季流程演練「' + name + '」失敗：' + err.message);
     return null;
+  }
+}
+
+/**
+ * 演練用嘅「儲存並確認．執行」。
+ *
+ * ⚠️ 只行零改動路徑（`executeSaveConfirmZeroChange_()`）。
+ * 演練中途冇改過任何格子，所以零改動係**預期路徑**；
+ * 而如果唔係零改動，就代表個沙盒季度嘅 grid 有人手改動殘留——
+ * 嗰種情況唔應該由一個測試工具自作主張寫落去，講返出嚟就算。
+ *
+ * ⚠️ 同 `buildSaveAndConfirmPlan_()` 一樣，**唔行 `api*`**——
+ * 嗰邊第一行係 `assertWebAppRequestAllowed_()`。
+ *
+ * @param {string} quarterId
+ * @returns {{ok: boolean, action: string, error: string}}
+ */
+function apiSaveAndConfirmExecuteForRehearsal_(quarterId) {
+  try {
+    const plan = buildSaveAndConfirmPlan_(quarterId);
+    if (plan.blocked) {
+      return { ok: false, action: '', error: '被擋住：' + plan.blockReason };
+    }
+    if (!plan.zeroChange) {
+      return {
+        ok: false, action: '',
+        error: '不是零改動路徑（grid 有 ' + (plan.gridChanges || []).length
+          + ' 格人手改動殘留）。演練不會替你寫入——請先自己處理那幾格。'
+      };
+    }
+    const done = executeSaveConfirmZeroChange_(quarterId, plan);
+    return {
+      ok: true,
+      action: (done && done.action) ? done.action : String(plan.zeroChangeAction),
+      error: ''
+    };
+  } catch (err) {
+    return { ok: false, action: '', error: err.message };
   }
 }
 
@@ -201,121 +259,153 @@ function executeSeasonRehearsal_(quarterId) {
   const baseline = readSeasonRehearsalBaseline_(quarterId);
   const steps = [];
 
+  // ⚠️ 第三十輪批次階段 C1：**次序改成真實流程。**
+  //
+  // 上一版排成「生成 → 儲存並確認 → 寄審閱 → 正式發出」，係錯嘅：
+  // 「儲存並確認」只有喺 `REVIEW_SENT` 先會令 Stage 前進到
+  // `REQUESTS_APPLIED`（見 `resolveZeroChangeAction_()`）。排喺寄審閱
+  // 之前，佢喺 `DRAFT` 撳、零改動＝乜都唔做，之後「正式發出」
+  // 需要 `REQUESTS_APPLIED` 但 Stage 停喺 `REVIEW_SENT` ⇒ 連環失敗。
+  //
+  //   1 生成初稿
+  //   2 寄給堂委審閱        → REVIEW_SENT
+  //   3 儲存並確認（零改動） → REQUESTS_APPLIED
+  //   4 正式發出給全體      → OFFICIAL_SENT
+  //   5 改動後重發
+
   // ── 步 1　生成初稿 ───────────────────────────────────────
-  const gen = runRehearsalStep_(steps, '步驟 1：生成初稿', function () {
-    const result = performRosterGeneration_(quarterId);
-    let publicLink = '（沒有嘗試）';
-    try {
-      const pub = publishPublicRoster_(quarterId);
-      publicLink = pub && pub.url ? '已建立' : '（回傳沒有連結）';
-    } catch (err) {
-      publicLink = '失敗：' + err.message;
-    }
-    return {
-      versionNo: result.versionNo,
-      sheetName: result.sheetName,
-      assigned: result.assigned,
-      blank: result.blank,
-      warnings: result.warnings,
-      publicLink: publicLink
-    };
-  });
+  const gen = runRehearsalStep_(steps, '步驟 1：生成初稿',
+    { quarterId: quarterId, requiresStage: QUARTER_STAGE.DRAFT }, function () {
+      const result = performRosterGeneration_(quarterId);
+      let publicLink = '（沒有嘗試）';
+      try {
+        const pub = publishPublicRoster_(quarterId);
+        publicLink = pub && pub.url ? '已建立' : '（回傳沒有連結）';
+      } catch (err) {
+        publicLink = '失敗：' + err.message;
+      }
+      return {
+        versionNo: result.versionNo,
+        sheetName: result.sheetName,
+        assigned: result.assigned,
+        blank: result.blank,
+        warnings: result.warnings,
+        publicLink: publicLink
+      };
+    });
 
-  // ── 步 2　儲存並確認（零改動路徑）────────────────────────
+  // ── 步 2　寄給堂委審閱 ───────────────────────────────────
+  runRehearsalStep_(steps, '步驟 2：寄給堂委審閱',
+    { quarterId: quarterId, requiresStage: QUARTER_STAGE.DRAFT }, function () {
+      const plan = planStep2_(quarterId);
+      const sendLogBefore = countRehearsalSendLogRows_(quarterId);
+      const result = executeStep2_(quarterId);
+      return {
+        recipientCount: plan.recipientCount,
+        isDryRun: plan.isDryRun,
+        sendLogAdded: countRehearsalSendLogRows_(quarterId) - sendLogBefore,
+        sent: result && result.sent !== undefined ? result.sent : '（回傳沒有這一欄）',
+        stageAfter: getQuarterStage_(quarterId)
+      };
+    });
+
+  // ── 步 3　儲存並確認（零改動路徑）────────────────────────
+  // 呢一步先係令 Stage 由 REVIEW_SENT 前進到 REQUESTS_APPLIED 嗰個。
   const versionBefore = gen ? gen.versionNo : findLatestVersionNo(quarterId);
-  runRehearsalStep_(steps, '步驟 2：儲存並確認（零改動）', function () {
-    const stageBefore = getQuarterStage_(quarterId);
-    // ⚠️ 叫 `buildSaveAndConfirmPlan_()` 而唔係 `apiSaveAndConfirmPlan()`：
-    // 後者第一行係 `assertWebAppRequestAllowed_()`，而呢個工具由試算表選單
-    // 行，唔係一個 Web 請求。行 `api*` 嘅話，Web UI 一關就會拋一個
-    // 同演練完全無關嘅錯，令人以為係流程本身出事。
-    const plan = buildSaveAndConfirmPlan_(quarterId);
-    const stageAfter = getQuarterStage_(quarterId);
-    const versionAfter = findLatestVersionNo(quarterId);
-    // ⚠️ `plan.requests` 係一個 `{apply, confirm, needsInput}` 物件，
-    // **唔係陣列**。當佢係陣列讀 `.length` 會靜靜得出 `undefined`，
-    // 而報告會印一格空白——即係「零申報」同「讀錯欄」睇落一樣。
-    const req = plan.requests || { apply: [], confirm: [], needsInput: [] };
-    return {
-      stageBefore: stageBefore,
-      stageAfter: stageAfter,
-      // 零改動路徑嘅重點就係「乜都唔應該變」，所以兩樣都要記。
-      stageAdvanced: stageBefore !== stageAfter,
-      versionCreated: versionAfter !== versionBefore,
-      blocked: plan.blocked ? ('是：' + plan.blockReason) : '否',
-      zeroChange: plan.zeroChange,
-      zeroChangeAction: plan.zeroChangeAction === null ? '（沒有）' : plan.zeroChangeAction,
-      gridChanges: (plan.gridChanges || []).length,
-      pendingRequests: req.apply.length + req.confirm.length + req.needsInput.length,
-      realViolations: ((plan.violations || {}).real || []).length
-    };
-  });
-
-  // ── 步 3　寄給堂委審閱 ───────────────────────────────────
-  runRehearsalStep_(steps, '步驟 3：寄給堂委審閱', function () {
-    const plan = planStep2_(quarterId);
-    const sendLogBefore = countRehearsalSendLogRows_(quarterId);
-    const result = executeStep2_(quarterId);
-    return {
-      recipientCount: plan.recipientCount,
-      isDryRun: plan.isDryRun,
-      sendLogAdded: countRehearsalSendLogRows_(quarterId) - sendLogBefore,
-      sent: result && result.sent !== undefined ? result.sent : '（回傳沒有這一欄）',
-      stageAfter: getQuarterStage_(quarterId)
-    };
-  });
-
-  // ── 步 3.5　套用申報（零申報路徑）——為咗行到步驟 4 ─────────
-  runRehearsalStep_(steps, '步驟 3.5：套用修改申報（零申報）', function () {
-    const plan = planApplyRequests_(quarterId);
-    const applied = applyRequests_(plan, [], VERSION_VALUES.BASIS_REQUESTS_APPLIED);
-    return {
-      requestCount: plan.results.length,
-      versionNo: applied && applied.versionNo !== undefined ? applied.versionNo : '（回傳沒有這一欄）',
-      stageAfter: getQuarterStage_(quarterId)
-    };
-  });
+  runRehearsalStep_(steps, '步驟 3：儲存並確認（零改動）',
+    { quarterId: quarterId, requiresStage: QUARTER_STAGE.REVIEW_SENT }, function () {
+      const stageBefore = getQuarterStage_(quarterId);
+      // ⚠️ 叫 `buildSaveAndConfirmPlan_()` 而唔係 `apiSaveAndConfirmPlan()`：
+      // 後者第一行係 `assertWebAppRequestAllowed_()`，而呢個工具由試算表選單
+      // 行，唔係一個 Web 請求。行 `api*` 嘅話，Web UI 一關就會拋一個
+      // 同演練完全無關嘅錯，令人以為係流程本身出事。
+      const plan = buildSaveAndConfirmPlan_(quarterId);
+      // ⚠️ `plan.requests` 係一個 `{apply, confirm, needsInput}` 物件，
+      // **唔係陣列**。當佢係陣列讀 `.length` 會靜靜得出 `undefined`，
+      // 而報告會印一格空白——即係「零申報」同「讀錯欄」睇落一樣。
+      const req = plan.requests || { apply: [], confirm: [], needsInput: [] };
+      // 零改動路徑要真正執行先會前進 Stage——只 plan 唔 execute 嘅話，
+      // Stage 唔會郁，下一步就一定失敗。
+      let executed = '（沒有執行）';
+      if (!plan.blocked && plan.zeroChange) {
+        const done = apiSaveAndConfirmExecuteForRehearsal_(quarterId);
+        executed = done.ok ? ('已執行：' + done.action) : ('失敗：' + done.error);
+      }
+      const stageAfter = getQuarterStage_(quarterId);
+      const versionAfter = findLatestVersionNo(quarterId);
+      return {
+        stageBefore: stageBefore,
+        stageAfter: stageAfter,
+        // 零改動路徑嘅重點就係「乜都唔應該變」，所以兩樣都要記。
+        stageAdvanced: stageBefore !== stageAfter,
+        versionCreated: versionAfter !== versionBefore,
+        blocked: plan.blocked ? ('是：' + plan.blockReason) : '否',
+        zeroChange: plan.zeroChange,
+        zeroChangeAction: plan.zeroChangeAction === null ? '（沒有）' : plan.zeroChangeAction,
+        executed: executed,
+        gridChanges: (plan.gridChanges || []).length,
+        pendingRequests: req.apply.length + req.confirm.length + req.needsInput.length,
+        realViolations: ((plan.violations || {}).real || []).length
+      };
+    });
 
   // ── 步 4　正式發出給全體 ─────────────────────────────────
-  runRehearsalStep_(steps, '步驟 4：正式發出給全體', function () {
-    const warn = planStep4Warnings_(quarterId);
-    const pdf = planStep4MissingPdf_(quarterId, warn.versionNo);
-    const preview = planStep4SendPreview_(quarterId, warn.versionNo);
-    const sendLogBefore = countRehearsalSendLogRows_(quarterId);
-    const result = executeStep4Send_(quarterId);
-    return {
-      versionNo: warn.versionNo,
-      pendingCells: warn.pendingCells.length,
-      missingPdf: pdf.missing ? pdf.missing.length : '（回傳沒有這一欄）',
-      recipientCount: preview.recipientCount,
-      isDryRun: preview.isDryRun,
-      sendLogAdded: countRehearsalSendLogRows_(quarterId) - sendLogBefore,
-      skipped: result && result.skipped !== undefined ? result.skipped : '（回傳沒有這一欄）',
-      outcomeSentence: result ? result.outcomeSentence : '',
-      stageAfter: getQuarterStage_(quarterId)
-    };
-  });
+  runRehearsalStep_(steps, '步驟 4：正式發出給全體',
+    { quarterId: quarterId, requiresStage: QUARTER_STAGE.REQUESTS_APPLIED }, function () {
+      const warn = planStep4Warnings_(quarterId);
+      const pdf = planStep4MissingPdf_(quarterId, warn.versionNo);
+      const preview = planStep4SendPreview_(quarterId, warn.versionNo);
+      const sendLogBefore = countRehearsalSendLogRows_(quarterId);
+      const result = executeStep4Send_(quarterId);
+      return {
+        versionNo: warn.versionNo,
+        pendingCells: warn.pendingCells.length,
+        missingPdf: pdf.missing ? pdf.missing.length : '（回傳沒有這一欄）',
+        recipientCount: preview.recipientCount,
+        isDryRun: preview.isDryRun,
+        sendLogAdded: countRehearsalSendLogRows_(quarterId) - sendLogBefore,
+        skipped: result && result.skipped !== undefined ? result.skipped : '（回傳沒有這一欄）',
+        outcomeSentence: result ? result.outcomeSentence : '',
+        stageAfter: getQuarterStage_(quarterId)
+      };
+    });
 
   // ── 步 5　改動後重發（預期 0 人，因為冇改過嘢）────────────
-  runRehearsalStep_(steps, '步驟 5：改動後重發', function () {
-    const plan = planStep5ChangedList_(quarterId);
-    return {
-      versionNo: plan.versionNo,
-      changedCount: plan.changedList.length,
-      // ⚠️ 特登唔真係寄——冇改動嘅話本來就唔應該寄，
-      // 而「有改動先寄」呢個判斷本身就係要驗證嗰樣嘢。
-      note: plan.changedList.length === 0
-        ? '沒有人有改動，所以沒有寄——這正是預期結果（演練中途沒有改過任何格子）'
-        : '有 ' + plan.changedList.length + ' 人被判定為有改動，但演練沒有改過任何格子，請查'
-    };
-  });
+  runRehearsalStep_(steps, '步驟 5：改動後重發',
+    { quarterId: quarterId, requiresStage: QUARTER_STAGE.OFFICIAL_SENT }, function () {
+      const plan = planStep5ChangedList_(quarterId);
+      return {
+        versionNo: plan.versionNo,
+        changedCount: plan.changedList.length,
+        // ⚠️ 特登唔真係寄——冇改動嘅話本來就唔應該寄，
+        // 而「有改動先寄」呢個判斷本身就係要驗證嗰樣嘢。
+        note: plan.changedList.length === 0
+          ? '沒有人有改動，所以沒有寄——這正是預期結果（演練中途沒有改過任何格子）'
+          : '有 ' + plan.changedList.length + ' 人被判定為有改動，但演練沒有改過任何格子，請查'
+      };
+    });
+
+  // ⚠️ 第三十輪批次階段 C3：2027T4 已經累積咗 9 個版本（演練跑過兩次）。
+  // 只講「版本由 N 變到 M」唔夠——要逐個列出**呢一次**建立咗邊幾個，
+  // 清理嗰陣先知邊啲可以動。
+  const created = { versions: [], pdfPaths: [] };
+  const firstNew = (Number(baseline.latestVersionNo) || -1) + 1;
+  const lastNew = findLatestVersionNo(quarterId);
+  for (let v = firstNew; v <= lastNew; v++) created.versions.push(v);
+
+  // PDF：檔名開頭係 `{quarterId}_v{呢次建立嘅版本}` 嘅先算「呢次新建」。
+  const pdfFiles = readRehearsalPdfPaths_(quarterId, created.versions);
+  created.pdfPaths = (pdfFiles.files || [])
+    .filter(function (f) { return f.isNew; })
+    .map(function (f) { return f.path; });
 
   return {
     quarterId: quarterId,
     baseline: baseline,
     steps: steps,
+    created: created,
     after: readSeasonRehearsalBaseline_(quarterId),
-    pdfFiles: readRehearsalPdfPaths_(quarterId),
+    pdfFiles: pdfFiles,
     ics: readRehearsalIcsSample_(quarterId),
     highlight: readRehearsalHighlightSample_(quarterId)
   };
@@ -348,11 +438,16 @@ function countRehearsalSendLogRows_(quarterId) {
  * 要逐個列出佢實際落咗喺邊。
  *
  * @param {string} quarterId
+ * @param {number[]=} newVersionNos 呢一次演練建立咗嘅版本號。傳咗嘅話，
+ *   檔名開頭對得上嘅會標成 `isNew`（階段 C3：清理嗰陣要知邊啲可以動）
  * @returns {{available: boolean, reason: string, rootName: string, files: Object[]}}
  */
-function readRehearsalPdfPaths_(quarterId) {
+function readRehearsalPdfPaths_(quarterId, newVersionNos) {
   try {
     const rootName = resolveMailAttachmentFolder_().getName();
+    const newPrefixes = (newVersionNos || []).map(function (v) {
+      return quarterId + '_v' + v;
+    });
     const files = listRosterPdfFilesForQuarter_(quarterId).map(function (f) {
       return {
         name: f.name,
@@ -361,7 +456,10 @@ function readRehearsalPdfPaths_(quarterId) {
         path: f.inSubfolder
           ? (rootName + ' / ' + quarterId + ' / ' + f.folderName + ' / ' + f.name)
           : (rootName + ' / ' + f.name),
-        inSubfolder: f.inSubfolder
+        inSubfolder: f.inSubfolder,
+        // ⚠️ 冇傳版本清單就一律 `false`——**唔可以猜**。
+        // 猜錯嘅後果係叫人清走一份唔應該清嘅檔案。
+        isNew: newPrefixes.some(function (p) { return f.name.indexOf(p) === 0; })
       };
     });
     return { available: true, reason: '', rootName: rootName, files: files };
@@ -464,22 +562,57 @@ function buildSeasonRehearsalRows_(record) {
   const base = r.baseline || {};
   const after = r.after || {};
 
-  rows.push(diagRow_('0. 起點', '季度', r.quarterId || '（沒有）', ''));
-  rows.push(diagRow_('0. 起點', 'Stage', base.stage, '演練開始前'));
-  rows.push(diagRow_('0. 起點', '最新版本號', base.latestVersionNo,
+  /**
+   * ⚠️ 第三十輪批次階段 C2-2：**每一格都要強制變成字串。**
+   *
+   * 實測：對話框寫「已寫入 Diagnostics…共 170 行」，但嗰張表根本
+   * 冇呢份報告。其中一個原因就係 `s.detail[k]` 入面有陣列／物件
+   *（例如 `warnings`），而 `Range.setValues()` 唔接受——
+   * 整份報告會拋錯，然後被 `tryWriteDiagnostics_()` 食咗。
+   *
+   * ⚠️ **唔可以「靜靜跳過寫唔入嗰啲行」**——嗰樣係把問題藏得更深。
+   * 應該喺砌報告嗰陣就展開成人話。
+   */
+  const cell = function (value) {
+    if (value === null || value === undefined) return '（沒有值）';
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '（空）';
+      // 陣列展開成人話，太長就截，但**明講截咗**。
+      const text = value.map(function (v) {
+        return (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
+      }).join('、');
+      return text.length > 400 ? (text.slice(0, 400) + '…（共 ' + value.length + ' 項，已截斷）') : text;
+    }
+    if (typeof value === 'object') {
+      const text = JSON.stringify(value);
+      return text.length > 400 ? (text.slice(0, 400) + '…（已截斷）') : text;
+    }
+    return String(value);
+  };
+  const row = function (section, item, value, note) {
+    return diagRow_(section, cell(item), cell(value), cell(note || ''));
+  };
+
+  rows.push(row('0. 起點', '季度', r.quarterId || '（沒有）', ''));
+  rows.push(row('0. 起點', 'Stage', base.stage, '演練開始前'));
+  rows.push(row('0. 起點', '最新版本號', base.latestVersionNo,
     '-1 代表這一季還沒有生成過任何版本'));
-  rows.push(diagRow_('0. 起點', 'SendLog 行數', base.sendLogRows, ''));
-  rows.push(diagRow_('0. 起點', 'PDF 檔案數', base.pdfFileCount, ''));
+  rows.push(row('0. 起點', 'SendLog 行數', base.sendLogRows, ''));
+  rows.push(row('0. 起點', 'PDF 檔案數', base.pdfFileCount, ''));
 
   // ── 逐步 ───────────────────────────────────────────────
   (r.steps || []).forEach(function (s, i) {
     const section = (i + 1) + '. ' + s.name;
-    rows.push(diagRow_(section, '結果', s.ok ? '成功' : '失敗',
+    rows.push(row(section, '結果', s.ok ? '成功' : '失敗',
       s.ok ? '' : s.error));
-    rows.push(diagRow_(section, '耗時', s.seconds + ' 秒',
+    // ⚠️ 階段 C1：前置條件要同結果排埋一齊睇，先分得出
+    // 「真失敗」同「前一步冇行到所以連鎖」。
+    rows.push(row(section, '前置條件', s.preconditionText || '（沒有記錄）',
+      s.preconditionMet === false ? '⚠️ 不符合' : ''));
+    rows.push(row(section, '耗時', s.seconds + ' 秒',
       'B 段要知道整個流程要多久'));
     Object.keys(s.detail || {}).forEach(function (k) {
-      rows.push(diagRow_(section, k, s.detail[k], ''));
+      rows.push(row(section, k, s.detail[k], ''));
     });
   });
 
@@ -487,34 +620,35 @@ function buildSeasonRehearsalRows_(record) {
   const pdf = r.pdfFiles || { available: false, reason: '（沒有資料）', files: [] };
   if (!pdf.available) {
     // ⚠️ 查不到就講查不到。回一個 0 會令人以為「確認過，一份都沒有」。
-    rows.push(diagRow_('PDF 資料夾', '查不到', pdf.reason,
+    rows.push(row('PDF 資料夾', '查不到', pdf.reason,
       '不是「一份都沒有」——是根本讀不到資料夾'));
   } else {
     const inSub = pdf.files.filter(function (f) { return f.inSubfolder; }).length;
-    rows.push(diagRow_('PDF 資料夾', '檔案總數', pdf.files.length, ''));
-    rows.push(diagRow_('PDF 資料夾', '在「季度／版本」子資料夾裡', inSub,
+    rows.push(row('PDF 資料夾', '檔案總數', pdf.files.length, ''));
+    rows.push(row('PDF 資料夾', '在「季度／版本」子資料夾裡', inSub,
       inSub === 0
         ? '⚠️ 一個都沒有——分季分版資料夾可能根本沒有建到，這是目前風險最高的未驗證項'
         : ''));
-    rows.push(diagRow_('PDF 資料夾', '仍然平鋪在根資料夾', pdf.files.length - inSub, ''));
+    rows.push(row('PDF 資料夾', '仍然平鋪在根資料夾', pdf.files.length - inSub, ''));
     pdf.files.forEach(function (f) {
-      rows.push(diagRow_('PDF 逐個檔案', f.path, f.sizeBytes + ' bytes', ''));
+      rows.push(row('PDF 逐個檔案', f.path, f.sizeBytes + ' bytes',
+        f.isNew ? '⚠️ 這一次演練新建立的' : ''));
     });
   }
 
   // ── ICS ───────────────────────────────────────────────
   const ics = r.ics || { available: false, reason: '（沒有資料）', lines: [] };
   if (!ics.available) {
-    rows.push(diagRow_('ICS 附件', '查不到', ics.reason, ''));
+    rows.push(row('ICS 附件', '查不到', ics.reason, ''));
   } else {
     ics.lines.forEach(function (line, i) {
-      rows.push(diagRow_('ICS 附件', '第 ' + (i + 1) + ' 行', line,
-        line.indexOf('NaN') !== -1
+      rows.push(row('ICS 附件', '第 ' + (i + 1) + ' 行', line,
+        String(line).indexOf('NaN') !== -1
           ? '⚠️ 含 NaN——日期／時間沒有正規化，收件人的日曆會加不到這一項'
           : ''));
     });
     if (ics.lines.length === 0) {
-      rows.push(diagRow_('ICS 附件', 'DTSTART／DTEND', '（一行都沒有）',
+      rows.push(row('ICS 附件', 'DTSTART／DTEND', '（一行都沒有）',
         '⚠️ 有產生檔案但找不到時間行'));
     }
   }
@@ -522,35 +656,53 @@ function buildSeasonRehearsalRows_(record) {
   // ── 個人 highlight ─────────────────────────────────────
   const hl = r.highlight || { available: false, reason: '（沒有資料）' };
   if (!hl.available) {
-    rows.push(diagRow_('個人 highlight', '查不到', hl.reason, ''));
+    rows.push(row('個人 highlight', '查不到', hl.reason, ''));
   } else {
-    rows.push(diagRow_('個人 highlight', '抽樣的 PersonID', hl.personId,
+    rows.push(row('個人 highlight', '抽樣的 PersonID', hl.personId,
       '選了這一季排得最多的那一位'));
-    rows.push(diagRow_('個人 highlight', '應該被標示的格數', hl.cellCount,
+    rows.push(row('個人 highlight', '應該被標示的格數', hl.cellCount,
       '這是按派工紀錄算出來的應有格數，沒有真的開啟 PDF 數過'));
   }
 
   // ── 收尾狀態 ───────────────────────────────────────────
-  rows.push(diagRow_('完結', 'Stage', after.stage,
-    '起點是 ' + base.stage));
-  rows.push(diagRow_('完結', '最新版本號', after.latestVersionNo,
-    '起點是 ' + base.latestVersionNo));
-  rows.push(diagRow_('完結', 'SendLog 行數', after.sendLogRows,
-    '起點是 ' + base.sendLogRows));
-  rows.push(diagRow_('完結', 'PDF 檔案數', after.pdfFileCount,
-    '起點是 ' + base.pdfFileCount));
+  rows.push(row('完結', 'Stage', after.stage, '起點是 ' + cell(base.stage)));
+  rows.push(row('完結', '最新版本號', after.latestVersionNo,
+    '起點是 ' + cell(base.latestVersionNo)));
+  rows.push(row('完結', 'SendLog 行數', after.sendLogRows,
+    '起點是 ' + cell(base.sendLogRows)));
+  rows.push(row('完結', 'PDF 檔案數', after.pdfFileCount,
+    '起點是 ' + cell(base.pdfFileCount)));
 
   const failed = (r.steps || []).filter(function (s) { return !s.ok; });
-  rows.push(diagRow_('完結', '失敗的步驟', failed.length,
+  rows.push(row('完結', '失敗的步驟', failed.length,
     failed.length === 0 ? '' : failed.map(function (s) { return s.name; }).join('；')));
+  // ⚠️ 階段 C1：分開「真失敗」同「前置條件不符合而連鎖」。
+  const chained = failed.filter(function (s) { return s.preconditionMet === false; });
+  rows.push(row('完結', '其中因為前置條件不符合而連鎖的', chained.length,
+    chained.length === 0 ? ''
+      : chained.map(function (s) { return s.name; }).join('；')
+        + '——這幾步很可能不是它們本身的問題，先看前一步'));
 
   // ── 清理（**工具唔會自己做**）───────────────────────────
-  rows.push(diagRow_('清理', '這次演練建立了什麼',
-    '版本 ' + base.latestVersionNo + ' → ' + after.latestVersionNo
-    + '；SendLog ' + base.sendLogRows + ' → ' + after.sendLogRows
-    + ' 行；PDF ' + base.pdfFileCount + ' → ' + after.pdfFileCount + ' 個檔案',
-    ''));
-  rows.push(diagRow_('清理', '要怎樣清走',
+  // ⚠️ 階段 C3：2027T4 已經累積咗 9 個版本（演練跑過兩次）。
+  // 只講「由 N 變到 M」唔夠——要逐個列出**呢一次**建立咗邊幾個。
+  const created = r.created || {};
+  rows.push(row('清理', '這次演練建立的版本',
+    (created.versions && created.versions.length > 0)
+      ? created.versions.map(function (v) { return 'v' + v; }).join('、')
+      : '（沒有建立新版本）',
+    '版本 ' + cell(base.latestVersionNo) + ' → ' + cell(after.latestVersionNo)));
+  rows.push(row('清理', '這次演練新增的 SendLog 行數',
+    (Number(after.sendLogRows) || 0) - (Number(base.sendLogRows) || 0),
+    '由 ' + cell(base.sendLogRows) + ' 變成 ' + cell(after.sendLogRows)));
+  const newPdfs = (pdf.files || []).filter(function (f) { return f.isNew; });
+  rows.push(row('清理', '這次演練新建立的 PDF',
+    newPdfs.length === 0 ? '（查不到——只知道總數的變化）' : newPdfs.length + ' 個檔案',
+    'PDF 總數 ' + cell(base.pdfFileCount) + ' → ' + cell(after.pdfFileCount)));
+  newPdfs.forEach(function (f) {
+    rows.push(row('清理', '新 PDF', f.path, ''));
+  });
+  rows.push(row('清理', '要怎樣清走',
     '選單 ▸ 維護 ▸ ⚠️⚠️ 重設季度測試資料',
     '⚠️ 這個工具刻意不會自動清理——自動清理是不可逆動作，'
     + '不應該由一個測試工具代你決定。'));
@@ -637,7 +789,13 @@ function runSeasonRehearsal_() {
   //
   // 正解係兩者都做到：接住回傳值，但改一個唔會被當成行數嘅名。
   // 行數一律用 `rows.length`；`wroteOk` 只用嚟決定顯唔顯示警告。
-  const wroteOk = tryWriteDiagnostics_(SEASON_REHEARSAL_REPORT, rows);
+  //
+  // ⚠️ 階段 C2-2：用 `tryWriteDiagnosticsDetailed_()` 攞埋失敗原因。
+  // 舊寫法只講「見執行記錄」——而 **Ivan 讀唔到 `Logger`**，
+  // 要走去 Apps Script 執行記錄先搵到。一句「失敗咗，自己去搵」
+  // 同冇講差唔多。
+  const wrote = tryWriteDiagnosticsDetailed_(SEASON_REHEARSAL_REPORT, rows);
+  const wroteOk = wrote.ok;
 
   // ⚠️ 對話框只講「去邊度睇」同幾個關鍵數字，**唔塞成份報告**。
   const failed = record.steps.filter(function (s) { return !s.ok; });
@@ -650,9 +808,16 @@ function runSeasonRehearsal_() {
     + 'Stage：' + record.baseline.stage + ' → ' + record.after.stage + '\n'
     + '版本：' + record.baseline.latestVersionNo + ' → ' + record.after.latestVersionNo + '\n\n'
     + '完整報告已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「'
-    + SEASON_REHEARSAL_REPORT + '」，共 ' + rows.length + ' 行'
-    + (wroteOk ? '' : '（⚠️ 寫入失敗，見執行記錄）') + '。\n\n'
-    + '⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走，'
-    + '報告最後一段列出了建立了什麼。',
+    + SEASON_REHEARSAL_REPORT + '」，共 ' + rows.length + ' 行。\n'
+    + (wroteOk ? '' : ('\n⚠️ 寫入失敗，Diagnostics 裡面沒有這份報告。\n原因：'
+      + wrote.error + '\n\n')) + '\n'
+    + '⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走。\n'
+    + '這次建立了：版本 '
+    + (record.created.versions.length === 0 ? '（沒有）'
+      : record.created.versions.map(function (v) { return 'v' + v; }).join('、'))
+    + '　新 PDF ' + record.created.pdfPaths.length + ' 個'
+    + '　SendLog ＋'
+    + ((Number(record.after.sendLogRows) || 0) - (Number(record.baseline.sendLogRows) || 0))
+    + ' 行。',
     ui.ButtonSet.OK);
 }
