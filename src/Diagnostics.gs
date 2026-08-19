@@ -14,11 +14,51 @@
  * 每次執行同一個工具，會先刪走該工具上一次的紀錄再寫入新的，不會無限累積。
  */
 
-/** Diagnostics 單一報告最多保留的行數；超出的部分截斷並附一行說明。 */
-const DIAGNOSTICS_MAX_ROWS_PER_REPORT = 250;
+/**
+ * Diagnostics 單一報告最多保留的行數；超出的部分截斷並附一行說明。
+ *
+ * ⚠️ 第三十一輪批次階段 C3：由 250 收窄到 240。
+ *
+ * 揀呢個數嘅根據（唔係拍腦袋）：
+ *   實測「全季流程演練」報告　　　　　　　　186 行
+ *   ＋ 階段 B1 新加嘅步驟 3.5（前置條件 ＋ 結果 ＋ 12 個 detail 欄）　約 15 行
+ *   ＝ 預計約 201 行
+ *
+ * 240 ＝ 預計值再留約兩成餘裕（人數增加、特殊主日增加都會令佢再長）。
+ * **唔敢收到 200**：186 加咗新一步之後已經超過 200，一收就會把
+ * 目前唯一一份大報告斬走尾巴——而嗰條尾正正係「清理」同「PDF 逐個檔案」
+ * 兩段，即係演練完之後最需要睇嗰兩段。
+ *
+ * 同時 240 仍然明顯細過 `DIAGNOSTICS_MAX_ROWS_TOTAL`（380），
+ * 所以一份大報告唔會單獨迫爆成張表。
+ */
+const DIAGNOSTICS_MAX_ROWS_PER_REPORT = 240;
 
-/** Diagnostics 整張表最多保留的行數；超出時由最舊的報告開始整份丟棄。 */
-const DIAGNOSTICS_MAX_ROWS_TOTAL = 800;
+/**
+ * Diagnostics 整張表最多保留的行數；超出時由最舊的報告開始整份丟棄。
+ *
+ * ⚠️ 第三十一輪批次階段 C：由 800 收窄到 380。
+ *
+ * 800 由頭到尾**都係一個定錯咗嘅數**。呢張表存在嘅唯一理由，
+ * 係要俾 Google Drive connector **一次過完整讀晒**——而 connector
+ * 大約 400 行就會截斷。設成 800 即係：呢張表可以合法地脹到
+ * connector 讀唔完，而**佢完全唔會出聲**，讀嗰個人以為自己睇咗全部。
+ *
+ * 一個「防止讀唔完」嘅上限，設到比讀得完嘅極限大一倍，等於冇設。
+ *
+ * 380 ＝ 貼住 400 但留返少少餘裕（標題兩行 ＋ 下面「（表格狀態）」自我警告行）。
+ */
+const DIAGNOSTICS_MAX_ROWS_TOTAL = 380;
+
+/**
+ * Google Drive connector 大約讀到幾多行就會截斷。
+ * ⚠️ 呢個係**外部工具嘅限制**，唔係我哋設嘅上限——所以獨立寫一個常數，
+ * 而唔係喺註解入面提一句。上面兩個上限都要對住佢嚟定。
+ */
+const DIAGNOSTICS_CONNECTOR_ROW_LIMIT = 400;
+
+/** 自我警告行嘅分區名。寫成常數係因為寫入同清走兩邊都要用同一個值。 */
+const DIAGNOSTICS_STATUS_SECTION = '（表格狀態）';
 
 /** 第 1 行的中文標題，對應 COLUMNS.DIAGNOSTICS 的機器鍵次序。 */
 const DIAGNOSTICS_TITLES_TC = ['報告名稱', '執行時間', '分區', '項目', '數值', '備註'];
@@ -33,6 +73,66 @@ const DIAGNOSTICS_TITLES_TC = ['報告名稱', '執行時間', '分區', '項目
  */
 function diagRow_(section, item, value, note) {
   return { section: section, item: item, value: value, note: note || '' };
+}
+
+/**
+ * 「（表格狀態）」自我警告行。**純函式**，可以離線測。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第三十一輪批次階段 C2：一張表要講得出自己有幾大
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 呢張表存在嘅唯一理由，係要俾 Google Drive connector 一次過完整讀晒。
+ * 但 connector 讀唔完嗰陣**唔會出聲**——佢淨係少俾你一截。
+ *
+ * 所以呢張表要自己講：而家幾多行、極限幾多行、夠唔夠位。
+ * 冇呢一行嘅話，「讀漏咗」同「本來就係咁多」喺畫面上完全一樣。
+ *
+ * @param {number} totalRows 包括呢一行自己在內嘅資料行總數
+ * @returns {{section: string, item: string, value: string, note: string}}
+ */
+function buildDiagnosticsStatusRow_(totalRows) {
+  const limit = DIAGNOSTICS_CONNECTOR_ROW_LIMIT;
+
+  // ⚠️ **一定要喺 `Number()` 之前擋走 `null`／`undefined`／空字串。**
+  //
+  // `Number(null)` ＝ 0、`Number('')` ＝ 0、`Number('  ')` ＝ 0。
+  // 即係「冇傳到行數落嚟」會靜靜變成「呢張表有 0 行」，
+  // 然後備註會好肯定咁話「仲有 400 行空間」——一個完全錯、
+  // 但睇落完全正常嘅答案。
+  //
+  // 呢一行嘅全部用途就係防止「靜靜讀漏咗」，佢自己踩中同一個 bug class
+  // 就最諷刺。呢個 check 係先寫測試先發現嘅。
+  const missing = (totalRows === null || totalRows === undefined
+    || String(totalRows).trim() === '');
+  const total = missing ? NaN : Number(totalRows);
+
+  // ⚠️ 算唔到就要嘈，唔可以印一個似模似樣嘅 0。
+  if (!isFinite(total) || total < 0) {
+    return diagRow_(DIAGNOSTICS_STATUS_SECTION, '這張表目前的資料行數', '（算不出來）',
+      '收到的行數是「' + totalRows + '」，不是一個數目。'
+      + '請把這件事告訴開發者——這一行的用途正是防止「讀漏了」無聲無息發生，'
+      + '它自己壞掉時更加不可以靜靜過去。');
+  }
+
+  const remaining = limit - total;
+  let note;
+  if (remaining < 0) {
+    note = '⚠️⚠️ 已經超過 connector 大約 ' + limit + ' 行的讀取極限 '
+      + (-remaining) + ' 行。用 connector 讀這張表會被截斷，'
+      // ⚠️ 呢一句唔可以寫 markdown 粗體——Diagnostics 一格入面
+      // 唔會渲染，寫咗就係一堆星號。
+      + '而且不會有任何提示——你會以為自己看到了全部。'
+      + '請先執行想看的那一個工具，再讀這張表。';
+  } else if (remaining <= 40) {
+    note = '⚠️ 距離 connector 大約 ' + limit + ' 行的讀取極限只剩 ' + remaining + ' 行。'
+      + '再多寫一份報告很可能就會讀不完。';
+  } else {
+    note = 'connector 大約 ' + limit + ' 行就會截斷，目前還有 ' + remaining + ' 行空間。'
+      + '整張表上限 ' + DIAGNOSTICS_MAX_ROWS_TOTAL + ' 行，'
+      + '單一報告上限 ' + DIAGNOSTICS_MAX_ROWS_PER_REPORT + ' 行。';
+  }
+  return diagRow_(DIAGNOSTICS_STATUS_SECTION, '這張表目前的資料行數', total + ' 行', note);
 }
 
 /**
@@ -102,7 +202,13 @@ function writeDiagnosticsReport_(reportName, rows) {
   const existing = lastRow >= 3
     ? sheet.getRange(3, 1, lastRow - 2, lastCol).getValues()
       .filter(function (row) {
-        return String(row[0] || '').trim() !== '' && String(row[0]) !== reportName;
+        if (String(row[0] || '').trim() === '') return false;
+        if (String(row[0]) === reportName) return false;
+        // ⚠️ 階段 C2：別份報告留低嘅「（表格狀態）」行要丟走。
+        // 唔丟嘅話，每份報告各留一行，而**每一行講嘅數都係佢寫入嗰一刻嘅舊數**——
+        // 一張用嚟講「而家幾多行」嘅表，同時印住三個唔同嘅答案，
+        // 比冇答案更差。下面會統一重新寫一行。
+        return String(row[2] || '') !== DIAGNOSTICS_STATUS_SECTION;
       })
     : [];
 
@@ -128,6 +234,19 @@ function writeDiagnosticsReport_(reportName, rows) {
       combined = combined.filter(function (row) { return String(row[0]) !== victim; });
     }
   }
+
+  // ── 自我警告行 ────────────────────────────────────────────
+  //
+  // ⚠️ 第三十一輪批次階段 C2：**呢張表要講得出自己有幾大。**
+  //
+  // 之前嘅情況：上限設成 800，而 connector 大約 400 行就截斷。
+  // 即係呢張表可以合法地脹到讀唔完，而**讀嗰個人完全睇唔出**——
+  // 佢見到嘅嘢會靜靜少咗一截，冇任何提示。
+  //
+  // 呢一行永遠寫喺最尾，屬於當前報告（下次執行會連同舊嗰行一齊換走）。
+  const statusRow = buildDiagnosticsStatusRow_(combined.length + 1);
+  combined = combined.concat([[reportName, now, statusRow.section, statusRow.item,
+    statusRow.value, statusRow.note]]);
 
   // 先清空資料區再重寫，避免舊資料殘留在後面
   if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, lastCol).clearContent();
