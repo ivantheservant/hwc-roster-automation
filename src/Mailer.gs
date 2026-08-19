@@ -687,7 +687,11 @@ function lookupExistingPersonalPdf_(context, recipient) {
     blob: file.getBlob(),
     fileName: fileName,
     fileId: file.getId(),
-    folderName: folder.getName(),
+    // ⚠️ 第三十輪批次階段 B1：本來寫住 `folder.getName()`，但嗰個 `folder`
+    // 喺第二十六輪改用 `findRosterPdfFile_()` 之後就冇再宣告——
+    // 即係**每次寄個人 PDF 都會 `ReferenceError: folder is not defined`**。
+    // 由檔案自己問返佢喺邊（新子資料夾／舊平舖兩種都啱）。
+    folderName: describePdfFileFolderName_(file),
     sizeBytes: sizeBytes,
     retries: 0
   };

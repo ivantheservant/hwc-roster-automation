@@ -29,17 +29,50 @@ const gsFiles = fs.readdirSync(SRC).filter(function (f) { return f.endsWith('.gs
 console.log('\n=== C1【核心】永久回歸：唔會再有「將 tryWriteDiagnostics_() 嘅布林值當行數用」呢種寫法 ===');
 {
   // 錯誤寫法固定形態：`<標識符> = tryWriteDiagnostics_(...)`，之後嗰個變數
-  // 又被當數字/字串用（例如 `+ written + ' 行'`）。呢度直接鎖住「捕捉咗
-  // 呢個函式嘅回傳值」呢一步本身就唔應該出現——正確做法一律唔捕捉，
-  // 行數另外由呼叫端已經有嘅 rows 陣列 `.length` 計。
-  const BUGGY_PATTERN = /\b\w+\s*=\s*tryWriteDiagnostics_\(/;
+  // 又被當數字/字串用（例如 `+ written + ' 行'`）。
+  //
+  // ⚠️ 第三十輪批次修正：本來呢度鎖死「一律唔可以捕捉回傳值」。
+  // 太嚴——「寫入失敗要講返」係一個**啱嘅**需求（`SeasonRehearsal.gs`
+  // 原本嘅 `(written ? '' : '（⚠️ 寫入失敗…）')` 設計係啱嘅）。
+  // 為咗過呢一條而把整個賦值拆走，結果漏咗清走下面嗰個引用，
+  // 變成 `written is not defined`：對話框寫「已寫入…共 170 行」，
+  // 而 Diagnostics 入面根本冇嗰份報告。**一條太嚴嘅不變式造出咗一個新 bug。**
+  //
+  // 收窄成真正嘅問題：**個變數名唔可以令人誤會成行數**。
+  // `written`／`writtenCount`／`rowsWritten` 呢類名一律唔准；
+  // `wroteOk`／`didWrite` 呢類明顯係 boolean 嘅名可以。
+  // 行數一律由 `rows.length` 計。
+  //
+  // ⚠️ 要**剝走註解先掃**——解釋「唔可以寫成咩」嘅註解本身就含住嗰個寫法，
+  // 而唯一嘅「修法」就係把註解寫得含糊。本專案已經撞過幾次。
+  const stripComments = function (s) {
+    return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  };
+  const COUNTY_NAMES = /\b(written|writtenCount|rowsWritten|writtenRows|count)\s*=\s*tryWriteDiagnostics_\(/;
   const offenders = [];
   gsFiles.forEach(function (fileName) {
-    const content = fs.readFileSync(path.join(SRC, fileName), 'utf8');
-    if (BUGGY_PATTERN.test(content)) offenders.push(fileName);
+    const content = stripComments(fs.readFileSync(path.join(SRC, fileName), 'utf8'));
+    if (COUNTY_NAMES.test(content)) offenders.push(fileName);
   });
-  check('★★★ 全部 ' + gsFiles.length + ' 個 .gs 檔案都冇再捕捉 tryWriteDiagnostics_() 嘅回傳值',
+  check('★★★ 全部 ' + gsFiles.length + ' 個 .gs 檔案都冇用一個「聽落似行數」'
+    + '嘅名接住 tryWriteDiagnostics_() 嘅 boolean 回傳值',
     offenders.length === 0, '仍然有問題嘅檔案：' + offenders.join('、'));
+
+  // 而接住咗嘅，個值只可以用喺條件判斷，唔可以直接串落文字。
+  const badUse = [];
+  gsFiles.forEach(function (fileName) {
+    const content = fs.readFileSync(path.join(SRC, fileName), 'utf8');
+    const m = content.match(/\b(\w+)\s*=\s*tryWriteDiagnostics_\(/);
+    if (!m) return;
+    const name = m[1];
+    // `+ name + ' 行'` 呢類直接串落文字嘅寫法
+    if (new RegExp('\\+\\s*' + name + '\\s*\\+\\s*[\'"]\\s*行').test(content)) {
+      badUse.push(fileName + '（' + name + '）');
+    }
+  });
+  check('★★★★★ 而且接住咗嘅 boolean 冇被直接串成「共 X 行」'
+    + '——實測撞過「共 true 行」',
+    badUse.length === 0, badUse.join('、'));
 }
 
 console.log('\n=== C1：已知嘅四個呼叫點都已經改用 rows.length（唔係得返一個 PublicRoster.gs）===');

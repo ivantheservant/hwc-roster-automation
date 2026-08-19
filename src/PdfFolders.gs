@@ -203,6 +203,33 @@ function findRosterPdfFile_(quarterId, versionNo, fileName) {
 }
 
 /**
+ * 一個檔案實際放咗喺邊個資料夾（名）。
+ *
+ * ⚠️ 第三十輪批次階段 B1：`lookupExistingPersonalPdf_()`（Mailer.gs）本來
+ * 寫住 `folder.getName()`，但嗰個 `folder` 喺第二十六輪改用
+ * `findRosterPdfFile_()` 之後就冇再宣告——即係**每次寄個人 PDF 都會
+ * `ReferenceError: folder is not defined`**。語法完全合法，
+ * 116 個測試冇一個行過呢條路，係 `lint-undeclared` 掃出嚟嘅。
+ *
+ * 而家由檔案自己問返佢喺邊——順帶解決埋「新子資料夾定舊平舖」
+ * 兩種情況要分開處理嘅問題。
+ *
+ * 查唔到就講查唔到，**唔可以回一個空字串**（空字串喺報告上面
+ * 睇落同「根資料夾」一樣）。
+ *
+ * @param {File} file Drive 檔案
+ * @returns {string}
+ */
+function describePdfFileFolderName_(file) {
+  try {
+    const parents = file.getParents();
+    return parents.hasNext() ? parents.next().getName() : '（查不到所在資料夾）';
+  } catch (err) {
+    return '（查不到所在資料夾：' + err.message + '）';
+  }
+}
+
+/**
  * 清理完之後，把**空咗嘅**版本資料夾刪走，唔好留一堆空 `v0`。
  *
  * ⚠️ **只刪真係空嘅資料夾**（冇檔案、冇子資料夾）。

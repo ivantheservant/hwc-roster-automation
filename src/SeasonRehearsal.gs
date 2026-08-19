@@ -626,10 +626,18 @@ function runSeasonRehearsal_() {
 
   const record = executeSeasonRehearsal_(quarterId);
   const rows = buildSeasonRehearsalRows_(record);
-  // ⚠️ **唔捕捉回傳值。** 佢回嘅係「有冇成功寫入」嘅 boolean 值，唔係行數，
-  // 而捕捉咗就一定有人會把佢當行數印出嚟（「共 true 行」實測撞過）。
-  // 行數一律用 `rows.length`。
-  tryWriteDiagnostics_(SEASON_REHEARSAL_REPORT, rows);
+  // ⚠️ 第三十輪批次階段 C2-1：**要接住回傳值**，但個名唔可以令人誤會成行數。
+  //
+  // 上一輪為咗過 `diagnostics_written_count` 呢條不變式（禁止
+  // `const written = tryWriteDiagnostics_(...)`，因為有人把個 boolean
+  // 當成行數印出「共 true 行」），把整個賦值拆走——**但漏咗清走下面
+  // 嗰個 `written` 引用**。結果：對話框寫「已寫入 Diagnostics…共 170 行」，
+  // 而 Diagnostics 入面根本冇呢份報告，因為嗰一行拋咗
+  // `written is not defined`（`lint-undeclared` 掃出嚟嘅）。
+  //
+  // 正解係兩者都做到：接住回傳值，但改一個唔會被當成行數嘅名。
+  // 行數一律用 `rows.length`；`wroteOk` 只用嚟決定顯唔顯示警告。
+  const wroteOk = tryWriteDiagnostics_(SEASON_REHEARSAL_REPORT, rows);
 
   // ⚠️ 對話框只講「去邊度睇」同幾個關鍵數字，**唔塞成份報告**。
   const failed = record.steps.filter(function (s) { return !s.ok; });
@@ -643,7 +651,7 @@ function runSeasonRehearsal_() {
     + '版本：' + record.baseline.latestVersionNo + ' → ' + record.after.latestVersionNo + '\n\n'
     + '完整報告已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「'
     + SEASON_REHEARSAL_REPORT + '」，共 ' + rows.length + ' 行'
-    + (written ? '' : '（⚠️ 寫入失敗，見執行記錄）') + '。\n\n'
+    + (wroteOk ? '' : '（⚠️ 寫入失敗，見執行記錄）') + '。\n\n'
     + '⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走，'
     + '報告最後一段列出了建立了什麼。',
     ui.ButtonSet.OK);
