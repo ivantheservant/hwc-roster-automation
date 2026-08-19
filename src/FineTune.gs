@@ -136,6 +136,10 @@ function normalizeCellText_(text) {
  * @returns {{changes: Object[], violations: Object[], manualState: Object[]}} 分析結果
  */
 function analyseManualState_(context) {
+  // ⚠️ 第三十輪批次階段 A2：只收一個參數，但傳錯嘢入去嘅後果一樣係
+  // 「行到深處先爆一個講唔出原因嘅 TypeError」。
+  requireContextArg_('analyseManualState_', 1, context, ['posts', 'serviceDates']);
+
   const overlay = buildGridOverlayState_(context);
   return {
     changes: overlay.changes,
@@ -157,6 +161,14 @@ function analyseManualState_(context) {
  * @returns {{changes: Object[], unresolved: Object[], manualState: Object[]}}
  */
 function buildGridOverlayState_(context) {
+  // ⚠️ 第三十輪批次階段 A2：先認「傳錯咗一個陣列（state）入嚟」呢種形狀。
+  // 下面嗰個 `gridRender` 檢查係另一件事（欄位缺失），兩個都要。
+  //
+  // ⚠️ 必要欄位只列**呢個函式自己真係讀嘅**（`gridValues`／`original`），
+  // 唔可以順手寫 `posts`——佢根本冇用到，寫咗就會擋住一啲完全合法嘅
+  // 精簡 context，而個錯誤訊息仲會指去一個錯嘅方向。
+  requireContextArg_('buildGridOverlayState_', 1, context, ['gridValues', 'original']);
+
   // 第二十輪批次階段 A2：`gridRender` 冇傳就拋錯，唔可以靜靜咁當佢空。
   //
   // 同第十八輪 `requireRoleContextField_()`、第十九輪
@@ -272,6 +284,10 @@ function buildGridOverlayState_(context) {
  * @returns {Object[]} 違規清單，每項含定位資訊與 ruleId
  */
 function findStateViolations_(state, context) {
+  // ⚠️ 第三十輪批次階段 A2：參數次序防線。**唔會自動糾正**——見 ArgShape.gs。
+  requireStateArg_('findStateViolations_', 1, state, 'context');
+  requireContextArg_('findStateViolations_', 2, context, ['posts', 'serviceDates', 'rules']);
+
   const violations = [];
   const rules = context.rules;
   const postById = {};
@@ -603,6 +619,10 @@ function substituteCell_(state, key, personId) {
  * @returns {{personId: string, reason: string}} 建議人選；找不到時 personId 為空字串
  */
 function findReplacementPerson_(violation, state, context) {
+  // ⚠️ 第三十輪批次階段 A2：同 `findStateViolations_()` 一樣收 `(…, state, context)`。
+  requireStateArg_('findReplacementPerson_', 2, state, 'context');
+  requireContextArg_('findReplacementPerson_', 3, context, ['eligibility']);
+
   const pool = (context.eligibility.byPost[violation.postId] || []).slice().sort();
   const key = cellKey_(violation.serviceDate, violation.postId, violation.slotIndex);
 
@@ -677,6 +697,10 @@ function violationKey_(violation) {
  * @returns {boolean} 是否超出上限
  */
 function exceedsAssignmentLimit_(personId, state, context) {
+  // ⚠️ 第三十輪批次階段 A2：同上。
+  requireStateArg_('exceedsAssignmentLimit_', 2, state, 'context');
+  requireContextArg_('exceedsAssignmentLimit_', 3, context, ['peopleById']);
+
   const limit = resolveAssignmentLimit_(personId, context);
   let count = 0;
   state.forEach(function (s) { if (s.personId === personId) count++; });

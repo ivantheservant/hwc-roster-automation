@@ -170,6 +170,13 @@ function resolveAuthoritativeState_(context, mode, callerName) {
  * @returns {{versionNo: number, sheetName: string, cellCount: number}}
  */
 function materialiseManualEdits_(context, changes, state, source) {
+  // ⚠️ 第三十輪批次階段 A2：呢個函式**同時收 context 同 state，而且
+  // context 行先**——同 `findStateViolations_()` 啱啱相反。
+  // 兩個次序相反嘅函式喺同一條路徑上面（`apiSaveAndConfirmExecute()`
+  // 兩個都叫），係最易寫錯嗰種形狀，所以兩邊都要防線。
+  requireContextArg_('materialiseManualEdits_', 1, context, ['posts', 'serviceDates']);
+  requireStateArg_('materialiseManualEdits_', 3, state, 'source');
+
   if (!changes || changes.length === 0) {
     throw new Error('materialiseManualEdits_() 沒有收到任何人手改動，不應該建立新版本');
   }

@@ -113,8 +113,24 @@ function buildGasStubs_() {
  *   `HtmlService` 都要拋錯。冇傳呢個參數時行為同以前完全一致。
  * @returns {Object} 沙箱全域物件
  */
+/**
+ * 永遠載入嘅檔案。
+ *
+ * ⚠️ 第三十輪批次階段 A2：`ArgShape.gs` 係一個**冇任何依賴**嘅
+ * 參數形狀防線，而 `FineTune.gs`／`StateSource.gs` 一開頭就會叫佢。
+ * 唔喺呢度自動加嘅話，每一份測試都要自己記得喺 `files` 清單補一行，
+ * 而漏咗嘅後果係 `requireStateArg_ is not defined`——
+ * 一個同測試本身完全無關嘅錯。
+ *
+ * 呢度只放「零依賴、而且好多檔案都會叫」嗰種。
+ */
+const ALWAYS_LOADED = ['ArgShape.gs'];
+
 function loadGasSource(files, overrides) {
-  const list = files || FILES_FOR_GENERATOR;
+  const requested = files || FILES_FOR_GENERATOR;
+  const list = ALWAYS_LOADED.filter(function (n) {
+    return requested.indexOf(n) === -1;
+  }).concat(requested);
   const sources = list.map(function (name) {
     const full = path.join(SRC_DIR, name);
     // 每個檔案前後加註解標記，語法錯誤時的行號訊息比較容易對回原始檔案

@@ -153,7 +153,12 @@ function buildSaveAndConfirmPlan_(quarterId) {
   });
 
   // ── 步 1.5　規則檢查（三分類 + 準硬）─────────────────────────
-  const allViolations = findStateViolations_(context, resolved.state);
+  // ⚠️ 參數次序：`findStateViolations_(state, context)`——**派工狀態行先**。
+  // 呢一行本來寫反咗，令掣 1「儲存並確認」一撳就爆
+  //（`Cannot read properties of undefined (reading 'forEach')`）。
+  // 由 Prompt B 寫出嚟到第二十九輪，114 個測試冇一個經過呢條路
+  // ——全部都直接叫 `findStateViolations_()`，冇一個由端點入口叫落去。
+  const allViolations = findStateViolations_(resolved.state, context);
   const violations = classifySaveConfirmViolations_(quarterId, versionNo, allViolations);
 
   // ── 步 1.6　三欄對照 ─────────────────────────────────────────
