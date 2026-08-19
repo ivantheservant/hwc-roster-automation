@@ -77,18 +77,56 @@ function apiHwcasPreview() {
   const rows = draft
     // `MISSING_IN_HWCAS` ＝ 名單有、HWCAS 冇。呢類冇嘢可以補，唔應該
     // 佔住畫面——幹事要逐行睇，每多一行冇用嘅行就多一分睇漏嘅機會。
+    // ⚠️ 但數目要出返（見下面 `notInHwcas`），唔可以靜靜掉咗。
     .filter(function (d) { return d.matchType !== HWCAS_MATCH.MISSING_IN_HWCAS; })
     .map(function (d) { return buildHwcasPreviewRow_(d, nameIndex); });
 
   const counts = {
     total: rows.length,
-    canApply: rows.filter(function (r) { return r.canApply; }).length,
-    needsCare: rows.filter(function (r) { return r.riskLevel === 'HIGH'; }).length,
-    noChange: rows.filter(function (r) { return r.noChange; }).length
+    canApply: rows.filter(function (r) { return r.bucket === HWCAS_BUCKET.APPLY; }).length,
+    needsAction: rows.filter(function (r) { return r.bucket === HWCAS_BUCKET.NEEDS_ACTION; }).length,
+    notRelevant: rows.filter(function (r) { return r.bucket === HWCAS_BUCKET.NOT_RELEVANT; }).length,
+    noChange: rows.filter(function (r) { return r.bucket === HWCAS_BUCKET.NO_CHANGE; }).length,
+    // 名單有、HWCAS 冇——冇列出嚟，但要出個數，否則「513 行入面只見到
+    // 89 行」會令幹事以為漏咗嘢。
+    notInHwcas: draft.filter(function (d) {
+      return d.matchType === HWCAS_MATCH.MISSING_IN_HWCAS;
+    }).length
   };
 
   return { ok: true, rows: rows, counts: counts, message: '' };
 }
+
+/**
+ * 第二十八輪批次階段 D：差異畫面三分類。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * Ivan 實測
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ *   共 513 行　可以套用 2 行　需要特別小心 434 行　沒有改動 79 行
+ *
+ * HWCAS 有 513 位會友，但職事表名單只有 89 位。
+ * 「需要特別小心」嗰 434 行入面，真正有用嘅大概只有 8 行
+ * （職事表有呢個名但系統分唔清係邊一位），
+ * 其餘四百幾行係「HWCAS 有呢個人，但佢根本唔喺職事表」——**唔關事**。
+ *
+ * **幹事要碌 513 行先搵到嗰 2 行有用嘅。**
+ *
+ * ⚠️ 呢個唔係「顯示得靚啲」嘅問題：一個要逐行睇嘅畫面，
+ * 每多一行唔關事嘅行，就多一分**睇漏真正要睇嗰行**嘅機會。
+ * 而睇漏嘅後果係把甲嘅電郵寫入乙嘅資料。
+ */
+const HWCAS_BUCKET = {
+  /** 名單有、電郵唔同 ⇒ 逐行列，可以勾（預設唔勾） */
+  APPLY: 'APPLY',
+  /** 名單有呢個人，但系統唔敢決定係邊一位 ⇒ 逐行列，唔能勾 */
+  NEEDS_ACTION: 'NEEDS_ACTION',
+  /** HWCAS 有、職事表名單完全冇 ⇒ 預設摺埋 */
+  NOT_RELEVANT: 'NOT_RELEVANT',
+  /** 對得上而且冇嘢要改 ⇒ 摺埋 */
+  NO_CHANGE: 'NO_CHANGE'
+};
 
 /**
  * 把一行初稿轉成畫面要嘅樣。
@@ -135,8 +173,24 @@ function buildHwcasPreviewRow_(d, nameIndex) {
 
   const matchedOk = d.matchType === HWCAS_MATCH.EXACT || d.matchType === HWCAS_MATCH.ALIAS;
   const noChange = matchedOk && (hwcasEmail === '' || sameEmail);
+  const canApply = matchedOk && !!d.personId && hwcasEmail !== '' && !sameEmail;
+
+  // 第二十八輪批次階段 D：三分類。
+  //
+  // ⚠️ **`NONE` 同 `AMBIGUOUS` 唔可以歸埋一類。**
+  //   `AMBIGUOUS` ＝ 名單上真係有呢個名（而且唔止一位）⇒ **要人手決定**
+  //   `NONE`      ＝ 名單上根本冇呢個名 ⇒ HWCAS 有個唔喺職事表嘅會友，
+  //                  **同排職事表完全無關**
+  // 上一輪兩者都標成「需要特別小心」，所以四百幾行唔關事嘅行
+  // 淹沒咗嗰八行真正要處理嘅。
+  let bucket;
+  if (canApply) bucket = HWCAS_BUCKET.APPLY;
+  else if (d.matchType === HWCAS_MATCH.NONE) bucket = HWCAS_BUCKET.NOT_RELEVANT;
+  else if (noChange) bucket = HWCAS_BUCKET.NO_CHANGE;
+  else bucket = HWCAS_BUCKET.NEEDS_ACTION;
 
   return {
+    bucket: bucket,
     // ⚠️ 用 PersonID 做 key，**唔用列號**。前端傳返嚟嗰陣，
     // 試算表可能已經有人插咗行——列號就會指去第二個人。
     personId: d.personId || '',
@@ -151,7 +205,7 @@ function buildHwcasPreviewRow_(d, nameIndex) {
     noChange: noChange,
     // 可以套用 ＝ 對得上人、HWCAS 有電郵、而且真係有改動。
     // 認唔出人／同名多人一律唔可以套用（連勾都唔畀勾）。
-    canApply: matchedOk && !!d.personId && hwcasEmail !== '' && !sameEmail,
+    canApply: canApply,
     note: String(d.note || '')
   };
 }

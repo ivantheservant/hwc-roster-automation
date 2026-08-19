@@ -67,9 +67,16 @@ console.log('\n=== E【核心】預覽係唯讀，唔會寫 NameMapping_Draft ==
 
 console.log('\n=== E【核心】預設全部唔勾 ===');
 {
-  check('★★★★★ 前端 checkbox 明確設成 false（而且有註解講點解）'
+  // 第二十八輪批次階段 D 之後：第三、四類會摺埋，撳「展開看看」會重畫，
+  // 所以 checkbox 唔可以再寫死 `false`（寫死就會靜靜清走幹事勾咗嘅行）。
+  // 「預設唔勾」呢個保證改成由 `hwcasChecked` 開畫面嗰陣係空嘅嚟撐住。
+  check('★★★★★ 前端 checkbox 預設唔勾（`hwcasChecked` 開畫面嗰陣係空嘅）'
     + '——呢一行係整個畫面最重要嘅一行',
-    /cb\.checked = false;/.test(zone3));
+    /cb\.checked = !!hwcasChecked\[r\.personId\];/.test(zone3)
+    && /hwcasChecked = \{\};\s*\n\s*hwcasExpanded = /.test(zone3));
+  check('★★★★★ 而且冇任何地方預先填 `hwcasChecked`'
+    + '——填咗就等於幫幹事勾咗',
+    !/hwcasChecked\[[^\]]+\] = true;[\s\S]{0,80}?forEach/.test(zone3));
   check('★★★★★ 冇「全部勾選」之類嘅捷徑'
     + '——有咗嗰粒掣，「逐個睇過」就會變成「撳一下」',
     !/全部勾選|全選/.test(zone3));
@@ -87,7 +94,7 @@ console.log('\n=== E【核心】名字相似但唔同人：紅色警告，而且
   check('★★★★★ 而且訊息明講「名字相似不代表是同一個人」',
     row.indexOf('名字相似不代表是同一個人') !== -1);
   check('★★★★★ 同名多人**唔可以套用**（連勾都唔畀勾）',
-    /canApply: matchedOk && !!d\.personId/.test(row)
+    /const canApply = matchedOk && !!d\.personId/.test(row)
     && /const matchedOk = d\.matchType === HWCAS_MATCH\.EXACT \|\| d\.matchType === HWCAS_MATCH\.ALIAS;/.test(row));
   check('★★★★★ 認唔出（NONE）亦係 HIGH，亦唔可以套用',
     /HWCAS_MATCH\.NONE\)?\s*\{[\s\S]{0,160}?riskLevel = 'HIGH'/.test(row));

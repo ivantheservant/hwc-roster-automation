@@ -1739,11 +1739,16 @@
 
   let hwcasData = null;
   let hwcasChecked = {};
+  // 第二十八輪批次階段 D：兩段摺埋嘅區。
+  // ⚠️ 呢兩個旗標**唔可以喺重新讀資料嗰陣保留**，否則換過一份資料之後
+  // 畫面仲記住上次展開咗邊一段，而入面嘅行已經唔同咗。
+  let hwcasExpanded = { notRelevant: false, noChange: false };
 
   function openHwcas() {
     runAction('讀取出席系統資料', async () => {
       hwcasData = await callServer('apiHwcasPreview');
       hwcasChecked = {};
+      hwcasExpanded = { notRelevant: false, noChange: false };
       renderHwcas();
     });
   }
@@ -1777,23 +1782,38 @@
         })
       ]),
       make('div', {
-        text: '共 ' + hwcasData.counts.total + ' 行　可以套用 '
-          + hwcasData.counts.canApply + ' 行　需要特別小心 '
-          + hwcasData.counts.needsCare + ' 行　沒有改動 '
-          + hwcasData.counts.noChange + ' 行',
+        // ⚠️ 第二十八輪批次階段 D：「需要特別小心 434 行」呢個數字本身
+        // 就係問題所在——入面得八行真係要處理。所以計數要跟返分類。
+        text: '出席系統對得上這裡的共 ' + hwcasData.counts.total + ' 行：'
+          + '可以套用 ' + hwcasData.counts.canApply + ' 行　'
+          + '要你處理 ' + hwcasData.counts.needsAction + ' 行　'
+          + '跟職事表無關 ' + hwcasData.counts.notRelevant + ' 行　'
+          + '沒有改動 ' + hwcasData.counts.noChange + ' 行',
+        className: 'muted'
+      }),
+      make('div', {
+        // 名單有、HWCAS 冇。呢類冇列出嚟，但個數要講，
+        // 否則幹事會以為系統靜靜漏咗人。
+        text: '另外名單上有 ' + hwcasData.counts.notInHwcas
+          + ' 位在出席系統找不到，這裡沒有列出（那邊沒有電郵可以補過來）。',
         className: 'muted'
       })
     ];
 
-    const applicable = hwcasData.rows.filter((r) => r.canApply);
-    const risky = hwcasData.rows.filter((r) => !r.canApply && r.riskLevel === 'HIGH');
-    const nothing = hwcasData.rows.filter((r) => !r.canApply && r.riskLevel !== 'HIGH');
+    // ⚠️ 一律用後端算好嘅 `bucket`，**唔喺前端再判斷一次**。
+    // 前端自己 filter 一次，就會有一日後端改咗規則而畫面照舊分錯——
+    // 「同一個狀態有兩個真相來源」係本專案撞過最多次嗰類問題。
+    const byBucket = (name) => hwcasData.rows.filter((r) => r.bucket === name);
+    const applicable = byBucket('APPLY');
+    const needsAction = byBucket('NEEDS_ACTION');
+    const notRelevant = byBucket('NOT_RELEVANT');
+    const nothing = byBucket('NO_CHANGE');
 
     if (applicable.length === 0) {
       nodes.push(make('div', { text: '沒有任何一行可以套用。', className: 'muted' }));
     } else {
       const box = make('div', { className: 'sec' }, [
-        sectionTitle('可以套用（' + applicable.length + ' 行）'),
+        sectionTitle('一、可以套用（' + applicable.length + ' 行）'),
         make('div', {
           text: '勾了才會寫入。不勾就完全不動。',
           className: 'muted'
@@ -1803,29 +1823,46 @@
       nodes.push(box);
     }
 
-    if (risky.length > 0) {
+    if (needsAction.length > 0) {
       const box = make('div', { className: 'sec' }, [
-        sectionTitle('系統不敢自己決定（' + risky.length + ' 行，不能勾）'),
+        sectionTitle('二、要你處理（' + needsAction.length + ' 行，不能勾）'),
         make('div', {
-          text: '這幾行要你自己在名單裡處理：加別名、新增人員，或者確認是不是同一位。',
+          // 呢一段同第三段嘅分別，就係整個階段 D 嘅重點：
+          // 呢啲人**喺職事表名單上**，所以真係要你去處理。
+          text: '這幾行是：名單上有這個人，但系統分不出是哪一位。'
+            + '要你自己在名單裡處理：加別名，或者確認是不是同一位。',
           className: 'muted'
         })
       ]);
-      risky.forEach((r) => box.appendChild(hwcasRow(r, false)));
+      needsAction.forEach((r) => box.appendChild(hwcasRow(r, false)));
       nodes.push(box);
     }
 
-    if (nothing.length > 0) {
-      const box = make('div', { className: 'sec' }, [
-        sectionTitle('沒有改動（' + nothing.length + ' 行）')
-      ]);
-      nothing.forEach((r) => {
-        box.appendChild(make('div', {
-          text: r.rosterName + '　' + (r.noChange ? '電郵跟現在的一樣' : '出席系統那邊沒有電郵'),
+    if (notRelevant.length > 0) {
+      nodes.push(hwcasCollapsedSection(
+        'notRelevant',
+        '三、跟職事表無關',
+        '出席系統另有 ' + notRelevant.length + ' 位不在職事表名單，已收起',
+        '這些人出席系統有，但職事表名單完全沒有。他們不會被排職事，'
+          + '所以這裡沒有東西要做。',
+        () => notRelevant.map((r) => make('div', {
+          text: (r.hwcasName || '（沒有名字）')
+            + (r.memberNo ? '　編號 ' + r.memberNo : ''),
           className: 'vio-row muted'
-        }));
-      });
-      nodes.push(box);
+        }))));
+    }
+
+    if (nothing.length > 0) {
+      nodes.push(hwcasCollapsedSection(
+        'noChange',
+        '四、沒有改動',
+        '沒有改動 ' + nothing.length + ' 行，已收起',
+        '',
+        () => nothing.map((r) => make('div', {
+          text: r.rosterName + '　'
+            + (r.hwcasEmail ? '電郵跟現在的一樣' : '出席系統那邊沒有電郵'),
+          className: 'vio-row muted'
+        }))));
     }
 
     nodes.push(make('div', { id: 'hwcasFooter', className: 'sec' }));
@@ -1837,6 +1874,35 @@
     renderHwcasFooter();
   }
 
+  /**
+   * 一段預設摺埋嘅區。
+   *
+   * ⚠️ 摺埋嗰陣**唔可以完全唔見**——「四百幾行去咗邊」係一個
+   * 令人以為系統靜靜漏咗嘢嘅問題。所以摺埋嗰陣仍然要有一句
+   * 講明有幾多行、同埋撳邊度會展開。
+   *
+   * @param {string} key `hwcasExpanded` 入面嘅旗標名
+   * @param {string} title 段落標題
+   * @param {string} summary 摺埋嗰陣嗰句
+   * @param {string} why 點解唔使理（可以係空字串）
+   * @param {function(): Element[]} buildRows 展開先至叫——四百幾個 DOM
+   *   節點唔應該喺摺埋嗰陣都起晒
+   */
+  function hwcasCollapsedSection(key, title, summary, why, buildRows) {
+    const open = !!hwcasExpanded[key];
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle(title),
+      make('div', { text: summary, className: 'muted' })
+    ]);
+    if (why) box.appendChild(make('div', { text: why, className: 'muted' }));
+    box.appendChild(button(open ? '收起' : '展開看看', () => {
+      hwcasExpanded[key] = !open;
+      renderHwcas();
+    }, 'secondary'));
+    if (open) buildRows().forEach((n) => box.appendChild(n));
+    return box;
+  }
+
   function hwcasRow(r, selectable) {
     const box = make('div', { className: 'prop' + (selectable ? '' : ' is-off') });
 
@@ -1845,7 +1911,10 @@
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       // ⚠️ **預設唔勾。** 呢一行係整個畫面最重要嘅一行。
-      cb.checked = false;
+      // `hwcasChecked` 開畫面嗰陣係空嘅，所以「預設唔勾」照樣成立；
+      // 但展開／收起會重畫成個畫面，所以要讀返幹事勾過乜——
+      // 寫死 `false` 嘅話，撳一下「展開看看」就會靜靜清走佢啲勾。
+      cb.checked = !!hwcasChecked[r.personId];
       cb.addEventListener('change', () => {
         if (cb.checked) hwcasChecked[r.personId] = true;
         else delete hwcasChecked[r.personId];
