@@ -78,7 +78,7 @@
  * @returns {{byKey: Object.<string, Object>, rows: Object[], invalid: Object[]}}
  *   `byKey` 用 `PersonID|PostID` 做 key
  */
-function readActivePersonPostWeights_(referenceDate, timezone) {
+function readActivePersonPostWeights_(referenceDate, timezone, baselineData) {
   const W = COLUMNS.PERSON_POST_WEIGHT;
   const byKey = {};
   const rows = [];
@@ -121,12 +121,22 @@ function readActivePersonPostWeights_(referenceDate, timezone) {
     }
     if (adjust === 0) return;   // 0 ＝ 冇偏好，同冇呢一行一樣
 
+    // 第二十八輪批次階段 A：目標次數喺呢度就算好。
+    // ⚠️ 冇傳 `baselineData` 嗰陣 `target` 係 `null`——**唔可以當成 0**。
+    // 排表路徑見到 null 會拋錯（見 `computePersonPostWeightBonus_()`）；
+    // 編輯畫面唔需要目標值，所以佢唔傳都冇問題。
+    const base = resolveWeightBaseline_(personId, postId, baselineData);
     const entry = {
       weightId: String(row[W.WEIGHT_ID] || '').trim(),
       personId: personId,
       postId: postId,
       adjust: adjust,
-      reason: String(row[W.REASON] || '').trim()
+      reason: String(row[W.REASON] || '').trim(),
+      baseline: base.baseline,
+      baselineSource: base.source,
+      baselineLabel: base.label,
+      target: base.source === WEIGHT_BASELINE_SOURCE.NOT_COMPUTED
+        ? null : computeWeightTarget_(base.baseline, adjust)
     };
     byKey[personId + '|' + postId] = entry;
     rows.push(entry);
@@ -141,6 +151,25 @@ function readActivePersonPostWeights_(referenceDate, timezone) {
  * ⚠️ 冇對應嘅偏好行 ⇒ **一定回 0**。0 加落 bonus 係恆等元，
  * 所以「張表空嘅時候結果一模一樣」呢個性質喺呢一行就保證咗。
  *
+ * ─────────────────────────────────────────────────────────────────────
+ * 第二十八輪批次階段 A：`+N` 由「地板」改成「增量」
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * **Ivan 實測（2027T4）：`+1` 完全冇效果。**
+ * 設咗一行 `+1`（某人／當值堂委），重新生成之後該崗位次數 1 → 1（冇變），
+ * 而佢全崗位總數 6 次、上限 8 次，即係**唔係撞上限**。
+ *
+ * 根因：舊寫法係「排夠 `adjust` 次就停止加分」——即係 `+1` 嘅實際意思係
+ * 「**至少排到 1 次**」（一個地板），唔係「**比原本多 1 次**」（一個增量）。
+ * 嗰位本身自然就排到 1 次，所以加分由頭到尾冇機會生效。
+ *
+ * 而畫面寫嘅係「這一季比系統原本會派的多大約一次」。
+ * **機制同承諾唔一致，而且冇量度，所以冇人睇得出**——過咗一整輪。
+ *
+ * 新語意：`目標 = 上一季實際次數 + 偏好`，計分正負**統一**：
+ *   `(target - already) × PERSON_POST_WEIGHT_STEP`
+ * 未夠就加分、超咗就扣分、啱啱好就 0。
+ *
  * @param {string} personId 候選人
  * @param {Object} state 排表狀態
  * @returns {number} 加分（正數＝更容易被揀），冇偏好時 0
@@ -151,17 +180,214 @@ function computePersonPostWeightBonus_(personId, state) {
   const entry = weights.byKey[personId + '|' + state.post.postId];
   if (!entry) return 0;
 
-  if (entry.adjust > 0) {
-    // 遞減加分：呢一季喺呢個崗位已經排夠 `adjust` 次就停。
-    // 唔遞減嘅話 +1 會變成「霸晒」，而 +1 嘅意思係「多大約一次」。
-    const already = readPersonPostCount_(state, personId, state.post.postId);
-    if (already >= entry.adjust) return 0;
-    return entry.adjust * PERSON_POST_WEIGHT_STEP;
+  // ⚠️ 目標值一定要喺 context 建立嗰陣就算好。算唔到就係一個**程式錯誤**
+  // （呼叫端漏咗傳基準資料），唔係一個資料狀況。
+  //
+  // 呢度特登拋錯而唔係回 0：回 0 嘅話，整個偏好機制會靜靜咁完全失效，
+  // 而排表結果睇落完全正常——**上一輪就係噉樣過咗一整輪都冇人發現**。
+  if (entry.target === null || entry.target === undefined) {
+    throw new Error('排表偏好未算好目標次數（' + personId + '｜' + state.post.postId
+      + '）。buildGeneratorContext_() 一定要傳基準資料畀 readActivePersonPostWeights_()。');
   }
-  // 負數：常數扣分。剎車由 SOFT_QUARTER_DISTRIBUTION 提供
-  // ——其他人越派越多，佢哋自己嘅扣分最終會蓋過呢個固定扣分，
-  // 所以係「排後啲」而唔係「排到零」。
-  return entry.adjust * PERSON_POST_WEIGHT_STEP;
+
+  const already = readPersonPostCount_(state, personId, state.post.postId);
+  return (entry.target - already) * PERSON_POST_WEIGHT_STEP;
+}
+
+/* ============================================================
+ * 第二十八輪批次階段 A：基準（baseline）
+ * ============================================================ */
+
+/** 基準嘅來源。**「查不到」一定要同「0 次」分得開。** */
+const WEIGHT_BASELINE_SOURCE = {
+  /** 上一個有版本嘅季度嘅實際次數（最可信） */
+  PREV_QUARTER: 'PREV_QUARTER',
+  /** 冇上一季 ⇒ 用歷史平均每季次數 */
+  HISTORICAL_AVERAGE: 'HISTORICAL_AVERAGE',
+  /** 兩樣都冇 ⇒ 基準當 0，但**要標示出嚟** */
+  NONE: 'NONE',
+  /** 未算過（例如編輯畫面只列清單，冇準備基準資料） */
+  NOT_COMPUTED: 'NOT_COMPUTED'
+};
+
+/**
+ * 由基準資料查一個 (人, 崗位) 嘅基準。**純函式，可以離線測。**
+ *
+ * ⚠️ 上一季**有版本**而嗰個人喺嗰個崗位排 0 次 ⇒ 基準係一個**真實嘅 0**，
+ * 唔係「查不到」。呢兩件事喺畫面上都係「0」，但意思完全相反：
+ * 前者係「佢上季真係冇做過」，後者係「我哋根本唔知」。
+ *
+ * @param {string} personId
+ * @param {string} postId
+ * @param {?Object} baselineData `buildWeightBaselineData_()` 嘅結果；null ＝ 未算
+ * @returns {{baseline: number, source: string, label: string}}
+ */
+function resolveWeightBaseline_(personId, postId, baselineData) {
+  if (!baselineData) {
+    return { baseline: 0, source: WEIGHT_BASELINE_SOURCE.NOT_COMPUTED, label: '' };
+  }
+  const key = personId + '|' + postId;
+
+  if (baselineData.prev) {
+    return {
+      baseline: baselineData.prev.byKey[key] || 0,
+      source: WEIGHT_BASELINE_SOURCE.PREV_QUARTER,
+      label: baselineData.prev.label
+    };
+  }
+
+  const historical = baselineData.historicalByKey[key];
+  if (historical !== undefined && baselineData.pastQuarterCount > 0) {
+    return {
+      baseline: historical / baselineData.pastQuarterCount,
+      source: WEIGHT_BASELINE_SOURCE.HISTORICAL_AVERAGE,
+      label: '歷史平均每季'
+    };
+  }
+
+  return { baseline: 0, source: WEIGHT_BASELINE_SOURCE.NONE, label: '' };
+}
+
+/**
+ * 目標次數。**純函式。**
+ *
+ * 基準可能係小數（歷史平均），所以先四捨五入再加偏好——
+ * 「1.4 次 ＋ 多一次」對幹事嚟講嘅意思係「2 次」，唔係「2.4 次」。
+ * @param {number} baseline
+ * @param {number} adjust
+ * @returns {number} 下限 0
+ */
+function computeWeightTarget_(baseline, adjust) {
+  return Math.max(0, Math.round(Number(baseline) || 0) + Number(adjust || 0));
+}
+
+/**
+ * 把基準寫成一句人話（畫面用）。前端後端共用，**唔可以兩邊各寫一次**。
+ * @param {{baseline: number, source: string, label: string}} info
+ * @param {string} postNameTC 崗位名（人話）
+ * @param {number} target 目標次數
+ * @returns {string}
+ */
+function describeWeightBaseline_(info, postNameTC, target) {
+  const post = postNameTC || '這個崗位';
+  if (info.source === WEIGHT_BASELINE_SOURCE.PREV_QUARTER) {
+    return '上一季（' + info.label + '）' + post + ' ' + info.baseline + ' 次'
+      + '　→　今季目標 ' + target + ' 次'
+      + (info.baseline === target ? '（與上一季相同）' : '');
+  }
+  if (info.source === WEIGHT_BASELINE_SOURCE.HISTORICAL_AVERAGE) {
+    return '沒有上一季的記錄，用歷史平均每季 '
+      + (Math.round(info.baseline * 10) / 10) + ' 次做基準'
+      + '　→　今季目標 ' + target + ' 次';
+  }
+  if (info.source === WEIGHT_BASELINE_SOURCE.NOT_COMPUTED) return '（還沒有算基準）';
+  // ⚠️ 「沒有基準」一定要講出嚟，唔可以寫成「上一季 0 次」——
+  // 後者係一個肯定句，而我哋根本冇資料。
+  return '沒有上一季的記錄，基準當作 0 次　→　今季目標 ' + target + ' 次';
+}
+
+/**
+ * 基準嘅**短版**文字（報告表格用，唔要「→ 今季目標」嗰半截）。
+ * @param {Object} entry 偏好行（有 baseline／baselineSource）
+ * @returns {string}
+ */
+function describeWeightBaselineShort_(entry) {
+  const source = entry.baselineSource || WEIGHT_BASELINE_SOURCE.NOT_COMPUTED;
+  if (source === WEIGHT_BASELINE_SOURCE.PREV_QUARTER) {
+    return entry.baseline + ' 次（' + (entry.baselineLabel || '上一季') + '）';
+  }
+  if (source === WEIGHT_BASELINE_SOURCE.HISTORICAL_AVERAGE) {
+    return (Math.round(entry.baseline * 10) / 10) + ' 次（歷史平均）';
+  }
+  if (source === WEIGHT_BASELINE_SOURCE.NONE) return '沒有基準（當作 0 次）';
+  return '（沒有算過基準）';
+}
+
+/**
+ * 準備「上一季實際次數」同「歷史平均」兩份基準資料。
+ *
+ * **要讀試算表**，所以只可以喺 `buildGeneratorContext_()` 同 Web API
+ * 呢類呼叫端叫。純函式部分（`resolveWeightBaseline_()`／
+ * `computeWeightTarget_()`）唔碰試算表，離線測得到。
+ *
+ * 「上一個季度」＝ 按 `StartDate` 排序，本季之前**最近一個有版本**嘅季度，
+ * 用嗰季**最新版本**嘅實際派工。
+ *
+ * ⚠️ 「有版本」呢個條件唔可以慳：一個已經建立但未生成過嘅季度
+ * （例如已經預先開好嘅下一季）派工紀錄係空嘅，
+ * 攞佢做基準就等於把每一個人嘅基準都當成 0。
+ *
+ * @param {string} quarterId 本季
+ * @param {string} timezone
+ * @returns {{prev: ?Object, historicalByKey: Object, pastQuarterCount: number}}
+ */
+function buildWeightBaselineData_(quarterId, timezone) {
+  const Q = COLUMNS.QUARTERS;
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const E = COLUMNS.ELIGIBILITY;
+
+  const quarters = readSheet(SHEETS.QUARTERS)
+    .map(function (row) {
+      return {
+        quarterId: String(row[Q.QUARTER_ID] || '').trim(),
+        startDate: toDateString(row[Q.START_DATE], timezone)
+      };
+    })
+    .filter(function (q) { return q.quarterId && q.startDate; })
+    .sort(function (a, b) { return a.startDate < b.startDate ? -1 : 1; });
+
+  const self = quarters.filter(function (q) { return q.quarterId === quarterId; })[0];
+  const earlier = self
+    ? quarters.filter(function (q) { return q.startDate < self.startDate; })
+    : [];
+
+  // 由最近嘅一季向前搵，第一個有版本嘅就係基準季。
+  let prev = null;
+  for (let i = earlier.length - 1; i >= 0 && !prev; i--) {
+    const candidate = earlier[i];
+    let versionNo = -1;
+    try { versionNo = findLatestVersionNo(candidate.quarterId); }
+    catch (err) { versionNo = -1; }
+    if (versionNo < 0) continue;
+
+    const byKey = {};
+    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+      if (String(row[A.QUARTER_ID] || '').trim() !== candidate.quarterId) return;
+      if (Number(row[A.VERSION_NO]) !== versionNo) return;
+      const personId = String(row[A.PERSON_ID] || '').trim();
+      const postId = String(row[A.POST_ID] || '').trim();
+      if (!personId || !postId) return;
+      const key = personId + '|' + postId;
+      byKey[key] = (byKey[key] || 0) + 1;
+    });
+
+    prev = {
+      quarterId: candidate.quarterId,
+      versionNo: versionNo,
+      label: buildQuarterLabel_(candidate.quarterId),
+      byKey: byKey
+    };
+  }
+
+  // 歷史平均嘅分母：本季之前已經存在嘅季度數。
+  // ⚠️ 呢個係一個近似值——`Eligibility.HistoricalCount` 統計嘅期間
+  // 唔一定等於 `Quarters` 入面全部舊季度。所以佢只做**後備**基準，
+  // 而且畫面會標明「用歷史平均做基準」，唔會扮成上一季嘅實數。
+  const historicalByKey = {};
+  try {
+    readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+      const personId = String(row[E.PERSON_ID] || '').trim();
+      const postId = String(row[E.POST_ID] || '').trim();
+      if (!personId || !postId) return;
+      const count = Number(row[E.HISTORICAL_COUNT]);
+      if (isNaN(count) || count <= 0) return;
+      historicalByKey[personId + '|' + postId] = count;
+    });
+  } catch (err) {
+    log_('WARN', '讀不到 Eligibility 的歷史次數，排表偏好只能用「沒有基準」：' + err.message);
+  }
+
+  return { prev: prev, historicalByKey: historicalByKey, pastQuarterCount: earlier.length };
 }
 
 /**
@@ -226,17 +452,25 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
     const peopleCount = Object.keys(perPostPeople[w.postId] || {}).length;
     const average = peopleCount === 0 ? 0 : (perPostTotals[w.postId] || 0) / peopleCount;
     const got = actual[key] || 0;
-    const target = average + w.adjust;
 
-    // 第二十七輪批次階段 B2：未達標一定要講得出係邊條規則擋住。
+    // ⚠️ 第二十八輪批次階段 A4：目標值改用**基準 ＋ 偏好**，
+    // 唔再用「該崗位平均 ＋ 偏好」。
     //
-    // ⚠️ 「未達標」嘅門檻用 0.5 而唔係 0：目標值本身係一個小數
-    //（平均 ＋ 偏好），差 0.3 次唔算「冇生效」，只係四捨五入。
-    // 用 0 做門檻會令幾乎每一行都報一堆原因，而真正有問題嗰行就淹沒咗。
+    // 舊做法兩個問題：
+    // 1. 平均值係由**呢一次生成嘅結果**算返出嚟。偏好生效令佢多排咗，
+    //    平均值本身亦會升，目標跟住升——即係一個追唔到嘅目標。
+    // 2. 平均值同排表計分實際用嘅嘢完全冇關係，
+    //    所以報告講嘅「目標」根本唔係系統真正追嗰個目標。
+    //
+    // 而家用 `w.target`，同 `computePersonPostWeightBonus_()` 用嘅係同一個數。
+    const target = (w.target === null || w.target === undefined)
+      ? computeWeightTarget_(w.baseline || 0, w.adjust) : w.target;
+
+    // 目標值而家係整數，所以「未達標」門檻係 0——差一次就係差一次。
     const shortfall = target - got;
     const personLimit = resolveWeightQuarterLimit_(peopleById[w.personId], limitContext);
-    const explained = shortfall > 0.5
-      ? explainWeightShortfall_(w, Math.round(target), got, assignments, personLimit)
+    const explained = shortfall > 0
+      ? explainWeightShortfall_(w, target, got, assignments, personLimit)
       : { reasons: [], text: '' };
 
     const row = {
@@ -245,20 +479,23 @@ function buildPersonPostWeightReport_(assignments, weights, peopleById, postName
       postId: w.postId,
       postNameTC: postNames[w.postId] || w.postId,
       adjust: w.adjust,
+      baseline: w.baseline === undefined ? null : w.baseline,
+      baselineSource: w.baselineSource || WEIGHT_BASELINE_SOURCE.NOT_COMPUTED,
+      baselineText: describeWeightBaselineShort_(w),
       averageForPost: Math.round(average * 10) / 10,
-      targetCount: Math.round(target * 10) / 10,
+      targetCount: target,
       actualCount: got,
-      gap: Math.round((got - target) * 10) / 10,
+      gap: got - target,
       reason: w.reason,
-      met: shortfall <= 0.5,
+      met: shortfall <= 0,
       shortfallReasons: explained.reasons,
       shortfallText: explained.text
     };
     rows.push(row);
     lines.push('　' + row.nameTC + '　' + row.postNameTC
+      + '　上一季 ' + row.baselineText
       + '　偏好 ' + (w.adjust > 0 ? '+' : '') + w.adjust
-      + '　這個崗位平均 ' + row.averageForPost + ' 次'
-      + '　目標約 ' + row.targetCount + ' 次'
+      + '　今季目標 ' + row.targetCount + ' 次'
       + '　實際 ' + row.actualCount + ' 次'
       + '　差 ' + (row.gap > 0 ? '+' : '') + row.gap);
     if (!row.met) lines.push('　　未達標原因：' + row.shortfallText);

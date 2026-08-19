@@ -34,11 +34,32 @@ function checkEqual(label, actual, expected) {
   if (!ok) console.log(`      got=${JSON.stringify(actual)}\n      expected=${JSON.stringify(expected)}`);
 }
 
-/** 把幾行偏好砌成 context 要嘅形狀。 */
+/**
+ * 把幾行偏好砌成 context 要嘅形狀。
+ *
+ * ⚠️ 第二十八輪批次階段 A：目標次數（`target`）而家係
+ * `readActivePersonPostWeights_()` 喺 context 建立嗰陣就算好嘅，
+ * 而 `computePersonPostWeightBonus_()` 見到冇 `target` 會**拋錯**。
+ * 呢個 helper 用同正式碼一模一樣嘅 `computeWeightTarget_()` 補返，
+ * **唔會另寫一條公式**——另寫一條就會出現「測試過但正式碼唔係噉行」。
+ *
+ * `baseline` 唔傳就係 0（＝ `+N` 等同「至少排到 N 次」，即係舊語意）。
+ * 真正要驗新語意嘅 case 一定要明確傳 `baseline`。
+ */
 function weights(rows) {
   const byKey = {};
-  rows.forEach(function (r) { byKey[r.personId + '|' + r.postId] = r; });
-  return { byKey: byKey, rows: rows, invalid: [] };
+  const built = rows.map(function (r) {
+    const baseline = r.baseline === undefined ? 0 : r.baseline;
+    const entry = Object.assign({}, r, {
+      baseline: baseline,
+      baselineSource: gas.WEIGHT_BASELINE_SOURCE.PREV_QUARTER,
+      baselineLabel: '（測試基準）',
+      target: gas.computeWeightTarget_(baseline, r.adjust)
+    });
+    byKey[entry.personId + '|' + entry.postId] = entry;
+    return entry;
+  });
+  return { byKey: byKey, rows: built, invalid: [] };
 }
 
 function generate(options) {
@@ -118,11 +139,20 @@ console.log('\n=== C3【驗收】用堂委真實修訂嘅形狀做基準 ===');
   const deaconPerson = deaconPool.indexOf(heavyChair) !== -1
     ? heavyChair : deaconPool[0];
 
+  // ⚠️ 第二十八輪批次階段 A：基準用**冇偏好嗰次生成嘅實際次數**。
+  //
+  // 呢個正正就係新語意想表達嘅嘢：「比佢原本會排到嘅多／少 N 次」。
+  // 舊語意（基準當 0）喺呢度會令 `+1` 對一個本來已經排到 1 次嘅人
+  // 完全冇效果——Ivan 實測撞到嘅就係嗰件事。
   const rows = [
-    { personId: heavyChair, postId: POST.CHAIR, adjust: -2, reason: '測試：少做主席' },
-    { personId: lightChair, postId: POST.CHAIR, adjust: 1, reason: '測試：多做主席' },
-    { personId: announcePerson, postId: POST.ANNOUNCE, adjust: 1, reason: '測試：多做報告' },
-    { personId: deaconPerson, postId: POST.DEACON, adjust: 1, reason: '測試：多做當值堂委' }
+    { personId: heavyChair, postId: POST.CHAIR, adjust: -2, reason: '測試：少做主席',
+      baseline: countFor(baseA, heavyChair, POST.CHAIR) },
+    { personId: lightChair, postId: POST.CHAIR, adjust: 1, reason: '測試：多做主席',
+      baseline: countFor(baseA, lightChair, POST.CHAIR) },
+    { personId: announcePerson, postId: POST.ANNOUNCE, adjust: 1, reason: '測試：多做報告',
+      baseline: countFor(baseA, announcePerson, POST.ANNOUNCE) },
+    { personId: deaconPerson, postId: POST.DEACON, adjust: 1, reason: '測試：多做當值堂委',
+      baseline: countFor(baseA, deaconPerson, POST.DEACON) }
   ];
   const tuned = generate({ randomSeed: 11, personPostWeights: weights(rows) });
   const tunedA = tuned.roster.assignments;

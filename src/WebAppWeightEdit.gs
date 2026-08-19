@@ -104,6 +104,14 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     // 第二十七輪批次階段 B2：呢一季每個人已經排咗幾多次、上限係幾多。
     const load = readQuarterLoadForWeights_(quarterId);
 
+    // ⚠️ 第二十八輪批次階段 A3：**每一行都要顯示基準同目標**，
+    // 唔理有冇偏好。Ivan 實測撞到嘅根本問題係：
+    // 佢揀咗「多一次」，但畫面上冇任何數字話俾佢知「多一次」係由幾多變到幾多，
+    // 所以生成完之後亦冇辦法知道有冇生效。
+    const baselineData = buildWeightBaselineDataSafely_(quarterId);
+    // 本季已經排咗幾多次（逐個崗位）——同「上一季幾多次」擺埋一齊睇先有意思。
+    const thisQuarterByKey = readThisQuarterPostCounts_(quarterId);
+
     const byPost = posts.map(function (p) {
       const ids = (eligibleByPost[p.postId] || []).slice().sort(function (a, b) {
         return (nameById[a] || a) < (nameById[b] || b) ? -1 : 1;
@@ -113,12 +121,24 @@ function apiGetPersonPostWeightMatrix(quarterId) {
         postNameTC: p.postNameTC,
         people: ids.map(function (id) {
           const hit = active.byKey[id + '|' + p.postId];
+          const adjust = hit ? hit.adjust : 0;
+          const base = resolveWeightBaseline_(id, p.postId, baselineData);
+          const target = computeWeightTarget_(base.baseline, adjust);
           return {
             personId: id,
             nameTC: nameById[id] || id,
-            adjust: hit ? hit.adjust : 0,
+            adjust: adjust,
             reason: hit ? hit.reason : '',
             weightId: hit ? hit.weightId : '',
+            baseline: base.baseline,
+            baselineSource: base.source,
+            target: target,
+            // 一句人話，前端直接印——**唔可以前端自己再砌一次**，
+            // 兩邊各砌一次就會有一日兩個畫面講唔同嘅嘢。
+            baselineText: describeWeightBaseline_(base, p.postNameTC, target),
+            // null ＝ 查不到（呢一季未有版本）。**唔係 0 次。**
+            thisQuarterCount: thisQuarterByKey
+              ? (thisQuarterByKey[id + '|' + p.postId] || 0) : null,
             // null ＝ 查不到（冇季度、冇版本、或者讀取失敗）
             quarterLoad: load.available ? (load.byPerson[id] || null) : null
           };
@@ -139,6 +159,59 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     };
   } finally {
     endSheetReadMemo_();
+  }
+}
+
+/**
+ * 第二十八輪批次階段 A3：安全咁攞基準資料。
+ *
+ * 基準資料要讀四張表。任何一張出問題都唔應該令整個編輯畫面開唔到
+ * ——冇基準只係少咗一行提示，而開唔到係幹事完全用唔到。
+ * 攞唔到就回 `null`，而 `resolveWeightBaseline_()` 收到 null 會標示
+ * 「還沒有算基準」，**唔會扮成 0 次**。
+ * @param {string} quarterId
+ * @returns {?Object}
+ */
+function buildWeightBaselineDataSafely_(quarterId) {
+  const id = String(quarterId || '').trim();
+  if (!id) return null;
+  try {
+    return buildWeightBaselineData_(
+      id, getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+  } catch (err) {
+    log_('WARN', '排表偏好畫面讀不到基準資料：' + err.message);
+    return null;
+  }
+}
+
+/**
+ * 本季最新版本、逐個 (人, 崗位) 已經排咗幾多次。
+ *
+ * ⚠️ 回 `null` ＝ **查不到**（未有版本／讀取失敗），唔係「全部 0 次」。
+ * 前端見到 null 就唔會顯示「今季已排 N 次」——顯示 0 等於話
+ * 「已經排過，而且排咗 0 次」，同「仲未生成」係兩件事。
+ * @param {string} quarterId
+ * @returns {?Object.<string, number>}
+ */
+function readThisQuarterPostCounts_(quarterId) {
+  const id = String(quarterId || '').trim();
+  if (!id) return null;
+  try {
+    const versionNo = findLatestVersionNo(id);
+    if (versionNo < 0) return null;
+    const A = COLUMNS.ROSTER_ASSIGNMENTS;
+    const byKey = {};
+    readVersionAssignmentsRaw_(id, versionNo).forEach(function (row) {
+      const personId = String(row[A.PERSON_ID] || '').trim();
+      const postId = String(row[A.POST_ID] || '').trim();
+      if (!personId || !postId) return;
+      const key = personId + '|' + postId;
+      byKey[key] = (byKey[key] || 0) + 1;
+    });
+    return byKey;
+  } catch (err) {
+    log_('WARN', '排表偏好畫面讀不到本季派工：' + err.message);
+    return null;
   }
 }
 

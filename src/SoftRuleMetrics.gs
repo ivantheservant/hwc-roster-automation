@@ -654,6 +654,85 @@ function buildSoftRuleMetricRows_(m) {
 }
 
 /**
+ * 第二十八輪批次階段 A4：**「排表偏好」一節，寫入 Diagnostics 報告本身。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 上一輪為什麼漏了
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 上一輪把 `buildPersonPostWeightReport_()` 接進了 `runSoftRuleMetrics_()`
+ * 的**彈窗文字**，但沒有接進 `buildSoftRuleMetricRows_()`——而後者才是
+ * 寫入 `Diagnostics` 工作表、幹事真正會讀的那一份。
+ *
+ * 結果：稽核文件寫了「已加入量度」，實際輸出裡完全沒有。
+ * Ivan 讀完整份 2027T4 v1 品質統計才發現。
+ *
+ * 這一節就是「沒有量度的軟機制等於沒有機制」那一句的實作。
+ *
+ * ⚠️ **沒有任何偏好時也要出現這一節**，寫一句「本季沒有設定任何排表偏好」。
+ * 完全消失的話，「沒有設定」與「有設定但沒有顯示」就分不開——
+ * 而上一輪出事的正正是後者。
+ *
+ * @param {string} quarterId
+ * @param {number} versionNo
+ * @returns {Object[]} `diagRow_()` 產生的行陣列
+ */
+function buildPersonPostWeightMetricRows_(quarterId, versionNo) {
+  const section = '5. 排表偏好';
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const quarterRow = findQuarter_(quarterId);
+    const refDate = quarterRow
+      ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+    const weights = readActivePersonPostWeights_(
+      refDate, timezone, buildWeightBaselineData_(quarterId, timezone));
+
+    if (weights.rows.length === 0 && weights.invalid.length === 0) {
+      return [diagRow_(section, '（本季沒有設定任何排表偏好）', '0 項',
+        '系統按一般規則排。要設定的話：幹事介面「名單維護 ▸ 排表偏好」。')];
+    }
+
+    const postNames = {};
+    readPosts().forEach(function (row) {
+      postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
+    });
+    const report = buildPersonPostWeightReport_(
+      readVersionAssignmentsRaw_(quarterId, versionNo),
+      weights, indexPeopleById_(), postNames, {
+        rules: readRules(),
+        defaultLimit:
+          Number(getConfig(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
+          || DEFAULTS.MAX_PER_QUARTER
+      });
+
+    const rows = [diagRow_(section, '（生效中的偏好）', weights.rows.length + ' 項',
+      '目標＝上一季實際次數 ＋ 偏好；偏好是「軟」的，不會令系統違反任何規則')];
+
+    report.rows.forEach(function (r) {
+      rows.push(diagRow_(section, r.nameTC + '｜' + r.postNameTC,
+        '目標 ' + r.targetCount + ' 次　實際 ' + r.actualCount + ' 次　差 '
+          + (r.gap > 0 ? '+' : '') + r.gap,
+        '上一季 ' + r.baselineText
+          + '　偏好 ' + (r.adjust > 0 ? '+' : '') + r.adjust
+          + (r.met ? '　✅ 達標' : '　⚠ 未達標原因：' + r.shortfallText)));
+    });
+
+    weights.invalid.forEach(function (bad) {
+      rows.push(diagRow_(section, bad.personId + '｜' + bad.postId,
+        '⚠️ Adjust=' + bad.rawAdjust, bad.reason + '（這一行完全沒有生效）'));
+    });
+
+    return rows;
+  } catch (err) {
+    // 讀不到只影響這一節，不應該令整份量度報告產生不到。
+    // 但**一定要留一行**寫明讀不到——整節消失就跟「沒有偏好」分不開。
+    log_('WARN', '排表偏好量度讀不到：' + err.message);
+    return [diagRow_(section, '（讀不到）', '',
+      err.message + '。這一節查不到，不代表沒有偏好生效。')];
+  }
+}
+
+/**
  * A3：同一季度兩個版本的並列比較，讓幹事看到人手修改與申報套用之後，
  * 軟規則數值有沒有被破壞。
  *
@@ -729,6 +808,9 @@ function runSoftRuleMetrics_() {
   try {
     metrics = measureSoftRuleMetrics_(target.quarterId, target.versionNo);
     rows = buildSoftRuleMetricRows_(metrics);
+    // 第二十八輪批次階段 A4：接進**寫入 Diagnostics 嗰份**。
+    // 上一輪只接咗彈窗文字，所以幹事讀嘅嗰份報告完全冇偏好量度。
+    rows = rows.concat(buildPersonPostWeightMetricRows_(target.quarterId, target.versionNo));
 
     // A3：如果量度的不是 v0 本身，順帶跟 v0 並列比較。v0 不存在（例如舊資料
     // 已封存、或該季根本沒有 v0）只是拿不到比較基準，不應該令整個工具失敗，
@@ -805,7 +887,10 @@ function runSoftRuleMetrics_() {
     const quarterRow = findQuarter_(metrics.quarterId);
     const refDate = quarterRow
       ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
-    const weights = readActivePersonPostWeights_(refDate, timezone);
+    // ⚠️ 一定要傳基準資料，否則目標次數會退化成「0 ＋ 偏好」，
+    // 而報告會理直氣壯咁印一個同排表實際追嗰個唔同嘅目標。
+    const weights = readActivePersonPostWeights_(
+      refDate, timezone, buildWeightBaselineData_(metrics.quarterId, timezone));
     const postNames = {};
     readPosts().forEach(function (row) {
       postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];

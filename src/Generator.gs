@@ -88,8 +88,14 @@ function buildGeneratorContext_(quarterId) {
     // 逐個位元一樣**（見 PersonPostWeight.gs 檔頭嘅安全性質）。
     // 參考日期用季初：一筆偏好生唔生效，應該睇「呢一季開始嗰陣」，
     // 唔係「今日執行生成嗰陣」——後者會令同一季喺唔同日重跑出唔同結果。
+    // ⚠️ 第二十八輪批次階段 A：**一定要傳基準資料**。
+    // 冇基準就冇目標次數，而冇目標次數嘅 entry 會令
+    // `computePersonPostWeightBonus_()` 拋錯——特登拋錯而唔係回 0，
+    // 因為回 0 會令整個偏好機制靜靜失效而排表結果睇落完全正常
+    //（上一輪就係噉樣過咗一整輪都冇人發現）。
     personPostWeights: readActivePersonPostWeights_(
-      toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone), timezone)
+      toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone), timezone,
+      buildWeightBaselineData_(quarterId, timezone))
   };
 }
 

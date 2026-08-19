@@ -886,6 +886,21 @@
     const box = make('div', { className: 'prop' });
     box.appendChild(make('div', { text: person.nameTC, className: 'prop-head' }));
 
+    // ⚠️ 第二十八輪批次階段 A3：**每一行都顯示基準同目標**，唔理有冇偏好。
+    //
+    // Ivan 實測撞到嘅根本問題：佢揀咗「多一次」，但畫面上冇任何數字話俾佢知
+    // 「多一次」係由幾多變到幾多，所以生成完之後亦冇辦法知道有冇生效。
+    // （而實際上舊版嗰個語意令佢完全冇生效——冇人睇得出。）
+    //
+    // 呢句字由後端砌（`describeWeightBaseline_()`），前端唔可以自己再砌一次
+    // ——兩邊各砌一次就會有一日兩個畫面講唔同嘅嘢。
+    const targetLine = make('div', { text: person.baselineText, className: 'lines' });
+    // `thisQuarterCount` 係 null ＝ 呢一季未有版本，**唔係「已排 0 次」**。
+    if (person.thisQuarterCount !== null && person.thisQuarterCount !== undefined) {
+      targetLine.textContent += '　今季已排 ' + person.thisQuarterCount + ' 次';
+    }
+    box.appendChild(targetLine);
+
     // ⚠️ 下拉用人話，**唔俾幹事打數字**——打錯一個負號就完全相反，
     // 而「多一次」同「少一次」睇落只差一個字。
     const sel = document.createElement('select');
