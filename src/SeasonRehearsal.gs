@@ -40,6 +40,24 @@ const SEASON_REHEARSAL_REPORT = '全季流程演練';
 const SEASON_REHEARSAL_CONFIRM_WORD = '演練';
 
 /**
+ * 步驟 3.5 最多行幾多批個人 PDF。
+ * ⚠️ 呢個係第二道保險。真正管住時間嘅係下面嗰個死線。
+ */
+const SEASON_REHEARSAL_PDF_MAX_ROUNDS = 6;
+
+/**
+ * 由**演練開始**計，行到幾多毫秒之後就唔再開新一批個人 PDF。
+ *
+ * Apps Script 單次執行上限係 6 分鐘（360 秒）。實測步驟 1～3 用咗
+ * 114 秒，而步驟 4、5 仲要寄兩輪信。留 210 秒（3.5 分鐘）做死線，
+ * 即係最壞情況都仲有成兩分鐘俾後面兩步同埋寫報告。
+ *
+ * ⚠️ **寧願 PDF 產生唔晒，都唔可以令成份報告寫唔出。**
+ * 報告寫唔出嘅話，連步驟 1～3 嗰啲已經行完嘅結果都一齊冇埋。
+ */
+const SEASON_REHEARSAL_PDF_DEADLINE_MS = 210000;
+
+/**
  * 預設受保護（唔准演練）嘅季度。
  *
  * ⚠️ **寫喺程式碼做預設值，唔係只靠 Config。**
@@ -267,6 +285,8 @@ function apiSaveAndConfirmExecuteForRehearsal_(quarterId) {
 function executeSeasonRehearsal_(quarterId) {
   const baseline = readSeasonRehearsalBaseline_(quarterId);
   const steps = [];
+  // 成次演練嘅開始時間，俾步驟 3.5 計自己仲剩幾多秒可以用。
+  const rehearsalStartedAtMs = Date.now();
 
   // ⚠️ 第三十輪批次階段 C1：**次序改成真實流程。**
   //
@@ -387,13 +407,37 @@ function executeSeasonRehearsal_(quarterId) {
 
       let rounds = 0;
       let last = null;
-      // 上限特登寫死：一個唔會停嘅 loop 喺 Apps Script 度會撞六分鐘上限，
-      // 而嗰陣咩報告都冇。20 批 × 每批預設 10 人 ＝ 200 人，夠有餘。
-      const MAX_ROUNDS = 20;
-      while (rounds < MAX_ROUNDS) {
+      let stoppedBy = '';
+      // ⚠️⚠️ **一次執行做唔晒 58 份，呢個係設計，唔係意外。**
+      //
+      // 實測（見稽核文件「個人 PDF 匯出重試效能分析」）：
+      //   58 人 ／ 3 批 ／ 552.6 秒 ／ 重試 81 次
+      // 而 `PDF_BATCH_TIME_BUDGET_MS` ＝ 4 分鐘，就係為咗確保
+      // **單次 Apps Script 執行唔會撞六分鐘上限**——每批之間要幹事
+      // 重新撳一次選單接續。
+      //
+      // 所以呢度唔可以 loop 到 `done` 為止：噉樣一定撞上限，而撞咗
+      // 之後**成份報告都唔會寫到**，連步驟 1～3 嘅結果都冇埋，
+      // 比而家淨係步驟 4 失敗更差。
+      //
+      // 做法：計住成次演練用咗幾耐，剩返嘅時間唔夠就停手，
+      // 老老實實喺報告寫「做咗幾多、仲差幾多、點解停」。
+      // 一個做唔晒嘅步驟講清楚自己做唔晒，好過扮做得晒。
+      while (rounds < SEASON_REHEARSAL_PDF_MAX_ROUNDS) {
+        const elapsed = Date.now() - rehearsalStartedAtMs;
+        if (elapsed > SEASON_REHEARSAL_PDF_DEADLINE_MS) {
+          stoppedBy = '時間用完（整個演練已經行了 ' + Math.round(elapsed / 1000)
+            + ' 秒，再產生下去會撞 Apps Script 六分鐘上限，'
+            + '連整份報告都寫不出來）';
+          break;
+        }
         rounds++;
         last = generatePersonalPdfBatch_(quarterId, versionNo);
         if (last && last.done) break;
+      }
+      if (!stoppedBy && rounds >= SEASON_REHEARSAL_PDF_MAX_ROUNDS
+        && !(last && last.done)) {
+        stoppedBy = '批次數到達上限 ' + SEASON_REHEARSAL_PDF_MAX_ROUNDS + ' 批';
       }
 
       const files = readRehearsalPdfPaths_(quarterId, [versionNo]);
@@ -408,6 +452,13 @@ function executeSeasonRehearsal_(quarterId) {
         versionNo: versionNo,
         rounds: rounds,
         finished: !!(last && last.done),
+        // ⚠️ 冇行完就一定要講得出**點解**停。淨係寫 `finished: false`
+        // 等於叫下一個人自己估係壞咗定係時間唔夠。
+        stoppedBy: stoppedBy || (last && last.done ? '' : '（不明——請告訴開發者）'),
+        nextAction: (last && last.done) ? ''
+          : '個人 PDF 未產生完，所以下面的「步驟 4」一定會被缺件保護擋住，'
+            + '這是預期之內。要走完寄送那一段，請先在選單「產生個人 PDF」'
+            + '重複執行到全部完成，然後再單獨執行步驟 4。',
         totalPeople: pick('totalPeople'),
         doneCount: pick('doneCount'),
         generatedCount: pick('generatedCount'),
@@ -827,8 +878,14 @@ function runSeasonRehearsal_() {
     + '・建立 2 個新版本（生成初稿一個、套用申報一個）\n'
     // ⚠️ 第三十一輪批次階段 B1：新增「步驟 3.5 產生個人 PDF」。
     // 冇呢一步，步驟 4 一定會被缺件保護擋住，寄送路徑永遠測唔到。
-    + '・為全體義工產生個人 PDF（每人一份，約 58 份；'
-    + '實測整個流程約 2 分鐘，加上這一步預計再多幾分鐘）\n'
+    + '・為全體義工產生個人 PDF（每人一份，約 58 份）\n'
+    // ⚠️ 唔可以講到似乎一次就產生得晒。實測 58 人要分 3 批、共 552 秒，
+    // 而單次 Apps Script 執行上限係 6 分鐘——所以演練只會盡力產生，
+    // 時間到就停手，報告會寫明差幾多。講明咗，步驟 4 被擋就唔會
+    // 再令人以為係壞咗。
+    + '　（實測 58 份要分 3 次執行、合共約 9 分鐘，而一次執行最多只有\n'
+    + '　　6 分鐘，所以演練只會在時間內盡力產生，報告會寫明產生了多少、\n'
+    + '　　還差多少。產生不完時「步驟 4」會被缺件保護擋住，那是預期之內。）\n'
     + '・在 SendLog 寫入兩批紀錄（審閱一批、正式發出一批）\n\n'
     + '⚠️ 不會真的寄出任何電郵——DRY_RUN 是 TRUE，'
     + '整個寄送流程會走完，但信不會離開系統。\n\n'

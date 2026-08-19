@@ -27,6 +27,9 @@ function check(label, condition, extra) {
 
 const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
 const src = read('src/SeasonRehearsal.gs');
+const gas = loadGasSource([
+  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Diagnostics.gs', 'SeasonRehearsal.gs'
+]);
 function stripComments(s) {
   return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 }
@@ -57,26 +60,41 @@ console.log('\n=== B1【核心】叫內部函式，唔可以叫 `run*_()` ===');
     (bare.match(/ui\.alert\(/g) || []).length <= 3, bare.match(/ui\.alert\(/g) + '');
 }
 
-console.log('\n=== B1【核心】要 loop 到 `done`，唔可以只叫一次 ===');
+console.log('\n=== B1【核心】要分批叫，但**唔可以 loop 到 done 為止** ===');
 {
   // `generatePersonalPdfBatch_()` 係分批嘅（`PDF_BATCH_SIZE` ＋ 時間預算）。
-  // 只叫一次 ⇒ 只產生第一批 ⇒ 步驟 4 照樣被缺件保護擋住，
-  // 即係加咗一步但問題原封不動。
-  check('★★★★★ 有 loop 直到 `last.done`',
-    /while \(rounds < MAX_ROUNDS\)/.test(bare) && /if \(last && last\.done\) break;/.test(bare));
-  check('★★★★★ 而且 loop 有寫死上限'
-    + '——Apps Script 六分鐘一到就乜報告都冇，'
-    + '一個唔會停嘅 loop 會令成次演練白行',
-    /const MAX_ROUNDS = \d+;/.test(bare));
+  // 只叫一次 ⇒ 只產生第一批 ⇒ 步驟 4 照樣被擋，等於冇加過。
+  //
+  // ⚠️ 但 loop 到 `done` 為止一樣係錯，而且錯得更嚴重：
+  // 實測 58 人要 3 批、共 552.6 秒，而單次 Apps Script 執行上限係 6 分鐘。
+  // Loop 落去一定撞上限，而撞咗之後**成份報告都寫唔出**——
+  // 連步驟 1～3 嗰啲已經行完嘅結果都一齊冇埋。
+  check('★★★★★ 有 loop（唔止叫一次）',
+    /while \(rounds < SEASON_REHEARSAL_PDF_MAX_ROUNDS\)/.test(bare)
+    && /if \(last && last\.done\) break;/.test(bare));
+  check('★★★★★ **而且有一個由演練開始計嘅死線**'
+    + '——冇死線就會撞六分鐘上限，成份報告一齊冇',
+    /Date\.now\(\) - rehearsalStartedAtMs/.test(bare)
+    && /SEASON_REHEARSAL_PDF_DEADLINE_MS/.test(bare));
+  check('★★★★★ 死線留返時間俾後面兩步同寫報告（< 6 分鐘，而且有明顯餘裕）',
+    gas.SEASON_REHEARSAL_PDF_DEADLINE_MS < 360000
+    && 360000 - gas.SEASON_REHEARSAL_PDF_DEADLINE_MS >= 100000,
+    String(gas.SEASON_REHEARSAL_PDF_DEADLINE_MS));
+  check('★★★★ 批次數仲有第二道上限',
+    typeof gas.SEASON_REHEARSAL_PDF_MAX_ROUNDS === 'number'
+    && gas.SEASON_REHEARSAL_PDF_MAX_ROUNDS > 0);
   check('★★★★★ 冇行完（`finished` false）都會照樣記低，唔會扮成完成',
     /finished: !!\(last && last\.done\)/.test(bare));
+  check('★★★★★ **而且講得出點解停**（時間用完／到批次上限）'
+    + '——淨係寫 finished: false 等於叫下一個人自己估',
+    /stoppedBy/.test(bare) && bare.indexOf('時間用完') !== -1);
+  check('★★★★★ 仲要講埋跟住點做，同埋明講步驟 4 被擋係預期之內'
+    + '——唔講嘅話，下一次見到步驟 4 失敗又會以為係新 bug',
+    /nextAction/.test(bare) && bare.indexOf('這是預期之內') !== -1);
 }
 
 console.log('\n=== B1【核心】失敗要記低然後照行落去 ===');
 {
-  const gas = loadGasSource([
-    'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Diagnostics.gs', 'SeasonRehearsal.gs'
-  ]);
   const log = [];
   gas.runRehearsalStep_(log, '步驟 3.5：產生個人 PDF', {}, function () {
     throw new Error('資料夾建立不到');
@@ -119,6 +137,10 @@ console.log('\n=== B1 確認畫面要講埋新加嗰一步 ===');
   check('★★★★★ 講明會產生大約幾多份（58）'
     + '——一個會行多幾分鐘嘅步驟，唔可以無聲無息加咗落去',
     src.indexOf('58 份') !== -1, '（睇確認對話框嗰段）');
+  check('★★★★★ **而且明講一次執行產生唔晒**'
+    + '——講到似乎一次搞掂，之後步驟 4 被擋就會被當成壞咗',
+    src.indexOf('分 3 次執行') !== -1 && src.indexOf('盡力產生') !== -1,
+    '（睇確認對話框嗰段）');
   check('★★★★★ 而且照舊講明唔會真正寄出電郵',
     src.indexOf('不會真的寄出') !== -1 || src.indexOf('唔會真正寄出') !== -1
     || src.indexOf('不會真正寄出') !== -1);
