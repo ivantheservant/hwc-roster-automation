@@ -212,6 +212,49 @@ function getOrCreateRuleReviewFolder_() {
 }
 
 /**
+ * 第二十八輪批次階段 B3：審閱表要**讀實際資料**，唔可以寫死。
+ *
+ * Ivan 匯出咗一份俾堂委睇，發現互斥組嗰條寫住「現時無任何組」，
+ * 但佢已經把主席同聖餐襄禮設成同一組——嗰句係試算表 `Description` 欄
+ * 上面一句寫死嘅字，由頭到尾冇讀過實際資料。
+ *
+ * 呢個函式讀 `Posts` 出返兩樣：現時有邊幾組互斥、邊幾個崗位有身分要求。
+ * @returns {{mutexGroups: Object[], gatedPosts: Object[]}}
+ */
+function buildRuleReviewContext_() {
+  const mutexByGroup = {};
+  const gatedPosts = [];
+  try {
+    readPostsNormalized().forEach(function (p) {
+      const group = String(p.mutexGroup || '').trim();
+      if (group) {
+        if (!mutexByGroup[group]) mutexByGroup[group] = [];
+        mutexByGroup[group].push(p.postNameTC || p.postId);
+      }
+      const required = p.requiredRoles || [];
+      if (required.length > 0) {
+        gatedPosts.push({
+          postId: p.postId,
+          postNameTC: p.postNameTC || p.postId,
+          requiredText: describeRoleCodes_(required)
+        });
+      }
+    });
+  } catch (err) {
+    // 讀唔到就回空——而**空會令嗰兩條寫「現時一組都沒有設」**，
+    // 所以要記低，唔可以當冇事發生。
+    log_('WARN', '規則審閱表讀不到 Posts，互斥組／身分要求會顯示為「沒有設」：' + err.message);
+  }
+
+  return {
+    mutexGroups: Object.keys(mutexByGroup).sort().map(function (g) {
+      return { group: g, postNames: mutexByGroup[g] };
+    }),
+    gatedPosts: gatedPosts
+  };
+}
+
+/**
  * 匯出一份新嘅規則審閱表。**會喺 Drive 建立一個新試算表。**
  *
  * ⚠️ 一格都唔會改動 `RuleSettings`。
@@ -223,7 +266,8 @@ function apiExportRuleReviewSheet() {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const weeksInfo = resolveRuleReviewWeeks_(timezone);
     const weeks = weeksInfo ? weeksInfo.weeks : null;
-    const built = buildRuleReviewSheetRows_(readSheet(SHEETS.RULE_SETTINGS), weeks);
+    const built = buildRuleReviewSheetRows_(
+      readSheet(SHEETS.RULE_SETTINGS), weeks, buildRuleReviewContext_());
 
     const stamp = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     const name = '規則審閱表　' + stamp;
@@ -247,14 +291,25 @@ function apiExportRuleReviewSheet() {
       const cell = sheet.getRange(i + 1, RULE_REVIEW_DECISION_COL);
       cell.setBackground(GRID_COLORS.WARNING);
       const rule = SpreadsheetApp.newDataValidation()
-        .requireValueInList(m.choices, true)
+        .requireValueInList(m.choices.map(function (c) { return c.label; }), true)
         .setAllowInvalid(false)
         .setHelpText('請由下拉揀一個。想改成別的，請在「備註／原因」寫。')
         .build();
       cell.setDataValidation(rule);
     });
 
-    sheet.autoResizeColumns(1, RULE_REVIEW_HEADERS.length);
+    // 第二十八輪批次階段 B5：欄闊 ＋ 自動換行 ＋ 行高。
+    // ⚠️ **唔可以用 `autoResizeColumns()`**：說明同選項都係長段文字，
+    // 自動調闊會令幾欄變到成千 pixel，堂委要橫向捲先睇得晒。
+    // 固定欄闊 ＋ 換行先係啱嘅做法。
+    RULE_REVIEW_COLUMN_WIDTHS.forEach(function (w, i) {
+      sheet.setColumnWidth(i + 1, w);
+    });
+    const lastRow = built.rows.length;
+    sheet.getRange(1, 1, lastRow, RULE_REVIEW_HEADERS.length)
+      .setWrap(true).setVerticalAlignment('top');
+    // 選項一個一行，所以行高要夠。設一個下限，內容多就由 Sheets 自己撐高。
+    sheet.setRowHeights(2, Math.max(1, lastRow - 1), 60);
 
     // 搬入 RuleReview 子資料夾（新建嘅試算表預設喺 My Drive 根）。
     const file = DriveApp.getFileById(ss.getId());
@@ -275,6 +330,9 @@ function apiExportRuleReviewSheet() {
       fileName: name,
       fileUrl: ss.getUrl(),
       ruleCount: built.meta.filter(function (m) { return !!m; }).length,
+      // ⚠️ 退回試算表說明欄嘅規則要報出嚟——嗰兩欄係寫俾開發者睇嘅，
+      // 退回咗就等於呢一條又會出現內部術語，而冇人知。
+      fallbackRuleIds: built.fallbackRuleIds,
       // 分母一定要講出嚟。查不到嗰陣，表上會寫百分比而唔係次數，
       // 幹事要知道點解突然唔同咗。
       weeksText: weeksInfo
@@ -338,7 +396,8 @@ function apiRuleReviewImportPlan(fileId) {
     const values = sheet.getDataRange().getValues();
 
     const plan = buildRuleReviewImportPlan_(
-      values, readSheet(SHEETS.RULE_SETTINGS), weeksInfo ? weeksInfo.weeks : null);
+      values, readSheet(SHEETS.RULE_SETTINGS),
+      weeksInfo ? weeksInfo.weeks : null, buildRuleReviewContext_());
 
     return {
       ok: true,
@@ -382,16 +441,20 @@ function apiRuleReviewImportExecute(fileId, acceptedRuleIds) {
       if (!accepted[c.ruleId]) return;
       const found = findRowById_(SHEETS.RULE_SETTINGS, R.RULE_ID, c.ruleId);
       if (found.sheetRow === -1) return;
+      // ⚠️ 第二十八輪批次階段 B4：有啲選項改嘅係目標值，有啲改嘅係開關
+      //（例如「關掉」）。兩者混做一欄就會把一個 boolean 寫入 TargetValue，
+      // 而嗰個值之後會被 `Number()` 讀成 NaN——規則靜靜失效。
+      const column = c.field === RULE_REVIEW_FIELD.ENABLED ? R.ENABLED : R.TARGET_VALUE;
       const updates = {};
-      updates[R.TARGET_VALUE] = c.newValue;
+      updates[column] = c.newValue;
       writeRowFields_(opened.sheet, opened.headers, found.sheetRow, updates);
       applied++;
       writeZone3Audit_({
         action: 'RULE_REVIEW_APPLY',
         targetSheet: SHEETS.RULE_SETTINGS,
         targetKey: c.ruleId,
-        oldValue: R.TARGET_VALUE + '=' + c.currentValue + '（' + c.currentText + '）',
-        newValue: R.TARGET_VALUE + '=' + c.newValue + '（' + c.decisionText + '）',
+        oldValue: column + '=' + c.currentValue + '（' + c.currentText + '）',
+        newValue: column + '=' + c.newValue + '（' + c.decisionText + '）',
         notes: '由規則審閱表匯入；幹事逐條接受' + (c.note ? '；備註：' + c.note : '')
       });
     });

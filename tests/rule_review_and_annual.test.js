@@ -76,40 +76,34 @@ console.log('\n=== G2【核心】小數換算成「N 個主日之中約 M 個」
     gas.describeRuleValue_('', 13) === '（沒有設定）');
 }
 
-console.log('\n=== G2 選項：2–5 個，唔會超出範圍 ===');
+console.log('\n=== G2 選項：2–5 個，唔會超出範圍，而且**自己帶住要寫入嘅值** ===');
 {
-  const choices = gas.buildRuleReviewChoices_(0.63, 13);
-  check('★★★★ 2 到 5 個選項', choices.length >= 2 && choices.length <= 5, choices.join(' / '));
+  // ⚠️ 第二十八輪批次階段 B4：選項而家係 `{label, value, field}`，
+  // 而且**唔再由顯示文字反推值**——反推就係上一輪抓到嗰個漂移 bug 嘅來源。
+  const choices = gas.buildRuleReviewRatioChoices_(0.63, 13);
+  check('★★★★ 2 到 5 個選項', choices.length >= 2 && choices.length <= 5,
+    JSON.stringify(choices));
+  check('★★★★★ 每個選項都帶住 value 同 field（呼叫端唔使反推）',
+    choices.every((c) => typeof c.value === 'number' && !!c.field),
+    JSON.stringify(choices));
   check('★★★★★ 有標明邊個係「維持現狀」'
     + '——冇標嘅話，堂委會以為每一個選項都係改動',
-    choices.some((c) => c.indexOf('（維持現狀）') !== -1), choices.join(' / '));
-  const edge = gas.buildRuleReviewChoices_(0.08, 13);   // ≈1 次
+    choices.some((c) => c.label.indexOf('（維持現狀）') !== -1));
+  check('★★★★★ 而且「維持現狀」帶住嘅係**原值 0.63**，唔係反推出嚟嘅 0.62'
+    + '——反推嘅話，揀「維持現狀」反而會靜靜改咗個值，每次匯入漂移少少',
+    choices.filter((c) => c.label.indexOf('（維持現狀）') !== -1)[0].value === 0.63);
+
+  const edge = gas.buildRuleReviewRatioChoices_(0.08, 13);   // ≈1 次
   check('★★★★★ 唔會生成負數次數',
-    edge.every((c) => !/約 -\d/.test(c)), edge.join(' / '));
-  const high = gas.buildRuleReviewChoices_(0.95, 13);   // ≈12 次
+    edge.every((c) => !/約 -\d/.test(c.label)), JSON.stringify(edge));
+  const high = gas.buildRuleReviewRatioChoices_(0.95, 13);   // ≈12 次
   check('★★★★★ 唔會生成超過主日總數嘅次數',
     high.every((c) => {
-      const m = /約 (\d+) 個/.exec(c);
+      const m = /約 (\d+) 個/.exec(c.label);
       return !m || Number(m[1]) <= 13;
-    }), high.join(' / '));
-  check('★★★★ 分母查不到就唔生成數值選項（改成「要討論」）',
-    gas.buildRuleReviewChoices_(0.63, null).join('').indexOf('要討論') !== -1);
-}
-
-console.log('\n=== G2【核心】反推：睇唔明就唔改，唔會估 ===');
-{
-  check('★★★★ 正常反推得返 0.62（8 / 13）',
-    Math.abs(gas.parseRuleReviewChoice_('13 個主日之中約 8 個', 13) - 0.62) < 0.005,
-    String(gas.parseRuleReviewChoice_('13 個主日之中約 8 個', 13)));
-  check('★★★★ 帶住「（維持現狀）」都反推得到',
-    gas.parseRuleReviewChoice_('13 個主日之中約 8 個（維持現狀）', 13) !== null);
-  check('★★★★★ 堂委自己打咗一句嘢 ⇒ 回 null（＝呢一條唔會被改動）'
-    + '——估錯一個規則值嘅後果係整季排表偏一邊，而冇人會知係邊度出事',
-    gas.parseRuleReviewChoice_('少少啦', 13) === null);
-  check('★★★★★ 超出範圍嘅次數 ⇒ 回 null',
-    gas.parseRuleReviewChoice_('13 個主日之中約 99 個', 13) === null);
-  check('★★★★★ 分母查不到 ⇒ 一律回 null（唔會用 13 硬算）',
-    gas.parseRuleReviewChoice_('13 個主日之中約 8 個', null) === null);
+    }), JSON.stringify(high));
+  check('★★★★ 分母查不到就唔生成數值選項（只留「維持現狀」）',
+    gas.buildRuleReviewRatioChoices_(0.63, null).length === 1);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -133,7 +127,9 @@ console.log('\n=== G2 表格結構：三組、七欄 ===');
     && built.rows.some((r) => r[0].indexOf('盡量遵守') === 0)
     && built.rows.some((r) => r[0].indexOf('目標值') === 0));
   check('★★★★★ 硬規則／準硬規則只有兩個選項（同意／要討論）',
-    built.rows.some((r) => r[1].indexOf('同一日') === 0 && r[4] === '同意 ／ 要討論'));
+    // 第二十八輪批次階段 B5：選項改成**一個一行**（用「／」串埋一行會排到好長，
+    // 而堂委係喺會議上面對住張表逐條揀）。
+    built.rows.some((r) => r[1].indexOf('同一日') === 0 && r[4] === '同意\n要討論'));
   check('★★★★★ 軟規則嘅「現時設定」係換算過嘅人話',
     built.rows.some((r) => r[1].indexOf('主席和報告') === 0
       && r[3] === '13 個主日之中約 8 個'));
@@ -141,7 +137,9 @@ console.log('\n=== G2 表格結構：三組、七欄 ===');
     + '——留白會令堂委以為「呢條冇嘢做」',
     gas.buildRuleReviewSheetRows_(
       [ruleRow('SOFT_B', '某條規則', 'SOFT', 0.5, { description: '' })], 13)
-      .rows.some((r) => r[2].indexOf('還沒有寫說明') !== -1));
+    // 第二十八輪批次階段 B2：說明改成由本檔案嘅人話對照表出，
+    // 對照表冇覆蓋到先退回試算表嗰欄——而退回時空白仍然唔可以留白。
+      .rows.some((r) => r[2].indexOf('還沒有寫給堂委看的說明') !== -1));
   check('★★★★ meta 逐行對應（組標題行係 null）',
     built.meta.length === built.rows.length
     && built.meta[0] === null
@@ -210,7 +208,10 @@ console.log('\n=== G2 睇唔明／冇改動嘅要列出原因，唔可以靜靜�
     gas.RULE_REVIEW_HEADERS.slice(),
     sheetRow(1, '主席和報告盡量由同一位擔任', '少少啦', ''),
     sheetRow(2, '一條系統沒有的規則', '13 個主日之中約 3 個', ''),
-    sheetRow(3, '主席和報告盡量由同一位擔任', '13 個主日之中約 8 個', '')
+    // ⚠️ 下拉裡面「維持現狀」嗰個選項嘅**完整文字**係帶住標記嘅。
+    // 用唔完整嘅文字就會落入「看不懂」——而嗰個行為係啱嘅：
+    // 匯入只認下拉入面真正有嘅選項，唔會靠猜。
+    sheetRow(3, '主席和報告盡量由同一位擔任', '13 個主日之中約 8 個（維持現狀）', '')
   ];
   const plan = gas.buildRuleReviewImportPlan_(values, IMPORT_RULES, 13);
   check('★★★★★ 三種情況都列入 ignored，而且各有原因',
@@ -238,15 +239,21 @@ console.log('\n=== G2 後端寫入 ===');
   check('★★★★★ 執行時後端自己重新算一次計畫，前端只傳「接受邊幾條」',
     /const plan = apiRuleReviewImportPlan\(fileId\);/.test(exec)
     && /accepted\[c\.ruleId\]/.test(exec));
-  check('★★★★★ 只寫 TargetValue 一欄',
-    /updates\[R\.TARGET_VALUE\] = c\.newValue;/.test(exec)
-    && (exec.match(/updates\[R\./g) || []).length === 1);
-  check('★★★★★ 硬規則只寫 AuditLog（RULE_REVIEW_NOTE_ONLY），唔會改 Enabled',
+  // ⚠️ 第二十八輪批次階段 B4：有啲選項改目標值、有啲改開關（例如「關掉」），
+  // 所以寫入嗰欄而家由選項自己指定（`c.field`）。
+  // 兩者混做一欄嘅話，一個 boolean 會被寫入 TargetValue，
+  // 之後被 `Number()` 讀成 NaN——規則靜靜失效。
+  check('★★★★★ 只寫**一欄**，而且係選項指定嗰欄',
+    /const column = c\.field === RULE_REVIEW_FIELD\.ENABLED \? R\.ENABLED : R\.TARGET_VALUE;/.test(exec)
+    && /updates\[column\] = c\.newValue;/.test(exec)
+    && (exec.match(/updates\[/g) || []).length === 1);
+  check('★★★★★ 硬規則只寫 AuditLog（RULE_REVIEW_NOTE_ONLY），完全唔會經過寫入路徑',
     /action: 'RULE_REVIEW_NOTE_ONLY'/.test(exec)
-    && !/R\.ENABLED/.test(exec));
+    && /plan\.hardNotes\.forEach[\s\S]{0,400}?RULE_REVIEW_NOTE_ONLY/.test(exec)
+    && !/plan\.hardNotes\.forEach[\s\S]{0,400}?writeRowFields_/.test(exec));
   check('★★★★ 每一條改動都寫 AuditLog，而且 old／new 兩邊都有',
-    /oldValue: R\.TARGET_VALUE \+ '=' \+ c\.currentValue/.test(exec)
-    && /newValue: R\.TARGET_VALUE \+ '=' \+ c\.newValue/.test(exec));
+    /oldValue: column \+ '=' \+ c\.currentValue/.test(exec)
+    && /newValue: column \+ '=' \+ c\.newValue/.test(exec));
 
   const exp = backend.slice(
     backend.indexOf('function apiExportRuleReviewSheet'),
@@ -255,7 +262,7 @@ console.log('\n=== G2 後端寫入 ===');
     !/writeRowFields_|R\.TARGET_VALUE\] =/.test(exp));
   check('★★★★ 「堂委決定」黃底 ＋ 下拉（其餘欄由系統產生）',
     /setBackground\(GRID_COLORS\.WARNING\)/.test(exp)
-    && /requireValueInList\(m\.choices, true\)/.test(exp));
+    && /requireValueInList\(m\.choices\.map\(function \(c\) \{ return c\.label; \}\), true\)/.test(exp));
   check('★★★★★ 分母要講出嚟（查不到嗰陣，表上會寫百分比而唔係次數）',
     /weeksText:/.test(exp));
   check('★★★★ 放入 RuleReview 子資料夾', /RULE_REVIEW_FOLDER_NAME/.test(backend));
