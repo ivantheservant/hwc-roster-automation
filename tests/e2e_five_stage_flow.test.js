@@ -884,31 +884,28 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物（apiStep5
     !resendLog.some(function (l) { return l[gas.COLUMNS.SEND_LOG.PERSON_ID] === 'P9005'; }),
     JSON.stringify(resendLog));
 
-  checkKnownRed('★★★★★ 【已知 src/ bug】P9006（OFFICIAL 階段因無電郵被略過、呢一刻'
-    + '先至補上電郵）理應真正被記到「已寄出」（第一次通知），但實際被記做'
-    + ' SKIPPED_UNCHANGED——deliverOne_() 嘅「RESEND 且內容未變」關卡淨係比較'
-    + ' hash，完全唔理會 computeResendDiff_() 已經算好嘅 firstNotifyDueToEmail 旗標，'
-    + '令呢個旗標形同虛設：呢個人永遠唔會透過步驟5真正收到佢嘅第一封信',
+  // 第三十三輪批次階段 A 修好之後，呢一條由 checkKnownRed() 升級成真斷言。
+  // 修法：`computeResendDiff_()` 算好嘅理由經 `context.notifyReasonByPerson`
+  // 傳到 `deliverOne_()`，下游只執行、唔再自己用 hash 判斷一次。
+  check('★★★★★ P9006（OFFICIAL 階段因無電郵被略過、呢一刻先至補上電郵）'
+    + '真正被記到「已寄出」——deliverOne_() 執行上游 firstNotifyDueToEmail 嘅決定，'
+    + '唔再用 hash 蓋過佢',
     resendLog.some(function (l) {
       return l[gas.COLUMNS.SEND_LOG.PERSON_ID] === 'P9006'
         && l[gas.COLUMNS.SEND_LOG.STATUS] === gas.MAIL_STATUS.DRY_RUN;
-    }), JSON.stringify(resendLog),
-    'src/Mailer.gs deliverOne_()「RESEND 且內容未變」嘅 hash-only 關卡（約第 510-519 行）');
+    }), JSON.stringify(resendLog));
 }
 
-console.log('\n=== 步驟 5：重複執行——上一輪 bug 嘅延續症狀 ===');
+console.log('\n=== 步驟 5：重複執行——冇死循環 ===');
 {
   const plan = gas.apiStep5Plan(Q);
   const changedIds = plan.changed.map(function (c) { return c.personId; });
-  checkKnownRed('★★★★★ 【已知 src/ bug 嘅延續】理論上 P9006 上一輪應該已經處理完，'
-    + '呢度應該冇嘢剩（plan.changed 應該係 []）；但因為 readLastSendRecordByPerson_()'
-    + '（Mailer.gs）嘅基準名單特登唔認 SKIPPED_UNCHANGED 呢個 Status（見該函式檔頭'
-    + '註解：「SKIPPED_UNCHANGED 同樣不在這三者之列」），上一輪嗰筆 SKIPPED_UNCHANGED'
-    + ' 唔算數，基準繼續停留喺更舊嗰筆 SKIPPED_NO_EMAIL——結果 P9006 會不斷被判'
-    + '「先前未通知過」，但每次都因為同一個 hash-only 關卡再次被跳過，形成永遠'
-    + '通知唔到嘅死循環',
-    JSON.stringify(changedIds) === JSON.stringify([]), JSON.stringify(changedIds),
-    'src/Mailer.gs readLastSendRecordByPerson_() + deliverOne_()（同一個根因，第二個症狀）');
+  // 修好之前呢度會永遠剩返 P9006：上一輪寫入嘅 SKIPPED_UNCHANGED 唔喺基準名單
+  // ⇒ 基準停留喺更舊嗰筆 SKIPPED_NO_EMAIL ⇒ 再被列入名單 ⇒ 再被同一個關卡擋住。
+  // 第三十三輪階段 A 兩處一齊修好（deliverOne_ 執行上游決定 ＋
+  // SKIPPED_UNCHANGED 入基準名單），死循環唔再成立。
+  checkEqual('★★★★★ P9006 上一輪已經真正處理完，呢度冇嘢剩（冇死循環）',
+    changedIds, []);
 }
 
 if (knownRed.length > 0) {

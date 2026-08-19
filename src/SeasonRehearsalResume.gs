@@ -265,7 +265,7 @@ function executeSeasonRehearsalResume_(state) {
       quarterId: quarterId, segment: segment, versionNo: versionNo,
       steps: steps, completed: false, stateCleared: false,
       startedAt: state.startedAt,
-      nextAction: '個人 PDF 還沒有產生完，請再撳一次「全季流程演練（接續）」。'
+      nextAction: '個人 PDF 還沒有產生完，請再撳一次「全季流程演練（接續上一段）」。'
         + '產生完之後系統會自動接住行步驟 4 同步驟 5。'
     };
   }
@@ -390,12 +390,12 @@ function describeRehearsalSpanMinutes_(startedAt) {
  * ============================================================ */
 
 /**
- * 選單「測試工具 ▸ ⚠️⚠️ 全季流程演練（接續）」。
+ * 選單「測試工具 ▸ ▶️ 全季流程演練（接續上一段）」。
  * @returns {void}
  */
 function runSeasonRehearsalResume_() {
   const ui = SpreadsheetApp.getUi();
-  const title = '全季流程演練（接續）';
+  const title = '全季流程演練（接續上一段）';
 
   const state = readRehearsalState_();
 

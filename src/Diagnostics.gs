@@ -134,6 +134,121 @@ function buildDiagnosticsStatusRow_(totalRows) {
 }
 
 /**
+ * 第三十三輪批次階段 C1／C2：**修剪嘅時候唔可以留半截報告。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 點解要有呢個函式（2026-08-20 實測揭出）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 演練第 1 段嘅完成對話框話報告「共 255 行」，但 Diagnostics 表上嗰份
+ * 報告只剩 241 行。三段演練合共 316 行，加埋其他報告超過上限，
+ * 修剪機制把一份報告斬走咗一截。
+ *
+ * **半截報告比冇報告更差。** 讀嘅人唔知自己睇緊嘅係殘缺版，
+ * 而報告開頭通常就係最重要嗰段摘要。呢個係「缺失被當成正常值」嘅變體
+ * ——一份被斬過嘅報告，睇落同一份完整報告一模一樣。
+ *
+ * 所以：**一份報告要就整份留低，要就整份丟走，冇中間狀態。**
+ *
+ * 純函式（唔掂試算表），可以離線測。
+ *
+ * @param {Array[]} existingRows 其他報告嘅既有行（每行係試算表嘅一列陣列，
+ *   第 0 格係報告名）
+ * @param {Array[]} freshRows 今次要寫入嘅行（同一份報告）
+ * @param {string} reportName 今次嘅報告名——**永遠保留**，唔會被丟
+ * @param {number} maxTotal 整張表嘅行數上限
+ * @returns {{rows: Array[], keptReportNames: string[], droppedReportNames: string[],
+ *   currentReportAlone: boolean}}
+ *   rows 為修剪後嘅行；currentReportAlone 代表「連丟晒其他報告都仲係超標」
+ */
+function planDiagnosticsTrim_(existingRows, freshRows, reportName, maxTotal) {
+  const limit = toFiniteNumberOrNull_(maxTotal);
+  // ⚠️ 算唔到上限就唔修剪，唔可以當成 0 而把成張表清空。
+  // 「缺失被當成正常值」喺呢度嘅後果係無聲無息刪走全部報告。
+  if (limit === null || limit <= 0) {
+    return {
+      rows: existingRows.concat(freshRows),
+      keptReportNames: listDiagnosticsReportNames_(existingRows.concat(freshRows)),
+      droppedReportNames: [],
+      currentReportAlone: false
+    };
+  }
+
+  let combined = existingRows.concat(freshRows);
+  const droppedReportNames = [];
+
+  if (combined.length > limit) {
+    // 由排喺最前（最舊寫入）嗰份開始，**整份**丟走。
+    const orderByReport = listDiagnosticsReportNames_(combined);
+    while (combined.length > limit && orderByReport.length > 0) {
+      const victim = orderByReport.shift();
+      if (victim === reportName) continue;   // 今次呢一份永遠保留
+      combined = combined.filter(function (row) { return String(row[0]) !== victim; });
+      droppedReportNames.push(victim);
+    }
+  }
+
+  // C2：丟晒其他報告之後，如果**淨返嗰一份自己都超過上限**，
+  // 唔可以靜靜咁把佢斬一半——寧願讓佢超標，並且喺佢頂部明講。
+  const currentReportAlone = combined.length > limit;
+
+  return {
+    rows: combined,
+    keptReportNames: listDiagnosticsReportNames_(combined),
+    droppedReportNames: droppedReportNames,
+    currentReportAlone: currentReportAlone
+  };
+}
+
+/**
+ * 依出現次序列出行陣列入面有邊幾份報告（去重，保持原次序）。
+ * @param {Array[]} rows 每行第 0 格係報告名
+ * @returns {string[]} 報告名，依首次出現次序
+ */
+function listDiagnosticsReportNames_(rows) {
+  const seen = {};
+  const order = [];
+  (rows || []).forEach(function (row) {
+    const name = String(row[0]);
+    if (name === '') return;
+    if (!seen[name]) { seen[name] = true; order.push(name); }
+  });
+  return order;
+}
+
+/**
+ * 第三十三輪批次階段 C3：**修剪之後要留低痕跡。**
+ *
+ * 冇呢一行嘅話，「呢張表本來就只有兩份報告」同「你嗰份啱啱被清走咗」
+ * 喺畫面上完全一樣——again 同一個 bug class。
+ *
+ * ⚠️ 冇清走任何嘢嗰陣**都要寫**，寫「本次沒有清走任何報告」。
+ * 只喺有清走嗰陣先寫，等於讀嘅人要靠「有冇呢一行」去推論，
+ * 而佢根本唔知應唔應該有。
+ *
+ * 純函式，可以離線測。
+ *
+ * @param {string[]} keptReportNames 修剪後仲留低嘅報告名
+ * @param {string[]} droppedReportNames 今次清走咗嘅報告名
+ * @param {number} maxTotal 整張表嘅行數上限
+ * @returns {{section: string, item: string, value: string, note: string}}
+ */
+function buildDiagnosticsTrimRow_(keptReportNames, droppedReportNames, maxTotal) {
+  const kept = (keptReportNames || []).length;
+  const dropped = (droppedReportNames || []).length;
+
+  const note = dropped === 0
+    ? '本次沒有清走任何報告。'
+    : '本次清走了：' + droppedReportNames.join('、')
+      + '。整份丟走，不會把一份報告斬一半——半截報告看起來跟完整報告一樣，'
+      + '但開頭的摘要已經不見了。要重新看被清走的報告，再執行一次那個工具即可。';
+
+  return diagRow_(DIAGNOSTICS_STATUS_SECTION, '本表保留的報告數',
+    '保留 ' + kept + ' 份，本次清走 ' + dropped + ' 份最舊的',
+    note + '（總行數上限 ' + maxTotal + ' 行）');
+}
+
+/**
  * 取得（必要時建立）Diagnostics 工作表，並確保第 1、2 行的標題正確。
  * 沿用全專案的慣例：第 1 行中文標題、第 2 行機器鍵、資料由第 3 行開始。
  * @returns {Sheet} Diagnostics 工作表
@@ -184,14 +299,19 @@ function writeDiagnosticsReport_(reportName, rows) {
   const now = nowTimestamp_();
 
   let incoming = (rows || []).slice();
-  let truncatedNote = null;
   if (incoming.length > DIAGNOSTICS_MAX_ROWS_PER_REPORT) {
     const dropped = incoming.length - DIAGNOSTICS_MAX_ROWS_PER_REPORT;
     incoming = incoming.slice(0, DIAGNOSTICS_MAX_ROWS_PER_REPORT);
-    truncatedNote = diagRow_('（截斷）', '超出單一報告上限',
+    // ⚠️ 第三十三輪批次階段 C2：呢一行**擺喺報告頂部**，唔再擺喺最尾。
+    //
+    // 擺喺最尾嘅問題：一份被斬過嘅報告，正正就係一份可能連最尾都讀唔到嘅報告
+    //（connector 大約 400 行截斷）。把「你睇緊嘅係殘缺版」呢個警告
+    // 擺喺讀者最有可能睇唔到嗰個位置，等於冇寫。
+    incoming.unshift(diagRow_('（截斷）', '超出單一報告上限',
       dropped + ' 行未寫入',
-      '單一報告上限 ' + DIAGNOSTICS_MAX_ROWS_PER_REPORT + ' 行，避免這張表大到 connector 讀不完。');
-    incoming.push(truncatedNote);
+      '這份報告的後面 ' + dropped + ' 行沒有寫入。單一報告上限 '
+      + DIAGNOSTICS_MAX_ROWS_PER_REPORT + ' 行，避免這張表大到 connector 讀不完。'
+      + '你現在看到的是這份報告的前半部分，不是完整版。'));
   }
 
   // 保留其他報告的既有紀錄，只換走同名那一份
@@ -215,22 +335,21 @@ function writeDiagnosticsReport_(reportName, rows) {
       (r.value === null || r.value === undefined) ? '' : r.value, r.note];
   });
 
-  let combined = existing.concat(fresh);
+  // 總量安全網：超出上限時，由最舊的報告開始**整份**丟棄。
+  // 第三十三輪批次階段 C1：抽咗做純函式 planDiagnosticsTrim_()，可以離線測。
+  const trim = planDiagnosticsTrim_(existing, fresh, reportName, DIAGNOSTICS_MAX_ROWS_TOTAL);
+  let combined = trim.rows;
 
-  // 總量安全網：超出上限時，由最舊的報告開始整份丟棄（同一份報告不會被斬半）
-  if (combined.length > DIAGNOSTICS_MAX_ROWS_TOTAL) {
-    const orderByReport = [];
-    const seen = {};
-    combined.forEach(function (row) {
-      const name = String(row[0]);
-      if (!seen[name]) { seen[name] = true; orderByReport.push(name); }
-    });
-    // 目前這一份永遠保留，其餘由排在最前（最舊寫入）的開始丟
-    while (combined.length > DIAGNOSTICS_MAX_ROWS_TOTAL && orderByReport.length > 0) {
-      const victim = orderByReport.shift();
-      if (victim === reportName) continue;
-      combined = combined.filter(function (row) { return String(row[0]) !== victim; });
-    }
+  // C2：連丟晒其他報告都仲係超標 ⇒ 呢一份報告自己就大過成張表嘅上限。
+  // 唔可以靜靜把佢斬一半，要喺佢頂部明講發生咗咩事。
+  if (trim.currentReportAlone) {
+    combined = [[reportName, now, '（超出上限）', '這份報告本身超過工作表上限',
+      combined.length + ' 行 / 上限 ' + DIAGNOSTICS_MAX_ROWS_TOTAL + ' 行',
+      '這份報告本身超過工作表上限，其餘報告已被清走。'
+      + '整張表現在只有這一份報告，而它仍然超過上限，'
+      + '用 connector 讀會被截斷。請把這件事告訴開發者——'
+      + '正確的方向是令這份報告更精簡，不是放大上限（放大等於讀不到尾）。']]
+      .concat(combined);
   }
 
   // ── 自我警告行 ────────────────────────────────────────────
@@ -242,9 +361,16 @@ function writeDiagnosticsReport_(reportName, rows) {
   // 佢見到嘅嘢會靜靜少咗一截，冇任何提示。
   //
   // 呢一行永遠寫喺最尾，屬於當前報告（下次執行會連同舊嗰行一齊換走）。
-  const statusRow = buildDiagnosticsStatusRow_(combined.length + 1);
-  combined = combined.concat([[reportName, now, statusRow.section, statusRow.item,
-    statusRow.value, statusRow.note]]);
+  //
+  // 第三十三輪批次階段 C3：連埋「修剪痕跡」嗰行，同一個位置、同一個分區。
+  // 兩行都係「呢張表講自己嘅狀態」，一齊寫、一齊被換走。
+  const trimRow = buildDiagnosticsTrimRow_(
+    trim.keptReportNames, trim.droppedReportNames, DIAGNOSTICS_MAX_ROWS_TOTAL);
+  const statusRow = buildDiagnosticsStatusRow_(combined.length + 2);
+  combined = combined.concat([
+    [reportName, now, trimRow.section, trimRow.item, trimRow.value, trimRow.note],
+    [reportName, now, statusRow.section, statusRow.item, statusRow.value, statusRow.note]
+  ]);
 
   // 先清空資料區再重寫，避免舊資料殘留在後面
   if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, lastCol).clearContent();

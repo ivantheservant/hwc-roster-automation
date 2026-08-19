@@ -118,8 +118,18 @@ console.log('\n=== C2 舊嘅「（表格狀態）」行要清走，唔可以一�
   check('★★★★★ 分區名寫成常數，寫入同清走兩邊用同一個值'
     + '——各自寫一次字面字串，改一邊就會靜靜清唔走',
     (bare.match(/DIAGNOSTICS_STATUS_SECTION/g) || []).length >= 4);
-  check('★★★★ 狀態行係最後先加，數目包括佢自己',
-    /buildDiagnosticsStatusRow_\(combined\.length \+ 1\)/.test(bare));
+  // ⚠️ 第三十三輪批次階段 C3：呢個數由 +1 變咗 +2。
+  // 唔係放寬斷言——係「自我狀態行」由一行變咗兩行（新增咗修剪痕跡嗰行），
+  // 而呢個斷言嘅本意一直都係「傳落去嘅數要包括即將加上去嘅狀態行自己」。
+  // 兩行都加、但數字仍然寫 +1 嘅話，呢張表就會少報自己一行——
+  // 一個講「我有幾多行」嘅機制自己報錯數，正正就係佢要防嘅嘢。
+  check('★★★★ 狀態行係最後先加，數目包括佢哋自己（修剪痕跡行 ＋ 行數狀態行 ＝ 2 行）',
+    /buildDiagnosticsStatusRow_\(combined\.length \+ 2\)/.test(bare));
+  check('★★★★★ 兩行狀態行係喺同一個 concat 一齊加落去'
+    + '——分開兩次加好易改咗一邊漏咗另一邊，令上面個 +2 對唔上',
+    /trimRow\.section[\s\S]{0,200}statusRow\.section/.test(bare));
+  check('★★★★★ 修剪痕跡行由 buildDiagnosticsTrimRow_() 產生，而且收到真正嘅清走名單',
+    /buildDiagnosticsTrimRow_\(\s*[\s\S]{0,120}trim\.droppedReportNames/.test(bare));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

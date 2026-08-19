@@ -304,7 +304,7 @@ function runRehearsalPdfBatches_(quarterId, versionNo, segmentStartedAtMs, round
     stoppedBy: stoppedBy || (done ? '' : '（不明——請告訴開發者）'),
     nextAction: done ? ''
       : '個人 PDF 未產生完，「步驟 4」一定會被缺件保護擋住，這是預期之內。'
-        + '請到選單 ▸ 測試工具 ▸ 全季流程演練（接續），'
+        + '請到選單 ▸ 測試工具 ▸ ▶️ 全季流程演練（接續上一段），'
         + '系統會續跑餘下的個人 PDF，產生完之後自動接住行步驟 4 同步驟 5。',
     totalPeople: pick('totalPeople'),
     doneCount: pick('doneCount'),
@@ -619,7 +619,8 @@ function executeSeasonRehearsal_(quarterId) {
         pdfRoundsDone: Number(pdfDetail.rounds) || 0,
         pdfDone: !!pdfDetail.finished,
         stoppedBy: String(pdfDetail.stoppedBy || ''),
-        notes: '第一段由「全季流程演練」建立。接續請用「全季流程演練（接續）」。'
+        notes: '第一段由「全季流程演練（第一段：由頭開始）」建立。'
+          + '接續請用「全季流程演練（接續上一段）」。'
       });
       stateWritten = true;
     }
@@ -954,7 +955,7 @@ function buildRehearsalNextStepText_(record) {
   if (r.stateError) {
     return '\n⚠️ 演練狀態寫不進 ' + SHEETS.REHEARSAL_STATE + ' 工作表（原因：'
       + r.stateError + '）。\n'
-      + '所以「全季流程演練（接續）」會說沒有未完成的演練。'
+      + '所以「全季流程演練（接續上一段）」會說沒有未完成的演練。'
       + '要走完步驟 4、5，只能重新演練一次。\n';
   }
   if (!r.resumeNeeded) {
@@ -970,7 +971,7 @@ function buildRehearsalNextStepText_(record) {
   const remain = (isFinite(total) && isFinite(done)) ? (total - done) : null;
 
   return '\n👉 跟住點做：\n'
-    + '請到選單 ▸ 測試工具 ▸ 全季流程演練（接續），把餘下的 '
+    + '請到選單 ▸ 測試工具 ▸ ▶️ 全季流程演練（接續上一段），把餘下的 '
     // ⚠️ 數唔到就講「餘下的」，**唔可以寫 0**——0 會令人以為做完咗。
     + (remain === null ? '' : (remain + ' 份'))
     + '個人 PDF 產生完，系統會自動接住行步驟 4 同步驟 5。\n'
@@ -978,7 +979,7 @@ function buildRehearsalNextStepText_(record) {
 }
 
 /**
- * 選單「測試工具 ▸ ⚠️⚠️ 全季流程演練」。
+ * 選單「測試工具 ▸ ⚠️⚠️ 全季流程演練（第一段：由頭開始）」。
  * @returns {void}
  */
 function runSeasonRehearsal_() {

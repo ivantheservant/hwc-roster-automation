@@ -62,7 +62,13 @@ function computeResendDiff_(context) {
       assignments: assignments,
       oldHash: oldHash,
       newHash: newHash,
-      firstNotifyDueToEmail: firstNotifyDueToEmail
+      firstNotifyDueToEmail: firstNotifyDueToEmail,
+      // 第三十三輪批次階段 A：把「為什麼要寄」明明白白帶出去，讓下游
+      // deliverOne_() 直接執行這個決定，不要再自己用 hash 判斷一次。
+      // hashChanged 優先——兩者同時成立時，派工真的改了才是主要原因。
+      notifyReason: hashChanged
+        ? RESEND_NOTIFY_REASON.ASSIGNMENT_CHANGED
+        : RESEND_NOTIFY_REASON.FIRST_NOTIFY_AFTER_EMAIL_ADDED
     });
   });
   return changed;
@@ -123,6 +129,17 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds) {
   const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.RESEND);
   const changedList = computeResendDiff_(context);
   context.placeholders.ChangedPeopleSummary = buildChangedPeopleSummaryText_(changedList, context);
+
+  // 第三十三輪批次階段 A：把上游的決定交給下游執行。
+  //
+  // computeResendDiff_() 已經逐個人判斷過「要不要寄、為什麼要寄」，
+  // deliverOne_() 讀這一份就夠，不需要（也不可以）再用 hash 判斷一次。
+  // 第三十二輪實測踩到的 bug 正是 deliverOne_() 自己再判斷一次，
+  // 把上游決定要寄的人擋了下來——見 Constants.gs 的 RESEND_NOTIFY_REASON。
+  context.notifyReasonByPerson = {};
+  changedList.forEach(function (c) {
+    context.notifyReasonByPerson[c.personId] = c.notifyReason;
+  });
 
   const outcomes = [];
   // 階段 G：跟 sendStage() 同一個理由，分批寫入 SendLog，見 Mailer.gs 的說明。

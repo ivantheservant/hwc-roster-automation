@@ -906,6 +906,74 @@ const MAIL_STATUS = {
 };
 
 /**
+ * 第三十三輪批次階段 A：步驟 5「改動後重發」判定「這個人為什麼要收信」的理由。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 這個列舉存在的理由：**上游決定，下游執行。**
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `computeResendDiff_()`（ResendFlow.gs）是「誰要收信」的唯一真相來源。
+ * 它已經知道每一個人要收信的原因，`deliverOne_()`（Mailer.gs）**不可以
+ * 重新判斷一次**——第三十二輪的實測就是被這件事咬到：`deliverOne_()`
+ * 自己用 hash 再判斷一次，把上游已經決定要寄的人擋了下來，
+ * 令「補上電郵之後的第一封信」永遠寄不出去。
+ *
+ * 用具名理由而不是一個 `forceSend` 布林值：日後一定會有第三、第四種
+ * 「內容沒變但仍然要寄」的情況（例如範本文字改了、個人 PDF 重新產生過），
+ * 到時只需要在這裡加一個值，不需要再想一次布林值的語意該不該反轉。
+ * 理由本身也是可以寫進報告與 SendLog 給人看的文字。
+ */
+const RESEND_NOTIFY_REASON = {
+  /** 派工內容跟上次寄出時不同（hash 變了）——步驟 5 最常見的情況。 */
+  ASSIGNMENT_CHANGED: 'ASSIGNMENT_CHANGED',
+  /**
+   * 派工內容一格都沒變，但上次因為 NameMapping 查無電郵被略過
+   * （`SKIPPED_NO_EMAIL`），而現在電郵已經補上。
+   * 對這個人來說這其實是**第一次**真正收到通知，不可以因為內容沒變而略過。
+   */
+  FIRST_NOTIFY_AFTER_EMAIL_ADDED: 'FIRST_NOTIFY_AFTER_EMAIL_ADDED'
+};
+
+/**
+ * 第三十三輪批次階段 A2：`readLastSendRecordByPerson_()`（Mailer.gs）認定
+ * 「這個人上一次已經確實被處理過」的 Status 白名單，以及每一個的理由。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 抽成常數的理由：這份名單原本只寫在 `readLastSendRecordByPerson_()`
+ * 的檔頭註解裡，是一段隨時會跟程式碼脫節的散文。而它決定的是
+ * 「步驟 5 拿什麼當比對基準」——基準錯了，整個步驟 5 就會靜靜地
+ * 重複騷擾人或者永遠漏掉人，兩種都沒有錯誤訊息。
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * | Status | 收不收 | 理由 |
+ * | --- | --- | --- |
+ * | `SENT` | ✅ | 真正寄出成功。 |
+ * | `DRY_RUN` | ✅ | 模擬模式下完整計算過派工與 hash，只是沒有真的寄。 |
+ * | `SKIPPED_NO_EMAIL` | ✅ | 查無電郵而略過，但派工與 hash 一樣完整計算過。**必須收**：不收的話，一個本來就沒有電郵、派工又完全沒變的人，會因為「查不到基準」被永遠誤判成「有改動」而重複出現。 |
+ * | `SKIPPED_UNCHANGED` | ✅ | 第三十三輪階段 A 修好 `deliverOne_()` 之後，這個狀態的意思才變乾淨：「上一輪確實有基準、而且真的沒有改動」。詳見 `docs/系統範圍稽核.md` 第三十三輪階段 A2 的判斷。 |
+ * | `FAILED`／`ERROR_PDF`／`ERROR_PDF_MISSING` | ❌ | 處理中途出錯，當時算出來的 hash 可能不完整或不可信，不可以當下次比對的基準。 |
+ *
+ * ⚠️ 加新 Status 到 `MAIL_STATUS` 時，一定要回來這裡決定它算不算基準。
+ * `tests/resend_baseline_statuses.test.js` 會擋住「加了新 Status 但沒有在這裡表態」。
+ */
+const RESEND_BASELINE_STATUSES = [
+  MAIL_STATUS.SENT,
+  MAIL_STATUS.DRY_RUN,
+  MAIL_STATUS.SKIPPED_NO_EMAIL,
+  MAIL_STATUS.SKIPPED_UNCHANGED
+];
+
+/**
+ * `RESEND_BASELINE_STATUSES` 刻意排除的 Status 與理由（給測試對照用，
+ * 令「漏了表態」與「刻意排除」可以分辨）。
+ */
+const RESEND_NON_BASELINE_STATUSES = {
+  FAILED: '寄送失敗，當時的 hash 未必完整',
+  ERROR_PDF: '個人 PDF 產生失敗，當時的派工計算可能中斷',
+  ERROR_PDF_MISSING: '個人 PDF 缺件，同上'
+};
+
+/**
  * 追加階段 AO：computeAssignmentHash_()（Mailer.gs）給「沒有任何派工」的人用的固定
  * 標記，取代原本回傳的空字串。原因：SendLog.AssignmentHash 欄若寫入空字串，跟這一欄
  * 「從來沒有被寫過」的真正空白儲存格在讀出來時完全無法分辨（兩者 getValues() 都是

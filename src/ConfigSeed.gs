@@ -176,6 +176,24 @@ function getConfigKeySeeds_() {
         + '（初稿之後的版本才是真正會寄出去的東西）。',
       editable: 'TRUE'
     },
+    {
+      // 第三十三輪批次階段 B1：呢一行本來漏咗。
+      // `CONFIG_KEYS`（Constants.gs）有登記、`SeasonRehearsal.gs` 有讀，
+      // 但呢份 seed 清單冇對應 row ⇒「維護 ▸ 補建 Config 參數」永遠建唔出佢
+      // ⇒ 全面體檢每次都報同一項缺席，變成一個冇人會再理嘅長期警告。
+      // 2026-08-20 實測：撳「補建 Config 參數」只加咗 1 個 Key
+      //（WEBAPP_STEWARD_URL），呢個仍然缺席。
+      key: CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS, type: CONFIG_TYPES.LIST, group: 'SYSTEM',
+      defaultValue: SEASON_REHEARSAL_PROTECTED_DEFAULT,
+      description: '「⚠️⚠️ 全季流程演練」絕對不可以碰的季度清單，逗號分隔'
+        + '（例如「2027T1,2026T4」）。演練會真正產生版本、寄 DRY_RUN 信、'
+        + '改動 Stage，所以正式上線那一季、以及培訓要用的季度都必須列在這裡。'
+        + '要加季度就在這一格加上去，用逗號分隔。'
+        + '⚠️ 填成空白並不會變成「什麼都不保護」——空白時系統仍然退回程式內建的預設值'
+        + '（' + SEASON_REHEARSAL_PROTECTED_DEFAULT + '）。'
+        + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
+      editable: 'TRUE'
+    },
     // ---- MAIL ----
     {
       key: CONFIG_KEYS.MAIL_ADMIN_NOTIFY, type: CONFIG_TYPES.EMAIL, group: 'MAIL',

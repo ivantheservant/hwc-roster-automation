@@ -348,7 +348,7 @@ console.log('\n=== B5【核心】第一段收尾要有一句明確嘅下一步 =
       detail: { totalPeople: 58, doneCount: 22 } }]
   });
   check('★★★★★ 明確叫人去邊個選單項目',
-    t.indexOf('全季流程演練（接續）') !== -1, t);
+    t.indexOf('全季流程演練（接續上一段）') !== -1, t);
   check('★★★★★ 講得出仲差幾多份（58 − 22 ＝ 36）',
     t.indexOf('36 份') !== -1, t);
   check('★★★★★ 而且講明系統會自動接住行步驟 4 同步驟 5',
@@ -360,7 +360,7 @@ console.log('\n=== B5【核心】第一段收尾要有一句明確嘅下一步 =
   });
   check('★★★★★ 數唔到就唔寫數字，**唔可以寫 0 份**'
     + '——0 份會令人以為已經做完',
-    noNum.indexOf('0 份') === -1 && noNum.indexOf('全季流程演練（接續）') !== -1, noNum);
+    noNum.indexOf('0 份') === -1 && noNum.indexOf('全季流程演練（接續上一段）') !== -1, noNum);
 
   const stateBad = gas.buildRehearsalNextStepText_({
     resumeNeeded: false, stateError: '權限不足', steps: []
@@ -382,7 +382,7 @@ console.log('\n=== B2 選單真係掛咗接續入口 ===');
   const menu = read('src/Menu.gs');
   check('★★★★★ `runSeasonRehearsalResume_` 掛咗上選單'
     + '——冇掛上去嘅話，成個階段 B 幹事撳唔到',
-    /addItem\([^)]*全季流程演練（接續）[^)]*, 'runSeasonRehearsalResume_'\)/.test(menu),
+    /addItem\([^)]*全季流程演練（接續上一段）[^)]*, 'runSeasonRehearsalResume_'\)/.test(menu),
     '（睇 Menu.gs）');
   check('★★★★ 而且排喺原本嗰項正下方',
     menu.indexOf("'runSeasonRehearsalResume_'") > menu.indexOf("'runSeasonRehearsal_'"));

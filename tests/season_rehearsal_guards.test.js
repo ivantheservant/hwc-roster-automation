@@ -330,7 +330,11 @@ console.log('\n=== D1 放試算表選單，唔搬上 Web ===');
 {
   const menu = read('src/Menu.gs');
   check('★★★★★ 選單有註冊，而且喺「測試工具」嗰組',
-    /addItem\('⚠️⚠️ 全季流程演練（只在 DRY_RUN 沙盒季度）', 'runSeasonRehearsal_'\)/.test(menu));
+    // 第三十三輪批次階段 D3：標籤由「（只在 DRY_RUN 沙盒季度）」改成
+    // 「（第一段：由頭開始）」——實測時 Ivan 撳錯咗（想跑第一段、撳咗接續），
+    // 因為兩項並排、字頭一模一樣。沙盒季度嘅限制本身冇變（四道閘照舊，
+    // 見 SeasonRehearsal.gs），只係標籤唔再靠副標題去區分兩項。
+    /addItem\('⚠️⚠️ 全季流程演練（第一段：由頭開始）', 'runSeasonRehearsal_'\)/.test(menu));
   check('★★★★★ 標住 ⚠️⚠️（會建立版本、產生 PDF、寫 SendLog）',
     /⚠️⚠️ 全季流程演練/.test(menu));
   check('★★★★★ **冇任何 `api*` 端點**——呢個係測試工具，'

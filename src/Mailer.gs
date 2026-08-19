@@ -507,13 +507,31 @@ function deliverOne_(recipient, template, context, isDryRun) {
     retries: 0
   };
 
-  // RESEND 且內容未變：預設完全不需要處理，連 PDF 都不必重新產生。
-  // Config 的 RESEND_ONLY_CHANGED 可關閉這個判斷（設 FALSE）：例如範本文字本身
-  // 改了、派工內容雖然沒變但還是想強制對每個人重寄一次。預設 TRUE，維持原行為。
+  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十三輪批次階段 A：**這裡不可以重新判斷「要不要寄」，
+  //    只可以執行上游已經做好的決定。**
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // 「誰要收信、為什麼」的唯一真相來源是 `computeResendDiff_()`
+  // （ResendFlow.gs 第 54 行附近的 `firstNotifyDueToEmail` 那一段）。
+  // 它把結果放進 `context.notifyReasonByPerson`（見 sendResendStage_()）。
+  //
+  // 原本這裡只比 hash，完全不理會上游算好的 `firstNotifyDueToEmail`：
+  // 一個人在 OFFICIAL 因為查無電郵被 SKIPPED_NO_EMAIL，幹事之後補上電郵、
+  // 派工一格都沒改——上游正確地把他列入「要通知」，但走到這裡因為 hash
+  // 沒變即刻被判 SKIPPED_UNCHANGED，**第一封信永遠沒有真正發出**，
+  // 而且沒有任何錯誤訊息。這是本專案的「兩個真相來源」bug class。
+  //
+  // 現在：上游有給理由 ⇒ 一定寄；上游沒有把這個人列進來（例如
+  // RESEND_ONLY_CHANGED=FALSE 之下由呼叫端硬塞進來的全體名單）⇒ 才輪到
+  // hash 這個保險絲。`RESEND_ONLY_CHANGED` 的原意（範本文字改了想強制
+  // 全體重寄）完全保留，預設 TRUE 對其他人的行為一模一樣。
   const resendOnlyChanged = getConfig(CONFIG_KEYS.RESEND_ONLY_CHANGED, true) === true;
+  const upstreamNotifyReason = (context.notifyReasonByPerson || {})[recipient.personId] || '';
   if (context.stage === MAIL_STAGES.RESEND
       && recipient.type === RECIPIENT_TYPE.PERSON
       && resendOnlyChanged
+      && !upstreamNotifyReason
       && context.lastHashByPerson[recipient.personId] === hash) {
     return Object.assign({}, base, { status: MAIL_STATUS.SKIPPED_UNCHANGED });
   }
@@ -828,23 +846,26 @@ function buildAssignmentSummary_(personAssignments, postNames, timezone) {
  * `readLastHashByPerson_()`／`readLastStatusByPerson_()` 都是這個函式的薄包裝，
  * 保證兩者永遠讀到同一行，不會各自套用不同篩選條件、兜出不一致的組合。
  *
- * 追加階段 AO：「最後一次已確實處理」認定為 Status 屬於 SENT／DRY_RUN／
- * SKIPPED_NO_EMAIL 三者之一——這三種都代表系統當時已經完整計算過該人這一版的
- * 派工與 hash，只是 SKIPPED_NO_EMAIL 因為查無電郵沒有真的寄出。原本只認
- * SENT／DRY_RUN 兩種，漏掉 SKIPPED_NO_EMAIL 的後果：一個人本來就沒有電郵、
- * 這一版派工完全沒變，也會因為「查不到基準」被誤判成「改動」而重複通知
- * （步驟 5 v11→v12 測試時，多位無電郵者的假陽性正是這個原因）。
- * 明確排除 FAILED／ERROR_PDF／ERROR_PDF_MISSING 這類真正處理中途出錯的紀錄
- * ——這些代表當時的 hash／派工計算可能不完整或不可信，不該當作下次比對的基準。
- * SKIPPED_UNCHANGED 同樣不在這三者之列：如果它是某人最新的一行，代表在它之前
- * 一定還有一行 hash 相同的 SENT／DRY_RUN／SKIPPED_NO_EMAIL，略過它、改採更早那行，
- * 找到的 hash 值本來就相同，不影響結果。
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第三十三輪批次階段 A2：白名單與每一項的理由已經抽到
+ * `Constants.gs` 的 `RESEND_BASELINE_STATUSES`（連逐項理由的對照表）。
+ * 以前那份名單只存在於這段註解裡，是一段隨時會跟程式碼脫節的散文，
+ * 而它決定的是「步驟 5 拿什麼當比對基準」——基準錯了整個步驟 5 就會
+ * 靜靜地重複騷擾人或者永遠漏掉人。要改名單請去 Constants.gs 改，
+ * 並且 `tests/resend_baseline_statuses.test.js` 會擋住「加了新 Status
+ * 但沒有表態算不算基準」。
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 追加階段 AO 的原始理由保留作歷史紀錄：原本只認 SENT／DRY_RUN 兩種，
+ * 漏掉 SKIPPED_NO_EMAIL 的後果是一個本來就沒有電郵、這一版派工完全沒變的人，
+ * 會因為「查不到基準」被誤判成「改動」而重複通知（步驟 5 v11→v12 測試時，
+ * 多位無電郵者的假陽性正是這個原因）。
  * @param {string} quarterId 季度 ID
  * @returns {Object.<string, {hash: string, status: string}>} {PersonID: {hash, status}}
  */
 function readLastSendRecordByPerson_(quarterId) {
   const C = COLUMNS.SEND_LOG;
-  const baselineStatuses = [MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.SKIPPED_NO_EMAIL];
+  const baselineStatuses = RESEND_BASELINE_STATUSES;
   const rows = readSheet(SHEETS.SEND_LOG).filter(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return false;
     if (!row[C.PERSON_ID]) return false;

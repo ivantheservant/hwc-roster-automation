@@ -784,3 +784,57 @@ function describeAdjacentPairActual_(repeats, pairs) {
   if (r === null || p === null || p < 1) return '（算不出來）';
   return r + ' 對（' + (r / p * 100).toFixed(1) + '%）';
 }
+
+/**
+ * 第三十三輪批次階段 E：**兩個分母唔同嗰陣，要講得出點解。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 呢個函式存在嘅理由
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 「報告連續」有兩個分母，而且**刻意唔一樣**（第三十二輪階段 C′2 拍板）：
+ *
+ *   目標嗰邊　`adjacentPairCount_(週數)`　　理論值 `週數 − 1`
+ *   實測嗰邊　`announce.pairs`　　　　　　　真正數到、兩邊都排到人嘅 pair
+ *
+ * 有週次冇排報告嗰陣，實測分母會**細過**理論值——而嗰個唔同係有意義嘅
+ * （夾硬用理論值做實測分母，等於把一個準確嘅量度改成一個估算）。
+ *
+ * 但報告只印兩個數、唔解釋，讀嘅人會以為係 bug。所以：
+ *   **兩者相同 ⇒ 回空字串**（唔好印一句廢話）
+ *   **兩者唔同 ⇒ 講明點解**
+ *
+ * `Verify.gs` 品質統計同 `RuleReview.gs` 規則審閱表兩處用同一句寫法
+ * ——各自寫一次就會慢慢漂移成兩個講法。
+ *
+ * @param {number} actualPairs 實際數到幾多對（`announce.pairs`）
+ * @param {number} weeksCounted 一季有幾多個主日
+ * @param {number=} weeksWithoutAnnounce 有幾多週完全冇排到報告（數得到先傳）
+ * @returns {string} 相同時回空字串；唔同時回一句解釋
+ */
+function describeAdjacentPairDenominatorGap_(actualPairs, weeksCounted, weeksWithoutAnnounce) {
+  const actual = toFiniteNumberOrNull_(actualPairs);
+  const theoretical = adjacentPairCount_(weeksCounted);
+
+  // 算唔到就唔好作嘢講。冇解釋好過一句錯嘅解釋。
+  if (actual === null || theoretical < 1) return '';
+  if (actual === theoretical) return '';
+
+  // 實測分母大過理論值係唔可能嘅（`pairs` 由同一批主日數出嚟）。
+  // 真係出現就代表上游有嘢壞咗，要嘈，唔可以當成正常情況解釋一番。
+  if (actual > theoretical) {
+    return '⚠️ 實際數到 ' + actual + ' 對，多過理論上限 ' + theoretical
+      + ' 對——呢個唔應該發生，請告訴開發者。';
+  }
+
+  const missingWeeks = toFiniteNumberOrNull_(weeksWithoutAnnounce);
+  // ⚠️ 數唔到週數就**唔好由 pair 差額倒推**：中間少一週會斷兩對、
+  // 頭尾少一週只斷一對，倒推出嚟嗰個數會係錯嘅。呢個正正就係
+  // 本專案 bug class 第 2 條（把一個唔知道嘅嘢變成一個似模似樣嘅數字）。
+  const cause = (missingWeeks !== null && missingWeeks > 0)
+    ? '其中 ' + missingWeeks + ' 週沒有排報告，'
+    : '有主日沒有排到報告，';
+
+  return cause + '所以實際只有 ' + actual + ' 對可以比較'
+    + '（' + weeksCounted + ' 個主日理論上有 ' + theoretical + ' 對）。';
+}

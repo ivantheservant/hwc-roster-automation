@@ -124,9 +124,13 @@ function buildVerifyReport_(context) {
     // 完全冇排到人，嗰啲 pair 唔算數）。兩個數唔一定一樣，
     // 而夾硬當佢哋一樣就會令實測比例失真。
     const goal = describeAdjacentPairTarget_(announce.target, context.serviceDates.length);
+    // 第三十三輪批次階段 E：兩個分母唔同嗰陣，喺實測嗰格後面加一句解釋。
+    // 相同嗰陣回空字串 ⇒ 唔會多印一句廢話。
+    const gap = describeAdjacentPairDenominatorGap_(
+      announce.pairs, context.serviceDates.length, announce.weeksWithoutAnnounce);
     rows.push(makeItemRow_(
       '相鄰 pair 重複比例',
-      describeAdjacentPairActual_(announce.repeats, announce.pairs),
+      describeAdjacentPairActual_(announce.repeats, announce.pairs) + (gap ? '　' + gap : ''),
       goal.ok
         ? (goal.text + '　' + goal.note)
         : (formatPercent_(announce.target) + ' ± ' + formatPercent_(announce.tolerance)),
@@ -333,6 +337,22 @@ function computeAnnounceConsecutiveRatio_(context) {
   }
   if (pairs === 0) return null;
 
+  // 第三十三輪批次階段 E：**兩個分母唔同嗰陣要講得出點解。**
+  //
+  // 目標嗰邊用 `adjacentPairCount_(週數)`（理論值 `週數 − 1`），
+  // 實測嗰邊用上面數到嘅 `pairs`（兩邊都真正排到人嘅 pair）。
+  // 有週次冇排報告嗰陣兩者會唔同，而**嗰個唔同係有意義嘅**。
+  // 但淨係印兩個數、唔解釋，讀嘅人會以為係 bug。
+  //
+  // 喺呢度順手數埋「有幾多週完全冇排到報告」——只有呢度攞得到逐個主日
+  // 嘅資料。淨係靠 pair 數係**推唔返**出週數嘅（中間少一週會斷兩對、
+  // 頭尾少一週只斷一對），夾硬推就係作一個數出嚟。
+  let weeksWithoutAnnounce = 0;
+  dates.forEach(function (d) {
+    const cell = byDate[d];
+    if (!cell || cell.length === 0) weeksWithoutAnnounce++;
+  });
+
   const target = Number(rule[COLUMNS.RULE_SETTINGS.TARGET_VALUE]);
   const tolerance = Number(rule[COLUMNS.RULE_SETTINGS.TOLERANCE]) || 0;
   const ratio = repeats / pairs;
@@ -342,6 +362,9 @@ function computeAnnounceConsecutiveRatio_(context) {
     ratio: ratio,
     target: target,
     tolerance: tolerance,
+    // 階段 E：供 describeAdjacentPairDenominatorGap_() 解釋兩個分母點解唔同。
+    weeksCounted: dates.length,
+    weeksWithoutAnnounce: weeksWithoutAnnounce,
     deviates: isNaN(target) ? false : Math.abs(ratio - target) > tolerance
   };
 }

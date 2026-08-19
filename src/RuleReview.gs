@@ -679,6 +679,22 @@ function describeRuleForReview_(rule, level, weeks, ctx) {
   if (unitId === RULE_REVIEW_UNITS.ADJACENT_PAIR.id && level === RULE_LEVELS.SOFT) {
     const goal = describeAdjacentPairTarget_(target, weeks);
     if (goal.ok) currentText = currentText + '\n' + goal.note;
+
+    // 第三十三輪批次階段 E：兩個分母唔同嗰陣要講出嚟，**用同一句寫法**
+    //（`describeAdjacentPairDenominatorGap_()`，同 `Verify.gs` 品質統計共用）。
+    //
+    // 上面嗰句寫「12 對相鄰的主日之中約 3 對」——嗰個 12 係理論值。
+    // 如果實際有主日冇排報告，幹事事後喺品質統計見到嘅分母會細過 12。
+    // 兩張表對唔上而又冇解釋，堂委同幹事都會以為係 bug。
+    //
+    // 相同嗰陣回空字串 ⇒ 唔會多印一句廢話。
+    // 算唔到（`ctx.adjacentPairActual` 係 null）亦都唔會印。
+    const actual = ctx && ctx.adjacentPairActual;
+    if (actual) {
+      const gap = describeAdjacentPairDenominatorGap_(
+        actual.pairs, actual.weeksCounted, actual.weeksWithoutAnnounce);
+      if (gap) currentText = currentText + '\n' + gap;
+    }
   }
 
   let choices;

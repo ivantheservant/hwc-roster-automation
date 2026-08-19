@@ -101,6 +101,42 @@ class RealisticMockRange {
   }
   clearFormat() { return this; }
   setNote() { return this; }
+  // 第三十三輪批次階段 F1：`RosterWriter.gs` 嘅 `applyCellMarks_()` 用
+  // `setNotes()`（複數）批次寫格註。同其餘格式方法一樣係 no-op——
+  // 呢個 mock 只保留「值」，格式／註解唔喺任何測試嘅斷言範圍內。
+  setNotes() { return this; }
+  getNote() { return ''; }
+  getNotes() {
+    const out = [];
+    for (let r = 0; r < this.numRows; r++) out.push(new Array(this.numCols).fill(''));
+    return out;
+  }
+  setFontFamily() { return this; }
+  setTextRotation() { return this; }
+  setShowHyperlink() { return this; }
+  protect() {
+    return {
+      setDescription: function () { return this; },
+      removeEditors: function () { return this; },
+      addEditors: function () { return this; },
+      setWarningOnly: function () { return this; },
+      getRange: function () { return null; }
+    };
+  }
+  copyTo() { return this; }
+  getA1Notation() {
+    const colName = function (n) {
+      let s = '';
+      while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+      return s;
+    };
+    return colName(this.col) + this.row
+      + ':' + colName(this.col + this.numCols - 1) + (this.row + this.numRows - 1);
+  }
+  getRow() { return this.row; }
+  getColumn() { return this.col; }
+  getNumRows() { return this.numRows; }
+  getNumColumns() { return this.numCols; }
 }
 
 /**
@@ -193,6 +229,25 @@ class RealisticMockSheet {
   activate() { return this; }
   hideSheet() { return this; }
   showSheet() { return this; }
+  // 第三十三輪批次階段 F1：`createRosterSheet()` 會 `hideRows(2)`
+  //（機器鍵嗰行）。隱藏與否唔影響 `getValues()`，所以係 no-op——
+  // 但一定要存在，唔係 `createRosterSheet()` 會中途拋錯，
+  // 而**工作表已經建立咗**，變成一張半成品 grid。
+  hideRows() { return this; }
+  showRows() { return this; }
+  hideColumns() { return this; }
+  showColumns() { return this; }
+  getDataRange() { return this.getRange(1, 1, Math.max(this._maxRow, 1), Math.max(this._maxCol, 1)); }
+  setHiddenGridlines() { return this; }
+  setTabColor() { return this; }
+  protect() {
+    return {
+      setDescription: function () { return this; },
+      removeEditors: function () { return this; },
+      addEditors: function () { return this; },
+      setWarningOnly: function () { return this; }
+    };
+  }
 }
 
 function hashString_(s) {

@@ -534,10 +534,18 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物 ===');
   // 就被系統悄悄放棄不再提醒。
   //
   // ⚠️ 呢個「移植」出嚟嘅假設，同真正 `src/ResendFlow.gs`／`src/Mailer.gs` 實際行為
-  // 已經對唔上：真正嘅 `computeResendDiff_()` 要求 `nowHasEmail` 為真先會標記
-  // `firstNotifyDueToEmail`，無電郵嘅人喺 hash 冇變嘅情況下根本唔會出現喺 changed
-  // 名單度（見 `tests/e2e_five_stage_flow.test.js` 「步驟 5：剛正式發出，未有任何
-  // 改動」嗰段對照）。呢度淨係反映呢份「純邏輯」版本自己嘅假設，唔代表正式碼咁做。
+  // 對唔上，而且第三十三輪批次階段 A 之後差異又變咗一次。真正嘅行為係：
+  //
+  //   1. `computeResendDiff_()` 要求 `nowHasEmail` 為真先會標記
+  //      `firstNotifyDueToEmail`。**無電郵嘅人喺 hash 冇變嘅情況下根本唔會
+  //      出現喺 changed 名單度**——唔會好似呢份純邏輯版咁「一直卡住等人補電郵」。
+  //   2. 補上電郵之後嗰一輪，佢先至出現一次、真正被寄出，之後就唔會再出現
+  //      （第三十三輪階段 A 之前有 bug，會被 `deliverOne_()` 嘅 hash 關卡擋住
+  //      而變成死循環；而家已經修好）。
+  //
+  // 對照見 `tests/e2e_five_stage_flow.test.js`「步驟 5：剛正式發出，未有任何改動」
+  // 同 `tests/resend_first_notify_after_email.test.js`（由真入口叫落去嗰份）。
+  // 呢度淨係反映呢份「純邏輯」版本自己嘅假設，唔代表正式碼咁做。
 
   // 特例三：P_FIRSTNOTIFY 派工內容完全不變，只是現在補上電郵——即使指派沒變，也要被判定為需要通知
   db.people.P_FIRSTNOTIFY.email = 'firstnotify@x.com';

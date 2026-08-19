@@ -288,8 +288,90 @@ function buildRuleReviewContext_() {
       };
     }),
     gatedPosts: gatedPosts,
-    postNameById: postNameById
+    postNameById: postNameById,
+    // 第三十三輪批次階段 E：最新一季實際數到幾多對「兩邊都排到報告」嘅相鄰主日。
+    // 審閱表寫「12 對相鄰的主日之中約 3 對」，但如果有主日冇排報告，
+    // 幹事事後喺品質統計見到嘅分母會細過 12——兩張表對唔上、又冇解釋，
+    // 睇嘅人會以為係 bug。查唔到就回 null，嗰陣審閱表唔會加嗰句
+    //（冇解釋好過一句作出嚟嘅解釋）。
+    adjacentPairActual: resolveRuleReviewAdjacentPairActual_()
   };
+}
+
+/**
+ * 第三十三輪批次階段 E：算最新一季實際嘅「相鄰報告 pair」數同冇排報告嘅週數。
+ *
+ * 同 `Verify.gs` 嘅 `computeAnnounceConsecutiveRatio_()` 數同一樣嘢，
+ * 但呢度只要分母，唔要比例——所以唔會為咗攞一個數而砌成個核對 context。
+ *
+ * ⚠️ 任何一步查唔到就回 `null`，**唔可以退回「理論值」當成實際值**
+ * ——嗰個正正就係呢一段要解釋嘅落差本身。
+ *
+ * @returns {?{pairs: number, weeksCounted: number, weeksWithoutAnnounce: number}}
+ */
+function resolveRuleReviewAdjacentPairActual_() {
+  try {
+    const rules = readRules();
+    const rule = rules[RULE_IDS.ANNOUNCE_RELIEF];
+    if (!rule) return null;
+    const scope = splitList_(rule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]);
+    if (scope.length === 0) return null;
+
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const weeksInfo = resolveRuleReviewWeeks_(timezone);
+    if (!weeksInfo) return null;
+
+    const quarterId = weeksInfo.quarterId;
+    const versionNo = findLatestVersionNo(quarterId);
+    if (versionNo === null || versionNo === undefined || versionNo < 0) return null;
+
+    const D = COLUMNS.SERVICE_DATES;
+    const dates = readSheet(SHEETS.SERVICE_DATES)
+      .filter(function (row) { return String(row[D.QUARTER_ID] || '').trim() === quarterId; })
+      .map(function (row) {
+        return {
+          date: toDateString(row[D.SERVICE_DATE], timezone),
+          week: Number(row[D.WEEK_INDEX])
+        };
+      })
+      .sort(function (a, b) { return a.week - b.week; })
+      .map(function (d) { return d.date; });
+    if (dates.length < 2) return null;
+
+    const A = COLUMNS.ROSTER_ASSIGNMENTS;
+    const byDate = {};
+    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+      if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+      if (Number(row[A.VERSION_NO]) !== versionNo) return;
+      if (scope.indexOf(String(row[A.POST_ID] || '').trim()) === -1) return;
+      const personId = String(row[A.PERSON_ID] || '').trim();
+      if (!personId) return;
+      const d = toDateString(row[A.SERVICE_DATE], timezone);
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(personId);
+    });
+
+    let pairs = 0;
+    for (let i = 1; i < dates.length; i++) {
+      const prev = byDate[dates[i - 1]];
+      const cur = byDate[dates[i]];
+      if (!prev || !cur || prev.length === 0 || cur.length === 0) continue;
+      pairs++;
+    }
+    let weeksWithoutAnnounce = 0;
+    dates.forEach(function (d) {
+      if (!byDate[d] || byDate[d].length === 0) weeksWithoutAnnounce++;
+    });
+
+    return {
+      pairs: pairs,
+      weeksCounted: dates.length,
+      weeksWithoutAnnounce: weeksWithoutAnnounce
+    };
+  } catch (err) {
+    log_('WARN', '規則審閱表算不到實際相鄰 pair 數，會略過那句解釋：' + err.message);
+    return null;
+  }
 }
 
 /**
