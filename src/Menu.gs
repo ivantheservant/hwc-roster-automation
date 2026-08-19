@@ -123,6 +123,12 @@ function onOpen() {
         .addItem('自我測試', 'runSelfTest_')
         .addItem('參數掃描', 'runTuneParameters_')
         .addItem('多次生成比較', 'runCompareMultiRun_')
+        // 第二十九輪批次階段 D：由頭到尾行足五步，然後出一份報告。
+        // ⚠️⚠️ 因為佢會建立版本、產生 PDF、寫 SendLog——即係
+        // 「會產生新版本工作表」＋「會走完整個寄送流程」，兩項都中。
+        // 四道閘（DRY_RUN=TRUE／非受保護季度／打字確認／冇預設季度）
+        // 見 SeasonRehearsal.gs。
+        .addItem('⚠️⚠️ 全季流程演練（只在 DRY_RUN 沙盒季度）', 'runSeasonRehearsal_')
     )
     .addSubMenu(
       // Stage H：安裝／移除 trigger 是全系統唯一會令它在無人看管下自動寄信的操作，

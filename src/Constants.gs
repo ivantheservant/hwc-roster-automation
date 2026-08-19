@@ -1109,6 +1109,11 @@ const CONFIG_KEYS = {
   // 第二十一輪批次階段 B：自我測試要驗邊一季。留空 = 用最近一個
   // 有生成過版本嘅季度（所以唔會過期）。
   SELF_TEST_QUARTER_ID: 'SELF_TEST_QUARTER_ID',
+  // 第二十九輪批次階段 D：唔准做「全季流程演練」嘅季度（逗號分隔）。
+  // ⚠️ 留空／未補建**唔等於冇保護**——`SeasonRehearsal.gs` 有一個寫死嘅
+  // 預設清單，讀唔到就用嗰個。只靠 Config 嘅話，一個被清走嘅 key
+  // 就等於保護消失，而畫面上完全睇唔出。
+  REHEARSAL_PROTECTED_QUARTERS: 'REHEARSAL_PROTECTED_QUARTERS',
   PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
   // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
