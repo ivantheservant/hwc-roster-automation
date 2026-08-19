@@ -238,6 +238,135 @@ function runRehearsalStep_(log, name, opts, fn) {
 }
 
 /**
+ * 產生個人 PDF：跑到時間死線或者批次上限為止。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️⚠️ 一次執行做唔晒 58 份，呢個係設計，唔係意外
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 實測（見稽核文件「個人 PDF 匯出重試效能分析」）：
+ *   58 人 ／ 3 批 ／ 552.6 秒 ／ 重試 81 次
+ * 而 `PDF_BATCH_TIME_BUDGET_MS` ＝ 4 分鐘，就係為咗確保**單次
+ * Apps Script 執行唔會撞六分鐘上限**——每批之間要幹事重新撳一次。
+ *
+ * 所以呢度唔可以 loop 到 `done` 為止：噉樣一定撞上限，而撞咗之後
+ * **成份報告都唔會寫到**，連前面幾步嘅結果都冇埋。
+ *
+ * ⚠️ 第三十二輪批次階段 B：**呢個函式係第一段同接續段共用嘅。**
+ * 兩邊各寫一次就係「同一個算法兩個真相來源」——而呢個算法入面
+ * 有時間死線同上限，兩邊漂移嘅後果係其中一條路會撞六分鐘上限。
+ *
+ * @param {string} quarterId
+ * @param {number} versionNo
+ * @param {number} segmentStartedAtMs **呢一段**開始嘅時間（唔係成次演練）
+ * @param {number=} roundsAlready 之前幾段已經跑咗幾多批（純粹累計顯示用）
+ * @returns {Object} 記落報告嘅明細
+ */
+function runRehearsalPdfBatches_(quarterId, versionNo, segmentStartedAtMs, roundsAlready) {
+  let rounds = 0;
+  let last = null;
+  let stoppedBy = '';
+
+  while (rounds < SEASON_REHEARSAL_PDF_MAX_ROUNDS) {
+    const elapsed = Date.now() - segmentStartedAtMs;
+    if (elapsed > SEASON_REHEARSAL_PDF_DEADLINE_MS) {
+      stoppedBy = '時間用完（這一段已經行了 ' + Math.round(elapsed / 1000)
+        + ' 秒，再產生下去會撞 Apps Script 六分鐘上限，'
+        + '連整份報告都寫不出來）';
+      break;
+    }
+    rounds++;
+    last = generatePersonalPdfBatch_(quarterId, versionNo);
+    if (last && last.done) break;
+  }
+  if (!stoppedBy && rounds >= SEASON_REHEARSAL_PDF_MAX_ROUNDS && !(last && last.done)) {
+    stoppedBy = '批次數到達上限 ' + SEASON_REHEARSAL_PDF_MAX_ROUNDS + ' 批';
+  }
+
+  const files = readRehearsalPdfPaths_(quarterId, [versionNo]);
+  const mine = (files.files || []).filter(function (f) { return f.isNew; });
+  // ⚠️ 欄名逐個對返 `buildPdfBatchResult_()`。第三十一輪 B3 就係讀錯一個
+  // 唔存在嘅欄名（`pub.url`）而靜靜得出 undefined，所以呢度用
+  // `!== undefined` 分開「係 0」同「根本冇呢一欄」。
+  const pick = function (key) {
+    return (last && last[key] !== undefined) ? last[key] : '（回傳沒有 ' + key + ' 這一欄）';
+  };
+  const done = !!(last && last.done);
+  const before = Number(roundsAlready) || 0;
+
+  return {
+    versionNo: versionNo,
+    rounds: rounds,
+    roundsTotal: before + rounds,
+    finished: done,
+    // ⚠️ 冇行完就一定要講得出**點解**停。淨係寫 `finished: false`
+    // 等於叫下一個人自己估係壞咗定係時間唔夠。
+    stoppedBy: stoppedBy || (done ? '' : '（不明——請告訴開發者）'),
+    nextAction: done ? ''
+      : '個人 PDF 未產生完，「步驟 4」一定會被缺件保護擋住，這是預期之內。'
+        + '請到選單 ▸ 測試工具 ▸ 全季流程演練（接續），'
+        + '系統會續跑餘下的個人 PDF，產生完之後自動接住行步驟 4 同步驟 5。',
+    totalPeople: pick('totalPeople'),
+    doneCount: pick('doneCount'),
+    generatedCount: pick('generatedCount'),
+    skippedExistingCount: pick('skippedExistingCount'),
+    errorCount: (last && last.errors) ? last.errors.length : '（回傳沒有 errors 這一欄）',
+    firstErrors: (last && last.errors) ? last.errors.slice(0, 3) : [],
+    // ⚠️ 要見到分季分版子資料夾——嗰個係目前風險最高嘅未驗證項。
+    filesInVersionFolder: mine.filter(function (f) { return f.inSubfolder; }).length,
+    filesFlatInRoot: mine.filter(function (f) { return !f.inSubfolder; }).length,
+    samplePaths: mine.slice(0, 5).map(function (f) { return f.path; })
+  };
+}
+
+/**
+ * 把任何值變成一格可以寫入 Diagnostics 嘅字串。
+ *
+ * ⚠️ 第三十輪批次階段 C2-2：**每一格都要強制變成字串。**
+ *
+ * 實測：對話框寫「已寫入 Diagnostics…共 170 行」，但嗰張表根本
+ * 冇呢份報告。其中一個原因就係 `s.detail[k]` 入面有陣列／物件
+ *（例如 `warnings`），而 `Range.setValues()` 唔接受——
+ * 整份報告會拋錯，然後被 `tryWriteDiagnostics_()` 食咗。
+ *
+ * ⚠️ **唔可以「靜靜跳過寫唔入嗰啲行」**——嗰樣係把問題藏得更深。
+ * 應該喺砌報告嗰陣就展開成人話。
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function stringifyDiagValue_(value) {
+  if (value === null || value === undefined) return '（沒有值）';
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '（空）';
+    // 陣列展開成人話，太長就截，但**明講截咗**。
+    const text = value.map(function (v) {
+      return (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
+    }).join('、');
+    return text.length > 400 ? (text.slice(0, 400) + '…（共 ' + value.length + ' 項，已截斷）') : text;
+  }
+  if (typeof value === 'object') {
+    const text = JSON.stringify(value);
+    return text.length > 400 ? (text.slice(0, 400) + '…（已截斷）') : text;
+  }
+  return String(value);
+}
+
+/**
+ * 演練報告名。**每一段一個名。**
+ *
+ * ⚠️ `writeDiagnosticsReport_()` 係「同名覆蓋」——兩段用同一個名嘅話，
+ * 第二段會把第一段整份洗走，而第一段先係最完整嗰份。
+ *
+ * @param {number} segment 第幾段（由 1 開始）
+ * @returns {string}
+ */
+function seasonRehearsalReportName_(segment) {
+  const n = Number(segment);
+  return SEASON_REHEARSAL_REPORT + '（第 ' + (isFinite(n) && n > 0 ? n : 1) + ' 段）';
+}
+
+/**
  * 演練用嘅「儲存並確認．執行」。
  *
  * ⚠️ 只行零改動路徑（`executeSaveConfirmZeroChange_()`）。
@@ -287,6 +416,8 @@ function executeSeasonRehearsal_(quarterId) {
   const steps = [];
   // 成次演練嘅開始時間，俾步驟 3.5 計自己仲剩幾多秒可以用。
   const rehearsalStartedAtMs = Date.now();
+  // 同一個開始時間嘅文字版，寫入 RehearsalState，之後幾段用嚟算總時長。
+  const startedAtText = nowTimestamp_();
 
   // ⚠️ 第三十輪批次階段 C1：**次序改成真實流程。**
   //
@@ -405,71 +536,7 @@ function executeSeasonRehearsal_(quarterId) {
       const versionNo = findLatestVersionNo(quarterId);
       if (versionNo < 0) throw new Error('這一季還沒有版本，產生不到個人 PDF。');
 
-      let rounds = 0;
-      let last = null;
-      let stoppedBy = '';
-      // ⚠️⚠️ **一次執行做唔晒 58 份，呢個係設計，唔係意外。**
-      //
-      // 實測（見稽核文件「個人 PDF 匯出重試效能分析」）：
-      //   58 人 ／ 3 批 ／ 552.6 秒 ／ 重試 81 次
-      // 而 `PDF_BATCH_TIME_BUDGET_MS` ＝ 4 分鐘，就係為咗確保
-      // **單次 Apps Script 執行唔會撞六分鐘上限**——每批之間要幹事
-      // 重新撳一次選單接續。
-      //
-      // 所以呢度唔可以 loop 到 `done` 為止：噉樣一定撞上限，而撞咗
-      // 之後**成份報告都唔會寫到**，連步驟 1～3 嘅結果都冇埋，
-      // 比而家淨係步驟 4 失敗更差。
-      //
-      // 做法：計住成次演練用咗幾耐，剩返嘅時間唔夠就停手，
-      // 老老實實喺報告寫「做咗幾多、仲差幾多、點解停」。
-      // 一個做唔晒嘅步驟講清楚自己做唔晒，好過扮做得晒。
-      while (rounds < SEASON_REHEARSAL_PDF_MAX_ROUNDS) {
-        const elapsed = Date.now() - rehearsalStartedAtMs;
-        if (elapsed > SEASON_REHEARSAL_PDF_DEADLINE_MS) {
-          stoppedBy = '時間用完（整個演練已經行了 ' + Math.round(elapsed / 1000)
-            + ' 秒，再產生下去會撞 Apps Script 六分鐘上限，'
-            + '連整份報告都寫不出來）';
-          break;
-        }
-        rounds++;
-        last = generatePersonalPdfBatch_(quarterId, versionNo);
-        if (last && last.done) break;
-      }
-      if (!stoppedBy && rounds >= SEASON_REHEARSAL_PDF_MAX_ROUNDS
-        && !(last && last.done)) {
-        stoppedBy = '批次數到達上限 ' + SEASON_REHEARSAL_PDF_MAX_ROUNDS + ' 批';
-      }
-
-      const files = readRehearsalPdfPaths_(quarterId, [versionNo]);
-      const mine = (files.files || []).filter(function (f) { return f.isNew; });
-      // ⚠️ 欄名逐個對返 `buildPdfBatchResult_()`。B3 就係讀錯一個唔存在
-      // 嘅欄名（`pub.url`）而靜靜得出 undefined，所以呢度用
-      // `!== undefined` 分開「係 0」同「根本冇呢一欄」。
-      const pick = function (key) {
-        return (last && last[key] !== undefined) ? last[key] : '（回傳沒有 ' + key + ' 這一欄）';
-      };
-      return {
-        versionNo: versionNo,
-        rounds: rounds,
-        finished: !!(last && last.done),
-        // ⚠️ 冇行完就一定要講得出**點解**停。淨係寫 `finished: false`
-        // 等於叫下一個人自己估係壞咗定係時間唔夠。
-        stoppedBy: stoppedBy || (last && last.done ? '' : '（不明——請告訴開發者）'),
-        nextAction: (last && last.done) ? ''
-          : '個人 PDF 未產生完，所以下面的「步驟 4」一定會被缺件保護擋住，'
-            + '這是預期之內。要走完寄送那一段，請先在選單「產生個人 PDF」'
-            + '重複執行到全部完成，然後再單獨執行步驟 4。',
-        totalPeople: pick('totalPeople'),
-        doneCount: pick('doneCount'),
-        generatedCount: pick('generatedCount'),
-        skippedExistingCount: pick('skippedExistingCount'),
-        errorCount: (last && last.errors) ? last.errors.length : '（回傳沒有 errors 這一欄）',
-        firstErrors: (last && last.errors) ? last.errors.slice(0, 3) : [],
-        // ⚠️ 要見到分季分版子資料夾——嗰個係目前風險最高嘅未驗證項。
-        filesInVersionFolder: mine.filter(function (f) { return f.inSubfolder; }).length,
-        filesFlatInRoot: mine.filter(function (f) { return !f.inSubfolder; }).length,
-        samplePaths: mine.slice(0, 5).map(function (f) { return f.path; })
-      };
+      return runRehearsalPdfBatches_(quarterId, versionNo, rehearsalStartedAtMs);
     });
 
   // ── 步 4　正式發出給全體 ─────────────────────────────────
@@ -522,6 +589,47 @@ function executeSeasonRehearsal_(quarterId) {
     .filter(function (f) { return f.isNew; })
     .map(function (f) { return f.path; });
 
+  // ── 第三十二輪批次階段 B：寫低跨段狀態 ────────────────────
+  //
+  // ⚠️ 個人 PDF 未產生完 ⇒ 步驟 4、5 一定被缺件閘門擋住。
+  // 冇呢個狀態，幹事就要由頭再演練一次先試到嗰兩步——
+  // 而**嗰兩步至今從來冇喺演練入面行過**。
+  //
+  // ⚠️ 就算 PDF 產生完咗都要寫，因為步驟 4、5 可能因為其他原因失敗，
+  // 而接續工具係唯一一條唔使重新生成版本就再試一次嘅路。
+  const pdfStep = steps.filter(function (s) {
+    return s.name.indexOf('產生個人 PDF') !== -1;
+  })[0];
+  const pdfDetail = (pdfStep && pdfStep.detail) || {};
+  const allOk = steps.every(function (s) { return s.ok; });
+  let stateWritten = false;
+  let stateError = '';
+  try {
+    if (allOk && pdfDetail.finished) {
+      // 全部行完 ⇒ 唔留狀態。
+      clearRehearsalState_();
+    } else {
+      writeRehearsalState_({
+        quarterId: quarterId,
+        startedAt: startedAtText,
+        segment: 1,
+        baseVersionNo: lastNew,
+        stepsDone: steps.filter(function (s) { return s.ok; })
+          .map(function (s) { return s.name; }).join('，'),
+        pdfRoundsDone: Number(pdfDetail.rounds) || 0,
+        pdfDone: !!pdfDetail.finished,
+        stoppedBy: String(pdfDetail.stoppedBy || ''),
+        notes: '第一段由「全季流程演練」建立。接續請用「全季流程演練（接續）」。'
+      });
+      stateWritten = true;
+    }
+  } catch (err) {
+    // ⚠️ 狀態寫唔到唔可以令成次演練白行——前面幾步嘅結果仲有價值。
+    // 但一定要講出嚟，否則幹事會撳「接續」然後見到「沒有未完成的演練」，
+    // 完全唔知發生咩事。
+    stateError = err.message;
+  }
+
   return {
     quarterId: quarterId,
     baseline: baseline,
@@ -530,7 +638,12 @@ function executeSeasonRehearsal_(quarterId) {
     after: readSeasonRehearsalBaseline_(quarterId),
     pdfFiles: pdfFiles,
     ics: readRehearsalIcsSample_(quarterId),
-    highlight: readRehearsalHighlightSample_(quarterId)
+    highlight: readRehearsalHighlightSample_(quarterId),
+    segment: 1,
+    startedAt: startedAtText,
+    resumeNeeded: stateWritten,
+    stateError: stateError,
+    pdfFinished: !!pdfDetail.finished
   };
 }
 
@@ -696,22 +809,11 @@ function buildSeasonRehearsalRows_(record) {
    * ⚠️ **唔可以「靜靜跳過寫唔入嗰啲行」**——嗰樣係把問題藏得更深。
    * 應該喺砌報告嗰陣就展開成人話。
    */
-  const cell = function (value) {
-    if (value === null || value === undefined) return '（沒有值）';
-    if (Array.isArray(value)) {
-      if (value.length === 0) return '（空）';
-      // 陣列展開成人話，太長就截，但**明講截咗**。
-      const text = value.map(function (v) {
-        return (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v);
-      }).join('、');
-      return text.length > 400 ? (text.slice(0, 400) + '…（共 ' + value.length + ' 項，已截斷）') : text;
-    }
-    if (typeof value === 'object') {
-      const text = JSON.stringify(value);
-      return text.length > 400 ? (text.slice(0, 400) + '…（已截斷）') : text;
-    }
-    return String(value);
-  };
+  // ⚠️ 第三十二輪批次階段 B：抽咗做 `stringifyDiagValue_()`，
+  // 因為接續段嗰邊要用同一套規則。喺兩邊各寫一次就係
+  //「同一個算法兩個真相來源」——而其中一邊漂移嘅後果，
+  // 係嗰一段報告靜靜寫唔入。
+  const cell = stringifyDiagValue_;
   const row = function (section, item, value, note) {
     return diagRow_(section, cell(item), cell(value), cell(note || ''));
   };
@@ -838,6 +940,44 @@ function buildSeasonRehearsalRows_(record) {
  * ============================================================ */
 
 /**
+ * 第一段做完之後嗰句「跟住點做」。
+ *
+ * ⚠️ 第三十二輪批次階段 B5：舊版只講「步驟 4 被擋是預期之內」。
+ * 幹事知道咗係預期，但完全唔知跟住應該做乜——一句「這是預期之內」
+ * 唔係一個下一步。
+ *
+ * @param {Object} record `executeSeasonRehearsal_()` 的結果
+ * @returns {string} 已經帶好前後換行，可以直接接落對話框
+ */
+function buildRehearsalNextStepText_(record) {
+  const r = record || {};
+  if (r.stateError) {
+    return '\n⚠️ 演練狀態寫不進 ' + SHEETS.REHEARSAL_STATE + ' 工作表（原因：'
+      + r.stateError + '）。\n'
+      + '所以「全季流程演練（接續）」會說沒有未完成的演練。'
+      + '要走完步驟 4、5，只能重新演練一次。\n';
+  }
+  if (!r.resumeNeeded) {
+    return '\n這一次演練五步全部行完了，沒有需要接續的東西。\n';
+  }
+
+  const pdfStep = (r.steps || []).filter(function (s) {
+    return s.name.indexOf('產生個人 PDF') !== -1;
+  })[0];
+  const d = (pdfStep && pdfStep.detail) || {};
+  const total = Number(d.totalPeople);
+  const done = Number(d.doneCount);
+  const remain = (isFinite(total) && isFinite(done)) ? (total - done) : null;
+
+  return '\n👉 跟住點做：\n'
+    + '請到選單 ▸ 測試工具 ▸ 全季流程演練（接續），把餘下的 '
+    // ⚠️ 數唔到就講「餘下的」，**唔可以寫 0**——0 會令人以為做完咗。
+    + (remain === null ? '' : (remain + ' 份'))
+    + '個人 PDF 產生完，系統會自動接住行步驟 4 同步驟 5。\n'
+    + '（那兩步至今從來沒有在演練裡行過一次。）\n';
+}
+
+/**
  * 選單「測試工具 ▸ ⚠️⚠️ 全季流程演練」。
  * @returns {void}
  */
@@ -926,7 +1066,11 @@ function runSeasonRehearsal_() {
   // 舊寫法只講「見執行記錄」——而 **Ivan 讀唔到 `Logger`**，
   // 要走去 Apps Script 執行記錄先搵到。一句「失敗咗，自己去搵」
   // 同冇講差唔多。
-  const wrote = tryWriteDiagnosticsDetailed_(SEASON_REHEARSAL_REPORT, rows);
+  // ⚠️ 第三十二輪批次階段 B4：**報告名要分段。**
+  // `writeDiagnosticsReport_()` 係同名覆蓋——兩段用同一個名嘅話，
+  // 第二段會把第一段整份洗走，而第一段先係最完整嗰份。
+  const reportName = seasonRehearsalReportName_(1);
+  const wrote = tryWriteDiagnosticsDetailed_(reportName, rows);
   const wroteOk = wrote.ok;
 
   // ⚠️ 對話框只講「去邊度睇」同幾個關鍵數字，**唔塞成份報告**。
@@ -940,10 +1084,14 @@ function runSeasonRehearsal_() {
     + 'Stage：' + record.baseline.stage + ' → ' + record.after.stage + '\n'
     + '版本：' + record.baseline.latestVersionNo + ' → ' + record.after.latestVersionNo + '\n\n'
     + '完整報告已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「'
-    + SEASON_REHEARSAL_REPORT + '」，共 ' + rows.length + ' 行。\n'
+    + reportName + '」，共 ' + rows.length + ' 行。\n'
     + (wroteOk ? '' : ('\n⚠️ 寫入失敗，Diagnostics 裡面沒有這份報告。\n原因：'
-      + wrote.error + '\n\n')) + '\n'
-    + '⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走。\n'
+      + wrote.error + '\n\n'))
+    // ⚠️ 第三十二輪批次階段 B5：**要有一句明確嘅下一步。**
+    // 舊版只講「步驟 4 被擋是預期之內」——幹事知道咗係預期，
+    // 但完全唔知跟住應該做乜。
+    + buildRehearsalNextStepText_(record)
+    + '\n⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走。\n'
     + '這次建立了：版本 '
     + (record.created.versions.length === 0 ? '（沒有）'
       : record.created.versions.map(function (v) { return 'v' + v; }).join('、'))

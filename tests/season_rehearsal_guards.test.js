@@ -308,8 +308,10 @@ console.log('\n=== D 報告去 Diagnostics，唔係塞落 ui.alert() ===');
 {
   // 第三十輪批次階段 C2-2：改用 `tryWriteDiagnosticsDetailed_()`，
   // 因為要把失敗原因帶返出嚟（Ivan 讀唔到 Logger）。
+  // ⚠️ 第三十二輪批次階段 B4：第一個參數由 `SEASON_REHEARSAL_REPORT`
+  // 改成分段名 `reportName`（＝ `seasonRehearsalReportName_(1)`）。
   check('★★★★★ 行 `tryWriteDiagnosticsDetailed_()` 寫 Diagnostics',
-    /tryWriteDiagnosticsDetailed_\(SEASON_REHEARSAL_REPORT, rows\)/.test(src));
+    /tryWriteDiagnosticsDetailed_\(reportName, rows\)/.test(src));
   check('★★★★★ 寫唔入嗰陣把 `err.message` 印落對話框'
     + '——舊寫法只講「見執行記錄」，而 Ivan 讀唔到 Logger，'
     + '等於冇講',

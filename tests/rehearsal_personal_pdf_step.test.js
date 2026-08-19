@@ -72,10 +72,22 @@ console.log('\n=== B1【核心】要分批叫，但**唔可以 loop 到 done 為
   check('★★★★★ 有 loop（唔止叫一次）',
     /while \(rounds < SEASON_REHEARSAL_PDF_MAX_ROUNDS\)/.test(bare)
     && /if \(last && last\.done\) break;/.test(bare));
-  check('★★★★★ **而且有一個由演練開始計嘅死線**'
+  check('★★★★★ **而且有一個由呢一段開始計嘅死線**'
     + '——冇死線就會撞六分鐘上限，成份報告一齊冇',
-    /Date\.now\(\) - rehearsalStartedAtMs/.test(bare)
+    /Date\.now\(\) - segmentStartedAtMs/.test(bare)
     && /SEASON_REHEARSAL_PDF_DEADLINE_MS/.test(bare));
+  // ⚠️ 第三十二輪批次階段 B：呢個 loop 抽咗做 `runRehearsalPdfBatches_()`，
+  // 因為接續段要用同一套死線同上限。兩邊各寫一次就係「同一個算法
+  // 兩個真相來源」——而漂移嘅後果係其中一條路會撞六分鐘上限。
+  check('★★★★★ 抽咗做共用函式，第一段同接續段用同一份實作',
+    /function runRehearsalPdfBatches_\(/.test(bare)
+    && /runRehearsalPdfBatches_\(quarterId, versionNo, rehearsalStartedAtMs\)/.test(bare));
+  {
+    const resume = stripComments(read('src/SeasonRehearsalResume.gs'));
+    check('★★★★★ 而接續段真係叫返同一個函式，冇另抄一份 loop',
+      /runRehearsalPdfBatches_\(quarterId, versionNo,/.test(resume)
+      && !/while \(rounds </.test(resume), '（睇 SeasonRehearsalResume.gs）');
+  }
   check('★★★★★ 死線留返時間俾後面兩步同寫報告（< 6 分鐘，而且有明顯餘裕）',
     gas.SEASON_REHEARSAL_PDF_DEADLINE_MS < 360000
     && 360000 - gas.SEASON_REHEARSAL_PDF_DEADLINE_MS >= 100000,
@@ -84,7 +96,7 @@ console.log('\n=== B1【核心】要分批叫，但**唔可以 loop 到 done 為
     typeof gas.SEASON_REHEARSAL_PDF_MAX_ROUNDS === 'number'
     && gas.SEASON_REHEARSAL_PDF_MAX_ROUNDS > 0);
   check('★★★★★ 冇行完（`finished` false）都會照樣記低，唔會扮成完成',
-    /finished: !!\(last && last\.done\)/.test(bare));
+    /const done = !!\(last && last\.done\);/.test(bare) && /finished: done,/.test(bare));
   check('★★★★★ **而且講得出點解停**（時間用完／到批次上限）'
     + '——淨係寫 finished: false 等於叫下一個人自己估',
     /stoppedBy/.test(bare) && bare.indexOf('時間用完') !== -1);

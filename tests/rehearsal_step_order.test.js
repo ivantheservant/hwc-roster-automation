@@ -173,8 +173,12 @@ console.log('\n=== C2-2【核心】寫入失敗要把原因帶返出嚟 ===');
   check('★★★★★ 而 `tryWriteDiagnostics_()` 變成薄殼，'
     + '其餘 20 幾個呼叫點嘅 boolean 行為完全不變',
     /return tryWriteDiagnosticsDetailed_\(reportName, rows\)\.ok;/.test(diag));
-  check('★★★★★ 演練用嗰個帶原因嘅版本',
-    /const wrote = tryWriteDiagnosticsDetailed_\(SEASON_REHEARSAL_REPORT, rows\);/.test(src));
+  // ⚠️ 第三十二輪批次階段 B4：報告名改成分段（`seasonRehearsalReportName_(1)`）。
+  // 兩段用同一個名嘅話，第二段會把第一段整份洗走，
+  // 而第一段先係最完整嗰份。
+  check('★★★★★ 演練用嗰個帶原因嘅版本，而且報告名係分段名',
+    /const reportName = seasonRehearsalReportName_\(1\);/.test(src)
+    && /const wrote = tryWriteDiagnosticsDetailed_\(reportName, rows\);/.test(src));
   check('★★★★★ 而且對話框印咗 `wrote.error`'
     + '——舊寫法只講「見執行記錄」，而 Ivan 讀唔到 Logger，等於冇講',
     /\+ wrote\.error/.test(src));

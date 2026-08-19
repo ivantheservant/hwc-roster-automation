@@ -27,6 +27,10 @@ const SHEETS = {
   MULTIRUN_RESULT: 'MultiRun_Result',
   REQUESTS: 'Requests',
   DIAGNOSTICS: 'Diagnostics',
+  // 第三十二輪批次階段 B：全季流程演練嘅跨段狀態。
+  // ⚠️ 用工作表唔用 `PropertiesService`——connector 讀唔到 Properties，
+  // 而演練狀態正正係開發時每一輪都要讀得到嗰樣嘢。
+  REHEARSAL_STATE: 'RehearsalState',
   // 階段 B（Opus 深度輪）新增：歸檔用的封存表。封存是**搬移不是刪除**——
   // 原始列完整搬到這兩張表，隨時可以人手查閱或搬回去。見 Archive.gs。
   SEND_LOG_ARCHIVE: 'SendLog_Archive',
@@ -540,6 +544,23 @@ const COLUMNS = {
     ITEM: 'Item',
     VALUE: 'Value',
     NOTE: 'Note'
+  },
+  /**
+   * 第三十二輪批次階段 B：演練跨段狀態。**最多一行。**
+   * 演練全部行完之後成行清走——留低一行舊狀態會令下一次接續
+   * 接住一個唔存在嘅演練。
+   */
+  REHEARSAL_STATE: {
+    QUARTER_ID: 'QuarterID',
+    STARTED_AT: 'StartedAt',
+    SEGMENT: 'Segment',
+    BASE_VERSION_NO: 'BaseVersionNo',
+    STEPS_DONE: 'StepsDone',
+    PDF_ROUNDS_DONE: 'PdfRoundsDone',
+    PDF_DONE: 'PdfDone',
+    STOPPED_BY: 'StoppedBy',
+    UPDATED_AT: 'UpdatedAt',
+    NOTES: 'Notes'
   }
 };
 

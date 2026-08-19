@@ -129,6 +129,11 @@ function onOpen() {
         // 四道閘（DRY_RUN=TRUE／非受保護季度／打字確認／冇預設季度）
         // 見 SeasonRehearsal.gs。
         .addItem('⚠️⚠️ 全季流程演練（只在 DRY_RUN 沙盒季度）', 'runSeasonRehearsal_')
+        // 第三十二輪批次階段 B：一次執行做唔晒 58 份個人 PDF（實測要
+        // 分 3 次、共 552 秒，而單次執行上限 6 分鐘）。呢一項就係
+        // 把同一次演練行完嘅路，包括步驟 4、5——嗰兩步至今
+        // 從來冇喺演練入面行過。
+        .addItem('⚠️⚠️ 全季流程演練（接續）', 'runSeasonRehearsalResume_')
     )
     .addSubMenu(
       // Stage H：安裝／移除 trigger 是全系統唯一會令它在無人看管下自動寄信的操作，

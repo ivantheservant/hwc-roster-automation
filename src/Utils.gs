@@ -657,3 +657,38 @@ function formatFileSize_(bytes) {
 function log_(level, message) {
   Logger.log('[' + level + '] ' + message);
 }
+
+/**
+ * 把一個值轉成有限數字；**轉唔到就回 `null`，唔會回 0。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 點解要有呢個（第三十二輪批次，本專案第 2 條 bug class）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `Number(null)` ＝ `0`
+ * `Number('')`   ＝ `0`
+ * `Number('  ')` ＝ `0`
+ * `Number([])`   ＝ `0`
+ *
+ * 即係「冇呢個值」會靜靜變成「呢個值係 0」——而 0 通常係一個
+ * **完全合法、睇落好正常**嘅答案。同一個形狀今個月已經咬過三次：
+ *
+ *   1. `buildDiagnosticsStatusRow_()`：冇傳到行數 ⇒「這張表有 0 行、
+ *      還有 400 行空間」
+ *   2. `evaluateRehearsalResume_()`：查唔到版本號 ⇒ 當成 v0
+ *      ⇒ 報「這一季又生成過新版本」並且清走演練狀態
+ *   3. Config 的 `INT`／`DEC`（見階段 A）
+ *
+ * 所以：**要分開「係 0」同「唔係一個數」嘅地方，一律用呢個。**
+ * 分唔開嗰兩件事嘅時候，先可以用 `Number()`。
+ *
+ * @param {*} value
+ * @returns {?number} 有限數字，或者 `null`
+ */
+function toFiniteNumberOrNull_(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'boolean') return null;
+  if (typeof value !== 'number' && String(value).trim() === '') return null;
+  const n = Number(value);
+  return isFinite(n) ? n : null;
+}

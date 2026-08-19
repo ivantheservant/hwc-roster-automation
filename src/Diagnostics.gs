@@ -103,12 +103,10 @@ function buildDiagnosticsStatusRow_(totalRows) {
   //
   // 呢一行嘅全部用途就係防止「靜靜讀漏咗」，佢自己踩中同一個 bug class
   // 就最諷刺。呢個 check 係先寫測試先發現嘅。
-  const missing = (totalRows === null || totalRows === undefined
-    || String(totalRows).trim() === '');
-  const total = missing ? NaN : Number(totalRows);
+  const total = toFiniteNumberOrNull_(totalRows);
 
   // ⚠️ 算唔到就要嘈，唔可以印一個似模似樣嘅 0。
-  if (!isFinite(total) || total < 0) {
+  if (total === null || total < 0) {
     return diagRow_(DIAGNOSTICS_STATUS_SECTION, '這張表目前的資料行數', '（算不出來）',
       '收到的行數是「' + totalRows + '」，不是一個數目。'
       + '請把這件事告訴開發者——這一行的用途正是防止「讀漏了」無聲無息發生，'
