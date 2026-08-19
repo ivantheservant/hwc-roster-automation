@@ -180,14 +180,23 @@ function runRehearsalStep_(log, name, opts, fn) {
   // 「步驟 4 失敗」，睇唔出係「真失敗」定係「前一步冇行到所以連鎖」。
   //
   // 記低之後，下次一眼睇得出。
+  //
+  // ⚠️ 第三十一輪批次階段 B2：**由 `describeFlowStepPrecondition_()` 問**
+  //（FiveStageCore.gs），唔喺演練工具入面另寫一套。
+  //
+  // 上一輪就係另寫咗一套，結果報告寫住
+  //   `步驟 1：生成初稿　　Stage 要係 DRAFT，實際係 REVIEW_SENT ⚠️ 不符合`
+  //   `步驟 2：寄給堂委審閱　Stage 要係 DRAFT，實際係 REVIEW_SENT ⚠️ 不符合`
+  // 但**兩步都成功**——因為步驟 2 早就放寬到三個 Stage，
+  // 而步驟 1 根本冇 Stage 限制。
+  //
+  // 一個講錯嘅前置條件，比冇前置條件更差：佢會令人去查一件冇發生嘅事。
   let preconditionText = '（沒有前置條件）';
   let preconditionMet = true;
-  if (o.requiresStage) {
-    let actual;
-    try { actual = getQuarterStage_(o.quarterId); } catch (err) { actual = '（查不到：' + err.message + '）'; }
-    preconditionMet = actual === o.requiresStage;
-    preconditionText = 'Stage 要係 ' + o.requiresStage + '，實際係 ' + actual
-      + (preconditionMet ? '　✅' : '　⚠️ 不符合——下面的失敗很可能是連鎖，不是這一步本身');
+  if (o.stepKey) {
+    const pre = describeFlowStepPrecondition_(o.stepKey, o.quarterId);
+    preconditionText = pre.text;
+    preconditionMet = pre.met;
   }
 
   const startedAt = Date.now();
@@ -275,12 +284,16 @@ function executeSeasonRehearsal_(quarterId) {
 
   // ── 步 1　生成初稿 ───────────────────────────────────────
   const gen = runRehearsalStep_(steps, '步驟 1：生成初稿',
-    { quarterId: quarterId, requiresStage: QUARTER_STAGE.DRAFT }, function () {
+    { quarterId: quarterId, stepKey: FLOW_STEP_KEYS.GENERATE }, function () {
       const result = performRosterGeneration_(quarterId);
       let publicLink = '（沒有嘗試）';
       try {
         const pub = publishPublicRoster_(quarterId);
-        publicLink = pub && pub.url ? '已建立' : '（回傳沒有連結）';
+        // ⚠️ 第三十一輪批次階段 B3：`publishPublicRoster_()` 回嘅欄位叫
+      // `fileUrl`，唔係 `url`。上一輪讀錯欄名，所以每次都印
+      // 「（回傳沒有連結）」——**發佈其實成功咗**，係顯示錯。
+      // 讀一個唔存在嘅欄名唔會拋錯，只會靜靜得出 undefined。
+      publicLink = (pub && pub.fileUrl) ? '已建立' : '（回傳沒有 fileUrl）';
       } catch (err) {
         publicLink = '失敗：' + err.message;
       }
@@ -296,7 +309,7 @@ function executeSeasonRehearsal_(quarterId) {
 
   // ── 步 2　寄給堂委審閱 ───────────────────────────────────
   runRehearsalStep_(steps, '步驟 2：寄給堂委審閱',
-    { quarterId: quarterId, requiresStage: QUARTER_STAGE.DRAFT }, function () {
+    { quarterId: quarterId, stepKey: FLOW_STEP_KEYS.REVIEW_SEND }, function () {
       const plan = planStep2_(quarterId);
       const sendLogBefore = countRehearsalSendLogRows_(quarterId);
       const result = executeStep2_(quarterId);
@@ -313,7 +326,7 @@ function executeSeasonRehearsal_(quarterId) {
   // 呢一步先係令 Stage 由 REVIEW_SENT 前進到 REQUESTS_APPLIED 嗰個。
   const versionBefore = gen ? gen.versionNo : findLatestVersionNo(quarterId);
   runRehearsalStep_(steps, '步驟 3：儲存並確認（零改動）',
-    { quarterId: quarterId, requiresStage: QUARTER_STAGE.REVIEW_SENT }, function () {
+    { quarterId: quarterId, stepKey: FLOW_STEP_KEYS.SAVE_CONFIRM }, function () {
       const stageBefore = getQuarterStage_(quarterId);
       // ⚠️ 叫 `buildSaveAndConfirmPlan_()` 而唔係 `apiSaveAndConfirmPlan()`：
       // 後者第一行係 `assertWebAppRequestAllowed_()`，而呢個工具由試算表選單
@@ -349,9 +362,68 @@ function executeSeasonRehearsal_(quarterId) {
       };
     });
 
+  // ── 步 3.5　產生個人 PDF ─────────────────────────────────
+  //
+  // ⚠️ 第三十一輪批次階段 B1：**冇呢一步，寄送路徑永遠測唔到。**
+  //
+  // 演練報告：`步驟 4：正式發出給全體 | 失敗 | 因為個人 PDF 缺件太多而中止`。
+  // 呢個唔係 bug——係 `evaluateStep4MissingPdfGate_()` 正確運作。
+  // 但後果係整條寄送路徑（12 月 4 日最重要嗰一步，亦即係 linter 前晚
+  // 捉到嗰個 `Mailer.gs` 個人 PDF bug 嘅同一條路）由頭到尾冇行過。
+  //
+  // ⚠️ 叫 `generatePersonalPdfBatch_()` 而唔係 `runGeneratePersonalPdfBatch_()`
+  // ——`run*_()` 會叫 `ui.alert()`。
+  //
+  // ⚠️ 佢係**分批**嘅（`PDF_BATCH_SIZE` ＋ 時間預算），所以要 loop 到
+  // `done` 為止；只叫一次就只會產生第一批，而步驟 4 照樣會被擋。
+  // ⚠️ **特登唔傳 `stepKey`。** 實測 `runGeneratePersonalPdfBatch_()`
+  // 由頭到尾冇 `requireQuarterStage_()`——產生 PDF 唔屬於五階段閘門，
+  // 佢只要求「有一個版本」。夾硬借用步驟 4 嗰個 `stepKey` 就會
+  // 喺報告寫一個唔存在嘅前置條件，即係 B2 要修嗰個毛病嘅翻版。
+  runRehearsalStep_(steps, '步驟 3.5：產生個人 PDF',
+    { quarterId: quarterId }, function () {
+      const versionNo = findLatestVersionNo(quarterId);
+      if (versionNo < 0) throw new Error('這一季還沒有版本，產生不到個人 PDF。');
+
+      let rounds = 0;
+      let last = null;
+      // 上限特登寫死：一個唔會停嘅 loop 喺 Apps Script 度會撞六分鐘上限，
+      // 而嗰陣咩報告都冇。20 批 × 每批預設 10 人 ＝ 200 人，夠有餘。
+      const MAX_ROUNDS = 20;
+      while (rounds < MAX_ROUNDS) {
+        rounds++;
+        last = generatePersonalPdfBatch_(quarterId, versionNo);
+        if (last && last.done) break;
+      }
+
+      const files = readRehearsalPdfPaths_(quarterId, [versionNo]);
+      const mine = (files.files || []).filter(function (f) { return f.isNew; });
+      // ⚠️ 欄名逐個對返 `buildPdfBatchResult_()`。B3 就係讀錯一個唔存在
+      // 嘅欄名（`pub.url`）而靜靜得出 undefined，所以呢度用
+      // `!== undefined` 分開「係 0」同「根本冇呢一欄」。
+      const pick = function (key) {
+        return (last && last[key] !== undefined) ? last[key] : '（回傳沒有 ' + key + ' 這一欄）';
+      };
+      return {
+        versionNo: versionNo,
+        rounds: rounds,
+        finished: !!(last && last.done),
+        totalPeople: pick('totalPeople'),
+        doneCount: pick('doneCount'),
+        generatedCount: pick('generatedCount'),
+        skippedExistingCount: pick('skippedExistingCount'),
+        errorCount: (last && last.errors) ? last.errors.length : '（回傳沒有 errors 這一欄）',
+        firstErrors: (last && last.errors) ? last.errors.slice(0, 3) : [],
+        // ⚠️ 要見到分季分版子資料夾——嗰個係目前風險最高嘅未驗證項。
+        filesInVersionFolder: mine.filter(function (f) { return f.inSubfolder; }).length,
+        filesFlatInRoot: mine.filter(function (f) { return !f.inSubfolder; }).length,
+        samplePaths: mine.slice(0, 5).map(function (f) { return f.path; })
+      };
+    });
+
   // ── 步 4　正式發出給全體 ─────────────────────────────────
   runRehearsalStep_(steps, '步驟 4：正式發出給全體',
-    { quarterId: quarterId, requiresStage: QUARTER_STAGE.REQUESTS_APPLIED }, function () {
+    { quarterId: quarterId, stepKey: FLOW_STEP_KEYS.OFFICIAL_SEND }, function () {
       const warn = planStep4Warnings_(quarterId);
       const pdf = planStep4MissingPdf_(quarterId, warn.versionNo);
       const preview = planStep4SendPreview_(quarterId, warn.versionNo);
@@ -372,7 +444,7 @@ function executeSeasonRehearsal_(quarterId) {
 
   // ── 步 5　改動後重發（預期 0 人，因為冇改過嘢）────────────
   runRehearsalStep_(steps, '步驟 5：改動後重發',
-    { quarterId: quarterId, requiresStage: QUARTER_STAGE.OFFICIAL_SENT }, function () {
+    { quarterId: quarterId, stepKey: FLOW_STEP_KEYS.RESEND }, function () {
       const plan = planStep5ChangedList_(quarterId);
       return {
         versionNo: plan.versionNo,
@@ -753,7 +825,10 @@ function runSeasonRehearsal_() {
     + '現在 PDF：' + before.pdfFileCount + ' 個檔案\n\n'
     + '這次演練會：\n'
     + '・建立 2 個新版本（生成初稿一個、套用申報一個）\n'
-    + '・為全體義工產生個人 PDF（每人一份，約幾十份）\n'
+    // ⚠️ 第三十一輪批次階段 B1：新增「步驟 3.5 產生個人 PDF」。
+    // 冇呢一步，步驟 4 一定會被缺件保護擋住，寄送路徑永遠測唔到。
+    + '・為全體義工產生個人 PDF（每人一份，約 58 份；'
+    + '實測整個流程約 2 分鐘，加上這一步預計再多幾分鐘）\n'
     + '・在 SendLog 寫入兩批紀錄（審閱一批、正式發出一批）\n\n'
     + '⚠️ 不會真的寄出任何電郵——DRY_RUN 是 TRUE，'
     + '整個寄送流程會走完，但信不會離開系統。\n\n'

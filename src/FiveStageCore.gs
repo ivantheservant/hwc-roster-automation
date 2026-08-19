@@ -87,6 +87,114 @@ const STEP2_ALLOWED_STAGES_ = [
 ];
 
 /**
+ * 「步驟 3：套用修改申報」允許嘅 Stage。
+ *
+ * ⚠️ 呢個同 `FLOW_STEP_KEYS.SAVE_CONFIRM`（Web UI 嘅「儲存並確認」）
+ * 係兩件唔同嘅事，唔好夾埋一齊。抽成常數係因為佢喺
+ * `planStep3_()` 同 `executeStep3Release_()` 兩處出現——
+ * 抄兩份就等於兩個真相來源，改一處另一處會靜靜唔同步。
+ */
+const STEP3_APPLY_ALLOWED_STAGES_ = [
+  QUARTER_STAGE.REVIEW_SENT, QUARTER_STAGE.REQUESTS_APPLIED
+];
+
+/**
+ * 步驟 4 容許嘅 Stage。
+ * ⚠️ 第三十一輪批次階段 B2：抽成常數，令「前置條件描述」同「實際閘門」
+ * 讀同一份清單——兩邊各寫一次就會漂移，而漂移嘅後果係報告講一套、
+ * 系統做另一套。
+ */
+const STEP4_ALLOWED_STAGES_ = [QUARTER_STAGE.REQUESTS_APPLIED];
+
+/** 步驟 5 容許嘅 Stage。同上。 */
+const STEP5_ALLOWED_STAGES_ = [QUARTER_STAGE.OFFICIAL_SENT];
+
+/**
+ * 五個流程步驟嘅代號。**唔可以用字面字串**——打錯一個字，
+ * `describeFlowStepPrecondition_()` 會拋錯（唔會靜靜當成「冇限制」）。
+ */
+const FLOW_STEP_KEYS = {
+  GENERATE: 'GENERATE',
+  REVIEW_SEND: 'REVIEW_SEND',
+  SAVE_CONFIRM: 'SAVE_CONFIRM',
+  OFFICIAL_SEND: 'OFFICIAL_SEND',
+  RESEND: 'RESEND'
+};
+
+/**
+ * 逐步嘅 Stage 閘門。**`null` ＝ 呢一步冇 Stage 限制。**
+ *
+ * ⚠️ 全部讀返閘門本身用嗰幾個常數，唔可以喺呢度另抄一份。
+ *
+ * - `GENERATE`：`performRosterGeneration_()` 冇叫過 `requireQuarterStage_()`，
+ *   而覆蓋式重新生成連「未有版本」都唔要求 ⇒ **真係冇限制**。
+ * - `SAVE_CONFIRM`：掣 1 本身冇 Stage 閘（`buildSaveAndConfirmPlan_()`
+ *   對任何 Stage 都行得），但**零改動路徑只有 `REVIEW_SENT` 會令 Stage 前進**
+ *  （見 `resolveZeroChangeAction_()`）。演練關心嘅係後者，所以寫 `REVIEW_SENT`。
+ */
+const FLOW_STEP_ALLOWED_STAGES_ = {
+  GENERATE: null,
+  REVIEW_SEND: STEP2_ALLOWED_STAGES_,
+  SAVE_CONFIRM: [QUARTER_STAGE.REVIEW_SENT],
+  OFFICIAL_SEND: STEP4_ALLOWED_STAGES_,
+  RESEND: STEP5_ALLOWED_STAGES_
+};
+
+/**
+ * 一個流程步驟嘅**前置條件**：要邊個 Stage、而家係邊個、滿唔滿足。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第三十一輪批次階段 B2：唯一嘅真相來源
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 演練報告寫住：
+ *   `步驟 1：生成初稿　前置條件　Stage 要係 DRAFT，實際係 REVIEW_SENT ⚠️ 不符合`
+ *   `步驟 2：寄給堂委審閱　前置條件　Stage 要係 DRAFT，實際係 REVIEW_SENT ⚠️ 不符合`
+ * ——但兩步都成功。**前置條件描述錯咗**，因為演練工具自己另寫咗一套。
+ *
+ * 實情：
+ *   步驟 2 喺第二十五輪已經放寬到三個 Stage（`STEP2_ALLOWED_STAGES_`）
+ *   步驟 1「生成初稿」根本冇 Stage 限制（`performRosterGeneration_()`
+ *   冇叫過 `requireQuarterStage_()`）
+ *
+ * 所以前置條件一律由呢度問，而呢度讀嘅係**閘門本身用嗰幾個常數**。
+ *
+ * @param {string} stepKey `FLOW_STEP_KEYS` 其中一個
+ * @param {string} quarterId
+ * @returns {{text: string, met: boolean, allowedStages: ?string[], actualStage: string}}
+ */
+function describeFlowStepPrecondition_(stepKey, quarterId) {
+  let actual;
+  try {
+    actual = getQuarterStage_(quarterId);
+  } catch (err) {
+    actual = '（查不到：' + err.message + '）';
+  }
+
+  const allowed = FLOW_STEP_ALLOWED_STAGES_[stepKey];
+  if (allowed === undefined) {
+    throw new Error('describeFlowStepPrecondition_() 認不出這個步驟代號：「'
+      + stepKey + '」。可用的是：' + Object.keys(FLOW_STEP_ALLOWED_STAGES_).join('、') + '。');
+  }
+
+  // `null` ＝ 呢一步**冇 Stage 限制**。
+  // ⚠️ 唔可以寫成一個假嘅「要係 DRAFT」——嗰個就係演練報告嗰兩行嘅來源。
+  if (allowed === null) {
+    return {
+      text: '這一步沒有 Stage 限制（目前 Stage 是 ' + actual + '）',
+      met: true, allowedStages: null, actualStage: actual
+    };
+  }
+
+  const met = allowed.indexOf(actual) !== -1;
+  return {
+    text: 'Stage 要是 ' + allowed.join(' / ') + '，實際是 ' + actual
+      + (met ? '　✅' : '　⚠️ 不符合——下面的失敗很可能是連鎖，不是這一步本身'),
+    met: met, allowedStages: allowed.slice(), actualStage: actual
+  };
+}
+
+/**
  * 步驟 2 的確認資料。純讀取。
  * @param {string} quarterId 季度 ID
  * @returns {{quarterId: string, versionNo: number, recipientCount: number, isDryRun: boolean}}
@@ -153,7 +261,7 @@ function executeStep2_(quarterId) {
  */
 function planStep3_(quarterId) {
   const stage = requireQuarterStage_(
-    quarterId, [QUARTER_STAGE.REVIEW_SENT, QUARTER_STAGE.REQUESTS_APPLIED], '步驟 3：套用修改申報');
+    quarterId, STEP3_APPLY_ALLOWED_STAGES_, '步驟 3：套用修改申報');
   const plan = planApplyRequests_(quarterId);
 
   if (plan.results.length > 0) {
@@ -217,7 +325,7 @@ function executeStep3Apply_(plan, confirmedSheetRows) {
  */
 function executeStep3Release_(quarterId, releaseText) {
   const stage = requireQuarterStage_(
-    quarterId, [QUARTER_STAGE.REVIEW_SENT, QUARTER_STAGE.REQUESTS_APPLIED], '步驟 3：套用修改申報');
+    quarterId, STEP3_APPLY_ALLOWED_STAGES_, '步驟 3：套用修改申報');
   if (stage === QUARTER_STAGE.REQUESTS_APPLIED) {
     return { advanced: false, alreadyAdvanced: true };
   }
@@ -253,7 +361,7 @@ function declineWithFreshPlan_(quarterId) {
  * @returns {{versionNo: number, pendingRequests: Object[], pendingCells: Object[]}}
  */
 function planStep4Warnings_(quarterId) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
+  requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 
@@ -274,7 +382,7 @@ function planStep4Warnings_(quarterId) {
  * @returns {Object} `checkMissingPersonalPdfs_()` 的結果
  */
 function planStep4MissingPdf_(quarterId, versionNo) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
+  requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
   const result = checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
   // 第十九輪批次階段 C1：缺件比例過高時 `gate.blocked = true`，
   // 呼叫端唔應該再畀「現在繼續」呢個選擇。
@@ -289,7 +397,7 @@ function planStep4MissingPdf_(quarterId, versionNo) {
  * @returns {{recipientCount: number, isDryRun: boolean}}
  */
 function planStep4SendPreview_(quarterId, versionNo) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
+  requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
   const recipientCount = listRecipients_(
     MAIL_STAGES.OFFICIAL, buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL)).length;
   return {
@@ -308,7 +416,7 @@ function planStep4SendPreview_(quarterId, versionNo) {
  * @returns {Object} `sendStage()` 的回傳結果
  */
 function executeStep4Send_(quarterId) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.REQUESTS_APPLIED], '步驟 4：正式發出');
+  requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 
@@ -352,7 +460,7 @@ function executeStep4Send_(quarterId) {
  * @returns {Object} `mode='HAS_PENDING'` 時附 `plan`；否則 `mode='NO_PENDING'`
  */
 function planStep5_(quarterId) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.OFFICIAL_SENT], '步驟 5：改動後重發');
+  requireQuarterStage_(quarterId, STEP5_ALLOWED_STAGES_, '步驟 5：改動後重發');
 
   let pendingRequests = [];
   try {
@@ -385,7 +493,7 @@ function executeStep5Apply_(plan, confirmedSheetRows) {
  * @returns {{versionNo: number, context: Object, changedList: Object[]}}
  */
 function planStep5ChangedList_(quarterId) {
-  requireQuarterStage_(quarterId, [QUARTER_STAGE.OFFICIAL_SENT], '步驟 5：改動後重發');
+  requireQuarterStage_(quarterId, STEP5_ALLOWED_STAGES_, '步驟 5：改動後重發');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
   const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.RESEND);

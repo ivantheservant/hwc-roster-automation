@@ -37,7 +37,8 @@ const src = read('src/SeasonRehearsal.gs');
 console.log('\n=== C1【核心】次序改成真實流程 ===');
 {
   const order = ['步驟 1：生成初稿', '步驟 2：寄給堂委審閱',
-    '步驟 3：儲存並確認（零改動）', '步驟 4：正式發出給全體', '步驟 5：改動後重發'];
+    '步驟 3：儲存並確認（零改動）', '步驟 3.5：產生個人 PDF',
+    '步驟 4：正式發出給全體', '步驟 5：改動後重發'];
   const positions = order.map(function (name) { return src.indexOf("'" + name + "'"); });
   check('★★★★★ 五步都喺原始碼入面搵得到',
     positions.every(function (p) { return p !== -1; }), JSON.stringify(positions));
@@ -50,21 +51,33 @@ console.log('\n=== C1【核心】次序改成真實流程 ===');
       > src.indexOf("'步驟 2：寄給堂委審閱'"));
 }
 
-console.log('\n=== C1【核心】每一步都記低前置條件 ===');
+console.log('\n=== B2【核心】前置條件由五階段閘門自己講，唔喺演練工具另寫一套 ===');
 {
+  // ⚠️ 第三十一輪批次階段 B2：舊版喺呢度寫死 `requiresStage: QUARTER_STAGE.DRAFT`，
+  // 而真正嘅閘門根本唔係噉——步驟 1 冇 Stage 限制，步驟 2 放寬到三個 Stage。
+  // 結果報告寫「⚠️ 不符合」但兩步都成功。**兩個真相來源。**
   const required = [
-    ['步驟 1：生成初稿', 'QUARTER_STAGE.DRAFT'],
-    ['步驟 2：寄給堂委審閱', 'QUARTER_STAGE.DRAFT'],
-    ['步驟 3：儲存並確認（零改動）', 'QUARTER_STAGE.REVIEW_SENT'],
-    ['步驟 4：正式發出給全體', 'QUARTER_STAGE.REQUESTS_APPLIED'],
-    ['步驟 5：改動後重發', 'QUARTER_STAGE.OFFICIAL_SENT']
+    ['步驟 1：生成初稿', 'GENERATE'],
+    ['步驟 2：寄給堂委審閱', 'REVIEW_SEND'],
+    ['步驟 3：儲存並確認（零改動）', 'SAVE_CONFIRM'],
+    ['步驟 4：正式發出給全體', 'OFFICIAL_SEND'],
+    ['步驟 5：改動後重發', 'RESEND']
   ];
   required.forEach(function (r) {
     const at = src.indexOf("'" + r[0] + "'");
     const chunk = src.slice(at, at + 220);
-    check('★★★★★ ' + r[0] + ' 標明前置 Stage 係 ' + r[1],
-      chunk.indexOf('requiresStage: ' + r[1]) !== -1, chunk.slice(0, 180));
+    check('★★★★★ ' + r[0] + ' 傳 `stepKey: FLOW_STEP_KEYS.' + r[1] + '`',
+      chunk.indexOf('stepKey: FLOW_STEP_KEYS.' + r[1]) !== -1, chunk.slice(0, 180));
   });
+
+  function stripComments(s) {
+    return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  }
+  check('★★★★★ **演練工具入面一個 `requiresStage` 都冇剩返**'
+    + '——留低一個就等於留低一套會靜靜講錯嘢嘅平行真相',
+    stripComments(src).indexOf('requiresStage') === -1);
+  check('★★★★★ 而且冇喺演練工具入面自己砌 Stage 描述字串',
+    stripComments(src).indexOf('Stage 要係') === -1);
 }
 
 console.log('\n=== C1【核心】前置條件不符合 ⇒ 報告要講到「係連鎖」 ===');
