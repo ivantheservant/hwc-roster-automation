@@ -51,7 +51,7 @@ const gas = loadGasSource([
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Mailer.gs', 'ResendFlow.gs', 'Trigger.gs',
   'WebAppGuards.gs', 'WebAppDashboard.gs', 'WebAppRollback.gs',
-  'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs'
+  'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs', 'PreacherTranslationFill.gs'
 ]);
 
 const Q = '2027T3';
@@ -83,6 +83,10 @@ gas.buildSeedNote_ = function (r) { return 'seed=' + r.seed; };
 gas.tryPublishPublicRoster_ = function () { return { failed: false, message: '' }; };
 gas.findPublicLinkRow_ = function () { return null; };
 gas.assertWebAppRequestAllowed_ = function () {};
+// `apiSavePreacherTranslationEntry()` 要嘅兩個 GAS-only 工具。
+gas.nowTimestamp_ = function () { return '2026-08-20 16:48:18'; };
+gas.applyTimestampFormat_ = function () {};
+gas.writeToPossiblyProtectedGridSheet_ = function (sheet, fn) { fn(); return false; };
 
 /* ══════════════════════════════════════════════════════════════
  * Fixture：三種「曾經被丟失過」嘅格全部都要有
@@ -105,10 +109,11 @@ function buildFixture() {
   seedSheet(ss, S.QUARTERS, ['Q'], [C.QUARTERS.QUARTER_ID, C.QUARTERS.YEAR, C.QUARTERS.TERM,
     C.QUARTERS.START_DATE, C.QUARTERS.END_DATE, C.QUARTERS.STAGE], [
     { [C.QUARTERS.QUARTER_ID]: Q, [C.QUARTERS.YEAR]: 2027, [C.QUARTERS.TERM]: 3,
-      [C.QUARTERS.START_DATE]: '2027-07-04', [C.QUARTERS.END_DATE]: '2027-07-25',
+      [C.QUARTERS.START_DATE]: '2027-07-04', [C.QUARTERS.END_DATE]: '2027-09-26',
       [C.QUARTERS.STAGE]: 'DRAFT' }]);
 
-  for (let i = 0; i < 4; i++) {
+  // 第三十七輪批次：照現場形狀——13 個主日 × 3 個非自動崗位 ＝ 39 格。
+  for (let i = 0; i < 13; i++) {
     const d = new Date(Date.UTC(2027, 6, 4 + i * 7));
     const p2 = function (n) { return n < 10 ? '0' + n : String(n); };
     DATES.push(d.getUTCFullYear() + '-' + p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()));
@@ -127,7 +132,10 @@ function buildFixture() {
     C.POSTS.ALLOW_CONSECUTIVE, C.POSTS.MUTEX_GROUP, C.POSTS.DISPLAY_ORDER,
     C.POSTS.ACTIVE, C.POSTS.EMPTY_DISPLAY],
     [['CHAIR', '主席', true], ['READ', '讀經', true],
-      ['PREACH', '講員', false], ['COMMUNION', '聖餐襄禮', true]].map(function (p, i) {
+      // ⚠️ 三個非自動崗位。中文名一定要啱——`findPreacherTranslationPostIds_()`
+      // 係靠中文名認嘅（唔係靠 PostID）。
+      ['PREACH', '講員', false], ['TRANSLATE', '翻譯', false], ['FLOWER', '獻花', false],
+      ['COMMUNION', '聖餐襄禮', true]].map(function (p, i) {
       return { [C.POSTS.POST_ID]: p[0], [C.POSTS.POST_NAME_TC]: p[1], [C.POSTS.SLOT_COUNT]: 1,
         [C.POSTS.DISTINCT_WITHIN_POST]: false,
         // COMMUNION 用 FIRST_SUNDAY ⇒ 非首主日嗰幾格會係「這一週不設」
@@ -236,17 +244,50 @@ console.log('\n=== 路 1／5：performRosterGeneration_()（生成初稿）===')
 
   const audit = auditCellClasses(gas, Q, 0, true);
   checkEqual('★★★★★ v0 分類守門', audit.problems, []);
-  checkEqual('★★★★ 16 格（4 主日 × 4 崗位）', audit.counts.total, 16);
+  checkEqual('★★★★ 78 格（13 主日 × 6 崗位）', audit.counts.total, 13 * 6);
+  checkEqual('★★★★★ 39 格非自動崗位（13 主日 × 講員／翻譯／獻花）——照現場形狀',
+    audit.counts.manualPending, 39);
   check('★★★★★ 三種「曾經被丟失過」嘅格 fixture 真係有：'
     + '待確認（講員）同不設（非首主日聖餐）',
     audit.counts.manualPending >= 4 && audit.counts.structuralNa >= 3,
     JSON.stringify(audit.counts));
   checkEqual('★★★★★ v0 「未能安排」＝ 0（基準線）', audit.counts.genuineGap, 0);
 
-  // 填一位外請講員（模擬「填講員／翻譯／獻花」：長表 ＋ grid 都寫自由文字）
-  check('（前置）長表寫入自由文字', setSnapshot(0, DATES[0], 'PREACH', GUEST));
-  check('（前置）grid 寫入同一個字', setGrid(0, DATES[0], 'PREACH', GUEST));
-  checkEqual('（前置）佢真係冇 PersonID', String(cellOf(0, DATES[0], 'PREACH')[A.PERSON_ID] || ''), '');
+  // ─────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十七輪批次 B 組：**一定要用真入口填，唔可以手砌。**
+  // ─────────────────────────────────────────────────────────────────
+  //
+  // 上一輪呢度用 `setSnapshot()` 手砌——只寫 `PersonNameSnapshot`，
+  // 而 `assignSource` 留返 `SKIPPED`。但真正嘅入口
+  // `apiSavePreacherTranslationEntry()` **同時會把 assignSource 寫成 MANUAL**。
+  //
+  // 即係 fixture 砌出嚟嗰個形狀，**真正嘅碼根本唔會產生**。
+  // 而 `MANUAL` 正正就係令 `classifyGridCell_()` 跌落 GENUINE_GAP 嗰個值。
+  // 所以上一輪嗰條共用斷言完全正常噉通過咗，而現場一撳就爆。
+  //
+  // 呢個係 bug class 第 6 條（測試冇由真入口叫落去）用喺**建立資料**嗰邊。
+  check('（前置）用真入口 apiSavePreacherTranslationEntry() 填講員',
+    gas.apiSavePreacherTranslationEntry(Q, DATES[0], 'PREACH', 1, GUEST) !== undefined);
+  checkEqual('（前置）佢真係冇 PersonID（外請講員唔喺 NameMapping）',
+    String(cellOf(0, DATES[0], 'PREACH')[A.PERSON_ID] || ''), '');
+  checkEqual('★★★★★ （證據）真入口會把 assignSource 寫成 MANUAL'
+    + '——上一輪 fixture 手砌嗰陣留咗 SKIPPED，所以斷言先會放行',
+    String(cellOf(0, DATES[0], 'PREACH')[A.ASSIGN_SOURCE]), gas.ASSIGN_SOURCE.MANUAL);
+  checkEqual('★★★★★ 而 ruleFlags 冇被清走（真入口唔會掂佢）',
+    gas.splitList_(cellOf(0, DATES[0], 'PREACH')[A.RULE_FLAGS]), [gas.RULE_IDS.NO_AUTO_GENERATE]);
+
+  const afterFill = auditCellClasses(gas, Q, 0, true);
+  checkEqual('★★★★★ **填完之後，同一版嘅「未能安排」仍然係 0**'
+    + '（現場就係喺呢一刻由 0 變 1——一格都未複製過）',
+    afterFill.counts.genuineGap, 0);
+  checkEqual('★★★★★ 而且嗰一格算「有人」（只有 ASSIGNED 會渲染人名，'
+    + '判錯類 ＝ 個名喺 grid 同 PDF 上消失）',
+    gas.classifyGridCell_({
+      personId: cellOf(0, DATES[0], 'PREACH')[A.PERSON_ID],
+      personName: cellOf(0, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT],
+      assignSource: cellOf(0, DATES[0], 'PREACH')[A.ASSIGN_SOURCE],
+      ruleFlags: gas.splitList_(cellOf(0, DATES[0], 'PREACH')[A.RULE_FLAGS])
+    }), gas.GRID_CELL_CLASS.ASSIGNED);
 }
 
 console.log('\n=== 路 2／5：applyRequests_()（有申報嗰條路）===');
@@ -295,12 +336,18 @@ console.log('\n=== 路 3／5：materialiseManualEdits_()（純人手改動）===
     + '（A 組：修正之前呢度會變成空字串，PDF 上顯示「⚠ 未能安排」——'
     + '幹事開季前填嘅 13 個講員一撳就全部唔見，而且冇任何錯誤訊息）',
     String(cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT]), GUEST);
-  checkEqual('★★★★★ 而且佢仍然係「待確認」，唔係「未能安排」',
+  // ⚠️ 第三十七輪批次：呢一格而家算「有人」（ASSIGNED），唔再係「待確認」
+  //——佢真係有一個幹事親手填嘅人名。而且只有 ASSIGNED 會渲染人名。
+  // 呢度**一定要傳 `personName`**，唔傳就會重現返個 bug（見 helper 嘅註解）。
+  checkEqual('★★★★★ 而且佢算「有人」（ASSIGNED），唔係「未能安排」',
     gas.classifyGridCell_({
       personId: cellOf(next, DATES[0], 'PREACH')[A.PERSON_ID],
+      personName: cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT],
       assignSource: cellOf(next, DATES[0], 'PREACH')[A.ASSIGN_SOURCE],
       ruleFlags: gas.splitList_(cellOf(next, DATES[0], 'PREACH')[A.RULE_FLAGS])
-    }), gas.GRID_CELL_CLASS.MANUAL_PENDING);
+    }), gas.GRID_CELL_CLASS.ASSIGNED);
+  checkEqual('★★★★★ 而且 assignSource 仍然係 MANUAL（唔會被覆寫成 SKIPPED）',
+    String(cellOf(next, DATES[0], 'PREACH')[A.ASSIGN_SOURCE]), gas.ASSIGN_SOURCE.MANUAL);
 }
 
 console.log('\n=== 路 4／5：apiRollbackExecute()（回到上一個版本）===');

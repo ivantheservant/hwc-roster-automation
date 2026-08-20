@@ -218,9 +218,21 @@ function materialiseManualEdits_(context, changes, state, source) {
       //   認唔到而且係人手改動 ⇒ 空（`unresolved` 已經擋住，行唔到呢度）
       //   認唔到而且**唔係**人手改動 ⇒ **原封不動搬上一版嗰個字**
       personName: person ? person.nameTC : (s.isManual ? '' : (originalRow.personName || '')),
-      assignSource: s.personId
-        ? (s.isManual ? ASSIGN_SOURCE.MANUAL : (originalRow.assignSource || ASSIGN_SOURCE.AUTO))
-        : ASSIGN_SOURCE.SKIPPED,
+      // ⚠️ 第三十七輪批次 A 組（第二處）：**唔可以淨係睇 `personId` 就當
+      // 呢一格係 SKIPPED。**
+      //
+      // 原本寫 `s.personId ? … : ASSIGN_SOURCE.SKIPPED`。自由文字嗰啲格
+      // 冇 `personId`，所以佢原本嘅 `MANUAL`（由「填講員／翻譯／獻花」
+      // 寫入）會被覆寫成 `SKIPPED`——又一次「解析唔到人 ⇒ 當冇嘢」。
+      //
+      // 呢個係上一輪嗰條共用斷言加咗 `assignSource` 之後先揪到嘅：
+      //   `2027-07-04|PREACH|1　assignSource：「MANUAL」 → 「SKIPPED」`
+      //
+      // 規則：冇被人手改動嘅格，**來源原封不動搬**（唔理有冇 personId）。
+      assignSource: s.isManual
+        ? (s.personId ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)
+        : (originalRow.assignSource
+          || (s.personId ? ASSIGN_SOURCE.AUTO : ASSIGN_SOURCE.SKIPPED)),
       // ─────────────────────────────────────────────────────────────
       // ⚠️ 第三十四輪批次甲5：**跳過原因一定要帶落去，唔可以寫死空陣列。**
       // ─────────────────────────────────────────────────────────────

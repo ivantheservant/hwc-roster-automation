@@ -1500,7 +1500,36 @@ function summariseBlankAssignments_(assignments) {
  */
 function classifyGridCell_(assignment) {
   if (!assignment) return GRID_CELL_CLASS.MANUAL_PENDING;
-  if (assignment.personId) return GRID_CELL_CLASS.ASSIGNED;
+  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十七輪批次 A 組：**「解析唔到人」唔等於「呢一格冇嘢」。**
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // 原本只睇 `personId`。但「填講員／翻譯／獻花」寫入嘅外請講員
+  // **根本冇 `PersonID`**（佢唔喺 `NameMapping`，亦都唔應該喺）——
+  // 佢只有 `PersonNameSnapshot` 一個自由文字。
+  //
+  // 於是嗰一格：`personId=''`、`personName='（某位客席講員）'`、
+  // `assignSource=MANUAL`（`apiSavePreacherTranslationEntry()` 咁寫）、
+  // `ruleFlags='HARD_NO_AUTO_PREACHER'`。
+  //
+  // 落到下面：唔係 STRUCTURAL_NA、唔係 SPECIAL_SKIP，
+  // 而 MANUAL_PENDING 嗰條要求 `assignSource === SKIPPED`（而家係 MANUAL）
+  // ⇒ **跌落 GENUINE_GAP**：一格幹事親手填咗人名嘅格，
+  // 被系統報成「搵唔到合資格而當日又有空嘅人」。
+  //
+  // 現場（2027T3）：填一個講員之後，同一版嘅圖例即刻由
+  // `待確認 39／未能安排 0` 變成 `待確認 38／未能安排 1`
+  // ——**一格都未複製過**，corruption 就喺填嗰一刻發生。
+  //
+  // ⚠️ 而且只有 `ASSIGNED` 會渲染人名（見 `resolveGridCellText_()`），
+  // 其餘四類一律出固定標籤。所以判錯類 ＝ 個名喺 grid 同 PDF 上消失。
+  //
+  // 呢個係本專案 bug class 第 2 條最直接嗰個形態：
+  // **把「我解析唔到佢係邊個」當成「呢度冇人」。**
+  //
+  // 判斷改成：有 `personId` **或者**有非空嘅 `personName` ⇒ 呢一格有人。
+  const freeText = String(assignment.personName || '').trim();
+  if (assignment.personId || freeText) return GRID_CELL_CLASS.ASSIGNED;
 
   const flags = assignment.ruleFlags || [];
   if (flags.some(function (id) { return STRUCTURAL_NA_RULE_IDS.indexOf(id) !== -1; })) {

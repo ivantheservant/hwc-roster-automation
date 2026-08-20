@@ -52,6 +52,11 @@ function countVersionCellClasses(gas, quarterId, versionNo) {
     counts.total++;
     const cls = gas.classifyGridCell_({
       personId: row[C.PERSON_ID],
+      // ⚠️ 第三十七輪批次：`personName` **一定要傳**。冇傳嘅話，
+      // 一格由「填講員／翻譯／獻花」寫入嘅自由文字（冇 PersonID）
+      // 會被呢個 helper 自己判成「冇人」——即係 helper 重現咗
+      // 佢本來要守嗰個 bug，變成一條假綠燈。
+      personName: row[C.PERSON_NAME_SNAPSHOT],
       assignSource: row[C.ASSIGN_SOURCE],
       ruleFlags: gas.splitList_(row[C.RULE_FLAGS])
     });
