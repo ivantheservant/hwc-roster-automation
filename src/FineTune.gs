@@ -907,15 +907,42 @@ function applyDecisions(batchId) {
     }
 
     const person = context.peopleById[personId];
+    // ─────────────────────────────────────────────────────────────────
+    // ⚠️ 第三十六輪批次：**呢度係第五條建立版本嘅路，而且兩樣都壞。**
+    // ─────────────────────────────────────────────────────────────────
+    //
+    // 全系統一共有五條路會 `writeAssignments()` 建立新版本：
+    //   1. `performRosterGeneration_()`（MultiRun.gs）　　生成初稿
+    //   2. `applyRequests_()`（RequestsApply.gs）　　　　 套用申報
+    //   3. `materialiseManualEdits_()`（StateSource.gs）　純人手改動
+    //   4. `applyDecisions()`（**呢度**）　　　　　　　　 微調提案
+    //   5. `apiRollbackExecute()`（WebAppRollback.gs）　　回到上一個版本
+    //
+    // 之前三輪逐個修 2、3，但**冇人數過總共有幾多條**，所以呢一條
+    // 由頭到尾冇被查過。佢兩個 bug 都有：
+    //
+    //   `personName: person ? person.nameTC : ''`
+    //     ⇒ 非自動崗位（講員／翻譯／獻花）嘅自由文字蒸發（同 A 組一樣）
+    //   `ruleFlags: []`
+    //     ⇒ 跳過原因整批丟失，格子分類全部倒入「未能安排」（同甲5 一樣）
+    //
+    // 兩條都照返已經驗證過嘅寫法：認唔到人而且唔係今次改動 ⇒ 原封不動搬。
+    const touchedByDecision = !!(entry
+      && entry.decision !== FINETUNE_DECISION.KEEP_MANUAL
+      && entry.decision !== FINETUNE_DECISION.PENDING);
     return {
       serviceDateId: s.serviceDateId,
       serviceDate: s.serviceDate,
       postId: s.postId,
       slotIndex: s.slotIndex,
       personId: personId || '',
-      personName: person ? person.nameTC : '',
+      personName: person
+        ? person.nameTC
+        : ((s.isManual || touchedByDecision) ? '' : (originalRow.personName || '')),
       assignSource: personId ? source : ASSIGN_SOURCE.SKIPPED,
-      ruleFlags: []
+      // 呢一格今次真係被改過 ⇒ 舊嘅跳過原因唔再適用（佢描述緊舊嗰個佔用者）；
+      // 冇被改過 ⇒ 原因原封不動保留。同 `materialiseManualEdits_()` 一致。
+      ruleFlags: (s.isManual || touchedByDecision) ? [] : ((originalRow.ruleFlags || []).slice())
     };
   });
 

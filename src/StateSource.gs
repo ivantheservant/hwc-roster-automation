@@ -195,7 +195,29 @@ function materialiseManualEdits_(context, changes, state, source) {
       postId: s.postId,
       slotIndex: s.slotIndex,
       personId: s.personId || '',
-      personName: person ? person.nameTC : '',
+      // ─────────────────────────────────────────────────────────────
+      // ⚠️ 第三十六輪批次 A 組：**自由文字唔可以喺呢度蒸發。**
+      // ─────────────────────────────────────────────────────────────
+      //
+      // 原本寫死 `person ? person.nameTC : ''`。而 `person` 係
+      // `context.peopleById[s.personId]`——非自動崗位（講員／翻譯／獻花）
+      // 嘅格**冇 `personId`**（外請講員唔喺 `NameMapping`，亦都唔應該喺），
+      // 所以 `person` 永遠 undefined ⇒ 名字被寫成空字串。
+      //
+      // 現場（2027T3）：`Roster_2027T3_v2` 嘅 2027-07-04 講員係一位客席講員，
+      // 撳「儲存並確認」建立新版本之後變成「⚠ 未能安排」。
+      // 幹事開季前要填 13 個講員、13 個獻花，一撳就全部唔見，
+      // 而且**冇任何錯誤訊息**。呢個係資料遺失，唔係顯示問題。
+      //
+      // ⚠️ 成因係一個滑坡：Prompt Q 把「非自動崗位**唔參與偵測**」做到了，
+      // 但「唔參與偵測」被連帶做成「唔寫入新版本」——**兩件事**。
+      // 佢哋唔參與偵測、唔參與規則檢查，但**一定要被複製**。
+      //
+      // 規則同 `applyRequests_()`（RequestsApply.gs 第 384 行）一致：
+      //   認到人 ⇒ 用正式姓名（人手改動嘅格會行呢條）
+      //   認唔到而且係人手改動 ⇒ 空（`unresolved` 已經擋住，行唔到呢度）
+      //   認唔到而且**唔係**人手改動 ⇒ **原封不動搬上一版嗰個字**
+      personName: person ? person.nameTC : (s.isManual ? '' : (originalRow.personName || '')),
       assignSource: s.personId
         ? (s.isManual ? ASSIGN_SOURCE.MANUAL : (originalRow.assignSource || ASSIGN_SOURCE.AUTO))
         : ASSIGN_SOURCE.SKIPPED,

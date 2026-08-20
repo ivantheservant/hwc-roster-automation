@@ -337,6 +337,17 @@ function readVersionAssignmentsForGrid_(quarterId, versionNo) {
     })
     .map(function (row) {
       return {
+        // ⚠️ 第三十六輪批次：**`serviceDateId` 本來冇帶出嚟。**
+        //
+        // `apiRollbackExecute()`（WebAppRollback.gs）用呢個函式攞目標版本
+        // 嘅內容再 `writeAssignments()`，而佢寫 `serviceDateId: a.serviceDateId`
+        // ——`undefined` ⇒ **回退建立嘅新版本，成版 ServiceDateID 全部空白**。
+        // 實測（呢一輪嘅五路測試）：v3 十六格全部空白。
+        //
+        // 同 A 組、甲5 係同一個 class：建立新版本嗰陣冇被改動嘅嘢冇完整搬過去。
+        // 呢個係第六個實例，而且係靠 C 組嗰條共用斷言先揪到
+        //（本來只比四個欄位，加咗呢一個之後即刻紅）。
+        serviceDateId: row[C.SERVICE_DATE_ID],
         serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID],
         slotIndex: Number(row[C.SLOT_INDEX]),
