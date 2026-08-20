@@ -443,8 +443,33 @@ function planApplyRequests_(quarterId) {
 function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverriddenSheetRows) {
   const confirmedSet = {};
   (confirmedSheetRows || []).forEach(function (r) { confirmedSet[r] = true; });
+  // ─────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十八輪批次 F 組：**「grid 贏」唔可以只喺一條路上生效。**
+  // ─────────────────────────────────────────────────────────────────
+  //
+  // 呢個參數本來只有掣 1「儲存並確認」（WebAppSaveConfirm.gs）會傳。
+  // 即係話步驟 3「套用修改申報」同步驟 5「改動後重發」兩條路
+  // **完全冇行過落面嗰段 grid 贏嘅邏輯**——申報照樣蓋過幹事親手改嗰格，
+  // 而且冇任何提示：幹事改完、跑完步驟 3，改動就冇咗。
+  //
+  // 呢個同第十九輪嗰個「讀長表定讀 grid」係同一件事嘅下半截：
+  // 嗰時修好咗「睇邊度」，但「邊個贏」只喺一條路上實作咗。
+  //
+  // 修法：冇傳呢個參數嗰陣**唔係當作冇 overlap**，而係由 `plan` 自己算返。
+  // `plan.assignByKey` 每一格都帶住 `isManual`（`planApplyRequests_()` 由
+  // grid 疊加算出嚟），所以下面呢段同掣 1 嗰邊嘅 `overlaps` 係同一個判斷。
   const gridOverriddenSet = {};
-  (gridOverriddenSheetRows || []).forEach(function (r) { gridOverriddenSet[r] = true; });
+  if (gridOverriddenSheetRows) {
+    gridOverriddenSheetRows.forEach(function (r) { gridOverriddenSet[r] = true; });
+  } else {
+    plan.results.forEach(function (r) {
+      const postId = r.post && r.post.postId;
+      if (!postId || !r.serviceDate || r.sheetRow === undefined || r.sheetRow === null) return;
+      const cell = plan.assignByKey[
+        cellKey_(r.serviceDate, postId, r.slotIndex === undefined ? 1 : r.slotIndex)];
+      if (cell && cell.isManual) gridOverriddenSet[r.sheetRow] = true;
+    });
+  }
 
   const workingByKey = {};
   Object.keys(plan.assignByKey).forEach(function (key) {

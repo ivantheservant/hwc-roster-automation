@@ -939,7 +939,22 @@ function applyDecisions(batchId) {
       personName: person
         ? person.nameTC
         : ((s.isManual || touchedByDecision) ? '' : (originalRow.personName || '')),
-      assignSource: personId ? source : ASSIGN_SOURCE.SKIPPED,
+      // ⚠️ 第三十八輪批次 D 組：**冇 PersonID 唔等於「冇人服侍」。**
+      //
+      // 原本呢度寫 `personId ? source : ASSIGN_SOURCE.SKIPPED`。
+      // 後果：一格由 `apiSavePreacherTranslationEntry()` 填咗自由文字嘅講員
+      // （有 PersonNameSnapshot、`assignSource = MANUAL`、冇 PersonID，因為
+      // 外請講員唔喺 NameMapping），一撳「套用決定」就被壓成 `SKIPPED`。
+      //
+      // 呢個同第三十七輪喺 `materialiseManualEdits_()` 修好嗰個
+      // 一模一樣，只係當時冇一齊改呢條路——因為第五條路一直冇端到端測過。
+      //
+      // 規則同嗰邊一致：唔係今次改動嘅格，**來源原封不動搬**。
+      assignSource: personId
+        ? source
+        : ((s.isManual || touchedByDecision)
+          ? ASSIGN_SOURCE.SKIPPED
+          : (originalRow.assignSource || ASSIGN_SOURCE.SKIPPED)),
       // 呢一格今次真係被改過 ⇒ 舊嘅跳過原因唔再適用（佢描述緊舊嗰個佔用者）；
       // 冇被改過 ⇒ 原因原封不動保留。同 `materialiseManualEdits_()` 一致。
       ruleFlags: (s.isManual || touchedByDecision) ? [] : ((originalRow.ruleFlags || []).slice())

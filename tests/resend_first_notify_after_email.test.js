@@ -1,4 +1,6 @@
 // 第三十三輪批次階段 A：「補上電郵之後的第一封信」——由真入口叫落去。
+// FIXTURE-OK: 檔內唯一一處係喺 `buildFineTuneContext_()` 嘅替身入面
+// **讀返** `row[C.ASSIGN_SOURCE]`（由真正寫入嘅長表讀），唔係手砌一個值。
 // 執行方式：node tests/resend_first_notify_after_email.test.js
 //
 // ═════════════════════════════════════════════════════════════════════

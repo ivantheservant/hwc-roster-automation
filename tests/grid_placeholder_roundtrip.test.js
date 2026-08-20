@@ -1,4 +1,9 @@
 // 第二十輪批次階段 A／B：顯示層 ↔ 資料層轉換必須對稱。
+// FIXTURE-OK: 呢度砌嘅係 `buildGridOverlayState_()` 嘅 `context.original`
+// ——即係「上一版長表讀出嚟係咩」，係純函式嘅直接輸入。
+// 而且每一格嘅形狀都對得返生成器真正會寫嘅嘢（SKIPPED ＋ 對應 ruleFlag）。
+// ⚠️ 「填咗講員之後」嗰個形狀**唔喺呢度砌**——嗰個由真入口產生，
+// 見 `version_carry_over_all_paths.test.js`（第三十七輪出事就係砌錯咗嗰個）。
 // 執行方式：node tests/grid_placeholder_roundtrip.test.js
 //
 // ─────────────────────────────────────────────────────────────────────

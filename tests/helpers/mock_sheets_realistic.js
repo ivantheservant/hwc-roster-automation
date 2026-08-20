@@ -323,6 +323,34 @@ function seedSheet(spreadsheet, sheetName, titles, keys, rows) {
 function appendRows(spreadsheet, sheetName, keys, rows) {
   const sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) throw new Error('appendRows()：找不到工作表 ' + sheetName + '（測試 fixture 寫錯）');
+
+  // ⚠️ 第三十八輪批次 F 組：**呢個函式係由第 1 欄開始逐個位寫落去嘅**，
+  // 唔係按欄名對號入座。所以 `keys` 一定要同工作表第 2 行嘅機器鍵
+  // **由頭開始逐個對齊**。
+  //
+  // 唔檢查嘅後果（實測撞到）：喺 `keys` 中間漏咗一個鍵，成行資料靜靜咁
+  // 向左移一格——`QuarterID` 寫咗入 `RequestID` 欄、`ServiceDate` 寫咗入
+  // `QuarterID` 欄……然後測試報「搵唔到待處理申報」，
+  // 而真正嘅成因喺 fixture 度，同被測嘅程式一啲關係都冇。
+  // 呢種錯要即刻大聲講出嚟，唔可以由得佢變成一個查半日嘅假 bug。
+  const lastCol = sheet.getLastColumn();
+  if (lastCol > 0) {
+    const header = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(String);
+    const bad = [];
+    keys.forEach(function (k, i) {
+      if (String(header[i]) !== String(k)) {
+        bad.push('第 ' + (i + 1) + ' 欄：keys 寫住「' + k + '」，但表上係「' + header[i] + '」');
+      }
+    });
+    if (bad.length > 0) {
+      throw new Error('appendRows()：`keys` 同 ' + sheetName + ' 嘅欄位次序對唔上。\n'
+        + bad.join('\n')
+        + '\n呢個函式由第 1 欄開始逐個位寫，所以 keys 要由第 1 欄開始逐個對齊'
+        + '（可以短過表，但唔可以跳欄、唔可以換次序）。\n'
+        + '表上嘅次序：' + JSON.stringify(header));
+    }
+  }
+
   const startRow = Math.max(3, sheet.getLastRow() + 1);
   const grid = rows.map(function (row) {
     return keys.map(function (k) {

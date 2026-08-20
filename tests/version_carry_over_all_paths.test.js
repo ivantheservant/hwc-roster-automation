@@ -1,4 +1,8 @@
 // 第三十六輪批次 A／B／C：建立新版本時，冇被改動嘅嘢要完整搬過去。
+// FIXTURE-OK: 檔內全部係喺斷言度**讀返**已經寫入嘅長表欄位
+// （`cellOf(...)[A.ASSIGN_SOURCE]`），唔係手砌。
+// 真正嘅資料一律由真入口產生：`apiGenerateDraftExecute()` ＋
+// `apiSavePreacherTranslationEntry()`。
 // 執行方式：node tests/version_carry_over_all_paths.test.js
 //
 // ═════════════════════════════════════════════════════════════════════
@@ -51,13 +55,29 @@ const gas = loadGasSource([
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Mailer.gs', 'ResendFlow.gs', 'Trigger.gs',
   'WebAppGuards.gs', 'WebAppDashboard.gs', 'WebAppRollback.gs',
-  'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs', 'PreacherTranslationFill.gs'
+  'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs', 'PreacherTranslationFill.gs',
+  // 第三十八輪批次 D 組：路 5 要真入口 apiDetectChanges()
+  'WebApp.gs'
 ]);
 
 const Q = '2027T3';
 const TZ = 'Pacific/Auckland';
 const ss = new RealisticMockSpreadsheet();
-gas.SpreadsheetApp = { getActiveSpreadsheet: function () { return ss; } };
+// 資料驗證（Decision 欄嘅下拉選單）純粹係試算表 UI，冇任何邏輯——
+// mock 嘅 Range 已經有 setDataValidation()，呢度只補返個 builder。
+function dvBuilder() {
+  const self = {
+    requireValueInList: function () { return self; },
+    setAllowInvalid: function () { return self; },
+    setHelpText: function () { return self; },
+    build: function () { return { _mock: 'dataValidation' }; }
+  };
+  return self;
+}
+gas.SpreadsheetApp = {
+  getActiveSpreadsheet: function () { return ss; },
+  newDataValidation: dvBuilder
+};
 gas.Session = { getActiveUser: function () { return { getEmail: function () { return 'r36@example.invalid'; } }; } };
 gas.CacheService = {
   getScriptCache: function () {
@@ -176,7 +196,9 @@ function buildFixture() {
       }));
 
   ['ROSTER_VERSIONS', 'ROSTER_ASSIGNMENTS', 'SEND_LOG', 'AUDIT_LOG', 'REQUESTS',
-    'SPECIAL_SUNDAYS', 'UNAVAILABLE', 'NAME_ALIAS'].forEach(function (k) {
+    'SPECIAL_SUNDAYS', 'UNAVAILABLE', 'NAME_ALIAS',
+    // 第三十八輪批次 D 組：路 5 由真入口 apiDetectChanges() 寫提案入呢張表
+    'FINE_TUNE_PROPOSALS'].forEach(function (k) {
     seedSheet(ss, S[k], [k], Object.keys(C[k]).map(function (x) { return C[k][x]; }), []);
   });
   seedSheet(ss, S.EMAIL_TEMPLATES, ['T'], [C.EMAIL_TEMPLATES.TEMPLATE_ID], []);
@@ -184,20 +206,12 @@ function buildFixture() {
 }
 buildFixture();
 
-function setSnapshot(v, date, post, name) {
-  const sh = ss.getSheetByName(S.ROSTER_ASSIGNMENTS);
-  const h = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
-  const col = function (k) { return h.indexOf(k) + 1; };
-  for (let r = 3; r <= sh.getLastRow(); r++) {
-    if (String(sh.getRange(r, col(A.QUARTER_ID)).getValue()) !== Q) continue;
-    if (Number(sh.getRange(r, col(A.VERSION_NO)).getValue()) !== v) continue;
-    if (String(sh.getRange(r, col(A.POST_ID)).getValue()) !== post) continue;
-    if (gas.toDateString(sh.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== date) continue;
-    sh.getRange(r, col(A.PERSON_NAME_SNAPSHOT)).setValue(name);
-    return true;
-  }
-  return false;
-}
+// ⚠️ 第三十八輪批次 B 組：`setSnapshot()` 已經刪走。
+// 佢只寫 `PersonNameSnapshot`、留低 `assignSource = SKIPPED`，
+// 而真入口 `apiSavePreacherTranslationEntry()` 會同時寫 `MANUAL`——
+// 即係佢砌出嚟嘅狀態**真實程式碼永遠唔會產生**。
+// 連續兩輪嘅假綠燈就係噉嚟。而家一律用真入口填。
+
 function setGrid(v, date, post, text) {
   const sh = ss.getSheetByName(gas.buildRosterSheetName_(Q, v));
   const keys = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
@@ -374,34 +388,171 @@ console.log('\n=== 路 4／5：apiRollbackExecute()（回到上一個版本）==
     String(cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT]), GUEST);
 }
 
-console.log('\n=== 路 5／5：applyDecisions()（微調提案）——第五條路 ===');
+console.log('\n=== 路 5／5：applyDecisions()（微調提案）——真入口端到端 ===');
 {
-  // ⚠️ 呢條路之前**從來冇被查過**。三輪都只數過四條。
-  // 佢兩個 bug 都有（`personName: ''` ＋ `ruleFlags: []`）。
-  const src = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'src', 'FineTune.gs'), 'utf8');
-  // ⚠️ 直接切「砌 assignments」嗰段，唔用 `indexOf('writeAssignments(')` 做終點
-  // ——嗰個字串喺註解入面都出現過，會切得太早而令下面幾條變成假綠燈。
-  const body = src.slice(src.indexOf('function applyDecisions('));
-  const start = body.indexOf('const assignments = analysis.manualState.map(');
-  const end = body.indexOf('revertBlocked.forEach(');
-  check('（前置）切到 applyDecisions 砌 assignments 嗰段',
-    start !== -1 && end !== -1 && end > start, 'start=' + start + ' end=' + end);
-  const upToWrite = body.slice(start, end);
-  // ⚠️ 拆走註解先查——修正嗰段嘅註解**特登引用咗舊嗰兩行**做對照，
-  // 唔拆嘅話會查中自己嘅註解，變成一條永遠紅嘅假警報。
-  const bare = upToWrite.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const base = gas.findLatestVersionNo(Q);
 
-  check('★★★★★ 唔再寫死 `ruleFlags: []`'
-    + '（同第三十四輪甲5 一模一樣嘅 bug，只係喺另一條路）',
-    !/ruleFlags:\s*\[\]/.test(bare), bare.slice(-300));
-  check('★★★★★ 唔再寫死「認唔到人就一律空字串」嘅 personName'
-    + '（同 A 組一模一樣嘅 bug）',
-    !/personName:\s*person \? person\.nameTC : ''/.test(bare), bare.slice(-300));
-  check('★★★★★ 冇被今次決定改動嘅格，`ruleFlags` 由 originalRow 搬過去',
-    /ruleFlags:[\s\S]{0,120}originalRow\.ruleFlags/.test(upToWrite), upToWrite.slice(-400));
-  check('★★★★★ `personName` 亦都由 originalRow 搬過去',
-    /personName:[\s\S]{0,160}originalRow\.personName/.test(upToWrite));
+  // 造一個真嘅違反：加一位只做「讀經」嘅人，然後喺 grid 把佢擺入「主席」。
+  // ⚠️ 呢兩樣都係**幹事嘅輸入**（NameMapping 同 grid 打字），手砌係正路。
+  const N = C.NAME_MAPPING, E = C.ELIGIBILITY;
+  appendRows(ss, S.NAME_MAPPING, [N.PERSON_ID, N.NAME_TC, N.EMAIL, N.ACTIVE],
+    [{ [N.PERSON_ID]: 'P9699', [N.NAME_TC]: '假戊',
+      [N.EMAIL]: 'p9699@example.invalid', [N.ACTIVE]: true }]);
+  appendRows(ss, S.ELIGIBILITY, [E.ELIGIBILITY_ID, E.PERSON_ID, E.POST_ID, E.ELIGIBLE, E.ACTIVE],
+    [{ [E.ELIGIBILITY_ID]: 'E999', [E.PERSON_ID]: 'P9699', [E.POST_ID]: 'READ',
+      [E.ELIGIBLE]: true, [E.ACTIVE]: true }]);
+
+  const origChair = String(cellOf(base, DATES[3], 'CHAIR')[A.PERSON_ID]);
+  check('（前置）grid 把「主席」改成一位冇資格做主席嘅人',
+    setGrid(base, DATES[3], 'CHAIR', '假戊'));
+
+  // ── 真入口一：檢查改動 ────────────────────────────────────────
+  const detect = gas.apiDetectChanges(Q, base);
+  check('★★★★★ 真入口 apiDetectChanges() 認到呢格人手改動',
+    detect.changeCount >= 1, JSON.stringify(detect).slice(0, 300));
+  check('★★★★★ 而且認到佢違反硬規則（唔係靜靜放行）',
+    detect.violationCount >= 1, JSON.stringify(detect).slice(0, 300));
+  check('★★★★★ 提案真係寫入咗 FineTuneProposals（唔係手砌一張表塞落去）',
+    detect.written >= 1, 'written=' + detect.written);
+
+  // ── 幹事去 FineTuneProposals 填 Decision（呢個係人手輸入，正路）──
+  const P = C.FINE_TUNE_PROPOSALS;
+  const psh = ss.getSheetByName(S.FINE_TUNE_PROPOSALS);
+  const phead = psh.getRange(2, 1, 1, psh.getLastColumn()).getValues()[0];
+  const dcol = phead.indexOf(P.DECISION) + 1;
+  const bcol = phead.indexOf(P.BATCH_ID) + 1;
+  let decided = 0;
+  for (let r = 3; r <= psh.getLastRow(); r++) {
+    if (String(psh.getRange(r, bcol).getValue()) !== detect.batchId) continue;
+    psh.getRange(r, dcol).setValue(gas.FINETUNE_DECISION.REVERT_ORIGINAL);
+    decided++;
+  }
+  check('（前置）幹事把提案全部設成「還原為原本的人」', decided >= 1, 'decided=' + decided);
+
+  // ── 真入口二：套用決定 ────────────────────────────────────────
+  const result = gas.applyDecisions(detect.batchId);
+  check('★★★★★ 真入口 applyDecisions() 行得完（第五條路，之前三輪都只係讀原始碼）',
+    !!(result && result.sheetName), JSON.stringify(result).slice(0, 300));
+
+  const next = gas.findLatestVersionNo(Q);
+  checkEqual('★★★★ 真係建立咗新一版', next, base + 1);
+
+  // ★★★ 核心：呢條路一直冇端到端查過。兩個 bug 都喺呢度出現過。
+  assertCarriedOver('applyDecisions', base, next, [KEY(DATES[3], 'CHAIR')]);
+
+  checkEqual('★★★★★ 「還原為原本的人」真係生效',
+    String(cellOf(next, DATES[3], 'CHAIR')[A.PERSON_ID]), origChair);
+
+  checkEqual('★★★★★ **講員嗰格嘅自由文字原封不動**'
+    + '（第三十六輪查出呢條路寫死 `personName: \'\'`——'
+    + '幹事撳「套用決定」，13 個講員名一次過消失）',
+    String(cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT]), GUEST);
+  checkEqual('★★★★★ 而且佢仍然算「有人」（ASSIGNED），唔係「未能安排」',
+    gas.classifyGridCell_({
+      personId: cellOf(next, DATES[0], 'PREACH')[A.PERSON_ID],
+      personName: cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT],
+      assignSource: cellOf(next, DATES[0], 'PREACH')[A.ASSIGN_SOURCE],
+      ruleFlags: gas.splitList_(cellOf(next, DATES[0], 'PREACH')[A.RULE_FLAGS])
+    }), gas.GRID_CELL_CLASS.ASSIGNED);
+  checkEqual('★★★★★ assignSource 仍然係 MANUAL（唔會被壓成 SKIPPED）',
+    String(cellOf(next, DATES[0], 'PREACH')[A.ASSIGN_SOURCE]), gas.ASSIGN_SOURCE.MANUAL);
+
+  checkEqual('★★★★★ 「這一週不設」嗰啲格嘅 ruleFlags 冇被清走'
+    + '（第三十四輪甲5 同一個 bug，喺呢條路上）',
+    gas.splitList_(cellOf(next, DATES[1], 'COMMUNION')[A.RULE_FLAGS]).length > 0, true);
+
+  const cls = auditCellClasses(gas, Q, next, true);
+  checkEqual('★★★★★ 套用決定之後，「未能安排」仍然係 0'
+    + '（現場嘅指紋係「未能安排 ＝ 總格數 − 有派人」，helper 會擋住）',
+    cls.counts.genuineGap, 0);
+}
+
+
+console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 ===');
+{
+  // ─────────────────────────────────────────────────────────────────
+  // 點解要特登砌呢個情境
+  // ─────────────────────────────────────────────────────────────────
+  //
+  // `applyDecisions()` 入面 `touchedByDecision` 同 `s.isManual` 喺絕大部分
+  // 情況下結果一樣，唯一分得出嘅時候係：
+  //   • 呢一格**唔係**幹事喺 grid 改嘅（isManual = false）
+  //   • 但係今次決定令佢**變成空白**（搵唔到替補）
+  // 呢陣冇咗 `touchedByDecision`，個格就會留低**上一版嗰個人嘅名**——
+  // grid 同 PDF 照舊印住佢，但實際上冇人服侍。
+  //
+  // 造法：把「讀經」嘅資格全部關掉 ⇒ 每一格讀經都違反 HARD_ELIGIBILITY，
+  // 而且搵唔到任何替補 ⇒ 系統建議係空白。
+  //（改資格表係幹事嘅正常操作，季中收到人退出就會噉做。）
+  const base = gas.findLatestVersionNo(Q);
+  const E = C.ELIGIBILITY;
+  const esh = ss.getSheetByName(S.ELIGIBILITY);
+  const ehead = esh.getRange(2, 1, 1, esh.getLastColumn()).getValues()[0];
+  const pcol = ehead.indexOf(E.POST_ID) + 1;
+  const acol = ehead.indexOf(E.ACTIVE) + 1;
+  let closed = 0;
+  for (let r = 3; r <= esh.getLastRow(); r++) {
+    if (String(esh.getRange(r, pcol).getValue()) !== 'READ') continue;
+    esh.getRange(r, acol).setValue(false);
+    closed++;
+  }
+  check('（前置）幹事把「讀經」嘅資格全部關掉', closed > 0, 'closed=' + closed);
+
+  const detect = gas.apiDetectChanges(Q, base);
+  check('★★★★★ 提案係喺**冇人喺 grid 改過**嘅格上面（呢個先分得出兩條分支）',
+    detect.changeCount === 0 && detect.written >= 1,
+    'changeCount=' + detect.changeCount + ' written=' + detect.written);
+  check('★★★★★ 而且系統搵唔到替補（建議係空白）',
+    detect.proposals.some(function (p) { return !p.suggestedPersonId; }),
+    JSON.stringify(detect.proposals.slice(0, 2)));
+
+  const P = C.FINE_TUNE_PROPOSALS;
+  const psh = ss.getSheetByName(S.FINE_TUNE_PROPOSALS);
+  const phead = psh.getRange(2, 1, 1, psh.getLastColumn()).getValues()[0];
+  const col = function (k) { return phead.indexOf(k) + 1; };
+  const touched = [];
+  for (let r = 3; r <= psh.getLastRow(); r++) {
+    if (String(psh.getRange(r, col(P.BATCH_ID)).getValue()) !== detect.batchId) continue;
+    if (String(psh.getRange(r, col(P.SUGGESTED_PERSON_ID)).getValue() || '')) continue;
+    psh.getRange(r, col(P.DECISION)).setValue(gas.FINETUNE_DECISION.ACCEPT_SUGGESTED);
+    touched.push(KEY(gas.toDateString(psh.getRange(r, col(P.SERVICE_DATE_ID)).getValue(), TZ)
+      || '', 'READ'));
+  }
+  check('（前置）幹事把「搵唔到替補」嗰啲設成「採用系統建議」', touched.length > 0);
+
+  const beforeNames = {};
+  DATES.forEach(function (d) {
+    beforeNames[d] = String(cellOf(base, d, 'READ')[A.PERSON_NAME_SNAPSHOT] || '');
+  });
+
+  gas.applyDecisions(detect.batchId);
+  const next = gas.findLatestVersionNo(Q);
+
+  // 實測結果：**決定永遠唔會把一格洗成空白。**
+  // ─────────────────────────────────────────────────────────────────
+  //
+  // `applyDecisions()` 嘅關卡係 `ACCEPT_SUGGESTED && entry.suggested`
+  //（FineTune.gs）——建議係空白嗰陣會跌落 `else`，即係同 KEEP_MANUAL 一樣
+  // 保留現況。`REVERT_ORIGINAL` 亦都有 `revertBlocked` 擋住同一件事。
+  //
+  // 呢個係**啱嘅**：搵唔到替補係「排唔到」，唔係「唔使人做」。
+  // 靜靜洗成空白會令一格服侍冇人知就冇咗。呢度鎖住呢個行為。
+  const kept = DATES.filter(function (d) {
+    return beforeNames[d] !== ''
+      && String(cellOf(next, d, 'READ')[A.PERSON_NAME_SNAPSHOT] || '') === beforeNames[d];
+  });
+  checkEqual('★★★★★ 搵唔到替補嗰啲格**保留現況**，唔會被靜靜洗成空白'
+    + '（洗成空白 ＝ 一格服侍冇人知就冇咗，而幹事只會見到「已套用」）',
+    kept.length, DATES.filter(function (d) { return beforeNames[d] !== ''; }).length);
+
+  checkEqual('★★★★★ 而講員嗰格嘅自由文字**照樣**原封不動'
+    + '（同一次寫入入面，唔同種類嘅格要行唔同嘅規則）',
+    String(cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT]), GUEST);
+  checkEqual('★★★★★ assignSource 亦都仍然係 MANUAL',
+    String(cellOf(next, DATES[0], 'PREACH')[A.ASSIGN_SOURCE]), gas.ASSIGN_SOURCE.MANUAL);
+
+  const cls5b = auditCellClasses(gas, Q, next, true);
+  checkEqual('★★★★★ 「未能安排」仍然係 0', cls5b.counts.genuineGap, 0);
 }
 
 console.log('\n=== C：守門本身要擋得住（用一個真嘅壞版本試）===');

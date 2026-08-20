@@ -1,4 +1,6 @@
 // 階段 A（本輪）：底色語意撞車 bug 的回歸測試。
+// FIXTURE-OK: 呢度砌嘅係「待補格分類」純函式嘅直接輸入，
+// 每一格嘅 `assignSource`／`ruleFlags` 組合都對應生成器真正會寫嘅結果。
 // 執行方式：node tests/pending_backfill_classification.test.js
 //
 // 背景（2027T1 實測發現的真實問題）：步驟 4 執行前的「有未完成事項」視窗

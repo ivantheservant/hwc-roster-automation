@@ -1,4 +1,7 @@
 // 第十九輪批次階段 A5／B3：派工狀態嘅權威來源。
+// FIXTURE-OK: 呢度砌嘅係 `context.original`（上一版長表）同 grid 文字，
+// 兩者都係 `resolveAuthoritativeState_()` 嘅直接輸入。
+// grid 文字嗰半本來就係「幹事打字」——外部輸入，手砌係正路。
 // 執行方式：node tests/state_source_authority.test.js
 //
 // ─────────────────────────────────────────────────────────────────────

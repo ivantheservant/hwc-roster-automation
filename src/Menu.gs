@@ -120,6 +120,11 @@ function onOpen() {
         .addItem('⚠️ 寄送（測試模式）', 'runSendStage_')
         .addItem('⚠️ 寄送單一 ICS／highlight 測試信', 'runSendIcsTestEmail_')
         .addItem('核對職事表', 'runVerifyRoster_')
+        // 第三十八輪批次 G 組：逐季逐版清點格子分類。**只看，不改。**
+        // 程式修好之後，已經建立出來的舊版本裡面壞掉的資料仍然壞著——
+        // 這一項就是用來看清楚「哪一季、哪一版有問題」。
+        // 刻意沒有自動修復，理由見 VersionCellAudit.gs 檔頭。
+        .addItem('清點格子分類（唯讀）', 'runVersionCellAudit_')
         .addItem('自我測試', 'runSelfTest_')
         .addItem('參數掃描', 'runTuneParameters_')
         .addItem('多次生成比較', 'runCompareMultiRun_')

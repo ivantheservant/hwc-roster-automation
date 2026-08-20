@@ -1538,8 +1538,25 @@ function classifyGridCell_(assignment) {
   if (flags.some(function (id) { return SPECIAL_SKIP_RULE_IDS.indexOf(id) !== -1; })) {
     return GRID_CELL_CLASS.SPECIAL_SKIP;
   }
-  if (assignment.assignSource === ASSIGN_SOURCE.SKIPPED
-    && flags.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) {
+  // ─────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十八輪批次 E 組：**「本來就唔由系統排」係睇 RuleFlags，唔係睇來源。**
+  // ─────────────────────────────────────────────────────────────────
+  //
+  // 原本呢度要求 `assignSource === SKIPPED` 先當「待確認」。
+  // 後果：一格講員一旦被寫成 `MANUAL`（幹事用側邊欄填過），之後個名
+  // 因為任何原因變返空白，佢就**唔再符合呢個條件**，跌落「未能安排」。
+  //
+  // 「未能安排」嘅意思係「系統要排，但排唔到」。一格帶住
+  // `NO_AUTO_GENERATE` 嘅格**系統由頭到尾都冇打算排佢**，
+  // 講佢「未能安排」係講錯嘢——而且會嚇親幹事（PDF 圖例會多咗紅字）。
+  //
+  // 呢個就係 2026-08-20 現場 2027T3 v7 見到嗰個
+  // 「待確認 37 ／ 未能安排 2，而 37 + 2 = 39（全部非自動崗位）」嘅成因：
+  // 嗰兩格係填過講員嘅格，`AssignSource` 停留喺 `MANUAL`。
+  //
+  // ⚠️ 呢度只影響**空白**嘅格——有 PersonID 或者有自由文字嘅上面已經
+  // 早走咗（ASSIGNED），所以放寬呢個條件唔會把有人嘅格算錯。
+  if (flags.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) {
     return GRID_CELL_CLASS.MANUAL_PENDING;
   }
   return GRID_CELL_CLASS.GENUINE_GAP;

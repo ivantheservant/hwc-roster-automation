@@ -1,4 +1,6 @@
 // 第三十二輪批次 Prompt N：五階段流程端對端——**由真入口叫落去**。
+// FIXTURE-OK: 檔內唯一一處係喺 `buildFineTuneContext_()` 嘅替身入面
+// **讀返** `row[C.ASSIGN_SOURCE]`（由真正寫入嘅長表讀），唔係手砌一個值。
 // 執行方式：node tests/e2e_five_stage_flow.test.js
 //
 // ═════════════════════════════════════════════════════════════════════
