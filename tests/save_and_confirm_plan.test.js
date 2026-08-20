@@ -83,8 +83,19 @@ console.log('\n=== 步 1.4【核心】同一格既有 grid 改動又有申報 �
 {
   check('★★★★★ 有 overlaps 一節（規格步 1.4 要求確認畫面獨立列出）',
     /overlaps/.test(SRC));
+  // ⚠️ 第三十九輪批次（順手）：呢一段搬咗去共用嘅
+  // `findRequestGridOverlaps_()`（RequestsApply.gs），因為
+  // `applyRequests_()` 嗰邊本來寫住一段一模一樣嘅。
+  // 兩個真相來源係本專案反覆出事嗰一類，所以合併。
+  const OVERLAP_SRC = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'src', 'RequestsApply.gs'), 'utf8');
   check('★★★★★ overlaps 逐項講得出「申報想改成」同「你表上是」',
-    /requestWants:/.test(SRC) && /gridHas:/.test(SRC));
+    /requestWants:/.test(OVERLAP_SRC) && /gridHas:/.test(OVERLAP_SRC));
+  check('★★★★★ 而且空白都要講得出係空白'
+    + '——寫一個空字串落畫面，幹事會以為系統壞咗',
+    /gridHas: cell\.personName \|\| '（空白）'/.test(OVERLAP_SRC));
+  check('★★★★★ 掣 1 嗰條路真係叫嗰個共用函式',
+    /findRequestGridOverlaps_\(requestPlan/.test(SRC));
   check('★★★★★ 註解講明「grid 贏」同點解'
     + '（幹事親手改嗰個係最新真相；申報係之前提交嘅）',
     /grid 贏/.test(SRC) && /最新真相/.test(SRC));

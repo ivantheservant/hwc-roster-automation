@@ -525,8 +525,27 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
     beforeNames[d] = String(cellOf(base, d, 'READ')[A.PERSON_NAME_SNAPSHOT] || '');
   });
 
-  gas.applyDecisions(detect.batchId);
+  const r5b = gas.applyDecisions(detect.batchId);
   const next = gas.findLatestVersionNo(Q);
+
+  // ⚠️ 第三十九輪批次（順手）：保留現況係啱嘅，但**一定要講**。
+  //
+  // 呢批本來同「幹事自己揀咗保留現況」一齊計入 `manualKept`，
+  // 於是畫面只會話佢「沿用你的改動 N 項」——佢會以為系統照佢意思做咗，
+  // 而實際上嗰幾格一格都冇郁過。兩件事完全唔同：
+  //   後者係佢自己嘅決定
+  //   前者係**佢揀咗一樣嘢，而系統做唔到**
+  check('★★★★★ 「搵唔到替補而保留現況」嗰批要逐格報返出嚟'
+    + '（唔報 ⇒ 幹事以為系統照佢意思做咗，實際上一格都冇郁）',
+    (r5b.noReplacement || []).length > 0,
+    JSON.stringify(r5b.noReplacement));
+  check('★★★★ 而且講得出係邊一日、邊個崗位',
+    (r5b.noReplacement || []).every(function (n) {
+      return !!n.serviceDate && !!n.postNameTC;
+    }), JSON.stringify((r5b.noReplacement || []).slice(0, 3)));
+  check('★★★★★ 佢哋仍然計入 manualKept（總數要對得返）',
+    r5b.manualKept >= (r5b.noReplacement || []).length,
+    'manualKept=' + r5b.manualKept + ' noReplacement=' + (r5b.noReplacement || []).length);
 
   // 實測結果：**決定永遠唔會把一格洗成空白。**
   // ─────────────────────────────────────────────────────────────────

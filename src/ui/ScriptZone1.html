@@ -230,6 +230,37 @@
   let savePlan = null;
   let saveDecisions = {};
 
+  /**
+   * 第三十九輪批次 A 組第 3 步：**完全沒有問題就不要彈窗。**
+   *
+   * 幹事改一格、撳「儲存我的修改」，如果一切正常，他不需要看一個
+   * 有五節內容的確認畫面再撳多一次「確定」。彈一個沒有東西要他決定的窗，
+   * 只會訓練他不看內容就撳確定——而下一次真的有東西要看的時候，
+   * 他一樣不會看。
+   *
+   * ⚠️ 「完全沒有問題」的定義刻意寫得**嚴**：任何一項有東西，就照舊彈窗。
+   * 判斷錯的代價不對稱——多彈一個窗只是麻煩，少彈一個就是靜靜改了東西。
+   *
+   * @param {Object} plan `apiSaveAndConfirmPlan` 的結果
+   * @returns {boolean} 可不可以直接儲存
+   */
+  function saveIsCompletelyClean(plan) {
+    const v = plan.violations || {};
+    const r = plan.requests || {};
+    return (v.real || []).length === 0
+      && (v.semiHard || []).length === 0
+      && (v.released || []).length === 0
+      && (r.confirm || []).length === 0
+      && (r.needsInput || []).length === 0
+      && (plan.overlaps || []).length === 0
+      && (plan.unresolved || []).length === 0
+      && !plan.needsRelease
+      // 有申報要套用就一定要彈——那不是他改的東西，他有權先看一眼。
+      && (r.apply || []).length === 0
+      // 真的有東西要儲存，才走這條快路。
+      && (plan.gridChanges || []).length > 0;
+  }
+
   function openSaveAndConfirm() {
     runAction('讀取改動', async () => {
       savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
@@ -237,6 +268,8 @@
 
       if (savePlan.blocked) return renderSaveBlocked(savePlan);
       if (savePlan.zeroChange) return renderSaveZeroChange(savePlan);
+      // 第三十九輪批次 A 組第 3 步：一切正常就直接儲存，唔彈窗。
+      if (saveIsCompletelyClean(savePlan)) return executeCleanSave(savePlan);
       renderSaveMain(savePlan);
     });
   }
@@ -410,7 +443,10 @@
           + ' 格違反了一定要遵守的規則。如果這是正確的（例如名單還未更新），'
           + '請在下面輸入「' + CONFIRM_PHRASE + '」放行。'
           + '放行之後這幾格會照樣儲存，並記入紀錄。',
-        confirmLabel: '放行並儲存',
+        confirmLabel: '照樣儲存',
+        // 第三十九輪批次 A 組第 3 步：「取消」喺呢度唔啱講法——
+        // 佢唔係放棄，係返去表上面改返嗰幾格。
+        cancelLabel: '返回修改',
         danger: true,
         onConfirm: (typed) => executeSaveAndConfirm(typed)
       });
@@ -418,7 +454,8 @@
       openConfirm({
         title: '儲存成第 ' + plan.targetVersionNo + ' 版',
         bodyNodes: bodyNodes,
-        confirmLabel: '確定儲存',
+        confirmLabel: '照樣儲存',
+        cancelLabel: '返回修改',
         onConfirm: () => executeSaveAndConfirm('')
       });
     }
@@ -526,6 +563,31 @@
   }
 
   /* ── C3：執行 ＋ 三種結果 ────────────────────────────────── */
+
+  /**
+   * 一切正常時的那條快路：直接儲存，講一句「已儲存」。
+   *
+   * ⚠️ 走的仍然是 `apiSaveAndConfirmExecute` 那一條——**沒有另一套儲存邏輯**。
+   * 分別只在於「有沒有先彈一個要他撳確定的窗」。
+   *
+   * ⚠️ 空的 `decisions` 是對的：三欄對照的預設本來就是「用我改的」，
+   * 而這條路的前提是一格違反都沒有，所以沒有任何東西要他決定。
+   */
+  function executeCleanSave(plan) {
+    runAction('儲存中，請稍候', async () => {
+      const result = await callServerMutating('apiSaveAndConfirmExecute', currentQuarterId, {
+        decisions: [], confirmedRequestRows: [], releaseText: ''
+      });
+      resetMainFlowState();
+      openModal('已儲存', [
+        make('div', { text: '已儲存', className: 'ok-head' }),
+        para('改了 ' + (plan.gridChanges || []).length + ' 格，'
+          + '存成第 ' + (result.versionNo !== undefined ? result.versionNo : plan.targetVersionNo) + ' 版。'
+          + '規則檢查全部通過，沒有東西需要你決定。'),
+        para('那條永久連結不用換——它已經指向這一版。', 'muted')
+      ], [button('知道了', () => closeModal(), '')]);
+    });
+  }
 
   function executeSaveAndConfirm(releaseText) {
     const confirmedRequestRows = Array.prototype.slice

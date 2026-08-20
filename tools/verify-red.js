@@ -44,6 +44,42 @@ const ROOT = path.join(__dirname, '..');
 //  「還原之後仍然綠」被誤讀成「測試有問題」，浪費咗一整輪）。
 const MUTATIONS = [
   {
+    id: 'dropdown-allow-invalid',
+    why: '把名單下拉選單還原成 `setAllowInvalid(false)`'
+      + '——即係「只准揀名單上的」，會把外請講員／新人／借調直接堵死',
+    file: 'src/GridNameDropdown.gs',
+    find: '.setAllowInvalid(true)',
+    replace: '.setAllowInvalid(false)',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
+  {
+    id: 'elig-unresolved-blocks',
+    why: '把名單工作表還原成「認不出的名字照樣套用」'
+      + '——那個人會被靜靜移出名單，而畫面上什麼都沒有講',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '    blocked: unresolved.length > 0,',
+    replace: '    blocked: false,',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
+  {
+    id: 'paper-list-keeps-unknown',
+    why: '把紙本名單還原成「NameMapping 查不到就略過」'
+      + '——幹事會少印一份，而且完全不知道少了誰',
+    file: 'src/WebAppMainFlow.gs',
+    find: "      nameTC: nameById[id] || ('（NameMapping 查不到這個編號：' + id + '）'),",
+    replace: '      nameTC: nameById[id],',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
+  {
+    id: 'generate-target-warns',
+    why: '把第 1 步還原成「不理那一季是不是已經開始／已經過去」'
+      + '——幹事會在完全沒有提示的情況下生成一個他不打算生成的季度',
+    file: 'src/WebAppMainFlow.gs',
+    find: '  if (target.endDate && target.endDate < today) {',
+    replace: '  if (false) {',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
+  {
     id: 'classify-free-text',
     why: '把 `classifyGridCell_()` 還原成「淨係睇 personId」——'
       + '即係第三十七輪之前嘅行為：填咗自由文字嘅講員格會跌落「未能安排」',
@@ -97,6 +133,16 @@ const MUTATIONS = [
     file: 'src/WebAppRollback.gs',
     find: "personName: a.personName || '',",
     replace: "personName: '',",
+    tests: ['tests/version_carry_over_all_paths.test.js']
+  },
+  {
+    id: 'finetune-report-norepl',
+    why: '把 `applyDecisions()` 還原成「找不到替補就靜靜計入 manualKept」'
+      + '——幹事只會見到「沿用你的改動 N 項」，以為系統照他意思做了，'
+      + '實際上那幾格一格都沒有動過',
+    file: 'src/FineTune.gs',
+    find: '        noReplacement.push({',
+    replace: '        [].push({',
     tests: ['tests/version_carry_over_all_paths.test.js']
   },
   {

@@ -168,44 +168,23 @@ function buildSaveAndConfirmPlan_(quarterId) {
     };
   });
 
-  const gridCellKeys = {};
-  resolved.changes.forEach(function (c) {
-    gridCellKeys[c.serviceDate + '|' + c.postId + '|' + c.slotIndex] = c;
-  });
   // 同一格既有 grid 改動、又有申報 ⇒ **grid 贏**（規格 1.4）。
   // 幹事親手改嗰個係最新真相；申報係之前提交嘅。
   //
-  // ─────────────────────────────────────────────────────────────────────
-  // ⚠️ 第三十四輪批次甲2：**呢個偵測本來一直都係死嘅。**
-  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十九輪批次（順手）：呢一段本來喺呢度自己寫一次，
+  // 而 `applyRequests_()` 嗰邊（第三十八輪 F 組）又寫多一次。
+  // 兩段答案一致，但係兩個真相來源——本專案反覆出事嗰一類。
+  // 而家兩邊都叫 `findRequestGridOverlaps_()`（RequestsApply.gs）。
   //
-  // 原本寫 `r.postId`，但 `validateRequest_()`（RequestsApply.gs）回嘅係
-  // `post`（成個崗位物件），**根本冇 `postId` 呢個欄位**。
-  // 所以 `r.postId` 永遠 `undefined` ⇒ 個 filter 永遠一項都唔中 ⇒
-  // `overlaps` 永遠係空陣列 ⇒ 規格 1.4 由頭到尾冇實作過，
-  // 而畫面上亦都永遠唔會話俾幹事聽「你親手改嗰格會蓋過一筆申報」。
-  //
-  // 之前偵測唔到係因為冇人套用過申報（甲2）——兩個 bug 互相遮住對方。
-  const requestCellKey = function (r) {
-    const postId = r.post && r.post.postId;
-    if (!r.serviceDate || !postId) return null;
-    return r.serviceDate + '|' + postId + '|' + (r.slotIndex === undefined ? 1 : r.slotIndex);
-  };
-  const overlaps = requestPlan.results.filter(function (r) {
-    const key = requestCellKey(r);
-    return key && gridCellKeys[key];
-  }).map(function (r) {
-    const g = gridCellKeys[requestCellKey(r)];
-    return {
-      serviceDate: r.serviceDate,
-      postNameTC: r.postNameText || (r.post && r.post.postNameTC) || '',
-      slotIndex: g.slotIndex,
-      requestWants: r.personNameText || '',
-      gridHas: g.manualText || '（空白）',
-      // 執行階段要靠呢個列號去略過嗰筆申報（見 apiSaveAndConfirmExecute()）。
-      sheetRow: r.sheetRow
-    };
+  // ⚠️ 順帶記低第三十四輪甲2 嗰個 bug 免得有人again：原本寫 `r.postId`，
+  // 但 `validateRequest_()` 回嘅係 `post`（成個崗位物件），
+  // **根本冇 `postId` 呢個欄位** ⇒ 個 filter 永遠一項都唔中 ⇒
+  // 規格 1.4 由頭到尾冇實作過。而家個 key 一律由 `r.post.postId` 攞。
+  const postNamesById = {};
+  (requestPlan.context && requestPlan.context.posts || []).forEach(function (po) {
+    postNamesById[po.postId] = po.postNameTC;
   });
+  const overlaps = findRequestGridOverlaps_(requestPlan, postNamesById);
 
   // ── 步 1.5　規則檢查（三分類 + 準硬）─────────────────────────
   // ⚠️ 參數次序：`findStateViolations_(state, context)`——**派工狀態行先**。

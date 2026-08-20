@@ -1,0 +1,425 @@
+<script>
+  /* ============================================================
+   * 第三十九輪批次 C 組：寄出彈窗　／　D 組：紙本
+   * ============================================================
+   *
+   * ⚠️ 載入次序：要排喺 `ScriptZone1` **之後**——
+   * 落到最後係叫 `openReview()`／`openOfficial()`／`openResend()`，
+   * 嗰三個喺 ScriptZone1 定義。
+   *
+   * ─────────────────────────────────────────────────────────────
+   * C 組：一粒「寄出」，一個彈窗
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 幹事本來要喺三粒掣之間自己揀（審閱／正式／重發），而嗰個判斷
+   * 其實完全係機械嘅——由呢一季行到邊一步決定。
+   *
+   * 而家：**由系統判斷，用一句人話講出嚟，佢睇得見但唔使自己諗。**
+   *
+   * ⚠️ 撳落去之後行嘅仍然係原本嗰三條路。呢度只係一個新嘅門口，
+   * 唔係第二套寄信邏輯——嗰條路上每一道閘（三層防重複、未儲存改動、
+   * 公開連結、附件資料夾、DRY_RUN）都係前面幾十輪逐個補返嚟嘅。
+   */
+
+  function openSendDialog() {
+    runAction('讀取寄送資料', async () => {
+      const s = await callServer('apiGetSendPlanSummary', currentQuarterId);
+      renderSendDialog(s);
+    });
+  }
+
+  function renderSendDialog(s) {
+    // ── 寄唔到：逐個原因講，唔好合成一句 ──────────────────────
+    if (s.kind === 'NONE') {
+      const nodes = [para('現在沒有可以寄的東西。')];
+      if (s.blockedReasons.length > 0) {
+        const box = make('div', { className: 'sec' }, [sectionTitle('原因')]);
+        const names = { review: '寄給堂委審閱', official: '正式發出給全體', resend: '改動後重發' };
+        s.blockedReasons.forEach((b) => {
+          box.appendChild(make('div', {
+            text: '・' + (names[b.key] || b.key) + '：' + b.reason,
+            className: 'vio-row'
+          }));
+        });
+        nodes.push(box);
+      }
+      openModal('寄出', nodes, [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+
+    // ── 有未儲存嘅改動：先問 ────────────────────────────────────
+    //
+    // ⚠️ 呢一問唔可以省。幹事啱啱改完表、未撳儲存就撳寄出，
+    // 系統寄出嘅係**上一次儲存確認嗰一版**——即係佢啱啱改嗰啲唔會喺入面，
+    // 而佢完全唔會察覺。
+    if (s.unsaved && s.unsaved.hasAny) {
+      openConfirm({
+        title: '寄出',
+        bodyNodes: [
+          make('div', { className: 'warnbox' }, [
+            make('div', {
+              text: '你有未儲存的修改。寄出的是「上一次儲存確認的版本」——'
+                + '你剛剛改的那些不會在裡面。',
+              className: 'lines'
+            })
+          ]),
+          para(describeUnsaved(s.unsaved), 'muted')
+        ],
+        confirmLabel: '繼續寄出',
+        cancelLabel: '先去儲存',
+        onCancel: () => { closeModal(); openSaveAndConfirm(); },
+        onConfirm: () => { closeModal(); renderSendMain(s); }
+      });
+      return;
+    }
+
+    renderSendMain(s);
+  }
+
+  function describeUnsaved(u) {
+    const bits = [];
+    if (u.gridChangeCount) bits.push('職事表上改過 ' + u.gridChangeCount + ' 格');
+    if (u.unresolvedCount) bits.push('有 ' + u.unresolvedCount + ' 格的名字認不出');
+    if (u.pendingRequestCount) bits.push('有 ' + u.pendingRequestCount + ' 筆未處理的修改申報');
+    return bits.length > 0 ? bits.join('；') + '。' : '';
+  }
+
+  function renderSendMain(s) {
+    const nodes = [];
+
+    // ── 頂部：這一次是什麼（系統判斷，不用他揀）────────────────
+    nodes.push(make('div', { className: 'statuscard' }, [
+      make('div', { text: s.kindSentence, className: 'statuscard-title' }),
+      make('div', {
+        text: '系統只會寄你已經儲存確認的版本'
+          + (s.latestVersion ? '（現在是第 ' + s.latestVersion.versionNo + ' 版）' : '')
+          + '。',
+        className: 'statuscard-sub'
+      })
+    ]));
+
+    if (s.isDryRun) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '系統現在是模擬模式：全部信都只會記錄，一封都不會真的寄出去。',
+          className: 'lines'
+        })
+      ]));
+    }
+
+    // ── 寄給誰 ──────────────────────────────────────────────
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('寄給誰'),
+      make('div', { text: s.recipientSentence, className: 'ok-line' })
+    ]));
+
+    // ── 寄什麼 ──────────────────────────────────────────────
+    //
+    // ⚠️ 呢一段係**講事實，唔係俾佢揀**。內容由 EmailTemplates 同階段
+    // 決定（見 WebAppSendPlan.gs 嘅 describeSendContents_()）。
+    // 畫一堆撳落去冇作用嘅勾選格，比唔畫更差。
+    const contentBox = make('div', { className: 'sec' }, [sectionTitle('會寄什麼')]);
+    if (s.contents.unknown) {
+      contentBox.appendChild(make('div', {
+        text: '查不到會寄什麼：' + s.contents.unknown,
+        className: 'vio-row'
+      }));
+    } else {
+      s.contents.items.forEach((it) => {
+        contentBox.appendChild(make('div', { text: '・' + it, className: 'ok-line' }));
+      });
+    }
+    nodes.push(contentBox);
+
+    // ⚠️ 那條永久連結**一律要在信裡面**。範本沒有放，就在這裡講出來——
+    // 靜靜寄一封沒有連結的信，收信的人就沒有辦法自己去看最新版。
+    if (!s.contents.hasPermanentLink) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一次的信件範本裡面沒有放那條永久連結。'
+            + '收信的人只會拿到附件，之後內容改了他不會知道。'
+            + '要加的話，在 EmailTemplates 那一張表把 {PublicRosterUrl} 放進內文。',
+          className: 'lines'
+        })
+      ]));
+    }
+
+    if (!s.permanentLink.hasLink) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: s.permanentLink.checkFailed
+            ? '查不到這一季有沒有永久連結。這不代表沒有，只代表系統現在看不到。'
+            : '這一季還沒有永久連結。如果信件範本要用它，寄出會被擋住。',
+          className: 'lines'
+        })
+      ]));
+    }
+
+    // ── 在 REQUESTS_APPLIED 那一步，「再寄一次審閱本」仍然做得到 ──
+    const actions = [];
+    if (s.alsoReview) {
+      actions.push(button('改為再寄一次審閱本', () => { closeModal(); openReview(); }, 'secondary'));
+    }
+
+    openConfirm({
+      title: '寄出',
+      bodyNodes: nodes,
+      confirmLabel: sendConfirmLabel(s.kind),
+      extraActions: actions,
+      onConfirm: () => { closeModal(); routeSend(s.kind); }
+    });
+  }
+
+  function sendConfirmLabel(kind) {
+    if (kind === 'REVIEW') return '寄給堂委審閱';
+    if (kind === 'OFFICIAL') return '正式發出給全體';
+    if (kind === 'RESEND') return '重發給有改動的人';
+    return '寄出';
+  }
+
+  /**
+   * 落到原本嗰三條路。
+   * ⚠️ **唔喺呢度重新實作任何一條。** 嗰三個函式各自帶住自己嗰套
+   * 前置檢查同確認畫面，繞開佢哋就等於把嗰啲閘全部丟掉。
+   */
+  function routeSend(kind) {
+    if (kind === 'REVIEW') { openReview(); return; }
+    if (kind === 'OFFICIAL') { openOfficial(); return; }
+    if (kind === 'RESEND') { openResend(); return; }
+  }
+
+  /* ============================================================
+   * D 組：無電郵者的紙本
+   * ============================================================ */
+
+  let paperSelection_ = null;
+
+  function openPaperDialog() {
+    runAction('讀取名單', async () => {
+      const s = await callServer('apiGetPaperListState', currentQuarterId);
+      if (s.versionNo < 0) {
+        openModal('要印紙本的人', [para(s.message)], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      // 預設：**冇電郵嗰批全部勾好**。佢哋一定要印，唔應該要幹事逐個勾。
+      paperSelection_ = {};
+      s.noEmail.forEach((p) => { paperSelection_[p.personId] = true; });
+      renderPaperDialog(s, '');
+    });
+  }
+
+  function renderPaperDialog(s, keyword) {
+    const nodes = [];
+
+    nodes.push(para('這幾位查不到電郵，收不到信，但照樣要服侍。'
+      + '下面是這一季第 ' + s.versionNo + ' 版有服侍的人。'));
+
+    // ── 冇電郵嗰批（預設全部勾好）──────────────────────────
+    const noEmailBox = make('div', { className: 'sec' }, [
+      sectionTitle('查不到電郵（' + s.noEmail.length + ' 位）——預設全部要印')
+    ]);
+    if (s.noEmail.length === 0) {
+      noEmailBox.appendChild(make('div', {
+        text: '這一季沒有查不到電郵的人。', className: 'muted'
+      }));
+    }
+    s.noEmail.forEach((p) => noEmailBox.appendChild(paperCheckRow(p, true)));
+    nodes.push(noEmailBox);
+
+    // ── 有電郵但都想要紙本（例如長者）────────────────────────
+    const k = String(keyword || '').trim();
+    const matched = k
+      ? s.withEmail.filter((p) => p.nameTC.indexOf(k) !== -1)
+      : s.withEmail;
+
+    const withBox = make('div', { className: 'sec' }, [
+      sectionTitle('有電郵，但你也想印給他（' + s.withEmail.length + ' 位可以揀）'),
+      make('div', { text: '有些長者兩樣都要。', className: 'muted' })
+    ]);
+
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.placeholder = '搵人名⋯⋯';
+    search.value = k;
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); renderPaperDialog(s, search.value); }
+    });
+    withBox.appendChild(row([search, button('搵', () => renderPaperDialog(s, search.value), 'secondary')]));
+
+    if (matched.length === 0) {
+      withBox.appendChild(make('div', { text: '找不到符合的人。', className: 'muted' }));
+    }
+    matched.forEach((p) => withBox.appendChild(paperCheckRow(p, false)));
+    nodes.push(withBox);
+
+    const countNode = make('div', { className: 'ok-line strong', id: 'paperCount' });
+    updatePaperCount(countNode);
+    nodes.push(countNode);
+
+    // ⚠️ 兩個出口都要講清楚會發生咩事——尤其係「寄到自己信箱」
+    // 就算喺模擬模式都會真係寄。
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('兩個出口'),
+      make('div', {
+        text: '・下載：系統會產生每人一份 PDF，然後給你一條資料夾連結。'
+          + '在 Google 雲端硬碟撳「下載」就會整個資料夾打包成 zip。',
+        className: 'ok-line'
+      }),
+      make('div', {
+        text: '・寄到自己信箱：全部 PDF 夾成信寄給你自己（不是寄給義工）。'
+          + '這一封就算系統仍然在模擬模式，都會真的寄出。',
+        className: 'ok-line'
+      })
+    ]));
+
+    openModal('要印紙本的人', nodes, [
+      button('產生並取得連結', () => runPaperGenerate(), ''),
+      button('寄到自己信箱', () => runPaperEmail(), 'secondary'),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  function paperCheckRow(p, defaultOn) {
+    const line = make('label', { className: 'check-row' });
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = paperSelection_[p.personId] === true
+      || (defaultOn && paperSelection_[p.personId] !== false);
+    paperSelection_[p.personId] = cb.checked;
+    cb.addEventListener('change', () => {
+      paperSelection_[p.personId] = cb.checked;
+      const node = el('paperCount');
+      if (node) updatePaperCount(node);
+    });
+    line.appendChild(cb);
+    line.appendChild(make('span', {
+      text: p.nameTC + '　（這一季 ' + p.cellCount + ' 格）'
+    }));
+    return line;
+  }
+
+  function selectedPaperIds() {
+    return Object.keys(paperSelection_ || {}).filter((id) => paperSelection_[id] === true);
+  }
+
+  function updatePaperCount(node) {
+    node.textContent = '已揀 ' + selectedPaperIds().length + ' 位。';
+  }
+
+  function runPaperGenerate() {
+    const ids = selectedPaperIds();
+    if (ids.length === 0) {
+      openModal('要印紙本的人', [para('一位都沒有揀。')],
+        [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+    runAction('產生個人 PDF', async () => {
+      busyShow('正在產生個人 PDF', '共 ' + ids.length + ' 份，需時較長，不要關掉這一頁。');
+      const r = await callServerMutating('apiGeneratePaperPack', currentQuarterId, ids);
+      renderPaperResult(r);
+    });
+  }
+
+  function renderPaperResult(r) {
+    const nodes = [
+      make('div', { text: r.done ? '已完成' : '做了一部分', className: 'ok-head' }),
+      para(r.message)
+    ];
+
+    if (r.folderUrl) {
+      const link = make('a', { text: '開啟資料夾（在裡面撳「下載」就會打包成 zip）', className: 'bigLink' });
+      link.href = r.folderUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      nodes.push(link);
+    }
+
+    if (r.files && r.files.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('逐個檔（只想印其中一兩位就用這裡）')
+      ]);
+      r.files.forEach((f) => {
+        const a = make('a', { text: f.nameTC, className: 'sheetlink' });
+        a.href = f.url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        box.appendChild(make('div', { className: 'vio-row' }, [a]));
+      });
+      nodes.push(box);
+    }
+
+    // ⚠️ 搵唔到嘅要逐個講。靜靜略過 ⇒ 幹事少印一份，而且唔知少咗邊個。
+    if (r.missing && r.missing.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + r.missing.length + ' 位找不到 PDF')
+      ]);
+      r.missing.forEach((m) => {
+        box.appendChild(make('div', {
+          text: (m.nameTC || m.personId) + '：' + m.reason, className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    if (r.errors && r.errors.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [sectionTitle('產生時出過錯')]);
+      r.errors.slice(0, 10).forEach((e) => {
+        box.appendChild(make('div', {
+          text: String(e && e.message ? e.message : e), className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    const actions = [button('知道了', () => closeModal(), '')];
+    if (!r.done) {
+      actions.unshift(button('繼續做餘下的', () => { closeModal(); runPaperGenerate(); }, ''));
+    }
+    openModal('紙本 PDF', nodes, actions);
+  }
+
+  function runPaperEmail() {
+    const ids = selectedPaperIds();
+    if (ids.length === 0) {
+      openModal('要印紙本的人', [para('一位都沒有揀。')],
+        [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+    openConfirm({
+      title: '寄到自己信箱',
+      bodyNodes: [
+        para('會把揀好的 ' + ids.length + ' 位的個人 PDF，夾成信寄給你自己。'),
+        make('div', { className: 'warnbox' }, [
+          make('div', {
+            text: '收件人永遠是你自己，不是義工。所以這一封就算系統仍然在模擬模式，'
+              + '都會真的寄出。附件太多的話會自動分成幾封。',
+            className: 'lines'
+          })
+        ]),
+        para('如果那幾份 PDF 還未產生過，先撳「產生並取得連結」。', 'muted')
+      ],
+      confirmLabel: '寄給我自己',
+      onConfirm: () => {
+        runAction('寄到自己信箱', async () => {
+          const r = await callServerMutating('apiEmailPaperPackToSelf', currentQuarterId, ids);
+          const nodes = [
+            make('div', { text: '已寄出', className: 'ok-head' }),
+            para(r.message)
+          ];
+          if (r.missing && r.missing.length > 0) {
+            const box = make('div', { className: 'sec sec-warn' }, [
+              sectionTitle('這 ' + r.missing.length + ' 位找不到 PDF，沒有夾進去')
+            ]);
+            r.missing.forEach((m) => {
+              box.appendChild(make('div', {
+                text: (m.nameTC || m.personId) + '：' + m.reason, className: 'vio-row'
+              }));
+            });
+            nodes.push(box);
+          }
+          openModal('寄到自己信箱', nodes, [button('知道了', () => closeModal(), '')]);
+        });
+      }
+    });
+  }
+</script>

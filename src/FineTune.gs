@@ -868,6 +868,16 @@ function applyDecisions(batchId) {
   let acceptedCount = 0;
   let revertedCount = 0;
   let manualKeptCount = 0;
+  // ⚠️ 第三十九輪批次（順手）：「揀咗採用系統建議，但系統搵唔到替補」
+  // 本來同「幹事自己揀咗保留現況」一齊計入 `manualKept`。
+  //
+  // 兩件事完全唔同：後者係佢自己嘅決定，前者係**佢揀咗一樣嘢，
+  // 而系統做唔到**。合埋一齊計，畫面就只會話佢「沿用你的改動 N 項」，
+  // 而佢會以為系統照佢意思做咗——實際上嗰幾格一格都冇郁過。
+  //
+  // 保留現況本身係啱嘅（搵唔到替補係「排唔到」，唔係「唔使人做」，
+  // 靜靜洗成空白會令一格服侍冇人知就冇咗）。要修嘅係**冇講**。
+  const noReplacement = [];
   const revertBlocked = [];
 
   const assignments = analysis.manualState.map(function (s) {
@@ -900,6 +910,17 @@ function applyDecisions(batchId) {
           source = originalRow.assignSource || ASSIGN_SOURCE.AUTO;
           revertedCount++;
         }
+      } else if (entry.decision === FINETUNE_DECISION.ACCEPT_SUGGESTED) {
+        // 行到呢度即係 `entry.suggested` 係空 —— 系統搵唔到替補。
+        // 保留現況（見上面 `noReplacement` 嘅說明），但要記低同報返出去。
+        noReplacement.push({
+          serviceDate: s.serviceDate,
+          postId: s.postId,
+          postNameTC: (findPostById_(context.posts, s.postId) || {}).postNameTC || s.postId,
+          slotIndex: s.slotIndex,
+          personName: (context.peopleById[s.personId] || {}).nameTC || ''
+        });
+        manualKeptCount++;
       } else {
         // KEEP_MANUAL 與 PENDING 都保留幹事的現況，即上面的預設值
         manualKeptCount++;
@@ -1003,6 +1024,9 @@ function applyDecisions(batchId) {
     accepted: acceptedCount,
     reverted: revertedCount,
     manualKept: manualKeptCount,
+    // ⚠️ 呢個係 `manualKept` 入面「唔係佢自己揀」嗰一批，逐格列出嚟。
+    // 呼叫端一定要顯示——見上面 `noReplacement` 嘅說明。
+    noReplacement: noReplacement,
     revertBlocked: revertBlocked,
     archived: archived,
     total: proposalRows.length

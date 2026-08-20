@@ -80,6 +80,13 @@
    */
   const READ_ONLY_APIS = [
     'apiListQuarters',
+    // 第三十九輪批次：主流程六步。三個都係純讀取——
+    // apiGetMainFlowState 同 apiGetSendPlanSummary 全程 beginSheetReadMemo_()，
+    // apiPlanEligibilitySheetApply 只係讀返張名單工作表同 Eligibility 做比對。
+    'apiGetMainFlowState',
+    'apiGetSendPlanSummary',
+    'apiGetPaperListState',
+    'apiPlanEligibilitySheetApply',
     'apiGetDashboardState',
     'apiGetThemePreference',
     'apiGenerateDraftPlan',
@@ -175,6 +182,97 @@
     node.className = isError ? 'status error' : 'status';
   }
 
+  /* ══════════════════════════════════════════════════════════════
+   * 第三十九輪批次 B 組：睇得見嘅載入回饋
+   * ══════════════════════════════════════════════════════════════
+   *
+   * Ivan 明講：舊嗰句細灰字「重新整理…」睇唔出係做緊嘢定係做完咗。
+   *
+   * 呢一組函式做四件事：
+   *   開始　　畫面中央出一塊牌，講明**做緊咩**（唔係一個轉圈）
+   *   進行中　需時長嘅動作叫 `setProgress()` 報第幾批／共幾批
+   *   完成　　明確講「已完成」，而且**停留 BUSY_DONE_MS 先收**
+   *   失敗　　紅色，講人話（詳細錯誤仍然由 showErrorModal 負責）
+   *
+   * ⚠️ 個牌係 `runAction()` 自動開關嘅，呼叫端唔使記得任何嘢——
+   * 同 `setBusy()` 一樣。唯一要主動叫嘅係 `setProgress()`。
+   */
+
+  /** 「已完成」停留幾耐先收。太短就等於冇顯示過。 */
+  const BUSY_DONE_MS = 1100;
+
+  let busyNode_ = null;
+  let busyHideTimer_ = null;
+
+  function busyEnsure_() {
+    if (busyNode_) return busyNode_;
+    const fill = make('div', { className: 'busy-bar-fill', id: 'busyBarFill' });
+    const bar = make('div', { className: 'busy-bar', id: 'busyBar' }, [fill]);
+    bar.hidden = true;
+    const card = make('div', { className: 'busy-card', id: 'busyCard' }, [
+      make('div', { className: 'busy-title', id: 'busyTitle' }),
+      make('div', { className: 'busy-sub', id: 'busySub' }),
+      bar
+    ]);
+    busyNode_ = make('div', { className: 'busy-overlay', id: 'busyOverlay' }, [card]);
+    busyNode_.hidden = true;
+    document.body.appendChild(busyNode_);
+    return busyNode_;
+  }
+
+  /**
+   * 開始一個動作：畫面中央出牌。
+   * @param {string} title 做緊咩（人話，例如「正在生成職事表」）
+   * @param {string=} sub 補充一句（可以慳）
+   */
+  function busyShow(title, sub) {
+    const node = busyEnsure_();
+    if (busyHideTimer_) { clearTimeout(busyHideTimer_); busyHideTimer_ = null; }
+    el('busyCard').className = 'busy-card';
+    el('busyTitle').textContent = title || '處理中';
+    el('busySub').textContent = sub || '請稍等，不要關掉這一頁。';
+    el('busyBar').hidden = true;
+    el('busyBarFill').style.width = '0';
+    node.hidden = false;
+  }
+
+  /**
+   * 需時長嘅動作報進度。**唔知總數就傳 0**，噉樣只出文字唔出進度條——
+   * 出一條永遠唔郁嘅進度條比冇進度條更誤導。
+   * @param {number} done 已完成
+   * @param {number} total 總數（0 代表唔知）
+   * @param {string=} label 一句人話（例如「第 2 批／共 5 批」）
+   */
+  function setProgress(done, total, label) {
+    if (!busyNode_ || busyNode_.hidden) return;
+    el('busySub').textContent = label
+      || (total > 0 ? ('已完成 ' + done + ' ／ 共 ' + total) : ('已完成 ' + done));
+    const hasBar = total > 0;
+    el('busyBar').hidden = !hasBar;
+    if (hasBar) {
+      const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+      el('busyBarFill').style.width = pct + '%';
+    }
+  }
+
+  /**
+   * 收牌。`outcome` 為 'done'／'fail' 時會先顯示一句結論再停留一陣。
+   * @param {string=} outcome 'done'｜'fail'｜其他（即刻收）
+   * @param {string=} message 結論一句
+   */
+  function busyHide(outcome, message) {
+    if (!busyNode_ || busyNode_.hidden) return;
+    if (outcome !== 'done' && outcome !== 'fail') { busyNode_.hidden = true; return; }
+    el('busyCard').className = 'busy-card ' + (outcome === 'done' ? 'is-done' : 'is-fail');
+    el('busyTitle').textContent = message || (outcome === 'done' ? '已完成' : '沒有完成');
+    el('busySub').textContent = outcome === 'done' ? '' : '下面會講清楚發生了什麼事。';
+    el('busyBar').hidden = true;
+    busyHideTimer_ = setTimeout(() => {
+      busyHideTimer_ = null;
+      if (busyNode_) busyNode_.hidden = true;
+    }, BUSY_DONE_MS);
+  }
+
   function setBusy(busy) {
     document.querySelectorAll('button').forEach((b) => {
       if (busy) {
@@ -198,11 +296,16 @@
    */
   async function runAction(label, action) {
     setBusy(true);
+    // 第三十九輪 B 組：細灰字留住（俾睇慣咗嘅人），但真正嘅回饋係中央嗰塊牌。
     setStatus(label + '…');
+    busyShow(label);
+    let ok = false;
     try {
       await action();
+      ok = true;
       setStatus('');
     } catch (err) {
+      busyHide('fail');
       showErrorModal(label + '失敗', err);
       setStatus('');
     } finally {
@@ -218,6 +321,9 @@
         try { await loadDashboard({ keepModal: true }); }
         catch (e) { setStatus('畫面上的數字可能不是最新的，請撳「重新整理」。', true); }
       }
+      // ⚠️ 收牌一定要喺刷新之後——刷新本身可能要幾秒，
+      // 喺嗰之前收牌就會出現「講咗已完成、但畫面仲係舊數字」嘅空窗。
+      if (ok) busyHide('done');
       setBusy(false);
     }
   }
@@ -328,10 +434,21 @@
     }, opts.danger ? 'danger' : '');
 
     // 規格 1.4.5：確認畫面永遠有「取消」，取消＝零改動、零寄出。
-    openModal(opts.title, body, [
-      confirmBtn,
-      button('取消', () => closeModal(), 'secondary')
-    ]);
+    //
+    // ⚠️ 第三十九輪批次 C 組：加咗三個**可選**參數，預設行為完全冇變。
+    //   cancelLabel　　「取消」嗰粒掣寫咩字。有啲情況「取消」唔係最啱嘅講法
+    //   　　　　　　　（例如「先去儲存」——嗰個係另一條路，唔係放棄）
+    //   onCancel　　　撳嗰粒掣之後除咗關窗仲要做咩
+    //   extraActions　中間插幾粒掣（例如「改為再寄一次審閱本」）
+    //
+    // ⚠️ 唔論點樣，**永遠都有一粒掣可以乜都唔做咁走**——
+    // 一個冇出口嘅確認畫面等於逼人撳「確定」。
+    const cancelBtn = button(opts.cancelLabel || '取消', () => {
+      if (opts.onCancel) { opts.onCancel(); return; }
+      closeModal();
+    }, 'secondary');
+    openModal(opts.title, body,
+      [confirmBtn].concat(opts.extraActions || []).concat([cancelBtn]));
     if (input) input.focus();
   }
 
@@ -452,11 +569,56 @@
   }
 
   /** 顯示規則違反四組（規格步 1.5）。 */
+  /* ── 第三十九輪批次 A 組第 3 步：確認清單要講人話 ───────────
+   *
+   * 原本一行係噉：
+   *   `2027-07-11　主席#1　陳大文　HARD_ELIGIBILITY`
+   *
+   * 對幹事嚟講，`HARD_ELIGIBILITY` 同一串亂碼冇分別。改成：
+   *   `7 月 11 日　主席　陳大文——他未做過主席`
+   *
+   * ⚠️ 對唔上嘅規則代號**照樣要印出嚟**，唔可以靜靜變成空白——
+   * 印一個代號，最少查得返；印空白就等於話「呢一格冇問題」。
+   */
+
+  /** 規則代號 → 一句人話。對唔上就回原文（見上面）。 */
+  const RULE_SENTENCE = {
+    HARD_ELIGIBILITY: '他未做過這個崗位',
+    HARD_DISTINCT_SLOT: '同一日這個崗位排了同一個人兩次',
+    HARD_UNAVAILABLE: '他已經申報那一日不能服侍',
+    HARD_COMMUNION_FIRST_SUNDAY: '這一週不設這個崗位',
+    HARD_NO_AUTO_PREACHER: '這個崗位不由系統排，要你自己填',
+    HARD_SPECIAL_SUNDAY_SKIP: '那一個主日是特別主日，這個崗位跳過',
+    HARD_MUTEX_GROUP: '他同一日已經做了另一個不可以兼任的崗位',
+    HARD_ROLE_REQUIRED: '這個崗位要求某個身分，他那一日沒有',
+    HARD_PERSON_POST_EXCLUDED: '名單上寫明他暫時不做這個崗位',
+    SEMI_NO_CONSECUTIVE: '他連續兩週都做這個崗位'
+  };
+
+  /**
+   * `2027-07-11` → `7 月 11 日`。
+   * ⚠️ 認唔出格式就回原文——**唔可以回空白**。
+   */
+  function humanDate(text) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text || '').trim());
+    if (!m) return String(text || '');
+    return Number(m[2]) + ' 月 ' + Number(m[3]) + ' 日';
+  }
+
+  /** 一格違反 → 一句人話。 */
+  function humanViolationLine(x) {
+    const post = (x.postNameTC || x.postId || '');
+    // 單一 slot 嘅崗位唔使寫 `#1`——嗰個編號對幹事冇意義。
+    const slot = (Number(x.slotIndex) > 1) ? (' ' + x.slotIndex) : '';
+    const who = x.personName ? ('　' + x.personName) : '';
+    const why = RULE_SENTENCE[x.ruleId] || x.reason || x.ruleId || '';
+    return humanDate(x.serviceDate) + '　' + post + slot + who
+      + (why ? ('——' + why) : '');
+  }
+
   function renderViolations(v) {
     const nodes = [];
-    const describe = (x) => x.serviceDate + '　' + (x.postNameTC || x.postId)
-      + '#' + x.slotIndex + '　' + (x.personName || '')
-      + '　' + (x.reason || x.ruleId || '');
+    const describe = humanViolationLine;
 
     if (v.real && v.real.length > 0) {
       const box = make('div', { className: 'vio vio-hard' });
@@ -541,6 +703,23 @@
     dashboardState_ = await callServer('apiGetDashboardState', currentQuarterId);
     dashboardStale_ = false;
     renderTop(dashboardState_);
+    // ⚠️ 第三十九輪批次 A 組：主流程要行喺最前——佢係幹事九成時間睇嘅嘢。
+    //
+    // 佢**唔可以**令成個載入失敗：主流程掛咗，落面四區同狀態卡照樣要出，
+    // 否則幹事會見到一版接近空白嘅畫面而完全唔知發生咩事。
+    // 所以獨立 try/catch，出事就喺主流程嗰格寫一句，其餘照畫。
+    try {
+      await renderMainFlow(dashboardState_);
+    } catch (err) {
+      const box = clear(el('mainFlowBody'));
+      box.appendChild(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '主流程畫不出來：' + (err && err.message ? err.message : String(err))
+            + '　落面的功能仍然用得到。',
+          className: 'lines'
+        })
+      ]));
+    }
     renderZone1(dashboardState_);
     renderZone2Head(dashboardState_);
     renderZone4(dashboardState_);

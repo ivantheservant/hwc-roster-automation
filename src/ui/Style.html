@@ -33,11 +33,11 @@
     font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
     color: var(--fg);
     background: var(--bg);
-    line-height: 1.65;
-    font-size: 15px;
+    line-height: 1.75;
+    font-size: 16px;
   }
 
-  h1 { font-size: 20px; margin: 0; }
+  h1 { font-size: 24px; margin: 0; }
 
   /* ── 頂部 ─────────────────────────────────────────────── */
   .topbar {
@@ -262,6 +262,122 @@
   .check-row.inline { display: inline-flex; margin-right: 12px; }
   .prop.is-off { opacity: .6; }
   .inp-date { max-width: 130px; }
+
+
+  /* ══════════════════════════════════════════════════════════════
+     第三十九輪批次 B 組：字大、間距闊、載入回饋睇得見
+     ══════════════════════════════════════════════════════════════
+
+     Ivan 明講兩件事：**字太細佢讀唔到**，**載入回饋太細睇唔出做緊嘢
+     定係做完咗**。所以呢一段唔係「美化」，係可用性。
+
+     ⚠️ 唔用 `zoom`。`zoom` 會連帶放大邊框同陰影、喺唔同瀏覽器行為唔一，
+     而且冇得逐個元件微調。改用一個一致嘅字級尺度，逐個元件講明用邊級。
+
+     ⚠️ 呢一段任何一條 `display` 規則都**唔可以**帶 `!important`——
+     上面 `[hidden] { display: none !important; }` 係總閘，
+     帶 `!important` 就會同佢打架，重現第三十四輪嗰個
+    「睇得見、撳得到、但會被靜靜忽略」嘅 bug。
+     ────────────────────────────────────────────────────────────── */
+  :root {
+    --fs-xs: 13px;   /* 附註、機器代號 */
+    --fs-sm: 15px;   /* 次要說明 */
+    --fs-md: 16px;   /* 內文基準 */
+    --fs-lg: 18px;   /* 區塊標題、彈窗標題 */
+    --fs-xl: 21px;   /* 主流程每一步嘅標題 */
+    --fs-2xl: 26px;  /* 載入回饋、頁首 */
+  }
+
+  /* ── 主流程六步（規格 1.0，第三十九輪 A 組）────────────────
+     呢一段要**明顯大過**其餘部分——幹事九成時間只會用呢六粒掣。 */
+  .flow { margin-bottom: 22px; }
+  .flow-head {
+    display: flex; align-items: baseline; gap: 10px;
+    margin: 0 0 12px; padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+  }
+  .flow-head-title { font-size: var(--fs-xl); font-weight: 700; }
+  .flow-head-sub { font-size: var(--fs-sm); color: var(--muted); }
+
+  .step {
+    display: flex; gap: 14px; align-items: flex-start;
+    padding: 16px 18px; margin-bottom: 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--card);
+  }
+  .step-num {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: var(--fs-lg); font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title { font-size: var(--fs-xl); font-weight: 700; line-height: 1.35; }
+  .step-note { font-size: var(--fs-sm); color: var(--muted); margin-top: 4px; }
+  .step-why { font-size: var(--fs-sm); color: var(--warn-fg); margin-top: 6px; }
+  .step-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+
+  /* 主掣：字要大過內文，撳落去唔使諗。 */
+  button.step-btn {
+    font-size: var(--fs-lg); font-weight: 600;
+    padding: 12px 22px; border-radius: 8px; min-height: 48px;
+  }
+  button.step-btn.secondary { font-weight: 600; }
+
+  /* 進行中：一眼分得出，而且唔可以再撳。 */
+  button.is-running {
+    background: var(--card-off) !important; color: var(--muted) !important;
+    border-color: var(--border) !important; cursor: progress;
+  }
+
+  /* 永久連結（第 1 步）*/
+  .permalink {
+    margin-top: 12px; padding: 12px 14px;
+    border: 1px solid var(--border); border-left: 4px solid var(--ok);
+    border-radius: 8px; background: var(--card-off);
+  }
+  .permalink-label { font-size: var(--fs-sm); font-weight: 600; }
+  .permalink-url {
+    font-size: var(--fs-sm); word-break: break-all; margin: 6px 0 8px;
+    color: var(--accent);
+  }
+  .permalink-note { font-size: var(--fs-xs); color: var(--muted); margin-top: 8px; }
+
+  /* ── 載入回饋（規格 B2）──────────────────────────────────
+     舊嗰句細灰字「重新整理…」唔夠。呢個係一塊蓋住畫面中央嘅牌，
+     講明**做緊咩**，做完講明**已完成**，而且停留夠耐俾人睇到。 */
+  .busy-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, .35);
+  }
+  .busy-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-left: 6px solid var(--accent);
+    border-radius: 12px; padding: 26px 32px; min-width: 280px; max-width: 90vw;
+    box-shadow: 0 12px 44px rgba(0, 0, 0, .35); text-align: center;
+  }
+  .busy-title { font-size: var(--fs-2xl); font-weight: 700; line-height: 1.4; }
+  .busy-sub { font-size: var(--fs-md); color: var(--muted); margin-top: 8px; }
+  .busy-bar {
+    margin-top: 14px; height: 10px; border-radius: 999px;
+    background: var(--card-off); border: 1px solid var(--border); overflow: hidden;
+  }
+  .busy-bar-fill { height: 100%; background: var(--accent); width: 0; }
+  .busy-card.is-done { border-left-color: var(--ok); }
+  .busy-card.is-done .busy-title { color: var(--ok); }
+  .busy-card.is-fail { border-left-color: var(--danger); }
+  .busy-card.is-fail .busy-title { color: var(--danger); }
+
+  /* ── 手機／平板 ───────────────────────────────────────────
+     幹事有機會用平板或手機開。呢度只放大同換行，唔改任何行為。 */
+  @media (max-width: 700px) {
+    body { padding: 14px; font-size: var(--fs-md); }
+    .step { flex-direction: column; gap: 10px; padding: 14px; }
+    .step-acts { flex-direction: column; align-items: stretch; }
+    button.step-btn { width: 100%; }
+    .busy-card { padding: 20px 22px; }
+    .busy-title { font-size: var(--fs-xl); }
+  }
 
   /* ── 深色模式 ─────────────────────────────────────────── */
   @media (prefers-color-scheme: dark) {

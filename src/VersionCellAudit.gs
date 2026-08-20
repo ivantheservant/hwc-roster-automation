@@ -47,6 +47,21 @@
  * 那個名字，抄回來就是了。
  */
 
+/**
+ * ⚠️ 第三十九輪批次（順手）：**這個工具要有自己的時限。**
+ *
+ * 上一輪的報告自己提過：它一次過讀晒 `RosterAssignments`，
+ * 真實資料量（多季 × 多版 × 幾百格）之下可能撞 Apps Script 的六分鐘上限。
+ *
+ * 撞到的後果不是「慢」，是**執行被切斷**——寫報告那一步根本行不到，
+ * 幹事只會見到一個超時錯誤，完全不知道已經看過幾多季。
+ *
+ * 所以加一條自己的死線：夠鐘就停，把**已經清點好的那部分**照樣寫成報告，
+ * 並且明明白白講「還有 N 個版本未看」。
+ * 看了一半而講得出看了一半，比什麼都沒有有用得多。
+ */
+const VERSION_CELL_AUDIT_DEADLINE_MS = 4 * 60 * 1000;
+
 /** 報告工作表的名稱。同名會被重建。 */
 const VERSION_CELL_AUDIT_SHEET = 'VersionCellAudit';
 
@@ -211,7 +226,16 @@ function auditAllVersionCellClasses() {
   });
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  return order.map(function (o, i) {
+  const startedAt = Date.now();
+  const results = [];
+  let stoppedEarly = false;
+
+  order.forEach(function (o, i) {
+    // ⚠️ 夠鐘就停，但**已經做好那些照樣回**（見檔頭）。
+    if (!stoppedEarly && Date.now() - startedAt > VERSION_CELL_AUDIT_DEADLINE_MS) {
+      stoppedEarly = true;
+    }
+    if (stoppedEarly) return;
     const counted = countVersionCellClasses_(byVersion[o.key]);
 
     // 上一版 ＝ 同一季、緊接住嘅前一個版本號。
@@ -223,7 +247,7 @@ function auditAllVersionCellClasses() {
       : [];
     const judged = judgeVersionCellCounts_(counted, lost, hasPrev ? prev.versionNo : -1);
 
-    return {
+    results.push({
       quarterId: o.quarterId,
       versionNo: o.versionNo,
       total: counted.total,
@@ -231,8 +255,14 @@ function auditAllVersionCellClasses() {
       lostNames: lost,
       level: judged.level,
       note: judged.note
-    };
+    });
   });
+
+  // ⚠️ 停早了**一定要講**。不講的話，一份少了幾季的報告看起來
+  // 跟一份完整的報告一模一樣，而幹事會以為那幾季沒有問題。
+  results.stoppedEarly = stoppedEarly;
+  results.notCheckedCount = order.length - results.length;
+  return results;
 }
 
 /**
@@ -312,6 +342,14 @@ function runVersionCellAudit_() {
     '',
     '這個工具只看，沒有改動任何資料。'
   ];
+  // ⚠️ 沒有看完一定要講在最前面——一份少了幾季的報告，
+  // 看起來跟一份完整的報告一模一樣。
+  if (results.stoppedEarly) {
+    lines.splice(1, 0,
+      '',
+      '⚠ 時間不夠，還有 ' + results.notCheckedCount + ' 個版本沒有看。',
+      '　報告上面那些是真的，只是不齊。再撳一次會由頭再看一遍。');
+  }
   if (bad.length > 0) {
     lines.push('');
     lines.push('看來資料壞掉的版本（' + bad.length + ' 個）：');

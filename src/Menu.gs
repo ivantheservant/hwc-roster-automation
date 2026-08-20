@@ -1467,6 +1467,19 @@ function runApplyDecisions_() {
       ''
     ];
 
+    // 第三十九輪批次（順手）：「揀咗採用系統建議，但系統搵唔到替補」
+    // 本來完全冇講——幹事只會見到「沿用你的改動 N 項」，
+    // 以為系統照佢意思做咗，實際上嗰幾格一格都冇郁過。
+    if (result.noReplacement && result.noReplacement.length > 0) {
+      lines.push('⚠ 有 ' + result.noReplacement.length
+        + ' 項因為找不到替補而保留現況（沒有改動）：');
+      result.noReplacement.forEach(function (n) {
+        lines.push('　' + n.serviceDate + ' ' + n.postNameTC
+          + (n.personName ? ('　現在是 ' + n.personName) : ''));
+      });
+      lines.push('找不到替補是「排不到」，不是「不用人做」，所以系統沒有把那幾格洗成空白。');
+      lines.push('');
+    }
     if (result.revertBlocked && result.revertBlocked.length > 0) {
       lines.push('⚠ 有 ' + result.revertBlocked.length + ' 項選了 REVERT_ORIGINAL 但無法還原：');
       result.revertBlocked.forEach(function (b) {

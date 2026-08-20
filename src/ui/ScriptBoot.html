@@ -28,12 +28,17 @@
       // 所以 `resetAllZoneLoadState()` 係整個物件掉走。加區三、區四
       // 內容嗰陣，**呢一行唔使改**。
       resetAllZoneLoadState();
+      // 第三十九輪批次 A 組：主流程嗰份額外資料一樣要跟住換季度。
+      // 唔清嘅話，主流程會講緊上一季嘅數字（要印紙本幾多位、
+      // 永久連結係邊條），而畫面睇落完全正常——同上面嗰個 bug 一模一樣。
+      resetMainFlowState();
       await loadDashboard();
     });
   });
 
   el('btnRefresh').addEventListener('click', () => {
     closeModal();
+    resetMainFlowState();
     runAction('重新整理', loadDashboard);
   });
 

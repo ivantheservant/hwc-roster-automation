@@ -152,8 +152,25 @@ console.log('\n=== 第二十四輪新增：三段式錯誤 ＋ 技術詳情收�
 console.log('\n=== 第二十四輪新增：確認畫面永遠有「取消」（規格 1.4.5）===');
 {
   const fn = common.slice(common.indexOf('function openConfirm'));
-  check('★★★★★ openConfirm() 一定會加一粒「取消」',
-    /button\('取消'/.test(fn.slice(0, 2000)));
+  // ⚠️ 第三十九輪批次 C 組：C 組要「先去儲存」呢類講法（嗰個係另一條路，
+  // 唔係放棄），所以 `openConfirm()` 加咗一個**可選**嘅 `cancelLabel`。
+  //
+  // 原本呢條斷言字面上搵 `button('取消'`，改咗之後就對唔上。
+  // 但真正要守嗰件事唔係「四個字一定要係『取消』」，
+  // 而係「**永遠都有一粒掣可以乜都唔做咁走**」——
+  // 一個冇出口嘅確認畫面等於逼人撳「確定」。
+  //
+  // 所以改成守三樣，全部比原本嚴：
+  check('★★★★★ openConfirm() 有一粒「乜都唔做咁走」嘅掣，而且預設寫「取消」',
+    /opts\.cancelLabel \|\| '取消'/.test(fn.slice(0, 2500)));
+  check('★★★★★ 嗰粒掣係**無條件**加入去嘅（唔可以有任何 if 令佢消失）'
+    + '——一有條件，就一定會有一條路行到一個冇出口嘅確認畫面',
+    /openModal\(opts\.title, body,\s*\n?\s*\[confirmBtn\]\.concat\([^)]*\)\.concat\(\[cancelBtn\]\)\)/
+      .test(fn.slice(0, 2500)));
+  check('★★★★★ 冇傳 onCancel 就一定會 closeModal()'
+    + '——唔關窗嘅話，撳完「取消」個畫面照樣喺度，同冇出口一樣',
+    /if \(opts\.onCancel\) \{ opts\.onCancel\(\); return; \}\s*\n\s*closeModal\(\);/
+      .test(fn.slice(0, 2500)));
   check('★★★★ 打字確認唔啱時唔會執行，只會提示（前端只係提早回饋，'
     + '後端一樣會再驗一次）',
     /typed !== CONFIRM_PHRASE/.test(fn) && /return;/.test(fn));

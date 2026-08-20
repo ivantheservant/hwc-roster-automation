@@ -36,6 +36,12 @@ const gas = loadGasSource([
   // 真正做嘢嘅係 `FiveStageCore.gs` 嘅 `planStep2_()`／`executeStep2_()`。
   // 唔載入佢就會 `planStep2_ is not defined`——而嗰個錯**唔係**測試想證嘅嘢。
   'FiveStageCore.gs',
+  // 第三十九輪批次（順手）：「同一格既有 grid 改動又有申報 ⇒ grid 贏」
+  // 嗰個判斷本來喺兩個檔各寫一次，而家合併成 `findRequestGridOverlaps_()`
+  //（RequestsApply.gs）。`buildSaveAndConfirmPlan_()` 會叫佢，
+  // 唔載入就會 `findRequestGridOverlaps_ is not defined`——
+  // 同上面 FiveStageCore 嗰個理由一模一樣。
+  'RequestsApply.gs',
   'WebAppSaveConfirm.gs', 'WebAppRollback.gs'
 ]);
 

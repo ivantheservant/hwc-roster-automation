@@ -86,7 +86,31 @@ console.log('\n=== D3【核心】版面規則只寫一份，唔可以跟主題�
     + '——版面跟主題各寫一份，改一次要改兩處，遲早會漏',
     offenders.length === 0, offenders.join('；'));
 
-  check('★★★★ body 嘅版面規則只寫一次', (styleHtml.match(/^\s*body \{/gm) || []).length === 1);
+  // ⚠️ 第三十九輪批次 B 組：原本呢度數 `body {` 出現幾多次，要求剛好一次。
+  //
+  // 但呢一輪加咗一個 `@media (max-width: 700px)` 斷點（幹事會用平板同手機開），
+  // 入面一定要有一條 `body {`——縮窄 padding 同放大字級。
+  //
+  // 淨係放寬個數字係錯嘅：噉樣原本要守嗰件事（**主題**同版面各寫一套）
+  // 就冇人守。所以改成講清楚三件唔同嘅事：
+  //   ・深色主題區塊入面一條 body 規則都唔可以有
+  //   ・非 media query 嘅頂層 body 規則只可以有一條
+  //   ・響應式斷點入面唔可以寫死顏色（顏色一律經變數）
+  const themeBlocksAll = darkBlocks.concat([mediaBlock]).join('\n');
+  check('★★★★★ 深色主題區塊入面一條 body 規則都冇'
+    + '——一有就代表版面跟主題各寫一份，改一次要改兩處',
+    (themeBlocksAll.match(/(^|\s)body\s*\{/g) || []).length === 0);
+
+  const responsiveText = (styleHtml.match(/@media \(max-width:[\s\S]*?\n  \}/g) || []).join('\n');
+  const topLevelBody = (styleHtml.replace(/@media[\s\S]*?\n  \}/g, '').match(/^\s*body \{/gm) || []);
+  check('★★★★ 非 media query 嘅 body 版面規則只寫一次',
+    topLevelBody.length === 1, '搵到 ' + topLevelBody.length + ' 條');
+
+  check('★★★★★ 響應式斷點入面唔可以寫死顏色'
+    + '——顏色一律經 CSS 變數，同「螢幕幾闊」完全無關；'
+    + '喺呢度寫死一隻色就會喺深色模式下讀唔到',
+    !/(color|background|border-color)\s*:\s*(?!var\()[^;]*;/.test(responsiveText),
+    responsiveText.slice(0, 200));
   check('★★★★★ 顏色一律經 CSS 變數（--bg／--fg／--border…）',
     /--bg:/.test(styleHtml) && /background: var\(--bg\)/.test(styleHtml)
     && /color: var\(--fg\)/.test(styleHtml));

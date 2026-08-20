@@ -1,0 +1,489 @@
+<script>
+  /* ============================================================
+   * 第三十九輪批次 A／C／D 組：**幹事主流程六步**
+   * ============================================================
+   *
+   * 幹事的真實工作流程就是這六件事，順序固定：
+   *
+   *   1. 生成下一季職事表
+   *   2. 查看／修改職事表
+   *   3. 改動時的名單協助
+   *   4. 維護各崗位的事奉人員名單
+   *   5. 寄出
+   *   6. 沒有電郵的人要印紙本
+   *
+   * 放在畫面最頂，字大、間距闊、一眼看得晒。每一步一粒主掣，
+   * **不用細字解釋**——他不會讀。
+   *
+   * ⚠️ 這一段**沒有另起爐灶**。每一粒掣落到最後都是叫原本那幾條
+   * 已經在真實環境跑過的路（`openGenerateDraft()`／`openSaveAndConfirm()`／
+   * `openReview()`／`openOfficial()`／`openResend()`）。
+   * 改的是「幹事看到什麼、要不要自己判斷」，不是寄信同建立版本那部機器。
+   *
+   * ⚠️ 載入次序：這個檔案要排在 `ScriptZone1` **之後**——
+   * 它會叫 `openGenerateDraft()` 那幾個函式（在 ScriptZone1 定義）。
+   */
+
+  /** 最近一次 `apiGetMainFlowState` 的結果。跟 dashboard 一樣，過期就重讀。 */
+  let mainFlowState_ = null;
+  let mainFlowStaleQuarter_ = null;
+
+  /**
+   * 主流程要的額外資料。**每次換季度或者做完動作都會重讀**——
+   * 快取一個舊季度的數字，就是「畫面看起來完全正常但講緊另一季」那一類 bug。
+   */
+  async function getMainFlowState() {
+    if (!mainFlowState_ || mainFlowStaleQuarter_ !== currentQuarterId) {
+      mainFlowState_ = await callServer('apiGetMainFlowState', currentQuarterId);
+      mainFlowStaleQuarter_ = currentQuarterId;
+    }
+    return mainFlowState_;
+  }
+
+  /** 換季度／做完寫入動作之後叫。 */
+  function resetMainFlowState() {
+    mainFlowState_ = null;
+    mainFlowStaleQuarter_ = null;
+  }
+
+  /**
+   * 砌一步。
+   * @param {Object} o {num, title, note, why, acts:[Node]}
+   * @returns {Node}
+   */
+  function stepCard(o) {
+    const body = make('div', { className: 'step-body' }, [
+      make('div', { text: o.title, className: 'step-title' })
+    ]);
+    if (o.note) body.appendChild(make('div', { text: o.note, className: 'step-note' }));
+    if (o.why) body.appendChild(make('div', { text: o.why, className: 'step-why' }));
+    if (o.acts && o.acts.length > 0) {
+      body.appendChild(make('div', { className: 'step-acts' }, o.acts));
+    }
+    if (o.extra) body.appendChild(o.extra);
+    return make('div', { className: 'step' }, [
+      make('div', { text: String(o.num), className: 'step-num' }),
+      body
+    ]);
+  }
+
+  /** 主流程用的大掣。 */
+  function stepButton(label, onClick, opts) {
+    opts = opts || {};
+    const b = button(label, onClick, 'step-btn ' + (opts.className || ''));
+    if (opts.disabled) b.disabled = true;
+    if (opts.title) b.title = opts.title;
+    return b;
+  }
+
+  /* ============================================================
+   * 主畫面
+   * ============================================================ */
+
+  async function renderMainFlow(d) {
+    const root = clear(el('mainFlowBody'));
+    const flow = await getMainFlowState();
+
+    root.appendChild(renderStep1(d, flow));
+    root.appendChild(renderStep2(d));
+    root.appendChild(renderStep3(d));
+    root.appendChild(renderStep4());
+    root.appendChild(renderStep5(d));
+    root.appendChild(renderStep6(d, flow));
+  }
+
+  /* ── 第 1 步：生成下一季職事表 ─────────────────────────────── */
+
+  function renderStep1(d, flow) {
+    const t = (flow && flow.generateTarget) || {};
+    const acts = [];
+
+    if (!t.found) {
+      return stepCard({
+        num: 1, title: '生成下一季職事表',
+        why: t.reason || '找不到任何季度。先去「開季前準備」建立一季。'
+      });
+    }
+
+    // ⚠️ 掣上面直接寫是哪一季——**不要他自己去揀**。
+    const label = '生成' + t.label + '職事表';
+    if (t.alreadyGenerated) {
+      acts.push(stepButton(label, () => {}, {
+        disabled: true,
+        title: '這一季已經生成過了。要重新生成（會覆蓋現有安排）'
+          + '請去下面「進階與診斷」。'
+      }));
+    } else {
+      acts.push(stepButton(label, () => openGenerateForTarget(t)));
+    }
+
+    const card = stepCard({
+      num: 1,
+      title: '生成下一季職事表',
+      note: t.alreadyGenerated
+        ? (t.label + ' 已經生成過了。要重新生成（會覆蓋現有安排）請去下面「進階與診斷」。')
+        : '',
+      why: t.warn ? firstLineOf(t.warnMessage) : '',
+      acts: acts,
+      extra: renderPermanentLink(flow)
+    });
+    return card;
+  }
+
+  /** 三段式訊息的第一段——步卡上面只講一句，詳情留在確認畫面。 */
+  function firstLineOf(text) {
+    return String(text || '').split('\n')[0];
+  }
+
+  /**
+   * 生成一個指定季度。
+   *
+   * ⚠️ 目標季度如果不是現在看著那一季，**先把上面的季度選單切過去**——
+   * 否則生成完之後，畫面其餘部分仍然在講另一季，
+   * 而幹事會以為生成失敗了。
+   */
+  function openGenerateForTarget(t) {
+    const go = () => {
+      if (t.quarterId !== currentQuarterId) {
+        const sel = el('quarter');
+        sel.value = t.quarterId;
+        currentQuarterId = t.quarterId;
+        resetAllZoneLoadState();
+        resetMainFlowState();
+        runAction('切換到' + t.label, async () => {
+          await loadDashboard();
+          openGenerateDraft();
+        });
+        return;
+      }
+      openGenerateDraft();
+    };
+
+    // 已經開始／已經過去 ⇒ **准許，但先講清楚**。
+    if (t.warn) {
+      openConfirm({
+        title: '生成' + t.label + '職事表',
+        bodyNodes: [para(t.warnMessage)],
+        confirmLabel: '知道了，照樣生成',
+        onConfirm: () => { closeModal(); go(); }
+      });
+      return;
+    }
+    go();
+  }
+
+  /* ── 那條永久連結 ─────────────────────────────────────────── */
+
+  function renderPermanentLink(flow) {
+    const p = (flow && flow.permanentLink) || {};
+    if (!p.hasLink) {
+      if (p.checkFailed) {
+        return make('div', { className: 'permalink' }, [
+          make('div', { text: '查不到這一季有沒有永久連結。', className: 'permalink-label' }),
+          make('div', {
+            text: '這不代表沒有連結，只代表系統現在看不到。'
+              + '撳一次「重新整理」再看，或者去下面「進階與診斷 ▸ 重新發佈公開連結」。',
+            className: 'permalink-note'
+          })
+        ]);
+      }
+      return make('div', { className: 'permalink' }, [
+        make('div', { text: '這一季還沒有永久連結。', className: 'permalink-label' }),
+        make('div', {
+          text: '生成職事表之後就會有。' + (p.explanation || ''),
+          className: 'permalink-note'
+        })
+      ]);
+    }
+
+    const urlNode = make('div', { text: p.url, className: 'permalink-url' });
+    const copyBtn = button('複製連結', () => copyTextToClipboard(p.url, copyBtn), 'secondary');
+    const openBtn = make('a', { text: '開啟看看', className: 'sheetlink' });
+    openBtn.href = p.url;
+    openBtn.target = '_blank';
+    openBtn.rel = 'noopener';
+
+    return make('div', { className: 'permalink' }, [
+      make('div', { text: '職事表的永久連結', className: 'permalink-label' }),
+      urlNode,
+      make('div', { className: 'row' }, [copyBtn, openBtn]),
+      make('div', { text: p.explanation || '', className: 'permalink-note' })
+    ]);
+  }
+
+  /**
+   * 複製到剪貼簿。
+   *
+   * ⚠️ `navigator.clipboard` 在 Apps Script 的 iframe 裡面**不一定**用得到
+   * （權限政策、非 HTTPS 情境都會令它失敗）。失敗**不可以靜靜當作成功**——
+   * 幹事會以為複製好了，貼出來卻是舊東西。所以有退路，而且兩條路都會
+   * 明確講結果。
+   */
+  function copyTextToClipboard(text, btn) {
+    const done = (ok) => {
+      if (!btn) return;
+      const original = btn.textContent;
+      btn.textContent = ok ? '已複製 ✓' : '複製不到，請自己選取上面那一行';
+      setTimeout(() => { btn.textContent = original; }, 2200);
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => done(true), () => fallbackCopy(text, done));
+        return;
+      }
+    } catch (e) { /* 落下面那條退路 */ }
+    fallbackCopy(text, done);
+  }
+
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      done(!!ok);
+    } catch (e) {
+      done(false);
+    }
+  }
+
+  /* ── 第 2 步：查看／修改職事表 ─────────────────────────────── */
+
+  function renderStep2(d) {
+    const acts = [];
+    const sheetUrl = d.latestVersion && d.latestVersion.sheetUrl;
+
+    if (sheetUrl) {
+      const open = make('a', { text: '查看／修改職事表', className: 'bigLink' });
+      open.href = sheetUrl;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.style.fontSize = 'var(--fs-lg)';
+      open.style.padding = '12px 22px';
+      acts.push(open);
+    } else {
+      acts.push(stepButton('查看／修改職事表', () => {}, {
+        disabled: true,
+        title: d.latestVersion ? '開不到那一張工作表。' : '要先在第 1 步生成職事表。'
+      }));
+    }
+
+    // ⚠️ 「儲存我的修改」同「查看／修改」要**並排、同樣大**：
+    // 他做完 A 一定會做 B。分開兩個地方就會漏。
+    const save = (d.buttons && d.buttons.save) || {};
+    acts.push(stepButton('儲存我的修改', openSaveAndConfirm, {
+      disabled: !save.enabled,
+      className: 'secondary',
+      title: save.enabled ? '' : (save.disabledReason || '')
+    }));
+
+    return stepCard({
+      num: 2,
+      title: '查看／修改職事表',
+      note: save.dynamicText || '',
+      why: (!save.enabled && save.disabledReason) ? save.disabledReason : '',
+      acts: acts
+    });
+  }
+
+  /* ── 第 3 步：改動時的名單協助 ─────────────────────────────── */
+
+  function renderStep3(d) {
+    const has = !!d.latestVersion;
+    return stepCard({
+      num: 3,
+      title: '在職事表加入名單選單',
+      note: '每一個崗位那一欄會多一個下拉選單，列出該崗位的合資格名單。'
+        + '你照樣可以直接打一個不在名單上的名（外請講員、新人、借調都是這樣填）。',
+      acts: [stepButton('加入名單選單', openApplyDropdowns, {
+        disabled: !has,
+        className: 'secondary',
+        title: has ? '' : '要先在第 1 步生成職事表。'
+      })]
+    });
+  }
+
+  function openApplyDropdowns() {
+    runAction('加入名單選單', async () => {
+      const r = await callServerMutating('apiApplyGridNameDropdowns', currentQuarterId);
+      openModal('名單選單', [
+        make('div', { text: '已完成', className: 'ok-head' }),
+        para(r.summary),
+        para('回到職事表（第 2 步那一粒）就會見到。', 'muted')
+      ], [button('知道了', () => closeModal(), '')]);
+    });
+  }
+
+  /* ── 第 4 步：維護各崗位的事奉人員名單 ─────────────────────── */
+
+  function renderStep4() {
+    return stepCard({
+      num: 4,
+      title: '維護各崗位的事奉人員名單',
+      note: '開一張工作表，一個崗位一欄。在裡面自由增刪改，改完回來撳「儲存並套用名單」。',
+      acts: [
+        stepButton('開啟名單工作表', openEligibilitySheet),
+        stepButton('儲存並套用名單', openApplyEligibilitySheet, { className: 'secondary' })
+      ]
+    });
+  }
+
+  function openEligibilitySheet() {
+    runAction('開啟名單工作表', async () => {
+      const r = await callServerMutating('apiOpenEligibilitySheet');
+      const link = make('a', { text: '開啟「' + r.sheetName + '」', className: 'bigLink' });
+      link.href = r.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      openModal('名單工作表', [
+        make('div', { text: '已經攤開好了', className: 'ok-head' }),
+        para('一個崗位一欄，底下是該崗位的人。加人就在那一欄下面打名，'
+          + '移走就把那一格清空。'),
+        link,
+        para('改完之後，回來撳「儲存並套用名單」。在你撳之前，'
+          + '真正的名單一格都不會變。', 'muted')
+      ], [button('知道了', () => closeModal(), '')]);
+    });
+  }
+
+  function openApplyEligibilitySheet() {
+    runAction('讀取名單工作表', async () => {
+      const plan = await callServer('apiPlanEligibilitySheetApply', currentQuarterId);
+      renderEligibilitySheetPlan(plan);
+    });
+  }
+
+  function renderEligibilitySheetPlan(plan) {
+    const nodes = [];
+
+    if (plan.unresolved.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + plan.unresolved.length + ' 個名字系統認不出'),
+        make('div', {
+          text: '在處理好之前，一項都不會寫入——'
+            + '認不出而照樣套用，等於把那個人靜靜移出名單，而沒有人會知道。',
+          className: 'muted'
+        })
+      ]);
+      plan.unresolved.forEach((u) => {
+        box.appendChild(make('div', { text: u.note, className: 'vio-row' }));
+      });
+      nodes.push(box);
+    }
+
+    if (plan.added.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('會加入（' + plan.added.length + ' 項）')
+      ]);
+      plan.added.forEach((a) => {
+        box.appendChild(make('div', {
+          text: a.postNameTC + '　＋　' + a.nameTC, className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    if (plan.removed.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('會移走（' + plan.removed.length + ' 項）'),
+        make('div', {
+          text: '移走是「停用」，不是刪除——紀錄仍然留著。',
+          className: 'muted'
+        })
+      ]);
+      plan.removed.forEach((r) => {
+        // ⚠️ 已經排在現有職事表上的人要特別標出來。移走名單**不會**
+        // 把他從已排好的格子拿走，幹事需要知道這一點。
+        const warn = r.assignedCount > 0
+          ? ('　⚠ 他在現有職事表上還有 ' + r.assignedCount
+            + ' 格是這個崗位——移走名單不會把那幾格拿走')
+          : '';
+        box.appendChild(make('div', {
+          text: r.postNameTC + '　－　' + r.nameTC + warn,
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    if (plan.blocked) {
+      openModal('儲存並套用名單', nodes.concat([
+        para('請先回去那張表把認不出的名字改好，再撳一次。', 'muted')
+      ]), [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+
+    if (plan.added.length === 0 && plan.removed.length === 0) {
+      openModal('儲存並套用名單', [
+        para('名單沒有改動，不需要儲存。')
+      ], [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+
+    openConfirm({
+      title: '儲存並套用名單',
+      bodyNodes: nodes,
+      confirmLabel: '確定套用',
+      onConfirm: () => {
+        runAction('套用名單', async () => {
+          const r = await callServerMutating('apiApplyEligibilitySheet', currentQuarterId);
+          resetMainFlowState();
+          const done = [
+            make('div', { text: '已完成', className: 'ok-head' }),
+            para(r.message)
+          ];
+          if (r.stillAssigned && r.stillAssigned.length > 0) {
+            done.push(para('這幾位已經排在現有職事表上，那幾格不會自動改動：', 'muted'));
+            r.stillAssigned.forEach((s) => {
+              done.push(make('div', {
+                text: s.postNameTC + '　' + s.nameTC + '　（' + s.assignedCount + ' 格）',
+                className: 'vio-row'
+              }));
+            });
+          }
+          openModal('名單已套用', done, [button('知道了', () => closeModal(), '')]);
+        });
+      }
+    });
+  }
+
+  /* ── 第 5 步：寄出（C 組）────────────────────────────────── */
+
+  function renderStep5(d) {
+    const canSend = !!(d.buttons && (
+      (d.buttons.review && d.buttons.review.enabled)
+      || (d.buttons.official && d.buttons.official.enabled)
+      || (d.buttons.resend && d.buttons.resend.enabled)));
+    return stepCard({
+      num: 5,
+      title: '寄出',
+      note: '系統只會寄你已經儲存確認的版本。撳落去會先講清楚這一次寄給誰、寄什麼。',
+      acts: [stepButton('寄出', openSendDialog, {
+        disabled: !canSend && !d.latestVersion,
+        title: d.latestVersion ? '' : '要先在第 1 步生成職事表。'
+      })]
+    });
+  }
+
+  /* ── 第 6 步：無電郵者的紙本（D 組）─────────────────────── */
+
+  function renderStep6(d, flow) {
+    const n = (flow && flow.paperCount) || 0;
+    return stepCard({
+      num: 6,
+      title: n > 0 ? ('要印紙本的有 ' + n + ' 位') : '要印紙本的人',
+      note: n > 0
+        ? '這幾位查不到電郵，收不到信，但照樣要服侍。'
+        : '這一季暫時沒有查不到電郵的人。你仍然可以在這裡加人（有些長者兩樣都要）。',
+      acts: [stepButton('處理紙本', openPaperDialog, {
+        disabled: !d.latestVersion,
+        className: n > 0 ? '' : 'secondary',
+        title: d.latestVersion ? '' : '要先在第 1 步生成職事表。'
+      })]
+    });
+  }
+</script>

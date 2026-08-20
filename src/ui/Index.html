@@ -44,37 +44,59 @@
     <div class="statuscard-link" id="statusLink" hidden></div>
   </section>
 
-  <!-- 區二：開季前準備（未做完 >0 時展開） -->
+
+  <!--
+    第三十九輪批次 A 組：主流程六步。
+
+    幹事九成時間只用呢六件事，順序固定。放喺最頂、字大、間距闊。
+    落面四區嘅內容**一樣都冇刪**，只係收咗落去。
+  -->
+  <section class="flow" id="mainFlow">
+    <div class="flow-head">
+      <span class="flow-head-title">主流程</span>
+      <span class="flow-head-sub">由上而下做，六步</span>
+    </div>
+    <div id="mainFlowBody"></div>
+  </section>
+  <!-- 開季前準備（每季開頭做一次；未做完 >0 時展開）-->
   <section class="zone" id="zone2">
     <button class="zone-head" id="zone2Head" type="button" aria-expanded="false">
-      <span class="zone-title">區二　開季前準備</span>
+      <span class="zone-title">開季前準備</span>
+      <span class="zone-count" id="zone2Hint">每季開頭做一次</span>
       <span class="zone-count" id="zone2Count"></span>
       <span class="zone-caret">▾</span>
     </button>
     <div class="zone-body" id="zone2Body" hidden></div>
   </section>
 
-  <!-- 區一：日常四個掣（永遠展開、永遠最當眼） -->
-  <section class="zone zone-primary" id="zone1">
+  <!--
+    區一：第三十九輪批次 E 組起，日常那幾粒掣已經搬上「主流程」。
+    ⚠️ 這個容器刻意保留：renderZone1() 仍然會畫進去，而且原有那幾份
+    測試守住它的行為。搬位置不等於刪功能。
+    預設收起——同一組掣不需要在畫面上出現兩次。
+  -->
+  <section class="zone" id="zone1" hidden>
     <div class="zone-head static">
-      <span class="zone-title">區一　日常</span>
+      <span class="zone-title">區一　日常（已經搬上「主流程」）</span>
     </div>
     <div class="zone-body" id="zone1Body"></div>
   </section>
 
-  <!-- 區三：名單維護（本輪未做） -->
+  <!-- 名單維護（改人、改資格、改偏好）-->
   <section class="zone" id="zone3">
     <button class="zone-head" id="zone3Head" type="button" aria-expanded="false">
-      <span class="zone-title">區三　名單維護</span>
+      <span class="zone-title">名單維護</span>
+      <span class="zone-count">改人、改資格、改偏好</span>
       <span class="zone-caret">▾</span>
     </button>
     <div class="zone-body" id="zone3Body" hidden></div>
   </section>
 
-  <!-- 區四：進階功能（本輪只有「回到上一個版本」） -->
+  <!-- 進階與診斷（出事或者要查數先用）-->
   <section class="zone" id="zone4">
     <button class="zone-head" id="zone4Head" type="button" aria-expanded="false">
-      <span class="zone-title">區四　進階功能</span>
+      <span class="zone-title">進階與診斷</span>
+      <span class="zone-count">出事或者要查數先用</span>
       <span class="zone-caret">▾</span>
     </button>
     <div class="zone-body" id="zone4Body" hidden></div>
@@ -98,6 +120,8 @@
   <?!= includeHtml('ui/ScriptZone2') ?>
   <?!= includeHtml('ui/ScriptZone3') ?>
   <?!= includeHtml('ui/ScriptZone4') ?>
+  <?!= includeHtml('ui/ScriptMainFlow') ?>
+  <?!= includeHtml('ui/ScriptSendPaper') ?>
   <?!= includeHtml('ui/ScriptRollback') ?>
   <?!= includeHtml('ui/ScriptBoot') ?>
 </body>

@@ -285,9 +285,23 @@ console.log('\n=== F 組：呼叫端傳咗清單嗰陣，以呼叫端為準（�
   check('★★★★★ 有傳 `gridOverriddenSheetRows` 就用佢，冇傳先自己算'
     + '（掣 1 嗰條路已經喺 plan 嗰邊算好，唔可以喺呢度覆蓋佢）',
     /if \(gridOverriddenSheetRows\)/.test(seg) && /else/.test(seg), seg.slice(-400));
-  check('★★★★★ 自己算嗰段係睇 `plan.assignByKey[...].isManual`'
-    + '（同掣 1 嗰邊 `overlaps` 同一個判斷來源）',
-    /assignByKey\[[\s\S]{0,160}isManual/.test(seg), seg.slice(-500));
+  // ⚠️ 第三十九輪批次（順手）：呢個判斷本來喺兩個檔各寫一次
+  // （呢度同 `buildSaveAndConfirmPlan_()` 嘅 `overlaps`）。
+  // 兩段答案一致，但係兩個真相來源——本專案反覆出事嗰一類。
+  // 而家合併成 `findRequestGridOverlaps_()`，兩邊都叫佢。
+  //
+  // 所以呢一條由「檢查嗰段推導」改成守更緊要嗰件事：**兩邊真係同一個函式**。
+  check('★★★★★ 自己算嗰段係叫共用嘅 `findRequestGridOverlaps_()`',
+    /findRequestGridOverlaps_\(plan\)/.test(seg), seg.slice(-500));
+  check('★★★★★ 而掣 1 嗰條路叫嘅係**同一個**函式'
+    + '——唔係同一個，就係兩個真相來源，改一個另一個唔會跟',
+    /findRequestGridOverlaps_\(requestPlan/.test(
+      require('fs').readFileSync(
+        require('path').join(__dirname, '..', 'src', 'WebAppSaveConfirm.gs'), 'utf8')));
+  check('★★★★★ 而嗰個共用函式係睇 `plan.assignByKey[...].isManual`'
+    + '（grid 疊加算出嚟嘅「幹事有冇親手改過」，唯一來源）',
+    /findRequestGridOverlaps_[\s\S]{0,1400}assignByKey\[[\s\S]{0,200}isManual/.test(src),
+    '');
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

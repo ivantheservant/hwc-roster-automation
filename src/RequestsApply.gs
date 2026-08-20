@@ -410,6 +410,55 @@ function planApplyRequests_(quarterId) {
 }
 
 /**
+ * 邊幾筆申報落喺「幹事已經喺 grid 親手改過」嗰啲格上面。
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️ 第三十九輪批次（順手）：**呢個判斷全系統只可以有一份。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 第三十八輪 F 組喺 `applyRequests_()` 加咗一段「冇傳清單就自己算」，
+ * 而 `buildSaveAndConfirmPlan_()`（WebAppSaveConfirm.gs）本來已經有
+ * 一段一模一樣嘅 `overlaps`。兩段答案一致，但**係兩段獨立嘅碼**——
+ * 呢個正正就係本專案反覆出事嗰一類（「兩個真相來源，只改一個」）。
+ *
+ * 而且呢一輪自己踩過一次：`listPeopleNeedingPaper_()` 同
+ * `apiGetPaperListState()` 各自寫咗一次「查唔到名點算」，
+ * `tools/verify-red.js` 一跑就抓到——改壞其中一個，測試照樣綠燈。
+ *
+ * 所以合併成呢一個。兩邊都叫佢。
+ *
+ * @param {Object} plan `planApplyRequests_()` 嘅結果
+ * @param {Object.<string, string>=} postNames PostID → 中文名（畀畫面用；可以慳）
+ * @returns {Object[]} 每筆 {sheetRow, serviceDate, postId, postNameTC, slotIndex,
+ *   requestWants, gridHas}
+ */
+function findRequestGridOverlaps_(plan, postNames) {
+  const names = postNames || {};
+  const out = [];
+  (plan.results || []).forEach(function (r) {
+    const postId = r.post && r.post.postId;
+    if (!postId || !r.serviceDate) return;
+    if (r.sheetRow === undefined || r.sheetRow === null) return;
+    const slotIndex = r.slotIndex === undefined ? 1 : r.slotIndex;
+    const cell = plan.assignByKey[cellKey_(r.serviceDate, postId, slotIndex)];
+    // ⚠️ `isManual` 係由 grid 疊加算出嚟嘅（`planApplyRequests_()`）。
+    // 呢個係「幹事有冇親手改過呢一格」嘅唯一來源。
+    if (!cell || !cell.isManual) return;
+    out.push({
+      sheetRow: r.sheetRow,
+      serviceDate: r.serviceDate,
+      postId: postId,
+      postNameTC: r.postNameText || names[postId] || (r.post && r.post.postNameTC) || postId,
+      slotIndex: slotIndex,
+      requestWants: r.personNameText || '',
+      // 空白都要講得出係空白——寫一個空字串落畫面，幹事會以為系統壞咗。
+      gridHas: cell.personName || '（空白）'
+    });
+  });
+  return out;
+}
+
+/**
  * 套用申報，建立新版本。confirmedSheetRows 是幹事已同意套用的 CONFIRM 類別申報
  * （用 Requests 的列號識別，來自 planApplyRequests_() 的 results[].sheetRow）。
  *
@@ -462,12 +511,9 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
   if (gridOverriddenSheetRows) {
     gridOverriddenSheetRows.forEach(function (r) { gridOverriddenSet[r] = true; });
   } else {
-    plan.results.forEach(function (r) {
-      const postId = r.post && r.post.postId;
-      if (!postId || !r.serviceDate || r.sheetRow === undefined || r.sheetRow === null) return;
-      const cell = plan.assignByKey[
-        cellKey_(r.serviceDate, postId, r.slotIndex === undefined ? 1 : r.slotIndex)];
-      if (cell && cell.isManual) gridOverriddenSet[r.sheetRow] = true;
+    // 冇傳 ⇒ 由 plan 自己算返（步驟 3、步驟 5 呢兩條路）。
+    findRequestGridOverlaps_(plan).forEach(function (o) {
+      gridOverriddenSet[o.sheetRow] = true;
     });
   }
 

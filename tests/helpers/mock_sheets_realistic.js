@@ -234,6 +234,12 @@ class RealisticMockSheet {
   // 但一定要存在，唔係 `createRosterSheet()` 會中途拋錯，
   // 而**工作表已經建立咗**，變成一張半成品 grid。
   hideRows() { return this; }
+
+  // 第三十九輪批次：writeToPossiblyProtectedGridSheet_() 會問工作表有冇保護。
+  // 回一個空陣列 ＝「冇保護」，於是嗰個包裝會直接跑 writeFn()。
+  // ⚠️ 呢個 mock **唔模擬保護**，所以任何一份測試都唔可以用佢去證明
+  // 「寫入受保護工作表」嗰條路行得通——嗰件事要喺真實環境驗。
+  getProtections() { return []; }
   showRows() { return this; }
   hideColumns() { return this; }
   showColumns() { return this; }

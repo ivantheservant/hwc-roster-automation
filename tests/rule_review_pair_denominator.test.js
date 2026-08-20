@@ -18,6 +18,10 @@
 // **一定要同一個分母**。兩個唔同就係「同一件事兩個真相來源」
 // 嘅另一個形狀，而今次錯嗰邊係俾堂委睇嗰一份。
 
+// 第三十九輪批次 F 組：稽核文件已經拆成每十輪一個檔。
+// 一律經呢個入口讀，唔好寫死主檔路徑——寫死嘅話，下一次拆檔
+// 呢條斷言就會變成一條同佢要守嗰件事完全無關嘅假紅燈。
+const { readAuditDoc } = require('./helpers/audit_doc.js');
 const fs = require('fs');
 const path = require('path');
 const { loadGasSource } = require('./helpers/gas_loader.js');
@@ -127,7 +131,7 @@ console.log('\n=== C′3【核心】嗰個分歧已經拍板，唔可以再留�
     + '——一個冇解釋嘅刻意唔一致，下一輪一定有人「順手修好」',
     read('src/Generator.gs').indexOf('greedy pass 內部的「節流參數」，不是量度') !== -1);
   check('★★★★ 稽核文件亦有寫',
-    read('docs/系統範圍稽核.md').indexOf('measureAnnounceRelief_') !== -1);
+    readAuditDoc().indexOf('measureAnnounceRelief_') !== -1);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
