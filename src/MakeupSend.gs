@@ -408,7 +408,9 @@ function runMakeupSendExecute_() {
  * @returns {?{quarterId: string, versionNo: number, stage: string}} 取消時回傳 null
  */
 function promptMakeupTarget_(ui, title) {
-  const stageResponse = ui.prompt(title,
+  // 丙4：標題寫明而家問緊邊一樣——實測時呢個框同下一個（季度）
+  // 樣子一模一樣，結果把 OFFICIAL 填咗入季度嗰格。
+  const stageResponse = ui.prompt(title + '｜先問：階段',
     '要補寄哪一個階段？請輸入：\n'
       + '　' + MAIL_STAGES.REVIEW + '　＝步驟 2：寄給堂委審閱\n'
       + '　' + MAIL_STAGES.OFFICIAL + '　＝步驟 4：正式發出\n\n'

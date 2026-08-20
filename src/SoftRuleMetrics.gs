@@ -294,6 +294,80 @@ function measureRolePostFocus_(assignments, posts, roles, focusRoles, focusPostI
  * @param {Object} context `buildVerifyContext_()` 嘅結果
  * @returns {?Object} `buildChairAnnounceBoundFromContext_()` 嘅結果；算唔到時 null
  */
+/**
+ * 第三十四輪批次丙1：**「主席兼報告」要同邊個數比——全系統唯一嘅判斷。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 點解要抽出嚟
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `docs/系統範圍稽核.md` 第 3265 行早已拍板：**63% 唔可以再做準則。**
+ * 嗰個數係**仲未有身分規則**嗰個年代由 78 週歷史算出嚟，
+ * 描述緊一個已經唔存在嘅世界。規則改變咗結構之後仍然攞佢做準則，
+ * 等於每一季都報一個**不可行動**嘅「偏低」——幹事分辨唔到
+ * 「排得唔好」同「規則造成嘅天花板」，而後者調高目標值唔會改善，
+ * 只會多咗一個永遠達唔到嘅數字。
+ *
+ * 「軟規則實測量度」（本檔案）**一直都已經改咗**跟上限比。
+ * 但 2026-08-20 實測見到「核對職事表」（`Verify.gs`）仍然印
+ * `23.1%　3/13 週　63.0% ± 5.0%　TRUE`——而**幹事日常會撳嗰個正正係
+ * 「核對職事表」**，唔係量度工具。即係拍板咗嘅嘢只做咗一半。
+ *
+ * 而家兩邊都叫呢一個函式，措辭亦都由 `describeChairEqReference_()` 出，
+ * 唔會各寫一份然後慢慢漂移。
+ *
+ * ⚠️ 算唔到上限就退回同歷史基準比（維持既有行為）——
+ * **唔可以因為算唔到就唔判斷**，嗰個就會變成靜靜放過。
+ *
+ * @param {?Object} chairEq `computeChairEqAnnounceRatio_()` 嘅結果
+ * @param {Object} context `buildVerifyContext_()` 嘅結果
+ * @returns {{baseline: ?number, ceiling: ?Object, hasCeiling: boolean,
+ *   reference: ?number, tolerance: number, deviates: boolean}}
+ */
+function resolveChairEqReference_(chairEq, context) {
+  const baseline = chairEq && !isNaN(chairEq.target) ? chairEq.target : null;
+  const tolerance = chairEq ? (chairEq.tolerance || 0) : 0;
+
+  let ceiling = null;
+  try {
+    ceiling = measureChairAnnounceCeiling_(context, buildAvailabilityByPostForMetrics_(context));
+  } catch (err) {
+    log_('WARN', 'resolveChairEqReference_ 算不到理論上限，退回同歷史基準比：' + err.message);
+    ceiling = null;
+  }
+  const hasCeiling = !!(ceiling && ceiling.applicable && ceiling.boundRatio !== null);
+  const reference = hasCeiling ? ceiling.boundRatio : baseline;
+
+  return {
+    baseline: baseline,
+    ceiling: ceiling,
+    hasCeiling: hasCeiling,
+    reference: reference,
+    tolerance: tolerance,
+    deviates: (reference === null || !chairEq)
+      ? false
+      : Math.abs(chairEq.ratio - reference) > tolerance
+  };
+}
+
+/**
+ * 丙1：上面嗰個判斷嘅**人話講法**。`Verify.gs` 同 `SoftRuleMetrics.gs`
+ * 兩邊用同一個 formatter——各寫一份就會漂移，而漂移嘅後果係
+ * 幹事喺兩個工具見到同一件事有兩種講法，唔知信邊個。
+ *
+ * @param {Object} ref `resolveChairEqReference_()` 嘅結果
+ * @returns {string}
+ */
+function describeChairEqReference_(ref) {
+  if (ref.hasCeiling) {
+    return formatMetricPercent_(ref.reference) + ' ± ' + formatPercent_(ref.tolerance)
+      + '（本季理論上限；歷史基準 ' + formatMetricPercent_(ref.baseline) + ' 只供參考）';
+  }
+  if (ref.baseline === null) return '-';
+  return formatMetricPercent_(ref.baseline) + ' ± ' + formatPercent_(ref.tolerance)
+    + '（歷史基準；本季理論上限算不出，這是退回的做法）';
+}
+
 function measureChairAnnounceCeiling_(context, availabilityByPost) {
   try {
     return buildChairAnnounceBoundFromContext_(
@@ -436,13 +510,12 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
   // 判斷改為同**上限**比（見下面 `chairEqJudgement`），上限本身低過
   // 「基準 − 容差」嗰陣報告會明確講出成因。推導見 `RoleImpact.gs` 嘅
   // `computeChairAnnounceUpperBound_()`。
-  const chairEqCeiling = measureChairAnnounceCeiling_(context, availabilityByPost);
-
-  // 有上限就同上限比，冇（規則未設定／算唔到）就退回同歷史基準比，
-  // 維持加入呢一項之前嘅行為。
-  const chairEqReference = (chairEqCeiling && chairEqCeiling.applicable && chairEqCeiling.boundRatio !== null)
-    ? chairEqCeiling.boundRatio
-    : chairEqBaseline;
+  // 第三十四輪批次丙1：抽咗做 `resolveChairEqReference_()`，同
+  // `Verify.gs`（核對職事表）**共用同一個判斷**——之前只有呢邊改咗，
+  // 而幹事日常會撳嗰個係核對職事表。
+  const chairEqRef = resolveChairEqReference_(chairEq, context);
+  const chairEqCeiling = chairEqRef.ceiling;
+  const chairEqReference = chairEqRef.reference;
 
   return {
     quarterId: quarterId,

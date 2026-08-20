@@ -131,12 +131,36 @@ console.log('\n=== D-2 步 5 失敗【核心】唔前進 Stage、唔發佈公開
     + '——半套資料唔應該一路推落去令堂委／義工睇到',
     untilReturn.indexOf('tryPublishPublicRoster_') === -1
     && untilReturn.indexOf('publishPublicRoster_') === -1);
-  check('★★★★★ 訊息明寫「第 N 版可能只寫入了一部分」（規格步 1.8）',
-    /可能只寫入了一部分/.test(untilReturn));
-  check('★★★★★ 訊息俾**兩條**補救路徑（核對／回到上一個版本）',
-    /檢查各版本派工紀錄/.test(untilReturn) && /回到上一個版本/.test(untilReturn));
-  check('★★★★ 回傳 ok:false 同 versionCreated:false，前端分辨得出「完全失敗」',
-    /ok: false/.test(untilReturn) && /versionCreated: false/.test(untilReturn));
+  // ⚠️ 第三十四輪批次甲4：文案由 catch 區塊搬咗入
+  // `buildSaveConfirmFailureResult_()`，因為而家要**分兩種情況**
+  //（未開始寫 vs 寫到一半）。上面兩條「唔前進 Stage、唔發佈」照樣守住
+  // catch 區塊本身；下面幾條跟住文案去到新嗰個函式。
+  check('★★★★★ catch 區塊交俾 buildSaveConfirmFailureResult_() 出文案，'
+    + '唔喺 catch 入面就地砌（兩種情況要分開判斷）',
+    /buildSaveConfirmFailureResult_\(/.test(untilReturn), untilReturn.slice(0, 300));
+
+  const failBody = SRC.slice(SRC.indexOf('function buildSaveConfirmFailureResult_'));
+  const failFn = failBody.slice(0, failBody.indexOf('\n/**', 10));
+
+  check('★★★★★ 「寫到一半」嗰種仍然明寫「第 N 版可能只寫入了一部分」（規格步 1.8）',
+    /可能只寫入了一部分/.test(failFn));
+  check('★★★★★ 「寫到一半」嗰種仍然俾兩條補救路徑（核對／回到上一個版本）',
+    /檢查各版本派工紀錄/.test(failFn) && /回到上一個版本/.test(failFn));
+  check('★★★★★ 但「一個字都冇寫入」嗰種要另有一套文案，'
+    + '而且明講「沒有任何東西被寫入」——實測核實甲1 嗰種失敗係完全乾淨嘅，'
+    + '講成需要人手善後會令幹事去做一次多餘嘅回退',
+    /沒有任何東西被寫入/.test(failFn));
+  check('★★★★★ 乾淨失敗嗰段唔可以叫人回退'
+    + '（回退本身會建立新版本——一句嚇人嘅文案會製造一個真正多餘嘅版本）',
+    /直接再撳一次/.test(failFn));
+  check('★★★★★ 兩種情況係靠**去睇實際狀態**分（有冇登記版本／grid 工作表在唔在），'
+    + '唔係靠估',
+    /findLatestVersionNo\(/.test(failFn) && /getSheetByName\(/.test(failFn));
+  check('★★★★★ 查唔到嗰陣一律當成「可能寫咗一半」（安全方向）',
+    /wroteSomething = true/.test(failFn));
+  check('★★★★ 兩種都回 ok:false 同 versionCreated:false，前端分辨得出「完全失敗」',
+    (failFn.match(/ok: false/g) || []).length >= 2
+    && (failFn.match(/versionCreated: false/g) || []).length >= 2);
 }
 
 console.log('\n=== D-2 步 7 失敗【核心】發佈失敗 ≠ 全盤失敗 ===');

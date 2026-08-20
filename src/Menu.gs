@@ -1906,7 +1906,10 @@ function runTuneParameters_() {
  */
 function promptQuarterAndVersion_(title) {
   const ui = SpreadsheetApp.getUi();
-  const quarterResponse = ui.prompt(title, '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
+  // 丙4：標題寫明**而家問緊邊一樣**。「補寄未收到的人」連問兩個框，
+  // 兩個樣子一模一樣，實測就係噉填反咗。
+  const quarterResponse = ui.prompt(title + '｜第 1 個問題：季度',
+    '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (quarterResponse.getSelectedButton() !== ui.Button.OK) return null;
 
   const quarterId = normalizeIdInput_(quarterResponse.getResponseText());
@@ -1915,7 +1918,8 @@ function promptQuarterAndVersion_(title) {
     return null;
   }
 
-  const versionResponse = ui.prompt(title, '請輸入版本號（留空 = 最新版本）：', ui.ButtonSet.OK_CANCEL);
+  const versionResponse = ui.prompt(title + '｜第 2 個問題：版本號',
+    '請輸入版本號（留空 = 最新版本）：', ui.ButtonSet.OK_CANCEL);
   if (versionResponse.getSelectedButton() !== ui.Button.OK) return null;
 
   const versionText = versionResponse.getResponseText().trim();
@@ -1936,6 +1940,28 @@ function promptQuarterAndVersion_(title) {
     return null;
   }
   if (isNaN(versionNo) || versionNo < 0) {
+    // ─────────────────────────────────────────────────────────────
+    // ⚠️ 第三十四輪批次丙4：**先講最可能嗰個原因。**
+    // ─────────────────────────────────────────────────────────────
+    //
+    // 2026-08-20 實測：「補寄未收到的人」先問階段、後問季度，
+    // 兩個框樣子一模一樣。Ivan 把 `OFFICIAL` 填咗入季度嗰一格，
+    // 收到嘅訊息係「RosterVersions 中找不到 OFFICIAL 的任何版本紀錄。
+    // 請確認 QuarterID 有沒有打錯……」。
+    //
+    // 訊息**冇錯**，但佢冇講出真正原因，於是幹事會去查 RosterVersions
+    // ——去查一件根本冇問題嘅嘢。
+    if (looksLikeMailStageValue_(quarterId)) {
+      ui.alert(
+        title,
+        '你好像把「階段」填在「季度」那一格了。\n\n'
+          + '收到的是「' + quarterId + '」，那是一個階段名稱，不是季度。\n'
+          + '季度的寫法是 2027T3 這種（年份 ＋ T ＋ 第幾季）。\n\n'
+          + '請再撳一次，這一格填季度。',
+        ui.ButtonSet.OK
+      );
+      return null;
+    }
     ui.alert(
       title,
       'RosterVersions 中找不到 ' + quarterId + ' 的任何版本紀錄。\n\n'

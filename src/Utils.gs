@@ -739,31 +739,75 @@ function adjacentPairCount_(weeksCounted) {
  *
  * ⚠️ 週數唔係 13 嗰陣要自動換算，**唔可以寫死 12 或者 3**。
  *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第三十四輪批次丙2：**百分比出唔出，由呼叫端決定；措辭只有一份。**
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 2026-08-20 實測見到兩邊唔一致：
+ *
+ *   核對職事表　　`12 對相鄰主日之中約 3 對（27%）`
+ *   規則審閱表　　`12 對相鄰的主日之中約 3 對`　　　（冇百分比）
+ *   但第二句　　　「因為只得 12 對，實際會落在 3 對（25.0%）或 4 對（33.3%）……」
+ *                 **兩邊完全一樣，都有百分比**
+ *
+ * 規則審閱表整體唔放百分比係合理嘅（堂委揀嘅係選項，而選項本身用對數），
+ * 但第二句又出現百分比 ⇒ **佢自己同自己唔一致**。
+ *
+ * 修法唔係各自寫一句（嗰個就會漂移），而係加一個開關：
+ * `options.withPercent`。措辭本身仍然只有呢一份。
+ *
  * @param {number} target 目標比例（0–1）
  * @param {?number} weeks 一季有幾多個主日
+ * @param {{withPercent: boolean}=} options `withPercent` 預設 true
+ *   （維持 `Verify.gs` 品質統計嘅既有寫法）。規則審閱表傳 false。
  * @returns {{ok: boolean, pairs: number, text: string, note: string}}
  *   `ok` false ＝ 換算唔到（呼叫端應該改講百分比，唔好硬砌）
  */
-function describeAdjacentPairTarget_(target, weeks) {
+/**
+ * 第三十四輪批次丙4：呢個字串睇落係咪一個「階段」名？
+ *
+ * 用途：季度嗰格收到明顯係階段名嘅值嗰陣，直接講「你好像把階段填在
+ * 季度那一格了」，而唔係叫幹事去查 RosterVersions——嗰度根本冇問題。
+ *
+ * ⚠️ 只認 `MAIL_STAGES` 入面真正有嘅值，**唔做模糊比對**。
+ * 猜錯咗會令一個真係打錯咗嘅 QuarterID 收到一句完全唔啱嘅指引，
+ * 比原本嗰句更難查。
+ *
+ * @param {*} text 使用者輸入
+ * @returns {boolean}
+ */
+function looksLikeMailStageValue_(text) {
+  const t = String(text || '').trim().toUpperCase();
+  if (!t) return false;
+  return Object.keys(MAIL_STAGES).some(function (k) {
+    return String(MAIL_STAGES[k]).toUpperCase() === t;
+  });
+}
+
+function describeAdjacentPairTarget_(target, weeks, options) {
   const t = toFiniteNumberOrNull_(target);
   const pairs = adjacentPairCount_(weeks);
   if (t === null || pairs < 1) {
     return { ok: false, pairs: pairs, text: '', note: '' };
   }
 
+  const withPercent = !(options && options.withPercent === false);
   const exact = t * pairs;
   const low = Math.floor(exact);
   const high = Math.ceil(exact);
-  const pct = function (n) { return (n / pairs * 100).toFixed(1) + '%'; };
+  // 唔出百分比嗰陣連個括號都唔出——留一對空括號比出咗個數更難睇。
+  const pct = function (n) {
+    return withPercent ? ('（' + (n / pairs * 100).toFixed(1) + '%）') : '';
+  };
 
   const text = pairs + ' 對相鄰主日之中約 ' + Math.round(exact) + ' 對'
-    + '（' + (t * 100).toFixed(0) + '%）';
+    + (withPercent ? '（' + (t * 100).toFixed(0) + '%）' : '');
 
   // 剛好整除 ⇒ 冇「兩者都算命中」呢回事，唔好講多餘嘢。
   const note = (low === high)
-    ? ('因為只得 ' + pairs + ' 對，' + low + ' 對（' + pct(low) + '）就是剛好命中。')
-    : ('因為只得 ' + pairs + ' 對，實際會落在 ' + low + ' 對（' + pct(low) + '）或 '
-      + high + ' 對（' + pct(high) + '），兩者都算命中。');
+    ? ('因為只得 ' + pairs + ' 對，' + low + ' 對' + pct(low) + '就是剛好命中。')
+    : ('因為只得 ' + pairs + ' 對，實際會落在 ' + low + ' 對' + pct(low) + '或 '
+      + high + ' 對' + pct(high) + '，兩者都算命中。');
 
   return { ok: true, pairs: pairs, text: text, note: note };
 }

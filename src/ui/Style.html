@@ -98,6 +98,25 @@
   .status { min-height: 20px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
   .status.error { color: var(--danger); }
 
+  /* ────────────────────────────────────────────────────────
+     第三十四輪批次乙1：`[hidden]` 一定要真係收起。
+
+     ⚠️ 瀏覽器預設嘅 `[hidden] { display: none }` 係喺 UA stylesheet，
+     **任何一條有 class 選擇器嘅 `display` 規則都會蓋過佢**。
+     本檔案已經因為呢件事逐個補過兩次
+     （`.zone-body[hidden]`、`.modal-backdrop[hidden]`）——
+     即係每加一個新元件就要記得補多一次，而唔記得嘅代價係
+     一個**睇得見、撳得到、但會被靜靜忽略**嘅控制項。
+
+     2026-08-20 實測撞到第三次：「不能服侍的日期」揀「全部崗位」時，
+     程式碼有寫 `postBox.hidden = true`，但 `.prop-opts { display: flex }`
+     蓋過咗佢，所以嗰張崗位清單照樣顯示、照樣勾得到，
+     而後端見到 `AppliesTo=ALL` 就完全唔理個勾——零提示。
+
+     所以改成一條總規則，唔再逐個補。
+     ──────────────────────────────────────────────────────── */
+  [hidden] { display: none !important; }
+
   /* ── 狀態卡（規格 1.2）────────────────────────────────── */
   .statuscard {
     border: 1px solid var(--border); border-left: 4px solid var(--accent);

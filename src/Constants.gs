@@ -1340,7 +1340,12 @@ const ON_VIOLATION = {
 /** Unavailable 的 AppliesTo 與 Status 欄可能出現的值。 */
 const UNAVAILABLE_VALUES = {
   APPLIES_TO_ALL: 'ALL',
-  STATUS_ACTIVE: 'ACTIVE'
+  STATUS_ACTIVE: 'ACTIVE',
+  // 第三十四輪批次乙2：本來 `apiSaveUnavailable()` 直接寫死字串 'CANCELLED'，
+  // 而讀嗰邊（`readUnavailableNormalized()`）淨係認 ACTIVE，兩邊各自寫一次
+  // 就係兩個真相來源。而家寫成常數，兩邊都讀同一個。
+  // ⚠️ 一律停用，**唔刪**——刪咗就冇咗紀錄。
+  STATUS_CANCELLED: 'CANCELLED'
 };
 
 /** Config 的 SELECTION_STRATEGY 可能出現的值。 */

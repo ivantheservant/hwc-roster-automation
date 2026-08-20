@@ -137,18 +137,36 @@ function buildSaveAndConfirmPlan_(quarterId) {
   });
   // 同一格既有 grid 改動、又有申報 ⇒ **grid 贏**（規格 1.4）。
   // 幹事親手改嗰個係最新真相；申報係之前提交嘅。
+  //
+  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十四輪批次甲2：**呢個偵測本來一直都係死嘅。**
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // 原本寫 `r.postId`，但 `validateRequest_()`（RequestsApply.gs）回嘅係
+  // `post`（成個崗位物件），**根本冇 `postId` 呢個欄位**。
+  // 所以 `r.postId` 永遠 `undefined` ⇒ 個 filter 永遠一項都唔中 ⇒
+  // `overlaps` 永遠係空陣列 ⇒ 規格 1.4 由頭到尾冇實作過，
+  // 而畫面上亦都永遠唔會話俾幹事聽「你親手改嗰格會蓋過一筆申報」。
+  //
+  // 之前偵測唔到係因為冇人套用過申報（甲2）——兩個 bug 互相遮住對方。
+  const requestCellKey = function (r) {
+    const postId = r.post && r.post.postId;
+    if (!r.serviceDate || !postId) return null;
+    return r.serviceDate + '|' + postId + '|' + (r.slotIndex === undefined ? 1 : r.slotIndex);
+  };
   const overlaps = requestPlan.results.filter(function (r) {
-    return r.serviceDate && r.postId
-      && gridCellKeys[r.serviceDate + '|' + r.postId + '|' + (r.slotIndex === undefined ? 1 : r.slotIndex)];
+    const key = requestCellKey(r);
+    return key && gridCellKeys[key];
   }).map(function (r) {
-    const key = r.serviceDate + '|' + r.postId + '|' + (r.slotIndex === undefined ? 1 : r.slotIndex);
-    const g = gridCellKeys[key];
+    const g = gridCellKeys[requestCellKey(r)];
     return {
       serviceDate: r.serviceDate,
-      postNameTC: r.postNameText || r.postId,
+      postNameTC: r.postNameText || (r.post && r.post.postNameTC) || '',
       slotIndex: g.slotIndex,
       requestWants: r.personNameText || '',
-      gridHas: g.manualText || '（空白）'
+      gridHas: g.manualText || '（空白）',
+      // 執行階段要靠呢個列號去略過嗰筆申報（見 apiSaveAndConfirmExecute()）。
+      sheetRow: r.sheetRow
     };
   });
 
@@ -338,37 +356,89 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
   }
 
   // ── 4／5　逐格寫 AuditLog、建立新版本 ────────────────────────
-  // materialiseManualEdits_() 內部就係「逐格 AuditLog → createRosterSheet()
-  // → writeAssignments()」，唔喺呢度再抄一次（第十八輪嘅教訓）。
+  //
+  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十四輪批次甲1／甲2：**有申報就一定要行 applyRequests_() 嗰條路。**
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // 修正之前呢度**淨係**叫 `materialiseManualEdits_()`，而嗰個函式只識得
+  // grid 人手改動。後果（2026-08-20 實測）：
+  //
+  //   甲1　0 格人手改動 ＋ 有申報 ⇒ `resolved.changes` 係空陣列 ⇒
+  //        `materialiseManualEdits_()` 嘅空守衛拋錯。**「幹事只填申報、
+  //        完全唔碰 grid」係日常最常見嘅用法，而呢條路從來冇實作過。**
+  //
+  //   甲2　有 grid 改動 ＋ 有申報 ⇒ 版本建立成功、Stage 前進、公開連結重發，
+  //        但**申報完全冇被套用**：`Requests` 嘅 RequestID／Status 仍然空白，
+  //        AuditLog 冇任何申報紀錄，而版本備註同確認畫面都寫住「申報 1 筆」。
+  //        `plan.requests.apply` 喺整個執行階段**淨係被用嚟砌嗰句備註**。
+  //        ⚠️ 靜默失敗——幹事會以為義工嘅申報已經處理好。
+  //
+  //   甲3　因此形成死鎖：掣 3 嘅閘門（正確地）擋住未處理申報，
+  //        但撳掣 1 永遠處理唔完，幹事喺介面上無路可走。
+  //
+  // 修法冇另起爐灶。`planApplyRequests_()` ＋ `applyRequests_()` 呢條路
+  // **本身就已經做齊全部嘢**，而且一直行得啱（2027T2 v1 嘅圖例正確）：
+  //   ・`assignByKey` 由 GRID_OVERLAY 砌 ⇒ 人手改動已經喺入面
+  //   ・`manualChanges` 逐格寫 AuditLog（MANUAL_GRID_EDIT_CARRIED）
+  //   ・`ruleFlags` 原樣帶落去（甲5 嗰個 bug 喺嗰邊唔存在）
+  //   ・套用完會叫 `writeRequestOutcomes_()` 回寫 Requests
+  //   ・同一格既有 grid 改動又有申報 ⇒ 由 `applyDesignatedServe_()` 覆寫，
+  //     而 plan 嗰邊已經計咗 `overlaps` 俾幹事睇（規格 1.4）
+  //
+  // 所以有申報就交返俾佢，冇申報就維持原本嗰條（已經有測試守住）。
+  // **兩條路都係「建立新版本」，但唔會有兩份實作。**
   const context = buildFineTuneContext_(quarterId, plan.baseVersionNo);
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiSaveAndConfirmExecute');
 
+  const hasRequests = plan.requests.apply.length > 0
+    || plan.requests.confirm.length > 0
+    || plan.requests.needsInput.length > 0;
+  const versionNote = '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
+    + (plan.requests.apply.length > 0 ? '、申報 ' + plan.requests.apply.length + ' 筆' : '');
+
   let created;
+  let requestResult = null;
   try {
-    created = materialiseManualEdits_(context, resolved.changes, resolved.state, 'apiSaveAndConfirmExecute');
-    registerVersion(
-      quarterId, created.versionNo, created.sheetName,
-      VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
-      plan.violations.real.length + plan.violations.semiHard.length,
-      false,
-      '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
-        + (plan.requests.apply.length > 0 ? '、申報 ' + plan.requests.apply.length + ' 筆' : ''));
+    if (hasRequests) {
+      // ⚠️ 重新 plan 一次，唔用上面個 `plan`——`buildSaveAndConfirmPlan_()`
+      // 出嚟嘅係俾前端睇嘅精簡版（`mapRequestForClient_()`），
+      // 而 `applyRequests_()` 要嘅係完整嘅 `results`／`assignByKey`／`context`。
+      const requestPlan = planApplyRequests_(quarterId);
+      requestResult = applyRequests_(
+        requestPlan,
+        (input.confirmedRequestRows || []),
+        VERSION_VALUES.BASIS_FINE_TUNE,
+        versionNote,
+        // 規格 1.4：同一格幹事已經親手改咗嗰啲申報，唔套用。
+        // 列號由 plan 嗰邊算好（`overlaps`）——**上游決定，下游執行**。
+        plan.overlaps.map(function (o) { return o.sheetRow; })
+          .filter(function (row) { return row !== undefined && row !== null; }));
+      created = {
+        versionNo: requestResult.versionNo,
+        sheetName: requestResult.sheetName,
+        cellCount: resolved.changes.length
+      };
+    } else {
+      created = materialiseManualEdits_(context, resolved.changes, resolved.state, 'apiSaveAndConfirmExecute');
+      registerVersion(
+        quarterId, created.versionNo, created.sheetName,
+        VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
+        plan.violations.real.length + plan.violations.semiHard.length,
+        false, versionNote);
+    }
   } catch (err) {
-    // 規格步 1.8：**最危險嘅一種。** 版本可能只寫咗一部分。
-    // ⚠️ 一定要 **唔前進 Stage、唔發佈公開連結**——半套資料唔應該
-    // 一路推落去令堂委／義工睇到。
-    return {
-      ok: false,
-      versionCreated: false,
-      publishFailed: false,
-      message: buildThreePartMessage_(
-        '儲存到一半失敗了（' + err.message + '）。',
-        '第 ' + (plan.baseVersionNo + 1) + ' 版可能只寫入了一部分。'
-          + 'Stage 沒有前進，公開連結沒有更新，沒有寄出任何電郵。',
-        ['去「進階功能 ▸ 檢查各版本派工紀錄」核對第 ' + (plan.baseVersionNo + 1) + ' 版是否完整',
-          '或者用「進階功能 ▸ 回到上一個版本」退回第 ' + plan.baseVersionNo + ' 版'])
-    };
+    // ─────────────────────────────────────────────────────────────
+    // ⚠️ 第三十四輪批次甲4：**分開「未開始寫」同「寫到一半」。**
+    // ─────────────────────────────────────────────────────────────
+    //
+    // 修正之前一律講「第 N 版可能只寫入了一部分」，並叫幹事去核對版本
+    // 甚至回退。但甲1 嗰種失敗係喺**建立版本之前**拋嘅——實測核實
+    // 一個字都冇寫入（RosterVersions 冇 v2、AuditLog 零新紀錄、Requests 未動）。
+    // 把「乾淨失敗」講成需要人手善後，會令幹事去做完全不必要嘅回退，
+    // 而回退本身係一個會建立新版本嘅動作。
+    return buildSaveConfirmFailureResult_(quarterId, plan.baseVersionNo, err);
   }
 
   // ── 6　前進 Stage（只喺 REVIEW_SENT → REQUESTS_APPLIED 呢一種）──
@@ -388,8 +458,12 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
     sheetName: created.sheetName,
     baseVersionNo: plan.baseVersionNo,
     cellCount: created.cellCount,
-    appliedRequestCount: plan.requests.apply.length,
-    needsInputCount: plan.requests.needsInput.length,
+    // ⚠️ 第三十四輪批次甲2：呢兩個數而家由**真正套用嘅結果**出，
+    // 唔再由 plan 嗰個「打算套用幾多筆」出。修正之前兩者永遠一樣，
+    // 因為根本冇套用過——一個永遠自我印證嘅數字。
+    appliedRequestCount: requestResult ? requestResult.appliedCount : 0,
+    rejectedRequestCount: requestResult ? requestResult.rejectedCount : 0,
+    needsInputCount: requestResult ? requestResult.needsInputCount : 0,
     releasedViolationCount: plan.violations.real.length,
     stageAdvanced: stageAdvanced,
     publishFailed: publish.failed,
@@ -402,6 +476,78 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
         ['去「進階功能 ▸ 重新發佈公開連結」再試一次',
           '如果連續失敗，先不要撳「寄給堂委審閱」，否則他們會看到舊版本'])
       : ''
+  };
+}
+
+/**
+ * 第三十四輪批次甲4：儲存失敗之後，**先查清楚到底寫咗幾多**，先至講文案。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 點解要分
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 原本一律講「第 N 版可能只寫入了一部分……去核對／或者回退」。
+ * 但甲1 嗰種失敗（空守衛拋錯）係喺**建立版本之前**發生，
+ * 實測核實一個字都冇寫入。把乾淨失敗講成需要人手善後，
+ * 會令幹事去做一次完全不必要嘅回退——而回退本身會建立新版本，
+ * 即係一句嚇人嘅文案製造咗一個真正嘅多餘版本。
+ *
+ * 判斷方法係**去睇實際狀態**，唔係靠估：
+ *   ・`RosterVersions` 有冇登記到新版本
+ *   ・grid 工作表存唔存在（登記之前就已經建立咗）
+ * 兩樣都冇 ⇒ 乾淨，可以直接再試。
+ *
+ * ⚠️ 查唔到嗰陣（連查都失敗）**一律當成「可能寫咗一半」**——
+ * 呢個方向嘅錯比較安全：叫人核對一次，好過叫人放心而其實有半套資料。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} baseVersionNo 失敗之前嘅最新版本號
+ * @param {Error} err 原本嘅錯誤
+ * @returns {Object} 失敗結果（`ok: false`）
+ */
+function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
+  const targetVersionNo = baseVersionNo + 1;
+
+  let wroteSomething = true;   // 查唔到就當寫咗（安全方向）
+  try {
+    const registered = findLatestVersionNo(quarterId) > baseVersionNo;
+    const sheetExists = !!SpreadsheetApp.getActiveSpreadsheet()
+      .getSheetByName(buildRosterSheetName_(quarterId, targetVersionNo));
+    wroteSomething = registered || sheetExists;
+  } catch (probeErr) {
+    log_('WARN', '儲存失敗之後查唔到寫入狀態，一律當成「可能寫咗一半」：' + probeErr.message);
+  }
+
+  if (!wroteSomething) {
+    return {
+      ok: false,
+      versionCreated: false,
+      publishFailed: false,
+      partialWrite: false,
+      message: buildThreePartMessage_(
+        '儲存沒有做成（' + err.message + '）。',
+        '沒有任何東西被寫入——第 ' + targetVersionNo + ' 版沒有建立，'
+          + '職事表、修改申報、Stage 全部維持原樣，第 ' + baseVersionNo + ' 版仍然是最新一版。'
+          + '沒有寄出任何電郵。',
+        ['直接再撳一次「儲存並確認」就可以，不需要做任何清理',
+          '如果再試仍然一樣，把上面整段文字交給開發者'])
+    };
+  }
+
+  // 規格步 1.8：**最危險嘅一種。** 版本可能只寫咗一部分。
+  // ⚠️ 一定要 **唔前進 Stage、唔發佈公開連結**——半套資料唔應該
+  // 一路推落去令堂委／義工睇到。
+  return {
+    ok: false,
+    versionCreated: false,
+    publishFailed: false,
+    partialWrite: true,
+    message: buildThreePartMessage_(
+      '儲存到一半失敗了（' + err.message + '）。',
+      '第 ' + targetVersionNo + ' 版可能只寫入了一部分。'
+        + 'Stage 沒有前進，公開連結沒有更新，沒有寄出任何電郵。',
+      ['去「進階功能 ▸ 檢查各版本派工紀錄」核對第 ' + targetVersionNo + ' 版是否完整',
+        '或者用「進階功能 ▸ 回到上一個版本」退回第 ' + baseVersionNo + ' 版'])
   };
 }
 

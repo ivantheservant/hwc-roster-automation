@@ -677,7 +677,10 @@ function describeRuleForReview_(rule, level, weeks, ctx) {
   // 同一個函式。兩邊各寫一次就會漂移，而漂移嘅後果係
   // 堂委見到嘅數同幹事事後見到嘅數唔同。
   if (unitId === RULE_REVIEW_UNITS.ADJACENT_PAIR.id && level === RULE_LEVELS.SOFT) {
-    const goal = describeAdjacentPairTarget_(target, weeks);
+    // 第三十四輪批次丙2：規則審閱表整體唔放百分比（堂委揀嘅係選項，
+    // 而選項本身用對數），所以呢一句都唔應該出百分比——
+    // 之前佢出，令呢張表自己同自己唔一致。
+    const goal = describeAdjacentPairTarget_(target, weeks, { withPercent: false });
     if (goal.ok) currentText = currentText + '\n' + goal.note;
 
     // 第三十三輪批次階段 E：兩個分母唔同嗰陣要講出嚟，**用同一句寫法**

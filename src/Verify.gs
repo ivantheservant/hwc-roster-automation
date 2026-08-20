@@ -100,11 +100,24 @@ function buildVerifyReport_(context) {
   const chairEq = computeChairEqAnnounceRatio_(context);
   rows.push(makeSectionRow_('2. 主席與報告同一人的週數比例'));
   if (chairEq) {
+    // ─────────────────────────────────────────────────────────────
+    // ⚠️ 第三十四輪批次丙1：**跟「本季理論上限」比，唔係跟 63% 歷史基準比。**
+    // ─────────────────────────────────────────────────────────────
+    //
+    // 63% 係仲未有身分規則嗰個年代由 78 週歷史算出嚟嘅，
+    // 描述緊一個已經唔存在嘅世界。`docs/系統範圍稽核.md` 第 3265 行
+    // 早已拍板要改，但當時只改咗「軟規則實測量度」
+    // （`SoftRuleMetrics.gs`）——**而幹事日常會撳嗰個係「核對職事表」**，
+    // 即係呢度。2026-08-20 實測仍然印住 `63.0% ± 5.0%　TRUE`。
+    //
+    // 判斷同措辭全部由 `resolveChairEqReference_()` ／
+    // `describeChairEqReference_()` 出，同量度工具**同一個函式**。
+    const ref = resolveChairEqReference_(chairEq, context);
     rows.push(makeItemRow_(
       '同一人週數比例',
       formatPercent_(chairEq.ratio) + '　' + chairEq.same + '/' + chairEq.weeks + ' 週',
-      formatPercent_(chairEq.target) + ' ± ' + formatPercent_(chairEq.tolerance),
-      chairEq.deviates
+      describeChairEqReference_(ref),
+      ref.deviates
     ));
   } else {
     rows.push(makeItemRow_('同一人週數比例', '無法計算（規則或資料不足）', '-', false));

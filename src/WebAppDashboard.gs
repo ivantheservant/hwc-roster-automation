@@ -333,17 +333,24 @@ function buildSaveButtonText_(s) {
   if (u.unresolvedCount > 0) {
     return '有 ' + u.unresolvedCount + ' 格的文字系統認不出，撳下去會告訴你是哪幾格。';
   }
+  // 第三十四輪批次甲3：`NEEDS_INPUT` 唔再擋住流程，但**一定要講出嚟**，
+  // 否則就變成靜靜消失。一律當成句尾嘅補充。
+  const needsInput = Number(u.needsInputCount) > 0
+    ? '另有 ' + u.needsInputCount + ' 筆申報系統看不懂，需要你自己到 Requests 工作表處理'
+      + '（它們不會擋住「正式發出」）。'
+    : '';
+
   const noChange = u.gridChangeCount === 0 && u.pendingRequestCount === 0;
   if (noChange && s.stage === QUARTER_STAGE.REVIEW_SENT) {
-    return '堂委沒有提出改動。撳下去就當作意見已收齊，可以進入正式發出。';
+    return '堂委沒有提出改動。撳下去就當作意見已收齊，可以進入正式發出。' + needsInput;
   }
-  if (noChange) return '未偵測到你在表上改過任何格。';
+  if (noChange) return '未偵測到你在表上改過任何格。' + needsInput;
   if (u.gridChangeCount > 0 && u.pendingRequestCount > 0) {
     return '偵測到你在表上改了 ' + u.gridChangeCount + ' 格，另有 '
-      + u.pendingRequestCount + ' 筆修改申報未處理。';
+      + u.pendingRequestCount + ' 筆修改申報未處理。' + needsInput;
   }
-  if (u.gridChangeCount > 0) return '偵測到你在表上改了 ' + u.gridChangeCount + ' 格。';
-  return '有 ' + u.pendingRequestCount + ' 筆修改申報未處理。';
+  if (u.gridChangeCount > 0) return '偵測到你在表上改了 ' + u.gridChangeCount + ' 格。' + needsInput;
+  return '有 ' + u.pendingRequestCount + ' 筆修改申報未處理。' + needsInput;
 }
 
 /** 規格 2.3 掣 2 嘅動態文字。 */
@@ -540,14 +547,45 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十四輪批次甲3：**「未處理」同「系統睇唔明、等人手處理」要分開。**
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // 修正之前呢度係 `readPendingRequests_(quarterId).length`——即係數晒
+  // 全部 `RequestID` 空白嘅行。但 `NEEDS_INPUT` 類申報**刻意永遠唔會攞到
+  // RequestID**（`RequestsApply.gs` 嘅 `writeRequestOutcomes_()`，
+  // 咁樣先可以喺底層資料修正之後重新驗證一次）。
+  //
+  // 兩件事夾埋嘅後果（2026-08-20 實測）：掣 3「正式發出」永遠灰，
+  // 訊息叫幹事「先撳儲存並確認」，但撳幾多次都處理唔完——
+  // 現場係靠人手去 `Requests` 刪走嗰兩行先行得返。
+  //
+  // 判斷：**閘門只應該擋「會改動職事表但仲未套用」嘅嘢。**
+  // 一筆 `NEEDS_INPUT` 申報系統根本睇唔明，佢**永遠唔會**自動改動職事表，
+  // 所以佢唔構成「正式發出之後職事表會唔啱」嘅風險——擋住佢冇保護到任何嘢，
+  // 只係令幹事無路可走。而一筆 `APPLY`／`CONFIRM` 未套用就係真風險，繼續擋。
+  //
+  // ⚠️ 但 `NEEDS_INPUT` **一定要繼續顯示出嚟**（獨立一個數），
+  // 唔可以變成靜靜消失——嗰個就會變成另一個「缺失被當成正常值」。
   let pendingRequestCount = 0;
+  let needsInputCount = 0;
   try {
-    pendingRequestCount = readPendingRequests_(quarterId).length;
+    if (versionNo >= 0) {
+      const requestPlan = planApplyRequests_(quarterId);
+      requestPlan.results.forEach(function (r) {
+        if (r.category === 'NEEDS_INPUT') needsInputCount++;
+        else pendingRequestCount++;
+      });
+    } else {
+      // 未有版本 ⇒ 分唔到類（驗證要對住一個版本嘅派工狀態）。
+      // 一律當成「未處理」——呢個方向嘅錯比較安全。
+      pendingRequestCount = readPendingRequests_(quarterId).length;
+    }
   } catch (err) {
     log_('WARN', 'readDashboardUnsavedState_ 讀不到待處理申報：' + err.message);
     return {
       gridChangeCount: gridChangeCount, unresolvedCount: unresolvedCount,
-      pendingRequestCount: -1, hasAny: true, error: err.message
+      pendingRequestCount: -1, needsInputCount: -1, hasAny: true, error: err.message
     };
   }
 
@@ -555,6 +593,8 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
     gridChangeCount: gridChangeCount,
     unresolvedCount: unresolvedCount,
     pendingRequestCount: pendingRequestCount,
+    needsInputCount: needsInputCount,
+    // ⚠️ `needsInputCount` **刻意唔計入 `hasAny`**——見上面嘅判斷。
     hasAny: gridChangeCount > 0 || unresolvedCount > 0 || pendingRequestCount > 0
   };
 }

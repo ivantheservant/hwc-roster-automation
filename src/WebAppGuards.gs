@@ -252,9 +252,25 @@ function planResendChangedPersons_(quarterId) {
       // 或者寫「無」）。前端見到空字串會顯示「（上次的安排沒有記錄）」
       // ——講「冇記錄」係誠實嘅，扮到有得比較就會令幹事以為自己核對過。
       previousSummary: (context.lastSummaryByPerson || {})[c.personId] || '',
-      currentSummary: (c.assignments || []).map(function (a) {
-        return a.serviceDate + '　' + (context.postNames[a.postId] || a.postId);
-      }).join('；')
+      // ─────────────────────────────────────────────────────────────
+      // ⚠️ 第三十四輪批次丙3：**兩邊要用同一個日期 formatter。**
+      // ─────────────────────────────────────────────────────────────
+      //
+      // 2026-08-20 實測：同一格派工、零改動，畫面卻顯示
+      //
+      //   原本：26/12 司琴
+      //   現在：2027-12-26　司琴
+      //
+      // 幹事會以為真係改咗。成因：`previousSummary` 來自 SendLog 嘅
+      // `AssignmentSummary`（由 `buildAssignmentSummary_()` 砌，用 Config
+      // 嘅 `MAIL_SUMMARY_DATE_FORMAT`，即 `dd/MM`），而 `currentSummary`
+      // 喺呢度用原始 `serviceDate` 直接砌（`yyyy-MM-dd`）。
+      //
+      // 而家直接叫**同一個函式** `buildAssignmentSummary_()`——
+      // 唔係喺呢度照抄一次佢嘅格式（照抄就係第二個真相來源，
+      // 而 Config 改咗格式之後又會再對唔上）。
+      currentSummary: buildAssignmentSummary_(
+        c.assignments || [], context.postNames, context.timezone)
     };
   });
 

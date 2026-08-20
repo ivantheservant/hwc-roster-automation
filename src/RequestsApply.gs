@@ -425,11 +425,26 @@ function planApplyRequests_(quarterId) {
  * @param {number[]} confirmedSheetRows 幹事同意套用的 CONFIRM 類別申報列號
  * @param {string=} basis 選填，RosterVersions 的 Basis 值；不傳時預設
  *   VERSION_VALUES.BASIS_REQUESTS_APPLIED（步驟 3 的行為）
+ * @param {string=} versionNote 選填，寫入 RosterVersions 備註欄的文字。
+ *   第三十四輪批次甲2 新增：掣 1「儲存並確認」而家會經呢條路建立版本
+ *   （見 `apiSaveAndConfirmExecute()`），而佢要喺備註講得出「人手改動幾多格、
+ *   申報幾多筆」。不傳時維持原本行為（備註留空）。
+ * @param {number[]=} gridOverriddenSheetRows 選填，**幹事已經喺 grid 親手改咗
+ *   同一格**的申報列號。呢啲申報唔會套用，而係記成 REJECTED 並寫明原因。
+ *
+ *   ⚠️ 第三十四輪批次甲2：呢個係規格 1.4「同一格既有 grid 改動又有申報 ⇒
+ *   grid 贏」嘅實作。之前呢條規則**只存在於一段註解同一個永遠係空嘅
+ *   `overlaps` 陣列**——偵測用咗一個唔存在嘅欄位（`r.postId`），
+ *   而執行階段根本冇套用過任何申報，所以兩邊都冇人發現。
+ *
+ *   不傳時維持原本行為（步驟 3／5 嘅既有呼叫端不用改）。
  * @returns {Object} 套用結果摘要
  */
-function applyRequests_(plan, confirmedSheetRows, basis) {
+function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverriddenSheetRows) {
   const confirmedSet = {};
   (confirmedSheetRows || []).forEach(function (r) { confirmedSet[r] = true; });
+  const gridOverriddenSet = {};
+  (gridOverriddenSheetRows || []).forEach(function (r) { gridOverriddenSet[r] = true; });
 
   const workingByKey = {};
   Object.keys(plan.assignByKey).forEach(function (key) {
@@ -454,6 +469,18 @@ function applyRequests_(plan, confirmedSheetRows, basis) {
   plan.results.forEach(function (r) {
     if (r.category === 'NEEDS_INPUT') {
       outcomes.push({ sheetRow: r.sheetRow, status: REQUEST_STATUS.NEEDS_INPUT, resultNote: r.reason });
+      return;
+    }
+
+    // 規格 1.4：同一格幹事已經親手改咗 ⇒ **grid 贏**，呢筆申報唔套用。
+    // ⚠️ 但一定要記低，唔可以靜靜咁唔理——幹事要知道佢親手改嗰下
+    // 蓋過咗一筆義工提交嘅申報，否則嗰位義工嘅要求就無聲無息消失咗。
+    if (gridOverriddenSet[r.sheetRow]) {
+      outcomes.push({
+        sheetRow: r.sheetRow,
+        status: REQUEST_STATUS.REJECTED,
+        resultNote: '同一格你已經在職事表上親手改過，以你改的為準，這一筆沒有套用'
+      });
       return;
     }
 
@@ -552,7 +579,7 @@ function applyRequests_(plan, confirmedSheetRows, basis) {
   let newEligibilityCount = 0;
   let newUnavailableCount = 0;
   try {
-    registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false);
+    registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false, versionNote || '');
     markPendingBackfillCells_(sheetName, pendingBackfillCells);
     newEligibilityCount = writeNewEligibilityRows_(newEligibilityRows);
     newUnavailableCount = writeNewUnavailableRows_(newUnavailableRows);

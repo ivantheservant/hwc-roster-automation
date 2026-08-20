@@ -250,11 +250,35 @@ function readServiceDatesNormalized(quarterId, timezone) {
  * @param {string} timezone 時區名稱
  * @returns {Object[]} 正規化後的不可服侍時段陣列
  */
+/**
+ * 第三十四輪批次乙3：**「呢一筆不能服侍算唔算生效」——全系統唯一嘅判斷。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 點解要抽出嚟
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 2026-08-20 實測：把一行改成 `CANCELLED` 之後，**排表引擎已經正確咁忽略咗佢**
+ *（呢個函式下面嗰個 filter），但幹事畫面「不能服侍的日期」照樣把佢列喺
+ * 「生效中」——因為 `WebAppUnavailable.gs` 嗰邊由頭到尾**完全冇睇 `Status`**，
+ * 只係按日期分「生效中」同「過期」。
+ *
+ * 兩層對「生效」有兩套理解，而且**係危險嗰個方向**：
+ * 幹事會以為一條已經取消嘅限制仍然生效，於是唔敢派嗰個人。
+ * 呢個係本專案 bug class 第 3 條。
+ *
+ * 而家兩邊都叫呢一個函式。要改「點先算生效」就改呢度一個地方。
+ *
+ * @param {Object} row `readUnavailable()` 出嚟嘅一列
+ * @returns {boolean} 生效（`Status` 係 ACTIVE）先回 true
+ */
+function isUnavailableRowActive_(row) {
+  return String(row[COLUMNS.UNAVAILABLE.STATUS] || '').trim().toUpperCase()
+    === UNAVAILABLE_VALUES.STATUS_ACTIVE;
+}
+
 function readUnavailableNormalized(timezone) {
   return readUnavailable()
-    .filter(function (row) {
-      return String(row[COLUMNS.UNAVAILABLE.STATUS] || '').toUpperCase() === UNAVAILABLE_VALUES.STATUS_ACTIVE;
-    })
+    .filter(isUnavailableRowActive_)
     .map(function (row) {
       return {
         personId: row[COLUMNS.UNAVAILABLE.PERSON_ID],

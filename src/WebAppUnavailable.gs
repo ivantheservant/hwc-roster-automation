@@ -56,6 +56,8 @@ function apiListUnavailable(quarterId, keyword) {
 
     const current = [];
     const past = [];
+    // 第三十四輪批次乙3：新增第三組。**唔刪走**——一律停用不刪除。
+    const cancelled = [];
     readSheet(SHEETS.UNAVAILABLE).forEach(function (row) {
       const personId = String(row[U.PERSON_ID] || '').trim();
       if (!personId) return;
@@ -78,6 +80,21 @@ function apiListUnavailable(quarterId, keyword) {
         source: String(row[U.SOURCE] || '').trim(),
         status: String(row[U.STATUS] || '').trim()
       };
+      // ─────────────────────────────────────────────────────────────
+      // ⚠️ 第三十四輪批次乙3：**先睇 `Status`，再睇日期。**
+      // ─────────────────────────────────────────────────────────────
+      //
+      // 修正之前呢度**完全冇睇 `Status`**，只按日期分兩組。
+      // 實測後果：一行改成 CANCELLED 之後，排表引擎已經忽略咗佢
+      //（`isUnavailableRowActive_()`），但畫面照樣列喺「生效中」。
+      // 幹事會以為一條已經取消嘅限制仍然生效，於是唔敢派嗰個人
+      // ——**危險嗰個方向**。
+      //
+      // 而家「算唔算生效」同引擎行同一個判斷（同一個函式）。
+      if (!isUnavailableRowActive_(row)) {
+        cancelled.push(item);
+        return;
+      }
       // 過去嘅摺埋，**唔刪**——刪咗就冇咗紀錄。
       if (dateTo && dateTo < today) past.push(item);
       else current.push(item);
@@ -88,6 +105,7 @@ function apiListUnavailable(quarterId, keyword) {
     };
     current.sort(sortByDate);
     past.sort(function (a, b) { return sortByDate(b, a); });   // 最近嘅過期擺前
+    cancelled.sort(function (a, b) { return sortByDate(b, a); });
 
     return {
       quarterId: quarterId,
@@ -101,7 +119,10 @@ function apiListUnavailable(quarterId, keyword) {
         };
       }),
       current: current,
-      past: past
+      past: past,
+      // 第三十四輪批次乙3：已取消嘅獨立一組。前端要分開顯示，
+      // **唔可以合返落 current**——嗰個就係本來個 bug。
+      cancelled: cancelled
     };
   } finally {
     endSheetReadMemo_();
@@ -257,7 +278,9 @@ function apiSaveUnavailable(payload) {
   newValues[U.APPLIES_TO] = appliesTo;
   newValues[U.POST_IDS] = postIds.join(',');
   newValues[U.REASON] = String(p.reason || '').trim();
-  newValues[U.STATUS] = p.active === false ? 'CANCELLED' : UNAVAILABLE_VALUES.STATUS_ACTIVE;
+  newValues[U.STATUS] = p.active === false
+    ? UNAVAILABLE_VALUES.STATUS_CANCELLED
+    : UNAVAILABLE_VALUES.STATUS_ACTIVE;
 
   const existingId = String(p.unavailableId || '').trim();
   if (existingId) {

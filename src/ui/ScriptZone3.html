@@ -61,6 +61,22 @@
       nodes.push(box);
     }
 
+    // 第三十四輪批次乙3：已取消嘅獨立一組。
+    // ⚠️ 修正之前呢啲行係**混喺「生效中」裡面**——排表引擎已經忽略咗佢哋，
+    // 但幹事見到佢哋列喺生效中，會以為一條已經取消嘅限制仍然生效。
+    if ((unavailableData.cancelled || []).length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('已取消（' + unavailableData.cancelled.length
+          + ' 筆，排表不會理會，保留紀錄，不會刪走）')
+      ]);
+      unavailableData.cancelled.forEach((r) => {
+        const line = unavailableRow(r, { cancelled: true });
+        line.className += ' is-off';
+        box.appendChild(line);
+      });
+      nodes.push(box);
+    }
+
     // 過期嘅摺埋，**唔刪**——刪咗就冇咗紀錄。
     if (unavailableData.past.length > 0) {
       const box = make('div', { className: 'sec' }, [
@@ -77,16 +93,81 @@
     openModal('不能服侍的日期', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
   }
 
-  function unavailableRow(r) {
+  function unavailableRow(r, opts) {
+    const o = opts || {};
     const box = make('div', { className: 'prop' });
     box.appendChild(make('div', {
       text: r.personName + '　' + r.dateFrom + ' 至 ' + r.dateTo
-        + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + r.postIds.join('、')),
+        + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + r.postIds.join('、'))
+        + (o.cancelled ? '　（已取消）' : ''),
       className: 'prop-head'
     }));
     if (r.reason) box.appendChild(make('div', { text: '原因：' + r.reason, className: 'muted' }));
-    box.appendChild(row([button('修改', () => openUnavailableEditor(r), 'link')], 'row-right'));
+
+    const actions = [button('修改', () => openUnavailableEditor(r), 'link')];
+    // ─────────────────────────────────────────────────────────────
+    // 第三十四輪批次乙2：**加返「取消這一筆」。**
+    //
+    // `apiSaveUnavailable()` 一直都支援 `active: false`（寫 Status=CANCELLED），
+    // 但呢個畫面由頭到尾冇任何方法把 `active` 送成 `false`
+    // ——後端有能力，介面上到唔到。對比「暫時不做某崗位」有〔解除限制〕、
+    // 「身分」有換屆同生效至，只有呢一頁漏咗。
+    //
+    // 實務上好重要：不能服侍日期係義工最常反口嘅嘢，幹事本來只能開試算表
+    // 自己改 `Status`。
+    // ─────────────────────────────────────────────────────────────
+    if (!o.cancelled) {
+      actions.push(button('取消這一筆', () => confirmCancelUnavailable(r), 'link danger'));
+    }
+    box.appendChild(row(actions, 'row-right'));
     return box;
+  }
+
+  /**
+   * 乙2：取消一筆之前要確認——因為佢會影響排表
+   *（嗰個人由「唔可以派」變返「可以派」）。
+   */
+  function confirmCancelUnavailable(r) {
+    openModal('取消這一筆不能服侍的日期', [
+      make('div', {
+        text: r.personName + '　' + r.dateFrom + ' 至 ' + r.dateTo,
+        className: 'prop-head'
+      }),
+      para('取消之後，排表就會當這個人在這段日期可以服侍。', ''),
+      para('這一筆不會被刪走，只會標示為「已取消」，之後仍然查得到。', 'muted'),
+      // ⚠️ 用 `vio vio-warn`（本檔案既有慣例），唔可以自己作一個 `warn` class
+      // ——Style.html 冇一條淨係 `.warn` 嘅規則，寫咗會完全冇效果，
+      // 變成一句「應該扎眼但其實同普通字一樣」嘅警告。
+      make('div', {
+        text: '現有版本不會自己變。要重新檢查，撳「儲存並確認」。',
+        className: 'vio vio-warn'
+      })
+    ], [
+      button('確定取消這一筆', () => {
+        runAction('取消中', async () => {
+          // ⚠️ 一定要用 `callServerMutating()`——取消一筆會改動資料，
+          // 而且會影響排表（嗰個人由「唔可以派」變返「可以派」），
+          // 所以區一嘅狀態卡同四粒掣都要跟住重新整理。
+          // 用 `callServer()` 會被唯讀白名單擋住（有測試守住呢條規則）。
+          const res = await callServerMutating('apiSaveUnavailable', {
+            unavailableId: r.unavailableId,
+            quarterId: currentQuarterId,
+            personId: r.personId,
+            dateFrom: r.dateFrom,
+            dateTo: r.dateTo,
+            appliesTo: r.appliesTo,
+            postIds: r.postIds || [],
+            reason: r.reason || '',
+            active: false
+          });
+          if (!res.ok) { showErrorModal('不能服侍的日期', new Error(res.message)); return; }
+          // 列表要即時反映——重新讀，唔係喺前端自己刪走一行。
+          unavailableData = await callServer('apiListUnavailable', currentQuarterId, '');
+          openUnavailable('');
+        });
+      }, 'danger'),
+      button('不要取消', () => openUnavailable(''), 'secondary')
+    ]);
   }
 
   /** 新增／修改嘅編輯畫面。`existing` 為 null 就係新增。 */
@@ -128,7 +209,20 @@
     });
     // 只有揀「指定崗位」先開放勾——揀「全部崗位」時仲勾住幾個，
     // 幹事會以為嗰幾個有特別意思。
-    const syncPostBox = () => { postBox.hidden = appliesSel.value !== 'POSTS'; };
+    //
+    // ⚠️ 第三十四輪批次乙1：本來淨係設 `hidden`，但 `.prop-opts` 有
+    // `display: flex`，class 選擇器蓋過咗瀏覽器嘅 `[hidden] { display: none }`
+    // ——即係**完全冇收起過**。實測：揀「全部崗位」同時勾咗「讀經」，
+    // 寫入嘅係 `AppliesTo=ALL`、`PostIDs` 空白，個勾零作用零提示。
+    //
+    // Style.html 加咗一條總規則令 `[hidden]` 真係收起。呢度再加一層：
+    // 逐個 checkbox `disabled`。**兩層都要**——CSS 嗰層日後再被蓋過嘅話，
+    // disabled 仍然令佢撳唔到、而且明顯係灰色。
+    const syncPostBox = () => {
+      const off = appliesSel.value !== 'POSTS';
+      postBox.hidden = off;
+      postInputs.forEach((cb) => { cb.disabled = off; });
+    };
     appliesSel.addEventListener('change', syncPostBox);
     syncPostBox();
 
@@ -147,7 +241,13 @@
       dateFrom: fromInput.value.trim(),
       dateTo: toInput.value.trim(),
       appliesTo: appliesSel.value,
-      postIds: postInputs.filter((c) => c.checked).map((c) => c.dataset.postId),
+      // ⚠️ 第三十四輪批次乙1：揀「全部崗位」時**一定要送空陣列**。
+      // 後端本來就會忽略佢（寫入 PostIDs 空白），但送一份會被靜靜丟棄嘅
+      // 資料上去，就係「畫面同實際寫入唔一致」嘅來源——
+      // 「先看影響」嗰個預覽亦都會照住一份唔會生效嘅資料去算。
+      postIds: appliesSel.value === 'POSTS'
+        ? postInputs.filter((c) => c.checked).map((c) => c.dataset.postId)
+        : [],
       reason: reasonInput.value.trim()
     });
 
