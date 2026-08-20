@@ -112,13 +112,21 @@ function buildVerifyReport_(context) {
     //
     // 判斷同措辭全部由 `resolveChairEqReference_()` ／
     // `describeChairEqReference_()` 出，同量度工具**同一個函式**。
+    // ⚠️ 第三十五輪批次 C 組：**唔再判定「偏離」。**
+    // 三個數並列、各自講明係咩，唯一會亮起嘅情況係「實測 > 上限」。
+    // 措辭由 `describeChairEqReference_()` 出，同「軟規則實測量度」
+    // **逐字相同**（D 組——第三十四輪要求過一次，但只改咗一邊）。
     const ref = resolveChairEqReference_(chairEq, context);
+    const desc = describeChairEqReference_(ref, chairEq);
     rows.push(makeItemRow_(
       '同一人週數比例',
       formatPercent_(chairEq.ratio) + '　' + chairEq.same + '/' + chairEq.weeks + ' 週',
-      describeChairEqReference_(ref),
+      desc.text,
       ref.deviates
     ));
+    if (desc.alert) {
+      rows.push(makeItemRow_('同一人週數比例（要留意）', desc.alert, '-', true));
+    }
   } else {
     rows.push(makeItemRow_('同一人週數比例', '無法計算（規則或資料不足）', '-', false));
   }

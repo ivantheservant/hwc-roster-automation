@@ -55,8 +55,24 @@ console.log('\n=== 步 1.2【核心】認唔出姓名 ⇒ 立即阻擋，冇「�
     + '——認唔出就係認唔出，猜係第十九／二十輪嗰一類 bug 嘅溫床',
     SRC.indexOf('略過') === -1 || !/skipUnresolved|ignoreUnresolved|forceContinue/.test(SRC));
 
-  check('★★★★ 阻擋時會列出日期／崗位／你輸入咗咩（規格步 1.2）',
-    /serviceDate: u\.serviceDate[\s\S]{0,200}?rawText:/.test(SRC));
+  // ⚠️ 第三十五輪批次 B 組：而家要送**兩個值**。
+  // 原本只送一個（而且欄位名寫錯咗，永遠 fallback 到空字串），
+  // 令對話框話幹事打咗空白，但 grid 上明明有字。
+  check('★★★★ 阻擋時會列出日期／崗位（規格步 1.2）',
+    /serviceDate: u\.serviceDate[\s\S]{0,400}?postNameTC:/.test(SRC));
+  check('★★★★★ 而且**兩個值都送**：格內現在有咩 ＋ 本來應該係咩'
+    + '——只送一個就永遠分唔出係邊一邊出事',
+    /gridText: u\.text/.test(SRC) && /expectedText: u\.expectedText/.test(SRC));
+  // ⚠️ 只查 unresolved 嗰段——`manualText` 喺 `changes` 嗰邊係**真實存在**
+  // 而且要用嘅欄位（`gridChanges`／`overlaps` 都靠佢），唔可以一竹篙打一船人。
+  {
+    const start = SRC.indexOf('unresolved: resolved.unresolved.map');
+    const block = start === -1 ? '' : SRC.slice(start, start + 700);
+    check('★★★★★ unresolved 嗰段唔可以再讀 `u.manualText`／`u.rawText`'
+      + '（`buildGridOverlayState_()` 推入 unresolved 嗰陣用嘅欄位名係 `text`，'
+      + '嗰兩個根本唔存在，所以永遠 fallback 到空字串）',
+      block !== '' && !/u\.manualText/.test(block), block.slice(0, 300));
+  }
 
   check('★★★★ 用返第二十輪已有嘅 buildUnresolvedGuidanceText_()，'
     + '唔喺呢度另寫一套指引',

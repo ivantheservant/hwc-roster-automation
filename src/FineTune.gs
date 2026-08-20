@@ -175,9 +175,19 @@ function buildGridOverlayState_(context) {
   // `resolveAuthoritativeState_()` 係同一套做法。呢度特別重要：
   // 如果冇咗渲染資料就退回「舊嘅反推做法」，個 bug 會靜靜咁復活，
   // 而且**淨係喺有合堂嘅季度先出現**——最難察覺嗰種。
-  if (!context || !context.gridRender || !context.gridRender.labels) {
+  // ─────────────────────────────────────────────────────────────────────
+  // ⚠️ 第三十五輪批次 A 組：`autoGenerateByPostId` **一樣係必要欄位**。
+  // ─────────────────────────────────────────────────────────────────────
+  //
+  // 唔可以「冇就當全部崗位都係自動排」——噉樣就係把一個「我唔知道」
+  // 靜靜當成「係」，而後果就係本輪嗰個 bug 原封不動翻生
+  //（講員一填，「儲存並確認」永遠撳唔到）。
+  // 呢個正正係本專案 bug class 第 2 條，唔可以喺修佢嘅時候順手種返一個。
+  if (!context || !context.gridRender || !context.gridRender.labels
+    || !context.gridRender.autoGenerateByPostId) {
     throw new Error(
-      '人手改動偵測需要 `context.gridRender`（顯示標籤／EmptyDisplay／ExternalOwner）。\n\n'
+      '人手改動偵測需要 `context.gridRender`'
+      + '（顯示標籤／EmptyDisplay／AutoGenerate／ExternalOwner）。\n\n'
       + '收到的值是：' + (context && context.gridRender === undefined
         ? 'undefined（完全沒有傳）' : JSON.stringify(context && context.gridRender)) + '\n\n'
       + '⚠️ 這個欄位不可以省略。偵測人手改動的方法是「算出這一格本來應該\n'
@@ -207,6 +217,32 @@ function buildGridOverlayState_(context) {
 
     // grid 沒有這一格（例如崗位是後來加的）：照抄原值
     if (gridText === undefined) {
+      return Object.assign({}, base, { personId: a.personId, isManual: false });
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ⚠️ 第三十五輪批次 A 組：`AutoGenerate = FALSE` 嘅崗位**整格略過**。
+    // ─────────────────────────────────────────────────────────────────
+    //
+    // 講員／翻譯／獻花呢類崗位嘅值**本來就係自由文字**——外請講員
+    //（例如外來嘅客席講員）根本唔喺 `NameMapping`，亦都唔應該喺。
+    // 佢哋喺 `RosterAssignments` 只有 `PersonNameSnapshot`、冇 `PersonID`。
+    //
+    // 修正之前，下面嗰段見到「grid 有字、版本記錄解析出空」就當成
+    // 一格認唔出嘅人手改動 ⇒ 整批拒絕建立新版本。
+    //
+    // 現場後果（2027T3）：**任何一季只要幹事填過講員，
+    // 就永遠撳唔到「儲存並確認」。** 而填講員係開季前必做嘅事,
+    // 即係呢條路喺真實使用上一定會踩到。
+    //
+    // 呢啲格嘅唯一寫入途徑係「填講員／翻譯／獻花」
+    //（`PreacherTranslationFill.gs`，佢會同時寫長表同 grid），
+    // **唔係 grid 人手改動**。所以佢哋唔應該參與人手改動偵測，
+    // 亦都唔應該攞去 `NameMapping` 解析。
+    //
+    // ⚠️ 判斷由 `Posts` 嘅 `AutoGenerate` 讀出嚟，**唔用崗位 ID 白名單**
+    // ——崗位會增減，寫死 ID 會喺下一次加崗位嗰陣再爆一次。
+    if (context.gridRender.autoGenerateByPostId[a.postId] === false) {
       return Object.assign({}, base, { personId: a.personId, isManual: false });
     }
 

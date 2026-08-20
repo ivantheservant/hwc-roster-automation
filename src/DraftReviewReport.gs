@@ -117,10 +117,14 @@ function buildDraftReviewRows_(m, blank) {
   if (m.chairEq) {
     rows.push(diagRow_('三、規則檢查結果', '主席同時擔任報告的比例',
       pct(m.chairEq.ratio) + '（' + m.chairEq.same + '/' + m.chairEq.weeks + ' 週）',
-      '過往習慣約 ' + pct(m.chairEqBaseline) + '。'
-        + (m.chairEqJudgement.judgement === SOFT_METRIC_JUDGEMENT.NORMAL
-          ? '今季貼近過往習慣。'
-          : '今季' + m.chairEqJudgement.judgement + '，可按需要調整。')));
+      // ⚠️ 第三十五輪批次 C 組：呢份報告係俾堂委睇嘅，更加唔應該講
+      // 「今季偏低」——嗰個判斷本身冇一個可行動嘅目標值支撐住。
+      // 只講事實：過往習慣係幾多、而過往習慣係喺乜嘢年代量出嚟。
+      '過往習慣約 ' + pct(m.chairEqBaseline)
+        + '（在還沒有身分規則的年代量出來，只供參考）。'
+        + ((m.chairEqRef && m.chairEqRef.exceedsCeiling)
+          ? '今季高於本季理論上限，幹事會另外核對。'
+          : '')));
   }
   if (m.announce) {
     rows.push(diagRow_('三、規則檢查結果', '報告連續兩週同一人的比例',

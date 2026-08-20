@@ -1058,12 +1058,18 @@ function renderExpectedGridText_(assignment, postId, serviceDate, renderContext)
  */
 function buildGridRenderContext_(quarterId, timezone, posts) {
   const emptyDisplayByPostId = {};
+  // 第三十五輪批次 A 組：邊啲崗位係「本來就唔由系統排」。
+  // 擺喺呢度而唔係另外讀一次 `Posts`——呢個 context 本身就係
+  // 「人手改動偵測要用嘅逐崗位資料」，多一個欄位唔使多讀一次表。
+  const autoGenerateByPostId = {};
   (posts || readPostsNormalized()).forEach(function (p) {
     emptyDisplayByPostId[p.postId] = p.emptyDisplay;
+    autoGenerateByPostId[p.postId] = p.autoGenerate !== false;
   });
   return {
     labels: readGridCellLabels_(),
     emptyDisplayByPostId: emptyDisplayByPostId,
+    autoGenerateByPostId: autoGenerateByPostId,
     externalOwnerByDate: buildSpecialSundayExternalOwnerIndex_(quarterId, timezone)
   };
 }

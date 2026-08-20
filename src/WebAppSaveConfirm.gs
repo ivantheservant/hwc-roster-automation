@@ -89,6 +89,18 @@ function buildSaveAndConfirmPlan_(quarterId) {
     });
   }
 
+  // ⚠️ 第三十五輪批次 B 組（順帶）：崗位中文名。
+  //
+  // 本檔案原本有**三處**寫 `context.postNames ? (context.postNames[x] || x) : x`，
+  // 但 `buildFineTuneContext_()` **根本冇 `postNames` 呢個欄位**
+  //（只有 `buildMailContext_()` 先有）。所以三處都永遠 fallback 到 postId，
+  // 幹事見到嘅係 `PREACHER#1` 呢種機器鍵——現場對話框嗰句
+  // `2027-07-04　PREACHER#1　……` 就係噉嚟。
+  //
+  // 由 `context.posts`（真正存在）砌一次，三處共用。
+  const postNameById = {};
+  (context.posts || []).forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
+
   // ── 步 1.2　認名 ─────────────────────────────────────────────
   // ⚠️ mode 必須明確傳（第十九輪）。
   const resolved = resolveAuthoritativeState_(
@@ -98,12 +110,37 @@ function buildSaveAndConfirmPlan_(quarterId) {
     // **立即中止，唔做之後任何一步**，亦唔提供「略過這幾格繼續」嘅出口。
     // 認唔出就係認唔出——猜係第十九／二十輪嗰一類 bug 嘅溫床。
     return blocked('UNRESOLVED_NAMES', {
+      // ─────────────────────────────────────────────────────────────
+      // ⚠️ 第三十五輪批次 B 組：**兩個值都要送，而且唔可以送錯欄位名。**
+      // ─────────────────────────────────────────────────────────────
+      //
+      // 原本寫 `rawText: u.manualText || u.rawText || ''`，但
+      // `buildGridOverlayState_()`（FineTune.gs）推入 `unresolved` 嗰陣
+      // 用嘅欄位名係 **`text`**——`manualText` 同 `rawText` 兩個都唔存在。
+      // 所以永遠 fallback 到 `''`，而畫面就印成「你打了：「(空白)」」。
+      //
+      // 現場後果：grid 上明明有一位客席講員嘅名，對話框話你打咗空白。
+      // 幹事會照住去改一格本來冇問題嘅嘢。
+      //
+      // ⚠️ 而家**兩個值都送**（格內現在／本來應該係）。只送一個
+      // 就永遠分唔出係邊一邊出事——而呢個 bug 正正就係噉樣藏咗好耐。
+      // ⚠️ 第三十五輪批次 B 組（順帶）：`context.postNames` **根本唔存在**。
+      // `buildFineTuneContext_()` 冇呢個欄位（只有寄信嗰個 context 先有），
+      // 所以個三元運算永遠 fallback 到 `u.postId` ⇒ 幹事見到嘅係
+      // `PREACHER#1` 呢種機器鍵，唔係「講員」。
+      // 現場對話框嗰句 `2027-07-04　PREACHER#1　……` 就係噉嚟。
+      // 而家由 `context.posts` 真正譯返中文名。
       unresolved: resolved.unresolved.map(function (u) {
         return {
           serviceDate: u.serviceDate,
-          postNameTC: context.postNames ? (context.postNames[u.postId] || u.postId) : u.postId,
+          postNameTC: postNameById[u.postId] || u.postId,
           slotIndex: u.slotIndex,
-          rawText: u.manualText || u.rawText || ''
+          // 格內而家真正有咩（幹事打嗰個）
+          gridText: u.text || '',
+          // 呢一格本來應該渲染成咩（版本記錄嗰邊）
+          expectedText: u.expectedText || '',
+          // 舊欄位名保留，等未更新嘅前端唔會即刻爆——但佢而家帶住**正確**嘅值。
+          rawText: u.text || ''
         };
       }),
       message: buildUnresolvedGuidanceText_(resolved.unresolved)
@@ -124,7 +161,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
     return {
       serviceDate: c.serviceDate,
       postId: c.postId,
-      postNameTC: context.postNames ? (context.postNames[c.postId] || c.postId) : c.postId,
+      postNameTC: postNameById[c.postId] || c.postId,
       slotIndex: c.slotIndex,
       originalName: c.originalName || '（空白）',
       manualName: c.manualText || '（空白）'
@@ -267,6 +304,11 @@ function classifySaveConfirmViolations_(quarterId, versionNo, allViolations) {
 function buildSaveConfirmProposals_(context, resolved, allViolations) {
   if (!resolved.changes || resolved.changes.length === 0) return [];
 
+  // 第三十五輪批次 B 組（順帶）：同 `buildSaveAndConfirmPlan_()` 一樣嘅理由
+  // ——`context.postNames` 唔存在，要由 `context.posts` 譯。
+  const postNameById = {};
+  (context.posts || []).forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
+
   const violationByCell = {};
   (allViolations || []).forEach(function (v) {
     if (v.severity !== RULE_LEVELS.HARD) return;
@@ -306,7 +348,7 @@ function buildSaveConfirmProposals_(context, resolved, allViolations) {
     return {
       serviceDate: c.serviceDate,
       postId: c.postId,
-      postNameTC: context.postNames ? (context.postNames[c.postId] || c.postId) : c.postId,
+      postNameTC: postNameById[c.postId] || c.postId,
       slotIndex: c.slotIndex,
       original: nameOf(original.personId),
       manual: c.manualText || '',

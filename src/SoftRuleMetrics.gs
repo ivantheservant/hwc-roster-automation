@@ -295,34 +295,41 @@ function measureRolePostFocus_(assignments, posts, roles, focusRoles, focusPostI
  * @returns {?Object} `buildChairAnnounceBoundFromContext_()` 嘅結果；算唔到時 null
  */
 /**
- * 第三十四輪批次丙1：**「主席兼報告」要同邊個數比——全系統唯一嘅判斷。**
+ * 「主席兼報告」呢個指標要點講——**全系統唯一嘅判斷**。
  *
  * ─────────────────────────────────────────────────────────────────────
- * ⚠️ 點解要抽出嚟
+ * ⚠️ 第三十五輪批次 C 組拍板：**呢一項唔再判定「偏離」。**
  * ─────────────────────────────────────────────────────────────────────
  *
- * `docs/系統範圍稽核.md` 第 3265 行早已拍板：**63% 唔可以再做準則。**
- * 嗰個數係**仲未有身分規則**嗰個年代由 78 週歷史算出嚟，
- * 描述緊一個已經唔存在嘅世界。規則改變咗結構之後仍然攞佢做準則，
- * 等於每一季都報一個**不可行動**嘅「偏低」——幹事分辨唔到
- * 「排得唔好」同「規則造成嘅天花板」，而後者調高目標值唔會改善，
- * 只會多咗一個永遠達唔到嘅數字。
+ * 演變經過（三輪，每一輪都以為修好咗）：
  *
- * 「軟規則實測量度」（本檔案）**一直都已經改咗**跟上限比。
- * 但 2026-08-20 實測見到「核對職事表」（`Verify.gs`）仍然印
- * `23.1%　3/13 週　63.0% ± 5.0%　TRUE`——而**幹事日常會撳嗰個正正係
- * 「核對職事表」**，唔係量度工具。即係拍板咗嘅嘢只做咗一半。
+ * | 輪 | 攞咩做目標 | 出事喺邊 |
+ * | --- | --- | --- |
+ * | 原本 | 63% 歷史基準 | 嗰個數係**仲未有身分規則**嗰個年代由 78 週歷史量出嚟，描述緊一個已經唔存在嘅世界 ⇒ 每季報一個不可行動嘅「偏低」 |
+ * | 第三十四輪丙1 | 本季理論上限 | **更差。** 實測見到上限算出 100%，於是攞 23.1% 同一個構造上達唔到嘅數字比 ± 5% |
+ * | 第三十五輪（而家） | **唔攞任何嘢做目標** | — |
  *
- * 而家兩邊都叫呢一個函式，措辭亦都由 `describeChairEqReference_()` 出，
- * 唔會各寫一份然後慢慢漂移。
+ * 點解上限唔可以做目標：`computeChairAnnounceUpperBound_()` 嘅
+ * `bound = Math.min(weeksBothPosts, sumCap)`。雙重合資格嘅人一多，
+ * `sumCap` 就遠大於 `weeksBothPosts` ⇒ `bound` 永遠等於 `weeksBothPosts`
+ * ⇒ 比例永遠 100%。**函式自己嘅假設清單已經明寫「呢個上限偏鬆
+ *（實際通常達唔到）」——一個偏鬆嘅上界唔係目標值。**
  *
- * ⚠️ 算唔到上限就退回同歷史基準比（維持既有行為）——
- * **唔可以因為算唔到就唔判斷**，嗰個就會變成靜靜放過。
+ * ⚠️ 呢度**冇改嗰條數學**。佢算得啱，問題係邊個攞佢去做咩。
+ *
+ * 而家嘅做法：三個數並列，各自講明係咩，唔標「偏低」「偏離」。
+ * **唯一會亮起嘅情況係「實測 > 上限」**——嗰個先至有行動意義：
+ * 代表準硬規則「同一崗位不可連續兩週」被放行咗。
+ *
+ * 理由一句講完：**呢個指標現時冇一個可行動嘅目標值。
+ * 與其編一個，不如老實講「呢個係實測、呢個係歷史、呢個係上界」。
+ * 編一個假目標比冇目標更差。**
  *
  * @param {?Object} chairEq `computeChairEqAnnounceRatio_()` 嘅結果
  * @param {Object} context `buildVerifyContext_()` 嘅結果
  * @returns {{baseline: ?number, ceiling: ?Object, hasCeiling: boolean,
- *   reference: ?number, tolerance: number, deviates: boolean}}
+ *   reference: ?number, tolerance: number, deviates: boolean,
+ *   exceedsCeiling: boolean}}
  */
 function resolveChairEqReference_(chairEq, context) {
   const baseline = chairEq && !isNaN(chairEq.target) ? chairEq.target : null;
@@ -332,40 +339,73 @@ function resolveChairEqReference_(chairEq, context) {
   try {
     ceiling = measureChairAnnounceCeiling_(context, buildAvailabilityByPostForMetrics_(context));
   } catch (err) {
-    log_('WARN', 'resolveChairEqReference_ 算不到理論上限，退回同歷史基準比：' + err.message);
+    log_('WARN', 'resolveChairEqReference_ 算不到理論上限：' + err.message);
     ceiling = null;
   }
   const hasCeiling = !!(ceiling && ceiling.applicable && ceiling.boundRatio !== null);
-  const reference = hasCeiling ? ceiling.boundRatio : baseline;
+
+  // ⚠️ **唯一會亮起嘅情況。** 實測高過上限 ＝ 準硬規則被放行咗
+  //（上限嘅推導假設咗「同一崗位不可連續兩週」有被遵守，
+  // 而嗰條係 SEMI_HARD——生成器只重扣分、唔會直接排除）。
+  // 呢個係一個訊號，唔係計錯數，而且有明確嘅下一步：去睇連續兩週嘅明細。
+  const exceedsCeiling = !!(hasCeiling && chairEq && chairEq.ratio > ceiling.boundRatio + 1e-9);
 
   return {
     baseline: baseline,
     ceiling: ceiling,
     hasCeiling: hasCeiling,
-    reference: reference,
+    // 保留俾仍然要一個「參考數」嘅呼叫端（例如 gap 計算）。
+    // ⚠️ **佢唔係目標值**——唔可以攞去判「偏離」。
+    reference: hasCeiling ? ceiling.boundRatio : baseline,
     tolerance: tolerance,
-    deviates: (reference === null || !chairEq)
-      ? false
-      : Math.abs(chairEq.ratio - reference) > tolerance
+    // C 組拍板：其餘情況一律唔標偏離。
+    deviates: exceedsCeiling,
+    exceedsCeiling: exceedsCeiling
   };
 }
 
 /**
- * 丙1：上面嗰個判斷嘅**人話講法**。`Verify.gs` 同 `SoftRuleMetrics.gs`
- * 兩邊用同一個 formatter——各寫一份就會漂移，而漂移嘅後果係
- * 幹事喺兩個工具見到同一件事有兩種講法，唔知信邊個。
+ * C／D 組：上面嗰個判斷嘅**人話講法**。
+ *
+ * ⚠️ `Verify.gs`（核對職事表）同 `SoftRuleMetrics.gs`（軟規則實測量度）
+ * **兩邊用呢一個 formatter，措辭只有一份**。
+ *
+ * 第三十四輪丙1 已經要求過兩邊一致，但結果係一邊改咗、一邊冇改，
+ * 現場同一時間跑兩個工具見到：
+ *
+ *   核對職事表　　　`100.0% ± 5.0%（本季理論上限；歷史基準 63.0% 只供參考）　TRUE`
+ *   軟規則實測量度　`主席兼報告：23.1%（歷史基準 63.0%）　偏低，建議留意`
+ *
+ * 兩個工具對同一件事俾兩個唔同答案——正正就係要避免嗰件事。
+ * 所以而家連「三個數點排」都喺呢度定死，呼叫端只負責擺落自己嗰個版面。
  *
  * @param {Object} ref `resolveChairEqReference_()` 嘅結果
- * @returns {string}
+ * @param {?Object} chairEq `computeChairEqAnnounceRatio_()` 嘅結果
+ * @returns {{lines: string[], text: string, alert: string}}
+ *   `lines` 三行（實測／歷史基準／本季理論上限）；
+ *   `text` 係用全形空格串埋嘅單行版（俾一行一格嘅表用）；
+ *   `alert` 只有「實測 > 上限」嗰陣先有內容
  */
-function describeChairEqReference_(ref) {
-  if (ref.hasCeiling) {
-    return formatMetricPercent_(ref.reference) + ' ± ' + formatPercent_(ref.tolerance)
-      + '（本季理論上限；歷史基準 ' + formatMetricPercent_(ref.baseline) + ' 只供參考）';
-  }
-  if (ref.baseline === null) return '-';
-  return formatMetricPercent_(ref.baseline) + ' ± ' + formatPercent_(ref.tolerance)
-    + '（歷史基準；本季理論上限算不出，這是退回的做法）';
+function describeChairEqReference_(ref, chairEq) {
+  const lines = [];
+
+  lines.push('實測：' + (chairEq ? formatMetricPercent_(chairEq.ratio) : '-')
+    + (chairEq ? '（' + chairEq.same + '/' + chairEq.weeks + ' 週）' : ''));
+
+  lines.push('歷史基準：' + formatMetricPercent_(ref.baseline)
+    + '（在還沒有身分規則的年代由 78 週歷史量出來，只供參考）');
+
+  lines.push('本季理論上限：'
+    + (ref.hasCeiling ? formatMetricPercent_(ref.ceiling.boundRatio) : '（算不出）')
+    + '（偏鬆的上界，實際通常達不到，不是目標）');
+
+  const alert = ref.exceedsCeiling
+    ? '⚠ 實測高於本季理論上限。上限的推導假設了準硬規則「同一崗位不可連續兩週」'
+      + '有被遵守（' + RULE_IDS.NO_CONSECUTIVE + ' 是 SEMI_HARD，生成器只重扣分、'
+      + '不會直接排除）。請看準硬規則違反的明細，確認是不是有主席連續兩週由同一人擔任。'
+    : '';
+
+  return { lines: lines, text: lines.join('　│　'), alert: alert };
 }
 
 function measureChairAnnounceCeiling_(context, availabilityByPost) {
@@ -526,8 +566,13 @@ function measureSoftRuleMetrics_(quarterId, versionNo) {
     chairEqBaseline: chairEqBaseline,
     chairEqCeiling: chairEqCeiling,
     chairEqReference: chairEqReference,
-    chairEqJudgement: judgeAgainstBaseline_(
-      chairEq ? chairEq.ratio : null, chairEqReference, thresholds.ratioTolerance),
+    chairEqRef: chairEqRef,
+    // ⚠️ 第三十五輪批次 C 組：**呢一項唔再判定「偏離」。**
+    // 原本係 `judgeAgainstBaseline_(實測, reference, 容差)`，而
+    // `reference` 而家已知係一個偏鬆嘅上界（實測見到算出 100%）。
+    // 攞一個構造上達唔到嘅數字去判「偏低」，比原本嗰個 63% 更冇用。
+    // 唯一會亮起嘅係「實測 > 上限」，見 `resolveChairEqReference_()`。
+    chairEqJudgement: null,
     announce: announce,
     announceBaseline: announceBaseline,
     announceJudgement: judgeAgainstBaseline_(
@@ -589,37 +634,35 @@ function buildSoftRuleMetricRows_(m) {
       + '　崗位動用率下限 ' + (t.postUsageMinRatio * 100).toFixed(0) + '%'
       + '（三者皆可在 Config 調整，見 ' + CONFIG_KEYS.SOFT_METRIC_RATIO_TOLERANCE + ' 等三個 Key）'));
 
-  // ---- 1. 主席與報告同一人（第十七輪批次階段 B2：改為三欄，跟理論上限比）----
+  // ---- 1. 主席與報告同一人 ----
+  //
+  // ⚠️ 第三十五輪批次 C／D 組：**三個數並列，唔判「偏離」。**
+  //
+  // 措辭由 `describeChairEqReference_()` 出，同「核對職事表」（Verify.gs）
+  // **逐字相同**。第三十四輪丙1 已經要求過兩邊一致，但結果係一邊改咗、
+  // 一邊冇改，現場同一時間跑兩個工具見到兩個唔同答案：
+  //
+  //   核對職事表　　　`100.0% ± 5.0%（本季理論上限……）　TRUE`
+  //   軟規則實測量度　`23.1%（歷史基準 63.0%）　偏低，建議留意`
+  //
+  // 而家連「三個數點排」都喺嗰個 formatter 定死，呢度只負責擺落版面。
+  // 原本嗰句「偏低，建議留意」按 C 組一併移走——冇目標值就唔應該有判斷。
   if (m.chairEq) {
     const ceiling = m.chairEqCeiling;
     const hasCeiling = !!(ceiling && ceiling.applicable && ceiling.boundRatio !== null);
+    const desc = describeChairEqReference_(m.chairEqRef, m.chairEq);
 
-    rows.push(diagRow_('1. 主席兼報告比例', label,
-      '歷史基準 ' + formatMetricPercent_(m.chairEqBaseline)
-        + '　│　本季理論上限 ' + (hasCeiling ? formatMetricPercent_(ceiling.boundRatio) : '（算不出）')
-        + '　│　本版實測 ' + formatMetricPercent_(m.chairEq.ratio),
-      '差距 ' + formatMetricGap_(m.chairEqJudgement.gap, true)
-        + '　判斷：' + m.chairEqJudgement.judgement
-        + '　（' + m.chairEq.same + '/' + m.chairEq.weeks + ' 週）'
-        + '　　※ 判斷是跟'
-        + (hasCeiling ? '「本季理論上限」' : '歷史基準（算不出上限時的退回做法）')
-        + '比，不是跟歷史基準比'));
+    rows.push(diagRow_('1. 主席兼報告比例', label, desc.text,
+      '這一項沒有判定「偏離」——本季理論上限是一個偏鬆的上界（實際通常達不到），'
+        + '拿它當目標值會得出一個永遠達不到的數字；而歷史基準 '
+        + formatMetricPercent_(m.chairEqBaseline)
+        + ' 是在還沒有身分規則的年代量出來的。三個數並列，由你自己判斷。'));
+
+    if (desc.alert) {
+      rows.push(diagRow_('1. 主席兼報告比例', '⚠ 高於理論上限', '請檢查', desc.alert));
+    }
 
     if (hasCeiling) {
-      // 上限本身已經低於「歷史基準 − 容差」＝ 63% 結構上達不到，要明確講出成因，
-      // 否則幹事只會見到「偏低」而以為排表出錯。
-      if (!isNaN(ceiling.target) && ceiling.boundRatio < ceiling.target - ceiling.tolerance) {
-        rows.push(diagRow_('1. 主席兼報告比例', '⚠ 天花板說明', '本季理論上限低於歷史基準',
-          buildChairAnnounceCeilingNote_(ceiling)));
-      }
-      // 實測高過上限＝準硬規則被放行咗（見上限推導的假設），係一個訊號唔係計錯數
-      if (m.chairEq.ratio > ceiling.boundRatio + 1e-9) {
-        rows.push(diagRow_('1. 主席兼報告比例', '⚠ 高於理論上限', '請檢查',
-          '本版實測高於本季理論上限。上限的推導假設了準硬規則「同一崗位不可連續兩週」'
-            + '有被遵守（' + RULE_IDS.NO_CONSECUTIVE + ' 是 SEMI_HARD，生成器只重扣分、'
-            + '不會直接排除）。實測超過上限，代表這一版有主席連續兩週由同一人擔任——'
-            + '請看下面第 4 項的準硬規則違反明細。'));
-      }
       rows.push(diagRow_('1. 主席兼報告比例', '　理論上限的計算依據',
         ceiling.bound + ' / ' + ceiling.weeksBothPosts + ' 週',
         '同時具備主席與報告資格的有 ' + ceiling.dualCount + ' 人；'
@@ -908,9 +951,10 @@ function runSoftRuleMetrics_() {
   const written = rows.length;
 
   const flagged = [];
-  if (metrics.chairEqJudgement.judgement !== SOFT_METRIC_JUDGEMENT.NORMAL
-    && metrics.chairEqJudgement.judgement !== SOFT_METRIC_JUDGEMENT.UNKNOWN) {
-    flagged.push('主席兼報告比例：' + metrics.chairEqJudgement.judgement);
+  // ⚠️ 第三十五輪批次 C 組：主席兼報告**唔再因為「偏低」而上榜**。
+  // 唯一會上榜嘅係「實測 > 理論上限」——嗰個先至有行動意義。
+  if (metrics.chairEqRef && metrics.chairEqRef.exceedsCeiling) {
+    flagged.push('主席兼報告比例：高於本季理論上限，請看準硬規則違反明細');
   }
   if (metrics.announceJudgement.judgement !== SOFT_METRIC_JUDGEMENT.NORMAL
     && metrics.announceJudgement.judgement !== SOFT_METRIC_JUDGEMENT.UNKNOWN) {
@@ -926,9 +970,11 @@ function runSoftRuleMetrics_() {
   const lines = [
     metrics.quarterId + ' v' + metrics.versionNo + '（共 ' + metrics.weekCount + ' 個主日）',
     '',
-    '主席兼報告：' + formatMetricPercent_(metrics.chairEq ? metrics.chairEq.ratio : null)
-      + '（歷史基準 ' + formatMetricPercent_(metrics.chairEqBaseline) + '）　'
-      + metrics.chairEqJudgement.judgement,
+    // C／D 組：對話框呢一行都用同一個 formatter，唔可以喺呢度另外砌一句
+    //（原本嗰句「23.1%（歷史基準 63.0%）　偏低，建議留意」就係現場見到
+    // 同「核對職事表」對唔上嗰句）。
+    '主席兼報告：'
+      + describeChairEqReference_(metrics.chairEqRef, metrics.chairEq).text,
     '報告連續兩週：' + formatMetricPercent_(metrics.announce ? metrics.announce.ratio : null)
       + '（歷史基準 ' + formatMetricPercent_(metrics.announceBaseline) + '）　'
       + metrics.announceJudgement.judgement,

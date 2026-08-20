@@ -91,6 +91,14 @@ function buildFixture() {
       COMMUNION: 'PENDING', PREACHER: 'PENDING', USHER: 'PENDING',
       FLOWER: 'BLANK'
     },
+    // 第三十五輪批次 A 組：邊啲崗位係「本來就唔由系統排」。
+    // 講員／獻花嘅值係自由文字（外請講員唔喺 NameMapping），
+    // 所以佢哋唔應該參與人手改動偵測、亦都唔應該攞去解析人名。
+    autoGenerateByPostId: {
+      WORSHIP: true, PIANO: true, SCRIPTURE: true,
+      COMMUNION: true, USHER: true,
+      PREACHER: false, FLOWER: false
+    },
     // 合堂日由英語堂負責——呢個字串係幹事喺 SpecialSundays.ExternalOwner 填嘅
     externalOwnerByDate: { '2026-10-04': '英語堂' }
   };
@@ -225,8 +233,11 @@ console.log('\n=== A：合堂格被幹事真係改成一個人名 ⇒ 要捉到 
 console.log('\n=== A：空格打錯字唔可以靜靜咁被當成「冇改動」===');
 {
   const context = buildFixture();
-  // PREACHER 本來係「待確認」，幹事打咗一個唔存在嘅名
-  context.gridValues['2026-11-15|PREACHER|1'] = '唔存在嘅人';
+  // ⚠️ 第三十五輪批次 A 組：呢一條本來用 PREACHER，但 PREACHER 而家係
+  // `AutoGenerate=FALSE`（本來就唔由系統排），已經**刻意豁免**咗人手改動偵測。
+  // 改用 USHER——佢一樣係空格，但佢係自動排嘅崗位，所以打錯字仍然要報。
+  // 呢條斷言嘅本意（空格打錯字唔可以靜靜消失）完全冇變。
+  context.gridValues['2026-11-15|USHER|1'] = '唔存在嘅人';
   const overlay = gas.buildGridOverlayState_(context);
 
   checkEqual('★★★★★ 空格打錯字要報 unresolved'
@@ -234,10 +245,54 @@ console.log('\n=== A：空格打錯字唔可以靜靜咁被當成「冇改動」
     + '解析唔到（\'\'）同原本空白（\'\'）會相等，'
     + '幹事打咗嘅嘢就會憑空消失而且冇提示',
     overlay.unresolved.map(function (u) { return u.postId + ':' + u.text; }),
-    ['PREACHER:唔存在嘅人']);
+    ['USHER:唔存在嘅人']);
   check('★★★★ unresolved 有帶「本來應該係咩」（階段 C1 訊息要用）',
-    overlay.unresolved[0].expectedText === LABELS.pending,
+    overlay.unresolved[0].expectedText === LABELS.gap,
     JSON.stringify(overlay.unresolved[0]));
+}
+
+console.log('\n=== 第三十五輪 A：AutoGenerate=FALSE 嘅崗位完全唔參與人手改動偵測 ===');
+{
+  // 現場（2027T3）：`2027-07-04` 講員一格早前用「填講員／翻譯／獻花」填咗
+  // 一位外請講員嘅名。佢唔喺 NameMapping（外請講員本來就唔應該喺），
+  // 所以喺 RosterAssignments 只有自由文字、冇 PersonID。
+  // 修正之前，偵測器見到「grid 有字、版本記錄解析出空」就當成一格認唔出嘅
+  // 人手改動 ⇒ 整批拒絕 ⇒ **任何一季只要填過講員就永遠撳唔到「儲存並確認」**。
+  const context = buildFixture();
+  context.gridValues['2026-11-15|PREACHER|1'] = '某某某牧師';   // 唔喺 NameMapping
+  const overlay = gas.buildGridOverlayState_(context);
+
+  checkEqual('★★★★★ **唔會被判成「認唔出」**（呢一條就係上線 blocker）',
+    overlay.unresolved.length, 0);
+  checkEqual('★★★★★ 亦都唔算人手改動——嗰啲格嘅唯一寫入途徑係'
+    + '「填講員／翻譯／獻花」，唔係 grid',
+    overlay.changes.length, 0);
+
+  // 再改一次成另一個自由文字，一樣唔應該有反應。
+  context.gridValues['2026-11-15|PREACHER|1'] = '另一位客席講員';
+  const again = gas.buildGridOverlayState_(context);
+  checkEqual('★★★★★ 改成另一個自由文字都一樣（唔係 grid 嘅職責）',
+    again.unresolved.length + again.changes.length, 0);
+
+  // ⚠️ 對照組：自動排嘅崗位打一個唔存在嘅名，**仍然**要被擋（現有行為不變）。
+  const control = buildFixture();
+  control.gridValues['2026-11-15|SCRIPTURE|1'] = '唔存在嘅人';
+  checkEqual('★★★★★ 對照組：AutoGenerate=TRUE 嘅崗位照舊要報 unresolved'
+    + '——豁免唔可以擴大到全部崗位',
+    gas.buildGridOverlayState_(control).unresolved.length, 1);
+}
+
+console.log('\n=== 第三十五輪 A：autoGenerateByPostId 冇傳一定要拋錯 ===');
+{
+  // 「冇就當全部崗位都係自動排」＝ 把「我唔知道」靜靜當成「係」，
+  // 而後果就係本輪嗰個 bug 原封不動翻生。
+  const broken = buildFixture();
+  broken.gridRender = Object.assign({}, broken.gridRender, { autoGenerateByPostId: undefined });
+  let threw = null;
+  try { gas.buildGridOverlayState_(broken); } catch (e) { threw = e; }
+  check('★★★★★ 拋錯，唔會靜靜退回「全部當自動排」', !!threw, String(threw));
+  check('★★★★ 錯誤訊息提到 AutoGenerate',
+    threw && threw.message.indexOf('AutoGenerate') !== -1, threw && threw.message);
 }
 
 console.log('\n=== A：重新打同一個人（或別名）唔算改動 ===');

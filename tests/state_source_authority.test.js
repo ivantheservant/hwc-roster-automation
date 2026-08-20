@@ -86,6 +86,9 @@ function buildContext(withGridEdit) {
         gap: gas.DEFAULTS.GRID_GAP_LABEL
       },
       emptyDisplayByPostId: { CHAIR: 'PENDING' },
+      // 第三十五輪批次 A 組：`AutoGenerate=FALSE` 嘅崗位唔參與人手改動偵測。
+      // 呢個 fixture 只有 CHAIR，而佢係自動排嘅。
+      autoGenerateByPostId: { CHAIR: true },
       externalOwnerByDate: {}
     },
     peopleById: {

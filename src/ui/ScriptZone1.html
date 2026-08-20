@@ -257,11 +257,19 @@
       ];
 
       const list = make('div', { className: 'sec' }, [sectionTitle('是這幾格：')]);
+      // ⚠️ 第三十五輪批次 B 組：**兩個值都要印。**
+      // 只印一個就永遠分唔出係邊一邊出事——之前就係只印「你打了」，
+      // 而嗰個值因為欄位名錯咗永遠係空，結果對話框話幹事打咗空白，
+      // 但 grid 上明明有字。幹事會照住去改一格本來冇問題嘅嘢。
       plan.unresolved.forEach((u) => {
         list.appendChild(make('div', {
-          text: u.serviceDate + '　' + (u.postNameTC || '') + '#' + u.slotIndex
-            + '　你打了：「' + (u.rawText || '（空白）') + '」',
+          text: u.serviceDate + '　' + (u.postNameTC || '') + '#' + u.slotIndex,
           className: 'vio-row'
+        }));
+        list.appendChild(make('div', {
+          text: '　　本來應該是：「' + (u.expectedText || '（空白）') + '」'
+            + '　　格內現在是：「' + (u.gridText || u.rawText || '（空白）') + '」',
+          className: 'muted'
         }));
       });
       nodes.push(list);
