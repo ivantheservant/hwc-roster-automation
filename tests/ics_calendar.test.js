@@ -235,8 +235,31 @@ console.log('\n=== C5：零派工者唔附 ICS（原始碼靜態檢查）===');
 console.log('\n=== Mailer.gs 整合：ICS 產生失敗唔會令整封信寄唔出（原始碼靜態檢查）===');
 {
   const deliverOneBody = mailerSource.slice(mailerSource.indexOf('function deliverOne_'), mailerSource.indexOf('function sendRealEmail_'));
-  check('★★ deliverOne_ 用獨立 try/catch 包住 buildIcsAttachmentForPerson_（同 PDF 附件嘅 try/catch 分開）',
-    /try\s*{\s*icsAttachment = buildIcsAttachmentForPerson_\(context, recipient, personAssignments\);\s*}\s*catch/.test(deliverOneBody));
+  // ⚠️ 第四十輪批次 A 組：呢度本來寫死成一句 `try { icsAttachment = ... } catch`。
+  // 加咗「幹事可以今次關掉 .ics」之後，try 入面多咗兩行（讀上游嘅決定），
+  // 而原本嗰條正則對唔上——但佢要守嗰件事（**ICS 產生失敗唔可以令成封信寄唔出**）
+  // 一啲都冇變。所以改成守個意思，唔守嗰段字：
+  //   ・`buildIcsAttachmentForPerson_()` 一定要喺一個 try 入面
+  //   ・嗰個 try 嘅 catch 唔可以 return（return ＝ 成封信唔寄）
+  //   ・而且要同 PDF 附件嗰個 try/catch 分開（PDF 嗰個係會 return 嘅）
+  // ⚠️ 一定要搵**真正嘅呼叫**（帶括號同參數），唔可以淨係搵個名——
+  //  上面幾行註解已經提過佢一次，搵中註解就會量錯個窗口。
+  const icsAt = deliverOneBody.indexOf('buildIcsAttachmentForPerson_(context,');
+  // 由呼叫嗰一刻開始，向前望夠遠去睇 try、向後望夠遠去睇 catch 做咗咩。
+  const beforeIcs = deliverOneBody.slice(Math.max(0, icsAt - 400), icsAt);
+  const afterIcs = deliverOneBody.slice(icsAt, icsAt + 500);
+  check('★★ buildIcsAttachmentForPerson_ 喺一個 try 入面',
+    icsAt !== -1 && /try \{[\s\S]*$/.test(beforeIcs), beforeIcs.slice(-120));
+  const icsCatch = (afterIcs.match(/catch \(err\) \{([\s\S]*?)\n  \}/) || ['', ''])[1];
+  check('★★★ 而嗰個 catch 只係寫一句 WARN，**唔會 return**'
+    + '——一 return 就變成「日曆檔整唔到 ⇒ 成封信都唔寄」，'
+    + '而個人 PDF 明明已經正確產生咗',
+    icsCatch !== '' && icsCatch.indexOf("log_('WARN'") !== -1
+      && icsCatch.indexOf('return') === -1,
+    JSON.stringify(icsCatch).slice(0, 300));
+  check('★★ 同 PDF 附件嗰個 try/catch 分開（PDF 嗰個係會 return 嘅）',
+    /attachment = generateMailAttachment_[\s\S]{0,400}?catch \(err\) \{[\s\S]{0,400}?return Object\.assign/
+      .test(deliverOneBody));
   check('★ ICS 產生失敗只係 log_(\'WARN\'...)，唔會 return 令呢封信整體失敗',
     /catch \(err\) {\s*log_\('WARN'/.test(deliverOneBody));
   check('★★ deliverOne_ 呼叫 sendRealEmail_ 時傳埋 icsAttachment（第 7 個參數）',

@@ -225,11 +225,11 @@ function planStep2_(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} `sendStage()` 的回傳結果
  */
-function executeStep2_(quarterId) {
+function executeStep2_(quarterId, sendOptions) {
   requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
-  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW);
+  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);
 
   // 第二十三輪批次階段 E1（決定 D2）：**一律設為 `REVIEW_SENT`，唔係「前進一格」。**
   // 由 `REQUESTS_APPLIED` 撳掣 2 係第二輪審閱，Stage 要退回 `REVIEW_SENT`
@@ -415,7 +415,7 @@ function planStep4SendPreview_(quarterId, versionNo) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} `sendStage()` 的回傳結果
  */
-function executeStep4Send_(quarterId) {
+function executeStep4Send_(quarterId, sendOptions) {
   requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
@@ -429,7 +429,7 @@ function executeStep4Send_(quarterId) {
     throw new Error('步驟 4：正式發出——因為個人 PDF 缺件太多而中止。\n\n' + gate.message);
   }
 
-  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
 
   // 第十九輪批次階段 C2：**寄送結果唔理想就唔前進 Stage。**
   //
@@ -550,8 +550,9 @@ function planStep5SendPreview_(quarterId, versionNo, context, changedList) {
  * @param {Object[]} changedList `computeResendDiff_()` 的結果
  * @returns {Object} `sendResendStage_()` 的結果
  */
-function executeStep5Send_(quarterId, versionNo, changedList) {
-  return sendResendStage_(quarterId, versionNo, changedList.map(function (c) { return c.personId; }));
+function executeStep5Send_(quarterId, versionNo, changedList, sendOptions) {
+  return sendResendStage_(quarterId, versionNo,
+    changedList.map(function (c) { return c.personId; }), sendOptions);
 }
 
 /* ============================================================

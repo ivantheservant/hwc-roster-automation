@@ -39,6 +39,21 @@ const GENERATE_TARGET_WARN_STARTED = 'STARTED';
 const GENERATE_TARGET_WARN_PAST = 'PAST';
 
 /**
+ * 第 1 步的目標季度：**還沒有到生成日期。**
+ *
+ * ⚠️ 第四十輪批次 E 組。2026-08-21 實測撞到：今日撳那粒掣寫住
+ * 「生成 2027 年 1-3 月職事表」，而 `2027T1` 的 `GenerateOn` 是
+ * 2026-11-27——還有三個多月。那一季是 Ivan 留來真正上線那一季，
+ * 今日撳落去會把它用掉。
+ *
+ * 原本的規則只看「有沒有生成過」，完全沒有看「到了生成日期沒有」。
+ *
+ * ⚠️ 這個仍然是**警告，不是阻擋**。提早生成不會出錯，
+ * 只是之後義工的情況可能會變、到時要重新生成。擋住他不是我們的位置。
+ */
+const GENERATE_TARGET_WARN_TOO_EARLY = 'TOO_EARLY';
+
+/**
  * 決定第 1 步那粒掣要生成哪一季。**純讀取。**
  *
  * 規則（順序就是優先次序）：
@@ -63,6 +78,8 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
       quarterId: quarterId,
       startDate: toDateString(row[C.START_DATE], timezone),
       endDate: toDateString(row[C.END_DATE], timezone),
+      // 第四十輪批次 E 組：生成日期。幹事要一眼看得到自己在做什麼。
+      generateOn: toDateString(row[C.GENERATE_ON], timezone),
       versionNo: findLatestVersionNo(quarterId)
     };
   }).filter(function (q) { return q.quarterId !== ''; });
@@ -93,6 +110,11 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
 
   // ⚠️ 「已經開始」同「已經過去」是兩件事，訊息不一樣。
   // 合成一句「日期不對」會令幹事不知道到底發生什麼事。
+  // 距離生成日期還有幾多天。算不出（沒填 GenerateOn）就是 null——
+  // ⚠️ **不可以當成 0**：0 的意思是「今日就是生成日」，那是一個肯定句，
+  // 而我們根本不知道。
+  const daysUntil = target.generateOn ? daysBetween_(today, target.generateOn) : null;
+
   let warn = '';
   let warnMessage = '';
   if (target.endDate && target.endDate < today) {
@@ -102,6 +124,17 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
       '還沒有生成，所以現在什麼都沒有改動。',
       ['如果你是在補一個漏掉的舊季度，照樣生成沒有問題',
         '如果你想做的是下一季，請在最上面的季度選單改一改']);
+  } else if (target.generateOn && target.generateOn > today) {
+    // ⚠️ 次序：「已經過去」同「已經開始」行先。
+    // 一季既已經開始、又未到生成日期，是資料本身矛盾（GenerateOn 填錯了），
+    // 這時候講「已經開始」對幹事有用得多——那才是他看得見的事實。
+    warn = GENERATE_TARGET_WARN_TOO_EARLY;
+    warnMessage = buildThreePartMessage_(
+      '「' + buildQuarterLabel_(target.quarterId) + '」的生成日期是 '
+        + target.generateOn + '，還有 ' + daysUntil + ' 天。',
+      '還沒有生成，所以現在什麼都沒有改動。',
+      ['提早生成不會出錯，但之後義工的情況可能會變，到時要重新生成',
+        '如果你只是想試一試，用一個測試季度，不要用這一季']);
   } else if (target.startDate && target.startDate <= today) {
     warn = GENERATE_TARGET_WARN_STARTED;
     warnMessage = buildThreePartMessage_(
@@ -117,6 +150,9 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     startDate: target.startDate,
     endDate: target.endDate,
     found: true,
+    // 第四十輪批次 E 組：掣旁邊要顯示，令幹事一眼看到自己在做什麼。
+    generateOn: target.generateOn,
+    daysUntilGenerateOn: daysUntil,
     alreadyGenerated: target.versionNo >= 0,
     warn: warn,
     warnMessage: warnMessage,

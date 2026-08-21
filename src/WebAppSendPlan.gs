@@ -147,12 +147,21 @@ function describeSendContents_(kind) {
   if (attachTypes[ATTACH_TYPE.PERSONAL_PDF]) items.push('每人自己那一份 PDF（個人版）');
   if (attachTypes[ATTACH_TYPE.FULL_PDF]) items.push('完整版職事表 PDF');
 
-  const hasPermanentLink = list.some(function (t) {
+  // ⚠️ 第四十輪批次 B 組：**那條永久連結一律附上，不再靠範本。**
+  //
+  // 2026-08-21 實測核對過七個範本：一個都沒有用 `{PublicRosterUrl}`。
+  // 即是「範本會放連結」這個假設由頭到尾不成立。現在由
+  // `appendPermanentLinkFooter_()`（Mailer.gs）自己加落信末。
+  //
+  // 所以這裡一律講「會有」——不是看範本。範本自己有放的話不重複加，
+  // 但對幹事來講兩種情況的結果一模一樣：信入面有那條連結。
+  const templateHasLink = list.some(function (t) {
     return [t.subject, t.bodyHtml, t.bodyPlain].some(function (part) {
       return String(part || '').indexOf('{PublicRosterUrl}') !== -1;
     });
   });
-  if (hasPermanentLink) items.push('那條永久連結（永遠指向最新一次儲存確認的版本）');
+  items.push('那條永久連結（永遠指向最新一次儲存確認的版本）——一律附上');
+  const hasPermanentLink = true;
 
   // ICS 由 `buildIcsAttachmentForPerson_()` 決定：只有 OFFICIAL／RESEND
   // 而且該收件人這一季有派工才會附。這裡照實講，不誇大。
@@ -161,7 +170,88 @@ function describeSendContents_(kind) {
   }
   if (items.length === 0) items.push('只有信件內文，沒有附件');
 
-  return { items: items, hasPermanentLink: hasPermanentLink, unknown: '' };
+  return {
+    items: items,
+    hasPermanentLink: hasPermanentLink,
+    templateHasLink: templateHasLink,
+    unknown: ''
+  };
+}
+
+/**
+ * 第四十輪批次 A 組：「自己揀」那個名單。**純讀取。**
+ *
+ * ⚠️ 列的是**這一個階段真正會收到信的人**，不是整張 NameMapping。
+ * 列一個不會收到信的人，他勾了之後照樣收不到，而畫面上看不出。
+ *
+ * ⚠️ 鍵一定要經 `sendRecipientKey_()`：REVIEW 階段只有 LIST 收件人
+ *（堂委名單），他們沒有 PersonID。淨用 PersonID 會令 REVIEW 一個都揀不到。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {string} kind SEND_KIND 之一
+ * @returns {Object[]} 每筆 {key, displayName, type, cellCount, hasEmail}
+ */
+function listSendCandidates_(quarterId, kind) {
+  const stage = sendKindToStage_(kind);
+  if (!stage) return [];
+
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) return [];
+
+  let context;
+  try {
+    context = buildMailContext_(quarterId, versionNo, stage);
+  } catch (err) {
+    // ⚠️ 砌不到 context **不可以**回一個空陣列——空陣列在畫面上等於
+    // 「這一季沒有人要收信」，而那是假的。照實拋，由前端顯示原因。
+    throw new Error(buildThreePartMessage_(
+      '讀不到這一次的收件名單（' + err.message + '）。',
+      '一封都沒有寄出。',
+      ['撳一次「重新整理」再試',
+        '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
+  }
+
+  return listRecipients_(stage, context).map(function (r) {
+    const assigned = r.personId
+      ? (context.assignmentsByPerson[r.personId] || []).length : 0;
+    return {
+      key: sendRecipientKey_(r),
+      displayName: r.displayName || r.email || r.personId,
+      type: r.type,
+      cellCount: assigned,
+      // 查不到電郵的人照樣列出來，並且講明——他不是「不用服侍」，
+      // 是要印紙本（第 6 步）。
+      hasEmail: !!String(r.email || '').trim()
+    };
+  });
+}
+
+/**
+ * SEND_KIND → MAIL_STAGES。
+ * @param {string} kind SEND_KIND 之一
+ * @returns {string} 階段；NONE 回空字串
+ */
+function sendKindToStage_(kind) {
+  if (kind === SEND_KIND.REVIEW) return MAIL_STAGES.REVIEW;
+  if (kind === SEND_KIND.OFFICIAL) return MAIL_STAGES.OFFICIAL;
+  if (kind === SEND_KIND.RESEND) return MAIL_STAGES.RESEND;
+  return '';
+}
+
+/**
+ * 供前端呼叫：「自己揀」那個名單。**純讀取。**
+ * @param {string} quarterId 季度 ID
+ * @param {string} kind SEND_KIND 之一
+ * @returns {Object[]} 名單
+ */
+function apiGetSendCandidates(quarterId, kind) {
+  assertWebAppRequestAllowed_();
+  beginSheetReadMemo_();
+  try {
+    return listSendCandidates_(quarterId, kind);
+  } finally {
+    endSheetReadMemo_();
+  }
 }
 
 /**
@@ -196,8 +286,23 @@ function apiGetSendPlanSummary(quarterId) {
     const alsoReview = kind === SEND_KIND.OFFICIAL
       && !!(buttons.review && buttons.review.enabled);
 
+    // 第四十輪批次 A 組：三個選項嘅**預設值**。
+    //
+    // ⚠️ 前端一定要用呢一份做預設，唔可以自己寫死一套——
+    // 寫死兩套就係兩個真相來源，而「幹事乜都唔揀嘅時候行為同今日一樣」
+    // 呢個保證會靜靜失效。
+    const stageForOptions = sendKindToStage_(kind);
+    const defaultDecision = stageForOptions
+      ? resolveSendOptions_(stageForOptions, null, resolveStageTemplates_(stageForOptions))
+      : null;
+
     return {
       kind: kind,
+      sendOptionDefaults: defaultDecision ? {
+        recipientScope: defaultDecision.recipientScope,
+        attachType: defaultDecision.attachType,
+        includeIcs: defaultDecision.includeIcs
+      } : null,
       kindSentence: buildSendKindSentence_(kind, {
         changedPersonCount: (buttons.resend && buttons.resend.changedPersonCount) || 0
       }),

@@ -120,8 +120,16 @@ console.log('\n=== A2-3 邊個階段要擋，由**範本實際文字**決定 ===
     /if \(publicRosterUrl\) return;/.test(body));
   check('★★★★★ sendStage() 喺**寄第一封之前**就叫嗰道關卡'
     + '——擺後面會變成「寄咗一半先發現」，而已經寄出嗰啲收唔返',
+    // ⚠️ 第四十輪批次 A 組：呢度本來搵 `listRecipients_(stage, context).forEach`
+    // 呢一句字。加咗「收件範圍」之後，嗰個迴圈變成
+    // `filterRecipientsByScope_(listRecipients_(...), ...).forEach`，字面對唔上——
+    // 但佢要守嗰件事（**關卡要喺寄第一封之前**）一啲都冇變。
+    //
+    // 所以改成對住「真正寄出嗰一刻」（`deliverOne_()` 第一次被叫）比。
+    // 呢個比原本嗰個準：中間再加幾多層包裝都唔會令呢條斷言失效，
+    // 而「關卡走到寄信後面」一定會捉到。
     mailer.indexOf('assertPublicRosterUrlAvailableForStage_(')
-      < mailer.indexOf('listRecipients_(stage, context).forEach'));
+      < mailer.indexOf('outcomes.push(deliverOne_('));
 }
 
 console.log('\n=== A2-3 null → 空字串嘅轉換要講明點解安全 ===');

@@ -122,12 +122,34 @@
       title: '生成下一季職事表',
       note: t.alreadyGenerated
         ? (t.label + ' 已經生成過了。要重新生成（會覆蓋現有安排）請去下面「進階與診斷」。')
-        : '',
+        // ⚠️ 第四十輪批次 E 組：掣旁邊要寫住生成日期同距離幾多日。
+        //
+        // 2026-08-21 實測撞到：粒掣寫住「生成 2027 年 1-3 月職事表」，
+        // 而嗰一季嘅 GenerateOn 係 2026-11-27——仲有三個幾月。
+        // 嗰一季係留嚟真正上線嗰季，今日撳落去會用掉佢。
+        //
+        // 冇 GenerateOn 就照講「冇填」——**唔可以當成「今日就係」**，
+        // 嗰個係一個肯定句，而我哋根本唔知。
+        : describeGenerateOn(t),
       why: t.warn ? firstLineOf(t.warnMessage) : '',
       acts: acts,
       extra: renderPermanentLink(flow)
     });
     return card;
+  }
+
+  /** 生成日期同距離幾多日，一句人話。 */
+  function describeGenerateOn(t) {
+    if (!t.generateOn) {
+      return '這一季的 Quarters 沒有填生成日期（GenerateOn），所以系統講不出還有多久。';
+    }
+    const d = t.daysUntilGenerateOn;
+    if (d === null || d === undefined) {
+      return '生成日期：' + t.generateOn + '。';
+    }
+    if (d > 0) return '生成日期：' + t.generateOn + '（還有 ' + d + ' 天）。';
+    if (d === 0) return '生成日期：' + t.generateOn + '（就是今日）。';
+    return '生成日期：' + t.generateOn + '（已經過了 ' + (-d) + ' 天）。';
   }
 
   /** 三段式訊息的第一段——步卡上面只講一句，詳情留在確認畫面。 */

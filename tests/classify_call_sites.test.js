@@ -166,6 +166,32 @@ CONVERTERS.forEach(function (c) {
   check('★★★★★ Generator.gs 砌嘅派工物件本身有 `personName` 欄位'
     + '（生成完成畫面嘅統計同 grid 要講同一句話）',
     /personName:/.test(src), '');
+
+  // ⚠️ 第四十輪批次 F4：上面嗰條淨係驗到「有嗰個欄位」，
+  // 驗唔到「統計真係認得兩種 ASSIGNED」——第三十八輪嘅報告自己列咗呢一點。
+  //
+  // 嗰段統計本來寫 `if (a.personId) return;`，即係只認「有 PersonID」嗰一種。
+  // 一格填好嘅講員（外請講員冇 PersonID，只有自由文字）會跌落最後個 else，
+  // 被當成「系統應該排但排唔出」——而 grid 同一格顯示佢個名。
+  const statsBody = src.slice(src.indexOf('let manualPendingCount = 0;'),
+    src.indexOf('genuineGapCells.push('));
+  check('★★★★★ 統計嗰段唔可以自己用 `a.personId` 判斷「已經有人」'
+    + '——只認 PersonID 就會把填好嘅講員格算成「未能安排」，'
+    + '而 grid 嗰邊顯示佢個名，兩邊講唔同嘅話幹事會去追一個唔存在嘅問題',
+    // ⚠️ 剝走註解先驗——上面段註解特登引用咗舊嗰一行做對照，
+    //  唔剝就會查中自己嘅註解，變成一條永遠紅嘅假警報。
+    !/if \(a\.personId\) return;/.test(statsBody.replace(/^\s*\/\/.*$/gm, '')),
+    statsBody.slice(0, 300));
+  check('★★★★★ 而係問返 `classifyGridCell_()`（全系統唯一嘅分類來源）'
+    + '，兩種 ASSIGNED 佢都認得',
+    /if \(cellClass === GRID_CELL_CLASS\.ASSIGNED\) return;/.test(statsBody),
+    statsBody.slice(0, 400));
+
+  // 真正餵一格「有自由文字、冇 PersonID」入去，確認佢係 ASSIGNED——
+  // 即係上面嗰個 early return 會接住佢，唔會跌落「未能安排」。
+  checkEqual('★★★★★ 反證：一格填好嘅講員（冇 PersonID）分類係 ASSIGNED，'
+    + '所以統計會當佢「已經有人」而唔會數落「未能安排」',
+    gas.classifyGridCell_(FREE_TEXT_ROW), gas.GRID_CELL_CLASS.ASSIGNED);
 }
 
 // ─────────────────────────────────────────────────────────────────────

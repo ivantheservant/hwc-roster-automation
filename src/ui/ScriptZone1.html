@@ -295,25 +295,49 @@
       // 而嗰個值因為欄位名錯咗永遠係空，結果對話框話幹事打咗空白，
       // 但 grid 上明明有字。幹事會照住去改一格本來冇問題嘅嘢。
       plan.unresolved.forEach((u) => {
-        list.appendChild(make('div', {
-          text: u.serviceDate + '　' + (u.postNameTC || '') + '#' + u.slotIndex,
-          className: 'vio-row'
+        const box = make('div', { className: 'prop' });
+        box.appendChild(make('div', {
+          text: u.serviceDate + '　' + (u.postNameTC || u.postId || '')
+            + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : ''),
+          className: 'prop-head'
         }));
-        list.appendChild(make('div', {
+        box.appendChild(make('div', {
           text: '　　本來應該是：「' + (u.expectedText || '（空白）') + '」'
-            + '　　格內現在是：「' + (u.gridText || u.rawText || '（空白）') + '」',
+            + '　　格內現在是：「' + (u.gridText || u.rawText || u.text || '（空白）') + '」',
           className: 'muted'
         }));
+        // ⚠️ 第四十輪批次 D 組：一粒〔立即加入這個人〕。
+        //
+        // 唔加〔照樣儲存〕嘅理由寫喺 `src/UnresolvedNameFix.gs` 檔頭：
+        // 一個系統認唔出嘅名冇 PersonID，所以嗰一格對嗰個人**完全冇作用**
+        // ——收唔到信、冇個人 PDF、唔會計入服侍次數、唔會被任何規則檢查覆蓋。
+        //
+        // 但幹事嘅需要係真實嘅（借調、外請、新人），所以補一個出口：
+        // 喺同一個對話框加咗佢，然後自動重新檢查。
+        box.appendChild(row([
+          button('立即加入這個人', () => openAddUnresolvedPerson(u), '')
+        ]));
+        list.appendChild(box);
       });
       nodes.push(list);
 
-      const how = make('div', { className: 'sec' }, [sectionTitle('每一格可以這樣處理：')]);
+      const how = make('div', { className: 'sec' }, [sectionTitle('或者這樣處理：')]);
       const ul = make('ul', { className: 'err-list' });
       ul.appendChild(make('li', { text: '如果打錯字，回到職事表把那一格改回正確的名字' }));
       ul.appendChild(make('li', { text: '如果是同一個人的另一種寫法，去「名單維護 ▸ 人員與電郵 ▸ 別名」加別名（下一輪才搬上來，暫時請用試算表的 NameAlias 工作表）' }));
-      ul.appendChild(make('li', { text: '如果是新人，去試算表的 NameMapping 工作表新增' }));
       how.appendChild(ul);
       nodes.push(how);
+
+      // ⚠️ 為什麼沒有〔照樣儲存〕——這一句一定要寫出來，否則幹事只會覺得
+      // 系統無理取鬧。理由的全文在 `src/UnresolvedNameFix.gs` 檔頭。
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這裡沒有「照樣儲存」，是刻意的：系統認不出的名字沒有內部編號，'
+            + '存了之後那一格對那個人完全沒有作用——他收不到信、沒有個人 PDF、'
+            + '不會被計入服侍次數，而且不會有任何錯誤訊息。',
+          className: 'lines'
+        })
+      ]));
 
       openModal('儲存並確認：有名字認不出', nodes, [
         button('知道了，我去改', () => closeModal(), '')
@@ -355,6 +379,95 @@
         + (plan.stage === 'REQUESTS_APPLIED' ? '可以撳「正式發出給全體」了。' : '')
         + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : ''))
     ], [button('知道了', () => closeModal(), '')]);
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 第四十輪批次 D 組：〔立即加入這個人〕
+   * ══════════════════════════════════════════════════════════════
+   *
+   * 唔加〔照樣儲存〕嘅理由喺 `src/UnresolvedNameFix.gs` 檔頭。
+   * 呢度做嘅係補一個出口：喺同一個對話框加咗佢，然後**自動重新檢查**
+   * ——嗰一項應該即刻消失，唔使佢自己再撳一次儲存。
+   */
+  function openAddUnresolvedPerson(u) {
+    const typed = String(u.gridText || u.rawText || u.text || '').trim();
+    const postName = u.postNameTC || u.postId || '';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = typed;          // 已經填好——佢啱啱先打過一次
+    const enInput = document.createElement('input');
+    enInput.type = 'text';
+    enInput.placeholder = '可以留空';
+    const emailInput = document.createElement('input');
+    emailInput.type = 'text';
+    emailInput.placeholder = '可以留空';
+
+    // 順帶問一句：同時讓他可以做該崗位。
+    // 預設**勾選**——他既然被排在那一格，多數就是要做那個崗位。
+    const eligRow = make('label', { className: 'check-row' });
+    const eligCb = document.createElement('input');
+    eligCb.type = 'checkbox';
+    eligCb.checked = true;
+    eligRow.appendChild(eligCb);
+    eligRow.appendChild(make('span', {
+      text: '同時讓他可以做「' + postName + '」'
+    }));
+
+    const field = (label, input) => make('div', { className: 'sec' }, [
+      make('div', { text: label, className: 'sec-title' }), input
+    ]);
+
+    openConfirm({
+      title: '加入「' + typed + '」',
+      bodyNodes: [
+        para('加入之後會自動重新檢查，這一項應該即刻消失。'),
+        field('中文名', nameInput),
+        field('英文名', enInput),
+        field('電郵', emailInput),
+        make('div', { className: 'sec' }, [eligRow]),
+        // ⚠️ 冇電郵係合法嘅（現時就有幾位），但一定要提——
+        // 唔提嘅話幹事會以為加完就萬事俱備，然後嗰個人一直收唔到信。
+        make('div', {
+          text: '沒有電郵的人收不到信，要用第 6 步印紙本給他。',
+          className: 'muted'
+        })
+      ],
+      confirmLabel: '加入',
+      onConfirm: () => {
+        const nameTC = nameInput.value.trim();
+        if (!nameTC) { setStatus('中文名不可以留空。', true); return; }
+        closeModal();
+        runAction('加入' + nameTC, async () => {
+          const r = await callServerMutating('apiAddPersonForUnresolvedName', {
+            nameTC: nameTC,
+            nameEN: enInput.value.trim(),
+            email: emailInput.value.trim(),
+            postId: u.postId,
+            alsoEligible: eligCb.checked
+          });
+          if (!r.ok) { showErrorModal('加入這個人', new Error(r.message)); return; }
+
+          // ⚠️ 撞名只係提示，唔阻擋——真係有兩個同名嘅人係正常事。
+          // 但一定要講出嚟，否則佢會以為加咗落原本嗰一個度。
+          if (r.duplicateWarning) {
+            openModal('加入完成（但要看一眼）', [
+              make('div', { text: r.message, className: 'ok-head' }),
+              make('div', { className: 'warnbox' }, [
+                make('div', { text: r.duplicateWarning, className: 'lines' })
+              ]),
+              para(r.noEmailNote || '', 'muted')
+            ], [button('繼續，重新檢查', () => { closeModal(); openSaveAndConfirm(); }, '')]);
+            return;
+          }
+
+          // ⚠️ **自動重新檢查**：直接再行一次儲存流程。
+          // 唔自動嘅話佢要自己記得再撳一次，而佢多數會以為加完就搞掂。
+          if (r.noEmailNote) setStatus(r.noEmailNote);
+          openSaveAndConfirm();
+        });
+      }
+    });
   }
 
   /* ── C2：正常流程（一個彈窗，由上而下五節）────────────────── */
@@ -718,7 +831,10 @@
     ]);
   }
 
-  function openReview() {
+  // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
+  // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
+  // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
+  function openReview(sendOptions) {
     runAction('讀取確認資料', async () => {
       // 前置檢查：狀態快取已經帶咗公開連結狀態返嚟，唔使多打一次伺服器。
       // ⚠️ `checkFailed` 唔可以當成「有連結」而放行——嗰個係「查不到」，
@@ -790,7 +906,7 @@
         bodyNodes: nodes,
         confirmLabel: '確定寄出',
         onConfirm: () => runAction('寄送中，請稍候', async () => {
-          const r = await callServerMutating('apiStep2Confirm', currentQuarterId);
+          const r = await callServerMutating('apiStep2Confirm', currentQuarterId, sendOptions);
           await renderReviewDone(r);
         })
       });
@@ -829,7 +945,10 @@
    * 掣 3：正式發出給全體（規格 2.6）
    * ============================================================ */
 
-  function openOfficial() {
+  // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
+  // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
+  // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
+  function openOfficial(sendOptions) {
     runAction('讀取確認資料', async () => {
       const d = await getDashboard();
       const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
@@ -940,7 +1059,7 @@
         confirmLabel: '確定發出',
         danger: true,
         onConfirm: (typed) => runAction('寄送中，請稍候', async () => {
-          const r = await callServerMutating('apiStep4Confirm', currentQuarterId);
+          const r = await callServerMutating('apiStep4Confirm', currentQuarterId, sendOptions);
           renderOfficialDone(r);
         })
       });
@@ -986,7 +1105,10 @@
    * 掣 4：改動後重發（規格 2.7）
    * ============================================================ */
 
-  function openResend() {
+  // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
+  // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
+  // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
+  function openResend(sendOptions) {
     runAction('比對有誰的安排改了', async () => {
       const d = await getDashboard();
       const plan = await callServer('apiStep5Plan', currentQuarterId);
@@ -1052,7 +1174,7 @@
         confirmLabel: '確定重發',
         danger: true,
         onConfirm: () => runAction('產生 PDF 並寄送，請稍候', async () => {
-          await resendGeneratePdfsThenSend('');
+          await resendGeneratePdfsThenSend('', sendOptions);
         })
       });
     });
@@ -1062,7 +1184,7 @@
    * 產生 PDF 可能要分批（接近單次執行時間上限會自動停），所以要重複呼叫。
    * 放行文字全程帶住——後端每次都會用「目前最新版本」重新驗一次。
    */
-  async function resendGeneratePdfsThenSend(releaseText) {
+  async function resendGeneratePdfsThenSend(releaseText, sendOptions) {
     let guard = 0;
     for (;;) {
       guard++;
@@ -1082,7 +1204,7 @@
       setStatus('產生個人 PDF：' + r.doneCount + ' / ' + r.totalPeople + ' 份…');
     }
 
-    const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText);
+    const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText, sendOptions);
     if (result.blocked) {
       showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，尚未寄出任何電郵。'));
       return;

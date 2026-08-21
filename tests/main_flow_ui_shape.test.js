@@ -226,10 +226,42 @@ console.log('\n=== C：寄出彈窗 ===');
   check('★★★★★ 落到最後係叫返原本嗰三條路，冇另起爐灶',
     /openReview\(\)/.test(sendPaper) && /openOfficial\(\)/.test(sendPaper)
     && /openResend\(\)/.test(sendPaper));
-  check('★★★★★ 範本冇放永久連結就要嘈'
-    + '——靜靜寄一封冇連結嘅信，收信嘅人就冇辦法自己去睇最新版',
-    /if \(!s\.contents\.hasPermanentLink\)/.test(sendPaper));
+  // ⚠️ 第四十輪批次 B 組：呢度本來守「範本冇放永久連結就要嘈」。
+  //
+  // 實測核對過七個範本：**一個都冇用 `{PublicRosterUrl}`**。
+  // 即係嗰句提示會封封信都出，而幹事乜都做唔到——佢唔會去改範本。
+  //
+  // 所以改成系統自己加落信末（`appendPermanentLinkFooter_()`，Mailer.gs），
+  // 而彈窗嗰段由「警告」變成「講清楚一律會附上」。
+  // 守嗰件事冇變（收信嘅人一定攞到條連結），變咗嘅係點做到。
+  check('★★★★★ 彈窗講明條永久連結**一律附上**，唔係一個選項'
+    + '——做成選項就有機會被關掉，而嗰批人手上就只剩一份會過期嘅附件',
+    /一律附在信末/.test(sendPaper), '');
+  check('★★★★★ 而且冇公開連結嗰陣要照實講「呢一次嘅信唔會有嗰一段」'
+    + '——扮有係最壞嘅：幹事以為寄咗，收信嘅人乜都冇',
+    /還沒有永久連結，所以這一次的信不會有那一段/.test(sendPaper), '');
   check('★★★★ 模擬模式要講出嚟', /模擬模式/.test(sendPaper));
+
+  // ── 第四十輪批次 A 組：三個決定 ──────────────────────────
+  check('★★★★★ 三個決定齊全（寄給誰／附件／日曆檔）',
+    /sectionTitle\('寄給誰'\)/.test(sendPaper)
+    && /sectionTitle\('附件'\)/.test(sendPaper)
+    && /sectionTitle\('日曆檔'\)/.test(sendPaper), '');
+  check('★★★★★ **預設值由後端嚟**，前端冇自己寫死一套'
+    + '——寫死兩套就係兩個真相來源，而「幹事乜都唔揀行為同今日一樣」會靜靜失效',
+    /s\.sendOptionDefaults \|\| \{\}\)\.recipientScope/.test(sendPaper), '');
+  check('★★★★★ 「只寄有改動嘅」淨係喺改動後重發先顯示'
+    + '（其餘階段顯示一個等於「全部」嘅選項，只會令人以為系統壞咗）',
+    /CHANGED_ONLY' && s\.kind !== 'RESEND'\) return;/.test(sendPaper), '');
+  check('★★★★★ 揀咗「自己揀」但一個都冇揀 ⇒ 唔行落去',
+    /recipientScope === 'PICK' && sendOptions_\.pickedKeys\.length === 0/.test(sendPaper), '');
+  check('★★★★★ 個人版 PDF／日曆檔只對「呢一季有服侍嘅人」有意義，要講出嚟'
+    + '——唔講嘅話幹事會以為堂委都會收到個人 PDF，然後去追一個唔存在嘅問題',
+    /只有「這一季有服侍的人」才會收到/.test(sendPaper), '');
+  check('★★★★★ `sendOptions` 一路傳到底（三條路都收）',
+    /openReview\(sendOptions\)/.test(sendPaper)
+    && /openOfficial\(sendOptions\)/.test(sendPaper)
+    && /openResend\(sendOptions\)/.test(sendPaper), '');
 }
 
 console.log('\n=== D：紙本 ===');

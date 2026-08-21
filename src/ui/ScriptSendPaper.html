@@ -47,47 +47,97 @@
       return;
     }
 
-    // ── 有未儲存嘅改動：先問 ────────────────────────────────────
+    // ── 有未儲存嘅改動：**入彈窗之前**先問 ──────────────────────
     //
     // ⚠️ 呢一問唔可以省。幹事啱啱改完表、未撳儲存就撳寄出，
     // 系統寄出嘅係**上一次儲存確認嗰一版**——即係佢啱啱改嗰啲唔會喺入面，
     // 而佢完全唔會察覺。
+    //
+    // ⚠️ 第四十輪批次 C 組：一定要講出**改咗幾多格**同**寄緊第幾版**。
+    // 淨係講「你有未儲存的修改」，幹事分唔清「係咪我啱啱嗰幾格」，
+    // 亦都唔知寄出去嗰份係咩內容——結果佢淨係撳「繼續」算數。
     if (s.unsaved && s.unsaved.hasAny) {
+      const versionText = s.latestVersion
+        ? ('第 ' + s.latestVersion.versionNo + ' 版') : '上一次儲存確認的版本';
       openConfirm({
         title: '寄出',
         bodyNodes: [
           make('div', { className: 'warnbox' }, [
             make('div', {
-              text: '你有未儲存的修改。寄出的是「上一次儲存確認的版本」——'
-                + '你剛剛改的那些不會在裡面。',
+              text: describeUnsaved(s.unsaved)
+                + '寄出的會是「' + versionText + '」，你剛才改的不會寄出去。',
               className: 'lines'
             })
           ]),
-          para(describeUnsaved(s.unsaved), 'muted')
+          para('先儲存的話，改動會存成新一版，然後那一版才會寄出去。', 'muted')
         ],
         confirmLabel: '繼續寄出',
         cancelLabel: '先去儲存',
+        // 〔先去儲存〕直接帶去第 2 步嗰粒「儲存我的修改」，
+        // 唔係淨係關窗——關咗窗佢就要自己再搵一次。
         onCancel: () => { closeModal(); openSaveAndConfirm(); },
         onConfirm: () => { closeModal(); renderSendMain(s); }
       });
       return;
     }
 
+    // ⚠️ 冇未儲存改動 ⇒ **唔好彈呢個窗**，直接開寄出彈窗。
+    // 彈一個冇嘢要佢決定嘅窗，只會訓練佢唔睇內容就撳「繼續」。
     renderSendMain(s);
   }
 
+  /**
+   * 未儲存嘅改動係咩。
+   * ⚠️ 三種都要講得出——只講「有改動」嘅話，幹事唔知係佢改嘅格、
+   * 定係一筆佢未睇過嘅申報，兩者要做嘅嘢完全唔同。
+   */
   function describeUnsaved(u) {
     const bits = [];
-    if (u.gridChangeCount) bits.push('職事表上改過 ' + u.gridChangeCount + ' 格');
+    if (u.gridChangeCount) bits.push('你在表上改了 ' + u.gridChangeCount + ' 格');
     if (u.unresolvedCount) bits.push('有 ' + u.unresolvedCount + ' 格的名字認不出');
     if (u.pendingRequestCount) bits.push('有 ' + u.pendingRequestCount + ' 筆未處理的修改申報');
-    return bits.length > 0 ? bits.join('；') + '。' : '';
+    if (bits.length === 0) return '你有未儲存的修改，';
+    return bits.join('、') + '，但還未儲存確認。';
   }
 
+  /* ══════════════════════════════════════════════════════════════
+   * 第四十輪批次 A 組：三個決定
+   * ══════════════════════════════════════════════════════════════
+   *
+   * 上一輪個彈窗只係**報告事實**（會寄咩、寄俾邊個），一樣都揀唔到。
+   * 實測之後 Ivan 講明幹事真係要每次揀——例如範本改好之後要重寄全體。
+   *
+   * 收成三個決定，功能覆蓋原本六個選項而少好多出錯機會：
+   *   一、寄給誰　　全部／只寄有改動嘅／自己揀
+   *   二、附件　　　不附／個人版 PDF／整季 PDF
+   *   三、日曆檔　　附／唔附
+   *
+   * ⚠️ **預設值一律由後端嗰份 sendOptionDefaults 嚟。**
+   * 前端自己寫死一套就係兩個真相來源，而「幹事乜都唔揀嘅時候行為
+   * 同今日一樣」呢個保證會靜靜失效。
+   */
+
+  /** 呢一次彈窗入面幹事揀咗咩。開窗嗰陣由後端嘅預設值填好。 */
+  let sendOptions_ = null;
+  /** 「自己揀」嗰個名單（第一次撳先去攞）。 */
+  let sendCandidates_ = null;
+
   function renderSendMain(s) {
+    // ⚠️ 每次開窗都重設，而且用**後端**畀嘅預設值。
+    sendOptions_ = {
+      recipientScope: (s.sendOptionDefaults || {}).recipientScope || 'ALL',
+      attachType: (s.sendOptionDefaults || {}).attachType || 'NONE',
+      includeIcs: !!(s.sendOptionDefaults || {}).includeIcs,
+      pickedKeys: []
+    };
+    sendCandidates_ = null;
+    drawSendMain(s);
+  }
+
+  function drawSendMain(s) {
     const nodes = [];
 
-    // ── 頂部：這一次是什麼（系統判斷，不用他揀）────────────────
+    // ── 頂部：呢一次係咩（系統判斷，唔使佢揀）────────────────
     nodes.push(make('div', { className: 'statuscard' }, [
       make('div', { text: s.kindSentence, className: 'statuscard-title' }),
       make('div', {
@@ -107,55 +157,95 @@
       ]));
     }
 
-    // ── 寄給誰 ──────────────────────────────────────────────
-    nodes.push(make('div', { className: 'sec' }, [
+    // ── 決定一：寄給誰 ──────────────────────────────────────
+    const whoBox = make('div', { className: 'sec' }, [
       sectionTitle('寄給誰'),
-      make('div', { text: s.recipientSentence, className: 'ok-line' })
+      make('div', { text: s.recipientSentence, className: 'muted' })
+    ]);
+    const scopes = [
+      ['ALL', '全部應收的人'],
+      ['CHANGED_ONLY', '只寄安排有改動的'],
+      ['PICK', '自己揀']
+    ];
+    scopes.forEach((opt) => {
+      // 「只寄有改動嘅」淨係喺改動後重發先有意義。其餘階段唔顯示——
+      // 顯示一個撳落去等於「全部」嘅選項只會令人以為系統壞咗。
+      if (opt[0] === 'CHANGED_ONLY' && s.kind !== 'RESEND') return;
+      whoBox.appendChild(sendRadio('scope', opt[0], opt[1],
+        sendOptions_.recipientScope === opt[0], () => {
+          sendOptions_.recipientScope = opt[0];
+          if (opt[0] === 'PICK') { openSendPickList(s); return; }
+          drawSendMain(s);
+        }));
+    });
+    if (sendOptions_.recipientScope === 'PICK') {
+      whoBox.appendChild(make('div', {
+        text: '已揀 ' + sendOptions_.pickedKeys.length + ' 位。',
+        className: 'ok-line strong'
+      }));
+      whoBox.appendChild(row([
+        button('改一改揀邊個', () => openSendPickList(s), 'secondary')
+      ]));
+    }
+    nodes.push(whoBox);
+
+    // ── 決定二：附件 ────────────────────────────────────────
+    const attachBox = make('div', { className: 'sec' }, [sectionTitle('附件')]);
+    [
+      ['NONE', '不附（只有內文同連結）'],
+      ['PERSONAL_PDF', '個人版 PDF（自己的名字有 highlight）'],
+      ['FULL_PDF', '整季 PDF']
+    ].forEach((opt) => {
+      attachBox.appendChild(sendRadio('attach', opt[0], opt[1],
+        sendOptions_.attachType === opt[0], () => {
+          sendOptions_.attachType = opt[0];
+          drawSendMain(s);
+        }));
+    });
+    nodes.push(attachBox);
+
+    // ── 決定三：日曆檔 ──────────────────────────────────────
+    const icsBox = make('div', { className: 'sec' }, [sectionTitle('日曆檔')]);
+    const icsRow = make('label', { className: 'check-row' });
+    const icsCb = document.createElement('input');
+    icsCb.type = 'checkbox';
+    icsCb.checked = sendOptions_.includeIcs;
+    icsCb.addEventListener('change', () => {
+      sendOptions_.includeIcs = icsCb.checked;
+      drawSendMain(s);
+    });
+    icsRow.appendChild(icsCb);
+    icsRow.appendChild(make('span', {
+      text: '附 .ics 日曆檔（iPhone 同 Google 日曆都開得到）'
+    }));
+    icsBox.appendChild(icsRow);
+    nodes.push(icsBox);
+
+    // ⚠️ 個人版 PDF 同 .ics 都只對「這一季有服侍的人」有意義。
+    // 唔講嘅話，幹事會以為堂委都會收到個人 PDF，然後去追一個唔存在嘅問題。
+    if (sendOptions_.attachType === 'PERSONAL_PDF' || sendOptions_.includeIcs) {
+      nodes.push(make('div', { className: 'muted' }, [
+        make('div', {
+          text: '個人版 PDF 同日曆檔只有「這一季有服侍的人」才會收到。'
+            + '堂委名單那一封不會有——那是正常的，不是漏了。'
+        })
+      ]));
+    }
+
+    // ── 那條永久連結：一律附上，唔係一個選項 ─────────────────
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('那條永久連結'),
+      make('div', {
+        text: s.permanentLink.hasLink
+          ? '一律附在信末。收信的人之後打開就是最新版，不用再等你寄。'
+          : (s.permanentLink.checkFailed
+            ? '查不到這一季有沒有永久連結。這不代表沒有，只代表系統現在看不到。'
+            : '這一季還沒有永久連結，所以這一次的信不會有那一段。'),
+        className: s.permanentLink.hasLink ? 'ok-line' : 'vio-row'
+      })
     ]));
 
-    // ── 寄什麼 ──────────────────────────────────────────────
-    //
-    // ⚠️ 呢一段係**講事實，唔係俾佢揀**。內容由 EmailTemplates 同階段
-    // 決定（見 WebAppSendPlan.gs 嘅 describeSendContents_()）。
-    // 畫一堆撳落去冇作用嘅勾選格，比唔畫更差。
-    const contentBox = make('div', { className: 'sec' }, [sectionTitle('會寄什麼')]);
-    if (s.contents.unknown) {
-      contentBox.appendChild(make('div', {
-        text: '查不到會寄什麼：' + s.contents.unknown,
-        className: 'vio-row'
-      }));
-    } else {
-      s.contents.items.forEach((it) => {
-        contentBox.appendChild(make('div', { text: '・' + it, className: 'ok-line' }));
-      });
-    }
-    nodes.push(contentBox);
-
-    // ⚠️ 那條永久連結**一律要在信裡面**。範本沒有放，就在這裡講出來——
-    // 靜靜寄一封沒有連結的信，收信的人就沒有辦法自己去看最新版。
-    if (!s.contents.hasPermanentLink) {
-      nodes.push(make('div', { className: 'warnbox' }, [
-        make('div', {
-          text: '這一次的信件範本裡面沒有放那條永久連結。'
-            + '收信的人只會拿到附件，之後內容改了他不會知道。'
-            + '要加的話，在 EmailTemplates 那一張表把 {PublicRosterUrl} 放進內文。',
-          className: 'lines'
-        })
-      ]));
-    }
-
-    if (!s.permanentLink.hasLink) {
-      nodes.push(make('div', { className: 'warnbox' }, [
-        make('div', {
-          text: s.permanentLink.checkFailed
-            ? '查不到這一季有沒有永久連結。這不代表沒有，只代表系統現在看不到。'
-            : '這一季還沒有永久連結。如果信件範本要用它，寄出會被擋住。',
-          className: 'lines'
-        })
-      ]));
-    }
-
-    // ── 在 REQUESTS_APPLIED 那一步，「再寄一次審閱本」仍然做得到 ──
+    // ── 喺 REQUESTS_APPLIED 嗰一步，「再寄一次審閱本」仍然做得到 ──
     const actions = [];
     if (s.alsoReview) {
       actions.push(button('改為再寄一次審閱本', () => { closeModal(); openReview(); }, 'secondary'));
@@ -166,8 +256,115 @@
       bodyNodes: nodes,
       confirmLabel: sendConfirmLabel(s.kind),
       extraActions: actions,
-      onConfirm: () => { closeModal(); routeSend(s.kind); }
+      onConfirm: () => {
+        // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ 唔可以行落去。
+        // 後端一樣會擋（resolveSendOptions_() 會拋），呢度只係提早講。
+        if (sendOptions_.recipientScope === 'PICK' && sendOptions_.pickedKeys.length === 0) {
+          setStatus('你揀了「自己揀」，但一位都沒有揀。', true);
+          return;
+        }
+        closeModal();
+        routeSend(s.kind, sendOptions_);
+      }
     });
+  }
+
+  /** 一粒 radio。 */
+  function sendRadio(group, value, label, checked, onPick) {
+    const line = make('label', { className: 'radio-row' });
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'sendopt-' + group;
+    input.value = value;
+    input.checked = !!checked;
+    input.addEventListener('change', () => { if (input.checked) onPick(); });
+    line.appendChild(input);
+    line.appendChild(make('span', { text: label }));
+    return line;
+  }
+
+  /* ── 「自己揀」嗰個名單 ─────────────────────────────────── */
+
+  function openSendPickList(s, keyword) {
+    if (sendCandidates_) { drawSendPickList(s, keyword || ''); return; }
+    runAction('讀取收件名單', async () => {
+      sendCandidates_ = await callServer('apiGetSendCandidates', currentQuarterId, s.kind);
+      drawSendPickList(s, '');
+    });
+  }
+
+  function drawSendPickList(s, keyword) {
+    const picked = {};
+    sendOptions_.pickedKeys.forEach((k) => { picked[k] = true; });
+
+    const k = String(keyword || '').trim();
+    const matched = k
+      ? sendCandidates_.filter((c) => c.displayName.indexOf(k) !== -1)
+      : sendCandidates_;
+
+    const nodes = [
+      para('揀邊幾位要收到這一封信。'),
+      para('沒有揀到的人，這一次一封都不會收到。', 'muted')
+    ];
+
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.placeholder = '搵人名⋯⋯';
+    search.value = k;
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); drawSendPickList(s, search.value); }
+    });
+    nodes.push(row([search, button('搵', () => drawSendPickList(s, search.value), 'secondary')]));
+
+    if (sendCandidates_.length === 0) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一次一個收件人都找不到。這通常代表這一季還沒有派工，'
+            + '或者收件人名單（EmailRecipients）是空的。',
+          className: 'lines'
+        })
+      ]));
+    }
+    if (sendCandidates_.length > 0 && matched.length === 0) {
+      nodes.push(make('div', { text: '找不到符合的人。', className: 'muted' }));
+    }
+
+    const box = make('div', { className: 'sec' });
+    matched.forEach((c) => {
+      const line = make('label', { className: 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = picked[c.key] === true;
+      cb.addEventListener('change', () => {
+        if (cb.checked) {
+          if (sendOptions_.pickedKeys.indexOf(c.key) === -1) sendOptions_.pickedKeys.push(c.key);
+        } else {
+          sendOptions_.pickedKeys = sendOptions_.pickedKeys.filter((x) => x !== c.key);
+        }
+      });
+      line.appendChild(cb);
+      // ⚠️ 查不到電郵嘅照樣列出嚟，並且講明。佢唔係「唔使服侍」，
+      // 係要印紙本（第 6 步）——收埋佢就等於靜靜當佢唔存在。
+      line.appendChild(make('span', {
+        text: c.displayName
+          + (c.type === 'LIST' ? '　（名單）' : '　（這一季 ' + c.cellCount + ' 格）')
+          + (c.hasEmail ? '' : '　⚠ 查不到電郵，寄不到，要印紙本')
+      }));
+      box.appendChild(line);
+    });
+    nodes.push(box);
+
+    openModal('自己揀寄給誰', nodes, [
+      button('揀好了', () => { drawSendMain(s); }, ''),
+      button('全部揀', () => {
+        sendOptions_.pickedKeys = sendCandidates_.map((c) => c.key);
+        drawSendPickList(s, keyword);
+      }, 'secondary'),
+      button('全部唔揀', () => {
+        sendOptions_.pickedKeys = [];
+        drawSendPickList(s, keyword);
+      }, 'secondary')
+    ]);
   }
 
   function sendConfirmLabel(kind) {
@@ -181,11 +378,14 @@
    * 落到原本嗰三條路。
    * ⚠️ **唔喺呢度重新實作任何一條。** 嗰三個函式各自帶住自己嗰套
    * 前置檢查同確認畫面，繞開佢哋就等於把嗰啲閘全部丟掉。
+   *
+   * ⚠️ 第四十輪：sendOptions 一路傳到底。三個入口都收多一個參數，
+   * 冇傳嘅時候行為同今日一模一樣（見 SendOptions.gs 檔頭）。
    */
-  function routeSend(kind) {
-    if (kind === 'REVIEW') { openReview(); return; }
-    if (kind === 'OFFICIAL') { openOfficial(); return; }
-    if (kind === 'RESEND') { openResend(); return; }
+  function routeSend(kind, sendOptions) {
+    if (kind === 'REVIEW') { openReview(sendOptions); return; }
+    if (kind === 'OFFICIAL') { openOfficial(sendOptions); return; }
+    if (kind === 'RESEND') { openResend(sendOptions); return; }
   }
 
   /* ============================================================

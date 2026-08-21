@@ -44,6 +44,62 @@ const ROOT = path.join(__dirname, '..');
 //  「還原之後仍然綠」被誤讀成「測試有問題」，浪費咗一整輪）。
 const MUTATIONS = [
   {
+    id: 'send-opts-default-same',
+    why: '把寄出選項嘅預設收件範圍改成一律 ALL'
+      + '——RESEND 本來係「只寄有改動嘅」，改咗之後幹事乜都唔揀撳落去，'
+      + '成班冇改動嘅人都會收到一封內容一模一樣嘅信',
+    file: 'src/SendOptions.gs',
+    find: '  RESEND: SEND_RECIPIENT_SCOPE.CHANGED_ONLY,',
+    replace: '  RESEND: SEND_RECIPIENT_SCOPE.ALL,',
+    tests: ['tests/send_options.test.js']
+  },
+  {
+    id: 'send-opts-pick-empty',
+    why: '把「揀咗自己揀但一個都冇揀」還原成靜靜當成寄全部'
+      + '——佢以為淨係寄俾三個人，實際上成班人收到',
+    file: 'src/SendOptions.gs',
+    find: '  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/send_options.test.js']
+  },
+  {
+    id: 'send-opts-ics-bool',
+    why: '把 includeIcs 還原成「truthy 就當 true」'
+      + '——傳一個字串（例如前端改壞咗）就會靜靜開咗一樣佢冇揀嘅嘢',
+    file: 'src/SendOptions.gs',
+    find: '  const includeIcs = (o.includeIcs === true || o.includeIcs === false)',
+    replace: '  const includeIcs = (o.includeIcs !== undefined)',
+    tests: ['tests/send_options.test.js']
+  },
+  {
+    id: 'permalink-footer-empty',
+    why: '把信末永久連結還原成「冇連結都照加嗰一段」'
+      + '——收信嘅人會見到「固定連結：」後面一片空白，仲差過唔加',
+    file: 'src/Mailer.gs',
+    find: '  if (!link) return text;',
+    replace: '  if (false) return text;',
+    tests: ['tests/permanent_link_footer.test.js']
+  },
+  {
+    id: 'permalink-footer-dup',
+    why: '把信末永久連結還原成「唔理範本有冇放，一律加」'
+      + '——範本自己有放嘅話，同一條連結會喺一封信入面出現兩次',
+    file: 'src/Mailer.gs',
+    find: "  if (String(templateSource || '').indexOf('{PublicRosterUrl}') !== -1) return text;",
+    replace: '  if (false) return text;',
+    tests: ['tests/permanent_link_footer.test.js']
+  },
+  {
+    id: 'generator-stats-assigned',
+    why: '把生成完成畫面嘅統計還原成「只認 a.personId」'
+      + '——一格填好嘅講員（外請講員冇 PersonID）會被算成「未能安排」，'
+      + '而 grid 同一格顯示佢個名',
+    file: 'src/Generator.gs',
+    find: '    if (cellClass === GRID_CELL_CLASS.ASSIGNED) return;',
+    replace: '    if (a.personId) return;',
+    tests: ['tests/classify_call_sites.test.js']
+  },
+  {
     id: 'dropdown-allow-invalid',
     why: '把名單下拉選單還原成 `setAllowInvalid(false)`'
       + '——即係「只准揀名單上的」，會把外請講員／新人／借調直接堵死',

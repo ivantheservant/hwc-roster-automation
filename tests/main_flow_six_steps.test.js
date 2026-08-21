@@ -36,7 +36,9 @@ const gas = loadGasSource([
   'PreacherTranslationFill.gs',
   // 本輪新增
   'WebAppMainFlow.gs', 'GridNameDropdown.gs', 'EligibilitySheetEditor.gs',
-  'WebAppSendPlan.gs'
+  'WebAppSendPlan.gs',
+  // 第四十輪批次 A 組：寄出嗰三個選項喺呢度解析（apiGetSendPlanSummary 要用）。
+  'SendOptions.gs'
 ]);
 
 let fail = 0;

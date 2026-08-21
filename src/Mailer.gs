@@ -84,7 +84,7 @@ function resolveStageTemplates_(stage) {
   return { person: findEmailTemplate_(stage), list: null };
 }
 
-function sendStage(quarterId, versionNo, stage) {
+function sendStage(quarterId, versionNo, stage, sendOptions) {
   assertNotPreviewMode_('sendStage');
   // 追加階段 N：OFFICIAL 永遠不可以由自動排程觸發，結構性防護見 Trigger.gs 的
   // assertOfficialNotFromAutomationTrigger_()——目前 dailyAutomationCheck_() 根本
@@ -110,6 +110,16 @@ function sendStage(quarterId, versionNo, stage) {
 
   const context = buildMailContext_(quarterId, versionNo, stage);
 
+  // ⚠️ 第四十輪批次 A 組：**三個決定喺呢度一次過解析完。**
+  //
+  // 落到 `deliverOne_()` 嗰一層，`attachType` 已經係一個確定嘅值、
+  // `includeIcs` 已經係一個確定嘅布林值——冇任何嘢要佢再諗。
+  //
+  // 呢條規矩唔係風格問題：第三十三、三十八輪連續喺呢條路上修過兩個
+  // 同一類嘅 bug（`deliverOne_()` 自己重新判斷，蓋過上游決定）。
+  context.sendDecision = resolveSendOptions_(stage, sendOptions, templates);
+
+
   // ⚠️ 第二十六輪批次階段 A2-3：範本要用公開連結但根本冇連結 ⇒ 一封都唔寄。
   //
   // 擺喺 `listRecipients_()` 之前，即係**一封都未寄之前**就拋。
@@ -130,7 +140,9 @@ function sendStage(quarterId, versionNo, stage) {
   // 跳過」），只是把「完全沒有任何紀錄」的最壞情況縮小成「有紀錄、只是不完整」。
   const flushBatchSize = Number(getConfig(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
-  listRecipients_(stage, context).forEach(function (recipient) {
+  // 收件範圍係上游嘅決定，喺呢度執行一次就算。
+  filterRecipientsByScope_(listRecipients_(stage, context), context.sendDecision)
+    .forEach(function (recipient) {
     // 第九輪批次階段 C：LIST 收件人（堂委／教會辦公室名單）與 PERSON 收件人
     // （逐一義工）用不同範本，見 resolveStageTemplates_() 的說明。
     const chosen = (recipient.type === RECIPIENT_TYPE.LIST && templates.list)
@@ -162,6 +174,9 @@ function sendStage(quarterId, versionNo, stage) {
     source: 'sendStage',
     notes: '成功=' + countStatus_(outcomes, MAIL_STATUS.SENT) + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
       + '　查無電郵=' + countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
+      // 第四十輪批次 A 組：今次用咗咩選項。SendLog 嗰欄可能唔存在，
+      // 但呢度一定寫得入——唔記低就查唔到「點解嗰次冇附件」。
+      + '　' + describeSendDecision_(context.sendDecision)
   });
 
   return {
@@ -464,6 +479,80 @@ function listRecipients_(stage, context) {
 }
 
 /**
+ * 第四十輪批次 B 組：**那條永久連結一律附在信末，不依賴範本。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 為什麼不做成選項
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 那條連結是收信的人**之後自己去看最新版**的唯一途徑。
+ * 做成選項就有機會被關掉，而關掉之後那一批人手上就只剩一份會過期的附件。
+ * 所以三個寄出選項裡面沒有它——一律附上。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 為什麼不靠範本
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 2026-08-21 實測核對過七個範本的 `Placeholders` 欄：
+ * **一個都沒有用 `{PublicRosterUrl}`。** 有幾個用 `{SpreadsheetUrl}`，
+ * 但那是幹事用的試算表連結，不是給義工看的公開連結，兩樣不可以混淆。
+ *
+ * 即是說「範本會放連結」這個假設，由頭到尾都不成立。
+ * 靠人去七張範本逐一補，補漏一張就是一批人收不到連結，而且沒有任何訊號。
+ *
+ * 所以改成系統自己加。範本已經有 `{PublicRosterUrl}` 的話就不重複加
+ *（見 `appendPermanentLinkFooter_()`）。
+ *
+ * @param {string} url 那條公開連結
+ * @returns {string} 純文字版的信末段落
+ */
+function buildPermanentLinkFooterPlain_(url) {
+  return '\n\n這一季職事表的固定連結（內容更新後打開就是最新版）：\n' + url;
+}
+
+/**
+ * 同上，HTML 版。
+ *
+ * ⚠️ 連結本身要轉義：`PublicLinks` 那一欄是資料，理論上可以含
+ * `&`、`<` 這類字元。不轉義就會整段 HTML 爛掉。
+ * @param {string} url 那條公開連結
+ * @returns {string} HTML 版的信末段落
+ */
+function buildPermanentLinkFooterHtml_(url) {
+  const safe = String(url)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  return '<hr><p>這一季職事表的固定連結（內容更新後打開就是最新版）：<br>'
+    + '<a href="' + safe + '">' + safe + '</a></p>';
+}
+
+/**
+ * 把那一段加落信末。
+ *
+ * 三種情況（`tests/permanent_link_footer.test.js` 各斷言一次）：
+ *   範本已經有 `{PublicRosterUrl}`　⇒ **不加**（避免同一條連結出現兩次）
+ *   範本沒有　　　　　　　　　　　　⇒ 加
+ *   這一季根本沒有公開連結　　　　　⇒ **整段略過**
+ *
+ * ⚠️ 第三種最重要：加一段「固定連結：」後面卻是空白、或者 `undefined`，
+ * 比不加更差——收信的人會以為系統壞了，而且會去撳一條不存在的連結。
+ *
+ * @param {string} text 已經套用完 placeholder 的內文
+ * @param {string} templateSource 原始範本內文（用來看有沒有 placeholder）
+ * @param {string} url 那條公開連結（沒有時傳空字串）
+ * @param {boolean} isHtml 是不是 HTML 版
+ * @returns {string} 加完（或者原封不動）的內文
+ */
+function appendPermanentLinkFooter_(text, templateSource, url, isHtml) {
+  const link = String(url || '').trim();
+  if (!link) return text;
+  // 範本自己有放 ⇒ `applyPlaceholders_()` 已經換好，不要再加一次。
+  if (String(templateSource || '').indexOf('{PublicRosterUrl}') !== -1) return text;
+  return String(text || '')
+    + (isHtml ? buildPermanentLinkFooterHtml_(link) : buildPermanentLinkFooterPlain_(link));
+}
+
+/**
  * 處理單一收件人：計算 hash、判斷是否需要寄、產生附件、組出內容，
  * 並在 DRY_RUN=FALSE 時才真正寄出。回傳結果供寫入 SendLog。
  *
@@ -555,7 +644,14 @@ function deliverOne_(recipient, template, context, isDryRun) {
   // （連同已經正確產生的個人 PDF）都寄不出，只記錄警告、繼續不附 ICS。
   let icsAttachment = null;
   try {
-    icsAttachment = buildIcsAttachmentForPerson_(context, recipient, personAssignments);
+    // ⚠️ 附唔附日曆檔係上游嘅決定（`context.sendDecision.includeIcs`），
+    // 呢度只係執行。冇決定就退回今日嘅自動判斷（見 icsDefaultForStage_()）。
+    const wantIcs = context.sendDecision
+      ? context.sendDecision.includeIcs
+      : icsDefaultForStage_(context.stage);
+    icsAttachment = wantIcs
+      ? buildIcsAttachmentForPerson_(context, recipient, personAssignments)
+      : null;
   } catch (err) {
     log_('WARN', 'ICS 日曆檔產生失敗（不影響本次寄信，本封信不附 ICS）：'
       + recipient.displayName + '（' + recipient.personId + '）　' + err.message);
@@ -573,8 +669,15 @@ function deliverOne_(recipient, template, context, isDryRun) {
 
   const subject = context.subjectPrefix
     + applyPlaceholders_(template.subject, context.placeholders, recipient, summary);
-  const bodyHtml = applyPlaceholders_(template.bodyHtml, context.placeholders, recipient, summary);
-  const bodyPlain = applyPlaceholders_(template.bodyPlain, context.placeholders, recipient, summary);
+  // ⚠️ 第四十輪批次 B 組：那條永久連結一律附在信末（見上面的說明）。
+  // 範本自己有放就不重複加；這一季沒有連結就整段略過。
+  const permanentLink = (context.placeholders || {}).PublicRosterUrl || '';
+  const bodyHtml = appendPermanentLinkFooter_(
+    applyPlaceholders_(template.bodyHtml, context.placeholders, recipient, summary),
+    template.bodyHtml, permanentLink, true);
+  const bodyPlain = appendPermanentLinkFooter_(
+    applyPlaceholders_(template.bodyPlain, context.placeholders, recipient, summary),
+    template.bodyPlain, permanentLink, false);
 
   if (isDryRun) {
     log_('INFO', '[DRY_RUN] 不寄出 → ' + recipient.email + ' | ' + subject
@@ -637,7 +740,15 @@ function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attach
  *   附件資訊；不需要附件時回傳 null
  */
 function generateMailAttachment_(template, context, recipient) {
-  const attachType = String(template.attachType || ATTACH_TYPE.NONE).toUpperCase();
+  // ⚠️ 第四十輪批次 A 組：附件類型由**上游嘅決定**話事，唔係喺呢度睇範本。
+  //
+  // 冇決定（例如舊呼叫端）先退回範本嗰一欄——即係今日嘅行為。
+  // 呢度**唔會**改寫 `EmailTemplates` 工作表：決定只係今次有效。
+  const d = context.sendDecision;
+  const resolved = d
+    ? (recipient.type === RECIPIENT_TYPE.LIST ? d.listAttachType : d.attachType)
+    : template.attachType;
+  const attachType = String(resolved || ATTACH_TYPE.NONE).toUpperCase();
   if (attachType === ATTACH_TYPE.NONE || attachType === '') return null;
   if (attachType === ATTACH_TYPE.PERSONAL_PDF && recipient.type !== RECIPIENT_TYPE.PERSON) return null;
 
@@ -1092,6 +1203,16 @@ function writeSendLogRows_(outcomes, context) {
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.SEND_LOG);
 
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+  // ⚠️ 第四十輪批次 A 組：舊嘅 SendLog 工作表冇 `SendOptions` 呢一欄。
+  // 下面 `headers.map(...)` 會靜靜略過佢——而「靜靜略過」正正係
+  // 呢個專案一直喺度殺嗰個 bug class。所以寫一句 WARN 出嚟。
+  // 同一份紀錄一定會寫入 AuditLog（自由文字），所以查得返。
+  if (headers.indexOf(COLUMNS.SEND_LOG.SEND_OPTIONS) === -1) {
+    log_('WARN', 'SendLog 冇 ' + COLUMNS.SEND_LOG.SEND_OPTIONS
+      + ' 呢一欄，今次用咗咩寄送選項只會寫入 AuditLog。'
+      + '想喺 SendLog 都見到，喺表頭（第 2 行）最尾加一欄叫 '
+      + COLUMNS.SEND_LOG.SEND_OPTIONS);
+  }
   const now = nowTimestamp_();
   const idStamp = compactTimestamp_();
   const actor = Session.getActiveUser().getEmail();
@@ -1123,6 +1244,7 @@ function writeSendLogRows_(outcomes, context) {
     record[C.MESSAGE_ID] = o.messageId;
     record[C.ERROR_MESSAGE] = o.errorMessage;
     record[C.TRIGGERED_BY] = actor;
+    record[C.SEND_OPTIONS] = describeSendDecision_(context.sendDecision);
     return headers.map(function (h) { return record[h] === undefined ? '' : record[h]; });
   });
 

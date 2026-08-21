@@ -191,14 +191,14 @@ function apiStep2Preview(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 寄送結果統計，欄位與選單版本完成對話框一致
  */
-function apiStep2Confirm(quarterId) {
+function apiStep2Confirm(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 2／3／4 永不改動職事表內容，
   // 所以有未儲存改動時一律拒絕，指去掣 1。
   assertNoUnsavedChanges_(quarterId, '寄給堂委審閱');
   // 第二十六輪批次階段 A2-2：冇公開連結就唔好寄。見 assertPublicLinkReady_()。
   assertPublicLinkReady_(quarterId);
-  const result = executeStep2_(quarterId);
+  const result = executeStep2_(quarterId, sendOptions);
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf
@@ -359,7 +359,7 @@ function apiStep4GetSendPreview(quarterId, versionNo) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 寄送結果統計
  */
-function apiStep4Confirm(quarterId) {
+function apiStep4Confirm(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2／E3：規格 2.6 三層防重複嘅第 2、3 層。
   // 第 1 層（Stage）由 executeStep4Send_() 內部嘅 requireQuarterStage_() 負責。
@@ -368,7 +368,7 @@ function apiStep4Confirm(quarterId) {
   // 已經發出過係更根本嘅阻擋理由，先講嗰個對幹事更有用。
   assertNeverOfficiallySent_(quarterId);
   assertNoUnsavedChanges_(quarterId, '正式發出給全體');
-  const result = executeStep4Send_(quarterId);
+  const result = executeStep4Send_(quarterId, sendOptions);
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, unchanged: result.unchanged,
@@ -540,7 +540,7 @@ function apiStep5SendPreview(quarterId) {
  * @param {string} releaseText 硬規則放行文字（沒有硬規則違反時可傳空字串）
  * @returns {Object} 寄送結果；`blocked:true` 時代表被硬規則關卡擋住，或沒有改動需要重發
  */
-function apiStep5SendConfirm(quarterId, releaseText) {
+function apiStep5SendConfirm(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 4 一樣唔可以喺有未儲存改動嘅
   // 情況下寄——否則義工會收到一封「最新安排」，但實際上仲有嘢未儲存。
@@ -554,7 +554,7 @@ function apiStep5SendConfirm(quarterId, releaseText) {
   if (hardForSend.length > 0) logHardViolationRelease_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', hardForSend);
   if (changed.changedList.length === 0) return { blocked: false, noChanges: true };
 
-  const sendResult = executeStep5Send_(quarterId, changed.versionNo, changed.changedList);
+  const sendResult = executeStep5Send_(quarterId, changed.versionNo, changed.changedList, sendOptions);
   return {
     blocked: false,
     isDryRun: sendResult.isDryRun, sent: sendResult.sent, dryRun: sendResult.dryRun,

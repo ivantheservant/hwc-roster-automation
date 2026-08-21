@@ -475,7 +475,15 @@ const COLUMNS = {
     STATUS: 'Status',
     MESSAGE_ID: 'MessageId',
     ERROR_MESSAGE: 'ErrorMessage',
-    TRIGGERED_BY: 'TriggeredBy'
+    TRIGGERED_BY: 'TriggeredBy',
+    // 第四十輪批次 A 組：今次用咗咩寄送選項（收件範圍／附件／日曆檔）。
+    //
+    // ⚠️ 現有嘅 SendLog 工作表**冇呢一欄**。`writeSendLogRows_()` 係按
+    // 表頭逐欄寫（`headers.map(...)`），所以冇呢一欄嘅表照樣寫得入，
+    // 只係呢一項唔會落到表上——而嗰個就係「靜靜唔見咗」。
+    // 所以 `writeSendLogRows_()` 見到冇呢一欄會寫一句 WARN，
+    // 而且**同一份紀錄一定會寫入 AuditLog**（嗰度係自由文字，一定寫得入）。
+    SEND_OPTIONS: 'SendOptions'
   },
   FINE_TUNE_PROPOSALS: {
     PROPOSAL_ID: 'ProposalID',

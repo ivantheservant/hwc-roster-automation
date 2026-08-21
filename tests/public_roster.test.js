@@ -433,8 +433,11 @@ console.log('\n=== A4（第二十六輪階段 A2-3 改寫）：查唔到要回 n
 
   check('★★★★★ sendStage() 喺**寄第一封之前**就叫嗰道關卡'
     + '——擺後面會變成「寄咗一半先發現」，而已經寄出嗰啲收唔返',
+    // ⚠️ 第四十輪批次 A 組：本來搵 `listRecipients_(stage, context).forEach`，
+    // 加咗「收件範圍」之後個迴圈多咗一層包裝，字面對唔上——但要守嗰件事冇變。
+    // 改成對住「真正寄出嗰一刻」比，中間再加幾多層包裝都唔會令佢失效。
     mailerSource.indexOf('assertPublicRosterUrlAvailableForStage_(')
-      < mailerSource.indexOf('listRecipients_(stage, context).forEach'));
+      < mailerSource.indexOf('outcomes.push(deliverOne_('));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

@@ -112,7 +112,7 @@ function buildChangedPeopleSummaryText_(changedList, context) {
  *   retryCount: number, durationMs: number, changedCount: number, listRecipientCount: number}}
  *   各類結果的統計
  */
-function sendResendStage_(quarterId, versionNo, changedPersonIds) {
+function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
   assertNotPreviewMode_('sendResendStage_');
   const startedAt = Date.now();
   const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
@@ -136,6 +136,11 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds) {
   // deliverOne_() 讀這一份就夠，不需要（也不可以）再用 hash 判斷一次。
   // 第三十二輪實測踩到的 bug 正是 deliverOne_() 自己再判斷一次，
   // 把上游決定要寄的人擋了下來——見 Constants.gs 的 RESEND_NOTIFY_REASON。
+  // ⚠️ 第四十輪批次 A 組：三個決定喺呢度一次過解析完，
+  // 落到 `deliverOne_()` 嗰一層已經係結論（理由見 SendOptions.gs 檔頭）。
+  context.sendDecision = resolveSendOptions_(
+    MAIL_STAGES.RESEND, sendOptions, { person: personTemplate, list: listTemplate });
+
   context.notifyReasonByPerson = {};
   changedList.forEach(function (c) {
     context.notifyReasonByPerson[c.personId] = c.notifyReason;
@@ -152,7 +157,44 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds) {
     }
   };
 
-  changedPersonIds.slice().sort().forEach(function (personId) {
+  // ⚠️ 第四十輪批次 A 組：收件範圍。
+  //
+  // 呢個決定**一定要喺呢度做**——即係喺 `deliverOne_()` 上游。
+  // 落咗去先篩，就變返第三十三輪嗰個 bug（下游自己重新判斷要唔要寄）。
+  //
+  //   CHANGED_ONLY　呼叫端傳落嚟嗰批（＝今日嘅行為）
+  //   ALL　　　　　　呢一版有派工嘅、加上一次收過信嘅（同 listRecipients_ 一致）
+  //   PICK　　　　　幹事逐個揀嗰批
+  const decision = context.sendDecision;
+  let targetPersonIds = changedPersonIds.slice();
+  if (decision.recipientScope === SEND_RECIPIENT_SCOPE.ALL) {
+    const everyone = {};
+    Object.keys(context.assignmentsByPerson || {}).forEach(function (id) { everyone[id] = true; });
+    Object.keys(context.lastHashByPerson || {}).forEach(function (id) { everyone[id] = true; });
+    targetPersonIds = Object.keys(everyone);
+    // ⚠️ 幹事揀咗「全部人」＝ 佢明知內容可能冇變都要寄。
+    // `deliverOne_()` 嗰個 hash 保險絲會把「內容冇變」嘅人擋走，
+    // 所以要喺呢度俾佢哋一個理由——同 `RESEND_ONLY_CHANGED=FALSE` 同一個意思。
+    targetPersonIds.forEach(function (id) {
+      if (!context.notifyReasonByPerson[id]) {
+        context.notifyReasonByPerson[id] = '幹事選擇寄給全部人';
+      }
+    });
+  } else if (decision.recipientScope === SEND_RECIPIENT_SCOPE.PICK) {
+    targetPersonIds = targetPersonIds.filter(function (id) {
+      return decision.pickedKeys[id] === true;
+    });
+    // 幹事揀咗一個唔喺「有改動」名單入面嘅人 ⇒ 照樣寄俾佢。
+    Object.keys(decision.pickedKeys).forEach(function (key) {
+      if (key.indexOf('LIST:') === 0) return;
+      if (targetPersonIds.indexOf(key) === -1) {
+        targetPersonIds.push(key);
+        context.notifyReasonByPerson[key] = '幹事指定要寄給這一位';
+      }
+    });
+  }
+
+  targetPersonIds.slice().sort().forEach(function (personId) {
     const person = context.peopleById[personId];
     const recipient = {
       type: RECIPIENT_TYPE.PERSON,
@@ -165,8 +207,10 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds) {
     maybeFlush_();
   });
 
-  const listRecipients = listRecipients_(MAIL_STAGES.RESEND, context)
-    .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST; });
+  const listRecipients = filterRecipientsByScope_(
+    listRecipients_(MAIL_STAGES.RESEND, context)
+      .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST; }),
+    decision);
   listRecipients.forEach(function (recipient) {
     outcomes.push(deliverOne_(recipient, listTemplate, context, isDryRun));
     maybeFlush_();
@@ -191,6 +235,8 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds) {
     source: 'sendResendStage_',
     notes: '成功=' + countStatus_(outcomes, MAIL_STATUS.SENT) + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
       + '　查無電郵=' + countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
+      // 第四十輪批次 A 組：今次用咗咩選項（同 sendStage() 一致）。
+      + '　' + describeSendDecision_(context.sendDecision)
   });
 
   return {

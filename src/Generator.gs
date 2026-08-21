@@ -1442,12 +1442,24 @@ function summariseBlankAssignments_(assignments) {
   const genuineGapCells = [];
 
   assignments.forEach(function (a) {
-    if (a.personId) return; // 已經有人，不算留空
-
     // 第十輪批次階段 A：分類判斷抽成 classifyGridCell_()，本函式與 grid 顯示層
     // （RosterWriter.gs 的文字與底色）共用同一個判斷，不會出現「統計說是待人手
     // 填、但表上畫成排不出」這種兩邊各自判斷而漂移的情況。
     const cellClass = classifyGridCell_(a);
+
+    // ⚠️ 第四十輪批次 F4：這一行本來寫 `if (a.personId) return;`。
+    //
+    // `ASSIGNED` 有**兩種**：有 PersonID、或者有自由文字
+    //（第三十七輪批次 A 組加的——外請講員不在 NameMapping，只有名字）。
+    // 只認第一種的話，一格填好的講員會跌落最後那個 else，
+    // 被當成「系統應該排但排不出」——而 grid 那邊同一格顯示他的名字。
+    //
+    // 兩邊講不同的話，幹事會見到「未能安排 N 格」但表上明明有人，
+    // 然後去追一個不存在的問題。這正是第三十八輪 E 組同一類的東西。
+    //
+    // 改成問分類器：它是全系統唯一的分類來源，兩種 ASSIGNED 它都認得。
+    if (cellClass === GRID_CELL_CLASS.ASSIGNED) return;
+
     if (cellClass === GRID_CELL_CLASS.STRUCTURAL_NA) {
       structuralNaCount++;
     } else if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) {

@@ -315,6 +315,77 @@ function writeVersionCellAuditSheet_(results) {
 }
 
 /**
+ * 第四十輪批次 F5：**把結果同時寫入 `Diagnostics` 同 `AuditLog`。**
+ *
+ * ⚠️ 2026-08-21 實測撞到：這個工具跑過，但 Ivan
+ *   ・讀不到報告（它只寫自己那一張 `VersionCellAudit`，他不知道要去哪裡看）
+ *   ・`AuditLog` 一行紀錄都沒有（它根本沒有寫）
+ *
+ * 兩者加起來的效果是：**跑過等於沒有跑過。**
+ * 一個「做完之後查不到自己做過什麼」的診斷工具，比沒有更差——
+ * 下一次出事的時候，沒有人答得出「上一次清點是什麼時候、看到什麼」。
+ *
+ * 所以：
+ *   `Diagnostics`　一份摘要（幾多個版本、幾多個看來壞了）——那是全系統
+ *                   其他診斷工具都會寫的地方，幹事本來就知道去那裡看
+ *   `AuditLog`　　 一行「跑過了」，連同結論
+ *   `VersionCellAudit`　逐版明細（本來就有，不變）
+ *
+ * ⚠️ `Diagnostics` 有總行數上限（`DIAGNOSTICS_MAX_ROWS_TOTAL`），
+ * **不會為了這一份而調高**。所以只寫摘要同「看來壞了」那幾個版本，
+ * 不逐版寫——逐版寫會把其他報告擠走。
+ *
+ * @param {Object[]} results `auditAllVersionCellClasses()` 的結果
+ * @param {string} sheetName 明細寫在哪一張表
+ * @returns {{diagnosticsOk: boolean, diagnosticsError: string}}
+ */
+function recordVersionCellAudit_(results, sheetName) {
+  const bad = results.filter(function (r) { return r.level === 'BAD'; });
+  const warn = results.filter(function (r) { return r.level === 'WARN'; });
+
+  const rows = [
+    diagRow_('清點格子分類', '清點了幾多個版本', results.length,
+      '明細在「' + sheetName + '」'),
+    diagRow_('清點格子分類', '看來資料壞掉的版本', bad.length,
+      bad.length > 0 ? '見下面逐項' : '沒有'),
+    diagRow_('清點格子分類', '要看一眼的版本', warn.length, ''),
+    diagRow_('清點格子分類', '這一次有沒有看完',
+      results.stoppedEarly ? '沒有' : '有',
+      results.stoppedEarly
+        ? ('時間不夠，還有 ' + results.notCheckedCount + ' 個版本沒有看')
+        : '')
+  ];
+  // 只列「看來壞了」那幾個，而且有上限——不可以為了這一份把其他報告擠走。
+  bad.slice(0, 20).forEach(function (r) {
+    rows.push(diagRow_('清點格子分類',
+      r.quarterId + ' v' + r.versionNo, '看來壞了', r.note));
+  });
+  if (bad.length > 20) {
+    rows.push(diagRow_('清點格子分類', '（其餘）',
+      bad.length - 20, '完整名單在「' + sheetName + '」'));
+  }
+
+  const written = tryWriteDiagnosticsDetailed_('清點格子分類', rows);
+
+  // ⚠️ AuditLog **一定要寫**，而且要喺 Diagnostics 寫唔到嗰陣都寫得到。
+  // 佢係自由文字、冇行數上限，係「跑過乜嘢」唯一保證查得返嘅地方。
+  writeAuditLog_({
+    action: 'VERSION_CELL_AUDIT',
+    targetSheet: sheetName,
+    targetKey: '',
+    oldValue: '',
+    newValue: '清點了 ' + results.length + ' 個版本：看來壞了 ' + bad.length
+      + ' 個、要看一眼 ' + warn.length + ' 個'
+      + (results.stoppedEarly
+        ? ('（時間不夠，還有 ' + results.notCheckedCount + ' 個沒有看）') : ''),
+    source: 'runVersionCellAudit_',
+    notes: written.ok ? '摘要已寫入 Diagnostics' : ('Diagnostics 寫不到：' + written.error)
+  });
+
+  return { diagnosticsOk: written.ok, diagnosticsError: written.error || '' };
+}
+
+/**
  * 選單入口：清點所有季度所有版本的格子分類，寫成報告表。**唯讀。**
  */
 function runVersionCellAudit_() {
@@ -334,13 +405,22 @@ function runVersionCellAudit_() {
   }
 
   const sheetName = writeVersionCellAuditSheet_(results);
+  // 第四十輪批次 F5：同時寫 Diagnostics 同 AuditLog（見上面的說明）。
+  const recorded = recordVersionCellAudit_(results, sheetName);
   const bad = results.filter(function (r) { return r.level === 'BAD'; });
   const warn = results.filter(function (r) { return r.level === 'WARN'; });
 
   const lines = [
     '已清點 ' + results.length + ' 個版本，報告寫在「' + sheetName + '」。',
     '',
-    '這個工具只看，沒有改動任何資料。'
+    '這個工具只看，沒有改動任何資料。',
+    '',
+    // ⚠️ 寫唔寫得入 Diagnostics 一定要講。第三十輪撞過同一件事：
+    // 對話框話「已寫入」，而嗰張表根本冇——真正原因喺 Logger，而 Ivan 讀唔到。
+    recorded.diagnosticsOk
+      ? '摘要已經寫入「Diagnostics」，逐版明細在「' + sheetName + '」。'
+      : ('⚠ 摘要寫不進「Diagnostics」（' + recorded.diagnosticsError
+        + '），但逐版明細已經寫在「' + sheetName + '」，而且 AuditLog 有紀錄。')
   ];
   // ⚠️ 沒有看完一定要講在最前面——一份少了幾季的報告，
   // 看起來跟一份完整的報告一模一樣。
