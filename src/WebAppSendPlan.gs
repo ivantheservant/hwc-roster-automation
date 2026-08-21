@@ -97,7 +97,7 @@ function buildSendRecipientSentence_(kind, buttons) {
     const n = (b.official && b.official.targetPersonCount) || 0;
     const noEmail = (b.official && b.official.noEmailCount) || 0;
     return '寄給這一季有服侍的 ' + n + ' 位，另外加堂委名單。'
-      + (noEmail > 0 ? '其中 ' + noEmail + ' 位查不到電郵，寄不到——他們要印紙本（第 6 步）。' : '');
+      + (noEmail > 0 ? '其中 ' + noEmail + ' 位查不到電郵，寄不到——他們要印紙本（第 5 步）。' : '');
   }
   if (kind === SEND_KIND.RESEND) {
     const n = (b.resend && b.resend.changedPersonCount) || 0;
@@ -220,7 +220,7 @@ function listSendCandidates_(quarterId, kind) {
       type: r.type,
       cellCount: assigned,
       // 查不到電郵的人照樣列出來，並且講明——他不是「不用服侍」，
-      // 是要印紙本（第 6 步）。
+      // 是要印紙本（第 5 步）。
       hasEmail: !!String(r.email || '').trim()
     };
   });
@@ -298,6 +298,14 @@ function apiGetSendPlanSummary(quarterId) {
 
     return {
       kind: kind,
+      // 第四十一輪批次 E 組：每個附件選項下面嗰行小字。
+      // ⚠️ 由後端出，同 attachTypeWantsPersonalLink_() 讀同一個判斷——
+      // 前端自己寫一套嘅話，畫面會講一件事而系統做另一件事。
+      attachOptionNotes: {
+        NONE: describeAttachOption_(ATTACH_TYPE.NONE),
+        PERSONAL_PDF: describeAttachOption_(ATTACH_TYPE.PERSONAL_PDF),
+        FULL_PDF: describeAttachOption_(ATTACH_TYPE.FULL_PDF)
+      },
       sendOptionDefaults: defaultDecision ? {
         recipientScope: defaultDecision.recipientScope,
         attachType: defaultDecision.attachType,

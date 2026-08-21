@@ -44,6 +44,72 @@ const ROOT = path.join(__dirname, '..');
 //  「還原之後仍然綠」被誤讀成「測試有問題」，浪費咗一整輪）。
 const MUTATIONS = [
   {
+    id: 'suggest-keyrow-scan',
+    why: '把建議表嘅機器鍵行還原成寫死第 2 行'
+      + '——建議表頂有一段圖例，寫死就會讀到一片空白，'
+      + '而幹事喺建議表上改嘅嘢會靜靜消失',
+    file: 'src/SuggestionSheet.gs',
+    find: '    if (hasKey) { keyRow = r; break; }',
+    replace: '    if (hasKey) { keyRow = 2; break; }',
+    tests: ['tests/suggestion_sheet.test.js']
+  },
+  {
+    id: 'suggest-blocks-unres',
+    why: '把「建議表遇到認唔出嘅名字」還原成照樣行落去'
+      + '——一個冇 PersonID 嘅名會經由建議表嗰條路溜入正式版本',
+    file: 'src/SuggestionSheet.gs',
+    find: '  if (analysis.unresolved.length > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/suggestion_sheet.test.js']
+  },
+  {
+    id: 'dropdown-auto-on-create',
+    why: '把 `createRosterSheet()` 收尾嗰個自動套用拆走'
+      + '——每一張新 grid 都冇咗名單選單，而幹事以為有（介面已經冇咗嗰一步）',
+    file: 'src/RosterWriter.gs',
+    find: '    dropdownResult = applyGridNameDropdowns_(quarterId, versionNo);',
+    replace: '    dropdownResult = null;',
+    tests: ['tests/main_flow_ui_shape.test.js']
+  },
+  {
+    id: 'dropdown-set-failed-loud',
+    why: '把「設唔到資料驗證」還原成靜靜拋出去'
+      + '——第三十九輪點名講過呢個情況從來冇喺現場驗過，'
+      + '而靜靜失敗嘅後果係「系統話加咗，開表卻冇」',
+    file: 'src/GridNameDropdown.gs',
+    find: "          reason: 'SET_FAILED', error: err.message",
+    replace: "          reason: 'NOT_AUTO'",
+    tests: ['tests/main_flow_ui_shape.test.js']
+  },
+  {
+    id: 'redirect-off-is-noop',
+    why: '把「冇設定轉寄地址」還原成照樣改收件人'
+      + '——正常運作嗰陣每一封信都會寄錯人',
+    file: 'src/MailRedirect.gs',
+    find: '  if (!target) {',
+    replace: '  if (false) {',
+    tests: ['tests/mail_redirect.test.js']
+  },
+  {
+    id: 'redirect-uses-new-to',
+    why: '把真正寄出還原成用返 `recipient.email`'
+      + '——整個轉寄機制冇生效，而畫面同 SendLog 都會話成功，'
+      + '即係 Ivan 以為安全咁測試緊，實際上信真係寄咗俾義工',
+    file: 'src/Mailer.gs',
+    find: '  MailApp.sendEmail(redirected.toEmail, redirected.subject, redirected.bodyPlain, options);',
+    replace: "  MailApp.sendEmail(recipient.email, redirected.subject, redirected.bodyPlain, options);",
+    tests: ['tests/mail_redirect.test.js']
+  },
+  {
+    id: 'redirect-bad-throws',
+    why: '把「轉寄地址填錯」還原成當成冇設定'
+      + '——喺應該轉寄嘅時候真係寄咗俾義工',
+    file: 'src/MailRedirect.gs',
+    find: '  if (!isPlausibleEmail_(value)) {',
+    replace: '  if (false) {',
+    tests: ['tests/mail_redirect.test.js']
+  },
+  {
     id: 'send-opts-default-same',
     why: '把寄出選項嘅預設收件範圍改成一律 ALL'
       + '——RESEND 本來係「只寄有改動嘅」，改咗之後幹事乜都唔揀撳落去，'
@@ -222,6 +288,216 @@ const MUTATIONS = [
   // 即係話呢兩條分支現時係**防守性寫法**，唔係現行行為。
   // 寫一個搆得到佢哋嘅 fixture ＝ 手砌一個真實碼唔會產生嘅狀態，
   // 正正就係 B 組禁止嘅嘢。所以呢度**唔註冊**，改為喺稽核文件記低。
+  {
+    id: 'paper-plain-highlight',
+    why: '把「不標示名字」嗰一份還原成行個人版嗰條路'
+      + '——一份「大家睇嘅表」會標住某一個人嘅名',
+    file: 'src/PaperPack.gs',
+    find: '  const built = buildFullRosterPdfBlob_(quarterId, versionNo);',
+    replace: '  const built = { fileName: \'x.pdf\', blob: null, highlight: 1 };',
+    tests: ['tests/paper_print_kinds.test.js']
+  },
+  {
+    id: 'paper-plain-folder',
+    why: '把「不標示名字」嗰一份還原成存去總資料夾'
+      + '——幹事撳「開啟資料夾」會喺嗰一版嘅子資料夾入面搵唔到自己啱啱做好嗰份',
+    file: 'src/PaperPack.gs',
+    find: '  const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);\n'
+      + '  const file = saveOrOverwriteFile_(folder, built.fileName, built.blob);',
+    replace: '  const folder = resolveRosterFolder_();\n'
+      + '  const file = saveOrOverwriteFile_(folder, built.fileName, built.blob);',
+    tests: ['tests/paper_print_kinds.test.js']
+  },
+  {
+    id: 'paper-full-draws-list',
+    why: '拆走「一份大家睇」嗰一種嘅提早 return'
+      + '——會畫返個名單出嚟，而嗰個名單喺嗰一種入面撳極都冇作用',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "    if (paperKind_ === 'FULL_ONE') {",
+    replace: "    if (paperKind_ === 'FULL_ONE' && false) {",
+    tests: ['tests/paper_print_kinds.test.js']
+  },
+  {
+    id: 'paper-kind-sticky',
+    why: '拆走「每次開彈窗重設返做預設」'
+      + '——幹事上次揀咗「不標示」，下次開會以為自己揀緊預設，然後印出一疊冇名嘅表',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "      paperKind_ = 'PERSONAL';\n      paperSelection_ = {};",
+    replace: '      paperSelection_ = {};',
+    tests: ['tests/paper_print_kinds.test.js']
+  },
+  {
+    id: 'paper-list-one-copy',
+    why: '把「不標示」嗰一種嘅份數還原成寫死 1'
+      + '——幹事揀咗 12 位，系統照樣叫佢印一張',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "        button('產生這一份', () => runPlainPaper(selectedPaperIds().length), ''),",
+    replace: "        button('產生這一份', () => runPlainPaper(1), ''),",
+    tests: ['tests/paper_print_kinds.test.js']
+  },
+  {
+    id: 'paper-pick-duplicated',
+    why: '把紙本嗰個名單還原成自己寫一份（唔用共用元件）'
+      + '——兩個名單會慢慢長得唔一樣，而幹事會覺得系統時好時壞',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '    pickListNodes({\n      items: items,\n      selected: paperSelection_,',
+    replace: '    pickListNodesPaperCopy_({\n      items: items,\n      selected: paperSelection_,',
+    tests: ['tests/main_flow_ui_shape.test.js']
+  },
+  {
+    id: 'elig-empty-is-all',
+    why: '把「一項都冇勾」還原成當成冇傳（`if (!selectedKeys)`）'
+      + '——幹事逐項揀走晒之後撳確定，會全部套用',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '  if (selectedKeys === null || selectedKeys === undefined) {',
+    replace: '  if (!selectedKeys) {',
+    tests: ['tests/eligibility_sheet_item_pick.test.js']
+  },
+  {
+    id: 'elig-write-uses-plan',
+    why: '把寫入還原成讀返未篩過嘅 `plan.added`'
+      + '——畫面會話「略過咗 2 項」而系統照樣寫入，'
+      + '即係呢個專案最常出現嗰類 bug：兩個來源，只更新咗一個',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '  pick.added.forEach(function (a) {',
+    replace: '  plan.added.forEach(function (a) {',
+    tests: ['tests/eligibility_sheet_item_pick.test.js']
+  },
+  {
+    id: 'elig-vanished-silent',
+    why: '把「勾咗但重算之後冇咗嘅項」還原成靜靜略過'
+      + '——幹事以為嗰幾項套用咗，實際上一格都冇動',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: "    vanished: Object.keys(want).filter(function (k) { return present[k] !== true; })",
+    replace: '    vanished: []',
+    tests: ['tests/eligibility_sheet_item_pick.test.js']
+  },
+  {
+    id: 'elig-add-duplicated',
+    why: '把第 3 步嗰粒〔這是新人，一併加入〕還原成自己另寫一份'
+      + '——兩邊嘅撞名提示同冇電郵提示會慢慢長得唔一樣',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: '              () => openAddUnresolvedPerson(u, openApplyEligibilitySheet), \'\')',
+    replace: '              () => openAddPersonForEligibility_(u), \'\')',
+    tests: ['tests/eligibility_sheet_item_pick.test.js']
+  },
+  {
+    id: 'elig-skip-sticky',
+    why: '拆走「每次重新讀清走上一次嘅勾選」'
+      + '——畫面上個勾係打咗開，而實際仲係略過緊嗰一項',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: '      eligSkip_ = {};\n      renderEligibilitySheetPlan(plan);',
+    replace: '      renderEligibilitySheetPlan(plan);',
+    tests: ['tests/eligibility_sheet_item_pick.test.js']
+  },
+  {
+    id: 'elig-dates-hidden',
+    why: '把「會移走」還原成淨係講一個數字，唔講邊幾個主日'
+      + '——一個幹事核對唔到嘅數字，同冇講差唔多',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '      assignedDates[key].push(toDateString(row[A.SERVICE_DATE], tz));',
+    replace: '      assignedDates[key].push(\'\');',
+    tests: ['tests/eligibility_sheet_item_pick.test.js']
+  },
+  {
+    id: 'pdf-cut-off-by-one',
+    why: '把「印到邊一行為止」還原成截喺標題嗰一行'
+      + '——會少印最後一個主日，而 PDF 上完全睇落正常',
+    file: 'src/PdfExport.gs',
+    find: '      cut = r - 1;',
+    replace: '      cut = r - 2;',
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  // ⚠️ 冇註冊「`if (cut <= 0) return 0;` 拆走」——試過，仍然綠燈。
+  // 查落去唔係測試假綠：嗰一句係一個提早出口（省返下面條 while），
+  // 而真正守住「搵唔到就唔截」嘅係最尾嗰句 `cut >= 3 ? cut : 0`。
+  // 兩句都拆先會出事，而咁樣嘅 mutation 唔係「還原成舊行為」。
+  // 所以改為註冊真正嗰一句 ↓
+  {
+    id: 'pdf-cut-floor',
+    why: '拆走「截到第 3 行以下就唔截」嗰個下限'
+      + '——一張一個主日都冇嘅表（圖例緊接住機器鍵行）會被截到淨返標題，'
+      + '出嚟係一份得標題冇內容嘅 PDF，而畫面會話匯出成功',
+    file: 'src/PdfExport.gs',
+    find: '  return cut >= 3 ? cut : 0;',
+    replace: '  return cut;',
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  {
+    id: 'pdf-zero-lastrow',
+    why: '拆走「lastRow 係 0 就唔截」——會傳 `r2=0` 落匯出網址，'
+      + '出嚟係一份完全空白嘅 PDF，而畫面會話匯出成功',
+    file: 'src/PdfExport.gs',
+    find: '  if (lastRow <= 0) return undefined;',
+    replace: '  if (lastRow < 0) return undefined;',
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  {
+    id: 'pdf-personal-not-cut',
+    why: '把個人版 PDF 還原成唔截'
+      + '——整季版冇圖例而個人版有，幹事會以為系統壞咗',
+    file: 'src/PdfExport.gs',
+    find: '    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName, ctx.rosterOnlyOpts);',
+    replace: '    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName);',
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  {
+    id: 'grid-width-week-wide',
+    why: '把「週次」欄還原成同人名欄一樣闊'
+      + '——`fitw=true` 會按同一個比例縮，結果人名嗰幾欄三個中文字都放唔落，'
+      + '而「週次」嗰欄仍然浪費緊位',
+    file: 'src/RosterWriter.gs',
+    find: 'const GRID_WIDTH_WEEK = 40;',
+    replace: 'const GRID_WIDTH_WEEK = 62;',
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  {
+    id: 'grid-width-zero-posts',
+    why: '拆走「一個崗位都冇就唔設欄寬」'
+      + '——`setColumnWidths(4, 0, ...)` 會拋錯，而嗰個會令整個建立版本失敗',
+    file: 'src/RosterWriter.gs',
+    find: '  const nameColumnCount = layout.keys.length - 3;\n  if (nameColumnCount > 0) {\n    sheet.setColumnWidths(4, nameColumnCount, GRID_WIDTH_NAME);\n  }',
+    replace: '  const nameColumnCount = layout.keys.length - 3;\n  sheet.setColumnWidths(4, nameColumnCount, GRID_WIDTH_NAME);',
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  {
+    id: 'wording-pick-back',
+    why: '把其中一句畫面文字嘅「選擇」改返做「揀」'
+      + '——畫面上一半寫「揀」一半寫「選擇」，幹事會以為係兩件唔同嘅事',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "['PICK', '自己選擇']",
+    replace: "['PICK', '自己揀']",
+    tests: ['tests/operator_wording.test.js']
+  },
+  {
+    id: 'wording-err-label',
+    why: '把三段式訊息第一段嘅顯示標籤改返做「發生了什麼」'
+      + '——好多時嗰一段講嘅係「呢一季仲未有公開連結」呢種前置條件未夠，'
+      + '根本冇嘢發生過，而幹事見到嗰四個字會以為系統壞咗',
+    file: 'src/ui/Script.html',
+    find: "  const ERR_LABEL_WHAT = '要留意';",
+    replace: "  const ERR_LABEL_WHAT = '發生了什麼';",
+    tests: ['tests/operator_wording.test.js']
+  },
+  {
+    id: 'wording-err-marker',
+    why: '把後端嘅機器標記一齊改埋'
+      + '——前端拆唔到三段，會退返去顯示原文，而三段式訊息係整套錯誤處理嘅基礎',
+    file: 'src/WebAppGuards.gs',
+    find: "  return '發生了什麼：' + whatHappened + '\\n'",
+    replace: "  return '要留意：' + whatHappened + '\\n'",
+    tests: ['tests/operator_wording.test.js']
+  },
+  {
+    id: 'wording-colloquial',
+    why: '把一句幹事會見到嘅字改返做口語'
+      + '——佢係一個唔熟電腦嘅使用者，畫面上一句口語會令佢覺得'
+      + '「呢個系統唔係做俾我用嘅」',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: "    dropdownNote = '名單已經套用好，但職事表上的下拉選單更新不到（'",
+    replace: "    dropdownNote = '名單已經套用好，但職事表上嘅下拉選單更新唔到（'",
+    tests: ['tests/operator_wording.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

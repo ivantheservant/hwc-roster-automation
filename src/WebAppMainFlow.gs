@@ -196,7 +196,12 @@ function apiGetMainFlowState(quarterId) {
         checkFailed: !!publicLink.checkFailed,
         explanation: buildPermanentLinkExplanation_()
       },
-      // 第 6 步要的人數，喺呢度一次過算好，唔使前端再叫多一次。
+      // 第四十一輪批次 B 組：而家有冇一張未處理嘅建議表。
+      //
+      // ⚠️ 有建議表而畫面唔講，幹事會喺正式表上改，然後發現改動唔見咗
+      // ——因為下一次「請系統幫我調整」會以建議表做起點。
+      suggestion: readSuggestionStateSafely_(quarterId),
+      // 第 5 步要的人數，喺呢度一次過算好，唔使前端再叫多一次。
       paperCount: countPeopleWithoutEmail_(quarterId)
     };
   } finally {
@@ -205,10 +210,27 @@ function apiGetMainFlowState(quarterId) {
 }
 
 /**
+ * 這一季有沒有一張未處理的建議表。**純讀取，而且不會拋錯。**
+ *
+ * ⚠️ 讀不到不可以令整個主流程畫不出來——那樣幹事會見到一版接近空白
+ * 的畫面而完全不知道發生什麼事。讀不到就當「沒有」，並且寫 log。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object} {hasSuggestion, sheetName, url}
+ */
+function readSuggestionStateSafely_(quarterId) {
+  try {
+    return apiGetSuggestionState(quarterId);
+  } catch (err) {
+    log_('WARN', 'readSuggestionStateSafely_：' + err.message);
+    return { hasSuggestion: false, sheetName: '', url: '' };
+  }
+}
+
+/**
  * 這一季有幾多位排了工、但 `NameMapping` 沒有電郵的人。**純讀取。**
  *
  * ⚠️ 「查不到電郵」不等於「這個人不用服侍」——他照樣要收到職事表，
- * 只是要印紙本。所以這個數字要在主流程第 6 步直接看得見，
+ * 只是要印紙本。所以這個數字要在主流程第 5 步直接看得見，
  * 而不是等寄完信之後才在報告裡面出現。
  * @param {string} quarterId 季度 ID
  * @returns {number} 人數；算不出時回 0（並寫 log，不拋錯）
@@ -227,7 +249,7 @@ function countPeopleWithoutEmail_(quarterId) {
 /**
  * 把這一版有派工的人分成兩批：沒有電郵的、有電郵的。**純讀取。**
  *
- * ⚠️ 這是第 6 步唯一的名單來源。
+ * ⚠️ 這是第 5 步唯一的名單來源。
  *
  * 第三十九輪原本寫成兩個函式（一個算人數、一個出名單），各自建一次
  * 名字對照表、各自寫一次「查不到名字」的處理。`tools/verify-red.js`
@@ -296,7 +318,7 @@ function listPeopleNeedingPaper_(quarterId, versionNo) {
 }
 
 /**
- * 供前端呼叫：第 6 步的名單。**純讀取。**
+ * 供前端呼叫：第 5 步的名單。**純讀取。**
  *
  * 回傳兩份：預設要印的（沒有電郵）、可以額外加入的（有電郵但可能也要紙本，
  * 例如同時想要紙本的長者）。

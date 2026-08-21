@@ -160,8 +160,8 @@ function reissuePersonalLinkToken_(personId) {
   // 應該用「補發個人專屬連結 token」畀全體，唔係喺呢度為一個人補建成欄。
   if (tokenCol === 0 || idCol === 0) {
     throw new Error('NameMapping 缺少 ' + C.PERSONAL_LINK_TOKEN + ' 或 ' + C.PERSON_ID
-      + ' 欄。如果係第一次使用個人專屬連結功能，請先執行「補發個人專屬連結 token」'
-      + '（會自動建立欄位並為全體補上 token），唔好用呢個工具開始。');
+      + ' 欄。如果是第一次使用個人專屬連結功能，請先執行「補發個人專屬連結 token」'
+      + '（會自動建立欄位並為全體補上 token），不要用這個工具開始。');
   }
 
   const lastRow = sheet.getLastRow();

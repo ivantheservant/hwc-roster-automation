@@ -502,7 +502,7 @@ function ruleReviewPlainEntry_(ruleId) {
   };
   table[RULE_IDS.LOAD_BALANCE] = {
     text: '最久沒有服侍的人優先',
-    what: '同樣合適的幾個人之中，系統會先揀最久沒有服侍那一位。',
+    what: '同樣合適的幾個人之中，系統會先選最久沒有服侍那一位。',
     current: onOff(''),
     choices: onOffChoices('有生效')
   };
@@ -580,16 +580,16 @@ function ruleReviewPlainEntry_(ruleId) {
     unit: 'PER_SUNDAY'
   };
   table[RULE_IDS.CHAIR_PREFER_DUAL] = {
-    text: '優先揀「主席和報告都做得到」的人',
+    text: '優先選「主席和報告都做得到」的人',
     // ⚠️ 第二十九輪批次階段 A4：呢一條個數字量嘅唔係「主日」，
     // 而係「**排主席嗰陣**，有幾多次揀咗一個兩邊都做得到嘅人」
     //（`computeChairPreferDualBonus_()` 嘅分母係 `dualAssigned + 1`）。
     // 每個主日排一次主席，所以數字上同主日數幾乎一樣，
     // 但一句唔講清楚，堂委會以為個數字係「有幾多個主日兼任咗」——
     // 而嗰個係上面另一條規則。
-    what: '排主席的時候，同樣合適的人之中先揀「主席和報告都做得到」那一位。'
+    what: '排主席的時候，同樣合適的人之中先選「主席和報告都做得到」那一位。'
       + '這樣上面那一條比較容易做到。'
-      + '下面的數字是「排主席的時候有多少次揀了兩邊都做得到的人」，'
+      + '下面的數字是「排主席的時候有多少次選了兩邊都做得到的人」，'
       + '不是「有多少個主日真的兼任了」。',
     unit: 'PER_SUNDAY'
   };
@@ -830,7 +830,7 @@ function buildRuleReviewImportPlan_(sheetValues, ruleRows, weeks, ctx) {
       // 硬規則／準硬規則：**只記錄，永不改動**。
       hardNotes.push({
         ruleId: m.ruleId, ruleText: ruleText, level: m.level,
-        decision: decision || '（沒有揀）', note: note
+        decision: decision || '（沒有選）', note: note
       });
       return;
     }
@@ -841,7 +841,7 @@ function buildRuleReviewImportPlan_(sheetValues, ruleRows, weeks, ctx) {
         seq: seq, ruleText: ruleText, decision: decision, note: note,
         reason: decision
           ? '看不懂這個決定（不是下拉裡面的選項），所以不會改動任何東西'
-          : '只填了備註，沒有揀決定'
+          : '只填了備註，沒有選決定'
       });
       return;
     }

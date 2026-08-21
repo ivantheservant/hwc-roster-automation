@@ -68,7 +68,7 @@ function apiGeneratePaperPack(quarterId, personIds) {
     .filter(function (x) { return x !== ''; });
   if (ids.length === 0) {
     throw new Error(buildThreePartMessage_(
-      '一位都沒有揀。',
+      '一位都沒有選。',
       '什麼都沒有產生。',
       ['在上面的名單勾選要印的人，再撳一次']));
   }
@@ -172,7 +172,7 @@ function apiEmailPaperPackToSelf(quarterId, personIds) {
     .filter(function (x) { return x !== ''; });
   if (ids.length === 0) {
     throw new Error(buildThreePartMessage_(
-      '一位都沒有揀。', '一封都沒有寄出。', ['在上面的名單勾選要印的人，再撳一次']));
+      '一位都沒有選。', '一封都沒有寄出。', ['在上面的名單勾選要印的人，再撳一次']));
   }
 
   const to = Session.getActiveUser().getEmail();
@@ -274,4 +274,84 @@ function extractDriveFileId_(url) {
     || /[?&]id=([A-Za-z0-9_-]+)/.exec(String(url || ''));
   if (!m) throw new Error('看不懂這一條 Drive 連結，抽不出檔案編號：' + url);
   return m[1];
+}
+
+/**
+ * 第四十一輪批次 G 組：**不標示名字的那一份紙本。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️ 先講一件必須誠實講的事
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 「個人版 PDF」實際上就是**整張職事表，加上那個人自己那幾格的底色**
+ *（見 `buildPersonalPdfBlob_()`：它複製整張 grid，只有 highlight 那一步
+ * 是逐人不同的）。所以一旦不標示名字，**每一個人那一份的內容會一模一樣**。
+ *
+ * 那麼「每人一份、不標示」同「一份大家看」在檔案層面是同一件事，
+ * 分別只在於**印幾多份**。
+ *
+ * 系統因此只做一個檔，然後告訴幹事要印幾多份。
+ * 為 12 個人做 12 個內容完全相同的 PDF，只會多花十幾分鐘、
+ * 撞爆 Apps Script 的六分鐘上限，而印出來一模一樣。
+ *
+ * ⚠️ 這一點會在畫面上直接寫出來，不是藏在這裡。
+ * 幹事撳之前就會見到「每一份都一樣，所以只做一個檔，你印 N 份」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 為什麼不是叫 `exportRosterPdf()`
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * `exportRosterPdf()` 存去 `ROSTER_DRIVE_FOLDER_ID` 那個總資料夾。
+ * 紙本這條路的其他檔全部在**那一版自己的子資料夾**裡面，
+ * 幹事撳「開啟資料夾」見到的是那一個。存去兩個不同地方的話，
+ * 他會在資料夾裡面找不到自己剛剛做好的那一份。
+ *
+ * blob 本身仍然是 `buildFullRosterPdfBlob_()` 做的——**沒有另寫一套匯出**。
+ * 那條路本來就完全沒有經過 highlight。
+ */
+
+/**
+ * 供前端呼叫：產生一份**沒有任何標示**的整季 PDF。
+ *
+ * ⚠️ **會寫入**（產生檔案去 Drive），前端要用 `callServerMutating()`。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number=} copies 幹事打算印幾多份（只影響回傳的提示文字，不影響檔案）
+ * @returns {Object} 檔名、連結、要印幾多份
+ */
+function apiGeneratePlainPaper(quarterId, copies) {
+  assertWebAppRequestAllowed_();
+
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) {
+    throw new Error(buildThreePartMessage_(
+      '這一季還沒有生成過任何版本。',
+      '什麼都沒有產生。',
+      ['先在第 1 步生成職事表']));
+  }
+
+  const built = buildFullRosterPdfBlob_(quarterId, versionNo);
+  const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);
+  const file = saveOrOverwriteFile_(folder, built.fileName, built.blob);
+
+  const wanted = Math.max(1, Math.floor(Number(copies) || 1));
+
+  writeAuditLog_({
+    action: 'PLAIN_PAPER_GENERATED',
+    targetSheet: buildRosterSheetName_(quarterId, versionNo),
+    targetCell: '',
+    oldValue: '',
+    newValue: '產生不標示名字的紙本（建議印 ' + wanted + ' 份）'
+  });
+
+  return {
+    versionNo: versionNo,
+    fileName: file.getName(),
+    fileUrl: file.getUrl(),
+    folderUrl: folder.getUrl(),
+    copies: wanted,
+    // ⚠️ 一定要講明「每一份都一樣」。不講的話，幹事會以為系統漏做了
+    // 其他人那幾份，然後再撳多幾次。
+    message: '這一份沒有任何標示，每一個人拿到的都一樣，所以只做一個檔。'
+  };
 }

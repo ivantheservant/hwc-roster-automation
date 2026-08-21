@@ -65,7 +65,7 @@
   var PENDING = [];
 
   function load() {
-    document.getElementById('quarterHint').textContent = '目前嘗試嘅季度：' + QUARTER_ID;
+    document.getElementById('quarterHint').textContent = '目前嘗試的季度：' + QUARTER_ID;
     document.getElementById('body').innerHTML = '載入中…';
     document.getElementById('bulkSaveBtn').style.display = 'none';
     document.getElementById('bulkStatus').textContent = '';
@@ -88,7 +88,7 @@
     PENDING = data.pending;
     // #quarterHint 已經顯示緊季度本身，呢度唔重複，淨係補充版本／Stage。
     document.getElementById('quarterHint').textContent =
-      '目前嘗試嘅季度：' + data.quarterId + '　v' + data.versionNo + '　Stage=' + data.stage;
+      '目前嘗試的季度：' + data.quarterId + '　v' + data.versionNo + '　Stage=' + data.stage;
     var html = '';
     if (data.officialSentHint) {
       html += '<div class="warn">這一季已經正式發出過。如果這裡填的內容是發出之後才確定的，'

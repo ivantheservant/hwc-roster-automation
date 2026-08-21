@@ -679,7 +679,7 @@
     const postSel = document.createElement('select');
     const allOpt = document.createElement('option');
     allOpt.value = '';
-    allOpt.textContent = '── 揀一個崗位 ──';
+    allOpt.textContent = '── 選一個崗位 ──';
     postSel.appendChild(allOpt);
     eligData.posts.forEach((p) => {
       const o = document.createElement('option');
@@ -719,7 +719,7 @@
 
     if (!eligPostFilter) {
       nodes.push(make('div', {
-        text: '揀一個崗位，就會列出全部人，逐個勾。',
+        text: '選一個崗位，就會列出全部人，逐個勾。',
         className: 'muted'
       }));
     } else {
@@ -936,7 +936,7 @@
     const postSel = document.createElement('select');
     const allOpt = document.createElement('option');
     allOpt.value = '';
-    allOpt.textContent = '── 揀一個崗位 ──';
+    allOpt.textContent = '── 選一個崗位 ──';
     postSel.appendChild(allOpt);
     weightData.posts.forEach((p) => {
       const o = document.createElement('option');
@@ -955,7 +955,7 @@
 
     if (!weightPostFilter) {
       nodes.push(make('div', {
-        text: '揀一個崗位，就會列出有資格做那個崗位的人。',
+        text: '選一個崗位，就會列出有資格做那個崗位的人。',
         className: 'muted'
       }));
     } else {
@@ -1043,7 +1043,7 @@
     ]));
     if (person.adjust !== 0) {
       box.appendChild(make('div', {
-        text: '目前生效中。揀「一般（預設）」就會解除（記錄會保留，不會刪走）。',
+        text: '目前生效中。選「一般（預設）」就會解除（記錄會保留，不會刪走）。',
         className: 'muted'
       }));
     }

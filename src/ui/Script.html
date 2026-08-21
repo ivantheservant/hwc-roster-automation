@@ -88,6 +88,10 @@
     // 第四十輪批次 A 組：「自己揀」嗰個名單。純讀取（只係讀 EmailRecipients
     // 同呢一版嘅派工，砌返該階段真正會收到信嘅人）。
     'apiGetSendCandidates',
+    // 第四十一輪批次 B 組：〔檢查我的改動〕係唯讀——佢乜都唔改，
+    // 呢一點喺畫面上都要講明（幹事撳完唔敢再撳第二次，驚改咗嘢）。
+    'apiCheckMyChanges',
+    'apiGetSuggestionState',
     'apiGetPaperListState',
     'apiPlanEligibilitySheetApply',
     'apiGetDashboardState',
@@ -363,6 +367,87 @@
     return node;
   }
 
+  /* ══════════════════════════════════════════════════════════════
+   * 共用：可搜尋嘅多選名單
+   * ══════════════════════════════════════════════════════════════
+   *
+   * 第四十一輪批次 E 組：Ivan 要求「寄給誰」揀「自己選擇」嗰陣，
+   * 展開一個**同紙本嗰個一模一樣**嘅名單，而且**用同一個共用元件**。
+   *
+   * ⚠️ 寫兩份嘅後果唔係「多咗幾行碼」——係兩個地方會慢慢長得唔一樣。
+   * 一邊加咗搜尋、另一邊冇；一邊顯示「這一季 N 格」、另一邊冇。
+   * 幹事會覺得系統時好時壞，而其實只係佢用緊兩個唔同嘅畫面。
+   *
+   * @param {Object} o {
+   *   items: [{key, label, note, warn}],   逐項要顯示咩
+   *   selected: {key: true},                而家揀咗邊啲（會被直接改動）
+   *   keyword: 搜尋字串,
+   *   onRedraw: (keyword) => void,          搜尋之後重畫
+   *   emptyText: 一個項目都冇嗰陣講咩
+   * }
+   * @returns {Node[]} 要塞入彈窗嘅節點
+   */
+  function pickListNodes(o) {
+    const nodes = [];
+    const k = String(o.keyword || '').trim();
+    const matched = k
+      ? o.items.filter((it) => String(it.label || '').indexOf(k) !== -1)
+      : o.items;
+
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.placeholder = '搜尋姓名⋯⋯';
+    search.value = k;
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); o.onRedraw(search.value); }
+    });
+    nodes.push(row([search, button('搜尋', () => o.onRedraw(search.value), 'secondary')]));
+
+    if (o.items.length === 0) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', { text: o.emptyText || '一個人都找不到。', className: 'lines' })
+      ]));
+      return nodes;
+    }
+    if (matched.length === 0) {
+      nodes.push(make('div', { text: '找不到符合的人。', className: 'muted' }));
+      return nodes;
+    }
+
+    const box = make('div', { className: 'sec' });
+    matched.forEach((it) => {
+      const line = make('label', { className: 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = o.selected[it.key] === true;
+      cb.addEventListener('change', () => {
+        o.selected[it.key] = cb.checked;
+        if (o.onToggle) o.onToggle();
+      });
+      line.appendChild(cb);
+      line.appendChild(make('span', {
+        text: it.label + (it.note ? ('　' + it.note) : '') + (it.warn ? ('　' + it.warn) : '')
+      }));
+      box.appendChild(line);
+    });
+    nodes.push(box);
+    return nodes;
+  }
+
+  /** 全選／全不選那兩粒掣。兩個名單都要有——五十幾個人逐個撳唔現實。 */
+  function pickListBulkButtons(items, selected, onRedraw) {
+    return [
+      button('全部選擇', () => {
+        items.forEach((it) => { selected[it.key] = true; });
+        onRedraw();
+      }, 'secondary'),
+      button('全部不選', () => {
+        items.forEach((it) => { selected[it.key] = false; });
+        onRedraw();
+      }, 'secondary')
+    ];
+  }
+
   // ── 彈窗（規格 1.4）────────────────────────────────────────
 
   let modalOpen = false;
@@ -470,7 +555,7 @@
     const parsed = parseThreePartMessage(raw);
 
     if (parsed) {
-      nodes.push(errorPart('發生了什麼', parsed.what));
+      nodes.push(errorPart(ERR_LABEL_WHAT, parsed.what));
       nodes.push(errorPart('現在的情況', parsed.state));
       const doBox = make('div', { className: 'err-part' });
       doBox.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
@@ -480,7 +565,7 @@
       nodes.push(doBox);
     } else {
       // 拆唔到三段：唔好扮到有三段。誠實顯示原文，但仍然俾一條出路。
-      nodes.push(errorPart('發生了什麼', raw));
+      nodes.push(errorPart(ERR_LABEL_WHAT, raw));
       nodes.push(errorPart('現在的情況',
         '這個動作沒有完成。系統沒有寄出任何電郵。'
         + '職事表有沒有被改動，要看下面的技術詳情或者去「檢查各版本派工紀錄」核對。'));
@@ -496,6 +581,22 @@
     nodes.push(buildTechDetails(raw));
     openModal(title, nodes, [button('知道了', () => closeModal(), '')]);
   }
+
+  /**
+   * 三段式訊息第一段嘅**顯示標籤**。
+   *
+   * ⚠️ 第四十一輪批次 I 組：本來寫「發生了什麼」。Ivan 實測講明
+   * 「讀起嚟好似報告一件已經發生咗嘅事」——而好多時嗰一段講嘅係
+   * 「呢一季仲未有公開連結」呢種**前置條件未夠**，根本冇嘢發生過。
+   * 佢見到嗰四個字會即刻以為系統壞咗。
+   *
+   * ⚠️ 後端傳過嚟嗰個分隔標記**仍然係**「發生了什麼：」
+   *（見 `buildThreePartMessage_()`）。嗰個係機器格式，唔係俾人睇嘅字：
+   * 改咗佢就要同時改晒所有已經拋緊三段式訊息嘅地方，
+   * 而漏一個就會變成「拆唔到三段」，畫面會退返去顯示原文。
+   * 顯示標籤同機器標記分開，改字先至安全。
+   */
+  const ERR_LABEL_WHAT = '要留意';
 
   function errorPart(label, text) {
     return make('div', { className: 'err-part' }, [
@@ -761,6 +862,15 @@
     badge.hidden = !d.isDryRun;
     badge.textContent = '測試模式：不會真的寄出任何電郵';
     badge.className = 'badge badge-dryrun';
+    // 第四十一輪批次 H 組：轉寄測試地址。同「測試模式」嗰個並排。
+    //
+    // ⚠️ 兩個係獨立嘅：DRY_RUN=TRUE 淨係模擬；轉寄地址有值就算 DRY_RUN=FALSE
+    // 都會真係寄，只係全部寄去同一個地址。兩者可以同時出現。
+    const redirect = el('mailRedirectBadge');
+    const redirectText = String(d.mailRedirectBadge || '');
+    redirect.hidden = redirectText === '';
+    redirect.textContent = redirectText;
+    redirect.className = 'badge badge-dryrun';
   }
 
   // ── 收摺區 ───────────────────────────────────────────────────

@@ -72,7 +72,9 @@ const gas = loadGasSource([
   'Mailer.gs', 'ResendFlow.gs',
   // 第四十輪批次 A 組：寄出嘅三個選項喺呢度解析（resolveSendOptions_()）。
   // 唔載入就會 `resolveSendOptions_ is not defined`——而嗰個錯**唔係**測試想證嘅嘢。
-  'SendOptions.gs', 'Trigger.gs',
+  'SendOptions.gs',
+  // 第四十一輪批次 E 組：個人專屬連結（buildMailContext_ 會叫 indexPersonalLinkTokens_）。
+  'PersonalLinkInMail.gs', 'Trigger.gs',
   'WebAppGuards.gs', 'WebAppDashboard.gs',
   'FiveStageCore.gs', 'WebAppFlow.gs'
 ]);

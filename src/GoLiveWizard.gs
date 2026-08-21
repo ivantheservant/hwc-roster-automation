@@ -57,18 +57,18 @@ function assessGoLiveState_() {
   let description;
   if (dryRunOff && prefixCleared) {
     phase = 'LIVE';
-    description = '已完全上線：會真正寄出電郵，主旨冇測試前綴。';
+    description = '已完全上線：會真正寄出電郵，主旨沒有測試前綴。';
   } else if (!dryRunOff && !prefixCleared) {
     phase = 'TEST';
-    description = '測試模式：唔會真正寄出電郵，主旨有前綴「' + subjectPrefix + '」。';
+    description = '測試模式：不會真正寄出電郵，主旨有前綴「' + subjectPrefix + '」。';
   } else if (dryRunOff && !prefixCleared) {
     phase = 'HALF_LIVE_WITH_PREFIX';
-    description = '⚠️ 改咗一半：已經會「真正寄出」電郵，但主旨仍然有測試前綴「'
+    description = '⚠️ 改了一半：已經會「真正寄出」電郵，但主旨仍然有測試前綴「'
       + subjectPrefix + '」——收件人會收到真信，但標題掛住測試字樣。';
   } else {
     phase = 'HALF_PREFIX_CLEARED';
-    description = '改咗一半：主旨前綴已清空，但仍然係測試模式（唔會真正寄出）。'
-      + '呢個狀態係安全嘅，繼續行落去或者停喺度都得。';
+    description = '改了一半：主旨前綴已清空，但仍然是測試模式（不會真正寄出）。'
+      + '這個狀態是安全的，繼續做下去或者停在這裡都可以。';
   }
 
   return {
@@ -97,7 +97,7 @@ function assessGoLiveState_() {
  */
 function setConfigValue_(key, value, source) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
-  if (!sheet) throw new Error('搵唔到工作表: ' + SHEETS.CONFIG);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.CONFIG);
 
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
@@ -109,7 +109,7 @@ function setConfigValue_(key, value, source) {
   const updatedAtCol = headers.indexOf(C.UPDATED_AT) + 1;
   const updatedByCol = headers.indexOf(C.UPDATED_BY) + 1;
   if (keyCol === 0 || valueCol === 0) {
-    throw new Error('Config 工作表搵唔到 ' + C.KEY + ' 或 ' + C.VALUE + ' 欄，無法安全改值。');
+    throw new Error('Config 工作表找不到 ' + C.KEY + ' 或 ' + C.VALUE + ' 欄，無法安全改值。');
   }
 
   const keys = lastRow >= 3 ? sheet.getRange(3, keyCol, lastRow - 2, 1).getValues() : [];
@@ -118,8 +118,8 @@ function setConfigValue_(key, value, source) {
     if (String(keys[i][0] || '').trim() === key) { targetRow = i + 3; break; }
   }
   if (targetRow === -1) {
-    throw new Error('Config 工作表冇 ' + key + ' 呢一行。'
-      + '請先執行「維護 ▸ 補建 Config 參數」，上線切換唔會自動新增設定行。');
+    throw new Error('Config 工作表沒有 ' + key + ' 呢一行。'
+      + '請先執行「維護 ▸ 補建 Config 參數」，上線切換不會自動新增設定行。');
   }
 
   const oldValue = String(sheet.getRange(targetRow, valueCol).getValue() || '');
@@ -174,7 +174,7 @@ function runGoLiveWizard_() {
   const before = assessGoLiveState_();
   if (before.phase === 'LIVE') {
     ui.alert(title,
-      '系統已經完全上線，唔需要再切換。\n\n' + before.description
+      '系統已經完全上線，不需要再切換。\n\n' + before.description
         + '\n\n如果想切返測試模式，請用「⚠️ 回退到測試模式」。',
       ui.ButtonSet.OK);
     return;
@@ -190,10 +190,10 @@ function runGoLiveWizard_() {
     '',
     '⚠️ 第 2 段完成之後，系統就會真正寄出電郵給義工。',
     '',
-    '開始之前會先跑一次全面體檢；如果有「必須處理」嘅項目，會拒絕繼續。',
+    '開始之前會先跑一次全面體檢；如果有「必須處理」的項目，會拒絕繼續。',
     '',
-    '中途隨時可以撳取消——已經完成嘅段落會保持完成，',
-    '再入返嚟嗰陣會顯示而家做到邊一段，可以接住做落去。',
+    '中途隨時可以撳取消——已經完成的段落會保持完成，',
+    '下次再進來的時候會顯示現在做到哪一段，可以接住做下去。',
     '',
     '要開始嗎？'
   ].join('\n');
@@ -201,7 +201,7 @@ function runGoLiveWizard_() {
 
   // ---- 第 1 段之前：全面體檢把關 ----
   const quarterResponse = ui.prompt(title,
-    '體檢要檢查邊一個季度？輸入 QuarterID（留空 = 只做唔需要季度嘅檢查）：',
+    '體檢要檢查哪一個季度？輸入 QuarterID（留空 = 只做不需要季度的檢查）：',
     ui.ButtonSet.OK_CANCEL);
   if (quarterResponse.getSelectedButton() !== ui.Button.OK) return;
   const quarterId = normalizeIdInput_(quarterResponse.getResponseText());
@@ -211,12 +211,12 @@ function runGoLiveWizard_() {
     readiness = checkGoLiveReadiness_(quarterId);
   } catch (err) {
     log_('ERROR', 'runGoLiveWizard_ 體檢失敗: ' + err.message);
-    ui.alert(title, '全面體檢執行失敗，為安全起見唔會繼續：\n\n' + err.message, ui.ButtonSet.OK);
+    ui.alert(title, '全面體檢執行失敗，為安全起見不會繼續：\n\n' + err.message, ui.ButtonSet.OK);
     return;
   }
 
   if (!readiness.ok) {
-    const lines = ['全面體檢搵到 ' + readiness.mustCount + ' 項「必須處理」，唔會繼續上線切換。', ''];
+    const lines = ['全面體檢搵到 ' + readiness.mustCount + ' 項「必須處理」，不會繼續上線切換。', ''];
     readiness.mustItems.slice(0, 10).forEach(function (item) {
       lines.push('🔴 ' + item.section + '：' + item.label);
       lines.push('　　' + item.summary);
@@ -225,7 +225,7 @@ function runGoLiveWizard_() {
       lines.push('　……另有 ' + (readiness.mustItems.length - 10) + ' 項');
     }
     lines.push('', '請先處理以上項目，再重新執行呢個嚮導。');
-    lines.push('（可以用「維護 ▸ 🩺 全面體檢（唯讀）」睇完整報告）');
+    lines.push('（可以用「維護 ▸ 🩺 全面體檢（唯讀）」看完整報告）');
     ui.alert(title, lines.join('\n'), ui.ButtonSet.OK);
     return;
   }
@@ -241,13 +241,13 @@ function runGoLiveWizard_() {
       '　現在：「' + before.subjectPrefix + '」',
       '　改成：（空白）',
       '',
-      '影響：之後寄出嘅電郵主旨唔會再有測試字樣。',
-      '呢一段本身唔會令系統寄出任何信（' + CONFIG_KEYS.DRY_RUN + ' 仍然係 TRUE）。',
+      '影響：之後寄出的電郵主旨不會再有測試字樣。',
+      '這一段本身不會令系統寄出任何信（' + CONFIG_KEYS.DRY_RUN + ' 仍然係 TRUE）。',
       '',
       '確定改嗎？'
     ].join('\n');
     if (ui.alert(title, seg1, ui.ButtonSet.YES_NO) !== ui.Button.YES) {
-      ui.alert(title, '已取消，冇改動任何嘢。目前狀態不變：\n\n' + before.description, ui.ButtonSet.OK);
+      ui.alert(title, '已取消，沒有改動任何東西。目前狀態不變：\n\n' + before.description, ui.ButtonSet.OK);
       return;
     }
     try {
@@ -255,11 +255,11 @@ function runGoLiveWizard_() {
       completed.push('第 1 段：' + CONFIG_KEYS.MAIL_SUBJECT_PREFIX + '「' + r.oldValue + '」→（空白）');
     } catch (err) {
       log_('ERROR', 'runGoLiveWizard_ 第 1 段失敗: ' + err.message);
-      ui.alert(title, '第 1 段失敗，冇改動任何嘢：\n\n' + err.message, ui.ButtonSet.OK);
+      ui.alert(title, '第 1 段失敗，沒有改動任何東西：\n\n' + err.message, ui.ButtonSet.OK);
       return;
     }
   } else {
-    completed.push('第 1 段：主旨前綴本來已經係空白，唔使改');
+    completed.push('第 1 段：主旨前綴本來已經是空白，不用改');
   }
 
   // ---- 第 2 段：DRY_RUN → FALSE（打字確認）----
@@ -279,10 +279,10 @@ function runGoLiveWizard_() {
     || confirmResponse.getResponseText().trim() !== GO_LIVE_CONFIRM_TEXT) {
     const mid = assessGoLiveState_();
     ui.alert(title,
-      '已取消，' + CONFIG_KEYS.DRY_RUN + ' 維持 TRUE（唔會寄出任何信）。\n\n'
+      '已取消，' + CONFIG_KEYS.DRY_RUN + ' 維持 TRUE（不會寄出任何信）。\n\n'
         + '已完成：\n　' + completed.join('\n　')
         + '\n\n目前狀態：' + mid.description
-        + '\n\n想繼續嘅話，隨時再執行一次呢個嚮導，佢會由未完成嗰一段接住做。',
+        + '\n\n想繼續的話，隨時再執行一次這個嚮導，它會由未完成那一段接住做。',
       ui.ButtonSet.OK);
     return;
   }
@@ -307,9 +307,9 @@ function runGoLiveWizard_() {
   try {
     const post = checkGoLiveReadiness_(quarterId);
     postCheckText = post.ok
-      ? '✅ 完成後體檢：冇「必須處理」項目（建議處理 ' + post.shouldCount + ' 項）'
+      ? '✅ 完成後體檢：沒有「必須處理」項目（建議處理 ' + post.shouldCount + ' 項）'
       : '⚠️ 完成後體檢：出現 ' + post.mustCount + ' 項「必須處理」，請即刻用'
-        + '「維護 ▸ 🩺 全面體檢（唯讀）」睇詳情';
+        + '「維護 ▸ 🩺 全面體檢（唯讀）」看詳情';
   } catch (err) {
     postCheckText = '⚠️ 完成後體檢執行失敗：' + err.message;
   }
@@ -352,7 +352,7 @@ function runGoLiveRollback_() {
   const before = assessGoLiveState_();
   if (before.phase === 'TEST') {
     ui.alert(title,
-      '系統已經係測試模式，唔需要回退。\n\n' + before.description, ui.ButtonSet.OK);
+      '系統已經是測試模式，不需要回退。\n\n' + before.description, ui.ButtonSet.OK);
     return;
   }
 
@@ -363,9 +363,9 @@ function runGoLiveRollback_() {
     '　第 1 段：' + CONFIG_KEYS.DRY_RUN + ' 改為 TRUE（即刻停止真正寄信）',
     '　第 2 段：' + CONFIG_KEYS.MAIL_SUBJECT_PREFIX + ' 放返測試前綴',
     '',
-    '次序同上線相反係刻意嘅：先止血，之後先還原前綴。',
+    '次序跟上線相反是刻意的：先止血，之後才還原前綴。',
     '',
-    '要放返嘅前綴（留空 = 用預設「' + GO_LIVE_TEST_SUBJECT_PREFIX + '」）：'
+    '要放回的前綴（留空 = 用預設「' + GO_LIVE_TEST_SUBJECT_PREFIX + '」）：'
   ].join('\n'), ui.ButtonSet.OK_CANCEL);
   if (prefixResponse.getSelectedButton() !== ui.Button.OK) return;
   const prefixText = prefixResponse.getResponseText();
@@ -377,14 +377,14 @@ function runGoLiveRollback_() {
     '　' + CONFIG_KEYS.DRY_RUN + '：' + (before.dryRun ? 'TRUE' : 'FALSE') + ' → TRUE',
     '　' + CONFIG_KEYS.MAIL_SUBJECT_PREFIX + '：「' + before.subjectPrefix + '」→「' + newPrefix + '」',
     '',
-    '回退之後系統唔會再寄出任何真實電郵。',
-    '（已經寄出咗嘅信收唔返，呢個掣只係阻止之後再寄。）',
+    '回退之後系統不會再寄出任何真實電郵。',
+    '（已經寄出的信收不回來，這一粒掣只是阻止之後再寄。）',
     '',
     '請逐字輸入：' + GO_LIVE_ROLLBACK_CONFIRM_TEXT
   ].join('\n'), ui.ButtonSet.OK_CANCEL);
   if (confirmResponse.getSelectedButton() !== ui.Button.OK
     || confirmResponse.getResponseText().trim() !== GO_LIVE_ROLLBACK_CONFIRM_TEXT) {
-    ui.alert(title, '已取消，冇改動任何嘢。目前狀態不變：\n\n' + before.description, ui.ButtonSet.OK);
+    ui.alert(title, '已取消，沒有改動任何東西。目前狀態不變：\n\n' + before.description, ui.ButtonSet.OK);
     return;
   }
 
@@ -411,9 +411,9 @@ function runGoLiveRollback_() {
     log_('ERROR', 'runGoLiveRollback_ 第 2 段失敗: ' + err.message);
     const mid = assessGoLiveState_();
     ui.alert(title,
-      '第 1 段已成功（已經停止寄信，最重要嗰步做咗），但第 2 段失敗：\n\n' + err.message
+      '第 1 段已成功（已經停止寄信，最重要那一步做好了），但第 2 段失敗：\n\n' + err.message
         + '\n\n目前狀態：' + mid.description
-        + '\n\n主旨前綴可以遲啲再改，唔急——系統而家已經唔會寄出任何真實電郵。',
+        + '\n\n主旨前綴可以遲一點再改，不急——系統現在已經不會寄出任何真實電郵。',
       ui.ButtonSet.OK);
     return;
   }
@@ -436,7 +436,7 @@ function runGoLiveRollback_() {
     '',
     '目前狀態：' + after.description,
     '',
-    '之後任何寄送操作都只會寫 SendLog（Status=DRY_RUN），唔會真正寄出。'
+    '之後任何寄送操作都只會寫 SendLog（Status=DRY_RUN），不會真正寄出。'
   ].join('\n'), ui.ButtonSet.OK);
 }
 
@@ -452,7 +452,7 @@ function runGoLiveStatus_() {
   const lines = [
     '目前狀態：' + state.description,
     '',
-    CONFIG_KEYS.DRY_RUN + '　＝　' + (state.dryRun ? 'TRUE（唔會真正寄出）' : 'FALSE（會真正寄出）'),
+    CONFIG_KEYS.DRY_RUN + '　＝　' + (state.dryRun ? 'TRUE（不會真正寄出）' : 'FALSE（會真正寄出）'),
     CONFIG_KEYS.MAIL_SUBJECT_PREFIX + '　＝　'
       + (state.subjectPrefix === '' ? '（空白）' : '「' + state.subjectPrefix + '」'),
     ''
@@ -461,20 +461,20 @@ function runGoLiveStatus_() {
   if (state.phase === 'TEST') {
     lines.push('下一步：想上線就用「⚠️⚠️ 上線切換嚮導」。');
   } else if (state.phase === 'LIVE') {
-    lines.push('下一步：已經完全上線，唔使做嘢。發現問題要止血就用「⚠️ 回退到測試模式」。');
+    lines.push('下一步：已經完全上線，不用做任何事。發現問題要止血就用「⚠️ 回退到測試模式」。');
   } else if (state.phase === 'HALF_PREFIX_CLEARED') {
-    lines.push('下一步：主旨前綴已清空，仲差最後一步（' + CONFIG_KEYS.DRY_RUN + ' → FALSE）。');
-    lines.push('再執行一次「⚠️⚠️ 上線切換嚮導」就會由呢一段接住做。');
-    lines.push('停喺呢個狀態係安全嘅——系統仍然唔會寄出任何真實電郵。');
+    lines.push('下一步：主旨前綴已清空，還差最後一步（' + CONFIG_KEYS.DRY_RUN + ' → FALSE）。');
+    lines.push('再執行一次「⚠️⚠️ 上線切換嚮導」就會由這一段接住做。');
+    lines.push('停在這個狀態是安全的——系統仍然不會寄出任何真實電郵。');
   } else {
-    lines.push('⚠️ 下一步：而家已經會真正寄信，但主旨仲掛住測試前綴。');
-    lines.push('收件人會收到真信、標題卻寫住測試字樣，應該盡快處理：');
+    lines.push('⚠️ 下一步：現在已經會真正寄信，但主旨仍然掛著測試前綴。');
+    lines.push('收件人會收到真信，標題卻寫著測試字樣，應該盡快處理：');
     lines.push('　• 想繼續上線 → 執行「⚠️⚠️ 上線切換嚮導」清空前綴；');
-    lines.push('　• 想返去測試 → 執行「⚠️ 回退到測試模式」。');
+    lines.push('　• 想回去測試 → 執行「⚠️ 回退到測試模式」。');
   }
 
   lines.push('');
-  lines.push('（呢個檢視完全唯讀，唔會改動任何設定。）');
+  lines.push('（這個檢視完全唯讀，不會改動任何設定。）');
 
   ui.alert('上線狀態（唯讀）', lines.join('\n'), ui.ButtonSet.OK);
 }

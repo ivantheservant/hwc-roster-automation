@@ -48,6 +48,33 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   sheet.setFrozenRows(2);
   sheet.setFrozenColumns(1);
   sheet.autoResizeColumns(1, layout.keys.length);
+  applyGridColumnWidthsForA4_(sheet, layout);
+
+  // ⚠️ 第四十一輪批次 A 組：**每一張新的 grid 都自動有名單下拉選單。**
+  //
+  // 原本這是主流程第 3 步，要幹事自己撳一粒掣。Ivan 實測之後講明：
+  // 「我想『生成』自動做這一步。每一個編輯過的版本都應該有這個下拉選單。」
+  //
+  // 掛在這裡（而不是在五條建立版本的路各自加一次）是刻意的：
+  // 這個函式是那五條路唯一的匯合點——生成初稿、套用申報、
+  // 人手改動、套用微調決定、回到上一個版本，五條都經過這裡。
+  // 掛在這裡，之後任何一條新加的路都自動有，不用記得。
+  // 逐條路各加一次，就一定會有一條忘記——那是本專案反覆出事的形狀。
+  //
+  // ⚠️ 失敗不可以令整個建立版本失敗。選單是輔助，職事表本身才是主體。
+  // 但也不可以靜靜失敗——幹事會以為有選單，開了表卻沒有，
+  // 然後以為是自己看錯。所以失敗要寫 log，而且交給呼叫端。
+  let dropdownResult = null;
+  try {
+    dropdownResult = applyGridNameDropdowns_(quarterId, versionNo);
+  } catch (err) {
+    log_('WARN', 'createRosterSheet：名單下拉選單套用不到（職事表本身已經建立好）：'
+      + err.message);
+    dropdownResult = { failed: true, error: err.message, columns: [], skipped: [] };
+  }
+  // 呼叫端要拿得到就讀這一個。回傳值維持是工作表名稱——
+  // 改回傳形狀會影響五條路，不值得。
+  createRosterSheet.lastDropdownResult = dropdownResult;
 
   return sheetName;
 }
@@ -919,8 +946,8 @@ function buildQuarterNotFoundMessage_(quarterId) {
   const knownText = known.length > 0
     ? '目前已生成過版本的季度：' + known.slice(0, 15).join('、')
       + (known.length > 15 ? '……等共 ' + known.length + ' 個' : '') + '。'
-      + '如果你輸入嘅同呢個清單入面睇落一樣但揀唔到，可能係全形字元或者複製貼上帶咗隱形字元，請重新逐個字打一次。'
-    : '目前 RosterVersions 完全冇任何已生成嘅版本紀錄。';
+      + '如果你輸入的跟這個清單看起來一樣但仍然找不到，可能是全形字元，或者複製貼上帶了看不見的字元。請重新逐個字打一次。'
+    : '目前 RosterVersions 完全沒有任何已生成的版本紀錄。';
   return '找不到 "' + quarterId + '" 已生成的版本，請先執行「步驟 1：生成初稿」。' + knownText;
 }
 
@@ -1083,4 +1110,76 @@ function buildGridRenderContext_(quarterId, timezone, posts) {
     autoGenerateByPostId: autoGenerateByPostId,
     externalOwnerByDate: buildSpecialSundayExternalOwnerIndex_(quarterId, timezone)
   };
+}
+
+/**
+ * 第四十一輪批次 F 組：**欄寬配合 A4 橫向印得出。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * Ivan 實測見到的問題
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 「欄位收縮了、撐不夠闊。」
+ *
+ * 成因是匯出用 `fitw=true`（縮到頁寬）：整張表有二十幾欄，Google 為了
+ * 塞落一版 A4，會把每一欄按比例縮細。而 `autoResizeColumns()` 之後，
+ * 「週次」那一欄（只有一個數字）同「聖餐襄禮1」那一欄（五個字）
+ * 寬度差好遠——縮的時候**兩欄按同一個比例縮**，
+ * 結果人名那幾欄縮到三個中文字都放不下，而「週次」那一欄仍然浪費著位。
+ *
+ * 所以要做的不是「加闊」，是**把省得到的位讓給人名那幾欄**：
+ *   日期　　剛好放得下 `2027-01-03`
+ *   週次　　最窄（只有一個數字）
+ *   類型　　窄（「主日崇拜」四個字，太長的會折行）
+ *   人名　　夠放三個中文字（教會的中文名絕大部分是二至三個字）
+ *
+ * ⚠️ 用 `setColumnWidth()` 而不是留給 `autoResizeColumns()`：
+ * autoResize 是按**內容**決定的，所以同一個崗位欄會因為那一季剛好排到
+ * 一個四個字的名而變闊，下一季又變窄——即是同一份表每季印出來都不同樣。
+ *
+ * ⚠️ 這個函式**只設欄寬**，一格資料都不碰。
+ * 失敗（例如工作表被保護）不可以令建立版本失敗——見呼叫端的 try/catch。
+ */
+
+/** 日期欄：剛好放得下 `2027-01-03`。 */
+const GRID_WIDTH_DATE = 82;
+
+/** 週次欄：最窄。只有一個一至兩位數。 */
+const GRID_WIDTH_WEEK = 40;
+
+/** 類型欄：窄。「主日崇拜」四個字，更長的靠自動換行折下去。 */
+const GRID_WIDTH_TYPE = 74;
+
+/**
+ * 人名欄：夠放三個中文字。
+ *
+ * 教會的中文名絕大部分是二至三個字；四個字的會折行，
+ * 而折行比縮到看不清楚好——起碼讀得出。
+ */
+const GRID_WIDTH_NAME = 62;
+
+/**
+ * 把 grid 的欄寬設成配合 A4 橫向。
+ *
+ * @param {Sheet} sheet grid 工作表
+ * @param {Object} layout `buildGridLayout_()` 的結果
+ */
+function applyGridColumnWidthsForA4_(sheet, layout) {
+  sheet.setColumnWidth(1, GRID_WIDTH_DATE);
+  sheet.setColumnWidth(2, GRID_WIDTH_WEEK);
+  sheet.setColumnWidth(3, GRID_WIDTH_TYPE);
+
+  // ⚠️ 第 4 欄起才是崗位。前三欄是日期／週次／類型——這個假設
+  // 在 `buildGridLayout_()`、`buildGridIndex_()` 幾處都有，
+  // 不是這裡自己定的。
+  const nameColumnCount = layout.keys.length - 3;
+  if (nameColumnCount > 0) {
+    sheet.setColumnWidths(4, nameColumnCount, GRID_WIDTH_NAME);
+  }
+
+  // 人名欄設定自動換行：四個字的名會折成兩行，而不是被隔壁欄蓋住。
+  // ⚠️ 蓋住是最差的一種——印出來看起來像那一格是空的。
+  if (nameColumnCount > 0 && layout.rows.length > 0) {
+    sheet.getRange(3, 4, layout.rows.length, nameColumnCount).setWrap(true);
+  }
 }

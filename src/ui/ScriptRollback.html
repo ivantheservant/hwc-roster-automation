@@ -65,7 +65,7 @@
     if (defaultTarget) select.value = String(defaultTarget.versionNo);
 
     openModal('回到上一個版本', [
-      para('揀一個版本，系統會先給你看預覽，確認之後才寫入。'),
+      para('選一個版本，系統會先給你看預覽，確認之後才寫入。'),
       make('div', { className: 'prop-head' }, [make('span', { text: '回到' }), select]),
       buildSheetsHistoryWarning('')
     ], [

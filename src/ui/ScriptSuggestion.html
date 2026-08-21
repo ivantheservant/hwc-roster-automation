@@ -1,0 +1,268 @@
+<script>
+  /* ============================================================
+   * 第四十一輪批次 B 組：〔檢查我的改動〕＋〔請系統幫我調整〕
+   * ============================================================
+   *
+   * Ivan 講嘅缺口：
+   *   「我改完之後，需要檢查我嘅改動有冇違反好重要嘅規則（一粒檢查掣），
+   *     同埋一粒掣俾系統調整成張表。幹事可以喺一張新嘅工作表睇系統建議
+   *     嘅版本，再撳一粒掣接受。亦都可以直接喺嗰張建議版本上再改，
+   *     然後再撳『調整』，重複到滿意為止。」
+   *
+   * ⚠️ 呢個唔係由零做。系統本來就有 `FineTune.gs` 嗰條路
+   *（`proposeMinimalFix()` 最小改動修復）。呢一組係**把佢接上主流程**。
+   *
+   * ⚠️ 載入次序：要排喺 `ScriptZone1` 之後——會叫 `openSaveAndConfirm()`。
+   */
+
+  /* ── 一、〔檢查我的改動〕：唯讀 ──────────────────────────── */
+
+  function openCheckMyChanges() {
+    runAction('檢查你的改動', async () => {
+      const r = await callServer('apiCheckMyChanges', currentQuarterId);
+      if (!r.ok) {
+        openModal('檢查我的改動', [para(r.message)],
+          [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      renderCheckResult(r);
+    });
+  }
+
+  function renderCheckResult(r) {
+    const nodes = [];
+
+    // ⚠️ 一定要講明呢粒掣**乜都唔會改**。唔講嘅話，
+    // 幹事撳完唔敢再撳第二次，驚改咗啲嘢。
+    nodes.push(make('div', { className: 'statuscard' }, [
+      make('div', {
+        text: r.allClear
+          ? ('你改的 ' + r.changes.length + ' 格全部沒有問題，可以儲存。')
+          : '下面幾項要看一看。',
+        className: 'statuscard-title'
+      }),
+      make('div', {
+        text: '這一粒掣只看，不會改動任何東西。',
+        className: 'statuscard-sub'
+      })
+    ]));
+
+    // ── 改了哪幾格 ──────────────────────────────────────────
+    if (r.changes.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('你改了這 ' + r.changes.length + ' 格')
+      ]);
+      r.changes.forEach((c) => {
+        box.appendChild(make('div', {
+          text: humanDate(c.serviceDate) + '　' + c.postNameTC
+            + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '')
+            + '　' + c.fromName + ' → ' + c.toName,
+          className: 'ok-line'
+        }));
+      });
+      nodes.push(box);
+    } else {
+      nodes.push(para('你還沒有改過任何一格。', 'muted'));
+    }
+
+    // ── 名字認不出 ──────────────────────────────────────────
+    if (r.unresolved.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + r.unresolved.length + ' 格的名字系統認不出'),
+        make('div', {
+          text: '這幾格在儲存的時候會被擋住。到時那個畫面有〔立即加入這個人〕。',
+          className: 'muted'
+        })
+      ]);
+      r.unresolved.forEach((u) => {
+        box.appendChild(make('div', {
+          text: humanDate(u.serviceDate) + '　' + u.postNameTC
+            + '　你打了「' + u.text + '」'
+            + (u.expectedText ? ('，本來應該是「' + u.expectedText + '」') : ''),
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    // ── 違反規則 ────────────────────────────────────────────
+    if (r.violations.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + r.violations.length + ' 格違反了規則')
+      ]);
+      r.violations.forEach((v) => {
+        // 用返共通嗰個人話轉換——規則代號對幹事嚟講同一串亂碼冇分別。
+        box.appendChild(make('div', {
+          text: humanViolationLine({
+            serviceDate: v.serviceDate, postNameTC: v.postNameTC,
+            slotIndex: v.slotIndex, personName: v.personName,
+            ruleId: v.ruleId, reason: v.reason
+          }),
+          className: 'vio-row'
+        }));
+      });
+      box.appendChild(make('div', {
+        text: '撳〔請系統幫我調整〕，系統會嘗試用最少的改動修好這幾格。',
+        className: 'muted'
+      }));
+      nodes.push(box);
+    }
+
+    // ── 空格 ────────────────────────────────────────────────
+    if (r.blanks.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + r.blanks.length + ' 格還沒有人'),
+        make('div', {
+          text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。',
+          className: 'muted'
+        })
+      ]);
+      r.blanks.forEach((b) => {
+        box.appendChild(make('div', {
+          text: humanDate(b.serviceDate) + '　' + b.postNameTC
+            + (Number(b.slotIndex) > 1 ? (' ' + b.slotIndex) : ''),
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    openModal('檢查我的改動', nodes, [
+      button('知道了', () => closeModal(), ''),
+      button('請系統幫我調整', () => { closeModal(); openBuildSuggestion(); }, 'secondary')
+    ]);
+  }
+
+  /* ── 二、〔請系統幫我調整〕：產生建議版本 ─────────────────── */
+
+  function openBuildSuggestion() {
+    runAction('系統調整中，請稍候', async () => {
+      const r = await callServerMutating('apiBuildSuggestion', currentQuarterId);
+      if (!r.ok) {
+        // 認唔出嘅名字要擋——理由同儲存嗰條路一樣。
+        showErrorModal('請系統幫我調整', new Error(r.message));
+        return;
+      }
+      renderSuggestionResult(r);
+    });
+  }
+
+  function renderSuggestionResult(r) {
+    const link = make('a', { text: '開啟建議版本（' + r.sheetName + '）', className: 'bigLink' });
+    link.href = r.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+
+    const nodes = [
+      make('div', { text: '建議版本已經做好', className: 'ok-head' }),
+      link,
+      make('div', { className: 'sec' }, [
+        sectionTitle('那張表上面的顏色'),
+        make('div', { text: '黃色格 ＝ 你自己改過的（' + r.manualCount + ' 格）',
+          className: 'ok-line' }),
+        make('div', { text: '藍色格 ＝ 系統建議改的（' + r.systemCount + ' 格）',
+          className: 'ok-line' }),
+        make('div', {
+          text: '系統改過的格，把滑鼠停在上面會見到它為甚麼改。',
+          className: 'muted'
+        })
+      ]),
+      para('你可以直接在那張表上再改，改完回來再撳一次〔請系統幫我調整〕，'
+        + '系統會用你改完之後那一版做起點再算一次。可以重複到你滿意為止。')
+    ];
+
+    // ⚠️ 系統調整完仍然違反規則嘅格**一定要講出嚟**。
+    // 唔講嘅話，幹事會以為「系統調整過 ＝ 一定冇問題」，然後直接接受，
+    // 而嗰幾格其實仲係壞嘅。
+    if (r.remaining && r.remaining.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('系統改完之後，這 ' + r.remaining.length + ' 格仍然違反規則'),
+        make('div', {
+          text: '系統找不到任何合資格又沒有衝突的人可以換。要你自己決定。',
+          className: 'muted'
+        })
+      ]);
+      r.remaining.forEach((v) => {
+        box.appendChild(make('div', {
+          text: humanViolationLine({
+            serviceDate: v.serviceDate, postNameTC: v.postNameTC,
+            slotIndex: v.slotIndex, personName: v.personName,
+            ruleId: v.ruleId, reason: v.reason
+          }),
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    openModal('系統建議版本', nodes, [
+      button('接受這個建議版本', () => openAcceptSuggestion(), ''),
+      button('放棄，回到我自己那一版', () => openDiscardSuggestion(), 'secondary'),
+      button('稍後再決定', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  /* ── 三、接受／放棄 ─────────────────────────────────────── */
+
+  function openAcceptSuggestion() {
+    openConfirm({
+      title: '接受這個建議版本',
+      bodyNodes: [
+        para('會把建議表上的內容儲存成新一版。'),
+        para('儲存之後那張建議表會清走——不清走的話會積落一堆，'
+          + '下一次你分不清哪一張是最新的。', 'muted')
+      ],
+      confirmLabel: '接受並儲存',
+      cancelLabel: '返回',
+      onConfirm: () => {
+        closeModal();
+        runAction('儲存中，請稍候', async () => {
+          const r = await callServerMutating('apiAcceptSuggestion', currentQuarterId);
+          resetMainFlowState();
+          const nodes = [
+            make('div', { text: r.message, className: 'ok-head' }),
+            para('第 ' + r.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted')
+          ];
+          if (r.publishFailed) {
+            nodes.push(make('div', { className: 'warnbox' }, [
+              make('div', {
+                text: '版本已經儲存好了，但公開連結未能更新（' + r.publishError + '）。'
+                  + '收到連結的人現在會看到舊內容。',
+                className: 'lines'
+              })
+            ]));
+          } else {
+            nodes.push(make('div', {
+              text: '公開連結已經更新——連結地址不變。', className: 'ok-line'
+            }));
+          }
+          openModal('已接受建議版本', nodes,
+            [button('知道了', () => closeModalAndRefresh(), '')]);
+        });
+      }
+    });
+  }
+
+  function openDiscardSuggestion() {
+    openConfirm({
+      title: '放棄建議版本',
+      bodyNodes: [
+        para('會刪走那張建議表。'),
+        para('你自己那一版（職事表上的內容）一格都不會改動。', 'muted')
+      ],
+      confirmLabel: '放棄建議',
+      cancelLabel: '返回',
+      danger: true,
+      onConfirm: () => {
+        closeModal();
+        runAction('放棄建議版本', async () => {
+          const r = await callServerMutating('apiDiscardSuggestion', currentQuarterId);
+          resetMainFlowState();
+          openModal('已放棄', [
+            make('div', { text: r.message, className: 'ok-line' })
+          ], [button('知道了', () => closeModalAndRefresh(), '')]);
+        });
+      }
+    });
+  }
+</script>

@@ -22,7 +22,8 @@ function buildFullRosterPdfBlob_(quarterId, versionNo) {
   if (!sheet) throw new Error('找不到工作表: ' + sheetName);
 
   const fileName = buildAttachmentName_(quarterId, versionNo, GRID_LABELS.FULL_VERSION);
-  const exported = exportSheetAsPdfBlob_(sheet, fileName);
+  // 第四十一輪批次 F 組：只印職事表本身（見 `resolveRosterOnlyExportOpts_()`）。
+  const exported = exportSheetAsPdfBlob_(sheet, fileName, resolveRosterOnlyExportOpts_(sheet));
   return { blob: exported.blob, fileName: fileName, retries: exported.retries };
 }
 
@@ -102,7 +103,11 @@ function buildPersonalPdfBlob_(quarterId, versionNo, personId, versionAssignment
     const highlightMs = Date.now() - highlightStart;
 
     const exportStart = Date.now();
-    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName);
+    // 第四十一輪批次 F 組：個人版都一樣只印職事表本身。
+    // ⚠️ 用 `ctx.rosterOnlyOpts`（開 context 那一次算好），
+    // 不是每個人各自再掃一次第一欄——幾十個人就是幾十次讀表，
+    // 而那條路本來就已經接近執行上限。
+    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName, ctx.rosterOnlyOpts);
     const exportMs = Date.now() - exportStart;
 
     return {
@@ -176,6 +181,8 @@ function openPersonalPdfRenderContext_(quarterId, versionNo) {
     tempSheet: tempSheet,
     wantHighlight: wantHighlight,
     gridIndex: gridIndex,
+    // 第四十一輪批次 F 組：整批只算一次，之後每個人共用。
+    rosterOnlyOpts: resolveRosterOnlyExportOpts_(tempSheet),
     dataRange: dataRange,
     baseBackgrounds: baseBackgrounds,
     baseWeights: baseWeights,
@@ -396,10 +403,24 @@ function debugPersonalHighlight(quarterId, versionNo, personId) {
  * @param {string} fileName 檔案名稱（含副檔名）
  * @returns {{blob: Blob, retries: number}} PDF 內容與實際重試次數
  */
-function exportSheetAsPdfBlob_(sheet, fileName) {
+function exportSheetAsPdfBlob_(sheet, fileName, opts) {
   const orientation = String(getConfig(CONFIG_KEYS.ATTACH_PAGE_ORIENTATION, PAGE_ORIENTATION.LANDSCAPE)).toUpperCase();
   const isPortrait = orientation === PAGE_ORIENTATION.PORTRAIT;
   const ssId = sheet.getParent().getId();
+
+  // ⚠️ 第四十一輪批次 F 組：只印到第 `opts.lastRow` 行為止。
+  //
+  // Google 匯出網址的 `r1`／`r2` 是 **0-based、右邊開區間**，
+  // 所以「印到第 N 行」＝ `r1=0&r2=N`。差一格就會少印最後一個主日，
+  // 而那種錯在 PDF 上看起來完全正常（只是少了一行）。
+  //
+  // ⚠️ 不傳 `opts` 的時候一個參數都不加——行為同今日一模一樣。
+  const rangeParams = [];
+  const lastRow = Number(opts && opts.lastRow);
+  if (lastRow > 0) {
+    rangeParams.push('r1=0');
+    rangeParams.push('r2=' + Math.floor(lastRow));
+  }
 
   // 注意：fitw 與 scale 是互相衝突的兩個縮放參數。
   // 同時指定 fitw=true 與 scale=4（fit to page）會過度壓縮，
@@ -420,7 +441,7 @@ function exportSheetAsPdfBlob_(sheet, fileName) {
     'bottom_margin=0.4',
     'left_margin=0.4',
     'right_margin=0.4'
-  ].join('&');
+  ].concat(rangeParams).join('&');
 
   const url = 'https://docs.google.com/spreadsheets/d/' + ssId + '/export?' + params;
   const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
@@ -862,4 +883,63 @@ function lookupPersonName_(personId) {
     }
   }
   return personId;
+}
+
+/**
+ * 第四十一輪批次 F 組：**職事表本身印到第幾行為止。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 為什麼要這樣找，不是記住行數
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 圖例那一段用多少行，本身是浮動的（`writeLegendSection_()` 回傳實際行數，
+ * 而它跟 Config 的 `GRID_SHOW_LEGEND` 有關）。記住一個行數，
+ * 一旦圖例多了或者少了一行，PDF 就會少印一個主日，或者多印半段圖例——
+ * 而那兩種在 PDF 上看起來都完全正常。
+ *
+ * 所以改為**在第一欄找那兩段的標題**，找到就在它前面截住。
+ *
+ * ⚠️ 兩段都找不到（例如 `GRID_SHOW_LEGEND` 關掉了、或者是一張舊表）
+ * 就回 `0` ＝ 不截。**寧可多印，不可以少印。**
+ * 少印一個主日是一個沒有人看得出的錯；多印一段圖例只是不好看。
+ *
+ * @param {Sheet} sheet grid 工作表
+ * @returns {number} 要印到第幾行（1-based）；`0` 代表不截
+ */
+function findRosterGridLastRow_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return 0;
+
+  const colA = sheet.getRange(1, 1, lastRow, 1).getValues();
+  let cut = 0;
+  for (let r = 3; r <= lastRow; r++) {
+    const text = String(colA[r - 1][0] || '').trim();
+    if (text === GRID_LABELS.LEGEND_TITLE || text === GRID_LABELS.STATS_TITLE) {
+      cut = r - 1;
+      break;
+    }
+  }
+  if (cut <= 0) return 0;
+
+  // 標題前面通常有一行空行分隔，一併截走——留住的話，PDF 最底會有
+  // 一條孤零零的空白列，看起來像印漏了東西。
+  while (cut >= 3 && String(colA[cut - 1][0] || '').trim() === '') cut--;
+  return cut >= 3 ? cut : 0;
+}
+
+/**
+ * 匯出 PDF 的時候要不要截住。**讀 Config，一個地方決定。**
+ *
+ * ⚠️ 兩條 PDF 路（個人版、整季版）都叫這一個，
+ * 不是各自讀一次 Config——各自讀的話，日後有人只改了其中一條，
+ * 就會出現「個人版沒有圖例而整季版有」，而幹事會以為系統壞了。
+ *
+ * @param {Sheet} sheet grid 工作表
+ * @returns {{lastRow: number}|undefined} 傳給 `exportSheetAsPdfBlob_()` 的選項
+ */
+function resolveRosterOnlyExportOpts_(sheet) {
+  if (getConfig(CONFIG_KEYS.PDF_ROSTER_ONLY, DEFAULTS.PDF_ROSTER_ONLY) !== true) return undefined;
+  const lastRow = findRosterGridLastRow_(sheet);
+  if (lastRow <= 0) return undefined;
+  return { lastRow: lastRow };
 }

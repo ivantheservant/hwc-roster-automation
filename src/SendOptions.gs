@@ -109,10 +109,10 @@ function resolveSendOptions_(stage, sendOptions, templates) {
   });
   if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0) {
     throw new Error(buildThreePartMessage_(
-      '你揀了「自己揀」，但一位都沒有揀。',
+      '你選了「自己選擇」，但一位都沒有選。',
       '一封都沒有寄出。',
       ['回去那個名單勾選要寄給誰，再撳一次',
-        '如果你想寄給全部人，請改揀「全部應收的人」']));
+        '如果你想寄給全部人，請改選「全部應收的人」']));
   }
 
   // ── 二、附件 ─────────────────────────────────────────────────
@@ -211,7 +211,7 @@ function describeSendDecision_(decision) {
   const scopeText = {
     ALL: '全部應收的人',
     CHANGED_ONLY: '只寄安排有改動的',
-    PICK: '自己揀（' + decision.pickedCount + ' 位）'
+    PICK: '自己選擇（' + decision.pickedCount + ' 位）'
   }[decision.recipientScope] || decision.recipientScope;
   const attachText = {
     NONE: '不附',
@@ -221,5 +221,5 @@ function describeSendDecision_(decision) {
   const mark = function (on) { return on ? '（幹事改過）' : ''; };
   return '收件範圍=' + scopeText + mark(decision.overridden.scope)
     + '　附件=' + attachText + mark(decision.overridden.attachType)
-    + '　日曆檔=' + (decision.includeIcs ? '有' : '冇') + mark(decision.overridden.includeIcs);
+    + '　日曆檔=' + (decision.includeIcs ? '有' : '沒有') + mark(decision.overridden.includeIcs);
 }

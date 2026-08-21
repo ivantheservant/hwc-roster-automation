@@ -259,7 +259,7 @@ function recommendEpsilon_(trials, preferenceBonus) {
       + baselineDeviation.toFixed(4) + ' 改善 ' + (improvementRatio * 100).toFixed(1) + '%；'
       + '硬規則違反 0 項，準硬規則沒有比現狀差，而且產生了 '
       + best.distinctRosters + ' / ' + best.seedCount + ' 份不同的表——'
-      + '「多次生成揀最好」到這裡才真正發揮作用。'
+      + '「多次生成選最好」到這裡才真正發揮作用。'
   };
 }
 
@@ -357,7 +357,7 @@ function buildEpsilonTrialRows_(trial) {
       '最好一份的總偏差 ' + bestDeviation
         + '　｜　排出 ' + t.distinctRosters + '/' + t.seedCount + ' 份不同的表'
         + '　｜　硬規則違反 ' + t.worstHardViolations + ' 項',
-      '總偏差越細越貼近歷史基準（「多次生成揀最好」就是揀這個數字最細的一份）。'
+      '總偏差越細越貼近歷史基準（「多次生成選最好」就是選這個數字最細的一份）。'
         + '　主席兼報告 ' + fmtRange(t.chairEq, true)
         + '　報告連續 ' + fmtRange(t.announce, true)
         + '　用人數 ' + fmtRange(t.peopleCount, false, 0)

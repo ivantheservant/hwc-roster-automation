@@ -507,6 +507,10 @@ function buildDashboardState_(quarterId) {
     statusText: buildDashboardStatusText_(stage, versionExists, generateOnText),
     latestVersion: latestVersion,
     isDryRun: isDryRun,
+    // 第四十一輪批次 H 組：轉寄測試地址有值嗰陣，介面頂部要有一個標籤。
+    // **唔可以靜靜生效**——佢最壞嘅失敗方式係「唔記得閂」，
+    // 而嗰陣所有畫面同報告都會話一切正常。
+    mailRedirectBadge: buildMailRedirectBadgeText_(),
     unsaved: unsaved,
     buttons: computeDashboardButtons_(facts),
     preQuarter: preQuarter,

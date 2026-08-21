@@ -88,7 +88,7 @@
         className: 'vio-row'
       }),
       make('div', {
-        text: '・系統會試 ' + plan.attemptsPlanned + ' 次不同排法，揀最平均那一次',
+        text: '・系統會試 ' + plan.attemptsPlanned + ' 次不同排法，選最平均那一次',
         className: 'vio-row'
       }),
       make('div', {
@@ -164,7 +164,7 @@
           className: 'warn-head'
         }),
         make('div', {
-          text: '初稿仍然可以用，只是「揀最平均那一次」的挑選範圍比平時窄。'
+          text: '初稿仍然可以用，只是「選最平均那一次」的挑選範圍比平時窄。'
             + '如果想試足全部次數，請用試算表選單的「生成職事表」重做一次。',
           className: 'lines'
         })
@@ -388,8 +388,17 @@
    * 唔加〔照樣儲存〕嘅理由喺 `src/UnresolvedNameFix.gs` 檔頭。
    * 呢度做嘅係補一個出口：喺同一個對話框加咗佢，然後**自動重新檢查**
    * ——嗰一項應該即刻消失，唔使佢自己再撳一次儲存。
+   *
+   * ⚠️ 第四十一輪批次 D 組：第 3 步（崗位名單）都要用返呢一粒掣。
+   * 所以「加完之後行邊個重新檢查」抽咗做參數 `onDone`——**唔係另寫一份**。
+   * 寫兩份嘅話，兩邊嘅撞名提示、冇電郵提示會慢慢長得唔一樣，
+   * 而幹事會覺得同一粒掣喺兩個地方行為唔同。
+   *
+   * @param {Object} u 認唔出嗰一項
+   * @param {Function=} onDone 加完之後行乜。唔傳就重新行一次「儲存並確認」。
    */
-  function openAddUnresolvedPerson(u) {
+  function openAddUnresolvedPerson(u, onDone) {
+    const done = onDone || openSaveAndConfirm;
     const typed = String(u.gridText || u.rawText || u.text || '').trim();
     const postName = u.postNameTC || u.postId || '';
 
@@ -429,7 +438,7 @@
         // ⚠️ 冇電郵係合法嘅（現時就有幾位），但一定要提——
         // 唔提嘅話幹事會以為加完就萬事俱備，然後嗰個人一直收唔到信。
         make('div', {
-          text: '沒有電郵的人收不到信，要用第 6 步印紙本給他。',
+          text: '沒有電郵的人收不到信，要用第 5 步印紙本給他。',
           className: 'muted'
         })
       ],
@@ -457,14 +466,14 @@
                 make('div', { text: r.duplicateWarning, className: 'lines' })
               ]),
               para(r.noEmailNote || '', 'muted')
-            ], [button('繼續，重新檢查', () => { closeModal(); openSaveAndConfirm(); }, '')]);
+            ], [button('繼續，重新檢查', () => { closeModal(); done(); }, '')]);
             return;
           }
 
           // ⚠️ **自動重新檢查**：直接再行一次儲存流程。
           // 唔自動嘅話佢要自己記得再撳一次，而佢多數會以為加完就搞掂。
           if (r.noEmailNote) setStatus(r.noEmailNote);
-          openSaveAndConfirm();
+          done();
         });
       }
     });
@@ -692,13 +701,10 @@
         decisions: [], confirmedRequestRows: [], releaseText: ''
       });
       resetMainFlowState();
-      openModal('已儲存', [
-        make('div', { text: '已儲存', className: 'ok-head' }),
-        para('改了 ' + (plan.gridChanges || []).length + ' 格，'
-          + '存成第 ' + (result.versionNo !== undefined ? result.versionNo : plan.targetVersionNo) + ' 版。'
-          + '規則檢查全部通過，沒有東西需要你決定。'),
-        para('那條永久連結不用換——它已經指向這一版。', 'muted')
-      ], [button('知道了', () => closeModal(), '')]);
+      // ⚠️ 第四十一輪批次 C 組：快路同正常路要用**同一個**結果畫面。
+      // 兩套「儲存成功」嘅講法 ＝ 兩個真相來源，改一個另一個唔會跟，
+      // 而幹事會見到兩種唔同嘅提示而唔知邊個先啱。
+      renderSaveResult(result);
     });
   }
 
@@ -773,17 +779,71 @@
     }
 
     // ── 完全成功 ───────────────────────────────────────────
-    const lines = ['已儲存成第 ' + result.versionNo + ' 版，公開連結已更新。'];
-    if (result.cellCount > 0) lines.push('套用了 ' + result.cellCount + ' 格改動。');
-    if (result.appliedRequestCount > 0) lines.push('套用了 ' + result.appliedRequestCount + ' 筆修改申報。');
-    if (result.needsInputCount > 0) {
-      lines.push(result.needsInputCount + ' 筆系統看不懂的申報留在申報表，沒有動過。');
-    }
-    if (result.stageAdvanced) lines.push('「正式發出給全體」現在可以撳了。');
-    lines.push('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。');
+    //
+    // ⚠️ 第四十一輪批次 C 組：Ivan 實測之後講「沒有任何成功儲存的提示」。
+    //
+    // 呢個彈窗本來就有，但佢淨係俾一個數字（「套用了 3 格改動」）。
+    // 一個數字證明唔到系統改嗰三格就係佢改嗰三格。所以逐格列出嚟。
+    //
+    // ⚠️ 呢個係**儲存之後**嘅結果，同儲存之前嗰個「會做／唔會做」預覽
+    // 係兩件事，兩樣都要有，唔可以用其中一個代替另一個。
+    const nodes = [
+      make('div', { text: '已儲存成第 ' + result.versionNo + ' 版', className: 'ok-head' })
+    ];
 
-    openModal('儲存完成', lines.map((t) => make('div', { text: t, className: 'ok-line' })),
-      [button('完成', () => closeModalAndRefresh(), '')]);
+    const changes = result.savedChanges || [];
+    if (changes.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('這一次儲存了這 ' + changes.length + ' 格')
+      ]);
+      changes.forEach((c) => {
+        box.appendChild(make('div', {
+          text: humanDate(c.serviceDate) + '　' + c.postNameTC
+            + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '')
+            + '　' + c.fromName + ' → ' + c.toName,
+          className: 'ok-line'
+        }));
+      });
+      nodes.push(box);
+    } else if (result.cellCount > 0) {
+      // 拿唔到明細都要講返個數——**唔可以乜都唔講**。
+      nodes.push(make('div', {
+        text: '套用了 ' + result.cellCount + ' 格改動。', className: 'ok-line'
+      }));
+    }
+
+    if (result.appliedRequestCount > 0) {
+      nodes.push(make('div', {
+        text: '另外套用了 ' + result.appliedRequestCount + ' 筆修改申報。',
+        className: 'ok-line'
+      }));
+    }
+    if (result.rejectedRequestCount > 0) {
+      nodes.push(make('div', {
+        text: result.rejectedRequestCount + ' 筆申報沒有套用（以你表上改的為準，或者你沒有確認）。',
+        className: 'ok-line'
+      }));
+    }
+    if (result.needsInputCount > 0) {
+      nodes.push(make('div', {
+        text: result.needsInputCount + ' 筆系統看不懂的申報留在申報表，沒有動過。',
+        className: 'ok-line'
+      }));
+    }
+    if (result.releasedViolationCount > 0) {
+      nodes.push(make('div', {
+        text: '你放行了 ' + result.releasedViolationCount + ' 格違反規則的安排，已經記入紀錄。',
+        className: 'ok-line'
+      }));
+    }
+    nodes.push(make('div', { text: '公開連結已經更新——連結地址不變，'
+      + '收到的人重新開就見到這一版。', className: 'ok-line' }));
+    if (result.stageAdvanced) {
+      nodes.push(make('div', { text: '「寄出」現在可以撳了。', className: 'ok-line strong' }));
+    }
+    nodes.push(para('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted'));
+
+    openModal('儲存完成', nodes, [button('知道了', () => closeModalAndRefresh(), '')]);
   }
 
   /* ============================================================
@@ -800,7 +860,7 @@
    */
   function renderReviewNeedsPublicLink() {
     openModal('寄給堂委審閱：還沒有公開連結', [
-      errorPart('發生了什麼', '這一季還沒有公開連結。堂委收到的信裡面有一條'
+      errorPart(ERR_LABEL_WHAT, '這一季還沒有公開連結。堂委收到的信裡面有一條'
         + '「唯讀連結」，而那條連結現在是空的。'),
       errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
       make('div', { className: 'err-part' }, [
@@ -849,7 +909,7 @@
       // 寄一封冇人收到嘅信，畫面仲會顯示「已寄出」——比唔寄更差。
       if (preview.recipientCount === 0) {
         openModal('寄給堂委審閱：沒有收件人', [
-          errorPart('發生了什麼', '現時沒有登記任何堂委電郵。'),
+          errorPart(ERR_LABEL_WHAT, '現時沒有登記任何堂委電郵。'),
           errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
           make('div', { className: 'err-part' }, [
             make('div', { text: '你可以怎樣做', className: 'err-label' }),
@@ -958,7 +1018,7 @@
       // 個人 PDF 缺件超過上限 ⇒ 保留現有阻擋（第十九輪嘅關卡）。
       if (missing.blocked) {
         openModal('正式發出：已中止', [
-          errorPart('發生了什麼',
+          errorPart(ERR_LABEL_WHAT,
             '有 ' + missing.missingTotal + ' / ' + missing.total + ' 人還沒有個人 PDF，'
             + '超過了容許的缺件上限。'),
           errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),

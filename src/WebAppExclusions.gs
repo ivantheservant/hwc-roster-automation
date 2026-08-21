@@ -132,10 +132,10 @@ function validateExclusionInput_(p, timezone) {
   };
 
   const personId = String(p.personId || '').trim();
-  if (!personId) return bad('沒有揀人。', ['在上面的下拉揀一位']);
+  if (!personId) return bad('沒有選人。', ['在上面的下拉選一位']);
 
   const postId = String(p.postId || '').trim();
-  if (!postId) return bad('沒有揀崗位。', ['在上面的下拉揀一個崗位']);
+  if (!postId) return bad('沒有選崗位。', ['在上面的下拉選一個崗位']);
 
   // ⚠️ 原因**必填**。三個月之後，一條沒有原因的限制沒有人記得為什麼，
   // 於是沒有人夠膽解除它——那個人就永遠不會再被排到那個崗位。

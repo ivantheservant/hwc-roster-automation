@@ -469,6 +469,11 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
     stageAdvanced = true;
   }
 
+  // 第四十一輪批次 C 組：逐格明細要寫崗位中文名，唔可以寫 PostID。
+  // 幹事腦入面冇 `CHAIR` 呢個概念。
+  const savedPostNames = {};
+  readPostsNormalized().forEach(function (po) { savedPostNames[po.postId] = po.postNameTC; });
+
   // ── 7　重新發佈公開連結 ─────────────────────────────────────
   const publish = tryPublishPublicRoster_(quarterId);
 
@@ -479,6 +484,25 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
     sheetName: created.sheetName,
     baseVersionNo: plan.baseVersionNo,
     cellCount: created.cellCount,
+    // ⚠️ 第四十一輪批次 C 組：**逐格列出來**，不是只給一個數字。
+    //
+    // Ivan 實測之後講：「沒有任何成功儲存的提示。需要提示幹事儲存了
+    // 什麼改動，或者至少講一句『已成功儲存』。」
+    //
+    // 一個「套用了 3 格改動」的數字，證明不到系統改的就是他改的那三格。
+    // 逐格寫「由誰改成誰」，他一眼就核對得到。
+    savedChanges: (resolved.changes || []).map(function (c) {
+      return {
+        serviceDate: c.serviceDate,
+        postId: c.postId,
+        postNameTC: savedPostNames[c.postId] || c.postId,
+        slotIndex: c.slotIndex,
+        // 空白也要講得出是空白——寫一個空字串落畫面，
+        // 幹事會以為系統壞了。
+        fromName: c.originalName || '（空白）',
+        toName: c.manualText || '（空白）'
+      };
+    }),
     // ⚠️ 第三十四輪批次甲2：呢兩個數而家由**真正套用嘅結果**出，
     // 唔再由 plan 嗰個「打算套用幾多筆」出。修正之前兩者永遠一樣，
     // 因為根本冇套用過——一個永遠自我印證嘅數字。

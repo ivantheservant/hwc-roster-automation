@@ -146,12 +146,12 @@ function validateRoleInput_(p, timezone) {
   };
 
   const personId = String(p.personId || '').trim();
-  if (!personId) return bad('沒有揀人。', ['在上面的下拉揀一位']);
+  if (!personId) return bad('沒有選人。', ['在上面的下拉選一位']);
 
   const roleCode = String(p.roleCode || '').trim().toUpperCase();
   if (!ROLE_LABELS_TC[roleCode]) {
     return bad('身分不是「堂委」或者「執事」。',
-      ['在下拉重新揀一次', '如果這裡應該有第三種身分，要先在程式碼加入，不能只在表上打字']);
+      ['在下拉重新選一次', '如果這裡應該有第三種身分，要先在程式碼加入，不能只在表上打字']);
   }
 
   // 生效日**可以留空**（＝一直以來都是），同 Roles.gs 嘅讀取邏輯一致。

@@ -165,7 +165,7 @@
     const scopes = [
       ['ALL', '全部應收的人'],
       ['CHANGED_ONLY', '只寄安排有改動的'],
-      ['PICK', '自己揀']
+      ['PICK', '自己選擇']
     ];
     scopes.forEach((opt) => {
       // 「只寄有改動嘅」淨係喺改動後重發先有意義。其餘階段唔顯示——
@@ -180,20 +180,21 @@
     });
     if (sendOptions_.recipientScope === 'PICK') {
       whoBox.appendChild(make('div', {
-        text: '已揀 ' + sendOptions_.pickedKeys.length + ' 位。',
+        text: '已選 ' + sendOptions_.pickedKeys.length + ' 位。',
         className: 'ok-line strong'
       }));
       whoBox.appendChild(row([
-        button('改一改揀邊個', () => openSendPickList(s), 'secondary')
+        button('改一改選誰', () => openSendPickList(s), 'secondary')
       ]));
     }
     nodes.push(whoBox);
 
     // ── 決定二：附件 ────────────────────────────────────────
     const attachBox = make('div', { className: 'sec' }, [sectionTitle('附件')]);
+    const notes = s.attachOptionNotes || {};
     [
-      ['NONE', '不附（只有內文同連結）'],
-      ['PERSONAL_PDF', '個人版 PDF（自己的名字有 highlight）'],
+      ['NONE', '不附'],
+      ['PERSONAL_PDF', '個人版 PDF'],
       ['FULL_PDF', '整季 PDF']
     ].forEach((opt) => {
       attachBox.appendChild(sendRadio('attach', opt[0], opt[1],
@@ -201,6 +202,18 @@
           sendOptions_.attachType = opt[0];
           drawSendMain(s);
         }));
+      // ⚠️ 第四十一輪批次 E 組：每個選項下面一行小字，直接寫出收件人會收到咩。
+      //
+      // 只寫「不附」三個字，幹事會以為嗰封信係空嘅——實際上仲有
+      // 佢自己嗰條個人專屬連結同永久連結。撳之前就要知道。
+      //
+      // ⚠️ 呢啲字由**後端**出，同 attachTypeWantsPersonalLink_() 讀同一個判斷。
+      // 前端自己寫一套，畫面就會講一件事而系統做另一件事。
+      if (notes[opt[0]]) {
+        attachBox.appendChild(make('div', {
+          text: '　　' + notes[opt[0]], className: 'muted'
+        }));
+      }
     });
     nodes.push(attachBox);
 
@@ -260,7 +273,7 @@
         // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ 唔可以行落去。
         // 後端一樣會擋（resolveSendOptions_() 會拋），呢度只係提早講。
         if (sendOptions_.recipientScope === 'PICK' && sendOptions_.pickedKeys.length === 0) {
-          setStatus('你揀了「自己揀」，但一位都沒有揀。', true);
+          setStatus('你選了「自己選擇」，但一位都沒有選。', true);
           return;
         }
         closeModal();
@@ -294,77 +307,44 @@
   }
 
   function drawSendPickList(s, keyword) {
-    const picked = {};
-    sendOptions_.pickedKeys.forEach((k) => { picked[k] = true; });
+    // ⚠️ 第四十一輪批次 E 組：用共用元件 `pickListNodes()`，
+    // 同第 5 步（紙本）嗰個名單**係同一份碼**。
+    // 寫兩份嘅話，兩邊會慢慢長得唔一樣，而幹事會覺得系統時好時壞。
+    const selected = {};
+    sendOptions_.pickedKeys.forEach((k) => { selected[k] = true; });
 
-    const k = String(keyword || '').trim();
-    const matched = k
-      ? sendCandidates_.filter((c) => c.displayName.indexOf(k) !== -1)
-      : sendCandidates_;
+    const items = sendCandidates_.map((c) => ({
+      key: c.key,
+      label: c.displayName,
+      note: c.type === 'LIST' ? '（名單）' : ('（這一季 ' + c.cellCount + ' 格）'),
+      // 查不到電郵嘅照樣列出嚟，並且講明。佢唔係「唔使服侍」，
+      // 係要印紙本（第 5 步）——收埋佢就等於靜靜當佢唔存在。
+      warn: c.hasEmail ? '' : '⚠ 查不到電郵，寄不到，要印紙本'
+    }));
+
+    const redraw = (kw) => {
+      sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
+      drawSendPickList(s, kw === undefined ? keyword : kw);
+    };
 
     const nodes = [
-      para('揀邊幾位要收到這一封信。'),
-      para('沒有揀到的人，這一次一封都不會收到。', 'muted')
-    ];
+      para('選擇哪幾位要收到這一封信。'),
+      para('沒有選到的人，這一次一封都不會收到。', 'muted')
+    ].concat(pickListNodes({
+      items: items,
+      selected: selected,
+      keyword: keyword,
+      onRedraw: redraw,
+      emptyText: '這一次一個收件人都找不到。這通常代表這一季還沒有派工，'
+        + '或者收件人名單（EmailRecipients）是空的。'
+    }));
 
-    const search = document.createElement('input');
-    search.type = 'text';
-    search.placeholder = '搵人名⋯⋯';
-    search.value = k;
-    search.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); drawSendPickList(s, search.value); }
-    });
-    nodes.push(row([search, button('搵', () => drawSendPickList(s, search.value), 'secondary')]));
-
-    if (sendCandidates_.length === 0) {
-      nodes.push(make('div', { className: 'warnbox' }, [
-        make('div', {
-          text: '這一次一個收件人都找不到。這通常代表這一季還沒有派工，'
-            + '或者收件人名單（EmailRecipients）是空的。',
-          className: 'lines'
-        })
-      ]));
-    }
-    if (sendCandidates_.length > 0 && matched.length === 0) {
-      nodes.push(make('div', { text: '找不到符合的人。', className: 'muted' }));
-    }
-
-    const box = make('div', { className: 'sec' });
-    matched.forEach((c) => {
-      const line = make('label', { className: 'check-row' });
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = picked[c.key] === true;
-      cb.addEventListener('change', () => {
-        if (cb.checked) {
-          if (sendOptions_.pickedKeys.indexOf(c.key) === -1) sendOptions_.pickedKeys.push(c.key);
-        } else {
-          sendOptions_.pickedKeys = sendOptions_.pickedKeys.filter((x) => x !== c.key);
-        }
-      });
-      line.appendChild(cb);
-      // ⚠️ 查不到電郵嘅照樣列出嚟，並且講明。佢唔係「唔使服侍」，
-      // 係要印紙本（第 6 步）——收埋佢就等於靜靜當佢唔存在。
-      line.appendChild(make('span', {
-        text: c.displayName
-          + (c.type === 'LIST' ? '　（名單）' : '　（這一季 ' + c.cellCount + ' 格）')
-          + (c.hasEmail ? '' : '　⚠ 查不到電郵，寄不到，要印紙本')
-      }));
-      box.appendChild(line);
-    });
-    nodes.push(box);
-
-    openModal('自己揀寄給誰', nodes, [
-      button('揀好了', () => { drawSendMain(s); }, ''),
-      button('全部揀', () => {
-        sendOptions_.pickedKeys = sendCandidates_.map((c) => c.key);
-        drawSendPickList(s, keyword);
-      }, 'secondary'),
-      button('全部唔揀', () => {
-        sendOptions_.pickedKeys = [];
-        drawSendPickList(s, keyword);
-      }, 'secondary')
-    ]);
+    openModal('自己選擇寄給誰', nodes, [
+      button('選好了', () => {
+        sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
+        drawSendMain(s);
+      }, '')
+    ].concat(pickListBulkButtons(items, selected, () => redraw())));
   }
 
   function sendConfirmLabel(kind) {
@@ -394,6 +374,15 @@
 
   let paperSelection_ = null;
 
+  /**
+   * G 組：要印邊一種。`PERSONAL` ＝ 標示自己個名（現狀，預設）、
+   * `PLAIN` ＝ 唔標示、`FULL_ONE` ＝ 一份大家睇。
+   *
+   * ⚠️ 每次開彈窗都要重設返做 `PERSONAL`——留住上一次嘅選擇，
+   * 幹事下次開會以為自己揀緊預設，然後印出一疊冇名嘅表。
+   */
+  let paperKind_ = 'PERSONAL';
+
   function openPaperDialog() {
     runAction('讀取名單', async () => {
       const s = await callServer('apiGetPaperListState', currentQuarterId);
@@ -402,59 +391,121 @@
         return;
       }
       // 預設：**冇電郵嗰批全部勾好**。佢哋一定要印，唔應該要幹事逐個勾。
+      paperKind_ = 'PERSONAL';
       paperSelection_ = {};
       s.noEmail.forEach((p) => { paperSelection_[p.personId] = true; });
       renderPaperDialog(s, '');
     });
   }
 
+  /**
+   * 第 5 步嘅名單。
+   *
+   * ⚠️ 第四十一輪批次 E 組：用共用元件 `pickListNodes()`，
+   * 同「寄出 ▸ 自己選擇」嗰個名單**係同一份碼**。
+   * 寫兩份嘅話，兩邊會慢慢長得唔一樣，而幹事會覺得系統時好時壞。
+   *
+   * ⚠️ 第四十一輪批次 G 組：加咗「印邊一種」三揀一。
+   */
   function renderPaperDialog(s, keyword) {
     const nodes = [];
 
-    nodes.push(para('這幾位查不到電郵，收不到信，但照樣要服侍。'
+    nodes.push(para('有幾位查不到電郵，收不到信，但照樣要服侍。'
       + '下面是這一季第 ' + s.versionNo + ' 版有服侍的人。'));
 
-    // ── 冇電郵嗰批（預設全部勾好）──────────────────────────
-    const noEmailBox = make('div', { className: 'sec' }, [
-      sectionTitle('查不到電郵（' + s.noEmail.length + ' 位）——預設全部要印')
-    ]);
-    if (s.noEmail.length === 0) {
-      noEmailBox.appendChild(make('div', {
-        text: '這一季沒有查不到電郵的人。', className: 'muted'
-      }));
-    }
-    s.noEmail.forEach((p) => noEmailBox.appendChild(paperCheckRow(p, true)));
-    nodes.push(noEmailBox);
-
-    // ── 有電郵但都想要紙本（例如長者）────────────────────────
-    const k = String(keyword || '').trim();
-    const matched = k
-      ? s.withEmail.filter((p) => p.nameTC.indexOf(k) !== -1)
-      : s.withEmail;
-
-    const withBox = make('div', { className: 'sec' }, [
-      sectionTitle('有電郵，但你也想印給他（' + s.withEmail.length + ' 位可以揀）'),
-      make('div', { text: '有些長者兩樣都要。', className: 'muted' })
-    ]);
-
-    const search = document.createElement('input');
-    search.type = 'text';
-    search.placeholder = '搵人名⋯⋯';
-    search.value = k;
-    search.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); renderPaperDialog(s, search.value); }
+    // ── G 組：要印哪一種 ────────────────────────────────────
+    const kindBox = make('div', { className: 'sec' }, [sectionTitle('要印哪一種')]);
+    [
+      ['PERSONAL', '每人一份，標示他自己的名字',
+        '每一份都不同：那個人自己那幾格有底色，一眼看到。'],
+      ['PLAIN', '每人一份，不標示名字',
+        '每一份內容都一模一樣，所以系統只做一個檔，你印幾份就可以。'
+          + '下面仍然要選人——選了多少位，就是要印多少份。'],
+      ['FULL_ONE', '一份整季表，印一張大家看',
+        '同上面那一種是同一個檔，只是印一張。不需要選人。']
+    ].forEach((opt) => {
+      const line = make('label', { className: 'radio-row' });
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'paper-kind';
+      input.checked = paperKind_ === opt[0];
+      input.addEventListener('change', () => {
+        if (!input.checked) return;
+        paperKind_ = opt[0];
+        renderPaperDialog(s, keyword);
+      });
+      line.appendChild(input);
+      line.appendChild(make('span', { text: opt[1] }));
+      kindBox.appendChild(line);
+      // ⚠️ 每個選項下面嗰行小字唔可以慳。「不標示名字」同「一份大家看」
+      // 係同一個檔——唔講清楚，幹事會以為系統漏做咗其他人嗰幾份，
+      // 然後再撳多幾次。
+      kindBox.appendChild(make('div', { text: '　　' + opt[2], className: 'muted' }));
     });
-    withBox.appendChild(row([search, button('搵', () => renderPaperDialog(s, search.value), 'secondary')]));
+    nodes.push(kindBox);
 
-    if (matched.length === 0) {
-      withBox.appendChild(make('div', { text: '找不到符合的人。', className: 'muted' }));
+    // ⚠️ 「一份整季表」根本唔使揀人。仲畫住個名單只會令人以為要揀——
+    // 一個撳落去冇作用嘅控制項，就係呢個專案一直喺度殺嗰樣嘢。
+    if (paperKind_ === 'FULL_ONE') {
+      openModal('要印紙本的人', nodes, [
+        button('產生這一份', () => runPlainPaper(1), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+      return;
     }
-    matched.forEach((p) => withBox.appendChild(paperCheckRow(p, false)));
-    nodes.push(withBox);
 
-    const countNode = make('div', { className: 'ok-line strong', id: 'paperCount' });
-    updatePaperCount(countNode);
+    // ── 名單（共用元件）────────────────────────────────────
+    //
+    // 冇電郵嗰批排喺前面並且預設勾好；有電郵嗰批排喺後面，
+    // 有啲長者兩樣都要，可以額外揀。
+    const items = s.noEmail.map((p) => ({
+      key: p.personId,
+      label: p.nameTC,
+      note: '（這一季 ' + p.cellCount + ' 格）',
+      warn: '⚠ 查不到電郵'
+    })).concat(s.withEmail.map((p) => ({
+      key: p.personId,
+      label: p.nameTC,
+      note: '（這一季 ' + p.cellCount + ' 格，有電郵）',
+      warn: ''
+    })));
+
+    const redraw = (kw) => renderPaperDialog(s, kw === undefined ? keyword : kw);
+
+    nodes.push(make('div', { className: 'sec' }, [
+      sectionTitle('查不到電郵的有 ' + s.noEmail.length + ' 位——預設全部已經選好'),
+      make('div', {
+        text: '有電郵的人也在下面，有些長者兩樣都要，可以額外選。',
+        className: 'muted'
+      })
+    ]));
+
+    const countNode = make('div', { className: 'ok-line strong' });
+    const refreshCount = () => {
+      const n = selectedPaperIds().length;
+      countNode.textContent = paperKind_ === 'PLAIN'
+        ? ('已選 ' + n + ' 位——即是要印 ' + n + ' 份。')
+        : ('已選 ' + n + ' 位。');
+    };
+    refreshCount();
+
+    pickListNodes({
+      items: items,
+      selected: paperSelection_,
+      keyword: keyword,
+      onRedraw: redraw,
+      onToggle: refreshCount,
+      emptyText: '這一季還沒有任何人有服侍。'
+    }).forEach((n) => nodes.push(n));
     nodes.push(countNode);
+
+    if (paperKind_ === 'PLAIN') {
+      openModal('要印紙本的人', nodes, [
+        button('產生這一份', () => runPlainPaper(selectedPaperIds().length), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ].concat(pickListBulkButtons(items, paperSelection_, () => redraw())));
+      return;
+    }
 
     // ⚠️ 兩個出口都要講清楚會發生咩事——尤其係「寄到自己信箱」
     // 就算喺模擬模式都會真係寄。
@@ -476,40 +527,48 @@
       button('產生並取得連結', () => runPaperGenerate(), ''),
       button('寄到自己信箱', () => runPaperEmail(), 'secondary'),
       button('取消', () => closeModal(), 'secondary')
-    ]);
-  }
-
-  function paperCheckRow(p, defaultOn) {
-    const line = make('label', { className: 'check-row' });
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = paperSelection_[p.personId] === true
-      || (defaultOn && paperSelection_[p.personId] !== false);
-    paperSelection_[p.personId] = cb.checked;
-    cb.addEventListener('change', () => {
-      paperSelection_[p.personId] = cb.checked;
-      const node = el('paperCount');
-      if (node) updatePaperCount(node);
-    });
-    line.appendChild(cb);
-    line.appendChild(make('span', {
-      text: p.nameTC + '　（這一季 ' + p.cellCount + ' 格）'
-    }));
-    return line;
+    ].concat(pickListBulkButtons(items, paperSelection_, () => redraw())));
   }
 
   function selectedPaperIds() {
     return Object.keys(paperSelection_ || {}).filter((id) => paperSelection_[id] === true);
   }
 
-  function updatePaperCount(node) {
-    node.textContent = '已揀 ' + selectedPaperIds().length + ' 位。';
+  /**
+   * G 組：不標示名字的那一份。
+   *
+   * ⚠️ 走的是 `apiGeneratePlainPaper()`，而佢入面用返
+   * `buildFullRosterPdfBlob_()`——**冇另寫一套匯出**。
+   * 嗰條路本來就完全冇經過 highlight（見 `PaperPack.gs` 檔尾嘅說明）。
+   *
+   * @param {number} copies 要印幾多份（只影響提示文字）
+   */
+  function runPlainPaper(copies) {
+    runAction('產生紙本', async () => {
+      const r = await callServerMutating('apiGeneratePlainPaper', currentQuarterId, copies);
+      const nodes = [make('div', { text: '已完成', className: 'ok-head' })];
+
+      const link = make('a', { text: '開啟這一份（' + r.fileName + '）', className: 'bigLink' });
+      link.href = r.fileUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      nodes.push(link);
+
+      nodes.push(make('div', { text: r.message, className: 'ok-line' }));
+      nodes.push(make('div', {
+        text: Number(r.copies) > 1
+          ? ('打印的時候，份數選 ' + r.copies + '。')
+          : '打印一張就可以。',
+        className: 'ok-line strong'
+      }));
+      openModal('紙本 PDF', nodes, [button('知道了', () => closeModal(), '')]);
+    });
   }
 
   function runPaperGenerate() {
     const ids = selectedPaperIds();
     if (ids.length === 0) {
-      openModal('要印紙本的人', [para('一位都沒有揀。')],
+      openModal('要印紙本的人', [para('一位都沒有選。')],
         [button('知道了', () => closeModal(), '')]);
       return;
     }
@@ -581,14 +640,14 @@
   function runPaperEmail() {
     const ids = selectedPaperIds();
     if (ids.length === 0) {
-      openModal('要印紙本的人', [para('一位都沒有揀。')],
+      openModal('要印紙本的人', [para('一位都沒有選。')],
         [button('知道了', () => closeModal(), '')]);
       return;
     }
     openConfirm({
       title: '寄到自己信箱',
       bodyNodes: [
-        para('會把揀好的 ' + ids.length + ' 位的個人 PDF，夾成信寄給你自己。'),
+        para('會把選好的 ' + ids.length + ' 位的個人 PDF，夾成信寄給你自己。'),
         make('div', { className: 'warnbox' }, [
           make('div', {
             text: '收件人永遠是你自己，不是義工。所以這一封就算系統仍然在模擬模式，'

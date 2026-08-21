@@ -413,7 +413,7 @@ function apiExportRuleReviewSheet() {
       const rule = SpreadsheetApp.newDataValidation()
         .requireValueInList(m.choices.map(function (c) { return c.label; }), true)
         .setAllowInvalid(false)
-        .setHelpText('請由下拉揀一個。想改成別的，請在「備註／原因」寫。')
+        .setHelpText('請由下拉選一個。想改成別的，請在「備註／原因」寫。')
         .build();
       cell.setDataValidation(rule);
     });
@@ -508,7 +508,7 @@ function apiRuleReviewImportPlan(fileId) {
   assertWebAppRequestAllowed_();
   try {
     const id = String(fileId || '').trim();
-    if (!id) return { ok: false, message: '沒有揀要讀哪一份。' };
+    if (!id) return { ok: false, message: '沒有選要讀哪一份。' };
 
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const weeksInfo = resolveRuleReviewWeeks_(timezone);

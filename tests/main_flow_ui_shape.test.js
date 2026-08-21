@@ -33,6 +33,7 @@ function checkEqual(label, actual, expected) {
 }
 
 const UI = path.join(__dirname, '..', 'src', 'ui');
+const SRC_GS = path.join(__dirname, '..', 'src');
 const readUi = (f) => fs.readFileSync(path.join(UI, f), 'utf8');
 
 const index = readUi('Index.html');
@@ -43,33 +44,89 @@ const sendPaper = readUi('ScriptSendPaper.html');
 const boot = readUi('ScriptBoot.html');
 
 // =====================================================================
-console.log('\n=== A【核心】六步齊全，而且順序係幹事真實嘅工作次序 ===');
+console.log('\n=== A【核心】五步齊全，而且順序係幹事真實嘅工作次序 ===');
 {
-  // 六步嘅標題逐個喺原始碼度出現，而且**次序唔可以亂**——
-  // 呢一段係一條直線，次序本身就係說明書。
+  // ⚠️ 第四十一輪批次 A 組：由**六步**變**五步**。
+  //
+  // 原本嘅第 3 步（加名單選單）而家全自動——
+  //   `createRosterSheet()` 收尾自動套用（五條建立版本嘅路都經過嗰度）
+  //   `apiApplyEligibilitySheet()` 套用完名單順帶再跑一次
+  // 所以佢唔再出現喺主流程，收咗落「進階與診斷」做手動補救。
   const titles = [
     '生成下一季職事表',
     '查看／修改職事表',
-    '在職事表加入名單選單',
     '維護各崗位的事奉人員名單',
     '寄出',
     '要印紙本'
   ];
   const positions = titles.map((t) => flow.indexOf(t));
-  check('★★★★★ 六步全部搵得到', positions.every((p) => p !== -1),
+  check('★★★★★ 五步全部搵得到', positions.every((p) => p !== -1),
     JSON.stringify(titles.map((t, i) => t + '=' + positions[i])));
 
-  const renderOrder = ['renderStep1(', 'renderStep2(', 'renderStep3(',
-    'renderStep4(', 'renderStep5(', 'renderStep6('];
+  const renderOrder = ['renderStep1(', 'renderStep2(', 'renderStepEligibility(',
+    'renderStepSend(', 'renderStepPaper('];
   const callBlock = flow.slice(flow.indexOf('async function renderMainFlow'));
-  const callPos = renderOrder.map((r) => callBlock.indexOf(r + 'd') !== -1
-    ? callBlock.indexOf(r) : callBlock.indexOf(r));
-  check('★★★★★ 而且係由 1 畫到 6，次序冇亂',
+  const callPos = renderOrder.map((r) => callBlock.indexOf(r));
+  check('★★★★★ 而且係由 1 畫到 5，次序冇亂',
     callPos.every((p, i) => p !== -1 && (i === 0 || p > callPos[i - 1])),
     JSON.stringify(callPos));
 
+  // ⚠️ **編號唔可以跳。** 跳號（第 2 步、第 4 步、第 5 步）對幹事嚟講
+  // 就係「我係咪漏咗一步」——一條直線唔可以有窿。
+  // ⚠️ 第 1 步有兩個 `num: 1`——一個係「搵唔到任何季度」嗰個 fallback 卡，
+  // 一個係正常嗰張。兩張都真係第 1 步，所以去重之後先比。
+  const nums = (flow.match(/num: (\d)[,\s]/g) || [])
+    .map((m) => Number(m.replace(/\D/g, '')));
+  const uniqueNums = Array.from(new Set(nums)).sort();
+  checkEqual('★★★★★ 編號係 1、2、3、4、5，冇跳號'
+    + '——跳號（第 2 步、第 4 步、第 5 步）對幹事嚟講就係「我係咪漏咗一步」',
+    uniqueNums, [1, 2, 3, 4, 5]);
+  checkEqual('★★★★★ 而且最大嗰個係 5（唔可以仲有一張第 6 步嘅卡留低）',
+    Math.max.apply(null, nums), 5);
+
+  check('★★★★★ 「在職事表加入名單選單」唔再喺主流程出現'
+    + '（Ivan 明講：做到自動嘅話，嗰一步就唔使出現喺介面上）',
+    flow.indexOf('在職事表加入名單選單') === -1, '');
+  check('★★★★★ 但個功能冇刪——搬咗去「進階與診斷」做手動補救',
+    readUi('ScriptZone4.html').indexOf('更新名單選單') !== -1, '');
+  check('★★★★★ 而且 `openApplyDropdowns()` 仲喺度（唔係得個掣冇實作）',
+    /function openApplyDropdowns\(\)/.test(flow), '');
+
   check('★★★★ 每一步都有一個編號圓點（step-num），令佢一眼睇得出係第幾步',
     /className: 'step-num'/.test(flow));
+}
+
+console.log('\n=== A【核心】下拉選單全自動 ===');
+{
+  const writer = fs.readFileSync(path.join(SRC_GS, 'RosterWriter.gs'), 'utf8');
+  // ⚠️ 掛喺 `createRosterSheet()` 而唔係逐條路各加一次，係刻意嘅：
+  // 嗰個函式係五條建立版本嘅路唯一嘅匯合點。
+  // 逐條路各加一次，就一定會有一條唔記得——本專案反覆出事嘅形狀。
+  const body = writer.slice(writer.indexOf('function createRosterSheet('),
+    writer.indexOf('function buildRosterSheetName_'));
+  check('★★★★★ `createRosterSheet()` 收尾會套用下拉選單'
+    + '——五條建立版本嘅路都經過佢，所以每一張新 grid 都自動有',
+    /applyGridNameDropdowns_\(quarterId, versionNo\)/.test(body), body.slice(-400));
+  check('★★★★★ 而且失敗**唔會令整個建立版本失敗**'
+    + '（選單係輔助，職事表本身先係主體）',
+    /try \{[\s\S]{0,200}applyGridNameDropdowns_[\s\S]{0,300}\} catch \(err\) \{/.test(body),
+    body.slice(-500));
+  check('★★★★★ 但亦都**唔會靜靜失敗**——會寫 log 而且交畀呼叫端',
+    /log_\('WARN'[\s\S]{0,120}名單下拉選單套用不到/.test(body)
+    && /lastDropdownResult/.test(body), body.slice(-500));
+
+  const elig = fs.readFileSync(path.join(SRC_GS, 'EligibilitySheetEditor.gs'), 'utf8');
+  check('★★★★★ 改完事奉人員名單之後亦都會自動再跑一次'
+    + '——唔跑嘅話，幹事喺表上見到嘅選單仲係舊名單，而佢啱啱先改完',
+    /applyGridNameDropdowns_\(quarterId, v\)/.test(elig), '');
+  check('★★★★★ 而且嗰度失敗都唔會令「套用名單」變成失敗（名單已經寫好咗）',
+    /dropdownNote/.test(elig), '');
+
+  const dd = fs.readFileSync(path.join(SRC_GS, 'GridNameDropdown.gs'), 'utf8');
+  check('★★★★★ 設唔到資料驗證（例如工作表被保護）要老實講'
+    + '——第三十九輪嘅報告點名講過呢個情況**從來冇喺現場驗過**，'
+    + '而靜靜失敗嘅後果係「系統話加咗，開表卻冇」',
+    /reason: 'SET_FAILED'/.test(dd) && /設不到選單/.test(dd), '');
 }
 
 console.log('\n=== A1：掣上面直接寫住季度，唔使佢揀 ===');
@@ -268,8 +325,16 @@ console.log('\n=== D：紙本 ===');
 {
   check('★★★★★ 冇電郵嗰批**預設全部勾好**（佢哋一定要印，唔應該要幹事逐個勾）',
     /s\.noEmail\.forEach\(\(p\) => \{ paperSelection_\[p\.personId\] = true; \}\)/.test(sendPaper));
-  check('★★★★ 有電郵嗰批可以額外加，而且搵得到人',
-    /有電郵，但你也想印給他/.test(sendPaper) && /搵人名/.test(sendPaper));
+  // ⚠️ 第四十一輪批次 E 組之後，搜尋框搬咗入共用元件 `pickListNodes()`。
+  // 斷言唔可以再貼住嗰幾隻字——要斷言嘅係**意圖**：
+  //   （一）有電郵嗰批真係有入到個名單；
+  //   （二）個名單走嘅係共用元件（所以一定有搜尋框）。
+  // 貼住字面嘅話，下次共用元件改一個字，呢度就會紅，而功能一啲事都冇。
+  check('★★★★ 有電郵嗰批可以額外加（唔止冇電郵嗰批）',
+    /s\.withEmail\.map\(\(p\) => \(\{/.test(sendPaper), '');
+  check('★★★★★ 而且走共用元件——同「寄出 ▸ 自己選擇」嗰個名單係同一份碼'
+    + '（寫兩份嘅話，兩邊會慢慢長得唔一樣）',
+    (sendPaper.match(/pickListNodes\(\{/g) || []).length >= 2, '');
   check('★★★★★ 兩個出口都有：下載（資料夾連結）同寄到自己信箱',
     /產生並取得連結/.test(sendPaper) && /寄到自己信箱/.test(sendPaper));
   check('★★★★★ 「寄到自己信箱」講明就算喺模擬模式都會真係寄'

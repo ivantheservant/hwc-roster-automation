@@ -868,7 +868,7 @@ function describeAdjacentPairDenominatorGap_(actualPairs, weeksCounted, weeksWit
   // 真係出現就代表上游有嘢壞咗，要嘈，唔可以當成正常情況解釋一番。
   if (actual > theoretical) {
     return '⚠️ 實際數到 ' + actual + ' 對，多過理論上限 ' + theoretical
-      + ' 對——呢個唔應該發生，請告訴開發者。';
+      + ' 對——這個不應該發生，請告訴開發者。';
   }
 
   const missingWeeks = toFiniteNumberOrNull_(weeksWithoutAnnounce);

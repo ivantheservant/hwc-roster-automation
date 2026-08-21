@@ -116,11 +116,25 @@ function applyGridNameDropdowns_(quarterId, versionNo) {
       const rule = SpreadsheetApp.newDataValidation()
         .requireValueInList(names, true)
         .setAllowInvalid(true)
-        .setHelpText('可以在選單裡面揀，也可以直接打一個不在名單上的名'
+        .setHelpText('可以在選單裡面選，也可以直接打一個不在名單上的名'
           + '（外請講員、新人、借調都是這樣填）。')
         .build();
-      sheet.getRange(3, i + 1, lastRow - 2, 1).setDataValidation(rule);
-      columns.push({ postId: postId, postNameTC: post.postNameTC, optionCount: names.length });
+      // ⚠️ 第四十一輪批次 A 組：設不到要老實講，不可以靜靜失敗。
+      //
+      // 第三十九輪的報告講明：受保護的第 0 版上面設不設得到資料驗證，
+      // 從來沒有在現場驗過。離線的 mock 不模擬保護，所以測試證不到。
+      //
+      // 靜靜失敗的後果：幹事開了表，那一欄沒有選單，
+      // 而系統剛剛才說「已經加入名單選單」——他會以為是自己看錯。
+      try {
+        sheet.getRange(3, i + 1, lastRow - 2, 1).setDataValidation(rule);
+        columns.push({ postId: postId, postNameTC: post.postNameTC, optionCount: names.length });
+      } catch (err) {
+        skipped.push({
+          postId: postId, postNameTC: post.postNameTC,
+          reason: 'SET_FAILED', error: err.message
+        });
+      }
     });
   });
 
@@ -188,7 +202,18 @@ function buildGridDropdownSummary_(result) {
   if (noOne.length > 0) {
     lines.push('這幾欄查不到任何合資格的人，所以沒有選單：'
       + noOne.map(function (s) { return s.postNameTC; }).join('、')
-      + '。去第 4 步維護名單就會有。');
+      + '。去第 3 步維護名單就會有。');
+  }
+
+  // ⚠️ 設不到（多數是工作表被保護）一定要講出來，而且要講建議。
+  // 這是第三十九輪報告點名「從來沒有在現場驗過」的那一個情況。
+  const setFailed = result.skipped.filter(function (s) { return s.reason === 'SET_FAILED'; });
+  if (setFailed.length > 0) {
+    lines.push('這幾欄設不到選單：'
+      + setFailed.map(function (s) { return s.postNameTC; }).join('、')
+      + '。多數是因為那一張工作表被保護了（第 0 版預設會保護）。'
+      + '職事表本身完全正常，只是那幾欄沒有下拉選單，你照樣可以直接打字。'
+      + '（第一個錯誤：' + setFailed[0].error + '）');
   }
 
   const tooMany = result.skipped.filter(function (s) { return s.reason === 'TOO_MANY'; });

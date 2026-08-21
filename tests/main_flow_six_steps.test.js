@@ -31,14 +31,20 @@ const gas = loadGasSource([
   'EmailRecipientsSeed.gs', 'TemplatePreview.gs', 'RequestsSheet.gs',
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Mailer.gs', 'ResendFlow.gs', 'Trigger.gs',
-  'WebAppGuards.gs', 'WebAppDashboard.gs', 'WebAppRollback.gs',
+  'WebAppGuards.gs', 'WebAppDashboard.gs',
+  // 第四十一輪批次 H 組：介面頂部嗰個轉寄標籤（buildMailRedirectBadgeText_）。
+  'MailRedirect.gs', 'WebAppRollback.gs',
   'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs',
   'PreacherTranslationFill.gs',
   // 本輪新增
   'WebAppMainFlow.gs', 'GridNameDropdown.gs', 'EligibilitySheetEditor.gs',
   'WebAppSendPlan.gs',
   // 第四十輪批次 A 組：寄出嗰三個選項喺呢度解析（apiGetSendPlanSummary 要用）。
-  'SendOptions.gs'
+  'SendOptions.gs',
+  // 第四十一輪批次 E 組：附件選項嗰幾行小字（describeAttachOption_）。
+  'PersonalLinkInMail.gs',
+  // 第四十一輪批次 H 組：介面頂部嗰個轉寄標籤。
+  'MailRedirect.gs'
 ]);
 
 let fail = 0;

@@ -332,7 +332,7 @@ function apiSaveAlias(payload) {
     return { ok: false, message: buildThreePartMessage_(
       '別名同對應的人兩樣都要填。',
       '什麼都沒有改動。',
-      ['填寫別名（例如異體字的另一種寫法）', '在下拉揀這個別名對應哪一位']) };
+      ['填寫別名（例如異體字的另一種寫法）', '在下拉選這個別名對應哪一位']) };
   }
 
   const nameIndex = buildPersonNameIndex_();

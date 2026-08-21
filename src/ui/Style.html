@@ -368,6 +368,29 @@
   .busy-card.is-fail { border-left-color: var(--danger); }
   .busy-card.is-fail .busy-title { color: var(--danger); }
 
+
+  /* ── 大字彈窗（第四十一輪批次 D 組）──────────────────────
+     Ivan 實測第 3 步嗰個預覽：「字太細」。嗰個窗一次要睇幾十行，
+     而佢要逐行核對「係咪真係想改呢一項」。
+
+     ⚠️ **只加一個有前綴嘅 scope，唔改任何現有 selector。**
+     `Style.html` 因為改咗現有規則而出過事兩次（`[hidden]` 被覆蓋）。
+     加一個新 class，冇用嗰度一啲影響都冇。
+
+     ⚠️ 亦都唔用 `!important`。要覆蓋嘅嗰幾條全部係單一 class
+     （`.vio-row` 等等），`.dlg-lg .vio-row` 兩個 class 已經夠特異。 */
+  .dlg-lg { font-size: var(--fs-md); }
+  .dlg-lg .vio-row,
+  .dlg-lg .ok-line,
+  .dlg-lg .radio-row,
+  .dlg-lg .check-row,
+  .dlg-lg .lines { font-size: var(--fs-md); line-height: 1.5; }
+  .dlg-lg .muted { font-size: var(--fs-sm); }
+  .dlg-lg .sec-title { font-size: var(--fs-lg); }
+  .dlg-lg .prop-head { font-size: var(--fs-md); }
+  /* 勾選框本身都要大——手指撳得中先算得上「勾得到」。 */
+  .dlg-lg .check-row input[type="checkbox"] { width: 17px; height: 17px; }
+
   /* ── 手機／平板 ───────────────────────────────────────────
      幹事有機會用平板或手機開。呢度只放大同換行，唔改任何行為。 */
   @media (max-width: 700px) {

@@ -27,6 +27,36 @@
  *
  * 所以 `planEligibilitySheetApply_()` 會把認不出的名字**逐個列出來**，
  * 而且**在有認不出的名字時拒絕套用**，直到幹事處理好為止。
+ *
+ * ⚠️ 第四十一輪批次 D 組補了一個出口：那張畫面上每一項認不出的名字旁邊
+ * 有一粒〔這是新人，一併加入〕，走的是第四十輪那一條
+ * `apiAddPersonForUnresolvedName()`——**同一粒掣，不是第二套**。
+ * Ivan 實測時撞到的正正是這個：他在「音響」欄打了一個新人的名，
+ * 然後整張表都套用不了，而畫面只叫他「去別的地方加這個人」。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 第四十一輪批次 D 組：逐項確認
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Ivan：「最好在這裡加一個 check box 去確認哪幾項要改。」
+ *
+ * 他的實際情況是：改一欄的時候順手碰到了另一欄，預覽一出來才發現，
+ * 而當時只有「全部套用」同「取消」兩個出口——要嘛連不想要的一起套用，
+ * 要嘛整個放棄、回去那張表再改一次。
+ *
+ * 做法：`apiApplyEligibilitySheet()` 收多一個 `selectedKeys`。
+ *
+ * ⚠️ 三件事一定要守住：
+ *
+ *   一、**沒有傳的時候行為同今日一模一樣**（全部套用）。
+ *      選單／舊畫面／診斷工具都可能不傳。
+ *
+ *   二、**仍然重新計算預覽，不信任前端傳來的任何東西。**
+ *      `selectedKeys` 只用來「篩走」，不會用來決定寫什麼。
+ *      幹事開著預覽的時候有可能又去改了那張表。
+ *
+ *   三、**勾了但重算之後已經不存在的項要講出來。**
+ *      靜靜略過的話，他以為套用了，而實際上一格都沒有動。
  */
 
 /** 名單工作表的名稱。同名會被重建。 */
@@ -34,6 +64,58 @@ const ELIGIBILITY_SHEET_NAME = '崗位名單';
 
 /** 第 1 行寫崗位中文名，第 2 行寫機器鍵（PostID），第 3 行起是人名。 */
 const ELIGIBILITY_SHEET_FIRST_DATA_ROW = 3;
+
+/**
+ * 一項改動的鍵（第四十一輪批次 D 組的逐項確認用）。
+ *
+ * ⚠️ **只有這裡砌得出這個字串。** 預覽回傳的每一項都自己帶著 `key`，
+ * 畫面只負責把它原樣送回來——畫面自己再砌一次的話，格式一改就會
+ * 「勾了但套用不到」，而那種錯誤在畫面上完全看不出來。
+ *
+ * @param {string} kind `ADD` 或者 `REMOVE`
+ * @param {string} personId 人員編號
+ * @param {string} postId 崗位編號
+ * @returns {string} 鍵
+ */
+function buildEligibilityChangeKey_(kind, personId, postId) {
+  return String(kind) + '|' + String(personId) + '|' + String(postId);
+}
+
+/**
+ * 按幹事勾選的項篩走不要的。**純函式。**
+ *
+ * ⚠️ `selectedKeys` 是 `null`／`undefined` 的時候**全部保留**——
+ * 即是同今日行為一模一樣。選單、舊畫面、診斷工具都可能不傳。
+ *
+ * ⚠️ 勾了但重算之後已經不存在的項要回報（`vanished`），不可以靜靜略過。
+ * 幹事看完預覽之後又去改了那張表，是完全正常的事。
+ *
+ * @param {Object} plan `planEligibilitySheetApply_()` 的結果
+ * @param {string[]=} selectedKeys 勾選了的鍵
+ * @returns {{added: Object[], removed: Object[], skipped: Object[], vanished: string[]}}
+ */
+function filterEligibilityPlanBySelection_(plan, selectedKeys) {
+  const all = (plan.added || []).concat(plan.removed || []);
+  if (selectedKeys === null || selectedKeys === undefined) {
+    return { added: plan.added || [], removed: plan.removed || [], skipped: [], vanished: [] };
+  }
+
+  const want = {};
+  (selectedKeys || []).forEach(function (k) {
+    const s = String(k || '').trim();
+    if (s) want[s] = true;
+  });
+
+  const present = {};
+  all.forEach(function (x) { present[x.key] = true; });
+
+  return {
+    added: (plan.added || []).filter(function (a) { return want[a.key] === true; }),
+    removed: (plan.removed || []).filter(function (r) { return want[r.key] === true; }),
+    skipped: all.filter(function (x) { return want[x.key] !== true; }),
+    vanished: Object.keys(want).filter(function (k) { return present[k] !== true; })
+  };
+}
 
 /**
  * 建立（或重建）那張名單工作表，把現時的 `Eligibility` 攤開成一欄一個崗位。
@@ -174,7 +256,10 @@ function planEligibilitySheetApply_(quarterId) {
       const personId = resolvePersonId(text);
       if (!personId) {
         unresolved.push({
-          kind: 'UNKNOWN_NAME', postId: postId, text: text,
+          // ⚠️ `postNameTC` 一定要帶出去：畫面上那一粒〔這是新人，一併加入〕
+          // 會問「同時讓他可以做『○○』」，只有 `postId` 的話那句就會
+          // 變成一串代號，而幹事根本看不懂自己在答什麼。
+          kind: 'UNKNOWN_NAME', postId: postId, postNameTC: postNameById[postId], text: text,
           note: postNameById[postId] + '　第 ' + (r + ELIGIBILITY_SHEET_FIRST_DATA_ROW)
             + ' 行的「' + text + '」不在人員名單裡面。'
         });
@@ -200,13 +285,15 @@ function planEligibilitySheetApply_(quarterId) {
     Object.keys(wanted[postId]).forEach(function (pid) {
       if (!before[pid]) {
         added.push({ postId: postId, postNameTC: postNameById[postId], personId: pid,
-          nameTC: nameById[pid] || pid });
+          nameTC: nameById[pid] || pid,
+          key: buildEligibilityChangeKey_('ADD', pid, postId) });
       }
     });
     Object.keys(before).forEach(function (pid) {
       if (!wanted[postId][pid]) {
         removed.push({ postId: postId, postNameTC: postNameById[postId], personId: pid,
-          nameTC: nameById[pid] || pid });
+          nameTC: nameById[pid] || pid,
+          key: buildEligibilityChangeKey_('REMOVE', pid, postId) });
       }
     });
   });
@@ -214,8 +301,14 @@ function planEligibilitySheetApply_(quarterId) {
   // ⚠️ 被移走的人如果已經排在現有職事表上，要特別標出來——
   // 移走名單不會把他從已排好的格子拿走，但下一次重排就不會再有他。
   // 幹事需要知道這件事，否則會以為「移走了就等於換了人」。
+  //
+  // ⚠️ 第四十一輪批次 D 組：不只要數目，還要**具體是哪幾個主日**。
+  // Ivan 的原話是他看不出「還有 3 格」是指哪一季、哪幾個日子。
+  // 一個他核對不到的數字，同沒有講差不多。
   const assignedNow = {};
+  const assignedDates = {};
   const versionNo = findLatestVersionNo(quarterId);
+  const tz = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   if (versionNo >= 0) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
@@ -225,10 +318,14 @@ function planEligibilitySheetApply_(quarterId) {
       if (!pid) return;
       const key = pid + '|' + row[A.POST_ID];
       assignedNow[key] = (assignedNow[key] || 0) + 1;
+      if (!assignedDates[key]) assignedDates[key] = [];
+      assignedDates[key].push(toDateString(row[A.SERVICE_DATE], tz));
     });
   }
   removed.forEach(function (r) {
-    r.assignedCount = assignedNow[r.personId + '|' + r.postId] || 0;
+    const key = r.personId + '|' + r.postId;
+    r.assignedCount = assignedNow[key] || 0;
+    r.assignedDates = (assignedDates[key] || []).sort();
   });
 
   const byName = function (a, b) {
@@ -273,7 +370,7 @@ function apiPlanEligibilitySheetApply(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 實際寫入的結果
  */
-function apiApplyEligibilitySheet(quarterId) {
+function apiApplyEligibilitySheet(quarterId, selectedKeys) {
   assertWebAppRequestAllowed_();
   const plan = planEligibilitySheetApply_(quarterId);
   if (plan.blocked) {
@@ -286,6 +383,19 @@ function apiApplyEligibilitySheet(quarterId) {
   }
   if (plan.added.length === 0 && plan.removed.length === 0) {
     return { changed: false, added: 0, removed: 0, message: '名單沒有改動，不需要儲存。' };
+  }
+
+  // ⚠️ 第四十一輪批次 D 組：逐項確認。篩走之後，下面每一段都只看
+  // `pick.added` ／ `pick.removed`——**不可以再有一段用回 `plan.added`**，
+  // 那樣就會出現「畫面說略過了，而系統照樣寫入」，
+  // 即是這個專案最常出現的那一類 bug：兩個來源，只更新了一個。
+  const pick = filterEligibilityPlanBySelection_(plan, selectedKeys);
+  if (pick.added.length === 0 && pick.removed.length === 0) {
+    return {
+      changed: false, added: 0, removed: 0, skipped: pick.skipped.length,
+      vanished: pick.vanished,
+      message: '一項都沒有勾選，所以一項都沒有寫入。'
+    };
   }
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ELIGIBILITY);
@@ -301,7 +411,7 @@ function apiApplyEligibilitySheet(quarterId) {
   // 不是「刪除」。刪了行就沒有任何紀錄講得出這個人曾經在名單上，
   // 而稽核要答得出「他上一季為什麼會被排到」。
   const removeKeys = {};
-  plan.removed.forEach(function (r) { removeKeys[r.personId + '|' + r.postId] = true; });
+  pick.removed.forEach(function (r) { removeKeys[r.personId + '|' + r.postId] = true; });
 
   let removedCount = 0;
   if (lastRow >= 3 && col(E.ACTIVE) > 0) {
@@ -323,7 +433,7 @@ function apiApplyEligibilitySheet(quarterId) {
   // 只有那張表會愈來愈長、愈來愈難看得懂。
   let addedCount = 0;
   const appendRows = [];
-  plan.added.forEach(function (a) {
+  pick.added.forEach(function (a) {
     let revived = false;
     if (lastRow >= 3) {
       for (let r = 3; r <= lastRow; r++) {
@@ -353,19 +463,50 @@ function apiApplyEligibilitySheet(quarterId) {
       .setValues(appendRows);
   }
 
+  // ⚠️ 第四十一輪批次 A 組：名單改咗，下拉選單要跟住更新。
+  //
+  // Ivan 明講：「如果『事奉人員名單』有更新，這個也要自動再跑一次去更新下拉選單。」唔跑嘅話，佢喺表上見到嘅選單仲係舊名單，
+  // 而佢啱啱先改完——嗰個係「畫面同資料唔同步」，最難察覺嗰種。
+  //
+  // ⚠️ 失敗唔可以令「套用名單」變成失敗——名單本身已經寫好咗。
+  // 但要記低，而且回傳畀畫面講一句。
+  let dropdownNote = '';
+  try {
+    const v = findLatestVersionNo(quarterId);
+    if (v >= 0) applyGridNameDropdowns_(quarterId, v);
+  } catch (err) {
+    log_('WARN', '名單套用咗，但下拉選單更新唔到：' + err.message);
+    dropdownNote = '名單已經套用好，但職事表上的下拉選單更新不到（'
+      + err.message + '）。可以去「進階與診斷 ▸ 更新名單選單」再試一次。';
+  }
+
   writeAuditLog_({
     action: 'ELIGIBILITY_SHEET_APPLIED',
     targetSheet: SHEETS.ELIGIBILITY,
     targetCell: '',
     oldValue: '',
     newValue: '加入 ' + addedCount + ' 項、停用 ' + removedCount + ' 項'
+      + (pick.skipped.length > 0 ? ('（幹事略過了 ' + pick.skipped.length + ' 項）') : '')
   });
 
   return {
     changed: true,
     added: addedCount,
     removed: removedCount,
-    stillAssigned: plan.removed.filter(function (r) { return r.assignedCount > 0; }),
+    // ⚠️ 略過了幾多項一定要回報。幹事勾走了兩項，而畫面只講「已經加入 5 項」
+    // 的話，他分不出系統是照他意思略過了，還是連他勾了的那幾項都漏做。
+    skipped: pick.skipped.length,
+    skippedItems: pick.skipped.map(function (x) {
+      return { postNameTC: x.postNameTC, nameTC: x.nameTC, key: x.key };
+    }),
+    // ⚠️ 勾了但重算之後已經不存在的項。他看預覽的時候又去改了那張表，
+    // 是完全正常的事——但一定要講，否則他以為那幾項套用了。
+    vanished: pick.vanished,
+    stillAssigned: pick.removed.filter(function (r) { return r.assignedCount > 0; }),
+    dropdownNote: dropdownNote,
     message: '已經加入 ' + addedCount + ' 項、停用 ' + removedCount + ' 項。'
+      + (pick.skipped.length > 0
+        ? ('按你的勾選略過了 ' + pick.skipped.length + ' 項，那幾項一格都沒有動。')
+        : '')
   };
 }

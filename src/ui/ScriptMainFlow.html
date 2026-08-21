@@ -84,12 +84,16 @@
     const root = clear(el('mainFlowBody'));
     const flow = await getMainFlowState();
 
+    // ⚠️ 第四十一輪批次 A 組：由六步變**五步**。
+    // 原本嘅第 3 步（加名單選單）已經全自動，唔再出現喺主流程。
+    //
+    // ⚠️ 編號一定要重新排好。跳號（第 2 步、第 4 步、第 5 步）
+    // 對幹事嚟講就係「我係咪漏咗一步」——一條直線唔可以有窿。
     root.appendChild(renderStep1(d, flow));
-    root.appendChild(renderStep2(d));
-    root.appendChild(renderStep3(d));
-    root.appendChild(renderStep4());
-    root.appendChild(renderStep5(d));
-    root.appendChild(renderStep6(d, flow));
+    root.appendChild(renderStep2(d, flow));
+    root.appendChild(renderStepEligibility());
+    root.appendChild(renderStepSend(d));
+    root.appendChild(renderStepPaper(d, flow));
   }
 
   /* ── 第 1 步：生成下一季職事表 ─────────────────────────────── */
@@ -275,9 +279,10 @@
 
   /* ── 第 2 步：查看／修改職事表 ─────────────────────────────── */
 
-  function renderStep2(d) {
+  function renderStep2(d, flow) {
     const acts = [];
     const sheetUrl = d.latestVersion && d.latestVersion.sheetUrl;
+    const suggestion = (flow && flow.suggestion) || {};
 
     if (sheetUrl) {
       const open = make('a', { text: '查看／修改職事表', className: 'bigLink' });
@@ -294,6 +299,23 @@
       }));
     }
 
+    // ── 第四十一輪批次 B 組：兩粒新掣 ───────────────────────────
+    //
+    // ⚠️ 兩粒都同「儲存我的修改」並排。Ivan 講嘅流程係
+    //「改 → 檢查 → 調整 → 再改 → 再調整 → 滿意先儲存」，
+    // 四樣嘢喺同一個地方佢先做得順。
+    const has = !!d.latestVersion;
+    acts.push(stepButton('檢查我的改動', openCheckMyChanges, {
+      disabled: !has,
+      className: 'secondary',
+      title: has ? '只看，不會改動任何東西。' : '要先在第 1 步生成職事表。'
+    }));
+    acts.push(stepButton('請系統幫我調整', openBuildSuggestion, {
+      disabled: !has,
+      className: 'secondary',
+      title: has ? '產生一張建議版本，正式職事表不會改動。' : '要先在第 1 步生成職事表。'
+    }));
+
     // ⚠️ 「儲存我的修改」同「查看／修改」要**並排、同樣大**：
     // 他做完 A 一定會做 B。分開兩個地方就會漏。
     const save = (d.buttons && d.buttons.save) || {};
@@ -303,32 +325,54 @@
       title: save.enabled ? '' : (save.disabledReason || '')
     }));
 
-    return stepCard({
+    const card = stepCard({
       num: 2,
       title: '查看／修改職事表',
       note: save.dynamicText || '',
       why: (!save.enabled && save.disabledReason) ? save.disabledReason : '',
       acts: acts
     });
+
+    // ⚠️ 有建議表而畫面唔講，幹事會喺正式表上改，然後發現改動唔見咗
+    //（因為下一次調整會以建議表做起點）。所以一定要講，而且要有出口。
+    if (suggestion.hasSuggestion) {
+      const link = make('a', { text: '開啟建議表', className: 'sheetlink' });
+      link.href = suggestion.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      const box = make('div', { className: 'permalink' }, [
+        make('div', { text: '現在有一張建議表未處理', className: 'permalink-label' }),
+        make('div', {
+          text: '「' + suggestion.sheetName + '」。'
+            + '在你接受或者放棄它之前，再撳「請系統幫我調整」會以那一張做起點。',
+          className: 'permalink-note'
+        }),
+        make('div', { className: 'row' }, [
+          link,
+          button('接受它', () => openAcceptSuggestion(), ''),
+          button('放棄它', () => openDiscardSuggestion(), 'secondary')
+        ])
+      ]);
+      card.querySelector('.step-body').appendChild(box);
+    }
+
+    return card;
   }
 
-  /* ── 第 3 步：改動時的名單協助 ─────────────────────────────── */
-
-  function renderStep3(d) {
-    const has = !!d.latestVersion;
-    return stepCard({
-      num: 3,
-      title: '在職事表加入名單選單',
-      note: '每一個崗位那一欄會多一個下拉選單，列出該崗位的合資格名單。'
-        + '你照樣可以直接打一個不在名單上的名（外請講員、新人、借調都是這樣填）。',
-      acts: [stepButton('加入名單選單', openApplyDropdowns, {
-        disabled: !has,
-        className: 'secondary',
-        title: has ? '' : '要先在第 1 步生成職事表。'
-      })]
-    });
-  }
-
+  /* ── 名單下拉選單：第四十一輪批次 A 組起全自動 ────────────────
+   *
+   * Ivan 實測之後講明：「我想『生成』自動做這一步。每一個編輯過的版本
+   * 都應該有這個下拉選單。如果『事奉人員名單』有更新，這個也要自動再跑
+   * 一次。如果做到，第 3 步就不用出現在介面上。」
+   *
+   * 所以做咗兩件事：
+   *   createRosterSheet()（RosterWriter.gs）收尾自動套用——五條建立版本
+   *   　嘅路都經過嗰度，所以每一張新 grid 都自動有
+   *   apiApplyEligibilitySheet() 套用完名單之後順帶再跑一次
+   *
+   * 下面呢個函式冇刪，佢搬咗去「進階與診斷」做手動補救——
+   * 萬一自動嗰次設唔到（例如工作表被保護），仲有一條路。
+   */
   function openApplyDropdowns() {
     runAction('加入名單選單', async () => {
       const r = await callServerMutating('apiApplyGridNameDropdowns', currentQuarterId);
@@ -340,11 +384,11 @@
     });
   }
 
-  /* ── 第 4 步：維護各崗位的事奉人員名單 ─────────────────────── */
+  /* ── 第 3 步：維護各崗位的事奉人員名單 ─────────────────────── */
 
-  function renderStep4() {
+  function renderStepEligibility() {
     return stepCard({
-      num: 4,
+      num: 3,
       title: '維護各崗位的事奉人員名單',
       note: '開一張工作表，一個崗位一欄。在裡面自由增刪改，改完回來撳「儲存並套用名單」。',
       acts: [
@@ -375,9 +419,24 @@
   function openApplyEligibilitySheet() {
     runAction('讀取名單工作表', async () => {
       const plan = await callServer('apiPlanEligibilitySheetApply', currentQuarterId);
+      // ⚠️ 每次重新讀都要清走上一次嘅勾選。留住嘅話，佢加咗一個新人
+      // 之後重新檢查，上一次揀走嗰一項會靜靜噉繼續被略過，
+      // 而畫面上嗰個勾**係打咗開**——即係畫面同實際做嘅嘢唔同。
+      eligSkip_ = {};
       renderEligibilitySheetPlan(plan);
     });
   }
+
+  /**
+   * 第 3 步嘅預覽畫面。
+   *
+   * ⚠️ 第四十一輪批次 D 組改咗四樣（全部係 Ivan 實測撞到嘅）：
+   *   一、認唔出嘅名字旁邊有一粒〔這是新人，一併加入〕
+   *   二、逐項可以勾走（預設全部勾好）
+   *   三、「會移走」講齊三件事，唔係得「停用不是刪除」一句
+   *   四、字大咗（`dlg-lg`，見 Style.html）
+   */
+  let eligSkip_ = {};   // key -> true 代表**唔要**呢一項（預設全部要）
 
   function renderEligibilitySheetPlan(plan) {
     const nodes = [];
@@ -392,96 +451,200 @@
         })
       ]);
       plan.unresolved.forEach((u) => {
-        box.appendChild(make('div', { text: u.note, className: 'vio-row' }));
+        const item = make('div', { className: 'prop' });
+        item.appendChild(make('div', { text: u.note, className: 'prop-head' }));
+        // ⚠️ 只有「認唔出嘅人名」先加得到人。「崗位代號對唔上」係另一回事
+        //（多數係整欄剪貼錯位），加一個人解決唔到，加咗仲會掩蓋咗真正嘅問題。
+        if (u.kind === 'UNKNOWN_NAME') {
+          item.appendChild(row([
+            // ⚠️ 走返第四十輪嗰一粒同一個對話框（`ScriptZone1.html`），
+            // **唔係另寫一份**。加完自動重新讀一次名單工作表。
+            button('這是新人，一併加入',
+              () => openAddUnresolvedPerson(u, openApplyEligibilitySheet), '')
+          ]));
+        } else {
+          item.appendChild(make('div', {
+            text: '這一項不是人名的問題，加人解決不了。'
+              + '多數是那一欄整欄貼錯了位置——回去那張表看第 1 行的崗位名。',
+            className: 'muted'
+          }));
+        }
+        box.appendChild(item);
       });
       nodes.push(box);
     }
+
+    // ── 逐項勾選 ────────────────────────────────────────────
+    //
+    // ⚠️ 預設**全部勾好**。Ivan 嘅情況係「改一欄嗰陣順手碰到咗另一欄」，
+    // 即係話大部分項都係佢想要嘅，得一兩項唔要。預設唔勾嘅話，
+    // 佢每次都要撳幾十下先做得返今日一撳就做到嘅嘢。
+    const countNode = make('div', { className: 'ok-line strong' });
+    const total = plan.added.length + plan.removed.length;
+    const refreshCount = () => {
+      const skipped = Object.keys(eligSkip_).filter((k) => eligSkip_[k] === true).length;
+      countNode.textContent = '會套用 ' + (total - skipped) + ' 項，略過 ' + skipped + ' 項。';
+    };
+
+    const checkRow = (key, textNode) => {
+      const line = make('label', { className: 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = eligSkip_[key] !== true;
+      cb.addEventListener('change', () => {
+        eligSkip_[key] = !cb.checked;
+        refreshCount();
+      });
+      line.appendChild(cb);
+      line.appendChild(textNode);
+      return line;
+    };
 
     if (plan.added.length > 0) {
       const box = make('div', { className: 'sec' }, [
         sectionTitle('會加入（' + plan.added.length + ' 項）')
       ]);
       plan.added.forEach((a) => {
-        box.appendChild(make('div', {
-          text: a.postNameTC + '　＋　' + a.nameTC, className: 'vio-row'
-        }));
+        box.appendChild(checkRow(a.key, make('span', {
+          text: a.postNameTC + '　＋　' + a.nameTC
+        })));
       });
       nodes.push(box);
     }
 
     if (plan.removed.length > 0) {
       const box = make('div', { className: 'sec sec-warn' }, [
-        sectionTitle('會移走（' + plan.removed.length + ' 項）'),
-        make('div', {
-          text: '移走是「停用」，不是刪除——紀錄仍然留著。',
-          className: 'muted'
-        })
+        sectionTitle('會移走（' + plan.removed.length + ' 項）')
       ]);
+      // ⚠️ 三件事都要講。Ivan 實測時見到嘅只有「停用不是刪除」一句，
+      // 而佢真正想知嘅係「噉現有嗰幾格點算」——嗰句冇答到佢。
+      const why = make('div', { className: 'sec' });
+      why.appendChild(make('div', {
+        text: '・以後重新生成，系統不會再自動排他做這個崗位。', className: 'ok-line'
+      }));
+      why.appendChild(make('div', {
+        text: '・現有職事表上已經排好的格不會被拿走。'
+          + '下面有哪幾格的，就是那幾格——要改就自己回職事表改。',
+        className: 'ok-line'
+      }));
+      why.appendChild(make('div', {
+        text: '・這是「停用」，不是刪除。紀錄仍然留著，'
+          + '下次在那張表把他的名字打回去就會重新啟用。',
+        className: 'ok-line'
+      }));
+      box.appendChild(why);
+
       plan.removed.forEach((r) => {
-        // ⚠️ 已經排在現有職事表上的人要特別標出來。移走名單**不會**
-        // 把他從已排好的格子拿走，幹事需要知道這一點。
-        const warn = r.assignedCount > 0
-          ? ('　⚠ 他在現有職事表上還有 ' + r.assignedCount
-            + ' 格是這個崗位——移走名單不會把那幾格拿走')
-          : '';
-        box.appendChild(make('div', {
-          text: r.postNameTC + '　－　' + r.nameTC + warn,
-          className: 'vio-row'
-        }));
+        const span = make('span', {
+          text: r.postNameTC + '　－　' + r.nameTC
+        });
+        const line = checkRow(r.key, span);
+        box.appendChild(line);
+        // ⚠️ 唔止講「還有 N 格」——要講**邊幾個主日**。
+        // 一個佢核對唔到嘅數字，同冇講差唔多。
+        if (r.assignedCount > 0) {
+          const dates = (r.assignedDates || []).map((d) => humanDate(d)).join('、');
+          box.appendChild(make('div', {
+            text: '　　⚠ 他在 ' + plan.quarterId + ' 第 ' + plan.versionNo
+              + ' 版還有 ' + r.assignedCount + ' 格是這個崗位'
+              + (dates ? ('：' + dates) : '') + '。那幾格不會被拿走。',
+            className: 'muted'
+          }));
+        }
       });
       nodes.push(box);
     }
 
     if (plan.blocked) {
       openModal('儲存並套用名單', nodes.concat([
-        para('請先回去那張表把認不出的名字改好，再撳一次。', 'muted')
+        para('把上面認不出的名字處理好，再撳一次。'
+          + '如果那是新人，可以直接撳上面那一粒〔這是新人，一併加入〕。', 'muted')
       ]), [button('知道了', () => closeModal(), '')]);
       return;
     }
 
-    if (plan.added.length === 0 && plan.removed.length === 0) {
+    if (total === 0) {
       openModal('儲存並套用名單', [
         para('名單沒有改動，不需要儲存。')
       ], [button('知道了', () => closeModal(), '')]);
       return;
     }
 
+    refreshCount();
+    nodes.push(countNode);
+
     openConfirm({
       title: '儲存並套用名單',
-      bodyNodes: nodes,
+      // ⚠️ 字太細係 Ivan 直接講嘅。呢個彈窗一次要睇幾十行，
+      // 而佢要逐行核對「係咪真係想改呢一項」。
+      // 包一層 `dlg-lg` 而唔係改 `openConfirm()`——Style.html 因為
+      // 改現有規則出過兩次事，加一個 scope 係最細嘅改動。
+      bodyNodes: [make('div', { className: 'dlg-lg' }, nodes)],
       confirmLabel: '確定套用',
       onConfirm: () => {
+        // ⚠️ 只傳**勾住嗰啲**嘅 key。後端仍然會自己重新算一次預覽，
+        // 呢個清單淨係用嚟篩走——見 `EligibilitySheetEditor.gs` 檔頭。
+        const keys = plan.added.concat(plan.removed)
+          .map((x) => x.key)
+          .filter((k) => eligSkip_[k] !== true);
         runAction('套用名單', async () => {
-          const r = await callServerMutating('apiApplyEligibilitySheet', currentQuarterId);
+          const r = await callServerMutating(
+            'apiApplyEligibilitySheet', currentQuarterId, keys);
           resetMainFlowState();
-          const done = [
-            make('div', { text: '已完成', className: 'ok-head' }),
-            para(r.message)
-          ];
-          if (r.stillAssigned && r.stillAssigned.length > 0) {
-            done.push(para('這幾位已經排在現有職事表上，那幾格不會自動改動：', 'muted'));
-            r.stillAssigned.forEach((s) => {
-              done.push(make('div', {
-                text: s.postNameTC + '　' + s.nameTC + '　（' + s.assignedCount + ' 格）',
-                className: 'vio-row'
-              }));
-            });
-          }
-          openModal('名單已套用', done, [button('知道了', () => closeModal(), '')]);
+          renderEligibilityApplyResult(r);
         });
       }
     });
   }
 
-  /* ── 第 5 步：寄出（C 組）────────────────────────────────── */
+  function renderEligibilityApplyResult(r) {
+    const done = [
+      make('div', { text: '已完成', className: 'ok-head' }),
+      para(r.message)
+    ];
 
-  function renderStep5(d) {
+    // ⚠️ 勾咗但重算之後已經唔存在嘅項**一定要講**。
+    // 佢睇緊預覽嗰陣又去改咗嗰張表，係完全正常嘅事——
+    // 但唔講嘅話，佢以為嗰幾項套用咗。
+    if (r.vanished && r.vanished.length > 0) {
+      done.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '你勾選的其中 ' + r.vanished.length + ' 項，在系統重新讀那張表的時候'
+            + '已經不存在了（多數是你看著這個畫面的時候又改過那張表）。'
+            + '那幾項一格都沒有動。再撳一次「儲存並套用名單」會重新看一次。',
+          className: 'lines'
+        })
+      ]));
+    }
+
+    if (r.stillAssigned && r.stillAssigned.length > 0) {
+      done.push(para('這幾位已經排在現有職事表上，那幾格不會自動改動：', 'muted'));
+      r.stillAssigned.forEach((s) => {
+        done.push(make('div', {
+          text: s.postNameTC + '　' + s.nameTC + '　（' + s.assignedCount + ' 格）',
+          className: 'vio-row'
+        }));
+      });
+    }
+
+    if (r.dropdownNote) {
+      done.push(make('div', { className: 'warnbox' }, [
+        make('div', { text: r.dropdownNote, className: 'lines' })
+      ]));
+    }
+
+    openModal('名單已套用', done, [button('知道了', () => closeModal(), '')]);
+  }
+
+  /* ── 第 4 步：寄出（C 組）────────────────────────────────── */
+
+  function renderStepSend(d) {
     const canSend = !!(d.buttons && (
       (d.buttons.review && d.buttons.review.enabled)
       || (d.buttons.official && d.buttons.official.enabled)
       || (d.buttons.resend && d.buttons.resend.enabled)));
     return stepCard({
-      num: 5,
+      num: 4,
       title: '寄出',
       note: '系統只會寄你已經儲存確認的版本。撳落去會先講清楚這一次寄給誰、寄什麼。',
       acts: [stepButton('寄出', openSendDialog, {
@@ -491,12 +654,12 @@
     });
   }
 
-  /* ── 第 6 步：無電郵者的紙本（D 組）─────────────────────── */
+  /* ── 第 5 步：無電郵者的紙本（D 組）─────────────────────── */
 
-  function renderStep6(d, flow) {
+  function renderStepPaper(d, flow) {
     const n = (flow && flow.paperCount) || 0;
     return stepCard({
-      num: 6,
+      num: 5,
       title: n > 0 ? ('要印紙本的有 ' + n + ' 位') : '要印紙本的人',
       note: n > 0
         ? '這幾位查不到電郵，收不到信，但照樣要服侍。'

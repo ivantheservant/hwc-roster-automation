@@ -483,7 +483,11 @@ const COLUMNS = {
     // 只係呢一項唔會落到表上——而嗰個就係「靜靜唔見咗」。
     // 所以 `writeSendLogRows_()` 見到冇呢一欄會寫一句 WARN，
     // 而且**同一份紀錄一定會寫入 AuditLog**（嗰度係自由文字，一定寫得入）。
-    SEND_OPTIONS: 'SendOptions'
+    SEND_OPTIONS: 'SendOptions',
+    // 第四十一輪批次 H 組：轉寄測試地址生效嗰陣，**兩樣都要記**。
+    // 只記其中一樣嘅話，日後查「嗰個人到底收唔收到」係查唔到嘅。
+    INTENDED_EMAIL: 'IntendedEmail',
+    DELIVERED_TO: 'DeliveredTo'
   },
   FINE_TUNE_PROPOSALS: {
     PROPOSAL_ID: 'ProposalID',
@@ -1153,6 +1157,16 @@ const CONFIG_KEYS = {
   //
   // 所以唔靠估：由管理員部署完之後貼一次。留空就唔附連結（只附試算表）。
   WEBAPP_STEWARD_URL: 'WEBAPP_STEWARD_URL',
+  // 第四十一輪批次 E 組：**義工**部署嘅 `/exec` 網址（個人專屬連結用）。
+  //
+  // 同上面嗰個一樣，唔靠 `ScriptApp.getService().getUrl()` 去估——
+  // 呢個專案有兩個部署，嗰個函式只會回其中一個，而喺 trigger 環境
+  // 回嘅可能係 head 部署。
+  //
+  // 個人連結嘅格式：`<呢個網址>?p=<PersonalLinkToken>&q=<QuarterID>`。
+  // 留空 ⇒ 每一封信都唔會有個人專屬連結，而寄出報告會講明有幾多位
+  // 收唔到（唔可以靜靜略過）。
+  WEBAPP_VOLUNTEER_URL: 'WEBAPP_VOLUNTEER_URL',
   // 第十七輪批次階段 C：T1～T4 各自由邊個月開始（逗號分隔嘅四個月份數字）。
   //
   // 點解要放 Config 而唔係寫死：教會嘅季度劃分未必係日曆季度（可能係學期制
@@ -1226,6 +1240,16 @@ const CONFIG_KEYS = {
   GRID_GAP_LABEL: 'GRID_GAP_LABEL',
   GRID_SHOW_LEGEND: 'GRID_SHOW_LEGEND',
   GRID_FOOTER_NOTE: 'GRID_FOOTER_NOTE',
+  // 第四十一輪批次 F 組：PDF 只印職事表本身。
+  //
+  // Ivan 實測：「個人專屬連結、PDF……只要職事表本身就夠。
+  // 不需要『圖例（本季實際格數）』、『本季服侍次數統計』。」
+  //
+  // ⚠️ 刻意做成「匯出的時候截住」而不是「不寫入 grid」：
+  // 那兩段在**試算表上**是有用的（幹事自己核對格數、核對誰做得多），
+  // 只是印出來給義工的那一份不需要。不寫入的話，
+  // 他連自己想看的時候都看不到，那是拿走一個他現在有的東西。
+  PDF_ROSTER_ONLY: 'PDF_ROSTER_ONLY',
   // 階段 A 新增：特別主日（SpecialSundays.SkipPostIDs）跳過的格子專用標籤，
   // 跟「這個崗位本來就不自動生成」（講員／翻譯／獻花等）的 GRID_PENDING_LABEL
   // 區分開——同一個崗位平常會自動生成，只是「這一週」因為特別主日而跳過，
@@ -1283,6 +1307,18 @@ const CONFIG_KEYS = {
   // 第十一輪批次階段 C：ICS 日曆事件的預設崇拜時間（HH:mm，24 小時制，
   // Pacific/Auckland）。個別崗位的提早到場時間見 Posts 的 EarlyArrivalMinutes 欄
   // （見 PostSeed.gs 檔頭說明——為什麼改用 Posts 欄而不是逐一開 Config Key）。
+  // 第四十一輪批次 H 組：**安全地真正寄一次信。**
+  //
+  // 有值嗰陣，每一封信嘅收件人一律改成嗰個地址，**唔理 DRY_RUN 係咩**。
+  // 於是 `DRY_RUN = FALSE` ＋ 呢個設定，就可以走完整條寄信路
+  //（真係產生附件、真係經過 MailApp、真係收到信），
+  // 而**冇任何一封會去到義工手上**。
+  //
+  // ⚠️ 佢最壞嘅失敗方式唔係「轉寄唔到」，係**唔記得閂**——
+  // 上線之後幹事撳「正式發出」，全體一封都收唔到，
+  // 而報告會話「已寄出 51 封」。所以介面、主旨、內文、SendLog、
+  // 上線前檢查五處都要大聲講，見 MailRedirect.gs。
+  MAIL_REDIRECT_ALL_TO: 'MAIL_REDIRECT_ALL_TO',
   ICS_SERVICE_START_TIME: 'ICS_SERVICE_START_TIME',
   ICS_SERVICE_END_TIME: 'ICS_SERVICE_END_TIME'
 };
@@ -1547,6 +1583,10 @@ const DEFAULTS = {
   GRID_GAP_LABEL: GRID_LABELS.GAP,
   GRID_SHOW_LEGEND: true,
   GRID_FOOTER_NOTE: '如未能按上表服侍，請盡早聯絡幹事安排調動。',
+  // 第四十一輪批次 F 組：預設**開啟**（即是 PDF 只印職事表本身）。
+  // 這是 Ivan 直接要求的，不是推論。要看圖例同統計，
+  // 開試算表那一張 grid 就有——那兩段一格都沒有被拿走。
+  PDF_ROSTER_ONLY: true,
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
   REMIND_DEADLINE_DAYS: 7,
@@ -1556,6 +1596,7 @@ const DEFAULTS = {
   // 第二十五輪批次階段 D：留空＝提醒信唔附幹事介面連結。
   // 見 CONFIG_KEYS.WEBAPP_STEWARD_URL 嘅說明。
   WEBAPP_STEWARD_URL: '',
+  WEBAPP_VOLUNTEER_URL: '',
   // 第十六輪批次階段 D：生成前幾多日開始提醒「仲有未確認日期嘅特殊主日」。
   REMIND_UNCONFIRMED_SPECIAL_DAYS: 7,
   // 第十七輪批次階段 C：T1～T4 各自嘅起始月份（日曆季度）。

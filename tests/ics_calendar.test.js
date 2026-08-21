@@ -262,8 +262,12 @@ console.log('\n=== Mailer.gs 整合：ICS 產生失敗唔會令整封信寄唔�
       .test(deliverOneBody));
   check('★ ICS 產生失敗只係 log_(\'WARN\'...)，唔會 return 令呢封信整體失敗',
     /catch \(err\) {\s*log_\('WARN'/.test(deliverOneBody));
+  // ⚠️ 第四十一輪批次 H 組：呢個呼叫而家要收返「實際寄咗去邊」（轉寄測試地址），
+  // 所以佢由一行變成跨行。要守嗰件事（icsAttachment 有傳落去做第 7 個參數）
+  // 一啲都冇變，所以個正則改成容許換行同空白。
   check('★★ deliverOne_ 呼叫 sendRealEmail_ 時傳埋 icsAttachment（第 7 個參數）',
-    /sendRealEmail_\(recipient, subject, bodyHtml, bodyPlain, context, attachment, icsAttachment\)/.test(deliverOneBody));
+    /sendRealEmail_\(\s*recipient,\s*subject,\s*bodyHtml,\s*bodyPlain,\s*context,\s*attachment,\s*icsAttachment\)/
+      .test(deliverOneBody));
 }
 
 console.log('\n=== Mailer.gs 整合：sendRealEmail_ 支援同時夾 PDF 同 ICS 兩個附件 ===');

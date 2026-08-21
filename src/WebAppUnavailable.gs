@@ -234,7 +234,7 @@ function apiSaveUnavailable(payload) {
   if (!personId) {
     return {
       ok: false,
-      message: buildThreePartMessage_('沒有揀人。', '什麼都沒有加入。', ['在上面的下拉揀一位'])
+      message: buildThreePartMessage_('沒有選人。', '什麼都沒有加入。', ['在上面的下拉選一位'])
     };
   }
 
@@ -260,9 +260,9 @@ function apiSaveUnavailable(payload) {
     return {
       ok: false,
       message: buildThreePartMessage_(
-        '揀了「指定崗位」，但一個崗位都沒有勾。',
+        '選了「指定崗位」，但一個崗位都沒有勾。',
         '什麼都沒有改動。',
-        ['勾選至少一個崗位', '或者改揀「全部崗位」'])
+        ['勾選至少一個崗位', '或者改選「全部崗位」'])
     };
   }
 

@@ -226,9 +226,9 @@ console.log('\n=== A：今次用咗咩選項一定要記低 ===');
     { recipientScope: 'PICK', pickedKeys: ['P9001', 'P9002'], attachType: 'NONE', includeIcs: false },
     TPL.OFFICIAL);
   const text = gas.describeSendDecision_(d);
-  check('★★★★ 講得出收件範圍同人數', text.indexOf('自己揀（2 位）') !== -1, text);
+  check('★★★★ 講得出收件範圍同人數', text.indexOf('自己選擇（2 位）') !== -1, text);
   check('★★★★ 講得出附件類型', text.indexOf('不附') !== -1, text);
-  check('★★★★ 講得出有冇日曆檔', text.indexOf('日曆檔=冇') !== -1, text);
+  check('★★★★ 講得出有冇日曆檔（呢一句係寫入 AuditLog 嘅，幹事查得返）', text.indexOf('日曆檔=沒有') !== -1, text);
   check('★★★★★ 而且標明邊幾項係幹事親手改嘅'
     + '——`EmailTemplates` 嗰一欄係當時嘅值，幹事可能今次覆寫過；'
     + '唔標明就查唔到「點解嗰次冇附件」',

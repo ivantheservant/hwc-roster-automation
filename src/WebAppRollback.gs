@@ -101,15 +101,15 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
   }
   if (isNaN(target) || target < 0) {
     return rollbackBlocked_('BAD_TARGET', buildThreePartMessage_(
-      '沒有揀要回到哪一個版本。',
+      '沒有選要回到哪一個版本。',
       '職事表沒有任何改動。',
-      ['在上面的版本清單揀一個，再撳一次']));
+      ['在上面的版本清單選一個，再撳一次']));
   }
   if (target === currentVersionNo) {
     return rollbackBlocked_('TARGET_IS_CURRENT', buildThreePartMessage_(
-      '你揀的第 ' + target + ' 版就是目前這一版。',
+      '你選的第 ' + target + ' 版就是目前這一版。',
       '職事表沒有任何改動。',
-      ['揀一個較早的版本', '如果只是想重新發佈公開連結，用「進階功能 ▸ 重新發佈公開連結」']));
+      ['選一個較早的版本', '如果只是想重新發佈公開連結，用「進階功能 ▸ 重新發佈公開連結」']));
   }
 
   // ── 前置檢查一：未儲存改動（規格 5.3 步 1）────────────────────
@@ -138,7 +138,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
     return rollbackBlocked_('TARGET_EMPTY', buildThreePartMessage_(
       '第 ' + target + ' 版在系統內部沒有任何派工紀錄。',
       '職事表沒有任何改動。',
-      ['揀另一個版本',
+      ['選另一個版本',
         '去「進階功能 ▸ 檢查各版本派工紀錄」看看這一版是不是曾經被清理過']));
   }
 

@@ -274,7 +274,7 @@ function validateRequest_(req, context, assignByKey, conflictKeys) {
       reason: req.personNameText + ' 在 ' + dateText + ' 同時有「' + REQUEST_TYPE.CANNOT_SERVE
         + '」與「' + REQUEST_TYPE.DESIGNATED_SERVE + '」兩筆申報，語意互相矛盾：'
         + '「' + REQUEST_TYPE.CANNOT_SERVE + '」的意思是當日整日不會出席，'
-        + '不可能同時獲指定服侍。系統不會自行揀選保留哪一筆，'
+        + '不可能同時獲指定服侍。系統不會自行選擇保留哪一筆，'
         + '請刪除其中一筆（或修正寫錯了的日期／姓名），再重新執行本步驟。'
     };
   }
@@ -1282,7 +1282,7 @@ function describeUnknownRequestDate_(dateText, quarterId) {
   // 只收「儲存格本身是日期值」同「文字 yyyy-MM-dd」。
   if (parseFailed) {
     return '日期「' + text + '」的格式認不出來。只接受兩種寫法：\n'
-      + '　1. 用格內的下拉選單揀（最穩陣，揀完儲存格本身就是日期值）；\n'
+      + '　1. 用格內的下拉選單選（最穩陣，選完儲存格本身就是日期值）；\n'
       + '　2. 手打成 yyyy-MM-dd，例如 2026-11-15（月、日都要兩位數）。\n'
       + '斜線（2026/11/15）、日月倒轉（15/11/2026）、句點、中文年月日、'
       + '全形數字一律不接受——\n'

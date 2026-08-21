@@ -85,7 +85,7 @@ function apiAddPersonForUnresolvedName(payload) {
   // 不講的話幹事會以為加完就萬事俱備，然後那個人一直收不到信而沒有人知道。
   const noEmailNote = String(p.email || '').trim()
     ? ''
-    : '這一位沒有填電郵，所以他收不到信。記得在第 6 步印紙本給他。';
+    : '這一位沒有填電郵，所以他收不到信。記得在第 5 步印紙本給他。';
 
   return {
     ok: true,

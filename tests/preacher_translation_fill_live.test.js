@@ -281,9 +281,9 @@ console.log('\n=== A2：季度完全不存在（連 RosterVersions 都冇任何�
     ['Constants.gs', 'Utils.gs', 'Config.gs', 'SheetReader.gs', 'QuarterStage.gs', 'RosterWriter.gs', 'PreacherTranslationFill.gs'],
     overrides
   );
-  checkThrows('★★ 完全冇任何版本時，訊息講明「完全冇任何已生成嘅版本紀錄」，唔會列出空清單',
+  checkThrows('★★ 完全冇任何版本時，訊息講明「完全沒有任何已生成的版本紀錄」，唔會列出空清單',
     () => gas.apiListPreacherTranslationPending('2026T4'),
-    /目前 RosterVersions 完全冇任何已生成嘅版本紀錄/);
+    /目前 RosterVersions 完全沒有任何已生成的版本紀錄/);
 }
 
 console.log('\n=== A4【核心】儲存後：RosterAssignments 更新、grid 工作表更新、AuditLog 有記錄、唔建新版本 ===');

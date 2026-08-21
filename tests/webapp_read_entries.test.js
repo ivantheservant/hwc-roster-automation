@@ -53,7 +53,9 @@ const gas = loadGasSource([
   'Verify.gs', 'SoftRuleMetrics.gs', 'EmailRecipientsSeed.gs', 'TemplatePreview.gs', 'RequestsSheet.gs',
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Mailer.gs', 'ResendFlow.gs', 'Trigger.gs',
-  'WebAppGuards.gs', 'WebAppDashboard.gs', 'AnnualCombined.gs', 'PreacherTranslationFill.gs', 'WebAppPreQuarter.gs',
+  'WebAppGuards.gs', 'WebAppDashboard.gs',
+  // 第四十一輪批次 H 組：介面頂部嗰個轉寄標籤（buildMailRedirectBadgeText_）。
+  'MailRedirect.gs', 'AnnualCombined.gs', 'PreacherTranslationFill.gs', 'WebAppPreQuarter.gs',
   'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs', 'WebApp.gs'
 ]);
 

@@ -190,6 +190,10 @@ function sendStage(quarterId, versionNo, stage, sendOptions) {
     isDryRun: isDryRun,
     noEmailPeople: noEmailPeople,
     retryCount: retryCount,
+    // 第四十一輪批次 E 組：有幾多位攞唔到個人專屬連結（冇 token，
+    // 或者 Config 冇填義工部署嘅網址）。**一定要報出去**——
+    // 靜靜略過嘅話，嗰幾位收到嘅信會比其他人少一段，而冇人知道。
+    noPersonalLinkCount: context._noPersonalLinkCount || 0,
     durationMs: Date.now() - startedAt
   };
 }
@@ -262,7 +266,11 @@ function buildMailContext_(quarterId, versionNo, stage) {
       // applyPlaceholders_() 的清理機制會處理掉範本裡的 {PublicRosterUrl}，
       // 不會有人收到一封信裡面留低一串花括號。
       PublicRosterUrl: resolvePublicRosterUrlForPlaceholder_(quarterId)
-    }
+    },
+    // 第四十一輪批次 E 組：個人專屬連結要嘅兩樣嘢。
+    // 喺呢度一次過讀好，唔好喺 deliverOne_() 逐個人讀一次表。
+    volunteerBaseUrl: String(getConfig(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),
+    personalTokenById: indexPersonalLinkTokens_()
   };
 }
 
@@ -672,11 +680,41 @@ function deliverOne_(recipient, template, context, isDryRun) {
   // ⚠️ 第四十輪批次 B 組：那條永久連結一律附在信末（見上面的說明）。
   // 範本自己有放就不重複加；這一季沒有連結就整段略過。
   const permanentLink = (context.placeholders || {}).PublicRosterUrl || '';
+
+  // ⚠️ 第四十一輪批次 E 組：**「不附」不等於「什麼都沒有」。**
+  //
+  // 沒有個人專屬連結的話，那一封信對收件人完全沒有用——他只會見到
+  // 一段內文同一條全體共用的連結，找不到自己那幾格。
+  //
+  // 「整季 PDF」那一種刻意沒有：那是「一份大家看的表」，
+  // 附一條每人不同的連結反而更亂。判斷在 attachTypeWantsPersonalLink_()。
+  const decidedAttach = context.sendDecision
+    ? (recipient.type === RECIPIENT_TYPE.LIST
+      ? context.sendDecision.listAttachType : context.sendDecision.attachType)
+    : template.attachType;
+  let personalUrl = '';
+  if (recipient.type === RECIPIENT_TYPE.PERSON
+    && attachTypeWantsPersonalLink_(decidedAttach)) {
+    personalUrl = buildPersonalRosterUrl_(
+      context.volunteerBaseUrl, (context.personalTokenById || {})[recipient.personId],
+      context.quarterId);
+    // ⚠️ 拿不到 token 要記低。靜靜略過的話，那幾位收到的信會比其他人
+    // 少一段，而沒有人知道。`sendStage()` 會把這個數字報出去。
+    if (!personalUrl) {
+      context._noPersonalLinkCount = (context._noPersonalLinkCount || 0) + 1;
+    }
+  }
+  // ⚠️ 次序：個人專屬連結**排在永久連結之前**。
+  // 對收件人來講，「我自己那幾格」比「全體那一份」有用得多。
   const bodyHtml = appendPermanentLinkFooter_(
-    applyPlaceholders_(template.bodyHtml, context.placeholders, recipient, summary),
+    appendPersonalLinkFooter_(
+      applyPlaceholders_(template.bodyHtml, context.placeholders, recipient, summary),
+      personalUrl, true),
     template.bodyHtml, permanentLink, true);
   const bodyPlain = appendPermanentLinkFooter_(
-    applyPlaceholders_(template.bodyPlain, context.placeholders, recipient, summary),
+    appendPersonalLinkFooter_(
+      applyPlaceholders_(template.bodyPlain, context.placeholders, recipient, summary),
+      personalUrl, false),
     template.bodyPlain, permanentLink, false);
 
   if (isDryRun) {
@@ -686,7 +724,12 @@ function deliverOne_(recipient, template, context, isDryRun) {
   }
 
   try {
-    sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attachment, icsAttachment);
+    // 第四十一輪批次 H 組：轉寄生效嗰陣，實際寄去邊要記入 SendLog。
+    const delivered = sendRealEmail_(
+      recipient, subject, bodyHtml, bodyPlain, context, attachment, icsAttachment);
+    base.intendedEmail = recipient.email;
+    base.deliveredTo = (delivered && delivered.toEmail) || recipient.email;
+    base.redirected = !!(delivered && delivered.redirected);
     return Object.assign({}, base, { status: MAIL_STATUS.SENT, attachmentName: attachmentName });
   } catch (err) {
     return Object.assign({}, base, { status: MAIL_STATUS.FAILED, errorMessage: err.message, attachmentName: attachmentName });
@@ -719,7 +762,25 @@ function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attach
     .filter(function (a) { return a && a.blob; })
     .map(function (a) { return a.blob; });
   if (blobs.length > 0) options.attachments = blobs;
-  MailApp.sendEmail(recipient.email, subject, bodyPlain || '', options);
+
+  // ⚠️ 第四十一輪批次 H 組：**轉寄測試地址喺呢度套用，唔喺上游。**
+  //
+  // 擺喺呢度（真正 MailApp.sendEmail() 之前最後一刻）係刻意嘅：
+  // 上游任何一條新加嘅路都自動受保護，唔使記得。
+  // 擺上游就會變成「有一條路唔記得套用」而真係寄咗俾義工。
+  const redirected = applyMailRedirect_(
+    {
+      toEmail: recipient.email,
+      displayName: recipient.displayName,
+      subject: subject,
+      bodyHtml: bodyHtml,
+      bodyPlain: bodyPlain || ''
+    },
+    readMailRedirectTarget_());
+  if (redirected.redirected) options.htmlBody = redirected.bodyHtml;
+
+  MailApp.sendEmail(redirected.toEmail, redirected.subject, redirected.bodyPlain, options);
+  return redirected;
 }
 
 /**
@@ -1208,8 +1269,8 @@ function writeSendLogRows_(outcomes, context) {
   // 呢個專案一直喺度殺嗰個 bug class。所以寫一句 WARN 出嚟。
   // 同一份紀錄一定會寫入 AuditLog（自由文字），所以查得返。
   if (headers.indexOf(COLUMNS.SEND_LOG.SEND_OPTIONS) === -1) {
-    log_('WARN', 'SendLog 冇 ' + COLUMNS.SEND_LOG.SEND_OPTIONS
-      + ' 呢一欄，今次用咗咩寄送選項只會寫入 AuditLog。'
+    log_('WARN', 'SendLog 沒有 ' + COLUMNS.SEND_LOG.SEND_OPTIONS
+      + ' 這一欄，這一次用了什麼寄送選項只會寫入 AuditLog。'
       + '想喺 SendLog 都見到，喺表頭（第 2 行）最尾加一欄叫 '
       + COLUMNS.SEND_LOG.SEND_OPTIONS);
   }
@@ -1245,6 +1306,10 @@ function writeSendLogRows_(outcomes, context) {
     record[C.ERROR_MESSAGE] = o.errorMessage;
     record[C.TRIGGERED_BY] = actor;
     record[C.SEND_OPTIONS] = describeSendDecision_(context.sendDecision);
+    // 第四十一輪批次 H 組：**兩樣都記。** 只記其中一樣，
+    // 日後查「嗰個人到底收唔收到」就查唔到。
+    record[C.INTENDED_EMAIL] = o.intendedEmail === undefined ? o.email : o.intendedEmail;
+    record[C.DELIVERED_TO] = o.deliveredTo === undefined ? o.email : o.deliveredTo;
     return headers.map(function (h) { return record[h] === undefined ? '' : record[h]; });
   });
 

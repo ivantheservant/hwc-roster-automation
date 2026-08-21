@@ -104,6 +104,15 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.PDF_ROSTER_ONLY, type: CONFIG_TYPES.BOOL, group: 'GRID',
+      defaultValue: 'TRUE',
+      description: '匯出 PDF 的時候是不是只印職事表本身，'
+        + '不印底部那段「圖例（本季實際格數）」同「本季服侍次數統計」。'
+        + '那兩段仍然會寫在試算表的職事表上，開表就看得到，只是不印出來。'
+        + '改了即時生效，不需要重新生成版本。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.GRID_FOOTER_NOTE, type: CONFIG_TYPES.STR, group: 'GRID',
       defaultValue: DEFAULTS.GRID_FOOTER_NOTE,
       description: '職事表 grid 最底的一句備註（對照現行人手職事表底部的聯絡人字句）。'
@@ -482,14 +491,26 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, type: CONFIG_TYPES.STR, group: 'PUBLIC',
       defaultValue: DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT,
-      description: '公開/個人頁面日期欄嘅顯示格式，支援 {M}（月）與 {d}（日）。',
+      description: '公開／個人頁面日期欄的顯示格式，支援 {M}（月）與 {d}（日）。',
       editable: 'TRUE'
     },
     {
       key: CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, type: CONFIG_TYPES.STR, group: 'PUBLIC',
       defaultValue: DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE,
-      description: '公開/個人頁面代替「EmptyDisplay=BLANK」崗位空白格嘅通用說明文字'
+      description: '公開／個人頁面代替「EmptyDisplay=BLANK」崗位空白格的通用說明文字'
         + '（例如獻花、翻譯）。留空則維持顯示空白。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, type: CONFIG_TYPES.STR, group: 'WEBAPP',
+      defaultValue: '',
+      description: '義工個人專屬連結那一個部署的 /exec 網址。部署完之後貼一次。留空的話，寄出的信不會有個人專屬連結（幹事只會收到一個「有 N 位沒有個人連結」的提示）。不靠程式自己去問，是因為這個專案有兩個部署，程式問到的可能是另一個。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, type: CONFIG_TYPES.STR, group: 'MAIL',
+      defaultValue: '',
+      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不理 DRY_RUN 是甚麼。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封去到義工手上。留空＝正常寄給收件人本人。',
       editable: 'TRUE'
     },
     // ---- ICS（第十一輪批次階段 C：日曆檔）----
@@ -510,7 +531,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.V0_PROTECT, type: CONFIG_TYPES.BOOL, group: 'GENERATOR',
       defaultValue: 'FALSE',
-      description: '多次生成揀最佳結果後，是否自動為 v0 加上保護（只留 SCRIPT_ACCOUNT_EMAIL 可編輯）。',
+      description: '多次生成選最佳結果後，是否自動為 v0 加上保護（只留 SCRIPT_ACCOUNT_EMAIL 可編輯）。',
       editable: 'TRUE'
     },
     // ---- FINETUNE / MULTIRUN ----
@@ -531,7 +552,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.MULTIRUN_ATTEMPTS, type: CONFIG_TYPES.INT, group: 'MULTIRUN',
       defaultValue: String(DEFAULTS.MULTIRUN_ATTEMPTS),
-      description: '「生成職事表」／「多次生成比較」預設嘗試幾次、揀最貼近歷史基準的一份。',
+      description: '「生成職事表」／「多次生成比較」預設嘗試幾次、選最貼近歷史基準的一份。',
       editable: 'TRUE'
     },
     // ---- WEBAPP ----

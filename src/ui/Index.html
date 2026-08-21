@@ -26,6 +26,12 @@
         <label for="quarter">季度</label>
         <select id="quarter"></select>
         <span class="badge" id="dryRunBadge" hidden></span>
+        <!--
+          第四十一輪批次 H 組：轉寄測試地址。
+          ⚠️ 佢最壞嘅失敗方式係「唔記得閂」——上線之後全體一封都收唔到，
+          而所有畫面同報告都會話一切正常。所以介面頂部一定要有呢個標籤。
+        -->
+        <span class="badge" id="mailRedirectBadge" hidden></span>
       </div>
     </div>
     <div class="topbar-actions">
@@ -122,6 +128,7 @@
   <?!= includeHtml('ui/ScriptZone4') ?>
   <?!= includeHtml('ui/ScriptMainFlow') ?>
   <?!= includeHtml('ui/ScriptSendPaper') ?>
+  <?!= includeHtml('ui/ScriptSuggestion') ?>
   <?!= includeHtml('ui/ScriptRollback') ?>
   <?!= includeHtml('ui/ScriptBoot') ?>
 </body>

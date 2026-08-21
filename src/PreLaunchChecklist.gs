@@ -115,6 +115,35 @@ function buildPreLaunchChecklist_(quarterId) {
       : '所有寄信步驟都會真正寄出電郵，請確保這是你有意的決定，並且已經完成測試。'
   ));
 
+  // 1b. MAIL_REDIRECT_ALL_TO 是否仍然有值（第四十一輪批次 H 組）
+  //
+  // ⚠️ 這一項比 DRY_RUN 更危險，因為它**看起來一切正常**：
+  // 幹事撳「正式發出」，系統報告「已寄出 51 封」、SendLog 全部成功，
+  // 而全體義工一封都收不到——五十一封全部去了同一個測試信箱。
+  //
+  // 所以它不是「請你留意」，是**必須處理**。
+  let redirectTo = '';
+  let redirectReadError = '';
+  try {
+    redirectTo = readMailRedirectTarget_();
+  } catch (err) {
+    // 設定本身有問題（例如填了一個不像電郵的字串）也要報——
+    // 那個情況下寄信會整批拋錯，一封都寄不出。
+    redirectReadError = err.message.split('\n')[0];
+  }
+  items.push(buildChecklistItem_(
+    'MAIL_REDIRECT_ALL_TO（測試用的轉寄地址）',
+    redirectTo === '' && redirectReadError === '',
+    redirectReadError
+      ? ('設定有問題：' + redirectReadError)
+      : (redirectTo ? ('有值：' + redirectTo) : '（空白，正常）'),
+    redirectReadError
+      ? '這個設定填了一個不像電郵地址的值。寄信會整批失敗，一封都寄不出。去 Config 改正，或者清空。'
+      : (redirectTo
+        ? '⚠️ 現在每一封信都會改寄到 ' + redirectTo + '，收件人本人一封都收不到。這個是測試用的設定，上線前一定要把它清空——不清空的話，幹事撳「正式發出」之後系統會報告「已寄出」而全體義工其實一封都沒有收到。'
+        : '沒有設定轉寄，信件會正常寄給收件人本人。這是正確的。')
+  ));
+
   // 2. MAIL_SUBJECT_PREFIX 是否仍有測試字眼
   const subjectPrefix = String(getConfig(CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '') || '');
   const testKeywords = ['test', '測試', 'demo', 'temp', 'sample', 'debug'];
@@ -194,10 +223,10 @@ function buildPreLaunchChecklist_(quarterId) {
   items.push(buildChecklistItem_(
     'Web UI 三層防護（appsscript.json 部署權限／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）',
     webappReady,
-    '第 1 層分兩行講，唔可以混埋：\n'
-      + '　靜態設定（程式讀得到，但只係新部署嘅預設值）：appsscript.json 的 '
+    '第 1 層分兩行講，不可以混在一起：\n'
+      + '　靜態設定（程式讀得到，但只是新部署的預設值）：appsscript.json 的 '
       + 'webapp.access=MYSELF\n'
-      + '　各部署實際存取權（程式讀唔到，必須人手核實）：\n'
+      + '　各部署實際存取權（程式讀不到，必須人手核實）：\n'
       + deploymentCheckLines + '\n'
       + '　　最後一次人手核實：' + MANUAL_DEPLOYMENT_ACCESS_CHECK_.checkedOnDate
       + '（' + MANUAL_DEPLOYMENT_ACCESS_CHECK_.checkedBy + '）\n'
