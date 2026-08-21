@@ -550,6 +550,14 @@ console.log('\n=== E／F：收件人選擇同自行輸入電郵 ===');
     + '——靜靜唔出嗰兩個勾，幹事只會以為系統壞咗',
     /找不到任何現任堂委或執事/.test(read('src/ui/ScriptSendPaper.html')), '');
 
+  check('★★★★★★ 自行輸入嗰格喺**主彈窗**，唔係收喺「自己選擇」入面'
+    + '——收喺入面嘅話，幹事揀「全部應收的人」就永遠見唔到，'
+    + '而佢想做嘅好可能正正就係「全部人 ＋ 多一個地址」',
+    /buildExtraEmailBox\(sendOptions_/.test(paper)
+      && paper.indexOf('buildExtraEmailBox(sendOptions_')
+        < paper.indexOf('function drawSendPickList'), '');
+  check('★★★★★ 而且主確認掣撳落去之前會驗一次格式',
+    /if \(!commitExtraEmails\(sendOptions_\)\) return;/.test(paper), '');
   check('★★★★★ 自行輸入嘅電郵格式唔啱**即刻標紅**，唔係等撳落去先講',
     /input\.classList\.toggle\('bad-input'/.test(common), '');
   check('★★★★★ 後端一樣要驗，而且格式唔啱要**拋錯**唔可以靜靜略過',

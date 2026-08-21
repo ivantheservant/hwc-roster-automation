@@ -128,7 +128,9 @@
       recipientScope: (s.sendOptionDefaults || {}).recipientScope || 'ALL',
       attachType: (s.sendOptionDefaults || {}).attachType || 'NONE',
       includeIcs: !!(s.sendOptionDefaults || {}).includeIcs,
-      pickedKeys: []
+      pickedKeys: [],
+      extraEmails: [],
+      extraEmailsRaw: ''
     };
     sendCandidates_ = null;
     drawSendMain(s);
@@ -258,6 +260,14 @@
       })
     ]));
 
+    // ── 第四十三輪批次 F 組：自行輸入電郵 ──────────────────────
+    //
+    // ⚠️ 一定要擺喺**主彈窗**，唔可以收喺「自己選擇」嗰個子彈窗入面。
+    // 收喺入面嘅話，幹事揀「全部應收的人」就永遠見唔到呢一格——
+    // 而佢想做嘅嘢好可能正正就係「全部人 ＋ 多一個地址」。
+    nodes.push(buildExtraEmailBox(sendOptions_,
+      '這幾個地址會收到同一封信（包括附件），但不會加入人員名單。'));
+
     // ── 喺 REQUESTS_APPLIED 嗰一步，「再寄一次審閱本」仍然做得到 ──
     const actions = [];
     if (s.alsoReview) {
@@ -280,6 +290,9 @@
           setStatus('你選了「自己選擇」，但一位都沒有選。', true);
           return;
         }
+        // ⚠️ 格式唔啱就唔可以行落去。後端一樣會擋（resolveSendOptions_()
+        // 會拋），呢度只係提早講。
+        if (!commitExtraEmails(sendOptions_)) return;
         closeModal();
         routeSend(s.kind, sendOptions_);
       }
@@ -393,13 +406,9 @@
         + '或者收件人名單（EmailRecipients）是空的。'
     }).forEach((n) => nodes.push(n));
 
-    // ── 第四十三輪批次 F 組：自行輸入電郵 ──────────────────────
-    nodes.push(buildExtraEmailBox(sendOptions_, '這幾個地址會收到同一封信（包括附件）。'));
-
     openModal('自己選擇寄給誰', nodes, [
       button('選好了', () => {
         sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
-        if (!commitExtraEmails(sendOptions_)) return;
         drawSendMain(s);
       }, '')
     ].concat(pickListBulkButtons(items, selected, () => redraw())));
