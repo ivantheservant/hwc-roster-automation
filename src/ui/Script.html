@@ -434,6 +434,58 @@
     return nodes;
   }
 
+  /**
+   * 第四十二輪批次 D 組：**「這一次儲存了哪幾格」呢一段，三個出口共用。**
+   *
+   * ⚠️ 三個儲存出口（〔儲存我的修改〕、〔接受這個建議版本〕、
+   * 套用申報）各寫一次嘅話，格式會慢慢長得唔一樣，
+   * 而幹事會以為嗰個係三件唔同嘅事。
+   *
+   * ⚠️ 超過 10 格就只列頭 10 格，並且**明明白白講仲有幾多格**——
+   * 靜靜截斷嘅話，佢會以為系統只動咗十格。
+   *
+   * @param {Object[]} changes `savedChanges`
+   * @param {number=} fallbackCount 攞唔到明細嗰陣至少講返個數
+   * @returns {Node[]} 可以直接 push 落彈窗嘅節點
+   */
+  const SAVED_CHANGE_ROW_LIMIT_UI = 10;
+
+  function savedChangeNodes(changes, fallbackCount) {
+    const list = changes || [];
+    if (list.length === 0) {
+      // 攞唔到明細都要講返個數——**唔可以乜都唔講**。
+      if (fallbackCount > 0) {
+        return [make('div', {
+          text: '套用了 ' + fallbackCount + ' 格改動。', className: 'ok-line'
+        })];
+      }
+      return [];
+    }
+
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle('這一次儲存了這 ' + list.length + ' 格')
+    ]);
+    list.slice(0, SAVED_CHANGE_ROW_LIMIT_UI).forEach((c) => {
+      box.appendChild(make('div', {
+        text: c.serviceDate + '　' + c.postNameTC
+          + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '')
+          + '　' + c.fromName + ' → ' + c.toName
+          // ⚠️ 申報帶嚟嗰啲一定要標出嚟。唔標嘅話，幹事會以為
+          // 嗰幾格係佢自己改嘅——然後去搵一個唔存在嘅記憶。
+          + (c.source === 'REQUEST' ? '（來自修改申報）' : ''),
+        className: 'ok-line'
+      }));
+    });
+    if (list.length > SAVED_CHANGE_ROW_LIMIT_UI) {
+      box.appendChild(make('div', {
+        text: '另有 ' + (list.length - SAVED_CHANGE_ROW_LIMIT_UI)
+          + ' 格，完整清單見版本備註。',
+        className: 'muted'
+      }));
+    }
+    return [box];
+  }
+
   /** 全選／全不選那兩粒掣。兩個名單都要有——五十幾個人逐個撳唔現實。 */
   function pickListBulkButtons(items, selected, onRedraw) {
     return [
@@ -603,6 +655,31 @@
       make('div', { text: label, className: 'err-label' }),
       make('div', { text: text, className: 'err-text' })
     ]);
+  }
+
+  /**
+   * 三段式訊息 ⇒ 一組節點（**唔係錯誤**嗰種場合用，例如確認畫面）。
+   *
+   * ⚠️ 第四十二輪批次 E 組：以前呢啲地方直接 `para(rawMessage)`，
+   * 於是「發生了什麼：」呢個**機器標記**原封不動印咗上畫面。
+   * 拆唔到三段就照原文顯示——**唔可以扮到有三段**。
+   *
+   * @param {string} text 後端嘅三段式訊息
+   * @returns {Node[]} 節點
+   */
+  function threePartNodes(text) {
+    const parsed = parseThreePartMessage(String(text || ''));
+    if (!parsed) return [para(String(text || ''))];
+    const nodes = [errorPart(ERR_LABEL_WHAT, parsed.what), errorPart('現在的情況', parsed.state)];
+    if (parsed.actions.length > 0) {
+      const box = make('div', { className: 'err-part' });
+      box.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
+      const ul = make('ul', { className: 'err-list' });
+      parsed.actions.forEach((a) => ul.appendChild(make('li', { text: a })));
+      box.appendChild(ul);
+      nodes.push(box);
+    }
+    return nodes;
   }
 
   /** 把後端 `buildThreePartMessage_()` 出嚟嘅字串拆返三段。 */

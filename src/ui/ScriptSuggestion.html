@@ -34,11 +34,18 @@
 
     // ⚠️ 一定要講明呢粒掣**乜都唔會改**。唔講嘅話，
     // 幹事撳完唔敢再撳第二次，驚改咗啲嘢。
+    // ⚠️ 第四十二輪批次 E 組：零改動嗰陣兩句自相矛盾——
+    //「你改的 **0 格**全部沒有問題，可以儲存。」跟住「你還沒有改過任何一格。」
+    // 一格都冇改，根本冇嘢可以儲存。呢個係「一個數字係 0 嗰陣，
+    // 文案讀落合唔合理」嗰條問題——每一句由數字砌出嚟嘅字都要問一次。
+    const noChange = r.changes.length === 0;
     nodes.push(make('div', { className: 'statuscard' }, [
       make('div', {
-        text: r.allClear
-          ? ('你改的 ' + r.changes.length + ' 格全部沒有問題，可以儲存。')
-          : '下面幾項要看一看。',
+        text: noChange
+          ? '你還沒有改過任何一格。'
+          : (r.allClear
+            ? ('你改的 ' + r.changes.length + ' 格全部沒有問題，可以儲存。')
+            : '下面幾項要看一看。'),
         className: 'statuscard-title'
       }),
       make('div', {
@@ -62,7 +69,9 @@
       });
       nodes.push(box);
     } else {
-      nodes.push(para('你還沒有改過任何一格。', 'muted'));
+      // ⚠️ 上面張狀態卡已經講咗同一句。喺度再講一次，
+      // 讀落好似系統講咗兩件唔同嘅事。改成講返「噉點做」。
+      nodes.push(para('去〔查看／修改職事表〕在表上改，改完回來再撳這一粒。', 'muted'));
     }
 
     // ── 名字認不出 ──────────────────────────────────────────
@@ -135,9 +144,17 @@
 
   /* ── 二、〔請系統幫我調整〕：產生建議版本 ─────────────────── */
 
-  function openBuildSuggestion() {
+  /**
+   * @param {string=} startFrom 幹事喺「用邊一張做起點」小窗揀嘅答案
+   */
+  function openBuildSuggestion(startFrom) {
     runAction('系統調整中，請稍候', async () => {
-      const r = await callServerMutating('apiBuildSuggestion', currentQuarterId);
+      const r = await callServerMutating(
+        'apiBuildSuggestion', currentQuarterId, startFrom || '');
+      // ⚠️ 第四十二輪批次 A 組：兩張表都改過 ⇒ **問返幹事**，
+      // 唔可以靜靜揀一張。揀錯嗰張就等於靜靜丟咗佢一批改動，
+      // 而佢完全唔會知。
+      if (r.needsChoice) { renderStartPointChoice(r); return; }
       if (!r.ok) {
         // 認唔出嘅名字要擋——理由同儲存嗰條路一樣。
         showErrorModal('請系統幫我調整', new Error(r.message));
@@ -147,28 +164,81 @@
     });
   }
 
+  function renderStartPointChoice(r) {
+    openModal('要用哪一張做起點', [
+      para(r.message),
+      make('div', { className: 'sec' }, [
+        sectionTitle('兩個選擇'),
+        make('div', {
+          text: '・職事表「' + r.gridSheetName + '」——你平時改的那一張',
+          className: 'ok-line'
+        }),
+        make('div', {
+          text: '・建議表「' + r.suggestionSheetName + '」——上一次系統做給你那一張',
+          className: 'ok-line'
+        })
+      ]),
+      // ⚠️ 一定要講明「另一張唔會計」。唔講嘅話佢會以為系統會夾埋兩邊。
+      make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '選了其中一張，另一張上面的改動這一次不會計算在內。'
+            + '兩張都不會被刪走，你可以先開來看清楚，再回來撳。',
+          className: 'lines'
+        })
+      ])
+    ], [
+      button('用職事表', () => { closeModal(); openBuildSuggestion('GRID'); }, ''),
+      button('用建議表', () => { closeModal(); openBuildSuggestion('SUGGESTION'); }, 'secondary'),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
   function renderSuggestionResult(r) {
     const link = make('a', { text: '開啟建議版本（' + r.sheetName + '）', className: 'bigLink' });
     link.href = r.url;
     link.target = '_blank';
     link.rel = 'noopener';
 
+    // ⚠️ 第四十二輪批次 B 組：`systemCount === 0` 嗰陣**唔可以**淨係寫
+    //「藍色格 ＝ 系統建議改的（0 格）」。嗰句要幹事自己推理，
+    // 而佢推理嘅結果多數係「系統壞咗」——Ivan 現場就係噉。
+    // 直接講結論：你改嘅嘢冇違反規則，系統唔使動。
+    const colourBox = make('div', { className: 'sec' }, [
+      sectionTitle('那張表上面的顏色'),
+      make('div', { text: '黃色格 ＝ 你自己改過的（' + r.manualCount + ' 格）',
+        className: 'ok-line' })
+    ]);
+    if (r.systemCount === 0) {
+      colourBox.appendChild(make('div', {
+        text: '你改的都沒有違反規則，系統不需要調整任何東西——所以沒有藍色格。',
+        className: 'ok-line strong'
+      }));
+    } else {
+      colourBox.appendChild(make('div', {
+        text: '藍色格 ＝ 系統建議改的（' + r.systemCount + ' 格）',
+        className: 'ok-line'
+      }));
+      colourBox.appendChild(make('div', {
+        text: '系統改過的格，把滑鼠停在上面會見到它為甚麼改。',
+        className: 'muted'
+      }));
+    }
+
     const nodes = [
       make('div', { text: '建議版本已經做好', className: 'ok-head' }),
+      // ⚠️ 第四十二輪批次 A 組：起點要寫出嚟，俾佢一眼核對得到。
+      // 唔講嘅話，「系統有冇計我啱啱改嗰幾格」呢條問題佢答唔到。
+      make('div', { text: r.startNote || '', className: 'ok-line strong' }),
       link,
-      make('div', { className: 'sec' }, [
-        sectionTitle('那張表上面的顏色'),
-        make('div', { text: '黃色格 ＝ 你自己改過的（' + r.manualCount + ' 格）',
-          className: 'ok-line' }),
-        make('div', { text: '藍色格 ＝ 系統建議改的（' + r.systemCount + ' 格）',
-          className: 'ok-line' }),
-        make('div', {
-          text: '系統改過的格，把滑鼠停在上面會見到它為甚麼改。',
-          className: 'muted'
-        })
-      ]),
+      colourBox,
+      // ⚠️ 第四十二輪批次 A 組：呢一段以前係**假嘅**。
+      // 系統當時只會用第一次嗰個快照，幹事之後改嘅嘢完全冇計。
+      // 而佢照住呢句去做，即係介面呃咗佢。
+      // 而家真係做得到，`tests/suggestion_start_point.test.js` 釘住。
       para('你可以直接在那張表上再改，改完回來再撳一次〔請系統幫我調整〕，'
-        + '系統會用你改完之後那一版做起點再算一次。可以重複到你滿意為止。')
+        + '系統會重新讀那一張表做起點再算一次。可以重複到你滿意為止。'),
+      para('如果你改的是正式那一張職事表（不是建議表），系統就會用正式那一張做起點。'
+        + '兩張都改過的話，它會先問你要用哪一張。', 'muted')
     ];
 
     // ⚠️ 系統調整完仍然違反規則嘅格**一定要講出嚟**。
@@ -219,10 +289,14 @@
         runAction('儲存中，請稍候', async () => {
           const r = await callServerMutating('apiAcceptSuggestion', currentQuarterId);
           resetMainFlowState();
+          // ⚠️ 第四十二輪批次 D 組：唔可以淨係講「2 格改動」。
+          // 一個數字證明唔到系統動嗰兩格就係佢改嗰兩格。
+          // 用返共用元件——同〔儲存我的修改〕嗰邊同一份碼。
           const nodes = [
-            make('div', { text: r.message, className: 'ok-head' }),
+            make('div', { text: r.message, className: 'ok-head' })
+          ].concat(savedChangeNodes(r.savedChanges, r.cellCount)).concat([
             para('第 ' + r.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted')
-          ];
+          ]);
           if (r.publishFailed) {
             nodes.push(make('div', { className: 'warnbox' }, [
               make('div', {

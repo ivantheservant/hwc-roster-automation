@@ -104,6 +104,14 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.GO_LIVE_QUARTER_ID, type: CONFIG_TYPES.STR, group: 'SYSTEM',
+      defaultValue: '',
+      description: '哪一個季度是真正要上線那一季（例如 2027T1）。'
+        + '第 1 步指向這一季的時候，確認畫面會額外講一句「這一季是實際要上線的季度」，'
+        + '讓你撳之前知道自己動的是那一季。留空 ＝ 不會出現那一句。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.PDF_ROSTER_ONLY, type: CONFIG_TYPES.BOOL, group: 'GRID',
       defaultValue: 'TRUE',
       description: '匯出 PDF 的時候是不是只印職事表本身，'

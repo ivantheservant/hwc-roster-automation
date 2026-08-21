@@ -221,7 +221,13 @@ function readGridTextFromSheet_(sheetName, timezone) {
   const result = {};
   values.forEach(function (row) {
     const dateStr = toDateString(row[0], timezone);
-    if (!dateStr) return;
+    // ⚠️ 第四十二輪批次 A 組：**一定要嚴格**。
+    //
+    // `toDateString()` 認不出的時候會**原樣回傳**（那是它刻意的，
+    // 為了讀得返歷史資料）。所以「不是空字串」不等於「是一個日期」——
+    // 圖例那幾行、最底那行指紋，全部都會變成一個看起來合法的 key，
+    // 而那些假 key 會令兩次指紋比對永遠對不上。
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
     for (let c = 3; c < keys.length; c++) {
       const key = String(keys[c] || '');
       if (key.indexOf('#') === -1) continue;
@@ -235,29 +241,29 @@ function readGridTextFromSheet_(sheetName, timezone) {
 /**
  * 建議版本的內容。**純計算，不寫任何工作表。**
  *
- * ⚠️ 起點是「幹事現在看著那一版」——如果建議表已經存在，起點就是**它**。
- * 這樣他就可以在建議表上再改、再撳一次調整，重複到滿意為止
- * （Ivan 明確要求這一點）。
+ * ⚠️ 第四十二輪批次 A 組：起點**由呼叫端明確傳入**，
+ * 不再在這裡靠「建議表在不在」猜（那個猜法就是現場那個 bug——
+ * 幹事在正式表上改的兩格被當成不存在）。
+ *
+ * ⚠️ **每一次叫都重新讀當下那一張表**，不重用任何快照。
+ * `buildFineTuneContext_()` 每次都重讀正式那一張；起點是建議表的時候，
+ * `readGridTextFromSheet_()` 每次都重讀建議表。
  *
  * @param {string} quarterId 季度 ID
+ * @param {Object} start `resolveSuggestionStartPoint_()` 的結果
  * @returns {Object} {versionNo, rows, manualKeys, systemKeys, notes, ...}
  */
-function buildSuggestionState_(quarterId) {
-  const versionNo = findLatestVersionNo(quarterId);
-  if (versionNo < 0) {
-    throw new Error(buildThreePartMessage_(
-      '這一季還沒有生成過任何版本。', '什麼都沒有改動。', ['先在第 1 步生成職事表']));
-  }
+function buildSuggestionState_(quarterId, start) {
+  const versionNo = start.versionNo;
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const context = buildFineTuneContext_(quarterId, versionNo);
 
-  // 建議表已經存在 ⇒ 以它為起點（他在上面再改過）。
-  const suggestionName = buildSuggestionSheetName_(quarterId, versionNo);
-  const hasSuggestion = !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(suggestionName);
-  if (hasSuggestion) {
-    context.gridValues = readGridTextFromSheet_(suggestionName, timezone);
+  if (start.source === SUGGESTION_START.SUGGESTION) {
+    context.gridValues = readGridTextFromSheet_(start.suggestionSheetName, timezone);
   }
+  // `SUGGESTION_START.GRID` ⇒ 原封不動用 `buildFineTuneContext_()` 讀返嚟那一份，
+  // 即是正式那一張職事表當下的內容。
 
   // ── 一、幹事那一版（把 grid 疊加落上一版）─────────────────────
   //
@@ -420,12 +426,40 @@ function proposeMinimalFixFromState_(context, analysis) {
  * ⚠️ 它**不會**碰 `RosterAssignments`。建議表是一張獨立的工作表，
  * 幹事撳〔接受這個建議版本〕之前，正式資料一格都沒有變。
  *
+ * ⚠️ 第四十二輪批次 A 組：起點每次重新判斷。兩張表都改過的時候
+ * **回一個 `needsChoice`，由幹事揀**——不自己靜靜揀一張。
+ *
  * @param {string} quarterId 季度 ID
+ * @param {string=} startFrom `GRID` 或者 `SUGGESTION`（幹事在小窗揀的答案）
  * @returns {Object} {ok, sheetName, url, manualCount, systemCount, ...}
  */
-function apiBuildSuggestion(quarterId) {
+function apiBuildSuggestion(quarterId, startFrom) {
   assertWebAppRequestAllowed_();
-  const built = buildSuggestionState_(quarterId);
+
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) {
+    throw new Error(buildThreePartMessage_(
+      '這一季還沒有生成過任何版本。', '什麼都沒有改動。', ['先在第 1 步生成職事表']));
+  }
+
+  const start = resolveSuggestionStartPoint_(quarterId, versionNo, startFrom);
+  if (start.needsChoice) {
+    return {
+      ok: false,
+      needsChoice: true,
+      versionNo: versionNo,
+      gridSheetName: start.gridSheetName,
+      suggestionSheetName: start.suggestionSheetName,
+      reason: start.reason,
+      message: start.reason === 'NO_FINGERPRINT'
+        ? '系統看不出上一次的建議表是由哪一版算出來的（那一張可能是舊版本，'
+          + '或者最底那一行被刪掉了）。要用哪一張做起點，請你決定。'
+        : '你在兩張表上都改過。要用哪一張做起點，請你決定——'
+          + '選了其中一張，另一張上面的改動這一次不會計算在內。'
+    };
+  }
+
+  const built = buildSuggestionState_(quarterId, start);
   if (built.blocked) {
     return {
       ok: false,
@@ -442,11 +476,25 @@ function apiBuildSuggestion(quarterId) {
   const sheetName = buildSuggestionSheetName_(quarterId, built.versionNo);
   const written = writeSuggestionSheet_(quarterId, built, sheetName);
 
+  // ── 記低這一次的兩個指紋 ────────────────────────────────────
+  //
+  // ⚠️ 建議表那一個指紋要**讀返出嚟先算**，不可以用寫入之前那份資料算。
+  // 用同一個 `readGridTextFromSheet_()` 讀，下一次比對才會是同一把尺；
+  // 兩把尺的話，幹事一格都沒有改，系統都會以為他改過。
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const gridFp = fingerprintGridText_(
+    readGridTextFromSheet_(start.gridSheetName, timezone));
+  const suggestionFp = fingerprintGridText_(
+    readGridTextFromSheet_(sheetName, timezone));
+  writeSuggestionFingerprints_(
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName), gridFp, suggestionFp);
+
   writeAuditLog_({
     action: 'SUGGESTION_BUILT',
     targetSheet: sheetName,
     targetCell: '',
-    oldValue: '',
+    oldValue: '起點：' + (start.source === SUGGESTION_START.SUGGESTION
+      ? start.suggestionSheetName : start.gridSheetName),
     newValue: '幹事改了 ' + Object.keys(built.manualKeys).length + ' 格，系統再改了 '
       + Object.keys(built.systemKeys).length + ' 格'
   });
@@ -456,6 +504,12 @@ function apiBuildSuggestion(quarterId) {
     versionNo: built.versionNo,
     sheetName: sheetName,
     url: buildGridSheetUrl_(sheetName),
+    // ⚠️ 畫面上一定要講明起點——讓幹事一眼核對得到。
+    // 不講的話，「系統有沒有計算我剛才改的那幾格」這條問題他答不出。
+    startSource: start.source,
+    startSheetName: start.source === SUGGESTION_START.SUGGESTION
+      ? start.suggestionSheetName : start.gridSheetName,
+    startNote: describeSuggestionStart_(start),
     manualCount: Object.keys(built.manualKeys).length,
     systemCount: Object.keys(built.systemKeys).length,
     // ⚠️ 系統改完之後仍然違反規則的格**一定要講出來**。
@@ -524,8 +578,13 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
     ['這是建議版本，不是正式版本。你在這裡改甚麼都不會影響正式職事表。'],
     ['黃色格 ＝ 你自己改過的', '藍色格 ＝ 系統建議改的'],
     ['系統改過的格，把滑鼠停在上面會見到它為甚麼改。'],
+    // ⚠️ 第四十二輪批次 A 組：這一句以前是**假的**——系統當時只會用
+    // 第一次那個快照。現在真的做得到（見 `resolveSuggestionStartPoint_()`），
+    // 而且有測試釘住。任何一句「系統會…」都要有一條測試證明它真的會。
     ['改完可以回介面再撳一次「請系統幫我調整」，'
-      + '系統會用你改完之後這一版做起點再算一次。']
+      + '系統會重新讀這一張表做起點再算一次。'],
+    ['如果你改的是正式那一張職事表（不是這一張），'
+      + '系統就會用正式那一張做起點。兩張都改過的話，它會問你要用哪一張。']
   ];
   legend.forEach(function (line, i) {
     sheet.getRange(i + 1, 1, 1, Math.max(2, line.length)).setValues(
@@ -633,11 +692,24 @@ function apiAcceptSuggestion(quarterId) {
     newValue: 'v' + created.versionNo + '（' + resolved.changes.length + ' 格）'
   });
 
+  // ⚠️ 第四十二輪批次 D 組：**逐格列出來**，不是只給一個數字。
+  // 「已經接受建議，儲存成第 10 版（2 格改動）」證明不到系統動的
+  // 就是他改的那兩格。三個儲存出口共用 `buildSavedChangeRows_()`。
+  const acceptPostNames = {};
+  (context.posts || []).forEach(function (p) { acceptPostNames[p.postId] = p.postNameTC; });
+
   return {
     ok: true,
     versionNo: created.versionNo,
     baseVersionNo: versionNo,
     cellCount: resolved.changes.length,
+    savedChanges: buildSavedChangeRows_(
+      (resolved.changes || []).map(function (c) {
+        return {
+          serviceDate: c.serviceDate, postId: c.postId, slotIndex: c.slotIndex,
+          fromName: c.originalName, toName: c.manualText
+        };
+      }), acceptPostNames, 'MANUAL'),
     publishFailed: publish.failed,
     publishError: publish.message,
     message: '已經接受建議，儲存成第 ' + created.versionNo + ' 版（'
@@ -697,4 +769,233 @@ function apiGetSuggestionState(quarterId) {
     sheetName: has ? sheetName : '',
     url: has ? buildGridSheetUrl_(sheetName) : ''
   };
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十二輪批次 A 組：**每一次撳〔請系統幫我調整〕都要重新讀當下的表。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 現場（2026-08-21 晚）
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ *   1. 改兩格 → 撳調整 → 建議表出現，報「你自己改過的（2 格）」
+ *   2. 撳〔稍後再決定〕
+ *   3. **在正式那一張職事表再改另外兩格**
+ *   4. 再撳調整 ⇒ 系統仍然報 2 格，把第 3 步那兩格當成不存在
+ *
+ * 成因：上一輪寫成「建議表存在 ⇒ 一律以建議表做起點」。
+ * 而建議表是第 1 步那一刻的**快照**——幹事之後在正式表上改的東西
+ * 完全不在裡面。
+ *
+ * ⚠️ 但真正嚴重的不是漏了兩格，是**建議表上面自己寫住**：
+ *
+ *   「改完可以回介面再撳一次『請系統幫我調整』，
+ *     系統會用你改完之後這一版做起點再算一次。」
+ *
+ * 介面明文承諾了一件系統不會做的事。**這比沒有這個功能更差**——
+ * 沒有功能他會自己想辦法，有一句假承諾他會相信它，然後照著做，
+ * 而系統靜靜地做另一件事。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 這一輪的做法
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 起點不再靠「建議表在不在」猜，改成**逐張表比對指紋**：
+ *
+ * | 正式表改過 | 建議表改過 | 起點 |
+ * |---|---|---|
+ * | ✗ | ✗ | 建議表（重撳一次結果一樣，這樣最穩定） |
+ * | ✓ | ✗ | **正式表**（就是現場那個情況） |
+ * | ✗ | ✓ | 建議表 |
+ * | ✓ | ✓ | **問幹事**，不自己揀 |
+ *
+ * ⚠️ 最後那一行是刻意的。兩張表都改過的時候，任何一個自動選擇都會
+ * 靜靜丟掉他其中一批改動——而他不會知道。**寧可多問一次。**
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️ 指紋放在哪裡，為什麼
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 放在**建議表自己最底那一行**（`[起點指紋]` 開頭），不是
+ * `PropertiesService`。理由：
+ *
+ *   • Properties 是一份**離開了那張表的**狀態。幹事手動刪走建議表之後，
+ *     Properties 仍然留著一組指向一張不存在的表的指紋——
+ *     那正正是這個專案一直在殺的「兩個真相來源」。
+ *   • 指紋跟表一齊生、一齊死，就不可能對不上。
+ *
+ * ⚠️ 那一行讀不到（舊的建議表、或者被人刪走了）⇒ **當成兩張都改過**，
+ * 即是問幹事。不可以猜——猜錯的代價是靜靜丟掉他的改動。
+ */
+
+/**
+ * 一份 grid 文字的指紋。**同一份內容一定出同一個字串。**
+ *
+ * ⚠️ 一定要排序。`Object.keys()` 的次序在規格上沒有保證，
+ * 靠它的話，同一份內容有機會算出兩個指紋 ⇒ 系統會以為幹事改過，
+ * 然後每次都問他一條沒有意義的問題。
+ *
+ * @param {Object.<string, string>} map `readGridTextFromSheet_()` 的結果
+ * @returns {string} 指紋
+ */
+function fingerprintGridText_(map) {
+  const keys = Object.keys(map || {}).sort();
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  keys.forEach(function (k) {
+    const s = k + ' ' + String(map[k] === undefined ? '' : map[k]) + '';
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      h1 = (h1 ^ c) * 16777619 >>> 0;
+      h2 = (h2 + c * 31 + (h2 << 5)) >>> 0;
+    }
+  });
+  return keys.length + '-' + h1.toString(16) + h2.toString(16);
+}
+
+/** 建議表最底那一行的標記。 */
+const SUGGESTION_FINGERPRINT_MARK = '[起點指紋]';
+
+/**
+ * 把這一次的兩個指紋寫落建議表最底。
+ *
+ * ⚠️ `readGridTextFromSheet_()` 只收「第一欄係嚴格 `yyyy-MM-dd`」那些行，
+ * 所以這一行不可能被當成資料讀入去。
+ *
+ * @param {Sheet} sheet 建議表
+ * @param {string} gridFp 產生這一次建議的時候，正式表的指紋
+ * @param {string} suggestionFp 剛剛寫好的建議表本身的指紋
+ */
+function writeSuggestionFingerprints_(sheet, gridFp, suggestionFp) {
+  const row = sheet.getLastRow() + 2;
+  sheet.getRange(row, 1, 1, 3).setValues([[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp]]);
+  sheet.hideRows(row);
+}
+
+/**
+ * 讀返那兩個指紋。**讀不到就回 `null`，不猜。**
+ *
+ * @param {string} sheetName 建議表名稱
+ * @returns {{gridFp: string, suggestionFp: string}|null}
+ */
+function readSuggestionFingerprints_(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  for (let r = lastRow; r >= 1 && r > lastRow - 6; r--) {
+    const row = sheet.getRange(r, 1, 1, 3).getValues()[0];
+    if (String(row[0] || '').trim() !== SUGGESTION_FINGERPRINT_MARK) continue;
+    const gridFp = String(row[1] || '').trim();
+    const suggestionFp = String(row[2] || '').trim();
+    if (!gridFp || !suggestionFp) return null;
+    return { gridFp: gridFp, suggestionFp: suggestionFp };
+  }
+  return null;
+}
+
+/** 起點的兩種來源。 */
+const SUGGESTION_START = { GRID: 'GRID', SUGGESTION: 'SUGGESTION' };
+
+/**
+ * 這一次要以哪一張表做起點。**每一次撳都重新讀，不重用任何快照。**
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string=} requested 幹事在「兩張都改過」的小窗揀了哪一張
+ * @returns {Object} {source, needsChoice, gridChanged, suggestionChanged, ...}
+ */
+function resolveSuggestionStartPoint_(quarterId, versionNo, requested) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const gridName = buildRosterSheetName_(quarterId, versionNo);
+  const suggestionName = buildSuggestionSheetName_(quarterId, versionNo);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const base = {
+    gridSheetName: gridName,
+    suggestionSheetName: suggestionName,
+    versionNo: versionNo
+  };
+
+  if (!ss.getSheetByName(suggestionName)) {
+    // 冇建議表 ⇒ 起點一定係正式表。冇任何歧義。
+    return Object.assign({}, base, {
+      source: SUGGESTION_START.GRID,
+      hasSuggestion: false,
+      needsChoice: false,
+      gridChanged: false,
+      suggestionChanged: false,
+      reason: 'NO_SUGGESTION'
+    });
+  }
+
+  const gridFpNow = fingerprintGridText_(readGridTextFromSheet_(gridName, timezone));
+  const suggestionFpNow = fingerprintGridText_(readGridTextFromSheet_(suggestionName, timezone));
+  const stored = readSuggestionFingerprints_(suggestionName);
+
+  // ⚠️ 幹事明確揀過就照佢揀嗰個。呢個係「兩張都改過」嗰個小窗嘅答案。
+  if (requested === SUGGESTION_START.GRID || requested === SUGGESTION_START.SUGGESTION) {
+    return Object.assign({}, base, {
+      source: requested,
+      hasSuggestion: true,
+      needsChoice: false,
+      gridChanged: !stored || stored.gridFp !== gridFpNow,
+      suggestionChanged: !stored || stored.suggestionFp !== suggestionFpNow,
+      reason: 'OPERATOR_CHOSE'
+    });
+  }
+
+  if (!stored) {
+    // ⚠️ 讀唔到指紋（舊嘅建議表、或者最底嗰行俾人刪咗）
+    // ⇒ 唔可以猜。問返幹事。
+    return Object.assign({}, base, {
+      source: '',
+      hasSuggestion: true,
+      needsChoice: true,
+      gridChanged: true,
+      suggestionChanged: true,
+      reason: 'NO_FINGERPRINT'
+    });
+  }
+
+  const gridChanged = stored.gridFp !== gridFpNow;
+  const suggestionChanged = stored.suggestionFp !== suggestionFpNow;
+
+  if (gridChanged && suggestionChanged) {
+    return Object.assign({}, base, {
+      source: '',
+      hasSuggestion: true,
+      needsChoice: true,
+      gridChanged: true,
+      suggestionChanged: true,
+      reason: 'BOTH_CHANGED'
+    });
+  }
+
+  return Object.assign({}, base, {
+    // 兩張都冇改過 ⇒ 用建議表（重撳一次結果一樣，最穩定）。
+    // 只有正式表改過 ⇒ 用正式表（就係現場嗰個情況）。
+    source: gridChanged ? SUGGESTION_START.GRID : SUGGESTION_START.SUGGESTION,
+    hasSuggestion: true,
+    needsChoice: false,
+    gridChanged: gridChanged,
+    suggestionChanged: suggestionChanged,
+    reason: gridChanged ? 'GRID_CHANGED'
+      : (suggestionChanged ? 'SUGGESTION_CHANGED' : 'NEITHER_CHANGED')
+  });
+}
+
+/**
+ * 起點那一句人話。**畫面上一定要講**，讓幹事一眼核對得到。
+ * @param {Object} start `resolveSuggestionStartPoint_()` 的結果
+ * @returns {string} 一句
+ */
+function describeSuggestionStart_(start) {
+  if (start.source === SUGGESTION_START.SUGGESTION) {
+    return '這一次的起點是建議表「' + start.suggestionSheetName + '」'
+      + (start.suggestionChanged ? '（你在上面改過）' : '（跟上一次一樣，沒有改過）') + '。';
+  }
+  return '這一次的起點是職事表「' + start.gridSheetName + '」（第 '
+    + start.versionNo + ' 版）'
+    + (start.gridChanged ? '，包括你剛才在上面改的那幾格' : '') + '。';
 }

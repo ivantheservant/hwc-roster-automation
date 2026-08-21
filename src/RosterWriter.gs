@@ -1190,3 +1190,75 @@ function applyGridColumnWidthsForA4_(sheet, layout) {
     sheet.getRange(3, 4, layout.rows.length, nameColumnCount).setWrap(true);
   }
 }
+
+/**
+ * 第四十二輪批次 D 組：**兩個版本之間，逐格邊個變成邊個。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 為什麼要有這個
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 儲存的三個出口之中，「套用修改申報」那一條**沒有一份逐格清單**：
+ * `applyRequests_()` 回傳的是逐筆申報的結果（`outcomes`），
+ * 而不是「哪一格由誰變成誰」。幹事撳完只見到「套用了 3 筆申報」，
+ * 核對不到系統實際動了哪幾格。
+ *
+ * 這裡不改 `applyRequests_()` 的寫入邏輯——**改它就等於在一條
+ * 已經跑過真人的路上動刀**。改為在它寫完之後，比對兩個版本的
+ * `RosterAssignments`，直接讀出結果。
+ *
+ * ⚠️ 比對讀的是 `PersonNameSnapshot`（即是那一版當時顯示的名字），
+ * 不是重新解析 `PersonID`——重新解析會令自由文字（外請講員）變成空白，
+ * 而那正正是第三十六／三十七輪連續修過兩次的那一類。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} fromVersionNo 舊版本
+ * @param {number} toVersionNo 新版本
+ * @returns {Object[]} `{serviceDate, postId, slotIndex, fromName, toName}`
+ */
+function diffVersionAssignments_(quarterId, fromVersionNo, toVersionNo) {
+  // ⚠️ 同一個版本 ⇒ 一定沒有分別。**一定要在這裡擋住。**
+  //
+  // 不擋的話，下面那一句 `if (v === fromVersionNo) … else …` 會把全部列
+  // 放進 `before`、`after` 一列都沒有，於是**整季每一格都會被算成
+  // 「某某 → （空白）」**——幹事會見到一份幾十行、寫住全體都被清空的清單，
+  // 而實際上一格都沒有動過。
+  if (Number(fromVersionNo) === Number(toVersionNo)) return [];
+
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const before = {};
+  const after = {};
+
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    const v = Number(row[A.VERSION_NO]);
+    if (v !== fromVersionNo && v !== toVersionNo) return;
+    const key = cellKey_(
+      toDateString(row[A.SERVICE_DATE], timezone), row[A.POST_ID], row[A.SLOT_INDEX]);
+    const name = String(row[A.PERSON_NAME_SNAPSHOT] || '').trim();
+    if (v === fromVersionNo) before[key] = name; else after[key] = name;
+  });
+
+  const out = [];
+  // ⚠️ 兩邊嘅 key 都要行——一格由「有人」變成「唔存在」（或者相反）
+  // 都係一個改動。只行其中一邊就會靜靜漏咗一半。
+  const keys = {};
+  Object.keys(before).forEach(function (k) { keys[k] = true; });
+  Object.keys(after).forEach(function (k) { keys[k] = true; });
+
+  Object.keys(keys).sort().forEach(function (key) {
+    const b = before[key] === undefined ? '' : before[key];
+    const a = after[key] === undefined ? '' : after[key];
+    if (b === a) return;
+    const parts = key.split('|');
+    out.push({
+      serviceDate: parts[0],
+      postId: parts[1],
+      slotIndex: Number(parts[2]),
+      fromName: b,
+      toName: a
+    });
+  });
+  return out;
+}

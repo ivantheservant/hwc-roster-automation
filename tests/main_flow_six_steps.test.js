@@ -240,15 +240,34 @@ console.log('\n=== A1【核心】第 1 步：掣上面寫住邊一季 ===');
   check('★★★★ 掣上面嗰個名係人話，唔係機器代號（2099T2）',
     sel.label.indexOf('T2') === -1 && sel.label.indexOf('年') !== -1, sel.label);
 
-  // 規則二：冇揀住任何一季（例如啱啱開頁）⇒ 開始日期最早而又未生成嗰一季。
+  // 規則二（第四十二輪批次 C 組改咗）：冇揀住任何一季 ⇒
+  // **由今日起計**第一個未生成過嘅季度。
+  //
+  // ⚠️ 舊規則係「開始日期最早而又未生成嗰一季」，即係會指去 2098T4
+  //（一個已經完全過去嘅季度）。幹事九成九想做嘅係眼前呢一季，
+  // 而唔係一個兩年前漏咗嘅季度。
   const none = gas.resolveGenerateTargetQuarter_('');
-  checkEqual('★★★★ 冇揀季度 ⇒ 開始日期最早而又未生成過嗰一季', none.quarterId, Q_PAST);
-  checkEqual('★★★★★ 而且**明確講出佢已經過去**'
-    + '（唔講就等於靜靜幫佢做咗一個決定）', none.warn, 'PAST');
+  checkEqual('★★★★★ 冇揀季度 ⇒ **由今日起計**第一個未生成過嘅季度',
+    none.quarterId, Q_NOW);
+  checkEqual('★★★★★ 而且講出佢已經開始咗', none.warn, 'STARTED');
   check('★★★★★ 警告係三段式人話，講得出「而家乜都未改動過」',
     none.warnMessage.indexOf('什麼都沒有改動') !== -1, none.warnMessage);
-  check('★★★★ 而且寫住結束日期，令佢自己分得出係咪真係搞錯咗',
-    none.warnMessage.indexOf('2098-12-28') !== -1, none.warnMessage);
+  check('★★★★★ 而且撳得到（`alreadyGenerated` 係 false）'
+    + '——呢個就係現場嗰個 blocker：粒掣灰咗，幹事永遠測唔到第 1 步',
+    none.alreadyGenerated === false, JSON.stringify(none));
+}
+
+console.log('\n=== A1：只剩下已經過去而又未生成嗰啲 ⇒ 照樣指得到，唔係死路 ===');
+{
+  // ⚠️ 補一個漏咗嘅舊季度係真實會發生嘅事。呢條後備路要留返，
+  // 只係唔可以再排喺「眼前呢一季」前面。
+  const t = gas.resolveGenerateTargetQuarter_(Q_PAST);
+  checkEqual('★★★★★ 直接揀住嗰一季 ⇒ 目標就係佢', t.quarterId, Q_PAST);
+  checkEqual('★★★★★ 而且**明確講出佢已經過去**'
+    + '（唔講就等於靜靜幫佢做咗一個決定）', t.warn, 'PAST');
+  check('★★★★ 寫住結束日期，令佢自己分得出係咪真係搞錯咗',
+    t.warnMessage.indexOf('2098-12-28') !== -1, t.warnMessage);
+  check('★★★★★ 但**冇擋住佢**', t.alreadyGenerated === false, JSON.stringify(t));
 }
 
 console.log('\n=== A1：已經開始咗嘅季度——准許，但要講 ===');
@@ -270,7 +289,35 @@ check('（前置）用真入口填一格講員',
 console.log('\n=== A1：生成咗之後，目標會跳去下一個未生成嘅季度 ===');
 {
   const t = gas.resolveGenerateTargetQuarter_(Q_NOW);
-  checkEqual('★★★★★ 唔會再指住已經生成過嗰一季', t.quarterId, Q_PAST);
+  checkEqual('★★★★★ 唔會再指住已經生成過嗰一季', t.quarterId, Q_NEXT);
+  check('★★★★★ 而且撳得到'
+    + '——第四十二輪批次 C 組現場：粒掣指住一個已經生成過嘅季度然後灰晒，'
+    + '幹事永遠做唔到第 1 步',
+    t.alreadyGenerated === false, JSON.stringify(t));
+  checkEqual('★★★★ 掣旁邊講得出而家有幾多個版本（未生成 ⇒ 0）',
+    t.versionCount, 0);
+}
+
+console.log('\n=== A1【核心】全部季度都生成過 ⇒ 灰掣，而且講清楚下一步去邊 ===');
+{
+  // ⚠️ 呢個就係現場嗰個 blocker 嘅另一半：舊碼喺呢種情況會指住
+  //「開始日期喺今日之後最早嗰一季」，而嗰一季已經生成過 ⇒ 粒掣灰晒，
+  // 同時仲會講「生成日期仲有 9 天」——兩句夾埋讀落好似系統壞咗。
+  check('（前置）補生成埋另外兩季',
+    gas.apiGenerateDraftExecute(Q_PAST) !== undefined
+      && gas.apiGenerateDraftExecute(Q_NEXT) !== undefined);
+
+  const t = gas.resolveGenerateTargetQuarter_('');
+  check('★★★★★ 呢個時候先至可以灰掣', t.alreadyGenerated === true, JSON.stringify(t));
+  checkEqual('★★★★★ 而且係一個獨立嘅警告種類，唔會再算日期警告'
+    + '——「已經全部生成過」同「仲有 9 天到生成日期」擺埋一齊，'
+    + '幹事讀出嚟只會覺得系統壞咗',
+    t.warn, 'ALL_GENERATED');
+  check('★★★★★ 訊息要講清楚下一步去邊（唔係淨係話「唔得」）',
+    t.warnMessage.indexOf('產生下一年度四個季度') !== -1, t.warnMessage);
+  check('★★★★ 而且講埋「想重新生成就去進階與診斷」',
+    t.warnMessage.indexOf('重新生成') !== -1, t.warnMessage);
+  check('★★★★ 掣旁邊講得出而家有幾多個版本', t.versionCount >= 1, 'v=' + t.versionCount);
 }
 
 // =====================================================================

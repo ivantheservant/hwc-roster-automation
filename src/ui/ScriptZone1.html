@@ -791,26 +791,11 @@
       make('div', { text: '已儲存成第 ' + result.versionNo + ' 版', className: 'ok-head' })
     ];
 
-    const changes = result.savedChanges || [];
-    if (changes.length > 0) {
-      const box = make('div', { className: 'sec' }, [
-        sectionTitle('這一次儲存了這 ' + changes.length + ' 格')
-      ]);
-      changes.forEach((c) => {
-        box.appendChild(make('div', {
-          text: humanDate(c.serviceDate) + '　' + c.postNameTC
-            + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '')
-            + '　' + c.fromName + ' → ' + c.toName,
-          className: 'ok-line'
-        }));
-      });
-      nodes.push(box);
-    } else if (result.cellCount > 0) {
-      // 拿唔到明細都要講返個數——**唔可以乜都唔講**。
-      nodes.push(make('div', {
-        text: '套用了 ' + result.cellCount + ' 格改動。', className: 'ok-line'
-      }));
-    }
+    // ⚠️ 第四十二輪批次 D 組：呢一段抽咗做共用元件 `savedChangeNodes()`。
+    // 三個儲存出口（呢度、接受建議、套用申報）用同一份碼——
+    // 各寫一次嘅話格式會慢慢長得唔一樣，而幹事會以為嗰個係三件唔同嘅事。
+    savedChangeNodes(result.savedChanges, result.cellCount)
+      .forEach((n) => nodes.push(n));
 
     if (result.appliedRequestCount > 0) {
       nodes.push(make('div', {

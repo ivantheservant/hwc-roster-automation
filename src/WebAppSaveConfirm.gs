@@ -491,18 +491,14 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
     //
     // 一個「套用了 3 格改動」的數字，證明不到系統改的就是他改的那三格。
     // 逐格寫「由誰改成誰」，他一眼就核對得到。
-    savedChanges: (resolved.changes || []).map(function (c) {
-      return {
-        serviceDate: c.serviceDate,
-        postId: c.postId,
-        postNameTC: savedPostNames[c.postId] || c.postId,
-        slotIndex: c.slotIndex,
-        // 空白也要講得出是空白——寫一個空字串落畫面，
-        // 幹事會以為系統壞了。
-        fromName: c.originalName || '（空白）',
-        toName: c.manualText || '（空白）'
-      };
-    }),
+    //
+    // ⚠️ 第四十二輪批次 D 組：**申報帶來那幾格也要列出來。**
+    // `resolved.changes` 只有幹事親手改的那批；套用申報那條路動了哪幾格，
+    // 這裡本來一句都沒有講——而那條路動的格數往往比他自己改的多。
+    // 由「比對兩個版本」讀出來，不改 `applyRequests_()` 的寫入邏輯。
+    savedChanges: buildSavedChangeRowsForSave_(
+      quarterId, plan.baseVersionNo, created.versionNo,
+      resolved.changes, savedPostNames, hasRequests),
     // ⚠️ 第三十四輪批次甲2：呢兩個數而家由**真正套用嘅結果**出，
     // 唔再由 plan 嗰個「打算套用幾多筆」出。修正之前兩者永遠一樣，
     // 因為根本冇套用過——一個永遠自我印證嘅數字。
@@ -667,4 +663,43 @@ function tryPublishPublicRoster_(quarterId) {
     log_('WARN', 'tryPublishPublicRoster_ 失敗（版本已儲存，唔當全盤失敗）：' + err.message);
     return { failed: true, message: err.message };
   }
+}
+
+/**
+ * 第四十二輪批次 D 組：這一次儲存了什麼，逐格。
+ *
+ * ⚠️ 兩批來源要分得清：
+ *   `MANUAL`　幹事自己在 grid 上改的（`resolved.changes`）
+ *   `REQUEST` 套用修改申報帶來的（比對兩個版本讀出來）
+ *
+ * ⚠️ 同一格兩邊都有 ⇒ **幹事那一批贏**。那是第四十輪定下的規矩
+ *（`plan.overlaps`：幹事已經親手改過那些格，申報不套用）。
+ * 顯示次序要同實際行為一致，否則畫面會講一件事而系統做另一件事。
+ *
+ * ⚠️ 比對失敗不可以令整個儲存變成失敗——版本已經寫好了。
+ * 退回「只列幹事那一批」，並且在 log 講一句。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} baseVersionNo 舊版本
+ * @param {number} newVersionNo 新版本
+ * @param {Object[]} manualChanges `resolved.changes`
+ * @param {Object.<string, string>} postNames `postId` → 崗位中文名
+ * @param {boolean} hasRequests 這一次有沒有走套用申報那一條
+ * @returns {Object[]} 逐格清單
+ */
+function buildSavedChangeRowsForSave_(
+  quarterId, baseVersionNo, newVersionNo, manualChanges, postNames, hasRequests) {
+  const manual = buildSavedChangeRows_(manualChanges, postNames, 'MANUAL');
+  if (!hasRequests) return manual;
+
+  let fromRequests = [];
+  try {
+    fromRequests = buildSavedChangeRows_(
+      diffVersionAssignments_(quarterId, baseVersionNo, newVersionNo), postNames, 'REQUEST');
+  } catch (err) {
+    log_('WARN', 'buildSavedChangeRowsForSave_ 比對唔到兩個版本（版本本身已經儲存好）：'
+      + err.message);
+    return manual;
+  }
+  return mergeSavedChangeRows_(manual, fromRequests);
 }

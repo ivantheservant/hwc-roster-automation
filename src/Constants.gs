@@ -1240,6 +1240,14 @@ const CONFIG_KEYS = {
   GRID_GAP_LABEL: 'GRID_GAP_LABEL',
   GRID_SHOW_LEGEND: 'GRID_SHOW_LEGEND',
   GRID_FOOTER_NOTE: 'GRID_FOOTER_NOTE',
+  // 第四十二輪批次 C 組：**哪一季是真正要上線那一季。**
+  //
+  // Ivan 留了一個季度做真正上線（現時是 2027T1）。第 1 步指向它的時候，
+  // 確認畫面要額外講一句，讓他撳之前知道自己動的是那一季。
+  //
+  // ⚠️ 不可以寫死在程式裡面——那是教會的資料，而且每年都不同。
+  // 留空（預設）就完全不會出現那一句，行為同今日一模一樣。
+  GO_LIVE_QUARTER_ID: 'GO_LIVE_QUARTER_ID',
   // 第四十一輪批次 F 組：PDF 只印職事表本身。
   //
   // Ivan 實測：「個人專屬連結、PDF……只要職事表本身就夠。
@@ -1587,6 +1595,8 @@ const DEFAULTS = {
   // 這是 Ivan 直接要求的，不是推論。要看圖例同統計，
   // 開試算表那一張 grid 就有——那兩段一格都沒有被拿走。
   PDF_ROSTER_ONLY: true,
+  // 第四十二輪批次 C 組：留空 ＝ 冇指定上線季度，完全唔會出現嗰一句。
+  GO_LIVE_QUARTER_ID: '',
   REMIND_STUCK_DAYS: 3,
   REMIND_STUCK_MAX_COUNT: 3,
   REMIND_DEADLINE_DAYS: 7,

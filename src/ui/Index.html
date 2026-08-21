@@ -52,15 +52,21 @@
 
 
   <!--
-    第三十九輪批次 A 組：主流程六步。
+    第三十九輪批次 A 組：主流程（第四十一輪起五步）。
 
-    幹事九成時間只用呢六件事，順序固定。放喺最頂、字大、間距闊。
+    幹事九成時間只用呢幾件事，順序固定。放喺最頂、字大、間距闊。
     落面四區嘅內容**一樣都冇刪**，只係收咗落去。
   -->
   <section class="flow" id="mainFlow">
     <div class="flow-head">
       <span class="flow-head-title">主流程</span>
-      <span class="flow-head-sub">由上而下做，六步</span>
+      <!--
+        ⚠️ 第四十二輪批次 E 組：呢個數字**唔可以寫死**。
+        第四十一輪由六步變五步，而呢度仍然寫住「六步」——
+        一個同實際唔符嘅數字，幹事會以為自己漏咗一步。
+        由 renderMainFlow() 按實際步數填。
+      -->
+      <span class="flow-head-sub" id="flowHeadSub"></span>
     </div>
     <div id="mainFlowBody"></div>
   </section>

@@ -89,11 +89,30 @@
     //
     // ⚠️ 編號一定要重新排好。跳號（第 2 步、第 4 步、第 5 步）
     // 對幹事嚟講就係「我係咪漏咗一步」——一條直線唔可以有窿。
-    root.appendChild(renderStep1(d, flow));
-    root.appendChild(renderStep2(d, flow));
-    root.appendChild(renderStepEligibility());
-    root.appendChild(renderStepSend(d));
-    root.appendChild(renderStepPaper(d, flow));
+    const steps = [
+      renderStep1(d, flow),
+      renderStep2(d, flow),
+      renderStepEligibility(),
+      renderStepSend(d),
+      renderStepPaper(d, flow)
+    ];
+    steps.forEach((node) => root.appendChild(node));
+
+    // ⚠️ 第四十二輪批次 E 組：頁頂嗰個「幾多步」**由實際步數算出嚟**。
+    //
+    // 第四十一輪由六步減成五步，而 `Index.html` 嗰句仍然寫住「六步」，
+    // 足足一輪冇人發現。一個同畫面唔符嘅數字，幹事會以為自己漏咗一步，
+    // 然後去搵一個唔存在嘅第六步。
+    //
+    // 寫死一個數字 ＝ 又一個「兩個真相來源」。呢度改成只有一個。
+    const sub = el('flowHeadSub');
+    if (sub) sub.textContent = '由上而下做，' + cnNumber(steps.length) + '步';
+  }
+
+  /** 一位數嘅中文數字。超出範圍就照回阿拉伯數字——**唔可以回空白**。 */
+  function cnNumber(n) {
+    const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    return (n >= 0 && n <= 10) ? digits[n] : String(n);
   }
 
   /* ── 第 1 步：生成下一季職事表 ─────────────────────────────── */
@@ -114,8 +133,11 @@
     if (t.alreadyGenerated) {
       acts.push(stepButton(label, () => {}, {
         disabled: true,
-        title: '這一季已經生成過了。要重新生成（會覆蓋現有安排）'
-          + '請去下面「進階與診斷」。'
+        title: t.allGenerated
+          ? '所有已建立的季度都生成過了。要建立更下一年的季度，'
+            + '請去「開季前準備 ▸ 產生下一年度四個季度」。'
+          : '這一季已經生成過了。要重新生成（會覆蓋現有安排）'
+            + '請去下面「進階與診斷」。'
       }));
     } else {
       acts.push(stepButton(label, () => openGenerateForTarget(t)));
@@ -125,7 +147,15 @@
       num: 1,
       title: '生成下一季職事表',
       note: t.alreadyGenerated
-        ? (t.label + ' 已經生成過了。要重新生成（會覆蓋現有安排）請去下面「進階與診斷」。')
+        // ⚠️ 第四十二輪批次 C 組：呢種情況粒掣係灰嘅，幹事乜都做唔到。
+        // 所以呢一句唯一有用嘅資訊係「下一步去邊」——
+        // 唔可以再夾一句「生成日期仲有 9 天」落嚟。
+        ? (t.allGenerated
+          ? ('所有已建立的季度都生成過了（' + t.label + ' 現時有 '
+            + t.versionCount + ' 個版本）。要建立更下一年的季度，'
+            + '請去下面「開季前準備 ▸ 產生下一年度四個季度」。')
+          : (t.label + ' 已經生成過了（現時有 ' + t.versionCount
+            + ' 個版本）。要重新生成（會覆蓋現有安排）請去下面「進階與診斷」。'))
         // ⚠️ 第四十輪批次 E 組：掣旁邊要寫住生成日期同距離幾多日。
         //
         // 2026-08-21 實測撞到：粒掣寫住「生成 2027 年 1-3 月職事表」，
@@ -151,14 +181,27 @@
     if (d === null || d === undefined) {
       return '生成日期：' + t.generateOn + '。';
     }
-    if (d > 0) return '生成日期：' + t.generateOn + '（還有 ' + d + ' 天）。';
-    if (d === 0) return '生成日期：' + t.generateOn + '（就是今日）。';
-    return '生成日期：' + t.generateOn + '（已經過了 ' + (-d) + ' 天）。';
+    // ⚠️ 第四十二輪批次 C 組：順帶講埋而家有幾多個版本。
+    // 呢一步係「生成」，而「而家有幾多個版本」就係佢撳落去之前
+    // 最需要知嗰件事——0 個代表全新，唔係 0 就代表佢會多開一版。
+    const v = '　現時有 ' + (t.versionCount || 0) + ' 個版本。';
+    if (d > 0) return '生成日期：' + t.generateOn + '（還有 ' + d + ' 天）。' + v;
+    if (d === 0) return '生成日期：' + t.generateOn + '（就是今日）。' + v;
+    return '生成日期：' + t.generateOn + '（已經過了 ' + (-d) + ' 天）。' + v;
   }
 
-  /** 三段式訊息的第一段——步卡上面只講一句，詳情留在確認畫面。 */
+  /**
+   * 三段式訊息的第一段——步卡上面只講一句，詳情留在確認畫面。
+   *
+   * ⚠️ 第四十二輪批次 E 組：要把「發生了什麼：」呢個**機器標記**剝走。
+   *
+   * 嗰個標記係後端同前端之間嘅分隔符（見 `buildThreePartMessage_()`），
+   * 唔係俾人睇嘅字。第四十一輪已經把彈窗嗰個顯示標籤改成「要留意」，
+   * 但步卡呢一句係直接攞原文第一行，所以嗰五個字照樣漏咗出嚟——
+   * 而嗰句講嘅係「呢一季仲未到生成日期」，根本冇嘢發生過。
+   */
   function firstLineOf(text) {
-    return String(text || '').split('\n')[0];
+    return String(text || '').split('\n')[0].replace(/^發生了什麼：\s*/, '');
   }
 
   /**
@@ -185,11 +228,29 @@
       openGenerateDraft();
     };
 
-    // 已經開始／已經過去 ⇒ **准許，但先講清楚**。
-    if (t.warn) {
+    // ⚠️ 第四十二輪批次 C 組：真正要上線嗰一季，撳之前要額外講一句。
+    // 邊一季係「上線嗰季」由 Config 嘅 `GO_LIVE_QUARTER_ID` 決定，
+    // **唔係寫死**——嗰個係教會嘅資料，而且每年都唔同。
+    const goLiveNote = t.isGoLiveQuarter
+      ? make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一季是實際要上線的季度。生成落去就會用掉它——'
+            + '如果你只是想試一試，請改用一個測試季度。',
+          className: 'lines'
+        })
+      ])
+      : null;
+
+    // 已經開始／已經過去／未到生成日期 ⇒ **准許，但先講清楚**。
+    if (t.warn || goLiveNote) {
       openConfirm({
         title: '生成' + t.label + '職事表',
-        bodyNodes: [para(t.warnMessage)],
+        bodyNodes: (t.warn
+          // ⚠️ 第四十二輪批次 E 組：唔可以 `para(rawMessage)`——
+          // 噉樣會把「發生了什麼：」呢個機器標記原封不動印上畫面。
+          ? threePartNodes(t.warnMessage)
+          : [para('現時有 ' + (t.versionCount || 0) + ' 個版本。')]
+        ).concat([goLiveNote]).filter(Boolean),
         confirmLabel: '知道了，照樣生成',
         onConfirm: () => { closeModal(); go(); }
       });

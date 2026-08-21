@@ -197,8 +197,8 @@ const MUTATIONS = [
     why: '把第 1 步還原成「不理那一季是不是已經開始／已經過去」'
       + '——幹事會在完全沒有提示的情況下生成一個他不打算生成的季度',
     file: 'src/WebAppMainFlow.gs',
-    find: '  if (target.endDate && target.endDate < today) {',
-    replace: '  if (false) {',
+    find: '  } else if (target.endDate && target.endDate < today) {',
+    replace: '  } else if (false) {',
     tests: ['tests/main_flow_six_steps.test.js']
   },
   {
@@ -507,6 +507,127 @@ const MUTATIONS = [
     replace: '  applyGridColumnWidthsForA4_(sheet, layout);\n  if (false) {\n'
       + "    const err = { message: '' };",
     tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
+  {
+    id: 'suggest-start-snapshot',
+    why: '把〔請系統幫我調整〕嘅起點還原成「建議表存在就一律用佢」'
+      + '——即係第四十二輪之前嘅行為：幹事撳完〔稍後再決定〕、'
+      + '再喺正式表改兩格，第二次調整會當嗰兩格唔存在。'
+      + '而建議表上面自己寫住「系統會用你改完之後那一版做起點」',
+    file: 'src/SuggestionSheet.gs',
+    find: '  const start = resolveSuggestionStartPoint_(quarterId, versionNo, startFrom);',
+    replace: '  const start = { versionNo: versionNo, needsChoice: false,\n'
+      + '    source: SpreadsheetApp.getActiveSpreadsheet().getSheetByName(\n'
+      + '      buildSuggestionSheetName_(quarterId, versionNo))\n'
+      + '      ? SUGGESTION_START.SUGGESTION : SUGGESTION_START.GRID,\n'
+      + '    gridSheetName: buildRosterSheetName_(quarterId, versionNo),\n'
+      + '    suggestionSheetName: buildSuggestionSheetName_(quarterId, versionNo) };',
+    tests: ['tests/suggestion_start_point.test.js']
+  },
+  {
+    id: 'suggest-both-silent',
+    why: '把「兩張表都改過」還原成靜靜揀一張'
+      + '——揀錯嗰張就等於靜靜丟咗幹事一批改動，而佢完全唔會知',
+    file: 'src/SuggestionSheet.gs',
+    find: '  if (gridChanged && suggestionChanged) {',
+    replace: '  if (false) {',
+    tests: ['tests/suggestion_start_point.test.js']
+  },
+  {
+    id: 'suggest-no-fp-guess',
+    why: '把「讀唔到指紋」還原成猜一張'
+      + '——舊嘅建議表（呢一輪之前產生嘅）冇指紋，猜錯就會丟咗佢一批改動',
+    file: 'src/SuggestionSheet.gs',
+    find: '  if (!stored) {',
+    replace: '  if (false) {',
+    tests: ['tests/suggestion_start_point.test.js']
+  },
+  {
+    id: 'suggest-loose-date',
+    why: '把建議表嘅日期判斷還原成寬鬆（唔係空字串就當日期）'
+      + '——圖例同最底嗰行指紋會變成假 key，令兩次指紋永遠對唔上，'
+      + '結果每次撳調整都問一條冇意義嘅問題',
+    file: 'src/SuggestionSheet.gs',
+    find: "    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateStr)) return;",
+    replace: '    if (!dateStr) return;',
+    tests: ['tests/suggestion_start_point.test.js']
+  },
+  {
+    id: 'suggest-fp-unsorted',
+    why: '把指紋還原成唔排序'
+      + '——`Object.keys()` 嘅次序冇保證，同一份內容可以算出兩個指紋，'
+      + '於是幹事一格都冇改，系統都會以為佢改過',
+    file: 'src/SuggestionSheet.gs',
+    find: '  const keys = Object.keys(map || {}).sort();',
+    replace: '  const keys = Object.keys(map || {});',
+    tests: ['tests/suggestion_start_point.test.js']
+  },
+  {
+    id: 'step1-skips-upcoming',
+    why: '把第 1 步挑季度還原成「開始日期最早而又未生成嗰一季」'
+      + '——會指去一個兩年前漏咗嘅季度，而唔係眼前呢一季',
+    file: 'src/WebAppMainFlow.gs',
+    find: '  } else if (upcoming.length > 0) {\n    target = upcoming[0];',
+    replace: '  } else if (ungenerated.length > 0) {\n    target = ungenerated[0];',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
+  {
+    id: 'step1-all-generated-date',
+    why: '把「全部季度都生成過」還原成照樣算日期警告'
+      + '——粒掣灰晒，而下面同時講「已經生成過了」同「仲有 9 天到生成日期」，'
+      + '幹事讀出嚟只會覺得系統壞咗',
+    file: 'src/WebAppMainFlow.gs',
+    find: '  if (allGenerated) {',
+    replace: '  if (false) {',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
+  {
+    id: 'diff-same-version',
+    why: '拆走「同一個版本一定冇分別」嗰個閘'
+      + '——整季每一格都會被算成「某某 → （空白）」，'
+      + '幹事會見到一份寫住全體都被清空嘅清單，而實際上一格都冇動過',
+    file: 'src/RosterWriter.gs',
+    find: '  if (Number(fromVersionNo) === Number(toVersionNo)) return [];',
+    replace: '  if (false) return [];',
+    tests: ['tests/save_feedback_and_step1.test.js']
+  },
+  {
+    id: 'diff-one-side-keys',
+    why: '把兩個版本嘅比對還原成只行其中一邊嘅 key'
+      + '——一格由「有人」變成「唔存在」會靜靜漏咗',
+    file: 'src/RosterWriter.gs',
+    find: '  Object.keys(after).forEach(function (k) { keys[k] = true; });',
+    replace: '  // (mutated)',
+    tests: ['tests/save_feedback_and_step1.test.js']
+  },
+  {
+    id: 'saved-rows-manual-wins',
+    why: '把「同一格幹事同申報都有」還原成申報贏'
+      + '——第四十輪定咗幹事親手改嗰啲格申報唔套用，'
+      + '畫面反過嚟講就等於講一件事而系統做另一件事',
+    file: 'src/Utils.gs',
+    find: '    if (seen[key]) return;',
+    replace: '    if (false) return;',
+    tests: ['tests/save_feedback_and_step1.test.js']
+  },
+  {
+    id: 'flow-steps-hardcoded',
+    why: '把頁頂嗰個步數還原成寫死'
+      + '——第四十一輪由六步減成五步之後，嗰句足足一輪冇人發現',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: "    if (sub) sub.textContent = '由上而下做，' + cnNumber(steps.length) + '步';",
+    replace: "    if (sub) sub.textContent = '由上而下做，六步';",
+    tests: ['tests/save_feedback_and_step1.test.js']
+  },
+  {
+    id: 'flow-marker-leaks',
+    why: '把步卡嗰一句還原成唔剝走「發生了什麼：」'
+      + '——嗰句講嘅係「呢一季仲未到生成日期」，根本冇嘢發生過，'
+      + '而幹事見到嗰五個字會即刻以為系統壞咗',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: "    return String(text || '').split('\\n')[0].replace(/^發生了什麼：\\s*/, '');",
+    replace: "    return String(text || '').split('\\n')[0];",
+    tests: ['tests/save_feedback_and_step1.test.js']
   },
 ];
 

@@ -109,9 +109,17 @@ console.log('\n=== I【核心】三段式訊息第一段嘅標籤 ===');
   check('★★★★★ 而且只有一個地方定義（五個呼叫點各自寫一次嘅話，'
     + '改一次字就一定會漏一兩個）',
     /const ERR_LABEL_WHAT = '要留意';/.test(script), '');
-  const useCount = (script.match(/errorPart\(ERR_LABEL_WHAT/g) || []).length
-    + (zone1.match(/errorPart\(ERR_LABEL_WHAT/g) || []).length;
-  check('★★★★★ 五個呼叫點全部用返嗰個常數', useCount === 5, String(useCount));
+  // ⚠️ 第四十二輪批次 E 組加咗 `threePartNodes()`（確認畫面用），
+  // 所以呼叫點由五個變六個。呢度斷言嘅係「**冇一個**寫死嗰四個字」，
+  // 唔係一個會隨住加功能而過時嘅數字。
+  const useInScript = (script.match(/errorPart\(ERR_LABEL_WHAT/g) || []).length;
+  const useInZone1 = (zone1.match(/errorPart\(ERR_LABEL_WHAT/g) || []).length;
+  const useCount = useInScript + useInZone1;
+  check('★★★★★ 全部呼叫點都用返嗰個常數（而家有 ' + useCount + ' 個）',
+    useCount >= 5, String(useCount));
+  check('★★★★★ 而且冇一個 `errorPart()` 寫死咗第一段嘅標籤',
+    !/errorPart\('(發生了什麼|要留意)'/.test(script)
+      && !/errorPart\('(發生了什麼|要留意)'/.test(zone1), '');
 
   // ⚠️ 呢一條係整份最重要嘅。後端傳過嚟嗰個分隔標記係**機器格式**，
   // 唔係俾人睇嘅字。改咗佢就要同時改晒所有拋緊三段式訊息嘅地方，

@@ -882,3 +882,82 @@ function describeAdjacentPairDenominatorGap_(actualPairs, weeksCounted, weeksWit
   return cause + '所以實際只有 ' + actual + ' 對可以比較'
     + '（' + weeksCounted + ' 個主日理論上有 ' + theoretical + ' 對）。';
 }
+
+/**
+ * 第四十二輪批次 D 組：**儲存成功之後，逐格列出這一次儲存了什麼。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 為什麼一個數字不夠
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * Ivan 接受建議版本之後見到的是：
+ *
+ *   「已經接受建議，儲存成第 10 版（**2 格改動**）。」
+ *
+ * 一個「2 格」的數字，證明不到系統動的就是他改的那兩格。
+ * 逐格寫「哪一個主日、哪一個崗位、由誰改成誰」，他一眼就核對得到。
+ *
+ * ⚠️ 三個儲存出口（〔儲存我的修改〕、〔接受這個建議版本〕、套用申報）
+ * **共用這一個**。三邊各寫一次的話，格式會慢慢長得不一樣，
+ * 而幹事會以為那是三件不同的事。
+ *
+ * ⚠️ 超過 `SAVED_CHANGE_ROW_LIMIT` 格就只列前面那批，
+ * 並且**明明白白講還有多少格**——靜靜截斷的話，
+ * 他會以為系統只動了十格。
+ */
+
+/** 儲存回饋最多逐格列幾多行。 */
+const SAVED_CHANGE_ROW_LIMIT = 10;
+
+/**
+ * 把逐格改動整成畫面用的一份清單。**純函式。**
+ *
+ * @param {Object[]} changes `{serviceDate, postId, slotIndex, fromName, toName}`
+ * @param {Object.<string, string>} postNames `postId` → 崗位中文名
+ * @param {string=} source `MANUAL`（幹事自己改）或者 `REQUEST`（來自修改申報）
+ * @returns {Object[]} 每項多了 `postNameTC`／`source`
+ */
+function buildSavedChangeRows_(changes, postNames, source) {
+  return (changes || []).map(function (c) {
+    return {
+      serviceDate: c.serviceDate,
+      postId: c.postId,
+      // 幹事腦裡面沒有 `CHAIR` 這個概念。查不到就照印 postId——
+      // ⚠️ 印一個空白比印一個代號更差：他會以為系統壞了。
+      postNameTC: (postNames || {})[c.postId] || c.postId,
+      slotIndex: c.slotIndex,
+      // 空白要講得出是空白。寫一個空字串落畫面，他會以為自己看漏。
+      fromName: c.fromName || c.originalName || '（空白）',
+      toName: c.toName || c.manualText || '（空白）',
+      source: source || 'MANUAL'
+    };
+  });
+}
+
+/**
+ * 兩批逐格改動合成一份，同一格以第一批為準。
+ *
+ * ⚠️ 「同一格既有幹事親手改、又有申報」的時候，**幹事那一批贏**——
+ * 那是第四十輪就定下的規矩（`plan.overlaps`：幹事已經親手改過那些格，
+ * 申報不套用）。這裡的顯示次序要同實際行為一致，否則畫面會講一件事
+ * 而系統做另一件事。
+ *
+ * @param {Object[]} primary 優先那一批（通常是幹事的）
+ * @param {Object[]} extra 另一批（通常是申報帶來的）
+ * @returns {Object[]} 合併結果
+ */
+function mergeSavedChangeRows_(primary, extra) {
+  const seen = {};
+  const out = [];
+  (primary || []).forEach(function (r) {
+    seen[r.serviceDate + '|' + r.postId + '|' + r.slotIndex] = true;
+    out.push(r);
+  });
+  (extra || []).forEach(function (r) {
+    const key = r.serviceDate + '|' + r.postId + '|' + r.slotIndex;
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push(r);
+  });
+  return out;
+}

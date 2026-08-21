@@ -54,15 +54,44 @@ const GENERATE_TARGET_WARN_PAST = 'PAST';
 const GENERATE_TARGET_WARN_TOO_EARLY = 'TOO_EARLY';
 
 /**
+ * 第 1 步的目標季度：**所有已建立的季度都生成過了。**
+ *
+ * ⚠️ 第四十二輪批次 C 組。這一種情況掣是灰的，幹事做不到任何事——
+ * 所以這時候**不可以**再講「還有 9 天到生成日期」那一類話。
+ * 唯一有用的資訊是「下一步去哪裡」（去開一年新的季度）。
+ */
+const GENERATE_TARGET_WARN_ALL_GENERATED = 'ALL_GENERATED';
+
+/**
  * 決定第 1 步那粒掣要生成哪一季。**純讀取。**
  *
- * 規則（順序就是優先次序）：
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️ 第四十二輪批次 C 組：這一粒掣曾經整粒廢掉
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 2026-08-21 現場：掣寫住「生成 2026 年 10-12 月職事表」，**灰色、撳不到**，
+ * 而下面同時講「已經生成過了」同「生成日期是 2026-08-30，還有 9 天」。
+ *
+ * 成因是舊規則第 3 條：全部季度都有版本的時候，回傳「開始日期在今天之後
+ * 最早那一季」——那一季**已經生成過**，所以掣變灰。而它**不會**跳去
+ * 下一個未生成的季度。
+ *
+ * 結果：幹事**永遠測不到第 1 步**，而那是他每季第一件做的事。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 新規則（順序就是優先次序）
+ * ─────────────────────────────────────────────────────────────────────
+ *
  *   1. 幹事現在看著的那一季，如果還沒有任何版本 ⇒ 就是它
  *      （他打開了它、看著它，最想做的一定是生成它）
- *   2. 否則，所有還沒有版本的季度之中，開始日期最早那一個
- *   3. 全部都生成過 ⇒ 仍然回傳「下一季」（開始日期在今天之後最早那個），
- *      但 `alreadyGenerated` 為 true，前端會把掣變灰並講明原因
- *      （重新生成是覆蓋式動作，留在「進階與診斷」，不放在主流程）
+ *   2. **由今日起計**，第一個還沒有版本的季度（`endDate >= today`）
+ *   3. 都找不到 ⇒ 還沒有版本、但已經完全過去的季度之中最早那一個
+ *      （補一個漏掉的舊季度是真實會發生的事，`PAST` 警告會講清楚）
+ *   4. 全部季度都已經生成過 ⇒ 才顯示灰掣，並且講清楚下一步去哪裡
+ *
+ * ⚠️ 第 4 種情況**不再算任何日期警告**。「已經全部生成過」同
+ * 「還有 9 天到生成日期」放在同一塊講，幹事讀出來只會覺得系統壞了
+ * ——而他其實什麼都做不到，因為掣是灰的。
  *
  * @param {string} selectedQuarterId 幹事現在看著的季度
  * @returns {Object} 目標季度同警告
@@ -70,6 +99,8 @@ const GENERATE_TARGET_WARN_TOO_EARLY = 'TOO_EARLY';
 function resolveGenerateTargetQuarter_(selectedQuarterId) {
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const goLiveQuarterId = String(
+    getConfig(CONFIG_KEYS.GO_LIVE_QUARTER_ID, DEFAULTS.GO_LIVE_QUARTER_ID) || '').trim();
   const C = COLUMNS.QUARTERS;
 
   const quarters = readSheet(SHEETS.QUARTERS).map(function (row) {
@@ -96,16 +127,27 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
 
   const selected = quarters.filter(function (q) { return q.quarterId === selectedQuarterId; })[0];
   const ungenerated = quarters.filter(function (q) { return q.versionNo < 0; });
+  // 「由今日起計」＝ 還沒有完全過去。`endDate` 空白的照樣算在內——
+  // ⚠️ 空白不等於「已經過去」，把它剔走就會令一個資料填漏的季度
+  // 靜靜地永遠揀不到。
+  const upcoming = ungenerated.filter(function (q) {
+    return !q.endDate || q.endDate >= today;
+  });
 
   let target = null;
+  let allGenerated = false;
   if (selected && selected.versionNo < 0) {
     target = selected;
+  } else if (upcoming.length > 0) {
+    target = upcoming[0];
   } else if (ungenerated.length > 0) {
-    target = ungenerated[0];
+    // 只剩下已經完全過去、而又未生成過的季度。照樣指向它並且撳得到
+    // ——補一個漏掉的舊季度是真實會發生的事。`PAST` 警告會講清楚。
+    target = ungenerated[ungenerated.length - 1];
   } else {
-    // 全部生成過。回傳開始日期喺今天之後最早嗰一季（冇就回最後一季）。
-    const future = quarters.filter(function (q) { return q.startDate > today; });
-    target = future.length > 0 ? future[0] : quarters[quarters.length - 1];
+    // 全部生成過。指向最後一季，掣變灰，而且**不算任何日期警告**。
+    allGenerated = true;
+    target = quarters[quarters.length - 1];
   }
 
   // ⚠️ 「已經開始」同「已經過去」是兩件事，訊息不一樣。
@@ -117,7 +159,17 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
 
   let warn = '';
   let warnMessage = '';
-  if (target.endDate && target.endDate < today) {
+  if (allGenerated) {
+    // ⚠️ 什麼日期警告都不算。掣是灰的，他做不到任何事——
+    // 這時候唯一有用的資訊是「下一步去哪裡」。
+    warn = GENERATE_TARGET_WARN_ALL_GENERATED;
+    warnMessage = buildThreePartMessage_(
+      '所有已建立的季度都生成過了。',
+      '什麼都沒有改動。',
+      ['要建立更下一年的季度，請去「開季前準備 ▸ 產生下一年度四個季度」',
+        '要重新生成一個已經生成過的季度（會覆蓋現有安排），'
+          + '請去「進階與診斷 ▸ 重新生成職事表」']);
+  } else if (target.endDate && target.endDate < today) {
     warn = GENERATE_TARGET_WARN_PAST;
     warnMessage = buildThreePartMessage_(
       '「' + buildQuarterLabel_(target.quarterId) + '」已經完全過去了（' + target.endDate + ' 結束）。',
@@ -154,6 +206,16 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     generateOn: target.generateOn,
     daysUntilGenerateOn: daysUntil,
     alreadyGenerated: target.versionNo >= 0,
+    // ⚠️ 第四十二輪批次 C 組：掣旁邊要同時顯示「現時有幾多個版本」。
+    // `findLatestVersionNo()` 回 -1 代表一個都沒有；版本由 v0 起計，
+    // 所以「有幾多個」＝ 最新版本號 ＋ 1。
+    versionCount: target.versionNo >= 0 ? target.versionNo + 1 : 0,
+    latestVersionNo: target.versionNo,
+    allGenerated: allGenerated,
+    // ⚠️ 第四十二輪批次 C 組：這一季是不是真正要上線那一季。
+    // 由 Config 的 `GO_LIVE_QUARTER_ID` 決定——**不可以寫死**，
+    // 那是教會的資料，而且每年都不同。留空就永遠是 false。
+    isGoLiveQuarter: goLiveQuarterId !== '' && goLiveQuarterId === target.quarterId,
     warn: warn,
     warnMessage: warnMessage,
     reason: ''
