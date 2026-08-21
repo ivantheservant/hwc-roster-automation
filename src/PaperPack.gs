@@ -312,8 +312,8 @@ function apiEmailPaperPackToSelf_locked_(quarterId, personIds, extraEmails) {
         + autoBatch.doneCount + (autoBatch.done ? '（做齊）' : '（未做齊）')
     });
 
-    if (!autoBatch.done || split.generatable.length > 0) {
-      // 未做齊 ⇒ 一封都唔寄，報進度。
+    if (!autoBatch.done) {
+      // 一次執行做唔晒（六分鐘上限）⇒ 一封都唔寄，報進度、俾佢接住做。
       const stillShort = split.generatable.length;
       return {
         sentCount: 0,
@@ -328,16 +328,44 @@ function apiEmailPaperPackToSelf_locked_(quarterId, personIds, extraEmails) {
           + '做齊之後就會立刻寄出。'
       };
     }
+
+    // ⚠️ **做齊咗，而仲有幾份找不到 ⇒ 那幾份是產生失敗，不是「未做完」。**
+    //
+    // `generatePersonalPdfBatchForPeople_()` 出錯的時候會把那一位從
+    // `remainingPersonIds` 拿走、記進 `errors`，然後照樣回 `done: true`。
+    // 所以這個情況再撳一百次都是同一個結果——如果這裡照樣回 `pending`
+    // 並且叫他「再撳一次」，他就會一直撳落去，而畫面永遠不會變。
+    //
+    // 正確做法：把那幾位當成「補不到」，逐個列出原因，其餘照樣寄出。
+    if (split.generatable.length > 0) {
+      const errorByPerson = {};
+      (autoBatch.errors || []).forEach(function (e) {
+        if (e && e.personId) errorByPerson[e.personId] = e.message;
+      });
+      split.generatable.forEach(function (m) {
+        m.reason = errorByPerson[m.personId]
+          ? ('系統試過補產生，但出錯了：' + errorByPerson[m.personId])
+          : '系統試過補產生，做完之後仍然找不到那一個檔案。';
+        split.unfixable.push(m);
+      });
+      split.generatable = [];
+    }
   }
 
   if (found.files.length === 0) {
-    // 行到呢度即係：想補都補唔到（全部都係 `NameMapping` 查唔到嗰種）。
-    const names = split.unfixable.map(function (m) { return m.personId; }).join('、');
+    // 行到呢度即係：一份都補唔到。兩種原因都可能——`NameMapping` 查唔到編號，
+    // 或者產生嗰陣出咗錯。⚠️ **逐個講原因**，唔可以一律當成「查唔到編號」：
+    // 講錯原因，佢就會走去改一份根本冇問題嘅 `NameMapping`。
+    const lines = split.unfixable.map(function (m) {
+      return (m.nameTC || m.personId) + '：' + m.reason;
+    });
     throw new Error(buildThreePartMessage_(
-      '一份個人 PDF 都做不出來。這 ' + split.unfixable.length
-        + ' 位在 NameMapping 查不到編號：' + names,
+      '這 ' + split.unfixable.length + ' 位一份個人 PDF 都做不出來。\n　'
+        + lines.join('\n　'),
       '一封都沒有寄出。',
-      ['去 NameMapping 看看這幾個編號是不是打錯了，或者那幾位已經被刪走',
+      ['「NameMapping 查不到這個編號」那幾位：去 NameMapping 看看是不是打錯了，'
+        + '或者那幾位已經被刪走',
+        '「補產生的時候出錯」那幾位：去「進階與診斷」看看那一版的職事表有沒有問題',
         '改好之後再撳一次']));
   }
 

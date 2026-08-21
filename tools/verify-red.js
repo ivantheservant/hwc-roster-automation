@@ -842,7 +842,11 @@ const MUTATIONS = [
       + '——幹事收到一封夾住三十份嘅信唔會逐份數，佢會印晒派晒，'
       + '然後有幾位企喺度冇紙，而佢由頭到尾唔知少咗邊個',
     file: 'src/PaperPack.gs',
-    find: '    if (!autoBatch.done || split.generatable.length > 0) {',
+    // ⚠️ 同一輪之內改過：本來嗰行係
+    // `if (!autoBatch.done || split.generatable.length > 0)`，
+    // 而「做齊咗但仲有幾份唔見」嗰半拆咗出去（見 `paper-endless-pending`）。
+    // 呢一條剩返守「一次執行做唔晒」嗰半。
+    find: '    if (!autoBatch.done) {',
     replace: '    if (false) {',
     tests: ['tests/paper_pack_autogen.test.js']
   },
@@ -985,6 +989,16 @@ const MUTATIONS = [
     find: '      if (built.notes[cellKey]) cell.setNote(built.notes[cellKey]);',
     replace: '      if (false) cell.setNote(built.notes[cellKey]);',
     tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'paper-endless-pending',
+    why: '把「補產生做齊咗但仲有幾份唔見」還原成回 `pending`'
+      + '——真正嗰個批次出錯嗰陣會照樣回 `done: true`，'
+      + '所以幹事會一直撳「接住做餘下的」而畫面永遠唔會變',
+    file: 'src/PaperPack.gs',
+    find: '    if (split.generatable.length > 0) {\n      const errorByPerson = {};',
+    replace: '    if (false) {\n      const errorByPerson = {};',
+    tests: ['tests/paper_pack_autogen.test.js']
   },
 ];
 

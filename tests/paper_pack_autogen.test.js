@@ -86,13 +86,25 @@ function setup(opts) {
     // `perRun` ＝ 一次執行做得晒幾多個（模擬六分鐘上限）。
     const perRun = opts.perRun === undefined ? ids.length : opts.perRun;
     const doing = ids.slice(0, perRun);
-    doing.forEach(function (id) { present[id] = true; });
+    // ⚠️ `failIds` ＝ 試過但係做唔到嗰啲。真正嗰個批次出錯嗰陣會把嗰位
+    // 由 `remainingPersonIds` 拿走、記入 `errors`，然後**照樣回 `done: true`**
+    // ——所以「做齊咗但仲有幾份唔見」係一個真實會出現嘅狀態。
+    const failIds = opts.failIds || [];
+    const errors = [];
+    doing.forEach(function (id) {
+      if (failIds.indexOf(id) !== -1) {
+        errors.push({ personId: id, nameTC: (opts.names || {})[id] || id,
+          message: '匯出 PDF 逾時' });
+        return;
+      }
+      present[id] = true;
+    });
     return {
       done: doing.length === ids.length,
       doneCount: doing.length,
-      generatedCount: doing.length,
+      generatedCount: doing.length - errors.length,
       skippedExistingCount: 0,
-      errors: []
+      errors: errors
     };
   };
 
@@ -262,6 +274,66 @@ console.log('\n=== D 畫面：未寄出唔可以用綠色「已寄出」報 ==='
   check('★★★★ 而且預先講明「一次可能做不完」'
     + '——唔預先講，佢見到「還未寄出」會以為系統壞咗',
     /一次可能做不完/.test(uiBare), '');
+}
+
+// =====================================================================
+console.log('\n=== D【核心】做齊咗但仲有幾份唔見 ⇒ **唔可以再叫佢「再撳一次」** ===');
+{
+  // ⚠️ 呢一節係第四十四輪批次寫完 D 組之後自己 review 抓到嘅。
+  //
+  // 第一版寫成 `if (!autoBatch.done || split.generatable.length > 0)`
+  // 就回 `pending` 同一句「再撳一次會接住做」。
+  //
+  // 但真正嗰個批次出錯嗰陣，會把嗰位由 `remainingPersonIds` 拿走、
+  // 記入 `errors`，然後**照樣回 `done: true`**。所以呢個情況再撳一百次
+  // 都係同一個結果——而畫面永遠寫住「再撳一次就會寄出」。
+  //
+  // **一粒撳極都唔會有進展、而畫面話仲有進展嘅掣**，
+  // 同一粒撳咗冇反應嘅掣係同一種錯。
+  const log = setup({
+    names: { P9001: '測試甲', P9002: '測試乙' },
+    presentIds: ['P9001'],
+    failIds: ['P9002']    // 補產生會出錯
+  });
+  const r = gas.apiEmailPaperPackToSelf_locked_('2027T3', ['P9001', 'P9002'], []);
+
+  check('★★★★★ **唔係 `pending`**'
+    + '——回 pending 就等於叫佢一直撳落去，而每一次結果都一樣',
+    !r.pending, JSON.stringify(r));
+  check('★★★★★ 而且**照樣寄出咗**做得到嗰一份'
+    + '——因為一個做唔到嘅人而拉住成批唔寄，係另一種壞',
+    r.sentCount === 1 && r.fileCount === 1, JSON.stringify(r));
+  check('★★★★★ 做唔到嗰位逐個列出（唔可以靜靜略過）',
+    (r.missing || []).length === 1 && r.missing[0].personId === 'P9002',
+    JSON.stringify(r.missing));
+  check('★★★★★ 而且原因寫住**真正嘅錯**，唔係「找不到那個檔案」'
+    + '——講錯原因，佢就會走去改一份根本冇問題嘅 NameMapping',
+    r.missing[0].reason.indexOf('匯出 PDF 逾時') !== -1, r.missing[0].reason);
+  check('★★★★ 只試過補一次（唔會為咗一個做唔到嘅人重試唔停）',
+    log.generatedFor.length === 1, JSON.stringify(log.generatedFor));
+}
+
+console.log('\n=== D 全部都做唔到（一種係查唔到編號、一種係產生出錯）===');
+{
+  setup({
+    names: { P9002: '測試乙' },   // P9998 冇名
+    presentIds: [],
+    failIds: ['P9002']
+  });
+  let msg = null;
+  try {
+    gas.apiEmailPaperPackToSelf_locked_('2027T3', ['P9002', 'P9998'], []);
+  } catch (err) { msg = err.message; }
+
+  check('★★★★★ 有拋錯', msg !== null);
+  check('★★★★★ **兩種原因分開講**'
+    + '——一律當成「NameMapping 查不到編號」，'
+    + '佢就會走去改一份根本冇問題嘅 NameMapping',
+    msg && msg.indexOf('匯出 PDF 逾時') !== -1
+    && msg.indexOf('NameMapping 查不到這個編號') !== -1, msg);
+  check('★★★★ 下一步都係分開講',
+    msg && msg.indexOf('「補產生的時候出錯」那幾位') !== -1, msg);
+  check('★★★★ 而且明講一封都冇寄', msg && msg.indexOf('一封都沒有寄出') !== -1, msg);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
