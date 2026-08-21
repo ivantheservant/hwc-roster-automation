@@ -118,8 +118,17 @@ console.log('\n=== B【核心】每一次撳開都講明「呢個名單入面係
   check('★★★★ REVIEW 講得出人數', review.indexOf('3') !== -1, review);
   check('★★★★★ 正式寄出講明係義工加收件人名單',
     official.indexOf('義工') !== -1 && official.indexOf('42') !== -1, official);
-  check('★★★★ 重發講明係「有改動嗰幾位」',
-    resend.indexOf('有改動') !== -1, resend);
+  // ⚠️ 呢一句本來寫「名單上是這一季安排有改動的那幾位」，而
+  // `listRecipients_()` 嘅 RESEND 分支收嘅係「有派工嘅」**加上**
+  //「曾經收過信嘅」——後者包括今次完全冇改動嘅人。
+  //「畫面講一件事、系統做另一件事」正正係呢個專案一直喺度殺嗰一類。
+  check('★★★★★ 重發嗰句要同 `listRecipients_()` 真正做嘅事對得上'
+    + '——唔可以講「有改動嗰幾位」，因為冇改動嘅人一樣喺個名單入面',
+    resend.indexOf('曾經收過信') !== -1
+    && resend.indexOf('就算這一次沒有改動') !== -1, resend);
+  check('★★★★ 而且講明「真正收到嘅仲要睇你揀嘅寄給誰」'
+    + '——呢個名單係階段名單，唔係最終收件人',
+    resend.indexOf('真正會收到信的還要看') !== -1, resend);
   check('★★★★★ 三個階段嘅句子唔一樣——一句通用嘅廢話等於冇講',
     review !== official && official !== resend && review !== resend);
 }
