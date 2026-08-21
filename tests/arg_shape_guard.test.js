@@ -163,8 +163,9 @@ console.log('\n=== A2 防線一定要載入到（`ArgShape.gs` 零依賴）===')
   check('★★★★★ 測試 loader 會自動載入佢'
     + '——唔自動載嘅話，每一份測試都要自己記得補一行，'
     + '而漏咗嘅錯誤（`requireStateArg_ is not defined`）同測試本身完全無關',
-    // ⚠️ 第四十四輪批次 A 組加咗 `SafeWrite.gs`，所以斷言唔可以再貼住
-    // 「陣列入面只有一個」。要守嘅係「`ArgShape.gs` 喺嗰個清單入面」。
+    // ⚠️ 第四十四輪批次加過 `SafeWrite.gs` 落呢個清單，第四十五輪已經移除
+    // （嗰個檔係為一個判錯咗嘅成因而做嘅）。斷言守嘅係
+    // 「`ArgShape.gs` 喺嗰個清單入面」，唔會貼住清單有幾多個。
     /const ALWAYS_LOADED = \[[^\]]*'ArgShape\.gs'/
       .test(read('tests/helpers/gas_loader.js')));
 }

@@ -22,12 +22,8 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   const warningIndex = indexWarnings_(warnings);
 
   // 第 1 行中文標題、第 2 行機器鍵
-  // ⚠️ 第四十四輪批次 A 組：全部**由程式算出嚟**嘅值一律經
-  // `setSheetValuesSafely_()`。一格 `undefined` 就會令成個 setValues()
-  // 拋 `Failed due to illegal value in property: <索引>`，
-  // 而嗰句錯完全睇唔出係邊一格出事。見 src/SafeWrite.gs 檔頭。
-  setSheetValuesSafely_(sheet, 1, 1, [layout.headers], 'createRosterSheet.headers');
-  setSheetValuesSafely_(sheet, 2, 1, [layout.keys], 'createRosterSheet.keys');
+  sheet.getRange(1, 1, 1, layout.headers.length).setValues([layout.headers]);
+  sheet.getRange(2, 1, 1, layout.keys.length).setValues([layout.keys]);
   // 標題設為自動換行：欄位在 PDF 被縮窄時，文字會往下折行而不是被裁掉或溢出到隔壁欄
   sheet.getRange(1, 1, 1, layout.headers.length)
     .setFontWeight('bold')
@@ -39,7 +35,7 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
 
   // 第 3 行起：每個主日一行
   if (layout.rows.length > 0) {
-    setSheetValuesSafely_(sheet, 3, 1, layout.rows, 'createRosterSheet.rows');
+    sheet.getRange(3, 1, layout.rows.length, layout.keys.length).setValues(layout.rows);
   }
 
   applyCellMarks_(sheet, layout, warningIndex);
@@ -768,7 +764,7 @@ function writeLegendSection_(sheet, layout) {
     row++;
 
     const legendRows = buildLegendRows_(layout);
-    setSheetValuesSafely_(sheet, row, 1, legendRows, 'writeLegendSection_');
+    sheet.getRange(row, 1, legendRows.length, 3).setValues(legendRows);
 
     // 每一行嘅第一格用返該類別喺表上嘅實際底色，令圖例同表格對得上
     const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
@@ -822,7 +818,7 @@ function writeStatsSection_(sheet, layout, assignments, extraOffset) {
     .setValues([[GRID_LABELS.NAME, GRID_LABELS.PERSON_ID, GRID_LABELS.COUNT]])
     .setFontWeight('bold');
   if (stats.length > 0) {
-    setSheetValuesSafely_(sheet, startRow + 2, 1, stats, 'writeStatsSection_');
+    sheet.getRange(startRow + 2, 1, stats.length, 3).setValues(stats);
   }
 }
 

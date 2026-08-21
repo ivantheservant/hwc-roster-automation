@@ -147,13 +147,16 @@ function buildGasStubs_() {
  *
  * 呢度只放「零依賴、而且好多檔案都會叫」嗰種。
  */
-// ⚠️ 第四十四輪批次 A 組：`SafeWrite.gs` 都要永遠載入。
-// 佢係「全部值寫入」嘅唯一入口（`setSheetValuesSafely_()`／`saveState_()`），
-// 而 `RosterWriter.gs`／`SuggestionSheet.gs`／`PdfBatch.gs`／`Tune.gs`
-// 都會叫佢。唔喺呢度自動加嘅話，每一份測試都要記得補一行，
-// 而漏咗嘅後果係 `setSheetValuesSafely_ is not defined`——
-// 一個同測試本身完全無關嘅錯。
-const ALWAYS_LOADED = ['ArgShape.gs', 'SafeWrite.gs'];
+// ⚠️ 第四十五輪批次：`SafeWrite.gs` 已經**移除**。
+//
+// 佢係第四十四輪為一個**判錯咗嘅成因**而做嘅——當時以為
+// `Failed due to illegal value in property: 1` 係 `Range.setValues()`
+// 收到壞值，所以把全部值寫入收窄埋一個入口。
+//
+// 真正嘅成因喺 client 端（`google.script.run` 序列化參數），後端一次都冇被叫到。
+// 而嗰個收窄點本身嘅行為係「壞值換成空字串 ＋ 寫一句 WARN」——
+// 即係把一個大聲嘅失敗變成一個靜靜嘅失敗，同呢個專案一直守嘅原則相反。
+const ALWAYS_LOADED = ['ArgShape.gs'];
 
 function loadGasSource(files, overrides) {
   const requested = files || FILES_FOR_GENERATOR;

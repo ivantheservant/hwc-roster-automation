@@ -45,11 +45,23 @@
       return;
     }
 
+    // ⚠️ 第四十五輪批次：**每一個都要包一層 `() => …`。**
+    //
+    // `bigButton()` 最後做嘅係 `button(label, opts.onClick, …)`，
+    // 而 `button()` 做嘅係 `addEventListener('click', onClick)`。
+    // 直接放函式名嘅話，`openReview`／`openOfficial`／`openResend`
+    // 收到嘅第一個參數會係一個 **MouseEvent**，跟住原封不動變成
+    // `apiStep2Confirm`／`apiStep4Confirm`／`apiStep5SendConfirm`
+    // 嘅第 1 個參數 ⇒ `Failed due to illegal value in property: 1`。
+    //
+    // 同一句錯亦都會由「完全唔傳」嗰條路造出嚟：`undefined` 一樣
+    // 過唔到 `google.script.run`。所以三個函式入面仲有一層
+    // `plainObjectOrNull_()`。
     const handlers = {
-      save: openSaveAndConfirm,
-      review: openReview,
-      official: openOfficial,
-      resend: openResend
+      save: () => openSaveAndConfirm(),
+      review: () => openReview(),
+      official: () => openOfficial(),
+      resend: () => openResend()
     };
     ZONE1_BUTTONS.forEach((b) => {
       const state = (d.buttons && d.buttons[b.key]) || {};
@@ -980,6 +992,13 @@
   // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
   // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
   function openReview(sendOptions) {
+    // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
+    // `google.script.run`，兩者都會變成
+    // `Failed due to illegal value in property: 1`。
+    // 收成純物件或者 `null`——後端 `resolveSendOptions_()` 做嘅係
+    // `sendOptions || {}`，所以 `null` 同 `undefined` 對佢完全一樣，
+    // 但 `null` 過得到。
+    const sendOpts = plainObjectOrNull_(sendOptions);
     runAction('讀取確認資料', async () => {
       // 前置檢查：狀態快取已經帶咗公開連結狀態返嚟，唔使多打一次伺服器。
       // ⚠️ `checkFailed` 唔可以當成「有連結」而放行——嗰個係「查不到」，
@@ -1051,7 +1070,7 @@
         bodyNodes: nodes,
         confirmLabel: '確定寄出',
         onConfirm: () => runAction('寄送中，請稍候', async () => {
-          const r = await callServerMutating('apiStep2Confirm', currentQuarterId, sendOptions);
+          const r = await callServerMutating('apiStep2Confirm', currentQuarterId, sendOpts);
           await renderReviewDone(r);
         })
       });
@@ -1094,6 +1113,13 @@
   // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
   // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
   function openOfficial(sendOptions) {
+    // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
+    // `google.script.run`，兩者都會變成
+    // `Failed due to illegal value in property: 1`。
+    // 收成純物件或者 `null`——後端 `resolveSendOptions_()` 做嘅係
+    // `sendOptions || {}`，所以 `null` 同 `undefined` 對佢完全一樣，
+    // 但 `null` 過得到。
+    const sendOpts = plainObjectOrNull_(sendOptions);
     runAction('讀取確認資料', async () => {
       const d = await getDashboard();
       const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
@@ -1204,7 +1230,7 @@
         confirmLabel: '確定發出',
         danger: true,
         onConfirm: (typed) => runAction('寄送中，請稍候', async () => {
-          const r = await callServerMutating('apiStep4Confirm', currentQuarterId, sendOptions);
+          const r = await callServerMutating('apiStep4Confirm', currentQuarterId, sendOpts);
           renderOfficialDone(r);
         })
       });
@@ -1254,6 +1280,13 @@
   // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
   // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
   function openResend(sendOptions) {
+    // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
+    // `google.script.run`，兩者都會變成
+    // `Failed due to illegal value in property: 1`。
+    // 收成純物件或者 `null`——後端 `resolveSendOptions_()` 做嘅係
+    // `sendOptions || {}`，所以 `null` 同 `undefined` 對佢完全一樣，
+    // 但 `null` 過得到。
+    const sendOpts = plainObjectOrNull_(sendOptions);
     runAction('比對有誰的安排改了', async () => {
       const d = await getDashboard();
       const plan = await callServer('apiStep5Plan', currentQuarterId);
@@ -1319,7 +1352,7 @@
         confirmLabel: '確定重發',
         danger: true,
         onConfirm: () => runAction('產生 PDF 並寄送，請稍候', async () => {
-          await resendGeneratePdfsThenSend('', sendOptions);
+          await resendGeneratePdfsThenSend('', sendOpts);
         })
       });
     });
@@ -1349,7 +1382,7 @@
       setStatus('產生個人 PDF：' + r.doneCount + ' / ' + r.totalPeople + ' 份…');
     }
 
-    const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText, sendOptions);
+    const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText, sendOpts);
     if (result.blocked) {
       showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，尚未寄出任何電郵。'));
       return;

@@ -203,7 +203,10 @@ console.log('\n=== C 全前端只有一個 `google.script.run` 入口，而且�
     'src/ui/ScriptZone1.html', 'src/ui/ScriptZone2.html', 'src/ui/ScriptZone3.html'];
   otherFiles.forEach(function (rel) {
     if (!fs.existsSync(path.join(ROOT, rel))) return;
-    const body = read(rel);
+    // ⚠️ 第四十五輪批次：要剝走註解先數。呢幾個檔嘅註解入面會提到
+    // 呢個名（解釋點解唔可以直接掂佢），而註解唔係呼叫。
+    const body = read(rel).replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
     check('★★★★ `' + rel.split('/').pop() + '` 冇自己直接叫 `google.script.run`',
       body.indexOf('google.script.run') === -1, '');
   });

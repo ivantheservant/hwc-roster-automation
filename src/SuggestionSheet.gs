@@ -715,9 +715,8 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   ];
   legend.forEach(function (line, i) {
     const width = Math.max(3, line.length);
-    setSheetValuesSafely_(sheet, i + 1, 1,
-      [line.concat(new Array(Math.max(0, width - line.length)).fill(''))],
-      'writeSuggestionSheet_.legend');
+    sheet.getRange(i + 1, 1, 1, width).setValues(
+      [line.concat(new Array(Math.max(0, width - line.length)).fill(''))]);
   });
   sheet.getRange(2, 1).setBackground(SUGGESTION_COLOR_MANUAL);
   sheet.getRange(2, 2).setBackground(SUGGESTION_COLOR_SYSTEM);
@@ -728,10 +727,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
 
   // ── 表身（同正式表一樣的欄位）───────────────────────────────
   const grid = [layout.headers, layout.keys].concat(layout.rows);
-  // ⚠️ 第四十四輪批次 A 組：見 src/SafeWrite.gs 檔頭。
-  // 呢一個 setValues() 嘅 index 1 就係 `layout.keys`——
-  // 而 Ivan 撞到嗰句錯正正就係 `illegal value in property: 1`。
-  setSheetValuesSafely_(sheet, headerRow, 1, grid, 'writeSuggestionSheet_.grid');
+  sheet.getRange(headerRow, 1, grid.length, layout.keys.length).setValues(grid);
   sheet.getRange(headerRow, 1, 1, layout.keys.length)
     .setFontWeight('bold').setBackground(GRID_COLORS.HEADER);
   sheet.hideRows(headerRow + 1);
@@ -1080,8 +1076,7 @@ const SUGGESTION_FINGERPRINT_MARK = '[起點指紋]';
  */
 function writeSuggestionFingerprints_(sheet, gridFp, suggestionFp) {
   const row = sheet.getLastRow() + 2;
-  setSheetValuesSafely_(sheet, row, 1,
-    [[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp]], 'writeSuggestionFingerprints_');
+  sheet.getRange(row, 1, 1, 3).setValues([[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp]]);
   sheet.hideRows(row);
 }
 

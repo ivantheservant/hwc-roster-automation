@@ -145,12 +145,32 @@
   /* ── 二、〔請系統幫我調整〕：產生建議版本 ─────────────────── */
 
   /**
+   * ⚠️ 第四十五輪批次：**呢個函式唔可以直接做點擊處理。**
+   *
+   * `button()` 做嘅係 `addEventListener('click', onClick)`，所以直接綁嘅話，
+   * `startFrom` 收到嘅係一個 **MouseEvent**，而佢會原封不動傳落
+   * `apiBuildSuggestion` 做第 1 個參數 ⇒
+   *
+   *     Failed due to illegal value in property: 1
+   *
+   * 現場就係噉樣爆嘅（`ScriptMainFlow.html` 嗰粒
+   * `stepButton('請系統幫我調整', openBuildSuggestion, …)`）。
+   * 而 `1` 就係參數索引——後端一次都冇被叫到。
+   *
+   * 綁掣一律用 `() => openBuildSuggestion()`。
+   * `tools/lint-handler-args.js` 會擋住直接綁。
+   *
    * @param {string=} startFrom 幹事喺「用邊一張做起點」小窗揀嘅答案
    */
   function openBuildSuggestion(startFrom) {
+    // ⚠️ 保底：就算將來有人再直接綁，都唔會送一個事件物件上去。
+    // 呢個唔係用嚟代替上面嗰條規矩——`sanitizeServerArgs_()` 會照樣
+    // 喺送出之前擋住，而 lint 會喺 commit 之前擋住。三層都要有，
+    // 因為呢一個 bug 上一輪令我查錯咗成個後端。
+    const from = (typeof startFrom === 'string') ? startFrom : '';
     runAction('系統調整中，請稍候', async () => {
       const r = await callServerMutating(
-        'apiBuildSuggestion', currentQuarterId, startFrom || '');
+        'apiBuildSuggestion', currentQuarterId, from);
       // ⚠️ 第四十二輪批次 A 組：兩張表都改過 ⇒ **問返幹事**，
       // 唔可以靜靜揀一張。揀錯嗰張就等於靜靜丟咗佢一批改動，
       // 而佢完全唔會知。

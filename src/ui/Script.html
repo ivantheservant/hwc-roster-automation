@@ -133,6 +133,211 @@
 
   // ── 伺服器呼叫 ───────────────────────────────────────────────
 
+  /* ══════════════════════════════════════════════════════════════
+   * 第四十五輪批次：送去伺服器之前，先清一次參數
+   * ══════════════════════════════════════════════════════════════
+   *
+   * 現場錯誤：`Failed due to illegal value in property: 1`
+   *
+   * ⚠️ 第四十四輪把呢句判成 `Range.setValues()` 收到壞值——**判錯咗**。
+   * 現場證據推翻咗：Apps Script 執行紀錄**完全冇呢一次執行**
+   *（只有 `apiGetMainFlowState`／`apiGetDashboardState`／`apiListQuarters`／
+   * `doGet`，全部 Completed）。即係後端從來冇被叫到。
+   *
+   * 真正嘅來源係 `google.script.run` 嘅**參數序列化**，喺 client 端、
+   * 喺送出之前就拋。合法嘅只有原始型別、陣列、純物件；
+   * `undefined`、函式、DOM 元素、事件物件、循環引用都唔合法。
+   * 而 `property: N` 入面嗰個 `N` 係**第幾個參數**（由 0 數起）。
+   *
+   * 真正嗰個 bug：
+   *
+   *     stepButton('請系統幫我調整', openBuildSuggestion, {…})
+   *     function openBuildSuggestion(startFrom) {…}
+   *
+   * `button()` 做嘅係 `addEventListener('click', onClick)`，所以
+   * `openBuildSuggestion` 收到嘅第一個參數係一個 **MouseEvent**。
+   * 跟住佢原封不動傳咗落去做第 1 個參數：
+   *
+   *     callServerMutating('apiBuildSuggestion', currentQuarterId, startFrom || '')
+   *                                              ↑ 參數 0        ↑ 參數 1 ＝ MouseEvent
+   *
+   * ⇒ `Failed due to illegal value in property: 1`。一個字都冇差。
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 點解要有呢一層，而唔係淨係修好嗰一粒掣
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 因為 sandbox 拋嗰句**冇講邊個 API、冇講嗰個值係乜**。
+   * 幹事見到一句英文；而我上一輪拎住同一句英文，查咗成個後端，
+   * 修咗一堆冇問題嘅地方。
+   *
+   * 所以呢度做兩件事：
+   *   一、送出之前**逐個參數行一次**，撞到唔合法嘅就喺 client 端
+   *       即刻拋一個講得明嘅三段式錯（邊個 API、第幾個參數、
+   *       入面邊一條路徑、嗰個值係乜嘢型別）。
+   *   二、乾淨嘅就 `JSON.parse(JSON.stringify(...))` 清一次，
+   *       剝走 prototype、getter 呢類唔會過得到 sandbox 嘅嘢。
+   *
+   * ⚠️ **次序唔可以掉轉。** `JSON.stringify()` 會把函式同 `undefined`
+   * **靜靜噉刪走**（物件入面成條 key 消失、陣列入面變 `null`）。
+   * 先清後驗嘅話，呢個 bug 就會由「拋一句睇唔明嘅英文」
+   * 變成「靜靜傳咗個 null 上去」——更差。
+   */
+
+  /**
+   * 「一個純物件」——`{}` 字面量或者 `Object.create(null)`，唔係
+   * `Date`／`MouseEvent`／`Element`／自訂 class 嘅 instance。
+   *
+   * ⚠️ 用 constructor **名**，唔用 `proto !== Object.prototype`。
+   * 一個由另一個 realm 造出嚟嘅普通物件（iframe、測試沙箱）
+   * 有一個唔同嘅 `Object.prototype`，身分比較會把佢誤判。
+   *
+   * ⚠️ 呢個係**唯一**一個「純物件」嘅定義：`findIllegalServerValue_()`
+   * 同 `plainObjectOrNull_()` 都行呢一個。寫兩份就一定會分岔，
+   * 而分岔嘅後果係「擋得住嘅同清得走嘅唔係同一批」。
+   *
+   * @param {*} v 要驗嘅值
+   * @returns {boolean} 係咪純物件
+   */
+  function isPlainObject_(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+    const proto = Object.getPrototypeOf(v);
+    if (proto === null) return true;
+    const ctor = proto.constructor;
+    return !!ctor && ctor.name === 'Object';
+  }
+
+  /**
+   * 第四十五輪批次：**一個「本來可以唔傳」嘅物件參數，一律收成純物件或者 `null`。**
+   *
+   * 兩個成因，同一句錯：
+   *
+   *   一、`undefined` **過唔到** `google.script.run`
+   *       ——`openReview()` 冇參數噉叫，第 1 個參數就係 `undefined`
+   *   二、直接綁做點擊處理嗰陣，收到嘅係一個 `MouseEvent`
+   *       ——區一四粒大掣本來就係 `onClick: handlers[b.key]`
+   *
+   * 兩者都會變成 `Failed due to illegal value in property: 1`。
+   *
+   * 後端嗰邊 `resolveSendOptions_()` 做嘅係 `sendOptions || {}`，
+   * 所以 `null` 同 `undefined` 對佢完全一樣——但 `null` 過得到，
+   * `undefined` 過唔到。
+   *
+   * @param {*} v 呼叫端收到嘅嘢
+   * @returns {?Object} 純物件本身；其餘一律 `null`
+   */
+  function plainObjectOrNull_(v) {
+    return isPlainObject_(v) ? v : null;
+  }
+
+  /** 一個值嘅型別，講到幹事同開發者都睇得明。 */
+  function describeIllegalValue_(v) {
+    if (v === undefined) return 'undefined（沒有值）';
+    if (typeof v === 'function') return '一個函式';
+    if (typeof v === 'symbol') return '一個 Symbol';
+    if (v && typeof v === 'object') {
+      const name = (v.constructor && v.constructor.name) ? v.constructor.name : '物件';
+      if (typeof v.nodeType === 'number') return '一個畫面元素（' + name + '）';
+      return '一個 ' + name;
+    }
+    return String(typeof v);
+  }
+
+  /**
+   * 一個值可唔可以過得到 `google.script.run`。
+   *
+   * ⚠️ 事件物件（`MouseEvent` 等）同 DOM 元素冇一個共通嘅簡單特徵，
+   * 所以用「唔喺白名單就當唔合法」：原始型別、`null`、純陣列、
+   * 純物件（`Object.prototype` 或者冇 prototype）先算合法。
+   * 呢個係**刻意保守**——寧可誤報一個講得明嘅錯，
+   * 都好過由 sandbox 拋一句冇人睇得明嘅英文。
+   *
+   * @param {*} value 要驗嘅值
+   * @param {string} path 由參數開始嘅路徑，用嚟報位置
+   * @param {Object[]} seen 已經行過嘅物件（捉循環引用）
+   * @returns {?{path: string, what: string}} 冇問題回 null
+   */
+  function findIllegalServerValue_(value, path, seen) {
+    if (value === null) return null;
+    const t = typeof value;
+    if (t === 'string' || t === 'number' || t === 'boolean') return null;
+    if (t === 'undefined' || t === 'function' || t === 'symbol' || t === 'bigint') {
+      return { path: path, what: describeIllegalValue_(value) };
+    }
+
+    // 由呢度開始一定係 object。
+    if (seen.indexOf(value) !== -1) {
+      return { path: path, what: '一個循環引用（自己指返自己）' };
+    }
+    seen.push(value);
+
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        const hit = findIllegalServerValue_(value[i], path + '[' + i + ']', seen);
+        if (hit) return hit;
+      }
+      seen.pop();
+      return null;
+    }
+
+    // ⚠️ 只放行**純物件**。`Date`／`MouseEvent`／`Element`／自訂 class
+    // 全部落喺呢度——`Date` 亦都唔應該直接傳（sandbox 唔會保留佢），
+    // 呼叫端要自己轉做字串。
+    // 「純物件」嘅定義只有一個，喺 `isPlainObject_()`。
+    if (!isPlainObject_(value)) {
+      return { path: path, what: describeIllegalValue_(value) };
+    }
+
+    const keys = Object.keys(value);
+    for (let k = 0; k < keys.length; k++) {
+      const hit = findIllegalServerValue_(value[keys[k]], path + '.' + keys[k], seen);
+      if (hit) return hit;
+    }
+    seen.pop();
+    return null;
+  }
+
+  /**
+   * 送出之前清一次。撞到清唔到嘅就拋一個**講得明**嘅錯。
+   *
+   * @param {string} fnName 要叫嘅後端函式名
+   * @param {*[]} args 參數
+   * @returns {*[]} 清乾淨、可以直接送出嘅參數
+   */
+  function sanitizeServerArgs_(fnName, args) {
+    return args.map(function (arg, i) {
+      const hit = findIllegalServerValue_(arg, '參數 ' + i, []);
+      if (hit) {
+        throw new Error(buildClientThreePart_(
+          '程式錯誤：呼叫「' + fnName + '」的時候，' + hit.path
+            + ' 是' + hit.what + '，這種東西送不到伺服器。',
+          '伺服器一次都沒有被呼叫，所以什麼都沒有改動。',
+          ['請把這一句連同你剛才撳過的掣告訴開發者',
+            '最常見的成因是：一粒掣直接把一個「會收參數」的函式當成點擊處理'
+              + '（那樣它收到的第一個參數會是滑鼠事件，不是你以為的那個值）']));
+      }
+      // 乾淨先清——`JSON` 一個來回剝走 prototype／getter 呢類
+      // 過唔到 sandbox 嘅嘢。上面已經驗過，所以唔會靜靜刪走任何嘢。
+      return arg === undefined ? arg : JSON.parse(JSON.stringify(arg));
+    });
+  }
+
+  /**
+   * client 端自己砌一個三段式訊息，格式同後端 `buildThreePartMessage_()` 一樣，
+   * 所以 `showErrorModal()` 嗰個拆解器照樣拆得開。
+   * @param {string} what 發生咗咩
+   * @param {string} state 而家嘅情況
+   * @param {string[]} howto 可以點做
+   * @returns {string} 三段式訊息
+   */
+  function buildClientThreePart_(what, state, howto) {
+    return '發生了什麼：' + what
+      + '\n現在的情況：' + state
+      + '\n你可以怎樣做：\n' + (howto || []).map(function (h) { return '・' + h; }).join('\n');
+  }
+
+
+
   /**
    * 把 google.script.run 包成 Promise。
    * ⚠️ **全前端只有呢一個函式可以掂 `google.script.run`。**
@@ -141,10 +346,13 @@
    */
   function callServerRaw_(fnName, ...args) {
     return new Promise((resolve, reject) => {
+      // ⚠️ 第四十五輪批次：送出之前一定要清一次。
+      // 喺 executor 入面拋 ⇒ 自動變成 reject，同其餘失敗一條路。
+      const safeArgs = sanitizeServerArgs_(fnName, args);
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler((err) => reject(new Error(err && err.message ? err.message : String(err))))
-        [fnName](...args);
+        [fnName](...safeArgs);
     });
   }
 
@@ -439,6 +647,41 @@
    * 冇人處理嘅 rejected promise——畫面毫無反應、亦冇錯誤訊息，
    * 幹事只會見到「撳咗冇反應」。
    */
+  /**
+   * 第四十五輪批次：**載入中嘅標題唔可以直接駁一個「失敗」落去。**
+   *
+   * 現場見到嘅視窗標題：
+   *
+   *     系統調整中，請稍候失敗
+   *
+   * 成因：`runAction(label, …)` 嗰個 `label` 係一個**進行中嘅講法**
+   *（俾中央嗰塊忙碌牌用），而失敗嗰陣直接寫咗 `label + '失敗'`。
+   * 兩者係兩件事：一個係「而家做緊乜」，一個係「邊一件事做唔到」。
+   *
+   * 全專案有六十幾個 `runAction()` 呼叫點，逐個改一次就一定有漏網。
+   * 所以喺呢度（唯一嗰個出口）把進行中嗰啲尾巴剝走：
+   *
+   *     系統調整中，請稍候 → 系統調整 → 「系統調整」做不到
+   *     儲存中             → 儲存     → 「儲存」做不到
+   *     讀取資料           → 讀取資料 → 「讀取資料」做不到
+   *
+   * ⚠️ 剝完之後**唔可以變成空字串**（例如 label 本身就係「載入中」
+   * 呢類極短嘅字）。空咗就退回一句通用嘅講法，唔可以出一個冇標題嘅視窗。
+   *
+   * @param {string} label `runAction()` 嗰個進行中嘅講法
+   * @returns {string} 錯誤視窗嘅標題
+   */
+  function actionErrorTitle_(label) {
+    const cleaned = String(label === undefined || label === null ? '' : label)
+      .trim()
+      .replace(/[，,]\s*請稍候$/, '')
+      .replace(/\s*請稍候$/, '')
+      .replace(/中$/, '')
+      .replace(/[.。…]+$/, '')
+      .trim();
+    return cleaned ? ('「' + cleaned + '」做不到') : '這一步做不到';
+  }
+
   async function runAction(label, action, steps) {
     setBusy(true);
     // 第三十九輪 B 組：細灰字留住（俾睇慣咗嘅人），但真正嘅回饋係中央嗰塊牌。
@@ -451,7 +694,7 @@
       setStatus('');
     } catch (err) {
       busyHide('fail');
-      showErrorModal(label + '失敗', err);
+      showErrorModal(actionErrorTitle_(label), err);
       setStatus('');
     } finally {
       // 階段 A：呢個動作期間有冇寫過嘢？有嘅話畫面（狀態卡、區一四粒掣、

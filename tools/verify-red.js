@@ -1000,6 +1000,55 @@ const MUTATIONS = [
     replace: '    if (false) {\n      const errorByPerson = {};',
     tests: ['tests/paper_pack_autogen.test.js']
   },
+  {
+    id: 'handler-arg-event',
+    why: '把〔請系統幫我調整〕嗰粒掣還原成直接綁 `openBuildSuggestion`'
+      + '——佢收到嘅第一個參數會係一個 MouseEvent，跟住原封不動送去'
+      + '做第 1 個參數 ⇒ 現場嗰句 `Failed due to illegal value in property: 1`',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: "stepButton('請系統幫我調整', () => openBuildSuggestion(), {",
+    replace: "stepButton('請系統幫我調整', openBuildSuggestion, {",
+    tests: ['tests/client_arg_sanitize.test.js']
+  },
+  {
+    id: 'zone1-handler-event',
+    why: '把區一四粒大掣還原成直接綁函式名'
+      + '——`openReview`／`openOfficial`／`openResend` 三個都收參數，'
+      + '所以三粒撳落去送出去嘅第 1 個參數都會係一個 MouseEvent',
+    file: 'src/ui/ScriptZone1.html',
+    find: '      review: () => openReview(),',
+    replace: '      review: openReview,',
+    tests: ['tests/client_arg_sanitize.test.js']
+  },
+  {
+    id: 'client-args-unclean',
+    why: '把送出嗰行還原成用未清過嗰份參數'
+      + '——清完而照樣送舊嗰份，成層防線白做，而且完全睇唔出',
+    file: 'src/ui/Script.html',
+    find: '        [fnName](...safeArgs);',
+    replace: '        [fnName](...args);',
+    tests: ['tests/client_arg_sanitize.test.js']
+  },
+  {
+    id: 'client-args-noverify',
+    why: '拆走「送出之前逐個參數驗一次」，剩返 `JSON` 一個來回'
+      + '——`JSON.stringify()` 會把函式同 `undefined` **靜靜刪走**，'
+      + '所以個 bug 會由「拋一句睇唔明嘅英文」變成「靜靜傳咗個 null 上去」',
+    file: 'src/ui/Script.html',
+    find: "      const hit = findIllegalServerValue_(arg, '參數 ' + i, []);",
+    replace: '      const hit = null;',
+    tests: ['tests/client_arg_sanitize.test.js']
+  },
+  {
+    id: 'error-title-joined',
+    why: '把錯誤視窗嘅標題還原成 `label + \'失敗\'`'
+      + '——`label` 係一個「進行中」嘅講法，'
+      + '駁埋就會出現現場嗰句「系統調整中，請稍候失敗」',
+    file: 'src/ui/Script.html',
+    find: '      showErrorModal(actionErrorTitle_(label), err);',
+    replace: "      showErrorModal(label + '失敗', err);",
+    tests: ['tests/client_arg_sanitize.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

@@ -419,7 +419,15 @@
       className: 'secondary',
       title: has ? '只看，不會改動任何東西。' : '要先在第 1 步生成職事表。'
     }));
-    acts.push(stepButton('請系統幫我調整', openBuildSuggestion, {
+    // ⚠️ 第四十五輪批次：**一定要包一層 `() => …`。**
+    //
+    // 直接綁 `openBuildSuggestion` 嘅話，佢收到嘅第一個參數係一個
+    // MouseEvent（`button()` 用嘅係 `addEventListener`），而嗰個會原封不動
+    // 傳落 `apiBuildSuggestion` 做第 1 個參數 ⇒
+    // `Failed due to illegal value in property: 1`，而且**後端一次都唔會被叫到**。
+    //
+    // 呢個就係現場嗰個錯。上一輪拎住同一句英文查咗成個後端，判錯咗成因。
+    acts.push(stepButton('請系統幫我調整', () => openBuildSuggestion(), {
       disabled: !has,
       className: 'secondary',
       title: has ? '產生一張建議版本，正式職事表不會改動。' : '要先在第 1 步生成職事表。'
