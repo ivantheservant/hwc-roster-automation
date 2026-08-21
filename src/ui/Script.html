@@ -210,6 +210,8 @@
 
   let busyNode_ = null;
   let busyHideTimer_ = null;
+  let busyTickTimer_ = null;
+  let busyStartedAt_ = 0;
 
   function busyEnsure_() {
     if (busyNode_) return busyNode_;
@@ -219,7 +221,10 @@
     const card = make('div', { className: 'busy-card', id: 'busyCard' }, [
       make('div', { className: 'busy-title', id: 'busyTitle' }),
       make('div', { className: 'busy-sub', id: 'busySub' }),
-      bar
+      bar,
+      // 第四十三輪批次 A 組：真嘅計時 ＋「會做嘅事」。
+      make('div', { className: 'busy-elapsed', id: 'busyElapsed' }),
+      make('div', { className: 'busy-steps', id: 'busySteps' })
     ]);
     busyNode_ = make('div', { className: 'busy-overlay', id: 'busyOverlay' }, [card]);
     busyNode_.hidden = true;
@@ -229,10 +234,28 @@
 
   /**
    * 開始一個動作：畫面中央出牌。
-   * @param {string} title 做緊咩（人話，例如「正在生成職事表」）
+   *
+   * ═════════════════════════════════════════════════════════════════
+   * ⚠️ 第四十三輪批次 A 組：三十幾秒嘅動作，一個轉圈唔夠
+   * ═════════════════════════════════════════════════════════════════
+   *
+   * Ivan 講儲存要等三十幾秒。呢個牌要做到兩件事：
+   *
+   *   一、**真嘅計時**——「已經 12 秒」。個數字自己郁，佢就知道系統
+   *   　　仲喺度做緊嘢，而唔係死咗。
+   *   二、**列出會做嘅事**——讀取改動、檢查規則、建立新版本、
+   *   　　重新發佈公開連結。
+   *
+   * ⚠️ 第二點刻意**唔扮成進度**：伺服器係一個請求，前端根本唔知道
+   * 佢做到邊一步。逐步 highlight 就要靠一個計時器去猜，而猜出嚟嗰個
+   * 「而家做緊第 3 步」係假嘅——同建議表嗰句假承諾同一種錯。
+   * 所以標題寫「會做這幾件事」，唔係「進度」。
+   *
+   * @param {string} title 做緊咩（人話，例如「正在儲存職事表」）
    * @param {string=} sub 補充一句（可以慳）
+   * @param {string[]=} steps 會做嘅事（可以慳）
    */
-  function busyShow(title, sub) {
+  function busyShow(title, sub, steps) {
     const node = busyEnsure_();
     if (busyHideTimer_) { clearTimeout(busyHideTimer_); busyHideTimer_ = null; }
     el('busyCard').className = 'busy-card';
@@ -240,6 +263,32 @@
     el('busySub').textContent = sub || '請稍等，不要關掉這一頁。';
     el('busyBar').hidden = true;
     el('busyBarFill').style.width = '0';
+
+    // ── 會做嘅事 ──────────────────────────────────────────────
+    const stepBox = clear(el('busySteps'));
+    const list = steps || [];
+    stepBox.hidden = list.length === 0;
+    if (list.length > 0) {
+      stepBox.appendChild(make('div', { text: '會做這幾件事：' }));
+      const ul = document.createElement('ul');
+      list.forEach((t) => ul.appendChild(make('li', { text: t })));
+      stepBox.appendChild(ul);
+    }
+
+    // ── 真嘅計時 ──────────────────────────────────────────────
+    busyStartedAt_ = Date.now();
+    el('busyElapsed').textContent = '已經 0 秒';
+    if (busyTickTimer_) clearInterval(busyTickTimer_);
+    busyTickTimer_ = setInterval(() => {
+      if (!busyNode_ || busyNode_.hidden) return;
+      const secs = Math.round((Date.now() - busyStartedAt_) / 1000);
+      el('busyElapsed').textContent = secs >= 25
+        // ⚠️ 二十五秒之後先講「通常要三十幾秒」。一開始就講，
+        // 佢會覺得每一個動作都要等咁耐（大部分其實一兩秒）。
+        ? ('已經 ' + secs + ' 秒　這一步通常要三十幾秒，不要關掉這一頁。')
+        : ('已經 ' + secs + ' 秒');
+    }, 1000);
+
     node.hidden = false;
   }
 
@@ -269,19 +318,68 @@
    */
   function busyHide(outcome, message) {
     if (!busyNode_ || busyNode_.hidden) return;
+    if (busyTickTimer_) { clearInterval(busyTickTimer_); busyTickTimer_ = null; }
     if (outcome !== 'done' && outcome !== 'fail') { busyNode_.hidden = true; return; }
     el('busyCard').className = 'busy-card ' + (outcome === 'done' ? 'is-done' : 'is-fail');
     el('busyTitle').textContent = message || (outcome === 'done' ? '已完成' : '沒有完成');
     el('busySub').textContent = outcome === 'done' ? '' : '下面會講清楚發生了什麼事。';
     el('busyBar').hidden = true;
+    if (busyTickTimer_) { clearInterval(busyTickTimer_); busyTickTimer_ = null; }
     busyHideTimer_ = setTimeout(() => {
       busyHideTimer_ = null;
       if (busyNode_) busyNode_.hidden = true;
     }, BUSY_DONE_MS);
   }
 
+  /**
+   * 忙碌鎖。**由撳落去到彈出結果為止，整個介面唔可以撳到任何嘢。**
+   *
+   * ═════════════════════════════════════════════════════════════════
+   * 第四十三輪批次 A 組：Ivan 現場撞到嘅嘢
+   * ═════════════════════════════════════════════════════════════════
+   *
+   * > 撳「儲存我的修改」，等咗一陣，畫面好似重新整理咗，我可以自由撳
+   * > 任何一粒掣。但再等三十幾秒，佢突然彈出「已儲存乜」。
+   * > 呢個等待空隙好易令我誤撳其他掣，或者再撳一次儲存。
+   *
+   * ─────────────────────────────────────────────────────────────────
+   * 點解舊寫法唔夠
+   * ─────────────────────────────────────────────────────────────────
+   *
+   * 舊寫法係「逐粒 `<button>` 設 `disabled`」。三個窿：
+   *
+   *   一、**只鎖 `<button>`**。頂部嗰個季度下拉（`<select>`）、
+   *   　　彈窗入面嘅輸入格、`<a class="bigLink">` 全部照樣撳得到。
+   *   　　換一次季度會令成個畫面重畫，而後台仲做緊嘢。
+   *
+   *   二、**重畫就解鎖**。`loadDashboard()` 會 `clear()` 再重新
+   *   　　`appendChild()`，新造出嚟嘅掣冇 `disabled`——即係只要動作期間
+   *   　　有任何一次重畫，鎖就自己冇咗。
+   *
+   *   三、鎖同解鎖靠一個 `dataset` 旗標對數，對唔上就解錯。
+   *
+   * ─────────────────────────────────────────────────────────────────
+   * 而家：**一個 body class，CSS 做鎖**
+   * ─────────────────────────────────────────────────────────────────
+   *
+   * `document.body.classList.add('is-busy')`，而 CSS 用
+   * `body.is-busy` 把成頁嘅 `pointer-events` 熄咗（見 `Style.html`）。
+   *
+   * ⚠️ 呢個做法**唔怕重畫**：新造出嚟嘅節點一樣喺 `body` 入面，
+   * 一樣受嗰條規則管。呢個就係第二個窿嘅治本。
+   *
+   * ⚠️ 仲係要照樣設 `disabled`：淨靠 `pointer-events: none` 擋唔到
+   * 鍵盤（Tab ＋ Enter）。兩層一齊做。
+   *
+   * @param {boolean} busy 鎖定定解鎖
+   */
   function setBusy(busy) {
-    document.querySelectorAll('button').forEach((b) => {
+    // 第一層：CSS。**唔怕重畫**——見上面。
+    document.body.classList.toggle('is-busy', !!busy);
+
+    // 第二層：`disabled`，擋鍵盤。⚠️ 連 `select` 同 `input` 都要，
+    // 唔止 `<button>`——頂部嗰個季度下拉就係一個 `<select>`。
+    document.querySelectorAll('button, select, input, textarea').forEach((b) => {
       if (busy) {
         if (!b.disabled) b.dataset.busyDisabled = '1';
         b.disabled = true;
@@ -295,17 +393,27 @@
   }
 
   /**
+   * 忙碌期間有畫面重畫過 ⇒ 重新鎖一次新造出嚟嗰批節點。
+   *
+   * ⚠️ CSS 嗰層唔使理（`body.is-busy` 自動蓋住新節點），
+   * 但 `disabled` 嗰層要補——新造嘅掣冇人幫佢設過。
+   */
+  function reapplyBusyLockIfNeeded_() {
+    if (document.body.classList.contains('is-busy')) setBusy(true);
+  }
+
+  /**
    * 包住每個會呼叫伺服器嘅動作：忙碌狀態＋錯誤處理。
    *
    * ⚠️ **全部** async 動作都一定要包一層。冇包嘅話，失敗會變成一個
    * 冇人處理嘅 rejected promise——畫面毫無反應、亦冇錯誤訊息，
    * 幹事只會見到「撳咗冇反應」。
    */
-  async function runAction(label, action) {
+  async function runAction(label, action, steps) {
     setBusy(true);
     // 第三十九輪 B 組：細灰字留住（俾睇慣咗嘅人），但真正嘅回饋係中央嗰塊牌。
     setStatus(label + '…');
-    busyShow(label);
+    busyShow(label, undefined, steps);
     let ok = false;
     try {
       await action();
@@ -484,6 +592,107 @@
       }));
     }
     return [box];
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 第四十三輪批次 F 組：自行輸入電郵（寄出 ＋ 紙本共用）
+   * ══════════════════════════════════════════════════════════════
+   *
+   * Ivan：「寄出及處理紙本，可以自行輸入 email（可以入多個 emails）」
+   *
+   * ⚠️ 呢啲地址**唔會存入 `NameMapping`**，淨係影響今次。
+   * 存入去就變成一個冇 PersonID、冇資格、冇服侍紀錄嘅「半個人」——
+   * 而嗰種半個人喺呢個系統入面出過好多次事。
+   *
+   * ⚠️ 格式一唔啱就**即刻標紅**，唔係等佢撳落去先講。
+   * 等到撳落去先講，佢已經行咗三步，要退返出嚟重做。
+   */
+
+  /** 一個寬鬆但夠用嘅電郵格式檢查。**同後端嗰個係同一套準則。** */
+  function looksLikeEmail(text) {
+    return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(text || '').trim());
+  }
+
+  /**
+   * 把一段文字拆成一批電郵地址。逗號、分號、換行、空格都當成分隔。
+   * @param {string} raw 幹事打嘅嘢
+   * @returns {{valid: string[], invalid: string[]}}
+   */
+  function parseEmailList(raw) {
+    const parts = String(raw || '').split(/[\s,;]+/)
+      .map((x) => x.trim()).filter((x) => x !== '');
+    const valid = [];
+    const invalid = [];
+    parts.forEach((p) => {
+      // ⚠️ 重複嘅唔算錯，但只留一個——寄兩封一模一樣嘅信俾同一個人
+      // 唔係佢想要嘅，而佢多數係貼上嗰陣重複咗。
+      if (!looksLikeEmail(p)) { invalid.push(p); return; }
+      if (valid.indexOf(p) === -1) valid.push(p);
+    });
+    return { valid: valid, invalid: invalid };
+  }
+
+  /**
+   * 「自行輸入電郵」嗰格。**寄出同紙本兩個彈窗共用。**
+   *
+   * @param {Object} store 要把結果放落邊個物件（會寫 `extraEmails`／`extraEmailsRaw`）
+   * @param {string} note 一句補充（兩邊講嘅嘢唔同）
+   * @returns {Node}
+   */
+  function buildExtraEmailBox(store, note) {
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle('另外自行輸入電郵（可以留空）')
+    ]);
+    const input = document.createElement('textarea');
+    input.rows = 2;
+    input.placeholder = 'someone@example.invalid, another@example.invalid';
+    input.value = store.extraEmailsRaw || '';
+    const msg = make('div', { className: 'muted' });
+
+    const refresh = () => {
+      const r = parseEmailList(input.value);
+      input.classList.toggle('bad-input', r.invalid.length > 0);
+      if (r.invalid.length > 0) {
+        msg.className = 'vio-row';
+        msg.textContent = '這 ' + r.invalid.length + ' 個看起來不是電郵地址：'
+          + r.invalid.join('、');
+      } else if (r.valid.length > 0) {
+        msg.className = 'ok-line';
+        msg.textContent = '會另外寄給這 ' + r.valid.length + ' 個地址。' + (note || '');
+      } else {
+        msg.className = 'muted';
+        msg.textContent = '用逗號或者換行分開，可以入多過一個。' + (note || '');
+      }
+    };
+    input.addEventListener('input', () => {
+      store.extraEmailsRaw = input.value;
+      refresh();
+    });
+    refresh();
+
+    box.appendChild(input);
+    box.appendChild(msg);
+    box.appendChild(make('div', {
+      text: '這幾個地址不會加入人員名單，只影響這一次。',
+      className: 'muted'
+    }));
+    return box;
+  }
+
+  /**
+   * 把輸入格的內容定下來。**格式不對就擋住，並且講明。**
+   * @param {Object} store 同 `buildExtraEmailBox()` 那一個
+   * @returns {boolean} 可不可以行落去
+   */
+  function commitExtraEmails(store) {
+    const r = parseEmailList(store.extraEmailsRaw || '');
+    if (r.invalid.length > 0) {
+      setStatus('這 ' + r.invalid.length + ' 個看起來不是電郵地址：'
+        + r.invalid.join('、') + '。改好或者刪走再撳一次。', true);
+      return false;
+    }
+    store.extraEmails = r.valid;
+    return true;
   }
 
   /** 全選／全不選那兩粒掣。兩個名單都要有——五十幾個人逐個撳唔現實。 */
@@ -904,6 +1113,17 @@
     renderZone1(dashboardState_);
     renderZone2Head(dashboardState_);
     renderZone4(dashboardState_);
+
+    // ⚠️ 第四十三輪批次 A 組：**重畫完要重新鎖一次。**
+    //
+    // 呢個函式會 `clear()` 再 `appendChild()`，即係造出一批全新嘅掣，
+    // 而嗰批新掣冇人幫佢哋設過 `disabled`。忙碌期間重畫過一次
+    //（`runAction()` 嘅 `finally` 就會），鎖就自己冇咗一半
+    // ——嗰個正正就係 Ivan 講嘅「畫面好似重新整理咗，我可以自由撳」。
+    //
+    // CSS 嗰層唔怕重畫（`body.is-busy` 自動蓋住新節點），
+    // 但鍵盤嗰層要補返。
+    reapplyBusyLockIfNeeded_();
   }
 
   function renderTop(d) {

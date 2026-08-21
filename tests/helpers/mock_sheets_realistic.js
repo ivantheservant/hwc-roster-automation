@@ -72,9 +72,40 @@ class RealisticMockRange {
 
   setValue(v) { this.sheet._setCell(this.row, this.col, v); return this; }
 
-  // ── 版面格式化：no-op，見檔頭說明 ─────────────────────────
-  setBackground() { return this; }
-  setBackgrounds() { return this; }
+  // ── 版面格式化 ────────────────────────────────────────────
+  //
+  // ⚠️ 第四十三輪批次 C1：**底色同格註而家會記低。**
+  //
+  // 之前兩樣都係 no-op，理由係「格式唔喺任何測試嘅斷言範圍內」。
+  // 而第四十三輪現場撞到嘅正正就係格式：對話框報「黃色格 1 格」，
+  // 而張表上一格黃色都冇。冇一條測試睇得到底色，所以冇一條測試捉得到。
+  //
+  // 由呢一輪起嘅規矩：**對話框報告嘅每一個數字，
+  // 都要有一條測試證明表上真係有對應嘅嘢。** 要做到就要睇得到格式。
+  setBackground(color) { this._eachCell((r, c) => this.sheet._setBg(r, c, color)); return this; }
+  setBackgrounds(colors) {
+    for (let r = 0; r < colors.length; r++) {
+      for (let c = 0; c < colors[r].length; c++) {
+        this.sheet._setBg(this.row + r, this.col + c, colors[r][c]);
+      }
+    }
+    return this;
+  }
+  getBackground() { return this.sheet._getBg(this.row, this.col); }
+  getBackgrounds() {
+    const out = [];
+    for (let r = 0; r < this.numRows; r++) {
+      const rowArr = [];
+      for (let c = 0; c < this.numCols; c++) rowArr.push(this.sheet._getBg(this.row + r, this.col + c));
+      out.push(rowArr);
+    }
+    return out;
+  }
+  _eachCell(fn) {
+    for (let r = 0; r < this.numRows; r++) {
+      for (let c = 0; c < this.numCols; c++) fn(this.row + r, this.col + c);
+    }
+  }
   setFontWeight() { return this; }
   setFontWeights() { return this; }
   setFontStyle() { return this; }
@@ -100,15 +131,26 @@ class RealisticMockRange {
     return this;
   }
   clearFormat() { return this; }
-  setNote() { return this; }
+  setNote(note) { this.sheet._setNote(this.row, this.col, note); return this; }
   // 第三十三輪批次階段 F1：`RosterWriter.gs` 嘅 `applyCellMarks_()` 用
   // `setNotes()`（複數）批次寫格註。同其餘格式方法一樣係 no-op——
   // 呢個 mock 只保留「值」，格式／註解唔喺任何測試嘅斷言範圍內。
-  setNotes() { return this; }
-  getNote() { return ''; }
+  setNotes(notes) {
+    for (let r = 0; r < notes.length; r++) {
+      for (let c = 0; c < notes[r].length; c++) {
+        this.sheet._setNote(this.row + r, this.col + c, notes[r][c]);
+      }
+    }
+    return this;
+  }
+  getNote() { return this.sheet._getNote(this.row, this.col); }
   getNotes() {
     const out = [];
-    for (let r = 0; r < this.numRows; r++) out.push(new Array(this.numCols).fill(''));
+    for (let r = 0; r < this.numRows; r++) {
+      const rowArr = [];
+      for (let c = 0; c < this.numCols; c++) rowArr.push(this.sheet._getNote(this.row + r, this.col + c));
+      out.push(rowArr);
+    }
     return out;
   }
   setFontFamily() { return this; }
@@ -174,6 +216,8 @@ class RealisticMockSheet {
   constructor(name) {
     this._name = name;
     this._cells = new Map();   // 'r,c' -> value
+    this._bg = new Map();      // 'r,c' -> 底色（第四十三輪 C1）
+    this._notes = new Map();   // 'r,c' -> 格註
     this._maxRow = 0;
     this._maxCol = 0;
     this._frozenRows = 0;
@@ -208,6 +252,21 @@ class RealisticMockSheet {
     this._cells.set(this._key(r, c), auto !== null ? auto : v);
     if (r > this._maxRow) this._maxRow = r;
     if (c > this._maxCol) this._maxCol = c;
+  }
+
+  // 第四十三輪批次 C1：底色同格註。⚠️ **只記低，冇任何自動正規化**——
+  // 真 Sheets 會把 `#FFF3C4` 正規化成小階，所以斷言嗰邊要自己
+  // 用小階比對（`String(bg).toLowerCase()`）。呢個 mock 唔扮嗰一步，
+  // 扮錯咗會令測試對住一個唔存在嘅行為綠燈。
+  _setBg(r, c, color) { this._bg.set(this._key(r, c), color); }
+  _getBg(r, c) {
+    const v = this._bg.get(this._key(r, c));
+    return v === undefined ? '#ffffff' : v;
+  }
+  _setNote(r, c, note) { this._notes.set(this._key(r, c), note === undefined ? '' : note); }
+  _getNote(r, c) {
+    const v = this._notes.get(this._key(r, c));
+    return v === undefined ? '' : v;
   }
 
   setFrozenRows(n) { this._frozenRows = n; return this; }

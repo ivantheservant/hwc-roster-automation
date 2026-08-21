@@ -45,7 +45,7 @@ const fs = require('fs');
 const path = require('path');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
+  'Constants.gs', 'MutationLock.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
   'QuarterStage.gs', 'Roles.gs', 'RoleImpact.gs', 'PersonPostWeight.gs',
   'HardViolationClass.gs', 'Generator.gs', 'FineTune.gs', 'StateSource.gs',
   'Debug.gs', 'Tune.gs', 'Verify.gs', 'SoftRuleMetrics.gs',
@@ -426,11 +426,13 @@ console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
       if (n) notes.push(n);
     }
   }
-  // `mock_sheets_realistic.js` 嘅 `getNote()` 係 no-op（一律回空字串），
-  // 所以喺呢度**驗唔到**真正嘅格註。改為驗產生備註嗰段邏輯。
+  // ⚠️ 第四十三輪批次 C1：`mock_sheets_realistic.js` 而家**真係記低格註同底色**。
+  // 之前兩樣都係 no-op，所以「對話框報咗，但表上冇」呢一類 bug
+  // 一條測試都捉唔到——現場撞到嗰個黃色格就係噉走甩嘅。
   const built = gas.buildSuggestionState_(Q,
     gas.resolveSuggestionStartPoint_(Q, gas.findLatestVersionNo(Q), 'GRID'));
   const noteTexts = Object.keys(built.notes).map(function (k) { return built.notes[k]; });
+  // （下面兩條斷言要用到 `noteTexts`，所以要喺呢一行之後。）
   check('★★★★★ 系統改過嘅格有備註，而且講得出原因',
     noteTexts.some(function (t) { return t.indexOf('系統改了這一格。原因：') !== -1; }),
     JSON.stringify(noteTexts).slice(0, 400));
@@ -439,8 +441,13 @@ console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
     noteTexts.some(function (t) {
       return t.indexOf('原本是「') !== -1 && t.indexOf('改成「') !== -1;
     }), JSON.stringify(noteTexts).slice(0, 400));
-  check('（附註）mock 嘅 getNote() 係 no-op，所以呢度只驗得到產生備註嗰段',
-    notes.length === 0, 'notes=' + notes.length);
+  check('★★★★★★ **而且嗰啲備註真係寫咗落張表**'
+    + '——呢一條就係 C1 嗰類問題嘅防線：對話框講「把滑鼠停喺上面會見到原因」，'
+    + '就一定要有一條測試證明表上真係有嗰個註',
+    notes.length >= 1, 'notes=' + notes.length);
+  check('★★★★★ 表上嗰個註同產生出嚟嗰個係同一句',
+    notes.some(function (n) { return noteTexts.indexOf(n) !== -1; }),
+    JSON.stringify(notes).slice(0, 300));
 }
 
 console.log('\n=== B：藍色格 0 格嗰陣，文案要讀得通 ===');
@@ -450,7 +457,12 @@ console.log('\n=== B：藍色格 0 格嗰陣，文案要讀得通 ===');
   const bare = ui.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★ 系統一格都唔使改嗰陣，直接講「不需要調整任何東西」'
     + '——「藍色格 0 格」要人自己推理，而佢推理嘅結果多數係「系統壞咗」',
-    /systemCount === 0/.test(bare) && /不需要調整任何東西/.test(ui), '');
+    /cc\.system === 0 && cc\.both === 0/.test(bare) && /不需要調整任何東西/.test(ui), '');
+  check('★★★★★★ 而且三個數字全部讀 `colourCounts`（上色嗰陣數出嚟嗰個）'
+    + '——讀 `manualCount`／`systemCount` 就會出現第四十三輪現場嗰個情況：'
+    + '對話框報「黃色 1 格」而張表上一格黃色都冇',
+    /const cc = r\.colourCounts/.test(bare)
+      && !/r\.manualCount/.test(bare) && !/r\.systemCount/.test(bare), '');
 }
 
 // =====================================================================

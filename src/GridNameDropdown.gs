@@ -56,15 +56,35 @@ function applyGridNameDropdowns_(quarterId, versionNo) {
       ['去「進階與診斷 ▸ 回到上一個版本」重新建立一張',
         '如果那張表只是被改了名，把名字改回原本的就可以']));
   }
+  // 正式那一張的機器鍵一定在第 2 行（見 `buildGridLayout_()`）。
+  return applyNameDropdownsToSheet_(sheet, sheetName, 2);
+}
 
+/**
+ * 第四十三輪批次 C2：**把下拉選單套到任何一張 grid 形狀的工作表。**
+ *
+ * ⚠️ 存在的理由：`_建議` 工作表都要有選單——Ivan 就是要在那一張上面
+ * 直接再改。而它的機器鍵行**不在第 2 行**（表頂有一段圖例），
+ * 所以行號要由呼叫端傳入。
+ *
+ * ⚠️ 抽出來而不是在建議表那邊另寫一份：兩份的話，
+ * 「`setAllowInvalid(true)`」「講員／翻譯／獻花不設選單」
+ * 「設不到要老實講」這三條規矩會慢慢只剩一邊有。
+ *
+ * @param {Sheet} sheet 目標工作表
+ * @param {string} sheetName 工作表名稱（只用來回報）
+ * @param {number} keyRow 機器鍵在第幾行
+ * @returns {Object} 逐欄的結果
+ */
+function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
-  if (lastRow < 3 || lastCol < 1) {
+  const dataStart = keyRow + 1;
+  if (lastRow < dataStart || lastCol < 1) {
     return { sheetName: sheetName, columns: [], skipped: [], unprotected: false };
   }
 
-  // 第 2 行是機器鍵（`POSTID#slot`），第 1 行是中文標題。見 buildGridLayout_()。
-  const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(String);
+  const keys = sheet.getRange(keyRow, 1, 1, lastCol).getValues()[0].map(String);
 
   const posts = readPostsNormalized();
   const postById = {};
@@ -127,7 +147,7 @@ function applyGridNameDropdowns_(quarterId, versionNo) {
       // 靜靜失敗的後果：幹事開了表，那一欄沒有選單，
       // 而系統剛剛才說「已經加入名單選單」——他會以為是自己看錯。
       try {
-        sheet.getRange(3, i + 1, lastRow - 2, 1).setDataValidation(rule);
+        sheet.getRange(dataStart, i + 1, lastRow - dataStart + 1, 1).setDataValidation(rule);
         columns.push({ postId: postId, postNameTC: post.postNameTC, optionCount: names.length });
       } catch (err) {
         skipped.push({

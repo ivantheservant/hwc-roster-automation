@@ -267,7 +267,11 @@
     openConfirm({
       title: '寄出',
       bodyNodes: nodes,
-      confirmLabel: sendConfirmLabel(s.kind),
+      // ⚠️ 第四十三輪批次 E2：粒掣一律叫「寄出」。
+      // Ivan：「click 寄給堂委審閱，不能 click。呢粒掣應該叫『寄出』。」
+      // 呢一次係邊一種，彈窗頂已經用一句人話講咗（見上面），
+      // 粒掣再講多次只會令佢以為嗰個係另一件事。
+      confirmLabel: '寄出',
       extraActions: actions,
       onConfirm: () => {
         // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ 唔可以行落去。
@@ -316,7 +320,9 @@
     const items = sendCandidates_.map((c) => ({
       key: c.key,
       label: c.displayName,
-      note: c.type === 'LIST' ? '（名單）' : ('（這一季 ' + c.cellCount + ' 格）'),
+      note: (c.type === 'LIST' ? '（名單）' : ('（這一季 ' + c.cellCount + ' 格）'))
+        // 第四十三輪批次 E 組：身分寫喺個名後面，噉佢自己勾嗰陣都睇得到。
+        + describeRoleTags(c.roles),
       // 查不到電郵嘅照樣列出嚟，並且講明。佢唔係「唔使服侍」，
       // 係要印紙本（第 5 步）——收埋佢就等於靜靜當佢唔存在。
       warn: c.hasEmail ? '' : '⚠ 查不到電郵，寄不到，要印紙本'
@@ -330,21 +336,80 @@
     const nodes = [
       para('選擇哪幾位要收到這一封信。'),
       para('沒有選到的人，這一次一封都不會收到。', 'muted')
-    ].concat(pickListNodes({
+    ];
+
+    // ── 第四十三輪批次 E 組：群組勾選 ──────────────────────────
+    //
+    // ⚠️ 身分由後端讀 `Roles`（連生效期一齊判斷），**唔係喺呢度寫死一份
+    // 名單**。寫死嗰份下一屆就錯，而且冇人會記得去改。
+    //
+    // ⚠️ 勾一個群組 ＝ 把嗰批人加入已選名單（**唔係取代**），
+    // 而且逐個仍然取消得到。Ivan 明確要求「全部堂委 ＋ 另外三個人」
+    // 呢種用法。
+    const groupBox = make('div', { className: 'sec' }, [sectionTitle('一次過加一整組')]);
+    let hasGroup = false;
+    [['COMMITTEE', '全部堂委'], ['DEACON', '全部執事']].forEach((g) => {
+      const members = sendCandidates_.filter(
+        (c) => (c.roles || []).indexOf(g[0]) !== -1);
+      if (members.length === 0) return;
+      hasGroup = true;
+      const allIn = members.every((c) => selected[c.key] === true);
+      const line = make('label', { className: 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = allIn;
+      cb.addEventListener('change', () => {
+        members.forEach((c) => { selected[c.key] = cb.checked; });
+        redraw();
+      });
+      line.appendChild(cb);
+      line.appendChild(make('span', {
+        text: g[1] + '（' + members.length + ' 位）'
+      }));
+      groupBox.appendChild(line);
+    });
+    if (hasGroup) {
+      groupBox.appendChild(make('div', {
+        text: '勾了整組之後，仍然可以在下面逐個取消。',
+        className: 'muted'
+      }));
+      nodes.push(groupBox);
+    } else {
+      // ⚠️ 一個群組都砌唔到嗰陣**要講**。靜靜唔出嗰兩個勾，
+      // 幹事只會以為系統壞咗——而真正嘅原因係 `Roles` 未填。
+      nodes.push(make('div', {
+        text: '（系統在「身分」那張表找不到任何現任堂委或執事，'
+          + '所以沒有群組可以勾。要用這個功能，先去「名單維護 ▸ 身分」填。）',
+        className: 'muted'
+      }));
+    }
+
+    pickListNodes({
       items: items,
       selected: selected,
       keyword: keyword,
       onRedraw: redraw,
       emptyText: '這一次一個收件人都找不到。這通常代表這一季還沒有派工，'
         + '或者收件人名單（EmailRecipients）是空的。'
-    }));
+    }).forEach((n) => nodes.push(n));
+
+    // ── 第四十三輪批次 F 組：自行輸入電郵 ──────────────────────
+    nodes.push(buildExtraEmailBox(sendOptions_, '這幾個地址會收到同一封信（包括附件）。'));
 
     openModal('自己選擇寄給誰', nodes, [
       button('選好了', () => {
         sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
+        if (!commitExtraEmails(sendOptions_)) return;
         drawSendMain(s);
       }, '')
     ].concat(pickListBulkButtons(items, selected, () => redraw())));
+  }
+
+  /** 身分標籤，例如「　堂委」。冇身分就回空字串。 */
+  function describeRoleTags(roles) {
+    const map = { COMMITTEE: '堂委', DEACON: '執事' };
+    const names = (roles || []).map((r) => map[r]).filter(Boolean);
+    return names.length > 0 ? ('　' + names.join('、')) : '';
   }
 
   function sendConfirmLabel(kind) {
@@ -373,6 +438,8 @@
    * ============================================================ */
 
   let paperSelection_ = null;
+  /** 第四十三輪批次 F 組：幹事自行輸入嘅電郵（同寄出嗰邊共用元件）。 */
+  let paperExtra_ = { extraEmails: [], extraEmailsRaw: '' };
 
   /**
    * G 組：要印邊一種。`PERSONAL` ＝ 標示自己個名（現狀，預設）、
@@ -392,6 +459,7 @@
       }
       // 預設：**冇電郵嗰批全部勾好**。佢哋一定要印，唔應該要幹事逐個勾。
       paperKind_ = 'PERSONAL';
+      paperExtra_ = { extraEmails: [], extraEmailsRaw: '' };
       paperSelection_ = {};
       s.noEmail.forEach((p) => { paperSelection_[p.personId] = true; });
       renderPaperDialog(s, '');
@@ -509,6 +577,9 @@
 
     // ⚠️ 兩個出口都要講清楚會發生咩事——尤其係「寄到自己信箱」
     // 就算喺模擬模式都會真係寄。
+    nodes.push(buildExtraEmailBox(paperExtra_,
+      '那幾個地址會收到整份紙本包（同你自己收到那幾封一模一樣），不是個人版。'));
+
     nodes.push(make('div', { className: 'sec' }, [
       sectionTitle('兩個出口'),
       make('div', {
@@ -659,8 +730,10 @@
       ],
       confirmLabel: '寄給我自己',
       onConfirm: () => {
+        if (!commitExtraEmails(paperExtra_)) return;
         runAction('寄到自己信箱', async () => {
-          const r = await callServerMutating('apiEmailPaperPackToSelf', currentQuarterId, ids);
+          const r = await callServerMutating(
+            'apiEmailPaperPackToSelf', currentQuarterId, ids, paperExtra_.extraEmails);
           const nodes = [
             make('div', { text: '已寄出', className: 'ok-head' }),
             para(r.message)

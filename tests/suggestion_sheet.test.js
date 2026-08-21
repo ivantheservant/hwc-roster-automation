@@ -30,7 +30,7 @@ const fs = require('fs');
 const path = require('path');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
+  'Constants.gs', 'MutationLock.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
   'QuarterStage.gs', 'Roles.gs', 'RoleImpact.gs', 'PersonPostWeight.gs',
   'HardViolationClass.gs', 'Generator.gs', 'FineTune.gs', 'StateSource.gs',
   'Debug.gs', 'Tune.gs', 'Verify.gs', 'SoftRuleMetrics.gs',
@@ -415,8 +415,16 @@ console.log('\n=== B3：接受之後，冇改動嘅格四個欄位要逐字搬�
 
 console.log('\n=== B：放棄 ===');
 {
+  // ⚠️ 第四十三輪批次 B 組：**啱啱接受完，grid 同版本紀錄一模一樣**，
+  // 而嗰種情況系統唔會再建立建議表（建立咗接受唔到，見 apiBuildSuggestion）。
+  // 所以要先真係改一格，先至有嘢可以建議。
+  const latestNow = gas.findLatestVersionNo(Q);
+  const gridNow2 = gas.buildRosterSheetName_(Q, latestNow);
+  const someone = PEOPLE[Object.keys(PEOPLE)[1]];
+  check('（前置）先喺正式表改一格', setGrid(gridNow2, DATES[6], 'CHAIR', someone));
+
   const built = gas.apiBuildSuggestion(Q);
-  check('（前置）再產生一張建議表', built.ok === true);
+  check('（前置）再產生一張建議表', built.ok === true, JSON.stringify(built).slice(0, 200));
   const before = snapshotAssignments();
   const versionBefore = gas.findLatestVersionNo(Q);
 

@@ -25,11 +25,16 @@
       // 後端算唔到。**唔可以顯示「全部做好了」**——嗰個等於話「檢查過冇問題」。
       countNode.textContent = '（暫時查不到）';
       countNode.className = 'zone-count warn';
-      setZoneOpen('zone2Head', 'zone2Body', false);
+      setZoneOpen('zone2Head', 'zone2Body', true);
+      markZoneLoaded('zone2Body');
     } else if (pq.undoneItemCount === 0) {
       countNode.textContent = '全部做好了';
       countNode.className = 'zone-count ok';
-      setZoneOpen('zone2Head', 'zone2Body', false);
+      // ⚠️ 第四十三輪批次 H 組：Ivan 要求呢一組**預設展開**。
+      // 佢每一季第一件做嘅事就係呢度（改名單、標特別主日）——
+      // 「全部做好咗」唔等於「唔使再開」，佢仍然會入嚟改名單。
+      setZoneOpen('zone2Head', 'zone2Body', true);
+      markZoneLoaded('zone2Body');
     } else {
       countNode.textContent = '還有 ' + pq.undoneItemCount + ' 項未做';
       countNode.className = 'zone-count warn';
@@ -64,6 +69,17 @@
       }));
     });
     body.appendChild(summary);
+
+    // ⚠️ 第四十三輪批次 H 組：「更改各崗位的事奉人員名單」搬咗入嚟做**第 0 步**。
+    //
+    // Ivan 嘅講法：改名單係**生成之前**做嘅事。擺喺主流程第 3 步
+    //（即係生成完、改完表之後）本身就講錯咗次序。
+    //
+    // ⚠️ 用返 `renderStepEligibility()`（ScriptMainFlow.html）——
+    // **唔係喺呢度另寫一份**。寫兩份嘅話，兩邊嘅掣會慢慢唔一樣。
+    if (typeof renderStepEligibility === 'function') {
+      body.appendChild(renderStepEligibility());
+    }
 
     body.appendChild(row([
       button('確認特別主日', openSpecialSundays, ''),

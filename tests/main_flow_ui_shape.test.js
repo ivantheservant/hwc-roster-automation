@@ -52,22 +52,28 @@ console.log('\n=== A【核心】五步齊全，而且順序係幹事真實嘅工
   //   `createRosterSheet()` 收尾自動套用（五條建立版本嘅路都經過嗰度）
   //   `apiApplyEligibilitySheet()` 套用完名單順帶再跑一次
   // 所以佢唔再出現喺主流程，收咗落「進階與診斷」做手動補救。
+  // ⚠️ 第四十三輪批次 H 組：主流程由五步減成**四步**。
+  // 「更改各崗位的事奉人員名單」搬咗入「開季前準備」做第 0 步——
+  // Ivan 嘅理由：改名單係**生成之前**做嘅事，擺喺生成之後本身就講錯咗次序。
   const titles = [
     '生成下一季職事表',
     '查看／修改職事表',
-    '維護各崗位的事奉人員名單',
     '寄出',
     '要印紙本'
   ];
   const positions = titles.map((t) => flow.indexOf(t));
-  check('★★★★★ 五步全部搵得到', positions.every((p) => p !== -1),
+  check('★★★★★ 四步全部搵得到', positions.every((p) => p !== -1),
     JSON.stringify(titles.map((t, i) => t + '=' + positions[i])));
+  check('★★★★★ 而且改名單嗰一步改咗名做「更改」，同時唔再喺主流程陣列入面'
+    + '（佢而家係「開季前準備」入面嘅第 0 步）',
+    /更改各崗位的事奉人員名單/.test(flow)
+      && !/renderStepEligibility\(\),/.test(flow), '');
 
-  const renderOrder = ['renderStep1(', 'renderStep2(', 'renderStepEligibility(',
+  const renderOrder = ['renderStep1(', 'renderStep2(',
     'renderStepSend(', 'renderStepPaper('];
   const callBlock = flow.slice(flow.indexOf('async function renderMainFlow'));
   const callPos = renderOrder.map((r) => callBlock.indexOf(r));
-  check('★★★★★ 而且係由 1 畫到 5，次序冇亂',
+  check('★★★★★ 而且係由 1 畫到 4，次序冇亂',
     callPos.every((p, i) => p !== -1 && (i === 0 || p > callPos[i - 1])),
     JSON.stringify(callPos));
 
@@ -78,11 +84,11 @@ console.log('\n=== A【核心】五步齊全，而且順序係幹事真實嘅工
   const nums = (flow.match(/num: (\d)[,\s]/g) || [])
     .map((m) => Number(m.replace(/\D/g, '')));
   const uniqueNums = Array.from(new Set(nums)).sort();
-  checkEqual('★★★★★ 編號係 1、2、3、4、5，冇跳號'
+  checkEqual('★★★★★ 編號係 0、1、2、3、4，冇跳號'
     + '——跳號（第 2 步、第 4 步、第 5 步）對幹事嚟講就係「我係咪漏咗一步」',
-    uniqueNums, [1, 2, 3, 4, 5]);
-  checkEqual('★★★★★ 而且最大嗰個係 5（唔可以仲有一張第 6 步嘅卡留低）',
-    Math.max.apply(null, nums), 5);
+    uniqueNums, [0, 1, 2, 3, 4]);
+  checkEqual('★★★★★ 而且最大嗰個係 4（唔可以仲有一張第 5 步嘅卡留低）',
+    Math.max.apply(null, nums), 4);
 
   check('★★★★★ 「在職事表加入名單選單」唔再喺主流程出現'
     + '（Ivan 明講：做到自動嘅話，嗰一步就唔使出現喺介面上）',
@@ -234,7 +240,16 @@ console.log('\n=== B：載入回饋要大而明確 ===');
   check('★★★★★ 牌上面嘅字用最大嗰級（--fs-2xl）',
     /\.busy-title \{[^}]*var\(--fs-2xl\)/.test(style));
   check('★★★★★ 有 `busyShow()`，而且會講**做緊咩**（收一個 title）',
-    /function busyShow\(title, sub\)/.test(common));
+    /function busyShow\(title, sub, steps\)/.test(common));
+  // ⚠️ 第四十三輪批次 A 組：三十幾秒嘅動作要有**真嘅計時**。
+  // 一個轉圈唔夠——Ivan 講「等咗一陣，畫面好似重新整理咗」。
+  check('★★★★★ 而且有一個真嘅秒數計時（唔係一個扮出嚟嘅進度）',
+    /busyStartedAt_ = Date\.now\(\)/.test(common)
+      && /已經 ' \+ secs \+ ' 秒/.test(common), '');
+  check('★★★★★ 「會做這幾件事」係一張**清單**，唔係逐步 highlight'
+    + '——伺服器係一個請求，前端根本唔知佢做到邊一步，'
+    + '逐步 highlight 就要靠計時器去猜，而嗰個猜出嚟嘅進度係假嘅',
+    /會做這幾件事/.test(common) && !/currentStep/.test(common), '');
   check('★★★★★ 需時長嘅動作報得到進度（第幾／共幾）',
     /function setProgress\(done, total, label\)/.test(common));
   check('★★★★★ 總數唔知就**唔畫進度條**'

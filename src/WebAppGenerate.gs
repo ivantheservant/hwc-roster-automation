@@ -102,8 +102,24 @@ function apiGenerateDraftPlan(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 生成結果；`ok:false` 時附三段式訊息
  */
+/**
+ * ⚠️ 第四十三輪批次 A 組：**同一時間只可以有一個會改動資料的動作在跑。**
+ *
+ * 這個薄殼只做兩件事：檢查權限、拿鎖。真正的內容在下面那一個
+ * `apiGenerateDraftExecute_locked_()`。分開兩層是刻意的——把 `withMutationLock_()`
+ * 塞進原本那個函式裡面，就要在它每一個 `return` 前面記得放鎖，
+ * 而漏一個就會令整份試算表卡死到下一次執行為止。
+ *
+ * 理由的全文在 `src/MutationLock.gs` 檔頭。
+ */
 function apiGenerateDraftExecute(quarterId) {
   assertWebAppRequestAllowed_();
+  return withMutationLock_('生成職事表', function () {
+    return apiGenerateDraftExecute_locked_(quarterId);
+  });
+}
+
+function apiGenerateDraftExecute_locked_(quarterId) {
 
   // 再檢查一次。前端撳掣同後端執行之間可能有人（或者另一個分頁）
   // 已經生成咗——只信 plan 嗰次嘅檢查就會建立兩個版本。

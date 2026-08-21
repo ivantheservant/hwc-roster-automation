@@ -57,6 +57,23 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
     log_('WARN', 'createRosterSheet：欄寬設定唔到（職事表本身已經建立好）：' + err.message);
   }
 
+  // ⚠️ 第四十三輪批次 B 組：**一有新版本，舊版本那些建議表就過時了。**
+  //
+  // 現場見到的形狀：`Roster_2028T1_v0_建議` 留在那裡，而職事表已經去到 v1。
+  // 幹事開試算表見到兩張「建議」，分不清哪一張是最新的——
+  // 而其中一張的內容是由一個已經被取代的版本算出來的。
+  //
+  // 掛在這裡（而不是在儲存那一條路加一句）是同一個道理：
+  // 這個函式是五條建立版本的路唯一的匯合點。
+  //
+  // ⚠️ 清不到不可以令建立版本失敗——那只是清潔工作。
+  try {
+    discardStaleSuggestionSheets_(quarterId, versionNo);
+  } catch (err) {
+    log_('WARN', 'createRosterSheet：清唔到過時嘅建議表（職事表本身已經建立好）：'
+      + err.message);
+  }
+
   // ⚠️ 第四十一輪批次 A 組：**每一張新的 grid 都自動有名單下拉選單。**
   //
   // 原本這是主流程第 3 步，要幹事自己撳一粒掣。Ivan 實測之後講明：
@@ -1148,8 +1165,27 @@ function buildGridRenderContext_(quarterId, timezone, posts) {
  * 失敗（例如工作表被保護）不可以令建立版本失敗——見呼叫端的 try/catch。
  */
 
-/** 日期欄：剛好放得下 `2027-01-03`。 */
-const GRID_WIDTH_DATE = 82;
+/**
+ * 日期欄：第四十三輪批次 C3 起顯示成 `MM-DD`（例如 `01-03`），所以窄得多。
+ *
+ * ⚠️ **只改顯示格式，不改儲存的值。** 格子裡面仍然是一個真正的日期值
+ *（`setValues()` 寫 `'2027-01-03'` 的時候，試算表本來就會自動轉成日期值——
+ * `tests/helpers/mock_sheets_realistic.js` 的 `looksLikeSheetsAutoDate_()`
+ * 就是照住這一點模擬的）。全部讀回 grid 的路都走 `toDateString(value, tz)`，
+ * 那個函式收 Date 物件收得很好，所以顯示格式改極都不會影響比對。
+ *
+ * 慳出來的位讓給人名欄——那是 Ivan 兩次都提到的一點。
+ */
+const GRID_WIDTH_DATE = 58;
+
+/**
+ * 日期欄的顯示格式（第四十三輪批次 C3）。
+ *
+ * ⚠️ 不含年份是刻意的：一張職事表只涵蓋一季，同一年，年份重複十三次
+ * 只是浪費那一欄的寬度。要知道是哪一年，工作表名稱（`Roster_2028T1_v0`）
+ * 同表頭都講得出。
+ */
+const GRID_DATE_FORMAT = 'MM-dd';
 
 /** 週次欄：最窄。只有一個一至兩位數。 */
 const GRID_WIDTH_WEEK = 40;
@@ -1163,7 +1199,7 @@ const GRID_WIDTH_TYPE = 74;
  * 教會的中文名絕大部分是二至三個字；四個字的會折行，
  * 而折行比縮到看不清楚好——起碼讀得出。
  */
-const GRID_WIDTH_NAME = 62;
+const GRID_WIDTH_NAME = 76;
 
 /**
  * 把 grid 的欄寬設成配合 A4 橫向。
@@ -1171,10 +1207,18 @@ const GRID_WIDTH_NAME = 62;
  * @param {Sheet} sheet grid 工作表
  * @param {Object} layout `buildGridLayout_()` 的結果
  */
-function applyGridColumnWidthsForA4_(sheet, layout) {
+function applyGridColumnWidthsForA4_(sheet, layout, dataStartRow) {
   sheet.setColumnWidth(1, GRID_WIDTH_DATE);
   sheet.setColumnWidth(2, GRID_WIDTH_WEEK);
   sheet.setColumnWidth(3, GRID_WIDTH_TYPE);
+
+  // ⚠️ 第四十三輪批次 C3：日期顯示成 `MM-DD`。
+  // 只套在**資料列**，不套在標題行——標題是文字，套數字格式沒有意義，
+  // 而且套錯範圍會把「日期」兩個字弄成一個看不懂的東西。
+  const firstDataRow = Number(dataStartRow) > 0 ? Number(dataStartRow) : 3;
+  if (layout.rows.length > 0) {
+    sheet.getRange(firstDataRow, 1, layout.rows.length, 1).setNumberFormat(GRID_DATE_FORMAT);
+  }
 
   // ⚠️ 第 4 欄起才是崗位。前三欄是日期／週次／類型——這個假設
   // 在 `buildGridLayout_()`、`buildGridIndex_()` 幾處都有，
@@ -1186,8 +1230,12 @@ function applyGridColumnWidthsForA4_(sheet, layout) {
 
   // 人名欄設定自動換行：四個字的名會折成兩行，而不是被隔壁欄蓋住。
   // ⚠️ 蓋住是最差的一種——印出來看起來像那一格是空的。
+  // ⚠️ 第四十三輪批次 C3：Ivan 兩次都講「人名欄要闊到中文名一行顯示得完，
+  // 不換行」。所以這裡由 `setWrap(true)` 改成 `false`——
+  // 換行會令整行變高兩倍，一頁 A4 就印不下八個主日。
+  // 四個字的名寧可被隔壁欄蓋住一點，也好過整張表變成兩頁。
   if (nameColumnCount > 0 && layout.rows.length > 0) {
-    sheet.getRange(3, 4, layout.rows.length, nameColumnCount).setWrap(true);
+    sheet.getRange(firstDataRow, 4, layout.rows.length, nameColumnCount).setWrap(false);
   }
 }
 

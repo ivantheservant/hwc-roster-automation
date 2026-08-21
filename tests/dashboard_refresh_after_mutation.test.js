@@ -123,7 +123,19 @@ function loadFrontendSandbox(serverImpl) {
     // 所以要一個最細嘅假節點——只係夠佢哋行完，唔係砌成個 DOM。
     document: {
       getElementById: fakeNode,
-      createElement: fakeNode
+      createElement: fakeNode,
+      querySelectorAll: function () { return []; },
+      // ⚠️ 第四十三輪批次 A 組：`loadDashboard()` 收尾會叫
+      // `reapplyBusyLockIfNeeded_()`（重畫完要重新鎖一次新造嘅掣）。
+      // 佢讀 `document.body.classList`，所以呢個最細嘅假 DOM 要補一個
+      // `body`——唔補嘅話呢一份測試會爆一個同佢要守嗰件事完全無關嘅錯。
+      body: {
+        classList: {
+          contains: function () { return false; },
+          add: function () {}, remove: function () {}, toggle: function () {}
+        },
+        appendChild: function () {}
+      }
     },
     __calls: calls
   };

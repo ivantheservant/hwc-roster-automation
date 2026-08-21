@@ -25,6 +25,9 @@
 //
 // 呢一份斷言嘅就係「有冇寫出嚟」同「有冇另寫一套匯出」。
 
+// ⚠️ 第四十三輪批次 A 組：呢幾個入口拆成咗「薄殼 ＋ _locked_ 本體」
+// （薄殼只做權限檢查同攞互斥鎖，見 src/MutationLock.gs）。
+// 靜態切片要切本體嗰個，切薄殼只會切到三行轉發碼。
 const fs = require('fs');
 const path = require('path');
 
@@ -57,7 +60,14 @@ console.log('\n=== G【核心】三揀一真係有三個 ===');
     /let paperKind_ = 'PERSONAL'/.test(uiBare), '');
   check('★★★★★ 每次開彈窗都重設返做預設'
     + '（留住上一次嘅選擇，佢下次會以為自己揀緊預設）',
-    /paperKind_ = 'PERSONAL';\s*\n\s*paperSelection_ = \{\};/.test(uiBare), '');
+    // ⚠️ 第四十三輪批次 F 組喺兩行中間插咗 `paperExtra_` 嘅重設。
+    // 斷言唔可以貼住「緊接住下一行」——要守嘅係「開窗嗰陣三樣都重設」，
+    // 唔係佢哋嘅先後次序。
+    /paperKind_ = 'PERSONAL';[\s\S]{0,240}paperSelection_ = \{\};/.test(uiBare), '');
+  check('★★★★★ 而且自行輸入嘅電郵都要清走'
+    + '——留住上一次打嘅地址，佢下次寄嗰陣會寄多幾封俾一個唔相干嘅人',
+    /paperExtra_ = \{ extraEmails: \[\], extraEmailsRaw: '' \};[\s\S]{0,200}paperSelection_ = \{\};/
+      .test(uiBare), '');
 }
 
 console.log('\n=== G【核心】「每一份都一樣」呢件事要講出嚟 ===');
@@ -105,7 +115,7 @@ console.log('\n=== G【核心】唔標示嗰一份真係冇 highlight ===');
   check('★★★★★ 後端用返 `buildFullRosterPdfBlob_()`'
     + '——嗰條路本來就完全冇經過 highlight',
     /const built = buildFullRosterPdfBlob_\(quarterId, versionNo\)/.test(packBare), '');
-  const fn = packBare.slice(packBare.indexOf('function apiGeneratePlainPaper'));
+  const fn = packBare.slice(packBare.indexOf('function apiGeneratePlainPaper_locked_'));
   const body = fn.slice(0, fn.indexOf('\n}'));
   check('★★★★★ 而且 `apiGeneratePlainPaper()` 本身冇叫過任何 highlight'
     + '（叫咗嘅話，一份「大家睇嘅表」會標住某一個人嘅名）',
@@ -119,7 +129,7 @@ console.log('\n=== G：檔案要存喺幹事搵得返嗰個資料夾 ===');
   // ⚠️ `exportRosterPdf()` 存去 ROSTER_DRIVE_FOLDER_ID 嗰個總資料夾，
   // 而紙本其他檔全部喺**嗰一版自己嘅子資料夾**。存去兩個地方嘅話，
   // 幹事撳「開啟資料夾」會搵唔到自己啱啱做好嗰一份。
-  const fn = packBare.slice(packBare.indexOf('function apiGeneratePlainPaper'));
+  const fn = packBare.slice(packBare.indexOf('function apiGeneratePlainPaper_locked_'));
   const body = fn.slice(0, fn.indexOf('\n}'));
   check('★★★★★ 存去嗰一版自己嘅子資料夾，唔係總資料夾',
     /getOrCreateRosterSubfolder_\(quarterId, versionNo\)/.test(body), body.slice(0, 400));

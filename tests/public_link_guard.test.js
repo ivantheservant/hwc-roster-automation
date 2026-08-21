@@ -21,6 +21,9 @@
 // 而家邊個做？」** 舊選單流程有一步「準備工作 ▸ 發佈公開職事表」，
 // 改成四粒掣之後冇人接手。
 
+// ⚠️ 第四十三輪批次 A 組：呢幾個入口拆成咗「薄殼 ＋ _locked_ 本體」
+// （薄殼只做權限檢查同攞互斥鎖，見 src/MutationLock.gs）。
+// 靜態切片要切本體嗰個，切薄殼只會切到三行轉發碼。
 const fs = require('fs');
 const path = require('path');
 
@@ -54,7 +57,7 @@ function bodyOf(src, fnName) {
 
 console.log('\n=== A2-1：生成初稿之後順手發佈 ===');
 {
-  const body = bodyOf(generate, 'apiGenerateDraftExecute');
+  const body = bodyOf(generate, 'apiGenerateDraftExecute_locked_');
   check('★★★★★ 生成成功之後有叫 tryPublishPublicRoster_()',
     /tryPublishPublicRoster_\(quarterId\)/.test(body));
   check('★★★★★ 發佈失敗**唔會**當成生成失敗（版本真係建立咗）'

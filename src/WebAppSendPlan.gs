@@ -211,6 +211,25 @@ function listSendCandidates_(quarterId, kind) {
         '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
   }
 
+  // ⚠️ 第四十三輪批次 E 組：逐個人帶埋佢嘅身分（堂委／執事）。
+  //
+  // Ivan 要求「☐ 全部堂委」「☐ 全部執事」兩個群組勾選。
+  // 身分**一定要由 `Roles` 讀**，唔可以喺畫面寫死一份名單——
+  // 寫死嗰份下一屆就錯，而且冇人會記得去改。
+  //
+  // ⚠️ 用「今日」判斷生效期：一個上一屆嘅堂委唔應該被「全部堂委」勾中。
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const roles = readRolesSafe_(timezone);
+  const rolesByPerson = {};
+  roles.forEach(function (r) {
+    if (!isEffectiveOn_(r.effectiveFrom, r.effectiveTo, today)) return;
+    if (!rolesByPerson[r.personId]) rolesByPerson[r.personId] = [];
+    if (rolesByPerson[r.personId].indexOf(r.roleCode) === -1) {
+      rolesByPerson[r.personId].push(r.roleCode);
+    }
+  });
+
   return listRecipients_(stage, context).map(function (r) {
     const assigned = r.personId
       ? (context.assignmentsByPerson[r.personId] || []).length : 0;
@@ -221,7 +240,8 @@ function listSendCandidates_(quarterId, kind) {
       cellCount: assigned,
       // 查不到電郵的人照樣列出來，並且講明——他不是「不用服侍」，
       // 是要印紙本（第 5 步）。
-      hasEmail: !!String(r.email || '').trim()
+      hasEmail: !!String(r.email || '').trim(),
+      roles: r.personId ? (rolesByPerson[r.personId] || []) : []
     };
   });
 }

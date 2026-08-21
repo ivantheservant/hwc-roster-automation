@@ -187,11 +187,19 @@ console.log('\n=== F【核心】欄寬配合 A4 ===');
   check('★★★★★ 人名欄闊過週次同類型'
     + '——Ivan 講嘅「撐不夠闊」講嘅就係人名嗰幾欄',
     gas.GRID_WIDTH_NAME > gas.GRID_WIDTH_WEEK, '');
-  check('★★★★★ 日期欄放得落 `2027-01-03`（十個字元）',
-    gas.GRID_WIDTH_DATE >= 78, String(gas.GRID_WIDTH_DATE));
-  check('★★★★★ 人名欄放得落三個中文字'
-    + '（教會嘅中文名絕大部分係二至三個字）',
-    gas.GRID_WIDTH_NAME >= 54, String(gas.GRID_WIDTH_NAME));
+  // ⚠️ 第四十三輪批次 C3：日期改成顯示 `MM-DD`，所以嗰欄窄得多，
+  // 而慳返嘅位全部俾咗人名欄——Ivan 兩次都講人名欄唔夠闊。
+  check('★★★★★ 日期欄放得落 `01-03`（五個字元）',
+    gas.GRID_WIDTH_DATE >= 46 && gas.GRID_WIDTH_DATE <= 70,
+    String(gas.GRID_WIDTH_DATE));
+  check('★★★★★ 而且顯示格式係唔含年份嘅 `MM-dd`'
+    + '——一張職事表只涵蓋一季，年份重複十三次淨係浪費嗰欄嘅闊度',
+    gas.GRID_DATE_FORMAT === 'MM-dd', gas.GRID_DATE_FORMAT);
+  check('★★★★★ 人名欄放得落**四個**中文字（Ivan 兩次都提，要一行顯示得完）',
+    gas.GRID_WIDTH_NAME >= 72, String(gas.GRID_WIDTH_NAME));
+  check('★★★★★ 而且人名欄比日期欄闊'
+    + '——上一輪最大嘅問題就係位俾咗日期，而人名縮到三個字都放唔落',
+    gas.GRID_WIDTH_NAME > gas.GRID_WIDTH_DATE, '');
 }
 
 console.log('\n=== F：設欄寬嗰個函式本身 ===');
@@ -208,9 +216,11 @@ console.log('\n=== F：設欄寬嗰個函式本身 ===');
     /if \(nameColumnCount > 0\)/.test(body), '');
   check('★★★★★ 一格資料都冇改（呢個函式只可以碰格式）',
     !/setValues?\(/.test(body), body.slice(0, 600));
-  check('★★★★ 人名欄有自動換行'
-    + '——四個字嘅名折成兩行好過俾隔籬欄蓋住（蓋住印出嚟好似嗰格係空嘅）',
-    /setWrap\(true\)/.test(body), '');
+  // ⚠️ 第四十三輪批次 C3 反轉咗呢一條：Ivan 明講「人名欄要闊到中文名
+  // 一行顯示得完，**不換行**」。換行會令整行變高兩倍，
+  // 一頁 A4 就印唔落八個主日——而印唔落係一個佢即刻見到嘅問題。
+  check('★★★★★ 人名欄**唔換行**（改為靠闊度解決）',
+    /setWrap\(false\)/.test(body), body.slice(0, 600));
   // ⚠️ 呢一條係因為註解寫住「失敗唔可以令建立版本失敗——見呼叫端嘅 try/catch」，
   // 而第一次寫嗰陣呼叫端根本冇 try/catch。一句講住有防守而實際冇嘅註解，
   // 比冇註解更差：下一個人會信佢，然後喺上面繼續起樓。

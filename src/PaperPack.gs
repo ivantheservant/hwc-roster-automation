@@ -62,8 +62,24 @@ const PAPER_PACK_MAX_ATTACH_COUNT = 20;
  * @param {string[]} personIds 要印的人
  * @returns {Object} 結果
  */
+/**
+ * ⚠️ 第四十三輪批次 A 組：**同一時間只可以有一個會改動資料的動作在跑。**
+ *
+ * 這個薄殼只做兩件事：檢查權限、拿鎖。真正的內容在下面那一個
+ * `apiGeneratePaperPack_locked_()`。分開兩層是刻意的——把 `withMutationLock_()`
+ * 塞進原本那個函式裡面，就要在它每一個 `return` 前面記得放鎖，
+ * 而漏一個就會令整份試算表卡死到下一次執行為止。
+ *
+ * 理由的全文在 `src/MutationLock.gs` 檔頭。
+ */
 function apiGeneratePaperPack(quarterId, personIds) {
   assertWebAppRequestAllowed_();
+  return withMutationLock_('產生紙本 PDF', function () {
+    return apiGeneratePaperPack_locked_(quarterId, personIds);
+  });
+}
+
+function apiGeneratePaperPack_locked_(quarterId, personIds) {
   const ids = (personIds || []).map(function (x) { return String(x || '').trim(); })
     .filter(function (x) { return x !== ''; });
   if (ids.length === 0) {
@@ -157,16 +173,32 @@ function listPaperPackFiles_(quarterId, versionNo, personIds) {
 }
 
 /**
- * 供前端呼叫：把那批人的個人 PDF 全部寄一封（或幾封）給**操作的人自己**。
+ * 供前端呼叫：把那批人的個人 PDF 全部寄一封（或幾封）給**操作的人自己**，
+ * 外加幹事自己在畫面上打入去那幾個地址。
  *
- * ⚠️ 收件人不接受任何參數，永遠是 `Session.getActiveUser().getEmail()`。
- * 這不是為了方便——是為了令這一條路**結構上不可能**被用來寄給義工。
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️ 第四十三輪批次 F 組改動了什麼，以及什麼**沒有**改
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 本來這一條路的收件人不接受任何參數，永遠是操作者自己——
+ * 那是為了令它**結構上不可能**被用來寄給義工。
+ *
+ * Ivan 要求「處理紙本可以自行輸入 email」。所以現在多收一個
+ * `extraEmails`，但那個保證**沒有鬆開**：
+ *
+ *   ・這裡仍然**完全不會**去讀 `NameMapping` 或者任何收件人名單
+ *   ・唯一會收到的，是操作者自己 ＋ 他剛剛親手逐個打入去的地址
+ *   ・所以「整批義工意外收到」在結構上仍然不可能發生
+ *
+ * ⚠️ 那幾個地址收到的是**整份紙本包**（同操作者一模一樣那幾封），
+ * 不是個人版——Ivan 明確要求這一點。用途是「幫手印的那個人」。
  *
  * @param {string} quarterId 季度 ID
  * @param {string[]} personIds 要印的人
+ * @param {string[]=} extraEmails 幹事自己輸入的地址（可以不傳）
  * @returns {Object} 寄了幾封、夾了幾個檔、哪幾位找不到檔
  */
-function apiEmailPaperPackToSelf(quarterId, personIds) {
+function apiEmailPaperPackToSelf(quarterId, personIds, extraEmails) {
   assertWebAppRequestAllowed_();
   const ids = (personIds || []).map(function (x) { return String(x || '').trim(); })
     .filter(function (x) { return x !== ''; });
@@ -175,7 +207,24 @@ function apiEmailPaperPackToSelf(quarterId, personIds) {
       '一位都沒有選。', '一封都沒有寄出。', ['在上面的名單勾選要印的人，再撳一次']));
   }
 
-  const to = Session.getActiveUser().getEmail();
+  const self = Session.getActiveUser().getEmail();
+  // ⚠️ 格式唔啱要拋錯，唔可以靜靜略過——靜靜略過嘅話，
+  // 佢以為嗰個幫手印嘅人收到咗，而實際上冇。
+  const extra = [];
+  const badEmails = [];
+  (extraEmails || []).forEach(function (raw) {
+    const e = String(raw || '').trim();
+    if (!e) return;
+    if (!isPlausibleEmail_(e)) { badEmails.push(e); return; }
+    if (extra.indexOf(e) === -1 && e !== self) extra.push(e);
+  });
+  if (badEmails.length > 0) {
+    throw new Error(buildThreePartMessage_(
+      '你自己輸入那 ' + badEmails.length + ' 個地址看起來不是電郵：' + badEmails.join('、'),
+      '一封都沒有寄出。',
+      ['回去那一格改正或者刪走，再撳一次']));
+  }
+  const to = self;
   if (!to) {
     throw new Error(buildThreePartMessage_(
       '查不到你自己的電郵地址。',
@@ -229,10 +278,13 @@ function apiEmailPaperPackToSelf(quarterId, personIds) {
       '',
       batchFiles.map(function (f) { return '　・' + f.nameTC; }).join('\n'),
       '',
-      '這一封是系統寄給你自己的，沒有任何一位義工會收到。'
+      extra.length > 0
+        ? ('這一封寄給你自己，另外還有你自己輸入的 ' + extra.length
+          + ' 個地址。系統沒有從任何名單找收件人，所以不會有義工意外收到。')
+        : '這一封是系統寄給你自己的，沒有任何一位義工會收到。'
     ];
     MailApp.sendEmail({
-      to: to,
+      to: [to].concat(extra).join(','),
       subject: '要印紙本的個人職事表：' + quarterLabel + partText,
       body: lines.join('\n'),
       attachments: blobs
@@ -254,7 +306,10 @@ function apiEmailPaperPackToSelf(quarterId, personIds) {
     missing: found.missing,
     // ⚠️ 收件人不寫出完整地址（這是一個公開 repo 的稽核紀錄會經過的路），
     // 但畫面要講得出「寄咗去你自己個信箱」。
-    message: '已經寄出 ' + sentCount + ' 封到你自己的信箱，共 ' + found.files.length + ' 份。'
+    extraCount: extra.length,
+    message: '已經寄出 ' + sentCount + ' 封到你自己的信箱'
+      + (extra.length > 0 ? ('（同你另外輸入的 ' + extra.length + ' 個地址）') : '')
+      + '，共 ' + found.files.length + ' 份。'
       + (found.missing.length > 0
         ? '另外有 ' + found.missing.length + ' 位找不到 PDF，沒有夾進去——下面有名單。'
         : '')
@@ -319,8 +374,24 @@ function extractDriveFileId_(url) {
  * @param {number=} copies 幹事打算印幾多份（只影響回傳的提示文字，不影響檔案）
  * @returns {Object} 檔名、連結、要印幾多份
  */
+/**
+ * ⚠️ 第四十三輪批次 A 組：**同一時間只可以有一個會改動資料的動作在跑。**
+ *
+ * 這個薄殼只做兩件事：檢查權限、拿鎖。真正的內容在下面那一個
+ * `apiGeneratePlainPaper_locked_()`。分開兩層是刻意的——把 `withMutationLock_()`
+ * 塞進原本那個函式裡面，就要在它每一個 `return` 前面記得放鎖，
+ * 而漏一個就會令整份試算表卡死到下一次執行為止。
+ *
+ * 理由的全文在 `src/MutationLock.gs` 檔頭。
+ */
 function apiGeneratePlainPaper(quarterId, copies) {
   assertWebAppRequestAllowed_();
+  return withMutationLock_('產生紙本', function () {
+    return apiGeneratePlainPaper_locked_(quarterId, copies);
+  });
+}
+
+function apiGeneratePlainPaper_locked_(quarterId, copies) {
 
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) {

@@ -322,8 +322,10 @@ const MUTATIONS = [
     why: '拆走「每次開彈窗重設返做預設」'
       + '——幹事上次揀咗「不標示」，下次開會以為自己揀緊預設，然後印出一疊冇名嘅表',
     file: 'src/ui/ScriptSendPaper.html',
-    find: "      paperKind_ = 'PERSONAL';\n      paperSelection_ = {};",
-    replace: '      paperSelection_ = {};',
+    // 第四十三輪批次 F 組喺兩行中間插咗 `paperExtra_` 嘅重設，
+    // 所以 `find` 只剩下第一行。
+    find: "      paperKind_ = 'PERSONAL';\n",
+    replace: '',
     tests: ['tests/paper_print_kinds.test.js']
   },
   {
@@ -628,6 +630,147 @@ const MUTATIONS = [
     find: "    return String(text || '').split('\\n')[0].replace(/^發生了什麼：\\s*/, '');",
     replace: "    return String(text || '').split('\\n')[0];",
     tests: ['tests/save_feedback_and_step1.test.js']
+  },
+  {
+    id: 'suggest-colour-shadow',
+    why: '把建議表嘅上色還原成「系統改過嘅蓋過幹事改過嘅」'
+      + '——對話框報「黃色 1 格」而張表上一格黃色都冇，'
+      + '而幹事第一件事就係去表上搵嗰一格',
+    file: 'src/SuggestionSheet.gs',
+    find: '      if (isManual && isSystem) {\n'
+      + '        cell.setBackground(SUGGESTION_COLOR_BOTH);\n'
+      + '        colourCounts.both++;\n'
+      + '      } else if (isSystem) {',
+    replace: '      if (false) {\n'
+      + '        cell.setBackground(SUGGESTION_COLOR_BOTH);\n'
+      + '        colourCounts.both++;\n'
+      + '      } else if (isSystem) {',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'suggest-count-from-keys',
+    why: '把對話框嗰三個數字還原成由 `manualKeys`／`systemKeys` 各自數'
+      + '——同一格兩邊都算一次，於是報出嚟嘅數字同表上實際上咗色嘅格數對唔上',
+    file: 'src/SuggestionSheet.gs',
+    find: '    colourCounts: written.colourCounts,',
+    replace: '    colourCounts: { manual: Object.keys(built.manualKeys).length,\n'
+      + '      system: Object.keys(built.systemKeys).length, both: 0 },',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'suggest-empty-sheet',
+    why: '把「零改動照樣建議表」還原'
+      + '——幹事儲存完即刻撳調整，會收到一張接受唔到嘅表，'
+      + '而撳〔接受〕就會撞到一句寫俾開發者睇嘅錯',
+    file: 'src/SuggestionSheet.gs',
+    find: '  if (manualCount === 0 && systemCount === 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'suggest-stale-sheets',
+    why: '拆走「建立新版本就清走舊版本嘅建議表」'
+      + '——幹事開試算表見到兩張「建議」，分唔清邊張係最新',
+    file: 'src/RosterWriter.gs',
+    find: '    discardStaleSuggestionSheets_(quarterId, versionNo);',
+    replace: '    if (false) discardStaleSuggestionSheets_(quarterId, versionNo);',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'gap-fill-off',
+    why: '拆走「⚠ 未能安排嗰啲格都試住填」'
+      + '——即係第四十三輪之前嘅行為：一格根本冇人唔算違反，'
+      + '所以由頭到尾冇被睇過一眼',
+    file: 'src/SuggestionSheet.gs',
+    find: '  const gap = proposeGapFills_(context, workingState);',
+    replace: '  const gap = { proposals: [], unfillable: [], capped: false, gapCount: 0 };',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'gap-fill-preacher',
+    why: '把「本來就應該留白」嗰三種還原成照樣派人'
+      + '——講員／翻譯／獻花會被自動派人，而嗰個係製造一個錯，唔係修一個錯',
+    file: 'src/FineTune.gs',
+    find: '  if (f.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) return true;',
+    replace: '  if (false) return true;',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'mutation-lock-off',
+    why: '把互斥鎖還原成「攞唔到都照做」'
+      + '——兩個請求同時改同一批資料，會出現兩行同版本號嘅 RosterVersions，'
+      + '或者一個寫咗一半嘅孤兒版本',
+    file: 'src/MutationLock.gs',
+    find: '  if (!got) {',
+    replace: '  if (false) {',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'busy-lock-not-css',
+    why: '把畫面嘅忙碌鎖還原成「淨係逐粒 button 設 disabled」'
+      + '——動作期間重畫一次，新造出嚟嗰批掣就冇人鎖過，'
+      + '而嗰個正正就係現場「畫面好似重新整理咗，我可以自由撳」',
+    file: 'src/ui/Script.html',
+    find: "    document.body.classList.toggle('is-busy', !!busy);",
+    replace: '    // (mutated)',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'busy-lock-no-reapply',
+    why: '拆走「重畫完重新鎖一次」'
+      + '——鍵盤嗰一層（Tab ＋ Enter）喺重畫之後就冇咗',
+    file: 'src/ui/Script.html',
+    find: '    reapplyBusyLockIfNeeded_();\n  }\n\n  function renderTop(d) {',
+    replace: '  }\n\n  function renderTop(d) {',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'save-blank-fastpath',
+    why: '把「仲有格冇人」還原成照樣行快路（唔彈窗）'
+      + '——幹事移走幾個名之後直接儲存、跟住寄出，'
+      + '收信嗰班人會見到空格，而佢中間一次都冇被提醒過',
+    file: 'src/ui/ScriptZone1.html',
+    find: '      && (plan.blankCells || []).length === 0;',
+    replace: '      && true;',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'extra-email-as-person',
+    why: '把幹事自行輸入嘅地址還原成 `PERSON` 收件人'
+      + '——下游會去查佢「呢一季有邊幾格」而查唔到，'
+      + '然後逐個地方各自處理一次空值',
+    file: 'src/SendOptions.gs',
+    find: '      type: RECIPIENT_TYPE.LIST,\n      email: email,',
+    replace: '      type: RECIPIENT_TYPE.PERSON,\n      email: email,',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'roles-hardcoded',
+    why: '把群組勾選嘅身分還原成唔理生效期'
+      + '——一個上一屆嘅堂委會被「全部堂委」勾中',
+    file: 'src/WebAppSendPlan.gs',
+    find: '    if (!isEffectiveOn_(r.effectiveFrom, r.effectiveTo, today)) return;',
+    replace: '    if (false) return;',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'health-redirect-yellow',
+    why: '把全面體檢嗰項轉寄地址還原成黃色（建議處理）'
+      + '——留住一個轉寄地址上線，系統會報告「已寄出 51 封」'
+      + '而全體義工一封都收唔到',
+    file: 'src/FullHealthCheck.gs',
+    find: "  'MAIL_REDIRECT_ALL_TO'\n];",
+    replace: '];',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'stepbutton-silent-grey',
+    why: '拆走「灰掣一定要有解釋」嗰個保底'
+      + '——一粒撳唔到而又冇字嘅掣，幹事企喺度唔知係壞咗定係佢做漏咗嘢',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: '    } else if (opts.disabled) {',
+    replace: '    } else if (false) {',
+    tests: ['tests/round43_field_fixes.test.js']
   },
 ];
 

@@ -115,6 +115,29 @@ function resolveSendOptions_(stage, sendOptions, templates) {
         '如果你想寄給全部人，請改選「全部應收的人」']));
   }
 
+  // ── 一之二、幹事自行輸入嘅電郵（第四十三輪批次 F 組）──────────
+  //
+  // ⚠️ 呢啲地址**唔會存入 `NameMapping`**，淨係影響今次。
+  // 存入去就變成一個冇 PersonID、冇資格、冇服侍紀錄嘅「半個人」——
+  // 而嗰種半個人喺呢個系統入面出過好多次事。
+  //
+  // ⚠️ 格式唔啱**要拋錯，唔可以靜靜略過**。靜靜略過嘅話，
+  // 佢以為嗰個人收到咗，而實際上冇——而佢永遠唔會發現。
+  const extraEmails = [];
+  const badEmails = [];
+  (o.extraEmails || []).forEach(function (raw) {
+    const e = String(raw || '').trim();
+    if (!e) return;
+    if (!isPlausibleEmail_(e)) { badEmails.push(e); return; }
+    if (extraEmails.indexOf(e) === -1) extraEmails.push(e);
+  });
+  if (badEmails.length > 0) {
+    throw new Error(buildThreePartMessage_(
+      '你自己輸入那 ' + badEmails.length + ' 個地址看起來不是電郵：' + badEmails.join('、'),
+      '一封都沒有寄出。',
+      ['回去那一格改正或者刪走，再撳一次']));
+  }
+
   // ── 二、附件 ─────────────────────────────────────────────────
   //
   // 預設 ＝ 該階段範本嗰一欄。**唔會改寫 `EmailTemplates` 工作表**——
@@ -146,6 +169,7 @@ function resolveSendOptions_(stage, sendOptions, templates) {
     recipientScope: scope,
     pickedKeys: picked,
     pickedCount: pickedCount,
+    extraEmails: extraEmails,
     attachType: attachType,
     listAttachType: listAttachType,
     includeIcs: includeIcs,
@@ -191,10 +215,59 @@ function sendRecipientKey_(recipient) {
  * @returns {Object[]} 篩完
  */
 function filterRecipientsByScope_(recipients, decision) {
-  if (!decision || decision.recipientScope !== SEND_RECIPIENT_SCOPE.PICK) return recipients;
-  return recipients.filter(function (r) {
-    return decision.pickedKeys[sendRecipientKey_(r)] === true;
+  const base = (!decision || decision.recipientScope !== SEND_RECIPIENT_SCOPE.PICK)
+    ? recipients
+    : recipients.filter(function (r) {
+      return decision.pickedKeys[sendRecipientKey_(r)] === true;
+    });
+  return appendExtraEmailRecipients_(base, decision);
+}
+
+/**
+ * 第四十三輪批次 F 組：把幹事自行輸入那幾個地址接落收件人清單。
+ *
+ * ⚠️ 它們是 `RECIPIENT_TYPE.LIST`——**不是 PERSON**。
+ * 那是刻意的：`PERSON` 那一種下游會去查「他這一季有哪幾格」、
+ * 會做個人版 PDF、會附個人專屬連結。一個只有電郵、沒有 `PersonID`
+ * 的地址查不出任何東西，當成 `PERSON` 只會令下游逐個地方拿到空值，
+ * 而每一個空值都要另外處理一次。
+ *
+ * 當成 `LIST`（同堂委名單那一種一樣）就完全不用改下游任何一段：
+ * 那一種本來就是「一個沒有個人資料的收件地址」。
+ *
+ * ⚠️ 同一個地址已經在名單裡面就不再加一次——否則他會收到兩封。
+ *
+ * @param {Object[]} recipients 已經篩好的收件人
+ * @param {Object} decision `resolveSendOptions_()` 的結果
+ * @returns {Object[]} 加上額外地址之後的清單
+ */
+function appendExtraEmailRecipients_(recipients, decision) {
+  const extra = (decision && decision.extraEmails) || [];
+  if (extra.length === 0) return recipients;
+
+  const seen = {};
+  recipients.forEach(function (r) {
+    const e = String(r.email || '').trim().toLowerCase();
+    if (e) seen[e] = true;
   });
+
+  const out = recipients.slice();
+  extra.forEach(function (email) {
+    const key = String(email).trim().toLowerCase();
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push({
+      type: RECIPIENT_TYPE.LIST,
+      email: email,
+      displayName: email,
+      personId: '',
+      sendAs: SEND_AS.TO,
+      // 標記出處。SendLog 同寄出報告都要分得出「名單上的」同
+      // 「幹事今次自己輸入的」——分不出就查不到「那一封為什麼寄了給他」。
+      isExtraEmail: true
+    });
+  });
+  return out;
 }
 
 /**

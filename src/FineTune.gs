@@ -1138,3 +1138,47 @@ function markProposalsApplied_(batchId, resultVersionNo) {
     if (resultCol > 0) sheet.getRange(rowNumber, resultCol).setValue(resultVersionNo);
   });
 }
+
+/**
+ * 這一格是不是「本來就應該留白」。
+ *
+ * @param {string[]} flags 那一格的 `ruleFlags`
+ * @returns {boolean} 是不是正常留白
+ */
+function isIntentionallyBlankCell_(flags) {
+  const f = flags || [];
+  if (f.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) return true;
+  if (f.some(function (id) { return STRUCTURAL_NA_RULE_IDS.indexOf(id) !== -1; })) return true;
+  if (f.some(function (id) { return SPECIAL_SKIP_RULE_IDS.indexOf(id) !== -1; })) return true;
+  return false;
+}
+
+/**
+ * 第四十三輪批次 D／G 組：**真正「應該有人而冇人」嗰啲格。**
+ *
+ * ⚠️ 呢個係「空格」嘅**唯一**定義。三個地方要用同一份：
+ *   〔檢查我的改動〕　列出仲有幾多格冇人
+ *   〔請系統幫我調整〕試住幫佢填
+ *   儲存前嘅提醒　　　「呢一版仲有 N 格冇人，寄出嘅話對方會見到空格」
+ *
+ * 三個地方各寫一次嘅話，三個數字會慢慢唔一樣——而幹事會以為
+ * 系統時好時壞。
+ *
+ * @param {Object[]} state 派工狀態
+ * @param {Object} context fine-tune context（要有 original 欄位）
+ * @returns {Object[]} 每項 {serviceDate, postId, slotIndex}
+ */
+function listGenuineBlankCells_(state, context) {
+  requireStateArg_('listGenuineBlankCells_', 1, state, 'context');
+  const flagsByKey = {};
+  (context.original || []).forEach(function (a) {
+    flagsByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a.ruleFlags || [];
+  });
+  return (state || []).filter(function (s) {
+    if (s.personId) return false;
+    return !isIntentionallyBlankCell_(
+      flagsByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)]);
+  }).map(function (s) {
+    return { serviceDate: s.serviceDate, postId: s.postId, slotIndex: s.slotIndex };
+  });
+}

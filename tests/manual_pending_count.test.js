@@ -18,7 +18,7 @@
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'AnnualCombined.gs',
+  'Constants.gs', 'MutationLock.gs', 'Utils.gs', 'SheetReader.gs', 'AnnualCombined.gs',
   'WebAppPreQuarter.gs', 'WebAppGenerate.gs'
 ]);
 
@@ -90,7 +90,7 @@ console.log('\n=== C【核心】兩邊用同一個函式，唔係各寫一次 ==
   const fs = require('fs');
   const path = require('path');
   const gen = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppGenerate.gs'), 'utf8');
-  const fn = gen.slice(gen.indexOf('function apiGenerateDraftExecute'));
+  const fn = gen.slice(gen.indexOf('function apiGenerateDraftExecute_locked_'));
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3);
 
   check('★★★★★ 生成完成用 sumManualFillItems_(preQuarter)，'

@@ -68,11 +68,27 @@
   }
 
   /** 主流程用的大掣。 */
+  /**
+   * 主流程一粒掣。
+   *
+   * ⚠️ 第四十三輪批次 E2：**一粒撳唔到而又冇解釋嘅掣，唔准存在。**
+   *
+   * Ivan 現場：「click 寄給堂委審閱，不能 click。」——一粒灰掣，
+   * 冇任何字講點解。佢企咗喺度，唔知係系統壞咗、定係佢做漏咗嘢。
+   *
+   * 所以 `disabled` 一定要連埋 `title`。冇傳 `title` 就喺度砌一句
+   * 保底嘅——一句「唔知點解」都好過完全冇字，起碼佢知道要去問。
+   */
   function stepButton(label, onClick, opts) {
     opts = opts || {};
     const b = button(label, onClick, 'step-btn ' + (opts.className || ''));
     if (opts.disabled) b.disabled = true;
-    if (opts.title) b.title = opts.title;
+    if (opts.title) {
+      b.title = opts.title;
+    } else if (opts.disabled) {
+      b.title = '這一粒現在撳不到，而系統講不出原因——這是一個程式問題，'
+        + '請把這一句連同你剛才做過的事告訴開發者。';
+    }
     return b;
   }
 
@@ -92,7 +108,6 @@
     const steps = [
       renderStep1(d, flow),
       renderStep2(d, flow),
-      renderStepEligibility(),
       renderStepSend(d),
       renderStepPaper(d, flow)
     ];
@@ -172,6 +187,30 @@
     return card;
   }
 
+  /**
+   * 生成之前問一次：使唔使先改名單？
+   *
+   * ⚠️ 兩粒掣都要係真出口：〔先去改名單〕直接開嗰張工作表，
+   * 唔係叫佢自己去搵。一個叫人「請去某某地方」而唔帶佢去嘅提示，
+   * 對一個唔熟電腦嘅人嚟講等於冇提示。
+   *
+   * @param {Function} onGenerate 揀咗「直接生成」之後行乜
+   */
+  function askEligibilityFirst(onGenerate) {
+    openConfirm({
+      title: '生成之前',
+      bodyNodes: [
+        para('要不要先更改各崗位的事奉人員名單？'),
+        para('名單改了，生成出來的安排才會用新名單。'
+          + '生成之後才改名單的話，那一版仍然是用舊名單排的。', 'muted')
+      ],
+      confirmLabel: '直接生成',
+      cancelLabel: '先去改名單',
+      onCancel: () => { closeModal(); openEligibilitySheet(); },
+      onConfirm: () => { closeModal(); onGenerate(); }
+    });
+  }
+
   /** 生成日期同距離幾多日，一句人話。 */
   function describeGenerateOn(t) {
     if (!t.generateOn) {
@@ -225,7 +264,12 @@
         });
         return;
       }
-      openGenerateDraft();
+      // ⚠️ 第四十三輪批次 H 組：生成之前先問一次「使唔使先改名單」。
+      //
+      // Ivan：「名單改咗，生成出嚟嘅安排先會用新名單。」
+      // 佢每一季真正嘅第一步就係改名單，而生成係一個**會用掉嗰一季**
+      // 嘅動作——問一次嘅成本係一秒，唔問嘅成本係重新生成一次。
+      askEligibilityFirst(() => openGenerateDraft());
     };
 
     // ⚠️ 第四十二輪批次 C 組：真正要上線嗰一季，撳之前要額外講一句。
@@ -386,6 +430,20 @@
       title: save.enabled ? '' : (save.disabledReason || '')
     }));
 
+    // ⚠️ 第四十三輪批次 H 組：第五粒——〔回到上一個儲存版本〕。
+    //
+    // Ivan：「幹事最常做嘅就係『我改壞咗，還原』。」
+    // 「進階與診斷」嗰粒要佢揀版本；呢一粒直接回上一版。
+    // 走嘅係**同一條路**（同一個預覽同確認），只係目標由系統揀。
+    const hasPrevious = !!(d.latestVersion && Number(d.latestVersion.versionNo) > 0);
+    acts.push(stepButton('回到上一個儲存版本', openRollbackToPrevious, {
+      disabled: !hasPrevious,
+      className: 'secondary',
+      title: hasPrevious
+        ? ''
+        : '這一季只有一個版本，沒有「上一個」可以回去。'
+    }));
+
     const card = stepCard({
       num: 2,
       title: '查看／修改職事表',
@@ -445,12 +503,21 @@
     });
   }
 
-  /* ── 第 3 步：維護各崗位的事奉人員名單 ─────────────────────── */
+  /* ── 第 0 步：更改各崗位的事奉人員名單 ─────────────────────
+   *
+   * ⚠️ 第四十三輪批次 H 組：呢一步由主流程搬咗入「開季前準備」。
+   *
+   * Ivan 嘅講法：改名單係**生成之前**做嘅事，唔係生成之後。
+   * 擺喺主流程第 3 步（即係生成、改表之後）本身就講錯咗次序——
+   * 佢改完名單先生成，排出嚟先會用到新名單。
+   *
+   * 所以佢而家係「第 0 步」，而主流程剩返四步。
+   */
 
   function renderStepEligibility() {
     return stepCard({
-      num: 3,
-      title: '維護各崗位的事奉人員名單',
+      num: 0,
+      title: '更改各崗位的事奉人員名單',
       note: '開一張工作表，一個崗位一欄。在裡面自由增刪改，改完回來撳「儲存並套用名單」。',
       acts: [
         stepButton('開啟名單工作表', openEligibilitySheet),
@@ -705,7 +772,7 @@
       || (d.buttons.official && d.buttons.official.enabled)
       || (d.buttons.resend && d.buttons.resend.enabled)));
     return stepCard({
-      num: 4,
+      num: 3,
       title: '寄出',
       note: '系統只會寄你已經儲存確認的版本。撳落去會先講清楚這一次寄給誰、寄什麼。',
       acts: [stepButton('寄出', openSendDialog, {
@@ -720,7 +787,7 @@
   function renderStepPaper(d, flow) {
     const n = (flow && flow.paperCount) || 0;
     return stepCard({
-      num: 5,
+      num: 4,
       title: n > 0 ? ('要印紙本的有 ' + n + ' 位') : '要印紙本的人',
       note: n > 0
         ? '這幾位查不到電郵，收不到信，但照樣要服侍。'

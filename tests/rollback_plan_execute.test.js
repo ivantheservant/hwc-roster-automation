@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebAppRollback.gs'
+  'Constants.gs', 'MutationLock.gs', 'Utils.gs', 'SheetReader.gs', 'WebAppRollback.gs'
 ]);
 
 let fail = 0;

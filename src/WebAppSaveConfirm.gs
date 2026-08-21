@@ -198,6 +198,22 @@ function buildSaveAndConfirmPlan_(quarterId) {
   // ── 步 1.6　三欄對照 ─────────────────────────────────────────
   const proposals = buildSaveConfirmProposals_(context, resolved, allViolations);
 
+  // ── 第四十三輪批次 G 組：仲有幾多格冇人 ─────────────────────
+  //
+  // Ivan：「我編輯之後，職事表未完成（我移走咗一啲名）。
+  //   建議喺真正儲存之前彈窗提醒我：而家未完成，最好唔好寄出。」
+  //
+  // ⚠️ 用共用嗰個定義（`listGenuineBlankCells_`，FineTune.gs），
+  // 唔喺呢度自己再數一次——三個地方三個數字，幹事會以為系統時好時壞。
+  const blankCells = listGenuineBlankCells_(resolved.state, context).map(function (b) {
+    return {
+      serviceDate: b.serviceDate,
+      postId: b.postId,
+      postNameTC: postNameById[b.postId] || b.postId,
+      slotIndex: b.slotIndex
+    };
+  });
+
   // ── 零改動路徑（D4）────────────────────────────────────────
   const zeroChange = resolved.changes.length === 0 && requestPlan.results.length === 0;
   return {
@@ -207,6 +223,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
     requests: requests,
     gridChanges: gridChanges,
     overlaps: overlaps,
+    blankCells: blankCells,
     violations: violations,
     needsRelease: violations.real.length > 0,
     proposals: proposals,
@@ -349,8 +366,24 @@ function buildSaveConfirmProposals_(context, resolved, allViolations) {
  * @param {Object} payload `{decisions, confirmedRequestRows, releaseText}`
  * @returns {Object} 三種結果可以分辨：完全成功／版本成功但發佈失敗／完全失敗
  */
+/**
+ * ⚠️ 第四十三輪批次 A 組：**同一時間只可以有一個會改動資料的動作在跑。**
+ *
+ * 這個薄殼只做兩件事：檢查權限、拿鎖。真正的內容在下面那一個
+ * `apiSaveAndConfirmExecute_locked_()`。分開兩層是刻意的——把 `withMutationLock_()`
+ * 塞進原本那個函式裡面，就要在它每一個 `return` 前面記得放鎖，
+ * 而漏一個就會令整份試算表卡死到下一次執行為止。
+ *
+ * 理由的全文在 `src/MutationLock.gs` 檔頭。
+ */
 function apiSaveAndConfirmExecute(quarterId, payload) {
   assertWebAppRequestAllowed_();
+  return withMutationLock_('儲存我的修改', function () {
+    return apiSaveAndConfirmExecute_locked_(quarterId, payload);
+  });
+}
+
+function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const input = payload || {};
 
   // ── 1　後端重新讀 Stage 同最新版本號，唔信前端 ────────────────

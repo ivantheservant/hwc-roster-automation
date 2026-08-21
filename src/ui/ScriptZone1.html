@@ -226,6 +226,20 @@
    * 掣 1：儲存並確認（規格 2.4）
    * ============================================================ */
 
+  /**
+   * 儲存嗰陣中央塊牌上面「會做這幾件事」。
+   *
+   * ⚠️ 第四十三輪批次 A 組：呢個係一張**清單**，唔係一個進度條。
+   * 伺服器係一個請求，前端根本唔知道佢做到邊一步——逐步 highlight
+   * 就要靠計時器去猜，而猜出嚟嗰個「而家做緊第 3 步」係假嘅。
+   * 假進度同建議表嗰句假承諾係同一種錯。
+   */
+  const SAVE_BUSY_STEPS = [
+    '讀取你在職事表上改過的格',
+    '檢查規則（資格、連續兩週、次數上限⋯⋯）',
+    '建立新一版並寫入紀錄',
+    '重新發佈公開連結'
+  ];
   /** 掣 1 嘅暫存狀態：由 plan 攞返嚟，逐格決定存喺呢度。 */
   let savePlan = null;
   let saveDecisions = {};
@@ -258,7 +272,11 @@
       // 有申報要套用就一定要彈——那不是他改的東西，他有權先看一眼。
       && (r.apply || []).length === 0
       // 真的有東西要儲存，才走這條快路。
-      && (plan.gridChanges || []).length > 0;
+      && (plan.gridChanges || []).length > 0
+      // ⚠️ 第四十三輪批次 G 組：仲有格冇人 ⇒ **一定要彈窗**。
+      // Ivan 移走咗幾個名之後直接儲存，跟住寄出，
+      // 收信嗰班人就會見到空格——而佢中間冇任何一個地方被提醒過。
+      && (plan.blankCells || []).length === 0;
   }
 
   function openSaveAndConfirm() {
@@ -552,6 +570,41 @@
       nodes.push(renderProposalTable(plan.proposals));
     }
 
+    // 4b　第四十三輪批次 G 組：仲有幾多格冇人
+    //
+    // Ivan：「我編輯之後，職事表未完成（我移走咗一啲名）。
+    //   建議喺真正儲存之前彈窗提醒我：而家未完成，最好唔好寄出。
+    //   加一粒〔請系統幫我調整〕，然後先至係確認儲存嘅掣。」
+    //
+    // ⚠️ 冇空格嗰陣**唔可以出呢一段**——每次都出就等於冇出過。
+    if (plan.blankCells && plan.blankCells.length > 0) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '⚠ 這一版還有 ' + plan.blankCells.length + ' 格沒有人。'
+            + '現在寄出的話，收到的人會見到空格。',
+          className: 'warn-head'
+        })
+      ]);
+      plan.blankCells.slice(0, 10).forEach((b) => {
+        box.appendChild(make('div', {
+          text: humanDate(b.serviceDate) + '　' + b.postNameTC
+            + (Number(b.slotIndex) > 1 ? (' ' + b.slotIndex) : ''),
+          className: 'vio-row'
+        }));
+      });
+      if (plan.blankCells.length > 10) {
+        box.appendChild(make('div', {
+          text: '另有 ' + (plan.blankCells.length - 10) + ' 格。',
+          className: 'muted'
+        }));
+      }
+      box.appendChild(make('div', {
+        text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。',
+        className: 'muted'
+      }));
+      nodes.push(box);
+    }
+
     // 5　確認畫面（規格步 1.7）
     nodes.push(buildSaveSummary(plan));
 
@@ -578,9 +631,32 @@
         bodyNodes: bodyNodes,
         confirmLabel: '照樣儲存',
         cancelLabel: '返回修改',
+        // ⚠️ 第四十三輪批次 G 組：仲有格冇人嗰陣，加一粒直接接落
+        // 〔請系統幫我調整〕——唔使佢退出再自己撳一次。
+        extraActions: buildFixItActions(plan),
         onConfirm: () => executeSaveAndConfirm('')
       });
     }
+  }
+
+  /**
+   * 第四十三輪批次 G 組：〔請系統幫我調整〕嗰粒。
+   *
+   * ⚠️ 只喺**真係有嘢可以調整**嗰陣先出。冇空格又冇違反嘅時候出一粒，
+   * 佢撳落去只會收到「冇嘢要調整」——一粒撳咗冇用嘅掣。
+   *
+   * ⚠️ 撳落去會**放棄呢一次儲存**（關窗，改為去建議表嗰條路）。
+   * 所以粒掣要講清楚，唔可以扮成一個順手嘅動作。
+   */
+  function buildFixItActions(plan) {
+    const hasBlank = (plan.blankCells || []).length > 0;
+    const hasViolation = ((plan.violations || {}).real || []).length > 0
+      || ((plan.violations || {}).semiHard || []).length > 0;
+    if (!hasBlank && !hasViolation) return [];
+    return [button('請系統幫我調整', () => {
+      closeModal();
+      openBuildSuggestion();
+    }, 'secondary')];
   }
 
   function requestRow(r) {
@@ -705,7 +781,7 @@
       // 兩套「儲存成功」嘅講法 ＝ 兩個真相來源，改一個另一個唔會跟，
       // 而幹事會見到兩種唔同嘅提示而唔知邊個先啱。
       renderSaveResult(result);
-    });
+    }, SAVE_BUSY_STEPS);
   }
 
   function executeSaveAndConfirm(releaseText) {
@@ -729,7 +805,7 @@
         releaseText: releaseText
       });
       renderSaveResult(result);
-    });
+    }, SAVE_BUSY_STEPS);
   }
 
   function renderSaveResult(result) {

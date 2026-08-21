@@ -329,7 +329,18 @@ function classifyTableSizeHealth_(rowCounts) {
 }
 
 /** 上線前檢查裡「不就緒」時無條件升級為 MUST 的項目標籤（子字串比對）。 */
-const HEALTH_PRELAUNCH_MUST_LABEL_SUBSTRINGS = ['最新版本是否仍有未解決的硬規則違反'];
+const HEALTH_PRELAUNCH_MUST_LABEL_SUBSTRINGS = [
+  '最新版本是否仍有未解決的硬規則違反',
+  // ⚠️ 第四十三輪批次 I 組：**這一項一定要是紅色。**
+  //
+  // 第四十二輪核實的時候發現它只是黃色（SHOULD）——因為這份清單
+  // 當時只有一項。而它比大部分項都嚴重：留著一個轉寄地址上線，
+  // 幹事撳「正式發出」，系統報告「已寄出 51 封」、SendLog 全部成功，
+  // 而全體義工一封都收不到——五十一封全部去了同一個測試信箱。
+  //
+  // 「看起來完全成功而實際上全錯」正正是要用紅色擋住的那一種。
+  'MAIL_REDIRECT_ALL_TO'
+];
 
 /** 上線前檢查裡本質是「全域統計」而非「這一季特有」，全面體檢已有獨立區塊涵蓋，故排除避免重複。 */
 const HEALTH_PRELAUNCH_EXCLUDE_LABEL_SUBSTRINGS = [

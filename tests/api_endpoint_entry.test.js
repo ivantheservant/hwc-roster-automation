@@ -28,7 +28,7 @@
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs',
+  'Constants.gs', 'MutationLock.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs',
   'Roles.gs', 'RoleImpact.gs', 'HardViolationClass.gs',
   'Generator.gs', 'FineTune.gs', 'StateSource.gs',
   'WebAppGuards.gs', 'WebAppFlow.gs',

@@ -203,26 +203,43 @@
     //「藍色格 ＝ 系統建議改的（0 格）」。嗰句要幹事自己推理，
     // 而佢推理嘅結果多數係「系統壞咗」——Ivan 現場就係噉。
     // 直接講結論：你改嘅嘢冇違反規則，系統唔使動。
+    // ⚠️ 第四十三輪批次 C1：呢三個數字**一定要讀 `colourCounts`**，
+    // 唔可以讀 `manualCount`／`systemCount`。
+    //
+    // 現場：對話框報「黃色格 1 格／藍色格 1 格」，而張表上一格黃色都冇。
+    // 成因係同一格既俾幹事改過、又俾系統再改一次——兩個數字各自算啱咗，
+    // 而上色嗰段只上得到一種。`colourCounts` 係**上色嗰陣順手數嘅**，
+    // 所以佢報幾多格，表上就一定有幾多格。
+    const cc = r.colourCounts || { manual: 0, system: 0, both: 0 };
     const colourBox = make('div', { className: 'sec' }, [
-      sectionTitle('那張表上面的顏色'),
-      make('div', { text: '黃色格 ＝ 你自己改過的（' + r.manualCount + ' 格）',
-        className: 'ok-line' })
+      sectionTitle('那張表上面的顏色')
     ]);
-    if (r.systemCount === 0) {
+    const colourLine = function (text, n) {
+      // 0 格嗰啲唔畫出嚟——一行「0 格」要幹事自己推理，
+      // 而佢推理嘅結果多數係「系統壞咗」。
+      if (n <= 0) return;
+      colourBox.appendChild(make('div', { text: text + '（' + n + ' 格）',
+        className: 'ok-line' }));
+    };
+    colourLine('黃色格 ＝ 你自己改過的', cc.manual);
+    colourLine('藍色格 ＝ 系統建議改的', cc.system);
+    colourLine('紫色格 ＝ 你改過，而系統又再改了一次', cc.both);
+
+    if (cc.system === 0 && cc.both === 0) {
       colourBox.appendChild(make('div', {
         text: '你改的都沒有違反規則，系統不需要調整任何東西——所以沒有藍色格。',
         className: 'ok-line strong'
       }));
     } else {
       colourBox.appendChild(make('div', {
-        text: '藍色格 ＝ 系統建議改的（' + r.systemCount + ' 格）',
-        className: 'ok-line'
-      }));
-      colourBox.appendChild(make('div', {
         text: '系統改過的格，把滑鼠停在上面會見到它為甚麼改。',
         className: 'muted'
       }));
     }
+    colourBox.appendChild(make('div', {
+      text: '那一張表同正式職事表一樣有下拉選單，你可以直接在上面改。',
+      className: 'muted'
+    }));
 
     const nodes = [
       make('div', { text: '建議版本已經做好', className: 'ok-head' }),
@@ -241,6 +258,41 @@
         + '兩張都改過的話，它會先問你要用哪一張。', 'muted')
     ];
 
+    // ── 第四十三輪批次 D 組：填唔到嗰啲空格 ─────────────────
+    //
+    // ⚠️ 淨係講「仲有 N 格填唔到」，幹事下一步做乜都唔知。
+    // 逐格講，而且講**點解**——佢要知道係「去加一個人」
+    // 定係「去改一改不能服侍的日期」。
+    if (r.unfillable && r.unfillable.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + r.unfillable.length + ' 格系統仍然找不到人'),
+        make('div', {
+          text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。',
+          className: 'muted'
+        })
+      ]);
+      r.unfillable.forEach((u) => {
+        box.appendChild(make('div', {
+          text: humanDate(u.serviceDate) + '　' + u.postNameTC
+            + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '')
+            + '　' + u.reason,
+          className: 'vio-row'
+        }));
+      });
+      nodes.push(box);
+    }
+
+    // ⚠️ 有上限嗰陣**一定要講**。靜靜做一半，幹事會以為淨返嗰啲
+    // 係「系統睇過但搞唔掂」，而其實係系統根本冇睇過。
+    if (r.gapCapped) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一季有 ' + r.gapCount + ' 格排不出，一次過全部處理會太慢，'
+            + '所以系統這一次只試了前面一批。接受之後再撳一次，它會繼續處理餘下的。',
+          className: 'lines'
+        })
+      ]));
+    }
     // ⚠️ 系統調整完仍然違反規則嘅格**一定要講出嚟**。
     // 唔講嘅話，幹事會以為「系統調整過 ＝ 一定冇問題」，然後直接接受，
     // 而嗰幾格其實仲係壞嘅。

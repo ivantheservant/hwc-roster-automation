@@ -370,8 +370,24 @@ function apiPlanEligibilitySheetApply(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 實際寫入的結果
  */
+/**
+ * ⚠️ 第四十三輪批次 A 組：**同一時間只可以有一個會改動資料的動作在跑。**
+ *
+ * 這個薄殼只做兩件事：檢查權限、拿鎖。真正的內容在下面那一個
+ * `apiApplyEligibilitySheet_locked_()`。分開兩層是刻意的——把 `withMutationLock_()`
+ * 塞進原本那個函式裡面，就要在它每一個 `return` 前面記得放鎖，
+ * 而漏一個就會令整份試算表卡死到下一次執行為止。
+ *
+ * 理由的全文在 `src/MutationLock.gs` 檔頭。
+ */
 function apiApplyEligibilitySheet(quarterId, selectedKeys) {
   assertWebAppRequestAllowed_();
+  return withMutationLock_('儲存並套用名單', function () {
+    return apiApplyEligibilitySheet_locked_(quarterId, selectedKeys);
+  });
+}
+
+function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
   const plan = planEligibilitySheetApply_(quarterId);
   if (plan.blocked) {
     throw new Error(buildThreePartMessage_(

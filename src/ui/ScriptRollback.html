@@ -85,6 +85,59 @@
   }
 
   /**
+   * 第四十三輪批次 H 組：**直接回到上一個儲存版本**（唔使揀）。
+   *
+   * Ivan：「幹事最常做嘅就係『我改壞咗，還原』。」
+   *
+   * ⚠️ 走嘅係**同一條路**（`apiRollbackPlan` ＋ 嗰個預覽同確認），
+   * 唔係另一套回退邏輯。分別只係「目標版本由系統揀」——
+   * 而系統揀嘅永遠係 N-1，同揀單度嗰個預設值一模一樣。
+   *
+   * ⚠️ 撳之前一定要講明「你而家未儲存嘅改動會唔見咗」。
+   * 回退會建立一個新版本並且重寫 grid 工作表——佢喺表上改咗而未儲存
+   * 嗰幾格會被蓋走，而嗰個係不可逆嘅。
+   */
+  function openRollbackToPrevious() {
+    runAction('讀取版本清單', async () => {
+      const data = await callServer('apiListVersionsForRollback', currentQuarterId);
+      const target = (data.versions || []).filter((v) => !v.isCurrent)[0];
+      if (!target) {
+        openModal('回到上一個儲存版本', [
+          para('這一季只有一個版本，沒有「上一個」可以回去。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      openConfirm({
+        title: '回到第 ' + target.versionNo + ' 版',
+        bodyNodes: [
+          para('會用第 ' + target.versionNo + ' 版的內容建立一個新版本，'
+            + '現在這一版原封不動保留，可以隨時再回來。'),
+          make('div', { className: 'warnbox' }, [
+            make('div', {
+              text: '⚠ 你現在在職事表上改了而還未儲存的東西，會不見了。'
+                + '如果那些改動要留住，先撳「儲存我的修改」，再回來撳這一粒。',
+              className: 'lines'
+            })
+          ])
+        ],
+        confirmLabel: '看預覽',
+        cancelLabel: '取消',
+        onConfirm: () => {
+          closeModal();
+          runAction('比對兩個版本', async () => {
+            const plan = await callServer('apiRollbackPlan', currentQuarterId, target.versionNo);
+            if (plan.blocked) {
+              showErrorModal('回到上一個儲存版本', new Error(plan.message));
+              return;
+            }
+            renderRollbackPreview(plan);
+          });
+        }
+      });
+    });
+  }
+
+  /**
    * 規格 5.3：**呢段字一定要出現喺畫面上，逐字照抄。**
    * 幹事一定會問「點解唔用 Google 試算表本身嘅版本記錄」，
    * 而佢自己去用嘅後果係災難性但唔明顯嘅。

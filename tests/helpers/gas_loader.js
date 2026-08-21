@@ -82,6 +82,15 @@ function buildGasStubs_() {
     });
   };
 
+  /** 一把永遠攞得到嘅鎖（見下面 LockService 嘅說明）。 */
+  function makeAlwaysAvailableLock_() {
+    return {
+      tryLock: function () { return true; },
+      waitLock: function () {},
+      releaseLock: function () {},
+      hasLock: function () { return true; }
+    };
+  }
   return {
     SpreadsheetApp: trap('SpreadsheetApp'),
     DriveApp: trap('DriveApp'),
@@ -96,7 +105,21 @@ function buildGasStubs_() {
     Utilities: trap('Utilities'),
     // Logger 是唯一容許靜靜吞掉的——log_()（Utils.gs）在正常流程也會被呼叫，
     // 它只是記錄訊息，不影響任何運算結果，讓它拋錯反而會干擾測試。
-    Logger: { log: function () {} }
+    Logger: { log: function () {} },
+    // ⚠️ 第四十三輪批次 A 組：`LockService` 一律**當成拿得到**。
+    //
+    // 離線的 node 只有一條執行緒，永遠不可能出現真正的並行——
+    // 所以在這裡模擬「拿不到鎖」沒有意義，只會令每一份測試都要
+    // 記得 stub 一次。
+    //
+    // ⚠️ 但要測「拿不到的時候會怎樣」的測試，仍然可以自己覆寫
+    // `gas.LockService`——那是刻意留的口，
+    // `tests/mutation_lock.test.js` 就是這樣做的。
+    LockService: {
+      getDocumentLock: function () { return makeAlwaysAvailableLock_(); },
+      getScriptLock: function () { return makeAlwaysAvailableLock_(); },
+      getUserLock: function () { return makeAlwaysAvailableLock_(); }
+    }
   };
 }
 

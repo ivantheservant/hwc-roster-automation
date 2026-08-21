@@ -369,6 +369,33 @@
   .busy-card.is-fail .busy-title { color: var(--danger); }
 
 
+  /* 第四十三輪批次 F 組：自行輸入電郵，格式唔啱即刻標紅。
+     ⚠️ 唔可以等佢撳落去先講——嗰陣佢已經行咗三步。 */
+  textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 8px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
+  .bad-input { border-color: var(--danger); background: var(--warn-bg); }
+  /* ── 忙碌鎖（第四十三輪批次 A 組）─────────────────────────
+     Ivan 現場：撳「儲存我的修改」之後三十幾秒，全部掣照樣撳得到，
+     而畫面睇落好似已經做完。佢話「好易令我誤撳其他掣，或者再撳一次儲存」。
+
+     ⚠️ 用 body class 而唔係逐粒掣設 disabled，係因為**動作期間會重畫**
+     （ 會 clear 再 appendChild）。逐粒設嘅話，
+     重畫出嚟嗰批新掣冇人幫佢哋設過 ⇒ 鎖自己冇咗。
+     一條 CSS 規則就冇呢個問題：新節點一樣喺 body 入面。
+
+     ⚠️ `.busy-overlay` 一定要排除，否則連中央嗰塊牌都會被熄掉
+     （佢自己唔使撳，但將來加「取消」掣就會撳唔到）。 */
+  body.is-busy { cursor: progress; }
+  body.is-busy > *:not(.busy-overlay) { pointer-events: none; }
+  body.is-busy > *:not(.busy-overlay) button,
+  body.is-busy > *:not(.busy-overlay) select,
+  body.is-busy > *:not(.busy-overlay) a { opacity: .55; }
+
+  /* 忙碌牌上面嗰個「已經等咗幾多秒」。⚠️ 呢個係**真嘅計時**，
+     唔係一個扮出嚟嘅進度——見 `busyShow()` 嘅說明。 */
+  .busy-elapsed { font-size: var(--fs-sm); color: var(--muted); margin-top: 10px; }
+  .busy-steps { font-size: var(--fs-sm); color: var(--muted); margin-top: 10px; text-align: left; }
+  .busy-steps li { margin: 2px 0; }
   /* ── 大字彈窗（第四十一輪批次 D 組）──────────────────────
      Ivan 實測第 3 步嗰個預覽：「字太細」。嗰個窗一次要睇幾十行，
      而佢要逐行核對「係咪真係想改呢一項」。
