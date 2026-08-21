@@ -207,8 +207,13 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
     maybeFlush_();
   });
 
+  // ⚠️ 第四十六輪批次 A 組：`LIST` 嗰邊個池一樣要跟幹事嘅選擇。
+  //
+  // 本來個池係 `listRecipients_(RESEND, …)`，即係只有 `Stage` 欄寫住
+  // 包含 RESEND 嗰幾行。幹事勾咗一個冇標 RESEND 嘅地址，就會靜靜寄唔到
+  // ——而畫面照樣把佢算入「已選 N 位」。
   const listRecipients = filterRecipientsByScope_(
-    listRecipients_(MAIL_STAGES.RESEND, context)
+    resolveSendRecipientPool_(MAIL_STAGES.RESEND, context, decision)
       .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST; }),
     decision);
   listRecipients.forEach(function (recipient) {

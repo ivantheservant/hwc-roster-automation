@@ -161,8 +161,10 @@
    * `tools/lint-handler-args.js` 會擋住直接綁。
    *
    * @param {string=} startFrom 幹事喺「用邊一張做起點」小窗揀嘅答案
+   * @param {string[]=} allowKeys 第四十六輪批次 C3 組：幹事**明確勾咗**
+   *   准系統調整嗰幾格。冇傳 ⇒ 一格都唔准動。
    */
-  function openBuildSuggestion(startFrom) {
+  function openBuildSuggestion(startFrom, allowKeys) {
     // ⚠️ 保底：就算將來有人再直接綁，都唔會送一個事件物件上去。
     // 呢個唔係用嚟代替上面嗰條規矩——`sanitizeServerArgs_()` 會照樣
     // 喺送出之前擋住，而 lint 會喺 commit 之前擋住。三層都要有，
@@ -170,7 +172,8 @@
     const from = (typeof startFrom === 'string') ? startFrom : '';
     runAction('系統調整中，請稍候', async () => {
       const r = await callServerMutating(
-        'apiBuildSuggestion', currentQuarterId, from);
+        'apiBuildSuggestion', currentQuarterId, from,
+        Array.isArray(allowKeys) ? allowKeys : []);
       // ⚠️ 第四十二輪批次 A 組：兩張表都改過 ⇒ **問返幹事**，
       // 唔可以靜靜揀一張。揀錯嗰張就等於靜靜丟咗佢一批改動，
       // 而佢完全唔會知。
@@ -230,7 +233,8 @@
     // 成因係同一格既俾幹事改過、又俾系統再改一次——兩個數字各自算啱咗，
     // 而上色嗰段只上得到一種。`colourCounts` 係**上色嗰陣順手數嘅**，
     // 所以佢報幾多格，表上就一定有幾多格。
-    const cc = r.colourCounts || { manual: 0, system: 0, both: 0 };
+    const cc = r.colourCounts
+      || { manual: 0, system: 0, both: 0, manualViolation: 0 };
     const colourBox = make('div', { className: 'sec' }, [
       sectionTitle('那張表上面的顏色')
     ]);
@@ -244,6 +248,8 @@
     colourLine('黃色格 ＝ 你自己改過的', cc.manual);
     colourLine('藍色格 ＝ 系統建議改的', cc.system);
     colourLine('紫色格 ＝ 你改過，而系統又再改了一次', cc.both);
+    // 第四十六輪批次 C4 組：第四種顏色。
+    colourLine('橙色格 ＝ 你改過、違反了規則，而系統沒有動它', cc.manualViolation);
 
     if (cc.system === 0 && cc.both === 0) {
       colourBox.appendChild(make('div', {
@@ -260,6 +266,41 @@
       text: '那一張表同正式職事表一樣有下拉選單，你可以直接在上面改。',
       className: 'muted'
     }));
+
+    // ── 第四十六輪批次 C3 組：你改的、違反規則、系統沒有動 ──────
+    //
+    // ⚠️ Ivan 嘅原則：**系統改壞幹事親手做嘅決定，比排錯更差。**
+    // 佢改一格，係因為佢知道一啲系統唔知道嘅事。所以系統唔會自己改走，
+    // 改為列出嚟問佢——而且**預設全部唔勾**。
+    //
+    // 預設勾好就等於系統仍然喺度替佢決定，只係多咗一個佢唔會細睇嘅畫面。
+    const untouched = r.untouchedManual || [];
+    const allowSelected = {};
+    let blockedBox = null;
+    if (untouched.length > 0) {
+      blockedBox = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('你改的 ' + untouched.length + ' 格違反了規則，系統沒有動它們'),
+        make('div', {
+          text: '系統不會自己改走你親手做的決定。要它一併調整的，'
+            + '在下面勾選，然後撳〔准系統調整我勾了的〕。',
+          className: 'muted'
+        })
+      ]);
+      untouched.forEach((u) => {
+        const line = make('label', { className: 'check-row' });
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = false;   // ⚠️ 預設不勾
+        cb.addEventListener('change', () => { allowSelected[u.key] = cb.checked; });
+        line.appendChild(cb);
+        line.appendChild(make('span', {
+          text: humanDate(u.serviceDate) + '　' + u.postNameTC
+            + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '')
+            + '　' + u.personName + '——' + u.reason
+        }));
+        blockedBox.appendChild(line);
+      });
+    }
 
     const nodes = [
       make('div', { text: '建議版本已經做好', className: 'ok-head' }),
@@ -337,11 +378,32 @@
       nodes.push(box);
     }
 
-    openModal('系統建議版本', nodes, [
+    // ⚠️ C3 組嗰段擺喺最後——佢係一個**要佢答**嘅問題，
+    // 唔應該混喺上面幾段報告中間。
+    if (blockedBox) nodes.push(blockedBox);
+
+    const acts = [
       button('接受這個建議版本', () => openAcceptSuggestion(), ''),
       button('放棄，回到我自己那一版', () => openDiscardSuggestion(), 'secondary'),
       button('稍後再決定', () => closeModal(), 'secondary')
-    ]);
+    ];
+    if (untouched.length > 0) {
+      // 〔准系統調整我勾了的〕＝ 用同一個起點再算一次，
+      // 但今次帶住「呢幾格准動」。**唔勾就一格都唔會動。**
+      acts.unshift(button('准系統調整我勾了的', () => {
+        const allow = Object.keys(allowSelected).filter((k) => allowSelected[k] === true);
+        if (allow.length === 0) {
+          setStatus('你一格都沒有勾。系統不會動你改過的任何一格。', true);
+          return;
+        }
+        closeModal();
+        // 起點用返呢一次嗰個，唔可以由頭再問一次——
+        // 佢啱啱先答過，再問一次只會令佢以為系統唔記得咗。
+        openBuildSuggestion(r.startSource, allow);
+      }, ''));
+      acts.push(button('保持原狀', () => closeModal(), 'secondary'));
+    }
+    openModal('系統建議版本', nodes, acts);
   }
 
   /* ── 三、接受／放棄 ─────────────────────────────────────── */

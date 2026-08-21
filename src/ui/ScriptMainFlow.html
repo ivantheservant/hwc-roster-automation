@@ -436,7 +436,9 @@
     // ⚠️ 「儲存我的修改」同「查看／修改」要**並排、同樣大**：
     // 他做完 A 一定會做 B。分開兩個地方就會漏。
     const save = (d.buttons && d.buttons.save) || {};
-    acts.push(stepButton('儲存我的修改', openSaveAndConfirm, {
+    // ⚠️ 第四十六輪批次 D2 組：改名叫「儲存及寄出」。
+    // 儲存之後直唔直接去寄出，係確認窗入面一個**預設唔勾**嘅選項。
+    acts.push(stepButton('儲存及寄出', () => openSaveAndConfirm(), {
       disabled: !save.enabled,
       className: 'secondary',
       title: save.enabled ? '' : (save.disabledReason || '')
@@ -800,11 +802,18 @@
     const n = (flow && flow.paperCount) || 0;
     return stepCard({
       num: 4,
-      title: n > 0 ? ('要印紙本的有 ' + n + ' 位') : '要印紙本的人',
+      // ⚠️ 第四十六輪批次 D3 組：標題嗰個動態數字保留（做得好），
+      // 但因為粒掣改咗名叫「下載及匯出」，副標題要講清楚呢度同時處理
+      // **兩種用途**——唔講嘅話，幹事會以為呢度淨係為咗冇電郵嗰批人，
+      // 而佢想自己留一份 PDF 嗰陣就唔知去邊度攞。
+      title: n > 0 ? ('要印紙本的有 ' + n + ' 位') : '下載及匯出',
       note: n > 0
         ? '這幾位查不到電郵，收不到信，但照樣要服侍。'
-        : '這一季暫時沒有查不到電郵的人。你仍然可以在這裡加人（有些長者兩樣都要）。',
-      acts: [stepButton('處理紙本', openPaperDialog, {
+          + '這裡同時可以把整季或者個人的 PDF 下載一份自己留底。'
+        : '這一季暫時沒有查不到電郵的人。'
+          + '這裡可以把整季或者個人的 PDF 下載一份自己留底，'
+          + '也可以在這裡加人（有些長者兩樣都要）。',
+      acts: [stepButton('下載及匯出', () => openPaperDialog(), {
         disabled: !d.latestVersion,
         className: n > 0 ? '' : 'secondary',
         title: d.latestVersion ? '' : '要先在第 1 步生成職事表。'

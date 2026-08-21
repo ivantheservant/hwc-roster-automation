@@ -119,39 +119,50 @@
 
   /** 呢一次彈窗入面幹事揀咗咩。開窗嗰陣由後端嘅預設值填好。 */
   let sendOptions_ = null;
-  /** 「自己揀」嗰個名單（第一次撳先去攞）。 */
-  let sendCandidates_ = null;
-  /** 第四十四輪批次 B 組：呢個名單入面係邊啲人（後端出嘅一句人話）。 */
-  let sendCandidateNote_ = '';
 
   function renderSendMain(s) {
     // ⚠️ 每次開窗都重設，而且用**後端**畀嘅預設值。
     sendOptions_ = {
-      recipientScope: (s.sendOptionDefaults || {}).recipientScope || 'ALL',
+      // ⚠️ 第四十六輪批次 A 組：收件人一律行 `PICK`（照 `pickedKeys` 寄）。
+      // 後端嗰個「按階段嘅預設收件範圍」仍然存在，但佢係**自動排程／補寄**
+      // 嗰幾條路用嘅；幹事喺呢個彈窗做嘅事就係逐個決定寄俾邊個。
+      recipientScope: 'PICK',
       attachType: (s.sendOptionDefaults || {}).attachType || 'NONE',
       includeIcs: !!(s.sendOptionDefaults || {}).includeIcs,
       pickedKeys: [],
       extraEmails: [],
       extraEmailsRaw: ''
     };
-    sendCandidates_ = null;
-    sendCandidateNote_ = '';
+    // 第四十六輪批次 A 組：換季度／重開彈窗一律重新攞池，
+    // 唔可以留住上一季嘅人名。
+    sendPool_ = null;
+    sendPoolGroups_ = null;
+    sendChangedInfo_ = null;
     drawSendMain(s);
   }
 
   function drawSendMain(s) {
     const nodes = [];
 
-    // ── 頂部：呢一次係咩（系統判斷，唔使佢揀）────────────────
+    // ── 頂部：**只講事實，唔再由階段推斷「這一次是⋯⋯」**─────────
+    //
+    // ⚠️ 第四十六輪批次 A3 組：舊嗰句係
+    //「這一次是寄給堂委審閱（這一季還未正式發出過）」——一句由**階段**
+    // 推斷出嚟嘅描述。而由呢一輪開始收件人係幹事自己勾嘅，
+    // 所以嗰句同佢實際做緊嘅事對唔上。Ivan 明確講咗嗰句係錯嘅。
+    //
+    // 留低嘅係兩樣真係有用嘅事實：寄邊一版、係咪模擬模式。
     nodes.push(make('div', { className: 'statuscard' }, [
-      make('div', { text: s.kindSentence, className: 'statuscard-title' }),
       make('div', {
         text: '系統只會寄你已經儲存確認的版本'
           + (s.latestVersion ? '（現在是第 ' + s.latestVersion.versionNo + ' 版）' : '')
           + '。',
-        className: 'statuscard-sub'
+        className: 'statuscard-title'
       })
     ]));
+
+    // ── 這一季的寄出紀錄（B3）───────────────────────────────
+    nodes.push(buildSendHistoryBox(s.sendHistory));
 
     if (s.isDryRun) {
       nodes.push(make('div', { className: 'warnbox' }, [
@@ -162,36 +173,18 @@
       ]));
     }
 
-    // ── 決定一：寄給誰 ──────────────────────────────────────
-    const whoBox = make('div', { className: 'sec' }, [
-      sectionTitle('寄給誰'),
-      make('div', { text: s.recipientSentence, className: 'muted' })
-    ]);
-    const scopes = [
-      ['ALL', '全部應收的人'],
-      ['CHANGED_ONLY', '只寄安排有改動的'],
-      ['PICK', '自己選擇']
-    ];
-    scopes.forEach((opt) => {
-      // 「只寄有改動嘅」淨係喺改動後重發先有意義。其餘階段唔顯示——
-      // 顯示一個撳落去等於「全部」嘅選項只會令人以為系統壞咗。
-      if (opt[0] === 'CHANGED_ONLY' && s.kind !== 'RESEND') return;
-      whoBox.appendChild(sendRadio('scope', opt[0], opt[1],
-        sendOptions_.recipientScope === opt[0], () => {
-          sendOptions_.recipientScope = opt[0];
-          if (opt[0] === 'PICK') { openSendPickList(s); return; }
-          drawSendMain(s);
-        }));
-    });
-    if (sendOptions_.recipientScope === 'PICK') {
-      whoBox.appendChild(make('div', {
-        text: '已選 ' + sendOptions_.pickedKeys.length + ' 位。',
-        className: 'ok-line strong'
-      }));
-      whoBox.appendChild(row([
-        button('改一改選誰', () => openSendPickList(s), 'secondary')
-      ]));
-    }
+    // ── 寄給誰：**由幹事決定，唔係由階段決定**（A1／A3）──────────
+    const whoBox = make('div', { className: 'sec' }, [sectionTitle('寄給誰')]);
+    whoBox.appendChild(make('div', {
+      text: describeSendSelection(),
+      className: (sendOptions_.pickedKeys || []).length === 0
+        && (sendOptions_.extraEmails || []).length === 0
+        ? 'vio-row' : 'ok-line strong'
+    }));
+    whoBox.appendChild(row([
+      button((sendOptions_.pickedKeys || []).length === 0 ? '選擇收件人' : '改一改寄給誰',
+        () => openSendRecipients(s), '')
+    ]));
     nodes.push(whoBox);
 
     // ── 決定二：附件 ────────────────────────────────────────
@@ -287,10 +280,11 @@
       confirmLabel: '寄出',
       extraActions: actions,
       onConfirm: () => {
-        // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ 唔可以行落去。
-        // 後端一樣會擋（resolveSendOptions_() 會拋），呢度只係提早講。
-        if (sendOptions_.recipientScope === 'PICK' && sendOptions_.pickedKeys.length === 0) {
-          setStatus('你選了「自己選擇」，但一位都沒有選。', true);
+        // ⚠️ 一位都冇揀而又冇自訂地址 ⇒ 唔可以行落去。
+        // 後端一樣會擋（`resolveSendOptions_()` 會拋），呢度只係提早講。
+        if ((sendOptions_.pickedKeys || []).length === 0
+            && (sendOptions_.extraEmailsRaw || '').trim() === '') {
+          setStatus('還沒有選任何收件人。撳〔選擇收件人〕選好再撳一次。', true);
           return;
         }
         // ⚠️ 格式唔啱就唔可以行落去。後端一樣會擋（resolveSendOptions_()
@@ -316,121 +310,254 @@
     return line;
   }
 
-  /* ── 「自己揀」嗰個名單 ─────────────────────────────────── */
+  /* ══════════════════════════════════════════════════════════════
+   * 第四十六輪批次 A／B 組：收件人由幹事決定
+   * ══════════════════════════════════════════════════════════════
+   *
+   * ⚠️ 之前兩輪做錯咗嘅地方：把個名單當成「喺階段本來嘅收件範圍入面再篩」。
+   * Ivan 要嘅係「寄俾職事表上全部人、CC、DB、IT、admin 同自訂 email」
+   * ——即係**收件人同階段完全無關**。
+   *
+   * 呢度嘅真相來源只有一個：`sendOptions_.pickedKeys`。
+   * 上面六個來源勾選框係**捷徑**，佢哋做嘅事係「把嗰一組人加入／移出
+   * `pickedKeys`」——唔係另一個並行嘅收件範圍。
+   *
+   * 兩個真相來源（一個「來源」＋ 一個「名單」）會即刻出現
+   *「勾咗堂委，但個名單度取消咗其中一個，到底寄唔寄」嘅問題。
+   * 所以：**名單就係答案，來源只係一次過幫你勾。**
+   */
 
-  function openSendPickList(s, keyword) {
-    if (sendCandidates_) { drawSendPickList(s, keyword || ''); return; }
+  /** 收件人池（第一次撳先去攞）。 */
+  let sendPool_ = null;
+  /** 六個來源各有幾多人。由後端數，唔喺畫面寫死。 */
+  let sendPoolGroups_ = null;
+  /** 「有改動」係相對邊一版。 */
+  let sendChangedInfo_ = null;
+
+  /**
+   * 一個來源入面**勾得到**嘅人。
+   * ⚠️ 冇電郵嘅唔算——勾咗都收唔到，而勾一個收唔到嘅人只會令個數字講大話。
+   * @param {string} sourceKey SEND_SOURCE 之一
+   * @returns {Object[]} 成員
+   */
+  function sendPoolMembersOf(sourceKey) {
+    return (sendPool_ || []).filter((c) =>
+      (c.sources || []).indexOf(sourceKey) !== -1 && c.selectable !== false);
+  }
+
+  /** 這一組是不是已經全部勾了。 */
+  function sendSourceAllPicked(sourceKey, selected) {
+    const members = sendPoolMembersOf(sourceKey);
+    return members.length > 0 && members.every((c) => selected[c.key] === true);
+  }
+
+  /**
+   * 第四十六輪批次 A3 組：**收件摘要——由實際勾咗乜算出嚟。**
+   *
+   * ⚠️ 唔可以由階段推斷。舊嗰句「這一次是寄給堂委審閱」就係噉嚟嘅，
+   * 而 Ivan 明確講咗嗰句係錯嘅描述。
+   *
+   * @returns {string} 一句
+   */
+  function describeSendSelection() {
+    const keys = sendOptions_.pickedKeys || [];
+    const extra = (sendOptions_.extraEmails || []).length;
+    if (keys.length === 0 && extra === 0) return '還沒有選任何收件人。';
+
+    const byKey = {};
+    (sendPool_ || []).forEach((c) => { byKey[c.key] = c; });
+
+    // 逐個來源數「呢一次揀咗嘅人入面，有幾多個屬於呢一組」。
+    // 一個人可以同時屬於幾組（例如一個堂委今季又有服侍），所以
+    // 各組加埋可以多過總數——所以總數要另外數，唔可以加埋。
+    const bits = [];
+    (sendPoolGroups_ || []).forEach((g) => {
+      const n = keys.filter((k) => byKey[k]
+        && (byKey[k].sources || []).indexOf(g.key) !== -1).length;
+      if (n > 0) bits.push(g.label + ' ' + n + ' 位');
+    });
+    if (extra > 0) bits.push('自訂 ' + extra + ' 個地址');
+
+    const total = keys.length + extra;
+    return '這一次會寄給 ' + total + ' 位'
+      + (bits.length > 0 ? ('：' + bits.join(' ＋ ')) : '')
+      + '。';
+  }
+
+  /**
+   * 第四十六輪批次 B3 組：這一季寄過幾次。
+   * @param {Object} h `buildSendHistoryView_()` 的結果
+   * @returns {Node} 一段
+   */
+  function buildSendHistoryBox(h) {
+    const box = make('div', { className: 'sec' }, [sectionTitle('這一季的寄出紀錄')]);
+    if (!h || (h.batches || []).length === 0) {
+      box.appendChild(make('div', {
+        text: '這一季從來沒有寄出過。', className: 'vio-row'
+      }));
+    } else {
+      box.appendChild(make('div', {
+        text: '這一季寄過 ' + h.batches.length + ' 次：', className: 'muted'
+      }));
+      h.batches.forEach((b) => {
+        box.appendChild(make('div', {
+          text: '　' + b.sentAt + '　' + b.stageLabel
+            + '　第 ' + b.versionNo + ' 版　' + b.sent + ' 位'
+            + (b.noEmail > 0 ? ('（' + b.noEmail + ' 位查無電郵）') : '')
+            + (b.failed > 0 ? ('（' + b.failed + ' 位失敗）') : ''),
+          className: 'ok-line'
+        }));
+      });
+    }
+    // ⚠️ 呢一行係整段最重要嘅：**現時嗰版從來未寄過就要明講。**
+    // 幹事最容易犯嘅錯就係「以為寄咗」。
+    if (h && h.warnSentence) {
+      box.appendChild(make('div', { className: 'warnbox' }, [
+        make('div', { text: h.warnSentence, className: 'lines' })
+      ]));
+    }
+    return box;
+  }
+
+  /* ── 收件人彈窗：上面六個來源，下面一個可搜尋嘅名單 ───────── */
+
+  function openSendRecipients(s, keyword) {
+    if (sendPool_) { drawSendRecipients(s, keyword || ''); return; }
     runAction('讀取收件名單', async () => {
-      const r = await callServer('apiGetSendCandidates', currentQuarterId, s.kind);
-      // 第四十四輪批次 B 組：後端而家連埋一句「呢個名單入面係邊啲人」。
-      sendCandidates_ = r.items || [];
-      sendCandidateNote_ = r.listNote || '';
-      drawSendPickList(s, '');
+      const r = await callServer('apiGetSendRecipientPool', currentQuarterId);
+      if (!r.ok) { showErrorModal('選擇收件人', new Error(r.message)); return; }
+      sendPool_ = r.items || [];
+      sendPoolGroups_ = r.groups || [];
+      sendChangedInfo_ = r.changed || null;
+      drawSendRecipients(s, '');
     });
   }
 
-  function drawSendPickList(s, keyword) {
-    // ⚠️ 第四十一輪批次 E 組：用共用元件 `pickListNodes()`，
-    // 同第 5 步（紙本）嗰個名單**係同一份碼**。
-    // 寫兩份嘅話，兩邊會慢慢長得唔一樣，而幹事會覺得系統時好時壞。
+  function drawSendRecipients(s, keyword) {
     const selected = {};
-    sendOptions_.pickedKeys.forEach((k) => { selected[k] = true; });
+    (sendOptions_.pickedKeys || []).forEach((k) => { selected[k] = true; });
 
-    const items = sendCandidates_.map((c) => ({
+    const redraw = (kw) => {
+      sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
+      drawSendRecipients(s, kw === undefined ? keyword : kw);
+    };
+
+    const nodes = [
+      para('先在上面勾一整組，再在下面逐個加或者減。下面那個名單就是最後會寄的人。')
+    ];
+
+    // ── 六 ＋ 一個來源 ───────────────────────────────────────
+    const srcBox = make('div', { className: 'sec' }, [sectionTitle('一次過加一整組')]);
+    (sendPoolGroups_ || []).forEach((g) => {
+      const isChanged = g.key === 'CHANGED';
+      // 「只寄給安排有改動的人」冇比較基準（從來未寄過）⇒ 勾唔到，
+      // 而且要講明點解，唔可以靜靜唔出。
+      const noBaseline = isChanged && sendChangedInfo_ && !sendChangedInfo_.hasBaseline;
+      const line = make('label', { className: (g.selectable === 0 || noBaseline) ? 'check-row muted' : 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      if (g.selectable === 0 || noBaseline) {
+        cb.disabled = true;
+        cb.checked = false;
+      } else {
+        cb.checked = sendSourceAllPicked(g.key, selected);
+        cb.addEventListener('change', () => {
+          sendPoolMembersOf(g.key).forEach((c) => { selected[c.key] = cb.checked; });
+          redraw();
+        });
+      }
+      line.appendChild(cb);
+      line.appendChild(make('span', {
+        text: g.label + '（' + g.selectable + ' 位'
+          + (g.total > g.selectable ? ('，另外 ' + (g.total - g.selectable) + ' 位沒有電郵') : '')
+          + '）'
+      }));
+      srcBox.appendChild(line);
+      // ⚠️ 一組零人嗰陣**要講點解同去邊度加**。靜靜出一個勾唔到嘅框，
+      // 幹事只會以為系統壞咗——而真正原因係「身分」那張表未填。
+      if (g.total === 0 && !isChanged) {
+        srcBox.appendChild(make('div', {
+          text: '　　現時沒有人有這個身分。要用這一組，先去「名單維護 ▸ 身分」'
+            + '把「' + g.label + '」加給相關的人。',
+          className: 'muted'
+        }));
+      }
+      if (isChanged && sendChangedInfo_) {
+        srcBox.appendChild(make('div', {
+          text: '　　' + sendChangedInfo_.sentence,
+          className: sendChangedInfo_.hasBaseline ? 'muted' : 'vio-row'
+        }));
+      }
+    });
+    nodes.push(srcBox);
+
+    // ── 自訂電郵：擺喺同一版，唔收埋去另一個窗 ──────────────
+    nodes.push(buildExtraEmailBox(sendOptions_,
+      '這幾個地址會收到同一封信（包括附件），但不會加入人員名單。'));
+
+    nodes.push(make('div', {
+      text: describeSendSelection(), className: 'ok-line strong'
+    }));
+
+    // ── 下面：**同「下載及匯出」一模一樣**嗰個可搜尋名單 ────────
+    //
+    // ⚠️ 用共用元件 `pickListNodes()`，兩邊叫同一份程式碼。
+    // Ivan 已經講咗三次「應該似處理紙本嗰個」，寫第二份就會再一次
+    // 出現兩邊行為唔一致。
+    const items = (sendPool_ || []).map((c) => ({
       key: c.key,
       label: c.displayName,
       disabled: c.selectable === false,
       note: (c.type === 'LIST' ? '（收件人名單）' : ('（這一季 ' + c.cellCount + ' 格）'))
-        // 第四十三輪批次 E 組：身分寫喺個名後面，噉佢自己勾嗰陣都睇得到。
-        + describeRoleTags(c.roles),
-      // 查不到電郵嘅照樣列出嚟，並且講明。佢唔係「唔使服侍」，
-      // 係要印紙本（第 5 步）——收埋佢就等於靜靜當佢唔存在。
+        + describeRoleTags(c.roles)
+        // B2：勾咗「只寄有改動」之後，逐個要講明**改咗乜**。
+        + ((c.changeNotes && c.changeNotes.length > 0)
+          ? ('　改動：' + c.changeNotes.join('、')) : ''),
       warn: c.hasEmail ? '' : '⚠ 沒有電郵，收不到信——要用第 4 步印紙本給他'
     }));
-
-    const redraw = (kw) => {
-      sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
-      drawSendPickList(s, kw === undefined ? keyword : kw);
-    };
-
-    const nodes = [
-      para('選擇哪幾位要收到這一封信。'),
-      // ⚠️ 第四十四輪批次 B 組：**一定要講明呢個名單入面係邊啲人。**
-      // Ivan 三次以為呢個功能未做，成因就係佢喺 REVIEW 見到三行電郵地址，
-      // 而「處理紙本」嗰個係幾十位有名有格數——兩個名單裝住唔同嘅人，
-      // 而畫面一句都冇講。
-      make('div', { text: sendCandidateNote_, className: 'ok-line strong' }),
-      para('沒有選到的人，這一次一封都不會收到。', 'muted')
-    ];
-
-    // ── 第四十三輪批次 E 組：群組勾選 ──────────────────────────
-    //
-    // ⚠️ 身分由後端讀 `Roles`（連生效期一齊判斷），**唔係喺呢度寫死一份
-    // 名單**。寫死嗰份下一屆就錯，而且冇人會記得去改。
-    //
-    // ⚠️ 勾一個群組 ＝ 把嗰批人加入已選名單（**唔係取代**），
-    // 而且逐個仍然取消得到。Ivan 明確要求「全部堂委 ＋ 另外三個人」
-    // 呢種用法。
-    const groupBox = make('div', { className: 'sec' }, [sectionTitle('一次過加一整組')]);
-    let hasGroup = false;
-    [['COMMITTEE', '全部堂委'], ['DEACON', '全部執事']].forEach((g) => {
-      // ⚠️ 第四十四輪批次 B 組：冇電郵嘅唔算入群組——勾咗都收唔到，
-      // 而勾一個收唔到嘅人只會令個數字講大話。
-      const members = sendCandidates_.filter(
-        (c) => (c.roles || []).indexOf(g[0]) !== -1 && c.selectable !== false);
-      if (members.length === 0) return;
-      hasGroup = true;
-      const allIn = members.every((c) => selected[c.key] === true);
-      const line = make('label', { className: 'check-row' });
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = allIn;
-      cb.addEventListener('change', () => {
-        members.forEach((c) => { selected[c.key] = cb.checked; });
-        redraw();
-      });
-      line.appendChild(cb);
-      line.appendChild(make('span', {
-        text: g[1] + '（' + members.length + ' 位）'
-      }));
-      groupBox.appendChild(line);
-    });
-    if (hasGroup) {
-      groupBox.appendChild(make('div', {
-        text: '勾了整組之後，仍然可以在下面逐個取消。',
-        className: 'muted'
-      }));
-      nodes.push(groupBox);
-    } else {
-      // ⚠️ 一個群組都砌唔到嗰陣**要講**。靜靜唔出嗰兩個勾，
-      // 幹事只會以為系統壞咗——而真正嘅原因係 `Roles` 未填。
-      nodes.push(make('div', {
-        text: '（系統在「身分」那張表找不到任何現任堂委或執事，'
-          + '所以沒有群組可以勾。要用這個功能，先去「名單維護 ▸ 身分」填。）',
-        className: 'muted'
-      }));
-    }
 
     pickListNodes({
       items: items,
       selected: selected,
       keyword: keyword,
       onRedraw: redraw,
-      emptyText: '這一次一個收件人都找不到。這通常代表這一季還沒有派工，'
-        + '或者收件人名單（EmailRecipients）是空的。'
+      onToggle: () => redraw(),
+      emptyText: '這一季一個收件人都找不到。這通常代表這一季還沒有派工，'
+        + '而且「身分」和「收件人名單」兩張表都是空的。'
     }).forEach((n) => nodes.push(n));
 
-    openModal('自己選擇寄給誰', nodes, [
-      button('選好了', () => {
-        sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
-        drawSendMain(s);
-      }, '')
-    ].concat(pickListBulkButtons(items, selected, () => redraw())));
+    openModal('選擇收件人', nodes,
+      pickListBulkButtons(items, selected, redraw).concat([
+        button('用這一份名單', () => {
+          sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);
+          // ⚠️ 收件人一律行 `PICK`：由呢一輪開始收件人係幹事決定嘅，
+          // 而 `PICK` 就係「照 `pickedKeys` 寄」嗰條路。
+          sendOptions_.recipientScope = 'PICK';
+          if (!commitExtraEmails(sendOptions_)) return;
+          closeModal();
+          drawSendMain(s);
+        }, ''),
+        button('取消', () => { closeModal(); drawSendMain(s); }, 'secondary')
+      ]));
   }
 
-  /** 身分標籤，例如「　堂委」。冇身分就回空字串。 */
+  /* ── 「自己揀」嗰個名單 ─────────────────────────────────── */
+
+  /* ── 舊嗰個「自己揀」名單已經拆走（第四十六輪批次 A2）──────────
+   *
+   * ⚠️ 佢同  做緊同一件事，而且兩份會慢慢長得
+   * 唔一樣——Ivan 講咗三次「應該似處理紙本嗰個」，成因就係兩份碼。
+   * 收件人池而家一律行 （同階段無關）。
+   */
+
+  /**
+   * 身分標籤，例如「　堂委」。冇身分就回空字串。
+   * ⚠️ 第四十六輪批次 A1 組：多咗 `IT` 同 `CLERK` 兩個身分，
+   * 呢度要一齊認得——認唔到就會喺名單上顯示成一片空白，
+   * 而幹事會以為嗰個人冇身分。
+   */
   function describeRoleTags(roles) {
-    const map = { COMMITTEE: '堂委', DEACON: '執事' };
+    const map = { COMMITTEE: '堂委', DEACON: '執事', IT: 'IT', CLERK: '幹事' };
     const names = (roles || []).map((r) => map[r]).filter(Boolean);
     return names.length > 0 ? ('　' + names.join('、')) : '';
   }

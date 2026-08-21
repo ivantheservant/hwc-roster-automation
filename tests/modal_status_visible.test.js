@@ -171,8 +171,11 @@ console.log('\n=== C 撳〔寄出〕嗰幾條「靜靜 return」都行呢個入�
   const onConfirm = sendPaperUi.slice(
     sendPaperUi.indexOf("confirmLabel: '寄出',"),
     sendPaperUi.indexOf("confirmLabel: '寄出',") + 1200);
-  check('★★★★★ 「揀咗自己選擇但一個都冇揀」有講一句先 return',
-    /setStatus\('你選了「自己選擇」，但一位都沒有選。', true\);\s*\n\s*return;/
+  // ⚠️ 第四十六輪批次 A 組改咗句子（收件範圍唔再有「自己選擇」呢個選項
+  // ——收件人一律由幹事勾）。守嘅嘢一個字都冇變：
+  // **一條靜靜 `return` 嘅路，一定要先講一句。**
+  check('★★★★★ 「一位都冇揀」有講一句先 return',
+    /setStatus\('還沒有選任何收件人。撳〔選擇收件人〕選好再撳一次。', true\);\s*\n\s*return;/
       .test(onConfirm), onConfirm.slice(0, 600));
   check('★★★★★ 電郵格式唔啱嗰條經 `commitExtraEmails()`'
     + '（佢入面一樣係 `setStatus(…, true)` 然後回 false）',

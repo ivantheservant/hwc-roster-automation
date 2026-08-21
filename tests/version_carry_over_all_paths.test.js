@@ -53,7 +53,7 @@ const gas = loadGasSource([
   'HardViolationClass.gs', 'Generator.gs', 'FineTune.gs', 'StateSource.gs', 'Debug.gs', 'Tune.gs',
   'Verify.gs', 'SoftRuleMetrics.gs', 'EmailRecipientsSeed.gs', 'TemplatePreview.gs', 'RequestsSheet.gs',
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
-  'Mailer.gs', 'ResendFlow.gs', 'Trigger.gs',
+  'SendRecipients.gs', 'Mailer.gs', 'ResendFlow.gs', 'Trigger.gs',
   'WebAppGuards.gs', 'WebAppDashboard.gs', 'WebAppRollback.gs',
   'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs', 'PreacherTranslationFill.gs',
   // 第三十八輪批次 D 組：路 5 要真入口 apiDetectChanges()

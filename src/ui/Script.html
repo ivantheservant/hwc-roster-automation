@@ -87,7 +87,9 @@
     'apiGetSendPlanSummary',
     // 第四十輪批次 A 組：「自己揀」嗰個名單。純讀取（只係讀 EmailRecipients
     // 同呢一版嘅派工，砌返該階段真正會收到信嘅人）。
-    'apiGetSendCandidates',
+    // 第四十六輪批次 A 組：同階段無關嘅收件人池（純讀取）。
+    // 取代咗舊嗰個 `apiGetSendCandidates`（按階段出名單），嗰個已經刪走。
+    'apiGetSendRecipientPool',
     // 第四十一輪批次 B 組：〔檢查我的改動〕係唯讀——佢乜都唔改，
     // 呢一點喺畫面上都要講明（幹事撳完唔敢再撳第二次，驚改咗嘢）。
     'apiCheckMyChanges',

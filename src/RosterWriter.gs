@@ -1277,6 +1277,8 @@ function diffVersionAssignments_(quarterId, fromVersionNo, toVersionNo) {
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const before = {};
   const after = {};
+  const beforeId = {};
+  const afterId = {};
 
   readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
@@ -1285,7 +1287,19 @@ function diffVersionAssignments_(quarterId, fromVersionNo, toVersionNo) {
     const key = cellKey_(
       toDateString(row[A.SERVICE_DATE], timezone), row[A.POST_ID], row[A.SLOT_INDEX]);
     const name = String(row[A.PERSON_NAME_SNAPSHOT] || '').trim();
-    if (v === fromVersionNo) before[key] = name; else after[key] = name;
+    // ⚠️ 第四十六輪批次 B 組：連 `PersonID` 一齊記低。
+    //
+    // 本來只記名字快照，而「只寄給安排有改動的人」要嘅係**收件人**，
+    // 即係 `PersonID`。喺呢度加多一個欄位，好過另寫一份「邊幾格改過」
+    // 嘅計算——寫兩份就會出現「畫面數到 4 位、實際寄 5 封」嗰種錯。
+    const personId = String(row[A.PERSON_ID] || '').trim();
+    if (v === fromVersionNo) {
+      before[key] = name;
+      beforeId[key] = personId;
+    } else {
+      after[key] = name;
+      afterId[key] = personId;
+    }
   });
 
   const out = [];
@@ -1305,7 +1319,11 @@ function diffVersionAssignments_(quarterId, fromVersionNo, toVersionNo) {
       postId: parts[1],
       slotIndex: Number(parts[2]),
       fromName: b,
-      toName: a
+      toName: a,
+      // 第四十六輪批次 B 組：收件人要靠呢兩個。冇 PersonID（例如外請講員
+      // 嗰種自由文字）就係空字串——嗰種人本來就冇得寄。
+      fromPersonId: beforeId[key] || '',
+      toPersonId: afterId[key] || ''
     });
   });
   return out;

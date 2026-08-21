@@ -471,8 +471,10 @@ const MUTATIONS = [
     why: '把其中一句畫面文字嘅「選擇」改返做「揀」'
       + '——畫面上一半寫「揀」一半寫「選擇」，幹事會以為係兩件唔同嘅事',
     file: 'src/ui/ScriptSendPaper.html',
-    find: "['PICK', '自己選擇']",
-    replace: "['PICK', '自己揀']",
+    // ⚠️ 第四十六輪批次 A 組拆走咗「自己選擇」嗰個收件範圍選項
+    //（收件人一律由幹事勾）。呢一條守嘅嘢冇變：畫面唔可以有「揀」。
+    find: '撳〔選擇收件人〕選好再撳一次。',
+    replace: '撳〔選擇收件人〕揀好再撳一次。',
     tests: ['tests/operator_wording.test.js']
   },
   {
@@ -643,11 +645,13 @@ const MUTATIONS = [
       + '——對話框報「黃色 1 格」而張表上一格黃色都冇，'
       + '而幹事第一件事就係去表上搵嗰一格',
     file: 'src/SuggestionSheet.gs',
-    find: '      if (isManual && isSystem) {\n'
+    // ⚠️ 第四十六輪批次 C4 組喺上面多咗一層 `isBlocked`。
+    // 呢一條守嘅仍然係「紫色唔可以被藍色蓋走」。
+    find: '      } else if (isManual && isSystem) {\n'
       + '        cell.setBackground(SUGGESTION_COLOR_BOTH);\n'
       + '        colourCounts.both++;\n'
       + '      } else if (isSystem) {',
-    replace: '      if (false) {\n'
+    replace: '      } else if (false) {\n'
       + '        cell.setBackground(SUGGESTION_COLOR_BOTH);\n'
       + '        colourCounts.both++;\n'
       + '      } else if (isSystem) {',
@@ -750,15 +754,11 @@ const MUTATIONS = [
     replace: '      type: RECIPIENT_TYPE.PERSON,\n      email: email,',
     tests: ['tests/round43_field_fixes.test.js']
   },
-  {
-    id: 'roles-hardcoded',
-    why: '把群組勾選嘅身分還原成唔理生效期'
-      + '——一個上一屆嘅堂委會被「全部堂委」勾中',
-    file: 'src/WebAppSendPlan.gs',
-    find: '    if (!isEffectiveOn_(r.effectiveFrom, r.effectiveTo, today)) return;',
-    replace: '    if (false) return;',
-    tests: ['tests/round43_field_fixes.test.js']
-  },
+  // ⚠️ 第四十六輪批次 A 組：`roles-hardcoded` 已經移除。
+  // 讀身分嗰段由 `WebAppSendPlan.gs` 搬咗去 `SendRecipients.gs`，
+  // 而 `send-roles-ignore-term`（下面）守緊一模一樣嘅嘢，
+  // 而且佢嘅測試真係行嗰個函式。留兩條指住同一件事，
+  // 只會令下一個人改錯一條，然後以為兩條都仲有效。
   {
     id: 'health-redirect-yellow',
     why: '把全面體檢嗰項轉寄地址還原成黃色（建議處理）'
@@ -779,33 +779,13 @@ const MUTATIONS = [
     tests: ['tests/round43_field_fixes.test.js']
   },
   {
-    id: 'send-list-note-off',
-    why: '拆走「呢一次個名單入面係邊啲人」嗰一句'
-      + '——Ivan 一連三輪以為「自己選擇」未做，成因就係呢一句一直冇講：'
-      + 'REVIEW 撳開得三行電郵地址，同紙本嗰幾十行完全唔似樣',
-    file: 'src/WebAppSendPlan.gs',
-    find: '    return { items: items, listNote: describeSendCandidateList_(kind, items.length) };',
-    replace: '    return { items: items, listNote: \'\' };',
-    tests: ['tests/send_pick_list_parity.test.js']
-  },
-  {
-    id: 'send-pick-noemail',
-    why: '把「冇電郵嘅人」改返做勾得到'
-      + '——勾得到但寄唔到，幹事會見到「已選 12 位」而實際只寄出 10 封，'
-      + '而畫面上完全睇唔出',
-    file: 'src/WebAppSendPlan.gs',
-    find: '      selectable: !!String(r.email || \'\').trim(),',
-    replace: '      selectable: true,',
-    tests: ['tests/send_pick_list_parity.test.js']
-  },
-  {
     id: 'picklist-disabled',
     why: '令 `pickListNodes()` 唔理 `disabled`'
       + '——後端標咗勾唔到，畫面照樣勾得到，等於後端嗰個標記白做',
     file: 'src/ui/Script.html',
     find: '      if (it.disabled) {',
     replace: '      if (false) {',
-    tests: ['tests/send_pick_list_parity.test.js']
+    tests: ['tests/send_recipients_pool.test.js']
   },
   {
     id: 'modal-status-blind',
@@ -1048,6 +1028,115 @@ const MUTATIONS = [
     find: '      showErrorModal(actionErrorTitle_(label), err);',
     replace: "      showErrorModal(label + '失敗', err);",
     tests: ['tests/client_arg_sanitize.test.js']
+  },
+  {
+    id: 'send-pool-stage-bound',
+    why: '把收件人池還原成「按階段出名單」'
+      + '——即係第四十一同四十三輪做錯咗嘅方向：幹事喺 REVIEW 勾一個義工，'
+      + '嗰個義工根本唔喺池入面，勾咗都唔會收到，而畫面會話「已選 12 位」',
+    file: 'src/SendRecipients.gs',
+    find: '  if (decision && decision.recipientScope === SEND_RECIPIENT_SCOPE.PICK) {',
+    replace: '  if (false) {',
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'send-pool-no-roleholders',
+    why: '把「冇服侍嘅身分持有人」由池入面拆走'
+      + '——一個堂委好可能呢一季一格都冇派工，而佢正正就係要收審閱本嗰個；'
+      + '幹事喺個名單度搵極都搵唔到佢',
+    file: 'src/SendRecipients.gs',
+    find: '  Object.keys(rolesByPerson).sort().forEach(function (personId) {',
+    replace: '  [].forEach(function (personId) {',
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'send-roles-ignore-term',
+    why: '把身分判斷還原成唔理生效期'
+      + '——一個上一屆嘅堂委會被「堂委」呢一組勾中',
+    file: 'src/SendRecipients.gs',
+    find: '    if (!isEffectiveOn_(r.effectiveFrom, r.effectiveTo, today)) return;',
+    replace: '    if (false) return;',
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'send-kind-sentence-back',
+    why: '把彈窗頂嗰句「這一次是寄給堂委審閱」擺返出嚟'
+      + '——收件人由幹事決定之後，嗰句由階段推斷嘅描述同佢實際做緊嘅事對唔上。'
+      + 'Ivan 明確講咗嗰句係錯嘅',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "        text: '系統只會寄你已經儲存確認的版本'",
+    replace: "        text: s.kindSentence + '系統只會寄你已經儲存確認的版本'",
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'send-history-no-warn',
+    why: '拆走「現時嗰版未寄過」嗰句提醒'
+      + '——幹事最容易犯嘅錯就係「以為寄咗」：改完、儲存咗、去做第二件事，'
+      + '而嗰一版由頭到尾冇寄過',
+    file: 'src/WebAppSendPlan.gs',
+    find: '  } else if (!sentVersions[currentVersionNo]) {',
+    replace: '  } else if (false) {',
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'changed-no-baseline',
+    why: '把「有改動」嘅比較基準由「上一次真正寄出嗰版」改成「上一版」'
+      + '——唔講明相對邊一版，幹事根本無從判斷「有 4 位改過」係指乜',
+    file: 'src/SendRecipients.gs',
+    find: '  const history = listSendHistory_(quarterId).filter(function (b) {',
+    replace: '  const history = [].filter(function (b) {',
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'diff-no-personid',
+    why: '把版本比對嘅 `PersonID` 拆走'
+      + '——「只寄給安排有改動嘅人」要嘅係收件人；'
+      + '冇 `PersonID` 就要另寫一份「邊幾格改過」，'
+      + '而兩份一定會出現「畫面數到 4 位、實際寄 5 封」',
+    file: 'src/RosterWriter.gs',
+    find: "      fromPersonId: beforeId[key] || '',",
+    replace: "      fromPersonId: '',",
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'suggest-touches-manual',
+    why: '令〔請系統幫我調整〕照舊改走幹事親手改過嘅格'
+      + '——第四十六輪 C 組嗰條原則：'
+      + '系統改壞幹事親手做嘅決定，比排錯更差',
+    file: 'src/SuggestionSheet.gs',
+    find: '    if (manual[key] && !allowed[key]) {',
+    replace: '    if (false) {',
+    tests: ['tests/round43_field_fixes.test.js', 'tests/suggestion_start_point.test.js']
+  },
+  {
+    id: 'suggest-allow-default-on',
+    why: '把「邊幾格准系統動」嘅預設值由「一格都唔准」改成「全部准」'
+      + '——噉樣就等於行返舊行為，而多咗嗰個清單只會變成'
+      + '一個幹事唔會細睇嘅畫面',
+    file: 'src/ui/ScriptSuggestion.html',
+    find: '        cb.checked = false;   // ⚠️ 預設不勾',
+    replace: '        cb.checked = true;',
+    tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'suggest-no-orange',
+    why: '拆走第四種顏色（幹事改過、違反規則、系統冇動）'
+      + '——用返黃色嘅話，佢喺表上完全分唔出邊幾格有問題，'
+      + '而嗰幾格正正就係佢要親自決定嘅',
+    file: 'src/SuggestionSheet.gs',
+    find: '      if (isBlocked) {',
+    replace: '      if (false) {',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'save-then-send-default',
+    why: '把「儲存之後直接去寄出」嘅預設值改成勾好'
+      + '——寄出係一個對外嘅動作；預設幫佢揀咗，'
+      + '就等於一個唔為意嘅人撳「照樣儲存」之後直接開咗寄出彈窗',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    thenSendCb.checked = false;',
+    replace: '    thenSendCb.checked = true;',
+    tests: ['tests/send_recipients_pool.test.js']
   },
 ];
 

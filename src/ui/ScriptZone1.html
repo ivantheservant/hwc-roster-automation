@@ -644,6 +644,24 @@
     // 5　確認畫面（規格步 1.7）
     nodes.push(buildSaveSummary(plan));
 
+    // ⚠️ 第四十六輪批次 D2 組：**儲存之後直接去寄出**（預設唔勾）。
+    //
+    // Ivan 嘅流程係「改 → 儲存 → 寄出」，而每次都要退出、再喺主流程
+    // 撳多一粒掣。呢個勾選框把兩步駁埋。
+    //
+    // ⚠️ **預設唔勾**。寄出係一個對外嘅動作，預設幫佢揀咗就等於
+    // 一個唔為意嘅人撳「照樣儲存」之後直接開咗寄出彈窗——
+    // 而佢以為自己淨係喺度儲存。
+    saveThenSend_ = false;
+    const thenSendRow = make('label', { className: 'check-row' });
+    const thenSendCb = document.createElement('input');
+    thenSendCb.type = 'checkbox';
+    thenSendCb.checked = false;
+    thenSendCb.addEventListener('change', () => { saveThenSend_ = thenSendCb.checked; });
+    thenSendRow.appendChild(thenSendCb);
+    thenSendRow.appendChild(make('span', { text: '儲存之後直接去寄出' }));
+    nodes.push(make('div', { className: 'sec' }, [thenSendRow]));
+
     const bodyNodes = nodes;
     if (plan.needsRelease) {
       openConfirm({
@@ -820,6 +838,13 @@
     }, SAVE_BUSY_STEPS);
   }
 
+  /**
+   * 第四十六輪批次 D2 組：這一次儲存完之後要不要直接開寄出彈窗。
+   * ⚠️ 每次畫確認窗都重設做 `false`——留住上一次嘅選擇，
+   * 幹事下次撳「照樣儲存」就會突然彈個寄出窗出嚟，而佢冇揀過。
+   */
+  let saveThenSend_ = false;
+
   function executeSaveAndConfirm(releaseText) {
     const confirmedRequestRows = Array.prototype.slice
       .call(document.querySelectorAll('input.req-confirm'))
@@ -940,7 +965,31 @@
     }
     nodes.push(para('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted'));
 
-    openModal('儲存完成', nodes, [button('知道了', () => closeModalAndRefresh(), '')]);
+    // ⚠️ 第四十六輪批次 D2 組：勾咗「儲存之後直接去寄出」⇒ 直接接落去。
+    //
+    // ⚠️ **唔可以跳過呢個結果畫面。** 佢係「系統改咗你嗰幾格」嘅唯一證據，
+    // 跳過就變成「撳一粒掣，寄出彈窗彈咗出嚟」，而佢完全唔知儲存咗乜。
+    // 所以做法係：照樣顯示，只係把主掣由〔知道了〕換成〔繼續去寄出〕。
+    const doneActs = saveThenSend_
+      ? [
+        button('繼續去寄出', () => {
+          closeModal();
+          // 刷新一次先——寄出彈窗要讀新版本號同新嘅寄出紀錄。
+          runAction('重新整理', async () => {
+            await loadDashboard();
+            openSendDialog();
+          });
+        }, ''),
+        button('留在這裡', () => closeModalAndRefresh(), 'secondary')
+      ]
+      : [button('知道了', () => closeModalAndRefresh(), '')];
+    if (saveThenSend_) {
+      nodes.push(make('div', {
+        text: '你剛才勾了「儲存之後直接去寄出」。撳〔繼續去寄出〕就會開寄出畫面。',
+        className: 'ok-line strong'
+      }));
+    }
+    openModal('儲存完成', nodes, doneActs);
   }
 
   /* ============================================================

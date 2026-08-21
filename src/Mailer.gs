@@ -141,7 +141,18 @@ function sendStage(quarterId, versionNo, stage, sendOptions) {
   const flushBatchSize = Number(getConfig(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
   // 收件範圍係上游嘅決定，喺呢度執行一次就算。
-  filterRecipientsByScope_(listRecipients_(stage, context), context.sendDecision)
+  //
+  // ⚠️ 第四十六輪批次 A 組：個**池**由 `resolveSendRecipientPool_()` 出。
+  // 幹事自己勾咗人（`PICK`）⇒ 全池（職事表上全部人 ＋ 身分持有人 ＋
+  // `EmailRecipients`），同階段完全無關；其餘一律行返 `listRecipients_()`，
+  // 即係自動排程／補寄／彩排嗰幾條路一個字都冇變。
+  //
+  // 點解唔可以繼續淨用 `listRecipients_(stage, …)`：篩選係喺一個池入面做嘅。
+  // 池仍然係「REVIEW 只有堂委地址」嘅話，幹事勾一個義工，
+  // 嗰個義工根本唔喺池入面 ⇒ 勾咗都唔會收到，而畫面會話「已選 12 位」。
+  filterRecipientsByScope_(
+    resolveSendRecipientPool_(stage, context, context.sendDecision),
+    context.sendDecision)
     .forEach(function (recipient) {
     // 第九輪批次階段 C：LIST 收件人（堂委／教會辦公室名單）與 PERSON 收件人
     // （逐一義工）用不同範本，見 resolveStageTemplates_() 的說明。

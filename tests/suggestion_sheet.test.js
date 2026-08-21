@@ -39,7 +39,7 @@ const gas = loadGasSource([
   'Trigger.gs', 'WebAppGuards.gs', 'WebAppDashboard.gs',
   'WebAppGenerate.gs', 'GridNameDropdown.gs', 'MailRedirect.gs',
   // indexPeopleById_ 喺 Mailer.gs（buildFineTuneContext_ 會用）。
-  'Mailer.gs',
+  'SendRecipients.gs', 'Mailer.gs',
   'SuggestionSheet.gs'
 ]);
 

@@ -593,7 +593,15 @@ const COLUMNS = {
  */
 const ROLE_CODES = {
   COMMITTEE: 'COMMITTEE',
-  DEACON: 'DEACON'
+  DEACON: 'DEACON',
+  // ⚠️ 第四十六輪批次 A 組新增。Ivan 要求寄出嗰陣可以按
+  // 「IT」同「幹事」揀收件人，而系統本來**冇呢兩個身分**。
+  //
+  // 加代號**唔等於**有人：`Roles` 表要有人填咗先會有人。
+  // 冇人填嗰陣，畫面要明講「現時沒有人有這個身分」同埋去邊度加——
+  // **唔可以靜靜當成幹事本人**（Ivan 明確講過）。
+  IT: 'IT',
+  CLERK: 'CLERK'
 };
 
 /**
@@ -602,7 +610,9 @@ const ROLE_CODES = {
  */
 const ROLE_LABELS_TC = {
   COMMITTEE: '堂委',
-  DEACON: '執事'
+  DEACON: '執事',
+  IT: 'IT',
+  CLERK: '幹事'
 };
 
 const RULE_IDS = {
@@ -894,6 +904,21 @@ const MAIL_STAGES = {
   OFFICIAL: 'OFFICIAL',
   RESEND: 'RESEND',
   REVIEW: 'REVIEW'
+};
+
+/**
+ * 階段代號對應嘅中文顯示名。**只用喺畀人睇嘅字**，唔參與任何比對。
+ *
+ * ⚠️ 第四十六輪批次 B3 組：寄出紀錄要逐行寫住「寄咗邊一種」。
+ * 喺畫面寫死一份對照表就會同呢度分岔，而分岔嘅後果係
+ * 一個階段顯示成一串英文代號。
+ */
+const SEND_STAGE_LABELS_TC = {
+  GENERATE: '生成通知',
+  REMIND: '提醒',
+  OFFICIAL: '正式發出給全體',
+  RESEND: '改動後重發',
+  REVIEW: '寄給堂委審閱'
 };
 
 /**

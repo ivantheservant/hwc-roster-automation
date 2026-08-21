@@ -179,90 +179,12 @@ function describeSendContents_(kind) {
 }
 
 /**
- * 第四十輪批次 A 組：「自己揀」那個名單。**純讀取。**
- *
- * ⚠️ 列的是**這一個階段真正會收到信的人**，不是整張 NameMapping。
- * 列一個不會收到信的人，他勾了之後照樣收不到，而畫面上看不出。
- *
- * ⚠️ 鍵一定要經 `sendRecipientKey_()`：REVIEW 階段只有 LIST 收件人
- *（堂委名單），他們沒有 PersonID。淨用 PersonID 會令 REVIEW 一個都揀不到。
- *
- * @param {string} quarterId 季度 ID
- * @param {string} kind SEND_KIND 之一
- * @returns {Object[]} 每筆 {key, displayName, type, cellCount, hasEmail}
- */
-function listSendCandidates_(quarterId, kind) {
-  const stage = sendKindToStage_(kind);
-  if (!stage) return [];
-
-  const versionNo = findLatestVersionNo(quarterId);
-  if (versionNo < 0) return [];
-
-  let context;
-  try {
-    context = buildMailContext_(quarterId, versionNo, stage);
-  } catch (err) {
-    // ⚠️ 砌不到 context **不可以**回一個空陣列——空陣列在畫面上等於
-    // 「這一季沒有人要收信」，而那是假的。照實拋，由前端顯示原因。
-    throw new Error(buildThreePartMessage_(
-      '讀不到這一次的收件名單（' + err.message + '）。',
-      '一封都沒有寄出。',
-      ['撳一次「重新整理」再試',
-        '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
-  }
-
-  // ⚠️ 第四十三輪批次 E 組：逐個人帶埋佢嘅身分（堂委／執事）。
-  //
-  // Ivan 要求「☐ 全部堂委」「☐ 全部執事」兩個群組勾選。
-  // 身分**一定要由 `Roles` 讀**，唔可以喺畫面寫死一份名單——
-  // 寫死嗰份下一屆就錯，而且冇人會記得去改。
-  //
-  // ⚠️ 用「今日」判斷生效期：一個上一屆嘅堂委唔應該被「全部堂委」勾中。
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
-  const roles = readRolesSafe_(timezone);
-  const rolesByPerson = {};
-  roles.forEach(function (r) {
-    if (!isEffectiveOn_(r.effectiveFrom, r.effectiveTo, today)) return;
-    if (!rolesByPerson[r.personId]) rolesByPerson[r.personId] = [];
-    if (rolesByPerson[r.personId].indexOf(r.roleCode) === -1) {
-      rolesByPerson[r.personId].push(r.roleCode);
-    }
-  });
-
-  // ⚠️ 第四十四輪批次 B 組：**每一行都要講得出「勾唔勾得」同「點解」。**
-  //
-  // Ivan 三次講同一件事：「自己選擇寄給誰」嗰個名單要同「處理紙本」
-  // 一模一樣。查落佢見到嘅同紙本嗰個唔同，成因唔係元件寫錯咗，
-  // 而係**兩個名單本身裝住唔同嘅人**：
-  //
-  //   ・處理紙本　　這一季有服侍嘅人（幾十位，有名、有格數）
-  //   ・寄出 REVIEW　`EmailRecipients` 嗰幾個堂委地址（冇名、冇格數）
-  //
-  // 所以呢一輪做兩件事：一、逐行標明勾唔勾得；
-  // 二、回一句 `listNote` 講明「呢一次個名單入面係邊啲人」——
-  // 唔講嘅話，佢喺 REVIEW 撳開見到三行地址，只會以為個功能未做。
-  return listRecipients_(stage, context).map(function (r) {
-    const assigned = r.personId
-      ? (context.assignmentsByPerson[r.personId] || []).length : 0;
-    return {
-      key: sendRecipientKey_(r),
-      displayName: r.displayName || r.email || r.personId,
-      type: r.type,
-      cellCount: assigned,
-      // 查不到電郵的人照樣列出來，並且講明——他不是「不用服侍」，
-      // 是要印紙本（第 5 步）。
-      hasEmail: !!String(r.email || '').trim(),
-      // ⚠️ 冇電郵嘅**勾唔到**。淨係喺後面加一行字而仲勾得到，
-      // 佢會勾咗，然後以為嗰個人會收到——而系統會靜靜略過。
-      selectable: !!String(r.email || '').trim(),
-      roles: r.personId ? (rolesByPerson[r.personId] || []) : []
-    };
-  });
-}
-
-/**
  * SEND_KIND → MAIL_STAGES。
+ *
+ * ⚠️ 第四十六輪批次 A4 組：呢個**冇拆走，亦都唔可以拆**。
+ * 版本紀錄、`SendLog`、稽核、重發比對全部靠 Stage。
+ * 改咗嘅只係「Stage 唔再決定收件人」——判斷同記錄一個字都冇變。
+ *
  * @param {string} kind SEND_KIND 之一
  * @returns {string} 階段；NONE 回空字串
  */
@@ -273,62 +195,178 @@ function sendKindToStage_(kind) {
   return '';
 }
 
-/**
- * 第四十四輪批次 B 組：「這一次的名單入面是哪些人」，一句人話。
+/* ── 舊嗰個「按階段出名單」已經拆走（第四十六輪批次 A 組）──────────
  *
- * ⚠️ 這一句是必須的。Ivan 三次講「自己選擇那個名單未做」，而查落
- * 程式碼一直都在——他見到的是 REVIEW 階段那個**只有幾行電郵地址**的
- * 名單，同「處理紙本」那個幾十位有名有格數的完全不同，所以他當成
- * 未做。**兩個名單裝住不同的人**，那是階段本身的分別，不是 bug；
- * 但畫面一句都沒有講，他沒有任何方法看得出。
+ * ⚠️ ／／
+ *  三個一齊刪咗。佢哋做嘅係「喺**階段本來嘅**
+ * 收件範圍入面再篩」——而嗰個正正就係第四十一同四十三輪做錯咗嘅方向。
  *
- * @param {string} kind SEND_KIND 之一
- * @param {number} total 名單有幾多行
- * @returns {string} 一句
+ * Ivan 嘅原話：「這是用來寄給職事表上所有人、CC、DB、IT、admin 同自訂
+ * email 的」——即係收件人同階段無關。
+ *
+ * 取而代之：（下面）＋
+ * （）。
+ *
+ * 留住一個冇人用嘅舊 API 就係留住第二份元件，而 A2 明確要求「唔准寫兩份」。
  */
-function describeSendCandidateList_(kind, total) {
-  if (kind === SEND_KIND.REVIEW) {
-    return '這一次是寄給堂委審閱，所以名單上是「收件人名單」那 ' + total
-      + ' 位（堂委的電郵地址），不是義工。義工這一次一封都不會收到。';
-  }
-  if (kind === SEND_KIND.RESEND) {
-    // ⚠️ 這一句本來寫「名單上是這一季安排有改動的那幾位」——**不準確**。
-    //
-    // `listRecipients_()` 的 RESEND 分支收的是「這一版有派工的」**加上**
-    //「曾經收過信的」（`lastHashByPerson`）——後者包括這一次完全沒有改動的人，
-    // 甚至包括這一版一格都沒有的人（他上一版有，所以要通知他被拿走了）。
-    //
-    // 「畫面講一件事、系統做另一件事」正正是這個專案一直在殺的那一類。
-    // 寧可句子長一點，都要同 `listRecipients_()` 真正做的事對得上。
-    return '這一次是改動後重發，所以名單上是這一季有派工的、'
-      + '加上曾經收過信的（就算這一次沒有改動），再加收件人名單（共 '
-      + total + ' 位）。真正會收到信的還要看你上面選的「寄給誰」。';
-  }
-  return '名單上是這一季有服侍的義工，加上收件人名單（共 ' + total + ' 位）。'
-    + '每一位後面寫住他這一季有幾多格。';
-}
+
 
 /**
- * 供前端呼叫：「自己選擇」那個名單。**純讀取。**
+ * 第四十六輪批次 A／B 組：**寄出彈窗嘅收件人池。**
  *
- * ⚠️ 第四十四輪批次 B 組改了回傳形狀：由一個陣列改成
- * `{ items, listNote }`。改形狀是有意的——舊形狀沒有位置放那一句
- * 「這一次的名單入面是哪些人」，而少了那一句，幹事在不同階段撳開
- * 見到長短差很遠的名單，沒有辦法知道是階段的分別還是壞了。
+ * ⚠️ 呢個**取代**咗 `apiGetSendCandidates()`（按階段出名單嗰個）。
+ * 個池同階段完全無關——收件人由幹事自己勾，唔係由階段決定。
+ * 理由全文喺 `src/SendRecipients.gs` 檔頭。
+ *
+ * 回傳三樣嘢：
+ *   `items`   　收件人池，逐個有 `sources`（佢屬於邊幾個來源）
+ *   `groups`  　六個來源，逐個有實際人數（**唔係寫死**）
+ *   `changed` 　「有改動」係相對邊一版、邊幾位、改咗乜
  *
  * @param {string} quarterId 季度 ID
- * @param {string} kind SEND_KIND 之一
- * @returns {{items: Object[], listNote: string}} 名單同一句說明
+ * @returns {Object} 收件人池
  */
-function apiGetSendCandidates(quarterId, kind) {
+function apiGetSendRecipientPool(quarterId) {
   assertWebAppRequestAllowed_();
   beginSheetReadMemo_();
   try {
-    const items = listSendCandidates_(quarterId, kind);
-    return { items: items, listNote: describeSendCandidateList_(kind, items.length) };
+    const versionNo = findLatestVersionNo(quarterId);
+    if (versionNo < 0) {
+      return {
+        ok: false,
+        message: buildThreePartMessage_(
+          '這一季還沒有生成過任何版本，所以沒有收件人可以選。',
+          '一封都沒有寄出。',
+          ['先在第 1 步生成職事表'])
+      };
+    }
+
+    let context;
+    try {
+      context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+    } catch (err) {
+      // ⚠️ 砌不到 context **不可以**回一個空池——空池在畫面上等於
+      // 「這一季一個人都沒有」，而那是假的。
+      throw new Error(buildThreePartMessage_(
+        '讀不到這一季的收件名單（' + err.message + '）。',
+        '一封都沒有寄出。',
+        ['撳一次「重新整理」再試',
+          '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
+    }
+
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const pool = buildSendRecipientPool_(context, timezone);
+
+    // ── 「有改動」相對邊一版 ────────────────────────────────
+    const lastSent = findLastSentSnapshot_(quarterId);
+    const changedByPerson = lastSent
+      ? listChangedPersonsBetweenVersions_(quarterId, lastSent.versionNo, versionNo)
+      : {};
+    pool.forEach(function (item) {
+      const notes = changedByPerson[item.personId];
+      if (notes && notes.length > 0) {
+        item.changeNotes = notes;
+        item.sources = item.sources.concat([SEND_SOURCE.CHANGED]);
+      }
+    });
+
+    // ── 六個來源逐個數人（**唔可以寫死**）────────────────────
+    const groups = SEND_SOURCE_LABELS.map(function (g) {
+      const members = pool.filter(function (item) {
+        return item.sources.indexOf(g.key) !== -1;
+      });
+      return {
+        key: g.key,
+        label: g.label,
+        total: members.length,
+        // 冇電郵嘅勾咗都收唔到，所以「勾呢一組會加幾多位」要數勾得到嗰批。
+        selectable: members.filter(function (m) { return m.selectable; }).length
+      };
+    });
+
+    return {
+      ok: true,
+      versionNo: versionNo,
+      items: pool,
+      groups: groups,
+      changed: {
+        // ⚠️ **一定要講明相對邊一版。** 只講「有 4 位改過」，
+        // 幹事無從判斷係相對佢啱啱儲存嗰版定係上一次寄嗰版。
+        hasBaseline: !!lastSent,
+        baselineVersionNo: lastSent ? lastSent.versionNo : null,
+        baselineStage: lastSent ? lastSent.stage : '',
+        baselineStageLabel: lastSent ? (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) : '',
+        baselineSentAt: lastSent ? lastSent.sentAt : '',
+        changedCount: Object.keys(changedByPerson).length,
+        sentence: lastSent
+          ? ('同 第 ' + lastSent.versionNo + ' 版（' + lastSent.sentAt + ' '
+            + (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) + '）比較，有 '
+            + Object.keys(changedByPerson).length + ' 位的安排改過。')
+          : '這一季從來沒有寄出過，所以沒有東西可以比較——'
+            + '「只寄給安排有改動的人」現在選不到。'
+      }
+    };
+  } catch (err) {
+    return { ok: false, message: err.message };
   } finally {
     endSheetReadMemo_();
   }
+}
+
+/**
+ * 第四十六輪批次 B3 組：**這一季寄過幾次、寄咗邊一版、幾多位。**
+ *
+ * ⚠️ 最後一行係重點：**現時嗰版從來未寄過就要明講。**
+ * 幹事最容易犯嘅錯就係「以為寄咗」——佢改完、儲存咗、然後去做第二件事，
+ * 而嗰一版由頭到尾冇寄過。一個「已經寄過 3 次」嘅紀錄唔會提醒到佢，
+ * 一句「第 9 及第 10 版未寄過給任何人」會。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {Object} {batches, currentVersionNo, unsentVersions, warnSentence}
+ */
+function buildSendHistoryView_(quarterId) {
+  const batches = listSendHistory_(quarterId);
+  const currentVersionNo = findLatestVersionNo(quarterId);
+
+  const sentVersions = {};
+  batches.forEach(function (b) {
+    if (b.versionNo !== null && b.sent > 0) sentVersions[b.versionNo] = true;
+  });
+
+  // 邊幾版由頭到尾冇寄過。只數**已經存在嘅版本**，唔會數到將來。
+  const unsent = [];
+  for (let v = 0; v <= currentVersionNo; v++) {
+    if (!sentVersions[v]) unsent.push(v);
+  }
+
+  let warnSentence = '';
+  if (currentVersionNo < 0) {
+    warnSentence = '';
+  } else if (!sentVersions[currentVersionNo]) {
+    const tail = unsent.filter(function (v) { return v > 0; });
+    warnSentence = tail.length > 1
+      ? ('⚠️ 目前是第 ' + currentVersionNo + ' 版，第 '
+        + tail.join(' 及第 ') + ' 版未寄過給任何人。')
+      : ('⚠️ 目前是第 ' + currentVersionNo + ' 版，這一版未寄過給任何人。');
+  }
+
+  return {
+    batches: batches.map(function (b) {
+      return {
+        stage: b.stage,
+        stageLabel: SEND_STAGE_LABELS_TC[b.stage] || b.stage,
+        versionNo: b.versionNo,
+        sentAt: b.sentAt,
+        total: b.total,
+        sent: b.sent,
+        noEmail: b.noEmail,
+        failed: b.failed
+      };
+    }),
+    currentVersionNo: currentVersionNo,
+    unsentVersions: unsent,
+    warnSentence: warnSentence
+  };
 }
 
 /**
@@ -388,10 +426,20 @@ function apiGetSendPlanSummary(quarterId) {
         attachType: defaultDecision.attachType,
         includeIcs: defaultDecision.includeIcs
       } : null,
+      // ⚠️ 第四十六輪批次 A3 組：`kindSentence` **唔再喺彈窗頂顯示**。
+      //
+      // 嗰句係「這一次是寄給堂委審閱（這一季還未正式發出過）」——
+      // 一句由**階段**推斷出嚟嘅描述。而由呢一輪開始收件人係由幹事勾嘅，
+      // 所以嗰句同佢實際做緊嘅事對唔上。Ivan 明確講咗嗰句係錯嘅。
+      //
+      // 欄位保留係因為 `AuditLog` 同開發者診斷仲用得着，
+      // 但畫面改為顯示一句由**實際勾咗乜**算出嚟嘅收件摘要。
       kindSentence: buildSendKindSentence_(kind, {
         changedPersonCount: (buttons.resend && buttons.resend.changedPersonCount) || 0
       }),
       recipientSentence: buildSendRecipientSentence_(kind, buttons),
+      // 第四十六輪批次 B3 組：這一季寄過幾次、哪一版未寄過。
+      sendHistory: buildSendHistoryView_(quarterId),
       contents: contents,
       alsoReview: alsoReview,
       blockedReasons: blockedReasons,

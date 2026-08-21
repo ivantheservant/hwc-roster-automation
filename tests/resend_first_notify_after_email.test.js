@@ -69,7 +69,7 @@ const gas = loadGasSource([
   'HardViolationClass.gs', 'Generator.gs', 'FineTune.gs', 'StateSource.gs', 'Debug.gs', 'Tune.gs',
   'Verify.gs', 'SoftRuleMetrics.gs', 'EmailRecipientsSeed.gs', 'TemplatePreview.gs', 'RequestsSheet.gs',
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
-  'Mailer.gs', 'ResendFlow.gs',
+  'SendRecipients.gs', 'Mailer.gs', 'ResendFlow.gs',
   // 第四十輪批次 A 組：寄出嘅三個選項喺呢度解析（resolveSendOptions_()）。
   // 唔載入就會 `resolveSendOptions_ is not defined`——而嗰個錯**唔係**測試想證嘅嘢。
   'SendOptions.gs',

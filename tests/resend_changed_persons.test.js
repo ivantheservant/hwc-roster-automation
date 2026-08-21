@@ -14,7 +14,7 @@ const path = require('path');
 // 所以一定要連 Mailer.gs 一齊載入——**唔可以喺測試自己砌一個假 hash 函式**，
 // 噉樣就變成測緊一份副本而唔係真正會跑嗰段。
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Mailer.gs', 'ResendFlow.gs'
+  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'SendRecipients.gs', 'Mailer.gs', 'ResendFlow.gs'
 ]);
 
 // `computeAssignmentHash_()` 用 Utilities.computeDigest；測試沙箱嘅 stub

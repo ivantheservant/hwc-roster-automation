@@ -250,7 +250,7 @@ console.log('\n=== C【核心】綁掣：`lint-handler-args.js` 真係捉得到�
     mutated && mutated.passed === false, JSON.stringify(mutated));
   check('★★★★★ 而且講得出係邊個函式、宣告咗幾多個參數',
     mutated && mutated.out.indexOf('openBuildSuggestion') !== -1
-    && mutated.out.indexOf('宣告咗 1 個參數') !== -1, mutated && mutated.out);
+    && /宣告咗 [12] 個參數/.test(mutated.out), mutated && mutated.out);
   check('★★★★★ 亦都講埋點改',
     mutated && mutated.out.indexOf('() => openBuildSuggestion()') !== -1,
     mutated && mutated.out);
@@ -261,13 +261,14 @@ console.log('\n=== C【核心】綁掣：`lint-handler-args.js` 真係捉得到�
 // =====================================================================
 console.log('\n=== C 保底：`openBuildSuggestion()` 自己都唔會轉發一個事件 ===');
 {
-  const fn = grabFn(suggestion, '  function openBuildSuggestion(startFrom) {');
+  // ⚠️ 第四十六輪批次 C3 組加咗第 2 個參數 `allowKeys`。
+  const fn = grabFn(suggestion, '  function openBuildSuggestion(startFrom, allowKeys) {');
   check('★★★★★ 收到唔係字串嘅嘢一律當成冇揀'
     + '——三層都要有：lint 喺 commit 前擋、'
     + '`sanitizeServerArgs_()` 喺送出前擋、呢一句喺源頭擋',
     /const from = \(typeof startFrom === 'string'\) \? startFrom : '';/.test(fn), fn);
   check('★★★★★ 而且送出嗰行用嘅係清完嗰個 `from`，唔係 `startFrom || \'\'`',
-    /'apiBuildSuggestion', currentQuarterId, from\);/.test(fn)
+    /'apiBuildSuggestion', currentQuarterId, from,/.test(fn)
     && fn.indexOf("startFrom || ''") === -1, fn);
 }
 

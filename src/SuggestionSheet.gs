@@ -53,6 +53,18 @@ const SUGGESTION_COLOR_SYSTEM = '#d7e9ff';
 const SUGGESTION_COLOR_BOTH = '#e2d3f5';
 
 /**
+ * 第四十六輪批次 C4 組：**幹事改過、違反規則、而系統冇動**那些格。
+ *
+ * ⚠️ 這一種一定要同「幹事改過、沒有問題」那隻黃色分開。
+ * 用同一隻黃色的話，他在表上完全分不出哪幾格有問題——
+ * 而那幾格正正就是他要親自決定的。
+ *
+ * 用橙紅色（不是純紅）：純紅在這個專案是「硬規則違反、系統不會排」，
+ * 而這裡是「你改的，系統尊重你，但你要知道」——兩件事。
+ */
+const SUGGESTION_COLOR_MANUAL_VIOLATION = '#ffd0b5';
+
+/**
  * 建議表的名稱。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -254,7 +266,7 @@ function readGridTextFromSheet_(sheetName, timezone) {
  * @param {Object} start `resolveSuggestionStartPoint_()` 的結果
  * @returns {Object} {versionNo, rows, manualKeys, systemKeys, notes, ...}
  */
-function buildSuggestionState_(quarterId, start) {
+function buildSuggestionState_(quarterId, start, allowedKeys) {
   const versionNo = start.versionNo;
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
@@ -301,13 +313,28 @@ function buildSuggestionState_(quarterId, start) {
   // ⚠️ 用返 `proposeMinimalFix()`——**不在這裡重寫一套修復邏輯**。
   // 它已經有「循序處理、每產生一項建議就視為已生效」那一套，
   // 重寫一定會分岔。
-  const fix = proposeMinimalFixFromState_(context, analysis);
+  // ⚠️ 第四十六輪批次 C 組：把「邊幾格係幹事親手改嘅」同
+  // 「邊幾格佢准咗系統動」一齊傳落去。冇傳嘅話，系統會照舊改走佢改嘅嘢。
+  const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys);
 
   const systemKeys = {};
   const notes = {};
   const stateByKey = {};
   analysis.manualState.forEach(function (s) {
     stateByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)] = s;
+  });
+
+  // ⚠️ 第四十六輪批次 C4 組：**第三種顏色。**
+  //
+  // 幹事改過、違反規則、而系統冇動嗰幾格要有自己嘅顏色同備註。
+  // 用返「幹事改過」嗰隻黃色嘅話，佢喺表上完全分唔出邊幾格有問題——
+  // 而嗰幾格正正就係佢要親自決定嘅。
+  const blockedKeys = {};
+  (fix.untouchedManual || []).forEach(function (u) {
+    blockedKeys[u.key] = true;
+    notes[u.key] = '你改的這一格違反了規則（' + u.reason + '）。'
+      + '系統沒有動它——你改的東西系統不會自己改走。'
+      + '如果要系統一併調整，回介面在那張清單勾選這一格，再撳一次「請系統幫我調整」。';
   });
 
   fix.proposals.forEach(function (p) {
@@ -355,6 +382,9 @@ function buildSuggestionState_(quarterId, start) {
     state: analysis.manualState,
     manualKeys: manualKeys,
     systemKeys: systemKeys,
+    // 第四十六輪批次 C4 組：幹事改過、違反規則、系統冇動嗰幾格（第三種顏色）。
+    blockedKeys: blockedKeys,
+    untouchedManual: fix.untouchedManual || [],
     notes: notes,
     unfixable: fix.unfixable,
     unfillable: fix.unfillable || [],
@@ -377,9 +407,25 @@ function buildSuggestionState_(quarterId, start) {
  * @param {Object} analysis `analyseManualState_(context)` 的結果
  * @returns {Object} {proposals, unfixable}
  */
-function proposeMinimalFixFromState_(context, analysis) {
+function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys) {
   const proposals = [];
   const unfixable = [];
+  // ⚠️ 第四十六輪批次 C 組：**幹事親手改過嘅格，一律唔動。**
+  //
+  // Ivan 嘅原話：「如果 admin 輸入了違反規則的東西，〔請系統幫我調整〕
+  // 不應該改動 admin 修改過的東西；如果違反規則或者有什麼奇怪，
+  // 要提示 admin，並問他需不需要系統也一併調整。」
+  //
+  // 呢個係一條**原則**，唔係一個選項：
+  //
+  //   > 系統改壞幹事親手做嘅決定，比排錯更差。
+  //
+  // 佢改一格，係因為佢知道一啲系統唔知道嘅事（某人嗰日要返工、
+  // 某人主動要求、牧養上嘅考慮）。系統見到佢違反規則就自己改走，
+  // 等於推翻一個佢唔明白嘅決定。
+  const manual = manualKeys || {};
+  const allowed = allowedKeys || {};
+  const untouchedManual = [];
   const handled = {};
   let workingState = analysis.manualState.map(function (s) {
     return Object.assign({}, s);
@@ -394,6 +440,26 @@ function proposeMinimalFixFromState_(context, analysis) {
 
     const key = cellKey_(violation.serviceDate, violation.postId, violation.slotIndex);
     handled[key] = true;
+
+    // ⚠️ 幹事親手改過而佢又冇明確准許 ⇒ **唔改，改為提示**。
+    // 唔可以靜靜略過——靜靜略過等於「系統睇唔到嗰個問題」，
+    // 而佢正正需要知道嗰一格有問題。
+    if (manual[key] && !allowed[key]) {
+      const post = findPostById_(context.posts, violation.postId);
+      untouchedManual.push({
+        key: key,
+        serviceDate: violation.serviceDate,
+        postId: violation.postId,
+        postNameTC: post ? post.postNameTC : violation.postId,
+        slotIndex: violation.slotIndex,
+        personId: violation.personId,
+        personName: nameOfPersonId_(context, violation.personId),
+        ruleId: violation.ruleId,
+        severity: violation.severity,
+        reason: violation.reason || violation.ruleId
+      });
+      continue;
+    }
 
     const replacement = findReplacementPerson_(violation, workingState, context);
     const post = findPostById_(context.posts, violation.postId);
@@ -453,6 +519,8 @@ function proposeMinimalFixFromState_(context, analysis) {
   return {
     proposals: proposals.concat(gap.proposals),
     unfixable: unfixable,
+    // 第四十六輪批次 C3 組：幹事改過、違反規則、而系統**冇動**嗰幾格。
+    untouchedManual: untouchedManual,
     unfillable: gap.unfillable,
     gapCapped: gap.capped,
     gapCount: gap.gapCount
@@ -482,14 +550,24 @@ function proposeMinimalFixFromState_(context, analysis) {
  *
  * 理由的全文在 `src/MutationLock.gs` 檔頭。
  */
-function apiBuildSuggestion(quarterId, startFrom) {
+function apiBuildSuggestion(quarterId, startFrom, allowKeys) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('請系統幫我調整', function () {
-    return apiBuildSuggestion_locked_(quarterId, startFrom);
+    return apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys);
   });
 }
 
-function apiBuildSuggestion_locked_(quarterId, startFrom) {
+function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
+  // ⚠️ 第四十六輪批次 C3 組：`allowKeys` ＝ 幹事**明確勾咗**
+  // 准系統調整嗰幾格。冇傳 ⇒ 一格都唔准動（**預設尊重佢嘅決定**）。
+  //
+  // 呢個預設值係整組嘅重點。預設「全部准」就等於行返舊行為，
+  // 而多咗嗰個清單只會變成一個佢唔會細睇嘅畫面。
+  const allowedKeys = {};
+  (Array.isArray(allowKeys) ? allowKeys : []).forEach(function (k) {
+    const key = String(k || '').trim();
+    if (key) allowedKeys[key] = true;
+  });
 
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) {
@@ -517,7 +595,7 @@ function apiBuildSuggestion_locked_(quarterId, startFrom) {
   }
 
   const built = suggestionStep_('讀取那一張表並且計算建議', function () {
-    return buildSuggestionState_(quarterId, start);
+    return buildSuggestionState_(quarterId, start, allowedKeys);
   });
   if (built.blocked) {
     return {
@@ -616,6 +694,22 @@ function apiBuildSuggestion_locked_(quarterId, startFrom) {
     // 但它們**不等於表上有幾多格黃、幾多格藍**：同一格兩邊都算一次。
     // 畫面只可以讀 `colourCounts`，否則又是兩個真相來源。
     colourCounts: written.colourCounts,
+    // ⚠️ 第四十六輪批次 C3 組：**幹事改過、違反規則、而系統沒有動**
+    // 那幾格要逐格列出來，讓他自己決定要不要讓系統調整。
+    //
+    // 預設**全部不勾**——一個預設勾好的清單，等於系統仍然在替他決定，
+    // 只是多了一個他不會細看的畫面。
+    untouchedManual: (built.untouchedManual || []).map(function (u) {
+      return {
+        key: u.key,
+        serviceDate: u.serviceDate,
+        postNameTC: u.postNameTC,
+        slotIndex: u.slotIndex,
+        personName: u.personName,
+        ruleId: u.ruleId,
+        reason: u.reason
+      };
+    }),
     // ⚠️ 系統改完之後仍然違反規則的格**一定要講出來**。
     // 不講的話，幹事會以為「系統調整過 ＝ 一定沒問題」，
     // 然後直接接受——而那幾格其實仍然是壞的。
@@ -702,8 +796,13 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
     //（上一次是第四十二輪那句「系統會用你改完那一版做起點」）。
     // 修法不是改上色次序（那樣只會反過來蓋走藍色），是**開多一種顏色**，
     // 令每一個數字都對得住表上一種真正存在的東西。
+    // ⚠️ 第四十六輪批次 C4 組：第四種顏色。
+    // 「你改的、違反規則、系統沒有動」一定要同「你改的、沒有問題」分開
+    // ——同一隻黃色的話，他在表上完全分不出哪幾格有問題，
+    // 而那幾格正正就是他要親自決定的。
     ['黃色格 ＝ 你自己改過的', '藍色格 ＝ 系統建議改的',
-      '紫色格 ＝ 你改過，而系統又再改了一次'],
+      '紫色格 ＝ 你改過，而系統又再改了一次',
+      '橙色格 ＝ 你改過、違反了規則，而系統沒有動它'],
     ['系統改過的格，把滑鼠停在上面會見到它為甚麼改。'],
     // ⚠️ 第四十二輪批次 A 組：這一句以前是**假的**——系統當時只會用
     // 第一次那個快照。現在真的做得到（見 `resolveSuggestionStartPoint_()`），
@@ -721,6 +820,8 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   sheet.getRange(2, 1).setBackground(SUGGESTION_COLOR_MANUAL);
   sheet.getRange(2, 2).setBackground(SUGGESTION_COLOR_SYSTEM);
   sheet.getRange(2, 3).setBackground(SUGGESTION_COLOR_BOTH);
+  // 第四十六輪批次 C4 組：第四格 ＝ 你改的、違反規則、系統沒有動。
+  sheet.getRange(2, 4).setBackground(SUGGESTION_COLOR_MANUAL_VIOLATION);
   sheet.getRange(1, 1, legend.length, 1).setFontWeight('bold');
 
   const headerRow = legend.length + 1;
@@ -740,7 +841,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   // 對話框那三個數字一定要由「實際上了色的格」數出來，
   // 不可以由 `manualKeys`／`systemKeys` 各自 `Object.keys().length` 算——
   // 那樣就是兩個真相來源，而現場那個 bug 正正是兩邊對不上。
-  const colourCounts = { manual: 0, system: 0, both: 0 };
+  const colourCounts = { manual: 0, system: 0, both: 0, manualViolation: 0 };
   layout.rows.forEach(function (row, r) {
     const dateStr = String(row[0]);
     for (let c = 3; c < layout.keys.length; c++) {
@@ -757,7 +858,15 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
       // 而幹事第一件事就是去表上找那 N 格。
       const isManual = built.manualKeys[cellKey] === true;
       const isSystem = built.systemKeys[cellKey] === true;
-      if (isManual && isSystem) {
+      const isBlocked = (built.blockedKeys || {})[cellKey] === true;
+      // ⚠️ 「幹事改過、違反規則、系統冇動」要**排喺最前判斷**。
+      // 佢一定同時係 `isManual`，所以放後面就會永遠被黃色蓋走，
+      // 而對話框報嘅「橙色 N 格」喺表上一格都搵唔到——
+      // 呢個正正就係第四十三輪 C1 嗰個 bug 嘅形狀。
+      if (isBlocked) {
+        cell.setBackground(SUGGESTION_COLOR_MANUAL_VIOLATION);
+        colourCounts.manualViolation++;
+      } else if (isManual && isSystem) {
         cell.setBackground(SUGGESTION_COLOR_BOTH);
         colourCounts.both++;
       } else if (isSystem) {

@@ -53,7 +53,7 @@ const gas = loadGasSource([
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Trigger.gs', 'WebAppGuards.gs', 'WebAppDashboard.gs',
   'WebAppGenerate.gs', 'GridNameDropdown.gs', 'MailRedirect.gs',
-  'Mailer.gs', 'SuggestionSheet.gs'
+  'SendRecipients.gs', 'Mailer.gs', 'SuggestionSheet.gs'
 ]);
 
 let fail = 0;
@@ -406,11 +406,36 @@ console.log('\n=== B【核心】造一個肯定違反嘅改動 ⇒ 藍色格一�
 
   const r = gas.apiBuildSuggestion(Q, 'GRID');
   check('★★★★ 產生到建議表', r.ok === true, JSON.stringify(r).slice(0, 300));
-  check('★★★★★★ **藍色格 ≥ 1**'
-    + '——Ivan 現場見到 0 格，要分得出「真係冇違反」定係「偵測唔到」。'
-    + '呢個 case 係肯定違反，所以 0 就一定係 bug',
-    r.systemCount >= 1, 'systemCount=' + r.systemCount
+  // ⚠️ 第四十六輪批次 C 組：呢一條**改咗形狀**。
+  //
+  // 呢個 case 造嘅係「**幹事親手改**咗一格，而嗰一格違反規則」。
+  // 由第四十六輪開始，系統對呢一種**唔會自己改走**——
+  // 佢改一格係因為佢知道一啲系統唔知道嘅事。
+  //
+  // 但守嘅嘢一個字都冇變：**系統一定要偵測到，而且一定要話畀佢知。**
+  // Ivan 現場嗰個問題係「0 格，分唔出係冇違反定係偵測唔到」，
+  // 而家答案係一個橙色格 ＋ 一行清單 ＋ 一個要佢答嘅問題。
+  check('★★★★★★ **系統偵測到，而且逐格列咗出嚟**'
+    + '——Ivan 現場見到 0 格，要分得出「真係冇違反」定係「偵測唔到」',
+    (r.untouchedManual || []).length >= 1,
+    'untouchedManual=' + JSON.stringify(r.untouchedManual)
       + ' remaining=' + JSON.stringify(r.remaining));
+  check('★★★★★★ 而且**冇動幹事改嗰一格**'
+    + '——呢個係第四十六輪 C 組嗰條原則：'
+    + '系統改壞幹事親手做嘅決定，比排錯更差',
+    r.systemCount === 0, 'systemCount=' + r.systemCount);
+  check('★★★★★ 表上真係有橙色格（唔係得個講字）',
+    (r.colourCounts || {}).manualViolation >= 1,
+    JSON.stringify(r.colourCounts));
+
+  // ⚠️ 反證：勾咗之後系統一定要真係動。冇呢一段嘅話，
+  // 上面全部斷言用一句「系統乜都唔做」都會綠。
+  const allowKey = (r.untouchedManual || [])[0] && (r.untouchedManual || [])[0].key;
+  const rAllowed = gas.apiBuildSuggestion(Q, 'GRID', [allowKey]);
+  check('★★★★★★ **勾咗之後藍色格 ≥ 1**'
+    + '——唔動嘅話，個勾選框就係一個冇作用嘅裝飾',
+    rAllowed.systemCount >= 1,
+    'systemCount=' + rAllowed.systemCount);
 }
 
 console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
@@ -429,9 +454,20 @@ console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
   // ⚠️ 第四十三輪批次 C1：`mock_sheets_realistic.js` 而家**真係記低格註同底色**。
   // 之前兩樣都係 no-op，所以「對話框報咗，但表上冇」呢一類 bug
   // 一條測試都捉唔到——現場撞到嗰個黃色格就係噉走甩嘅。
-  const built = gas.buildSuggestionState_(Q,
-    gas.resolveSuggestionStartPoint_(Q, gas.findLatestVersionNo(Q), 'GRID'));
+  // ⚠️ 第四十六輪批次 C 組：呢個 case 嘅違反格係**幹事親手改**嘅，
+  // 所以要明確准咗系統動，先至會有「系統改了這一格」嗰種備註。
+  // 唔准嘅話，備註係「你改的這一格違反了規則⋯⋯系統沒有動它」——
+  // 兩句都要有測試守住，而下面守嘅係「系統真係動嗰陣講唔講得出原因」。
+  const startForNotes = gas.resolveSuggestionStartPoint_(
+    Q, gas.findLatestVersionNo(Q), 'GRID');
+  const blockedFirst = gas.buildSuggestionState_(Q, startForNotes);
+  const allowAll = Object.keys(blockedFirst.blockedKeys || {});
+  const allowMap = {};
+  allowAll.forEach(function (k) { allowMap[k] = true; });
+  const built = gas.buildSuggestionState_(Q, startForNotes, allowMap);
   const noteTexts = Object.keys(built.notes).map(function (k) { return built.notes[k]; });
+  check('★★★★★ （前置）呢個 case 真係有幹事改過而違反嘅格',
+    allowAll.length >= 1, JSON.stringify(allowAll));
   // （下面兩條斷言要用到 `noteTexts`，所以要喺呢一行之後。）
   check('★★★★★ 系統改過嘅格有備註，而且講得出原因',
     noteTexts.some(function (t) { return t.indexOf('系統改了這一格。原因：') !== -1; }),
@@ -477,9 +513,11 @@ console.log('\n=== A：介面上每一句「系統會…」都要有測試證明
     /系統會重新讀這一張表做起點再算一次/.test(src), '');
   check('★★★★★ 而且講埋「改正式表就用正式表、兩張都改就會問你」',
     /兩張都改過的話，它會問你要用哪一張/.test(src), '');
+  // ⚠️ 第四十六輪批次 C3 組多咗第 3 個參數 `allowedKeys`
+  //（幹事明確准咗系統動嗰幾格）。守嘅嘢冇變：**唔可以自己猜起點**。
   check('★★★★★ `buildSuggestionState_()` 唔可以再自己靠「建議表在不在」猜起點',
     !/const hasSuggestion = /.test(bare)
-      && /function buildSuggestionState_\(quarterId, start\)/.test(bare), '');
+      && /function buildSuggestionState_\(quarterId, start, allowedKeys\)/.test(bare), '');
   check('★★★★★ 起點每次都由 `resolveSuggestionStartPoint_()` 重新算',
     // ⚠️ 第四十四輪批次 A 組：呢一句而家包咗一層 `suggestionStep_()`
     //（出錯嗰陣要講得出係邊一步）。斷言要守嘅係「每次都重新算」，

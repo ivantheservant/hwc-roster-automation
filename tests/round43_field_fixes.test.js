@@ -40,7 +40,7 @@ const gas = loadGasSource([
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Trigger.gs', 'WebAppGuards.gs', 'WebAppDashboard.gs', 'WebAppRollback.gs',
   'WebAppGenerate.gs', 'GridNameDropdown.gs', 'MailRedirect.gs',
-  'Mailer.gs', 'SendOptions.gs', 'SuggestionSheet.gs'
+  'SendRecipients.gs', 'Mailer.gs', 'SendOptions.gs', 'SuggestionSheet.gs'
 ]);
 
 let fail = 0;
@@ -233,8 +233,18 @@ const GRID = gas.buildRosterSheetName_(Q, V0);
 // =====================================================================
 console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都要有對應嘅嘢 ===');
 {
-  // 造一格「既俾幹事改過、又會俾系統再改」：把第 4 週嘅主席改成
-  // 第 3 週嗰一位 ⇒ 連續兩週 ⇒ 系統一定會動返嗰一格。
+  // ⚠️ 第四十六輪批次 C 組：**呢一節嘅預期行為反轉咗。**
+  //
+  // 本來造嘅係「一格既俾幹事改過、又俾系統再改一次」（紫色）。
+  // 而由第四十六輪開始，Ivan 定咗一條原則：
+  //
+  //   > 系統改壞幹事親手做嘅決定，比排錯更差。
+  //
+  // 所以同一個 case 而家嘅正確結果係：**系統唔會動嗰一格**，
+  // 改為上第四種色（橙）＋ 一個講清楚嘅備註 ＋ 喺對話框問返佢。
+  //
+  // 「紫色」呢一種**仍然存在**，但佢而家只會喺幹事**明確勾咗准動**
+  // 之後先出現——下面第二段就係造嗰一種。
   const prev = readGrid(GRID, DATES[2], 'CHAIR#1');
   check('（前置）上一週有人', prev !== '' && prev.indexOf('待填') === -1, prev);
   check('（前置）改成連續兩週同一人', setGrid(GRID, DATES[3], 'CHAIR#1', prev));
@@ -242,36 +252,57 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
   const r = gas.apiBuildSuggestion(Q, 'GRID');
   check('★★★★ 產生到建議表', r.ok === true, JSON.stringify(r).slice(0, 300));
 
+  const norm = function (x) { return String(x || '').toLowerCase(); };
+  const countColours = function (sheetName) {
+    const sh2 = ss.getSheetByName(sheetName);
+    const kr2 = keyRowOf(sh2);
+    const seen2 = { manual: 0, system: 0, both: 0, manualViolation: 0 };
+    for (let row = kr2 + 1; row <= sh2.getLastRow(); row++) {
+      for (let c = 1; c <= sh2.getLastColumn(); c++) {
+        const bg = norm(sh2.getRange(row, c).getBackground());
+        if (bg === norm(gas.SUGGESTION_COLOR_MANUAL_VIOLATION)) seen2.manualViolation++;
+        else if (bg === norm(gas.SUGGESTION_COLOR_MANUAL)) seen2.manual++;
+        else if (bg === norm(gas.SUGGESTION_COLOR_SYSTEM)) seen2.system++;
+        else if (bg === norm(gas.SUGGESTION_COLOR_BOTH)) seen2.both++;
+      }
+    }
+    return seen2;
+  };
   const sh = ss.getSheetByName(r.sheetName);
   const kr = keyRowOf(sh);
-  const seen = { manual: 0, system: 0, both: 0 };
-  const norm = function (x) { return String(x || '').toLowerCase(); };
-  for (let row = kr + 1; row <= sh.getLastRow(); row++) {
-    for (let c = 1; c <= sh.getLastColumn(); c++) {
-      const bg = norm(sh.getRange(row, c).getBackground());
-      if (bg === norm(gas.SUGGESTION_COLOR_MANUAL)) seen.manual++;
-      else if (bg === norm(gas.SUGGESTION_COLOR_SYSTEM)) seen.system++;
-      else if (bg === norm(gas.SUGGESTION_COLOR_BOTH)) seen.both++;
-    }
-  }
+  const seen = countColours(r.sheetName);
 
-  checkEqual('★★★★★★ **對話框報嘅三個數字，同張表上實際上咗色嘅格數一模一樣**'
+  checkEqual('★★★★★★ **對話框報嘅每一個數字，同張表上實際上咗色嘅格數一模一樣**'
     + '——現場就係報「黃色 1 格」而張表上一格黃色都冇',
     r.colourCounts, seen);
-  check('★★★★★ 而且呢個 case 真係造到「兩邊都有」嗰一種'
-    + '（造唔到嘅話，上面嗰條斷言就係一個假綠燈：兩邊都係 0 都會相等）',
-    seen.both >= 1, JSON.stringify(seen));
-  check('★★★★★ 三種顏色各有各嘅色碼，冇兩種撞埋',
+  check('★★★★★★ **系統冇動幹事改嗰一格**，改為上橙色'
+    + '——呢個係第四十六輪 C 組嗰條原則：'
+    + '系統改壞幹事親手做嘅決定，比排錯更差',
+    seen.manualViolation >= 1, JSON.stringify(seen));
+  check('★★★★★★ 而且嗰一格**完全冇被改走**（`systemKeys` 唔會包住佢）'
+    + '——上色啱咗而個值被改咗，等於顏色講大話',
+    readGrid(r.sheetName, DATES[3], 'CHAIR#1') === prev,
+    readGrid(r.sheetName, DATES[3], 'CHAIR#1') + ' / ' + prev);
+  check('★★★★★ 對話框逐格列出嚟俾佢自己決定',
+    (r.untouchedManual || []).length >= 1, JSON.stringify(r.untouchedManual));
+  check('★★★★★ 而且講得出邊一格、邊個、點解',
+    (r.untouchedManual || []).some(function (u) {
+      return u.serviceDate === DATES[3] && u.postNameTC === '主席'
+        && u.personName === prev && u.reason.indexOf('上一週同崗位已是此人') !== -1;
+    }), JSON.stringify(r.untouchedManual));
+  check('★★★★★ 四種顏色各有各嘅色碼，冇兩種撞埋',
     gas.SUGGESTION_COLOR_MANUAL !== gas.SUGGESTION_COLOR_SYSTEM
       && gas.SUGGESTION_COLOR_SYSTEM !== gas.SUGGESTION_COLOR_BOTH
-      && gas.SUGGESTION_COLOR_MANUAL !== gas.SUGGESTION_COLOR_BOTH, '');
-  check('★★★★★ 圖例有印埋第三種顏色（唔印就要人自己估）',
-    sh.getRange(2, 3).getValue().indexOf('紫色格') !== -1,
-    String(sh.getRange(2, 3).getValue()));
+      && gas.SUGGESTION_COLOR_MANUAL !== gas.SUGGESTION_COLOR_BOTH
+      && gas.SUGGESTION_COLOR_MANUAL_VIOLATION !== gas.SUGGESTION_COLOR_MANUAL
+      && gas.SUGGESTION_COLOR_MANUAL_VIOLATION !== gas.SUGGESTION_COLOR_SYSTEM
+      && gas.SUGGESTION_COLOR_MANUAL_VIOLATION !== gas.SUGGESTION_COLOR_BOTH, '');
+  check('★★★★★ 圖例有印埋第三同第四種顏色（唔印就要人自己估）',
+    sh.getRange(2, 3).getValue().indexOf('紫色格') !== -1
+      && sh.getRange(2, 4).getValue().indexOf('橙色格') !== -1,
+    String(sh.getRange(2, 3).getValue()) + ' | ' + String(sh.getRange(2, 4).getValue()));
 
-  // ⚠️ 第四十四輪批次 H1 第 4 項：Ivan 要求嘅唔止「藍色格有色」，
-  // 而係「**有備註講明為什麼改**」。上色同備註係兩件事：
-  // 有色而冇備註，幹事見到一格藍色但唔知系統改咗乜、點解改。
+  // ── 格註：橙色格要講清楚「系統冇動佢」同埋點樣叫佢動 ──────────
   const notes = [];
   for (let row = kr + 1; row <= sh.getLastRow(); row++) {
     for (let c = 1; c <= sh.getLastColumn(); c++) {
@@ -279,23 +310,54 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
       if (n) notes.push(n);
     }
   }
-  check('★★★★★ **系統改過嘅格真係有格註**'
-    + '——一格藍色而冇備註，幹事唔知系統改咗乜、點解改',
+  check('★★★★★ **橙色格真係有格註**'
+    + '——一格橙色而冇備註，幹事唔知點解佢係橙色',
     notes.length >= 1, 'notes=' + notes.length);
-  // ⚠️ 呢一條係第四十四輪批次修出嚟嘅。修之前格註係：
+  const blockNote = notes.filter(function (n) {
+    return n.indexOf('你改的這一格違反了規則') !== -1;
+  })[0];
+  check('★★★★★★ 格註明講**系統冇動佢**'
+    + '——唔講嘅話，佢會以為系統已經修好咗',
+    !!blockNote && blockNote.indexOf('系統沒有動它') !== -1, String(blockNote));
+  check('★★★★★ 而且講得出真正嘅原因（呢個 case 係連續兩週同一人）',
+    !!blockNote && blockNote.indexOf('上一週同崗位已是此人') !== -1, String(blockNote));
+  check('★★★★★ 亦都講埋「想系統一併調整可以點做」'
+    + '——一句「系統冇動」而唔講點樣叫佢動，等於得一半',
+    !!blockNote && blockNote.indexOf('勾選這一格') !== -1, String(blockNote));
+
+  // ── 勾咗之後：系統先至動 ───────────────────────────────────
   //
-  //     系統改了這一格。原因：建議改派 試甲。原本是「試丙」，改成「試甲」。
-  //
-  //「原因：建議改派 試甲」係一句同義反覆——佢答嘅係「改成乜」，
-  // 而 Ivan 要嘅係「點解改」。成因喺 `proposeMinimalFixFromState_()`：
-  // `replacement.reason || violation.reason` 而 `replacement.reason`
-  // 幾乎一定有值，所以真正嘅原因由頭到尾冇機會出現。
-  const fixNote = notes.filter(function (n) { return n.indexOf('系統改了這一格') !== -1; })[0];
+  // ⚠️ 呢一段係整節嘅反證。冇佢嘅話，上面全部斷言用一句
+  // 「系統乜都唔做」都會綠——而嗰個唔係我哋要嘅行為。
+  const allowKey = (r.untouchedManual || [])[0] && (r.untouchedManual || [])[0].key;
+  check('（前置）攞到嗰一格嘅 key', !!allowKey, String(allowKey));
+  const r2 = gas.apiBuildSuggestion(Q, 'GRID', [allowKey]);
+  check('★★★★ 再產生一次', r2.ok === true, JSON.stringify(r2).slice(0, 200));
+  check('★★★★★★ **勾咗之後系統真係動咗嗰一格**'
+    + '——唔動嘅話，個勾選框就係一個冇作用嘅裝飾',
+    readGrid(r2.sheetName, DATES[3], 'CHAIR#1') !== prev,
+    readGrid(r2.sheetName, DATES[3], 'CHAIR#1') + ' / ' + prev);
+  const seen2 = countColours(r2.sheetName);
+  check('★★★★★★ 而且嗰一格變成**紫色**（你改過，而系統又再改咗一次）',
+    seen2.both >= 1 && seen2.manualViolation === 0, JSON.stringify(seen2));
+  checkEqual('★★★★★ 第二次嘅數字一樣對得住表上實際上色',
+    r2.colourCounts, seen2);
+
+  const notes2 = [];
+  const sh2 = ss.getSheetByName(r2.sheetName);
+  const kr2b = keyRowOf(sh2);
+  for (let row = kr2b + 1; row <= sh2.getLastRow(); row++) {
+    for (let c = 1; c <= sh2.getLastColumn(); c++) {
+      const n = String(sh2.getRange(row, c).getNote() || '').trim();
+      if (n) notes2.push(n);
+    }
+  }
+  const fixNote = notes2.filter(function (n) { return n.indexOf('系統改了這一格') !== -1; })[0];
   check('★★★★★ 系統改嗰格嘅格註講得出**真正嘅原因**'
     + '——呢個 case 係連續兩週同一人，所以要見到「上一週同崗位已是此人」；'
     + '淨係寫「建議改派 ○○」等於答緊「改成乜」，唔係「點解改」',
     !!fixNote && fixNote.indexOf('上一週同崗位已是此人') !== -1,
-    JSON.stringify(notes.slice(0, 3)));
+    JSON.stringify(notes2.slice(0, 3)));
   check('★★★★ 而且照樣講埋改成邊個（兩樣都要，唔係二選一）',
     !!fixNote && fixNote.indexOf('建議改派') !== -1
       && fixNote.indexOf('改成「試甲」') !== -1, String(fixNote));
@@ -570,23 +632,28 @@ console.log('\n=== E／F：收件人選擇同自行輸入電郵 ===');
 
   check('★★★★★ 收件名單同紙本用**同一個共用元件**',
     (paper.match(/pickListNodes\(\{/g) || []).length >= 2, '');
+  // ⚠️ 第四十六輪批次 A 組：收件人池搬咗去 `src/SendRecipients.gs`，
+  // 而且同階段無關。守嘅嘢一個字都冇變——身分一定要由 `Roles` 讀。
+  const sendRecipients = bare(read('src/SendRecipients.gs'));
   check('★★★★★ 身分由 `Roles` 讀（連生效期），**唔係喺畫面寫死一份名單**'
     + '——寫死嗰份下一屆就錯，而且冇人會記得去改',
-    /readRolesSafe_\(timezone\)/.test(sendPlan)
-      && /isEffectiveOn_\(r\.effectiveFrom, r\.effectiveTo, today\)/.test(sendPlan), '');
+    /readRolesSafe_\(timezone\)/.test(sendRecipients)
+      && /isEffectiveOn_\(r\.effectiveFrom, r\.effectiveTo, today\)/.test(sendRecipients), '');
   check('★★★★★ 群組勾選係「加入」唔係「取代」'
     + '（Ivan 明確要求「全部堂委 ＋ 另外三個人」呢種用法）',
-    /members\.forEach\(\(c\) => \{ selected\[c\.key\] = cb\.checked; \}\)/.test(paper), '');
-  check('★★★★★ 一個群組都砌唔到嗰陣要講'
-    + '——靜靜唔出嗰兩個勾，幹事只會以為系統壞咗',
-    /找不到任何現任堂委或執事/.test(read('src/ui/ScriptSendPaper.html')), '');
+    /sendPoolMembersOf\(g\.key\)\.forEach\(\(c\) => \{ selected\[c\.key\] = cb\.checked; \}\)/
+      .test(paper), '');
+  // ⚠️ 第四十六輪批次 A1 組：一組零人嗰陣要講嘅嘢改咗——
+  // 而家有四個身分（堂委／執事／IT／幹事），而 `IT` 同 `幹事` 係新加嘅，
+  // 好可能一個人都未填。所以逐組講，唔再淨係講「堂委或執事」。
+  check('★★★★★ 一組零人嗰陣要講點解同去邊度加'
+    + '——靜靜出一個勾唔到嘅框，幹事只會以為系統壞咗',
+    /現時沒有人有這個身分。要用這一組，先去「名單維護 ▸ 身分」/.test(paper), '');
 
-  check('★★★★★★ 自行輸入嗰格喺**主彈窗**，唔係收喺「自己選擇」入面'
-    + '——收喺入面嘅話，幹事揀「全部應收的人」就永遠見唔到，'
+  check('★★★★★★ 自行輸入嗰格同六個來源喺**同一版**'
+    + '——收埋去另一個窗嘅話，幹事勾咗「職事表上全部人」就永遠見唔到，'
     + '而佢想做嘅好可能正正就係「全部人 ＋ 多一個地址」',
-    /buildExtraEmailBox\(sendOptions_/.test(paper)
-      && paper.indexOf('buildExtraEmailBox(sendOptions_')
-        < paper.indexOf('function drawSendPickList'), '');
+    (paper.match(/buildExtraEmailBox\(sendOptions_/g) || []).length >= 2, '');
   check('★★★★★ 而且主確認掣撳落去之前會驗一次格式',
     /if \(!commitExtraEmails\(sendOptions_\)\) return;/.test(paper), '');
   check('★★★★★ 自行輸入嘅電郵格式唔啱**即刻標紅**，唔係等撳落去先講',

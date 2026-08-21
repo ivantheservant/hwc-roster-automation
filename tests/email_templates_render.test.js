@@ -25,7 +25,7 @@ const { loadGasSource } = require('./helpers/gas_loader.js');
 // 所以可以安全載入沙箱。EmailTemplateSeed.gs 的 EMAIL_TEMPLATE_SEEDS 是
 // 純資料陣列，只引用 MAIL_STAGES／ATTACH_TYPE 兩個常數。
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'EmailTemplateSeed.gs', 'Mailer.gs'
+  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'EmailTemplateSeed.gs', 'SendRecipients.gs', 'Mailer.gs'
 ]);
 
 let fail = 0;

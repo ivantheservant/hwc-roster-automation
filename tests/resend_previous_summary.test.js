@@ -21,7 +21,7 @@ const path = require('path');
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource([
-  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs', 'Mailer.gs'
+  'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs', 'SendRecipients.gs', 'Mailer.gs'
 ]);
 
 let fail = 0;

@@ -20,7 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
-const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Mailer.gs']);
+const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'SendRecipients.gs', 'Mailer.gs']);
 
 let fail = 0;
 function check(label, condition, extra) {

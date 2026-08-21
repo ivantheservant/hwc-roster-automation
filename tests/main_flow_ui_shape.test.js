@@ -294,8 +294,20 @@ console.log('\n=== B：新樣式唔可以蓋過 `[hidden]` ===');
 // =====================================================================
 console.log('\n=== C：寄出彈窗 ===');
 {
-  check('★★★★★ 階段由系統判斷，用一句人話講出嚟（唔係俾佢揀）',
-    /kindSentence/.test(sendPaper) && !/揀階段|選擇階段/.test(sendPaper));
+  // ⚠️ 第四十六輪批次 A3 組：呢一條**反轉咗**。
+  //
+  // 舊行為係彈窗頂用一句人話講「這一次是寄給堂委審閱（這一季還未正式
+  // 發出過）」。Ivan 明確講咗**嗰句係錯嘅描述**——因為收件人由呢一輪
+  // 開始係佢自己勾嘅，唔再由階段決定。
+  //
+  // Stage 仍然要判斷同記錄（`SendLog`／`AuditLog`／重發比對全部靠佢），
+  // 但**唔可以再喺彈窗頂當成「這一次是⋯⋯」講出嚟**。
+  check('★★★★★★ 彈窗頂**唔再**由階段推斷「這一次是⋯⋯」'
+    + '——收件人由幹事決定，所以嗰句同佢實際做緊嘅事對唔上',
+    !/text: s\.kindSentence/.test(sendPaper), '');
+  check('★★★★★ 改為由**實際勾咗乜**算出一句收件摘要',
+    /describeSendSelection\(\)/.test(sendPaper)
+    && /這一次會寄給 /.test(sendPaper), '');
   check('★★★★★ 頂部再講一次「系統只會寄已經儲存確認的版本」',
     /系統只會寄你已經儲存確認的版本/.test(sendPaper));
   check('★★★★★ 有未儲存改動要先問，而且「取消」嗰粒寫「先去儲存」'
@@ -325,14 +337,21 @@ console.log('\n=== C：寄出彈窗 ===');
     /sectionTitle\('寄給誰'\)/.test(sendPaper)
     && /sectionTitle\('附件'\)/.test(sendPaper)
     && /sectionTitle\('日曆檔'\)/.test(sendPaper), '');
-  check('★★★★★ **預設值由後端嚟**，前端冇自己寫死一套'
-    + '——寫死兩套就係兩個真相來源，而「幹事乜都唔揀行為同今日一樣」會靜靜失效',
-    /s\.sendOptionDefaults \|\| \{\}\)\.recipientScope/.test(sendPaper), '');
-  check('★★★★★ 「只寄有改動嘅」淨係喺改動後重發先顯示'
-    + '（其餘階段顯示一個等於「全部」嘅選項，只會令人以為系統壞咗）',
-    /CHANGED_ONLY' && s\.kind !== 'RESEND'\) return;/.test(sendPaper), '');
-  check('★★★★★ 揀咗「自己揀」但一個都冇揀 ⇒ 唔行落去',
-    /recipientScope === 'PICK' && sendOptions_\.pickedKeys\.length === 0/.test(sendPaper), '');
+  // 附件同日曆檔嘅預設值仍然由後端嚟（兩個真相來源嘅問題冇變）。
+  check('★★★★★ 附件同日曆檔嘅預設值由後端嚟，前端冇自己寫死一套',
+    /s\.sendOptionDefaults \|\| \{\}\)\.attachType/.test(sendPaper)
+    && /s\.sendOptionDefaults \|\| \{\}\)\.includeIcs/.test(sendPaper), '');
+  // ⚠️ 第四十六輪批次 A 組：收件範圍**唔再有三揀一**。
+  // 收件人一律行 `PICK`（照 `pickedKeys` 寄），而 `pickedKeys` 由
+  // 六個來源勾選框 ＋ 逐個加減砌出嚟。
+  check('★★★★★★ 收件範圍一律 `PICK`'
+    + '——`ALL`／`CHANGED_ONLY` 嗰個三揀一係由階段推斷收件人嗰套，'
+    + '而嗰套正正就係之前兩輪做錯咗嘅方向',
+    /recipientScope: 'PICK',/.test(sendPaper)
+    && !/\['ALL', '全部應收的人'\]/.test(sendPaper), '');
+  check('★★★★★ 一位都冇揀而又冇自訂地址 ⇒ 唔行落去',
+    /\(sendOptions_\.pickedKeys \|\| \[\]\)\.length === 0/.test(sendPaper)
+    && /還沒有選任何收件人/.test(sendPaper), '');
   check('★★★★★ 個人版 PDF／日曆檔只對「呢一季有服侍嘅人」有意義，要講出嚟'
     + '——唔講嘅話幹事會以為堂委都會收到個人 PDF，然後去追一個唔存在嘅問題',
     /只有「這一季有服侍的人」才會收到/.test(sendPaper), '');
