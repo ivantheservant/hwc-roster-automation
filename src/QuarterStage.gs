@@ -179,6 +179,58 @@ function setQuarterStage_(quarterId, newStage, reason) {
  */
 
 /**
+ * 第四十四輪批次 G 組：由 StartDate ＋ 前置日數算出一個季度日期。
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️ 這一條算式本來抄了三份
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 同一句 `isNaN(lead) ? '' : applyWeekdayGuard_(shiftDateString_(…), guard)`
+ * 本來散在三個地方：`NewQuarterWizard.gs`、`planComputeQuarterDates_()`、
+ * 還有 `Trigger.gs` 的即時推算。三份之中改一份，另外兩份就會靜靜地
+ * 算出另一個日期——而「自動排程今天會不會跑」正正靠這個值。
+ *
+ * 所以收成一句。年度工具（本輪新接上）是第四個呼叫端，
+ * 再抄一份就一定會走樣。
+ *
+ * @param {string} startDate 季度開始日 yyyy-MM-dd
+ * @param {number} leadDays 前置日數（負數＝開季之前）
+ * @param {string} guardMode SEND_WEEKDAY_GUARD
+ * @returns {string} 算出的日期；算不出（lead days 未設定）回空字串
+ */
+function computeQuarterDateFromLead_(startDate, leadDays, guardMode) {
+  // ⚠️ `Number(null)` 同 `Number('')` 都係 **0**，唔係 NaN。
+  // 淨靠 `isNaN()` 擋，「未設定」就會變成「提早 0 日」＝ 開季當日，
+  // 即係「到咗先生成」——而幹事要嘅係提早 35 日。
+  // 呢個係一個睇落好合理、而且完全唔會有人察覺嘅錯日期。
+  if (leadDays === null || leadDays === undefined || leadDays === '') return '';
+  const lead = Number(leadDays);
+  if (!startDate || isNaN(lead)) return '';
+  return applyWeekdayGuard_(shiftDateString_(startDate, lead), guardMode);
+}
+
+/**
+ * 第四十四輪批次 G 組：算季度日期要用嘅那幾個 Config 值，讀一次。
+ *
+ * ⚠️ **不可以在算不出的時候悄悄當成 0。** `LEAD_DAYS_GENERATE` 沒有填
+ * 而當成 0，`GenerateOn` 就會變成開季當日——即係「到咗先生成」，
+ * 而幹事本來要的是提早 35 天。回 `null` 並且在畫面上明講算不出，
+ * 比一個看起來合理的錯日期好。
+ *
+ * @returns {{leadGenerate: ?number, leadOfficial: ?number, guardMode: string}}
+ */
+function readQuarterDateSettings_() {
+  const config = readConfig();
+  const g = Number(config[CONFIG_KEYS.LEAD_DAYS_GENERATE]);
+  const o = Number(config[CONFIG_KEYS.LEAD_DAYS_OFFICIAL]);
+  return {
+    leadGenerate: isNaN(g) ? null : g,
+    leadOfficial: isNaN(o) ? null : o,
+    guardMode: String(config[CONFIG_KEYS.SEND_WEEKDAY_GUARD] || 'NONE').toUpperCase()
+  };
+}
+
+/**
  * 計算指定季度的 GenerateOn／OfficialSendOn（只讀，不寫入）：按 StartDate 加上
  * Config 的 LEAD_DAYS_GENERATE／LEAD_DAYS_OFFICIAL 天數，再套用 SEND_WEEKDAY_GUARD，
  * 跟 Trigger.gs 的 computeAutomationSchedule_() 用同一套 shiftDateString_()／
@@ -206,7 +258,7 @@ function planComputeQuarterDates_(quarterId) {
     const columnIndex = info.headers.indexOf(def.key) + 1;
     const currentValue = toDateString(info.values[def.key], timezone);
     const leadDays = Number(config[def.leadDaysKey]);
-    const computedValue = isNaN(leadDays) ? '' : applyWeekdayGuard_(shiftDateString_(startDate, leadDays), guardMode);
+    const computedValue = computeQuarterDateFromLead_(startDate, leadDays, guardMode);
     return {
       key: def.key, label: def.label, columnIndex: columnIndex,
       currentValue: currentValue, computedValue: computedValue,
@@ -215,6 +267,62 @@ function planComputeQuarterDates_(quarterId) {
   });
 
   return { quarterId: quarterId, sheetRow: info.sheetRow, startDate: startDate, fields: fields };
+}
+
+/**
+ * 第四十四輪批次 G 組：**列出所有仍然欠日期的季度。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 點解要有
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 年度工具由本輪開始會自己算好兩個日期，但**以前用佢開嘅季度冇**——
+ * Ivan 手上 2028T1～T4 就係噉樣，四季全部空白。
+ *
+ * 而原本嗰個「計算季度日期」一次只做一季，要輸入 `QuarterID`。
+ * 四季即係做四次，每次都要記得個 ID 點串。做少一次就會有一季
+ * 喺主流程一直顯示「這一季的 Quarters 沒有填生成日期」。
+ *
+ * ⚠️ 呢度**只列出真係欠嘅**（兩格入面至少一格空白）。
+ * 把已經有值嘅都列返出嚟，就會令幹事以為要全部重算，
+ * 而重算會蓋走佢人手改過嘅日期。
+ *
+ * @returns {Object[]} 每項 {quarterId, startDate, missingGenerateOn, missingOfficialSendOn}
+ */
+function listQuartersMissingDates_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.QUARTERS);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.QUARTERS);
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 3 || lastCol === 0) return [];
+
+  const config = readConfig();
+  const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
+  const headers = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  const Q = COLUMNS.QUARTERS;
+  const idx = {};
+  headers.forEach(function (h, i) { idx[h] = i; });
+
+  const out = [];
+  values.forEach(function (row) {
+    const quarterId = String(row[idx[Q.QUARTER_ID]] || '').trim();
+    if (!quarterId) return;
+    const startDate = toDateString(row[idx[Q.START_DATE]], timezone);
+    const g = idx[Q.GENERATE_ON] === undefined
+      ? '' : toDateString(row[idx[Q.GENERATE_ON]], timezone);
+    const o = idx[Q.OFFICIAL_SEND_ON] === undefined
+      ? '' : toDateString(row[idx[Q.OFFICIAL_SEND_ON]], timezone);
+    if (g && o) return;
+    out.push({
+      quarterId: quarterId,
+      startDate: startDate,
+      missingGenerateOn: !g,
+      missingOfficialSendOn: !o
+    });
+  });
+  return out;
 }
 
 /**

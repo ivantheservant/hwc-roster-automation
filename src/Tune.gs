@@ -245,15 +245,8 @@ function buildTuneSaturationNotes_(rows) {
  * @returns {{quarterId: string, nextIndex: number, rows: Object[]}} 進度物件
  */
 function loadTuneProgress_(quarterId) {
-  const raw = PropertiesService.getScriptProperties().getProperty(TUNE_PROGRESS_KEY);
-  if (raw) {
-    try {
-      const saved = JSON.parse(raw);
-      if (saved && saved.quarterId === quarterId) return saved;
-    } catch (err) {
-      log_('WARN', 'tuneParameters: 進度紀錄損毀，重新開始。' + err.message);
-    }
-  }
+  const saved = readState_(TUNE_PROGRESS_KEY);
+  if (saved && saved.quarterId === quarterId) return saved;
   return { quarterId: quarterId, nextIndex: 0, rows: [] };
 }
 
@@ -263,7 +256,7 @@ function loadTuneProgress_(quarterId) {
  * @returns {void}
  */
 function saveTuneProgress_(progress) {
-  PropertiesService.getScriptProperties().setProperty(TUNE_PROGRESS_KEY, JSON.stringify(progress));
+  saveState_(TUNE_PROGRESS_KEY, progress);
 }
 
 /**
@@ -271,7 +264,7 @@ function saveTuneProgress_(progress) {
  * @returns {void}
  */
 function clearTuneProgress_() {
-  PropertiesService.getScriptProperties().deleteProperty(TUNE_PROGRESS_KEY);
+  clearState_(TUNE_PROGRESS_KEY);
 }
 
 /**

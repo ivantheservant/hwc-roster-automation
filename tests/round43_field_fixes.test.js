@@ -268,6 +268,37 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
   check('★★★★★ 圖例有印埋第三種顏色（唔印就要人自己估）',
     sh.getRange(2, 3).getValue().indexOf('紫色格') !== -1,
     String(sh.getRange(2, 3).getValue()));
+
+  // ⚠️ 第四十四輪批次 H1 第 4 項：Ivan 要求嘅唔止「藍色格有色」，
+  // 而係「**有備註講明為什麼改**」。上色同備註係兩件事：
+  // 有色而冇備註，幹事見到一格藍色但唔知系統改咗乜、點解改。
+  const notes = [];
+  for (let row = kr + 1; row <= sh.getLastRow(); row++) {
+    for (let c = 1; c <= sh.getLastColumn(); c++) {
+      const n = String(sh.getRange(row, c).getNote() || '').trim();
+      if (n) notes.push(n);
+    }
+  }
+  check('★★★★★ **系統改過嘅格真係有格註**'
+    + '——一格藍色而冇備註，幹事唔知系統改咗乜、點解改',
+    notes.length >= 1, 'notes=' + notes.length);
+  // ⚠️ 呢一條係第四十四輪批次修出嚟嘅。修之前格註係：
+  //
+  //     系統改了這一格。原因：建議改派 試甲。原本是「試丙」，改成「試甲」。
+  //
+  //「原因：建議改派 試甲」係一句同義反覆——佢答嘅係「改成乜」，
+  // 而 Ivan 要嘅係「點解改」。成因喺 `proposeMinimalFixFromState_()`：
+  // `replacement.reason || violation.reason` 而 `replacement.reason`
+  // 幾乎一定有值，所以真正嘅原因由頭到尾冇機會出現。
+  const fixNote = notes.filter(function (n) { return n.indexOf('系統改了這一格') !== -1; })[0];
+  check('★★★★★ 系統改嗰格嘅格註講得出**真正嘅原因**'
+    + '——呢個 case 係連續兩週同一人，所以要見到「上一週同崗位已是此人」；'
+    + '淨係寫「建議改派 ○○」等於答緊「改成乜」，唔係「點解改」',
+    !!fixNote && fixNote.indexOf('上一週同崗位已是此人') !== -1,
+    JSON.stringify(notes.slice(0, 3)));
+  check('★★★★ 而且照樣講埋改成邊個（兩樣都要，唔係二選一）',
+    !!fixNote && fixNote.indexOf('建議改派') !== -1
+      && fixNote.indexOf('改成「試甲」') !== -1, String(fixNote));
 }
 
 console.log('\n=== C2：建議表都要有下拉選單 ===');
@@ -607,7 +638,17 @@ console.log('\n=== H：版面 ===');
     /body\.appendChild\(renderStepEligibility\(\)\)/.test(zone2), '');
   check('★★★★★ 而且係**同一個函式**，唔係喺 zone2 另寫一份',
     !/function renderStepEligibility/.test(zone2), '');
-  check('★★★★★ 生成之前會問「使唔使先改名單」，而且〔先去改名單〕真係帶佢去',
+  // ⚠️ 第四十四輪批次 F 組：**呢一條斷言唔夠。**
+  //
+  // 佢綠燈，而 Ivan 實測話「冇問過」——而佢係啱嘅。呢條證明嘅只係
+  //「檔案入面有呢個名」，唔係「每一條去生成嘅路都會經過佢」。
+  // 當時實際上有三條路，只有一條包咗。
+  //
+  // 真正嘅斷言喺 `tests/generate_asks_eligibility.test.js`：
+  // 嗰度真係行嗰幾個函式，逐條路睇彈窗有冇喺讀資料之前出現。
+  // 呢一條保留住做「第四十三輪做過呢件事」嘅紀錄，唔可以當佢係保證。
+  check('★★★★ 生成之前會問「使唔使先改名單」，而且〔先去改名單〕真係帶佢去'
+    + '（⚠️ 只證明有呢個名；真正嘅保證喺 generate_asks_eligibility.test.js）',
     /askEligibilityFirst/.test(flow) && /openEligibilitySheet\(\);/.test(flow), '');
   check('★★★★★ 第 2 步有〔回到上一個儲存版本〕，而且走返同一條回退路',
     /openRollbackToPrevious/.test(flow)

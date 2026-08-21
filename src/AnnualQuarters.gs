@@ -18,7 +18,7 @@
  * |---|---|---|
  * | 範圍 | 一季 | 一年四季 |
  * | 自訂開始日 | 有（可以覆寫日曆季度） | 冇（一律用 Config 嘅月份劃分） |
- * | GenerateOn／OfficialSendOn | 會算 | **留空**，之後跑「計算季度日期」補 |
+ * | GenerateOn／OfficialSendOn | 會算 | 會算（第四十四輪批次 G 組；以前留空） |
  * | 已存在時 | 拋錯、整個工具停低 | **略過嗰一季**，其餘照做 |
  *
  * 冇自訂開始日係刻意嘅：一次過四季，逐季問自訂開始日就變返四次問答，
@@ -39,14 +39,46 @@
  * `weekCount` 係自己數出嚟嘅主日數（`listSundaysInRange_()`），唔係假設
  * 13 週——一季實際可以係 12 或者 14 個主日，視乎月份點樣落。
  *
+ * ═════════════════════
+ * ⚠️ 第四十四輪批次 G 組：而家會算埋 GenerateOn／OfficialSendOn
+ * ═════════════════════
+ *
+ * Ivan 用呢個工具開咗 2028 年四季，然後喺主流程見到：
+ *
+ *     這一季的 Quarters 沒有填生成日期（GenerateOn），
+ *     所以系統講不出還有多久。
+ *
+ * 舊設計係「一律留空，之後跑『計算季度日期』逐季補」。但兩件事都無效：
+ * 一、幹事唔會記得跑一個藏喺選單入面、名字叫「計算季度日期」嘅工具；
+ * 二、`OfficialSendOn` 空白會令 GENERATE／REMIND 範本嘅
+ *     `{OfficialSendDate}` 喺信入面顯示空白——**信已經寄出去先發現**。
+ *
+ * 而算呢兩個日期唯一要嘅就係 `StartDate` ＋ Config 嘅前置日數，
+ * 兩樣喺呢一步都已經有。留空唔係一個保守嘅選擇，係一個缺口。
+ *
+ * ⚠️ 前置日數未設定 ⇒ 照樣留空，而且喺預覽明講算唔到。
+ * **唔可以當成 0**——當成 0，`GenerateOn` 就變咗開季當日，
+ * 即係「到咗先生成」，而幹事要嘅係提早 35 日。
+ *
  * @param {number} year 西曆年份
  * @param {Object.<number, number>} startMonths T1～T4 嘅起始月份
  * @param {Object.<string, boolean>} existingQuarterIds 已存在嘅 QuarterID
  * @param {Object.<string, boolean>} existingServiceDateIds 已存在嘅 ServiceDateID
+ * @param {{leadGenerate: ?number, leadOfficial: ?number, guardMode: string}} dateSettings
+ *   `readQuarterDateSettings_()` 嘅結果。**必須傳**——漏傳嘅話兩欄會靜靜留空，
+ *   而嗰個正正就係呢一組要修嘅嘢。
  * @returns {Object[]} 四項規劃，每項含 quarterId／startDate／endDate／weekCount／
- *   serviceDates／alreadyExists／newServiceDates／skippedServiceDates
+ *   generateOn／officialSendOn／serviceDates／alreadyExists／newServiceDates／
+ *   skippedServiceDates
  */
-function planAnnualQuarters_(year, startMonths, existingQuarterIds, existingServiceDateIds) {
+function planAnnualQuarters_(year, startMonths, existingQuarterIds, existingServiceDateIds,
+  dateSettings) {
+  if (!dateSettings || typeof dateSettings !== 'object') {
+    throw new Error('planAnnualQuarters_()：第 5 個參數 dateSettings 沒有傳。'
+      + '它是 readQuarterDateSettings_() 的結果，用來計算 GenerateOn／OfficialSendOn。'
+      + '漏傳的話那兩欄會靜靜留空——而那正是第四十四輪批次 G 組要修的問題，'
+      + '所以這裡寧可拋錯。');
+  }
   const plans = [];
 
   for (let term = 1; term <= 4; term++) {
@@ -81,6 +113,11 @@ function planAnnualQuarters_(year, startMonths, existingQuarterIds, existingServ
       weekCount: sundays.length,
       firstSunday: sundays.length > 0 ? sundays[0] : '',
       lastSunday: sundays.length > 0 ? sundays[sundays.length - 1] : '',
+      // 算唔到（Config 嘅前置日數未填）就係空字串，而預覽會明講。
+      generateOn: computeQuarterDateFromLead_(
+        range.startDate, dateSettings.leadGenerate, dateSettings.guardMode),
+      officialSendOn: computeQuarterDateFromLead_(
+        range.startDate, dateSettings.leadOfficial, dateSettings.guardMode),
       serviceDates: serviceDates,
       newServiceDates: newServiceDates,
       skippedServiceDates: serviceDates.length - newServiceDates.length,
@@ -121,7 +158,8 @@ function readExistingQuarterAndServiceDateIds_() {
  * 因為嗰一季係人手建立定係之前用工具建立，我哋唔知佢有冇特殊安排——
  * 要補就用返「新增季度」或者人手處理）；`ServiceDateID` 已存在嘅行略過。
  *
- * `GenerateOn`／`OfficialSendOn` 一律留空，見檔頭嘅分工表。
+ * `GenerateOn`／`OfficialSendOn` 由 `planAnnualQuarters_()` 算好帶落嚟；
+ * 算唔到（Config 嘅前置日數未填）就仍然係空白。
  *
  * @param {Object[]} plans `planAnnualQuarters_()` 嘅結果
  * @returns {{quartersWritten: number, serviceDatesWritten: number, skippedQuarters: string[]}}
@@ -157,7 +195,11 @@ function executeAnnualQuarters_(plans) {
     q[Q.START_DATE] = plan.startDate;
     q[Q.END_DATE] = plan.endDate;
     q[Q.WEEK_COUNT] = plan.weekCount;
-    // GenerateOn／OfficialSendOn 刻意留空，見檔頭
+    // ⚠️ 第四十四輪批次 G 組：算得到就寫落去（算唔到就仍然係空字串）。
+    // 舊行為係一律留空、叫幹事之後跑「計算季度日期」補——而佢唔會記得，
+    // 結果主流程一直顯示「這一季的 Quarters 沒有填生成日期」。
+    q[Q.GENERATE_ON] = plan.generateOn || '';
+    q[Q.OFFICIAL_SEND_ON] = plan.officialSendOn || '';
     q[Q.STAGE] = QUARTER_STAGE.DRAFT;
     quarterRows.push(quartersHeaders.map(function (h) { return q[h] === undefined ? '' : q[h]; }));
 
@@ -210,6 +252,10 @@ function buildAnnualQuartersPreview_(year, plans, startMonths) {
   plans.forEach(function (p) {
     lines.push(p.quarterId + '　' + p.startDate + ' 至 ' + p.endDate);
     lines.push('　　主日 ' + p.weekCount + ' 個　第一個 ' + p.firstSunday + '　最後一個 ' + p.lastSunday);
+    // ⚠️ 第四十四輪批次 G 組：兩個日期要**喺預覽度睇得到**。
+    // 寫入之後先去 Quarters 逐格對，等於冇畀佢過目。
+    lines.push('　　生成日期 ' + (p.generateOn || '（算不出）')
+      + '　正式發出日期 ' + (p.officialSendOn || '（算不出）'));
     if (p.alreadyExists) {
       lines.push('　　⚠ Quarters 已經有這一季 → 整季略過（不會覆寫任何既有資料）');
     } else if (p.skippedServiceDates > 0) {
@@ -222,8 +268,21 @@ function buildAnnualQuartersPreview_(year, plans, startMonths) {
   const totalDates = writable.reduce(function (s, p) { return s + p.newServiceDates.length; }, 0);
   lines.push('將新增：' + writable.length + ' 個季度、' + totalDates + ' 行 ServiceDates。');
   lines.push('');
-  lines.push('⚠️ GenerateOn 與 OfficialSendOn 一律留空——寫入之後請執行');
-  lines.push('　 「準備工作 ▸ ⚠️ 計算季度日期」逐季補上。');
+  // ⚠️ 第四十四輪批次 G 組：算得到就唔使再叫佢跑另一個工具。
+  // 算唔到就要明講**點解**同埋**跟住做乜**——一句「算不出」而唔講原因，
+  // 幹事只會當佢係壞咗。
+  const cannot = plans.filter(function (p) {
+    return !p.alreadyExists && (!p.generateOn || !p.officialSendOn);
+  });
+  if (cannot.length > 0) {
+    lines.push('⚠️ 其中 ' + cannot.length + ' 季算不出生成日期／正式發出日期，');
+    lines.push('　 原因是 Config 的 ' + CONFIG_KEYS.LEAD_DAYS_GENERATE + ' 或 '
+      + CONFIG_KEYS.LEAD_DAYS_OFFICIAL + ' 還沒有填。');
+    lines.push('　 那兩格會留空。填好 Config 之後，執行');
+    lines.push('　 「準備工作 ▸ ⚠️ 計算季度日期」就可以補上。');
+  } else {
+    lines.push('生成日期與正式發出日期會一併寫入，不用再另外執行「計算季度日期」。');
+  }
   lines.push('');
   lines.push('只會新增，不會覆寫任何一格既有資料。確定要寫入嗎？');
   return lines.join('\n');
@@ -256,7 +315,8 @@ function runAnnualQuartersWizard_() {
   try {
     startMonths = readQuarterTermStartMonths_();
     const existing = readExistingQuarterAndServiceDateIds_();
-    plans = planAnnualQuarters_(year, startMonths, existing.quarterIds, existing.serviceDateIds);
+    plans = planAnnualQuarters_(year, startMonths, existing.quarterIds, existing.serviceDateIds,
+      readQuarterDateSettings_());
   } catch (err) {
     log_('ERROR', 'planAnnualQuarters_ 失敗: ' + err.message);
     ui.alert(title, '計算失敗：\n\n' + err.message, ui.ButtonSet.OK);

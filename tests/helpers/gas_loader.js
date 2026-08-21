@@ -147,7 +147,13 @@ function buildGasStubs_() {
  *
  * 呢度只放「零依賴、而且好多檔案都會叫」嗰種。
  */
-const ALWAYS_LOADED = ['ArgShape.gs'];
+// ⚠️ 第四十四輪批次 A 組：`SafeWrite.gs` 都要永遠載入。
+// 佢係「全部值寫入」嘅唯一入口（`setSheetValuesSafely_()`／`saveState_()`），
+// 而 `RosterWriter.gs`／`SuggestionSheet.gs`／`PdfBatch.gs`／`Tune.gs`
+// 都會叫佢。唔喺呢度自動加嘅話，每一份測試都要記得補一行，
+// 而漏咗嘅後果係 `setSheetValuesSafely_ is not defined`——
+// 一個同測試本身完全無關嘅錯。
+const ALWAYS_LOADED = ['ArgShape.gs', 'SafeWrite.gs'];
 
 function loadGasSource(files, overrides) {
   const requested = files || FILES_FOR_GENERATOR;

@@ -172,6 +172,26 @@
     border-bottom: 1px solid var(--border);
   }
   .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+  /* 第四十四輪批次 C 組：彈窗入面嘅訊息列。**唔可以係細灰字**——
+     佢出現嘅時候，幹事啱啱撳完一粒掣而件事冇發生，要一眼睇得到。 */
+  .modal-status {
+    margin: 0 20px 12px; padding: 10px 12px; border-radius: 6px;
+    font-size: 14px; line-height: 1.5; font-weight: 600;
+    /* 錯誤用紅（`--danger`），唔用琥珀——琥珀喺呢個專案係
+       「對唔上名單但唔一定係錯」嗰種，而呢度係「你撳咗，件事冇發生」。 */
+    background: var(--warn-bg); color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  .modal-status.ok {
+    color: var(--ok); border-color: var(--ok);
+    background: var(--card-off);
+  }
+  /* 第四十四輪批次 D 組：「未寄出，仲喺度補產生」嗰個頭。
+     ⚠️ **唔可以**用 `.ok-head` 嗰隻綠——幹事見到綠色就會走去印，
+     而封信根本未寄出。 */
+  .warn-head {
+    font-size: 16px; font-weight: 600; color: var(--danger); margin-bottom: 6px;
+  }
   .modal-actions {
     padding: 12px 20px; border-top: 1px solid var(--border);
     display: flex; gap: 10px; flex-wrap: wrap;

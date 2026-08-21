@@ -69,7 +69,31 @@
    * 掣 0：生成初稿（規格 2.1，第二十五輪批次階段 A5）
    * ============================================================ */
 
+  /**
+   * 生成初稿。
+   *
+   * ⚠️ 第四十四輪批次 F 組：「使唔使先改名單」呢一問**擺喺呢度**，
+   * 唔喺呼叫端。
+   *
+   * 第四十三輪批次 H 組本來把 `askEligibilityFirst()` 包喺
+   * `openGenerateForTarget()` 入面，而實測 Ivan 話「冇問過」——查落
+   * 係真嘅：同一個函式入面有**兩條**路去生成，而只有一條包咗。
+   *
+   *   ・目標季度就係而家睇緊嗰季 ⇒ 包咗（會問）
+   *   ・目標季度係另一季 ⇒ 先切季度，然後**直接**叫
+   *     `openGenerateDraft()`——冇問過
+   *
+   * 而「下一個未生成嘅季度」好多時**就係**另一季，所以佢撳落去
+   * 行嘅正正係冇問嗰條。除此之外，區一嗰粒「生成初稿」亦都係直接叫。
+   *
+   * 三條路各自記得包一次，就係「總有一條唔記得」。所以改成：
+   * **問嗰一問就住喺入口本身**，冇任何一條路繞得過。
+   */
   function openGenerateDraft() {
+    askEligibilityFirst(function () { openGenerateDraftAfterAsking_(); });
+  }
+
+  function openGenerateDraftAfterAsking_() {
     runAction('讀取資料', async () => {
       const plan = await callServer('apiGenerateDraftPlan', currentQuarterId);
       if (plan.blocked) {

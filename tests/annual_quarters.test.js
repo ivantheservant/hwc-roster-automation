@@ -7,7 +7,10 @@
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource(
-  ['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'NewQuarterWizard.gs', 'AnnualQuarters.gs'],
+  // ⚠️ 第四十四輪批次 G 組：`computeQuarterDateFromLead_()` 喺 `QuarterStage.gs`，
+  // 而佢會叫 `Trigger.gs` 嘅 `applyWeekdayGuard_()`。兩個都要載入。
+  ['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Trigger.gs', 'QuarterStage.gs',
+    'NewQuarterWizard.gs', 'AnnualQuarters.gs'],
   {
     Utilities: {
       formatDate: function (date, tz, fmt) {
@@ -33,9 +36,22 @@ function checkEqual(label, actual, expected) {
 
 const CALENDAR = { 1: 1, 2: 4, 3: 7, 4: 10 };
 
+/**
+ * ⚠️ 第四十四輪批次 G 組：`planAnnualQuarters_()` 多咗第 5 個參數
+ *（算 GenerateOn／OfficialSendOn 要嘅 Config 值）。
+ *
+ * 呢個參數**刻意係必須嘅**：漏傳嘅話兩欄會靜靜留空，而嗰個正正就係
+ * 第四十四輪要修嘅嘢（Ivan 用年度工具開咗 2028 四季，四季全部冇日期）。
+ * 所以正式碼漏傳會拋錯，唔會靜靜當成「冇設定」。
+ *
+ * 實際嘅前置日數見 `ConfigBaselineCheck.gs` 嘅上線目標值：
+ * `LEAD_DAYS_GENERATE = -35`、`LEAD_DAYS_OFFICIAL = -28`。
+ */
+const DATE_SETTINGS = { leadGenerate: -35, leadOfficial: -28, guardMode: 'NONE' };
+
 console.log('\n=== C1【核心】planAnnualQuarters_()：四季起訖日 ===');
 {
-  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, {});
+  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, {}, DATE_SETTINGS);
   checkEqual('★★★★ 一次過四季', plans.length, 4);
   checkEqual('★★★★★ 四個 QuarterID',
     plans.map((p) => p.quarterId), ['2027T1', '2027T2', '2027T3', '2027T4']);
@@ -49,7 +65,7 @@ console.log('\n=== C1【核心】planAnnualQuarters_()：四季起訖日 ===');
 
 console.log('\n=== C1【核心】WeekCount 係真係數出嚟，唔係假設 13 ===');
 {
-  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, {});
+  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, {}, DATE_SETTINGS);
   const counts = plans.map((p) => p.weekCount);
 
   // 逐季獨立驗證：主日數 = serviceDates 長度 = 該範圍內星期日數
@@ -64,10 +80,10 @@ console.log('\n=== C1【核心】WeekCount 係真係數出嚟，唔係假設 13 
   // ⚠️ 2027 年啱啱好四季都係 13 個主日，所以單用 2027 證明唔到「真係數出嚟」。
   // 用 2029（12／13／14／13）同 2028（13／13／13／14）——兩年都有唔同嘅季度長度，
   // 如果實作係硬寫 13，呢兩個斷言即刻爆。
-  const counts2029 = gas.planAnnualQuarters_(2029, CALENDAR, {}, {}).map((p) => p.weekCount);
+  const counts2029 = gas.planAnnualQuarters_(2029, CALENDAR, {}, {}, DATE_SETTINGS).map((p) => p.weekCount);
   checkEqual('★★★★★ 2029 年四季主日數係 12／13／14／13（證明真係逐季數，唔係硬寫 13）',
     counts2029, [12, 13, 14, 13]);
-  const counts2028 = gas.planAnnualQuarters_(2028, CALENDAR, {}, {}).map((p) => p.weekCount);
+  const counts2028 = gas.planAnnualQuarters_(2028, CALENDAR, {}, {}, DATE_SETTINGS).map((p) => p.weekCount);
   checkEqual('★★★★ 2028 年 T4 有 14 個主日', counts2028, [13, 13, 13, 14]);
 
   // 全部日期一定要係星期日，而且連續相隔 7 日
@@ -80,7 +96,7 @@ console.log('\n=== C1【核心】WeekCount 係真係數出嚟，唔係假設 13 
 
 console.log('\n=== C1：ServiceDateID 格式同「新增季度」一致、IsFirstSundayOfMonth 自動算 ===');
 {
-  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, {});
+  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, {}, DATE_SETTINGS);
   const t1 = plans[0];
 
   checkEqual('★★★★ ServiceDateID 用 {QuarterID}-W{兩位數} 格式（沿用既有慣例）',
@@ -101,7 +117,7 @@ console.log('\n=== C1：ServiceDateID 格式同「新增季度」一致、IsFirs
 console.log('\n=== C4【核心】只 append 唔覆寫：已存在嘅季度整季略過 ===');
 {
   const existingQ = { '2027T1': true, '2027T3': true };
-  const plans = gas.planAnnualQuarters_(2027, CALENDAR, existingQ, {});
+  const plans = gas.planAnnualQuarters_(2027, CALENDAR, existingQ, {}, DATE_SETTINGS);
 
   checkEqual('★★★★★ 已存在嘅兩季標咗 alreadyExists',
     plans.map((p) => p.quarterId + '=' + p.alreadyExists),
@@ -116,7 +132,7 @@ console.log('\n=== C4【核心】只 append 唔覆寫：已存在嘅季度整季
 console.log('\n=== C4：已存在嘅 ServiceDateID 逐行略過 ===');
 {
   const existingSD = { '2027T2-W01': true, '2027T2-W02': true };
-  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, existingSD);
+  const plans = gas.planAnnualQuarters_(2027, CALENDAR, {}, existingSD, DATE_SETTINGS);
   const t2 = plans[1];
 
   checkEqual('★★★★★ 兩行已存在 → newServiceDates 少兩行',
@@ -132,7 +148,7 @@ console.log('\n=== C6【核心】季度月份劃分可以由 Config 改（唔再
 {
   // 學期制：T1 由 2 月起、T2 由 5 月起、T3 由 8 月起、T4 由 11 月起
   const academic = { 1: 2, 2: 5, 3: 8, 4: 11 };
-  const plans = gas.planAnnualQuarters_(2027, academic, {}, {});
+  const plans = gas.planAnnualQuarters_(2027, academic, {}, {}, DATE_SETTINGS);
 
   checkEqual('★★★★★ 換咗月份劃分，起訖日跟住變（證明真係冇寫死）',
     plans.map((p) => p.startDate + '~' + p.endDate),
@@ -156,7 +172,7 @@ console.log('\n=== C6：computeCalendarQuarterRange_() 唔傳 startMonths 時維
 
 console.log('\n=== C2：預覽文字要列清楚每季起訖、主日數、第一個同最後一個主日 ===');
 {
-  const plans = gas.planAnnualQuarters_(2027, CALENDAR, { '2027T1': true }, {});
+  const plans = gas.planAnnualQuarters_(2027, CALENDAR, { '2027T1': true }, {}, DATE_SETTINGS);
   const preview = gas.buildAnnualQuartersPreview_(2027, plans, CALENDAR);
 
   check('★★★★ 四個 QuarterID 都出現',
@@ -166,8 +182,35 @@ console.log('\n=== C2：預覽文字要列清楚每季起訖、主日數、第�
   check('★★★★ 有第一個同最後一個主日', preview.indexOf('第一個 ') !== -1 && preview.indexOf('最後一個 ') !== -1);
   check('★★★★★ 已存在嘅季度明確標示「整季略過、不會覆寫」',
     preview.indexOf('整季略過') !== -1 && preview.indexOf('不會覆寫') !== -1, preview);
-  check('★★★★★ C5：明確提醒 GenerateOn／OfficialSendOn 留空、要跑「計算季度日期」',
-    preview.indexOf('GenerateOn') !== -1 && preview.indexOf('計算季度日期') !== -1, preview);
+  // ⚠️ 第四十四輪批次 G 組：呢一條反轉咗。
+  //
+  // 舊行為係「兩欄一律留空，之後跑『計算季度日期』補」，而呢條測試
+  // 守嘅就係「有冇提醒佢去跑」。實測結果：**佢冇跑。**
+  // Ivan 用呢個工具開咗 2028 四季，四季嘅 GenerateOn 全部空白，
+  // 然後喺主流程見到「這一季的 Quarters 沒有填生成日期」。
+  //
+  // 一句提醒抵唔過一個唔會有人做嘅步驟。而算呢兩個日期要嘅嘢
+  //（StartDate ＋ Config 前置日數）喺呢一步已經齊。所以而家一齊填。
+  check('★★★★★ 預覽逐季寫住算出嘅生成日期同正式發出日期'
+    + '——寫入之後先去 Quarters 逐格對，等於冇畀佢過目',
+    preview.indexOf('生成日期 2027-02-25') !== -1
+    && preview.indexOf('正式發出日期 2027-03-04') !== -1, preview);
+  check('★★★★★ 而且明講「會一併寫入，不用再另外執行計算季度日期」',
+    preview.indexOf('不用再另外執行') !== -1, preview);
+
+  // 算唔到嗰陣（Config 前置日數未填）要講返**原因**同**跟住做乜**。
+  const noLead = gas.planAnnualQuarters_(2027, CALENDAR, { '2027T1': true }, {},
+    { leadGenerate: null, leadOfficial: null, guardMode: 'NONE' });
+  const noLeadPreview = gas.buildAnnualQuartersPreview_(2027, noLead, CALENDAR);
+  check('★★★★★ 前置日數未填 ⇒ 明講算不出、原因、同跟住可以點做'
+    + '——一句「算不出」而唔講原因，幹事只會當佢係壞咗',
+    noLeadPreview.indexOf('算不出') !== -1
+    && noLeadPreview.indexOf('LEAD_DAYS_GENERATE') !== -1
+    && noLeadPreview.indexOf('計算季度日期') !== -1, noLeadPreview);
+  check('★★★★★ 而且**唔會**當成 0（即係開季當日）'
+    + '——當成 0，GenerateOn 就變咗「到咗先生成」，而幹事要嘅係提早 35 日',
+    noLead.every(function (p) { return p.generateOn === ''; }),
+    JSON.stringify(noLead.map(function (p) { return p.generateOn; })));
   check('★★★ 有講月份劃分喺 Config 邊個 Key 改',
     preview.indexOf('QUARTER_TERM_START_MONTHS') !== -1, preview);
   check('★★★ 有列出將新增嘅季度數同 ServiceDates 行數',
@@ -177,7 +220,7 @@ console.log('\n=== C2：預覽文字要列清楚每季起訖、主日數、第�
 console.log('\n=== C：閏年／年尾邊界 ===');
 {
   // 2028 係閏年
-  const plans2028 = gas.planAnnualQuarters_(2028, CALENDAR, {}, {});
+  const plans2028 = gas.planAnnualQuarters_(2028, CALENDAR, {}, {}, DATE_SETTINGS);
   checkEqual('★★★★ 閏年 T1 結束日係 3-31（唔會因為 2 月 29 而算錯）',
     plans2028[0].endDate, '2028-03-31');
   checkEqual('★★★★ T4 結束日一定係 12-31', plans2028[3].endDate, '2028-12-31');

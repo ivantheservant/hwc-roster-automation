@@ -40,7 +40,7 @@ function apiAnnualQuartersPlan(year) {
     const startMonths = readQuarterTermStartMonths_();
     const existing = readExistingQuarterAndServiceDateIds_();
     const plans = planAnnualQuarters_(y, startMonths,
-      existing.quarterIds, existing.serviceDateIds);
+      existing.quarterIds, existing.serviceDateIds, readQuarterDateSettings_());
 
     return {
       ok: true,
@@ -52,6 +52,11 @@ function apiAnnualQuartersPlan(year) {
           endDate: p.endDate,
           weekCount: p.weekCount,
           alreadyExists: !!p.alreadyExists,
+          // ⚠️ 第四十四輪批次 G 組：呢兩個要**返到畫面上**。
+          // 後端算咗而畫面唔顯示，幹事就要寫入之後去 Quarters 逐格對，
+          // 等於冇畀佢過目。
+          generateOn: p.generateOn || '',
+          officialSendOn: p.officialSendOn || '',
           newServiceDateCount: (p.newServiceDates || []).length,
           skippedServiceDates: p.skippedServiceDates || 0
         };
@@ -86,7 +91,7 @@ function apiAnnualQuartersExecute(year, confirmText) {
     const startMonths = readQuarterTermStartMonths_();
     const existing = readExistingQuarterAndServiceDateIds_();
     const plans = planAnnualQuarters_(plan.year, startMonths,
-      existing.quarterIds, existing.serviceDateIds);
+      existing.quarterIds, existing.serviceDateIds, readQuarterDateSettings_());
     const result = executeAnnualQuarters_(plans);
 
     writeZone3Audit_({

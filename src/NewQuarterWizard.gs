@@ -135,8 +135,12 @@ function planNewQuarterWizard_(year, term, customStartDate) {
   const guardMode = String(config[CONFIG_KEYS.SEND_WEEKDAY_GUARD] || 'NONE').toUpperCase();
   const leadGenerate = Number(config[CONFIG_KEYS.LEAD_DAYS_GENERATE]);
   const leadOfficial = Number(config[CONFIG_KEYS.LEAD_DAYS_OFFICIAL]);
-  const generateOn = isNaN(leadGenerate) ? '' : applyWeekdayGuard_(shiftDateString_(startDate, leadGenerate), guardMode);
-  const officialSendOn = isNaN(leadOfficial) ? '' : applyWeekdayGuard_(shiftDateString_(startDate, leadOfficial), guardMode);
+  // ⚠️ 第四十四輪批次 G 組：呢一句本來抄咗三份，而家收埋喺
+  // `computeQuarterDateFromLead_()`（`QuarterStage.gs`）。
+  // 三份之中改一份，另外兩份就會靜靜算出另一個日期，
+  // 而「自動排程今日會唔會跑」正正靠呢個值。
+  const generateOn = computeQuarterDateFromLead_(startDate, leadGenerate, guardMode);
+  const officialSendOn = computeQuarterDateFromLead_(startDate, leadOfficial, guardMode);
 
   let lastMonth = '';
   const serviceDates = sundays.map(function (date, i) {

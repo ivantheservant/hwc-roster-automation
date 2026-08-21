@@ -407,7 +407,23 @@ function proposeMinimalFixFromState_(context, analysis) {
       suggestedName: replacement.personId
         ? nameOfPersonId_(context, replacement.personId) : '',
       brokenRuleId: violation.ruleId,
-      reason: replacement.reason || violation.reason || violation.ruleId
+      // ⚠️ 第四十四輪批次 H1 第 4 項：**先講「為什麼」，才講「改成什麼」。**
+      //
+      // 本來寫 `replacement.reason || violation.reason || violation.ruleId`，
+      // 而 `replacement.reason` 幾乎一定有值（「建議改派 ○○」）——
+      // 所以 `violation.reason`（真正的原因，例如「上一週同崗位已是此人」）
+      // **由頭到尾沒有機會出現**。格註於是讀成：
+      //
+      //     系統改了這一格。原因：建議改派 試甲。原本是「試丙」，改成「試甲」。
+      //
+      // 「原因：建議改派 試甲」是一句同義反覆——它答的是「改成什麼」，
+      // 而 Ivan 要的是「為什麼改」。
+      //
+      // `FineTune.gs` 那一份（`proposeMinimalFix()`）本來就寫對了
+      //（`violation.reason + '；' + replacement.reason`）。這裡是同一個概念
+      // 的第二份，而且是走了樣那一份。現在跟回它。
+      reason: [violation.reason, replacement.reason]
+        .filter(Boolean).join('；') || violation.ruleId
     });
 
     if (!replacement.personId) {
@@ -481,7 +497,9 @@ function apiBuildSuggestion_locked_(quarterId, startFrom) {
       '這一季還沒有生成過任何版本。', '什麼都沒有改動。', ['先在第 1 步生成職事表']));
   }
 
-  const start = resolveSuggestionStartPoint_(quarterId, versionNo, startFrom);
+  const start = suggestionStep_('判斷這一次的起點是哪一張表', function () {
+    return resolveSuggestionStartPoint_(quarterId, versionNo, startFrom);
+  });
   if (start.needsChoice) {
     return {
       ok: false,
@@ -498,7 +516,9 @@ function apiBuildSuggestion_locked_(quarterId, startFrom) {
     };
   }
 
-  const built = buildSuggestionState_(quarterId, start);
+  const built = suggestionStep_('讀取那一張表並且計算建議', function () {
+    return buildSuggestionState_(quarterId, start);
+  });
   if (built.blocked) {
     return {
       ok: false,
@@ -548,7 +568,9 @@ function apiBuildSuggestion_locked_(quarterId, startFrom) {
   }
 
   const sheetName = buildSuggestionSheetName_(quarterId, built.versionNo);
-  const written = writeSuggestionSheet_(quarterId, built, sheetName);
+  const written = suggestionStep_('寫入建議工作表', function () {
+    return writeSuggestionSheet_(quarterId, built, sheetName);
+  });
 
   // ── 記低這一次的兩個指紋 ────────────────────────────────────
   //
@@ -556,12 +578,14 @@ function apiBuildSuggestion_locked_(quarterId, startFrom) {
   // 用同一個 `readGridTextFromSheet_()` 讀，下一次比對才會是同一把尺；
   // 兩把尺的話，幹事一格都沒有改，系統都會以為他改過。
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const gridFp = fingerprintGridText_(
-    readGridTextFromSheet_(start.gridSheetName, timezone));
-  const suggestionFp = fingerprintGridText_(
-    readGridTextFromSheet_(sheetName, timezone));
-  writeSuggestionFingerprints_(
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName), gridFp, suggestionFp);
+  suggestionStep_('記低這一次的起點指紋', function () {
+    const gridFp = fingerprintGridText_(
+      readGridTextFromSheet_(start.gridSheetName, timezone));
+    const suggestionFp = fingerprintGridText_(
+      readGridTextFromSheet_(sheetName, timezone));
+    writeSuggestionFingerprints_(
+      SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName), gridFp, suggestionFp);
+  });
 
   writeAuditLog_({
     action: 'SUGGESTION_BUILT',
@@ -690,8 +714,10 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
       + '系統就會用正式那一張做起點。兩張都改過的話，它會問你要用哪一張。']
   ];
   legend.forEach(function (line, i) {
-    sheet.getRange(i + 1, 1, 1, Math.max(2, line.length)).setValues(
-      [line.concat(new Array(Math.max(0, Math.max(2, line.length) - line.length)).fill(''))]);
+    const width = Math.max(3, line.length);
+    setSheetValuesSafely_(sheet, i + 1, 1,
+      [line.concat(new Array(Math.max(0, width - line.length)).fill(''))],
+      'writeSuggestionSheet_.legend');
   });
   sheet.getRange(2, 1).setBackground(SUGGESTION_COLOR_MANUAL);
   sheet.getRange(2, 2).setBackground(SUGGESTION_COLOR_SYSTEM);
@@ -702,7 +728,10 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
 
   // ── 表身（同正式表一樣的欄位）───────────────────────────────
   const grid = [layout.headers, layout.keys].concat(layout.rows);
-  sheet.getRange(headerRow, 1, grid.length, layout.keys.length).setValues(grid);
+  // ⚠️ 第四十四輪批次 A 組：見 src/SafeWrite.gs 檔頭。
+  // 呢一個 setValues() 嘅 index 1 就係 `layout.keys`——
+  // 而 Ivan 撞到嗰句錯正正就係 `illegal value in property: 1`。
+  setSheetValuesSafely_(sheet, headerRow, 1, grid, 'writeSuggestionSheet_.grid');
   sheet.getRange(headerRow, 1, 1, layout.keys.length)
     .setFontWeight('bold').setBackground(GRID_COLORS.HEADER);
   sheet.hideRows(headerRow + 1);
@@ -1022,7 +1051,11 @@ function fingerprintGridText_(map) {
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   keys.forEach(function (k) {
-    const s = k + ' ' + String(map[k] === undefined ? '' : map[k]) + '';
+    // ⚠️ 第四十四輪批次：呢兩個分隔符本來係**原始控制字元**（0x00／0x01）
+    // 直接嵌喺原始碼入面——`git` 因此把成個檔當成 binary（`grep` 搵唔到嘢），
+    // 而任何一次編輯器來回都可能靜靜噉丟咗佢哋，令指紋整批變值。
+    // 改成跳脫寫法：**算出嚟嘅值完全一樣**，只係唔再有原始控制字元。
+    const s = k + '\u0000' + String(map[k] === undefined ? '' : map[k]) + '\u0001';
     for (let i = 0; i < s.length; i++) {
       const c = s.charCodeAt(i);
       h1 = (h1 ^ c) * 16777619 >>> 0;
@@ -1047,7 +1080,8 @@ const SUGGESTION_FINGERPRINT_MARK = '[起點指紋]';
  */
 function writeSuggestionFingerprints_(sheet, gridFp, suggestionFp) {
   const row = sheet.getLastRow() + 2;
-  sheet.getRange(row, 1, 1, 3).setValues([[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp]]);
+  setSheetValuesSafely_(sheet, row, 1,
+    [[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp]], 'writeSuggestionFingerprints_');
   sheet.hideRows(row);
 }
 
@@ -1325,4 +1359,55 @@ function proposeGapFills_(context, workingState) {
     gapCount: gaps.length,
     triedCount: todo.length
   };
+}
+
+/**
+ * 第四十四輪批次 A 組：**每一步都要講得出自己叫什麼名。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 為什麼要有這個
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * Ivan 撳〔請系統幫我調整〕撞到三次同一句：
+ *
+ *     Failed due to illegal value in property: 1
+ *
+ * 那一句是 Google 那邊拋的，**完全講不出是哪一步、哪一格**。
+ * 三輪過去，那三次的資訊量加起來仍然是零。
+ *
+ * ⚠️ 這個包裝不會令錯誤消失。它做的是把
+ *
+ *     Failed due to illegal value in property: 1
+ *
+ * 變成
+ *
+ *     要留意：在「寫入建議工作表」這一步出錯。
+ *     系統原本的訊息：Failed due to illegal value in property: 1
+ *     現在的情況：建議表沒有做好；職事表一格都沒有改動。
+ *     你可以怎樣做：把上面整段複製給開發者⋯⋯
+ *
+ * 一句「是哪一步」，就把下一次的排查由三輪縮成一輪。
+ *
+ * ⚠️ **不可以吞掉。** 這裡一定要重新拋——吞掉就會變成
+ * 「撳完什麼都沒有發生」，而那是最難查的一種失敗。
+ *
+ * @param {string} label 這一步叫什麼（人話）
+ * @param {Function} fn 這一步做什麼
+ * @returns {*} `fn()` 的回傳值
+ */
+function suggestionStep_(label, fn) {
+  try {
+    return fn();
+  } catch (err) {
+    const raw = (err && err.message) ? err.message : String(err);
+    // 已經是三段式訊息（我們自己拋的）就原封不動——包多一層只會
+    // 令幹事讀到兩段重複的說明。
+    if (raw.indexOf('發生了什麼：') !== -1) throw err;
+    throw new Error(buildThreePartMessage_(
+      '在「' + label + '」這一步出錯。\n　系統原本的訊息：' + raw,
+      '建議表沒有做好。職事表一格都沒有改動。',
+      ['再撳一次——這一類錯有時是暫時的',
+        '仍然不行的話，把上面整段（包括「' + label + '」那幾個字）複製給開發者',
+        '想繼續改職事表的話，直接開職事表改就可以，這一個錯不影響它']));
+  }
 }

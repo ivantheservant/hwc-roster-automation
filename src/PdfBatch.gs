@@ -440,15 +440,11 @@ function checkMissingPersonalPdfs_(quarterId, versionNo, stage) {
  * @returns {Object} 進度物件
  */
 function loadPdfBatchProgress_(quarterId, versionNo) {
-  const raw = PropertiesService.getScriptProperties().getProperty(PDF_BATCH_PROGRESS_KEY);
-  if (raw) {
-    try {
-      const saved = JSON.parse(raw);
-      if (saved && saved.quarterId === quarterId && saved.versionNo === versionNo) return saved;
-    } catch (err) {
-      log_('WARN', 'generatePersonalPdfBatch_: 進度紀錄損毀，重新開始。' + err.message);
-    }
-  }
+  // 第四十四輪批次 A 組：讀寫一律經 `readState_()`／`saveState_()`。
+  // 讀不到或者爛咗，`readState_()` 自己會回 null 並且寫 log，
+  // 所以呢度唔使再包一層 try/catch。
+  const saved = readState_(PDF_BATCH_PROGRESS_KEY);
+  if (saved && saved.quarterId === quarterId && saved.versionNo === versionNo) return saved;
 
   const people = listPeopleNeedingPersonalPdf_(quarterId, versionNo);
   return {
@@ -473,7 +469,7 @@ function loadPdfBatchProgress_(quarterId, versionNo) {
  * @returns {void}
  */
 function savePdfBatchProgress_(progress) {
-  PropertiesService.getScriptProperties().setProperty(PDF_BATCH_PROGRESS_KEY, JSON.stringify(progress));
+  saveState_(PDF_BATCH_PROGRESS_KEY, progress);
 }
 
 /**
@@ -481,7 +477,7 @@ function savePdfBatchProgress_(progress) {
  * @returns {void}
  */
 function clearPdfBatchProgress_() {
-  PropertiesService.getScriptProperties().deleteProperty(PDF_BATCH_PROGRESS_KEY);
+  clearState_(PDF_BATCH_PROGRESS_KEY);
 }
 
 /**
@@ -496,17 +492,10 @@ function clearPdfBatchProgress_() {
  */
 function loadPdfResendBatchProgress_(quarterId, versionNo, personIds) {
   const signature = personIds.slice().sort().join(',');
-  const raw = PropertiesService.getScriptProperties().getProperty(PDF_RESEND_BATCH_PROGRESS_KEY);
-  if (raw) {
-    try {
-      const saved = JSON.parse(raw);
-      if (saved && saved.quarterId === quarterId && saved.versionNo === versionNo
-          && saved.signature === signature) {
-        return saved;
-      }
-    } catch (err) {
-      log_('WARN', 'generatePersonalPdfBatchForPeople_: 進度紀錄損毀，重新開始。' + err.message);
-    }
+  const saved = readState_(PDF_RESEND_BATCH_PROGRESS_KEY);
+  if (saved && saved.quarterId === quarterId && saved.versionNo === versionNo
+      && saved.signature === signature) {
+    return saved;
   }
 
   return {
@@ -532,7 +521,7 @@ function loadPdfResendBatchProgress_(quarterId, versionNo, personIds) {
  * @returns {void}
  */
 function savePdfResendBatchProgress_(progress) {
-  PropertiesService.getScriptProperties().setProperty(PDF_RESEND_BATCH_PROGRESS_KEY, JSON.stringify(progress));
+  saveState_(PDF_RESEND_BATCH_PROGRESS_KEY, progress);
 }
 
 /**
@@ -540,7 +529,7 @@ function savePdfResendBatchProgress_(progress) {
  * @returns {void}
  */
 function clearPdfResendBatchProgress_() {
-  PropertiesService.getScriptProperties().deleteProperty(PDF_RESEND_BATCH_PROGRESS_KEY);
+  clearState_(PDF_RESEND_BATCH_PROGRESS_KEY);
 }
 
 /**

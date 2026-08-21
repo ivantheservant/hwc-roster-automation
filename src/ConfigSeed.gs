@@ -518,7 +518,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, type: CONFIG_TYPES.STR, group: 'MAIL',
       defaultValue: '',
-      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不理 DRY_RUN 是甚麼。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封去到義工手上。留空＝正常寄給收件人本人。',
+      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不理 DRY_RUN 是甚麼。要多過一個地址（例如你自己加幫手那位一齊看）就用逗號、分號、頓號或者換行分開，例如「a@example.invalid, b@example.invalid」。每一個地址都要是正確格式，有一個打錯就整批不寄——不會「寄得到那幾個先寄」。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封去到義工手上。留空＝正常寄給收件人本人。',
       editable: 'TRUE'
     },
     // ---- ICS（第十一輪批次階段 C：日曆檔）----

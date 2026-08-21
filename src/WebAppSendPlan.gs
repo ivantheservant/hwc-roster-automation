@@ -230,6 +230,18 @@ function listSendCandidates_(quarterId, kind) {
     }
   });
 
+  // ⚠️ 第四十四輪批次 B 組：**每一行都要講得出「勾唔勾得」同「點解」。**
+  //
+  // Ivan 三次講同一件事：「自己選擇寄給誰」嗰個名單要同「處理紙本」
+  // 一模一樣。查落佢見到嘅同紙本嗰個唔同，成因唔係元件寫錯咗，
+  // 而係**兩個名單本身裝住唔同嘅人**：
+  //
+  //   ・處理紙本　　這一季有服侍嘅人（幾十位，有名、有格數）
+  //   ・寄出 REVIEW　`EmailRecipients` 嗰幾個堂委地址（冇名、冇格數）
+  //
+  // 所以呢一輪做兩件事：一、逐行標明勾唔勾得；
+  // 二、回一句 `listNote` 講明「呢一次個名單入面係邊啲人」——
+  // 唔講嘅話，佢喺 REVIEW 撳開見到三行地址，只會以為個功能未做。
   return listRecipients_(stage, context).map(function (r) {
     const assigned = r.personId
       ? (context.assignmentsByPerson[r.personId] || []).length : 0;
@@ -241,6 +253,9 @@ function listSendCandidates_(quarterId, kind) {
       // 查不到電郵的人照樣列出來，並且講明——他不是「不用服侍」，
       // 是要印紙本（第 5 步）。
       hasEmail: !!String(r.email || '').trim(),
+      // ⚠️ 冇電郵嘅**勾唔到**。淨係喺後面加一行字而仲勾得到，
+      // 佢會勾咗，然後以為嗰個人會收到——而系統會靜靜略過。
+      selectable: !!String(r.email || '').trim(),
       roles: r.personId ? (rolesByPerson[r.personId] || []) : []
     };
   });
@@ -259,16 +274,49 @@ function sendKindToStage_(kind) {
 }
 
 /**
- * 供前端呼叫：「自己揀」那個名單。**純讀取。**
+ * 第四十四輪批次 B 組：「這一次的名單入面是哪些人」，一句人話。
+ *
+ * ⚠️ 這一句是必須的。Ivan 三次講「自己選擇那個名單未做」，而查落
+ * 程式碼一直都在——他見到的是 REVIEW 階段那個**只有幾行電郵地址**的
+ * 名單，同「處理紙本」那個幾十位有名有格數的完全不同，所以他當成
+ * 未做。**兩個名單裝住不同的人**，那是階段本身的分別，不是 bug；
+ * 但畫面一句都沒有講，他沒有任何方法看得出。
+ *
+ * @param {string} kind SEND_KIND 之一
+ * @param {number} total 名單有幾多行
+ * @returns {string} 一句
+ */
+function describeSendCandidateList_(kind, total) {
+  if (kind === SEND_KIND.REVIEW) {
+    return '這一次是寄給堂委審閱，所以名單上是「收件人名單」那 ' + total
+      + ' 位（堂委的電郵地址），不是義工。義工這一次一封都不會收到。';
+  }
+  if (kind === SEND_KIND.RESEND) {
+    return '這一次是改動後重發，所以名單上是這一季安排有改動的那幾位，'
+      + '加上收件人名單（共 ' + total + ' 位）。';
+  }
+  return '名單上是這一季有服侍的義工，加上收件人名單（共 ' + total + ' 位）。'
+    + '每一位後面寫住他這一季有幾多格。';
+}
+
+/**
+ * 供前端呼叫：「自己選擇」那個名單。**純讀取。**
+ *
+ * ⚠️ 第四十四輪批次 B 組改了回傳形狀：由一個陣列改成
+ * `{ items, listNote }`。改形狀是有意的——舊形狀沒有位置放那一句
+ * 「這一次的名單入面是哪些人」，而少了那一句，幹事在不同階段撳開
+ * 見到長短差很遠的名單，沒有辦法知道是階段的分別還是壞了。
+ *
  * @param {string} quarterId 季度 ID
  * @param {string} kind SEND_KIND 之一
- * @returns {Object[]} 名單
+ * @returns {{items: Object[], listNote: string}} 名單同一句說明
  */
 function apiGetSendCandidates(quarterId, kind) {
   assertWebAppRequestAllowed_();
   beginSheetReadMemo_();
   try {
-    return listSendCandidates_(quarterId, kind);
+    const items = listSendCandidates_(quarterId, kind);
+    return { items: items, listNote: describeSendCandidateList_(kind, items.length) };
   } finally {
     endSheetReadMemo_();
   }

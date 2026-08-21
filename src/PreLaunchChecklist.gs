@@ -122,10 +122,15 @@ function buildPreLaunchChecklist_(quarterId) {
   // 而全體義工一封都收不到——五十一封全部去了同一個測試信箱。
   //
   // 所以它不是「請你留意」，是**必須處理**。
+  // ⚠️ 第四十四輪批次 E 組：可以有多過一個地址。逐個列出來——
+  // 只講「有 2 個」的話，幹事要走去 Config 才知道是哪幾個，
+  // 而那正是他在上線前不會做的一步。
+  let redirectList = [];
   let redirectTo = '';
   let redirectReadError = '';
   try {
-    redirectTo = readMailRedirectTarget_();
+    redirectList = readMailRedirectTargets_();
+    redirectTo = redirectList.join('、');
   } catch (err) {
     // 設定本身有問題（例如填了一個不像電郵的字串）也要報——
     // 那個情況下寄信會整批拋錯，一封都寄不出。
@@ -136,7 +141,10 @@ function buildPreLaunchChecklist_(quarterId) {
     redirectTo === '' && redirectReadError === '',
     redirectReadError
       ? ('設定有問題：' + redirectReadError)
-      : (redirectTo ? ('有值：' + redirectTo) : '（空白，正常）'),
+      : (redirectTo
+        ? ('有值：' + redirectTo
+          + (redirectList.length > 1 ? ('（共 ' + redirectList.length + ' 個地址）') : ''))
+        : '（空白，正常）'),
     redirectReadError
       ? '這個設定填了一個不像電郵地址的值。寄信會整批失敗，一封都寄不出。去 Config 改正，或者清空。'
       : (redirectTo

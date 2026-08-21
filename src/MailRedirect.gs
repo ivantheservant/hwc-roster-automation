@@ -21,6 +21,11 @@
  * Config 有值的時候，**每一封信的收件人一律改成那個地址**，
  * 不論 `DRY_RUN` 是 `TRUE` 還是 `FALSE`。
  *
+ * ⚠️ 第四十四輪批次 E 組：可以填**多過一個**地址，用逗號、分號、頓號
+ * 或者換行分開都可以（例如「我自己 ＋ 幫手那位」一齊看同一批信）。
+ * 逐個地址照樣要通過 `isPlausibleEmail_()`；有一個打錯就整批拋，
+ * 不會「寄得到那幾個先寄」——部分成功在這裡是最壞的結果。
+ *
  * 於是 `DRY_RUN = FALSE` ＋ `MAIL_REDIRECT_ALL_TO = 你自己的地址`
  * 就可以走完整條路，而**沒有任何一封會去到義工手上**。
  *
@@ -43,26 +48,98 @@
  */
 
 /**
- * 現時的轉寄地址。空字串代表沒有設定（正常運作）。
+ * 第四十四輪批次 E 組：**可以填多過一個地址。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 點解要改
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * Ivan 想同時用兩個信箱睇實測（一個自己、一個幫手嗰位）。他在 Config 填了
+ * 兩個地址、用逗號分隔，然後一撳寄出就收到：
+ *
+ *     Config 的 MAIL_REDIRECT_ALL_TO 填了「a@…, b@…」，
+ *     但它看起來不像一個電郵地址。
+ *
+ * 成因：整串字直接餵去 `isPlausibleEmail_()`，而它見到逗號同空白就回
+ * `false`（它本來就是驗**一個**地址的）。
+ *
+ * ⚠️ 分隔符要收得闊：逗號、分號、頓號、換行、空白都算。
+ * 幹事在試算表一格入面打兩個地址，最自然就是打一個頓號或者換行——
+ * 而「只認半形逗號」等於把同一個錯留在下一次。
+ *
+ * ⚠️ 但驗證**不可以放寬**：逐個地址照樣要通過 `isPlausibleEmail_()`。
+ * 一個打錯的地址混在裡面而系統照寄，等於那一封靜靜掉進黑洞。
+ *
+ * @param {string} raw Config 那一格的原文
+ * @returns {{targets: string[], bad: string[]}} 通過的、同埋看起來不像電郵的
+ */
+function parseMailRedirectTargets_(raw) {
+  const text = String(raw === null || raw === undefined ? '' : raw);
+  const pieces = text.split(/[,;、\s]+/)
+    .map(function (s) { return s.trim(); })
+    .filter(function (s) { return s !== ''; });
+
+  const targets = [];
+  const bad = [];
+  pieces.forEach(function (p) {
+    if (!isPlausibleEmail_(p)) { bad.push(p); return; }
+    // 重複嘅唔算錯，但唔好寄兩次。
+    if (targets.indexOf(p) === -1) targets.push(p);
+  });
+  return { targets: targets, bad: bad };
+}
+
+/**
+ * 現時的轉寄地址，逐個。空陣列代表沒有設定（正常運作）。
  *
  * ⚠️ 讀不到 Config **不可以當成「沒有設定」**——那樣會在應該轉寄的時候
  * 真的寄給義工。讀不到就拋，寧可寄不出。
  *
+ * ⚠️ 有一個打錯就**整批拋**，不會「寄得到那幾個先寄」。
+ * 部分成功在這裡是最壞的結果：幹事見到信到了，就以為設定沒有問題，
+ * 而其實有一個地址由頭到尾收不到，他要對到最後才發現。
+ *
+ * @returns {string[]} 轉寄地址；沒有設定時回空陣列
+ */
+function readMailRedirectTargets_() {
+  const raw = getConfig(CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, '');
+  const value = String(raw === null || raw === undefined ? '' : raw).trim();
+  if (!value) return [];
+
+  const parsed = parseMailRedirectTargets_(value);
+  if (parsed.bad.length > 0) {
+    throw new Error(buildThreePartMessage_(
+      'Config 的 ' + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO + ' 入面，這 '
+        + parsed.bad.length + ' 個看起來不像電郵地址：' + parsed.bad.join('、'),
+      '一封都沒有寄出。',
+      ['去 Config 工作表把它們改成正確的電郵地址',
+        '要填多過一個地址的話，用逗號、分號、頓號或者換行分開都可以',
+        '或者把整格清空——清空就代表正常寄給收件人本人']));
+  }
+  if (parsed.targets.length === 0) {
+    // 例如成格得幾個逗號。當成「填錯咗」處理，唔可以當成冇設定——
+    // 當成冇設定就會真係寄咗俾義工。
+    throw new Error(buildThreePartMessage_(
+      'Config 的 ' + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO + ' 填了「' + value
+        + '」，但入面找不到任何一個電郵地址。',
+      '一封都沒有寄出。',
+      ['去 Config 工作表填一個正確的電郵地址',
+        '或者把整格清空——清空就代表正常寄給收件人本人']));
+  }
+  return parsed.targets;
+}
+
+/**
+ * 現時的轉寄地址，砌成 `MailApp.sendEmail()` 收得嘅一個字串。
+ * 空字串代表沒有設定（正常運作）。
+ *
+ * ⚠️ 名同回傳型別都保持不變，因為 `sendRealEmail_()` 要嘅正正係
+ * 一個「收件人字串」。多過一個就用逗號駁埋——`MailApp` 本身收得。
+ *
  * @returns {string} 轉寄地址；沒有設定時回空字串
  */
 function readMailRedirectTarget_() {
-  const raw = getConfig(CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, '');
-  const value = String(raw === null || raw === undefined ? '' : raw).trim();
-  if (!value) return '';
-  if (!isPlausibleEmail_(value)) {
-    throw new Error(buildThreePartMessage_(
-      'Config 的 ' + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO + ' 填了「' + value
-        + '」，但它看起來不像一個電郵地址。',
-      '一封都沒有寄出。',
-      ['去 Config 工作表把它改成一個正確的電郵地址',
-        '或者把它清空——清空就代表正常寄給收件人本人']));
-  }
-  return value;
+  return readMailRedirectTargets_().join(',');
 }
 
 /**
@@ -125,13 +202,17 @@ function buildRedirectBannerHtml_(text) {
  * @returns {string} 標籤文字；沒有設定時回空字串
  */
 function buildMailRedirectBadgeText_() {
-  let target = '';
+  let targets = [];
   try {
-    target = readMailRedirectTarget_();
+    targets = readMailRedirectTargets_();
   } catch (err) {
     // 設定有問題本身也要講出來——比「沒有標籤」好。
     return '⚠️ 轉寄設定有問題：' + err.message.split('\n')[0];
   }
-  if (!target) return '';
-  return '⚠️ 全部信件轉寄至 ' + target;
+  if (targets.length === 0) return '';
+  // ⚠️ 第四十四輪批次 E 組：**逐個列出來，不可以只講「2 個地址」。**
+  // 這個標籤唯一的用途，就是讓幹事一眼認得出「這不是我要的設定」。
+  // 只講個數，他要走去 Config 才知道是哪幾個——而那正是他不會做的一步。
+  return '⚠️ 全部信件轉寄至 ' + targets.join('、')
+    + (targets.length > 1 ? ('（共 ' + targets.length + ' 個地址）') : '');
 }

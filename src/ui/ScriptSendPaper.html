@@ -121,6 +121,8 @@
   let sendOptions_ = null;
   /** 「自己揀」嗰個名單（第一次撳先去攞）。 */
   let sendCandidates_ = null;
+  /** 第四十四輪批次 B 組：呢個名單入面係邊啲人（後端出嘅一句人話）。 */
+  let sendCandidateNote_ = '';
 
   function renderSendMain(s) {
     // ⚠️ 每次開窗都重設，而且用**後端**畀嘅預設值。
@@ -133,6 +135,7 @@
       extraEmailsRaw: ''
     };
     sendCandidates_ = null;
+    sendCandidateNote_ = '';
     drawSendMain(s);
   }
 
@@ -318,7 +321,10 @@
   function openSendPickList(s, keyword) {
     if (sendCandidates_) { drawSendPickList(s, keyword || ''); return; }
     runAction('讀取收件名單', async () => {
-      sendCandidates_ = await callServer('apiGetSendCandidates', currentQuarterId, s.kind);
+      const r = await callServer('apiGetSendCandidates', currentQuarterId, s.kind);
+      // 第四十四輪批次 B 組：後端而家連埋一句「呢個名單入面係邊啲人」。
+      sendCandidates_ = r.items || [];
+      sendCandidateNote_ = r.listNote || '';
       drawSendPickList(s, '');
     });
   }
@@ -333,12 +339,13 @@
     const items = sendCandidates_.map((c) => ({
       key: c.key,
       label: c.displayName,
-      note: (c.type === 'LIST' ? '（名單）' : ('（這一季 ' + c.cellCount + ' 格）'))
+      disabled: c.selectable === false,
+      note: (c.type === 'LIST' ? '（收件人名單）' : ('（這一季 ' + c.cellCount + ' 格）'))
         // 第四十三輪批次 E 組：身分寫喺個名後面，噉佢自己勾嗰陣都睇得到。
         + describeRoleTags(c.roles),
       // 查不到電郵嘅照樣列出嚟，並且講明。佢唔係「唔使服侍」，
       // 係要印紙本（第 5 步）——收埋佢就等於靜靜當佢唔存在。
-      warn: c.hasEmail ? '' : '⚠ 查不到電郵，寄不到，要印紙本'
+      warn: c.hasEmail ? '' : '⚠ 沒有電郵，收不到信——要用第 4 步印紙本給他'
     }));
 
     const redraw = (kw) => {
@@ -348,6 +355,11 @@
 
     const nodes = [
       para('選擇哪幾位要收到這一封信。'),
+      // ⚠️ 第四十四輪批次 B 組：**一定要講明呢個名單入面係邊啲人。**
+      // Ivan 三次以為呢個功能未做，成因就係佢喺 REVIEW 見到三行電郵地址，
+      // 而「處理紙本」嗰個係幾十位有名有格數——兩個名單裝住唔同嘅人，
+      // 而畫面一句都冇講。
+      make('div', { text: sendCandidateNote_, className: 'ok-line strong' }),
       para('沒有選到的人，這一次一封都不會收到。', 'muted')
     ];
 
@@ -362,8 +374,10 @@
     const groupBox = make('div', { className: 'sec' }, [sectionTitle('一次過加一整組')]);
     let hasGroup = false;
     [['COMMITTEE', '全部堂委'], ['DEACON', '全部執事']].forEach((g) => {
+      // ⚠️ 第四十四輪批次 B 組：冇電郵嘅唔算入群組——勾咗都收唔到，
+      // 而勾一個收唔到嘅人只會令個數字講大話。
       const members = sendCandidates_.filter(
-        (c) => (c.roles || []).indexOf(g[0]) !== -1);
+        (c) => (c.roles || []).indexOf(g[0]) !== -1 && c.selectable !== false);
       if (members.length === 0) return;
       hasGroup = true;
       const allIn = members.every((c) => selected[c.key] === true);
@@ -735,21 +749,31 @@
             className: 'lines'
           })
         ]),
-        para('如果那幾份 PDF 還未產生過，先撳「產生並取得連結」。', 'muted')
+        // ⚠️ 第四十四輪批次 D 組：舊嗰句係「如果那幾份 PDF 還未產生過，
+        // 先撳『產生並取得連結』」——即係系統明明知道欠邊幾份、
+        // 明明有工具補得返，但叫幹事自己去撳多一粒掣。Ivan 就係喺呢度
+        // 收到「一份個人 PDF 都找不到。」
+        para('還未產生的，系統會在寄之前自己補產生，不用先撳「產生並取得連結」。'
+          + '份數多的時候一次可能做不完，做不完會停下來講清楚還差多少，'
+          + '再撳一次就會接住做。', 'muted')
       ],
       confirmLabel: '寄給我自己',
       onConfirm: () => {
         if (!commitExtraEmails(paperExtra_)) return;
-        runAction('寄到自己信箱', async () => {
+        runAction('產生欠缺的 PDF 並寄出', async () => {
           const r = await callServerMutating(
             'apiEmailPaperPackToSelf', currentQuarterId, ids, paperExtra_.extraEmails);
-          const nodes = [
-            make('div', { text: '已寄出', className: 'ok-head' }),
-            para(r.message)
-          ];
+
+          // ⚠️ 未做齊 ⇒ **一封都未寄**。呢個唔可以用「已寄出」個綠色頭
+          // 嚟報——幹事見到綠色就會走去印，而信根本未到。
+          const nodes = r.pending
+            ? [make('div', { text: '還未寄出——還在補產生 PDF', className: 'warn-head' }),
+              para(r.message)]
+            : [make('div', { text: '已寄出', className: 'ok-head' }), para(r.message)];
+
           if (r.missing && r.missing.length > 0) {
             const box = make('div', { className: 'sec sec-warn' }, [
-              sectionTitle('這 ' + r.missing.length + ' 位找不到 PDF，沒有夾進去')
+              sectionTitle('這 ' + r.missing.length + ' 位補不到 PDF，沒有夾進去')
             ]);
             r.missing.forEach((m) => {
               box.appendChild(make('div', {
@@ -758,7 +782,14 @@
             });
             nodes.push(box);
           }
-          openModal('寄到自己信箱', nodes, [button('知道了', () => closeModal(), '')]);
+
+          // 未做齊 ⇒ 直接俾一粒「接住做」，唔好要佢由頭撳過一次。
+          const acts = [];
+          if (r.pending) {
+            acts.push(button('接住做餘下的', () => { closeModal(); runPaperEmail(); }, ''));
+          }
+          acts.push(button('知道了', () => closeModal(), r.pending ? 'secondary' : ''));
+          openModal('寄到自己信箱', nodes, acts);
         });
       }
     });

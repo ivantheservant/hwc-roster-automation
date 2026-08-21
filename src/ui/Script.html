@@ -183,10 +183,40 @@
     return dashboardState_;
   }
 
+  /**
+   * 講一句畀幹事聽。
+   *
+   * ⚠️ 第四十四輪批次 C 組：**彈窗開住嘅時候一定要寫入彈窗本身。**
+   *
+   * 重現：寄出 ▸ 寄給誰揀「自己選擇」▸ 一個都唔勾 ▸ 撳〔寄出〕。
+   * 修正之前：`onConfirm` 叫 `setStatus('你選了「自己選擇」，但一位都
+   * 沒有選。', true)` 然後 `return`。而 `#status` 喺畫面最頂、
+   * 喺 `.modal-backdrop`（`position: fixed; inset: 0; z-index: 100`，
+   * 半透明黑）**下面**——所以嗰句字寫咗，但一個像素都見唔到。
+   * 幹事見到嘅係：**撳落去完全冇反應。**
+   *
+   * 呢個唔係得一個位。任何一句喺彈窗開住時講嘅話都一樣消失。
+   * 所以修喺呢度（唯一入口），唔係逐個呼叫端補。
+   *
+   * @param {string} message 一句人話；空字串等於清走
+   * @param {boolean=} isError 係咪錯誤（紅色）
+   */
   function setStatus(message, isError) {
     const node = el('status');
     node.textContent = message || '';
     node.className = isError ? 'status error' : 'status';
+
+    // 彈窗開住 ⇒ 頂嗰條睇唔到，一定要喺彈窗入面再講一次。
+    const inModal = el('modalStatus');
+    if (!inModal) return;
+    if (modalOpen && message) {
+      inModal.textContent = message;
+      inModal.className = isError ? 'modal-status' : 'modal-status ok';
+      inModal.hidden = false;
+    } else {
+      inModal.textContent = '';
+      inModal.hidden = true;
+    }
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -527,11 +557,26 @@
       const line = make('label', { className: 'check-row' });
       const cb = document.createElement('input');
       cb.type = 'checkbox';
-      cb.checked = o.selected[it.key] === true;
-      cb.addEventListener('change', () => {
-        o.selected[it.key] = cb.checked;
-        if (o.onToggle) o.onToggle();
-      });
+      // ⚠️ 第四十四輪批次 B 組：勾唔到嘅要**真係勾唔到**。
+      //
+      // Ivan 明講「冇電郵嘅人要標示『冇電郵，收唔到信』，而且唔可以勾」。
+      // 淨係喺後面加一行字而仲勾得到，佢會勾咗，然後以為嗰個人會收到
+      // ——而系統會靜靜略過。一個勾得到但冇作用嘅勾，
+      // 同一粒撳咗冇反應嘅掣係同一種錯。
+      if (it.disabled) {
+        cb.disabled = true;
+        cb.checked = false;
+        // 已經喺已選名單入面就要清走——否則佢之前勾過（或者由群組勾入）
+        // 嗰個人會留喺 `selected` 入面，而畫面上顯示未勾。
+        if (o.selected[it.key]) o.selected[it.key] = false;
+        line.className = 'check-row muted';
+      } else {
+        cb.checked = o.selected[it.key] === true;
+        cb.addEventListener('change', () => {
+          o.selected[it.key] = cb.checked;
+          if (o.onToggle) o.onToggle();
+        });
+      }
       line.appendChild(cb);
       line.appendChild(make('span', {
         text: it.label + (it.note ? ('　' + it.note) : '') + (it.warn ? ('　' + it.warn) : '')
@@ -699,7 +744,8 @@
   function pickListBulkButtons(items, selected, onRedraw) {
     return [
       button('全部選擇', () => {
-        items.forEach((it) => { selected[it.key] = true; });
+        // ⚠️ 第四十四輪批次 B 組：勾唔到嗰啲唔可以由「全部選擇」偷偷勾入。
+        items.forEach((it) => { if (!it.disabled) selected[it.key] = true; });
         onRedraw();
       }, 'secondary'),
       button('全部不選', () => {
@@ -725,15 +771,27 @@
     (bodyNodes || []).forEach((n) => { if (n) body.appendChild(n); });
     const actions = clear(el('modalActions'));
     (actionNodes || []).forEach((n) => { if (n) actions.appendChild(n); });
+    // ⚠️ 第四十四輪批次 C 組：換一個彈窗就要清走上一個嘅訊息——
+    // 留住嘅話，幹事會喺一個全新嘅彈窗上面見到一句同佢無關嘅紅字。
+    clearModalStatus_();
     el('modalBackdrop').hidden = false;
     modalOpen = true;
     body.scrollTop = 0;
+  }
+
+  /** 第四十四輪批次 C 組：清走彈窗嗰條訊息列。 */
+  function clearModalStatus_() {
+    const node = el('modalStatus');
+    if (!node) return;
+    node.textContent = '';
+    node.hidden = true;
   }
 
   function closeModal() {
     el('modalBackdrop').hidden = true;
     clear(el('modalBody'));
     clear(el('modalActions'));
+    clearModalStatus_();
     modalOpen = false;
   }
 

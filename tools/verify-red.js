@@ -105,7 +105,11 @@ const MUTATIONS = [
     why: '把「轉寄地址填錯」還原成當成冇設定'
       + '——喺應該轉寄嘅時候真係寄咗俾義工',
     file: 'src/MailRedirect.gs',
-    find: '  if (!isPlausibleEmail_(value)) {',
+    // ⚠️ 第四十四輪批次 E 組改寫咗 `readMailRedirectTarget_()`（支援多個地址），
+    // 舊嗰行 `if (!isPlausibleEmail_(value))` 唔再存在。呢一條守嘅嘢冇變：
+    // 「Config 填咗一個算唔出任何地址嘅值」**唔可以**當成冇設定——
+    // 當成冇設定就會喺應該轉寄嘅時候真係寄咗俾義工。
+    find: '  if (parsed.targets.length === 0) {',
     replace: '  if (false) {',
     tests: ['tests/mail_redirect.test.js']
   },
@@ -517,13 +521,15 @@ const MUTATIONS = [
       + '再喺正式表改兩格，第二次調整會當嗰兩格唔存在。'
       + '而建議表上面自己寫住「系統會用你改完之後那一版做起點」',
     file: 'src/SuggestionSheet.gs',
-    find: '  const start = resolveSuggestionStartPoint_(quarterId, versionNo, startFrom);',
-    replace: '  const start = { versionNo: versionNo, needsChoice: false,\n'
-      + '    source: SpreadsheetApp.getActiveSpreadsheet().getSheetByName(\n'
-      + '      buildSuggestionSheetName_(quarterId, versionNo))\n'
-      + '      ? SUGGESTION_START.SUGGESTION : SUGGESTION_START.GRID,\n'
-      + '    gridSheetName: buildRosterSheetName_(quarterId, versionNo),\n'
-      + '    suggestionSheetName: buildSuggestionSheetName_(quarterId, versionNo) };',
+    // ⚠️ 第四十四輪批次 A 組把呢一句包咗入 suggestionStep_()，
+    // 所以 find 由 const start = … 改成入面嗰句 return …。
+    find: '    return resolveSuggestionStartPoint_(quarterId, versionNo, startFrom);',
+    replace: '    return { versionNo: versionNo, needsChoice: false,\n'
+      + '      source: SpreadsheetApp.getActiveSpreadsheet().getSheetByName(\n'
+      + '        buildSuggestionSheetName_(quarterId, versionNo))\n'
+      + '        ? SUGGESTION_START.SUGGESTION : SUGGESTION_START.GRID,\n'
+      + '      gridSheetName: buildRosterSheetName_(quarterId, versionNo),\n'
+      + '      suggestionSheetName: buildSuggestionSheetName_(quarterId, versionNo) };',
     tests: ['tests/suggestion_start_point.test.js']
   },
   {
@@ -772,6 +778,214 @@ const MUTATIONS = [
     replace: '    } else if (false) {',
     tests: ['tests/round43_field_fixes.test.js']
   },
+  {
+    id: 'send-list-note-off',
+    why: '拆走「呢一次個名單入面係邊啲人」嗰一句'
+      + '——Ivan 一連三輪以為「自己選擇」未做，成因就係呢一句一直冇講：'
+      + 'REVIEW 撳開得三行電郵地址，同紙本嗰幾十行完全唔似樣',
+    file: 'src/WebAppSendPlan.gs',
+    find: '    return { items: items, listNote: describeSendCandidateList_(kind, items.length) };',
+    replace: '    return { items: items, listNote: \'\' };',
+    tests: ['tests/send_pick_list_parity.test.js']
+  },
+  {
+    id: 'send-pick-noemail',
+    why: '把「冇電郵嘅人」改返做勾得到'
+      + '——勾得到但寄唔到，幹事會見到「已選 12 位」而實際只寄出 10 封，'
+      + '而畫面上完全睇唔出',
+    file: 'src/WebAppSendPlan.gs',
+    find: '      selectable: !!String(r.email || \'\').trim(),',
+    replace: '      selectable: true,',
+    tests: ['tests/send_pick_list_parity.test.js']
+  },
+  {
+    id: 'picklist-disabled',
+    why: '令 `pickListNodes()` 唔理 `disabled`'
+      + '——後端標咗勾唔到，畫面照樣勾得到，等於後端嗰個標記白做',
+    file: 'src/ui/Script.html',
+    find: '      if (it.disabled) {',
+    replace: '      if (false) {',
+    tests: ['tests/send_pick_list_parity.test.js']
+  },
+  {
+    id: 'modal-status-blind',
+    why: '把「彈窗開住嗰陣講嘅話」還原成只寫畫面最頂嗰條 `#status`'
+      + '——嗰條喺 `.modal-backdrop`（fixed／inset 0／z-index 100／半透明黑）'
+      + '下面，所以撳〔寄出〕而一位都冇揀，幹事見到嘅係完全冇反應',
+    file: 'src/ui/Script.html',
+    find: '    if (modalOpen && message) {',
+    replace: '    if (false) {',
+    tests: ['tests/modal_status_visible.test.js']
+  },
+  {
+    id: 'modal-status-stale',
+    why: '拆走「開新彈窗要清走上一個嘅訊息」'
+      + '——幹事會喺一個全新彈窗上面見到一句同佢完全無關嘅紅字',
+    file: 'src/ui/Script.html',
+    find: '    clearModalStatus_();\n    el(\'modalBackdrop\').hidden = false;',
+    replace: '    el(\'modalBackdrop\').hidden = false;',
+    tests: ['tests/modal_status_visible.test.js']
+  },
+  {
+    id: 'paper-no-autogen',
+    why: '拆走「寄之前自己補產生欠嗰幾份」'
+      + '——即係回到 Ivan 撞到嗰個死胡同：系統明明知道欠邊幾份、'
+      + '明明有工具補得返，卻回一句「一份個人 PDF 都找不到。」',
+    file: 'src/PaperPack.gs',
+    find: '  if (split.generatable.length > 0) {\n    const needIds',
+    replace: '  if (false) {\n    const needIds',
+    tests: ['tests/paper_pack_autogen.test.js']
+  },
+  {
+    id: 'paper-partial-send',
+    why: '令「補產生未做齊」照樣寄出'
+      + '——幹事收到一封夾住三十份嘅信唔會逐份數，佢會印晒派晒，'
+      + '然後有幾位企喺度冇紙，而佢由頭到尾唔知少咗邊個',
+    file: 'src/PaperPack.gs',
+    find: '    if (!autoBatch.done || split.generatable.length > 0) {',
+    replace: '    if (false) {',
+    tests: ['tests/paper_pack_autogen.test.js']
+  },
+  {
+    id: 'paper-missing-merged',
+    why: '把「`NameMapping` 查唔到」同「未產生過」混返做一種'
+      + '——查唔到編號嗰啲補極都補唔到，混埋一齊就會叫幹事'
+      + '一次又一次撳同一粒掣',
+    file: 'src/PaperPack.gs',
+    find: '    if (m && String(m.nameTC || \'\').trim()) generatable.push(m);',
+    replace: '    if (m) generatable.push(m);',
+    tests: ['tests/paper_pack_autogen.test.js']
+  },
+  {
+    id: 'redirect-single-only',
+    why: '把轉寄地址還原成「成串字當一個地址驗」'
+      + '——Ivan 填兩個地址用逗號分隔，一撳寄出就收到'
+      + '「填了⋯⋯但它看起來不像一個電郵地址」',
+    file: 'src/MailRedirect.gs',
+    find: '  const pieces = text.split(/[,;、\\s]+/)',
+    replace: '  const pieces = [text]',
+    tests: ['tests/mail_redirect.test.js']
+  },
+  {
+    id: 'redirect-skip-bad',
+    why: '令打錯咗嗰個地址靜靜略過，淨係寄好嗰幾個'
+      + '——部分成功喺呢度係最壞嘅結果：幹事見到信到咗就以為設定啱，'
+      + '而其實有一個地址由頭到尾收唔到',
+    file: 'src/MailRedirect.gs',
+    find: '  if (parsed.bad.length > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/mail_redirect.test.js']
+  },
+  {
+    id: 'redirect-badge-count',
+    why: '把介面標籤還原成只講個數，唔逐個列出'
+      + '——呢個標籤唯一嘅用途就係俾幹事一眼認得出「呢個唔係我要嘅設定」，'
+      + '淨係講個數，佢要走去 Config 先知係邊幾個',
+    file: 'src/MailRedirect.gs',
+    find: '  return \'⚠️ 全部信件轉寄至 \' + targets.join(\'、\')',
+    replace: '  return \'⚠️ 全部信件轉寄至 \' + (\'\')',
+    tests: ['tests/mail_redirect.test.js']
+  },
+  {
+    id: 'generate-skip-ask',
+    why: '把「使唔使先改名單」嗰一問由入口搬走'
+      + '——即係第四十三輪嘅狀態：三條去生成嘅路只有一條問過，'
+      + '而「下一個未生成嘅季度」好多時就係冇問嗰條',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    askEligibilityFirst(function () { openGenerateDraftAfterAsking_(); });',
+    replace: '    openGenerateDraftAfterAsking_();',
+    tests: ['tests/generate_asks_eligibility.test.js']
+  },
+  {
+    id: 'generate-ask-noexit',
+    why: '把〔先去改名單〕改成淨係關窗，唔帶佢去嗰張表'
+      + '——一個叫人「請去某某地方」而唔帶佢去嘅提示，'
+      + '對一個唔熟電腦嘅人嚟講等於冇提示',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: '      onCancel: () => { closeModal(); openEligibilitySheet(); },',
+    replace: '      onCancel: () => { closeModal(); },',
+    tests: ['tests/generate_asks_eligibility.test.js']
+  },
+  {
+    id: 'annual-dates-blank',
+    why: '把年度工具嘅 GenerateOn／OfficialSendOn 還原成一律留空'
+      + '——即係 Ivan 撞到嗰個狀態：2028 四季全部冇日期，'
+      + '主流程一直顯示「這一季的 Quarters 沒有填生成日期」',
+    file: 'src/AnnualQuarters.gs',
+    find: '    q[Q.GENERATE_ON] = plan.generateOn || \'\';',
+    replace: '    q[Q.GENERATE_ON] = \'\';',
+    tests: ['tests/quarter_dates_backfill.test.js']
+  },
+  {
+    id: 'lead-null-as-zero',
+    why: '把「前置日數未設定」還原成當成 0'
+      + '——`Number(null)` 係 0 唔係 NaN，所以 GenerateOn 會變成開季當日，'
+      + '即係「到咗先生成」，而幹事要嘅係提早 35 日',
+    file: 'src/QuarterStage.gs',
+    find: '  if (leadDays === null || leadDays === undefined || leadDays === \'\') return \'\';',
+    replace: '  if (false) return \'\';',
+    tests: ['tests/quarter_dates_backfill.test.js']
+  },
+  {
+    id: 'quarter-backfill-all',
+    why: '拆走「留空 ＝ 一次過補齊全部欠日期嘅季度」'
+      + '——2028 有四季要補，逐季輸入 QuarterID 做四次，'
+      + '做少一次就有一季一直顯示「沒有填生成日期」',
+    file: 'src/Menu.gs',
+    find: '      missing = listQuartersMissingDates_();',
+    replace: '      missing = [];',
+    tests: ['tests/quarter_dates_backfill.test.js']
+  },
+  {
+    id: 'elig-blank-stops',
+    why: '把「空格跳過」改成「撞到空格就當成呢一欄完咗」'
+      + '——幹事喺中間留一行空白，下面嗰批人就會被靜靜移走，'
+      + '而畫面上完全睇唔出（Ivan 問過兩次嘅正正就係呢件事）',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '      if (!text) return;\n      const personId = resolvePersonId(text);',
+    replace: '      if (!text) { wanted[postId]._stop = true; return; }\n'
+      + '      if (wanted[postId]._stop) return;\n'
+      + '      const personId = resolvePersonId(text);',
+    tests: ['tests/eligibility_sheet_safety.test.js']
+  },
+  {
+    id: 'elig-unknown-skip',
+    why: '把「認唔出嘅名整批擋住」改成靜靜略過'
+      + '——幹事打錯一個字，佢以為加咗，而下一次生成先發現嗰個人一格都冇',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '    blocked: unresolved.length > 0,',
+    replace: '    blocked: false,',
+    tests: ['tests/eligibility_sheet_safety.test.js']
+  },
+  {
+    id: 'elig-unknown-post-skip',
+    why: '把「崗位代號對唔上」改成當嗰一欄唔存在'
+      + '——幹事整欄剪貼錯位，成個崗位嘅名單會被清空，而畫面上睇唔出',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '    if (!postNameById[postId]) {',
+    replace: '    if (false) {',
+    tests: ['tests/eligibility_sheet_safety.test.js']
+  },
+  {
+    id: 'note-reason-tautology',
+    why: '把建議格註嘅原因還原成「改成乜」而唔係「點解改」'
+      + '——格註會變成「原因：建議改派 試甲」，一句同義反覆；'
+      + 'Ivan 明確要求藍色格要講明**為什麼改**',
+    file: 'src/SuggestionSheet.gs',
+    find: '      reason: [violation.reason, replacement.reason]\n'
+      + '        .filter(Boolean).join(\'；\') || violation.ruleId',
+    replace: '      reason: replacement.reason || violation.reason || violation.ruleId',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
+  {
+    id: 'suggest-no-notes',
+    why: '拆走建議表嘅格註'
+      + '——幹事見到一格藍色，但唔知系統改咗乜、點解改',
+    file: 'src/SuggestionSheet.gs',
+    find: '      if (built.notes[cellKey]) cell.setNote(built.notes[cellKey]);',
+    replace: '      if (false) cell.setNote(built.notes[cellKey]);',
+    tests: ['tests/round43_field_fixes.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。
@@ -842,5 +1056,18 @@ console.log('\n=== C 組：工具本身唔可以留低任何改動 ===');
   report(dirty.length === 0, 'src/ 冇殘留任何 verify-red 改動',
     dirty.length === 0 ? '' : '呢啲檔案同開跑之前唔一樣：\n' + dirty.join('\n'));
 }
+
+// ── 結論同退出碼 ────────────────────────────────────────────────
+//
+// ⚠️ 第四十四輪批次發現：呢個工具本來**冇呢一段**——即係唔論幾多條防線
+// 塌咗、幾多條註冊過期，佢都係 exit 0。而佢係推送閘嘅一部分，所以
+//「跑咗 verify-red」一直只等於「有人肉眼睇過個輸出」。
+//
+// 呢個正正就係呢個專案由第一輪殺到而家嗰種錯：**靜靜失敗**。
+// 一個永遠回 0 嘅檢查工具，比冇呢個工具更差——因為佢令人以為檢查過。
+console.log('\n' + (fail === 0
+  ? ('ALL RED OK（' + MUTATIONS.length + ' 條突變）')
+  : (fail + ' 條唔合格——唔可以 commit')));
+process.exit(fail === 0 ? 0 : 1);
 
 

@@ -481,7 +481,11 @@ console.log('\n=== A：介面上每一句「系統會…」都要有測試證明
     !/const hasSuggestion = /.test(bare)
       && /function buildSuggestionState_\(quarterId, start\)/.test(bare), '');
   check('★★★★★ 起點每次都由 `resolveSuggestionStartPoint_()` 重新算',
-    /const start = resolveSuggestionStartPoint_\(quarterId, versionNo, startFrom\);/.test(bare),
+    // ⚠️ 第四十四輪批次 A 組：呢一句而家包咗一層 `suggestionStep_()`
+    //（出錯嗰陣要講得出係邊一步）。斷言要守嘅係「每次都重新算」，
+    // 唔係嗰一行嘅字面。
+    /resolveSuggestionStartPoint_\(quarterId, versionNo, startFrom\)/.test(bare)
+      && /suggestionStep_\('判斷這一次的起點是哪一張表'/.test(bare),
     '');
   check('★★★★★ 建議表個指紋要**讀返出嚟先算**（同一把尺）'
     + '——用寫入之前嗰份資料算嘅話，幹事一格都冇改都會被當成改過',

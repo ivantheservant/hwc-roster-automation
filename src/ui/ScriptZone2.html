@@ -327,6 +327,29 @@
     ]);
   }
 
+  /**
+   * 第四十四輪批次 G 組：生成日期／正式發出日期那一句。
+   * 算得到就講「會一併寫入」；算不到就講**為什麼**同**跟住做乜**。
+   * @param {Object} plan `apiAnnualQuartersPlan()` 嘅結果
+   * @returns {Node} 一句
+   */
+  function annualQuartersDateNote(plan) {
+    const cannot = plan.rows.filter(
+      (r) => !r.alreadyExists && (!r.generateOn || !r.officialSendOn));
+    if (cannot.length === 0) {
+      return para('「什麼時候生成」和「什麼時候正式發出」會一併填好，'
+        + '不用再另外做一次。', 'muted');
+    }
+    return make('div', { className: 'warnbox' }, [
+      make('div', {
+        text: '其中 ' + cannot.length + ' 季算不出「什麼時候生成」和「什麼時候正式發出」，'
+          + '因為 Config 的 LEAD_DAYS_GENERATE 或 LEAD_DAYS_OFFICIAL 還沒有填。'
+          + '那兩格會留空，之後可以用選單的「準備工作 ▸ 計算季度日期」補上。',
+        className: 'lines'
+      })
+    ]);
+  }
+
   function renderAnnualQuartersPlan(plan) {
     const willWrite = plan.rows.filter((r) => !r.alreadyExists);
     const list = make('div', { className: 'sec' }, [
@@ -343,6 +366,16 @@
                 ? '（其中 ' + r.skippedServiceDates + ' 行已存在，會略過）' : '')),
         className: r.alreadyExists ? 'vio-row muted' : 'vio-row'
       }));
+      // ⚠️ 第四十四輪批次 G 組：兩個日期要**喺呢一版睇得到**。
+      // 後端算咗而畫面唔顯示，幹事就要寫入之後去 Quarters 逐格對——
+      // 而佢唔會做，於是第 1 步就會一直顯示「沒有填生成日期」。
+      if (!r.alreadyExists) {
+        list.appendChild(make('div', {
+          text: '　　生成日期 ' + (r.generateOn || '（算不出）')
+            + '　　正式發出日期 ' + (r.officialSendOn || '（算不出）'),
+          className: (r.generateOn && r.officialSendOn) ? 'ok-line' : 'vio-row'
+        }));
+      }
     });
 
     if (willWrite.length === 0) {
@@ -369,8 +402,10 @@
           make('div', { text: '・不會產生任何職事表', className: 'vio-row' }),
           make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
         ]),
-        para('寫入之後，每一季還要用選單的「準備工作 ▸ 計算季度日期」補上'
-          + '「什麼時候生成」和「什麼時候正式發出」——那兩格這裡不會填。', 'muted')
+        // ⚠️ 第四十四輪批次 G 組：呢一句以前寫住「那兩格這裡不會填」，
+        // 而幹事唔會記得去跑一個藏喺選單、叫「計算季度日期」嘅工具。
+        // 而家兩格會一齊填。算唔到嘅時候先至講返點算。
+        annualQuartersDateNote(plan)
       ],
       requireTyping: true,
       confirmLabel: '確定寫入',

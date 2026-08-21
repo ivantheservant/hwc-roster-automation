@@ -798,26 +798,72 @@ function runResetRequestsValidations_() {
  */
 function runComputeQuarterDates_() {
   const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt('計算季度日期', '請輸入 QuarterID（例如 2027T1）：', ui.ButtonSet.OK_CANCEL);
+  // ⚠️ 第四十四輪批次 G 組：留空 ＝ 一次過補齊全部仲欠嘅季度。
+  //
+  // Ivan 用年度工具開咗 2028T1～T4，四季嘅 GenerateOn／OfficialSendOn
+  // 全部空白（舊版年度工具一律留空）。而呢個工具本來一次只做一季，
+  // 要記住個 QuarterID 點串、做四次——做少一次就有一季一直顯示
+  //「這一季的 Quarters 沒有填生成日期」。
+  const response = ui.prompt('計算季度日期',
+    '請輸入 QuarterID（例如 2027T1）。\n\n'
+      + '留空並撳「確定」＝ 一次過補齊全部還欠日期的季度。',
+    ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
   const quarterId = normalizeIdInput_(response.getResponseText());
-  if (!quarterId) return;
 
-  let plan;
-  try {
-    plan = planComputeQuarterDates_(quarterId);
-  } catch (err) {
-    ui.alert('計算季度日期', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+  const targets = [];
+  if (quarterId) {
+    targets.push(quarterId);
+  } else {
+    let missing;
+    try {
+      missing = listQuartersMissingDates_();
+    } catch (err) {
+      ui.alert('計算季度日期', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+      return;
+    }
+    if (missing.length === 0) {
+      ui.alert('計算季度日期',
+        '每一季的 GenerateOn 與 OfficialSendOn 都已經有值，沒有東西要補。',
+        ui.ButtonSet.OK);
+      return;
+    }
+    missing.forEach(function (m) { targets.push(m.quarterId); });
+  }
+
+  // ⚠️ 逐季各自算，但**全部算完先問一次**。逐季問一次，
+  // 幹事撳到第三次就唔會再睇內容。
+  const plans = [];
+  const failed = [];
+  targets.forEach(function (id) {
+    try {
+      plans.push(planComputeQuarterDates_(id));
+    } catch (err) {
+      failed.push(id + '：' + err.message);
+    }
+  });
+  if (plans.length === 0) {
+    ui.alert('計算季度日期', '執行失敗：\n\n' + failed.join('\n'), ui.ButtonSet.OK);
     return;
   }
 
-  const lines = ['季度：' + quarterId + '　StartDate：' + plan.startDate, ''];
-  plan.fields.forEach(function (f) {
-    lines.push('　' + f.label + '　現值：' + (f.currentValue || '（空白）')
-      + '　算出值：' + (f.computedValue || '（無法計算，Config 的 lead days 未設定）'));
+  const lines = [];
+  plans.forEach(function (plan) {
+    lines.push('季度：' + plan.quarterId + '　StartDate：' + plan.startDate);
+    plan.fields.forEach(function (f) {
+      lines.push('　' + f.label + '　現值：' + (f.currentValue || '（空白）')
+        + '　算出值：' + (f.computedValue || '（無法計算，Config 的 lead days 未設定）'));
+    });
+    lines.push('');
   });
+  // ⚠️ 算唔到嘅季度要照樣列出嚟。靜靜略過就會變成
+  //「報告話補齊咗」而其實嗰幾季一格都冇改。
+  if (failed.length > 0) {
+    lines.push('以下季度算不出，不會寫入：');
+    failed.forEach(function (f) { lines.push('　' + f); });
+    lines.push('');
+  }
   lines.push(
-    '',
     '是＝全部覆寫成算出值（包括已有值的格）',
     '否＝只填目前空白的格，已有值的格保留原值',
     '取消＝不寫入任何東西'
@@ -827,8 +873,14 @@ function runComputeQuarterDates_() {
   if (choice === ui.Button.CANCEL) return;
 
   try {
-    const written = writeQuarterDates_(plan, choice === ui.Button.YES);
-    ui.alert('計算季度日期', '已寫入 ' + written + ' 格。', ui.ButtonSet.OK);
+    let written = 0;
+    plans.forEach(function (plan) {
+      written += writeQuarterDates_(plan, choice === ui.Button.YES);
+    });
+    ui.alert('計算季度日期',
+      '已寫入 ' + written + ' 格（' + plans.length + ' 季）。'
+        + (failed.length > 0 ? ('\n算不出、沒有寫入：' + failed.length + ' 季。') : ''),
+      ui.ButtonSet.OK);
   } catch (err) {
     log_('ERROR', 'runComputeQuarterDates_ 失敗: ' + err.message);
     ui.alert('計算季度日期', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);

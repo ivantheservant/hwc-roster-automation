@@ -225,5 +225,137 @@ console.log('\n=== H：Config 有 seed，而且說明講得出用途同風險 ==
     /【測試用，上線前一定要清空】/.test(block), block.slice(0, 200));
 }
 
+// =====================================================================
+// 第四十四輪批次 E 組：可以填多過一個地址
+// =====================================================================
+//
+// Ivan 想同時用兩個信箱睇實測，在 Config 填了兩個地址、用逗號分隔，
+// 一撳寄出就收到：
+//
+//     Config 的 MAIL_REDIRECT_ALL_TO 填了「a@…, b@…」，
+//     但它看起來不像一個電郵地址。
+//
+// 成因：整串字直接餵去 `isPlausibleEmail_()`，而它見到逗號同空白
+// 就回 `false`（它本來就係驗**一個**地址嘅）。
+console.log('\n=== E【核心】兩個地址用逗號分隔 ⇒ 唔再拋錯 ===');
+{
+  gas.getConfig = function () { return 'ivan@example.invalid, helper@example.invalid'; };
+  let threw = null;
+  let targets = null;
+  try { targets = gas.readMailRedirectTargets_(); } catch (e) { threw = e; }
+  check('★★★★★ **唔再拋錯**（修正之前呢一句就係 Ivan 見到嗰個錯）',
+    threw === null, threw && threw.message);
+  checkEqual('★★★★★ 兩個地址都認得出', targets,
+    ['ivan@example.invalid', 'helper@example.invalid']);
+  checkEqual('★★★★★ `readMailRedirectTarget_()` 回一個 `MailApp` 收得嘅字串'
+    + '——`sendRealEmail_()` 要嘅係一個收件人字串，唔係陣列；'
+    + '回陣列就會靜靜變成 "[object Object]"',
+    gas.readMailRedirectTarget_(), 'ivan@example.invalid,helper@example.invalid');
+}
+
+console.log('\n=== E 分隔符要收得闊（幹事喺一格入面點打都算）===');
+{
+  const expected = ['a@example.invalid', 'b@example.invalid'];
+  [
+    ['半形逗號', 'a@example.invalid,b@example.invalid'],
+    ['逗號加空格', 'a@example.invalid, b@example.invalid'],
+    ['分號', 'a@example.invalid; b@example.invalid'],
+    ['頓號（中文輸入法打出嚟嗰個）', 'a@example.invalid、b@example.invalid'],
+    ['換行（試算表 Alt+Enter）', 'a@example.invalid\nb@example.invalid'],
+    ['淨係空格', 'a@example.invalid b@example.invalid'],
+    ['前後有多餘空白', '  a@example.invalid ,  b@example.invalid  ']
+  ].forEach(function (pair) {
+    gas.getConfig = function () { return pair[1]; };
+    checkEqual('★★★★ ' + pair[0], gas.readMailRedirectTargets_(), expected);
+  });
+  check('★★★★★ 只認半形逗號係唔夠嘅'
+    + '——幹事用中文輸入法喺一格入面打兩個地址，最自然就係一個頓號'
+    + '或者一個換行；認唔到就等於把同一個錯留返喺下一次',
+    true);
+}
+
+console.log('\n=== E【核心】有一個打錯 ⇒ **整批拋**，唔可以「寄得到嗰幾個先寄」 ===');
+{
+  gas.getConfig = function () { return 'ivan@example.invalid, 打錯咗, b@example.invalid'; };
+  let threw = null;
+  try { gas.readMailRedirectTargets_(); } catch (e) { threw = e; }
+  check('★★★★★ 有拋錯', threw !== null);
+  check('★★★★★ **唔會**變成「淨係寄兩個好嘅」'
+    + '——部分成功喺呢度係最壞嘅結果：幹事見到信到咗就以為設定啱，'
+    + '而其實有一個地址由頭到尾收唔到，佢要對到最後先發現',
+    threw !== null);
+  check('★★★★★ 逐個列出打錯咗嗰啲（唔係淨係講「有一個唔啱」）',
+    threw && threw.message.indexOf('打錯咗') !== -1, threw && threw.message);
+  check('★★★★ 而且講「一封都冇寄出」',
+    threw && threw.message.indexOf('一封都沒有寄出') !== -1, threw && threw.message);
+  check('★★★★★ 下一步要講埋「填多過一個可以點分隔」'
+    + '——唔講嘅話，幹事改完一次仲係唔知點樣先啱',
+    threw && threw.message.indexOf('用逗號、分號、頓號或者換行分開都可以') !== -1,
+    threw && threw.message);
+}
+
+console.log('\n=== E 幾個邊界 ===');
+{
+  gas.getConfig = function () { return 'ivan@example.invalid, ivan@example.invalid'; };
+  checkEqual('★★★★ 同一個地址填兩次 ⇒ 只寄一次（唔算錯，但唔好寄兩封）',
+    gas.readMailRedirectTargets_(), ['ivan@example.invalid']);
+
+  gas.getConfig = function () { return '  '; };
+  checkEqual('★★★★★ 空白 ⇒ 空陣列，即係正常運作（行為同修正之前一樣）',
+    gas.readMailRedirectTargets_(), []);
+  checkEqual('★★★★★ 而 `readMailRedirectTarget_()` 照樣回空字串',
+    gas.readMailRedirectTarget_(), '');
+
+  gas.getConfig = function () { return ',,、;'; };
+  let threw = null;
+  try { gas.readMailRedirectTargets_(); } catch (e) { threw = e; }
+  check('★★★★★ 成格得幾個分隔符 ⇒ **拋錯**，唔可以當成「冇設定」'
+    + '——當成冇設定就會喺應該轉寄嘅時候真係寄咗俾義工',
+    threw !== null, '');
+
+  gas.getConfig = function () { return 'ivan@example.invalid'; };
+  checkEqual('★★★★★ 填一個嘅時候，行為同修正之前一模一樣',
+    gas.readMailRedirectTarget_(), 'ivan@example.invalid');
+}
+
+console.log('\n=== E 標籤同上線前檢查都要逐個列出嚟 ===');
+{
+  gas.getConfig = function () { return 'ivan@example.invalid、helper@example.invalid'; };
+  const badge = gas.buildMailRedirectBadgeText_();
+  check('★★★★★ 標籤**逐個列出**，唔係淨係講「2 個地址」'
+    + '——呢個標籤唯一嘅用途就係俾幹事一眼認得出「呢個唔係我要嘅設定」；'
+    + '淨係講個數，佢要走去 Config 先知係邊幾個，而嗰步佢唔會做',
+    badge.indexOf('ivan@example.invalid') !== -1
+    && badge.indexOf('helper@example.invalid') !== -1, badge);
+  check('★★★★ 而且順便講埋共幾多個', badge.indexOf('共 2 個地址') !== -1, badge);
+
+  gas.getConfig = function () { return 'ivan@example.invalid'; };
+  const one = gas.buildMailRedirectBadgeText_();
+  check('★★★★ 得一個嗰陣唔好畫蛇添足講「共 1 個地址」',
+    one.indexOf('共 1 個') === -1 && one.indexOf('ivan@example.invalid') !== -1, one);
+
+  const checklist = fs.readFileSync(path.join(SRC, 'PreLaunchChecklist.gs'), 'utf8');
+  check('★★★★★ 上線前檢查改用 `readMailRedirectTargets_()`（複數嗰個）'
+    + '——留返單數嗰個嘅話，兩個地址嗰陣佢會報「設定有問題」而其實冇問題',
+    /readMailRedirectTargets_\(\)/.test(checklist), '');
+  check('★★★★ 而且逐個列出（用頓號駁埋）',
+    /redirectList\.join\('、'\)/.test(checklist), '');
+}
+
+console.log('\n=== E Config 說明要講得出「可以填多過一個」同「點分隔」 ===');
+{
+  const seed = fs.readFileSync(path.join(SRC, 'ConfigSeed.gs'), 'utf8');
+  const at = seed.indexOf('CONFIG_KEYS.MAIL_REDIRECT_ALL_TO');
+  const block = seed.slice(at, at + 900);
+  check('★★★★★ 說明講明可以填多過一個'
+    + '——說明唔講，幹事就會照舊淨係填一個，而呢個功能等於冇做過',
+    /要多過一個地址/.test(block), block.slice(0, 300));
+  check('★★★★★ 而且舉咗一個例（有例先至真係睇得明）',
+    /a@example.invalid, b@example.invalid/.test(block), block.slice(0, 300));
+  check('★★★★★ 亦都講明「有一個打錯就整批唔寄」'
+    + '——唔講嘅話，幹事會以為打錯嗰個淨係嗰個收唔到',
+    /有一個打錯就整批不寄/.test(block), block.slice(0, 400));
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);
