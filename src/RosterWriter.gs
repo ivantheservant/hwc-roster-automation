@@ -48,7 +48,14 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   sheet.setFrozenRows(2);
   sheet.setFrozenColumns(1);
   sheet.autoResizeColumns(1, layout.keys.length);
-  applyGridColumnWidthsForA4_(sheet, layout);
+  // ⚠️ 第四十一輪批次 F 組：欄寬只係「印出嚟好唔好睇」，
+  // 唔可以令一張已經排好嘅職事表整個失敗。同下面嗰個下拉選單同一個道理。
+  // 但一樣唔可以靜靜失敗——要寫 log。
+  try {
+    applyGridColumnWidthsForA4_(sheet, layout);
+  } catch (err) {
+    log_('WARN', 'createRosterSheet：欄寬設定唔到（職事表本身已經建立好）：' + err.message);
+  }
 
   // ⚠️ 第四十一輪批次 A 組：**每一張新的 grid 都自動有名單下拉選單。**
   //

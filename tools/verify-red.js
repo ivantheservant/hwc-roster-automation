@@ -498,6 +498,16 @@ const MUTATIONS = [
     replace: "    dropdownNote = '名單已經套用好，但職事表上嘅下拉選單更新唔到（'",
     tests: ['tests/operator_wording.test.js']
   },
+  {
+    id: 'grid-width-no-guard',
+    why: '拆走欄寬嗰個 try/catch'
+      + '——工作表被保護嘅時候，一張已經排好嘅職事表會因為設唔到欄寬而整個失敗',
+    file: 'src/RosterWriter.gs',
+    find: '  try {\n    applyGridColumnWidthsForA4_(sheet, layout);\n  } catch (err) {',
+    replace: '  applyGridColumnWidthsForA4_(sheet, layout);\n  if (false) {\n'
+      + "    const err = { message: '' };",
+    tests: ['tests/pdf_roster_only_and_widths.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

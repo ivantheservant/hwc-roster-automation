@@ -211,6 +211,15 @@ console.log('\n=== F：設欄寬嗰個函式本身 ===');
   check('★★★★ 人名欄有自動換行'
     + '——四個字嘅名折成兩行好過俾隔籬欄蓋住（蓋住印出嚟好似嗰格係空嘅）',
     /setWrap\(true\)/.test(body), '');
+  // ⚠️ 呢一條係因為註解寫住「失敗唔可以令建立版本失敗——見呼叫端嘅 try/catch」，
+  // 而第一次寫嗰陣呼叫端根本冇 try/catch。一句講住有防守而實際冇嘅註解，
+  // 比冇註解更差：下一個人會信佢，然後喺上面繼續起樓。
+  check('★★★★★ 呼叫端真係有 try/catch'
+    + '——欄寬只係「印出嚟好唔好睇」，唔可以令一張已經排好嘅職事表整個失敗',
+    /try \{\s*\n\s*applyGridColumnWidthsForA4_\(sheet, layout\);\s*\n\s*\} catch/
+      .test(writerBare), '');
+  check('★★★★ 但唔可以靜靜失敗——要寫 log',
+    /log_\('WARN', 'createRosterSheet：欄寬設定唔到/.test(writer), '');
   check('★★★★★ 排喺 `autoResizeColumns()` **之後**'
     + '——排之前嘅話，autoResize 會即刻把佢設嘅寬度改返',
     writerBare.indexOf('sheet.autoResizeColumns(1, layout.keys.length);')
