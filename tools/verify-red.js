@@ -2761,6 +2761,176 @@ const MUTATIONS = [
       + '      outcome.repeat = {',
     tests: ['tests/selftest_stop_pressing.test.js']
   },
+  // ── 第五十五輪批次 A 組：造版本嘅路有六條，發佈漏咗兩條 ────────
+  {
+    id: 'pub-apply-req',
+    why: '套用修改申報造完版本冇發佈'
+      + '——實測 I09：v3 係步驟 3 造嘅，而 PublicLinks 仍然停喺 v2，'
+      + '收到連結嘅人開連結見到嘅係舊版',
+    file: 'src/RequestsApply.gs',
+    find: '  const publish = tryPublishPublicRoster_(plan.quarterId);',
+    replace: '  const publish = { failed: false, message: \'\' };',
+    tests: ['tests/every_version_publishes.test.js']
+  },
+  {
+    id: 'pub-apply-dec',
+    why: '微調 ▸ 套用決定造完版本冇發佈'
+      + '——呢一條由「某支函式嘅 caller」數起嗰陣完全見唔到，'
+      + '要由「邊個會喺 RosterVersions 加行」數起先數得到',
+    file: 'src/FineTune.gs',
+    find: '  const publish = tryPublishPublicRoster_(quarterId);',
+    replace: '  const publish = { failed: false, message: \'\' };',
+    tests: ['tests/every_version_publishes.test.js']
+  },
+  {
+    id: 'pub-skip-blind',
+    why: '查唔到公開連結而家係邊一版就當成「已經發咗」'
+      + '——當成已經發咗嘅話，收到連結嘅人會一直見住舊版，'
+      + '而冇任何一個畫面提示過。呢個係最差嗰種錯',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  } catch (err) {' + '\n'
+      + '    // 查唔到 ⇒ 照發。' + '\n'
+      + "    log_('WARN', '查不到公開連結目前是哪一版，照樣發佈一次：' + err.message);"
+      + '\n' + '  }',
+    replace: '  } catch (err) {' + '\n'
+      + "    return { failed: false, message: '', skipped: true };" + '\n'
+      + '  }',
+    tests: ['tests/every_version_publishes.test.js']
+  },
+  {
+    id: 'pub-skip-always',
+    why: '一律當成「已經發咗」，永遠唔發'
+      + '——一部乜都唔發嘅機器同冇呢個功能一樣',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  const row = findPublicLinkRow_(quarterId);' + '\n'
+      + '  if (!row) return false;',
+    replace: '  const row = findPublicLinkRow_(quarterId);' + '\n'
+      + '  if (!row) return true;',
+    tests: ['tests/every_version_publishes.test.js']
+  },
+  {
+    id: 'pub-skip-never',
+    why: '拆走「已經係最新就唔使再發」嗰一道'
+      + '——最常撳嗰粒掣（儲存並確認，有申報嗰條路）會發佈兩次，'
+      + '而發佈要開／寫一個外部試算表，唔係平嘢',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '    if (publicLinkAlreadyAtLatest_(quarterId)) {',
+    replace: '    if (false) {',
+    tests: ['tests/every_version_publishes.test.js']
+  },
+  {
+    id: 'pub-retry-skips',
+    why: '幹事撳「重試發佈」嗰粒都經埋「已經係最新就唔使再發」'
+      + '——一個「發佈失敗但版本號啱」嘅情況就永遠重試唔到',
+    file: 'src/WebAppGuards.gs',
+    find: '    publishPublicRoster_(quarterId);' + '\n'
+      + '    const state = readPublicLinkState_(quarterId);',
+    replace: '    tryPublishPublicRoster_(quarterId);' + '\n'
+      + '    const state = readPublicLinkState_(quarterId);',
+    tests: ['tests/every_version_publishes.test.js']
+  },
+
+  // ── 第五十五輪批次 B 組：S07 寫申報用咗 PostID ─────────────────
+  {
+    id: 's07-post-id',
+    why: 'S07 寫申報嗰陣崗位欄填 PostID'
+      + '——張表收嘅係中文名稱，三筆會全部跌落 needsInput，'
+      + '而「套用申報」呢條路一格都冇真正走過（第五十四輪就係噉）',
+    file: 'src/SelfTestRunner.gs',
+    find: '    put(R.POST_NAME, postNameById[c.postId]);',
+    replace: '    put(R.POST_NAME, c.postId);',
+    tests: ['tests/selftest_request_rows.test.js']
+  },
+  {
+    id: 's07-no-name-ok',
+    why: '揀埋啲喺 Posts 冇中文名嘅崗位'
+      + '——嗰啲申報唔到，揀咗就一定跌落 needsInput',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (!postNameById[c.postId]) return;',
+    replace: '    if (false) return;',
+    tests: ['tests/selftest_request_rows.test.js']
+  },
+  {
+    id: 's07-applied-zero',
+    why: '拆走 `appliedCount >= 1` 嗰條'
+      + '——冇咗佢，一次「三筆全部跌落 needsInput」嘅執行照樣綠，'
+      + '而「套用申報」由頭到尾一格都冇走過',
+    file: 'src/SelfTestRunner.gs',
+    find: "  t.expect('至少有 1 筆真的套用了（appliedCount ≥ 1）'",
+    replace: "  if (false) t.expect('至少有 1 筆真的套用了（appliedCount ≥ 1）'",
+    tests: ['tests/selftest_request_rows.test.js']
+  },
+  {
+    id: 's07-same-day',
+    why: '三筆申報落晒喺同一日'
+      + '——同一日抽三個崗位會令替補人選重疊，一次過走三筆嘅成功率低好多',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (usedDates[c.serviceDate]) return;' + '\n'
+      + '    usedDates[c.serviceDate] = true;',
+    replace: '    if (false) return;' + '\n'
+      + '    usedDates[c.serviceDate] = true;',
+    tests: ['tests/selftest_request_rows.test.js']
+  },
+  {
+    id: 's07-record-red',
+    why: '把「Stage advanced／appliedCount」嗰條記錄變成真斷言'
+      + '——A3 嗰個決策點未覆之前唔應該判斷佢嘅對錯，'
+      + '判斷咗就係代 Ivan 拍板',
+    file: 'src/SelfTestRunner.gs',
+    find: "  t.expect('（記錄，不是斷言）Stage advanced=' + applied.advanced" + '\n'
+      + "    + '，而 appliedCount=' + applied.appliedCount," + '\n'
+      + '    true,',
+    replace: "  t.expect('（記錄，不是斷言）Stage advanced=' + applied.advanced" + '\n'
+      + "    + '，而 appliedCount=' + applied.appliedCount," + '\n'
+      + '    Number(applied.appliedCount) > 0,',
+    tests: ['tests/selftest_request_rows.test.js']
+  },
+
+  // ── 第五十五輪批次 C 組：回退預覽 ─────────────────────────────
+  {
+    id: 'rb-no-warning',
+    why: '`apiRollbackPlan()` 唔再帶嗰段「不要用試算表版本記錄還原」'
+      + '——冇警告嘅回退，幹事會當成「睇一睇」噉撳落去',
+    file: 'src/WebAppRollback.gs',
+    find: '    outdatedPersonCount: outdatedPersonCount,' + '\n'
+      + '    sheetsHistoryWarning: ROLLBACK_SHEETS_HISTORY_WARNING',
+    replace: '    outdatedPersonCount: outdatedPersonCount,' + '\n'
+      + "    sheetsHistoryWarning: ''",
+    tests: ['tests/rollback_preview_replay.test.js']
+  },
+  {
+    id: 'rb-ui-drop-warn',
+    why: '前端唔再畫嗰段警告'
+      + '——API 有嗰個欄位，同幹事真係見到，係兩件事',
+    file: 'src/ui/ScriptRollback.html',
+    find: '    nodes.push(buildSheetsHistoryWarning(plan.sheetsHistoryWarning));',
+    replace: '    // nodes.push(buildSheetsHistoryWarning(plan.sheetsHistoryWarning));',
+    tests: ['tests/rollback_preview_replay.test.js']
+  },
+  {
+    id: 'rb-no-typing',
+    why: '回退唔使打字確認'
+      + '——回退會蓋走現況，撳一下就做嘅話，'
+      + '幹事會當成「睇一睇」噉撳落去',
+    file: 'src/ui/ScriptRollback.html',
+    find: '      requireTyping: true,' + '\n'
+      + "      confirmLabel: '確定回退',",
+    replace: '      requireTyping: false,' + '\n'
+      + "      confirmLabel: '確定回退',",
+    tests: ['tests/rollback_preview_replay.test.js']
+  },
+  {
+    id: 'rb-check-fail-hid',
+    why: '規則檢查查唔到嗰陣扮「冇問題」'
+      + '——「檢查過，冇問題」同「檢查唔到」係兩件事，'
+      + '而後者被顯示成前者係最難察覺嗰種錯',
+    file: 'src/ui/ScriptRollback.html',
+    find: '      plan.violationCheckFailed' + '\n'
+      + '        ? make(',
+    replace: '      false' + '\n'
+      + '        ? make(',
+    tests: ['tests/rollback_preview_replay.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

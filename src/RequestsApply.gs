@@ -673,6 +673,36 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
     );
   }
 
+
+  // ── 第五十五輪批次 A 組：**造完版本一定要更新公開連結。** ──────
+  //
+  // ⚠️⚠️ 呢個係第二次撞同一個病。
+  //
+  // 第五十二輪 A 組 audit 過「造版本之後有冇發佈」，但數嘅係
+  // `performRosterGeneration_()` 嘅 caller——於是漏咗**所有唔經
+  // 嗰支函式造版本嘅路**，包括呢一條。
+  //
+  // 現場（第五十五輪實測）：
+  //
+  //     ⚠️ I09｜預期 v3｜實際 v2｜PublicLinks.LastPublishedVersion=2；
+  //     findLatestVersionNo()=3
+  //
+  // v2 係「儲存並確認」造嘅（有發佈），v3 係步驟 3 套用修改申報
+  // 造嘅——冇發佈。收到連結嘅人開連結見到嘅係 v2。
+  //
+  // ⚠️ 所以呢一次擺喺 **choke point**：`applyRequests_()` 係
+  // 「套用申報造版本」唯一嗰支，步驟 3、步驟 5、同埋「儲存並確認」
+  // 有申報嗰條路全部行過呢度。擺喺各個 caller 度就係再種一次同一個病。
+  //
+  // ⚠️ 「儲存並確認」自己之後仲會叫多一次 `tryPublishPublicRoster_()`。
+  // 嗰一次會被「已經係最新就唔使再發」擋住（見嗰支嘅註解），
+  // 所以唔會發佈兩次。
+  const publish = tryPublishPublicRoster_(plan.quarterId);
+  if (publish.failed) {
+    // ⚠️ **唔可以只寫 log。** 寫 log 等於冇人知。
+    // 版本已經真係建立咗，所以唔當成套用失敗——但要帶出去畀呼叫端講。
+    log_('WARN', '套用申報之後發佈公開連結失敗：' + publish.message);
+  }
   return {
     sheetName: sheetName,
     versionNo: newVersionNo,

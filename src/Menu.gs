@@ -1552,6 +1552,11 @@ function runApplyDecisions_() {
     const lines = [
       '已建立新版本 ' + result.sheetName,
       '',
+      // ⚠️ 第五十五輪批次 A 組：發佈失敗唔可以只寫 log。
+      (result.publishFailed
+        ? result.publishMessage
+        : '公開連結已經更新到第 ' + result.versionNo + ' 版（連結地址不變）。'),
+      '',
       '提案共 ' + result.total + ' 項：',
       '　採用系統建議（ACCEPT_SUGGESTED）：' + result.accepted + ' 項',
       '　還原為原本的人（REVERT_ORIGINAL）：' + result.reverted + ' 項',

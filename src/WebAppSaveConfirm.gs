@@ -769,10 +769,36 @@ function describePublishAfterGenerate_(publish, versionNo, quarterId) {
 
 /**
  * 發佈公開連結，把失敗降級成「唔算全盤失敗」（規格步 1.9）。
+ *
+ * ⚠️ 第五十五輪批次 A 組：**已經發佈咗最新嗰一版就唔使再發一次。**
+ *
+ * 點解要有呢一道：`applyRequests_()` 而家自己會發佈（見嗰邊嘅註解），
+ * 而「儲存並確認」有申報嗰條路會行過 `applyRequests_()` 之後
+ * 自己再發佈一次。冇呢一道嘅話，最常撳嗰粒掣就會**發佈兩次**。
+ *
+ * 而發佈唔係平嘢——`publishPublicRoster_()` 要砌成份公開內容、
+ * 開／寫一個外部試算表、再讀分享設定。
+ *
+ * 呢一道只係讀一行 `PublicLinks`，成本低得多。
+ *
+ * ⚠️ 查唔到就**照發**。查唔到當成「已經發咗」係最差嗰種錯：
+ * 收到連結嘅人會一直見住舊版，而冇任何一個畫面提示過。
+ *
+ * ⚠️ `apiRepublishPublicLink()`（幹事撳「重試」嗰粒）行嘅係
+ * `publishPublicRoster_()`，**唔經呢一道**——重試就係要迫佢再發一次。
+ *
  * @param {string} quarterId 季度 ID
- * @returns {{failed: boolean, message: string}}
+ * @returns {{failed: boolean, message: string, skipped: (boolean|undefined)}}
  */
 function tryPublishPublicRoster_(quarterId) {
+  try {
+    if (publicLinkAlreadyAtLatest_(quarterId)) {
+      return { failed: false, message: '', skipped: true };
+    }
+  } catch (err) {
+    // 查唔到 ⇒ 照發。
+    log_('WARN', '查不到公開連結目前是哪一版，照樣發佈一次：' + err.message);
+  }
   try {
     publishPublicRoster_(quarterId);
     return { failed: false, message: '' };
@@ -780,6 +806,24 @@ function tryPublishPublicRoster_(quarterId) {
     log_('WARN', 'tryPublishPublicRoster_ 失敗（版本已儲存，唔當全盤失敗）：' + err.message);
     return { failed: true, message: err.message };
   }
+}
+
+/**
+ * 公開連結而家指住嘅，係咪已經係最新嗰一版？
+ *
+ * ⚠️ 查唔到／未發佈過一律回 `false`（＝要發）。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {boolean}
+ */
+function publicLinkAlreadyAtLatest_(quarterId) {
+  const latest = findLatestVersionNo(quarterId);
+  if (latest < 0) return false;
+  const row = findPublicLinkRow_(quarterId);
+  if (!row) return false;
+  const published = Number(row.lastPublishedVersion);
+  if (!isFinite(published)) return false;
+  return published === latest;
 }
 
 /**

@@ -1066,7 +1066,6 @@ function selfTestS06_(quarterId) {
 function selfTestS07_(quarterId) {
   const t = selfTestCollector_('S07');
   const versionNo = findLatestVersionNo(quarterId);
-  const cells = selfTestPickCells_(quarterId, versionNo, 3);
   const R = COLUMNS.REQUESTS;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1077,11 +1076,59 @@ function selfTestS07_(quarterId) {
     return t.result();
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第五十五輪批次 B 組：**「崗位」欄要中文名稱，唔係 PostID。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 第五十四輪嗰次，S07 填咗 `ANNOUNCE`／`SCRIPTURE`（PostID），
+  // 而系統嘅拒絕理由已經講到明：
+  //
+  //     "postNameText":"ANNOUNCE" … reason:"找不到崗位「ANNOUNCE」
+  //     （Posts 沒有這個中文名稱，或該崗位 Active=FALSE）"
+  //
+  // **系統冇錯，仲畀咗一段完美嘅錯誤訊息。** 錯嘅係測試寫錯格式。
+  //
+  // 比對嗰句喺 `validateRequest_()`（RequestsApply.gs）：
+  //     `context.posts.filter(function (p) { return p.postNameTC === req.postNameText; })`
+  //
+  // ⚠️ 由 `readPostsNormalized()` 現場查，**唔准寫死中文名**——
+  // 寫死嘅話，日後有人改咗崗位名，自測機就會無聲無息噉壞掉。
+  const postNameById = {};
+  readPostsNormalized().forEach(function (p) {
+    if (p.postNameTC) postNameById[p.postId] = p.postNameTC;
+  });
+
+  // ⚠️ B3：申報要揀「套用得到」嘅。
+  //
+  // 「不能服侍」行到 `APPLY` 嘅條件（`validateRequest_()`）：
+  //   ・崗位嘅**中文名**喺 `Posts` 搵得到
+  //   ・嗰個人嗰日**真係有被排**喺嗰個崗位
+  //
+  // 所以由現時最新嗰一版嘅實際派工揀，而且揀三個唔同主日——
+  // 同一日抽三個崗位會令替補人選重疊，一次過走三筆嘅成功率低好多。
+  const pool = selfTestPickCells_(quarterId, versionNo, 60);
+  const peopleById = indexPeopleById_();
+  const usedDates = {};
+  const cells = [];
+  pool.forEach(function (c) {
+    if (cells.length >= 3) return;
+    if (!postNameById[c.postId]) return;          // 冇中文名 ⇒ 申報唔到
+    if (!peopleById[c.personId]) return;          // 認唔出 ⇒ 一定 NEEDS_INPUT
+    if (usedDates[c.serviceDate]) return;
+    usedDates[c.serviceDate] = true;
+    cells.push(c);
+  });
+
+  if (cells.length === 0) {
+    return t.skip('（跳過）這一季找不到「崗位有中文名稱、而且那一天真的有人」的格，'
+      + '所以造不出可以套用的申報。');
+  }
+  const want = cells.length;
+
   // ⚠️ **真嘅 append 落張工作表**，唔係喺記憶體造。
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(function (v) { return String(v || '').trim(); });
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const peopleById = indexPeopleById_();
   let appended = 0;
   cells.forEach(function (c) {
     const row = new Array(headers.length).fill('');
@@ -1091,24 +1138,54 @@ function selfTestS07_(quarterId) {
     };
     put(R.QUARTER_ID, quarterId);
     put(R.SERVICE_DATE, c.serviceDate);
-    put(R.POST_NAME, c.postId);
-    const person = peopleById[c.personId];
-    put(R.PERSON_NAME, person ? person.nameTC : c.personId);
-    put(R.REQUEST_TYPE, '不能服侍');
+    // ⚠️ 中文名，唔係 PostID。
+    put(R.POST_NAME, postNameById[c.postId]);
+    put(R.PERSON_NAME, peopleById[c.personId].nameTC);
+    // ⚠️ 用常數，唔好硬寫——`REQUEST_TYPE` 改咗嘅話呢度要一齊改。
+    put(R.REQUEST_TYPE, REQUEST_TYPE.CANNOT_SERVE);
     put(R.CREATED_AT, Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss'));
     sheet.appendRow(row);
     appended++;
   });
-  t.equal('3 筆申報真的寫進 Requests 工作表', appended, 3, 'sheet.appendRow()');
+  t.equal(want + ' 筆申報真的寫進 Requests 工作表', appended, want,
+    cells.map(function (c) {
+      return c.serviceDate + '　' + postNameById[c.postId]
+        + '　' + peopleById[c.personId].nameTC;
+    }).join('；'));
 
   const plan = selfTestCall_('S07', 'apiStep3Plan',
     function () { return apiStep3Plan(quarterId); });
   t.expect('系統看得到剛才那幾筆申報',
-    (plan.results || []).length >= 3, '≥ 3 筆',
+    (plan.results || []).length >= want, '≥ ' + want + ' 筆',
     (plan.results || []).length + ' 筆', 'apiStep3Plan().results');
 
-  selfTestCall_('S07', 'apiStep3Apply',
+  const applied = selfTestCall_('S07', 'apiStep3Apply',
     function () { return apiStep3Apply(quarterId, []); });
+
+  // ⚠️⚠️ B3：**呢一條先係今輪 S07 嘅關鍵。**
+  //
+  // 第五十四輪嗰次 `appliedCount=0`、`needsInputCount=3`——
+  // 三筆全部跌落 `needsInputList`，即係「套用申報」呢條路
+  // 由頭到尾一格都冇真正套用過，而 S07 當時係綠嘅。
+  t.expect('至少有 1 筆真的套用了（appliedCount ≥ 1）'
+    + '——全部跌落 needsInput 的話，「套用申報」這條路一格都沒有走過',
+    Number(applied.appliedCount) >= 1, '≥ 1',
+    'appliedCount=' + applied.appliedCount
+      + '、rejectedCount=' + applied.rejectedCount
+      + '、needsInputCount=' + applied.needsInputCount,
+    (plan.results || []).filter(function (r) {
+      return r.category === 'NEEDS_INPUT';
+    }).map(function (r) { return r.reason || ''; }).join('；')
+      || 'apiStep3Apply() 的回傳');
+
+  // ⚠️ B2：Stage 前進咗，但 `appliedCount` 係幾多？兩者嘅關係
+  // 有一個**未覆嘅決策點**（見報告 A3）。呢度只記低，唔判斷對錯。
+  t.expect('（記錄，不是斷言）Stage advanced=' + applied.advanced
+    + '，而 appliedCount=' + applied.appliedCount,
+    true, '（記錄）',
+    'advanced=' + applied.advanced + '、appliedCount=' + applied.appliedCount,
+    'appliedCount = 0 而照樣造版本、照樣前進 Stage——'
+      + '這個行為有一個決策點還沒有回覆（見第五十五輪批次 A3）。');
 
   // 套用之後，Status 一定要寫返落張表——唔寫嘅話，
   // 同一批申報下次會再被當成「未處理」。
@@ -1302,24 +1379,74 @@ function selfTestS12_(quarterId) {
   const t = selfTestCollector_('S12');
   const before = findLatestVersionNo(quarterId);
   if (before < 1) {
-    t.expect('這一季有多過一個版本才回退得到', false, '≥ v1', 'v' + before,
-      '前面的情境沒有造出第二個版本。這一批要由 S01 順住跑。');
-    return t.result();
+    return t.skip('（跳過）這一季只有第 0 版，回退不到。'
+      + '前面的情境沒有造出第二個版本。');
   }
 
   const target = before - 1;
   const plan = selfTestCall_('S12', 'apiRollbackPlan',
     function () { return apiRollbackPlan(quarterId, target); });
 
-  // ⚠️ 回退係一個**會蓋走現況**嘅動作，所以個 plan 一定要有警告。
-  // 冇警告嘅回退，幹事會當成「睇一睇」噉撳落去。
-  t.expect('回退的預覽有警告，不是靜靜就做',
-    JSON.stringify(plan).indexOf('警告') !== -1
-      || (plan.warnings && plan.warnings.length > 0)
-      || plan.needsRelease === true
-      || String(plan.confirmText || '') !== '',
-    '有警告／要打字確認', JSON.stringify(plan).slice(0, 300),
-    'apiRollbackPlan() 的回傳');
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第五十五輪批次 C 組：**上一次嘅斷言搵錯咗嘢。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 舊寫法係喺 `JSON.stringify(plan)` 入面搵「警告」兩個字。
+  //
+  // 而 `apiRollbackPlan()` **真係有**一個警告欄位：`sheetsHistoryWarning`
+  //（`ROLLBACK_SHEETS_HISTORY_WARNING`，WebAppRollback.gs）。佢嘅內容係：
+  //
+  //     不要用 Google 試算表本身的「版本記錄」還原。…
+  //
+  // 嗰段字入面**一個「警告」都冇**——所以個斷言搵唔到。
+  // 警告一直都喺度，係測試搵錯咗字。
+  //
+  // ⚠️ 教訓同 S07 一樣：**唔好靠喺一大舊 JSON 入面搵一個字。**
+  // 要斷言就斷言個**欄位**。
+  t.expect('回退的預覽帶著「不要用試算表版本記錄還原」那段警告',
+    String(plan.sheetsHistoryWarning || '').length > 0,
+    '有 sheetsHistoryWarning', String(plan.sheetsHistoryWarning || '（空）').slice(0, 120),
+    'apiRollbackPlan().sheetsHistoryWarning');
+  t.equal('而且就是 ROLLBACK_SHEETS_HISTORY_WARNING 那一段'
+    + '——兩邊各寫一次的話，改了其中一邊就會靜靜地不一致',
+    plan.sheetsHistoryWarning, ROLLBACK_SHEETS_HISTORY_WARNING,
+    '常數在 WebAppRollback.gs');
+
+  // ── C1：plan 要帶齊前端需要嘅嘢 ──────────────────────────────
+  t.equal('沒有被擋住', plan.blocked, false,
+    'apiRollbackPlan().blocked＝' + JSON.stringify(plan.blockReason));
+  t.equal('現在是第 ' + before + ' 版', plan.currentVersionNo, before,
+    'apiRollbackPlan().currentVersionNo');
+  t.equal('要回去的是第 ' + target + ' 版', plan.targetVersionNo, target,
+    'apiRollbackPlan().targetVersionNo');
+  t.equal('回退會造出第 ' + (before + 1) + ' 版（回退本身也是一個新版本，'
+    + '不是把舊版刪掉）', plan.newVersionNo, before + 1,
+    'apiRollbackPlan().newVersionNo');
+
+  // ── C2：真係列得出差異 ──────────────────────────────────────
+  //
+  // ⚠️ 第五十四輪嗰次 `cellChangeCount:0`——一個「回退等於冇嘢改」
+  // 嘅退化狀態。成因係上一版同上上版一模一樣
+  //（`appliedCount=0` 都照造版本，見第五十五輪批次 A3 嗰個決策點）。
+  t.expect('列得出真實差異（cellChangeCount > 0）'
+    + '——0 的話代表第 ' + before + ' 版同第 ' + target + ' 版一模一樣，'
+    + '那是一個「回退等於沒有改動」的退化狀態，回退預覽沒有東西可以給幹事看',
+    Number(plan.cellChangeCount) > 0, '> 0',
+    String(plan.cellChangeCount),
+    'apiRollbackPlan().cellChangeCount。如果是 0，先看第 ' + before
+      + ' 版是怎樣造出來的——一個 appliedCount=0 的空套用會造出一個'
+      + '跟上一版一模一樣的版本。');
+  t.equal('而且 cellChanges 的筆數同 cellChangeCount 對得上'
+    + '——兩個數各自算一次的話，畫面上會出現「N 格」但只列得出 M 行',
+    (plan.cellChanges || []).length, Number(plan.cellChangeCount),
+    'apiRollbackPlan().cellChanges');
+  t.expect('每一筆差異都講得出是哪一格',
+    (plan.cellChanges || []).every(function (c) {
+      return c.serviceDate && c.postId && c.slotIndex !== undefined;
+    }), '每筆都有 serviceDate／postId／slotIndex',
+    JSON.stringify((plan.cellChanges || []).slice(0, 3)),
+    'apiRollbackPlan().cellChanges');
+
   t.expect('而且預覽本身沒有動到版本'
     + '——「先算後做」：看一眼不應該改任何東西',
     findLatestVersionNo(quarterId) === before,

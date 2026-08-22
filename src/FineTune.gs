@@ -1018,7 +1018,23 @@ function applyDecisions(batchId) {
   markProposalsApplied_(batchId, newVersionNo);
   const archived = archiveOldProposals_(batchId);
 
+  // ── 第五十五輪批次 A 組：**造完版本一定要更新公開連結。** ──────
+  //
+  // ⚠️ 呢一條係由**資料嗰邊**數出嚟嘅——`registerVersion()` 一共有
+  // 六個真呼叫點，而由「某支函式嘅 caller」數起嗰陣完全見唔到佢。
+  //
+  // 唔發佈嘅話，幹事喺「微調 ▸ 套用決定」改完，收到連結嗰班人
+  // 見到嘅仍然係上一版，而中間冇任何一個畫面提示過。
+  //
+  // ⚠️ 用**同一支** `tryPublishPublicRoster_()`。發佈失敗唔算套用失敗
+  //（版本已經真係建立咗），但要帶返出去畀呼叫端講。
+  const publish = tryPublishPublicRoster_(quarterId);
+
   return {
+    // ⚠️ 呼叫端一定要顯示——寫 log 等於冇人知。
+    publishFailed: !!publish.failed,
+    publishMessage: publish.failed
+      ? describePublishAfterGenerate_(publish, newVersionNo, quarterId) : '',
     sheetName: sheetName,
     versionNo: newVersionNo,
     accepted: acceptedCount,
