@@ -1437,6 +1437,40 @@ function clearFailedSelfTestState_(state) {
  * ═════════════════════════════════════════════════════════════════════ */
 
 /**
+ * 第五十二輪批次 B 組：**影低此刻邊幾條快嘅不變量係紅嘅。**
+ *
+ * ⚠️ 為咩要影：舊寫法係「情境跑完，快嘅不變量有一條紅 ⇒ 呢個情境紅」。
+ * 但不變量係**成個季度嘅性質**，唔係呢個情境嘅產物。
+ * 一條喺開跑之前就已經紅嘅不變量，會令**之後每一個情境**都紅，
+ * 而每一個紅嘅情境又會經 `dependsOn` 把下游標成 `BLOCKED`。
+ *
+ * 現場：一條既有嘅不變量失敗，令 13 條情境一條都跑唔到——
+ * 而報告上面睇落好似有 13 個地方壞咗。
+ *
+ * ⚠️ 呢一支**唔判斷邊個嘅責任**，凈係影相。歸咎喺呼叫嗰邊做。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {Object} `{map, error}`；`map` 是 `{不變量 ID: 一行證據}`，
+ *   `error` 是影唔到相時的錯誤原文（此時 `map` 是空的）
+ */
+function snapshotFailingInvariants_(quarterId) {
+  const map = {};
+  try {
+    const inv = runAllInvariants_(quarterId, INVARIANT_SET.PER_SCENARIO);
+    inv.results.forEach(function (r) {
+      if (r.status === INVARIANT_STATUS.FAILED || r.status === INVARIANT_STATUS.ERROR) {
+        map[r.id] = r.id + '｜預期 ' + r.expected + '｜實際 ' + r.actual + '｜' + r.evidence;
+      }
+    });
+    return { map: map, error: '' };
+  } catch (err) {
+    // ⚠️ 影唔到相 ⇒ **唔可以當成「乜都冇紅」**。當成冇紅嘅話，
+    // 一條既有嘅失敗會被算落第一個情境頭上——即係呢一組要修嗰件事。
+    return { map: {}, error: err.message };
+  }
+}
+
+/**
  * 跑自測機。
  *
  * @param {boolean} resume true ＝ 由上一次停低嘅地方接住；
@@ -1488,6 +1522,20 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       };
     }
   }
+
+  // ── 開跑之前，先影一次底相 ──────────────────────────────────
+  //
+  // 第五十二輪批次 B2 組：**要分得出「呢個情境整紅嘅」同「本來就紅」。**
+  //
+  // ⚠️ 呢一張底相之後唔會再重新影。每一個情境跑完會影多一次，
+  // 而**上一個情境嘅事後相，就係下一個情境嘅事前相**——
+  // 所以逐個情境嘅歸咎唔使額外跑多一次不變量，一蚊都唔使多畀。
+  //（開跑呢一次係唯一嗰次額外開支，全程只影一次。）
+  const baseline = snapshotFailingInvariants_(quarterId);
+  let knownFailing = baseline.map;
+  const startupFailures = Object.keys(baseline.map).map(function (id) {
+    return baseline.map[id];
+  });
 
   // ── 逐個情境 ────────────────────────────────────────────────
   const results = [];
@@ -1638,22 +1686,51 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     //
     // 貴嗰幾條留到全部情境跑完之後先一次過跑（見下面 `finalInvariants`）。
     const invStartedAt = new Date().getTime();
-    try {
-      const inv = runAllInvariants_(quarterId, INVARIANT_SET.PER_SCENARIO);
-      outcome.invariantFailed = inv.failedCount + inv.errorCount;
-      outcome.invariantDetail = inv.results.filter(function (r) {
-        return r.status === INVARIANT_STATUS.FAILED || r.status === INVARIANT_STATUS.ERROR;
-      }).map(function (r) {
-        return r.id + '｜預期 ' + r.expected + '｜實際 ' + r.actual + '｜' + r.evidence;
+    const after = snapshotFailingInvariants_(quarterId);
+    if (after.error) {
+      outcome.invariantFailed = -1;
+      outcome.invariantDetail = ['不變量算不出來：' + after.error];
+      outcome.status = SELFTEST_STATUS.ERROR;
+    } else {
+      // ── 第五十二輪批次 B3 組：**歸咎。** ──────────────────────
+      //
+      // 　本來綠、而家紅 ⇒ 呢個情境整嘅　　　　　　⇒ 算佢頭上
+      // 　本來紅、而家仲紅 ⇒ 開跑之前就已經噉　　　⇒ **唔算佢頭上**
+      // 　本來紅、而家綠 ⇒ 呢個情境順手整返好咗　　⇒ 講一句
+      //
+      // ⚠️ 中間嗰一行係成組嘅重點。一條既有嘅失敗會令之後
+      // **每一個**情境都紅，而每一個紅嘅情境又會把下游標成 `BLOCKED`。
+      // 一個根因，13 條跑唔到。
+      const caused = [];
+      const carried = [];
+      Object.keys(after.map).forEach(function (id) {
+        if (knownFailing[id]) { carried.push(id); } else { caused.push(after.map[id]); }
       });
-      if (outcome.invariantFailed > 0 && outcome.status === SELFTEST_STATUS.PASSED) {
-        // 情境自己嘅斷言全綠，而不變量紅咗 ⇒ **整體算紅**。
+      const healed = Object.keys(knownFailing).filter(function (id) {
+        return !after.map[id];
+      });
+
+      outcome.invariantFailed = caused.length;
+      outcome.invariantDetail = caused;
+      outcome.invariantCarried = carried;
+      if (carried.length > 0) {
+        // ⚠️ 唔算佢頭上，但要講——完全唔提嘅話，一條開跑就紅嘅
+        // 不變量會靜靜噉喺成份報告度消失。
+        outcome.note = (outcome.note ? outcome.note + ' ' : '')
+          + '（跑的時候 ' + carried.join('、') + ' 仍然是紅的，'
+          + '但那是開跑之前就已經這樣，不算在這一條頭上。'
+          + '詳情見報告開頭。）';
+      }
+      if (healed.length > 0) {
+        outcome.note = (outcome.note ? outcome.note + ' ' : '')
+          + '（順手修好了：' + healed.join('、') + '。）';
+      }
+      if (caused.length > 0 && outcome.status === SELFTEST_STATUS.PASSED) {
+        // 情境自己嘅斷言全綠，而佢**整紅咗**一條本來綠嘅不變量 ⇒ 算紅。
         outcome.status = SELFTEST_STATUS.FAILED;
       }
-    } catch (err) {
-      outcome.invariantFailed = -1;
-      outcome.invariantDetail = ['不變量算不出來：' + err.message];
-      outcome.status = SELFTEST_STATUS.ERROR;
+      // ⚠️ 事後相變成下一個情境嘅事前相。
+      knownFailing = after.map;
     }
 
     invariantMs += new Date().getTime() - invStartedAt;
@@ -1703,6 +1780,9 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     rerunFailedOnly: !!rerunFailedOnly,
     rerunIds: rerunIds,
     results: results,
+    // 第五十二輪批次 B4 組：開跑就已經紅嗰幾條，要排喺報告最頂。
+    startupFailures: startupFailures,
+    startupSnapshotError: baseline.error,
     finalInvariants: finalInvariants,
     totalMs: totalMs,
     invariantMs: invariantMs,
@@ -1752,6 +1832,26 @@ function describeSelfTestReport_(report) {
       + '。沙盒季度沒有清掉。）');
   }
   lines.push('');
+
+  // ── 第五十二輪批次 B4 組：開跑就已經紅嗰幾條，排喺最頂 ─────
+  //
+  // ⚠️ 排喺最頂係因為佢係**先決條件**：呢幾條唔清乾淨，
+  // 下面每一條情境嘅綠同紅都要打個折扣。
+  if (report.startupSnapshotError) {
+    lines.push('⚠️ 開跑之前影不到不變量的底相：' + report.startupSnapshotError);
+    lines.push('　 所以下面每一條情境的「不變量」欄都可能把一個'
+      + '本來就存在的問題算了在它頭上。');
+    lines.push('');
+  } else if ((report.startupFailures || []).length > 0) {
+    lines.push('⚠️ 開跑的時候已經存在的不變量失敗（'
+      + report.startupFailures.length + ' 條）');
+    lines.push('　 這幾條不是下面任何一個情境弄出來的，所以不算在它們頭上。');
+    lines.push('　 但它們是先決條件：不清乾淨，下面每一條的綠和紅都要打個折扣。');
+    report.startupFailures.forEach(function (d) {
+      lines.push('　 ⚠️ ' + d);
+    });
+    lines.push('');
+  }
 
   // ⚠️ 情境按**執行次序**印，唔係按編號——S14／S15 排咗上嚟 S02 之後
   // （見登記表嗰段：重新生成要 Stage 仍然係 DRAFT）。

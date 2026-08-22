@@ -943,6 +943,11 @@ function runGenerateRoster_() {
     // 生成多份候選揀最貼近歷史基準的一份，並建立版本；與 Web UI、自動排程共用同一入口
     const result = performRosterGeneration_(quarterId);
 
+    // ⚠️ 第五十二輪批次 A 組：造完版本一定要更新公開連結。
+    // 呢個舊入口仍然撳得到（試算表選單），而佢造出嚟嘅版本
+    // 同 Web UI 造嘅完全一樣——所以公開連結一樣要跟住走。
+    const publish = tryPublishPublicRoster_(quarterId);
+
     // 第十六輪批次階段 D3：未確認日期的特殊主日要喺完成畫面明確標示出嚟
     // （同「四階段流程 ▸ 步驟 1」嗰個畫面一致，兩邊讀同一個回傳值）。
     const unconfirmedText = describeUnconfirmedSpecialSundays_(result.unconfirmedSpecials);
@@ -958,7 +963,9 @@ function runGenerateRoster_() {
         + (result.stoppedByTime ? '（原定 ' + result.attemptsPlanned + ' 次，因時間上限提早停止）' : '') + '\n'
         + '採用第 ' + result.attemptIndex + ' 次（seed=' + result.seed + '）\n'
         + '總偏差 ' + result.deviation.toFixed(4) + '\n'
-        + (result.protected ? '\nv0 已加保護。' : ''),
+        + (result.protected ? '\nv0 已加保護。' : '')
+        // ⚠️ 發佈失敗唔可以只寫 log——寫 log 等於冇人知。
+        + '\n\n' + describePublishAfterGenerate_(publish, result.versionNo, quarterId),
       ui.ButtonSet.OK
     );
   } catch (err) {

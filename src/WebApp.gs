@@ -226,7 +226,21 @@ function apiGenerateRoster(quarterId) {
   assertWebAppRequestAllowed_();
   requireQuarterStage_(quarterId, [QUARTER_STAGE.DRAFT], '生成職事表（Web UI）');
   const result = performRosterGeneration_(quarterId);
+
+  // ⚠️ 第五十二輪批次 A 組：**造完版本一定要更新公開連結。**
+  //
+  // 呢一支係「進階功能 ▸ 重新生成初稿（覆蓋式）」嗰條路。佢造出一個
+  // 新版本取代原本嗰一版——而公開連結嘅承諾係「永遠指向最新嗰一版」。
+  // 唔更新嘅話，幹事重新生成完同堂委講「連結已經更新」，
+  // 而堂委開連結見到嘅仍然係舊版。
+  //
+  // ⚠️ 用**同一支** `tryPublishPublicRoster_()`——發佈失敗唔算生成失敗
+  //（版本已經真係建立咗），但一定要分開報畀前端。
+  const publish = tryPublishPublicRoster_(quarterId);
   return {
+    publishFailed: !!publish.failed,
+    publishMessage: publish.failed
+      ? describePublishAfterGenerate_(publish, result.versionNo, quarterId) : '',
     sheetName: result.sheetName,
     versionNo: result.versionNo,
     assigned: result.assigned,

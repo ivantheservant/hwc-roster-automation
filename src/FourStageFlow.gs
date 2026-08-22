@@ -64,6 +64,11 @@ function runFourStageStep1_() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('生成中，請稍候…', '四階段流程', 300);
     const result = performRosterGeneration_(quarterId);
+
+    // ⚠️ 第五十二輪批次 A 組：造完版本一定要更新公開連結。
+    // 呢條係另一條舊路，但佢造出嚟嘅版本同其餘三個入口一模一樣。
+    const publish = tryPublishPublicRoster_(quarterId);
+
     const b = result.blankBreakdown;
     const lines = [
       '已建立 ' + result.sheetName,
@@ -86,6 +91,9 @@ function runFourStageStep1_() {
     // 第十六輪批次階段 D3：未確認日期的特殊主日要喺完成畫面明確標示出嚟。
     const unconfirmedText = describeUnconfirmedSpecialSundays_(result.unconfirmedSpecials);
     if (unconfirmedText) lines.push('', unconfirmedText);
+    // ⚠️ 排喺「Stage 維持 DRAFT」前面——發佈失敗係一件要即刻處理嘅事，
+    // 唔應該排喺一句例行說明後面。
+    lines.push('', describePublishAfterGenerate_(publish, result.versionNo, quarterId));
     lines.push('', 'Stage 維持 DRAFT。覆核無誤後可執行「步驟 2：寄給堂委審閱」。');
     ui.alert('步驟 1：生成初稿', lines.join('\n'), ui.ButtonSet.OK);
   } catch (err) {

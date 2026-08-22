@@ -1773,9 +1773,10 @@ const MUTATIONS = [
     why: '情境自己全綠而不變量紅咗嗰陣，整體照樣報綠'
       + '——一個「畫面同表對唔上」會被一份綠色報告蓋住',
     file: 'src/SelfTestRunner.gs',
-    find: '      if (outcome.invariantFailed > 0 && outcome.status === SELFTEST_STATUS.PASSED) {',
+    find: '      if (caused.length > 0 && outcome.status === SELFTEST_STATUS.PASSED) {',
     replace: '      if (false) {',
-    tests: ['tests/selftest_runner.test.js']
+    tests: ['tests/selftest_runner.test.js',
+      'tests/selftest_invariant_attribution.test.js']
   },
   {
     id: 'st-scenario-throws-all',
@@ -2031,8 +2032,8 @@ const MUTATIONS = [
       + '——I04 掃全表 10,920 行、I08 每條要行一次完整 plan，'
       + '兩個情境就食光時間預算。呢個就係死鎖嘅另一半',
     file: 'src/SelfTestRunner.gs',
-    find: '      const inv = runAllInvariants_(quarterId, INVARIANT_SET.PER_SCENARIO);',
-    replace: '      const inv = runAllInvariants_(quarterId, INVARIANT_SET.ALL);',
+    find: '    const inv = runAllInvariants_(quarterId, INVARIANT_SET.PER_SCENARIO);',
+    replace: '    const inv = runAllInvariants_(quarterId, INVARIANT_SET.ALL);',
     tests: ['tests/selftest_resume_deadlock.test.js']
   },
   {
@@ -2335,6 +2336,190 @@ const MUTATIONS = [
     find: "      if (c.evidence && c.evidence !== c.actual) lines.push('　　 證據：' + c.evidence);",
     replace: "      if (c.evidence) lines.push('　　 證據：' + c.evidence);",
     tests: ['tests/selftest_mainflow.test.js']
+  },
+  // ── 第五十二輪批次 A 組：造完版本冇更新公開連結 ──────────────
+  {
+    id: 'pub-web-skip',
+    why: '「進階功能 ▸ 重新生成初稿」造完版本冇更新公開連結'
+      + '——公開連結嘅畫面文案自己寫住「永遠指向最新嗰一版」，'
+      + '而堂委開連結見到嘅係舊嗰一版，中間冇任何一個畫面提示過',
+    file: 'src/WebApp.gs',
+    find: '  const publish = tryPublishPublicRoster_(quarterId);',
+    replace: '  const publish = { failed: false, message: \'\' };',
+    tests: ['tests/generate_publishes_link.test.js']
+  },
+  {
+    id: 'pub-menu-skip',
+    why: '試算表選單嗰個入口造完版本冇更新公開連結'
+      + '——舊入口仍然撳得到，而佢造出嚟嘅版本同 Web UI 造嘅一模一樣',
+    file: 'src/Menu.gs',
+    find: '    const publish = tryPublishPublicRoster_(quarterId);',
+    replace: '    const publish = { failed: false, message: \'\' };',
+    tests: ['tests/generate_publishes_link.test.js']
+  },
+  {
+    id: 'pub-four-skip',
+    why: '四階段流程步驟 1 造完版本冇更新公開連結',
+    file: 'src/FourStageFlow.gs',
+    find: '    const publish = tryPublishPublicRoster_(quarterId);',
+    replace: '    const publish = { failed: false, message: \'\' };',
+    tests: ['tests/generate_publishes_link.test.js']
+  },
+  {
+    id: 'pub-fail-silent',
+    why: '發佈失敗只寫 log，唔喺畫面講'
+      + '——寫 log 等於冇人知：幹事會照樣同堂委講「連結已經更新」',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  if (!publish || !publish.failed) {',
+    replace: '  if (true) {',
+    tests: ['tests/generate_publishes_link.test.js']
+  },
+  {
+    id: 'pub-fail-nover',
+    why: '發佈失敗淨係講「失敗」，唔講「收到連結嘅人而家見到邊一版」'
+      + '——幹事唔知嚴唔嚴重',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: "    + '　 收到連結的人現在看到的仍然是' + publishedVersion + '。" + String.fromCharCode(92) + "n'",
+    replace: "    + ''",
+    tests: ['tests/generate_publishes_link.test.js']
+  },
+  {
+    id: 'pub-web-noflag',
+    why: 'Web UI 嗰個入口唔把發佈失敗帶落回傳值'
+      + '——Web UI 冇 `ui.alert()`，唔帶出去就完全冇人知',
+    file: 'src/WebApp.gs',
+    find: '    publishFailed: !!publish.failed,',
+    replace: '    publishFailed: false,',
+    tests: ['tests/generate_publishes_link.test.js']
+  },
+
+  // ── 第五十二輪批次 B 組：既有嘅不變量失敗污染下游 ────────────
+  {
+    id: 'inv-blame-all',
+    why: '把「開跑之前就已經紅」嗰幾條都算落情境頭上'
+      + '——一條既有嘅失敗令之後每一個情境都紅，'
+      + '而每一個紅嘅情境又經 `dependsOn` 把下游標成 BLOCKED：'
+      + '一個根因，13 條情境一條都跑唔到',
+    file: 'src/SelfTestRunner.gs',
+    find: '        if (knownFailing[id]) { carried.push(id); }'
+      + ' else { caused.push(after.map[id]); }',
+    replace: '        caused.push(after.map[id]);',
+    tests: ['tests/selftest_invariant_attribution.test.js']
+  },
+  {
+    id: 'inv-base-empty',
+    why: '開跑唔影底相，當成「一條都冇紅」'
+      + '——噉樣一條既有嘅失敗會被算落第一個情境頭上',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const baseline = snapshotFailingInvariants_(quarterId);',
+    replace: "  const baseline = { map: {}, error: '' };",
+    tests: ['tests/selftest_invariant_attribution.test.js']
+  },
+  {
+    id: 'inv-snap-throw',
+    why: '影唔到底相就當成「一條都冇紅」'
+      + '——影唔到唔可以當冇事，否則歸咎會靜靜噉錯',
+    file: 'src/SelfTestRunner.gs',
+    find: '    return { map: {}, error: err.message };',
+    replace: "    return { map: {}, error: '' };",
+    tests: ['tests/selftest_invariant_attribution.test.js']
+  },
+  {
+    id: 'inv-carry-mute',
+    why: '既有嘅失敗完全唔提'
+      + '——唔算佢頭上係啱，但完全唔提就會令一條開跑就紅嘅不變量'
+      + '靜靜噉喺成份報告度消失',
+    file: 'src/SelfTestRunner.gs',
+    find: '      if (carried.length > 0) {',
+    replace: '      if (false) {',
+    tests: ['tests/selftest_invariant_attribution.test.js']
+  },
+  {
+    id: 'inv-top-mute',
+    why: '報告開頭唔印「開跑就已經存在嘅不變量失敗」'
+      + '——嗰幾條係先決條件，唔印嘅話下面每一條嘅綠同紅都冇得打折扣',
+    file: 'src/SelfTestRunner.gs',
+    find: "    lines.push('⚠️ 開跑的時候已經存在的不變量失敗（'",
+    replace: "    lines.push('（'",
+    tests: ['tests/selftest_invariant_attribution.test.js']
+  },
+  {
+    id: 'inv-snap-twice',
+    why: '每個情境額外再影多一次事前相'
+      + '——第五十輪批次嗰個時間預算問題會走回頭路：'
+      + '不變量跑多一倍，13 條情境又會變成「未跑」',
+    file: 'src/SelfTestRunner.gs',
+    find: '      knownFailing = after.map;',
+    replace: '      knownFailing = snapshotFailingInvariants_(quarterId).map;',
+    tests: ['tests/selftest_invariant_attribution.test.js']
+  },
+
+  // ── 第五十二輪批次 C 組：亂行機冇睇回傳值 ────────────────────
+  {
+    id: 'mky-no-check',
+    why: '亂行機叫完真實入口冇睇回傳值'
+      + '——一個唔拋錯、但係靜靜噉乜都冇做嘅入口，'
+      + '會令亂行機一路行到 50 步，然後交一份綠色報告',
+    file: 'src/MonkeyRun.gs',
+    find: '      monkeyCheckOutcome_(picked, result, facts, after)'
+      + '.forEach(function (complaint) {',
+    replace: '      [].forEach(function (complaint) {',
+    tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  {
+    id: 'mky-ok-false',
+    why: '`legal()` 話做得而系統回 `ok: false`，亂行機唔記低'
+      + '——`legal()` 已經話咗做得，呢個拒絕同一個合法動作拋錯係同一級',
+    file: 'src/MonkeyRun.gs',
+    find: '  if (result && result.ok === false) {',
+    replace: '  if (false) {',
+    tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  {
+    id: 'mky-gen-flag',
+    why: '「生成初稿」唔睇 `versionCreated`'
+      + '——嗰一支喺已經有版本嗰陣回 `{ok:false, versionCreated:false}` 而唔拋錯',
+    file: 'src/MonkeyRun.gs',
+    find: '        if (result && result.versionCreated === false) {',
+    replace: '        if (false) {',
+    tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  {
+    id: 'mky-gen-ver',
+    why: '「生成初稿」只信回傳值，唔核對版本號有冇真係加'
+      + '——只信回傳值嘅話，一個講咗大話嘅入口永遠捉唔到',
+    file: 'src/MonkeyRun.gs',
+    find: '        if (!(after.latestVersionNo > before.latestVersionNo)) {',
+    replace: '        if (false) {',
+    tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  {
+    id: 'mky-pure-move',
+    why: '純算／純讀嘅動作改咗嘢都當冇事'
+      + '——一個自稱只係計算嘅入口改咗季度狀態，係一個真發現',
+    file: 'src/MonkeyRun.gs',
+    find: "  return moved.length === 0 ? ''",
+    replace: "  return true ? ''",
+    tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  {
+    id: 'mky-same-mute',
+    why: '「看一次主畫面」算咗 `same` 但冇人睇'
+      + '——呢個動作存在嘅唯一理由就係問「連續讀兩次會唔會唔同」，'
+      + '而佢問完之後冇睇答案',
+    file: 'src/MonkeyRun.gs',
+    find: '        if (result && result.same === false) {',
+    replace: '        if (false) {',
+    tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  {
+    id: 'mky-expect-eat',
+    why: '查證本身爆咗就靜靜噉當佢過'
+      + '——靜靜噉當佢過就係呢一組要修嗰件事',
+    file: 'src/MonkeyRun.gs',
+    find: "      complaints.push('查不到這一步做過什麼：' + err.message);",
+    replace: '      complaints.length = complaints.length;',
+    tests: ['tests/monkey_checks_return_value.test.js']
   },
 ];
 

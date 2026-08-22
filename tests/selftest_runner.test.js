@@ -207,8 +207,9 @@ console.log('\n=== 四【核心】一個爆咗，後面照跑；而且每個都�
     /error: err\.message/.test(CODE), '');
   // 第五十輪批次 B1 組：每個情境只跑**快嗰批**，貴嗰批留到最尾。
   check('★★★★★★ 每一個情境跑完都叫一次不變量（快嗰批）',
-    /outcome = scenario\.run\(quarterId\);[\s\S]{0,1200}runAllInvariants_\(quarterId, INVARIANT_SET\.PER_SCENARIO\)/
-      .test(CODE), '');
+    /outcome = scenario\.run\(quarterId\);[\s\S]{0,1200}snapshotFailingInvariants_\(quarterId\)/
+      .test(CODE)
+      && /runAllInvariants_\(quarterId, INVARIANT_SET\.PER_SCENARIO\)/.test(CODE), '');
   check('★★★★★★ 而全部情境跑完之後一次過跑貴嗰批'
     + '——I04 掃全表 10,920 行、I08 每條要行一次完整 plan，'
     + '每個情境都跑就 6 分鐘內完全唔可能',
@@ -218,7 +219,7 @@ console.log('\n=== 四【核心】一個爆咗，後面照跑；而且每個都�
     /if \(!stoppedForTime\) \{[\s\S]{0,300}INVARIANT_SET\.FINAL/.test(CODE), '');
   check('★★★★★★ 情境自己全綠而不變量紅咗 ⇒ **整體算紅**'
     + '——唔係噉嘅話，一個「畫面同表對唔上」會被一份綠色報告蓋住',
-    /outcome\.invariantFailed > 0 && outcome\.status === SELFTEST_STATUS\.PASSED[\s\S]{0,120}SELFTEST_STATUS\.FAILED/
+    /caused\.length > 0 && outcome\.status === SELFTEST_STATUS\.PASSED[\s\S]{0,120}SELFTEST_STATUS\.FAILED/
       .test(CODE), '');
   check('★★★★★ 不變量算唔出 ⇒ 情境算 `ERROR`，唔可以當冇事',
     /outcome\.invariantFailed = -1;[\s\S]{0,200}SELFTEST_STATUS\.ERROR/.test(CODE), '');

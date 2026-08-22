@@ -96,6 +96,20 @@ function makeMonkeyRandom_(seed, skip) {
  *   `id`　　　　報告上面點叫佢
  *   `legal`　　喺呢個狀態下合唔合法（**純判斷，唔准改嘢**）
  *   `run`　　　真正執行（一律經真實入口）
+ *   `expect`　 撳完之後**應該點**（第五十二輪批次 C 組）
+ *
+ * ⚠️ `expect` 係呢一輪加嘅。冇佢之前，`run()` 嘅回傳值只係
+ * `JSON.stringify` 落 `MonkeyLog` 就算數——冇人睇。
+ * 於是一個「`legal` 話做得、真係叫咗、而系統靜靜噉乜都冇做」嘅動作，
+ * 亂行機會照樣行落去，一路行到 50 步，然後報一份綠色報告。
+ *
+ * 現場（第五十一輪批次 C1）：`apiGenerateDraftExecute()` 喺已經有版本嘅
+ * 季度上面回 `{ok: false, versionCreated: false}`——**佢唔拋錯**。
+ * 自測機 S14 當時就係噉行過咗頭，攞住舊嘅 v0 去驗，
+ * 報咗一句完全誤導嘅結論。
+ *
+ * ⚠️ **一個真實入口靜靜地冇做事，而測試照樣往下走**
+ * ——呢個係呢個專案由第一輪殺到而家嗰種病。
  *
  * ⚠️ `legal` 唔係「掣亮唔亮」——係「呢個動作而家做唔做得到」。
  * 兩者理應一致，而**唔一致本身就係一個發現**：
@@ -107,7 +121,21 @@ function monkeyActions_() {
     {
       id: '生成初稿',
       legal: function (facts) { return !facts.hasVersion; },
-      run: function (quarterId) { return apiGenerateDraftExecute(quarterId); }
+      run: function (quarterId) { return apiGenerateDraftExecute(quarterId); },
+      // ⚠️ 呢一支喺已經有版本嗰陣回 `{ok: false, versionCreated: false}`，
+      // **唔拋錯**。`legal` 已經查過冇版本，所以喺呢度收到拒絕
+      // 就係「畫面話得，而系統話唔得」。
+      expect: function (result, before, after) {
+        if (result && result.versionCreated === false) {
+          return '回傳 `versionCreated: false`——叫了，但沒有造出版本。'
+            + '回傳訊息：' + String((result || {}).message || '（沒有）');
+        }
+        if (!(after.latestVersionNo > before.latestVersionNo)) {
+          return '版本號沒有增加（之前 ' + before.latestVersionNo
+            + '，之後 ' + after.latestVersionNo + '）。';
+        }
+        return '';
+      }
     },
     {
       id: '改 grid 幾格',
@@ -122,6 +150,12 @@ function monkeyActions_() {
             c.postId, c.slotIndex, '亂行' + (i + 1))) written++;
         });
         return { changedCells: written };
+      },
+      // ⚠️ 一格都寫唔到 ⇒ 呢一步實際上乜都冇做，而下一步會當佢做過。
+      expect: function (result) {
+        return result.changedCells > 0 ? ''
+          : '一格都沒有寫到——這一步實際上什麼都沒有做，'
+            + '但後面每一步都當它做過了。';
       }
     },
     {
@@ -129,6 +163,12 @@ function monkeyActions_() {
       legal: function (facts) { return facts.hasVersion && facts.gridChangeCount > 0; },
       run: function (quarterId) {
         return apiSaveAndConfirmExecute(quarterId, { decisions: [] });
+      },
+      // `legal` 已經查過「有未儲存改動」。儲存完仲有未儲存改動 ⇒ 有嘢冇入到。
+      expect: function (result, before, after) {
+        return after.gridChangeCount === 0 ? ''
+          : '儲存完之後仍然有 ' + after.gridChangeCount + ' 格未儲存'
+            + '（之前 ' + before.gridChangeCount + ' 格）。';
       }
     },
     {
@@ -136,14 +176,29 @@ function monkeyActions_() {
       legal: function (facts) {
         return !!(facts.buttons.review && facts.buttons.review.enabled);
       },
-      run: function (quarterId) { return apiStep2Confirm(quarterId, null); }
+      run: function (quarterId) { return apiStep2Confirm(quarterId, null); },
+      // `legal` 睇嘅係「掣着咗」。撳咗之後 Stage 冇郁過 ⇒
+      // 掣話得，而系統實際上乜都冇推進。
+      expect: function (result, before, after) {
+        return after.stage !== before.stage ? ''
+          : '撳了之後 Stage 沒有動過（仍然是 ' + before.stage + '）。';
+      }
     },
     {
       id: '正式發出給全體（模擬）',
       legal: function (facts) {
         return !!(facts.buttons.official && facts.buttons.official.enabled);
       },
-      run: function (quarterId) { return apiStep4Confirm(quarterId, null); }
+      run: function (quarterId) { return apiStep4Confirm(quarterId, null); },
+      // ⚠️ `advanced: false` 係一個**特登**嘅結果（有人未收到，
+      // Stage 特登唔前進，補救之後可以再行一次）——嗰個唔算靜默。
+      // 靜默嘅係「`advanced` 冇講唔前進，而 Stage 又真係冇郁」。
+      expect: function (result, before, after) {
+        if (result && result.advanced === false) return '';
+        return after.stage !== before.stage ? ''
+          : '撳了之後 Stage 沒有動過（仍然是 ' + before.stage + '），'
+            + '而回傳值也沒有說明為什麼不前進。';
+      }
     },
     {
       id: '改動後重發（只算，不寄）',
@@ -153,7 +208,9 @@ function monkeyActions_() {
       // ⚠️ 只叫 `apiStep5Plan()`——佢係純算。
       // 亂行機唔應該喺一條隨機路徑上面走完整條寄送流程：
       // 走一次要幾分鐘，而一次亂行要行 50 步。
-      run: function (quarterId) { return apiStep5Plan(quarterId, null); }
+      run: function (quarterId) { return apiStep5Plan(quarterId, null); },
+      // ⚠️ 佢自稱「純算」。一個純算嘅入口改咗嘢，就係一個真發現。
+      expect: function (result, before, after) { return monkeyExpectNoChange_(before, after); }
     },
     {
       id: '回到上一個儲存版本',
@@ -161,7 +218,9 @@ function monkeyActions_() {
       run: function (quarterId) {
         const target = findLatestVersionNo(quarterId) - 1;
         return apiRollbackPlan(quarterId, target);
-      }
+      },
+      // `apiRollbackPlan()` 只係算，唔會真回退。同上：純算就唔准改嘢。
+      expect: function (result, before, after) { return monkeyExpectNoChange_(before, after); }
     },
     {
       id: '看一次主畫面',
@@ -175,14 +234,90 @@ function monkeyActions_() {
           same: JSON.stringify(a.unsaved) === JSON.stringify(b.unsaved),
           unsaved: a.unsaved
         };
+      },
+      // ⚠️ `same` 本來算咗出嚟，但**冇人睇**——JSON 落 `MonkeyLog` 就算數。
+      // 呢個動作存在嘅唯一理由就係問「連續讀兩次會唔會唔同」，
+      // 而佢問完之後冇睇答案。同 C 組要修嗰件事一模一樣。
+      expect: function (result, before, after) {
+        if (result && result.same === false) {
+          return '連續讀兩次主畫面，「未儲存」的內容不一樣'
+            + '——中間沒有做過任何事。';
+        }
+        return monkeyExpectNoChange_(before, after);
       }
     },
     {
       id: '看一次寄出彈窗',
       legal: function () { return true; },
-      run: function (quarterId) { return apiGetSendPlanSummary(quarterId); }
+      run: function (quarterId) { return apiGetSendPlanSummary(quarterId); },
+      // 純讀。讀一次彈窗改咗季度嘅狀態，就係一個真發現。
+      expect: function (result, before, after) { return monkeyExpectNoChange_(before, after); }
     }
   ];
+}
+
+/**
+ * 「呢一步唔應該改到任何嘢」——畀純算／純讀嗰幾個動作用。
+ *
+ * @param {Object} before 撳之前的 facts
+ * @param {Object} after 撳之後的 facts
+ * @returns {string} 空字串 ＝ 冇改過；否則一句解釋
+ */
+function monkeyExpectNoChange_(before, after) {
+  const moved = [];
+  if (before.stage !== after.stage) {
+    moved.push('Stage 由 ' + before.stage + ' 變成 ' + after.stage);
+  }
+  if (before.latestVersionNo !== after.latestVersionNo) {
+    moved.push('版本號由 ' + before.latestVersionNo + ' 變成 ' + after.latestVersionNo);
+  }
+  if (before.gridChangeCount !== after.gridChangeCount) {
+    moved.push('未儲存格數由 ' + before.gridChangeCount
+      + ' 變成 ' + after.gridChangeCount);
+  }
+  return moved.length === 0 ? ''
+    : '這一個動作說明自己只是計算／只是讀，但它改了東西：' + moved.join('；') + '。';
+}
+
+/**
+ * 第五十二輪批次 C 組：**撳完之後真係要睇一眼回傳值同狀態。**
+ *
+ * ⚠️ 之前 `run()` 嘅回傳值只係 `JSON.stringify` 落 `MonkeyLog`，冇人睇。
+ * 一個唔拋錯、但係靜靜噉乜都冇做嘅入口，亂行機會照樣行落去。
+ *
+ * 兩層：
+ *   1. **共通規則**——`legal` 話做得，而回傳 `ok: false` ⇒ 系統拒絕咗
+ *   2. **逐個動作嘅 `expect`**——狀態有冇真係郁過
+ *
+ * @param {Object} picked 揀中咗的動作
+ * @param {Object} result `run()` 的回傳值
+ * @param {Object} before 撳之前的 facts
+ * @param {Object} after 撳之後的 facts；讀唔到就是 null
+ * @returns {Array<string>} 每一句是一個問題；空陣列 ＝ 冇問題
+ */
+function monkeyCheckOutcome_(picked, result, before, after) {
+  const complaints = [];
+  // ── 1. 共通規則 ──────────────────────────────────────────────
+  //
+  // ⚠️ `legal()` 已經話咗呢個狀態下做得。系統喺呢度回一個拒絕，
+  // 就係「畫面話得，而系統話唔得」——同一個合法動作拋錯同一級。
+  if (result && result.ok === false) {
+    complaints.push('`legal()` 說這一步做得到，而系統拒絕了：'
+      + String(result.message || '（回傳值沒有說明原因）'));
+  }
+  if (!after) return complaints;
+
+  // ── 2. 逐個動作 ──────────────────────────────────────────────
+  if (typeof picked.expect === 'function') {
+    try {
+      const complaint = picked.expect(result, before, after);
+      if (complaint) complaints.push(complaint);
+    } catch (err) {
+      // ⚠️ 查證本身爆咗 ⇒ **要報**。靜靜噉當佢過就係呢一組要修嗰件事。
+      complaints.push('查不到這一步做過什麼：' + err.message);
+    }
+  }
+  return complaints;
 }
 
 /**
@@ -281,6 +416,28 @@ function runMonkey_(steps, seed, skipDraws) {
     try {
       const result = picked.run(quarterId, rnd);
       outcome = JSON.stringify(result).slice(0, 300);
+
+      // ── 第五十二輪批次 C 組：**睇返個回傳值。** ────────────────
+      //
+      // ⚠️ 之前呢一行下面就直接落去跑不變量。回傳值淨係
+      // `JSON.stringify` 落 `MonkeyLog`——冇人睇。
+      // 一個唔拋錯、但係靜靜噉乜都冇做嘅入口，會一路行到 50 步，
+      // 然後交一份綠色報告。
+      let after = null;
+      try {
+        after = monkeyReadFacts_(quarterId);
+      } catch (err) {
+        failures.push({ step: i, kind: '撳完讀不到狀態',
+          detail: picked.id + '　' + err.message,
+          path: path.slice().concat([picked.id]) });
+      }
+      monkeyCheckOutcome_(picked, result, facts, after).forEach(function (complaint) {
+        failures.push({
+          step: i, kind: '合法動作靜靜地沒有做事',
+          detail: picked.id + '　' + complaint,
+          path: path.slice().concat([picked.id])
+        });
+      });
     } catch (err) {
       // ⚠️ 拋錯**唔會**被吞。一個 `legal` 講得通而執行起上嚟拋錯嘅動作，
       // 就係「畫面話得，而系統話唔得」——嗰個本身就係一個發現。

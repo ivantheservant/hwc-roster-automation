@@ -684,6 +684,55 @@ function assertSaveConfirmPlanStillFresh_(plan, decisions) {
 }
 
 /**
+ * 第五十二輪批次 A 組：**造完版本之後嗰一句「公開連結點樣」。**
+ *
+ * ⚠️ 四個造版本嘅入口，之前只有一個（`apiGenerateDraftExecute_locked_()`）
+ * 真係會去更新公開連結。其餘三個造完版本就完——而公開連結嘅畫面文案
+ * 自己寫住：
+ *
+ *     這是唯一一條連結。它永遠指向你最近一次「儲存我的修改」的版本。
+ *
+ * 幹事重新生成一次，然後同堂委講「連結已經更新」，
+ * 而堂委開連結見到嘅係舊嗰一版——**中間冇任何一個畫面提示過**。
+ * 呢個係靜默嘅錯，唔係會報錯嘅錯。
+ *
+ * ⚠️ 呢一支**只負責砌嗰句字**，發佈本身仍然行
+ * `tryPublishPublicRoster_()`——同一件事唔可以有第二個做法。
+ * 呢一組 bug 嘅成因就係「同一件事四個地方做，其中三個漏咗」；
+ * 再各自補一次只會把四個分岔變成四個新分岔。
+ *
+ * @param {Object} publish `tryPublishPublicRoster_()` 的結果
+ * @param {number} versionNo 剛剛造出來的版本號
+ * @param {string} quarterId 季度 ID
+ * @returns {string} 要顯示給幹事看的一段字；成功時是一句簡短的確認
+ */
+function describePublishAfterGenerate_(publish, versionNo, quarterId) {
+  if (!publish || !publish.failed) {
+    return '公開連結已經更新到第 ' + versionNo + ' 版（連結地址不變）。';
+  }
+  // ⚠️ **唔可以只寫 log。** 寫 log 等於冇人知。
+  //
+  // 而且要講得出「收到連結嗰班人而家見到嘅係邊一版」——
+  // 淨係講「發佈失敗」，幹事唔知嚴唔嚴重。
+  let publishedVersion = '（查不到）';
+  try {
+    const P = COLUMNS.PUBLIC_LINKS;
+    const row = readSheet(SHEETS.PUBLIC_LINKS).filter(function (r) {
+      return String(r[P.QUARTER_ID] || '').trim() === quarterId;
+    })[0];
+    publishedVersion = row ? ('第 ' + Number(row[P.LAST_PUBLISHED_VERSION]) + ' 版')
+      : '（這一季還沒有發佈過公開連結）';
+  } catch (err) {
+    publishedVersion = '（查不到：' + err.message + '）';
+  }
+  return '⚠️ 職事表已經生成第 ' + versionNo + ' 版，'
+    + '但公開連結沒有更新成功——\n'
+    + '　 收到連結的人現在看到的仍然是' + publishedVersion + '。\n'
+    + '　 請撳「⚠️ 發佈公開職事表（一季一條固定連結）」重試一次。\n'
+    + '　 失敗原因：' + publish.message;
+}
+
+/**
  * 發佈公開連結，把失敗降級成「唔算全盤失敗」（規格步 1.9）。
  * @param {string} quarterId 季度 ID
  * @returns {{failed: boolean, message: string}}
