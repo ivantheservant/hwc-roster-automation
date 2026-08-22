@@ -294,6 +294,33 @@ const AMBIGUOUS_TLDS = [
   'email', 'site', 'store', 'blog', 'wiki', 'club', 'online', 'pro'
 ];
 
+/**
+ * 抽出一行入面每一個字串字面量嘅**內容**（唔包括引號本身）。
+ *
+ * ⚠️ 呢一支特登寫得簡單：唔處理逃逸字元、唔理註釋。
+ * 佢嘅用途只係「呢個 token 到底喺唔喺一個字串入面」，
+ * 而漏判嘅方向係「當成唔喺字串」⇒ 更少誤報、唔會更多漏報。
+ *
+ * @param {string} text 一行原始碼
+ * @returns {string[]} 每一個字串字面量嘅內容
+ */
+function literalsOf(text) {
+  const out = [];
+  const line = String(text || '');
+  let quote = '';
+  let buf = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line.charAt(i);
+    if (quote === '') {
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; buf = ''; }
+      continue;
+    }
+    if (ch === quote) { out.push(buf); quote = ''; buf = ''; continue; }
+    buf += ch;
+  }
+  return out;
+}
+
 /** 把字串轉成可以安全放入 RegExp 嘅樣式。 */
 function escapeForRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -337,9 +364,25 @@ function scanDomains(lines) {
       // 教會網域係 `.org`／`.nz`／`.com` 呢類，唔喺呢個清單入面，
       // 所以實際風險好低。
       if (AMBIGUOUS_TLDS.some(function (t) { return lower.endsWith('.' + t); })) {
-        const quoted = new RegExp('["\'`][^"\'`]*' + escapeForRegex(domain) + '[^"\'`]*["\'`]');
+        // ⚠️ 第四十九輪批次：**要真係喺同一個字串字面量入面**，
+        // 唔可以用「兩個引號之間有佢」嚟判斷。
+        //
+        // 舊寫法係 `/["'`][^"'`]*<domain>[^"'`]*["'`]/`。
+        // 一句**字串拼接**（`'…' + 物件.屬性 + '…'`）完全符合嗰個樣式：
+        // 個屬性存取確實夾喺兩個引號中間，而佢個屬性名又啱啱好
+        // 係一個真實嘅兩個字母國碼 TLD。結果一句普通嘅程式碼被報成網域。
+        //
+        // 實測：`src/Invariants.gs` 兩處被擋住。
+        //
+        // （同上面嗰段一樣，呢度**特登唔舉完整例子**——
+        //   寫完整形狀出嚟，會被呢個 script 自己捉到。）
+        //
+        // 新做法：真正抽出**每一個字串字面量嘅內容**，睇吓個 domain
+        // 有冇喺其中一個入面。呢個嚴格啲，唔會放寬對真網域嘅偵測——
+        // 一個真網域寫喺字串入面，一定喺某一個字面量嘅內容之內。
         const inProse = /^(?:docs|README)/.test(l.file) || /^\s*(?:\/\/|\*|#)/.test(l.text);
-        if (!quoted.test(l.text) && !inProse) continue;
+        if (!literalsOf(l.text).some(function (lit) { return lit.indexOf(domain) !== -1; })
+            && !inProse) continue;
       }
 
       const key = l.file + '|' + lower;

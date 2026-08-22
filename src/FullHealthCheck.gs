@@ -415,6 +415,12 @@ function buildFullHealthCheckReport_(quarterId) {
       '見備註', report.lines.join('\n'), []);
   });
   run(function () { return classifyRequestsHealth_(scanPendingRequestsAllQuarters_()); });
+  // 第四十九輪批次 第 3 層：不變量。
+  //
+  // ⚠️ 有輸入季度先驗得到 I02／I08／I09／I10（嗰四條要對住一季）。
+  // 冇輸入嘅話仍然會跑其餘五條，並且喺報告入面明講「跳過咗邊幾條」——
+  // 唔可以靜靜少驗四條而個報告睇落一樣係「全部通過」。
+  run(function () { return classifyInvariantsHealth_(runAllInvariants_(quarterId)); });
   run(function () {
     const counts = {};
     counts[SHEETS.SEND_LOG] = readSheet(SHEETS.SEND_LOG).length;
