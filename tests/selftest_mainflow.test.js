@@ -113,8 +113,11 @@ console.log('\n=== A2【核心】S03 要同時驗兩個數 ===');
 {
   const s03 = CODE.slice(CODE.indexOf('function selfTestS03_('),
     CODE.indexOf('function selfTestS04_('));
-  check('★★★★★ 仍然驗 `gridChangeCount === 3`',
-    /gridChangeCount, 3,/.test(s03), '');
+  // 第五十三輪批次 A2 組：揀唔到三格嘅時候要照實際揀到嘅數目驗，
+  // 所以唔再寫死 3。但仍然要驗——唔驗嘅話，一個「寫唔到格」
+  // 嘅 S03 一樣綠。
+  check('★★★★★ 仍然驗 `gridChangeCount` 對得上實際選到嘅格數',
+    /gridChangeCount, want,/.test(s03), s03.slice(-900));
   // ⚠️ 唔可以淨係搵「有冇提到 unresolvedCount」——
   // `if (false) t.equal(…)` 一樣會中。要驗**佢係一句冇被關住嘅呼叫**：
   // 行首兩個空格、直接 `t.equal(`。verify-red 嗰陣就係噉捉到。
@@ -122,7 +125,7 @@ console.log('\n=== A2【核心】S03 要同時驗兩個數 ===');
     + '——冇呢一條，同一個坑下次仲會踩：'
     + '一個「最小改動」順手令系統整批擋住，'
     + '而報告上面 S03 仍然係綠嘅',
-    /^  t\.equal\('而且 3 格全部認得出（unresolvedCount = 0）'/m.test(s03)
+    /^  t\.equal\('而且 ' \+ want \+ ' 格全部認得出（unresolvedCount = 0）'/m.test(s03)
       && /unresolvedCount, 0,/.test(s03), s03.slice(-700));
   // ⚠️ 驗 `CODE`（剝走註釋）唔係 `SRC`——檔頭有幾句註釋喺度講返
   // 第五十輪嗰個做法點解錯，嗰幾句要留低。
@@ -170,9 +173,11 @@ console.log('\n=== A3【核心】S16：認唔出嘅名獨立一條，而且自�
   const ids = (registry.match(/id: 'S\d\d'/g) || []).map(function (m) {
     return m.replace(/id: '|'/g, '');
   });
-  checkEqual('★★★★★★ S16 排喺**最後**'
+  // 第五十三輪批次 B 組：S17（打字放行）排喺 S16 之後，一樣自己收拾。
+  // 兩條都會污染現場，所以兩條都要排後面。
+  checkEqual('★★★★★★ S16 同 S17 排喺**最後兩條**'
     + '——放中間又會污染後面每一條',
-    ids[ids.length - 1], 'S16');
+    ids.slice(-2).join('、'), 'S16、S17');
   check('★★★★★ 有 `selfTestS16_()`',
     /function selfTestS16_\(quarterId\) \{/.test(CODE), '');
 
@@ -393,7 +398,7 @@ console.log('\n=== 驗收：S05–S13 每一條都要有得跑 ===');
     .forEach(function (id) {
       check('★★★★★ ' + id + ' 仍然喺登記表', ids.indexOf(id) !== -1, ids.join(' '));
     });
-  checkEqual('★★★★★ 一共 16 條情境', ids.length, 16);
+  checkEqual('★★★★★ 一共 17 條情境（第五十三輪批次加咗 S17）', ids.length, 17);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

@@ -2160,8 +2160,8 @@ const MUTATIONS = [
       + '而報告上面 S03 仍然係綠。第五十輪就係噉，'
       + '後面七條情境連環倒，主流程一步都冇跑過',
     file: 'src/SelfTestRunner.gs',
-    find: "  t.equal('而且 3 格全部認得出（unresolvedCount = 0）'",
-    replace: "  if (false) t.equal('而且 3 格全部認得出（unresolvedCount = 0）'",
+    find: "  t.equal('而且 ' + want + ' 格全部認得出（unresolvedCount = 0）'",
+    replace: "  if (false) t.equal('而且 ' + want + ' 格全部認得出（unresolvedCount = 0）'",
     tests: ['tests/selftest_mainflow.test.js']
   },
   {
@@ -2171,13 +2171,13 @@ const MUTATIONS = [
       + '而嗰個正正係佢最嚴厲嗰一道閘',
     file: 'src/SelfTestRunner.gs',
     find: '  const result = selfTestWriteRealNames_(quarterId, versionNo, cells);' + '\n'
-      + "  t.equal('3 格都真的寫進 grid 工作表', result.written, 3,",
-    replace: '  const result = { written: 3, picks: [], notEligible: [] };' + '\n'
+      + "  t.equal(want + ' 格都真的寫進 grid 工作表', result.written, want,",
+    replace: '  const result = { written: want, picks: [], notEligible: [] };' + '\n'
       + '  cells.forEach(function (c, i) {' + '\n'
       + '    selfTestWriteGridCell_(quarterId, versionNo, c.serviceDate, c.postId,' + '\n'
       + "      c.slotIndex, '認不出' + (i + 1));" + '\n'
       + '  });' + '\n'
-      + "  t.equal('3 格都真的寫進 grid 工作表', result.written, 3,",
+      + "  t.equal(want + ' 格都真的寫進 grid 工作表', result.written, want,",
     tests: ['tests/selftest_mainflow.test.js']
   },
   {
@@ -2198,8 +2198,10 @@ const MUTATIONS = [
       + '——揀返同一個就唔算改動，而 `gridChangeCount` 會係 0，'
       + '之後每一條斷言都係喺驗一個冇發生過嘅改動',
     file: 'src/SelfTestRunner.gs',
-    find: '    return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;',
-    replace: '    return peopleById[id] && peopleById[id].nameTC;',
+    find: '  const eligibleIds = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
+      + '    return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;',
+    replace: '  const eligibleIds = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
+      + '    return peopleById[id] && peopleById[id].nameTC;',
     tests: ['tests/selftest_mainflow.test.js']
   },
   {
@@ -2520,6 +2522,182 @@ const MUTATIONS = [
     find: "      complaints.push('查不到這一步做過什麼：' + err.message);",
     replace: '      complaints.length = complaints.length;',
     tests: ['tests/monkey_checks_return_value.test.js']
+  },
+  // ── 第五十三輪批次 A 組：S03 揀格嘅次序反咗 ───────────────────
+  {
+    id: 'pick-same-person',
+    why: '揀格嗰陣容許揀返同一個人'
+      + '——揀返同一個就唔算改動，而 `gridChangeCount` 會係 0，'
+      + '之後每一條斷言都係喺驗一個冇發生過嘅改動。'
+      + '而「換咗之後有冇多咗違反」嗰個重算擋唔到佢：換返自己，一條都唔會多',
+    file: 'src/SelfTestRunner.gs',
+    find: '    const candidates = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
+      + '      return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;',
+    replace: '    const candidates = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
+      + '      return peopleById[id] && peopleById[id].nameTC;',
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+  {
+    id: 'pick-no-recheck',
+    why: '揀格之後唔問系統「換咗之後有冇多咗違反」'
+      + '——自己判斷「合唔合資格」就係第二個算法，'
+      + '而第四十六輪嗰個 3 vs 9 就係噉嚟',
+    file: 'src/SelfTestRunner.gs',
+    find: '      if (added.length === 0) {' + '\n'
+      + '        picked = { personId: candidateId, name: peopleById[candidateId].nameTC };',
+    replace: '      if (true) {' + '\n'
+      + '        picked = { personId: candidateId, name: peopleById[candidateId].nameTC };',
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+  {
+    id: 'pick-same-day',
+    why: '三格落晒喺同一日'
+      + '——同一日改三格會順手撞到「同週司事1 ≠ 司事2」嗰類同週規則，'
+      + '又係另一種雜訊',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (usedDates[cell.serviceDate]) continue;',
+    replace: '    if (false) continue;',
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+  {
+    id: 'pick-no-cap',
+    why: '揀格試到成季都唔停'
+      + '——第五十輪嗰個時間預算問題會走回頭路：13 條情境又變成「未跑」',
+    file: 'src/SelfTestRunner.gs',
+    find: '      if (tries >= SELFTEST_SAFE_PICK_MAX_TRIES) { budgetHit = true; break; }',
+    replace: '      if (false) { budgetHit = true; break; }',
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+  {
+    id: 'pick-key-person',
+    why: '違反嘅身分證包埋 `personId`'
+      + '——包咗嘅話，一格本來就違反緊嘅嘢換咗個人就會被當成「新違反」，'
+      + '於是嗰一格永遠揀唔到',
+    file: 'src/SelfTestRunner.gs',
+    find: "  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex].join('|');",
+    replace: "  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex, v.personId].join('|');",
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+  {
+    id: 'pick-second-look',
+    why: '寫入嗰陣再查一次替代人選'
+      + '——揀格嗰陣已經問過系統，呢度再查一次就會有第二個答案，'
+      + '而嗰個答案可以推翻前面嗰個判斷',
+    file: 'src/SelfTestRunner.gs',
+    find: '    const pick = c.replacement',
+    replace: '    const pick = false',
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+  {
+    id: 'pick-short-mute',
+    why: '揀唔夠格唔講'
+      + '——唔講嘅話，S03 淨係報「找到 2 格」，而冇人知點解係 2 唔係 3',
+    file: 'src/SelfTestRunner.gs',
+    find: "  if (picked.cells.length >= howMany) return '';",
+    replace: "  if (true) return '';",
+    tests: ['tests/selftest_safe_cell_pick.test.js']
+  },
+
+  // ── 第五十三輪批次 C 組：唔好再撳 ─────────────────────────────
+  {
+    id: 'rep-no-count',
+    why: '唔數「呢一條跑過幾次」'
+      + '——呢個已經係第四次 Ivan 撳同一粒掣三次以上而報告一字不差，'
+      + '而佢十月返嚟嗰陣係一個人，冇人喺旁邊幫佢數',
+    file: 'src/SelfTestRunner.gs',
+    find: '    const runCount = history.runCount + 1;',
+    replace: '    const runCount = 1;',
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+  {
+    id: 'rep-no-streak',
+    why: '唔數「連續幾多次同一個結果」',
+    file: 'src/SelfTestRunner.gs',
+    find: '    const sameStreak = (history.fingerprint && history.fingerprint === fingerprint)'
+      + '\n' + '      ? history.sameStreak + 1 : 1;',
+    replace: '    const sameStreak = 1;',
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+  {
+    id: 'rep-status-only',
+    why: '指紋只睇狀態，唔睇證據'
+      + '——一條由「A 斷言紅」變成「B 斷言紅」嘅情境係有進展，'
+      + '噉樣會被數成「又係同一樣」而叫人停手',
+    file: 'src/SelfTestRunner.gs',
+    find: "  const parts = [String(outcome.status || '')];",
+    replace: "  return String(outcome.status || '');" + '\n'
+      + "  // eslint-disable-next-line no-unreachable" + '\n'
+      + "  const parts = [String(outcome.status || '')];",
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+  {
+    id: 'rep-line-mute',
+    why: '逐條唔印「已經重跑 N 次」',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (!repeat || Number(repeat.sameStreak) < 2) return \'\';',
+    replace: '  if (true) return \'\';',
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+  {
+    id: 'rep-next-step',
+    why: '最尾嗰句仍然叫佢撳「只重跑紅色情境」'
+      + '——Ivan 就係照住嗰句撳咗三次',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (real.length > 0 && stuck.length === real.length) {',
+    replace: '    if (false) {',
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+  {
+    id: 'rep-no-history',
+    why: '「只重跑紅色情境」之後唔讀返歷史'
+      + '——嗰個入口會把紅嗰幾條由狀態表清走，'
+      + '而嗰幾條正正就係要數次數嗰幾條',
+    file: 'src/SelfTestRunner.gs',
+    find: '    const persisted = readSelfTestState_();',
+    replace: '    const persisted = {};',
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+  {
+    id: 'rep-skip-summary',
+    why: '`SKIPPED` 報成「0 條斷言失敗」'
+      + '——嗰句睇落似通過，而佢根本冇跑過',
+    file: 'src/SelfTestRunner.gs',
+    find: '        : (outcome.status === SELFTEST_STATUS.SKIPPED ? \'跳過\'',
+    replace: '        : (false ? \'跳過\'',
+    tests: ['tests/selftest_stop_pressing.test.js']
+  },
+
+  // ── 第五十三輪批次 B 組：打字放行 ─────────────────────────────
+  {
+    id: 'rel-no-audit',
+    why: '打字放行硬規則違反冇留低任何痕跡'
+      + '——一個違反咗硬規則、由人手放行嘅版本，'
+      + '事後冇任何方法分得出佢同一個乾淨版本嘅分別',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  if (plan.needsRelease) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_release_scenario.test.js']
+  },
+  {
+    id: 'rel-audit-always',
+    why: '每一次儲存都寫一筆「放行」'
+      + '——一部乜都記嘅機器同一部乜都唔記嘅機器一樣冇用：'
+      + '每一版都有一筆嘅話，「放行」就唔再係一個訊號',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  if (plan.needsRelease) {' + '\n' + '    try {' + '\n'
+      + '      writeAuditLog_({',
+    replace: '  if (true) {' + '\n' + '    try {' + '\n'
+      + '      writeAuditLog_({',
+    tests: ['tests/selftest_release_scenario.test.js']
+  },
+  {
+    id: 'rel-pick-any',
+    why: '揀一格會多過一條違反嘅'
+      + '——S17 就會分唔出係邊條規則攔住佢',
+    file: 'src/SelfTestRunner.gs',
+    find: '      if (added.length === 1 && added[0].severity === RULE_LEVELS.HARD',
+    replace: '      if (added.length >= 1 && added[0].severity === RULE_LEVELS.HARD',
+    tests: ['tests/selftest_release_scenario.test.js']
   },
 ];
 

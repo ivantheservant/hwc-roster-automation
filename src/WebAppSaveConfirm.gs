@@ -495,6 +495,41 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     return buildSaveConfirmFailureResult_(quarterId, plan.baseVersionNo, err);
   }
 
+  // ── 第五十三輪批次 B 組：**放行咗就要留低痕跡。** ────────────
+  //
+  // ⚠️ 修正之前，一次「打字放行硬規則違反」喺 `AuditLog` 度**冇任何紀錄**。
+  // `RosterVersions` 嗰句 note 淨係寫「人手改動 N 格」，
+  // 睇落同一次乾淨儲存一模一樣。
+  //
+  // 即係話：一個違反咗硬規則、由人手放行嘅版本，
+  // 事後**冇任何方法分得出佢同一個乾淨版本嘅分別**。
+  // 而放行呢個動作嘅意思就係「我知道呢度違規，我照樣要」——
+  // 嗰句話唔留低，就等於冇講過。
+  //
+  // ⚠️ 排喺版本真係建立咗之後先寫。建立失敗嗰條路喺上面就 return 咗，
+  // 唔會行到呢度——唔可以記低一次冇發生過嘅放行。
+  if (plan.needsRelease) {
+    try {
+      writeAuditLog_({
+        action: '放行硬規則違反',
+        targetSheet: SHEETS.ROSTER_VERSIONS,
+        targetKey: quarterId + ' v' + created.versionNo,
+        oldValue: '第 ' + plan.baseVersionNo + ' 版',
+        newValue: '放行了 ' + plan.violations.real.length + ' 格規則違反',
+        source: 'apiSaveAndConfirmExecute',
+        // ⚠️ 用 `postId`。岗位中文名嘸個 map 係
+        // `buildSaveAndConfirmPlan_()` 嘅本地變數，嘸呢度拿唔到。
+        notes: plan.violations.real.map(function (v) {
+          return v.serviceDate + '　' + v.postId + '#' + v.slotIndex
+            + '　' + v.ruleId;
+        }).join('；')
+      });
+    } catch (err) {
+      // ⚠️ 記唔到唔可以令一次已經成功嘅儲存變成失敗——版本已經建立咗。
+      log_('WARN', '放行紀錄寫不進 AuditLog：' + err.message);
+    }
+  }
+
   // ── 6　前進 Stage（只喺 REVIEW_SENT → REQUESTS_APPLIED 呢一種）──
   let stageAdvanced = false;
   if (plan.stage === QUARTER_STAGE.REVIEW_SENT) {

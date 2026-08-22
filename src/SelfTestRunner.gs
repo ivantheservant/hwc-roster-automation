@@ -212,6 +212,22 @@ function selfTestCollector_(scenarioId) {
         checks: checks,
         failedChecks: failed
       };
+    },
+    /**
+     * 第五十三輪批次 A2 組：**造唔出呢個情境 ⇒ 跳過，唔係紅。**
+     *
+     * ⚠️ 一條「造唔出情境」嘅紅同一條「系統做錯咗」嘅紅擺埋一齊，
+     * 就分唔出邊條要修碼。而更嚴重嘅係：紅會經 `dependsOn`
+     * 把下游標成 `BLOCKED`——第五十二輪嗰次就係一條紅擋住九條。
+     *
+     * @param {string} note 要喺報告講嘅一句
+     * @returns {Object} 一個 `SKIPPED` 嘅結果
+     */
+    skip: function (note) {
+      return {
+        id: scenarioId, status: SELFTEST_STATUS.SKIPPED,
+        checks: checks, failedChecks: [], note: note
+      };
     }
   };
   return api;
@@ -284,6 +300,214 @@ function selfTestPickCells_(quarterId, versionNo, howMany) {
   return out;
 }
 
+/** 揀安全格嗰陣，最多准重算幾多次規則。見 `selfTestPickSafeCells_()`。 */
+const SELFTEST_SAFE_PICK_MAX_TRIES = 60;
+
+/**
+ * 一條違反嘅身分證。**唔包 `personId`**。
+ *
+ * ⚠️ 包咗 `personId` 嘅話，一格本來就違反緊嘅嘢換咗個人之後
+ * 會被當成「新違反」，於是嗰一格永遠揀唔到。
+ * 我哋要問嘅係「換完之後有冇**多咗**一個問題」，唔係「有冇問題」。
+ *
+ * @param {Object} v `findStateViolations_()` 出嚟嗰一條
+ * @returns {string}
+ */
+function selfTestViolationKey_(v) {
+  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex].join('|');
+}
+
+/**
+ * 第五十三輪批次 A1 組：**先問「有冇合資格嘅替代人選」，有先揀嗰一格。**
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 上一輪嘅現場
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * `selfTestPickCells_()` 係「由 `RosterAssignments` 順住揀頭三格有人嘅」，
+ * 揀完之後先至去 `Eligibility` 搵替代人選。
+ *
+ * ⇒ 揀咗一格之後先發現「呢個崗位得一個合資格嘅人」，
+ * 　於是被迫揀一個**唔合資格**嘅。
+ *
+ * 而「儲存並確認」見到硬規則違反就要求打字放行——**佢攔得啱**。
+ * S05 拋錯，S06–S13、S16 九條連環被擋住。
+ *
+ *     執行時拋錯：發生了什麼：有 1 格違反了一定要遵守的規則，
+ *     需要你打字放行才能儲存。
+ *
+ * ⚠️⚠️ 呢一次系統一次都冇做錯。錯嘅係**測試揀資料嘅次序**。
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 點解唔自己寫一套「合唔合資格」嘅判斷
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * 因為呢個專案已經因為「同一件事兩個算法」蝕過幾次
+ *（第四十六輪嗰個 3 vs 9 就係）。所以呢一支**唔自己判斷**，
+ * 佢直接問系統本身嗰一支 `findStateViolations_()`：
+ *
+ *     換咗個人之後，有冇**多咗**一條違反？冇 ⇒ 呢一格安全。
+ *
+ * 噉樣崗位資格、同日撞崗、請假、身分要求、個人崗位排除、
+ * 互斥組……全部一次過覆蓋，而且永遠同系統嘅判斷一致。
+ *
+ * ⚠️ 而且用 `context.eligibility.byPost`，唔係 `readEligibility().byPost`。
+ * 兩者**唔一樣**：`buildFineTuneContext_()` 會用身分名單增補候選池
+ *（`FineTune.gs` 嗰句 `eligibility.byPost = roleContext.eligibleByPost`），
+ * 而規則檢查用嘅係增補後嗰份。舊嗰支 `selfTestPickReplacementName_()`
+ * 用緊未增補嗰份——即係同一件事嘅第二個算法。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {number} howMany 要幾多格
+ * @returns {{cells: Object[], rejected: string[], tries: number, budgetHit: boolean}}
+ *   `cells` 每一格帶住 `replacement: {personId, name}`——
+ *   ⚠️ **順手帶出嚟，唔好揀完格再查一次。**
+ */
+function selfTestPickSafeCells_(quarterId, versionNo, howMany) {
+  const context = buildFineTuneContext_(quarterId, versionNo);
+  const resolved = resolveAuthoritativeState_(
+    context, STATE_SOURCE.GRID_OVERLAY, 'selfTestPickSafeCells_');
+  const baseState = resolved.state;
+
+  const known = {};
+  findStateViolations_(baseState, context).forEach(function (v) {
+    known[selfTestViolationKey_(v)] = true;
+  });
+
+  const byPost = (context.eligibility || {}).byPost || {};
+  const peopleById = context.peopleById || {};
+
+  const cells = [];
+  const rejected = [];
+  const usedDates = {};
+  let tries = 0;
+  let budgetHit = false;
+
+  for (let i = 0; i < baseState.length && cells.length < howMany; i++) {
+    const cell = baseState[i];
+    if (!cell.personId) continue;
+    // ⚠️ 三格唔可以全部落喺同一日。同一日改三格會順手撞到
+    // 「同週司事1 ≠ 司事2」嗰類同週規則，又係另一種雜訊。
+    if (usedDates[cell.serviceDate]) continue;
+
+    const candidates = (byPost[cell.postId] || []).filter(function (id) {
+      return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;
+    });
+    if (candidates.length === 0) {
+      rejected.push(cell.serviceDate + '　' + cell.postId
+        + '（Eligibility 上這個崗位只有現在那一位）');
+      continue;
+    }
+
+    let picked = null;
+    for (let j = 0; j < candidates.length && !picked; j++) {
+      if (tries >= SELFTEST_SAFE_PICK_MAX_TRIES) { budgetHit = true; break; }
+      tries++;
+      const candidateId = candidates[j];
+      const next = baseState.map(function (sc) {
+        if (sc.serviceDate !== cell.serviceDate || sc.postId !== cell.postId
+          || String(sc.slotIndex) !== String(cell.slotIndex)) return sc;
+        return {
+          serviceDateId: sc.serviceDateId, serviceDate: sc.serviceDate,
+          postId: sc.postId, slotIndex: sc.slotIndex,
+          personId: candidateId, isManual: true
+        };
+      });
+      const added = findStateViolations_(next, context).filter(function (v) {
+        return !known[selfTestViolationKey_(v)];
+      });
+      if (added.length === 0) {
+        picked = { personId: candidateId, name: peopleById[candidateId].nameTC };
+      }
+    }
+    if (budgetHit) break;
+    if (!picked) {
+      rejected.push(cell.serviceDate + '　' + cell.postId
+        + '（每一個合資格的替代人選都會弄出新的規則違反）');
+      continue;
+    }
+
+    usedDates[cell.serviceDate] = true;
+    cells.push({
+      serviceDate: cell.serviceDate, postId: cell.postId,
+      slotIndex: cell.slotIndex, personId: cell.personId,
+      replacement: picked
+    });
+  }
+
+  return { cells: cells, rejected: rejected, tries: tries, budgetHit: budgetHit };
+}
+
+/**
+ * 「揀唔夠格」嗰陣要喺報告講嘅一句。
+ *
+ * ⚠️ 唔講嘅話，S03 淨係報「找到 2 格」，而冇人知點解係 2 唔係 3。
+ *
+ * @param {Object} picked `selfTestPickSafeCells_()` 嘅結果
+ * @param {number} howMany 本來想要幾多格
+ * @returns {string} 唔使講就回空字串
+ */
+function describeSafePickShortfall_(picked, howMany) {
+  if (picked.cells.length >= howMany) return '';
+  const head = '只找到 ' + picked.cells.length + ' 格有合資格替代人選的（想要 '
+    + howMany + ' 格）。';
+  if (picked.budgetHit) {
+    return head + '已經試過 ' + picked.tries + ' 次就停手，沒有掃完整季'
+      + '——再試落去會吃掉自測機的時間預算。';
+  }
+  return head + '其餘的：' + (picked.rejected.slice(0, 6).join('；') || '（沒有記到）')
+    + (picked.rejected.length > 6 ? '……（還有 ' + (picked.rejected.length - 6) + ' 格）' : '');
+}
+
+/**
+ * 第五十三輪批次 C 組：**一次執行結果嘅指紋。**
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 點解要有呢樣嘢
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * 呢個已經係第四次「Ivan 撳同一粒掣三次以上，三份報告一字不差」：
+ *
+ *   第五十輪　續跑只跳過通過嗰啲　　⇒ 撳三次，三次一樣
+ *   第五十輪　不變量太貴　　　　　　⇒ 撳三次，三次一樣
+ *   第五十二輪　既有失敗污染下游　　⇒ 撳三次，三次一樣
+ *   第五十三輪　一條真嘅紅　　　　　⇒ 撳三次，三次一樣
+ *
+ * 每一次都要 Ivan 自己察覺「咦，三份一樣」然後停手問。
+ *
+ * ⚠️⚠️ 而 Ivan 十月返嚟嗰陣係**一個人**。到時冇人喺旁邊幫佢數
+ *「你已經撳咗三次」。所以呢件事要由報告自己講。
+ *
+ * ⚠️ 指紋要包住**證據**，唔係淨係包住狀態。淨係比對「紅唔紅」嘅話，
+ * 一條由「A 斷言紅」變成「B 斷言紅」嘅情境會被當成「同一個結果」，
+ * 而嗰個其實係有進展。
+ *
+ * @param {Object} outcome 一個情境嘅結果
+ * @returns {string} 內容一樣就一樣嘅一串字
+ */
+function selfTestOutcomeFingerprint_(outcome) {
+  if (!outcome) return '';
+  const parts = [String(outcome.status || '')];
+  if (outcome.error) parts.push('ERR｜' + outcome.error);
+  (outcome.failedChecks || []).forEach(function (c) {
+    parts.push('CHK｜' + c.label + '｜' + c.expected + '｜' + c.actual);
+  });
+  (outcome.invariantDetail || []).forEach(function (d) { parts.push('INV｜' + d); });
+  return parts.join('\n');
+}
+
+/**
+ * 「唔好再撳」嗰一句。
+ *
+ * @param {Object} repeat `{runCount, sameStreak}`
+ * @returns {string} 唔使講就回空字串
+ */
+function describeSelfTestRepeat_(repeat) {
+  if (!repeat || Number(repeat.sameStreak) < 2) return '';
+  return '⛔ 這一條已經重跑 ' + Number(repeat.runCount) + ' 次，每次都是同一個結果。';
+}
+
 /**
  * 第 2 層 2A：把一個真實 API 回傳值錄低。
  *
@@ -299,6 +523,38 @@ function selfTestPickCells_(quarterId, versionNo, howMany) {
  * @returns {void}
  */
 function selfTestRecordPayload_(scenarioId, apiName, value) {
+  // ── 第五十三輪批次：**同一份原文亦都要入報告。** ─────────────
+  //
+  // ⚠️ 之前只入 `SelfTest_Payloads` 工作表。而下一輪落手查嗰個
+  // 淨係睇得到 Ivan 貼上嚟嗰份報告——工作表佢睇唔到。
+  //
+  // S05 到 S13 係一段**從來冇執行過**嘅路。高機率各有各嘅問題，
+  // 而每一個問題嘅第一個問句都係「呢個 API 到底回咗乜」。
+  // 冇原文就答唔到，而答唔到就要 Ivan 再撳一次——
+  // 即係 C 組要修嗰件事。
+  try {
+    if (!selfTestPayloads_[scenarioId]) selfTestPayloads_[scenarioId] = [];
+    // 每條情境最多留 12 筆——多過噉份報告會變到冇人睇得落去。
+    if (selfTestPayloads_[scenarioId].length < 12) {
+      let text;
+      try {
+        text = JSON.stringify(value);
+      } catch (err) {
+        text = '（寫不成 JSON：' + err.message + '）';
+      }
+      text = String(text === undefined ? 'undefined' : text);
+      selfTestPayloads_[scenarioId].push({
+        api: apiName,
+        // ⚠️ 截**頭** 500 字，而且要標明截過——
+        // 一段被截而冇標明嘅 JSON 會被當成完整嘅嚟讀。
+        text: text.length > 500 ? (text.slice(0, 500) + '……（還有 '
+          + (text.length - 500) + ' 字，全文在 SelfTest_Payloads 工作表）') : text
+      });
+    }
+  } catch (err) {
+    log_('WARN', '回傳值記不進報告（' + scenarioId + '）：' + err.message);
+  }
+
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = ss.getSheetByName(SELFTEST_SHEETS.PAYLOADS);
@@ -417,7 +673,14 @@ function selfTestWriteRealNames_(quarterId, versionNo, cells) {
   const notEligible = [];
   let written = 0;
   cells.forEach(function (c) {
-    const pick = selfTestPickReplacementName_(c, peopleById, eligibility);
+    // ⚠️ 第五十三輪批次 A1 組：**揀格嗰陣已經連替代人選一齊揀好。**
+    //
+    // 查兩次就會有兩個答案——而呢個專案已經因為「同一件事兩個算法」
+    // 蝕過幾次（第四十六輪嗰個 3 vs 9 就係）。
+    // 揀格嗰支問過系統本身「換咗之後有冇多咗違反」，呢度唔可以推翻佢。
+    const pick = c.replacement
+      ? { name: c.replacement.name, personId: c.replacement.personId, eligible: true }
+      : selfTestPickReplacementName_(c, peopleById, eligibility);
     if (!pick.name) return;
     if (!pick.eligible) {
       notEligible.push(c.serviceDate + '　' + c.postId + ' ⇒ ' + pick.name);
@@ -507,31 +770,43 @@ function selfTestS02_(quarterId) {
 function selfTestS03_(quarterId) {
   const t = selfTestCollector_('S03');
   const versionNo = findLatestVersionNo(quarterId);
-  const cells = selfTestPickCells_(quarterId, versionNo, 3);
-  t.equal('找得到 3 格有人的來改', cells.length, 3,
-    'selfTestPickCells_() 由 RosterAssignments 選出來');
+
+  // ⚠️ 第五十三輪批次 A1 組：**先問「有冇合資格嘅替代人選」，有先揀嗰格。**
+  // 舊寫法係順住揀頭三格，揀完先發現個崗位得一個人。見
+  // `selfTestPickSafeCells_()` 檔頭嗰段。
+  const picked = selfTestPickSafeCells_(quarterId, versionNo, 3);
+  const cells = picked.cells;
+
+  // ── A2：一格都揀唔到 ⇒ **跳過，唔係紅** ─────────────────────
+  if (cells.length === 0) {
+    return t.skip('（跳過）這一季每一個崗位在 Eligibility 上都只有一個合資格的人，'
+      + '所以造不出「改一格而不違反硬規則」的情境。'
+      + 'S04–S13 會照樣跑，但用的是原本那一版，沒有未儲存改動。'
+      + (picked.rejected.length > 0
+        ? '　查過的格：' + picked.rejected.slice(0, 4).join('；') : ''));
+  }
+
+  const want = cells.length;
+  // ⚠️ 揀唔夠 ⇒ **要講**。唔講嘅話冇人知點解係 2 唔係 3。
+  const shortfall = describeSafePickShortfall_(picked, 3);
+  if (shortfall) {
+    t.expect('（提示）' + shortfall, true, '（提示，不是失敗）',
+      '試了 ' + picked.tries + ' 次',
+      '下面幾條斷言按實際選到的 ' + want + ' 格算，不是按 3 格算。');
+  }
 
   const result = selfTestWriteRealNames_(quarterId, versionNo, cells);
-  t.equal('3 格都真的寫進 grid 工作表', result.written, 3,
+  t.equal(want + ' 格都真的寫進 grid 工作表', result.written, want,
     'selfTestWriteRealNames_()：'
       + result.picks.map(function (p) {
         return p.cell.serviceDate + '　' + p.cell.postId
           + '　' + p.cell.personId + ' ⇒ ' + p.pick.name;
       }).join('；'));
 
-  // ⚠️ 揀唔到合資格嘅人 ⇒ **要講出嚟**，唔可以靜靜噉算。
-  // 唔講嘅話，S05 嗰條規則提示會變成一個查極查唔到來源嘅雜訊。
-  if (result.notEligible.length > 0) {
-    t.expect('（提示）這一次有 ' + result.notEligible.length
-      + ' 格找不到該崗位合資格的人，改成了不合資格的人',
-      true, '（提示，不是失敗）',
-      result.notEligible.join('；'),
-      'S05 的規則檢查會見到對應數目的違反，那是這一次改動造成的，不是系統問題。');
-  }
-
   const d = selfTestCall_('S03', 'apiGetDashboardState',
     function () { return apiGetDashboardState(quarterId); });
-  t.equal('dashboard 數到 3 格未儲存', (d.unsaved || {}).gridChangeCount, 3,
+  t.equal('dashboard 數到 ' + want + ' 格未儲存',
+    (d.unsaved || {}).gridChangeCount, want,
     'apiGetDashboardState().unsaved＝' + JSON.stringify(d.unsaved));
 
   // ⚠️⚠️ 第五十一輪批次 A2 組：**呢一條先係關鍵。**
@@ -539,10 +814,33 @@ function selfTestS03_(quarterId) {
   // 冇佢，同一個坑下次仲會踩：一個「最小改動」順手令
   // `unresolvedCount` 變成 3，而系統嘅規矩係「有認唔出嘅名就乜都唔准做」，
   // 於是主流程由 S04 開始整條斷咗，而報告上面 S03 係綠嘅。
-  t.equal('而且 3 格全部認得出（unresolvedCount = 0）'
+  t.equal('而且 ' + want + ' 格全部認得出（unresolvedCount = 0）'
     + '——認不出的話，系統會整批擋住，後面七條情境全部連環倒',
     (d.unsaved || {}).unresolvedCount, 0,
     'apiGetDashboardState().unsaved＝' + JSON.stringify(d.unsaved));
+
+  // ⚠️⚠️ 第五十三輪批次 A3 組：**呢一條先係今輪嘅關鍵。**
+  //
+  // 上一輪 S03 係綠嘅：3 格寫到、全部認得出。
+  // 但其中一格改成咗一個**該崗位唔合資格**嘅人，
+  // 而「儲存並確認」見到硬規則違反就要求打字放行——佢攔得啱。
+  // S05 拋錯，S06–S13、S16 九條連環被擋住。
+  //
+  // 冇呢一條，同一個坑下次仲會踩，而且下次未必睇得出係同一個坑。
+  const plan = selfTestCall_('S03', 'apiSaveAndConfirmPlan',
+    function () { return apiSaveAndConfirmPlan(quarterId); });
+  const real = ((plan.violations || {}).real || []);
+  t.equal('而且 ' + want + ' 格都沒有違反硬規則（hardRuleViolations = 0）'
+    + '——違反了的話，「儲存並確認」會要求打字放行，'
+    + 'S05 會拋錯，而 S06 之後全部被擋住',
+    real.length, 0,
+    real.map(function (v) {
+      return v.serviceDate + '　' + v.postId + '#' + v.slotIndex + '　' + v.ruleId
+        + '（' + (v.reason || '') + '）';
+    }).join('；') || 'apiSaveAndConfirmPlan().violations.real＝[]');
+  t.expect('而且不需要打字放行（needsRelease = false）',
+    plan.needsRelease === false, 'false', String(plan.needsRelease),
+    'apiSaveAndConfirmPlan().needsRelease');
   return t.result();
 }
 
@@ -810,10 +1108,28 @@ function selfTestS10_(quarterId) {
   }
 
   const versionNo = findLatestVersionNo(quarterId);
-  const cells = selfTestPickCells_(quarterId, versionNo, 2);
+  // ⚠️ 第五十三輪批次 A4 組：同 S03 行**同一支**揀格——
+  // S10 一樣係改格，所以一樣會揀到「呢個崗位得一個合資格嘅人」嗰種格。
+  // 一齊修，唔可以只修 S03。
+  const picked = selfTestPickSafeCells_(quarterId, versionNo, 2);
+  const cells = picked.cells;
+  if (cells.length === 0) {
+    return t.skip('（跳過）這一季找不到「改一格而不違反硬規則」的格，'
+      + '所以改動後重發這一條造不出來。'
+      + (picked.rejected.length > 0
+        ? '　查過的格：' + picked.rejected.slice(0, 4).join('；') : ''));
+  }
+  const want = cells.length;
+  const shortfall = describeSafePickShortfall_(picked, 2);
+  if (shortfall) {
+    t.expect('（提示）' + shortfall, true, '（提示，不是失敗）',
+      '試了 ' + picked.tries + ' 次',
+      '下面幾條斷言按實際選到的 ' + want + ' 格算。');
+  }
+
   // ⚠️ 同 S03 一樣，寫**認得出**嘅名。
   const result = selfTestWriteRealNames_(quarterId, versionNo, cells);
-  t.equal('2 格真的寫進 grid', result.written, 2,
+  t.equal(want + ' 格真的寫進 grid', result.written, want,
     'selfTestWriteRealNames_()：'
       + result.picks.map(function (p) {
         return p.cell.serviceDate + '　' + p.cell.postId
@@ -822,9 +1138,20 @@ function selfTestS10_(quarterId) {
 
   const midway = selfTestCall_('S10', 'apiGetDashboardState',
     function () { return apiGetDashboardState(quarterId); });
-  t.equal('2 格全部認得出（unresolvedCount = 0）',
+  t.equal(want + ' 格全部認得出（unresolvedCount = 0）',
     (midway.unsaved || {}).unresolvedCount, 0,
     JSON.stringify(midway.unsaved));
+
+  // ⚠️ A4：同 S03 一樣要驗硬規則。S10 撞到嘅話，S11／S12 會連環倒。
+  const midPlan = selfTestCall_('S10', 'apiSaveAndConfirmPlan',
+    function () { return apiSaveAndConfirmPlan(quarterId); });
+  const midReal = ((midPlan.violations || {}).real || []);
+  t.equal(want + ' 格都沒有違反硬規則（hardRuleViolations = 0）'
+    + '——違反了的話，下面那一句「儲存並確認」會拋錯',
+    midReal.length, 0,
+    midReal.map(function (v) {
+      return v.serviceDate + '　' + v.postId + '　' + v.ruleId;
+    }).join('；') || 'apiSaveAndConfirmPlan().violations.real＝[]');
 
   selfTestCall_('S10', 'apiSaveAndConfirmExecute',
     function () { return apiSaveAndConfirmExecute(quarterId, { decisions: [] }); });
@@ -1308,13 +1635,243 @@ function selfTestScenarios_() {
       dependsOn: ['S05'] },
     // ⚠️ S16 一定要排喺最後，而且佢自己收拾。放中間會污染後面每一條。
     { id: 'S16', title: '認不出的名字：整批拒絕，而且講得出是哪幾格',
-      run: selfTestS16_, dependsOn: ['S05'] }
+      run: selfTestS16_, dependsOn: ['S05'] },
+    // ⚠️ 第五十三輪批次 B 組：S17 排喺 S16 之後，一樣自己收拾。
+    //
+    // 「有硬規則違反、要打字放行」嗰條路同「乾淨儲存」一樣重要
+    //（幹事真實會遇到——名單未更新嗰陣就會撞到），
+    // 但佢**唔可以擋住主流程**。所以佢自己一條，排喺最後。
+    { id: 'S17', title: '硬規則違反：要打字放行才儲存得到（自己收拾）',
+      run: selfTestS17_, dependsOn: ['S05'] }
   ];
+}
+
+/**
+ * 第五十三輪批次 B 組：揀一格，**而且揀一個一定會違反硬規則嘅人**。
+ *
+ * ⚠️ 呢一支係 `selfTestPickSafeCells_()` 嘅反面，而且**特登**噉樣做。
+ *
+ * 「有硬規則違反、要打字放行」嗰條路同「乾淨儲存」一樣重要——
+ * 幹事真實會遇到（名單未更新嗰陣就會撞到）。
+ * 但佢**唔可以擋住主流程**，所以佢自己一條情境，排喺最後，
+ * 而且跑完自己收拾。
+ *
+ * ⚠️ 同樣唔自己判斷「合唔合資格」——問系統本身嗰一支
+ * `findStateViolations_()`：換咗個人之後，係咪**啱啱多咗一條 HARD**？
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {Object|null} `{serviceDate, postId, slotIndex, personId,
+ *   originalName, replacement: {personId, name}, ruleId}`；揀唔到就 null
+ */
+function selfTestPickViolatingCell_(quarterId, versionNo) {
+  const context = buildFineTuneContext_(quarterId, versionNo);
+  const resolved = resolveAuthoritativeState_(
+    context, STATE_SOURCE.GRID_OVERLAY, 'selfTestPickViolatingCell_');
+  const baseState = resolved.state;
+
+  const known = {};
+  findStateViolations_(baseState, context).forEach(function (v) {
+    known[selfTestViolationKey_(v)] = true;
+  });
+
+  const byPost = (context.eligibility || {}).byPost || {};
+  const peopleById = context.peopleById || {};
+  let tries = 0;
+
+  for (let i = 0; i < baseState.length; i++) {
+    const cell = baseState[i];
+    if (!cell.personId) continue;
+    const pool = byPost[cell.postId] || [];
+    // 揀一個**唔喺呢個崗位名單上面**嘅人 ⇒ HARD_ELIGIBILITY。
+    const candidates = Object.keys(peopleById).filter(function (id) {
+      return id !== cell.personId && peopleById[id].nameTC && pool.indexOf(id) === -1;
+    });
+
+    for (let j = 0; j < candidates.length; j++) {
+      if (tries >= SELFTEST_SAFE_PICK_MAX_TRIES) return null;
+      tries++;
+      const candidateId = candidates[j];
+      const next = baseState.map(function (sc) {
+        if (sc.serviceDate !== cell.serviceDate || sc.postId !== cell.postId
+          || String(sc.slotIndex) !== String(cell.slotIndex)) return sc;
+        return {
+          serviceDateId: sc.serviceDateId, serviceDate: sc.serviceDate,
+          postId: sc.postId, slotIndex: sc.slotIndex,
+          personId: candidateId, isManual: true
+        };
+      });
+      const added = findStateViolations_(next, context).filter(function (v) {
+        return !known[selfTestViolationKey_(v)];
+      });
+      // ⚠️ 要**啱啱一條**，而且要係 HARD。多過一條就唔知係邊條攔住，
+      // 而一條 SEMI_HARD 根本唔會要求打字放行。
+      if (added.length === 1 && added[0].severity === RULE_LEVELS.HARD
+        && added[0].serviceDate === cell.serviceDate
+        && added[0].postId === cell.postId) {
+        return {
+          serviceDate: cell.serviceDate, postId: cell.postId,
+          slotIndex: cell.slotIndex, personId: cell.personId,
+          originalName: (peopleById[cell.personId] || {}).nameTC || '',
+          replacement: { personId: candidateId, name: peopleById[candidateId].nameTC },
+          ruleId: added[0].ruleId
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * S17：硬規則違反——要打字放行先儲存得到。
+ *
+ * ⚠️ **排喺最後，而且自己收拾。** 放中間又會污染後面——
+ * S16 已經因為同一個道理排到最後。
+ *
+ * 現場（第五十二輪）：S03 揀咗一格唔合資格嘅人，S05 就係喺呢一句拋錯：
+ *
+ *     有 1 格違反了一定要遵守的規則，需要你打字放行才能儲存。
+ *
+ * 嗰次系統攔得啱，錯嘅係測試。而「攔得啱」本身值得有一條情境守住。
+ */
+function selfTestS17_(quarterId) {
+  const t = selfTestCollector_('S17');
+  const versionNo = findLatestVersionNo(quarterId);
+  const target = selfTestPickViolatingCell_(quarterId, versionNo);
+  if (!target) {
+    return t.skip('（跳過）這一季找不到「改一格就剛好違反一條硬規則」的格，'
+      + '所以造不出打字放行這個情境。');
+  }
+
+  // ── 1　故意填一個不合資格的人 ────────────────────────────────
+  const wrote = selfTestWriteGridCell_(quarterId, versionNo, target.serviceDate,
+    target.postId, target.slotIndex, target.replacement.name);
+  t.expect('那一格真的寫進 grid（故意填一個該崗位不合資格的人）',
+    wrote, '寫得到', String(wrote),
+    target.serviceDate + '　' + target.postId + '　'
+      + target.originalName + ' ⇒ ' + target.replacement.name
+      + '（預期違反 ' + target.ruleId + '）');
+
+  const plan = selfTestCall_('S17', 'apiSaveAndConfirmPlan',
+    function () { return apiSaveAndConfirmPlan(quarterId); });
+  t.expect('系統認得出這是一條硬規則違反，而且要求打字放行',
+    plan.needsRelease === true, 'needsRelease=true', String(plan.needsRelease),
+    'apiSaveAndConfirmPlan().violations.real＝'
+      + JSON.stringify((plan.violations || {}).real || []).slice(0, 500));
+
+  // ── 2　直接儲存 ⇒ 要被拒絕，而且講得出是哪一格、哪一條規則 ──
+  let refused = '';
+  try {
+    selfTestCall_('S17', 'apiSaveAndConfirmExecute（不帶放行字眼）',
+      function () { return apiSaveAndConfirmExecute(quarterId, { decisions: [] }); });
+  } catch (err) {
+    refused = err.message;
+  }
+  t.expect('不帶放行字眼就儲存 ⇒ 被拒絕', refused !== '',
+    '被拒絕', refused || '（居然存到了）',
+    'apiSaveAndConfirmExecute(quarterId, {decisions: []})');
+  t.expect('而且訊息講得出有幾多格違反',
+    /違反了一定要遵守的規則/.test(refused), '有這一句',
+    refused.slice(0, 300), '拒絕訊息原文');
+  t.expect('而且講得出「職事表沒有任何改動」——'
+    + '不講的話，幹事不知道現在到底存了沒有',
+    /職事表沒有任何改動/.test(refused), '有這一句',
+    refused.slice(0, 300), '拒絕訊息原文');
+  t.expect('而且講得出要輸入什麼才放行得到',
+    refused.indexOf(SAVE_CONFIRM_RELEASE_TEXT) >= 0,
+    '訊息裡面有「' + SAVE_CONFIRM_RELEASE_TEXT + '」',
+    refused.slice(0, 300), '拒絕訊息原文');
+
+  const stillAt = findLatestVersionNo(quarterId);
+  t.equal('被拒絕之後，版本號沒有變——說「沒有任何改動」就真的不可以有',
+    stillAt, versionNo, 'findLatestVersionNo()');
+
+  // ── 3　帶住放行字眼再叫一次 ⇒ 存得到 ────────────────────────
+  let released = null;
+  let releaseThrew = '';
+  try {
+    released = selfTestCall_('S17', 'apiSaveAndConfirmExecute（帶放行字眼）',
+      function () {
+        return apiSaveAndConfirmExecute(quarterId,
+          { decisions: [], releaseText: SAVE_CONFIRM_RELEASE_TEXT });
+      });
+  } catch (err) {
+    releaseThrew = err.message;
+  }
+  t.expect('帶住放行字眼再叫一次 ⇒ 存得到',
+    releaseThrew === '' && !!released, '存得到',
+    releaseThrew || JSON.stringify(released).slice(0, 400),
+    'apiSaveAndConfirmExecute(quarterId, {decisions: [], releaseText: "'
+      + SAVE_CONFIRM_RELEASE_TEXT + '"})');
+  const afterRelease = findLatestVersionNo(quarterId);
+  t.expect('而且真的多了一版', afterRelease > versionNo,
+    '> ' + versionNo, String(afterRelease), 'findLatestVersionNo()');
+
+  // ── 4　AuditLog 要記低放行了幾多格 ──────────────────────────
+  //
+  // ⚠️ 沒有這一筆的話，一個違反了硬規則、由人手放行的版本，
+  // 事後**沒有任何方法分得出它同一個乾淨版本的分別**。
+  const A = COLUMNS.AUDIT_LOG;
+  const releaseRows = readSheet(SHEETS.AUDIT_LOG).filter(function (r) {
+    return String(r[A.ACTION] || '').trim() === '放行硬規則違反'
+      && String(r[A.TARGET_KEY] || '').indexOf(quarterId) >= 0;
+  });
+  t.expect('AuditLog 記低了這一次放行', releaseRows.length > 0,
+    '≥ 1 筆', releaseRows.length + ' 筆',
+    'AuditLog 裡面 Action=「放行硬規則違反」而且 TargetKey 有 ' + quarterId + ' 的');
+  t.expect('而且講得出放行了幾多格',
+    releaseRows.some(function (r) {
+      // ⚠️ 用 `indexOf()` 唔用正則——`tools/lint-undeclared.js`
+      // 會把 `/… \d+ …/` 讀成除法，然後報一個叫 `d` 嘅未宣告變數。
+      const v = String(r[A.NEW_VALUE] || '');
+      return v.indexOf('放行了 ') === 0 && v.indexOf(' 格規則違反') > 0;
+    }), '有「放行了 N 格規則違反」',
+    releaseRows.map(function (r) { return String(r[A.NEW_VALUE] || ''); }).join('；'),
+    'AuditLog.NewValue');
+
+  // ── 5　自己收拾 ─────────────────────────────────────────────
+  //
+  // ⚠️ 把那一格改回原本的人，再乾淨儲存一次。
+  // 不收拾的話，這一季就永遠帶住一格違反，而下一次重跑
+  // 每一條情境都會見到它。
+  const newVersionNo = findLatestVersionNo(quarterId);
+  let cleaned = false;
+  let cleanupNote = '';
+  try {
+    selfTestWriteGridCell_(quarterId, newVersionNo, target.serviceDate,
+      target.postId, target.slotIndex, target.originalName);
+    apiSaveAndConfirmExecute(quarterId, { decisions: [] });
+    cleaned = true;
+  } catch (err) {
+    cleanupNote = err.message;
+  }
+  t.expect('收拾：把那一格改回原本的人，並且乾淨儲存一次',
+    cleaned, '收拾得到', cleanupNote || '收拾得到',
+    target.serviceDate + '　' + target.postId + '　⇒ ' + target.originalName);
+
+  const after = selfTestCall_('S17', 'apiGetDashboardState',
+    function () { return apiGetDashboardState(quarterId); });
+  t.equal('收拾完之後，未儲存格數回到 0',
+    (after.unsaved || {}).gridChangeCount, 0,
+    'apiGetDashboardState().unsaved＝' + JSON.stringify(after.unsaved));
+
+  const finalPlan = selfTestCall_('S17', 'apiSaveAndConfirmPlan（收拾之後）',
+    function () { return apiSaveAndConfirmPlan(quarterId); });
+  t.equal('而且再沒有硬規則違反留低',
+    ((finalPlan.violations || {}).real || []).length, 0,
+    'apiSaveAndConfirmPlan().violations.real');
+  return t.result();
 }
 
 /* ═════════════════════════════════════════════════════════════════════
  * 執行時間、狀態、續跑
  * ═════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 第五十三輪批次：呢一次執行入面，每條情境叫過嘅 API 同佢回咗乜。
+ * 由 `runSelfTestMachine_()` 開跑嗰陣清空，`selfTestRecordPayload_()` 填。
+ */
+let selfTestPayloads_ = {};
 
 /** 呢一次執行嘅開始時間（毫秒）。由 `runSelfTestMachine_()` 設。 */
 let selfTestStartedAt_ = 0;
@@ -1342,6 +1899,8 @@ function readSelfTestState_() {
   if (!sheet) return {};
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return {};
+  // ⚠️ 第五十三輪批次 C1 組：多咗「跑過幾次」同「連續相同結果」兩欄。
+  // 舊表得 5 欄一樣讀得返（讀出嚟係 undefined，下面當 0）。
   const lastCol = Math.max(4, sheet.getLastColumn());
   const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
   const out = {};
@@ -1353,7 +1912,7 @@ function readSelfTestState_() {
     // 跳過一個紅色情境嗰陣，報告仍然要印得出「邊一條斷言紅咗、
     // 預期幾多、實際幾多」。冇咗證據，一個「跳過」嘅紅色情境
     // 就變成一句冇內容嘅「紅」——而嗰個等於冇報告過。
-    let detail = { failedChecks: [], invariantDetail: [] };
+    let detail = { failedChecks: [], invariantDetail: [], fingerprint: '' };
     try {
       const raw = String(row[3] || '');
       if (raw) detail = JSON.parse(raw);
@@ -1364,7 +1923,12 @@ function readSelfTestState_() {
     out[id] = {
       id: id, status: String(row[1] || ''), summary: String(row[2] || ''),
       failedChecks: detail.failedChecks || [],
-      invariantDetail: detail.invariantDetail || []
+      invariantDetail: detail.invariantDetail || [],
+      payloads: detail.payloads || [],
+      // 第五十三輪批次 C1 組：跑過幾次、連續幾多次同一個結果。
+      fingerprint: detail.fingerprint || '',
+      runCount: Number(row[5]) || 0,
+      sameStreak: Number(row[6]) || 0
     };
   });
   return out;
@@ -1384,7 +1948,8 @@ function writeSelfTestState_(state) {
     sheet = ss.insertSheet(SELFTEST_SHEETS.STATE);
   }
   sheet.clear();
-  sheet.appendRow(['情境', '結果', '摘要', '證據（JSON）', '更新於']);
+  sheet.appendRow(['情境', '結果', '摘要', '證據（JSON）', '更新於',
+    '跑過幾次', '連續相同結果']);
   sheet.setFrozenRows(1);
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const now = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss');
@@ -1393,14 +1958,17 @@ function writeSelfTestState_(state) {
     try {
       evidence = JSON.stringify({
         failedChecks: state[id].failedChecks || [],
-        invariantDetail: state[id].invariantDetail || []
+        invariantDetail: state[id].invariantDetail || [],
+        payloads: state[id].payloads || [],
+        fingerprint: state[id].fingerprint || ''
       });
       // 一格上限 50,000 字元。爆咗就只記一句，唔好令成次寫入失敗。
       if (evidence.length > 45000) evidence = '（證據太長，已略去；見 SelfTestReport）';
     } catch (err) {
       evidence = '（證據寫不出來：' + err.message + '）';
     }
-    sheet.appendRow([id, state[id].status, state[id].summary, evidence, now]);
+    sheet.appendRow([id, state[id].status, state[id].summary, evidence, now,
+      Number(state[id].runCount) || 0, Number(state[id].sameStreak) || 0]);
   });
 }
 
@@ -1479,6 +2047,7 @@ function snapshotFailingInvariants_(quarterId) {
  */
 function runSelfTestMachine_(resume, rerunFailedOnly) {
   selfTestStartedAt_ = new Date().getTime();
+  selfTestPayloads_ = {};
 
   const quarter = readSelfTestQuarterDetail_();
   const quarterId = quarter.value;
@@ -1489,6 +2058,27 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       blocked: true, quarterId: quarterId, quarterSource: quarter.source,
       reasons: gate.reasons, results: [], invariants: null
     };
+  }
+
+  // ── 第五十三輪批次 C1 組：先讀返「呢一條跑過幾次」 ──────────
+  //
+  // ⚠️ **唔理今次係咪續跑都要讀。** 「只重跑紅色情境」會把紅嗰幾條
+  // 由 `state` 清走，而嗰幾條正正就係要數次數嗰幾條。
+  // 由頭跑一次亦都要讀——一條連沙盒清乾淨都仲係紅嘅情境，
+  // 係更強嘅證據，唔係更弱。
+  const priorHistory = {};
+  try {
+    const persisted = readSelfTestState_();
+    Object.keys(persisted).forEach(function (id) {
+      priorHistory[id] = {
+        runCount: Number(persisted[id].runCount) || 0,
+        sameStreak: Number(persisted[id].sameStreak) || 0,
+        fingerprint: String(persisted[id].fingerprint || '')
+      };
+    });
+  } catch (err) {
+    // 讀唔到就由零數起，唔可以令成次執行爆。
+    log_('WARN', '讀不回 SelfTestState 的重跑次數：' + err.message);
   }
 
   let state = resume ? readSelfTestState_() : {};
@@ -1584,6 +2174,13 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
         // 冇咗佢，一個「跳過」嘅紅色情境就會冇晒證據。
         failedChecks: previous.failedChecks || [],
         invariantDetail: previous.invariantDetail || [],
+        payloads: previous.payloads || [],
+        // ⚠️ 上一次嗰個次數要照樣帶出嚟，否則一條「上一次紅、
+        // 今次跳過」嘅情境喺報告上面就唔會有「唔好再撳」嗰一句。
+        repeat: {
+          runCount: Number(previous.runCount) || 0,
+          sameStreak: Number(previous.sameStreak) || 0
+        },
         note: '（上一次已經有結論：'
           + (previous.status === SELFTEST_STATUS.PASSED ? '綠'
             : (previous.status === SELFTEST_STATUS.SKIPPED ? '跳過' : '紅'))
@@ -1735,15 +2332,39 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
 
     invariantMs += new Date().getTime() - invStartedAt;
 
+    // ── 第五十三輪批次 C2 組：**同一個結果連續幾多次？** ────────
+    //
+    // ⚠️ 比對嘅係**指紋**，唔係「紅唔紅」。一條由「A 斷言紅」變成
+    // 「B 斷言紅」嘅情境係有進展，唔應該被數成「又係同一樣」。
+    // ⚠️ 只有紅／ERROR 先入報告。17 條全部入，份報告會長到冇人睇。
+    if (outcome.status === SELFTEST_STATUS.FAILED
+      || outcome.status === SELFTEST_STATUS.ERROR) {
+      outcome.payloads = selfTestPayloads_[scenario.id] || [];
+    }
+
+    const fingerprint = selfTestOutcomeFingerprint_(outcome);
+    const history = priorHistory[scenario.id] || { runCount: 0, sameStreak: 0, fingerprint: '' };
+    const runCount = history.runCount + 1;
+    const sameStreak = (history.fingerprint && history.fingerprint === fingerprint)
+      ? history.sameStreak + 1 : 1;
+    outcome.repeat = { runCount: runCount, sameStreak: sameStreak };
+
     results.push(outcome);
     byId[scenario.id] = outcome;
     state[scenario.id] = {
       id: scenario.id, status: outcome.status,
+      // ⚠️ `SKIPPED` 唔可以報成「0 條斷言失敗」——嗰句睇落似通過。
       summary: outcome.status === SELFTEST_STATUS.PASSED ? '通過'
-        : (outcome.error || ((outcome.failedChecks || []).length + ' 條斷言失敗')),
+        : (outcome.status === SELFTEST_STATUS.SKIPPED ? '跳過'
+          : (outcome.error || ((outcome.failedChecks || []).length + ' 條斷言失敗'))),
       // 第五十輪批次 A1 組：跳過嗰陣要拎得返上一次嘅證據。
       failedChecks: outcome.failedChecks || [],
-      invariantDetail: outcome.invariantDetail || []
+      invariantDetail: outcome.invariantDetail || [],
+      // ⚠️ 一齊存落 `SelfTestState`——續跑嗰陣一條「上一次紅、今次跳過」
+      // 嘅情境仲要印得返啲原文，否則要 Ivan 再由頭跑一次先攞得返。
+      payloads: outcome.payloads || [],
+      fingerprint: fingerprint,
+      runCount: runCount, sameStreak: sameStreak
     };
     // ⚠️ 逐個寫，唔可以等成批完。
     try { writeSelfTestState_(state); } catch (err) {
@@ -1861,6 +2482,16 @@ function describeSelfTestReport_(report) {
   const printOne = function (r, icon) {
     lines.push(icon + ' ' + r.id + '　' + (r.title || ''));
     if (r.note) lines.push('　 ' + r.note);
+    // ── 第五十三輪批次 C2 組：**唔好再撳。** ─────────────────────
+    //
+    // ⚠️ 呢一句排喺證據**前面**。排喺後面嘅話，Ivan 要睇完成段
+    // 失敗訊息先見到——而佢已經睇過同一段三次。
+    const repeatLine = describeSelfTestRepeat_(r.repeat);
+    if (repeatLine && (r.status === SELFTEST_STATUS.FAILED
+      || r.status === SELFTEST_STATUS.ERROR)) {
+      lines.push('　 ' + repeatLine);
+      lines.push('　　 再撳「▶️ 只重跑紅色情境」不會有分別——要修碼才會變。');
+    }
     if (r.error) lines.push('　 執行時拋錯：' + r.error);
     (r.failedChecks || []).forEach(function (c) {
       lines.push('　 ' + c.label);
@@ -1875,6 +2506,17 @@ function describeSelfTestReport_(report) {
     (r.invariantDetail || []).forEach(function (d) {
       lines.push('　 ⚠️ 不變量：' + d);
     });
+    // ── 第五十三輪批次：**API 回咗乜，原文貼出嚟。** ────────────
+    //
+    // ⚠️ 下一輪落手查嗰個淨係睇得到呢份報告。
+    // 每一個問題嘅第一個問句都係「呢個 API 到底回咗乜」——
+    // 冇原文就答唔到，而答唔到就要 Ivan 再撳一次。
+    if ((r.payloads || []).length > 0) {
+      lines.push('　 ── 這一條叫過的 API 回了什麼（原文）──');
+      r.payloads.forEach(function (pl) {
+        lines.push('　　 ' + pl.api + '　⇒　' + pl.text);
+      });
+    }
     lines.push('');
   };
 
@@ -1944,8 +2586,24 @@ function describeSelfTestReport_(report) {
     lines.push(report.results.length + ' 個情境全部跑完了，'
       + (report.failedCount + report.errorCount) + ' 個紅、'
       + blockedCount + ' 個被擋住。');
-    lines.push('修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」——'
-      + '它會重跑紅的同被擋住的那幾個，不會把沙盒季度清掉重頭來。');
+    // ── 第五十三輪批次 C3 組：**全部紅嘅都重跑過兩次以上 ⇒ 唔好再撳。** ──
+    //
+    // ⚠️ 呢一句嘅價值唔喺自測機本身，喺於 Ivan 十月返嚟嗰陣係一個人。
+    // 到時冇人喺旁邊幫佢數「你已經撳咗三次」。
+    const stuck = real.filter(function (r) {
+      return Number((r.repeat || {}).sameStreak) >= 2;
+    });
+    if (real.length > 0 && stuck.length === real.length) {
+      const times = Math.min.apply(null, stuck.map(function (r) {
+        return Number(r.repeat.runCount) || 0;
+      }));
+      lines.push('⛔ 那 ' + real.length + ' 條紅已經重跑過 ' + times
+        + ' 次，結果沒有變。不要再撳——');
+      lines.push('　 把這份報告交給 Claude，要修碼。');
+    } else {
+      lines.push('修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」——'
+        + '它會重跑紅的同被擋住的那幾個，不會把沙盒季度清掉重頭來。');
+    }
   } else {
     lines.push('全部通過。');
   }
