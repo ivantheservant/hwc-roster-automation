@@ -143,6 +143,11 @@ function onOpen() {
         // 實測時 Ivan 撳錯咗。
         .addItem('⚠️ 跑自測（沙盒季度，DRY_RUN）', 'runSelfTestMachineFromMenu_')
         .addItem('▶️ 繼續跑自測', 'runSelfTestMachineResumeFromMenu_')
+        // 第四十九輪批次 第 4 層：亂行機。
+        // 隨機揀合法動作、每一步跑一次全部不變量。
+        // ⚠️ 全程 DRY_RUN，每 10 步重新斷言一次。
+        .addItem('⚠️ 亂行機（沙盒季度，DRY_RUN）', 'runMonkeyFromMenu_')
+        .addItem('▶️ 繼續亂行', 'runMonkeyResumeFromMenu_')
         .addItem('參數掃描', 'runTuneParameters_')
         .addItem('多次生成比較', 'runCompareMultiRun_')
         // 第二十九輪批次階段 D：由頭到尾行足五步，然後出一份報告。

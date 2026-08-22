@@ -1797,6 +1797,82 @@ const MUTATIONS = [
       + "    log_('WARN', 'selfTestRecordPayload_ 失敗（' + scenarioId + '／' + apiName",
     tests: ['tests/selftest_runner.test.js']
   },
+  {
+    id: 'mk-uses-math-random',
+    why: '亂行機改用 `Math.random()`'
+      + '——同一個 seed 就唔會再行同一條路，'
+      + '而一個紅咗嘅步驟永遠重現唔到',
+    file: 'src/MonkeyRun.gs',
+    find: '    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;',
+    replace: '    return Math.random();',
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-resume-restarts',
+    why: '續跑唔快轉過上一次抽咗嘅次數'
+      + '——「繼續亂行」會由第一抽再嚟一次，即係行返上一次同一條路，'
+      + '而報告寫住「繼續」',
+    file: 'src/MonkeyRun.gs',
+    find: '  for (let i = 0; i < (Number(skip) || 0); i++) next();',
+    replace: '',
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-no-path-in-report',
+    why: '報告唔印「走到這裡的完整步驟」'
+      + '——紅咗都重現唔到，而一個重現唔到嘅 bug 報告等於冇',
+    file: 'src/MonkeyRun.gs',
+    find: "    lines.push('　 走到這裡的完整步驟：' + (f.path.join(' → ') || '（第一步）'));",
+    replace: '',
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-no-seed-in-report',
+    why: '報告唔印 seed——冇 seed 就重現唔到',
+    file: 'src/MonkeyRun.gs',
+    find: "    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）',",
+    replace: "    '（隨機）',",
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-dryrun-once-only',
+    why: '只喺開跑嗰陣驗一次 DRY_RUN，中途唔再驗'
+      + '——一次亂行行幾分鐘，中間有人改咗 Config，'
+      + '後面嗰幾十步就會真係寄信',
+    file: 'src/MonkeyRun.gs',
+    find: '      if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {',
+    replace: '      if (false) {',
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-swallow-throws',
+    why: '把合法動作嘅拋錯吞咗'
+      + '——一個 `legal` 講得通而執行起上嚟拋錯嘅動作，'
+      + '就係「畫面話得而系統話唔得」，嗰個本身就係一個發現',
+    file: 'src/MonkeyRun.gs',
+    find: "        step: i, kind: '合法動作拋錯',",
+    replace: "        step: i, kind: '（略過）',",
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-skip-preflight',
+    why: '拆走開跑之前嗰套閘'
+      + '——亂行機比自測機更危險：佢會用一條冇人預先睇過嘅次序去撳嘢',
+    file: 'src/MonkeyRun.gs',
+    find: '  const gate = checkSelfTestPreconditions_(quarterId);',
+    replace: '  const gate = { ok: true, reasons: [] };',
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mk-no-invariants',
+    why: '每一步唔跑不變量'
+      + '——亂行機自己冇斷言，佢全部靠不變量出力。'
+      + '拆走咗就變成「隨機撳嘢，而冇人睇結果」',
+    file: 'src/MonkeyRun.gs',
+    find: '      const inv = runAllInvariants_(quarterId);',
+    replace: '      const inv = { results: [] };',
+    tests: ['tests/monkey_run.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。
