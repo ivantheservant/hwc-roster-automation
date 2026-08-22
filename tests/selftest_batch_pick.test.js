@@ -173,6 +173,26 @@ function sandbox(opts) {
     planCount: function () { return planIdx; } };
 }
 
+/**
+ * 而家 grid 上面實際仲寫住替代人選嘅係邊幾格。
+ *
+ * ⚠️ 一份真嘅 plan **只會**喺有人手改動嘅格上面報違反。
+ * fixture 硬報一堆「我哋冇掂過嘅格」，就會變成一個
+ * 真實世界唔會出現嘅現場——而喺嗰個假現場上面綠，冇意思。
+ *
+ * @param {Object} box `sandbox()` 嘅結果
+ * @param {string[]} originals 原本嗰幾個名（改返原本嘅字就唔算改動）
+ * @returns {Object[]} `{serviceDate, postId, slotIndex}`
+ */
+function stillWritten(box, originals) {
+  const last = {};
+  box.written.forEach(function (w) {
+    last[w.serviceDate + '|' + w.postId + '|' + w.slotIndex] = w;
+  });
+  return Object.keys(last).map(function (k) { return last[k]; })
+    .filter(function (w) { return originals.indexOf(w.text) === -1; });
+}
+
 /** 一季五個主日、每日兩個崗位。 */
 const ROWS = [];
 DATES.forEach(function (d, i) {
@@ -279,17 +299,23 @@ console.log('\n=== A【核心】第一批有一格犯規 ⇒ 改回原本嘅字�
 console.log('\n=== A【核心】次次都犯規 ⇒ 用乾淨嗰幾格收口，唔死循環 ===');
 {
   // 每一次都係 WORSHIP 嗰幾格犯規，USHER 嗰幾格乾淨。
+  //
+  // ⚠️ 只喺**而家實際寫住**嗰幾格報違反——真嘅 plan 就係噉。
+  let box = null;
   const always = function () {
+    const live = stillWritten(box, ['假甲乙', '假丙丁']);
     return makePlan({
-      real: DATES.map(function (d) {
-        return makeViolation(d, 'WORSHIP', 1, 'HARD_ELIGIBILITY');
-      }),
-      gridChanges: DATES.map(function (d) {
-        return makeGridChange(d, 'WORSHIP', 1, '假甲乙', '假戊己');
+      real: live.filter(function (w) { return w.postId === 'WORSHIP'; })
+        .map(function (w) {
+          return makeViolation(w.serviceDate, w.postId, w.slotIndex, 'HARD_ELIGIBILITY');
+        }),
+      gridChanges: live.map(function (w) {
+        return makeGridChange(w.serviceDate, w.postId, w.slotIndex,
+          w.postId === 'WORSHIP' ? '假甲乙' : '假丙丁', w.text);
       })
     });
   };
-  const box = sandbox({ rows: ROWS, byPost: BY_POST, plans: [always] });
+  box = sandbox({ rows: ROWS, byPost: BY_POST, plans: [always] });
   const picked = box.gas.selfTestPickAcceptedCells_('2028T3', 0, 3, 'S03');
 
   check('★★★★★ 用完候選就停手，唔會死循環',
@@ -318,17 +344,19 @@ console.log('\n=== A【核心】候選源源不絕而次次都犯規 ⇒ plan �
   const manyRows = manyDates.map(function (d) {
     return { serviceDate: d, postId: 'WORSHIP', slotIndex: 1, personId: 'P1' };
   });
+  let box = null;
   const always = function () {
+    const live = stillWritten(box, ['假甲乙']);
     return makePlan({
-      real: manyDates.map(function (d) {
-        return makeViolation(d, 'WORSHIP', 1, 'HARD_ELIGIBILITY');
+      real: live.map(function (w) {
+        return makeViolation(w.serviceDate, w.postId, w.slotIndex, 'HARD_ELIGIBILITY');
       }),
-      gridChanges: manyDates.map(function (d) {
-        return makeGridChange(d, 'WORSHIP', 1, '假甲乙', '假戊己');
+      gridChanges: live.map(function (w) {
+        return makeGridChange(w.serviceDate, w.postId, w.slotIndex, '假甲乙', w.text);
       })
     });
   };
-  const box = sandbox({ rows: manyRows, byPost: BY_POST, plans: [always] });
+  box = sandbox({ rows: manyRows, byPost: BY_POST, plans: [always] });
   const picked = box.gas.selfTestPickAcceptedCells_('2028T3', 0, 3, 'S03');
   checkEqual('★★★★★★ **plan 最多叫 4 次**'
     + '——`apiSaveAndConfirmPlan()` 好貴，冇上限就會食光 4.5 分鐘預算，'
@@ -404,6 +432,35 @@ console.log('\n=== A【核心】`slotIndex` 型唔同都要對得上 ===');
       return c.serviceDate + ' ' + c.postId;
     })));
   checkEqual('★★★★★ 而且真係換過格重試', picked.planCalls, 2);
+}
+
+// =====================================================================
+console.log('\n=== A【核心】違反有一格唔係我哋寫嘅 ⇒ 即刻收手，唔燒 plan ===');
+{
+  // ⚠️ 混合情況：一格係我哋寫嘅、一格唔係。
+  // 唔係我哋寫嗰格點換都清唔走，所以再試落去只係燒清四次好貴嘅 plan，
+  // 而最後 S03 一樣紅、S04–S13 一樣被 `dependsOn` 擋住。
+  const box = sandbox({
+    rows: ROWS, byPost: BY_POST,
+    plans: [makePlan({
+      real: [
+        makeViolation('2028-07-02', 'WORSHIP', 1, 'HARD_ROLE_REQUIRED'),
+        makeViolation('2028-07-02', 'DUTY_CC', 1, 'HARD_ROLE_REQUIRED')
+      ],
+      gridChanges: DATES.slice(0, 3).map(function (d) {
+        return makeGridChange(d, 'WORSHIP', 1, '假甲乙', '假戊己');
+      })
+    })]
+  });
+  const picked = box.gas.selfTestPickAcceptedCells_('2028T3', 0, 3, 'S03');
+  checkEqual('★★★★★★ 只叫咗一次 plan 就收手', picked.planCalls, 1);
+  checkEqual('★★★★★★ 一格都唔收', picked.cells.length, 0);
+  check('★★★★★★ 而且報嘅係**唔係我哋寫嗰格**（`DUTY_CC`），'
+    + '唔係連我哋自己寫嗰格一齊報'
+    + '——報錯咗嘅話，落手查嗰陣會查錯方向',
+    (picked.preExisting || []).join('；').indexOf('DUTY_CC') >= 0
+      && (picked.preExisting || []).join('；').indexOf('WORSHIP') === -1,
+    JSON.stringify(picked.preExisting));
 }
 
 // =====================================================================
@@ -504,17 +561,20 @@ console.log('\n=== C【核心】S03 真正跑一次：第一批有一格犯規 �
 // =====================================================================
 console.log('\n=== C S03：湊唔夠格 ⇒ 跳過，唔係紅 ===');
 {
+  let box = null;
   const always = function () {
+    const live = stillWritten(box, ['假甲乙', '假丙丁']);
     return makePlan({
-      real: ROWS.map(function (r) {
-        return makeViolation(r.serviceDate, r.postId, r.slotIndex, 'HARD_ELIGIBILITY');
+      real: live.map(function (w) {
+        return makeViolation(w.serviceDate, w.postId, w.slotIndex, 'HARD_ELIGIBILITY');
       }),
-      gridChanges: ROWS.map(function (r) {
-        return makeGridChange(r.serviceDate, r.postId, r.slotIndex, '假甲乙', '假戊己');
+      gridChanges: live.map(function (w) {
+        return makeGridChange(w.serviceDate, w.postId, w.slotIndex,
+          w.postId === 'WORSHIP' ? '假甲乙' : '假丙丁', w.text);
       })
     });
   };
-  const box = sandbox({ rows: ROWS, byPost: BY_POST, plans: [always] });
+  box = sandbox({ rows: ROWS, byPost: BY_POST, plans: [always] });
   const out = box.gas.selfTestS03_('2028T3');
   checkEqual('★★★★★★ **標 `SKIPPED`，唔係紅**'
     + '——紅會經 `dependsOn` 把 S04–S13 標成 `BLOCKED`，'

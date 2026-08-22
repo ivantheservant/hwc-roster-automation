@@ -2661,7 +2661,7 @@ const MUTATIONS = [
       + '——嗰種情況係呢一版本身帶住違反，點換都改變唔到，'
       + '照換就係燒清四次好貴嘅 plan',
     file: 'src/SelfTestRunner.gs',
-    find: '    if (bad.length === 0) {',
+    find: '    if (foreign.length > 0) {',
     replace: '    if (false) {',
     tests: ['tests/selftest_batch_pick.test.js']
   },

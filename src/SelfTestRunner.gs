@@ -518,6 +518,12 @@ function selfTestPickAcceptedCells_(quarterId, versionNo, howMany, scenarioId) {
     real.forEach(function (v) { offending[selfTestCellKey_(v)] = v; });
     const bad = written.filter(function (c) { return offending[selfTestCellKey_(c)]; });
     const good = written.filter(function (c) { return !offending[selfTestCellKey_(c)]; });
+    // ⚠️ 有違反落喺**我哋冇掂過嘅格**上面 ⇒ 呢一版本身就帶住佢。
+    // 點換格都改變唔到，換落去只係燒清四次好貴嘅 plan，
+    // 而最後 S03 一樣紅、S04–S13 一樣被擋住。
+    const mine = {};
+    written.forEach(function (c) { mine[selfTestCellKey_(c)] = true; });
+    const foreign = real.filter(function (v) { return !mine[selfTestCellKey_(v)]; });
 
     attempts.push({
       round: round,
@@ -545,10 +551,11 @@ function selfTestPickAcceptedCells_(quarterId, versionNo, howMany, scenarioId) {
       originalByKey[selfTestCellKey_(g)] = g.originalName;
     });
 
-    if (bad.length === 0) {
-      // ⚠️ 有違反，但**冇一格係我哋寫嘅**——即係呢一版本身就帶住違反。
-      // 唔關呢一次改動事，而且點換格都改變唔到。全部改返原本嘅字。
-      preExisting = real.map(function (v) {
+    if (foreign.length > 0) {
+      // ⚠️ 唔關呢一次改動事。全部改返原本嘅字，然後由呼叫嗰邊
+      // 報成「跳過」——報紅嘅話，S04–S13 會被 `dependsOn` 一齊擋住，
+      // 而嗰九條先係呢部機器存在嘅理由。
+      preExisting = foreign.map(function (v) {
         return v.serviceDate + ' ' + v.postId + '#' + v.slotIndex + '　' + v.ruleId;
       });
       written.forEach(function (c) { revert(c, originalByKey); });
