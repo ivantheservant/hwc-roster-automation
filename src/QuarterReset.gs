@@ -529,15 +529,25 @@ const QUARTER_RESET_BLOCKED_DEFAULT = '2026T4';
  * @returns {string[]} 季度 ID 陣列
  */
 function readQuarterResetBlockedQuarters_() {
-  let raw = '';
-  try {
-    raw = String(getConfig(CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS,
-      QUARTER_RESET_BLOCKED_DEFAULT) || '').trim();
-  } catch (err) {
-    raw = QUARTER_RESET_BLOCKED_DEFAULT;
-  }
+  return readQuarterResetBlockedQuartersDetail_().value;
+}
+
+/**
+ * 同上，但**連「呢個值由邊度嚟」一齊回**。
+ *
+ * 第四十八輪批次 B 組：確認畫面本來寫住「設定在 Config「X」」，
+ * 而嗰個 Key **根本未加入 Config 工作表**。
+ *
+ * ⚠️ `raw === ''` 嗰一句要留返——填成空白**唔會**變成「乜都唔擋」。
+ *
+ * @returns {{value: string[], source: string}}
+ */
+function readQuarterResetBlockedQuartersDetail_() {
+  const result = getConfigWithSourceSafe_(CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS,
+    QUARTER_RESET_BLOCKED_DEFAULT);
+  let raw = String(result.value || '').trim();
   if (raw === '') raw = QUARTER_RESET_BLOCKED_DEFAULT;
-  return splitList_(raw);
+  return { value: splitList_(raw), source: result.source };
 }
 
 /**

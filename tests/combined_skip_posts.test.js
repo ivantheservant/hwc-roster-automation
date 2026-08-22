@@ -88,10 +88,13 @@ console.log('\n=== D1【核心】Config 鍵：合堂預設跳邊幾個崗位 ===
     gas.COMBINED_BACKFILL_BLOCKED_DEFAULT, '2026T4');
 
   // 空白唔可以變成「乜都唔保護」——同 `readRehearsalProtectedQuarters_()` 一樣。
+  // ⚠️ 剝走註釋先數——理由同 `quarter_reset_batch.test.js` 嗰一條一樣。
+  const backfillCode = read('src/CombinedSkipBackfill.gs')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★★ Config 填成空白 ⇒ **仍然退回內建預設**，'
     + '唔會變成「乜都唔保護」'
     + '——一格打空咗就冧晒保護，係最易誤觸嗰種',
-    /raw === ''/.test(read('src/CombinedSkipBackfill.gs')), '');
+    /raw === ''/.test(backfillCode), '');
 }
 
 // =====================================================================
@@ -201,6 +204,117 @@ console.log('\n=== D4【核心】年度合堂工具新寫入嗰幾行要帶住�
     '仲寫住「一律留空」');
   check('★★★★★ 而且講得出實際會填邊幾個崗位',
     /會先填上/.test(src), '');
+}
+
+// =====================================================================
+console.log('\n=== 第四十八輪批次 C 組【核心】受保護季度要**排第一** ===');
+{
+  // ═══════════════════════════════════════════════════════════════
+  // 一道從來冇響過嘅警報，同冇裝過係一樣嘅
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // 修正前，確認畫面寫住：
+  //
+  //     不會動的:
+  //     　・已經填了值：1 行（不覆寫你填的東西）
+  //     　・Active=FALSE：1 行
+  //     　・不是合堂：1 行
+  //     　・受保護季度（2026T4）：0 行
+  //
+  // 而真實資料入面，`SP-2026-02` 就係 `2026T4` 嘅合堂列
+  // （`SkipPostIDs=WORSHIP,PIANO`）。佢**應該**被「受保護季度」擋住，
+  // 但佢先被「已經填了值」接走咗，所以受保護季度嗰一項報 0。
+  //
+  // 即係：**2026T4 嘅保護由寫出嚟到而家，一次都冇真正行過。**
+  //
+  // ⚠️ 呢個唔止係一個數字錯。一個永遠報 0 嘅保護計數，
+  // 睇上去同「冇嘢需要保護」一模一樣——所以冇人會去問佢到底有冇跑過。
+  const C = gas.COLUMNS.SPECIAL_SUNDAYS;
+  const mk = function (id, quarterId, type, skip, active) {
+    const out = {};
+    out[C.SPECIAL_ID] = id;
+    out[C.QUARTER_ID] = quarterId;
+    out[C.SERVICE_DATE] = '2026-10-04';
+    out[C.TYPE] = type;
+    out[C.TITLE] = '';
+    out[C.SKIP_POST_IDS] = skip;
+    out[C.ACTIVE] = active;
+    return out;
+  };
+  const DEFAULT_SKIP = 'CHAIR,PREACHER,TRANSLATOR,WORSHIP,PIANO';
+  const ids = function (list) {
+    return list.map(function (i) { return i.specialId; }).sort().join(',');
+  };
+
+  // ── C2　保護真係擋得住 ────────────────────────────────────────
+  //
+  // ⚠️ 呢一條就係整組嘅全部價值。
+  // fixture 係一行**四項條件全部符合「應該被補填」**嘅列：
+  // `2026T4` ／ 合堂 ／ `SkipPostIDs` 空白 ／ `Active=TRUE`。
+  // 冇呢一條，C1 只係把一個數字由 0 改成 1。
+  //
+  // ⚠️ 老實講一句：呢一條喺 C1 之前**已經係綠**——
+  // 空白嗰一行本來就落到 `blocked`。佢守嘅唔係 C1 改嗰件事，
+  // 而係「保護到底攔唔攔得住」呢個問題**由頭到尾冇人問過**。
+  {
+    const plan = gas.classifyCombinedSkipRows_(
+      [mk('SP-BLOCK-EMPTY', '2026T4', '合堂', '', 'TRUE')],
+      DEFAULT_SKIP, ['2026T4']);
+    checkEqual('★★★★★★ 四項條件全部符合「應該補填」嘅 `2026T4` 列，'
+      + '**唔會**被改', ids(plan.willFill), '');
+    checkEqual('★★★★★★ 而且歸類喺「受保護季度」'
+      + '——歸錯類嘅話，個數字報 0，而幹事會以為冇嘢需要保護',
+      ids(plan.blocked), 'SP-BLOCK-EMPTY');
+  }
+
+  // ── C1　受保護季度排第一 ──────────────────────────────────────
+  //
+  // 用真實嗰一行嘅形狀：`2026T4` 合堂列，而 `SkipPostIDs` **已經有值**。
+  {
+    const plan = gas.classifyCombinedSkipRows_(
+      [mk('SP-2026-02', '2026T4', '合堂', 'WORSHIP,PIANO', 'TRUE')],
+      DEFAULT_SKIP, ['2026T4']);
+    checkEqual('★★★★★★ 已經填咗值嘅 `2026T4` 列，歸「受保護季度」'
+      + '——修正前佢先被「已經填了值」接走，'
+      + '所以「受保護季度：0 行」報咗兩輪',
+      ids(plan.blocked), 'SP-2026-02');
+    checkEqual('★★★★★★ 而且**唔會**同時出現喺「已經填了值」'
+      + '——一行只可以歸一類，兩邊都算就會出現「總數對唔上」',
+      ids(plan.alreadyFilled), '');
+  }
+
+  // ── 受保護優先於**每一個**其他分類，唔止「已經填了值」 ────────
+  {
+    const plan = gas.classifyCombinedSkipRows_([
+      mk('P-FILLED', '2026T4', '合堂', 'WORSHIP', 'TRUE'),
+      mk('P-INACTIVE', '2026T4', '合堂', '', 'FALSE'),
+      mk('P-NOTCOMBINED', '2026T4', '浸禮', '', 'TRUE'),
+      mk('OK-FILL', '2027T2', '合堂', '', 'TRUE')
+    ], DEFAULT_SKIP, ['2026T4']);
+    checkEqual('★★★★★★ `2026T4` 嗰三行全部歸「受保護季度」'
+      + '——一行只要落喺受保護季度，唔理佢有冇值、`Active` 係乜、'
+      + '`Type` 係乜，一律先歸呢一類。'
+      + '噉個數字先至講得出真話',
+      ids(plan.blocked), 'P-FILLED,P-INACTIVE,P-NOTCOMBINED');
+    checkEqual('★★★★★ 而唔受保護嗰季照補', ids(plan.willFill), 'OK-FILL');
+    checkEqual('★★★★★ 其餘三類全部係空', ids(plan.alreadyFilled)
+      + '|' + ids(plan.inactive) + '|' + ids(plan.notCombined), '||');
+  }
+
+  // ── 分類次序本身要寫喺碼度，唔係靠人記住 ─────────────────────
+  const src = read('src/CombinedSkipBackfill.gs');
+  const body = src.slice(src.indexOf('function classifyCombinedSkipRows_('));
+  const posBlocked = body.indexOf('out.blocked.push(item)');
+  const posFilled = body.indexOf('out.alreadyFilled.push(item)');
+  const posInactive = body.indexOf('out.inactive.push(item)');
+  const posNotCombined = body.indexOf('out.notCombined.push(item)');
+  check('★★★★★★ `blocked` 嗰個判斷實際上排喺其餘三個之前'
+    + '——次序就係規則本身。'
+    + '寫喺註釋度話「受保護優先」而碼度排喺後面，等於冇寫',
+    posBlocked >= 0 && posBlocked < posFilled
+      && posBlocked < posInactive && posBlocked < posNotCombined,
+    'blocked=' + posBlocked + ' filled=' + posFilled
+      + ' inactive=' + posInactive + ' notCombined=' + posNotCombined);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

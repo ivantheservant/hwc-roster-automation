@@ -193,14 +193,31 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   const bestSortKey = {};
   stages.forEach(function (s) { lastSentAt[s] = null; bestSortKey[s] = null; });
   let hasOfficialRecord = false;
+  // 第四十八輪批次 A4 組第 3 點：最近一筆嘅 `SendOptions`。
+  //
+  // ⚠️ **摺入呢一次讀，唔另開一次。** `WebAppDashboard.gs` 由第十九輪
+  // 起就守住「SendLog 只喺一個地方讀」，而 `tests/webapp_dashboard_state.test.js`
+  // 會靜態檢查 `readSheet(SHEETS.SEND_LOG)` 只出現一次。
+  // 另開一次讀嘅代價唔止係慢：兩次讀之間張表可以變，
+  // 而畫面上兩個數字就會對唔上。
+  let latestOptions = '';
+  let latestSortKey = null;
 
   readSheet(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     const stage = String(row[C.STAGE] || '').trim();
     if (stage === MAIL_STAGES.OFFICIAL) hasOfficialRecord = true;
-    if (stages.indexOf(stage) === -1) return;
 
     const sentAt = normalizeSentAt_(row[C.SENT_AT], tz);
+    // ⚠️ 「最近一筆」唔篩階段——三個階段任何一次寄出都算數。
+    // 篩咗嘅話，一次用缺口寄出嘅「改動後重發」就會被漏走，
+    // 而嗰一句警告永遠唔會出現。
+    if (sentAt && (latestSortKey === null || sentAt.sortKey > latestSortKey)) {
+      latestSortKey = sentAt.sortKey;
+      latestOptions = String(row[C.SEND_OPTIONS] || '');
+    }
+
+    if (stages.indexOf(stage) === -1) return;
     if (!sentAt) return;
     // 比大細用 sortKey（真正嘅時間值），顯示用 text（已格式化）。
     if (bestSortKey[stage] === null || sentAt.sortKey > bestSortKey[stage]) {
@@ -209,7 +226,11 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
     }
   });
 
-  return { lastSentAt: lastSentAt, hasOfficialRecord: hasOfficialRecord };
+  return {
+    lastSentAt: lastSentAt,
+    hasOfficialRecord: hasOfficialRecord,
+    unsavedRelease: parseUnsavedReleaseNote_(latestOptions)
+  };
 }
 
 /**
@@ -507,6 +528,14 @@ function buildDashboardState_(quarterId) {
     // ⚠️ 第四十七輪批次 A1 組：「三粒掣唔著嘅**唯一**原因就係未儲存」。
     // 詳細理由見 `computeSendBlockedByUnsavedOnly_()` 檔內說明。
     blockedByUnsavedOnly: computeSendBlockedByUnsavedOnly_(facts),
+    // 第四十八輪批次 A3 組：呢一次可唔可以用〔寄出但不儲存〕。
+    // ⚠️ 唔符合條件嗰陣**唔好畫嗰粒掣**——一粒撳咗拋錯嘅掣，
+    // 比冇嗰粒掣更差。而且要講得出點解今次唔得。
+    canSendUnsaved: canSendWithUnsavedChanges_(unsaved).allowed,
+    canSendUnsavedReason: canSendWithUnsavedChanges_(unsaved).reason,
+    // 第四十八輪批次 A4 組第 3 點：寄完之後一直顯示，直到佢儲存為止。
+    sentWithUnsavedWarning: buildSentWithUnsavedWarning_(
+      sendLog.unsavedRelease, unsaved),
     statusText: buildDashboardStatusText_(stage, versionExists, generateOnText),
     latestVersion: latestVersion,
     isDryRun: isDryRun,
@@ -562,6 +591,60 @@ function computeSendBlockedByUnsavedOnly_(facts) {
   return ['review', 'official', 'resend'].some(function (k) {
     return !!(buttons[k] && buttons[k].enabled);
   });
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十八輪批次 A4 組第 3 點：**寄完之後，主畫面要一直講返呢件事。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * ⚠️ 呢一點係整組最重要嗰一句。
+ *
+ * AuditLog 同 SendLog 係畀**日後查**嘅；呢一句係畀**而家**嘅佢睇。
+ * 佢撳完寄出、閂咗個窗，五分鐘之後就會唔記得自己揀咗乜——
+ * 而嗰陣佢會以為收信嘅人睇到嘅係佢表上而家嗰個內容。
+ *
+ * 顯示條件：**上一次寄出用咗缺口**，而且**而家表上仍然有未儲存改動**。
+ * 儲存咗之後就自動消失（因為儲存之後兩者已經一致）。
+ */
+
+/**
+ * 由一行 `SendLog.SendOptions` 讀返「呢一次係咪喺未儲存改動下放行」。
+ * **純函式。**
+ *
+ * 嗰句由 `describeSendDecision_()`（`SendOptions.gs`）寫入，
+ * 兩邊講嘅係同一件事。
+ *
+ * ⚠️ 寫成純函式，係為咗**唔使另開一次 `readSheet(SHEETS.SEND_LOG)`**。
+ * 呢一支檔案由第十九輪起就守住「SendLog 只喺一個地方讀」。
+ *
+ * @param {string} optionsText `SendLog` 的 `SendOptions` 欄
+ * @returns {{used: boolean, versionNo: number, gridChangeCount: number}}
+ */
+function parseUnsavedReleaseNote_(optionsText) {
+  const none = { used: false, versionNo: -1, gridChangeCount: 0 };
+  const match = String(optionsText || '')
+    .match(/未儲存改動下放行：寄出第 (-?\d+) 版，當時表上有 (\d+) 格未儲存/);
+  if (!match) return none;
+  return { used: true, versionNo: Number(match[1]), gridChangeCount: Number(match[2]) };
+}
+
+/**
+ * 主畫面第 2 步嗰一句警告——冇嘢要講嗰陣回空字串。
+ *
+ * @param {Object} release `parseUnsavedReleaseNote_()` 的結果
+ * @param {Object} unsaved `readDashboardUnsavedState_()` 的結果
+ * @returns {string} 要顯示的句子；不需要顯示時是空字串
+ */
+function buildSentWithUnsavedWarning_(release, unsaved) {
+  if (!release || !release.used) return '';
+  const grid = (unsaved || {}).gridChangeCount;
+  // ⚠️ 儲存咗（而家冇未儲存改動）⇒ 唔再講。
+  // 兩者已經一致，繼續講就變成一句永遠關唔甩嘅警告，
+  // 而永遠關唔甩嘅警告好快就會冇人再讀。
+  if (!(grid > 0)) return '';
+  return '⚠️ 上一次寄出的是第 ' + release.versionNo + ' 版，'
+    + '而你表上有 ' + grid + ' 格改動還未儲存。\n'
+    + '收到信的人看到的不是你現在表上的內容。';
 }
 
 /**

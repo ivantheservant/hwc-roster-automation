@@ -189,6 +189,62 @@ function apiStep2Preview(quarterId, sendOptions) {
   return planStep2_(quarterId, sendOptions);
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十八輪批次 A 組：〔寄出但不儲存〕嘅共用件
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 把「呢一次係喺未儲存改動下放行」帶落 `sendOptions`，好讓佢入到 SendLog。
+ *
+ * ⚠️ **建一個新物件，唔改呼叫方傳嚟嗰個。** 直接改嘅話，
+ * 同一個 `sendOptions` 之後再用嗰陣會帶住一個唔關佢事嘅標記。
+ *
+ * @param {Object} sendOptions 前端傳來的寄送選項
+ * @param {Object} guard `assertNoUnsavedChanges_()` 的結果
+ * @returns {Object} 未放行時原樣回傳
+ */
+function withUnsavedReleaseNote_(sendOptions, guard) {
+  if (!guard || !guard.released) return sendOptions;
+  return Object.assign({}, sendOptions || {}, {
+    unsavedRelease: {
+      versionNo: guard.versionNo,
+      gridChangeCount: guard.state.gridChangeCount
+    }
+  });
+}
+
+/**
+ * 放行咗就寫一筆 AuditLog（第四十八輪批次 A4 組第 1 點）。
+ *
+ * ⚠️ 動作名要**睇得出係呢一種**。夾埋普通寄送嗰個動作名嘅話，
+ * 日後想篩「邊幾次係喺未儲存改動下寄嘅」就篩唔出。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {string} actionName 動作名，例如「寄給堂委審閱」
+ * @param {Object} guard `assertNoUnsavedChanges_()` 的結果
+ * @returns {void}
+ */
+function logSendWithUnsavedRelease_(quarterId, actionName, guard) {
+  if (!guard || !guard.released) return;
+  try {
+    writeAuditLog_({
+      action: '寄送批次（未儲存改動下放行）',
+      targetSheet: SHEETS.SEND_LOG,
+      targetKey: quarterId,
+      oldValue: '表上有 ' + guard.state.gridChangeCount + ' 格未儲存',
+      newValue: '寄出第 ' + guard.versionNo + ' 版',
+      source: 'assertNoUnsavedChanges_（allowUnsaved）',
+      notes: actionName + '：寄出第 ' + guard.versionNo + ' 版，'
+        + '當時表上有 ' + guard.state.gridChangeCount + ' 格未儲存。'
+        + '收信的人看到的是第 ' + guard.versionNo + ' 版，'
+        + '不是幹事當時表上的內容。'
+    });
+  } catch (err) {
+    // ⚠️ 寫唔到紀錄唔應該擋住已經寄咗嘅嘢——但一定要留低一句。
+    log_('ERROR', 'logSendWithUnsavedRelease_ 失敗：' + err.message);
+  }
+}
+
 /**
  * 供前端呼叫：實際執行步驟 2——寄審閱信、Stage 前進到 REVIEW_SENT。
  * @param {string} quarterId 季度 ID
@@ -198,10 +254,15 @@ function apiStep2Confirm(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 2／3／4 永不改動職事表內容，
   // 所以有未儲存改動時一律拒絕，指去掣 1。
-  assertNoUnsavedChanges_(quarterId, '寄給堂委審閱');
+  // 第四十八輪批次 A3 組：`allowUnsaved` 一定要由前端**明確傳 `true`**。
+  // `resolveAllowUnsavedFlag_()` 只認布林 `true`——傳漏、`undefined`、
+  // 字串 `'false'`（truthy！）三種都當成唔放行。
+  const guard = assertNoUnsavedChanges_(quarterId, '寄給堂委審閱',
+    resolveAllowUnsavedFlag_(sendOptions));
+  logSendWithUnsavedRelease_(quarterId, '寄給堂委審閱', guard);
   // 第二十六輪批次階段 A2-2：冇公開連結就唔好寄。見 assertPublicLinkReady_()。
   assertPublicLinkReady_(quarterId);
-  const result = executeStep2_(quarterId, sendOptions);
+  const result = executeStep2_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf
@@ -370,8 +431,10 @@ function apiStep4Confirm(quarterId, sendOptions) {
   // ⚠️ 次序：先查「已經發出過未」再查「有冇未儲存改動」——
   // 已經發出過係更根本嘅阻擋理由，先講嗰個對幹事更有用。
   assertNeverOfficiallySent_(quarterId);
-  assertNoUnsavedChanges_(quarterId, '正式發出給全體');
-  const result = executeStep4Send_(quarterId, sendOptions);
+  const guard = assertNoUnsavedChanges_(quarterId, '正式發出給全體',
+    resolveAllowUnsavedFlag_(sendOptions));
+  logSendWithUnsavedRelease_(quarterId, '正式發出給全體', guard);
+  const result = executeStep4Send_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, unchanged: result.unchanged,
@@ -574,7 +637,9 @@ function apiStep5SendConfirm(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 4 一樣唔可以喺有未儲存改動嘅
   // 情況下寄——否則義工會收到一封「最新安排」，但實際上仲有嘢未儲存。
-  assertNoUnsavedChanges_(quarterId, '改動後重發');
+  const guard = assertNoUnsavedChanges_(quarterId, '改動後重發',
+    resolveAllowUnsavedFlag_(sendOptions));
+  logSendWithUnsavedRelease_(quarterId, '改動後重發', guard);
   const changed = planStep5ChangedList_(quarterId);
   const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
   if (!resolveHardViolationRelease_(violations, releaseText)) {
@@ -584,7 +649,8 @@ function apiStep5SendConfirm(quarterId, releaseText, sendOptions) {
   if (hardForSend.length > 0) logHardViolationRelease_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', hardForSend);
   if (changed.changedList.length === 0) return { blocked: false, noChanges: true };
 
-  const sendResult = executeStep5Send_(quarterId, changed.versionNo, changed.changedList, sendOptions);
+  const sendResult = executeStep5Send_(quarterId, changed.versionNo, changed.changedList,
+    withUnsavedReleaseNote_(sendOptions, guard));
   return {
     blocked: false,
     isDryRun: sendResult.isDryRun, sent: sendResult.sent, dryRun: sendResult.dryRun,

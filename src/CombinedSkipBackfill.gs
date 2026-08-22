@@ -71,12 +71,26 @@ const COMBINED_BACKFILL_BLOCKED_DEFAULT = '2026T4';
  * @returns {string} 逗號分隔嘅 PostID 清單，可以係空字串
  */
 function readCombinedDefaultSkipPostIds_() {
-  try {
-    return String(getConfig(CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS,
-      COMBINED_DEFAULT_SKIP_POST_IDS_DEFAULT) || '').trim();
-  } catch (err) {
-    return COMBINED_DEFAULT_SKIP_POST_IDS_DEFAULT;
-  }
+  return readCombinedDefaultSkipPostIdsDetail_().value;
+}
+
+/**
+ * 同上，但**連「呢個值由邊度嚟」一齊回**。
+ *
+ * 第四十八輪批次 B 組：確認畫面本來寫住「來自 Config「X」」，
+ * 而嗰個 Key **根本未加入 Config 工作表**——幹事去搵，搵唔到，
+ * 於是佢會以為自己睇漏咗眼。
+ *
+ * ⚠️ 值同來源由**同一支**函式出。分開兩支嘅話，
+ * 「畫面講嘅來源」同「實際採用嘅值」可以慢慢分岔，
+ * 而分岔咗之後個畫面睇落一樣正常。
+ *
+ * @returns {{value: string, source: string}}
+ */
+function readCombinedDefaultSkipPostIdsDetail_() {
+  const result = getConfigWithSourceSafe_(CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS,
+    COMBINED_DEFAULT_SKIP_POST_IDS_DEFAULT);
+  return { value: String(result.value || '').trim(), source: result.source };
 }
 
 /**
@@ -89,15 +103,23 @@ function readCombinedDefaultSkipPostIds_() {
  * @returns {string[]} 季度 ID 陣列
  */
 function readCombinedBackfillBlockedQuarters_() {
-  let raw = '';
-  try {
-    raw = String(getConfig(CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS,
-      COMBINED_BACKFILL_BLOCKED_DEFAULT) || '').trim();
-  } catch (err) {
-    raw = COMBINED_BACKFILL_BLOCKED_DEFAULT;
-  }
+  return readCombinedBackfillBlockedQuartersDetail_().value;
+}
+
+/**
+ * 同上，但連來源一齊回。見 `readCombinedDefaultSkipPostIdsDetail_()`。
+ *
+ * ⚠️ `raw === ''` 嗰一句要留返——呢一格填成空白**唔會**變成
+ * 「乜都唔保護」，仍然退回內建預設。
+ *
+ * @returns {{value: string[], source: string}}
+ */
+function readCombinedBackfillBlockedQuartersDetail_() {
+  const result = getConfigWithSourceSafe_(CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS,
+    COMBINED_BACKFILL_BLOCKED_DEFAULT);
+  let raw = String(result.value || '').trim();
   if (raw === '') raw = COMBINED_BACKFILL_BLOCKED_DEFAULT;
-  return splitList_(raw);
+  return { value: splitList_(raw), source: result.source };
 }
 
 /**
@@ -160,19 +182,38 @@ function classifyCombinedSkipRows_(rows, defaultSkip, blockedQuarters) {
       newValue: value
     };
 
-    // ⚠️ 次序有意思：**先分類，後決定**。
+    // ⚠️⚠️ 次序有意思，而**受保護季度一定要排第一**。
     //
-    // 「唔係合堂」擺喺最前——一行浸禮主日就算喺受保護季度、
-    // 就算 Active=FALSE，佢首先係「呢支工具由頭到尾唔關佢事」。
-    // 分錯類嘅話，報告會話「呢一行因為季度受保護所以冇補」，
-    // 而幹事解除保護之後會發現佢仍然冇補，然後以為系統壞咗。
-    if (!isCombinedSpecialSunday_(row)) { out.notCombined.push(item); return; }
-    if (!isTrueValue_(row[C.ACTIVE])) { out.inactive.push(item); return; }
-    if (item.oldValue !== '') { out.alreadyFilled.push(item); return; }
+    // ── 第四十七輪批次寫錯咗，第四十八輪批次改返 ──────────────
+    //
+    // 第四十七輪嗰陣我把「唔係合堂」擺喺最前，理由係
+    // 「一行浸禮主日首先係呢支工具唔關佢事」。個理由本身講得通，
+    // 但佢造成咗一個**由頭到尾冇響過嘅警報**：
+    //
+    //   真實資料入面 `SP-2026-02` 就係 `2026T4` 嘅合堂列
+    //   （`SkipPostIDs=WORSHIP,PIANO`）。佢應該被「受保護季度」擋住，
+    //   但佢先被「已經填了值」接走咗——所以確認畫面上面
+    //   「受保護季度（2026T4）：0 行」報咗兩輪。
+    //
+    //   0 行睇上去同「冇嘢需要保護」一模一樣。
+    //   即係：**2026T4 嘅保護由寫出嚟到嗰陣，一次都冇真正行過**，
+    //   而冇任何一樣嘢會提你。
+    //
+    // ⚠️ 一道從來冇響過嘅警報，同冇裝過係一樣嘅。
+    //
+    // 所以：一行只要落喺受保護季度，**唔理佢有冇值、`Active` 係乜、
+    // `Type` 係乜**，一律先歸「受保護季度」。噉個數字先至講得出真話。
+    //
+    // 代價係第四十七輪嗰個理由仍然成立——`2026T4` 嗰行浸禮主日
+    // 而家會顯示喺「受保護季度」而唔係「不是合堂」。
+    // 兩害相權：一個分類上嘅小失真，好過一個永遠報 0 嘅保護計數。
     if (blocked.indexOf(item.quarterId.toUpperCase()) !== -1) {
       out.blocked.push(item);
       return;
     }
+    if (!isCombinedSpecialSunday_(row)) { out.notCombined.push(item); return; }
+    if (!isTrueValue_(row[C.ACTIVE])) { out.inactive.push(item); return; }
+    if (item.oldValue !== '') { out.alreadyFilled.push(item); return; }
     // ⚠️ Config 揀成空白 ⇒ **一行都唔補**。
     // 當成「冇設定所以照用內建」會推翻幹事特登清空嗰個決定。
     if (value === '') return;
@@ -189,12 +230,14 @@ function classifyCombinedSkipRows_(rows, defaultSkip, blockedQuarters) {
  *   同 `blockedQuarters` 兩個欄位（畀確認畫面照住講）
  */
 function planCombinedSkipBackfill_() {
-  const defaultSkip = readCombinedDefaultSkipPostIds_();
-  const blockedQuarters = readCombinedBackfillBlockedQuarters_();
+  const skip = readCombinedDefaultSkipPostIdsDetail_();
+  const blocked = readCombinedBackfillBlockedQuartersDetail_();
   const rows = readSheet(SHEETS.SPECIAL_SUNDAYS);
-  const plan = classifyCombinedSkipRows_(rows, defaultSkip, blockedQuarters);
-  plan.defaultSkip = defaultSkip;
-  plan.blockedQuarters = blockedQuarters;
+  const plan = classifyCombinedSkipRows_(rows, skip.value, blocked.value);
+  plan.defaultSkip = skip.value;
+  plan.defaultSkipSource = skip.source;
+  plan.blockedQuarters = blocked.value;
+  plan.blockedQuartersSource = blocked.source;
   return plan;
 }
 
@@ -269,7 +312,14 @@ function runCombinedSkipBackfill_() {
   const lines = ['合堂主日那一天，主席／講員／傳譯／領詩／司琴由另一堂帶領，'];
   lines.push('所以這五個崗位不應該由本堂排。');
   lines.push('');
-  lines.push('要填進去的值（來自 Config「' + CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS + '」）：');
+  // ⚠️ 第四十八輪批次 B 組：講「來自 Config「X」」之前，
+  // 要先知道嗰個 Key 到底喺唔喺張表度。
+  //
+  // 修正前：「要填進去的值（來自 Config「COMBINED_DEFAULT_SKIP_POST_IDS」）：」
+  // ——而同一日嘅全面體檢報告寫住嗰個 Key 未加入 Config 工作表。
+  // 兩句都啱，合埋就係呃人。
+  lines.push('要填進去的值（' + describeConfigValueOrigin_(
+    CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS, plan.defaultSkipSource) + '）：');
   lines.push('　' + (plan.defaultSkip || '（空白）'));
   lines.push('');
 
@@ -310,6 +360,8 @@ function runCombinedSkipBackfill_() {
   lines.push('　・不是合堂：' + plan.notCombined.length + ' 行');
   lines.push('　・受保護季度（' + plan.blockedQuarters.join('、') + '）：'
     + plan.blocked.length + ' 行');
+  lines.push('　　　' + describeConfigValueOrigin_(
+    CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS, plan.blockedQuartersSource));
   lines.push('');
   lines.push('只會改「' + COLUMNS.SPECIAL_SUNDAYS.SKIP_POST_IDS + '」這一欄，其他一格都不動。');
   lines.push('');

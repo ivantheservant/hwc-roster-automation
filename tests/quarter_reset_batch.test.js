@@ -95,10 +95,15 @@ console.log('\n=== E4【核心】受保護季度：預設 2026T4，空白唔會�
     gas.QUARTER_RESET_BLOCKED_DEFAULT, '2026T4');
 
   const src = read('src/QuarterReset.gs');
+  // ⚠️ 第四十八輪批次：**剝走註釋先數。**
+  // 檔案入面有一句註釋寫住「`raw === ''` 嗰一句要留返」——
+  // 淨係搵字串嘅話，就算真正嗰一行守衛被拆走，呢一條測試都仍然綠。
+  // verify-red 嗰陣就係噉捉到。
+  const resetCode = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★★ Config 填成空白 ⇒ **仍然退回內建預設**'
     + '——一格打空咗就冧晒保護，係最易誤觸嗰種。'
     + '想解除某一季嘅保護，只能把它由嗰一格移走',
-    /raw === ''/.test(src), '');
+    /raw === ''/.test(resetCode), '')
 
   const seed = read('src/ConfigSeed.gs');
   check('★★★★★ `ConfigSeed.gs` 有落種，而且係 LIST 型',
@@ -258,8 +263,12 @@ console.log('\n=== E1/E2 接線【核心】選單入口真係行批次嗰條路 
   check('★★★★★★ 入口真係叫 `splitQuarterResetTargets_()`'
     + '——冇呢一步，2026T4 就照清',
     /splitQuarterResetTargets_\(/.test(entry.slice(0, 3000)), '');
-  check('★★★★★ 入口真係叫 `readQuarterResetBlockedQuarters_()`',
-    /readQuarterResetBlockedQuarters_\(/.test(entry.slice(0, 3000)), '');
+  // 第四十八輪批次 B 組之後，入口改叫 `…Detail_()`——
+  // 佢除咗個清單，仲會回「呢個值由邊度嚟」，畀畫面照住講。
+  // 兩支都認，因為呢一條守嘅係「入口有讀受保護清單」，
+  // 唔係「佢叫邊一支」。
+  check('★★★★★ 入口真係讀受保護季度清單',
+    /readQuarterResetBlockedQuarters(Detail)?_\(/.test(entry.slice(0, 3000)), '');
   check('★★★★★★ 入口真係叫 `executeQuarterResetBatch_()`'
     + '——仲直接叫 `executeQuarterReset_()` 嘅話，'
     + '逐季 try/catch 同逐季 AuditLog 全部行唔到',

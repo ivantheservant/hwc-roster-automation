@@ -369,6 +369,74 @@ function buildSendHistoryView_(quarterId) {
   };
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十八輪批次 A2 組：〔寄出但不儲存〕嗰個確認畫面要嘅料
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 撳咗〔寄出但不儲存〕**唔會直接寄**。中間要有一個把後果講到白嘅畫面：
+ *
+ *     會寄出的：第 5 版（2026-08-22 儲存）
+ *     不會寄出的：你在表上改了、還未儲存的這 2 格
+ *       2028-04-02　主席　假甲乙 → 假丙丁
+ *       2028-04-02　報告　假戊己 → 假庚辛
+ *
+ * ⚠️ 嗰幾格要**逐格列出嚟**，而且要同「檢查我的改動」嗰個畫面
+ * 用**同一支**函式產生（`buildSavedChangeRows_()`）。
+ * 三個地方講同一件事而各自格式化，一定會分岔——而分岔咗之後，
+ * 兩個畫面對住同一格會顯示唔同嘅嘢，冇人分得出邊個啱。
+ */
+
+/** 確認畫面最多列幾多格；多過呢個數就摺埋，另外畀一粒〔全部列出〕。 */
+const UNSAVED_SEND_PREVIEW_LIMIT = 12;
+
+/**
+ * 砌〔寄出但不儲存〕確認畫面要嘅料。**純讀取。**
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {Object} state `buildDashboardState_()` 的結果
+ * @returns {Object} `{versionNo, savedAt, total, shown, moreCount, all}`
+ */
+function buildUnsavedSendPreview_(quarterId, state) {
+  const empty = {
+    versionNo: -1, savedAt: '', total: 0, shown: [], moreCount: 0, all: []
+  };
+  if (!state || !state.canSendUnsaved) return empty;
+
+  const versionNo = (state.latestVersion || {}).versionNo;
+  if (!(versionNo >= 0)) return empty;
+
+  let rows = [];
+  try {
+    const context = buildFineTuneContext_(quarterId, versionNo);
+    const resolved = resolveAuthoritativeState_(
+      context, STATE_SOURCE.GRID_OVERLAY, 'buildUnsavedSendPreview_');
+    // `context.postNames` 唔存在，要由 `context.posts` 譯——
+    // 同 `buildSaveAndConfirmPlan_()` 一樣嘅做法。
+    const postNameById = {};
+    (context.posts || []).forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
+    // ⚠️ **同一支**函式，同「檢查我的改動」嗰個畫面一樣。
+    rows = buildSavedChangeRows_(resolved.changes, postNameById, 'MANUAL');
+  } catch (err) {
+    // 讀唔到 ⇒ 唔可以扮成「零格」。零格會令個畫面寫住
+    //「不會寄出的：0 格」，而幹事會以為佢改嗰幾格其實已經入咗。
+    log_('WARN', 'buildUnsavedSendPreview_ 讀不到 grid 狀態：' + err.message);
+    return Object.assign({}, empty, { versionNo: versionNo, error: err.message });
+  }
+
+  const cap = UNSAVED_SEND_PREVIEW_LIMIT;
+  return {
+    versionNo: versionNo,
+    savedAt: (state.latestVersion || {}).createdAt || '',
+    total: rows.length,
+    shown: rows.slice(0, cap),
+    moreCount: Math.max(0, rows.length - cap),
+    // 整份都帶埋，令〔全部列出〕唔使再打一次伺服器——
+    // 再打一次嘅話，兩次之間狀態有機會唔同，
+    // 而幹事會見到一份同上面個數字對唔上嘅清單。
+    all: rows
+  };
+}
+
 /**
  * 供前端呼叫：「寄出」彈窗要的一切。**純讀取，一格都不會寫。**
  *
@@ -418,6 +486,15 @@ function apiGetSendPlanSummary(quarterId) {
       // 前端要靠佢排喺 `kind === NONE` 之前——否則第四十輪寫嘅
       //「未儲存」嗰段永遠行唔到（有未儲存改動 ⇒ `kind` 必定係 `NONE`）。
       blockedByUnsavedOnly: !!state.blockedByUnsavedOnly,
+      // 第四十八輪批次 A1／A3 組：〔寄出但不儲存〕嗰粒掣畫唔畫、
+      // 唔畫嗰陣點解釋。
+      // ⚠️ 由後端出，同 `assertNoUnsavedChanges_()` 讀**同一支**
+      // `canSendWithUnsavedChanges_()`——前端自己再判斷一次嘅話，
+      // 就會出現「畫咗粒掣、撳落去拋錯」。
+      canSendUnsaved: !!state.canSendUnsaved,
+      canSendUnsavedReason: String(state.canSendUnsavedReason || ''),
+      // A2 嗰個確認畫面要嘅嘢：寄邊一版、幾時儲存嘅、邊幾格唔會寄出。
+      unsavedSendPreview: buildUnsavedSendPreview_(quarterId, state),
       // 第四十一輪批次 E 組：每個附件選項下面嗰行小字。
       // ⚠️ 由後端出，同 attachTypeWantsPersonalLink_() 讀同一個判斷——
       // 前端自己寫一套嘅話，畫面會講一件事而系統做另一件事。

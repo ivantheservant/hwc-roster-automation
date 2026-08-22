@@ -184,7 +184,16 @@ function resolveSendOptions_(stage, sendOptions, templates) {
       scope: defaultScope,
       attachType: ATTACH_TYPE[templateAttach] ? templateAttach : ATTACH_TYPE.NONE,
       includeIcs: icsDefault
-    }
+    },
+    // ⚠️ 第四十八輪批次 A4 組：「未儲存改動下放行」要跟住呢一批入 SendLog。
+    //
+    // 日後查「佢點解收到舊版」，答案要喺 **SendLog 嗰一行**搵得到，
+    // 唔係要去翻 AuditLog 對時間——兩張表對時間嗰種查法，
+    // 喺一次寄咗幾十封嘅情況下實際上做唔到。
+    //
+    // 呢個值由 `WebAppFlow.gs` 嘅 `withUnsavedReleaseNote_()` 放入嚟，
+    // 而嗰度嘅來源係 `assertNoUnsavedChanges_()` 真正放行嗰一刻嘅狀態。
+    unsavedRelease: o.unsavedRelease || null
   };
 }
 
@@ -292,7 +301,12 @@ function describeSendDecision_(decision) {
     FULL_PDF: '整季 PDF'
   }[decision.attachType] || decision.attachType;
   const mark = function (on) { return on ? '（幹事改過）' : ''; };
-  return '收件範圍=' + scopeText + mark(decision.overridden.scope)
+  const base = '收件範圍=' + scopeText + mark(decision.overridden.scope)
     + '　附件=' + attachText + mark(decision.overridden.attachType)
     + '　日曆檔=' + (decision.includeIcs ? '有' : '沒有') + mark(decision.overridden.includeIcs);
+  // 第四十八輪批次 A4 組第 2 點。
+  const rel = decision.unsavedRelease;
+  if (!rel) return base;
+  return base + '　⚠️ 未儲存改動下放行：寄出第 ' + rel.versionNo + ' 版，'
+    + '當時表上有 ' + rel.gridChangeCount + ' 格未儲存';
 }

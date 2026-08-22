@@ -1478,6 +1478,181 @@ const MUTATIONS = [
       + '  plan.pdfFiles.forEach(function (f) {',
     tests: ['tests/quarter_reset_batch.test.js']
   },
+  {
+    id: 'unsaved-flag-default-on',
+    why: '把 `allowUnsaved` 改成「冇傳就當 true」'
+      + '——一個根本冇撳過嗰粒掣嘅寄出會靜靜跳過閘門，'
+      + '而嗰個正正就係呢道閘當初要防嗰件事',
+    file: 'src/WebAppGuards.gs',
+    find: '  return !!sendOptions && sendOptions.allowUnsaved === true;',
+    replace: '  return !sendOptions || sendOptions.allowUnsaved !== false;',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-flag-truthy',
+    why: '用 `if (flag)` 嗰種 truthy 判斷'
+      + '——字串 `\'false\'` 係 truthy，噉樣就會靜靜放行',
+    file: 'src/WebAppGuards.gs',
+    find: '  return !!sendOptions && sendOptions.allowUnsaved === true;',
+    replace: '  return !!(sendOptions && sendOptions.allowUnsaved);',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-allow-unresolved',
+    why: '連「有格嘅文字系統認唔出」都放行'
+      + '——嗰個唔係「改咗未儲存」，係「表上有系統讀唔明嘅字」。'
+      + '寄咗出去之後嗰幾格會變成乜，系統自己都講唔出',
+    file: 'src/WebAppGuards.gs',
+    find: '  if (s.unresolvedCount > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-allow-pending',
+    why: '連「有修改申報未處理」都放行——嗰啲仲未入到表度',
+    file: 'src/WebAppGuards.gs',
+    find: '  if (s.pendingRequestCount > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-allow-unreadable',
+    why: '讀唔到狀態（`-1`）都照放行'
+      + '——「查不到」唔等於「冇嘢」。呢個方向估錯咗，'
+      + '就係寄一份冇人知內容嘅嘢出去',
+    file: 'src/WebAppGuards.gs',
+    find: '  if (s.error || s.gridChangeCount < 0 || s.unresolvedCount < 0',
+    replace: '  if (false && (s.error || s.gridChangeCount < 0 || s.unresolvedCount < 0',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-ack-prechecked',
+    why: '把「我明白」嗰個框改成預設勾住'
+      + '——整個確認畫面唯一嘅作用就係逼佢睇一眼，'
+      + '預設勾住等於冇咗嗰一眼',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '    ackBox.checked = false;',
+    replace: '    ackBox.checked = true;',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-no-confirm',
+    why: '撳〔寄出但不儲存〕直接去寄，唔出中間嗰個確認畫面'
+      + '——真正嘅風險係「幹事以為寄出去嘅係佢啱啱改嗰一版」，'
+      + '而嗰個畫面就係唯一講清楚呢件事嘅地方',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "        ? [button('寄出但不儲存', () => renderSendWithoutSavingConfirm(s), 'secondary')]",
+    replace: "        ? [button('寄出但不儲存', () => renderSendMain(s, { allowUnsaved: true }), 'secondary')]",
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-no-banner',
+    why: '拆走寄完之後主畫面嗰一句'
+      + '——佢撳完寄出、閂咗個窗，五分鐘之後就會唔記得自己揀咗乜，'
+      + '而嗰陣佢會以為收信嘅人睇到嘅係佢表上而家嗰個內容',
+    file: 'src/WebAppDashboard.gs',
+    find: "  return '⚠️ 上一次寄出的是第 ' + release.versionNo + ' 版，'",
+    replace: "  if (true) return '';" + '\n'
+      + "  return '⚠️ 上一次寄出的是第 ' + release.versionNo + ' 版，'",
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-banner-sticks',
+    why: '儲存咗之後嗰一句照樣顯示'
+      + '——一句永遠關唔甩嘅警告，好快就冇人再讀',
+    file: 'src/WebAppDashboard.gs',
+    find: "  if (!(grid > 0)) return '';",
+    replace: '',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-no-sendlog-note',
+    why: '唔把放行紀錄寫入 SendLog'
+      + '——日後查「佢點解收到舊版」就要去翻 AuditLog 對時間，'
+      + '而一次寄咗幾十封嘅時候實際上對唔到',
+    file: 'src/SendOptions.gs',
+    find: '  if (!rel) return base;',
+    replace: '  if (true) return base;',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-mutates-options',
+    why: '直接改呼叫方傳嚟嗰個 `sendOptions`'
+      + '——同一個物件之後再用嗰陣會帶住一個唔關佢事嘅標記',
+    file: 'src/WebAppFlow.gs',
+    find: '  return Object.assign({}, sendOptions || {}, {',
+    replace: '  return Object.assign(sendOptions || {}, {',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'unsaved-cells-not-shared',
+    why: '確認畫面自己再格式化一次嗰幾格'
+      + '——三個地方講同一件事而各自格式化，一定會分岔，'
+      + '而分岔咗之後兩個畫面對住同一格會顯示唔同嘅嘢',
+    file: 'src/WebAppSendPlan.gs',
+    find: "    rows = buildSavedChangeRows_(resolved.changes, postNameById, 'MANUAL');",
+    replace: '    rows = resolved.changes.map(function (c) {' + '\n'
+      + '      return { serviceDate: c.serviceDate, postId: c.postId,' + '\n'
+      + "        postNameTC: c.postId, fromName: '', toName: '' };" + '\n'
+      + '    });',
+    tests: ['tests/send_without_saving.test.js']
+  },
+  {
+    id: 'cfg-missing-lies',
+    why: '把 `MISSING` 講返做「來自 Config」'
+      + '——畫面叫幹事去搵一格根本唔存在嘅嘢，'
+      + '而佢會以為自己睇漏咗眼',
+    file: 'src/Config.gs',
+    find: "  // MISSING：⚠️ 這一句就是整組要修的那一句。" + '\n'
+      + "  return '程式內建預設值——「' + key + '」這個 Key 還沒有加進 Config 工作表，'",
+    replace: "  return '來自 Config「' + key + '」';" + '\n'
+      + "  // eslint-disable-next-line no-unreachable" + '\n'
+      + "  return '程式內建預設值——「' + key + '」這個 Key 還沒有加進 Config 工作表，'",
+    tests: ['tests/config_value_source.test.js']
+  },
+  {
+    id: 'cfg-missing-eq-def',
+    why: '把「張表根本冇嗰一行」同「有行但係空白」當成同一件事'
+      + '——前者叫佢跑補建，後者叫佢喺嗰一格填。'
+      + '講錯咗，佢就會做一件冇用嘅事',
+    file: 'src/Config.gs',
+    find: '  const present = Object.prototype.hasOwnProperty.call(config, key);',
+    replace: '  const present = true;',
+    tests: ['tests/config_value_source.test.js']
+  },
+  {
+    id: 'config-error-eq-missing',
+    why: '把型別壞格扮成 `MISSING`'
+      + '——叫幹事「去跑補建 Config 參數」對住一個型別壞格完全冇用，'
+      + '嗰一行本來就喺度，跑幾多次都一樣',
+    file: 'src/Config.gs',
+    find: '    return { value: fallback, source: CONFIG_VALUE_SOURCES.ERROR };',
+    replace: '    return { value: fallback, source: CONFIG_VALUE_SOURCES.MISSING };',
+    tests: ['tests/config_value_source.test.js']
+  },
+  {
+    id: 'blocked-not-first',
+    why: '把「受保護季度」嗰個判斷排返去最後'
+      + '——`SP-2026-02` 會先被「已經填了值」接走，'
+      + '而確認畫面就會報「受保護季度（2026T4）：0 行」。'
+      + '一道從來冇響過嘅警報，同冇裝過係一樣嘅',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: '    if (blocked.indexOf(item.quarterId.toUpperCase()) !== -1) {' + '\n'
+      + '      out.blocked.push(item);' + '\n'
+      + '      return;' + '\n'
+      + '    }' + '\n'
+      + '    if (!isCombinedSpecialSunday_(row)) { out.notCombined.push(item); return; }' + '\n'
+      + '    if (!isTrueValue_(row[C.ACTIVE])) { out.inactive.push(item); return; }' + '\n'
+      + "    if (item.oldValue !== '') { out.alreadyFilled.push(item); return; }",
+    replace: '    if (!isCombinedSpecialSunday_(row)) { out.notCombined.push(item); return; }' + '\n'
+      + '    if (!isTrueValue_(row[C.ACTIVE])) { out.inactive.push(item); return; }' + '\n'
+      + "    if (item.oldValue !== '') { out.alreadyFilled.push(item); return; }" + '\n'
+      + '    if (blocked.indexOf(item.quarterId.toUpperCase()) !== -1) {' + '\n'
+      + '      out.blocked.push(item);' + '\n'
+      + '      return;' + '\n'
+      + '    }',
+    tests: ['tests/combined_skip_posts.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

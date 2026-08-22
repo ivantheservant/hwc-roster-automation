@@ -466,6 +466,23 @@
       acts: acts
     });
 
+    // ── 第四十八輪批次 A4 組第 3 點 ──────────────────────────────
+    //
+    // ⚠️ 呢一句係整組最重要嗰一句。
+    //
+    // AuditLog 同 SendLog 係畀**日後查**嘅；呢一句係畀**而家**嘅佢睇。
+    // 佢撳完〔寄出但不儲存〕、閂咗個窗，五分鐘之後就會唔記得自己揀咗乜
+    // ——而嗰陣佢會以為收信嘅人睇到嘅係佢表上而家嗰個內容。
+    //
+    // 儲存咗之後自動消失（後端 `buildSentWithUnsavedWarning_()` 見到
+    // 冇未儲存改動就回空字串）——一句永遠關唔甩嘅警告，好快就冇人再讀。
+    if (d.sentWithUnsavedWarning) {
+      card.querySelector('.step-body').appendChild(
+        make('div', { className: 'warnbox' }, [
+          make('div', { text: d.sentWithUnsavedWarning, className: 'lines' })
+        ]));
+    }
+
     // ⚠️ 有建議表而畫面唔講，幹事會喺正式表上改，然後發現改動唔見咗
     //（因為下一次調整會以建議表做起點）。所以一定要講，而且要有出口。
     if (suggestion.hasSuggestion) {

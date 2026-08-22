@@ -2180,14 +2180,19 @@ function runResetQuarterTestData_() {
 
   // ⚠️ 受保護季度喺**掃描之前**就擋走，唔係喺確認畫面上面畫個叉。
   // 一個入唔到清理名單嘅季度，唔應該有機會出現喺「將會清理」下面。
-  const blockedQuarters = readQuarterResetBlockedQuarters_();
+  const blockedDetail = readQuarterResetBlockedQuartersDetail_();
+  const blockedQuarters = blockedDetail.value;
+  const blockedSource = blockedDetail.source;
   const split = splitQuarterResetTargets_(parsed.quarterIds, blockedQuarters);
 
   if (split.blocked.length > 0) {
     const msg = ['以下季度受保護，這一支不會碰：'];
     split.blocked.forEach(function (q) { msg.push('　・' + q); });
     msg.push('');
-    msg.push('（設定在 Config「' + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + '」。');
+    // ⚠️ 第四十八輪批次 B 組：講「設定在 Config「X」」之前，
+    // 要先知道嗰個 Key 到底喺唔喺張表度。
+    msg.push('（' + describeConfigValueOrigin_(
+      CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS, blockedSource) + '。');
     msg.push('　⚠️ 把那一格清空並不會解除保護，系統會退回內建的預設清單。）');
     if (split.allowed.length === 0) {
       msg.push('');

@@ -1408,6 +1408,24 @@ function getRequiredConfigKeys() {
   ];
 }
 
+/**
+ * 第四十八輪批次 B 組：一個 Config 值「由邊度嚟」。
+ *
+ * ⚠️ `DEFAULT` 同 `MISSING` 對 `getConfig()` 嚟講一模一樣，
+ * 而對幹事嚟講差好遠：
+ *   `DEFAULT` ＝ 張表有嗰一行、格係空白　⇒ 佢搵得到嗰一格去填
+ *   `MISSING` ＝ 張表**根本冇嗰一行**　　⇒ 佢點搵都搵唔到
+ */
+const CONFIG_VALUE_SOURCES = {
+  SHEET: 'SHEET',
+  DEFAULT: 'DEFAULT',
+  MISSING: 'MISSING',
+  // ⚠️ 第四個：嗰一格有，但係型別認唔出。
+  // 扮成 `MISSING` 就會叫幹事去跑「補建 Config 參數」——
+  // 而嗰一行本來就喺度，跑幾多次都唔會有分別。
+  ERROR: 'ERROR'
+};
+
 /** Config 工作表 Type 欄可能出現的值。 */
 const CONFIG_TYPES = {
   INT: 'INT',

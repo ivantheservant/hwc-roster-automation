@@ -272,3 +272,114 @@ function buildConfigTypeErrorMessage_(key, type, str, why) {
   }
   return lines.join('\n');
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十八輪批次 B 組：**畫面講「來自 Config」，而張表根本冇嗰一格。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 現場（同一日、同一張試算表）：
+ *
+ *   「維護 ▸ 補填合堂跳過崗位」寫住
+ *       要填進去的值（來自 Config「COMBINED_DEFAULT_SKIP_POST_IDS」）：
+ *         CHAIR,PREACHER,TRANSLATOR,WORSHIP,PIANO
+ *
+ *   而「🩺 全面體檢」寫住
+ *       CONFIG_KEYS 已登記但工作表沒有這個 Key：
+ *       COMBINED_BACKFILL_BLOCKED_QUARTERS、COMBINED_DEFAULT_SKIP_POST_IDS、
+ *       QUARTER_RESET_BLOCKED_QUARTERS
+ *
+ * 兩句都啱，合埋就係呃人：畫面叫幹事「呢個值嚟自 Config」，
+ * 佢去 Config 工作表**搵唔到嗰一格**，於是佢會以為自己睇漏咗眼。
+ *
+ * ⚠️ `getConfig()` 分唔到三件事：
+ *
+ *   一、張表有嗰一行、有值　　　⇒ `SHEET`
+ *   二、張表有嗰一行、格係空白　⇒ `DEFAULT`（退回程式內建值）
+ *   三、張表**根本冇嗰一行**　　⇒ `MISSING`（退回程式內建值）
+ *
+ * 二同三喺 `getConfig()` 眼中一模一樣，而對幹事嚟講差好遠：
+ * 「格係空白」佢搵得到嗰一格去填；「冇嗰一行」佢點搵都搵唔到。
+ *
+ * ⚠️ **唔改 `getConfig()` 本身嘅簽名**——全專案叫佢嘅地方太多，
+ * 改簽名嘅風險遠大過另開一支。
+ */
+
+/**
+ * 同 `getConfig()` 取同一個值，但**連「呢個值由邊度嚟」一齊回**。
+ *
+ * @param {string} key Config 的 Key
+ * @param {*} fallback Config 沒有設定時要用的預設值
+ * @returns {{value: *, source: string, fallback: *}}
+ *   `source` 係 `'SHEET'`／`'DEFAULT'`／`'MISSING'`
+ */
+function getConfigWithSource(key, fallback) {
+  const config = readConfig();
+
+  // ⚠️ 型別壞咗嘅 key 照樣拋——同 `getConfig()` 一致。
+  // 呢度靜靜回一個「用緊預設值」會令一個壞格睇落好正常。
+  const raw = config[key];
+  if (isConfigTypeErrorMarker_(raw)) {
+    throw new Error(raw.message);
+  }
+
+  // ⚠️ 用 `hasOwnProperty` 分「冇嗰一行」同「有行但係空白」。
+  // 淨係睇 `=== undefined` 嘅話兩者一樣，而兩者要對幹事講嘅嘢唔同。
+  const present = Object.prototype.hasOwnProperty.call(config, key);
+  if (!present) {
+    return { value: fallback, source: CONFIG_VALUE_SOURCES.MISSING, fallback: fallback };
+  }
+  if (raw === undefined || raw === null || raw === '') {
+    return { value: fallback, source: CONFIG_VALUE_SOURCES.DEFAULT, fallback: fallback };
+  }
+  return { value: raw, source: CONFIG_VALUE_SOURCES.SHEET, fallback: fallback };
+}
+
+/**
+ * 把「呢個值由邊度嚟」寫成一句畀幹事睇嘅說明。
+ *
+ * ⚠️ 寫成一支共用嘅，係因為呢一句要喺幾個工具度出現。
+ * 三個地方各自寫一次，一定會分岔——而分岔咗之後，
+ * 其中一個講返「來自 Config」而另外兩個講咗真相，
+ * 冇人分得出邊個啱。
+ *
+ * @param {string} key Config 的 Key
+ * @param {string} source `getConfigWithSource()` 回的 `source`
+ * @returns {string} 一句說明；`SHEET` 的時候是簡短那一句
+ */
+function describeConfigValueOrigin_(key, source) {
+  if (source === CONFIG_VALUE_SOURCES.SHEET) {
+    return '來自 Config「' + key + '」';
+  }
+  if (source === CONFIG_VALUE_SOURCES.DEFAULT) {
+    return '程式內建預設值——Config「' + key + '」那一行有，但那一格是空白的。'
+      + '想改這個值，在那一格填上去';
+  }
+  if (source === CONFIG_VALUE_SOURCES.ERROR) {
+    return '程式內建預設值——Config「' + key + '」那一格的型別認不出來，'
+      + '所以系統沒有採用它（詳情見「維護 ▸ 🩺 全面體檢 ▸ Config 值型別檢查」）';
+  }
+  // MISSING：⚠️ 這一句就是整組要修的那一句。
+  return '程式內建預設值——「' + key + '」這個 Key 還沒有加進 Config 工作表，'
+    + '所以你在那裡找不到它。想改這個值，先跑「維護 ▸ 補建 Config 參數」';
+}
+
+/**
+ * 取一個值，連來源一齊回，而且**唔會拋錯**。
+ *
+ * ⚠️ 型別壞格喺呢度唔可以扮成 `MISSING`——「張表冇嗰一行」同
+ * 「嗰一格填錯咗型別」係兩件事，而叫幹事「去跑補建 Config 參數」
+ * 對住一個型別壞格係完全冇用嘅指示。呢個就係本輪要修嗰種錯
+ * （畫面講一件事、而實情係另一件事）嘅另一個樣。
+ *
+ * @param {string} key Config 的 Key
+ * @param {*} fallback Config 沒有設定時要用的預設值
+ * @returns {{value: *, source: string}} `source` 可能是 `ERROR`
+ */
+function getConfigWithSourceSafe_(key, fallback) {
+  try {
+    const result = getConfigWithSource(key, fallback);
+    return { value: result.value, source: result.source };
+  } catch (err) {
+    return { value: fallback, source: CONFIG_VALUE_SOURCES.ERROR };
+  }
+}

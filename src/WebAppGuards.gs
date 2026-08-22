@@ -36,6 +36,91 @@ function buildThreePartMessage_(whatHappened, currentState, whatYouCanDo) {
     + (whatYouCanDo || []).map(function (s) { return '　・' + s; }).join('\n');
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十八輪批次 A 組：**〔寄出但不儲存〕——一道特登設落嘅閘開一個缺口。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * ⚠️ 呢個缺口唔係「幹事想繞過安全閘」。
+ *
+ *   ・公開職事表嗰條永久連結**本來就**指向最近一次儲存嗰一版。
+ *     寄一條連結出去，收信嘅人睇到嘅一直都係嗰一版——寄同唔寄冇分別。
+ *   ・幹事可能正喺表上試改幾格、未決定要唔要，而審閱信今日一定要出。
+ *     逼佢先儲存，等於逼佢把未決定嘅嘢變成正式一版。
+ *   ・表上嗰幾格未儲存嘅改動，亦都可能純粹係撞到鍵盤撞出嚟。
+ *
+ * 所以真正嘅風險**唔係**寄出舊嗰一版，
+ * 而係**幹事以為寄出去嘅係佢啱啱改嗰一版**。
+ * 整個缺口要防嘅就只有呢一件事——所以佢窄，而且留痕。
+ */
+
+/**
+ * 呢一種「未儲存」可唔可以放行？**純函式。**
+ *
+ * ⚠️ 缺口只開得咁窄：
+ *
+ *   ・`gridChangeCount > 0` ＋ 其餘全部 0 ⇒ **可以**
+ *   ・`unresolvedCount > 0` ⇒ **唔可以**。嗰個唔係「幹事改咗未儲存」，
+ *     係「表上有系統讀唔明嘅字」——寄咗出去之後嗰幾格會變成乜，
+ *     系統自己都講唔出。
+ *   ・`pendingRequestCount > 0` ⇒ **唔可以**。嗰啲仲未入到表度。
+ *   ・讀唔到（`-1`）⇒ **唔可以**。「查不到」唔等於「冇嘢」，
+ *     而呢個方向估錯咗，就係寄一份冇人知內容嘅嘢出去。
+ *
+ * @param {Object} state `readDashboardUnsavedState_()` 的結果
+ * @returns {{allowed: boolean, reason: string}} 不放行時 `reason` 講得出原因
+ */
+function canSendWithUnsavedChanges_(state) {
+  const s = state || {};
+  if (s.error || s.gridChangeCount < 0 || s.unresolvedCount < 0
+      || s.pendingRequestCount < 0) {
+    return {
+      allowed: false,
+      reason: '系統查不到目前有沒有未儲存的改動（' + (s.error || '原因不明') + '）。'
+        + '「查不到」不等於「沒有」，所以這一次不能用「寄出但不儲存」。'
+    };
+  }
+  if (s.unresolvedCount > 0) {
+    return {
+      allowed: false,
+      reason: '表上有 ' + s.unresolvedCount + ' 格的文字系統認不出來。'
+        + '那不是「你改了還沒儲存」，那是系統讀不懂那幾格——'
+        + '寄出去之後那幾格會變成什麼，系統自己都講不出，'
+        + '所以這一次不能用「寄出但不儲存」。先去「儲存並確認」把那幾格處理好。'
+    };
+  }
+  if (s.pendingRequestCount > 0) {
+    return {
+      allowed: false,
+      reason: '有 ' + s.pendingRequestCount + ' 筆修改申報還沒有處理。'
+        + '那些東西還沒有進到表上，所以這一次不能用「寄出但不儲存」。'
+        + '先去「儲存並確認」處理它們。'
+    };
+  }
+  if (!(s.gridChangeCount > 0)) {
+    return { allowed: false, reason: '目前沒有未儲存的改動，不需要用這一個。' };
+  }
+  return { allowed: true, reason: '' };
+}
+
+/**
+ * 前端到底有冇**明確**要求「寄出但不儲存」？**純函式。**
+ *
+ * ⚠️⚠️ **只認布林 `true`。**
+ *
+ * 「冇傳就當 true」、`if (sendOptions.allowUnsaved)`、
+ * 或者任何預設放行嘅寫法，都會令一個**根本冇撳過嗰粒掣**嘅寄出
+ * 靜靜跳過閘門——而嗰個正正就係呢道閘當初要防嗰件事。
+ *
+ * 特別要當心 `'false'` 呢個字串：佢係 truthy，
+ * 用 `if (flag)` 寫法會靜靜放行。
+ *
+ * @param {Object} sendOptions 前端傳來的寄送選項
+ * @returns {boolean} 只有明確 `true` 才回 true
+ */
+function resolveAllowUnsavedFlag_(sendOptions) {
+  return !!sendOptions && sendOptions.allowUnsaved === true;
+}
+
 /**
  * 掣 2／3／4 嘅共用前置檢查（決定 D5）。三項任一成立即拋錯。
  *
@@ -44,15 +129,47 @@ function buildThreePartMessage_(whatHappened, currentState, whatYouCanDo) {
  * 2. grid 上有系統認不出嘅文字
  * 3. `Requests` 有待處理申報
  *
+ * 第四十八輪批次 A3 組多咗第三個參數。`allowUnsaved === true` 而且
+ * `canSendWithUnsavedChanges_()` 認可嗰陣唔拋錯，**但一定要回傳當時
+ * 嘅狀態**——呼叫方要用佢寫紀錄。唔回傳嘅話，「寄咗第幾版、當時有
+ * 幾多格未儲存」呢件事就冇人記得低。
+ *
  * @param {string} quarterId 季度 ID
  * @param {string} actionName 動作名（訊息用），例如「寄給堂委審閱」
- * @returns {void}
- * @throws {Error} 有未儲存改動時拋三段式訊息
+ * @param {boolean=} allowUnsaved 明確傳 `true` 才可能放行
+ * @returns {Object} `{versionNo, state, released}`；
+ *   `released=true` 代表係用咗缺口放行，唔係本來就冇未儲存改動
+ * @throws {Error} 有未儲存改動而又冇放行時拋三段式訊息
  */
-function assertNoUnsavedChanges_(quarterId, actionName) {
+function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
   const versionNo = findLatestVersionNo(quarterId);
   const state = readDashboardUnsavedState_(quarterId, versionNo);
-  if (!state.hasAny) return;
+  if (!state.hasAny) return { versionNo: versionNo, state: state, released: false };
+
+  // ── 第四十八輪批次 A3 組：缺口 ────────────────────────────────
+  //
+  // ⚠️ 兩個條件**都**要成立：
+  //   一、前端明確傳咗 `true`（`resolveAllowUnsavedFlag_()`）
+  //   二、呢一種未儲存本身放得行（`canSendWithUnsavedChanges_()`）
+  //
+  // 放行條件唔喺呢度再寫一次——同一件事兩個算法，一定會分岔，
+  // 而分岔咗之後前端會畫一粒撳咗拋錯嘅掣。
+  // ⚠️ `=== true`。呼叫方已經用 `resolveAllowUnsavedFlag_()` 把
+  // 前端傳嚟嗰個值收窄成布林；呢度再守一次，唔認 truthy。
+  if (allowUnsaved === true) {
+    const verdict = canSendWithUnsavedChanges_(state);
+    if (verdict.allowed) {
+      return { versionNo: versionNo, state: state, released: true };
+    }
+    // ⚠️ 唔可以靜靜當成「冇放行」跌落去下面嗰段通用訊息——
+    // 幹事撳咗〔寄出但不儲存〕，佢要知嘅係**點解呢一次唔得**。
+    throw new Error(buildThreePartMessage_(
+      verdict.reason,
+      '「' + actionName + '」沒有執行，沒有寄出任何電郵。'
+        + '你在表上的東西一格都沒有動。',
+      ['先撳「儲存並確認」，把表上的東西處理好，之後再撳「' + actionName + '」',
+        '如果那些東西是打錯的，把那幾格改回原樣']));
+  }
 
   const bits = [];
   if (state.gridChangeCount > 0) bits.push('你在表上改了 ' + state.gridChangeCount + ' 格');

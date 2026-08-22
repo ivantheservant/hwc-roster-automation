@@ -458,11 +458,15 @@ function runAnnualCombinedWizard_() {
 
   lines.push('將新增 ' + writable.length + ' 行到 ' + SHEETS.SPECIAL_SUNDAYS + '。');
   lines.push('');
-  const defaultSkip = readCombinedDefaultSkipPostIds_();
+  // ⚠️ 第四十八輪批次 B 組：唔可以淨係講「去 Config 改」——
+  // 嗰個 Key 有可能**根本未加入 Config 工作表**，
+  // 而幹事去到嗰度搵唔到，會以為自己睇漏咗眼。
+  const skip = readCombinedDefaultSkipPostIdsDetail_();
   lines.push('跳過崗位（SkipPostIDs）會先填上：');
-  lines.push('　' + (defaultSkip || '（Config 那一格是空白，所以留空）'));
+  lines.push('　' + (skip.value || '（空白，所以留空）'));
   lines.push('　 合堂那一天，這幾個崗位由另一堂帶領，所以不由本堂排。');
-  lines.push('　 要改就去 Config「' + CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS + '」。');
+  lines.push('　 ' + describeConfigValueOrigin_(
+    CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS, skip.source) + '。');
   lines.push('');
   lines.push('⚠️ 外部負責單位（ExternalOwner）仍然一律留空，');
   lines.push('　 需要你自己按每一次合堂的實際安排填寫（例如堂慶由英語堂帶領詩、司琴，');
