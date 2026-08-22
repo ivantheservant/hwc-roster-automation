@@ -1718,9 +1718,9 @@ const MUTATIONS = [
     why: '令不變量寫一筆 AuditLog'
       + '——一支唯讀檢查寫嘢落去，就會令佢自己成為佢要驗嗰個狀態嘅一部分',
     file: 'src/Invariants.gs',
-    find: 'function runAllInvariants_(quarterId) {' + '\n'
+    find: 'function runAllInvariants_(quarterId, set) {' + '\n'
       + '  const results = [];',
-    replace: 'function runAllInvariants_(quarterId) {' + '\n'
+    replace: 'function runAllInvariants_(quarterId, set) {' + '\n'
       + '  const results = [];' + '\n'
       + "  writeAuditLog_({ action: '跑不變量' });",
     tests: ['tests/invariants.test.js']
@@ -1967,6 +1967,189 @@ const MUTATIONS = [
       + "  t.expect('特殊主日那一行真的寫進工作表'",
     replace: "  t.expect('特殊主日那一行真的寫進工作表'",
     tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-resume-only-passed',
+    why: '**把死鎖種返落去**：續跑只跳過通過咗嘅情境。'
+      + '任何一個早期情境紅咗，後面十三個永遠跑唔到——'
+      + '而後面嗰十三個先至係呢部機器存在嘅理由。'
+      + 'Ivan 現場撳咗三次，三次報告一模一樣',
+    file: 'src/SelfTestRunner.gs',
+    find: '      || previous.status === SELFTEST_STATUS.FAILED',
+    replace: '      || (false && previous.status === SELFTEST_STATUS.FAILED)',
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-skip-shows-green',
+    why: '跳過嗰陣一律顯示成通過'
+      + '——一個紅色情境會變成綠，而嗰個係講大話',
+    file: 'src/SelfTestRunner.gs',
+    find: '        status: previous.status,',
+    replace: '        status: SELFTEST_STATUS.PASSED,',
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-skip-loses-evidence',
+    why: '跳過嗰陣唔帶返上一次嘅證據'
+      + '——一個冇證據嘅「紅」等於冇報告過',
+    file: 'src/SelfTestRunner.gs',
+    find: '        failedChecks: previous.failedChecks || [],',
+    replace: '        failedChecks: [],',
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-next-step-wrong',
+    why: '三種情況都印同一句「撳繼續跑自測」'
+      + '——其中一種撳咗係冇用嘅，而 Ivan 就係照住嗰一句白撳咗三次',
+    file: 'src/SelfTestRunner.gs',
+    find: "    lines.push('修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」——'",
+    replace: "    lines.push('撳「測試工具 ▸ ▶️ 繼續跑自測」——'",
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-rerun-resets',
+    why: '「只重跑紅色情境」順手重設埋沙盒季度'
+      + '——呢個入口嘅意思就係「保留現場，只重跑嗰幾個」',
+    file: 'src/SelfTestRunner.gs',
+    find: "  selfTestMenuEntry_(true, '▶️ 只重跑紅色情境', true);",
+    replace: "  selfTestMenuEntry_(false, '▶️ 只重跑紅色情境', true);",
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-rerun-clears-green',
+    why: '「只重跑紅色情境」連通過咗嗰啲都清走'
+      + '——噉就同「由頭再跑一次」冇分別，而時間預算又會爆',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (status === SELFTEST_STATUS.FAILED || status === SELFTEST_STATUS.ERROR) {',
+    replace: '    if (true) {',
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-inv-all-per-scenario',
+    why: '每個情境都跑全套不變量'
+      + '——I04 掃全表 10,920 行、I08 每條要行一次完整 plan，'
+      + '兩個情境就食光時間預算。呢個就係死鎖嘅另一半',
+    file: 'src/SelfTestRunner.gs',
+    find: '      const inv = runAllInvariants_(quarterId, INVARIANT_SET.PER_SCENARIO);',
+    replace: '      const inv = runAllInvariants_(quarterId, INVARIANT_SET.ALL);',
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-no-timing-line',
+    why: '報告唔講時間用喺邊'
+      + '——冇呢一行，下次再卡住又要由零查一次',
+    file: 'src/SelfTestRunner.gs',
+    find: "    lines.push('時間：用了 ' + describeSelfTestDuration_(report.totalMs)",
+    replace: "    lines.push('（時間：略）'); if (false) lines.push('時間：用了 '"
+      + " + describeSelfTestDuration_(report.totalMs)",
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-s01-runs-dirty',
+    why: '拆走 S01 嘅「只喺全新開跑時有意義」'
+      + '——S02 已經生成咗 v0，所以 S01 三條斷言一定紅，'
+      + '而嗰三條紅係自測機自己嘅問題，唔係系統嘅問題',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (scenario.requiresFreshQuarter) {',
+    replace: '    if (false) {',
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'st-fresh-by-flag',
+    why: '查唔到季度狀態嗰陣當成「全新」'
+      + '——噉就會喺一個唔知咩狀態嘅季度上面跑一個假設佢全新嘅情境',
+    file: 'src/SelfTestRunner.gs',
+    find: "        freshness = { fresh: false, reason: '查不到這一季的狀態：' + err.message };",
+    replace: "        freshness = { fresh: true, reason: '' };",
+    tests: ['tests/selftest_resume_deadlock.test.js']
+  },
+  {
+    id: 'inv-na-counts-failed',
+    why: '把「唔適用」算成失敗'
+      + '——Stage 到 REQUESTS_APPLIED 之前每一個情境嘅 I08.step4 都會紅，'
+      + '即係 S01 到 S08 全部一定紅，不論系統有冇問題。'
+      + '紅色一多就冇人睇，而嗰個就係假警報',
+    file: 'src/Invariants.gs',
+    find: '        INVARIANT_STATUS.NOT_APPLICABLE, '
+      + "'（這個狀態下不適用）', na, na));",
+    replace: '        INVARIANT_STATUS.FAILED, '
+      + "'（這個狀態下不適用）', na, na));",
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'inv-na-hides-error',
+    why: '把「有版本而其中一條路拋錯」都當成唔適用'
+      + '——呢一組就變成「把紅色改成睇唔見」，比修之前更差',
+    file: 'src/Invariants.gs',
+    find: "          entry.where, INVARIANT_STATUS.ERROR, '兩條路數出同一個數', '算不出來',",
+    replace: "          entry.where, INVARIANT_STATUS.NOT_APPLICABLE, "
+      + "'兩條路數出同一個數', '算不出來',",
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'inv-i04-always-full',
+    why: '拆走 I04 嘅季度篩選，永遠掃全表'
+      + '——自測機每個情境掃 10,920 行，15 個情境就係 16 萬行',
+    file: 'src/Invariants.gs',
+    find: '    if (only && qid !== only) return;',
+    replace: '',
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'sendlog-no-block',
+    why: '轉寄生效而缺 `IntendedEmail` 都照寄'
+      + '——SendLog 每一行嘅收件人都會係同一個轉寄地址，'
+      + '查唔到邊個收到乜。第四十一輪 H 組要防嘅就係呢件事',
+    file: 'src/Mailer.gs',
+    find: '  throw new Error(buildThreePartMessage_(' + '\n'
+      + "    '轉寄測試地址生效中（' + redirectTargets.join('、') + '），'",
+    replace: '  log_(' + "'WARN', " + "'（已略過）'); return;" + '\n'
+      + '  // eslint-disable-next-line no-unreachable' + '\n'
+      + '  throw new Error(buildThreePartMessage_(' + '\n'
+      + "    '轉寄測試地址生效中（' + redirectTargets.join('、') + '），'",
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'sendlog-block-always',
+    why: '轉寄冇生效都照擋'
+      + '——把成個寄送流程綁死喺一個歷史遺留問題上。'
+      + '轉寄冇生效嗰陣，兩個地址本來就一樣，查得返',
+    file: 'src/Mailer.gs',
+    find: '  if (redirectTargets.length === 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'sendlog-unknown-ok',
+    why: '讀唔到轉寄設定嗰陣當成「冇生效」'
+      + '——「查不到」當成「冇事」，而估錯呢一邊嘅代價'
+      + '係一批查唔返嘅寄送紀錄',
+    file: 'src/Mailer.gs',
+    find: "    redirectTargets = ['（讀不到轉寄設定：' + err.message + '）'];",
+    replace: '    redirectTargets = [];',
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'sendlog-backfill-fills',
+    why: '補欄工具順手替既有行填值'
+      + '——舊行到底寄咗去邊已經無從得知，猜一個上去就係造假紀錄。'
+      + '而一份造假嘅寄送紀錄，比冇紀錄更差：'
+      + '冇紀錄你知道自己唔知，假紀錄會令你以為自己知',
+    file: 'src/MailRedirect.gs',
+    find: '不會替任何一行填值',
+    replace: '會替每一行填返個估計值',
+    tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'lint-quiet-about-gap',
+    why: '把 lint 嗰句「掃唔到唔等於冇事」改返做中性免責聲明'
+      + '——之前嗰一句讀落似免責聲明，而實際上嗰 19 張入面'
+      + '真係有一張缺欄，而且缺咗嗰兩欄係特登為咗一件事而加嘅',
+    file: 'tools/lint-schema-drift.js',
+    find: "lines.push('⚠️ ⚠️ 上面嗰 ' + uncovered.length + "
+      + "' 張，**唔係「查過冇事」，係「查唔到」。**');",
+    replace: "lines.push('（以上僅供參考。）');",
+    tests: ['tests/sendlog_columns.test.js']
   },
 ];
 

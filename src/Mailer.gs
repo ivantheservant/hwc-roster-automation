@@ -1264,6 +1264,73 @@ function applyPlaceholders_(text, placeholders, recipient, summary) {
 }
 
 /**
+ * 第五十輪批次 E2 組：`SendLog` 缺 `IntendedEmail`／`DeliveredTo` 嗰陣。
+ *
+ * ⚠️ **兩種待遇，睇轉寄有冇生效。**
+ *
+ *   轉寄冇生效 ⇒ 只寫 WARN。缺呢兩欄嗰陣，`IntendedEmail` 同
+ *                `DeliveredTo` 本來就等於 `Email`，所以查得返——
+ *                唔應該為咗一個歷史遺留問題而擋住成個寄送流程。
+ *
+ *   轉寄生效　 ⇒ **直接擋住。** 呢個先係嗰兩欄存在嘅唯一理由：
+ *                信實際寄咗去轉寄地址，而「原本要寄畀邊個」只喺
+ *                `IntendedEmail` 度。冇咗嗰一欄就寫落 `Email` 一欄，
+ *                而 `Email` 記嘅係實際寄去嗰個——即係成批紀錄
+ *                全部指住同一個地址，而「邊個收到乜」查唔返。
+ *
+ * ⚠️ 擋住之後一封都唔會寄。呢個係啱嘅：一批查唔返嘅寄送紀錄，
+ * 對一個要向堂委交代嘅幹事嚟講，等於冇寄過。
+ *
+ * @param {string[]} headers `SendLog` 第 2 行
+ * @returns {void}
+ * @throws {Error} 轉寄生效而又缺 `IntendedEmail` 時拋三段式訊息
+ */
+function assertSendLogRedirectColumnsReady_(headers) {
+  const C = COLUMNS.SEND_LOG;
+  const missing = [C.INTENDED_EMAIL, C.DELIVERED_TO].filter(function (key) {
+    return headers.indexOf(key) === -1;
+  });
+  if (missing.length === 0) return;
+
+  let redirectTargets = [];
+  try {
+    redirectTargets = readMailRedirectTargets_();
+  } catch (err) {
+    // 讀唔到轉寄設定 ⇒ **當成有生效**。
+    // 「查不到」當成「冇事」就係呢個專案一直喺度殺嗰個 bug class，
+    // 而估錯呢一邊嘅代價係一批查唔返嘅寄送紀錄。
+    redirectTargets = ['（讀不到轉寄設定：' + err.message + '）'];
+  }
+
+  if (redirectTargets.length === 0) {
+    log_('WARN', 'SendLog 沒有 ' + missing.join('／')
+      + ' 這幾欄。轉寄測試地址目前沒有生效，所以每一封的收件人'
+      + '同實際寄去的地址是同一個，查得回。'
+      + '想補齊，去選單「維護 ▸ ⚠️ 補建 SendLog 缺欄」。');
+    return;
+  }
+
+  if (missing.indexOf(C.INTENDED_EMAIL) === -1) {
+    // 只缺 `DeliveredTo`：轉寄地址喺 Config 查得返，唔算致命。
+    log_('WARN', 'SendLog 沒有 ' + C.DELIVERED_TO + ' 這一欄。'
+      + '轉寄生效中，實際寄去的地址要靠 Config 的 '
+      + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO + ' 反推。');
+    return;
+  }
+
+  throw new Error(buildThreePartMessage_(
+    '轉寄測試地址生效中（' + redirectTargets.join('、') + '），'
+      + '但 SendLog 沒有「' + C.INTENDED_EMAIL + '」這一欄，'
+      + '記不到每一封原本要寄給誰。',
+    '一封都沒有寄出。這樣寄出去之後，SendLog 每一行的收件人'
+      + '都會是同一個轉寄地址，查不到誰收到什麼。',
+    ['先去選單「維護 ▸ ⚠️ 補建 SendLog 缺欄」補上這一欄，再回來寄',
+      '那一支只會在最後加欄，不會重排、不會改動任何既有資料',
+      '如果你其實不想用轉寄，去 Config 把 '
+        + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO + ' 清空']));
+}
+
+/**
  * 把本次所有處理結果寫入 SendLog（附加在現有資料之後）。
  * @param {Object[]} outcomes deliverOne_() 的結果陣列
  * @param {Object} context 寄信 context
@@ -1285,6 +1352,12 @@ function writeSendLogRows_(outcomes, context) {
       + '想喺 SendLog 都見到，喺表頭（第 2 行）最尾加一欄叫 '
       + COLUMNS.SEND_LOG.SEND_OPTIONS);
   }
+
+  // ── 第五十輪批次 E2 組：`IntendedEmail`／`DeliveredTo` ──────────
+  //
+  // 呢兩欄同 `SendOptions` 一樣會被 `headers.map(...)` 靜靜略過。
+  // 平時缺欄只寫 WARN——**唔好把成個寄送流程綁死喺一個歷史遺留問題上**。
+  assertSendLogRedirectColumnsReady_(headers);
   const now = nowTimestamp_();
   const idStamp = compactTimestamp_();
   const actor = Session.getActiveUser().getEmail();

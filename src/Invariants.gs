@@ -26,6 +26,39 @@
  *       「查不到」當成「冇事」，就係呢個專案由第一輪殺到而家嗰種錯。
  *   三、**每一條都要拿得出證據。** 只講「失敗」而唔講實際值，
  *       等於逼下一個人由零查起。
+ *   四、**「唔適用」同「算錯咗」要分開。** 見下面。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * ⚠️⚠️ 第五十輪批次 C 組：`NOT_APPLICABLE` 嘅判斷準則
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 現場：季度啱啱清乾淨、一個版本都未有，而 I08 報
+ *
+ *     實際 算不出來｜找不到 2028T3 已生成的版本，請先執行「步驟 1：生成初稿」
+ *
+ * 呢一句**唔係失敗**，係「呢個狀態下本來就唔適用」。
+ * 後果係 S01–S08 每一個都一定紅，不論系統本身有冇問題——
+ * 而紅色一多就冇人再睇。嗰個就係假警報。
+ *
+ * ⚠️ 但呢一組最大嘅風險係**分錯邊**：分錯咗就變成
+ * 「把紅色改成睇唔見」，比而家更差。所以準則要寫得死：
+ *
+ *   ┌─────────────────────────────────┬──────────────────┐
+ *   │ 情況                             │ 判                │
+ *   ├─────────────────────────────────┼──────────────────┤
+ *   │ 呢一季一個版本都未有              │ NOT_APPLICABLE   │
+ *   │ Stage 未到嗰一步                  │ NOT_APPLICABLE   │
+ *   │ 有版本，而兩條路數出嚟嘅數唔同     │ **FAILED**       │
+ *   │ 有版本，而其中一條路拋錯          │ **FAILED**       │
+ *   │ 讀唔到工作表／Config              │ **ERROR**        │
+ *   └─────────────────────────────────┴──────────────────┘
+ *
+ * 換句話講：**只有「前置條件本身唔成立」先至係 NOT_APPLICABLE。**
+ * 前置條件成立咗而算唔出，就係失敗——嗰個先係我哋要捉嘅嘢。
+ *
+ * ⚠️ 判斷「前置條件成唔成立」**唔可以靠讀錯誤訊息嘅字**。
+ * 錯誤訊息會改，而改咗之後一條真失敗就會靜靜變成「唔適用」。
+ * 一律**喺叫之前自己查一次**（有冇版本、Stage 係乜）。
  */
 
 /** 一條不變量嘅結果狀態。 */
@@ -35,7 +68,12 @@ const INVARIANT_STATUS = {
   // ⚠️ 讀唔到／算唔到 —— **唔可以當成 OK**。
   ERROR: 'ERROR',
   // 冇足夠資料去驗（例如一季一個版本都冇）。同 OK 分開報。
-  SKIPPED: 'SKIPPED'
+  SKIPPED: 'SKIPPED',
+  // ⚠️ 第五十輪批次 C 組：**「呢個狀態下本來就唔適用」。**
+  //
+  // 唔計入 `failedCount`，報告用 ⚪ 唔用 ⚠️。
+  // 詳細判斷準則見檔頭「⚠️ 四條界線」第四條。
+  NOT_APPLICABLE: 'NOT_APPLICABLE'
 };
 
 /**
@@ -88,6 +126,13 @@ function buildDialogNumberRegistry_() {
     {
       id: 'step2.recipientCount',
       where: '寄給堂委審閱（確認畫面）「會寄給這 N 位」',
+      // 一個版本都未有 ⇒ 根本冇嘢可以數。唔係失敗。
+      notApplicable: function (f) {
+        return f.versionNo < 0
+          ? '這一季還沒有生成過版本，所以算不出「會寄給誰」。'
+            + '這不是失敗——生成之後（S02）就驗得到。'
+          : '';
+      },
       // ⚠️ 兩條路要用**同一份** `sendOptions`，否則比嘅唔係同一件事。
       produce: function (quarterId, sendOptions) {
         return planStep2_(quarterId, sendOptions).recipientCount;
@@ -102,6 +147,20 @@ function buildDialogNumberRegistry_() {
     {
       id: 'step4.recipientCount',
       where: '正式發出給全體（確認畫面）「會寄給這 N 位」',
+      // ⚠️ 「正式發出」要 Stage 到 `REQUESTS_APPLIED` 先做得到。
+      // 之前嗰幾個階段本來就唔適用——唔係失敗。
+      //
+      // 冇呢一句嘅話，S01–S08 每一個都一定紅，不論系統有冇問題。
+      notApplicable: function (f) {
+        if (f.versionNo < 0) {
+          return '這一季還沒有生成過版本，所以算不出「會寄給誰」。';
+        }
+        return STEP4_ALLOWED_STAGES_.indexOf(f.stage) === -1
+          ? '「正式發出」要 Stage 是「' + STEP4_ALLOWED_STAGES_.join('／')
+            + '」才做得到，而現在是「' + (f.stage || '（讀不到）') + '」。'
+            + '這不是失敗——走到那一步（S09）就驗得到。'
+          : '';
+      },
       produce: function (quarterId, sendOptions) {
         const versionNo = findLatestVersionNo(quarterId);
         return planStep4SendPreview_(quarterId, versionNo, sendOptions).recipientCount;
@@ -115,6 +174,11 @@ function buildDialogNumberRegistry_() {
     {
       id: 'dashboard.gridChangeCount',
       where: '主畫面「你有 N 格改動還未儲存」',
+      notApplicable: function (f) {
+        return f.versionNo < 0
+          ? '這一季還沒有生成過版本，所以沒有 grid 可以比。'
+          : '';
+      },
       produce: function (quarterId) {
         const versionNo = findLatestVersionNo(quarterId);
         return readDashboardUnsavedState_(quarterId, versionNo).gridChangeCount;
@@ -234,7 +298,26 @@ function invariantDialogNumbers_(quarterId) {
   const registry = buildDialogNumberRegistry_();
   const results = [];
 
+  // ⚠️ 第五十輪批次 C 組：**喺叫之前自己查前置條件。**
+  //
+  // 唔可以靠讀 `err.message` 嘅字去分「唔適用」同「算錯咗」——
+  // 錯誤訊息會改，而改咗之後一條真失敗就會靜靜變成「唔適用」。
+  const versionNo = findLatestVersionNo(quarterId);
+  const stage = (function () {
+    try { return getQuarterStage_(quarterId); } catch (err) { return ''; }
+  })();
+
   registry.forEach(function (entry) {
+    // ── 前置條件唔成立 ⇒ `NOT_APPLICABLE`，唔計入失敗 ──────────
+    const na = entry.notApplicable
+      ? entry.notApplicable({ versionNo: versionNo, stage: stage })
+      : '';
+    if (na) {
+      results.push(invariantResult_('I08.' + entry.id, entry.where,
+        INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）', na, na));
+      return;
+    }
+
     // ⚠️ 兩種 `sendOptions` 都要跑。
     const cases = [
       { label: '（沒有選項）', options: null },
@@ -269,14 +352,32 @@ function invariantDialogNumbers_(quarterId) {
 
 /**
  * I04：`RosterAssignments` 每一個 (季,版本,日期,崗位,slot) 唯一。
+ *
+ * ⚠️ 第五十輪批次 B2 組：加咗一個**可選**嘅 `quarterId`。
+ *
+ * 現場實測：呢張表 10,920 行、40 個版本。自測機每個情境跑完都掃全表，
+ * 15 個情境就係掃 16 萬行——一次執行 6 分鐘完全唔夠。
+ *
+ * 而自測機只關心沙盒季度嗰一季。
+ *
+ * ⚠️ **唔可以因此把全表嗰條刪走。** 「維護 ▸ 全面體檢」嗰邊要掃全表
+ * ——嗰邊冇時間壓力，而且一個跨季度嘅重複（例如版本號撞咗）
+ * 只有掃全表先睇得到。兩個用途都要保留，只係自測機用窄嗰個。
+ *
+ * @param {string=} quarterId 只掃呢一季；省略就掃全表
  * @returns {Object} `invariantResult_()`
  */
-function invariantAssignmentUniqueness_() {
+function invariantAssignmentUniqueness_(quarterId) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const only = String(quarterId || '').trim();
   const seen = {};
   const dups = [];
+  let scanned = 0;
   readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
-    const key = [row[A.QUARTER_ID], row[A.VERSION_NO], row[A.SERVICE_DATE],
+    const qid = String(row[A.QUARTER_ID] || '').trim();
+    if (only && qid !== only) return;
+    scanned++;
+    const key = [qid, row[A.VERSION_NO], row[A.SERVICE_DATE],
       row[A.POST_ID], row[A.SLOT_INDEX]].join('|');
     if (seen[key]) {
       if (dups.indexOf(key) === -1) dups.push(key);
@@ -285,10 +386,11 @@ function invariantAssignmentUniqueness_() {
     seen[key] = true;
   });
   return invariantResult_('I04',
-    'RosterAssignments 沒有重複的 (季,版本,日期,崗位,slot)',
+    'RosterAssignments 沒有重複的 (季,版本,日期,崗位,slot)'
+      + (only ? '（只掃 ' + only + '）' : '（全表）'),
     dups.length === 0 ? INVARIANT_STATUS.OK : INVARIANT_STATUS.FAILED,
     '0 個重複', dups.length + ' 個重複',
-    dups.length === 0 ? '掃了 ' + Object.keys(seen).length + ' 行。'
+    dups.length === 0 ? '掃了 ' + scanned + ' 行。'
       : dups.slice(0, 10).join('；'));
 }
 
@@ -373,7 +475,7 @@ function invariantProtectedV0_() {
   if (checked === 0) {
     return invariantResult_('I07',
       '受保護季度的 v0 真的有 Protected=TRUE',
-      INVARIANT_STATUS.SKIPPED, '每一季的 v0 都有保護', '沒有可以檢查的 v0',
+      INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）', '沒有可以檢查的 v0',
       '受保護季度：' + (blocked.join('、') || '（無）') + '，在 RosterVersions 找不到它們的 v0。');
   }
   return invariantResult_('I07',
@@ -393,14 +495,17 @@ function invariantPublicLinkVersion_(quarterId) {
   const latest = findLatestVersionNo(quarterId);
   if (latest < 0) {
     return invariantResult_('I09', '公開連結指向最新儲存的版本',
-      INVARIANT_STATUS.SKIPPED, '', '', quarterId + ' 還沒有任何版本。');
+      INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）',
+      '這一季還沒有任何版本', quarterId + ' 還沒有任何版本，所以沒有東西可以發佈。');
   }
   const row = readSheet(SHEETS.PUBLIC_LINKS).filter(function (r) {
     return String(r[P.QUARTER_ID] || '').trim() === quarterId;
   })[0];
   if (!row) {
     return invariantResult_('I09', '公開連結指向最新儲存的版本',
-      INVARIANT_STATUS.SKIPPED, '', '', quarterId + ' 還沒有發佈過公開連結。');
+      INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）',
+      '這一季還沒有發佈過公開連結',
+      quarterId + ' 還沒有發佈過公開連結，所以沒有東西可以對。');
   }
   const published = Number(row[P.LAST_PUBLISHED_VERSION]);
   return invariantResult_('I09', '公開連結指向最新儲存的版本',
@@ -425,7 +530,8 @@ function invariantDryRunNoRealSend_(quarterId) {
   const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
   if (!isDryRun) {
     return invariantResult_('I10', '模擬模式下沒有真實寄出紀錄',
-      INVARIANT_STATUS.SKIPPED, '', '', 'DRY_RUN 目前不是 TRUE，這一條不適用。');
+      INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）',
+      'DRY_RUN 不是 TRUE', 'DRY_RUN 目前不是 TRUE，這一條守的是模擬模式，所以不適用。');
   }
   const S = COLUMNS.SEND_LOG;
   const real = [];
@@ -458,8 +564,41 @@ function invariantDryRunNoRealSend_(quarterId) {
  * @returns {{results: Object[], failedCount: number, errorCount: number,
  *   okCount: number, skippedCount: number}}
  */
-function runAllInvariants_(quarterId) {
+/**
+ * 第五十輪批次 B1 組：**每個情境跑完就跑嗰批（要快）。**
+ *
+ * ⚠️ 揀呢四條嘅準則：**只碰沙盒季度，而且唔會遍歷大表。**
+ *
+ *   I01　只讀每張表第 2 行（header），唔遍歷資料
+ *   I05　`Quarters` 得幾十行
+ *   I09　`PublicLinks` 得幾十行
+ *   I10　`SendLog` 篩一季（沙盒季度嗰一季通常得幾十行）
+ *
+ * 貴嗰幾條（I04 全表 10,920 行、I08 每條要行一次完整 plan）
+ * 留到全部情境跑完之後先一次過跑——見 `INVARIANT_SET.FINAL`。
+ */
+const INVARIANT_SET = {
+  PER_SCENARIO: 'PER_SCENARIO',
+  FINAL: 'FINAL',
+  ALL: 'ALL'
+};
+
+/**
+ * 跑不變量。**唯讀。**
+ *
+ * ⚠️ 逐條包 try/catch：一條爆咗，其餘照跑。
+ * 一條爆就成批停低嘅話，一個細問題會掩蓋晒後面全部。
+ *
+ * @param {string=} quarterId 要驗嘅季度；冇傳就跳過同季度有關嗰幾條
+ * @param {string=} set `INVARIANT_SET` 之一；省略 ＝ `ALL`
+ * @returns {{results: Object[], failedCount: number, errorCount: number,
+ *   okCount: number, skippedCount: number, notApplicableCount: number}}
+ */
+function runAllInvariants_(quarterId, set) {
   const results = [];
+  const mode = set || INVARIANT_SET.ALL;
+  const wantFast = mode === INVARIANT_SET.PER_SCENARIO || mode === INVARIANT_SET.ALL;
+  const wantSlow = mode === INVARIANT_SET.FINAL || mode === INVARIANT_SET.ALL;
 
   const run = function (id, label, fn) {
     try {
@@ -473,25 +612,39 @@ function runAllInvariants_(quarterId) {
     }
   };
 
-  run('I01', 'COLUMNS 定義的每一個欄，工作表真的有', invariantSheetHeaders_);
-  run('I04', 'RosterAssignments 沒有重複的格', invariantAssignmentUniqueness_);
-  run('I05', 'Quarters.Stage 的值全部認得', invariantStageDomain_);
-  run('I06', 'SendLog 每一行的版本找得到', invariantSendLogVersions_);
-  run('I07', '受保護季度的 v0 真的有保護', invariantProtectedV0_);
-
   const qid = String(quarterId || '').trim();
-  if (qid) {
-    run('I02', '每一粒掣的前置條件', function () {
-      return invariantButtonPreconditions_(qid);
+
+  // ── 快嗰批 ──────────────────────────────────────────────────
+  if (wantFast) {
+    run('I01', 'COLUMNS 定義的每一個欄，工作表真的有', invariantSheetHeaders_);
+    run('I05', 'Quarters.Stage 的值全部認得', invariantStageDomain_);
+    if (qid) {
+      run('I09', '公開連結指向最新版本', function () {
+        return invariantPublicLinkVersion_(qid);
+      });
+      run('I10', '模擬模式下沒有真實寄出', function () {
+        return invariantDryRunNoRealSend_(qid);
+      });
+    }
+  }
+
+  // ── 貴嗰批 ──────────────────────────────────────────────────
+  if (wantSlow) {
+    // ⚠️ 有季度就只掃嗰一季（B2 組）。全面體檢冇傳季度 ⇒ 掃全表。
+    run('I04', 'RosterAssignments 沒有重複的格', function () {
+      return invariantAssignmentUniqueness_(qid || null);
     });
-    run('I08', '畫面上的每一個數字', function () { return invariantDialogNumbers_(qid); });
-    run('I09', '公開連結指向最新版本', function () {
-      return invariantPublicLinkVersion_(qid);
-    });
-    run('I10', '模擬模式下沒有真實寄出', function () {
-      return invariantDryRunNoRealSend_(qid);
-    });
-  } else {
+    run('I06', 'SendLog 每一行的版本找得到', invariantSendLogVersions_);
+    run('I07', '受保護季度的 v0 真的有保護', invariantProtectedV0_);
+    if (qid) {
+      run('I02', '每一粒掣的前置條件', function () {
+        return invariantButtonPreconditions_(qid);
+      });
+      run('I08', '畫面上的每一個數字', function () { return invariantDialogNumbers_(qid); });
+    }
+  }
+
+  if (!qid && (wantFast || wantSlow)) {
     results.push(invariantResult_('I02／I08／I09／I10', '需要指定季度才驗得到',
       INVARIANT_STATUS.SKIPPED, '', '',
       '這四條要對住一個季度才驗得到。跑自測機或亂行機時會自動帶上沙盒季度。'));
@@ -502,10 +655,13 @@ function runAllInvariants_(quarterId) {
   };
   return {
     results: results,
+    set: mode,
     okCount: count(INVARIANT_STATUS.OK),
     failedCount: count(INVARIANT_STATUS.FAILED),
     errorCount: count(INVARIANT_STATUS.ERROR),
-    skippedCount: count(INVARIANT_STATUS.SKIPPED)
+    skippedCount: count(INVARIANT_STATUS.SKIPPED),
+    // ⚠️ 第五十輪批次 C 組：**唔計入失敗。**
+    notApplicableCount: count(INVARIANT_STATUS.NOT_APPLICABLE)
   };
 }
 
@@ -521,9 +677,13 @@ function runAllInvariants_(quarterId) {
 function describeInvariantReport_(report) {
   const lines = ['不變量：' + report.results.length + ' 條　'
     + '✅ ' + report.okCount + '　🔴 ' + report.failedCount
-    + '　⚠️ 算不出 ' + report.errorCount + '　⚪ 跳過 ' + report.skippedCount];
+    + '　⚠️ 算不出 ' + report.errorCount
+    + '　⚪ 不適用 ' + (report.notApplicableCount || 0)
+    + '　⚪ 跳過 ' + report.skippedCount];
   report.results.forEach(function (r) {
     if (r.status === INVARIANT_STATUS.OK) return;
+    // ⚠️ 「不適用」用 ⚪，唔用 ⚠️——用 ⚠️ 就會同真失敗混埋一齊，
+    // 而紅色一多就冇人再睇。
     const icon = r.status === INVARIANT_STATUS.FAILED ? '🔴'
       : (r.status === INVARIANT_STATUS.ERROR ? '⚠️' : '⚪');
     lines.push('');

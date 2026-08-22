@@ -62,7 +62,13 @@ const SELFTEST_STATUS = {
   PASSED: 'PASSED',
   FAILED: 'FAILED',
   ERROR: 'ERROR',
-  NOT_RUN: 'NOT_RUN'
+  NOT_RUN: 'NOT_RUN',
+  // ⚠️ 第五十輪批次 D 組：**「呢個情境喺呢個狀態下冇意義」。**
+  //
+  // 唔係紅。S01 驗嘅係「季度啱啱清乾淨嗰陣 dashboard 講咩」，
+  // 而喺一個已經有 v0 嘅季度上面跑佢，三條斷言一定紅——
+  // 而嗰三條紅**全部係自測機自己嘅問題，唔係系統嘅問題**。
+  SKIPPED: 'SKIPPED'
 };
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -864,6 +870,34 @@ function selfTestS15_(quarterId) {
 }
 
 /**
+ * 第五十輪批次 D2 組：**呢一季而家係咪「全新」？**
+ *
+ * ⚠️ **直接查，唔可以用一個 flag 記住「今次有冇重設過」。**
+ *
+ * 記住嘅嘢會同真實狀態分岔——呢個專案已經因為呢一類問題食過幾次虧
+ *（第十九輪讀錯來源、第四十六輪兩個算法、第四十七輪 header 同表分家）。
+ * 而且「重設過」同「而家係全新」根本唔係同一件事：
+ * 重設完之後跑咗 S02，個季度就唔再全新，而 flag 仲係話「重設過」。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {{fresh: boolean, reason: string}}
+ */
+function isSelfTestQuarterFresh_(quarterId) {
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo >= 0) {
+    return { fresh: false, reason: '這一季已經有 v' + versionNo + '。' };
+  }
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+    return String(r[A.QUARTER_ID] || '').trim() === quarterId;
+  });
+  if (rows.length > 0) {
+    return { fresh: false, reason: '這一季還有 ' + rows.length + ' 行派工紀錄。' };
+  }
+  return { fresh: true, reason: '' };
+}
+
+/**
  * 全部情境嘅登記表。
  *
  * ⚠️ 次序有意思：後面嗰個情境靠前面嗰個造出嚟嘅狀態。
@@ -874,7 +908,11 @@ function selfTestS15_(quarterId) {
  */
 function selfTestScenarios_() {
   return [
-    { id: 'S01', title: '空季度：generate 之前 dashboard 講什麼', run: selfTestS01_ },
+    // ⚠️ 第五十輪批次 D1 組：S01 驗嘅係「季度啱啱清乾淨嗰陣」。
+    // 喺一個已經有 v0 嘅季度上面跑佢，三條斷言一定紅——
+    // 而嗰三條紅係自測機自己嘅問題，唔係系統嘅問題。
+    { id: 'S01', title: '空季度：generate 之前 dashboard 講什麼', run: selfTestS01_,
+      requiresFreshQuarter: true },
     { id: 'S02', title: '生成初稿', run: selfTestS02_ },
     { id: 'S03', title: '改 grid 3 格（真的寫工作表）', run: selfTestS03_ },
     { id: 'S04', title: '有未儲存改動之下開寄出（第四十七輪那個死碼）', run: selfTestS04_ },
@@ -922,12 +960,30 @@ function readSelfTestState_() {
   if (!sheet) return {};
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return {};
-  const values = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  const lastCol = Math.max(4, sheet.getLastColumn());
+  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
   const out = {};
   values.forEach(function (row) {
     const id = String(row[0] || '').trim();
     if (!id) return;
-    out[id] = { id: id, status: String(row[1] || ''), summary: String(row[2] || '') };
+    // ⚠️ 第五十輪批次 A1 組：**連證據一齊讀返。**
+    //
+    // 跳過一個紅色情境嗰陣，報告仍然要印得出「邊一條斷言紅咗、
+    // 預期幾多、實際幾多」。冇咗證據，一個「跳過」嘅紅色情境
+    // 就變成一句冇內容嘅「紅」——而嗰個等於冇報告過。
+    let detail = { failedChecks: [], invariantDetail: [] };
+    try {
+      const raw = String(row[3] || '');
+      if (raw) detail = JSON.parse(raw);
+    } catch (err) {
+      // 讀唔返就當冇證據，唔可以令成個續跑爆。
+      log_('WARN', 'SelfTestState 的證據欄讀不回來（' + id + '）：' + err.message);
+    }
+    out[id] = {
+      id: id, status: String(row[1] || ''), summary: String(row[2] || ''),
+      failedChecks: detail.failedChecks || [],
+      invariantDetail: detail.invariantDetail || []
+    };
   });
   return out;
 }
@@ -946,13 +1002,47 @@ function writeSelfTestState_(state) {
     sheet = ss.insertSheet(SELFTEST_SHEETS.STATE);
   }
   sheet.clear();
-  sheet.appendRow(['情境', '結果', '摘要', '更新於']);
+  sheet.appendRow(['情境', '結果', '摘要', '證據（JSON）', '更新於']);
   sheet.setFrozenRows(1);
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const now = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss');
   Object.keys(state).sort().forEach(function (id) {
-    sheet.appendRow([id, state[id].status, state[id].summary, now]);
+    let evidence = '';
+    try {
+      evidence = JSON.stringify({
+        failedChecks: state[id].failedChecks || [],
+        invariantDetail: state[id].invariantDetail || []
+      });
+      // 一格上限 50,000 字元。爆咗就只記一句，唔好令成次寫入失敗。
+      if (evidence.length > 45000) evidence = '（證據太長，已略去；見 SelfTestReport）';
+    } catch (err) {
+      evidence = '（證據寫不出來：' + err.message + '）';
+    }
+    sheet.appendRow([id, state[id].status, state[id].summary, evidence, now]);
   });
+}
+
+/**
+ * 第五十輪批次 A2 組：把紅色情境由狀態表清走，等佢哋下一次會重跑。
+ *
+ * ⚠️ **唔會重設沙盒季度。** 呢個入口嘅意思就係「保留現場，只重跑嗰幾個」
+ * ——修好咗一樣嘢之後，唔使把成季清晒重頭嚟。
+ *
+ * @param {Object.<string, Object>} state 現有狀態
+ * @returns {{state: Object, clearedIds: string[]}}
+ */
+function clearFailedSelfTestState_(state) {
+  const kept = {};
+  const clearedIds = [];
+  Object.keys(state || {}).forEach(function (id) {
+    const status = state[id].status;
+    if (status === SELFTEST_STATUS.FAILED || status === SELFTEST_STATUS.ERROR) {
+      clearedIds.push(id);
+      return;
+    }
+    kept[id] = state[id];
+  });
+  return { state: kept, clearedIds: clearedIds };
 }
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -966,7 +1056,7 @@ function writeSelfTestState_(state) {
  *   false ＝ 由頭開始（會先清乾淨沙盒季度）
  * @returns {Object} 報告
  */
-function runSelfTestMachine_(resume) {
+function runSelfTestMachine_(resume, rerunFailedOnly) {
   selfTestStartedAt_ = new Date().getTime();
 
   const quarter = readSelfTestQuarterDetail_();
@@ -980,7 +1070,15 @@ function runSelfTestMachine_(resume) {
     };
   }
 
-  const state = resume ? readSelfTestState_() : {};
+  let state = resume ? readSelfTestState_() : {};
+  // 第五十輪批次 A2 組：只重跑紅色 ⇒ 把紅嗰幾個由狀態表清走，
+  // 其餘照 resume 模式跳過。
+  let rerunIds = [];
+  if (resume && rerunFailedOnly) {
+    const cleared = clearFailedSelfTestState_(state);
+    state = cleared.state;
+    rerunIds = cleared.clearedIds;
+  }
 
   // ── 由頭開始 ⇒ 先清乾淨 ─────────────────────────────────────
   //
@@ -1007,14 +1105,79 @@ function runSelfTestMachine_(resume) {
   // ── 逐個情境 ────────────────────────────────────────────────
   const results = [];
   let stoppedForTime = false;
+  // 第五十輪批次 B3 組：時間要講得出用喺邊。
+  // 冇呢一行，下次再卡住又要由零查一次。
+  let invariantMs = 0;
+  const runStartedAt = new Date().getTime();
   selfTestScenarios_().forEach(function (scenario) {
     const previous = state[scenario.id];
-    if (resume && previous && previous.status === SELFTEST_STATUS.PASSED) {
-      results.push({ id: scenario.id, title: scenario.title,
-        status: SELFTEST_STATUS.PASSED, checks: [], failedChecks: [],
-        note: '（上一次已經通過，這一次跳過）' });
+
+    // ── 第五十輪批次 A1 組：**跳過「已經有結論」嘅，唔係只跳過通過嘅** ──
+    //
+    // ⚠️⚠️ 舊寫法係 `previous.status === PASSED`，即係**只有通過先跳過**。
+    //
+    // 後果係一個**結構性死鎖**：
+    //   S01 紅 → 續跑時 S01 重新執行 → 加上每個情境跑完要跑全套不變量
+    //   → 兩個情境食晒時間預算 → S03 之後又標成「未跑」
+    //   → 下一次續跑再重複同一件事。
+    //
+    // 現場：Ivan 撳咗三次，三次報告一模一樣，S03–S15 永遠「未跑」。
+    // 而後面嗰十三個先至係呢部機器存在嘅理由。
+    //
+    // ⚠️ 跳過嘅時候要**照樣顯示上一次嗰個結論**——
+    // 紅就仍然係紅、帶住上次嘅證據。**唔可以**因為今次冇跑就顯示成
+    //「通過」或者「未跑」：前者係講大話，後者會令佢再撳一次續跑，
+    // 而再撳一次一樣係呢個結果。
+    const settled = previous && (
+      previous.status === SELFTEST_STATUS.PASSED
+      || previous.status === SELFTEST_STATUS.FAILED
+      || previous.status === SELFTEST_STATUS.ERROR
+      // 「跳過」都算有結論——續跑再跑一次一樣會跳過。
+      || previous.status === SELFTEST_STATUS.SKIPPED);
+    if (resume && settled) {
+      results.push({
+        id: scenario.id, title: scenario.title,
+        status: previous.status,
+        checks: [],
+        // 上一次嗰幾條失敗斷言由 `SelfTestState` 讀返——
+        // 冇咗佢，一個「跳過」嘅紅色情境就會冇晒證據。
+        failedChecks: previous.failedChecks || [],
+        invariantDetail: previous.invariantDetail || [],
+        note: '（上一次已經有結論：'
+          + (previous.status === SELFTEST_STATUS.PASSED ? '綠'
+            : (previous.status === SELFTEST_STATUS.SKIPPED ? '跳過' : '紅'))
+          + '，這一次不再跑）'
+      });
       return;
     }
+    // ── 第五十輪批次 D1 組：前置狀態唔啱 ⇒ `SKIPPED`（唔係紅）──
+    if (scenario.requiresFreshQuarter) {
+      let freshness = { fresh: true, reason: '' };
+      try {
+        freshness = isSelfTestQuarterFresh_(quarterId);
+      } catch (err) {
+        // 查唔到 ⇒ **唔可以當成「全新」**。當成全新就會喺一個
+        // 唔知咩狀態嘅季度上面跑一個假設佢全新嘅情境。
+        freshness = { fresh: false, reason: '查不到這一季的狀態：' + err.message };
+      }
+      if (!freshness.fresh) {
+        results.push({
+          id: scenario.id, title: scenario.title,
+          status: SELFTEST_STATUS.SKIPPED, checks: [], failedChecks: [],
+          note: '（這一個只在全新開跑時有意義。' + freshness.reason + '）'
+        });
+        state[scenario.id] = {
+          id: scenario.id, status: SELFTEST_STATUS.SKIPPED,
+          summary: '跳過：' + freshness.reason,
+          failedChecks: [], invariantDetail: []
+        };
+        try { writeSelfTestState_(state); } catch (err) {
+          log_('WARN', '寫 SelfTestState 失敗：' + err.message);
+        }
+        return;
+      }
+    }
+
     if (stoppedForTime || selfTestOutOfTime_()) {
       stoppedForTime = true;
       results.push({ id: scenario.id, title: scenario.title,
@@ -1043,9 +1206,16 @@ function runSelfTestMachine_(resume) {
       };
     }
 
-    // ⚠️ 每一個情境跑完，都要叫一次不變量。
+    // ⚠️ 每一個情境跑完，都要叫一次不變量——**但只跑快嗰批**。
+    //
+    // 第五十輪批次 B1 組：舊寫法跑全套（I01–I10）。其中 I04 掃全表
+    // 10,920 行、I08 每個登記數字要行一次完整 plan（一個情境六次）。
+    // 15 個情境 × 全套 ＝ 6 分鐘內完全唔可能。
+    //
+    // 貴嗰幾條留到全部情境跑完之後先一次過跑（見下面 `finalInvariants`）。
+    const invStartedAt = new Date().getTime();
     try {
-      const inv = runAllInvariants_(quarterId);
+      const inv = runAllInvariants_(quarterId, INVARIANT_SET.PER_SCENARIO);
       outcome.invariantFailed = inv.failedCount + inv.errorCount;
       outcome.invariantDetail = inv.results.filter(function (r) {
         return r.status === INVARIANT_STATUS.FAILED || r.status === INVARIANT_STATUS.ERROR;
@@ -1062,11 +1232,16 @@ function runSelfTestMachine_(resume) {
       outcome.status = SELFTEST_STATUS.ERROR;
     }
 
+    invariantMs += new Date().getTime() - invStartedAt;
+
     results.push(outcome);
     state[scenario.id] = {
       id: scenario.id, status: outcome.status,
       summary: outcome.status === SELFTEST_STATUS.PASSED ? '通過'
-        : (outcome.error || ((outcome.failedChecks || []).length + ' 條斷言失敗'))
+        : (outcome.error || ((outcome.failedChecks || []).length + ' 條斷言失敗')),
+      // 第五十輪批次 A1 組：跳過嗰陣要拎得返上一次嘅證據。
+      failedChecks: outcome.failedChecks || [],
+      invariantDetail: outcome.invariantDetail || []
     };
     // ⚠️ 逐個寫，唔可以等成批完。
     try { writeSelfTestState_(state); } catch (err) {
@@ -1074,12 +1249,39 @@ function runSelfTestMachine_(resume) {
     }
   });
 
+  // ── 全部情境跑完之後，一次過跑貴嗰批 ────────────────────────
+  //
+  // ⚠️ 仲有「未跑」嘅時候**唔跑**——嗰陣本來就仲未行完，
+  // 跑埋只會食埋下一次續跑嘅時間預算。
+  let finalInvariants = null;
+  if (!stoppedForTime) {
+    const finalStartedAt = new Date().getTime();
+    try {
+      finalInvariants = runAllInvariants_(quarterId, INVARIANT_SET.FINAL);
+    } catch (err) {
+      finalInvariants = {
+        results: [invariantResult_('（整體不變量）', '跑不起來',
+          INVARIANT_STATUS.ERROR, '算得出結果', '拋錯', err.message)],
+        okCount: 0, failedCount: 0, errorCount: 1, skippedCount: 0,
+        notApplicableCount: 0
+      };
+    }
+    invariantMs += new Date().getTime() - finalStartedAt;
+  }
+
+  const totalMs = new Date().getTime() - runStartedAt;
   return {
     blocked: false,
     quarterId: quarterId,
     quarterSource: quarter.source,
     resetSummary: resetSummary,
+    rerunFailedOnly: !!rerunFailedOnly,
+    rerunIds: rerunIds,
     results: results,
+    finalInvariants: finalInvariants,
+    totalMs: totalMs,
+    invariantMs: invariantMs,
+    scenarioMs: Math.max(0, totalMs - invariantMs),
     stoppedForTime: stoppedForTime,
     passedCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.PASSED; }).length,
     failedCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.FAILED; }).length,
@@ -1103,11 +1305,20 @@ function describeSelfTestReport_(report) {
     return ['自測機沒有執行。', ''].concat(
       report.reasons.map(function (r) { return '・' + r; }));
   }
+  const skippedCount = (report.results || []).filter(function (r) {
+    return r.status === SELFTEST_STATUS.SKIPPED;
+  }).length;
   const lines = ['自測機：' + report.results.length + ' 個情境，'
     + report.passedCount + ' 綠 '
     + (report.failedCount + report.errorCount) + ' 紅 '
+    + skippedCount + ' 跳過 '
     + report.notRunCount + ' 未跑'];
   lines.push('沙盒季度：' + report.quarterId + '　' + report.resetSummary);
+  if (report.rerunFailedOnly) {
+    lines.push('（只重跑紅色情境：'
+      + ((report.rerunIds || []).join('、') || '沒有紅色情境可以重跑')
+      + '。沙盒季度沒有清掉。）');
+  }
   lines.push('');
 
   report.results.forEach(function (r) {
@@ -1128,15 +1339,65 @@ function describeSelfTestReport_(report) {
     lines.push('');
   });
 
-  if (report.stoppedForTime) {
-    lines.push('⚠️ 執行時間到，已經乾淨停低。');
-    lines.push('　 撳「測試工具 ▸ ▶️ 繼續跑自測」由停低的地方接住。');
+  // ── 全部情境跑完之後嗰批（貴嘅）─────────────────────────────
+  //
+  // 第五十輪批次 B1 組：I04（全表 10,920 行）同 I08（每條要行一次
+  // 完整 plan）唔可以每個情境都跑，所以留到最尾一次過跑。
+  if (report.finalInvariants) {
+    const fin = report.finalInvariants;
+    lines.push('━━━ 全部跑完之後的整體不變量 ━━━');
+    describeInvariantReport_(fin).forEach(function (l) { lines.push(l); });
+    lines.push('');
+  } else if (report.stoppedForTime) {
+    lines.push('━━━ 全部跑完之後的整體不變量 ━━━');
+    lines.push('（還有情境沒有跑完，所以這一批先不跑——'
+      + '跑埋只會吃掉下一次續跑的時間。）');
     lines.push('');
   }
-  if (report.failedCount + report.errorCount === 0 && report.notRunCount === 0) {
-    lines.push('全部情境通過。');
+
+  // ── 時間用在哪裡（B3 組）──────────────────────────────────────
+  //
+  // ⚠️ 沒有這一行，下次再卡住又要重新查一次。
+  if (report.totalMs !== undefined) {
+    lines.push('時間：用了 ' + describeSelfTestDuration_(report.totalMs)
+      + '（情境 ' + describeSelfTestDuration_(report.scenarioMs)
+      + '／不變量 ' + describeSelfTestDuration_(report.invariantMs) + '）');
+    lines.push('');
+  }
+
+  // ── ⚠️ 下一步該撳哪一粒 ───────────────────────────────────────
+  //
+  // 第五十輪批次 A3 組：以前三種情況都印同一句「撳『繼續跑自測』」，
+  // 而其中一種情況撳了是沒有用的。
+  //
+  // 現場：Ivan 就是照着那一句撳了三次，三次報告一模一樣。
+  // 一句寫錯的指示，代價是實實在在的——他白撳了三次。
+  lines.push('━━━ 下一步 ━━━');
+  if (report.notRunCount > 0) {
+    lines.push('還有 ' + report.notRunCount + ' 個情境沒有跑。');
+    lines.push('撳「測試工具 ▸ ▶️ 繼續跑自測」由停下來的地方接住。');
+  } else if (report.failedCount + report.errorCount > 0) {
+    lines.push(report.results.length + ' 個情境全部跑完了，'
+      + (report.failedCount + report.errorCount) + ' 個紅。');
+    lines.push('修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」——'
+      + '它只重跑紅的那幾個，不會把沙盒季度清掉重頭來。');
+  } else {
+    lines.push('全部通過。');
   }
   return lines;
+}
+
+/**
+ * 把毫秒寫成「N 分 N 秒」。
+ * @param {number} ms 毫秒
+ * @returns {string}
+ */
+function describeSelfTestDuration_(ms) {
+  const total = Math.max(0, Math.round(Number(ms) || 0) / 1000);
+  const minutes = Math.floor(total / 60);
+  const seconds = Math.round(total - minutes * 60);
+  if (minutes === 0) return seconds + ' 秒';
+  return minutes + ' 分 ' + seconds + ' 秒';
 }
 
 /**
@@ -1179,12 +1440,27 @@ function runSelfTestMachineResumeFromMenu_() {
 }
 
 /**
- * 兩個選單入口嘅共用本體。
- * @param {boolean} resume 續跑
- * @param {string} title 對話框標題
+ * 選單「測試工具 ▸ ▶️ 只重跑紅色情境」。
+ *
+ * 第五十輪批次 A2 組：修好一樣嘢之後，唔使把成季清晒重頭嚟。
+ *
+ * ⚠️ **唔會重設沙盒季度。** 呢個入口嘅意思就係「保留現場，
+ * 只重跑嗰幾個」。要由頭嚟就撳「⚠️ 跑自測」。
+ *
  * @returns {void}
  */
-function selfTestMenuEntry_(resume, title) {
+function runSelfTestRerunFailedFromMenu_() {
+  selfTestMenuEntry_(true, '▶️ 只重跑紅色情境', true);
+}
+
+/**
+ * 三個選單入口嘅共用本體。
+ * @param {boolean} resume 續跑
+ * @param {string} title 對話框標題
+ * @param {boolean=} rerunFailedOnly 只重跑紅色情境
+ * @returns {void}
+ */
+function selfTestMenuEntry_(resume, title, rerunFailedOnly) {
   const ui = SpreadsheetApp.getUi();
   const quarter = readSelfTestQuarterDetail_();
 
@@ -1207,7 +1483,7 @@ function selfTestMenuEntry_(resume, title) {
 
   let report;
   try {
-    report = runSelfTestMachine_(resume);
+    report = runSelfTestMachine_(resume, rerunFailedOnly);
   } catch (err) {
     log_('ERROR', 'runSelfTestMachine_ 失敗：' + err.message);
     ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);

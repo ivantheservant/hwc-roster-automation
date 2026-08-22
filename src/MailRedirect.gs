@@ -216,3 +216,190 @@ function buildMailRedirectBadgeText_() {
   return '⚠️ 全部信件轉寄至 ' + targets.join('、')
     + (targets.length > 1 ? ('（共 ' + targets.length + ' 個地址）') : '');
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第五十輪批次 E 組：**`SendLog` 缺 `IntendedEmail` 同 `DeliveredTo`。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 現場（第四十九輪自測機嘅 I01，每一個情境都報）：
+ *
+ *     I01｜預期 0 個缺欄｜實際 2 個缺欄｜
+ *     SendLog：缺「IntendedEmail」（COLUMNS.SEND_LOG.INTENDED_EMAIL）；
+ *     SendLog：缺「DeliveredTo」（COLUMNS.SEND_LOG.DELIVERED_TO）
+ *
+ * 呢一條係真嘅：
+ *   ・`Constants.gs` 定義咗兩個鍵，而且註釋自己寫住「兩樣都要記」
+ *   ・`Mailer.gs` 真係有寫呢兩個值入 `record`
+ *   ・**但** `writeSendLogRows_()` 係按表頭逐欄寫（`headers.map(...)`），
+ *     而真實試算表冇呢兩欄 ⇒ 兩個值靜靜掉咗
+ *
+ * ⚠️ 後果好實在：`MAIL_REDIRECT_ALL_TO` 而家有值、正在生效。
+ * 即係 Ivan 準備做嘅真實寄信測試，`SendLog` 只會記到轉寄地址，
+ * 記唔到「呢一封原本要寄畀邊個」。
+ * 第四十一輪 H 組要防嗰件事，**一次都冇真正生效過**。
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * 同第四十七輪 C 組一模一樣
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * 第四十七輪修嘅係 `SpecialSundays` 缺 `Confirmed`。同一種病：
+ * **`COLUMNS` 定義咗鍵，真實試算表冇嗰一欄，寫入靜靜略過。**
+ *
+ * ⚠️ 而第四十七輪 C5 特登為此寫嘅 `tools/lint-schema-drift.js`
+ * **捉唔到呢一個**——因為佢比對嘅係「`COLUMNS.<SHEET>` 嘅鍵」對
+ * 「程式碼入面嘅 `*_HEADERS_TC` 陣列」，而 `SendLog` 喺程式碼入面
+ * 根本冇 header 陣列，所以佢冇嘢可以比，就當成冇問題。
+ *
+ * **即係嗰支 lint 只驗得到「碼對碼」，驗唔到「碼對真實試算表」。**
+ * 呢一次係 I01（執行期不變量）捉到嘅。
+ */
+
+/** `SendLog` 應該有、而真實試算表可能冇嘅欄。 */
+function sendLogExpectedKeys_() {
+  const C = COLUMNS.SEND_LOG;
+  return Object.keys(C).map(function (k) { return C[k]; });
+}
+
+/**
+ * 算一算 `SendLog` 缺邊幾欄。**純讀取。**
+ *
+ * @returns {{sheetExists: boolean, headers: string[], missing: string[],
+ *   nextCol: number, rowCount: number}}
+ */
+function planSendLogColumnBackfill_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SEND_LOG);
+  if (!sheet) {
+    return { sheetExists: false, headers: [], missing: [], nextCol: 0, rowCount: 0 };
+  }
+  const lastCol = sheet.getLastColumn();
+  const lastRow = sheet.getLastRow();
+  const headers = lastCol > 0
+    ? sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(function (v) {
+      return String(v || '').trim();
+    })
+    : [];
+  const missing = sendLogExpectedKeys_().filter(function (key) {
+    return headers.indexOf(key) === -1;
+  });
+  return {
+    sheetExists: true, headers: headers, missing: missing,
+    nextCol: lastCol + 1, rowCount: Math.max(0, lastRow - 2)
+  };
+}
+
+/**
+ * 真正補欄。**只喺最後加欄，一格既有資料都唔會動。**
+ *
+ * ⚠️ **唔會替既有行填值。** 舊行到底寄咗去邊，而家已經無從得知——
+ * 猜一個上去就係造假紀錄。而一份造假嘅寄送紀錄，比冇紀錄更差：
+ * 冇紀錄嘅時候你知道自己唔知；假紀錄會令你以為自己知。
+ *
+ * @param {Object} plan `planSendLogColumnBackfill_()` 的結果
+ * @returns {{added: string[]}}
+ */
+function executeSendLogColumnBackfill_(plan) {
+  if (!plan.sheetExists || plan.missing.length === 0) return { added: [] };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SEND_LOG);
+  let col = plan.nextCol;
+  plan.missing.forEach(function (key) {
+    // 第 1 行係中文標題、第 2 行係機器鍵——同其他工作表一樣。
+    sheet.getRange(1, col).setValue(key);
+    sheet.getRange(2, col).setValue(key);
+    col++;
+  });
+
+  // ⚠️ **到此為止。** 唔會替任何一行填值。
+
+  writeAuditLog_({
+    action: 'SEND_LOG_COLUMN_BACKFILL',
+    targetSheet: SHEETS.SEND_LOG,
+    targetCell: '第 ' + plan.nextCol + ' 欄起',
+    oldValue: '（沒有這幾欄）',
+    newValue: plan.missing.join('、'),
+    source: 'executeSendLogColumnBackfill_',
+    notes: '只在最後加欄；沒有重排、沒有刪除、沒有改動任何既有資料，'
+      + '亦沒有替任何一行填值（舊行寄去了哪裡已經無從得知，'
+      + '猜一個上去就是造假紀錄）'
+  });
+  return { added: plan.missing.slice() };
+}
+
+/**
+ * 選單項目「維護 ▸ ⚠️ 補建 SendLog 缺欄」的執行入口。
+ * @returns {void}
+ */
+function runSendLogColumnBackfill_() {
+  const ui = SpreadsheetApp.getUi();
+  const title = '補建 SendLog 缺欄';
+
+  let plan;
+  try {
+    plan = planSendLogColumnBackfill_();
+  } catch (err) {
+    log_('ERROR', 'runSendLogColumnBackfill_ 失敗: ' + err.message);
+    ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  if (!plan.sheetExists) {
+    ui.alert(title, '找不到「' + SHEETS.SEND_LOG + '」這一張工作表。', ui.ButtonSet.OK);
+    return;
+  }
+  if (plan.missing.length === 0) {
+    ui.alert(title,
+      '這一張表已經有全部欄，沒有改動。\n\n'
+        + '目前有 ' + plan.headers.length + ' 欄、' + plan.rowCount + ' 行資料。',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  const lines = [
+    '「' + SHEETS.SEND_LOG + '」現在缺這 ' + plan.missing.length + ' 欄：',
+    '　' + plan.missing.join('、'),
+    ''
+  ];
+  // ⚠️ 轉寄生效嗰陣要講得特別清楚——嗰個就係呢兩欄存在嘅理由。
+  let redirectTargets = [];
+  try {
+    redirectTargets = readMailRedirectTargets_();
+  } catch (err) {
+    redirectTargets = [];
+  }
+  if (redirectTargets.length > 0
+      && plan.missing.indexOf(COLUMNS.SEND_LOG.INTENDED_EMAIL) !== -1) {
+    lines.push('⚠️ 轉寄測試地址目前生效中（' + redirectTargets.join('、') + '）。');
+    lines.push('　 缺了「' + COLUMNS.SEND_LOG.INTENDED_EMAIL + '」這一欄，');
+    lines.push('　 寄出去之後就查不到「這一封原本要寄給誰」。');
+    lines.push('');
+  }
+  lines.push('會做的事：');
+  lines.push('　・在最後（第 ' + plan.nextCol + ' 欄起）加這幾欄，標題同機器鍵各一行');
+  lines.push('');
+  lines.push('不會做的事：');
+  lines.push('　・不會重排、不會刪除任何一欄');
+  lines.push('　・不會改動任何一格既有資料');
+  lines.push('　・不會替任何一行填值');
+  lines.push('');
+  lines.push('補完之後，既有的 ' + plan.rowCount + ' 行這幾欄會是空白——那是正常的，');
+  lines.push('因為那些是補欄之前寄的，寄去了哪裡已經無從得知。');
+  lines.push('');
+  lines.push('要加這幾欄嗎？');
+
+  if (ui.alert(title, lines.join('\n'), ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+
+  let result;
+  try {
+    result = executeSendLogColumnBackfill_(plan);
+  } catch (err) {
+    log_('ERROR', 'executeSendLogColumnBackfill_ 失敗: ' + err.message);
+    ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  ui.alert(title,
+    '已經加好這 ' + result.added.length + ' 欄：\n　' + result.added.join('、') + '\n\n'
+      + '既有的 ' + plan.rowCount + ' 行這幾欄是空白的——那是正常的。\n'
+      + '由現在起寄出的每一封，都會記得到「原本要寄給誰」同「實際寄去了哪裡」。',
+    ui.ButtonSet.OK);
+}

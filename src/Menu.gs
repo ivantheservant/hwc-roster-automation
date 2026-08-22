@@ -95,6 +95,10 @@ function onOpen() {
         // 第四十七輪批次 D 組：合堂嗰五個崗位由另一堂帶領，
         // 而系統一直交咗畀幹事逐次記得人手填。
         .addItem('補填合堂跳過崗位', 'runCombinedSkipBackfill_')
+        // 第五十輪批次 E 組：`SendLog` 缺 `IntendedEmail`／`DeliveredTo`。
+        // ⚠️ 轉寄測試地址生效嗰陣，冇咗嗰兩欄就查唔到
+        // 「呢一封原本要寄畀邊個」。
+        .addItem('⚠️ 補建 SendLog 缺欄', 'runSendLogColumnBackfill_')
         .addItem('建立 Requests 工作表', 'runCreateRequestsSheet_')
         .addItem('⚠️ 清理 Requests 手改痕跡', 'runCleanRequestsTampering_')
         .addItem('重設 Requests 驗證規則', 'runResetRequestsValidations_')
@@ -143,6 +147,9 @@ function onOpen() {
         // 實測時 Ivan 撳錯咗。
         .addItem('⚠️ 跑自測（沙盒季度，DRY_RUN）', 'runSelfTestMachineFromMenu_')
         .addItem('▶️ 繼續跑自測', 'runSelfTestMachineResumeFromMenu_')
+        // 第五十輪批次 A2 組：修好一樣嘢之後，只重跑紅嗰幾個。
+        // ⚠️ 唔會重設沙盒季度——呢個入口嘅意思就係「保留現場」。
+        .addItem('▶️ 只重跑紅色情境', 'runSelfTestRerunFailedFromMenu_')
         // 第四十九輪批次 第 4 層：亂行機。
         // 隨機揀合法動作、每一步跑一次全部不變量。
         // ⚠️ 全程 DRY_RUN，每 10 步重新斷言一次。

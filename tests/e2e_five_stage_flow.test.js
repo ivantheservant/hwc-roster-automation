@@ -477,7 +477,18 @@ function buildFixture() {
       C.SEND_LOG.RECIPIENT_TYPE, C.SEND_LOG.PERSON_ID, C.SEND_LOG.EMAIL, C.SEND_LOG.DISPLAY_NAME,
       C.SEND_LOG.ASSIGNMENT_HASH, C.SEND_LOG.ASSIGNMENT_SUMMARY, C.SEND_LOG.ATTACHMENT_NAME,
       C.SEND_LOG.SENT_AT, C.SEND_LOG.STATUS, C.SEND_LOG.MESSAGE_ID, C.SEND_LOG.ERROR_MESSAGE,
-      C.SEND_LOG.TRIGGERED_BY], []);
+      C.SEND_LOG.TRIGGERED_BY,
+      // ⚠️ 第五十輪批次 E 組：**header 要同 `COLUMNS.SEND_LOG` 一致。**
+      //
+      // 呢個 fixture 本來手砌到 `TriggeredBy` 為止，即係少咗
+      // `SendOptions`／`IntendedEmail`／`DeliveredTo` 三欄——
+      // 而嗰個正正就係真實試算表嘅狀態，亦即係 E 組要修嗰個 bug。
+      //
+      // 補返呢三欄有兩個作用：
+      //   一、fixture 反映「Ivan 跑完『補建 SendLog 缺欄』之後」嘅樣
+      //   二、E2 嗰個擋（轉寄生效 ＋ 缺欄 ⇒ 唔准寄）唔會喺呢一份 e2e
+      //       度誤觸——佢守嘅係真實試算表，唔係一個手砌 fixture
+      C.SEND_LOG.SEND_OPTIONS, C.SEND_LOG.INTENDED_EMAIL, C.SEND_LOG.DELIVERED_TO], []);
   seedSheet(ss, S.AUDIT_LOG, ['稽核記錄'],
     [C.AUDIT_LOG.LOG_ID, C.AUDIT_LOG.TIMESTAMP, C.AUDIT_LOG.ACTOR, C.AUDIT_LOG.ACTION,
       C.AUDIT_LOG.TARGET_SHEET, C.AUDIT_LOG.TARGET_KEY, C.AUDIT_LOG.OLD_VALUE, C.AUDIT_LOG.NEW_VALUE,
