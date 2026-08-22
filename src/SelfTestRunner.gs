@@ -670,6 +670,199 @@ function selfTestS10_(quarterId) {
   return t.result();
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+ * 情境　S11 – S15
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/** S11：再撳一次正式發出 ⇒ 要被防重複擋住，而且講得出原因。 */
+function selfTestS11_(quarterId) {
+  const t = selfTestCollector_('S11');
+  let threw = '';
+  try {
+    selfTestCall_('S11', 'apiStep4Confirm',
+      function () { return apiStep4Confirm(quarterId, null); });
+  } catch (err) {
+    threw = err.message;
+  }
+  t.expect('第二次「正式發出」被擋住',
+    threw !== '', '拋錯', threw || '（沒有拋錯，即是又寄了一次）',
+    '正式發出是一季一次的動作。擋不住的話，全體義工會收到第二封'
+      + '「正式」通知——對他們來說就是「究竟哪一封才算數」。');
+  // ⚠️ 「被擋住」唔夠。**要講得出點解**——
+  // 一句「不能執行」對幹事完全冇用。
+  t.expect('而且訊息講得出是因為已經發出過',
+    /已經.*發出|已經.*正式/.test(threw), '訊息提到已經發出過', threw, threw);
+  t.expect('訊息是三段式（發生了什麼／現在的情況／你可以怎樣做）',
+    threw.indexOf('發生了什麼') !== -1 && threw.indexOf('你可以怎樣做') !== -1,
+    '三段都有', threw.slice(0, 120), threw);
+  return t.result();
+}
+
+/** S12：回到上一個版本。 */
+function selfTestS12_(quarterId) {
+  const t = selfTestCollector_('S12');
+  const before = findLatestVersionNo(quarterId);
+  if (before < 1) {
+    t.expect('這一季有多過一個版本才回退得到', false, '≥ v1', 'v' + before,
+      '前面的情境沒有造出第二個版本。這一批要由 S01 順住跑。');
+    return t.result();
+  }
+
+  const target = before - 1;
+  const plan = selfTestCall_('S12', 'apiRollbackPlan',
+    function () { return apiRollbackPlan(quarterId, target); });
+
+  // ⚠️ 回退係一個**會蓋走現況**嘅動作，所以個 plan 一定要有警告。
+  // 冇警告嘅回退，幹事會當成「睇一睇」噉撳落去。
+  t.expect('回退的預覽有警告，不是靜靜就做',
+    JSON.stringify(plan).indexOf('警告') !== -1
+      || (plan.warnings && plan.warnings.length > 0)
+      || plan.needsRelease === true
+      || String(plan.confirmText || '') !== '',
+    '有警告／要打字確認', JSON.stringify(plan).slice(0, 300),
+    'apiRollbackPlan() 的回傳');
+  t.expect('而且預覽本身沒有動到版本'
+    + '——「先算後做」：看一眼不應該改任何東西',
+    findLatestVersionNo(quarterId) === before,
+    'v' + before, 'v' + findLatestVersionNo(quarterId),
+    '叫過 apiRollbackPlan() 之後最新版本號');
+  return t.result();
+}
+
+/** S13：下載及匯出——整季 PDF。 */
+function selfTestS13_(quarterId) {
+  const t = selfTestCollector_('S13');
+  const versionNo = findLatestVersionNo(quarterId);
+  let result = null;
+  let threw = '';
+  try {
+    result = selfTestCall_('S13', 'apiExportRosterPdf',
+      function () { return apiExportRosterPdf(quarterId, versionNo); });
+  } catch (err) {
+    threw = err.message;
+  }
+  t.expect('整季 PDF 真的產生出來', threw === '' && !!result,
+    '產生得到', threw || JSON.stringify(result),
+    'apiExportRosterPdf()');
+  // ⚠️ 「有回傳」唔等於「有檔案」。要拎得到 URL 先算數。
+  t.expect('而且拿得到檔案連結（不是只回一個空物件）',
+    !!(result && (result.url || result.fileUrl)),
+    '有 url', JSON.stringify(result || {}).slice(0, 200),
+    '回傳裡面找不到 url／fileUrl 就代表「報告說做好了，而檔案不知在哪」');
+  return t.result();
+}
+
+/**
+ * S14：特殊主日——`SkipPostIDs` 填上之後，重新生成，嗰幾格要真係空住。
+ *
+ * ⚠️ 而且標籤要係「特殊主日」（或者 `ExternalOwner` 嗰句），
+ * **唔可以**係「待確認」——後者係「未派到人」嘅意思，
+ * 而呢一格係「特登唔派」。兩者對幹事嚟講差好遠。
+ */
+function selfTestS14_(quarterId) {
+  const t = selfTestCollector_('S14');
+  const S = COLUMNS.SPECIAL_SUNDAYS;
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const dates = readServiceDatesNormalized(quarterId, timezone);
+  if (dates.length === 0) {
+    t.expect('這一季有主日', false, '≥ 1 個', '0 個', 'readServiceDatesNormalized()');
+    return t.result();
+  }
+  const targetDate = dates[0].serviceDate;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.SPECIAL_SUNDAYS);
+  if (!sheet) {
+    t.expect('SpecialSundays 工作表存在', false, '存在', '找不到',
+      '維護 ▸ 補建 SpecialSundays 工作表');
+    return t.result();
+  }
+
+  // ⚠️ **真嘅 append 一行落張工作表**，唔係喺記憶體造。
+  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (v) { return String(v || '').trim(); });
+  const row = new Array(headers.length).fill('');
+  const put = function (key, value) {
+    const idx = headers.indexOf(key);
+    if (idx >= 0) row[idx] = value;
+  };
+  put(S.SPECIAL_ID, quarterId + '-SELFTEST');
+  put(S.QUARTER_ID, quarterId);
+  put(S.SERVICE_DATE, targetDate);
+  put(S.TYPE, '合堂');
+  put(S.TITLE, '自測用合堂');
+  put(S.SKIP_POST_IDS, 'CHAIR');
+  put(S.ACTIVE, 'TRUE');
+  // ⚠️ S15 要用：明確填 FALSE 先至算「未確認」。
+  put(S.CONFIRMED, 'FALSE');
+  sheet.appendRow(row);
+  t.expect('特殊主日那一行真的寫進工作表', true, '寫得到', '寫得到',
+    quarterId + '-SELFTEST　' + targetDate + '　SkipPostIDs=CHAIR');
+
+  // 重新生成——⚠️ 經真實入口。
+  selfTestCall_('S14', 'apiGenerateDraftExecute',
+    function () { return apiGenerateDraftExecute(quarterId); });
+
+  const versionNo = findLatestVersionNo(quarterId);
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const chairOnThatDay = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+    return String(r[A.QUARTER_ID] || '').trim() === quarterId
+      && Number(r[A.VERSION_NO]) === versionNo
+      && toDateString(r[A.SERVICE_DATE], timezone) === targetDate
+      && String(r[A.POST_ID] || '').trim() === 'CHAIR'
+      && String(r[A.PERSON_ID] || '').trim() !== '';
+  });
+  t.equal('那一天的主席沒有被派人（SkipPostIDs 生效）',
+    chairOnThatDay.length, 0,
+    targetDate + ' 的 CHAIR 在 v' + versionNo + ' 有 '
+      + chairOnThatDay.length + ' 個有人的格');
+
+  // ⚠️ 標籤要講「特殊主日」，唔可以係「待確認」。
+  const gridName = buildRosterSheetName_(quarterId, versionNo);
+  const grid = ss.getSheetByName(gridName);
+  if (grid) {
+    const keys = grid.getRange(2, 1, 1, grid.getLastColumn()).getValues()[0]
+      .map(function (v) { return String(v || ''); });
+    const col = keys.indexOf('CHAIR#1') + 1;
+    const rows = grid.getRange(3, 1, Math.max(0, grid.getLastRow() - 2), 1).getValues();
+    let text = '（找不到那一格）';
+    for (let i = 0; i < rows.length; i++) {
+      if (toDateString(rows[i][0], timezone) !== targetDate) continue;
+      if (col > 0) text = String(grid.getRange(i + 3, col).getValue() || '');
+      break;
+    }
+    t.expect('而且那一格的字不是「待確認」'
+      + '——「待確認」的意思是「還沒有派到人」，'
+      + '而這一格是「特意不派」。兩者對幹事來說差很遠',
+      text.indexOf('待確認') === -1, '不是「待確認」', text,
+      gridName + ' 的 ' + targetDate + '　CHAIR#1');
+  }
+  return t.result();
+}
+
+/** S15：合堂 ＋ `Confirmed=FALSE` ⇒ 體檢要報「未確認的特殊主日 1 個」。 */
+function selfTestS15_(quarterId) {
+  const t = selfTestCollector_('S15');
+  // S14 已經寫咗一行 `Confirmed=FALSE`。
+  const rows = readSpecialSundays(quarterId).filter(function (r) {
+    return isUnconfirmedSpecialSunday_(r);
+  });
+  t.expect('系統數得到那一個未確認的特殊主日',
+    rows.length >= 1, '≥ 1 個', rows.length + ' 個',
+    '第四十七輪 C 組之前，這個數字永遠是 0——'
+      + '因為 SpecialSundays 根本沒有 Confirmed 欄，'
+      + 'isUnconfirmedSpecialSunday_() 永遠讀到 undefined。'
+      + '這一條就是那個 bug 的真環境防線。');
+
+  // ⚠️ 順手驗埋 I01：張表真係有 `Confirmed` 呢一欄。
+  const inv = invariantSheetHeaders_();
+  t.expect('而且 SpecialSundays 真的有 Confirmed 這一欄',
+    inv.status === INVARIANT_STATUS.OK
+      || inv.evidence.indexOf(COLUMNS.SPECIAL_SUNDAYS.CONFIRMED) === -1,
+    '沒有缺欄', inv.actual, inv.evidence);
+  return t.result();
+}
+
 /**
  * 全部情境嘅登記表。
  *
@@ -690,7 +883,12 @@ function selfTestScenarios_() {
     { id: 'S07', title: '寫 3 筆申報 → 套用', run: selfTestS07_ },
     { id: 'S08', title: '產生個人 PDF', run: selfTestS08_ },
     { id: 'S09', title: '正式發出（DRY_RUN）', run: selfTestS09_ },
-    { id: 'S10', title: '改 2 格 → 儲存 → 改動後重發', run: selfTestS10_ }
+    { id: 'S10', title: '改 2 格 → 儲存 → 改動後重發', run: selfTestS10_ },
+    { id: 'S11', title: '再撳一次正式發出 ⇒ 要被擋住，而且講得出原因', run: selfTestS11_ },
+    { id: 'S12', title: '回到上一個儲存版本（只看預覽，不執行）', run: selfTestS12_ },
+    { id: 'S13', title: '下載及匯出：整季 PDF', run: selfTestS13_ },
+    { id: 'S14', title: '特殊主日 SkipPostIDs 生效（第四十七輪 D 組）', run: selfTestS14_ },
+    { id: 'S15', title: '未確認的特殊主日數得到（第四十七輪 C 組）', run: selfTestS15_ }
   ];
 }
 

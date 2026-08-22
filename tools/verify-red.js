@@ -1946,6 +1946,28 @@ const MUTATIONS = [
     replace: '      if (false) {',
     tests: ['tests/missing_pdf_inline.test.js']
   },
+  {
+    id: 'st-s12-really-rolls',
+    why: '令 S12 真係執行回退'
+      + '——回退會蓋走現況，而後面 S13–S15 全部靠住嗰個現況。'
+      + '嗰種假紅最難查：幾個情境驗緊一個佢哋以為冇變過嘅狀態',
+    file: 'src/SelfTestRunner.gs',
+    find: "  const plan = selfTestCall_('S12', 'apiRollbackPlan',",
+    replace: "  apiRollbackExecute(quarterId, target, '');" + '\n'
+      + "  const plan = selfTestCall_('S12', 'apiRollbackPlan',",
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-s14-fake-special',
+    why: '令 S14 唔真嘅寫 `SpecialSundays`'
+      + '——喺記憶體造一個 overlay 就係「fixture 造到一個'
+      + '真實 code path 造唔出嘅狀態」，即係呢一層要擋嗰件事本身',
+    file: 'src/SelfTestRunner.gs',
+    find: '  sheet.appendRow(row);\n'
+      + "  t.expect('特殊主日那一行真的寫進工作表'",
+    replace: "  t.expect('特殊主日那一行真的寫進工作表'",
+    tests: ['tests/selftest_runner.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

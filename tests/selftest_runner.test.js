@@ -220,13 +220,38 @@ console.log('\n=== 四【核心】一個爆咗，後面照跑；而且每個都�
 console.log('\n=== 五 情境要獨立、可以單獨重跑 ===');
 {
   const ids = (CODE.match(/function selfTestS\d\d_\(/g) || []);
-  check('★★★★★ S01–S10 每一個都係獨立函式',
-    ids.length >= 10, JSON.stringify(ids));
+  check('★★★★★ S01–S15 每一個都係獨立函式',
+    ids.length >= 15, JSON.stringify(ids));
   const registry = CODE.slice(CODE.indexOf('function selfTestScenarios_('));
-  ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10']
+  ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09', 'S10',
+    'S11', 'S12', 'S13', 'S14', 'S15']
     .forEach(function (id) {
       check('★★★★ ' + id + ' 有登記', registry.indexOf("'" + id + "'") !== -1, '');
     });
+
+  // ── S12 唔准真係回退 ────────────────────────────────────────
+  //
+  // ⚠️ 回退會蓋走現況，而後面 S13–S15 全部靠住嗰個現況。
+  // 一個「順手做埋佢」嘅情境，會令後面幾個情境驗緊一個
+  // 佢哋以為冇變過嘅狀態——而嗰個就係最難查嗰種假紅。
+  const s12 = CODE.slice(CODE.indexOf('function selfTestS12_('),
+    CODE.indexOf('function selfTestS13_('));
+  check('★★★★★★ S12 只叫 `apiRollbackPlan()`，唔叫 `apiRollbackExecute()`'
+    + '——回退會蓋走現況，而後面幾個情境全部靠住嗰個現況',
+    /apiRollbackPlan\(/.test(s12) && !/apiRollbackExecute\(/.test(s12), s12.slice(0, 300));
+
+  // ── S14／S15 係第四十七輪兩個 bug 嘅真環境防線 ────────────────
+  const s14 = CODE.slice(CODE.indexOf('function selfTestS14_('),
+    CODE.indexOf('function selfTestS15_('));
+  check('★★★★★★ S14 真嘅 append 一行落 `SpecialSundays`，然後真嘅重新生成'
+    + '——喺記憶體造一個 overlay 就係「fixture 造到一個'
+    + '真實 code path 造唔出嘅狀態」',
+    /sheet\.appendRow\(row\);/.test(s14) && /apiGenerateDraftExecute/.test(s14),
+    s14.slice(0, 200));
+  check('★★★★★★ 而且驗埋「唔可以係『待確認』」'
+    + '——「待確認」＝「未派到人」，而呢一格係「特登唔派」。'
+    + '兩者對幹事嚟講差好遠',
+    /待確認/.test(s14), '');
 }
 
 // =====================================================================
