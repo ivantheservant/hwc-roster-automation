@@ -255,6 +255,20 @@ function getConfigKeySeeds_() {
         + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.SELFTEST_QUARTER_ID, type: CONFIG_TYPES.STR, group: 'SYSTEM',
+      defaultValue: SELFTEST_QUARTER_DEFAULT,
+      description: '「測試工具 ▸ ⚠️ 跑自測（沙盒季度，DRY_RUN）」專用的沙盒季度。'
+        + '⚠️ 自測機每一次開跑都會把這一季整季清乾淨（連 v0），然後由頭走一次完整流程，'
+        + '所以這一格一定要填一個沒有真實資料的季度。'
+        + '開跑之前有三道閘擋住（不可以在 '
+        + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + ' 或 '
+        + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + ' 裡面、Stage 不可以是已正式發出），'
+        + '但最後一道防線仍然是這一格填得對。'
+        + '⚠️ 填成空白會退回程式內建的預設值（' + SELFTEST_QUARTER_DEFAULT + '），'
+        + '不會變成「隨便挑一季」。',
+      editable: 'TRUE'
+    },
     // ---- MAIL ----
     {
       key: CONFIG_KEYS.MAIL_ADMIN_NOTIFY, type: CONFIG_TYPES.EMAIL, group: 'MAIL',

@@ -132,6 +132,17 @@ function onOpen() {
         // 刻意沒有自動修復，理由見 VersionCellAudit.gs 檔頭。
         .addItem('清點格子分類（唯讀）', 'runVersionCellAudit_')
         .addItem('自我測試', 'runSelfTest_')
+        // ── 第四十九輪批次 第 1 層：真環境自測機 ──────────────
+        //
+        // ⚠️ 同上面嗰個「自我測試」係兩件事，唔好撳錯：
+        //   「自我測試」　　＝ 一組唯讀嘅單元檢查，唔會改任何嘢
+        //   「⚠️ 跑自測」　＝ 會把沙盒季度整季清乾淨，然後由頭走一次
+        //                     完整流程（生成／改格／儲存／寄信 DRY_RUN）
+        //
+        // 字頭同圖示特登唔同——第三十三輪就係因為兩項字頭一樣，
+        // 實測時 Ivan 撳錯咗。
+        .addItem('⚠️ 跑自測（沙盒季度，DRY_RUN）', 'runSelfTestMachineFromMenu_')
+        .addItem('▶️ 繼續跑自測', 'runSelfTestMachineResumeFromMenu_')
         .addItem('參數掃描', 'runTuneParameters_')
         .addItem('多次生成比較', 'runCompareMultiRun_')
         // 第二十九輪批次階段 D：由頭到尾行足五步，然後出一份報告。

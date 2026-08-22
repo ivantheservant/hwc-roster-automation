@@ -1653,6 +1653,150 @@ const MUTATIONS = [
       + '    }',
     tests: ['tests/combined_skip_posts.test.js']
   },
+  {
+    id: 'inv-error-is-ok',
+    why: '令一條算唔出嘅不變量報成通過'
+      + '——「查不到」當成「冇事」，就係呢個專案由第一輪殺到而家嗰種錯。'
+      + '一支「拋咗錯就當成通過」嘅檢查，比冇檢查更差',
+    file: 'src/Invariants.gs',
+    find: '      results.push(invariantResult_(id, label, INVARIANT_STATUS.ERROR,',
+    replace: '      results.push(invariantResult_(id, label, INVARIANT_STATUS.OK,',
+    tests: ['tests/invariants.test.js']
+  },
+  {
+    id: 'inv-stops-on-first',
+    why: '一條爆咗就成批停低'
+      + '——一個細問題會掩蓋晒後面全部',
+    file: 'src/Invariants.gs',
+    find: '    try {' + '\n'
+      + '      const out = fn();',
+    replace: '    if (true) {' + '\n'
+      + '      const out = fn();',
+    tests: ['tests/invariants.test.js']
+  },
+  {
+    id: 'inv-error-not-must',
+    why: '把「算唔出」由 MUST 降做資訊'
+      + '——「我哋唔知對唔對得上」同「對唔上」一樣咁重要',
+    file: 'src/Invariants.gs',
+    find: '  const broken = report.failedCount + report.errorCount;',
+    replace: '  const broken = report.failedCount;',
+    tests: ['tests/invariants.test.js']
+  },
+  {
+    id: 'inv-i08-tautology',
+    why: '把 I08 嘅 `verify` 改成抄 `produce` 一份'
+      + '——自己同自己比，永遠綠。'
+      + '而嗰個正正就係第四十六輪「3 位 vs 9 封」冇被捉到嘅原因',
+    file: 'src/Invariants.gs',
+    find: '      verify: function (quarterId, sendOptions) {' + '\n'
+      + '        // 另一條路：直接由收件人解析器數，唔經 `planStep2_()`。' + '\n'
+      + '        const versionNo = findLatestVersionNo(quarterId);' + '\n'
+      + '        return resolveActualRecipients_(' + '\n'
+      + '          quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions).length;' + '\n'
+      + '      }',
+    replace: '      verify: function (quarterId, sendOptions) {' + '\n'
+      + '        return planStep2_(quarterId, sendOptions).recipientCount;' + '\n'
+      + '      }',
+    tests: ['tests/invariants.test.js']
+  },
+  {
+    id: 'inv-i08-no-pick',
+    why: '只用「冇揀」嗰一份 `sendOptions` 跑'
+      + '——兩個算法喺嗰種情況啱啱好重合，'
+      + '而第四十七輪 e2e 就係噉樣由頭綠到尾',
+    file: 'src/Invariants.gs',
+    find: '      {' + '\n'
+      + "        label: '（自己選擇 1 位）'," + '\n'
+      + "        options: { recipientScope: SEND_RECIPIENT_SCOPE.PICK, pickedKeys: ['__I08_PROBE__'] }" + '\n'
+      + '      }',
+    replace: "      { label: '（沒有選項，第二次）', options: null }",
+    tests: ['tests/invariants.test.js']
+  },
+  {
+    id: 'inv-writes-back',
+    why: '令不變量寫一筆 AuditLog'
+      + '——一支唯讀檢查寫嘢落去，就會令佢自己成為佢要驗嗰個狀態嘅一部分',
+    file: 'src/Invariants.gs',
+    find: 'function runAllInvariants_(quarterId) {' + '\n'
+      + '  const results = [];',
+    replace: 'function runAllInvariants_(quarterId) {' + '\n'
+      + '  const results = [];' + '\n'
+      + "  writeAuditLog_({ action: '跑不變量' });",
+    tests: ['tests/invariants.test.js']
+  },
+  {
+    id: 'st-skip-dryrun-gate',
+    why: '拆走自測機嘅 `DRY_RUN` 閘'
+      + '——自測機會走完整個寄送流程，'
+      + 'DRY_RUN=FALSE 嗰陣嗰啲信會真係寄出去畀全體義工',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {',
+    replace: '  if (getConfig(CONFIG_KEYS.DRY_RUN, true) === false) {',
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-skip-protected',
+    why: '拆走「沙盒季度唔可以係受保護季度」嗰道閘'
+      + '——自測機每次開跑都會把沙盒季度整季清乾淨。'
+      + '行錯咗一季就係真係清咗一季真資料',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (inList(readQuarterResetBlockedQuarters_())) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-fake-stage',
+    why: '直接寫 `Quarters.Stage` 去造狀態，唔行真實入口'
+      + '——噉就係「fixture 造到一個真實 code path 造唔出嘅狀態」，'
+      + '即係呢一層要擋嗰件事本身',
+    file: 'src/SelfTestRunner.gs',
+    find: '/** S02：生成初稿。 */',
+    replace: '/** S02：生成初稿。 */' + '\n'
+      + '// eslint-disable-next-line' + '\n'
+      + "function selfTestFakeStage_(q) { setQuarterStage_(q, 'REVIEW_SENT', '假'); }",
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-time-silent-stop',
+    why: '時間到靜靜停低，唔標成未跑'
+      + '——就會變成「跑完了，全綠」嘅假象，而嗰個假象比冇跑過更差',
+    file: 'src/SelfTestRunner.gs',
+    // ⚠️ `find` 特登只鎖住 `status:` 嗰一行——上一行寫住嘅
+    // 物件屬性存取會被 `scan-staged-secrets.js` 當成一個國碼網域。
+    find: '        status: SELFTEST_STATUS.NOT_RUN, checks: [], failedChecks: [],',
+    replace: '        status: SELFTEST_STATUS.PASSED, checks: [], failedChecks: [],',
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-inv-not-fail',
+    why: '情境自己全綠而不變量紅咗嗰陣，整體照樣報綠'
+      + '——一個「畫面同表對唔上」會被一份綠色報告蓋住',
+    file: 'src/SelfTestRunner.gs',
+    find: '      if (outcome.invariantFailed > 0 && outcome.status === SELFTEST_STATUS.PASSED) {',
+    replace: '      if (false) {',
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-scenario-throws-all',
+    why: '一個情境爆咗就成批停低'
+      + '——Ivan 要重跑十次先見得晒十個問題',
+    file: 'src/SelfTestRunner.gs',
+    find: "      log_('ERROR', '自測機 ' + failedScenarioId + ' 拋錯：' + err.message);",
+    replace: '      throw err;',
+    tests: ['tests/selftest_runner.test.js']
+  },
+  {
+    id: 'st-record-can-fail',
+    why: '令錄影失敗會拋錯'
+      + '——錄影係順手做嘅嘢，唔應該有權令一個情境變紅',
+    file: 'src/SelfTestRunner.gs',
+    find: "    log_('WARN', 'selfTestRecordPayload_ 失敗（' + scenarioId + '／' + apiName",
+    replace: "    throw err;" + '\n'
+      + "    // eslint-disable-next-line no-unreachable" + '\n'
+      + "    log_('WARN', 'selfTestRecordPayload_ 失敗（' + scenarioId + '／' + apiName",
+    tests: ['tests/selftest_runner.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

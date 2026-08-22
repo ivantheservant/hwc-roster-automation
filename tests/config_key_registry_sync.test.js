@@ -37,7 +37,9 @@ function check(label, condition, extra) {
 // `QUARTER_RESET_BLOCKED_DEFAULT`（QuarterReset.gs）。
 // ⚠️ 一樣唔喺呢度手抄——載入真正嗰兩支檔案，等 seed 讀到嘅就係真值。
 const gas = loadGasSource([
-  'Constants.gs', 'ConfigSeed.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs'
+  'Constants.gs', 'ConfigSeed.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs',
+  // 第四十九輪批次：`SELFTEST_QUARTER_DEFAULT` 住喺自測機嗰度。
+  'SelfTestRunner.gs'
 ]);
 
 // `getConfigKeySeeds_()` 其中一行嘅 defaultValue 係

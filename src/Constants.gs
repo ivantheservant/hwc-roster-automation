@@ -1276,6 +1276,13 @@ const CONFIG_KEYS = {
   // 同演練、同補填工具嗰兩格都係唔同嘅事。
   // ⚠️ 填成空白**唔會**變成「乜都唔擋」，仍然退回內建預設（`2026T4`）。
   QUARTER_RESET_BLOCKED_QUARTERS: 'QUARTER_RESET_BLOCKED_QUARTERS',
+
+  // 第四十九輪批次 第 1 層：自測機專用嘅沙盒季度。
+  //
+  // ⚠️ 自測機每次開跑都會把佢**整季清乾淨**，所以呢一格填錯就係
+  // 真係清咗一季真資料。開跑之前有三道閘（受保護清單 ×2、Stage）擋住，
+  // 但最後一道防線仍然係呢一格填得啱。
+  SELFTEST_QUARTER_ID: 'SELFTEST_QUARTER_ID',
   PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
   // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
