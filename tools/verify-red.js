@@ -1907,6 +1907,45 @@ const MUTATIONS = [
     // 會令「冇未儲存改動」嗰一條斷言即刻紅。
     tests: ['tests/ui_replay.test.js']
   },
+  {
+    id: 'pdf-block-sends-menu',
+    why: '把「缺個人 PDF」嗰個窗改返做「去試算表選單自己搞掂」'
+      + '——嗰個窗把幹事踢出四步主流程，'
+      + '而第四十四輪已經為「寄紙本」修過同一個毛病',
+    file: 'src/ui/ScriptZone1.html',
+    find: '        openMissingPdfBlock(missing, versionNo, sendOpts);',
+    replace: "        openModal('正式發出：已中止', ["
+      + "errorPart('要留意', '先去試算表選單「準備工作 ▸ 產生個人 PDF」')"
+      + "], [button('知道了', () => closeModal(), '')]);",
+    tests: ['tests/missing_pdf_inline.test.js']
+  },
+  {
+    id: 'pdf-half-says-done',
+    why: '做唔完都顯示「已經產生好」'
+      + '——第四十四輪嗰個「做齊咗但仲有幾份唔見」就係同一種錯',
+    file: 'src/ui/ScriptZone1.html',
+    find: '      if (!last.done) {',
+    replace: '      if (false) {',
+    tests: ['tests/missing_pdf_inline.test.js']
+  },
+  {
+    id: 'pdf-no-way-back',
+    why: '做完之後唔畀路行返轉頭去正式發出'
+      + '——佢又要自己搵路返嚟，而嗰個就係本來要修嗰件事',
+    file: 'src/ui/ScriptZone1.html',
+    find: "        button('回到正式發出', () => { closeModal(); openOfficial(sendOpts); }, ''),",
+    replace: "        button('知道了', () => closeModal(), ''),",
+    tests: ['tests/missing_pdf_inline.test.js']
+  },
+  {
+    id: 'pdf-block-removed',
+    why: '**把個擋拆走**——冇個人 PDF 都照寄。'
+      + '收信嘅人會收到一封講住「附件係你嗰一份」而冇附件嘅信',
+    file: 'src/ui/ScriptZone1.html',
+    find: '      if (missing.blocked) {',
+    replace: '      if (false) {',
+    tests: ['tests/missing_pdf_inline.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

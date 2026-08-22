@@ -1182,6 +1182,117 @@
    * 掣 3：正式發出給全體（規格 2.6）
    * ============================================================ */
 
+  /**
+   * 一次〔現在就產生個人 PDF〕最多跑幾多批。
+   *
+   * ⚠️ 到咗呢個數唔係失敗——係「一次執行做唔晒」，
+   * 而畫面會顯示還差幾多，再畀一粒〔繼續產生〕。
+   */
+  const MISSING_PDF_MAX_ROUNDS = 40;
+
+  /**
+   * 第四十九輪批次：個人 PDF 缺件擋住正式發出嗰陣，就地補齊。
+   *
+   * ⚠️ 用返既有嗰個**分批**入口 `apiGeneratePersonalPdfBatch()`，
+   * 唔另寫一條。59 份 PDF 好可能超過單次執行時間上限，
+   * 而嗰一支本來就係為咗呢件事而寫成分批嘅。
+   *
+   * ⚠️ 做唔完**唔可以**顯示「完成了」。做唔完就顯示進度，
+   * 再畀一粒〔繼續產生〕——第四十四輪嗰個「做齊咗但仲有幾份唔見」
+   * 就係同一種錯。
+   *
+   * @param {Object} missing `apiStep4GetMissingPdfWarnings()` 嘅結果
+   * @param {number} versionNo 版本號
+   * @param {Object} sendOpts 原本嗰一次嘅寄送選項（補完之後行返轉頭要用）
+   * @returns {void}
+   */
+  function openMissingPdfBlock(missing, versionNo, sendOpts) {
+    openModal('正式發出：還沒有個人 PDF', [
+      errorPart(ERR_LABEL_WHAT,
+        '有 ' + missing.missingTotal + ' / ' + missing.total + ' 人還沒有個人 PDF，'
+        + '超過了容許的缺件上限。'),
+      errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
+      make('div', { className: 'err-part' }, [
+        make('div', { text: '你可以怎樣做', className: 'err-label' }),
+        make('div', {
+          text: '撳下面那一粒就地產生。人數多的時候要跑幾分鐘，'
+            + '而且可能會分幾次跑完——畫面會自己接住跑，不要關掉視窗。',
+          className: 'err-text'
+        })
+      ]),
+      buildTechDetails(missing.gateMessage || '')
+    ], [
+      button('現在就產生個人 PDF', () => runMissingPdfBatch(versionNo, sendOpts), ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  /**
+   * 跑分批，跑完之後行返轉頭去正式發出。
+   *
+   * @param {number} versionNo 版本號
+   * @param {Object} sendOpts 原本嗰一次嘅寄送選項
+   * @returns {void}
+   */
+  function runMissingPdfBatch(versionNo, sendOpts) {
+    closeModal();
+    runAction('產生個人 PDF，請稍候', async () => {
+      let guard = 0;
+      let last = null;
+      for (;;) {
+        guard++;
+        last = await callServerMutating(
+          'apiGeneratePersonalPdfBatch', currentQuarterId, versionNo);
+        if (!last.ok) { showErrorModal('產生個人 PDF', new Error(last.message)); return; }
+        if (last.done) break;
+        setStatus('產生個人 PDF：' + last.doneCount + ' / ' + last.totalPeople + ' 份…');
+        // ⚠️ 上限：冇呢一句，一個永遠回 `done:false` 嘅後端會令畫面
+        // 轉到天荒地老。
+        //
+        // ⚠️ 到咗上限係 **`break`，唔係 `throw`**——同 `ScriptZone4.html`
+        // 嗰個迴圈唔同。嗰邊 throw 係啱嘅（嗰個係一個獨立工具）；
+        // 呢邊 throw 就會把幹事踢返出去，而佢啱啱就係想留喺主流程度。
+        // `break` 之後 `last.done` 仍然係 false，下面會顯示
+        //「還差 N 份」＋〔繼續產生〕。
+        if (guard >= MISSING_PDF_MAX_ROUNDS) break;
+      }
+
+      if (!last.done) {
+        // ⚠️ 做唔完 ⇒ 講明仲差幾多，畀一粒〔繼續產生〕。
+        // 顯示「完成了」而實際只做咗一半，就係第四十四輪嗰個錯。
+        openModal('個人 PDF：還沒有做完', [
+          make('div', {
+            text: '已經做了 ' + last.doneCount + ' / ' + last.totalPeople + ' 份，'
+              + '還差 ' + (last.totalPeople - last.doneCount) + ' 份。',
+            className: 'lines'
+          }),
+          para('一次執行有時間上限，所以要分幾次。撳「繼續產生」接住做。', 'muted')
+        ], [
+          button('繼續產生', () => runMissingPdfBatch(versionNo, sendOpts), ''),
+          button('之後再說', () => closeModal(), 'secondary')
+        ]);
+        return;
+      }
+
+      // ── 做完 ⇒ **行返轉頭去正式發出**，唔使佢自己搵路返嚟 ──────
+      openModal('個人 PDF：已經產生好', [
+        make('div', {
+          text: '已完成 ' + last.doneCount + ' / ' + last.totalPeople + ' 位。',
+          className: 'ok-line'
+        }),
+        make('div', {
+          text: '新產生 ' + last.generatedCount + ' 份　略過（已經有同一版的檔案）'
+            + last.skippedExistingCount + ' 份',
+          className: 'muted'
+        }),
+        para('現在可以繼續「正式發出給全體」了。', 'muted')
+      ], [
+        button('回到正式發出', () => { closeModal(); openOfficial(sendOpts); }, ''),
+        button('之後再說', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
   // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
   // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
   // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
@@ -1199,22 +1310,19 @@
       const versionNo = warnings.versionNo;
       const missing = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);
 
-      // 個人 PDF 缺件超過上限 ⇒ 保留現有阻擋（第十九輪嘅關卡）。
+      // ── 個人 PDF 缺件超過上限 ⇒ 保留現有阻擋（第十九輪嘅關卡）──────
+      //
+      // ⚠️ **個擋係啱嘅，唔准拆。** 冇個人 PDF 就寄出去，
+      // 收信嘅人會收到一封講住「附件係你嗰一份」而冇附件嘅信。
+      //
+      // 但第四十九輪要修嘅係另一件事：呢個窗把幹事**踢出四步主流程**，
+      // 叫佢去另一個選單，做完再自己行返嚟。
+      // 第四十四輪已經為「寄紙本」修過同一個毛病
+      //（「做齊咗但仲有幾份唔見」唔可以再叫佢撳）。
+      //
+      // 所以：喺呢個窗**就地**畀一粒〔現在就產生個人 PDF〕。
       if (missing.blocked) {
-        openModal('正式發出：已中止', [
-          errorPart(ERR_LABEL_WHAT,
-            '有 ' + missing.missingTotal + ' / ' + missing.total + ' 人還沒有個人 PDF，'
-            + '超過了容許的缺件上限。'),
-          errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
-          make('div', { className: 'err-part' }, [
-            make('div', { text: '你可以怎樣做', className: 'err-label' }),
-            make('div', {
-              text: '先去試算表選單「準備工作 ▸ 產生個人 PDF」，把缺的補齊，再回來撳這一粒。',
-              className: 'err-text'
-            })
-          ]),
-          buildTechDetails(missing.gateMessage || '')
-        ], [button('知道了', () => closeModal(), '')]);
+        openMissingPdfBlock(missing, versionNo, sendOpts);
         return;
       }
 
