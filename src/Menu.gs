@@ -89,6 +89,12 @@ function onOpen() {
         .addItem('補建排表偏好工作表', 'runEnsurePersonPostWeightSheet_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')
         .addItem('補建 SpecialSundays 工作表', 'runEnsureSpecialSundaysSheet_')
+        // ⚠️ 第四十七輪批次 C2 組：既有嗰張表冇 `Confirmed` 欄。
+        // 補返 header 陣列只影響**日後新建**嘅表，既有嗰張要行呢一支。
+        .addItem('⚠️ 補建 SpecialSundays 缺欄', 'runSpecialSundaysColumnBackfill_')
+        // 第四十七輪批次 D 組：合堂嗰五個崗位由另一堂帶領，
+        // 而系統一直交咗畀幹事逐次記得人手填。
+        .addItem('補填合堂跳過崗位', 'runCombinedSkipBackfill_')
         .addItem('建立 Requests 工作表', 'runCreateRequestsSheet_')
         .addItem('⚠️ 清理 Requests 手改痕跡', 'runCleanRequestsTampering_')
         .addItem('重設 Requests 驗證規則', 'runResetRequestsValidations_')
@@ -2044,48 +2050,18 @@ function promptQuarterAndVersion_(title) {
 }
 
 /**
- * 選單項目「⚠️⚠️ 重設季度測試資料」的執行入口——階段 C 新增。
+ * 把一季嘅重設計畫寫成一段人睇嘅清單。**純組字，唔讀唔寫任何嘢。**
  *
- * 把一個季度累積的測試資料清走，供正式上線前重來一次。分三步：
- * 1. 掃描（`planQuarterReset_()`，只讀不刪）
- * 2. 列出將會清理的東西與數量、以及「需要人手處理」的項目，要求打字輸入
- *    「確認重設」才繼續
- * 3. 按計畫執行（`executeQuarterReset_()`）
+ * 第四十七輪批次 E2 組：由 `runResetQuarterTestData_()` 入面抽出嚟。
+ * 批次清理要**逐季**印一次呢一段，再喺最後印總數——
+ * 淨係一個總數嘅話，幹事睇唔出邊一季會清走乜，
+ * 而佢要判斷嘅正正就係「呢一季係咪真係可以清」。
  *
- * 危險程度與「安裝自動排程」同級，所以標 ⚠️⚠️。
- * @returns {void}
+ * @param {string} quarterId 季度 ID
+ * @param {Object} plan `planQuarterReset_()` 的結果
+ * @returns {string[]} 清單各行
  */
-function runResetQuarterTestData_() {
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt('⚠️⚠️ 重設季度測試資料',
-    '請輸入要重設的 QuarterID（例如 2026T4）：\n\n'
-      + '這個功能會清走該季度的版本、派工紀錄、寄送紀錄、申報，'
-      + '以及由申報自動加入的不可服侍日與該季的 PDF。\n'
-      + '人員資料、資格、Config、範本、崗位、規則一律不碰。',
-    ui.ButtonSet.OK_CANCEL);
-  if (response.getSelectedButton() !== ui.Button.OK) return;
-  const quarterId = normalizeIdInput_(response.getResponseText());
-  if (!quarterId) return;
-
-  const v0Response = ui.alert('⚠️⚠️ 重設季度測試資料',
-    'v0 是自動生成的原始版本，通常已加保護，預設「保留」。\n\n'
-      + '要連 v0 一齊清走嗎？\n\n'
-      + '「是」＝連 v0 一齊清（整季由零開始）\n'
-      + '「否」＝保留 v0（只清 v1 之後的測試版本）',
-    ui.ButtonSet.YES_NO_CANCEL);
-  if (v0Response === ui.Button.CANCEL) return;
-  const includeV0 = v0Response === ui.Button.YES;
-
-  let plan;
-  try {
-    SpreadsheetApp.getActiveSpreadsheet().toast('掃描中，請稍候…', '重設季度測試資料', 60);
-    plan = planQuarterReset_(quarterId, includeV0);
-  } catch (err) {
-    log_('ERROR', 'planQuarterReset_ 失敗: ' + err.message);
-    ui.alert('⚠️⚠️ 重設季度測試資料', '掃描失敗：\n\n' + err.message, ui.ButtonSet.OK);
-    return;
-  }
-
+function describeQuarterResetPlanLines_(quarterId, plan) {
   const lines = [
     'QuarterID：' + quarterId,
     '目前 Stage：' + (plan.quarterStage || '（讀取不到）'),
@@ -2165,72 +2141,249 @@ function runResetQuarterTestData_() {
     lines.push('', '⚠ 以下項目系統不會自動處理，需要你人手判斷：');
     plan.manualAttention.forEach(function (m) { lines.push('　• ' + m); });
   }
+  return lines;
+}
 
-  if (plan.versions.length === 0 && plan.assignmentRows === 0 && plan.sendLogRows === 0
-      && plan.requestRows === 0 && plan.unavailableRequestRows === 0 && plan.pdfFiles.length === 0
-      && plan.fineTuneProposalRows === 0 && plan.fineTuneProposalArchiveRows === 0) {
-    lines.push('', '沒有找到任何可以清理的東西，不需要執行。');
-    ui.alert('⚠️⚠️ 重設季度測試資料', lines.join('\n'), ui.ButtonSet.OK);
+/**
+ * 選單項目「⚠️⚠️ 重設季度測試資料」的執行入口。
+ *
+ * 第四十七輪批次 E 組：**一次可以食幾個季度。**
+ *
+ * 分五步：
+ * 1. 輸入一個或幾個 QuarterID（逗號分隔）
+ * 2. 揀「連 v0 一齊清」——**整批一次過揀**，唔會逐季問
+ * 3. 逐季掃描（`planQuarterReset_()`，只讀不刪）
+ * 4. 一個**合併確認畫面**：逐季細項 ＋ 總數，要求打字輸入「確認重設」
+ * 5. 逐季執行（`executeQuarterResetBatch_()`），一季爆咗其餘照做
+ *
+ * ⚠️ 真正刪嘢嗰兩支（`planQuarterReset_()`／`executeQuarterReset_()`）
+ * 一行都冇改，包括佢哋嗰啲「絕對不碰」嘅界線。呢度加嘅只係外殼。
+ *
+ * 危險程度與「安裝自動排程」同級，所以標 ⚠️⚠️。
+ * @returns {void}
+ */
+function runResetQuarterTestData_() {
+  const ui = SpreadsheetApp.getUi();
+  const TITLE = '⚠️⚠️ 重設季度測試資料';
+
+  const response = ui.prompt(TITLE,
+    '請輸入要重設的 QuarterID。要一次清幾季就用逗號分隔：\n'
+      + '　例如　2027T1　或　2027T1,2027T2,2027T3\n\n'
+      + '這個功能會清走該季度的版本、派工紀錄、寄送紀錄、申報，'
+      + '以及由申報自動加入的不可服侍日與該季的 PDF。\n'
+      + '人員資料、資格、Config、範本、崗位、規則、主日清單一律不碰。',
+    ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+
+  const parsed = parseQuarterResetBatchInput_(response.getResponseText());
+  if (parsed.quarterIds.length === 0) return;
+
+  // ⚠️ 受保護季度喺**掃描之前**就擋走，唔係喺確認畫面上面畫個叉。
+  // 一個入唔到清理名單嘅季度，唔應該有機會出現喺「將會清理」下面。
+  const blockedQuarters = readQuarterResetBlockedQuarters_();
+  const split = splitQuarterResetTargets_(parsed.quarterIds, blockedQuarters);
+
+  if (split.blocked.length > 0) {
+    const msg = ['以下季度受保護，這一支不會碰：'];
+    split.blocked.forEach(function (q) { msg.push('　・' + q); });
+    msg.push('');
+    msg.push('（設定在 Config「' + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + '」。');
+    msg.push('　⚠️ 把那一格清空並不會解除保護，系統會退回內建的預設清單。）');
+    if (split.allowed.length === 0) {
+      msg.push('');
+      msg.push('沒有其他季度可以清，這一次什麼都不會做。');
+      ui.alert(TITLE, msg.join('\n'), ui.ButtonSet.OK);
+      return;
+    }
+    msg.push('');
+    msg.push('其餘 ' + split.allowed.length + ' 季會繼續：' + split.allowed.join('、'));
+    if (ui.alert(TITLE, msg.join('\n'), ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
+  }
+
+  if (parsed.duplicates.length > 0) {
+    // 靜靜去重嘅話，幹事以為佢揀咗三季，而畫面顯示兩季，
+    // 佢會以為系統食咗一季。
+    ui.alert(TITLE,
+      '輸入裡面有重複的季度：' + parsed.duplicates.join('、') + '\n\n'
+        + '重複的只會做一次，不影響結果，這裡只是講一聲。',
+      ui.ButtonSet.OK);
+  }
+
+  const v0Response = ui.alert(TITLE,
+    'v0 是自動生成的原始版本，通常已加保護，預設「保留」。\n\n'
+      + '要連 v0 一齊清走嗎？\n\n'
+      + '「是」＝連 v0 一齊清（整季由零開始）\n'
+      + '「否」＝保留 v0（只清 v1 之後的測試版本）\n\n'
+      + '⚠️ 這一個選擇會套用到這一批的全部 ' + split.allowed.length + ' 季。',
+    ui.ButtonSet.YES_NO_CANCEL);
+  if (v0Response === ui.Button.CANCEL) return;
+  const includeV0 = v0Response === ui.Button.YES;
+
+  // ── 逐季掃描 ───────────────────────────────────────────────────
+  const entries = [];
+  const scanFailures = [];
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast('掃描中，請稍候…', '重設季度測試資料', 120);
+    split.allowed.forEach(function (quarterId) {
+      // ⚠️ 掃描都要逐季 try/catch。一季讀唔到（例如 QuarterID 打錯咗）
+      // 就成批停低嘅話，打錯一個字就要由頭再嚟過。
+      try {
+        entries.push({ quarterId: quarterId, plan: planQuarterReset_(quarterId, includeV0) });
+      } catch (err) {
+        log_('ERROR', 'planQuarterReset_ 失敗（' + quarterId + '）: ' + err.message);
+        scanFailures.push(quarterId + '：' + err.message);
+      }
+    });
+  } catch (err) {
+    log_('ERROR', 'planQuarterReset_ 批次失敗: ' + err.message);
+    ui.alert(TITLE, '掃描失敗：\n\n' + err.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  if (entries.length === 0) {
+    ui.alert(TITLE,
+      '沒有一個季度掃描得到，什麼都不會做。\n\n'
+        + scanFailures.join('\n'),
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  const summary = summariseQuarterResetBatch_(entries);
+
+  // ── 合併確認畫面 ───────────────────────────────────────────────
+  const lines = ['這一批共 ' + summary.totals.quarters + ' 季：'
+    + entries.map(function (e) { return e.quarterId; }).join('、')];
+  lines.push('連 v0 一齊清：' + (includeV0 ? 'YES' : 'NO'));
+  if (scanFailures.length > 0) {
+    lines.push('');
+    lines.push('⚠ 以下季度掃描不到，不會處理：');
+    scanFailures.forEach(function (f) { lines.push('　• ' + f); });
+  }
+  lines.push('');
+  lines.push('━━━━━━ 全部加起來 ━━━━━━');
+  lines.push('　版本：' + summary.totals.versions + ' 個');
+  lines.push('　RosterAssignments：' + summary.totals.assignmentRows + ' 行');
+  lines.push('　SendLog：' + summary.totals.sendLogRows + ' 行');
+  lines.push('　Requests：' + summary.totals.requestRows + ' 行');
+  lines.push('　Unavailable（只限 Source=REQUEST）：'
+    + summary.totals.unavailableRequestRows + ' 行');
+  lines.push('　FineTuneProposals（主表＋封存表）：'
+    + (summary.totals.fineTuneProposalRows
+      + summary.totals.fineTuneProposalArchiveRows) + ' 行');
+  lines.push('　RosterPDF：' + summary.totals.pdfFiles + ' 個（移到垃圾桶）');
+  if (summary.totals.manualAttention > 0) {
+    lines.push('　⚠ 需要人手判斷的項目：' + summary.totals.manualAttention + ' 項（見下面逐季細項）');
+  }
+
+  // ⚠️ 逐季細項一定要有。淨係一個總數嘅話，
+  // 幹事睇唔出邊一季會清走乜，而佢要判斷嘅正正就係嗰樣。
+  entries.forEach(function (entry) {
+    lines.push('');
+    lines.push('━━━━━━ ' + entry.quarterId + ' ━━━━━━');
+    describeQuarterResetPlanLines_(entry.quarterId, entry.plan).forEach(function (l) {
+      lines.push(l);
+    });
+  });
+
+  if (summary.nothingToDo) {
+    lines.push('', '這一批沒有找到任何可以清理的東西，不需要執行。');
+    ui.alert(TITLE, lines.join('\n'), ui.ButtonSet.OK);
     return;
   }
 
   lines.push('', '這個動作除了 PDF（移到垃圾桶）之外，全部無法復原。');
-  ui.alert('⚠️⚠️ 重設季度測試資料（確認清單）', lines.join('\n'), ui.ButtonSet.OK);
+  ui.alert(TITLE + '（確認清單）', lines.join('\n'), ui.ButtonSet.OK);
 
-  const confirm = ui.prompt('⚠️⚠️ 重設季度測試資料（最後確認）',
-    '看清楚上一個視窗的清單之後，如果確定要清走 ' + quarterId + ' 的測試資料，\n'
+  const confirm = ui.prompt(TITLE + '（最後確認）',
+    '看清楚上一個視窗的清單之後，如果確定要清走這 '
+      + entries.length + ' 季（' + entries.map(function (e) { return e.quarterId; }).join('、')
+      + '）的測試資料，\n'
       + '請逐字輸入「' + QUARTER_RESET_CONFIRM_TEXT + '」：\n\n'
       + '（輸入其他任何文字、或按取消，都不會清走任何東西）',
     ui.ButtonSet.OK_CANCEL);
   if (confirm.getSelectedButton() !== ui.Button.OK) return;
   if (confirm.getResponseText().trim() !== QUARTER_RESET_CONFIRM_TEXT) {
-    ui.alert('⚠️⚠️ 重設季度測試資料',
+    ui.alert(TITLE,
       '輸入的文字不是「' + QUARTER_RESET_CONFIRM_TEXT + '」，已取消，沒有清走任何東西。',
       ui.ButtonSet.OK);
     return;
   }
 
-  try {
-    SpreadsheetApp.getActiveSpreadsheet().toast('清理中，請稍候…', '重設季度測試資料', 120);
-    const result = executeQuarterReset_(plan);
+  // ── 逐季執行 ───────────────────────────────────────────────────
+  SpreadsheetApp.getActiveSpreadsheet().toast('清理中，請稍候…', '重設季度測試資料', 300);
+  const batch = executeQuarterResetBatch_(entries);
 
-    const resultLines = [
-      quarterId + ' 的測試資料已清理：',
-      '',
-      '　RosterVersions 登記列：' + result.versionRowsDeleted + ' 行',
-      '　grid 工作表：' + result.versionSheetsDeleted + ' 張',
-      '　RosterAssignments：' + result.assignmentRowsDeleted + ' 行',
-      '　SendLog：' + result.sendLogRowsDeleted + ' 行',
-      '　Requests：' + result.requestRowsDeleted + ' 行',
-      '　Unavailable（Source=REQUEST）：' + result.unavailableRowsDeleted + ' 行',
-      '　FineTuneProposals（主表）：' + result.fineTuneProposalRowsDeleted + ' 行',
-      '　FineTuneProposals_Archive（封存表）：' + result.fineTuneProposalArchiveRowsDeleted + ' 行',
-      '　RosterPDF：' + result.pdfTrashed + ' 個已移到垃圾桶',
-      '　Quarters.Stage：' + (result.stageReset ? '已重設為 ' + QUARTER_STAGE.DRAFT : '⚠ 重設失敗'),
-      '　公開職事表：' + (plan.publicLinkFileUrl
-        ? (result.publicRosterCleared ? '已清空內容並顯示「已重設」提示（連結不變）' : '⚠ 清空失敗或檔案已不存在，請自行檢查')
-        : '（這一季沒有發佈過，不適用）'),
-      '',
-      '清理前的摘要已寫入 AuditLog。'
-    ];
-    if (result.errors.length > 0) {
-      resultLines.push('', '⚠ 過程中有 ' + result.errors.length + ' 項出錯：');
-      result.errors.forEach(function (e) { resultLines.push('　• ' + e); });
-    }
-    if (plan.manualAttention.length > 0) {
-      resultLines.push('', '以下項目系統沒有處理，仍然需要你人手判斷：');
-      plan.manualAttention.forEach(function (m) { resultLines.push('　• ' + m); });
-    }
-
-    ui.alert('⚠️⚠️ 重設季度測試資料（完成）', resultLines.join('\n'), ui.ButtonSet.OK);
-  } catch (err) {
-    log_('ERROR', 'executeQuarterReset_ 失敗: ' + err.message);
-    ui.alert('⚠️⚠️ 重設季度測試資料',
-      '清理途中失敗：\n\n' + err.message + '\n\n'
-        + '部分內容可能已經被清走。清理前的摘要已寫入 AuditLog，請對照檢查。',
-      ui.ButtonSet.OK);
+  const resultLines = ['這一批共 ' + entries.length + ' 季，已經處理完。'];
+  if (batch.failedQuarters.length > 0) {
+    resultLines.push('');
+    resultLines.push('⚠ 以下 ' + batch.failedQuarters.length + ' 季中途失敗：'
+      + batch.failedQuarters.join('、'));
+    resultLines.push('　部分內容可能已經被清走。每一季的清理前摘要都寫了 AuditLog，');
+    resultLines.push('　對照 QUARTER_RESET_BATCH_BEFORE 與 QUARTER_RESET_BATCH_FAILED 兩筆檢查。');
   }
+
+  batch.results.forEach(function (r) {
+    resultLines.push('');
+    resultLines.push('━━━━━━ ' + r.quarterId + ' ━━━━━━');
+    if (!r.ok) {
+      resultLines.push('⚠ 失敗：' + r.error);
+      return;
+    }
+    const result = r.result;
+    resultLines.push('　RosterVersions 登記列：' + result.versionRowsDeleted + ' 行');
+    resultLines.push('　grid 工作表：' + result.versionSheetsDeleted + ' 張');
+    resultLines.push('　RosterAssignments：' + result.assignmentRowsDeleted + ' 行');
+    resultLines.push('　SendLog：' + result.sendLogRowsDeleted + ' 行');
+    resultLines.push('　Requests：' + result.requestRowsDeleted + ' 行');
+    resultLines.push('　Unavailable（Source=REQUEST）：' + result.unavailableRowsDeleted + ' 行');
+    resultLines.push('　FineTuneProposals（主表）：' + result.fineTuneProposalRowsDeleted + ' 行');
+    resultLines.push('　FineTuneProposals_Archive：'
+      + result.fineTuneProposalArchiveRowsDeleted + ' 行');
+    resultLines.push('　RosterPDF：' + result.pdfTrashed + ' 個已移到垃圾桶');
+    resultLines.push('　Quarters.Stage：'
+      + (result.stageReset ? '已重設為 ' + QUARTER_STAGE.DRAFT : '⚠ 重設失敗'));
+    // 第十二輪批次階段 D 嘅那一行：**連結唔會變、檔案唔會刪**，只清空內容。
+    // 幹事最驚就係「係咪連個公開連結都冇埋」，所以三種情況都要講得出。
+    const entryForResult = entries.filter(function (e) {
+      return e.quarterId === r.quarterId;
+    })[0];
+    const planForResult = entryForResult ? entryForResult.plan : {};
+    resultLines.push('　公開職事表：' + (planForResult.publicLinkFileUrl
+      ? (result.publicRosterCleared
+        ? '已清空內容並顯示「已重設」提示（連結不變）'
+        : '⚠ 清空失敗或檔案已不存在，請自行檢查')
+      : '（這一季沒有發佈過，不適用）'));
+    if (result.errors.length > 0) {
+      resultLines.push('　⚠ 過程中有 ' + result.errors.length + ' 項出錯：');
+      result.errors.forEach(function (e) { resultLines.push('　　• ' + e); });
+    }
+  });
+
+  // ⚠️ 需要人手判斷嗰啲要**再講一次**。
+  // 佢哋喺確認畫面出現過，但幹事嗰陣個注意力喺「撳唔撳落去」，
+  // 而唔係喺「之後我要做啲乜」。
+  const manual = [];
+  entries.forEach(function (entry) {
+    (entry.plan.manualAttention || []).forEach(function (m) {
+      manual.push('　• [' + entry.quarterId + '] ' + m);
+    });
+  });
+  if (manual.length > 0) {
+    resultLines.push('');
+    resultLines.push('以下項目系統沒有處理，仍然需要你人手判斷：');
+    manual.forEach(function (m) { resultLines.push(m); });
+  }
+
+  resultLines.push('');
+  resultLines.push('⚠️ Quarters 的 GenerateOn／OfficialSendOn、以及 ServiceDates 的主日清單，');
+  resultLines.push('　 這一支從頭到尾都不會碰——那些是季度本身的設定，不是測試痕跡。');
+  resultLines.push('');
+  resultLines.push('每一季的清理前後摘要都已寫入 AuditLog');
+  resultLines.push('（QUARTER_RESET_BATCH_BEFORE ／ QUARTER_RESET_BATCH_AFTER）。');
+
+  ui.alert(TITLE + '（完成）', resultLines.join('\n'), ui.ButtonSet.OK);
 }
+
 
 /**
  * 選單項目「補齊 Email 範本」的執行入口。

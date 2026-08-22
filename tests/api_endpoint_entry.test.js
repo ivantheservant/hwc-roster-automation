@@ -35,6 +35,16 @@ const gas = loadGasSource([
   // 第三十二輪批次階段 D4：步驟 2 嘅端點 `apiStep2Preview()` 只係一層薄殼，
   // 真正做嘢嘅係 `FiveStageCore.gs` 嘅 `planStep2_()`／`executeStep2_()`。
   // 唔載入佢就會 `planStep2_ is not defined`——而嗰個錯**唔係**測試想證嘅嘢。
+  // ⚠️ 第四十七輪批次 B 組：`planStep2_()` 而家行
+  // `resolveActualRecipients_()`（`SendRecipients.gs`），
+  // 而佢會叫 `buildMailContext_()`／`resolveStageTemplates_()`（`Mailer.gs`）
+  // 同 `resolveSendOptions_()`（`SendOptions.gs`）。
+  //
+  // ⚠️ 呢個係**想要**嘅耦合：呢一組 bug 嘅本質就係
+  //「事前講會寄給誰」同「實際寄給誰」有兩個算法。收埋一個之後，
+  // 事前預覽自然要載入寄信嗰邊嘅嘢——載入清單長咗，
+  // 但兩個數字唔會再各自漂走。
+  'SendOptions.gs', 'MailRedirect.gs', 'SendRecipients.gs', 'Mailer.gs',
   'FiveStageCore.gs',
   // 第三十九輪批次（順手）：「同一格既有 grid 改動又有申報 ⇒ grid 贏」
   // 嗰個判斷本來喺兩個檔各寫一次，而家合併成 `findRequestGridOverlaps_()`
@@ -251,9 +261,25 @@ console.log('\n=== A3【核心】「回到上一個版本」預覽由端點入�
 
 console.log('\n=== D4【核心】步驟 2「寄給堂委審閱」由端點入口行一次 ===');
 {
+  // ⚠️ 第四十七輪批次 B1 組：`planStep2_()` 唔再叫
+  // `countReviewerRecipients_()`——佢而家行 `resolveActualRecipients_()`，
+  // 即係**真正會寄嗰一份名單**。所以呢度改為 stub 嗰一個。
+  //
+  // 呢個改動本身就係整組 B 嘅重點：事前預覽同真正寄出行同一個算法。
   stubIo({
-    countReviewerRecipients_: function () { return 4; },
-    countAlreadySentForStage_: function () { return 0; }
+    countAlreadySentForStage_: function () { return 0; },
+    resolveActualRecipients_: function () {
+      return [
+        { type: 'LIST', personId: '', email: 'a@example.invalid',
+          displayName: '堂委甲', sendAs: 'TO' },
+        { type: 'LIST', personId: '', email: 'b@example.invalid',
+          displayName: '堂委乙', sendAs: 'TO' },
+        { type: 'PERSON', personId: 'P9001', email: 'c@example.invalid',
+          displayName: '測試丙', sendAs: 'TO' },
+        { type: 'PERSON', personId: 'P9002', email: '',
+          displayName: '測試丁', sendAs: 'TO' }
+      ];
+    }
   });
 
   let result = null;
@@ -271,6 +297,21 @@ console.log('\n=== D4【核心】步驟 2「寄給堂委審閱」由端點入口
   check('★★★★★ 而且真係攞到收件人數同版本號',
     result !== null && result.recipientCount === 4 && result.versionNo === 1,
     JSON.stringify(result));
+  check('★★★★★★ 第四十七輪批次 B3 組：**連名單一齊回**，唔淨係一個數字'
+    + '——現場嗰句「會寄給這 3 位」一個名都冇，'
+    + '幹事撳〔確定寄出〕之前核對唔到任何嘢',
+    result !== null && result.recipientPreview
+    && result.recipientPreview.total === 4
+    && result.recipientPreview.shown.length === 4,
+    JSON.stringify(result && result.recipientPreview));
+  check('★★★★★ 電郵有遮一半，但仍然分得出邊個係邊個',
+    result !== null
+    && result.recipientPreview.shown[0].emailMasked.indexOf('@example.invalid') !== -1
+    && result.recipientPreview.shown[0].emailMasked.indexOf('a@') === -1,
+    JSON.stringify(result && result.recipientPreview.shown[0]));
+  check('★★★★★ 查唔到電郵嗰個要標出嚟（佢會被略過，而個數字照計佢）',
+    result !== null && result.recipientPreview.shown[3].hasEmail === false,
+    JSON.stringify(result && result.recipientPreview.shown[3]));
   check('★★★★ `isDryRun` 有講（呢個欄位決定確認畫面寫「會唔會真係寄」）',
     result !== null && typeof result.isDryRun === 'boolean', JSON.stringify(result));
 }

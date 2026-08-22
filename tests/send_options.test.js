@@ -202,8 +202,11 @@ console.log('\n=== A【核心】`deliverOne_()` 唔可以自己再判斷一次 =
 
 console.log('\n=== A：收件範圍嘅決定要喺上游做 ===');
 {
+  // ⚠️ 第四十七輪批次 B 組：收件範圍嗰段抽咗做
+  // `resolveResendTargetPersonIds_()`——**事前預覽同真正寄出要行同一個算法**。
+  const picker = resend.slice(resend.indexOf('function resolveResendTargetPersonIds_'));
   const body = resend.slice(resend.indexOf('function sendResendStage_'));
-  const before = body.indexOf('SEND_RECIPIENT_SCOPE.ALL');
+  const before = body.indexOf('resolveResendTargetPersonIds_(');
   // ⚠️ 要搵**真正嘅呼叫**：上面嘅註解已經提過 deliverOne_ 好幾次，
   //  搵中註解就會量錯次序，而個測試會指住一段註解話你知有 bug。
   const firstDeliver = body.indexOf('outcomes.push(deliverOne_(');
@@ -214,9 +217,17 @@ console.log('\n=== A：收件範圍嘅決定要喺上游做 ===');
   check('★★★★★ 揀「全部人」嗰陣要俾每個人一個理由'
     + '——唔俾嘅話 `deliverOne_()` 嗰個 hash 保險絲會把「內容冇變」嗰啲擋走，'
     + '而幹事明明揀咗「全部人」',
-    /notifyReasonByPerson\[id\] = '幹事選擇寄給全部人'/.test(body), '');
+    /noteReason\(id, '幹事選擇寄給全部人'\)/.test(picker), '');
   check('★★★★ 揀咗一個唔喺「有改動」名單入面嘅人 ⇒ 照樣寄俾佢',
-    /notifyReasonByPerson\[key\] = '幹事指定要寄給這一位'/.test(body), '');
+    /notifyReasonByPerson\[key\] = '幹事指定要寄給這一位'/.test(picker), '');
+  check('★★★★★★ 第四十七輪批次 B 組：**事前預覽唔可以寫 `notifyReasonByPerson`**'
+    + '——嗰個係寄信嗰段會讀嘅狀態。預覽順手寫落去，'
+    + '就等於「睇一眼」改變咗「做出嚟」嘅結果',
+    /if \(previewOnly\) return;/.test(picker)
+    && /if \(!previewOnly\) \{/.test(picker), picker.slice(0, 900));
+  check('★★★★★ 而真正寄出嗰次一定要傳 `false`（照舊寫理由）',
+    /resolveResendTargetPersonIds_\([\s\S]{0,60}?context, decision, changedPersonIds, false\)/
+      .test(body), body.slice(before - 100, before + 200));
 }
 
 // =====================================================================

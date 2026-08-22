@@ -199,7 +199,7 @@ function describeFlowStepPrecondition_(stepKey, quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {{quarterId: string, versionNo: number, recipientCount: number, isDryRun: boolean}}
  */
-function planStep2_(quarterId) {
+function planStep2_(quarterId, sendOptions) {
   // 第二十三輪批次階段 E1（決定 D2）：由 `[DRAFT]` 放寬成三個 Stage。
   // 掣 2 開放於「未正式發出之前嘅任何時候」——由 `REQUESTS_APPLIED` 撳
   // 係合法嘅**第二輪審閱**（堂委提咗意見、幹事改完，想再俾佢哋睇一次）。
@@ -208,10 +208,20 @@ function planStep2_(quarterId) {
   requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
+  // ⚠️ 第四十七輪批次 B1 組：**用實際會寄嗰一份名單嚟數。**
+  //
+  // 本來係 `countReviewerRecipients_()`——只數 `EmailRecipients` 上
+  // `Role=REVIEWER` 而且 `Active=TRUE` 嘅行。而第四十六輪之後，
+  // 真正會寄嘅係收件人池（`SendRecipients.gs`）＋ 幹事勾咗嗰批。
+  // 兩個算法 ⇒ 確認窗講「3 位」而完成窗講「9 封」。
+  const recipients = resolveActualRecipients_(
+    quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);
   return {
     quarterId: quarterId,
     versionNo: versionNo,
-    recipientCount: countReviewerRecipients_(),
+    recipientCount: recipients.length,
+    // 第四十七輪批次 B3 組：**列出名字**，唔淨係一個數字。
+    recipientPreview: summariseRecipientsForPreview_(recipients),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 階段 A（收尾輪）新增：>0 代表這個版本＋這個階段在 SendLog 已經有人收過信，
     // 很可能是上次執行中途中斷後重新執行——見 Mailer.gs 的
@@ -396,12 +406,18 @@ function planStep4MissingPdf_(quarterId, versionNo) {
  * @param {number} versionNo 版本號
  * @returns {{recipientCount: number, isDryRun: boolean}}
  */
-function planStep4SendPreview_(quarterId, versionNo) {
+function planStep4SendPreview_(quarterId, versionNo, sendOptions) {
   requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
-  const recipientCount = listRecipients_(
-    MAIL_STAGES.OFFICIAL, buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL)).length;
+  // ⚠️ 第四十七輪批次 B2 組：**呢一個本來有同步驟 2 一模一樣嘅問題。**
+  //
+  // 本來係 `listRecipients_(OFFICIAL, …)`——即係完全唔理 `sendOptions`。
+  // 幹事喺寄出彈窗勾咗人之後，呢個數字仍然係「全部應收嘅人」，
+  // 同實際寄出嘅唔同。改為行同一個 `resolveActualRecipients_()`。
+  const recipients = resolveActualRecipients_(
+    quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
   return {
-    recipientCount: recipientCount,
+    recipientCount: recipients.length,
+    recipientPreview: summariseRecipientsForPreview_(recipients),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 階段 A（收尾輪）新增：見 planStep2_() 同一段說明——步驟 4 的收件人數量
     // 遠多於步驟 2（約 60 人 vs 幾位堂委），實際撞到 Apps Script 執行逾時的
@@ -526,8 +542,18 @@ function executeStep5GeneratePdfs_(quarterId, versionNo, changedList) {
  * @param {Object[]} changedList `computeResendDiff_()` 的結果
  * @returns {Object} 3/3 畫面資料
  */
-function planStep5SendPreview_(quarterId, versionNo, context, changedList) {
-  const listRecipientCount = listRecipients_(MAIL_STAGES.RESEND, context)
+function planStep5SendPreview_(quarterId, versionNo, context, changedList, sendOptions) {
+  // ⚠️ 第四十七輪批次 B2 組：**呢一個本來都有同一個問題**，
+  // 只係形狀唔同：佢把「有改動嘅人」同「名單收件人」分開兩個數字報，
+  // 而兩個都冇經過 `sendOptions`。
+  //
+  // 而家整份名單由 `resolveActualRecipientsFromContext_()` 出，
+  // 佢入面叫嘅 `resolveResendTargetPersonIds_()` **就係** `sendResendStage_()`
+  // 真正寄出嗰陣叫嗰一個。
+  const changedPersonIds = (changedList || []).map(function (c) { return c.personId; });
+  const recipients = resolveActualRecipientsFromContext_(
+    context, MAIL_STAGES.RESEND, sendOptions, changedPersonIds);
+  const listRecipientCount = recipients
     .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST; }).length;
   const noEmailList = changedList.filter(function (c) {
     const person = context.peopleById[c.personId];
@@ -538,6 +564,11 @@ function planStep5SendPreview_(quarterId, versionNo, context, changedList) {
     noEmailList: noEmailList,
     personSendableCount: changedList.length - noEmailList.length,
     listRecipientCount: listRecipientCount,
+    // 第四十七輪批次 B4 組：**一個總數**，同 `execute` 嗰邊對得上。
+    // 兩個分開嘅數字（有改動嘅 ＋ 名單）加起上嚟唔一定等於實際寄出，
+    // 因為幹事可以勾咗一個唔喺「有改動」名單入面嘅人。
+    recipientCount: recipients.length,
+    recipientPreview: summariseRecipientsForPreview_(recipients),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
   };
 }

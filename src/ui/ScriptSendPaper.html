@@ -29,61 +29,178 @@
   }
 
   function renderSendDialog(s) {
-    // ── 寄唔到：逐個原因講，唔好合成一句 ──────────────────────
+    // ══════════════════════════════════════════════════════════
+    // ⚠️ 第四十七輪批次 A2 組：**次序調轉咗，而且唔可以再調返轉。**
+    // ══════════════════════════════════════════════════════════
+    //
+    // 第四十輪批次 C 組寫咗「有未儲存改動」嗰段（就係下面第二段），
+    // 寫得完全正確——但佢由寫出嚟到第四十七輪**一次都冇執行過**。
+    //
+    // 成因係一條純邏輯鏈：
+    //
+    //   `computeDashboardButtons_()`　三粒掣全部帶 `&& !unsaved.hasAny`
+    //     ⇒ 有未儲存改動 ⇒ 三粒必定全部 disabled
+    //   `resolveSendKind_()`　三粒都唔 enabled ⇒ 回 `NONE`
+    //   而 `kind === 'NONE'` 嗰段本來排喺**第一**，仲要自己 `return`
+    //     ⇒ 「未儲存」嗰段永遠拎唔到控制權
+    //
+    // Ivan 現場見到嘅就係嗰個 `NONE` 窗：叫佢「先撳儲存並確認」，
+    // 而個窗入面**冇嗰粒掣**。
+    //
+    // ⚠️ 而每一輪嘅測試都係綠嘅——因為測試直接呼叫嗰個分支，
+    // 從來冇問過「真實嘅 `kind` 到得到嗰度嗎」。
+    // `tests/send_unsaved_gate.test.js` 而家釘住呢個次序。
+
+    // ── 一、只有未儲存擋住 ⇒ 一個救得返自己嘅窗 ────────────────
+    if (s.blockedByUnsavedOnly) {
+      renderUnsavedBlocksSend(s);
+      return;
+    }
+
+    // ── 二、真係寄唔到：逐個原因講，唔好合成一句 ────────────────
     if (s.kind === 'NONE') {
       const nodes = [para('現在沒有可以寄的東西。')];
       if (s.blockedReasons.length > 0) {
         const box = make('div', { className: 'sec' }, [sectionTitle('原因')]);
-        const names = { review: '寄給堂委審閱', official: '正式發出給全體', resend: '改動後重發' };
         s.blockedReasons.forEach((b) => {
           box.appendChild(make('div', {
-            text: '・' + (names[b.key] || b.key) + '：' + b.reason,
+            text: '・' + (SEND_KIND_NAMES_TC[b.key] || b.key) + '：' + b.reason,
             className: 'vio-row'
           }));
         });
         nodes.push(box);
       }
-      openModal('寄出', nodes, [button('知道了', () => closeModal(), '')]);
+
+      // ⚠️ 第四十七輪批次 A4 組：**呢個窗都要救得返自己。**
+      //
+      // 就算唔係「只有未儲存擋住」（例如未儲存 ＋ Stage 都未到），
+      // 只要仲有未儲存改動，就一定要俾佢一粒〔立即儲存〕。
+      // 叫人去撳一粒掣而個窗入面冇嗰粒掣，就係 Ivan 撞到嗰件事。
+      const acts = [];
+      if (s.unsaved && s.unsaved.hasAny) {
+        const hint = describeAfterSaveHint_(s);
+        if (hint) nodes.push(make('div', { text: hint, className: 'muted' }));
+        acts.push(button('立即儲存', () => { closeModal(); openSaveAndConfirm(); }, ''));
+      }
+      acts.push(button('知道了', () => closeModal(),
+        acts.length > 0 ? 'secondary' : ''));
+      openModal('寄出', nodes, acts);
       return;
     }
 
-    // ── 有未儲存嘅改動：**入彈窗之前**先問 ──────────────────────
+    // ── 三、冇嘢擋住 ⇒ 直接開寄出彈窗 ──────────────────────────
     //
-    // ⚠️ 呢一問唔可以省。幹事啱啱改完表、未撳儲存就撳寄出，
-    // 系統寄出嘅係**上一次儲存確認嗰一版**——即係佢啱啱改嗰啲唔會喺入面，
-    // 而佢完全唔會察覺。
-    //
-    // ⚠️ 第四十輪批次 C 組：一定要講出**改咗幾多格**同**寄緊第幾版**。
-    // 淨係講「你有未儲存的修改」，幹事分唔清「係咪我啱啱嗰幾格」，
-    // 亦都唔知寄出去嗰份係咩內容——結果佢淨係撳「繼續」算數。
-    if (s.unsaved && s.unsaved.hasAny) {
-      const versionText = s.latestVersion
-        ? ('第 ' + s.latestVersion.versionNo + ' 版') : '上一次儲存確認的版本';
-      openConfirm({
-        title: '寄出',
-        bodyNodes: [
-          make('div', { className: 'warnbox' }, [
-            make('div', {
-              text: describeUnsaved(s.unsaved)
-                + '寄出的會是「' + versionText + '」，你剛才改的不會寄出去。',
-              className: 'lines'
-            })
-          ]),
-          para('先儲存的話，改動會存成新一版，然後那一版才會寄出去。', 'muted')
-        ],
-        confirmLabel: '繼續寄出',
-        cancelLabel: '先去儲存',
-        // 〔先去儲存〕直接帶去第 2 步嗰粒「儲存我的修改」，
-        // 唔係淨係關窗——關咗窗佢就要自己再搵一次。
-        onCancel: () => { closeModal(); openSaveAndConfirm(); },
-        onConfirm: () => { closeModal(); renderSendMain(s); }
-      });
-      return;
-    }
-
-    // ⚠️ 冇未儲存改動 ⇒ **唔好彈呢個窗**，直接開寄出彈窗。
-    // 彈一個冇嘢要佢決定嘅窗，只會訓練佢唔睇內容就撳「繼續」。
+    // ⚠️ 唔好喺呢度再彈一個「確定要寄嗎」——彈一個冇嘢要佢決定嘅窗，
+    // 只會訓練佢唔睇內容就撳「繼續」。
     renderSendMain(s);
+  }
+
+  /** 三個階段嘅中文名。畫面同摘要都行呢一份，唔喺兩處各寫一次。 */
+  const SEND_KIND_NAMES_TC = {
+    review: '寄給堂委審閱',
+    official: '正式發出給全體',
+    resend: '改動後重發'
+  };
+
+  /**
+   * 第四十七輪批次 A3 組：**只有未儲存擋住**嗰個窗。
+   *
+   * 第四十輪批次 C 組嗰段措辭照用，補齊 Ivan 要嘅兩件事：
+   *   一、窗入面要有嗰粒掣（佢原話：「叫我去撳儲存並確認，但這個窗裡面沒有那一粒掣」）
+   *   二、要講明「如果真的寄了出去，寄出去的會是上一次儲存的那一版」
+   *
+   * ⚠️ **冇〔仍然寄出第 N 版〕嗰粒。**
+   * 後端 `assertNoUnsavedChanges_()` 一定會擋，所以嗰粒撳落去必定失敗。
+   * 畫一粒撳落去必定彈後端錯誤嘅掣，比冇嗰粒差——改為誠實講一句
+   * 「有未儲存的改動的時候，系統不容許寄出」。
+   *
+   * @param {Object} s `apiGetSendPlanSummary()` 嘅結果
+   */
+  function renderUnsavedBlocksSend(s) {
+    const n = (s.unsaved && s.unsaved.gridChangeCount > 0)
+      ? s.unsaved.gridChangeCount
+      : ((s.unsaved && s.unsaved.unresolvedCount)
+        || (s.unsaved && s.unsaved.pendingRequestCount) || 0);
+
+    // ⚠️ 版本號一定要真係印出嚟。第四十輪批次 C 組已經記過原因：
+    // 唔講版本號，幹事分唔清寄出去嘅係咩內容，結果只會照撳〔繼續〕。
+    //
+    // 攞唔到嗰陣（`latestVersion` 係 null——即係呢一季一個版本都冇）
+    // 退而求其次講「上一次儲存確認的版本」。⚠️ 但嗰種情況其實根本
+    // 寄唔到（`blockedByUnsavedOnly` 會係 false），所以呢一句係保底，
+    // 唔應該喺正常流程見到。
+    const versionText = s.latestVersion
+      ? ('第 ' + s.latestVersion.versionNo + ' 版') : '上一次儲存確認的版本';
+
+    openConfirm({
+      title: '寄出：你有 ' + n + ' 格改動還未儲存',
+      bodyNodes: [
+        make('div', { className: 'warnbox' }, [
+          make('div', {
+            text: describeUnsaved(s.unsaved)
+              + '如果現在寄出去，寄出的會是「' + versionText + '」'
+              + '——你剛才改的那 ' + n + ' 格不會在裡面。',
+            className: 'lines'
+          })
+        ]),
+        para('先儲存的話，改動會存成新一版，然後那一版才會寄出去。', 'muted'),
+        // ⚠️ 誠實講明點解冇〔仍然寄出〕嗰粒。靜靜唔畫，佢會以為
+        // 系統壞咗或者自己漏睇咗。
+        para('有未儲存的改動的時候，系統不容許寄出——'
+          + '這是為了不會出現「畫面說寄了，而寄出去的是舊內容」。', 'muted')
+      ],
+      // 〔立即儲存並繼續〕係預設掣：佢本來就係想寄出，只係被未儲存擋住。
+      confirmLabel: '立即儲存並繼續',
+      cancelLabel: '取消',
+      onConfirm: () => {
+        closeModal();
+        // ⚠️ `{ thenSend: true }` ⇒ 儲存確認窗嗰個「儲存之後直接去寄出」
+        // **預設勾住**。第四十六輪 D 組定咗平時預設唔勾；呢度係一個例外，
+        // 因為佢啱啱就係撳緊〔寄出〕先被擋住。
+        openSaveAndConfirm({ thenSend: true });
+      }
+    });
+  }
+
+  /**
+   * 第四十七輪批次 A4 組：「儲存之後仲要等咩」嗰一句。
+   *
+   * ⚠️ **由實際嘅 `blockedReasons` 算出嚟，唔可以寫死。**
+   * 只剩一項嘅時候唔可以講「上面第一項」——嗰句要人自己數，
+   * 而佢數嘅時候好可能數錯。
+   *
+   * @param {Object} s `apiGetSendPlanSummary()` 嘅結果
+   * @returns {string} 一句；冇未儲存改動就回空字串
+   */
+  function describeAfterSaveHint_(s) {
+    if (!s.unsaved || !s.unsaved.hasAny) return '';
+    const reasons = s.blockedReasons || [];
+    if (reasons.length === 0) return '';
+
+    // 「儲存之後就會解決」嗰啲 ＝ 原因入面提到未儲存嘅。
+    const fixedBySave = [];
+    const stillBlocked = [];
+    reasons.forEach((b) => {
+      const name = SEND_KIND_NAMES_TC[b.key] || b.key;
+      const text = String(b.reason || '');
+      if (text.indexOf('未儲存') !== -1 || text.indexOf('你在表上改了') !== -1
+        || text.indexOf('未處理的修改申報') !== -1
+        || text.indexOf('認不出') !== -1) {
+        fixedBySave.push(name);
+      } else {
+        stillBlocked.push(name);
+      }
+    });
+    if (fixedBySave.length === 0) return '';
+
+    let out = '儲存之後，「' + fixedBySave.join('」、「') + '」就會解決';
+    if (stillBlocked.length > 0) {
+      out += '，但「' + stillBlocked.join('」、「') + '」仍然要等——'
+        + '原因見上面那幾行。';
+    } else {
+      out += '。';
+    }
+    return out;
   }
 
   /**

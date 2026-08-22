@@ -1250,6 +1250,32 @@ const CONFIG_KEYS = {
   // 預設清單，讀唔到就用嗰個。只靠 Config 嘅話，一個被清走嘅 key
   // 就等於保護消失，而畫面上完全睇唔出。
   REHEARSAL_PROTECTED_QUARTERS: 'REHEARSAL_PROTECTED_QUARTERS',
+
+  // 第四十七輪批次 D 組：合堂主日預設跳過嘅崗位（逗號分隔 PostID）。
+  //
+  // 合堂嗰日，主席／講員／傳譯／領詩／司琴由另一堂帶領。呢件事每次都一樣，
+  // 但系統一直交咗畀幹事逐次記得人手填 `SkipPostIDs`。
+  //
+  // ⚠️ 呢一格填成空白**係一個有意思嘅決定**（「我唔想任何合堂自動跳崗位」），
+  // 所以空白就係空白，唔會退回內建預設——同下面嗰個相反。
+  COMBINED_DEFAULT_SKIP_POST_IDS: 'COMBINED_DEFAULT_SKIP_POST_IDS',
+
+  // 「補填合堂跳過崗位」絕對唔可以碰嘅季度（逗號分隔）。
+  //
+  // ⚠️ **另開一格，唔重用 `REHEARSAL_PROTECTED_QUARTERS`。**
+  // 嗰一個守嘅係「演練唔可以碰邊幾季」，呢一個守嘅係「補填工具唔可以改
+  // 邊幾季嘅資料」。今日啱啱好重疊，唔代表日後都重疊；共用一格嘅話，
+  // 日後有人為咗演練而加減一季，就會靜靜連補填工具嘅保護範圍都改埋。
+  //
+  // ⚠️ 呢一格同上面相反：填成空白**唔會**變成「乜都唔保護」，仍然退回內建預設。
+  COMBINED_BACKFILL_BLOCKED_QUARTERS: 'COMBINED_BACKFILL_BLOCKED_QUARTERS',
+
+  // 第四十七輪批次 E 組：「⚠️⚠️ 重設季度測試資料」絕對唔可以碰嘅季度（逗號分隔）。
+  //
+  // ⚠️ 又係另開一格。呢一個守嘅係「清理唔可以清邊幾季」，
+  // 同演練、同補填工具嗰兩格都係唔同嘅事。
+  // ⚠️ 填成空白**唔會**變成「乜都唔擋」，仍然退回內建預設（`2026T4`）。
+  QUARTER_RESET_BLOCKED_QUARTERS: 'QUARTER_RESET_BLOCKED_QUARTERS',
   PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
   // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。

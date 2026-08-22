@@ -413,6 +413,11 @@ function apiGetSendPlanSummary(quarterId) {
 
     return {
       kind: kind,
+      // ⚠️ 第四十七輪批次 A1 組：三粒掣唔著嘅**唯一**原因就係未儲存。
+      //
+      // 前端要靠佢排喺 `kind === NONE` 之前——否則第四十輪寫嘅
+      //「未儲存」嗰段永遠行唔到（有未儲存改動 ⇒ `kind` 必定係 `NONE`）。
+      blockedByUnsavedOnly: !!state.blockedByUnsavedOnly,
       // 第四十一輪批次 E 組：每個附件選項下面嗰行小字。
       // ⚠️ 由後端出，同 attachTypeWantsPersonalLink_() 讀同一個判斷——
       // 前端自己寫一套嘅話，畫面會講一件事而系統做另一件事。

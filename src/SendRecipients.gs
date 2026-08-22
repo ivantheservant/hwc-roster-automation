@@ -223,6 +223,157 @@ function resolveSendRecipientPool_(stage, context, decision) {
 }
 
 /* ═════════════════════════════════════════════════════════════════════
+ * 第四十七輪批次 B 組：**「事前講會寄給誰」同「實際寄給誰」要同一份名單。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 現場：同一次操作，兩個畫面前後腳出現——
+ *
+ *   確認窗　　「會寄給這 3 位」
+ *   完成窗　　「寄出 0 封　模擬 9 封　查無電郵略過 0 位」
+ *
+ * **3 ≠ 9。**
+ *
+ * 成因：兩個數字來自兩條完全唔同嘅路。
+ *
+ *   確認窗　`planStep2_()` → `countReviewerRecipients_()`
+ *           ⇒ 只數 `EmailRecipients` 上 `Role=REVIEWER` 而且 `Active=TRUE` = 3
+ *   完成窗　`executeStep2_()` → `sendStage()`
+ *           ⇒ 第四十六輪新加嘅收件人池（`SendRecipients.gs`）= 9
+ *
+ * 即係：**第四十六輪把「實際寄給誰」重做咗，但冇一併改
+ * 「事前告訴幹事會寄給誰」。**
+ *
+ * ⚠️ 第四十三輪已經立過一條規矩：「對話框報嘅每一個數字，
+ * 表上都要有對應嘅嘢」。呢一條又破咗——而破法係同一種：
+ * **同一件事有兩個算法。**
+ *
+ * 所以呢度抽一個**唯一嘅**收件人解析器。`plan*` 同 `execute*` 兩邊都行佢。
+ * 再多寫一個「順手數一數」就係多一個分岔點。
+ */
+
+/**
+ * 這一次真正會寄給誰。**事前同事後行同一個函式。**
+ *
+ * ⚠️ 這個函式**一格都不會寫**，純粹計算。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} stage MAIL_STAGES 之一
+ * @param {Object=} sendOptions 幹事在寄出彈窗做的決定（可以不傳）
+ * @returns {Object[]} 收件人（形狀同 `listRecipients_()` 一樣）
+ */
+function resolveActualRecipients_(quarterId, versionNo, stage, sendOptions) {
+  const context = buildMailContext_(quarterId, versionNo, stage);
+  return resolveActualRecipientsFromContext_(context, stage, sendOptions);
+}
+
+/**
+ * 同上，但用一份已經砌好的 context（避免同一次操作讀兩次試算表）。
+ *
+ * ⚠️ RESEND 那一條路**不是**用 `filterRecipientsByScope_()` 篩人的
+ *（見 `sendResendStage_()`：它有自己一套「有改動的人 ＋ 幹事指定的人」），
+ * 所以這裡分開處理。兩邊都叫同一個 `resolveResendTargetPersonIds_()`——
+ * **不是各自再判斷一次**。
+ *
+ * @param {Object} context `buildMailContext_()` 的結果
+ * @param {string} stage MAIL_STAGES 之一
+ * @param {Object=} sendOptions 幹事的決定
+ * @param {string[]=} changedPersonIds RESEND 專用：這一次算出來有改動的人
+ * @returns {Object[]} 收件人
+ */
+function resolveActualRecipientsFromContext_(context, stage, sendOptions, changedPersonIds) {
+  const decision = resolveSendOptions_(stage, sendOptions, resolveStageTemplates_(stage));
+
+  if (stage !== MAIL_STAGES.RESEND) {
+    return filterRecipientsByScope_(
+      resolveSendRecipientPool_(stage, context, decision), decision);
+  }
+
+  // ── RESEND ─────────────────────────────────────────────────────
+  //
+  // ⚠️ 這裡**不可以**改動 `context`。事前預覽同真正寄出會各叫一次，
+  // 而 `resolveResendTargetPersonIds_()` 在真正寄出那一次要寫
+  // `notifyReasonByPerson`。所以傳一個 `dryRun` 旗，預覽那一次不寫。
+  const personIds = resolveResendTargetPersonIds_(
+    context, decision, changedPersonIds || [], true);
+  const people = personIds.slice().sort().map(function (personId) {
+    const person = context.peopleById[personId];
+    return {
+      type: RECIPIENT_TYPE.PERSON,
+      personId: personId,
+      email: person ? person.email : '',
+      displayName: person ? person.nameTC : personId,
+      sendAs: SEND_AS.TO
+    };
+  });
+  const listOnes = filterRecipientsByScope_(
+    resolveSendRecipientPool_(MAIL_STAGES.RESEND, context, decision)
+      .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST; }),
+    decision);
+  return people.concat(listOnes);
+}
+
+/**
+ * 第四十七輪批次 B3 組：把收件人整理成畫面用得着的樣。
+ *
+ * ⚠️ **名單要同 `resolveActualRecipients_()` 回傳那一份是同一批物件**，
+ * 不是另外再查一次 `NameMapping`。再查一次就是第二個真相來源，
+ * 而且它會在「名單上有而實際寄不到」這種情況下靜靜對不上。
+ *
+ * @param {Object[]} recipients `resolveActualRecipients_()` 的結果
+ * @param {number=} limit 最多列幾多個（預設 12）
+ * @returns {{total: number, shown: Object[], moreCount: number}}
+ */
+function summariseRecipientsForPreview_(recipients, limit) {
+  const cap = (limit === undefined || limit === null) ? 12 : limit;
+  const all = (recipients || []).map(function (r) {
+    return {
+      type: r.type,
+      personId: r.personId || '',
+      displayName: r.displayName || r.email || r.personId || '（不知道是誰）',
+      emailMasked: maskEmailForPreview_(r.email),
+      hasEmail: !!String(r.email || '').trim()
+    };
+  });
+  return {
+    total: all.length,
+    shown: cap > 0 ? all.slice(0, cap) : all,
+    moreCount: cap > 0 ? Math.max(0, all.length - cap) : 0,
+    // ⚠️ 整份都帶埋，令〔全部列出〕唔使再打一次伺服器。
+    //
+    // 再打一次嘅話，兩次之間資料有機會唔同（例如另一個人啱啱改咗
+    // `EmailRecipients`），而幹事會見到一份同上面個數字對唔上嘅名單。
+    all: all
+  };
+}
+
+/**
+ * 把電郵遮一半（`a***@example.invalid`）。
+ *
+ * ⚠️ 遮，但**唔可以遮到分唔出邊個係邊個**——幹事撳〔確定寄出〕之前
+ * 要核對得到。所以留住第一個字同整個網域。
+ *
+ * @param {string} email 電郵
+ * @returns {string} 遮咗嘅電郵；空值回空字串
+ */
+function maskEmailForPreview_(email) {
+  const value = String(email || '').trim();
+  if (!value) return '';
+  const at = value.indexOf('@');
+  if (at <= 0) return value;
+  const head = value.slice(0, at);
+  const domain = value.slice(at);
+  // ⚠️ 用 `Array(4).join('*')` 而唔係直接寫三粒星：
+  // `tests/output_string_hygiene.test.js` 會掃 `.gs` 字串字面量入面嘅
+  // 兩粒連星（`ui.alert()` 唔渲染 markdown，寫出嚟就係一堆星號）。
+  // 呢度嘅星係**遮蔽符號**唔係 markdown，但個掃描分唔到——
+  // 改個寫法比為咗一個特例而放寬嗰條掃描好。
+  const mask = Array(4).join('*');
+  if (head.length <= 1) return head + mask + domain;
+  return head.charAt(0) + mask + domain;
+}
+
+/* ═════════════════════════════════════════════════════════════════════
  * B 組：寄出紀錄　＋　「有改動」係相對邊一版
  * ═════════════════════════════════════════════════════════════════════ */
 

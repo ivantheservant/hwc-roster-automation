@@ -310,9 +310,14 @@ console.log('\n=== C：寄出彈窗 ===');
     && /這一次會寄給 /.test(sendPaper), '');
   check('★★★★★ 頂部再講一次「系統只會寄已經儲存確認的版本」',
     /系統只會寄你已經儲存確認的版本/.test(sendPaper));
-  check('★★★★★ 有未儲存改動要先問，而且「取消」嗰粒寫「先去儲存」'
-    + '——嗰個係另一條路，唔係放棄',
-    /cancelLabel: '先去儲存'/.test(sendPaper) && /onCancel: [\s\S]{0,60}openSaveAndConfirm\(\)/.test(sendPaper));
+  // ⚠️ 第四十七輪批次 A3 組：呢一段由「取消嗰粒寫先去儲存」
+  // 改成「**〔立即儲存並繼續〕做預設掣**」——因為佢本來就係想寄出，
+  // 只係被未儲存擋住。把出路擺喺取消掣度，等於叫佢喺一個
+  //「放棄」嘅位置搵一條「繼續」嘅路。
+  check('★★★★★★ 有未儲存改動 ⇒ 一個救得返自己嘅窗，'
+    + '而且〔立即儲存並繼續〕係**預設掣**',
+    /confirmLabel: '立即儲存並繼續'/.test(sendPaper)
+    && /openSaveAndConfirm\(\{ thenSend: true \}\)/.test(sendPaper));
   check('★★★★★ 落到最後係叫返原本嗰三條路，冇另起爐灶',
     /openReview\(\)/.test(sendPaper) && /openOfficial\(\)/.test(sendPaper)
     && /openResend\(\)/.test(sendPaper));

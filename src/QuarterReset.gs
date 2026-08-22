@@ -492,3 +492,252 @@ function resetQuarterStageForTesting_(quarterId) {
   const stageAtCol = info.headers.indexOf(COLUMNS.QUARTERS.STAGE_UPDATED_AT) + 1;
   if (stageAtCol > 0) sheet.getRange(info.sheetRow, stageAtCol).setValue('');
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十七輪批次 E 組：**沙盒季度批次清理。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 一次只食一個 QuarterID 嘅時候，清四季就要由頭做四次：
+ * 打 QuarterID ⇒ 揀 v0 ⇒ 睇清單 ⇒ 打「確認重設」。
+ *
+ * 做四次唔止係煩：**中間任何一次撳錯／睇漏，都冇一個總覽睇得返**。
+ * 而每一次都要重新讀一次「呢一季會清乜」，前後對唔對得上，
+ * 全靠幹事自己記住。
+ *
+ * ⚠️ 呢一組加嘅係**批次外殼**，唔係新嘅刪除邏輯。
+ * 真正刪嘢嗰兩支（`planQuarterReset_()`／`executeQuarterReset_()`）
+ * 一行都冇改——包括佢哋嗰啲「絕對不碰」嘅界線。
+ */
+
+/**
+ * 「重設季度測試資料」絕對唔可以碰嘅季度（程式內建預設值）。
+ *
+ * ⚠️ 空白**唔會**變成「乜都唔擋」——見 `readQuarterResetBlockedQuarters_()`。
+ * 語意同 `REHEARSAL_PROTECTED_QUARTERS` 一樣，但**另開一格**：
+ * 嗰一個守嘅係「演練唔可以碰邊幾季」，呢一個守嘅係「清理唔可以清邊幾季」。
+ */
+const QUARTER_RESET_BLOCKED_DEFAULT = '2026T4';
+
+/**
+ * 讀「重設季度測試資料唔可以碰邊幾季」設定。
+ *
+ * ⚠️ 呢一格填成空白**仍然退回內建預設**。
+ * 一格打空咗就冧晒保護，係最易誤觸嗰種——而呢一支係全系統
+ * 最危險嘅功能之一，冧咗就係真係清走咗。
+ * 想真正解除某一季嘅保護，只能把它由嗰一格移走。
+ *
+ * @returns {string[]} 季度 ID 陣列
+ */
+function readQuarterResetBlockedQuarters_() {
+  let raw = '';
+  try {
+    raw = String(getConfig(CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS,
+      QUARTER_RESET_BLOCKED_DEFAULT) || '').trim();
+  } catch (err) {
+    raw = QUARTER_RESET_BLOCKED_DEFAULT;
+  }
+  if (raw === '') raw = QUARTER_RESET_BLOCKED_DEFAULT;
+  return splitList_(raw);
+}
+
+/**
+ * 把幹事打入去嗰串字拆成季度 ID 清單。**純函式。**
+ *
+ * @param {string} raw 例如 `2027T1, 2027T2，2027T3`
+ * @returns {{quarterIds: string[], duplicates: string[]}}
+ */
+function parseQuarterResetBatchInput_(raw) {
+  // `normalizeIdInput_()` 順手把全形逗號（U+FF0C）轉成半形——
+  // 幹事用中文輸入法打，好自然就會打到全形。
+  const text = normalizeIdInput_(raw);
+  const quarterIds = [];
+  const duplicates = [];
+  text.split(',').forEach(function (piece) {
+    const id = String(piece || '').trim().toUpperCase();
+    if (id === '') return;
+    // ⚠️ 重複要**報出嚟**，唔可以靜靜去重。
+    // 靜靜去重嘅話，幹事以為佢揀咗三季，而畫面顯示兩季，
+    // 佢會以為系統食咗一季。
+    if (quarterIds.indexOf(id) !== -1) {
+      if (duplicates.indexOf(id) === -1) duplicates.push(id);
+      return;
+    }
+    quarterIds.push(id);
+  });
+  return { quarterIds: quarterIds, duplicates: duplicates };
+}
+
+/**
+ * 把季度清單分成「可以清」同「受保護」兩堆。**純函式。**
+ *
+ * @param {string[]} quarterIds 要清嘅季度
+ * @param {string[]} blockedQuarters 受保護嘅季度
+ * @returns {{allowed: string[], blocked: string[]}}
+ */
+function splitQuarterResetTargets_(quarterIds, blockedQuarters) {
+  const blocked = (blockedQuarters || []).map(function (q) {
+    return String(q || '').trim().toUpperCase();
+  });
+  const out = { allowed: [], blocked: [] };
+  (quarterIds || []).forEach(function (raw) {
+    const id = String(raw || '').trim().toUpperCase();
+    if (id === '') return;
+    // ⚠️ 被擋嗰季要**明講**。靜靜略過嘅話，
+    // 幹事以為清咗三季，而實際兩季，而佢唔會發現。
+    if (blocked.indexOf(id) !== -1) out.blocked.push(id);
+    else out.allowed.push(id);
+  });
+  return out;
+}
+
+/**
+ * 把逐季嘅 plan 加埋成一份總覽。**純函式。**
+ *
+ * ⚠️ **逐季細項同總數兩樣都要有。**
+ * 淨係一個總數嘅話，幹事睇唔出邊一季會清走乜，
+ * 而佢要判斷嘅正正就係「呢一季係咪真係可以清」。
+ *
+ * @param {Array<{quarterId: string, plan: Object}>} entries 逐季嘅計畫
+ * @returns {{perQuarter: Object[], totals: Object, nothingToDo: boolean}}
+ */
+function summariseQuarterResetBatch_(entries) {
+  const perQuarter = [];
+  const totals = {
+    quarters: 0, versions: 0, assignmentRows: 0, sendLogRows: 0,
+    requestRows: 0, unavailableRequestRows: 0,
+    fineTuneProposalRows: 0, fineTuneProposalArchiveRows: 0,
+    pdfFiles: 0, manualAttention: 0
+  };
+
+  (entries || []).forEach(function (entry) {
+    const plan = entry.plan || {};
+    const item = {
+      quarterId: entry.quarterId,
+      quarterStage: plan.quarterStage || '（讀取不到）',
+      versions: (plan.versions || []).length,
+      versionLabels: (plan.versions || []).map(function (v) { return 'v' + v.versionNo; }),
+      assignmentRows: plan.assignmentRows || 0,
+      sendLogRows: plan.sendLogRows || 0,
+      requestRows: plan.requestRows || 0,
+      unavailableRequestRows: plan.unavailableRequestRows || 0,
+      fineTuneProposalRows: plan.fineTuneProposalRows || 0,
+      fineTuneProposalArchiveRows: plan.fineTuneProposalArchiveRows || 0,
+      pdfFiles: (plan.pdfFiles || []).length,
+      manualAttention: (plan.manualAttention || []).slice()
+    };
+    perQuarter.push(item);
+
+    totals.quarters += 1;
+    totals.versions += item.versions;
+    totals.assignmentRows += item.assignmentRows;
+    totals.sendLogRows += item.sendLogRows;
+    totals.requestRows += item.requestRows;
+    totals.unavailableRequestRows += item.unavailableRequestRows;
+    totals.fineTuneProposalRows += item.fineTuneProposalRows;
+    totals.fineTuneProposalArchiveRows += item.fineTuneProposalArchiveRows;
+    totals.pdfFiles += item.pdfFiles;
+    totals.manualAttention += item.manualAttention.length;
+  });
+
+  const nothingToDo = totals.versions === 0 && totals.assignmentRows === 0
+    && totals.sendLogRows === 0 && totals.requestRows === 0
+    && totals.unavailableRequestRows === 0 && totals.fineTuneProposalRows === 0
+    && totals.fineTuneProposalArchiveRows === 0 && totals.pdfFiles === 0;
+
+  return { perQuarter: perQuarter, totals: totals, nothingToDo: nothingToDo };
+}
+
+/**
+ * 逐季執行清理。**每一季獨立 try/catch，獨立寫 AuditLog。**
+ *
+ * ⚠️ 一季爆咗就成批停低嘅話，會變成「前面清咗一半、後面完全冇做」，
+ * 而幹事唔知停咗喺邊。所以爆咗嗰季記低，繼續做下一季。
+ *
+ * ⚠️ 每一季寫**兩次** AuditLog：做之前一次、做之後一次。
+ * 只有 before 嘅話，「打算清」同「實際清咗」永遠對唔到帳——
+ * 一季中途爆咗，AuditLog 睇落同成功一模一樣。
+ *
+ * @param {Array<{quarterId: string, plan: Object}>} entries 逐季嘅計畫
+ * @returns {{results: Object[], failedQuarters: string[]}}
+ */
+function executeQuarterResetBatch_(entries) {
+  const results = [];
+  const failedQuarters = [];
+
+  (entries || []).forEach(function (entry) {
+    const quarterId = entry.quarterId;
+    const plan = entry.plan;
+
+    // ── 做之前 ────────────────────────────────────────────────
+    try {
+      writeAuditLog_({
+        action: 'QUARTER_RESET_BATCH_BEFORE',
+        targetSheet: '（多張）',
+        targetKey: quarterId,
+        oldValue: 'Stage=' + (plan.quarterStage || '?')
+          + '　版本=' + (plan.versions || []).map(function (v) {
+            return 'v' + v.versionNo;
+          }).join(',')
+          + '　RosterAssignments=' + (plan.assignmentRows || 0) + ' 行'
+          + '　SendLog=' + (plan.sendLogRows || 0) + ' 行'
+          + '　PDF=' + (plan.pdfFiles || []).length + ' 個',
+        newValue: '（準備清理）',
+        source: 'executeQuarterResetBatch_',
+        notes: '批次清理，這一批共 ' + (entries || []).length + ' 季'
+      });
+    } catch (err) {
+      // AuditLog 寫唔到唔應該擋住清理本身——但要記低。
+      log_('ERROR', 'QUARTER_RESET_BATCH_BEFORE 寫入失敗（' + quarterId + '）: ' + err.message);
+    }
+
+    // ── 真正做 ────────────────────────────────────────────────
+    try {
+      const result = executeQuarterReset_(plan);
+      results.push({ quarterId: quarterId, ok: true, result: result, error: '' });
+
+      try {
+        writeAuditLog_({
+          action: 'QUARTER_RESET_BATCH_AFTER',
+          targetSheet: '（多張）',
+          targetKey: quarterId,
+          oldValue: '（見同一季的 QUARTER_RESET_BATCH_BEFORE）',
+          newValue: 'RosterVersions=' + result.versionRowsDeleted + ' 行'
+            + '　grid=' + result.versionSheetsDeleted + ' 張'
+            + '　RosterAssignments=' + result.assignmentRowsDeleted + ' 行'
+            + '　SendLog=' + result.sendLogRowsDeleted + ' 行'
+            + '　PDF=' + result.pdfTrashed + ' 個已移到垃圾桶',
+          source: 'executeQuarterResetBatch_',
+          notes: (result.errors || []).length > 0
+            ? '過程中有 ' + result.errors.length + ' 項出錯：' + result.errors.join('；')
+            : '沒有出錯'
+        });
+      } catch (err) {
+        log_('ERROR', 'QUARTER_RESET_BATCH_AFTER 寫入失敗（' + quarterId + '）: ' + err.message);
+      }
+    } catch (err) {
+      log_('ERROR', 'executeQuarterReset_ 失敗（' + quarterId + '）: ' + err.message);
+      failedQuarters.push(quarterId);
+      results.push({ quarterId: quarterId, ok: false, result: null, error: err.message });
+
+      // ⚠️ 爆咗嗰季**都要寫低**。靜靜冇咗嘅話，
+      // AuditLog 上面呢一季就只有一句「準備清理」，
+      // 而冇人知佢到底清咗幾多先至爆。
+      try {
+        writeAuditLog_({
+          action: 'QUARTER_RESET_BATCH_FAILED',
+          targetSheet: '（多張）',
+          targetKey: quarterId,
+          oldValue: '（見同一季的 QUARTER_RESET_BATCH_BEFORE）',
+          newValue: '中途失敗',
+          source: 'executeQuarterResetBatch_',
+          notes: '錯誤訊息：' + err.message
+            + '　⚠️ 部分內容可能已經被清走，請對照 BEFORE 那一筆檢查'
+        });
+      } catch (err2) {
+        log_('ERROR', 'QUARTER_RESET_BATCH_FAILED 寫入失敗（' + quarterId + '）: ' + err2.message);
+      }
+    }
+  });
+
+  return { results: results, failedQuarters: failedQuarters };
+}

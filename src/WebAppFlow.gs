@@ -181,9 +181,12 @@ function mapPendingPlanForClient_(plan) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 確認畫面資料
  */
-function apiStep2Preview(quarterId) {
+function apiStep2Preview(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
-  return planStep2_(quarterId);
+  // ⚠️ 第四十七輪批次 B1 組：一定要把 `sendOptions` 傳落去。
+  // 唔傳嘅話，事前講嘅收件人數同真正寄嘅唔同——
+  // 而現場就係「會寄給這 3 位」對住「模擬 9 封」。
+  return planStep2_(quarterId, sendOptions);
 }
 
 /**
@@ -349,9 +352,9 @@ function apiStep4GetMissingPdfWarnings(quarterId, versionNo) {
  * @param {number} versionNo 版本號
  * @returns {Object} 收件人數、DRY_RUN
  */
-function apiStep4GetSendPreview(quarterId, versionNo) {
+function apiStep4GetSendPreview(quarterId, versionNo, sendOptions) {
   assertWebAppRequestAllowed_();
-  return planStep4SendPreview_(quarterId, versionNo);
+  return planStep4SendPreview_(quarterId, versionNo, sendOptions);
 }
 
 /**
@@ -392,7 +395,7 @@ function apiStep4Confirm(quarterId, sendOptions) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} `mode='HAS_PENDING'` 時附申報清單；否則 `mode='NO_PENDING'`
  */
-function apiStep5Plan(quarterId) {
+function apiStep5Plan(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
 
   // 第二十三輪批次階段 E5：**瘦身。** 「套用申報」嗰段已經歸咗掣 1
@@ -404,11 +407,30 @@ function apiStep5Plan(quarterId) {
   requireQuarterStage_(quarterId, [QUARTER_STAGE.OFFICIAL_SENT], '步驟 5：改動後重發');
   const changedPlan = planResendChangedPersons_(quarterId);
 
+  // ⚠️ 第四十七輪批次 B2 組：**呢個畫面本來只講「有 N 位有改動」，
+  // 而完全冇講「實際會寄幾多封」。**
+  //
+  // 兩者唔一樣：名單收件人（堂委地址）都會收到，而幹事亦都可以勾一個
+  // 唔喺「有改動」名單入面嘅人。所以要用同一個解析器再出一個總數。
+  let recipientCount = 0;
+  let recipientPreview = { total: 0, shown: [], moreCount: 0 };
+  if (changedPlan.changed.length > 0) {
+    const context = buildMailContext_(
+      quarterId, changedPlan.versionNo, MAIL_STAGES.RESEND);
+    const recipients = resolveActualRecipientsFromContext_(
+      context, MAIL_STAGES.RESEND, sendOptions,
+      changedPlan.changed.map(function (c) { return c.personId; }));
+    recipientCount = recipients.length;
+    recipientPreview = summariseRecipientsForPreview_(recipients);
+  }
+
   return {
     mode: changedPlan.changed.length === 0 ? 'NO_CHANGES' : 'HAS_CHANGES',
     versionNo: changedPlan.versionNo,
     changed: changedPlan.changed,
     changedPersonCount: changedPlan.changed.length,
+    recipientCount: recipientCount,
+    recipientPreview: recipientPreview,
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
   };
 }
@@ -505,12 +527,13 @@ function apiStep5GeneratePdfs(quarterId, releaseText) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} `mode='NO_CHANGES'` 時代表沒有改動需要重發；否則附完整名單與統計
  */
-function apiStep5SendPreview(quarterId) {
+function apiStep5SendPreview(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   const changed = planStep5ChangedList_(quarterId);
   if (changed.changedList.length === 0) return { mode: 'NO_CHANGES', versionNo: changed.versionNo };
 
-  const preview = planStep5SendPreview_(quarterId, changed.versionNo, changed.context, changed.changedList);
+  const preview = planStep5SendPreview_(
+    quarterId, changed.versionNo, changed.context, changed.changedList, sendOptions);
   const changedForClient = preview.changedList.map(function (c) {
     const person = changed.context.peopleById[c.personId];
     return {
@@ -528,6 +551,13 @@ function apiStep5SendPreview(quarterId) {
     noEmailCount: preview.noEmailList.length,
     personSendableCount: preview.personSendableCount,
     listRecipientCount: preview.listRecipientCount,
+    // ⚠️ 第四十七輪批次 B4 組：**一個總數。**
+    //
+    // 上面嗰兩個數字（有改動嘅人、名單收件人）加埋唔一定等於實際寄出——
+    // 幹事可以勾一個唔喺「有改動」名單入面嘅人。所以要有一個
+    // 由**實際會寄嗰一份名單**數出嚟嘅總數，同 `execute` 嗰邊對得上。
+    recipientCount: preview.recipientCount,
+    recipientPreview: preview.recipientPreview,
     isDryRun: preview.isDryRun
   };
 }

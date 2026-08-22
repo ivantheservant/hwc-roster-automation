@@ -95,6 +95,63 @@ function buildChangedPeopleSummaryText_(changedList, context) {
 }
 
 /**
+ * 第四十七輪批次 B 組：**改動後重發，這一次寄給哪幾位。**
+ *
+ * ⚠️ 抽出來的唯一理由：`planStep5SendPreview_()`（事前告訴幹事）
+ * 同 `sendResendStage_()`（真正寄出）**必須行同一個算法**。
+ * 第四十六輪把後者重做了而沒有改前者，結果確認窗講「3 位」、
+ * 完成窗講「9 封」。
+ *
+ *   `CHANGED_ONLY`　呼叫端傳落來那一批（＝今日的行為）
+ *   `ALL`　　　　　這一版有派工的、加上曾經收過信的（同 `listRecipients_` 一致）
+ *   `PICK`　　　　幹事逐個揀那一批（＋ 他指定而不在「有改動」名單裡面的）
+ *
+ * @param {Object} context `buildMailContext_()` 的結果
+ * @param {Object} decision `resolveSendOptions_()` 的結果
+ * @param {string[]} changedPersonIds 這一次算出來有改動的人
+ * @param {boolean} previewOnly `true` ＝ 事前預覽，**不寫 `notifyReasonByPerson`**。
+ *   ⚠️ 這一個旗是必須的：預覽會在真正寄出之前跑一次，
+ *   而 `notifyReasonByPerson` 是寄信那一段會讀的狀態——
+ *   預覽順手寫落去，就等於「看一眼」改變了「做出來」的結果。
+ * @returns {string[]} PersonID
+ */
+function resolveResendTargetPersonIds_(context, decision, changedPersonIds, previewOnly) {
+  const noteReason = function (personId, reason) {
+    if (previewOnly) return;
+    if (!context.notifyReasonByPerson[personId]) {
+      context.notifyReasonByPerson[personId] = reason;
+    }
+  };
+
+  let targetPersonIds = (changedPersonIds || []).slice();
+  if (decision.recipientScope === SEND_RECIPIENT_SCOPE.ALL) {
+    const everyone = {};
+    Object.keys(context.assignmentsByPerson || {}).forEach(function (id) { everyone[id] = true; });
+    Object.keys(context.lastHashByPerson || {}).forEach(function (id) { everyone[id] = true; });
+    targetPersonIds = Object.keys(everyone);
+    // ⚠️ 幹事揀咗「全部人」＝ 佢明知內容可能冇變都要寄。
+    // `deliverOne_()` 嗰個 hash 保險絲會把「內容冇變」嘅人擋走，
+    // 所以要喺呢度俾佢哋一個理由——同 `RESEND_ONLY_CHANGED=FALSE` 同一個意思。
+    targetPersonIds.forEach(function (id) { noteReason(id, '幹事選擇寄給全部人'); });
+  } else if (decision.recipientScope === SEND_RECIPIENT_SCOPE.PICK) {
+    targetPersonIds = targetPersonIds.filter(function (id) {
+      return decision.pickedKeys[id] === true;
+    });
+    // 幹事揀咗一個唔喺「有改動」名單入面嘅人 ⇒ 照樣寄俾佢。
+    Object.keys(decision.pickedKeys).forEach(function (key) {
+      if (key.indexOf('LIST:') === 0) return;
+      if (targetPersonIds.indexOf(key) === -1) {
+        targetPersonIds.push(key);
+        if (!previewOnly) {
+          context.notifyReasonByPerson[key] = '幹事指定要寄給這一位';
+        }
+      }
+    });
+  }
+  return targetPersonIds;
+}
+
+/**
  * 步驟 5「改動後重發」的實際寄送：只寄給 changedPersonIds 名單中的人
  * （PERSON，用 TPL_RESEND_TC）＋ EmailRecipients 中 Stage 欄含 RESEND 的名單
  * （LIST，用 TPL_RESEND_LIST_TC，內容為本輪異動摘要）。
@@ -165,34 +222,14 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
   //   CHANGED_ONLY　呼叫端傳落嚟嗰批（＝今日嘅行為）
   //   ALL　　　　　　呢一版有派工嘅、加上一次收過信嘅（同 listRecipients_ 一致）
   //   PICK　　　　　幹事逐個揀嗰批
+  // ⚠️ 第四十七輪批次 B 組：呢一段抽咗做 `resolveResendTargetPersonIds_()`。
+  //
+  // 點解要抽：**事前預覽（`planStep5SendPreview_()`）同真正寄出**
+  // 要行同一個算法。第四十六輪把「實際寄給誰」重做咗而冇改事前預覽，
+  // 結果確認窗講「3 位」而完成窗講「9 封」——同一件事兩個算法。
   const decision = context.sendDecision;
-  let targetPersonIds = changedPersonIds.slice();
-  if (decision.recipientScope === SEND_RECIPIENT_SCOPE.ALL) {
-    const everyone = {};
-    Object.keys(context.assignmentsByPerson || {}).forEach(function (id) { everyone[id] = true; });
-    Object.keys(context.lastHashByPerson || {}).forEach(function (id) { everyone[id] = true; });
-    targetPersonIds = Object.keys(everyone);
-    // ⚠️ 幹事揀咗「全部人」＝ 佢明知內容可能冇變都要寄。
-    // `deliverOne_()` 嗰個 hash 保險絲會把「內容冇變」嘅人擋走，
-    // 所以要喺呢度俾佢哋一個理由——同 `RESEND_ONLY_CHANGED=FALSE` 同一個意思。
-    targetPersonIds.forEach(function (id) {
-      if (!context.notifyReasonByPerson[id]) {
-        context.notifyReasonByPerson[id] = '幹事選擇寄給全部人';
-      }
-    });
-  } else if (decision.recipientScope === SEND_RECIPIENT_SCOPE.PICK) {
-    targetPersonIds = targetPersonIds.filter(function (id) {
-      return decision.pickedKeys[id] === true;
-    });
-    // 幹事揀咗一個唔喺「有改動」名單入面嘅人 ⇒ 照樣寄俾佢。
-    Object.keys(decision.pickedKeys).forEach(function (key) {
-      if (key.indexOf('LIST:') === 0) return;
-      if (targetPersonIds.indexOf(key) === -1) {
-        targetPersonIds.push(key);
-        context.notifyReasonByPerson[key] = '幹事指定要寄給這一位';
-      }
-    });
-  }
+  const targetPersonIds = resolveResendTargetPersonIds_(
+    context, decision, changedPersonIds, false);
 
   targetPersonIds.slice().sort().forEach(function (personId) {
     const person = context.peopleById[personId];

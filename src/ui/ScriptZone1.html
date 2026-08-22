@@ -315,7 +315,23 @@
       && (plan.blankCells || []).length === 0;
   }
 
-  function openSaveAndConfirm() {
+  /**
+   * ⚠️ 第四十七輪批次 A5 組：多咗一個 `opts`。
+   *
+   * `openSaveAndConfirm({ thenSend: true })` ⇒ 儲存確認窗嗰個
+   *「儲存之後直接去寄出」**預設勾住**。
+   *
+   * 第四十六輪 D 組定咗平時預設唔勾（寄出係對外動作，唔可以幫佢揀）。
+   * 呢度係**一個例外，而且只有一個入口**：佢啱啱撳緊〔寄出〕、
+   * 被「有未儲存改動」擋住、然後撳〔立即儲存並繼續〕。
+   * 佢本來就係想寄出——喺呢一條路上唔預設勾住，反而係要佢再做多一次
+   * 佢啱啱已經做過嘅決定。
+   *
+   * @param {{thenSend: boolean}=} opts 由〔立即儲存並繼續〕嗰條路傳落嚟
+   */
+  function openSaveAndConfirm(opts) {
+    // ⚠️ 只有明確傳咗先會預設勾住。其餘全部入口一律唔勾。
+    saveThenSendDefault_ = !!(opts && opts.thenSend);
     runAction('讀取改動', async () => {
       savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
       saveDecisions = {};
@@ -652,11 +668,13 @@
     // ⚠️ **預設唔勾**。寄出係一個對外嘅動作，預設幫佢揀咗就等於
     // 一個唔為意嘅人撳「照樣儲存」之後直接開咗寄出彈窗——
     // 而佢以為自己淨係喺度儲存。
-    saveThenSend_ = false;
+    // ⚠️ 第四十七輪批次 A5 組：預設值由 `saveThenSendDefault_` 決定。
+    // 平時係 `false`；只有由〔立即儲存並繼續〕入嚟先會係 `true`。
+    saveThenSend_ = saveThenSendDefault_;
     const thenSendRow = make('label', { className: 'check-row' });
     const thenSendCb = document.createElement('input');
     thenSendCb.type = 'checkbox';
-    thenSendCb.checked = false;
+    thenSendCb.checked = saveThenSendDefault_;
     thenSendCb.addEventListener('change', () => { saveThenSend_ = thenSendCb.checked; });
     thenSendRow.appendChild(thenSendCb);
     thenSendRow.appendChild(make('span', { text: '儲存之後直接去寄出' }));
@@ -844,6 +862,14 @@
    * 幹事下次撳「照樣儲存」就會突然彈個寄出窗出嚟，而佢冇揀過。
    */
   let saveThenSend_ = false;
+
+  /**
+   * 第四十七輪批次 A5 組：**這一次進來的時候，那個勾應不應該預設勾住。**
+   *
+   * ⚠️ 每次 `openSaveAndConfirm()` 都會重設它——留住上一次的值，
+   * 幹事下一次由主流程進來就會突然見到一個他沒有勾過的勾。
+   */
+  let saveThenSendDefault_ = false;
 
   function executeSaveAndConfirm(releaseText) {
     const confirmedRequestRows = Array.prototype.slice
@@ -1056,7 +1082,9 @@
       const link = d && d.publicLink;
       if (link && !link.hasLink) { renderReviewNeedsPublicLink(); return; }
 
-      const preview = await callServer('apiStep2Preview', currentQuarterId);
+      // ⚠️ 第四十七輪批次 B1 組：把 `sendOpts` 一齊傳上去。
+      // 唔傳嘅話，確認窗講嘅收件人數同真正寄嘅唔同。
+      const preview = await callServer('apiStep2Preview', currentQuarterId, sendOpts);
 
       // 收件人 0 ⇒ **拒絕執行**，唔係警告。
       // 寄一封冇人收到嘅信，畫面仲會顯示「已寄出」——比唔寄更差。
@@ -1077,13 +1105,9 @@
       }
 
       const nodes = [
-        make('div', { className: 'sec' }, [
-          sectionTitle('會寄給這 ' + preview.recipientCount + ' 位'),
-          make('div', {
-            text: '他們會收到一條唯讀連結，可以看到目前第 ' + preview.versionNo + ' 版的職事表。',
-            className: 'muted'
-          })
-        ])
+        recipientPreviewBox(preview.recipientPreview,
+          '會寄給這 ' + preview.recipientCount + ' 位',
+          '他們會收到一條唯讀連結，可以看到目前第 ' + preview.versionNo + ' 版的職事表。')
       ];
 
       if (preview.alreadySentCount > 0) {
@@ -1194,7 +1218,8 @@
         return;
       }
 
-      const preview = await callServer('apiStep4GetSendPreview', currentQuarterId, versionNo);
+      const preview = await callServer(
+        'apiStep4GetSendPreview', currentQuarterId, versionNo, sendOpts);
       const b = d.buttons.official;
       const willReceive = b.targetPersonCount - b.noEmailCount;
 
@@ -1251,11 +1276,17 @@
           className: 'vio-row'
         }));
       }
-      detail.appendChild(make('div', {
-        text: '・同時寄給堂委 ' + d.buttons.review.recipientCount + ' 人',
-        className: 'vio-row'
-      }));
       nodes.push(detail);
+
+      // ⚠️ 第四十七輪批次 B2／B3 組：**實際會寄嘅名單，逐個列出。**
+      //
+      // 本來呢度寫「同時寄給堂委 N 人」，而嗰個 N 係
+      // `d.buttons.review.recipientCount`——同真正會寄嘅完全兩回事。
+      // 而家整份由 `planStep4SendPreview_()` 出，同 `executeStep4Send_()`
+      // 行同一個 `resolveActualRecipients_()`。
+      nodes.push(recipientPreviewBox(preview.recipientPreview,
+        '會寄給這 ' + preview.recipientCount + ' 位',
+        '這一份就是撳落去之後真正會收到信的人。'));
 
       nodes.push(make('div', { className: 'sec sec-warn' }, [
         make('div', {
@@ -1338,7 +1369,7 @@
     const sendOpts = plainObjectOrNull_(sendOptions);
     runAction('比對有誰的安排改了', async () => {
       const d = await getDashboard();
-      const plan = await callServer('apiStep5Plan', currentQuarterId);
+      const plan = await callServer('apiStep5Plan', currentQuarterId, sendOpts);
 
       if (plan.mode === 'NO_CHANGES') {
         openModal('改動後重發', [
@@ -1358,6 +1389,15 @@
           })
         ])
       ];
+
+      // ⚠️ 第四十七輪批次 B2／B3 組：「有改動嘅人」**唔等於**「會收到信嘅人」。
+      //
+      // 名單收件人（堂委地址）都會收到，而幹事亦都可以勾一個唔喺
+      //「有改動」名單入面嘅人。上面嗰句「只會寄給這幾位和堂委」
+      // 一直冇俾過一個真正嘅數字。
+      nodes.push(recipientPreviewBox(plan.recipientPreview,
+        '會寄給這 ' + plan.recipientCount + ' 位',
+        '這一份就是撳落去之後真正會收到信的人（包括堂委名單）。'));
 
       const list = make('div', { className: 'sec' });
       plan.changed.forEach((c) => {

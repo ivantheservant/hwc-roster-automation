@@ -423,9 +423,13 @@ console.log('\n=== D【核心】兩處改名 ＋ 儲存後接去寄出 ===');
   check('★★★★★★ 確認窗有「儲存之後直接去寄出」，而且**預設唔勾**'
     + '——預設幫佢揀咗，就等於一個唔為意嘅人撳「照樣儲存」之後'
     + '直接開咗寄出彈窗，而佢以為自己淨係喺度儲存',
+    // ⚠️ 第四十七輪批次 A5 組：預設值改咗由 `saveThenSendDefault_` 出，
+    // 而佢平時係 `false`，只有由〔立即儲存並繼續〕入嚟先會係 `true`。
+    // 守嘅嘢冇變：**平時預設唔勾。**
     /text: '儲存之後直接去寄出'/.test(zone1)
-    && /thenSendCb\.checked = false;/.test(zone1)
-    && /saveThenSend_ = false;/.test(zone1), '');
+    && /thenSendCb\.checked = saveThenSendDefault_;/.test(zone1)
+    && /saveThenSendDefault_ = !!\(opts && opts\.thenSend\);/.test(zone1)
+    && /let saveThenSendDefault_ = false;/.test(zone1), '');
   check('★★★★★★ 勾咗都**唔會跳過儲存結果畫面**'
     + '——嗰個係「系統改咗你嗰幾格」嘅唯一證據；'
     + '跳過就變成「撳一粒掣，寄出彈窗彈咗出嚟」',

@@ -211,6 +211,50 @@ function getConfigKeySeeds_() {
         + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS, type: CONFIG_TYPES.LIST, group: 'SYSTEM',
+      defaultValue: COMBINED_DEFAULT_SKIP_POST_IDS_DEFAULT,
+      description: '合堂主日預設不排的崗位（PostID，逗號分隔）。'
+        + '合堂那一天，主席／講員／傳譯／領詩／司琴由另一堂帶領，'
+        + '所以這五個崗位不應該由本堂排。'
+        + '「維護 ▸ 補填合堂跳過崗位」會把這一格的內容填進 SpecialSundays 的 '
+        + 'SkipPostIDs；「準備工作 ▸ ⚠️ 產生年度合堂建議」新寫入的那幾行也會帶著它。'
+        + '⚠️ 這一格填成空白就是空白——系統當成你的決定（「我不要任何合堂自動跳崗位」），'
+        + '不會自動退回程式內建的那五個崗位。'
+        + '某一次合堂實際上不只跳這五個（例如堂慶連司事都由英語堂負責），'
+        + '在 SpecialSundays 那一行自己加上去就可以，補填工具不會覆寫已填的值。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS, type: CONFIG_TYPES.LIST, group: 'SYSTEM',
+      defaultValue: COMBINED_BACKFILL_BLOCKED_DEFAULT,
+      description: '「維護 ▸ 補填合堂跳過崗位」絕對不可以改動的季度清單，逗號分隔。'
+        + '正式上線那一季必須列在這裡。'
+        + '⚠️ 這一格跟「' + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + '」是兩件事，'
+        + '故意分開兩格：那一個守的是「演練不可以碰哪幾季」，'
+        + '這一個守的是「補填工具不可以改哪幾季的資料」。'
+        + '共用一格的話，日後為了演練而加減一季，就會連補填工具的保護範圍都一起改掉。'
+        + '⚠️ 填成空白並不會變成「什麼都不保護」——空白時系統仍然退回程式內建的預設值'
+        + '（' + COMBINED_BACKFILL_BLOCKED_DEFAULT + '）。'
+        + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS, type: CONFIG_TYPES.LIST, group: 'SYSTEM',
+      defaultValue: QUARTER_RESET_BLOCKED_DEFAULT,
+      description: '「維護 ▸ ⚠️⚠️ 重設季度測試資料」絕對不可以清的季度清單，逗號分隔。'
+        + '正式上線那一季必須列在這裡。'
+        + '⚠️ 這是全系統最危險的功能之一，清走了就是真的清走了。'
+        + '⚠️ 這一格跟「' + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + '」和'
+        + '「' + CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS + '」是三件事，故意分開三格：'
+        + '一個守「演練不可以碰哪幾季」，一個守「補填工具不可以改哪幾季」，'
+        + '這一個守「清理不可以清哪幾季」。共用一格的話，日後改其中一邊'
+        + '就會連另外兩件事的保護範圍都一起改掉。'
+        + '⚠️ 填成空白並不會變成「什麼都不保護」——空白時系統仍然退回程式內建的預設值'
+        + '（' + QUARTER_RESET_BLOCKED_DEFAULT + '）。'
+        + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
+      editable: 'TRUE'
+    },
     // ---- MAIL ----
     {
       key: CONFIG_KEYS.MAIL_ADMIN_NOTIFY, type: CONFIG_TYPES.EMAIL, group: 'MAIL',

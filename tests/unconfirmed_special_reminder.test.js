@@ -70,6 +70,24 @@ class FakeSpreadsheet {
 }
 
 /**
+ * 第四十七輪批次 C4 組：由真正嗰個建表函式攞 header。
+ *
+ * 呢一行本來手砌咗 'Confirmed' 喺最後，而真實嘅
+ * getSpecialSundaysHeaderKeys_() 一直冇嗰一項——
+ * 即係呢個 fixture 造咗一個真實 code path 造唔出嘅狀態：
+ * 現實嘅試算表根本冇曾經有過呢一欄。
+ *
+ * 後果：「未確認的特殊主日永遠係 0」呢個 bug 由頭到尾綠燈，
+ * 而全面體檢報告一直寫住「未確認的特殊主日 0 個（已提醒 0 / 3 次）」。
+ *
+ * @returns {string[]} SpecialSundays 第 2 行機器鍵
+ */
+function specialSundaysHeaderKeys() {
+  const probe = loadGasSource(['Constants.gs', 'Utils.gs', 'SpecialSundaysSeed.gs']);
+  return probe.getSpecialSundaysHeaderKeys_();
+}
+
+/**
  * 組一個場景。
  * @param {Object} opts
  *   opts.specialSundays  SpecialSundays 資料列（null＝連工作表都唔存在）
@@ -105,10 +123,8 @@ function buildGas(opts) {
     []);
 
   if (opts.specialSundays !== null) {
-    ss.addSheet('SpecialSundays',
-      ['SpecialID', 'QuarterID', 'ServiceDate', 'Type', 'Title', 'SkipPostIDs', 'LockPostIDs',
-        'ExternalOwner', 'CommunionOverride', 'TranslationRequired', 'Active', 'Notes', 'Confirmed'],
-      opts.specialSundays);
+    // 第四十七輪批次 C4 組：header 由真正嗰個建表函式出，唔准手砌。
+    ss.addSheet('SpecialSundays', specialSundaysHeaderKeys(), opts.specialSundays);
   }
 
   return loadGasSource(

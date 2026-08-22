@@ -91,6 +91,8 @@
 //     只需要「有連結」呢個事實，所以直接餵一個已經有 `fileUrl` 嘅假列。
 
 const { loadGasSource } = require('./helpers/gas_loader.js');
+// 第四十七輪批次 B4 組：事前講「會寄給 N 位」，事後就一定要寄到 N 封。
+const { assertPreviewMatchesSend } = require('./helpers/preview_matches_send.js');
 const {
   RealisticMockSpreadsheet, seedSheet, appendRows
 } = require('./helpers/mock_sheets_realistic.js');
@@ -589,6 +591,7 @@ console.log('\n=== 步驟 2：寄給堂委審閱（apiStep2Preview → apiStep2C
     preview.recipientCount === 1, JSON.stringify(preview));
 
   const result = gas.apiStep2Confirm(Q);
+  assertPreviewMatchesSend(check, '步驟 2 寄給堂委審閱', preview.recipientCount, result);
   checkEqual('★★★★★ Stage → REVIEW_SENT（由 executeStep2_() 的 setQuarterStage_() 真正寫入）',
     gas.getQuarterStage_(Q), gas.QUARTER_STAGE.REVIEW_SENT);
   checkEqual('★★★★★ **1 位審閱者真正被 sendStage() 記成 DRY_RUN**'
@@ -790,6 +793,8 @@ console.log('\n=== 步驟 4：正式發出（含無電郵特例，apiStep4Get*Wa
     sendPreview.recipientCount > 0, JSON.stringify(sendPreview));
 
   const result = gas.apiStep4Confirm(Q);
+  assertPreviewMatchesSend(check, '步驟 4 正式發出給全體',
+    sendPreview.recipientCount, result);
   checkEqual('★★★★★ Stage → OFFICIAL_SENT（真正由 executeStep4Send_() 前進）',
     gas.getQuarterStage_(Q), gas.QUARTER_STAGE.OFFICIAL_SENT);
 
@@ -875,6 +880,11 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物（apiStep5
 
   const sendResult = gas.apiStep5SendConfirm(Q, '');
   check('★★★★★ 冇被硬規則關卡擋住', sendResult.blocked !== true, JSON.stringify(sendResult));
+  // ⚠️ 步驟 5 嘅預覽要用 `apiStep5SendPreview()` 嗰個總數
+  //（`recipientCount`），唔係 `changedList.length`——
+  // 後者淨係「有改動嘅人」，唔包名單收件人。
+  assertPreviewMatchesSend(check, '步驟 5 改動後重發',
+    sendPreview.recipientCount, sendResult);
 
   const resendLog = gas.readSheet(gas.SHEETS.SEND_LOG).filter(function (l) {
     return l[gas.COLUMNS.SEND_LOG.STAGE] === 'RESEND';

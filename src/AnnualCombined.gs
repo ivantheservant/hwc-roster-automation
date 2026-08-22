@@ -356,9 +356,28 @@ function writeAnnualCombinedSundays_(plan) {
       return;
     }
 
+    // ⚠️ 第四十七輪批次 C3 組：**欄唔存在 ⇒ 大聲失敗，唔可以靜靜略過。**
+    //
+    // 本來係 `if (col > 0) …`，即係欄唔存在就靜靜唔寫。而 `SpecialSundays`
+    // 由第一日就冇 `Confirmed` 欄（見 `SpecialSundaysSeed.gs` 檔內說明），
+    // 所以呢個工具「把五月嗰行標成未確認」呢件事**由頭到尾冇發生過**——
+    // 而工具嘅報告一直話做咗。
+    //
+    // 呢一改本身會令「未跑過補欄工具」嘅試算表喺跑年度合堂工具時失敗。
+    // **嗰個係想要嘅行為**——比靜靜寫唔到好。所以錯誤訊息一定要
+    // 講得出係邊一欄、同埋去邊度補。
     const setCell = function (key, value) {
       const col = colOf(key);
-      if (col > 0) sheet.getRange(nextRow, col).setValue(value);
+      if (col <= 0) {
+        throw new Error(buildThreePartMessage_(
+          '「' + SHEETS.SPECIAL_SUNDAYS + '」這一張工作表沒有「' + key + '」這一欄，'
+            + '所以這一次要寫進去的內容寫不了。',
+          '什麼都沒有寫入——這一次的年度合堂建議整批停下來了。',
+          ['去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄',
+            '補完之後再撳一次這個工具',
+            '⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料']));
+      }
+      sheet.getRange(nextRow, col).setValue(value);
     };
     setCell(C.SPECIAL_ID, item.quarterId + '-' + item.kind);
     setCell(C.QUARTER_ID, item.quarterId);
@@ -366,6 +385,15 @@ function writeAnnualCombinedSundays_(plan) {
     setCell(C.TYPE, item.type);
     setCell(C.TITLE, item.title);
     setCell(C.ACTIVE, 'TRUE');
+    // 第四十七輪批次 D4 組：**新寫入嗰幾行帶住預設跳過崗位。**
+    //
+    // 之前呢一格一律留空，而確認畫面仲明文寫住「需要你自己填」。
+    // 即係把一件每次都一樣嘅嘢（合堂嗰五個崗位由另一堂帶領）
+    // 交咗畀幹事逐次記得人手做。
+    //
+    // ⚠️ 只修呢一邊唔夠：既有嗰幾季仲係空白。
+    // 「維護 ▸ 補填合堂跳過崗位」補嘅就係嗰邊。
+    setCell(C.SKIP_POST_IDS, readCombinedDefaultSkipPostIds_());
     setCell(C.CONFIRMED, item.confirmed ? 'TRUE' : 'FALSE');
     setCell(C.NOTES, item.notes);
 
@@ -430,9 +458,15 @@ function runAnnualCombinedWizard_() {
 
   lines.push('將新增 ' + writable.length + ' 行到 ' + SHEETS.SPECIAL_SUNDAYS + '。');
   lines.push('');
-  lines.push('⚠️ 跳過崗位（SkipPostIDs）與外部負責單位（ExternalOwner）一律留空，');
+  const defaultSkip = readCombinedDefaultSkipPostIds_();
+  lines.push('跳過崗位（SkipPostIDs）會先填上：');
+  lines.push('　' + (defaultSkip || '（Config 那一格是空白，所以留空）'));
+  lines.push('　 合堂那一天，這幾個崗位由另一堂帶領，所以不由本堂排。');
+  lines.push('　 要改就去 Config「' + CONFIG_KEYS.COMBINED_DEFAULT_SKIP_POST_IDS + '」。');
+  lines.push('');
+  lines.push('⚠️ 外部負責單位（ExternalOwner）仍然一律留空，');
   lines.push('　 需要你自己按每一次合堂的實際安排填寫（例如堂慶由英語堂帶領詩、司琴，');
-  lines.push('　 就填那兩個崗位的 PostID 與「英語堂」）。');
+  lines.push('　 就在那一行加上那兩個崗位的 PostID 與「英語堂」）。');
   lines.push('');
   lines.push('確定要寫入嗎？');
 

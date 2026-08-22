@@ -32,7 +32,13 @@ function check(label, condition, extra) {
   if (!ok && extra) console.log(extra.split('\n').map(function (l) { return '      ' + l; }).join('\n'));
 }
 
-const gas = loadGasSource(['Constants.gs', 'ConfigSeed.gs']);
+// 第四十七輪批次 D／E 組：`ConfigSeed.gs` 嘅 seed 清單引用咗
+// `COMBINED_DEFAULT_SKIP_POST_IDS_DEFAULT`（CombinedSkipBackfill.gs）同
+// `QUARTER_RESET_BLOCKED_DEFAULT`（QuarterReset.gs）。
+// ⚠️ 一樣唔喺呢度手抄——載入真正嗰兩支檔案，等 seed 讀到嘅就係真值。
+const gas = loadGasSource([
+  'Constants.gs', 'ConfigSeed.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs'
+]);
 
 // `getConfigKeySeeds_()` 其中一行嘅 defaultValue 係
 // `SpreadsheetApp.getActiveSpreadsheet().getId()`（ROSTER_SPREADSHEET_ID），

@@ -504,6 +504,9 @@ function buildDashboardState_(quarterId) {
     quarterId: quarterId,
     quarterLabel: buildQuarterLabel_(quarterId),
     stage: stage,
+    // ⚠️ 第四十七輪批次 A1 組：「三粒掣唔著嘅**唯一**原因就係未儲存」。
+    // 詳細理由見 `computeSendBlockedByUnsavedOnly_()` 檔內說明。
+    blockedByUnsavedOnly: computeSendBlockedByUnsavedOnly_(facts),
     statusText: buildDashboardStatusText_(stage, versionExists, generateOnText),
     latestVersion: latestVersion,
     isDryRun: isDryRun,
@@ -516,6 +519,49 @@ function buildDashboardState_(quarterId) {
     preQuarter: preQuarter,
     publicLink: publicLink
   };
+}
+
+/**
+ * 第四十七輪批次 A1 組：**三粒寄出掣不著的唯一原因，是不是就只有「未儲存」？**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * 為什麼要重算，不可以只看 `unsaved.hasAny`
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 兩種情況在畫面上長得一模一樣（三粒掣全部灰、`kind === NONE`），
+ * 而幹事要做的事完全相反：
+ *
+ *   ・**只有未儲存擋住** ⇒ 儲存完就寄得到 ⇒ 應該給他〔立即儲存並繼續〕
+ *   ・未儲存 **加上** Stage 也未到 ⇒ 儲存完一樣寄不到 ⇒ 給那粒掣是騙他
+ *
+ * 所以判斷方法是：把 `unsaved` 換成一個全 0 的物件，**用同一個
+ * `computeDashboardButtons_()` 再算一次**，看有沒有至少一粒會著。
+ *
+ * ⚠️ **不可以在這裡抄一份 `computeDashboardButtons_()` 的邏輯。**
+ * 那三粒掣的條件（Stage 到沒到、有沒有 OFFICIAL 紀錄、有沒有人改動）
+ * 隨時會加。抄一份出來就是兩個真相來源，而分岔的後果是
+ * 「畫面給了一粒儲存完都寄不到的掣」——比不給更差。
+ *
+ * @param {Object} facts `buildDashboardState_()` 裡面那一份
+ * @returns {boolean} 是不是「只有未儲存擋住」
+ */
+function computeSendBlockedByUnsavedOnly_(facts) {
+  const unsaved = (facts && facts.unsaved) || {};
+  if (!unsaved.hasAny) return false;
+
+  // 把 `unsaved` 換成全 0，其餘一個字都不改，再叫同一個函式。
+  const asIfSaved = Object.assign({}, facts, {
+    unsaved: {
+      gridChangeCount: 0,
+      unresolvedCount: 0,
+      pendingRequestCount: 0,
+      hasAny: false
+    }
+  });
+  const buttons = computeDashboardButtons_(asIfSaved);
+  return ['review', 'official', 'resend'].some(function (k) {
+    return !!(buttons[k] && buttons[k].enabled);
+  });
 }
 
 /**

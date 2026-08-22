@@ -1134,9 +1134,349 @@ const MUTATIONS = [
       + '——寄出係一個對外嘅動作；預設幫佢揀咗，'
       + '就等於一個唔為意嘅人撳「照樣儲存」之後直接開咗寄出彈窗',
     file: 'src/ui/ScriptZone1.html',
-    find: '    thenSendCb.checked = false;',
-    replace: '    thenSendCb.checked = true;',
+    // ⚠️ 第四十七輪批次 A5 組：預設值由 `saveThenSendDefault_` 出。
+    // 呢一條守嘅嘢冇變：**平時預設唔勾。**
+    find: '  let saveThenSendDefault_ = false;',
+    replace: '  let saveThenSendDefault_ = true;',
     tests: ['tests/send_recipients_pool.test.js']
+  },
+  {
+    id: 'unsaved-dialog-dead',
+    why: '把「未儲存」嗰段調返去 `NONE` 後面'
+      + '——有未儲存改動嗰陣 `kind` 必定係 `NONE`，而 `NONE` 嗰段自己 return，'
+      + '所以第四十輪寫嘅嗰段（連〔先去儲存〕）永遠行唔到。'
+      + 'Ivan 現場見到嘅就係一個叫佢撳一粒掣、而窗入面冇嗰粒掣嘅畫面',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '    if (s.blockedByUnsavedOnly) {\n      renderUnsavedBlocksSend(s);\n      return;\n    }',
+    replace: '    if (false) {\n      renderUnsavedBlocksSend(s);\n      return;\n    }',
+    tests: ['tests/send_unsaved_gate.test.js']
+  },
+  {
+    id: 'unsaved-no-recalc',
+    why: '把「係咪只有未儲存擋住」由重算改成淨睇 `unsaved.hasAny`'
+      + '——未儲存 ＋ Stage 都未到嗰陣，會俾咗一粒'
+      + '「立即儲存並繼續」而佢儲存完一樣寄唔到',
+    file: 'src/WebAppDashboard.gs',
+    find: '  const buttons = computeDashboardButtons_(asIfSaved);\n'
+      + '  return [\'review\', \'official\', \'resend\'].some(function (k) {\n'
+      + '    return !!(buttons[k] && buttons[k].enabled);\n'
+      + '  });',
+    replace: '  return true;',
+    tests: ['tests/send_unsaved_gate.test.js']
+  },
+  {
+    id: 'none-dialog-no-save',
+    why: '拆走 `NONE` 窗嗰粒〔立即儲存〕'
+      + '——即係回到現場嗰個狀態：叫佢去撳「儲存並確認」，'
+      + '而個窗入面冇嗰粒掣',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "        acts.push(button('立即儲存', () => { closeModal(); openSaveAndConfirm(); }, ''));",
+    replace: '        acts.push(null);',
+    tests: ['tests/send_unsaved_gate.test.js']
+  },
+  {
+    id: 'save-send-not-optin',
+    why: '把〔立即儲存並繼續〕嗰條路嘅「儲存後直接寄出」改成唔預設勾'
+      + '——佢本來就係想寄出，只係被未儲存擋住；'
+      + '唔勾嘅話佢儲存完又要自己再搵一次〔寄出〕',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    saveThenSendDefault_ = !!(opts && opts.thenSend);',
+    replace: '    saveThenSendDefault_ = false;',
+    tests: ['tests/send_unsaved_gate.test.js']
+  },
+  {
+    id: 'preview-counts-reviewers',
+    why: '把步驟 2 嘅事前收件人數改返做 `countReviewerRecipients_()`'
+      + '——即係現場嗰個 bug：確認窗講「會寄給這 3 位」，'
+      + '而完成窗講「模擬 9 封」',
+    file: 'src/FiveStageCore.gs',
+    find: '    recipientCount: recipients.length,\n'
+      + '    // 第四十七輪批次 B3 組：**列出名字**，唔淨係一個數字。',
+    replace: '    recipientCount: countReviewerRecipients_(),\n'
+      + '    // 第四十七輪批次 B3 組：**列出名字**，唔淨係一個數字。',
+    // ⚠️ **只列 `preview_matches_send.test.js`。**
+    // `e2e_five_stage_flow.test.js` 喺呢幾條突變下面仍然綠——
+    // 因為佢**冇傳 `sendOptions`**，而冇傳嘅時候兩個算法
+    // 啟啟好都退回 `listRecipients_()`。兩者就係喺 `PICK`
+    // 之下先至分家，而 Ivan 現場嗰一次正正就係 `PICK`。
+    //
+    // 列一條捕唔到嘅測試入去，verify-red 會報 FAIL——
+    // 而呢個報告本身就係一個有用嘅發現：
+    // 那一份 e2e 看不到這一類問題。
+    tests: ['tests/preview_matches_send.test.js']
+  },
+  {
+    id: 'step4-ignores-opts',
+    why: '把步驟 4 嘅事前收件人數改返做「唔理 `sendOptions`」'
+      + '——幹事喺寄出彈窗勾咗人之後，'
+      + '個數字仍然係「全部應收嘅人」，同實際寄出唔同',
+    file: 'src/FiveStageCore.gs',
+    find: '  const recipients = resolveActualRecipients_(\n'
+      + '    quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+    replace: '  const recipients = listRecipients_(MAIL_STAGES.OFFICIAL,\n'
+      + '    buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL));',
+    // ⚠️ **只列 `preview_matches_send.test.js`。**
+    // `e2e_five_stage_flow.test.js` 喺呢幾條突變下面仍然綠——
+    // 因為佢**冇傳 `sendOptions`**，而冇傳嘅時候兩個算法
+    // 啟啟好都退回 `listRecipients_()`。兩者就係喺 `PICK`
+    // 之下先至分家，而 Ivan 現場嗰一次正正就係 `PICK`。
+    //
+    // 列一條捕唔到嘅測試入去，verify-red 會報 FAIL——
+    // 而呢個報告本身就係一個有用嘅發現：
+    // 那一份 e2e 看不到這一類問題。
+    tests: ['tests/preview_matches_send.test.js']
+  },
+  {
+    id: 'resend-preview-diverges',
+    why: '令步驟 5 嘅事前預覽自己再數一次收件人'
+      + '——同真正寄出嗰個算法分家，'
+      + '就會出現「事前 3 位、事後 9 封」嗰種對唔上',
+    file: 'src/FiveStageCore.gs',
+    find: '    recipientCount: recipients.length,\n'
+      + '    recipientPreview: summariseRecipientsForPreview_(recipients),\n'
+      + '    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false\n'
+      + '  };\n}',
+    replace: '    recipientCount: changedList.length,\n'
+      + '    recipientPreview: summariseRecipientsForPreview_(recipients),\n'
+      + '    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false\n'
+      + '  };\n}',
+    // ⚠️ **只列 `preview_matches_send.test.js`。**
+    // `e2e_five_stage_flow.test.js` 喺呢幾條突變下面仍然綠——
+    // 因為佢**冇傳 `sendOptions`**，而冇傳嘅時候兩個算法
+    // 啟啟好都退回 `listRecipients_()`。兩者就係喺 `PICK`
+    // 之下先至分家，而 Ivan 現場嗰一次正正就係 `PICK`。
+    //
+    // 列一條捕唔到嘅測試入去，verify-red 會報 FAIL——
+    // 而呢個報告本身就係一個有用嘅發現：
+    // 那一份 e2e 看不到這一類問題。
+    tests: ['tests/preview_matches_send.test.js']
+  },
+  {
+    id: 'preview-writes-reason',
+    why: '令事前預覽都寫 `notifyReasonByPerson`'
+      + '——嗰個係寄信嗰段會讀嘅狀態。'
+      + '「睇一眼」改變咗「做出嚟」嘅結果，係最難查嗰種錯',
+    file: 'src/ResendFlow.gs',
+    find: '    if (previewOnly) return;\n',
+    replace: '    if (false) return;\n',
+    tests: ['tests/send_options.test.js']
+  },
+  {
+    id: 'sp-header-no-conf',
+    why: '把 `Confirmed` 由 header 陣列刪返走'
+      + '——即係第四十七輪批次之前嘅原狀：'
+      + '`COLUMNS` 有、建表路徑冇，讀出嚟永遠 `undefined`，'
+      + '而「未確認的特殊主日」永遠係 0',
+    file: 'src/SpecialSundaysSeed.gs',
+    find: '\n    C.CONFIRMED\n  ];',
+    replace: '\n  ];',
+    tests: [
+      'tests/special_sundays_schema.test.js',
+      // ⚠️ 呢一條要一齊紅。
+      // 佢本來手砌咗 header，所以嗰個 bug 由頭到尾綠燈；
+      // C4 修完之後，佢先至真係踩到建表路徑。
+      'tests/unconfirmed_special_reminder.test.js'
+    ]
+  },
+  {
+    id: 'sp-header-tc-len',
+    why: '中文標題陣列少一項'
+      + '——建出嚟第 1 行同第 2 行會整排錯位，而冇任何嘢會出聲',
+    file: 'src/SpecialSundaysSeed.gs',
+    find: "  '日期是否已確認（留空＝已確認；只有填 FALSE 才算未確認）'\n];",
+    replace: '];',
+    tests: ['tests/special_sundays_schema.test.js']
+  },
+  {
+    id: 'setcell-silent-skip',
+    why: '把 `setCell()` 改返做 `if (col > 0)` 靜靜略過'
+      + '——工具會報「已經標咗未確認」，而張表上面係空白。'
+      + '報告講一件事、資料係另一件事，係最難查嗰種錯',
+    file: 'src/AnnualCombined.gs',
+    find: '      if (col <= 0) {\n        throw new Error(buildThreePartMessage_(\n          \'「\' + SHEETS.SPECIAL_SUNDAYS + \'」這一張工作表沒有「\' + key + \'」這一欄，\'\n            + \'所以這一次要寫進去的內容寫不了。\',\n          \'什麼都沒有寫入——這一次的年度合堂建議整批停下來了。\',\n          [\'去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄\',\n            \'補完之後再撳一次這個工具\',\n            \'⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料\']));\n      }\n',
+    replace: '      if (col <= 0) return;\n',
+    tests: ['tests/special_sundays_schema.test.js']
+  },
+  {
+    id: 'backfill-fills-values',
+    why: '令補欄工具順手替既有列填 `FALSE`'
+      + '——邊一行嘅日期真係未確認，只有幹事知；'
+      + '猜一個值上去會即刻噴一堆假警報。'
+      + '系統改壞幹事親手做嘅決定，比排錯更差',
+    file: 'src/SpecialSundaysSeed.gs',
+    find: '不會替任何一列填值',
+    replace: '會替每一列填 FALSE',
+    tests: ['tests/special_sundays_schema.test.js']
+  },
+  {
+    id: 'drift-lint-autofix',
+    why: '把「只報告，不修改」呢句拆走'
+      + '——一支會順手改嘢嘅 lint，就唔再係「畀 Ivan 拍板」，'
+      + '而係「幫你決定咗」',
+    file: 'tools/lint-schema-drift.js',
+    find: '// ⚠️ 只報告，不修改',
+    replace: '// ⚠️ 掃描器',
+    tests: ['tests/special_sundays_schema.test.js']
+  },
+  {
+    id: 'combined-skip-overwrites',
+    why: '令補填工具連已經填咗嘅 `SkipPostIDs` 都覆寫'
+      + '——幹事填咗一個值落去就係佢對嗰一日嘅決定。'
+      + '系統改壞幹事親手做嘅決定，比排錯更差',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: "    if (item.oldValue !== '') { out.alreadyFilled.push(item); return; }",
+    replace: "    if (false) { out.alreadyFilled.push(item); return; }",
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'cb-touch-protected',
+    why: '拆走受保護季度嘅擋格'
+      + '——2026T4 係正式上線嗰一季，一格都唔准改',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: '    if (blocked.indexOf(item.quarterId.toUpperCase()) !== -1) {',
+    replace: '    if (false) {',
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'cb-touch-inactive',
+    why: '令補填工具連 `Active=FALSE` 嗰啲行都補'
+      + '——嗰啲係範例列同已停用嘅安排，補落去等於整返生佢哋',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: '    if (!isTrueValue_(row[C.ACTIVE])) { out.inactive.push(item); return; }',
+    replace: '    if (false) { out.inactive.push(item); return; }',
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'cb-empty-fallback',
+    why: '令 Config 揀成空白嗰陣退回內建嗰五個崗位'
+      + '——噉就推翻咗幹事特登清空嗰個決定。'
+      + '「空白＝冇設定過」同「空白＝我唔要」，系統分唔到就會做錯',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: "    if (value === '') return;",
+    replace: "    if (false) return;",
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'cb-detect-narrow',
+    why: '只認 `Type`、唔認 `Title`'
+      + '——「產生年度合堂建議」寫嘅係 `Type=合堂`，'
+      + '而人手加嘅行成日係 `Title=五月合堂`。'
+      + '只認一格就會靜靜漏咗一半，而報告會話「冇嘢要補」',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: "  const text = (String((row && row[C.TYPE]) || '') + ' '"
+      + "\n    + String((row && row[C.TITLE]) || '')).trim();",
+    replace: "  const text = String((row && row[C.TYPE]) || '').trim();",
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'combined-detect-too-wide',
+    why: '把判斷放闊到「有 Type 就算合堂」'
+      + '——浸禮主日、宣教主日嗰幾日係**要排人**嘅，'
+      + '誤判就會喺唔應該跳嘅日子跳咗五個崗位，而表面睇落好正常',
+    file: 'src/CombinedSkipBackfill.gs',
+    find: "  if (text.indexOf('合堂') !== -1) return true;",
+    replace: '  if (text !== BACKTICK) return true;'.replace('BACKTICK', "''"),
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'cb-annual-blank',
+    why: '把年度合堂工具改返做「跳過崗位一律留空」'
+      + '——今日補完，出年產生 2028 年嘅四次合堂又再一次全部留空',
+    file: 'src/AnnualCombined.gs',
+    find: '    setCell(C.SKIP_POST_IDS, readCombinedDefaultSkipPostIds_());',
+    replace: '',
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'cb-share-rehearsal',
+    why: '把保護季度改成重用 `REHEARSAL_PROTECTED_QUARTERS`'
+      + '——兩件唔同嘅事共用一格，日後有人為咗演練而加減一季，'
+      + '就會靜靜連補填工具嘅保護範圍都改埋',
+    file: 'src/Constants.gs',
+    find: "  COMBINED_BACKFILL_BLOCKED_QUARTERS: 'COMBINED_BACKFILL_BLOCKED_QUARTERS',",
+    replace: "  COMBINED_BACKFILL_BLOCKED_QUARTERS: 'REHEARSAL_PROTECTED_QUARTERS',",
+    tests: ['tests/combined_skip_posts.test.js']
+  },
+  {
+    id: 'reset-batch-single-only',
+    why: '把選單入口改返做「一次只食一個 QuarterID」'
+      + '——批次嗰幾支純函式全部寫好、全部綠燈，'
+      + '而入口行唔到嗰條路。碼寫得啱而行唔到，等於冇寫過',
+    file: 'src/Menu.gs',
+    find: '  const parsed = parseQuarterResetBatchInput_(response.getResponseText());',
+    replace: '  const parsed = { quarterIds: [normalizeIdInput_(response.getResponseText())],'
+      + ' duplicates: [] };',
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'reset-batch-no-blocked',
+    why: '拆走受保護季度嗰一步'
+      + '——2026T4 係正式上線嗰一季，清走咗係真係冇咗',
+    file: 'src/Menu.gs',
+    find: '  const split = splitQuarterResetTargets_(parsed.quarterIds, blockedQuarters);',
+    replace: '  const split = { allowed: parsed.quarterIds, blocked: [] };',
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'rs-blank-no-guard',
+    why: '令 Config 填成空白就變成「乜都唔擋」'
+      + '——一格打空咗就冧晒保護。'
+      + '呢一支係全系統最危險嘅功能之一，冧咗就係真係清走咗',
+    file: 'src/QuarterReset.gs',
+    find: "  if (raw === '') raw = QUARTER_RESET_BLOCKED_DEFAULT;",
+    replace: '',
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'rs-stops-on-error',
+    why: '拆走逐季 try/catch，一季爆咗就成批停低'
+      + '——前面清咗一半、後面完全冇做，而幹事唔知停咗喺邊',
+    file: 'src/QuarterReset.gs',
+    find: '      const result = executeQuarterReset_(plan);' + '\n'
+      + "      results.push({ quarterId: quarterId, ok: true, result: result, error: '' });",
+    replace: '      const result = executeQuarterReset_(plan);',
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'rs-no-after-audit',
+    why: '淨係寫 before、唔寫 after'
+      + '——「打算清」同「實際清咗」永遠對唔到帳，'
+      + '一季中途爆咗，AuditLog 睇落同成功一模一樣',
+    file: 'src/QuarterReset.gs',
+    find: "          action: 'QUARTER_RESET_BATCH_AFTER',",
+    replace: "          action: 'QUARTER_RESET_BATCH_BEFORE',",
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'rs-dedup-silent',
+    why: '靜靜去重，唔講返邊一個重複咗'
+      + '——幹事以為佢揀咗三季，而畫面顯示兩季，佢會以為系統食咗一季',
+    file: 'src/QuarterReset.gs',
+    find: '      if (duplicates.indexOf(id) === -1) duplicates.push(id);',
+    replace: '      if (false) duplicates.push(id);',
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'reset-batch-totals-only',
+    why: '合併確認畫面淨係印總數，唔印逐季細項'
+      + '——幹事睇唔出邊一季會清走乜，'
+      + '而佢要判斷嘅正正就係「呢一季係咪真係可以清」',
+    file: 'src/Menu.gs',
+    find: '    describeQuarterResetPlanLines_(entry.quarterId, entry.plan)'
+      + '.forEach(function (l) {',
+    replace: '    [].forEach(function (l) {',
+    tests: ['tests/quarter_reset_batch.test.js']
+  },
+  {
+    id: 'rs-touch-svc-dates',
+    why: '令清理連 `ServiceDates` 都掃'
+      + '——2027T1 嗰 13 個主日唔係測試痕跡，係嗰一季本身嘅設定。'
+      + '清走咗，主流程即刻顯示「這一季的 Quarters 沒有填生成日期」',
+    file: 'src/QuarterReset.gs',
+    find: "  plan.pdfFiles.forEach(function (f) {",
+    replace: '  deleteRowsMatching_(SHEETS.SERVICE_DATES, function () { return false; }, errors);' + '\n'
+      + '  plan.pdfFiles.forEach(function (f) {',
+    tests: ['tests/quarter_reset_batch.test.js']
   },
 ];
 

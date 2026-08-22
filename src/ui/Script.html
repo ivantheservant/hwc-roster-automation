@@ -985,6 +985,64 @@
     return true;
   }
 
+  /**
+   * 第四十七輪批次 B3 組：**確認窗要列出名字，唔淨係一個數字。**
+   *
+   * ⚠️ 第四十四輪 B 組已經定過「講明係邊個」。而確認窗一直只講
+   * 「這 3 位」，一個名都冇——幹事撳〔確定寄出〕之前核對唔到任何嘢。
+   *
+   * ⚠️ 呢一份名單由後端 `summariseRecipientsForPreview_()` 出，
+   * 而佢收嘅係 `resolveActualRecipients_()` **回嗰一份物件**——
+   * 唔係另外再查一次 `NameMapping`。再查一次就係第二個真相來源。
+   *
+   * @param {Object} preview `summariseRecipientsForPreview_()` 嘅結果
+   * @param {string} title 段落標題（已經包住數字）
+   * @param {string} note 標題下面嗰行小字
+   * @returns {Node} 一段
+   */
+  function recipientPreviewBox(preview, title, note) {
+    const box = make('div', { className: 'sec' }, [sectionTitle(title)]);
+    if (note) box.appendChild(make('div', { text: note, className: 'muted' }));
+
+    const p = preview || { total: 0, shown: [], moreCount: 0 };
+    if (p.total === 0) {
+      // ⚠️ 零個收件人**一定要講**。一個空白嘅段落等於冇講——
+      // 而幹事撳落去之後會見到「寄出 0 封」，然後以為系統壞咗。
+      box.appendChild(make('div', {
+        text: '⚠ 一個收件人都沒有。撳落去不會寄出任何東西。',
+        className: 'vio-row'
+      }));
+      return box;
+    }
+
+    const drawRows = function (rows) {
+      rows.forEach((r) => {
+        box.appendChild(make('div', {
+          text: '・' + r.displayName
+            + (r.emailMasked ? ('　' + r.emailMasked) : '')
+            + (r.hasEmail ? '' : '　⚠ 查不到電郵，寄不到'),
+          className: r.hasEmail ? 'ok-line' : 'vio-row'
+        }));
+      });
+    };
+    drawRows(p.shown);
+
+    if (p.moreCount > 0) {
+      const more = make('div', {
+        text: '　另外還有 ' + p.moreCount + ' 位。',
+        className: 'muted'
+      });
+      box.appendChild(more);
+      // 〔全部列出〕：撳咗就把餘下嗰批畫出嚟。⚠️ 唔係開多一個窗——
+      // 佢而家喺一個確認窗入面，再開一個窗就會蓋住佢要確認嘅嘢。
+      box.appendChild(row([button('全部列出', () => {
+        box.removeChild(more);
+        drawRows((p.all || []).slice(p.shown.length));
+      }, 'secondary')]));
+    }
+    return box;
+  }
+
   /** 全選／全不選那兩粒掣。兩個名單都要有——五十幾個人逐個撳唔現實。 */
   function pickListBulkButtons(items, selected, onRedraw) {
     return [
