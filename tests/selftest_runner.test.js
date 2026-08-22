@@ -251,10 +251,15 @@ console.log('\n=== 五 情境要獨立、可以單獨重跑 ===');
   // ── S14／S15 係第四十七輪兩個 bug 嘅真環境防線 ────────────────
   const s14 = CODE.slice(CODE.indexOf('function selfTestS14_('),
     CODE.indexOf('function selfTestS15_('));
+  // ⚠️ 第五十一輪批次 C3 組：重新生成改咗行 `apiGenerateRoster()`
+  //（「進階功能 ▸ 重新生成初稿（覆蓋式）」嗰條路）。
+  // `apiGenerateDraftExecute()` 喺一個已經有版本嘅季度上面只會回
+  // `{ok:false}`，乜都唔做——而第五十輪嗰次 S14 就係噉樣攞住一個
+  // 舊版本去驗，報咗一句完全誤導嘅結論。
   check('★★★★★★ S14 真嘅 append 一行落 `SpecialSundays`，然後真嘅重新生成'
     + '——喺記憶體造一個 overlay 就係「fixture 造到一個'
     + '真實 code path 造唔出嘅狀態」',
-    /sheet\.appendRow\(row\);/.test(s14) && /apiGenerateDraftExecute/.test(s14),
+    /sheet\.appendRow\(row\);/.test(s14) && /apiGenerateRoster/.test(s14),
     s14.slice(0, 200));
   check('★★★★★★ 而且驗埋「唔可以係『待確認』」'
     + '——「待確認」＝「未派到人」，而呢一格係「特登唔派」。'

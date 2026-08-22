@@ -2020,7 +2020,8 @@ const MUTATIONS = [
     why: '「只重跑紅色情境」連通過咗嗰啲都清走'
       + '——噉就同「由頭再跑一次」冇分別，而時間預算又會爆',
     file: 'src/SelfTestRunner.gs',
-    find: '    if (status === SELFTEST_STATUS.FAILED || status === SELFTEST_STATUS.ERROR) {',
+    find: '    if (status === SELFTEST_STATUS.FAILED || status === SELFTEST_STATUS.ERROR' + '\n'
+      + '        || status === SELFTEST_STATUS.BLOCKED) {',
     replace: '    if (true) {',
     tests: ['tests/selftest_resume_deadlock.test.js']
   },
@@ -2150,6 +2151,190 @@ const MUTATIONS = [
       + "' 張，**唔係「查過冇事」，係「查唔到」。**');",
     replace: "lines.push('（以上僅供參考。）');",
     tests: ['tests/sendlog_columns.test.js']
+  },
+  {
+    id: 'st-s03-no-unresolved',
+    why: '拆走 S03 嗰條 `unresolvedCount === 0`'
+      + '——冇咗佢，一個「最小改動」順手令系統整批擋住，'
+      + '而報告上面 S03 仍然係綠。第五十輪就係噉，'
+      + '後面七條情境連環倒，主流程一步都冇跑過',
+    file: 'src/SelfTestRunner.gs',
+    find: "  t.equal('而且 3 格全部認得出（unresolvedCount = 0）'",
+    replace: "  if (false) t.equal('而且 3 格全部認得出（unresolvedCount = 0）'",
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s03-fake-name',
+    why: '令 S03 寫返一個系統認唔出嘅字'
+      + '——系統嘅規矩係「有認唔出嘅名就乜都唔准做」，'
+      + '而嗰個正正係佢最嚴厲嗰一道閘',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const result = selfTestWriteRealNames_(quarterId, versionNo, cells);' + '\n'
+      + "  t.equal('3 格都真的寫進 grid 工作表', result.written, 3,",
+    replace: '  const result = { written: 3, picks: [], notEligible: [] };' + '\n'
+      + '  cells.forEach(function (c, i) {' + '\n'
+      + '    selfTestWriteGridCell_(quarterId, versionNo, c.serviceDate, c.postId,' + '\n'
+      + "      c.slotIndex, '認不出' + (i + 1));" + '\n'
+      + '  });' + '\n'
+      + "  t.equal('3 格都真的寫進 grid 工作表', result.written, 3,",
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-pick-hardcoded',
+    why: '把替代人名寫死'
+      + '——日後有人離開名單，自測機就會無聲無息噉壞掉，'
+      + '而「無聲無息噉壞掉」正正就係呢部機器要擋嗰件事',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const byPost = (eligibility && eligibility.byPost) || {};',
+    replace: "  return { name: '陳大文', personId: 'P9999', eligible: true };" + '\n'
+      + '  // eslint-disable-next-line no-unreachable' + '\n'
+      + '  const byPost = (eligibility && eligibility.byPost) || {};',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-pick-same-person',
+    why: '揀返同一個人'
+      + '——揀返同一個就唔算改動，而 `gridChangeCount` 會係 0，'
+      + '之後每一條斷言都係喺驗一個冇發生過嘅改動',
+    file: 'src/SelfTestRunner.gs',
+    find: '    return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;',
+    replace: '    return peopleById[id] && peopleById[id].nameTC;',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s10-runs-dirty',
+    why: '令 S10 喺污染狀態下照樣硬跑'
+      + '——第五十輪嗰次 S10 見到 S03 嘅殘留仍然硬跑，'
+      + '而佢報嘅嘢同真正嘅問題無關',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (beforeUnsaved.unresolvedCount > 0 || beforeUnsaved.gridChangeCount > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s16-no-cleanup',
+    why: '令 S16 唔收拾'
+      + '——下一次「只重跑紅色情境」就會喺一個污染狀態下開始，'
+      + '而嗰種紅同系統無關',
+    file: 'src/SelfTestRunner.gs',
+    find: '  selfTestWriteGridCell_(quarterId, versionNo, cell.serviceDate,' + '\n'
+      + '    cell.postId, cell.slotIndex, originalName);',
+    replace: '  // （突變：唔收拾）',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s04-two-reds',
+    why: '拆走 S04 嗰個前置檢查'
+      + '——`buildUnsavedSendPreview_()` 喺 `canSendUnsaved=false` 之下'
+      + '回空預覽係**啱嘅**，一個根因報成兩條紅會令報告睇落比實際嚴重',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (s.canSendUnsaved !== true) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s14-wrong-entry',
+    why: '令 S14 用返 `apiGenerateDraftExecute()`'
+      + '——嗰一支喺一個已經有版本嘅季度上面只會回 `{ok:false}`，'
+      + '乜都唔做。而 S14 唔睇回傳值，繼續攞舊版本去驗',
+    file: 'src/SelfTestRunner.gs',
+    find: "    regenerated = selfTestCall_('S14', 'apiGenerateRoster'," + '\n'
+      + '      function () { return apiGenerateRoster(quarterId); });',
+    replace: "    regenerated = selfTestCall_('S14', 'apiGenerateDraftExecute'," + '\n'
+      + '      function () { return apiGenerateDraftExecute(quarterId); });',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s14-no-version-check',
+    why: '拆走「重新生成真係產生咗新版本」嗰條斷言'
+      + '——一個真實入口靜靜噉冇做嘢，而測試照樣往下走，'
+      + '正正就係呢個專案由第一輪殺到而家嗰種病',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (versionNo !== versionBefore + 1) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s14-runs-late',
+    why: '把 S14／S15 排返去最後'
+      + '——`apiGenerateRoster()` 要 Stage=DRAFT，'
+      + '跑到 S09 之後 Stage 係 OFFICIAL_SENT，嗰陣一定被擋',
+    file: 'src/SelfTestRunner.gs',
+    find: "    { id: 'S14', title: '特殊主日 SkipPostIDs 生效（要 Stage=DRAFT，所以排在這裡）',",
+    replace: "    { id: 'SZZ', title: '（突變：排錯位）',",
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-s15-no-cleanup',
+    why: '令 S15 唔收拾 S14 種落嗰一行'
+      + '——下一次由頭跑，`SpecialSundays` 會累積一堆自測留低嘅行',
+    file: 'src/SelfTestRunner.gs',
+    find: "  const cleanup = selfTestDeactivateSpecialSunday_(quarterId + '-SELFTEST');",
+    replace: "  const cleanup = { done: true, detail: '（突變：冇收拾）' };",
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-no-blocked',
+    why: '拆走 `dependsOn` 嘅擋'
+      + '——一個根因報成八條紅，而 Ivan 要逐條睇完先知邊幾條係雜訊',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (blockedBy.length > 0) {',
+    replace: '    if (false) {',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-blocked-not-counted',
+    why: '報告摘要唔獨立數「被擋住」'
+      + '——`BLOCKED` 唔等於通過。只數綠同紅嘅話，'
+      + '一份「6 綠 1 紅」嘅報告睇落好似情況唔錯，'
+      + '而實際上有幾條根本冇跑過',
+    file: 'src/SelfTestRunner.gs',
+    find: "    + blockedCount + ' 被擋住　'",
+    replace: "    + ''",
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-rerun-skips-blocked',
+    why: '「只重跑紅色情境」唔清走 `BLOCKED`'
+      + '——修好上游之後，被擋住嗰幾條仍然唔會跑，'
+      + '而嗰幾條先係整件事嘅重點',
+    file: 'src/SelfTestRunner.gs',
+    find: '        || status === SELFTEST_STATUS.BLOCKED) {',
+    replace: '        || (false && status === SELFTEST_STATUS.BLOCKED)) {',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-resume-ignores-state',
+    why: '續跑嗰陣唔理上一次嘅結論'
+      + '——一個「上一次紅、今次跳過」嘅上游就唔會擋到下游，'
+      + '於是下游又會喺一個壞狀態下硬跑',
+    file: 'src/SelfTestRunner.gs',
+    find: '  Object.keys(state).forEach(function (id) { byId[id] = state[id]; });',
+    replace: '',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-duration-carry',
+    why: '把秒數進位改返做舊寫法'
+      + '——299.6 秒會印成「4 分 60 秒」。上一輪報告嘅原文',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const totalSeconds = Math.max(0, Math.round((Number(ms) || 0) / 1000));' + '\n'
+      + '  const minutes = Math.floor(totalSeconds / 60);' + '\n'
+      + '  const seconds = totalSeconds - minutes * 60;',
+    replace: '  const total = Math.max(0, Math.round(Number(ms) || 0) / 1000);' + '\n'
+      + '  const minutes = Math.floor(total / 60);' + '\n'
+      + '  const seconds = Math.round(total - minutes * 60);',
+    tests: ['tests/selftest_mainflow.test.js']
+  },
+  {
+    id: 'st-evidence-twice',
+    why: '證據欄把「實際」抄多一次'
+      + '——上一輪 S11 嘅「實際」同「證據」係同一段長文字，印咗兩次。'
+      + '證據欄應該講呢個值由邊度嚟',
+    file: 'src/SelfTestRunner.gs',
+    find: "      if (c.evidence && c.evidence !== c.actual) lines.push('　　 證據：' + c.evidence);",
+    replace: "      if (c.evidence) lines.push('　　 證據：' + c.evidence);",
+    tests: ['tests/selftest_mainflow.test.js']
   },
 ];
 
