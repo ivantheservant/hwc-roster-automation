@@ -1024,3 +1024,178 @@ function selfTestMenuEntry_(resume, title) {
 
   ui.alert(title, describeSelfTestReport_(report).join('\n'), ui.ButtonSet.OK);
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第四十九輪批次 第 2 層 2B：**匯出 payload（連洗資料）。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 自測機錄低嘅係**真實回傳值**——入面有真人姓名、真電郵、真 PersonID。
+ * 呢個 repo 係公開嘅，所以匯出之前一定要洗。
+ *
+ * ⚠️ **洗唔乾淨就唔好匯出——寧願呢一層做唔成。**
+ *
+ * 一份「洗咗九成」嘅資料入咗公開 repo，就係一次真實嘅個人資料外洩，
+ * 而佢換返嚟嘅只係一層測試。呢個交換完全唔值。
+ *
+ * ⚠️ 洗完之後**仲要跑一次** `tools/scan-staged-secrets.js` 先准入 repo
+ * ——呢一支只係第一道，唔係最後一道。
+ */
+
+/**
+ * 洗一份 payload。
+ *
+ * 三種東西要換走：
+ *   ・PersonID（`P` ＋ 3-4 位數字）　⇒ `P9001`、`P9002`⋯⋯
+ *   ・電郵　　　　　　　　　　　　　⇒ `p01@example.invalid`
+ *   ・真人姓名（由 `NameMapping` 出）⇒ `測試人物01`
+ *
+ * ⚠️ 對照表**逐次執行都一致**（同一個 PersonID 永遠換成同一個代號），
+ * 否則同一份資料入面兩處提到同一個人會變成兩個人，
+ * 而重播出嚟嘅畫面就同真實嗰個唔一樣。
+ *
+ * @param {string} text 一段 JSON 文字
+ * @param {Object} maps 對照表（會被就地補充）
+ * @returns {string} 洗完的文字
+ */
+function scrubPayloadText_(text, maps) {
+  let out = String(text || '');
+
+  // ── 一、真人姓名 ────────────────────────────────────────────
+  //
+  // ⚠️ 由長到短換。唔排嘅話，一個兩個字嘅名會先換走，
+  // 而一個包住佢嘅三個字嘅名就會剩返一截。
+  (maps.names || []).forEach(function (pair) {
+    if (!pair.from) return;
+    out = out.split(pair.from).join(pair.to);
+  });
+
+  // ── 二、電郵 ────────────────────────────────────────────────
+  out = out.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, function (email) {
+    if (/\.invalid$/i.test(email)) return email;
+    if (!maps.emails[email]) {
+      maps.emailCount = (maps.emailCount || 0) + 1;
+      maps.emails[email] = 'p' + ('0' + maps.emailCount).slice(-2) + '@example.invalid';
+    }
+    return maps.emails[email];
+  });
+
+  // ── 三、PersonID ────────────────────────────────────────────
+  //
+  // ⚠️ 排喺最尾。姓名對照表入面嘅 `to` 唔會撞到 `P` ＋ 數字，
+  // 而電郵換完之後亦都唔會。
+  out = out.replace(/\bP\d{3,4}\b/g, function (pid) {
+    if (/^P9\d{3}$/.test(pid)) return pid;   // 已經係測試 ID
+    if (!maps.persons[pid]) {
+      maps.personCount = (maps.personCount || 0) + 1;
+      maps.persons[pid] = 'P9' + ('00' + maps.personCount).slice(-3);
+    }
+    return maps.persons[pid];
+  });
+
+  return out;
+}
+
+/**
+ * 砌姓名對照表：由 `NameMapping` 讀真名，換成 `測試人物NN`。
+ * @returns {Array<{from: string, to: string}>} 由長到短排好
+ */
+function buildScrubNameMap_() {
+  const C = COLUMNS.NAME_MAPPING;
+  const names = [];
+  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    [row[C.NAME_TC], row[C.NAME_EN]].forEach(function (raw) {
+      const name = String(raw || '').trim();
+      // 一個字嘅「名」多數係雜訊，換走反而會整爛其他字。
+      if (name.length < 2) return;
+      if (names.indexOf(name) === -1) names.push(name);
+    });
+  });
+  // ⚠️ 由長到短。見 `scrubPayloadText_()` 嗰段說明。
+  names.sort(function (a, b) { return b.length - a.length; });
+  return names.map(function (name, i) {
+    return { from: name, to: '測試人物' + ('0' + (i + 1)).slice(-2) };
+  });
+}
+
+/**
+ * 選單「測試工具 ▸ 匯出自測 payload（已洗資料）」。
+ * @returns {void}
+ */
+function runExportSelfTestPayloads_() {
+  const ui = SpreadsheetApp.getUi();
+  const title = '匯出自測 payload（已洗資料）';
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SELFTEST_SHEETS.PAYLOADS);
+  if (!sheet || sheet.getLastRow() < 2) {
+    ui.alert(title,
+      '「' + SELFTEST_SHEETS.PAYLOADS + '」工作表裡面沒有東西。\n\n'
+        + '請先撳「測試工具 ▸ ⚠️ 跑自測（沙盒季度，DRY_RUN）」——'
+        + '自測機一邊跑，一邊會把每一次 API 呼叫的真實回傳值錄在那裡。',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  const maps = { names: buildScrubNameMap_(), emails: {}, persons: {} };
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  const entries = [];
+  const broken = [];
+  rows.forEach(function (row, i) {
+    const scenario = String(row[0] || '');
+    const api = String(row[1] || '');
+    const raw = String(row[2] || '');
+    if (!api || !raw) return;
+    try {
+      // ⚠️ 洗**文字**，然後再 parse 一次。
+      // 洗完 parse 唔返轉頭，就代表洗嗰一步整爛咗個 JSON——
+      // 嗰種情況一定要報出嚟，唔可以匯出一份壞檔案。
+      const scrubbed = scrubPayloadText_(raw, maps);
+      entries.push({ scenario: scenario, api: api, value: JSON.parse(scrubbed) });
+    } catch (err) {
+      broken.push('第 ' + (i + 2) + ' 行（' + scenario + '／' + api + '）：' + err.message);
+    }
+  });
+
+  if (entries.length === 0) {
+    ui.alert(title, '一筆都洗不出來。\n\n' + broken.join('\n'), ui.ButtonSet.OK);
+    return;
+  }
+
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const stamp = Utilities.formatDate(new Date(), timezone, 'yyyyMMdd-HHmmss');
+  const fileName = 'selftest-payloads-' + stamp + '.json';
+  let url = '';
+  try {
+    // ⚠️ 用兩個參數嗰個 `createFile(name, content)`——佢本來就係純文字。
+    // 三個參數嗰個要 `MimeType`，而 `MimeType` 唔喺 `GAS_GLOBALS` 白名單
+    // 入面（`tools/lint-undeclared.js` 會報）。加一個全域名去遷就一個
+    // 唔必要嘅參數，係倒轉咗——嗰張白名單擋緊嘅正正就係打錯字。
+    const file = DriveApp.createFile(fileName, JSON.stringify(entries, null, 2));
+    url = file.getUrl();
+  } catch (err) {
+    ui.alert(title, '寫不出檔案：\n\n' + err.message, ui.ButtonSet.OK);
+    return;
+  }
+
+  const lines = [
+    '已經匯出 ' + entries.length + ' 筆（' + fileName + '）。',
+    url,
+    '',
+    '換走了：',
+    '　・真人姓名 ' + maps.names.length + ' 個 ⇒ 測試人物NN',
+    '　・電郵 ' + Object.keys(maps.emails).length + ' 個 ⇒ pNN@example.invalid',
+    '　・PersonID ' + Object.keys(maps.persons).length + ' 個 ⇒ P9NNN',
+    ''
+  ];
+  if (broken.length > 0) {
+    lines.push('⚠️ 以下這幾行洗完之後 JSON 讀不回來，沒有匯出：');
+    broken.slice(0, 10).forEach(function (b) { lines.push('　' + b); });
+    lines.push('');
+  }
+  lines.push('⚠️ 放進 repo 的 tests/payloads/ 之前，一定要再跑一次');
+  lines.push('　 node tools/scan-staged-secrets.js。');
+  lines.push('　 這一支只是第一道，不是最後一道。');
+  lines.push('　 洗不乾淨就不要放進去——寧願那一層做不成。');
+
+  ui.alert(title, lines.join('\n'), ui.ButtonSet.OK);
+}

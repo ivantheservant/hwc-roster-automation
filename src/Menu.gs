@@ -148,6 +148,10 @@ function onOpen() {
         // ⚠️ 全程 DRY_RUN，每 10 步重新斷言一次。
         .addItem('⚠️ 亂行機（沙盒季度，DRY_RUN）', 'runMonkeyFromMenu_')
         .addItem('▶️ 繼續亂行', 'runMonkeyResumeFromMenu_')
+        // 第四十九輪批次 第 2 層 2B：把自測機錄低嘅真實回傳值
+        // 洗乾淨之後匯出，放入 repo 嘅 `tests/payloads/`。
+        // ⚠️ 洗唔乾淨就唔好匯出——寧願嗰一層做唔成。
+        .addItem('匯出自測 payload（已洗資料）', 'runExportSelfTestPayloads_')
         .addItem('參數掃描', 'runTuneParameters_')
         .addItem('多次生成比較', 'runCompareMultiRun_')
         // 第二十九輪批次階段 D：由頭到尾行足五步，然後出一份報告。

@@ -1873,6 +1873,40 @@ const MUTATIONS = [
     replace: '      const inv = { results: [] };',
     tests: ['tests/monkey_run.test.js']
   },
+  {
+    id: 'ui-none-before-unsaved',
+    why: '**把第四十七輪嗰個死碼種返落去**：'
+      + '把 `kind === NONE` 嗰段排返去「未儲存」嗰段前面。'
+      + '⚠️ 呢一條就係第 2 層存在嘅唯一理由——'
+      + '前面三層全部捉唔到佢，因為佢係 HTML `<script>` 入面'
+      + '一個控制流次序問題，而所有測試都只係喺讀原始碼字串',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '    // ── 一、只有未儲存擋住 ⇒ 一個救得返自己嘅窗 ────────────────' + '\n'
+      + '    if (s.blockedByUnsavedOnly) {' + '\n'
+      + '      renderUnsavedBlocksSend(s);' + '\n'
+      + '      return;' + '\n'
+      + '    }',
+    replace: '    // （突變：呢一段被推到 NONE 之後）',
+    // ⚠️ 兩份都要紅。
+    // `send_unsaved_gate.test.js` 驗嘅係**原始碼次序**；
+    // `ui_replay.test.js` 驗嘅係**真正畫咗乜出嚟**。
+    // 兩者係唔同層次嘅證據——前者答「排咗喺邊」，
+    // 後者答「行唔行得到」。
+    tests: ['tests/ui_replay.test.js', 'tests/send_unsaved_gate.test.js']
+  },
+  {
+    id: 'ui-replay-not-real',
+    why: '把重播用嘅 `s` 由「後端算出嚟」改成「我打落去」'
+      + '——打落去就係喺假設答案，而假設答案就係'
+      + '第四十七輪個 bug 冇被捉到嘅原因',
+    file: 'tests/ui_replay.test.js',
+    find: '    blockedByUnsavedOnly: gas.computeSendBlockedByUnsavedOnly_(f),',
+    replace: '    blockedByUnsavedOnly: true,',
+    // ⚠️ 呢一條突變改嘅係測試本身。
+    // 佢驗嘅係：一份**唔會反映後端改動**嘅 payload，
+    // 會令「冇未儲存改動」嗰一條斷言即刻紅。
+    tests: ['tests/ui_replay.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。
