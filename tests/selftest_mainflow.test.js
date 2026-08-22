@@ -62,50 +62,25 @@ const gas = loadGasSource([
 ]);
 
 // =====================================================================
-console.log('\n=== A1【核心】揀一個系統認得出嘅名，而且唔准寫死 ===');
+console.log('\n=== A1【核心】第五十四輪：兩支「自己揀替代人選」已經拆走 ===');
 {
-  const pick = gas.selfTestPickReplacementName_;
-  const peopleById = {
-    P9001: { personId: 'P9001', nameTC: '測試人物01' },
-    P9002: { personId: 'P9002', nameTC: '測試人物02' },
-    P9003: { personId: 'P9003', nameTC: '測試人物03' }
-  };
-  const eligibility = { byPost: { CHAIR: ['P9001', 'P9002'] } };
-  const cell = { postId: 'CHAIR', personId: 'P9001' };
-
-  const out = pick(cell, peopleById, eligibility);
-  checkEqual('★★★★★★ 揀到一個**同現時嗰個唔同**嘅人'
-    + '——揀返同一個人就唔算改動，而 gridChangeCount 會係 0',
-    out.personId, 'P9002');
-  checkEqual('★★★★★★ 而且優先揀**該崗位合資格**嘅人'
-    + '——唔係嘅話，個改動會順手違反硬規則，'
-    + '而 S05 嘅規則檢查就會混入雜訊',
-    out.eligible, true);
-  checkEqual('★★★★★ 回傳嘅係人名（要寫落 grid 嗰個）',
-    out.name, '測試人物02');
-
-  // 冇合資格嘅人 ⇒ 退而求其次，但要標明。
-  const noEligible = pick({ postId: 'PIANO', personId: 'P9001' },
-    peopleById, eligibility);
-  check('★★★★★★ 揀唔到合資格嘅 ⇒ 仍然揀一個**認得出**嘅人',
-    noEligible.name !== '' && noEligible.personId !== 'P9001',
-    JSON.stringify(noEligible));
-  checkEqual('★★★★★★ 但要標成 `eligible: false`'
-    + '——唔標嘅話，S05 嗰條規則提示會變成一個查極查唔到來源嘅雜訊',
-    noEligible.eligible, false);
-
-  // ⚠️ 唔准寫死人名。
-  const helper = CODE.slice(CODE.indexOf('function selfTestPickReplacementName_('),
-    CODE.indexOf('function selfTestWriteRealNames_('));
-  check('★★★★★★ 由 `NameMapping`／`Eligibility` 現場揀，**冇寫死人名**'
-    + '——寫死嘅話，日後有人離開名單，'
-    + '自測機就會無聲無息噉壞掉',
-    !/'[一-龥]{2,4}'/.test(helper.replace(/'（[^']*）'/g, '')),
-    helper.slice(0, 400));
-  const writer = CODE.slice(CODE.indexOf('function selfTestWriteRealNames_('),
-    CODE.indexOf('function selfTestWriteRealNames_(') + 1200);
-  check('★★★★★ 真係由 `indexPeopleById_()` ＋ `readEligibility()` 攞',
-    /indexPeopleById_\(\)/.test(writer) && /readEligibility\(\)/.test(writer), '');
+  // ⚠️ 第五十一輪加咗 `selfTestPickReplacementName_()`，
+  // 入面嗰句「優先揀合資格嘅，揀唔到就退而求其次」正正就係
+  // 三輪紅嘅根源：**測試自己重新實作系統嘅接受條件。**
+  //
+  // 第五十四輪拆走咗佢，換成「寫入之後問 `apiSaveAndConfirmPlan()`」。
+  // 呢一條守住佢唔會被人好心噉加返。
+  check('★★★★★★ **`selfTestPickReplacementName_()` 已經冇咗**'
+    + '——留低就係留低第二個算法，而系統有幾多道閘就會有幾多輪失敗',
+    !/function selfTestPickReplacementName_\(/.test(SRC), '');
+  check('★★★★★★ `selfTestWriteRealNames_()` 一樣冇咗',
+    !/function selfTestWriteRealNames_\(/.test(SRC), '');
+  check('★★★★★★ 而且冇人再叫佢哋',
+    !/selfTestPickReplacementName_\(/.test(CODE)
+      && !/selfTestWriteRealNames_\(/.test(CODE), '');
+  check('★★★★★ 拆走嘅理由要留喺檔案入面'
+    + '——冇解釋嘅話，下一個人會照樣加返一支',
+    /測試喺度自己重新實作系統嘅接受條件/.test(SRC), '');
 }
 
 // =====================================================================
@@ -134,11 +109,16 @@ console.log('\n=== A2【核心】S03 要同時驗兩個數 ===');
     !/自測改動/.test(CODE), '');
   // ⚠️ 「冇寫『自測改動』」唔夠——寫「認不出1」一樣係認唔出嘅字。
   // 要驗**佢真係行共用嗰支揀真名**。
-  check('★★★★★★ S03 真係叫 `selfTestWriteRealNames_()`'
-    + '——換一個名（例如「認不出1」）繼續寫認唔出嘅字，'
-    + '一個淨係搵「自測改動」嘅斷言照樣綠',
-    /const result = selfTestWriteRealNames_\(quarterId, versionNo, cells\);/.test(s03),
-    s03.slice(0, 700));
+  // 第五十四輪批次 A 組：S03 而家行批量路——寫入之後問系統。
+  check('★★★★★★ S03 真係叫 `selfTestPickAcceptedCells_()`'
+    + '——寫入之後問 `apiSaveAndConfirmPlan()`，'
+    + '唔再自己實作一次「儲存會唔會被攔」',
+    /const picked = selfTestPickAcceptedCells_\(quarterId, versionNo, 3, 'S03'\);/
+      .test(s03), s03.slice(0, 900));
+  check('★★★★★★ 而且真係驗 `needsRelease === false`'
+    + '——呢一句就係攔住 S05 嗰道閘自己用嘅判斷',
+    /^  t\.equal\('不需要打字放行（needsRelease = false）'/m.test(s03),
+    s03.slice(-900));
   check('★★★★★★ 而且冇喺 S03 度直接叫 `selfTestWriteGridCell_()`'
     + '——直接叫就係繞過咗揀真名嗰一步',
     !/selfTestWriteGridCell_\(/.test(s03), s03.slice(0, 700));
@@ -158,11 +138,13 @@ console.log('\n=== A4【核心】S10 開始之前先驗前置狀態 ===');
     + '而佢報嘅嘢同真正嘅問題無關',
     /if \(beforeUnsaved\.unresolvedCount > 0 \|\| beforeUnsaved\.gridChangeCount > 0\) \{/
       .test(s10) && /上一個情境留下了未清理的格/.test(SRC), s10.slice(0, 800));
-  check('★★★★★ 用返共用嗰支揀真名',
-    /selfTestWriteRealNames_\(quarterId, versionNo, cells\)/.test(s10), '');
+  check('★★★★★ S10 行返同一條批量路',
+    /const picked = selfTestPickAcceptedCells_\(quarterId, versionNo, 2, 'S10'\);/
+      .test(s10), s10.slice(0, 900));
   check('★★★★★★ 「冇碰過嘅人」要連**新填嗰幾個**都算入去'
     + '——改一格會令兩個人受影響（本來嗰個少咗、新填嗰個多咗）',
-    /result\.picks\.map\(function \(p\) \{ return p\.pick\.personId; \}\)/.test(s10),
+    /result\.picks\.map\(function \(p\) \{ return p\.pick\.personId; \}\)/.test(s10)
+      && /const touched = picked\.cells\.map/.test(s10),
     s10.slice(-800));
 }
 

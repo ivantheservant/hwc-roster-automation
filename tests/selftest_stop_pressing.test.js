@@ -178,6 +178,102 @@ console.log('\n=== C1【核心】跑過幾次要記低，而且過得到下一�
 }
 
 // =====================================================================
+console.log('\n=== B【核心】第五十四輪：被擋住之後，次數唔可以歸零 ===');
+{
+  // ═══════════════════════════════════════════════════════════════
+  // 現場
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // S05 至少紅咗四次，但報告從來冇出過「⛔ 呢一條已經重跑 N 次」。
+  //
+  // 查出嚟嘅原因**唔係** `clearFailedSelfTestState_()`——嗰邊已經冇事，
+  // `priorHistory` 喺清除**之前**就讀咗（第五十三輪 C1 已經噉做）。
+  //
+  // 真正嘅漏喺三條寫入路：`BLOCKED`／`SKIPPED`／`NOT_RUN`
+  // 寫 `SelfTestState` 嗰陣冇帶次數 ⇒ 歸零。
+  //
+  // ⚠️ 而 S05 嘅實況正正就係第一條：S03 紅咗、S05 被標 `BLOCKED`，
+  // 於是佢每一次都由零數起——**永遠數唔到 2**。
+  const gas = loadGasSource([
+    'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Invariants.gs', 'SelfTestRunner.gs'
+  ]);
+  const S = gas.SELFTEST_STATUS;
+  let store = {};
+  let upstreamOk = true;
+
+  gas.log_ = function () {};
+  gas.readSelfTestQuarterDetail_ = function () { return { value: '2028T3', source: 'x' }; };
+  gas.checkSelfTestPreconditions_ = function () { return { ok: true, reasons: [] }; };
+  gas.planQuarterReset_ = function () { return {}; };
+  gas.executeQuarterReset_ = function () {
+    return { versionRowsDeleted: 0, assignmentRowsDeleted: 0, sendLogRowsDeleted: 0 };
+  };
+  gas.runAllInvariants_ = function () {
+    return { results: [], okCount: 0, failedCount: 0, errorCount: 0,
+      skippedCount: 0, notApplicableCount: 0 };
+  };
+  gas.selfTestOutOfTime_ = function () { return false; };
+  gas.readSelfTestState_ = function () { return JSON.parse(JSON.stringify(store)); };
+  gas.writeSelfTestState_ = function (st) { store = JSON.parse(JSON.stringify(st)); };
+  gas.selfTestScenarios_ = function () {
+    return [
+      { id: 'X0', title: '上游', run: function () {
+        return upstreamOk
+          ? { id: 'X0', status: S.PASSED, checks: [], failedChecks: [] }
+          : { id: 'X0', status: S.FAILED, checks: [],
+            failedChecks: [{ label: '上游爆咗', expected: 'a', actual: 'b', evidence: '' }] };
+      } },
+      { id: 'X1', title: '下游（就係 S05 嗰個角色）', dependsOn: ['X0'],
+        run: function () {
+          return { id: 'X1', status: S.FAILED, checks: [],
+            failedChecks: [{ label: '儲存並確認', expected: 'ok=true',
+              actual: 'ok=false', evidence: '有 1 格違反了一定要遵守的規則' }] };
+        } }
+    ];
+  };
+  const run = function (rerun) {
+    const report = gas.runSelfTestMachine_(!!rerun, !!rerun);
+    const m = {};
+    report.results.forEach(function (r) { m[r.id] = r; });
+    return { byId: m, lines: gas.describeSelfTestReport_(report).join('\n') };
+  };
+
+  const a = run(false);
+  checkEqual('★★★★★ 第一次：X1 跑咗 1 次', (a.byId.X1.repeat || {}).runCount, 1);
+
+  const b = run(true);
+  checkEqual('★★★★★ 第二次：X1 跑咗 2 次', (b.byId.X1.repeat || {}).runCount, 2);
+  checkEqual('★★★★★ 連續相同結果 2 次', (b.byId.X1.repeat || {}).sameStreak, 2);
+
+  // ── 上游爆咗 ⇒ X1 被擋住，冇跑 ─────────────────────────────
+  // ⚠️ 要由頭跑，唔係「只重跑紅色情境」——後者會把 X0（上一次綠）
+  // 當成「已經有結論」跳過，於是佢根本唔會重新跑，X1 也就唔會被擋住。
+  upstreamOk = false;
+  const c = run(false);
+  checkEqual('★★★★★ 第三次：X1 被擋住', c.byId.X1.status, S.BLOCKED);
+  checkEqual('★★★★★★ **被擋住之後，次數仍然係 2**'
+    + '——歸零嘅話，佢下一次由頭數起，「連續兩次」永遠數唔到，'
+    + '而 S05 嘅實況正正就係噉：S03 紅咗、S05 被擋住',
+    Number(store.X1.runCount), 2);
+  checkEqual('★★★★★★ 連續次數一樣留住', Number(store.X1.sameStreak), 2);
+  check('★★★★★★ 連上一次嘅指紋都要留住'
+    + '——冇咗指紋，下一次跑出同一個結果會被當成「第一次見」',
+    String(store.X1.fingerprint || '').indexOf('儲存並確認') >= 0,
+    JSON.stringify(store.X1).slice(0, 300));
+
+  // ── 上游修好 ⇒ X1 重新跑，次數要接落去 ───────────────────
+  upstreamOk = true;
+  const d = run(false);
+  checkEqual('★★★★★★ 第四次：X1 跑咗 3 次（唔係由 1 數起）',
+    (d.byId.X1.repeat || {}).runCount, 3);
+  checkEqual('★★★★★★ 而且連續相同結果 3 次', (d.byId.X1.repeat || {}).sameStreak, 3);
+  check('★★★★★★ **所以「唔好再撳」終於出得到**'
+    + '——之前佢每次被擋住就歸零，於是永遠去唔到嗰一句',
+    /⛔ 這一條已經重跑 3 次，每次都是同一個結果。/.test(d.lines),
+    d.lines.slice(0, 1200));
+}
+
+// =====================================================================
 console.log('\n=== C2【核心】結果變咗 ⇒ 連續次數歸零 ===');
 {
   let gasRef = null;

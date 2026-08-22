@@ -2165,46 +2165,6 @@ const MUTATIONS = [
     tests: ['tests/selftest_mainflow.test.js']
   },
   {
-    id: 'st-s03-fake-name',
-    why: '令 S03 寫返一個系統認唔出嘅字'
-      + '——系統嘅規矩係「有認唔出嘅名就乜都唔准做」，'
-      + '而嗰個正正係佢最嚴厲嗰一道閘',
-    file: 'src/SelfTestRunner.gs',
-    find: '  const result = selfTestWriteRealNames_(quarterId, versionNo, cells);' + '\n'
-      + "  t.equal(want + ' 格都真的寫進 grid 工作表', result.written, want,",
-    replace: '  const result = { written: want, picks: [], notEligible: [] };' + '\n'
-      + '  cells.forEach(function (c, i) {' + '\n'
-      + '    selfTestWriteGridCell_(quarterId, versionNo, c.serviceDate, c.postId,' + '\n'
-      + "      c.slotIndex, '認不出' + (i + 1));" + '\n'
-      + '  });' + '\n'
-      + "  t.equal(want + ' 格都真的寫進 grid 工作表', result.written, want,",
-    tests: ['tests/selftest_mainflow.test.js']
-  },
-  {
-    id: 'st-pick-hardcoded',
-    why: '把替代人名寫死'
-      + '——日後有人離開名單，自測機就會無聲無息噉壞掉，'
-      + '而「無聲無息噉壞掉」正正就係呢部機器要擋嗰件事',
-    file: 'src/SelfTestRunner.gs',
-    find: '  const byPost = (eligibility && eligibility.byPost) || {};',
-    replace: "  return { name: '陳大文', personId: 'P9999', eligible: true };" + '\n'
-      + '  // eslint-disable-next-line no-unreachable' + '\n'
-      + '  const byPost = (eligibility && eligibility.byPost) || {};',
-    tests: ['tests/selftest_mainflow.test.js']
-  },
-  {
-    id: 'st-pick-same-person',
-    why: '揀返同一個人'
-      + '——揀返同一個就唔算改動，而 `gridChangeCount` 會係 0，'
-      + '之後每一條斷言都係喺驗一個冇發生過嘅改動',
-    file: 'src/SelfTestRunner.gs',
-    find: '  const eligibleIds = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
-      + '    return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;',
-    replace: '  const eligibleIds = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
-      + '    return peopleById[id] && peopleById[id].nameTC;',
-    tests: ['tests/selftest_mainflow.test.js']
-  },
-  {
     id: 'st-s10-runs-dirty',
     why: '令 S10 喺污染狀態下照樣硬跑'
       + '——第五十輪嗰次 S10 見到 S03 嘅殘留仍然硬跑，'
@@ -2525,50 +2485,6 @@ const MUTATIONS = [
   },
   // ── 第五十三輪批次 A 組：S03 揀格嘅次序反咗 ───────────────────
   {
-    id: 'pick-same-person',
-    why: '揀格嗰陣容許揀返同一個人'
-      + '——揀返同一個就唔算改動，而 `gridChangeCount` 會係 0，'
-      + '之後每一條斷言都係喺驗一個冇發生過嘅改動。'
-      + '而「換咗之後有冇多咗違反」嗰個重算擋唔到佢：換返自己，一條都唔會多',
-    file: 'src/SelfTestRunner.gs',
-    find: '    const candidates = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
-      + '      return id !== cell.personId && peopleById[id] && peopleById[id].nameTC;',
-    replace: '    const candidates = (byPost[cell.postId] || []).filter(function (id) {' + '\n'
-      + '      return peopleById[id] && peopleById[id].nameTC;',
-    tests: ['tests/selftest_safe_cell_pick.test.js']
-  },
-  {
-    id: 'pick-no-recheck',
-    why: '揀格之後唔問系統「換咗之後有冇多咗違反」'
-      + '——自己判斷「合唔合資格」就係第二個算法，'
-      + '而第四十六輪嗰個 3 vs 9 就係噉嚟',
-    file: 'src/SelfTestRunner.gs',
-    find: '      if (added.length === 0) {' + '\n'
-      + '        picked = { personId: candidateId, name: peopleById[candidateId].nameTC };',
-    replace: '      if (true) {' + '\n'
-      + '        picked = { personId: candidateId, name: peopleById[candidateId].nameTC };',
-    tests: ['tests/selftest_safe_cell_pick.test.js']
-  },
-  {
-    id: 'pick-same-day',
-    why: '三格落晒喺同一日'
-      + '——同一日改三格會順手撞到「同週司事1 ≠ 司事2」嗰類同週規則，'
-      + '又係另一種雜訊',
-    file: 'src/SelfTestRunner.gs',
-    find: '    if (usedDates[cell.serviceDate]) continue;',
-    replace: '    if (false) continue;',
-    tests: ['tests/selftest_safe_cell_pick.test.js']
-  },
-  {
-    id: 'pick-no-cap',
-    why: '揀格試到成季都唔停'
-      + '——第五十輪嗰個時間預算問題會走回頭路：13 條情境又變成「未跑」',
-    file: 'src/SelfTestRunner.gs',
-    find: '      if (tries >= SELFTEST_SAFE_PICK_MAX_TRIES) { budgetHit = true; break; }',
-    replace: '      if (false) { budgetHit = true; break; }',
-    tests: ['tests/selftest_safe_cell_pick.test.js']
-  },
-  {
     id: 'pick-key-person',
     why: '違反嘅身分證包埋 `personId`'
       + '——包咗嘅話，一格本來就違反緊嘅嘢換咗個人就會被當成「新違反」，'
@@ -2576,25 +2492,6 @@ const MUTATIONS = [
     file: 'src/SelfTestRunner.gs',
     find: "  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex].join('|');",
     replace: "  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex, v.personId].join('|');",
-    tests: ['tests/selftest_safe_cell_pick.test.js']
-  },
-  {
-    id: 'pick-second-look',
-    why: '寫入嗰陣再查一次替代人選'
-      + '——揀格嗰陣已經問過系統，呢度再查一次就會有第二個答案，'
-      + '而嗰個答案可以推翻前面嗰個判斷',
-    file: 'src/SelfTestRunner.gs',
-    find: '    const pick = c.replacement',
-    replace: '    const pick = false',
-    tests: ['tests/selftest_safe_cell_pick.test.js']
-  },
-  {
-    id: 'pick-short-mute',
-    why: '揀唔夠格唔講'
-      + '——唔講嘅話，S03 淨係報「找到 2 格」，而冇人知點解係 2 唔係 3',
-    file: 'src/SelfTestRunner.gs',
-    find: "  if (picked.cells.length >= howMany) return '';",
-    replace: "  if (true) return '';",
     tests: ['tests/selftest_safe_cell_pick.test.js']
   },
 
@@ -2698,6 +2595,171 @@ const MUTATIONS = [
     find: '      if (added.length === 1 && added[0].severity === RULE_LEVELS.HARD',
     replace: '      if (added.length >= 1 && added[0].severity === RULE_LEVELS.HARD',
     tests: ['tests/selftest_release_scenario.test.js']
+  },
+  // ── 第五十四輪批次 A 組：寫三格、問一次、換走犯規嗰幾格 ───────
+  {
+    id: 'batch-take-any',
+    why: '唔理 plan 講乜，一律收貨'
+      + '——`needsRelease === false` 而且 `violations.real` 係空陣列'
+      + '先係接受條件，而嗰一句就係攔住 S05 嗰道閘自己用嘅判斷',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (bad.length === 0 && plan.needsRelease === false) {',
+    replace: '    if (true) {',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-no-swap',
+    why: '犯規嗰幾格唔改回原本嘅字'
+      + '——留低就等於交一批一定會被攔嘅格畀 S05',
+    file: 'src/SelfTestRunner.gs',
+    find: '    bad.forEach(function (c) { revert(c, originalByKey); });' + '\n'
+      + '    written = good;',
+    replace: '    written = good;',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-drop-clean',
+    why: '連乾淨嗰幾格都一齊改回'
+      + '——噉就等於重頭嚟過，浪費咗嗰一次好貴嘅 plan',
+    file: 'src/SelfTestRunner.gs',
+    find: '    written = good;',
+    replace: '    written.forEach(function (c) { revert(c, originalByKey); });' + '\n'
+      + '    written = [];',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-no-cap',
+    why: '搵格嗰個迴圈冇上限'
+      + '——`apiSaveAndConfirmPlan()` 好貴，冇上限就會食光 4.5 分鐘預算，'
+      + '退回「時間到、原地打轉」嗰個老問題',
+    file: 'src/SelfTestRunner.gs',
+    find: 'const SELFTEST_PLAN_SEARCH_ROUNDS = 4;',
+    replace: 'const SELFTEST_PLAN_SEARCH_ROUNDS = 99;',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-same-day',
+    why: '幾格落晒喺同一日'
+      + '——同一日改幾格會順手撞到同週規則，又係另一種雜訊',
+    file: 'src/SelfTestRunner.gs',
+    find: '      if (usedDates[c.serviceDate]) continue;',
+    replace: '      if (false) continue;',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-plan-eat',
+    why: 'plan 拋錯就靜靜當佢揀唔到格'
+      + '——靜靜過嘅話，後面每一條都會喺一個唔知咩狀態嘅季度上面跑',
+    file: 'src/SelfTestRunner.gs',
+    find: "      planError = 'apiSaveAndConfirmPlan() 拋錯：' + err.message;",
+    replace: "      planError = '';",
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-blame-self',
+    why: '違反明明唔喺我哋寫嗰幾格，都照當成「換格就得」'
+      + '——嗰種情況係呢一版本身帶住違反，點換都改變唔到，'
+      + '照換就係燒清四次好貴嘅 plan',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (bad.length === 0) {',
+    replace: '    if (false) {',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-elig-filter',
+    why: '喺揀候選嗰陣就篩走「Eligibility 冇佢」嘅人'
+      + '——嗰個就係自己再實作一次接受條件，而三輪紅嘅根源就係噉：'
+      + '第五十一輪撞名字、第五十三輪撞 Eligibility、跟住撞 Roles',
+    file: 'src/SelfTestRunner.gs',
+    find: '    const chosen = eligibleHere.length > 0 ? eligibleHere[0] : fallback[0];',
+    replace: '    const chosen = eligibleHere[0];',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-slow-drop',
+    why: '把 `ANNOUNCE`／`DUTY_CC` **篩走**（唔係排後）'
+      + '——排序係優化，篩走就係規則判斷。'
+      + '一個只剩嗰兩個崗位嘅季度會變成一格都揀唔到',
+    file: 'src/SelfTestRunner.gs',
+    find: '      preferred: eligibleHere.length > 0' + '\n'
+      + '        && SELFTEST_SLOW_POSTS.indexOf(postId) === -1',
+    replace: '      preferred: eligibleHere.length > 0',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-key-coarse',
+    why: '對格嗰個 key 唔夠細（唔分主日）'
+      + '——一格犯規就會令**其餘每一格同崗位嘅**都被當成犯規，'
+      + '於是乾淨嗰幾格都一齊被改回，白白燒咗一次好貴嘅 plan',
+    file: 'src/SelfTestRunner.gs',
+    find: "  return String(x.serviceDate) + '|' + String(x.postId) + '|' + String(x.slotIndex);",
+    replace: "  return String(x.postId) + '|' + String(x.slotIndex);",
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-fake-confirm',
+    why: '收唔到貨都標成 `confirmed`'
+      + '——呼叫嗰邊會拎住一份過期嘅 plan 去斷言，'
+      + '而嗰份 plan 唔係講緊而家格局',
+    file: 'src/SelfTestRunner.gs',
+    find: '    plan: lastPlan, planError: planError, preExisting: preExisting,' + '\n'
+      + '    confirmed: false };',
+    replace: '    plan: lastPlan, planError: planError, preExisting: preExisting,' + '\n'
+      + '    confirmed: true };',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-s03-quiet',
+    why: 'S03 唔把揀格嘅過程寫入報告'
+      + '——一句「找到 2 格」冇人知佢試過乜、換過邊格、撞過邊條規則，'
+      + '而嗰啲正正係下一輪要靠嘅資料',
+    file: 'src/SelfTestRunner.gs',
+    find: "  t.expect('（過程）' + describeAcceptedPickAttempts_(picked)," + '\n'
+      + "    true, '（過程紀錄，不是斷言）'," + '\n'
+      + "    'plan ' + picked.planCalls + ' 次'," + '\n'
+      + "    '接受條件只有一條：needsRelease === false 而且 violations.real 是空的。');" + '\n'
+      + '\n'
+      + '  // ── plan 拋錯／被擋住 ⇒ **拋出去，令它報 ERROR 帶住原文** ────',
+    replace: '  // ── plan 拋錯／被擋住 ⇒ **拋出去，令它報 ERROR 帶住原文** ────',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-s03-eat',
+    why: 'S03 見到 plan 拋錯都照跑落去'
+      + '——一個真實入口靜靜噉冇做事而測試照樣往下走，'
+      + '就係呢個專案由第一輪殺到而家嗰種病',
+    file: 'src/SelfTestRunner.gs',
+    find: "  if (picked.planError) throw new Error('S03 選格時：' + picked.planError);",
+    replace: '  if (false) throw new Error(picked.planError);',
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+  {
+    id: 'batch-s03-red',
+    why: '湊唔夠格就報紅（唔係跳過）'
+      + '——紅會經 `dependsOn` 把 S04–S13 標成 `BLOCKED`，'
+      + '而嗰九條先係呢部機器存在嘅理由',
+    file: 'src/SelfTestRunner.gs',
+    find: "    return t.skip('（跳過）試了 ' + picked.planCalls" + '\n'
+      + "      + ' 次都湊不到一格「改了不會被攔」的。'",
+    replace: "    return t.result('（不跳過，報紅）') || t.skip('（跳過）試了 '"
+      + " + picked.planCalls" + '\n'
+      + "      + ' 次都湊不到一格「改了不會被攔」的。'",
+    tests: ['tests/selftest_batch_pick.test.js']
+  },
+
+  // ── 第五十四輪批次 B 組：被擋住之後次數唔可以歸零 ─────────────
+  {
+    id: 'rep-blocked-zero',
+    why: '被上游擋住之後，重跑次數歸零'
+      + '——S05 嘅實況正正就係噉：S03 紅咗、S05 被標 `BLOCKED`，'
+      + '於是佢每一次都由零數起，「連續兩次」永遠數唔到，'
+      + '而「⛔ 唔好再撳」嗰一句永遠出唔到',
+    file: 'src/SelfTestRunner.gs',
+    find: '      }, blockedHistory);' + '\n'
+      + '      outcome.repeat = {',
+    replace: '      });' + '\n'
+      + '      outcome.repeat = {',
+    tests: ['tests/selftest_stop_pressing.test.js']
   },
 ];
 
