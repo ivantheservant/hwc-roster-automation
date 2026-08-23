@@ -630,6 +630,60 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
     findStateViolations_(violationCheckState, plan.context), plan.context);
   const warnings = violations.map(function (v) { return makeWarning_(v, v.ruleId, v.reason); });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 第五十六輪批次 A 組：**一筆都套用唔到 ⇒ 唔造版本。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 現場（第五十五輪實測）：`appliedCount=0`、`needsInputCount=3`，
+  // 但照樣造咗 v3——一個同 v2 **逐格一樣**嘅版本。
+  // 後果：回退預覽出「0 格改動」呢種怪相，版本號白白通脹。
+  //
+  // ⚠️ 呢個判斷一定要喺**真正寫入之前**做。
+  // 造咗版本先發現係空然後刪返——刪版本呢種動作唔應該存在。
+  //
+  // ⚠️ 條件唔止 `appliedCount === 0`，係「**一格都冇寫過**」：
+  //   ・冇一筆申報套用到
+  //   ・冇幹事喺 grid 上嘅人手改動要帶入新版本
+  //   ・冇待補格、冇要新增嘅 Eligibility／Unavailable 行
+  // 任何一樣有嘢，新版本就有內容，就要照造。
+  //
+  // ⚠️ **`outcomes` 照樣要寫返落張表。** 唔寫嘅話，同一批申報
+  // 下次會再被當成「未處理」，而幹事會見到同一批嘢彈返出嚟。
+  //
+  // ⚠️ 措辭同「儲存並確認」嗰邊嘅零改動路徑對齊：
+  // 一律叫 `zeroChange`／`versionCreated: false`，唔另起一個名。
+  const appliedCount = outcomes.filter(function (o) {
+    return o.status === REQUEST_STATUS.APPLIED;
+  }).length;
+  const wroteNothing = appliedCount === 0
+    && (plan.manualChanges || []).length === 0
+    && pendingBackfillCells.length === 0
+    && newEligibilityRows.length === 0
+    && newUnavailableRows.length === 0;
+
+  if (wroteNothing) {
+    writeRequestOutcomes_(outcomes, plan.quarterId);
+    return {
+      // ⚠️ 回傳**現有**最新版本號，唔係一個幻想出嚟嘅新號。
+      sheetName: buildRosterSheetName_(plan.quarterId, plan.baseVersionNo),
+      versionNo: plan.baseVersionNo,
+      baseVersionNo: plan.baseVersionNo,
+      versionCreated: false,
+      zeroChange: true,
+      message: '沒有建立新版本，因為一筆申報都沒有套用到。'
+        + '職事表內容沒有改變，第 ' + plan.baseVersionNo + ' 版仍然是最新一版。',
+      appliedCount: 0,
+      rejectedCount: outcomes.filter(function (o) { return o.status === REQUEST_STATUS.REJECTED; }).length,
+      needsInputCount: outcomes.filter(function (o) { return o.status === REQUEST_STATUS.NEEDS_INPUT; }).length,
+      pendingBackfillCount: 0,
+      newEligibilityCount: 0,
+      newUnavailableCount: 0,
+      // ⚠️ `violations` 照回——`executeStep3Apply_()` 靠佢決定 Stage 前唔前進，
+      // 而 Ivan 嘅決定係「Stage 嘅前進與否維持現有行為不變」。
+      violations: violations
+    };
+  }
+
   // 先建 grid 工作表：若名稱衝突會在寫入長表之前就中止，避免留下孤兒資料列
   // （同 MultiRun.gs 的 performRosterGeneration_() 既有慣例）。
   const sheetName = createRosterSheet(plan.quarterId, newVersionNo, assignments, warnings);
@@ -707,7 +761,12 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
     sheetName: sheetName,
     versionNo: newVersionNo,
     baseVersionNo: plan.baseVersionNo,
-    appliedCount: outcomes.filter(function (o) { return o.status === REQUEST_STATUS.APPLIED; }).length,
+    // ⚠️ 兩條路（有造版本／冇造版本）嘅欄位要一樣，
+    // 否則呼叫端要寫 `result.versionCreated === undefined` 呢種判斷。
+    versionCreated: true,
+    zeroChange: false,
+    message: '',
+    appliedCount: appliedCount,
     rejectedCount: outcomes.filter(function (o) { return o.status === REQUEST_STATUS.REJECTED; }).length,
     needsInputCount: outcomes.filter(function (o) { return o.status === REQUEST_STATUS.NEEDS_INPUT; }).length,
     pendingBackfillCount: pendingBackfillCells.length,

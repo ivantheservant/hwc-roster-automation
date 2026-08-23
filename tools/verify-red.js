@@ -1964,10 +1964,13 @@ const MUTATIONS = [
       + '——喺記憶體造一個 overlay 就係「fixture 造到一個'
       + '真實 code path 造唔出嘅狀態」，即係呢一層要擋嗰件事本身',
     file: 'src/SelfTestRunner.gs',
-    find: '  sheet.appendRow(row);\n'
-      + "  t.expect('特殊主日那一行真的寫進工作表'",
-    replace: "  t.expect('特殊主日那一行真的寫進工作表'",
-    tests: ['tests/selftest_runner.test.js']
+    find: '  if (foundRow > 0) {\n'
+      + '    sheet.getRange(foundRow, 1, 1, headers.length).setValues([row]);\n'
+      + '  } else {\n'
+      + '    sheet.appendRow(row);\n'
+      + '  }',
+    replace: '  if (false) { sheet.appendRow(row); }',
+    tests: ['tests/selftest_reset_and_clock.test.js']
   },
   {
     id: 'st-resume-only-passed',
@@ -2003,9 +2006,11 @@ const MUTATIONS = [
     why: '三種情況都印同一句「撳繼續跑自測」'
       + '——其中一種撳咗係冇用嘅，而 Ivan 就係照住嗰一句白撳咗三次',
     file: 'src/SelfTestRunner.gs',
-    find: "    lines.push('修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」——'",
-    replace: "    lines.push('撳「測試工具 ▸ ▶️ 繼續跑自測」——'",
-    tests: ['tests/selftest_resume_deadlock.test.js']
+    find: "      lines.push('・你沒有改過程式碼，只是修了工作表的資料'",
+    replace: "      lines.push('撳「測試工具 ▸ ▶️ 繼續跑自測」——'",
+    // ⚠️ `verify-red` 要求**列出嘅每一條**都變紅。
+    // `selftest_resume_deadlock` 而家唔再踩呢一行，所以唔可以再列佢。
+    tests: ['tests/selftest_reset_and_clock.test.js']
   },
   {
     id: 'st-rerun-resets',
@@ -2930,6 +2935,169 @@ const MUTATIONS = [
     replace: '      false' + '\n'
       + '        ? make(',
     tests: ['tests/rollback_preview_replay.test.js']
+  },
+  // ── 第五十六輪批次 A 組：`appliedCount = 0` 唔造版本 ──────────
+  {
+    id: 'zero-apply-makes-ver',
+    why: '一筆都套用唔到都照造版本'
+      + '——造出嚟嗰個同上一版逐格一樣，回退預覽出「0 格改動」，'
+      + '版本號白白通脹',
+    file: 'src/RequestsApply.gs',
+    find: '  if (wroteNothing) {',
+    replace: '  if (false) {',
+    tests: ['tests/zero_apply_no_version.test.js']
+  },
+  {
+    id: 'zero-apply-only-count',
+    why: '「冇任何格被寫」只睇 `appliedCount`'
+      + '——幹事喺 grid 親手改過嗰幾格要跟住新版本入 version of record，'
+      + '唔造版本嘅話就會蒸發咗',
+    file: 'src/RequestsApply.gs',
+    find: '  const wroteNothing = appliedCount === 0' + '\n'
+      + "    && (plan.manualChanges || []).length === 0",
+    replace: '  const wroteNothing = appliedCount === 0' + '\n'
+      + '    && true',
+    tests: ['tests/zero_apply_no_version.test.js']
+  },
+  {
+    id: 'zero-apply-eat-outcome',
+    why: '零套用嗰條路唔寫返 outcomes'
+      + '——同一批申報下次會再被當成「未處理」，'
+      + '而幹事會見到同一批嘢彈返出嚟',
+    file: 'src/RequestsApply.gs',
+    find: '  if (wroteNothing) {' + '\n'
+      + '    writeRequestOutcomes_(outcomes, plan.quarterId);',
+    replace: '  if (wroteNothing) {',
+    tests: ['tests/zero_apply_no_version.test.js']
+  },
+  {
+    id: 'zero-apply-fake-ver',
+    why: '零套用嗰條路回一個幻想出嚟嘅新版本號'
+      + '——呼叫端會攞住佢去讀一張唔存在嘅表',
+    file: 'src/RequestsApply.gs',
+    find: '      versionNo: plan.baseVersionNo,' + '\n'
+      + '      baseVersionNo: plan.baseVersionNo,',
+    replace: '      versionNo: newVersionNo,' + '\n'
+      + '      baseVersionNo: plan.baseVersionNo,',
+    tests: ['tests/zero_apply_no_version.test.js']
+  },
+
+  // ── 第五十六輪批次 B1 組：清理唔可以食時間預算 ────────────────
+  {
+    id: 'clock-before-reset',
+    why: '起錶排喺清理之前'
+      + '——清 546 行派工要幾分鐘，預算被食光，'
+      + '重設完即刻停、17 個情境全部「未跑」，而報告寫「用了 2 秒」。'
+      + 'Ivan 見過至少兩次，每次都以為部機器壞咗',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const resetMs = new Date().getTime() - machineStartedAt;' + '\n'
+      + '  selfTestStartedAt_ = new Date().getTime();',
+    replace: '  const resetMs = new Date().getTime() - machineStartedAt;',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'clock-sum-drift',
+    why: '總數另外量一次，唔係由三段砌返出嚟'
+      + '——兩個數會唔對，而幹事會問邊個先啱',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const totalMs = resetMs + scenarioMs + invariantMs;',
+    replace: '  const totalMs = loopMs;',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'clock-no-reset-seg',
+    why: '報告嗰行唔印「清理」嗰一段'
+      + '——時間去咗邊完全睇唔到，而清理正正就係食得最多嗰一段',
+    file: 'src/SelfTestRunner.gs',
+    find: "      + '（清理 ' + describeSelfTestDuration_(report.resetMs || 0)",
+    replace: "      + '（",
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+
+  // ── 第五十六輪批次 B2 組：尾句唔好估 ──────────────────────────
+  {
+    id: 'nextstep-guess',
+    why: '尾句只印「撳只重跑紅色情境」一句'
+      + '——部機器睇唔到使用者有冇 clasp push 過，'
+      + '估唔到就唔好扮估到。指示錯咗兩次，Ivan 照住撳，白撳',
+    file: 'src/SelfTestRunner.gs',
+    find: "      lines.push('・你改過程式碼（有 clasp push 過）'" + '\n'
+      + "        + ' ⇒ 撳「⚠️ 跑自測」重頭跑');",
+    replace: '      // （拆走咗）',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+
+  // ── 第五十六輪批次 B3／C 組：自測機自己收身 ──────────────────
+  {
+    id: 'reset-keeps-junk',
+    why: '重設嗰陣唔清走自測機自己種落去嘅殘留'
+      + '——每次全新跑 append 多一行 -SELFTEST，'
+      + '實測已經積咗 3 行，生成嗰陣出「2／3 個特殊主日未確認」',
+    file: 'src/SelfTestRunner.gs',
+    find: '      const extra = selfTestResetOwnSheets_(quarterId);',
+    replace: '      const extra = { specialSundayRowsDeleted: 0, payloadRowsDeleted: 0 };',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'reset-delete-any-quarter',
+    why: '刪 SpecialSundays 嗰陣唔對季度'
+      + '——一行喺**第二個季度**嘅 -SELFTEST 都會被刪走。'
+      + '呢個係刪資料嘅動作，寧可漏刪都唔可以錯刪',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (rowQuarter !== quarterId) return;',
+    replace: '    if (false) return;',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'reset-delete-any-id',
+    why: '刪 SpecialSundays 嗰陣唔對 `-SELFTEST`'
+      + '——沙盒季度入面**每一行**特殊主日都會被刪走，'
+      + '包括幹事自己加落去嘅真資料',
+    file: 'src/SelfTestRunner.gs',
+    find: "    if (specialId.slice(-9) !== '-SELFTEST') return;",
+    replace: '    if (false) return;',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'reset-delete-topdown',
+    why: '由上而下刪行'
+      + '——刪完一行之後下面每一行都會向上移一格，'
+      + '而之後嗰幾個行號就全部錯晒：會刪錯行',
+    file: 'src/SelfTestRunner.gs',
+    find: '  doomed.slice().reverse().forEach(function (d) {',
+    replace: '  doomed.slice().forEach(function (d) {',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'payload-clear-no-trace',
+    why: '清 payloads 之前唔留低摘要'
+      + '——清咗就冇得追返，而「上一次到底叫過幾多個 API」'
+      + '係一條事後會想知嘅資料',
+    file: 'src/SelfTestRunner.gs',
+    find: '    writeAuditLog_({\n'
+      + "      action: '清走上一次自測的回傳值紀錄',",
+    replace: '    const unusedSummary = ({\n'
+      + "      action: '',",
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'payload-trim-newest',
+    why: '剪 payloads 嗰陣由最新嗰邊剪起'
+      + '——剪走嘅正正係今次跑嗰批，而下一輪要靠嗰批原文',
+    file: 'src/SelfTestRunner.gs',
+    find: '  sheet.deleteRows(2, rowCount - SELFTEST_PAYLOAD_MAX_ROWS);',
+    replace: '  sheet.deleteRows(SELFTEST_PAYLOAD_MAX_ROWS + 2,' + '\n'
+      + '    rowCount - SELFTEST_PAYLOAD_MAX_ROWS);',
+    tests: ['tests/selftest_reset_and_clock.test.js']
+  },
+  {
+    id: 'reset-own-throws',
+    why: '收身嗰步拋錯就令成次自測跑唔到'
+      + '——清理係收身動作，唔應該擋住 17 條情境',
+    file: 'src/SelfTestRunner.gs',
+    find: "    log_('WARN', '清不走自測用的特殊主日：' + err.message);",
+    replace: '    throw err;',
+    tests: ['tests/selftest_reset_and_clock.test.js']
   },
 ];
 

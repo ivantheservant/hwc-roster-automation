@@ -170,8 +170,11 @@ console.log('\n=== C1【核心】跑過幾次要記低，而且過得到下一�
     + '而 Ivan 就係照住嗰句撳咗三次',
     /不要再撳——/.test(third.lines) && /把這份報告交給 Claude，要修碼。/.test(third.lines),
     third.lines.slice(-700));
-  check('★★★★★★ 而且唔再叫佢撳「只重跑紅色情境」',
-    !/修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」/.test(third.lines),
+  // 第五十六輪批次 B2 組：尾句而家係兩行「撳邊粒」嘅指示。
+  // 卡住嗰陣兩行都唔應該再出——出咗就係繼續叫佢撳。
+  check('★★★★★★ 而且唔再印嗰兩行「撳邊粒」嘅指示',
+    !/・你改過程式碼（有 clasp push 過）/.test(third.lines)
+      && !/・你沒有改過程式碼，只是修了工作表的資料/.test(third.lines),
     third.lines.slice(-700));
   checkEqual('★★★★★ 綠嗰條唔會被講「唔好再撳」',
     /X2[\s\S]{0,200}已經重跑/.test(third.lines), 'false');
@@ -324,9 +327,9 @@ console.log('\n=== C3 有一條紅係新嘅 ⇒ 唔可以叫佢停手 ===');
     passedCount: 0, failedCount: 2, errorCount: 0, notRunCount: 0,
     startupFailures: [], finalInvariants: null
   }).join('\n');
-  check('★★★★★★ 只有一條卡住 ⇒ 仲係叫佢撳「只重跑紅色情境」'
+  check('★★★★★★ 只有一條卡住 ⇒ 仲係印返嗰兩行指示'
     + '——另一條係新嘅，重跑有機會有分別',
-    /修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」/.test(lines) && !/不要再撳/.test(lines),
+    /・你改過程式碼（有 clasp push 過）/.test(lines) && !/不要再撳/.test(lines),
     lines.slice(-600));
   check('★★★★★ 但卡住嗰條自己嗰一節仍然要講',
     /⛔ 這一條已經重跑 3 次/.test(lines), lines.slice(0, 800));

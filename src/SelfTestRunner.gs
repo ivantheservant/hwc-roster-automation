@@ -729,10 +729,190 @@ function selfTestRecordPayload_(scenarioId, apiName, value) {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     sheet.appendRow([scenarioId, apiName, JSON.stringify(value),
       Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss')]);
+    // 第五十六輪批次 C 組：太長就由最舊嗰邊剪起。
+    trimSelfTestPayloads_(sheet);
   } catch (err) {
     log_('WARN', 'selfTestRecordPayload_ 失敗（' + scenarioId + '／' + apiName
       + '）：' + err.message);
   }
+}
+
+/**
+ * `SelfTestPayloads` 最多留幾多行。超過就由最舊嗰邊剪起。
+ *
+ * ⚠️ 呢個係「就算清理嗰步冇跑到都唔會膨脹落去」嘅第二道防線。
+ * connector 讀唔切嗰陣，症狀係「報告攞唔到」——一個同自測機
+ * 完全無關嘅怪錯。
+ */
+const SELFTEST_PAYLOAD_MAX_ROWS = 500;
+
+/**
+ * 第五十六輪批次 B3／C 組：**自測機自己嗰幾張表，自己收身。**
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 點解唔擺入季度重設工具
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * 季度重設工具嘅規矩係「**絕對唔碰 `SpecialSundays`**」——嗰個唔好改。
+ * 佢係一個幹事會喺真季度上面撳嘅嘢，而 `SpecialSundays` 入面
+ * 全部都係真資料。
+ *
+ * 但自測機自己種落去嗰幾行係另一回事：`SpecialID` 以 `-SELFTEST`
+ * 結尾、`QuarterID` 又係沙盒季度。嗰啲係佢自己嘅垃圾，自己清。
+ *
+ * ⚠️⚠️ **兩個條件都要中先刪。** 只對 `-SELFTEST` 嘅話，
+ * 一行真季度嘅資料改錯咗名就會被刪；只對季度嘅話，
+ * 沙盒季度入面一行真嘅特殊主日就會被刪。
+ * 呢個係一個**刪資料**嘅動作，寧可漏刪都唔可以錯刪。
+ *
+ * ⚠️ 每一次刪都寫 `AuditLog`——刪咗乜要追得返。
+ *
+ * @param {string} quarterId 沙盒季度 ID
+ * @returns {{specialSundayRowsDeleted: number, payloadRowsDeleted: number}}
+ */
+function selfTestResetOwnSheets_(quarterId) {
+  let specialSundayRowsDeleted = 0;
+  let payloadRowsDeleted = 0;
+
+  // ── 一、自測機種落 `SpecialSundays` 嗰幾行 ────────────────────
+  try {
+    specialSundayRowsDeleted = deleteSelfTestSpecialSundays_(quarterId);
+  } catch (err) {
+    // ⚠️ 清唔到唔可以令成次執行爆——但要留低一句，唔可以靜靜過。
+    log_('WARN', '清不走自測用的特殊主日：' + err.message);
+  }
+
+  // ── 二、上一次跑嘅回傳值紀錄 ─────────────────────────────────
+  try {
+    payloadRowsDeleted = clearSelfTestPayloads_();
+  } catch (err) {
+    log_('WARN', '清不走上一次的回傳值紀錄：' + err.message);
+  }
+
+  return {
+    specialSundayRowsDeleted: specialSundayRowsDeleted,
+    payloadRowsDeleted: payloadRowsDeleted
+  };
+}
+
+/**
+ * 刪走自測機種喺 `SpecialSundays` 嘅行。
+ *
+ * ⚠️ **兩個條件都要中**：`QuarterID` 係沙盒季度，
+ * 而且 `SpecialID` 以 `-SELFTEST` 結尾。
+ *
+ * @param {string} quarterId 沙盒季度 ID
+ * @returns {number} 刪咗幾多行
+ */
+function deleteSelfTestSpecialSundays_(quarterId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName(SHEETS.SPECIAL_SUNDAYS);
+  if (!sheet) return 0;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return 0;
+
+  const S = COLUMNS.SPECIAL_SUNDAYS;
+  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (v) { return String(v || '').trim(); });
+  const idCol = headers.indexOf(S.SPECIAL_ID);
+  const quarterCol = headers.indexOf(S.QUARTER_ID);
+  if (idCol < 0 || quarterCol < 0) return 0;
+
+  const values = sheet.getRange(3, 1, lastRow - 2, headers.length).getValues();
+  const doomed = [];
+  values.forEach(function (row, i) {
+    const specialId = String(row[idCol] || '').trim();
+    const rowQuarter = String(row[quarterCol] || '').trim();
+    // ⚠️ 兩個條件都要中。
+    if (rowQuarter !== quarterId) return;
+    if (specialId.slice(-9) !== '-SELFTEST') return;
+    doomed.push({ sheetRow: i + 3, specialId: specialId });
+  });
+  if (doomed.length === 0) return 0;
+
+  // ⚠️ 由下而上刪——由上而下刪嘅話，刪完一行之後下面每一行都會
+  // 向上移一格，而之後嗰幾個行號就全部錯晒。
+  doomed.slice().reverse().forEach(function (d) {
+    sheet.deleteRow(d.sheetRow);
+  });
+  try {
+    writeAuditLog_({
+      action: '清走自測用的特殊主日',
+      targetSheet: SHEETS.SPECIAL_SUNDAYS,
+      targetKey: quarterId,
+      oldValue: doomed.map(function (d) { return d.specialId; }).join('；'),
+      newValue: '已刪除 ' + doomed.length + ' 行',
+      source: 'selfTestResetOwnSheets_',
+      notes: '每次「⚠️ 跑自測」重設時清走，條件：QuarterID 是沙盒季度'
+        + ' 而且 SpecialID 以 -SELFTEST 結尾。'
+    });
+  } catch (err) {
+    log_('WARN', '刪除自測特殊主日的稽核紀錄寫不進去：' + err.message);
+  }
+  return doomed.length;
+}
+
+/**
+ * 清走 `SelfTestPayloads` 上一次跑嘅行。
+ *
+ * ⚠️ 清之前把上一次嘅**摘要一行**寫入 `AuditLog`——
+ * 清咗就冇得追返，而「上一次到底叫過幾多個 API」係一條
+ * 事後會想知嘅資料。
+ *
+ * @returns {number} 清咗幾多行
+ */
+function clearSelfTestPayloads_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SELFTEST_SHEETS.PAYLOADS);
+  if (!sheet) return 0;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 0;
+  const rowCount = lastRow - 1;
+
+  try {
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function (v) { return String(v || '').trim(); });
+    const scenarioCol = Math.max(0, headers.indexOf('情境'));
+    const scenarios = {};
+    sheet.getRange(2, scenarioCol + 1, rowCount, 1).getValues()
+      .forEach(function (r) {
+        const id = String(r[0] || '').trim();
+        if (id) scenarios[id] = (scenarios[id] || 0) + 1;
+      });
+    writeAuditLog_({
+      action: '清走上一次自測的回傳值紀錄',
+      targetSheet: SELFTEST_SHEETS.PAYLOADS,
+      targetKey: '（整張表）',
+      oldValue: rowCount + ' 行',
+      newValue: Object.keys(scenarios).sort().map(function (id) {
+        return id + '×' + scenarios[id];
+      }).join('、') || '（沒有情境欄）',
+      source: 'clearSelfTestPayloads_',
+      notes: '每次「⚠️ 跑自測」重設時清走，只留這一行摘要。'
+    });
+  } catch (err) {
+    log_('WARN', '上一次回傳值紀錄的摘要寫不進 AuditLog：' + err.message);
+  }
+
+  sheet.deleteRows(2, rowCount);
+  return rowCount;
+}
+
+/**
+ * `SelfTestPayloads` 太長 ⇒ 由最舊嗰邊剪起。
+ *
+ * ⚠️ 呢個係第二道防線：就算清理嗰步冇跑到（例如一直用「續跑」），
+ * 張表都唔會無止境噉長落去。
+ *
+ * @param {Object} sheet `SelfTestPayloads` 工作表
+ * @returns {void}
+ */
+function trimSelfTestPayloads_(sheet) {
+  const lastRow = sheet.getLastRow();
+  const rowCount = lastRow - 1;
+  if (rowCount <= SELFTEST_PAYLOAD_MAX_ROWS) return;
+  // 由第 2 行（最舊嗰行）起剪。
+  sheet.deleteRows(2, rowCount - SELFTEST_PAYLOAD_MAX_ROWS);
 }
 
 /**
@@ -1504,15 +1684,36 @@ function selfTestS14_(quarterId) {
     return t.result();
   }
 
-  // ⚠️ **真嘅 append 一行落張工作表**，唔係喺記憶體造。
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第五十六輪批次 B3 組：**upsert，唔係每次 append 多一行。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 現場：舊寫法每一次全新跑都 append 一行 `2028T3-SELFTEST`，
+  // 而 S15 只係熄返自己嗰一行。實測已經積咗 3 行（兩行仲 Active=TRUE），
+  // 生成嗰陣就會出「2／3 個特殊主日未確認」呢種重覆警告。
+  //
+  // ⚠️ 季度重設工具係「絕對唔碰 SpecialSundays」——**嗰個唔好改**。
+  // 所以清理喺自測機自己嗰一步做（見 `selfTestResetOwnSheets_()`），
+  // 而呢度改成 upsert，兩邊夾埋先至唔會再積。
+  const specialId = quarterId + '-SELFTEST';
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(function (v) { return String(v || '').trim(); });
+  const idCol = headers.indexOf(S.SPECIAL_ID);
+  const lastRow = sheet.getLastRow();
+  let foundRow = 0;
+  if (idCol >= 0 && lastRow >= 3) {
+    const ids = sheet.getRange(3, idCol + 1, lastRow - 2, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0] || '').trim() === specialId) { foundRow = i + 3; break; }
+    }
+  }
+
   const row = new Array(headers.length).fill('');
   const put = function (key, value) {
     const idx = headers.indexOf(key);
     if (idx >= 0) row[idx] = value;
   };
-  put(S.SPECIAL_ID, quarterId + '-SELFTEST');
+  put(S.SPECIAL_ID, specialId);
   put(S.QUARTER_ID, quarterId);
   put(S.SERVICE_DATE, targetDate);
   put(S.TYPE, '合堂');
@@ -1521,9 +1722,15 @@ function selfTestS14_(quarterId) {
   put(S.ACTIVE, 'TRUE');
   // ⚠️ S15 要用：明確填 FALSE 先至算「未確認」。
   put(S.CONFIRMED, 'FALSE');
-  sheet.appendRow(row);
-  t.expect('特殊主日那一行真的寫進工作表', true, '寫得到', '寫得到',
-    quarterId + '-SELFTEST　' + targetDate + '　SkipPostIDs=CHAIR');
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, headers.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  t.expect('特殊主日那一行真的寫進工作表（'
+    + (foundRow > 0 ? '覆寫既有那一行' : '新增一行') + '）',
+    true, '寫得到', '寫得到',
+    specialId + '　' + targetDate + '　SkipPostIDs=CHAIR');
 
   // ── 重新生成 ──────────────────────────────────────────────────
   //
@@ -2264,7 +2471,21 @@ function snapshotFailingInvariants_(quarterId) {
  * @returns {Object} 報告
  */
 function runSelfTestMachine_(resume, rerunFailedOnly) {
-  selfTestStartedAt_ = new Date().getTime();
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第五十六輪批次 B1 組：**時間預算由清理之後先開始計。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 現場：「⚠️ 跑自測」清 546 行派工要幾分鐘。舊寫法喺呢一行起錶，
+  // 於是預算被清理食光——重設完即刻停，17 個情境全部「未跑」，
+  // 而報告寫「用了 2 秒」（嗰一行只計情境迴圈）。
+  //
+  // Ivan 見過至少兩次，每次都以為部機器壞咗。
+  //
+  // ⚠️ 所以：`selfTestStartedAt_`（＝ `selfTestOutOfTime_()` 睇嗰個）
+  // 喺 reset **之後**先設。清理要幾耐都好，都唔會食情境嘅預算。
+  // 清理本身冇 6 分鐘上限問題——佢係一次獨立嘅寫入。
+  const machineStartedAt = new Date().getTime();
+  selfTestStartedAt_ = machineStartedAt;
   selfTestPayloads_ = {};
 
   const quarter = readSelfTestQuarterDetail_();
@@ -2349,9 +2570,14 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     try {
       const plan = planQuarterReset_(quarterId, true);
       const result = executeQuarterReset_(plan);
+      // 第五十六輪批次 B3／C 組：季度重設工具「絕對唔碰 SpecialSundays」，
+      // 亦唔碰 SelfTest 嗰幾張表。呢兩件事喺自測機自己嗰一步做。
+      const extra = selfTestResetOwnSheets_(quarterId);
       resetSummary = '已清乾淨：版本 ' + result.versionRowsDeleted + ' 行、'
         + '派工 ' + result.assignmentRowsDeleted + ' 行、'
-        + 'SendLog ' + result.sendLogRowsDeleted + ' 行';
+        + 'SendLog ' + result.sendLogRowsDeleted + ' 行、'
+        + '自測特殊主日 ' + extra.specialSundayRowsDeleted + ' 行、'
+        + '上一次的回傳值紀錄 ' + extra.payloadRowsDeleted + ' 行';
     } catch (err) {
       return {
         blocked: true, quarterId: quarterId, quarterSource: quarter.source,
@@ -2360,6 +2586,11 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       };
     }
   }
+
+  // ⚠️ B1：清理做完先起錶。上面嗰句 `selfTestStartedAt_ = machineStartedAt`
+  // 只係一個保底值（萬一清理拋錯，`selfTestOutOfTime_()` 仍然有嘢好睇）。
+  const resetMs = new Date().getTime() - machineStartedAt;
+  selfTestStartedAt_ = new Date().getTime();
 
   // ── 開跑之前，先影一次底相 ──────────────────────────────────
   //
@@ -2654,7 +2885,11 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     invariantMs += new Date().getTime() - finalStartedAt;
   }
 
-  const totalMs = new Date().getTime() - runStartedAt;
+  // ⚠️ B1：三段時間**加埋一定等於總數**——`totalMs` 由三段砌返出嚟，
+  // 唔係另外量一次。另外量一次嘅話兩個數會唔對，而幹事會問邊個先啱。
+  const loopMs = new Date().getTime() - runStartedAt;
+  const scenarioMs = Math.max(0, loopMs - invariantMs);
+  const totalMs = resetMs + scenarioMs + invariantMs;
   return {
     blocked: false,
     quarterId: quarterId,
@@ -2668,8 +2903,9 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     startupSnapshotError: baseline.error,
     finalInvariants: finalInvariants,
     totalMs: totalMs,
+    resetMs: resetMs,
     invariantMs: invariantMs,
-    scenarioMs: Math.max(0, totalMs - invariantMs),
+    scenarioMs: scenarioMs,
     stoppedForTime: stoppedForTime,
     passedCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.PASSED; }).length,
     failedCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.FAILED; }).length,
@@ -2828,7 +3064,8 @@ function describeSelfTestReport_(report) {
   // ⚠️ 沒有這一行，下次再卡住又要重新查一次。
   if (report.totalMs !== undefined) {
     lines.push('時間：用了 ' + describeSelfTestDuration_(report.totalMs)
-      + '（情境 ' + describeSelfTestDuration_(report.scenarioMs)
+      + '（清理 ' + describeSelfTestDuration_(report.resetMs || 0)
+      + '／情境 ' + describeSelfTestDuration_(report.scenarioMs)
       + '／不變量 ' + describeSelfTestDuration_(report.invariantMs) + '）');
     lines.push('');
   }
@@ -2863,8 +3100,18 @@ function describeSelfTestReport_(report) {
         + ' 次，結果沒有變。不要再撳——');
       lines.push('　 把這份報告交給 Claude，要修碼。');
     } else {
-      lines.push('修好之後撳「測試工具 ▸ ▶️ 只重跑紅色情境」——'
-        + '它會重跑紅的同被擋住的那幾個，不會把沙盒季度清掉重頭來。');
+      // ── 第五十六輪批次 B2 組：**估唔到就唔好扮估到。** ──────────
+      //
+      // 現場：舊寫法按狀態揀一句印。但「使用者改咗碼（clasp push 過）」
+      // 呢個最關鍵嘅情況，部機器**根本知唔到**——佢睇唔到 Ivan 有冇
+      // push 過。於是指示錯咗兩次，Ivan 照住撳「繼續／只重跑」，白撳。
+      //
+      // ⚠️ 所以唔再揀：兩種情況一齊印，等使用者自己對號入座。
+      // 一句估錯嘅指示，代價係實實在在嘅——佢白撳咗幾次。
+      lines.push('・你改過程式碼（有 clasp push 過）'
+        + ' ⇒ 撳「⚠️ 跑自測」重頭跑');
+      lines.push('・你沒有改過程式碼，只是修了工作表的資料'
+        + ' ⇒ 撳「▶️ 只重跑紅色情境」');
     }
   } else {
     lines.push('全部通過。');

@@ -237,8 +237,22 @@ console.log('\n=== C【核心】S14：真實入口靜靜噉冇做嘢 ===');
     + '——S15 要用 S14 種落嗰一行；S14 自己收拾嘅話，'
     + 'S15 就會冇嘢可以數，而佢會報一個同系統無關嘅紅',
     /selfTestDeactivateSpecialSunday_\(quarterId \+ '-SELFTEST'\)/.test(s15), '');
+  // ⚠️ 第五十六輪批次 B3 組：`deleteRow` 而家喺 `SelfTestRunner.gs` 出現咗——
+  // 但係喺**另一支**（`deleteSelfTestSpecialSundays_()`，重設嗰陣清走
+  // 自測機自己種落去嗰幾行）。所以呢一條要**限喺 S15 嗰段**度睇，
+  // 唔可以掃全檔。
+  const cleanup = CODE.slice(CODE.indexOf('function selfTestDeactivateSpecialSunday_('),
+    CODE.indexOf('function selfTestS16_('));
   check('★★★★★★ 收拾係**設成 `Active=FALSE`，唔刪行**（留住做證據）',
-    /setValue\('FALSE'\)/.test(CODE) && !/deleteRow/.test(CODE), '');
+    /setValue\('FALSE'\)/.test(cleanup) && !/deleteRow/.test(cleanup),
+    cleanup.slice(0, 600));
+  // ⚠️ 而重設嗰邊真係會刪行——所以要守住佢**兩個條件都要中**。
+  check('★★★★★★ 重設嗰邊刪行要 `QuarterID` 同 `-SELFTEST` 兩個條件都中'
+    + '——只對其中一個嘅話，一行真資料就會被刪走',
+    /if \(rowQuarter !== quarterId\) return;/.test(CODE)
+      && /if \(specialId\.slice\(-9\) !== '-SELFTEST'\) return;/.test(CODE),
+    CODE.slice(CODE.indexOf('function deleteSelfTestSpecialSundays_('),
+      CODE.indexOf('function deleteSelfTestSpecialSundays_(') + 1400));
 }
 
 // =====================================================================
@@ -313,8 +327,12 @@ console.log('\n=== D【核心】連環倒要報成「被擋住」，唔係九條
     /🔴 真正失敗（1 條）/.test(lines) && /🚧 被上游擋住（2 條/.test(lines), lines);
   check('★★★★★ 被擋住嗰節列咗編號，一眼睇得晒',
     /S06　S07/.test(lines), lines);
-  check('★★★★★★ 下一步要講明「紅同被擋住嘅都會重跑」',
-    /會重跑紅的同被擋住的那幾個/.test(lines), lines.slice(-400));
+  // 第五十六輪批次 B2 組：尾句唔再按狀態揀一句印，兩種情況一齊印。
+  check('★★★★★★ 下一步**兩種情況一齊印**'
+    + '——部機器根本知唔到使用者有冇 clasp push 過，估唔到就唔好扮估到',
+    /・你改過程式碼（有 clasp push 過） ⇒ 撳「⚠️ 跑自測」重頭跑/.test(lines)
+      && /・你沒有改過程式碼，只是修了工作表的資料 ⇒ 撳「▶️ 只重跑紅色情境」/
+        .test(lines), lines.slice(-500));
 
   // D3：只重跑紅色情境要一併清走 BLOCKED。
   const cleared = gas.clearFailedSelfTestState_({
