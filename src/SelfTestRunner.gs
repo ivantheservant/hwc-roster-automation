@@ -1335,9 +1335,50 @@ function selfTestS07_(quarterId) {
 
   const plan = selfTestCall_('S07', 'apiStep3Plan',
     function () { return apiStep3Plan(quarterId); });
-  t.expect('系統看得到剛才那幾筆申報',
-    (plan.results || []).length >= want, '≥ ' + want + ' 筆',
-    (plan.results || []).length + ' 筆', 'apiStep3Plan().results');
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第五十七輪批次：**上一次呢度讀緊一個唔存在嘅欄位。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 舊寫法：`(plan.results || []).length >= want`
+  // 現場：`expected「≥ 3 筆」actual「0 筆」`，而系統其實完全正確——
+  // `apiStep3Plan()` 回嘅 `applyList` 有 3 筆、`needsInputList` 空、
+  // `apiStep3Apply()` 回 `{appliedCount:3, violations:[], advanced:true}`。
+  //
+  // `apiStep3Plan()` **根本冇 `results` 呢個欄位**。
+  // `results` 係內部嗰個 `planApplyRequests_()` 嘅欄位；
+  // `mapPendingPlanForClient_()`（WebAppFlow.gs）把佢**拆成三個陣列**
+  // 先至交出嚟：`applyList`／`confirmList`／`needsInputList`。
+  //
+  // ⚠️ 所以 `plan.results` 永遠 `undefined`，個數永遠 0。
+  // **系統冇錯，係測試讀錯欄位。**
+  //
+  // ⚠️ 而家驗兩件事，次序有意思：
+  //   一、`mode === 'HAS_PENDING'`——唔係呢個 mode 嘅話，
+  //       上面三個陣列**根本唔會出現喺回傳入面**，
+  //       下面驗幾多都係喺度數一個 undefined。
+  //   二、`applyList` 夠數——唔係「總數夠數」。S07 已經特登揀咗
+  //       套用得到嘅格（第五十五輪 B3），所以一筆跌落 needsInput
+  //       就係一個問題。驗總數嘅話，嗰筆會等到下面 `appliedCount`
+  //       先爆，而嗰陣就分唔出係「寫錯格式」定係「套用邏輯壞咗」。
+  t.equal('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'
+    + '——不是這個 mode 的話，applyList／confirmList／needsInputList'
+    + '根本不會出現在回傳裡面',
+    plan.mode, 'HAS_PENDING',
+    'apiStep3Plan().mode。其餘 mode：NO_PENDING_NEEDS_ADVANCE／'
+      + 'NO_PENDING_DONE／NO_VERSION。');
+  const applyList = plan.applyList || [];
+  const needsInputList = plan.needsInputList || [];
+  t.expect('剛才那 ' + want + ' 筆申報全部落在「可以套用」那一批',
+    applyList.length >= want, '≥ ' + want + ' 筆',
+    'applyList ' + applyList.length + ' 筆、'
+      + 'confirmList ' + (plan.confirmList || []).length + ' 筆、'
+      + 'needsInputList ' + needsInputList.length + ' 筆',
+    needsInputList.map(function (r) {
+      // ⚠️ 欄位名照 `mapRequestForClient_()`（WebAppFlow.gs）：
+      // 係 `serviceDateText`，唔係 `serviceDate`。
+      return (r.serviceDateText || '') + '　' + (r.postNameText || '')
+        + '　' + (r.reason || '');
+    }).join('；') || 'apiStep3Plan().applyList');
 
   const applied = selfTestCall_('S07', 'apiStep3Apply',
     function () { return apiStep3Apply(quarterId, []); });
@@ -1353,10 +1394,13 @@ function selfTestS07_(quarterId) {
     'appliedCount=' + applied.appliedCount
       + '、rejectedCount=' + applied.rejectedCount
       + '、needsInputCount=' + applied.needsInputCount,
-    (plan.results || []).filter(function (r) {
-      return r.category === 'NEEDS_INPUT';
-    }).map(function (r) { return r.reason || ''; }).join('；')
-      || 'apiStep3Apply() 的回傳');
+    // ⚠️ 同上：呢度本來也讀緊 `plan.results`，永遠空。
+    // 而且 `needsInputList` 本身就已經係 NEEDS_INPUT 嗰一批，
+    // 唔使再 filter 一次 `category`（嗰個欄位一樣冇交出嚟）。
+    needsInputList.map(function (r) {
+      return (r.serviceDateText || '') + '　' + (r.postNameText || '')
+        + '　' + (r.reason || '');
+    }).join('；') || 'apiStep3Apply() 的回傳');
 
   // ⚠️ B2：Stage 前進咗，但 `appliedCount` 係幾多？兩者嘅關係
   // 有一個**未覆嘅決策點**（見報告 A3）。呢度只記低，唔判斷對錯。
@@ -1506,7 +1550,17 @@ function selfTestS10_(quarterId) {
 
   const plan = selfTestCall_('S10', 'apiStep5Plan',
     function () { return apiStep5Plan(quarterId, null); });
-  const changedIds = (plan.changedList || []).map(function (c) { return c.personId; });
+  // ⚠️ 第五十七輪批次 A2 組：**同一個病，第二處。**
+  //
+  // 舊寫法讀 `plan.changedList`——而 `apiStep5Plan()` 回嘅係 `changed`。
+  //（`changedList` 係內部嗰個 `planStep5ChangedList_()`（FiveStageCore.gs）
+  // 嘅欄位，冇交出嚟。）
+  //
+  // 後果比 S07 嗰個更難察覺：
+  //   ・「名單裡面沒有我沒有碰過的人」⇒ 空陣列，**永遠綠**（假綠）
+  //   ・「而且真的有人被算進去」　　　⇒ 空陣列，**永遠紅**
+  // 一條假綠 ＋ 一條假紅，而兩條都指唔到真正嘅問題。
+  const changedIds = (plan.changed || []).map(function (c) { return c.personId; });
 
   // ⚠️ 「只寄給那 2 格涉及的人」——**唔可以淨係驗「大過 0」**。
   //
@@ -1522,7 +1576,7 @@ function selfTestS10_(quarterId) {
       + JSON.stringify(changedIds) + '；多出來的是 ' + JSON.stringify(unexpected));
   t.expect('而且真的有人被算進去（不是空的）',
     changedIds.length > 0, '> 0 人', changedIds.length + ' 人',
-    'apiStep5Plan().changedList');
+    'apiStep5Plan().changed（不是 changedList——那個是內部欄位，沒有交出來）');
   return t.result();
 }
 

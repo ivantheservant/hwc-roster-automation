@@ -3099,6 +3099,53 @@ const MUTATIONS = [
     replace: '    throw err;',
     tests: ['tests/selftest_reset_and_clock.test.js']
   },
+  // ── 第五十七輪批次：讀緊一個 API 根本冇嘅欄位 ──────
+  {
+    id: 's07-plan-results',
+    why: 'S07 讀回 `apiStep3Plan().results`'
+      + '——嗰支 API 根本冇那個欄位（`results` 係內部嘅，'
+      + '`mapPendingPlanForClient_()` 把佢拆成 applyList／confirmList／'
+      + 'needsInputList 先至交出嘅）。數永遠係 0，'
+      + '而系統其實完全正確',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const applyList = plan.applyList || [];',
+    replace: '  const applyList = plan.results || [];',
+    tests: ['tests/selftest_reads_real_api_fields.test.js']
+  },
+  {
+    id: 's07-plan-no-mode',
+    why: 'S07 不先驗 `mode === HAS_PENDING`'
+      + '——其餘 mode 之下那三個陣列根本唔會出現嗺回傳入面，'
+      + '驗幾多都係嗺度數一個 undefined',
+    file: 'src/SelfTestRunner.gs',
+    find: "  t.equal('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'",
+    replace: "  if (false) t.equal('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'",
+    tests: ['tests/selftest_reads_real_api_fields.test.js']
+  },
+  {
+    id: 's07-total-not-apply',
+    why: 'S07 驗「三個陣列加埋夠數」而唔係驗 `applyList`'
+      + '——一筆跌落 needsInput 嘅話總數照樣夠，'
+      + '而問題要等到下面 `appliedCount` 先爆，'
+      + '嗰陣就分唔出係「寫錯格式」定係「套用邏輯壞咗」',
+    file: 'src/SelfTestRunner.gs',
+    find: '    applyList.length >= want,',
+    replace: '    applyList.length + (plan.confirmList || []).length'
+      + ' + needsInputList.length >= want,',
+    tests: ['tests/selftest_reads_real_api_fields.test.js']
+  },
+  {
+    id: 's10-changed-list',
+    why: 'S10 讀回 `apiStep5Plan().changedList`'
+      + '——嗰支 API 回嘅係 `changed`。'
+      + '讀錯咗嘅話：「名單裡面沒有我沒有碰過的人」'
+      + '嗺空陣列之下**永遠綠**（假綠），'
+      + '而「真的有人被算進去」**永遠紅**',
+    file: 'src/SelfTestRunner.gs',
+    find: '  const changedIds = (plan.changed || []).map(function (c) { return c.personId; });',
+    replace: '  const changedIds = (plan.changedList || []).map(function (c) { return c.personId; });',
+    tests: ['tests/selftest_reads_real_api_fields.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

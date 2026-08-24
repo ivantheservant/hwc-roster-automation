@@ -75,8 +75,31 @@ function sandbox(opts) {
   gas.readPostsNormalized = function () { return opts.posts; };
   gas.selfTestPickCells_ = function () { return opts.cells; };
   gas.readSheet = function () { return []; };
+  // ⚠️⚠️ 第五十七輪批次：**呢個 stub 本來寫錯咗。**
+  //
+  // 舊寫法回 `{results: […]}`——而 `apiStep3Plan()` 根本冇嗰個欄位。
+  // 於是離線測試一直綠，而實機永遠數到 0 筆。
+  //
+  // **fixture 照自己嘅想像砌，就只驗到自己嘅想像。**
+  // 見 `tests/selftest_reads_real_api_fields.test.js`——嗰度有一條
+  // 斷言守住「欄位名同真嗰個 return 一樣」。
   gas.apiStep3Plan = function () {
-    return { results: [{}, {}, {}] };
+    return {
+      mode: 'HAS_PENDING',
+      stage: 'REVIEW_SENT',
+      skippedIncompleteCount: 0,
+      applyList: [{ sheetRow: 3, serviceDateText: '2028-07-02',
+        postNameText: '報告', personNameText: '假甲乙',
+        requestType: '不能服侍', reason: '' },
+      { sheetRow: 4, serviceDateText: '2028-07-09',
+        postNameText: '讀經', personNameText: '假丙丁',
+        requestType: '不能服侍', reason: '' },
+      { sheetRow: 5, serviceDateText: '2028-07-16',
+        postNameText: '司事', personNameText: '假戊己',
+        requestType: '不能服侍', reason: '' }],
+      confirmList: [],
+      needsInputList: []
+    };
   };
   gas.apiStep3Apply = function () {
     return Object.assign({ appliedCount: 3, rejectedCount: 0, needsInputCount: 0,
