@@ -185,7 +185,7 @@ console.log('\n=== 六 每一步都要跑一次全部不變量 ===');
 {
   check('★★★★★★ 每一步跑一次 `runAllInvariants_()`'
     + '——亂行機自己冇斷言，佢全部靠不變量出力',
-    /path\.push\(picked\.id\);[\s\S]{0,400}runAllInvariants_\(quarterId\)/.test(CODE), '');
+    /path\.push\(picked\.id\);[\s\S]{0,2000}runAllInvariants_\(quarterId\)/.test(CODE), '');
   check('★★★★★ 逐步紀錄寫入 `MonkeyLog`',
     /function writeMonkeyLog_\(/.test(CODE) && /第幾步/.test(SRC), '');
   check('★★★★★ 有選單入口（兩個：開跑同續跑）',

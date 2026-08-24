@@ -3301,6 +3301,137 @@ const MUTATIONS = [
     replace: '  if (false) {',
     tests: ['tests/selftest_gate_official_sent.test.js']
   },
+  // ── 第六十輪批次：亂行機喺沙盒度原地打轉 ──────────────────────
+  {
+    id: 'mky-writes-garbage',
+    why: '「改 grid」寫返「亂行N」'
+      + '——一個系統認唔出嘅名，寫咗之後儲存整批拒絕、寄出封鎖、'
+      + '套用申報行唔到，於是每一步只剩「改 grid」合法，'
+      + '亂行機一直寫更多，永遠出唔到個坑'
+      + '（第五十四輪 S03 嗰個修正冇套到亂行機）',
+    file: 'src/MonkeyRun.gs',
+    find: '        const picked = selfTestPickAcceptedCells_(\n'
+      + '          quarterId, versionNo, howMany, MONKEY_SCENARIO_ID);',
+    replace: '        const picked = { cells: [], planCalls: 0 };\n'
+      + '        selfTestPickCells_(quarterId, versionNo, howMany)\n'
+      + '          .forEach(function (c, i) {\n'
+      + '            selfTestWriteGridCell_(quarterId, versionNo, c.serviceDate,\n'
+      + "              c.postId, c.slotIndex, '亂行' + (i + 1));\n"
+      + '          });',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-grid-unresolved-mute',
+    why: '寫完之後仲有認唔出嘅名，「改 grid」唔出聲'
+      + '——正正就係今輪嗰個坑：報告一句都冇講，'
+      + '而部機器已經行緊 50 步無效動作',
+    file: 'src/MonkeyRun.gs',
+    find: '        if (Number(after.unresolvedCount || 0) > 0) {',
+    replace: '        if (false) {',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-facts-unres-zero',
+    why: '`monkeyReadFacts_()` 寫死 `unresolvedCount: 0`'
+      + '——上面嗰條斷言就永遠唔會 fire，'
+      + '而一條永遠 true 嘅斷言同冇斷言係同一件事',
+    file: 'src/MonkeyRun.gs',
+    find: '    unresolvedCount: (state.unsaved || {}).unresolvedCount || 0,',
+    replace: '    unresolvedCount: 0,',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-no-spin-guard',
+    why: '拆走防打轉閘'
+      + '——亂行機嘅本質就係會撞到冇人諗過嘅狀態，'
+      + '佢一定要有自己爬得出嚟嘅能力，否則每撞一個新坑都要人手救',
+    file: 'src/MonkeyRun.gs',
+    find: '    if (sameFingerprintRun >= MONKEY_SPIN_LIMIT) {',
+    replace: '    if (false) {',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-spin-silent',
+    why: '偵測到打轉之後靜靜停低，唔記成失敗'
+      + '——一份「跑咗 5 步、0 項失敗」嘅報告睇落好似冇事',
+    file: 'src/MonkeyRun.gs',
+    find: "      failures.push({\n        step: i, kind: '偵測到原地打轉，已停止',",
+    replace: "      [].push({\n        step: i, kind: '偵測到原地打轉，已停止',",
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-spin-not-printed',
+    why: '報告唔印「偵測到原地打轉，已停止」'
+      + '——嗰句係「點解跑到一半就停」嘅唯一答案',
+    file: 'src/MonkeyRun.gs',
+    find: '  if (report.spinning) {',
+    replace: '  if (false) {',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-fingerprint-grid',
+    why: '狀態指紋包埋 `gridChangeCount`'
+      + '——一部一路寫更多「亂行N」嘅機器每一步個數都加一，'
+      + '於是指紋每步都唔同，防打轉閘永遠唔會 fire，'
+      + '今輪個 bug 原封不動',
+    file: 'src/MonkeyRun.gs',
+    find: '  return [facts.stage, facts.latestVersionNo,\n'
+      + "    Number(facts.unresolvedCount || 0)].join('|');",
+    replace: '  return [facts.stage, facts.latestVersionNo,\n'
+      + "    Number(facts.unresolvedCount || 0),\n"
+      + "    facts.gridChangeCount].join('|');",
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-spin-limit-one',
+    why: '連續 1 步就當打轉'
+      + '——一部乜都當打轉嘅機器同一部乜都唔停嘅機器一樣冇用',
+    file: 'src/MonkeyRun.gs',
+    find: 'const MONKEY_SPIN_LIMIT = 5;',
+    replace: 'const MONKEY_SPIN_LIMIT = 1;',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-rare-no-revert',
+    why: '寫完認唔出嘅名之後唔改返原值'
+      + '——即係親手種返今輪嗰個坑：下一步開始系統乜都唔准做',
+    file: 'src/MonkeyRun.gs',
+    find: '        const reverted = selfTestWriteGridCell_(quarterId, versionNo,'
+      + ' cell.serviceDate,\n'
+      + '          cell.postId, cell.slotIndex, originalName);',
+    replace: '        const reverted = true;',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-rare-block-mute',
+    why: '寫咗個認唔出嘅名，儲存冇擋住都唔出聲'
+      + '——嗰個係系統最嚴厲嗰一道閘，佢失效嘅話'
+      + '一個認唔出嘅名會靜靜噉入咗版本',
+    file: 'src/MonkeyRun.gs',
+    find: "        if (result.blockReason !== 'UNRESOLVED_NAMES') {",
+    replace: '        if (false) {',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-rare-weight-normal',
+    why: '「寫一格認不出的名字」用返一般權重'
+      + '——呢類順手探一探嘅動作經常做會蓋過其餘動作嘅覆蓋率，'
+      + '而 S16 已經有一條完整情境專門驗呢件事',
+    file: 'src/MonkeyRun.gs',
+    find: '      weight: MONKEY_RARE_WEIGHT,',
+    replace: '      weight: MONKEY_DEFAULT_WEIGHT,',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
+  {
+    id: 'mky-weight-ignored',
+    why: '加權揀動作嗰陣唔加權重，每個當一份'
+      + '——低權重嗰個會變成永遠揀唔中，'
+      + '而「順手探一探」嘅價值就係偶然真係會撞到',
+    file: 'src/MonkeyRun.gs',
+    find: '    total += Math.max(1, Number(a.weight) || MONKEY_DEFAULT_WEIGHT);',
+    replace: '    total += 1;',
+    tests: ['tests/monkey_no_spin.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。

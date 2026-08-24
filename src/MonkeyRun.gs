@@ -116,6 +116,30 @@ function makeMonkeyRandom_(seed, skip) {
  * 一個 `legal` 講得通而執行起上嚟拋錯嘅動作，
  * 就係「畫面話得，而系統話唔得」。所以拋錯會被記低，唔會被吞。
  */
+/** 亂行機錄回傳值嗰陣用嘅「情境 ID」。 */
+const MONKEY_SCENARIO_ID = 'MONKEY';
+
+/** 一般動作嘅權重。 */
+const MONKEY_DEFAULT_WEIGHT = 10;
+
+/**
+ * 「順手探一探」嗰類動作嘅權重。
+ *
+ * ⚠️ 要**明顯細過** `MONKEY_DEFAULT_WEIGHT`。呢類動作嘅價值喺於
+ * 「偶然撞到」，唔係「經常做」——而經常做會蓋過其餘動作嘅覆蓋率。
+ */
+const MONKEY_RARE_WEIGHT = 2;
+
+/** 寫落去試「系統認唔認得出」嗰串字。 */
+const MONKEY_UNRESOLVED_TEXT = '一個系統認不出的名字';
+
+/**
+ * 連續幾多步「同一個動作 ＋ 狀態完全冇變」先當佢原地打轉。
+ *
+ * ⚠️ 見 `runMonkey_()` 入面嗰段。
+ */
+const MONKEY_SPIN_LIMIT = 5;
+
 function monkeyActions_() {
   return [
     {
@@ -140,22 +164,132 @@ function monkeyActions_() {
     {
       id: '改 grid 幾格',
       legal: function (facts) { return facts.hasVersion; },
+      // ═══════════════════════════════════════════════════════════════
+      // ⚠️⚠️ 第六十輪批次 A1 組：**亂行機喺沙盒度原地打轉。**
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // 舊寫法寫嘅係 `'亂行' + (i + 1)`——「亂行1」「亂行2」，
+      // 一個系統一定認唔出嘅字。實測 grid 上面見到
+      // `07-02 主席=亂行1、報告=亂行2`。
+      //
+      // `unresolvedCount > 0` 之後，系統嘅規矩係
+      // **「有認唔出嘅名就乜都唔准做」**：
+      //   ・儲存並確認　整批拒絕
+      //   ・寄出　　　　封鎖
+      //   ・套用申報　　行唔到
+      //
+      // ⇒ 每一步只剩「改 grid」合法 ⇒ 亂行機一直寫更多「亂行N」
+      // ⇒ 永遠出唔到個坑。2028T3 嘅 Stage 停喺 OFFICIAL_SENT
+      //   一路冇變過，證明零動作成功過。
+      //
+      // ⚠️⚠️ 呢個同第五十四輪 S03 嗰個 bug **完全同一種病**。
+      // 當時嘅解法係「唔猜規則，寫入之後叫唯讀嘅
+      // `apiSaveAndConfirmPlan()` 問系統」——但嗰個修正只套咗喺
+      // `selfTestPickCells_()` 嘅呼叫端，冇套到亂行機。
+      //
+      // ⚠️ 所以呢度**直接重用 S03 嗰一支**，唔另寫一份。
+      // 兩份邏輯必定分岔——而分岔之後，下一次撞規則嗰陣
+      // 冇人分得出邊一份答錯。
       run: function (quarterId, rnd) {
         const versionNo = findLatestVersionNo(quarterId);
-        const howMany = 1 + Math.floor(rnd() * 5);
-        const cells = selfTestPickCells_(quarterId, versionNo, howMany);
-        let written = 0;
-        cells.forEach(function (c, i) {
-          if (selfTestWriteGridCell_(quarterId, versionNo, c.serviceDate,
-            c.postId, c.slotIndex, '亂行' + (i + 1))) written++;
-        });
-        return { changedCells: written };
+        const howMany = 1 + Math.floor(rnd() * 3);
+        const picked = selfTestPickAcceptedCells_(
+          quarterId, versionNo, howMany, MONKEY_SCENARIO_ID);
+        return {
+          changedCells: picked.cells.length,
+          wanted: howMany,
+          planCalls: picked.planCalls,
+          planError: picked.planError || '',
+          preExisting: picked.preExisting || [],
+          noCandidate: picked.noCandidate || '',
+          cells: picked.cells.map(function (c) {
+            return c.serviceDate + ' ' + c.postId + '#' + c.slotIndex
+              + ' ← ' + c.replacement.name;
+          })
+        };
       },
-      // ⚠️ 一格都寫唔到 ⇒ 呢一步實際上乜都冇做，而下一步會當佢做過。
-      expect: function (result) {
+      expect: function (result, before, after) {
+        // ⚠️ **呢一條先係防止今輪個 bug 翻生嗰一條。**
+        // 寫入之後仲有認唔出嘅名 ⇒ 系統會整批擋住，
+        // 而亂行機就會困喺「只剩改 grid 合法」嗰個坑入面。
+        if (Number(after.unresolvedCount || 0) > 0) {
+          return '寫完之後仍然有 ' + after.unresolvedCount + ' 格認不出——'
+            + '系統的規矩是「有認不出的名字就什麼都不准做」，'
+            + '接下來每一步都會被擋，亂行機會困在原地。';
+        }
+        if (result.planError) {
+          return '選格的時候：' + result.planError;
+        }
+        if ((result.preExisting || []).length > 0) {
+          return '這一版本身就帶著 ' + result.preExisting.length
+            + ' 格硬規則違反，不是這一次改動造成的：'
+            + result.preExisting.join('；');
+        }
+        // ⚠️ 一格都寫唔到 ⇒ 呢一步實際上乜都冇做，而下一步會當佢做過。
         return result.changedCells > 0 ? ''
           : '一格都沒有寫到——這一步實際上什麼都沒有做，'
-            + '但後面每一步都當它做過了。';
+            + '但後面每一步都當它做過了。'
+            + (result.noCandidate ? '　' + result.noCandidate : '');
+      }
+    },
+    {
+      // ═══════════════════════════════════════════════════════════════
+      // 第六十輪批次 A2 組：**「認唔出嘅名」仍然要驗，但唔可以鎖死部機。**
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // ⚠️ 呢一個動作**自己收拾**：寫入 → 問系統 → 即刻改返原值。
+      // 全部喺同一步之內做完，所以：
+      //   ・唔會留低一格認唔出嘅名去鎖死下一步
+      //   ・個斷言唔使靠「下一步啱啱揀中儲存」先跑得到
+      //
+      // ⚠️ 權重低（見 `MONKEY_RARE_WEIGHT`）。S16 已經有一條完整嘅
+      // 情境專門驗呢件事，呢度只係一個順手嘅探針。
+      id: '寫一格認不出的名字（即刻改回）',
+      weight: MONKEY_RARE_WEIGHT,
+      legal: function (facts) { return facts.hasVersion; },
+      run: function (quarterId, rnd) {
+        const versionNo = findLatestVersionNo(quarterId);
+        const cells = selfTestPickCells_(quarterId, versionNo, 1);
+        if (cells.length === 0) return { skipped: '找不到一格有人的來改' };
+        const cell = cells[0];
+        const peopleById = indexPeopleById_();
+        const originalName = (peopleById[cell.personId] || {}).nameTC || '';
+        if (!originalName) return { skipped: '拿不到那一格原本的人名，不動它' };
+
+        const wrote = selfTestWriteGridCell_(quarterId, versionNo, cell.serviceDate,
+          cell.postId, cell.slotIndex, MONKEY_UNRESOLVED_TEXT);
+        let blockReason = '';
+        let blockMessage = '';
+        try {
+          const plan = apiSaveAndConfirmPlan(quarterId);
+          blockReason = plan.blocked ? String(plan.blockReason || '') : '';
+          blockMessage = String(plan.message || '').slice(0, 200);
+        } catch (err) {
+          blockReason = '（拋錯）' + err.message;
+        }
+        // ⚠️ **無論上面點，都要改返原值。** 唔收拾就等於種一個坑。
+        const reverted = selfTestWriteGridCell_(quarterId, versionNo, cell.serviceDate,
+          cell.postId, cell.slotIndex, originalName);
+        return {
+          wrote: wrote, reverted: reverted, blockReason: blockReason,
+          blockMessage: blockMessage,
+          cell: cell.serviceDate + ' ' + cell.postId + '#' + cell.slotIndex,
+          originalName: originalName
+        };
+      },
+      expect: function (result, before, after) {
+        if (result.skipped) return '';
+        if (!result.wrote) return '那一格寫不進去，這一步什麼都沒有驗到。';
+        // ⚠️ **儲存必定被拒絕。** 唔拒絕嘅話，一個認唔出嘅名
+        // 就會靜靜噉入咗版本——而嗰個係系統最嚴厲嗰一道閘。
+        if (result.blockReason !== 'UNRESOLVED_NAMES') {
+          return '寫了一個系統認不出的名字，而「儲存並確認」竟然沒有'
+            + '因為 UNRESOLVED_NAMES 而擋住（blockReason='
+            + (result.blockReason || '（沒有擋）') + '）。';
+        }
+        if (!result.reverted) return '驗完之後改不回原值，留下了一格認不出的名字。';
+        // 收拾乾淨 ⇒ 狀態要同做之前一模一樣。
+        return monkeyExpectNoChange_(before, after);
       }
     },
     {
@@ -275,6 +409,11 @@ function monkeyExpectNoChange_(before, after) {
     moved.push('未儲存格數由 ' + before.gridChangeCount
       + ' 變成 ' + after.gridChangeCount);
   }
+  // 第六十輪批次：收拾乾淨嘅話，認唔出嘅格數都要打返和。
+  if (Number(before.unresolvedCount || 0) !== Number(after.unresolvedCount || 0)) {
+    moved.push('認不出的格數由 ' + Number(before.unresolvedCount || 0)
+      + ' 變成 ' + Number(after.unresolvedCount || 0));
+  }
   return moved.length === 0 ? ''
     : '這一個動作說明自己只是計算／只是讀，但它改了東西：' + moved.join('；') + '。';
 }
@@ -321,6 +460,52 @@ function monkeyCheckOutcome_(picked, result, before, after) {
 }
 
 /**
+ * 由合法動作入面揀一個，**按權重**。
+ *
+ * ⚠️ 冇寫 `weight` 嘅動作用 `MONKEY_DEFAULT_WEIGHT`。
+ * 噉樣加新動作嘅人唔使諗權重，而「順手探一探」嗰類要明確寫低。
+ *
+ * ⚠️ 用整數權重同一次 `rnd()`——用浮點數或者抽兩次嘅話，
+ * 同一個 seed 就唔會行同一條路，而「同一個 seed 行同一條路」
+ * 係亂行機可以續跑、可以重現嘅根本。
+ *
+ * @param {Object[]} legal 合法動作
+ * @param {Function} rnd 亂數
+ * @returns {Object} 揀中嗰個動作
+ */
+function monkeyPickWeighted_(legal, rnd) {
+  let total = 0;
+  legal.forEach(function (a) {
+    total += Math.max(1, Number(a.weight) || MONKEY_DEFAULT_WEIGHT);
+  });
+  let hit = Math.floor(rnd() * total);
+  for (let i = 0; i < legal.length; i++) {
+    hit -= Math.max(1, Number(legal[i].weight) || MONKEY_DEFAULT_WEIGHT);
+    if (hit < 0) return legal[i];
+  }
+  return legal[legal.length - 1];
+}
+
+/**
+ * 系統狀態嘅指紋——防打轉閘用。
+ *
+ * ⚠️ 三樣嘢：Stage、最新版本號、認唔出嘅格數。
+ * 呢三樣都冇郁過，就代表嗰一步實際上乜都冇推進。
+ *
+ * ⚠️ **唔包 `gridChangeCount`。** 包咗嘅話，一部一路寫更多
+ * 「亂行N」嘅機器每一步個數都會加一，於是指紋每步都唔同，
+ * 而防打轉閘就永遠唔會 fire——即係今輪個 bug 原封不動。
+ *
+ * @param {Object} facts `monkeyReadFacts_()` 嘅結果
+ * @returns {string}
+ */
+function monkeyStateFingerprint_(facts) {
+  if (!facts) return '（讀不到）';
+  return [facts.stage, facts.latestVersionNo,
+    Number(facts.unresolvedCount || 0)].join('|');
+}
+
+/**
  * 讀當前狀態，畀 `legal()` 用。**純讀取。**
  *
  * @param {string} quarterId 季度 ID
@@ -334,6 +519,8 @@ function monkeyReadFacts_(quarterId) {
     latestVersionNo: versionNo,
     stage: state.stage,
     gridChangeCount: (state.unsaved || {}).gridChangeCount || 0,
+    // 第六十輪批次：防打轉閘同「改 grid」嗰個 expect 都要用。
+    unresolvedCount: (state.unsaved || {}).unresolvedCount || 0,
     buttons: state.buttons || {}
   };
 }
@@ -372,6 +559,10 @@ function runMonkey_(steps, seed, skipDraws) {
   const stepLog = [];
   const failures = [];
   let stoppedForTime = false;
+  // 第六十輪批次 A3 組：防打轉閘。
+  let lastFingerprint = '';
+  let sameFingerprintRun = 0;
+  let spinning = null;
   const total = Math.max(1, Math.min(MONKEY_MAX_STEPS, Number(steps) || 50));
 
   for (let i = 1; i <= total; i++) {
@@ -410,9 +601,12 @@ function runMonkey_(steps, seed, skipDraws) {
       break;
     }
 
-    const picked = legal[Math.floor(rnd() * legal.length)];
+    const picked = monkeyPickWeighted_(legal, rnd);
     let outcome = '';
     let threw = '';
+    // ⚠️ 喺迴圈嗰層宣告，唔可以留喺下面個 `try` 入面——
+    // 下面防打轉嗰段喺 `try` 之後先用到佢。
+    let after = null;
     try {
       const result = picked.run(quarterId, rnd);
       outcome = JSON.stringify(result).slice(0, 300);
@@ -423,7 +617,6 @@ function runMonkey_(steps, seed, skipDraws) {
       // `JSON.stringify` 落 `MonkeyLog`——冇人睇。
       // 一個唔拋錯、但係靜靜噉乜都冇做嘅入口，會一路行到 50 步，
       // 然後交一份綠色報告。
-      let after = null;
       try {
         after = monkeyReadFacts_(quarterId);
       } catch (err) {
@@ -450,6 +643,49 @@ function runMonkey_(steps, seed, skipDraws) {
       });
     }
     path.push(picked.id);
+
+    // ═══════════════════════════════════════════════════════════════
+    // ⚠️⚠️ 第六十輪批次 A3 組：**原地打轉要自己爬得出嚟。**
+    // ═══════════════════════════════════════════════════════════════
+    //
+    // 現場：亂行機喺沙盒 2028T3 上面一路寫「亂行N」，
+    // 而寫完之後系統乜都唔准做 ⇒ 每一步只剩「改 grid」合法 ⇒
+    // 一路寫更多。Stage 停喺 OFFICIAL_SENT 一路冇變過，
+    // 50 步跑完，零動作成功過，而報告一句都冇講。
+    //
+    // ⚠️ 呢一道係**通用防護**，唔止為咗今次呢一個 bug。
+    // 亂行機嘅本質就係會撞到冇人諗過嘅狀態——佢一定要有
+    // 自己爬得出嚟嘅能力，否則佢每一次撞到新坑都要人手救。
+    //
+    // 判斷：連續 `MONKEY_SPIN_LIMIT` 步揀中**同一個動作 id**，
+    // 而且系統狀態指紋**完全冇變**。
+    const fingerprint = picked.id + '　' + monkeyStateFingerprint_(after || facts);
+    if (fingerprint === lastFingerprint) {
+      sameFingerprintRun++;
+    } else {
+      sameFingerprintRun = 1;
+      lastFingerprint = fingerprint;
+    }
+    if (sameFingerprintRun >= MONKEY_SPIN_LIMIT) {
+      spinning = {
+        actionId: picked.id,
+        steps: sameFingerprintRun,
+        state: monkeyStateFingerprint_(after || facts)
+      };
+      failures.push({
+        step: i, kind: '偵測到原地打轉，已停止',
+        detail: '連續 ' + sameFingerprintRun + ' 步都選中「' + picked.id
+          + '」，而且 Stage／最新版本號／認不出的格數完全沒有變過（'
+          + monkeyStateFingerprint_(after || facts) + '）。'
+          + '再跑下去只會重複同一步。',
+        path: path.slice()
+      });
+      stepLog.push({
+        step: i, action: picked.id, outcome: outcome,
+        invariant: '（原地打轉，已停止）', threw: threw
+      });
+      break;
+    }
 
     // ── 每一步跑一次全部不變量 ──────────────────────────────────
     let invariantText = '';
@@ -485,6 +721,8 @@ function runMonkey_(steps, seed, skipDraws) {
     requestedSteps: total,
     ranSteps: stepLog.length,
     stoppedForTime: stoppedForTime,
+    // 第六十輪批次 A3 組：有嘅話，報告要大聲講。
+    spinning: spinning,
     steps: stepLog,
     failures: failures,
     path: path,
@@ -516,6 +754,22 @@ function describeMonkeyReport_(report) {
     '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）',
     ''
   ];
+
+  // ── 第六十輪批次 A3 組：原地打轉要排喺最頂，大聲講。 ─────────
+  //
+  // ⚠️ 排喺失敗清單前面——佢係「點解跑到一半就停」嘅答案，
+  // 唔應該混喺一堆逐步失敗入面等人自己揾。
+  if (report.spinning) {
+    lines.push('⛔ 偵測到原地打轉，已停止。');
+    lines.push('　 連續 ' + report.spinning.steps + ' 步都選中「'
+      + report.spinning.actionId + '」，'
+      + '而 Stage／最新版本號／認不出的格數完全沒有變過。');
+    lines.push('　 停下來時的狀態：' + report.spinning.state
+      + '（Stage｜最新版本號｜認不出的格數）');
+    lines.push('　 完整重現路徑：' + (report.path.join(' → ') || '（第一步）'));
+    lines.push('　 用同一個種子（' + report.seed + '）重跑會走同一條路。');
+    lines.push('');
+  }
 
   if (report.failures.length === 0) {
     lines.push('沒有一步令不變量失敗。');

@@ -55,6 +55,13 @@
 # docs/幹事操作說明.md 不受影響，繼續公開（內容全部用虛構例子，已驗證乾淨）。
 /docs/開發歷程.md
 
+# docs/十月回來看這一份.md：Ivan 停工前寫給自己的接力筆記。
+# 2026-08-24 發現它被 `git add -A` 順手加進 index（還未 commit），
+# 而內文有真實 Script ID、真實 Spreadsheet ID、真實電郵地址。
+# 這個 repo 是公開的，所以跟 HANDOFF.md 同一類處理：不公開。
+# （它仍然留在 Ivan 那部機，只是不進 git。）
+/docs/十月回來看這一份.md
+
 # .claude/：Claude Code 的本機專案設定（權限白名單等個人化設定），
 # 屬於本機開發環境設定，不是專案原始碼的一部分，不應該公開。
 /.claude/
