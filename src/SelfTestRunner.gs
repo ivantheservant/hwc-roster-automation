@@ -117,6 +117,37 @@ function readSelfTestQuarterDetail_() {
 }
 
 /**
+ * 第五十九輪批次 A1 組：**呢一季真係寄咗幾多封信出去？**
+ *
+ * ⚠️ 只數 `Status = SENT`。`DRY_RUN` 唔算——嗰啲係模擬，冇人收過。
+ *
+ * ⚠️ 讀唔到就回 `-1`（＝「查不到」），**唔可以回 0**。
+ * 「查不到」同「查到係 0」係兩件事，而估錯嗰邊嘅代價係
+ * 一個真季度被自測機清乾淨。呼叫端把 `-1` 當成「唔安全」。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {number} 真實寄出嘅封數；查不到回 -1
+ */
+function countRealSendsForQuarter_(quarterId) {
+  const upper = String(quarterId || '').trim().toUpperCase();
+  if (upper === '') return -1;
+  try {
+    const C = COLUMNS.SEND_LOG;
+    return readSheet(SHEETS.SEND_LOG).filter(function (row) {
+      return String(row[C.QUARTER_ID] || '').trim().toUpperCase() === upper
+        && String(row[C.STATUS] || '').trim().toUpperCase() === MAIL_STATUS.SENT;
+    }).length;
+  } catch (err) {
+    // ⚠️ 冇 SendLog 呢張表都會行到呢度。但呢一段只喺
+    // 「Stage 已經係 OFFICIAL_SENT」嗰個前提下先叫——
+    // 一個寄過信嘅季度冇 SendLog，本身就已經係一個要停低嘅狀況。
+    log_('WARN', '讀不到 SendLog，不能確認 ' + quarterId
+      + ' 有沒有真的寄過信：' + err.message);
+    return -1;
+  }
+}
+
+/**
  * 開跑之前逐條閘。**任何一條唔過就唔准跑。**
  *
  * ⚠️ 呢幾條閘唔係形式主義。自測機會**真嘅生成版本、真嘅走寄送流程、
@@ -167,9 +198,61 @@ function checkSelfTestPreconditions_(quarterId) {
     stage = '';
   }
   if (stage === QUARTER_STAGE.OFFICIAL_SENT) {
-    reasons.push('「' + quarterId + '」的 Stage 已經是 '
-      + QUARTER_STAGE.OFFICIAL_SENT + '。'
-      + '那代表這一季已經正式發出給全體，不是一個沙盒季度。');
+    // ═════════════════════════════════════════════════════════════════
+    // ⚠️⚠️ 第五十九輪批次 A1 組：**自測機把自己鎖死喺門外。**
+    // ═════════════════════════════════════════════════════════════════
+    //
+    // 現場（2026-08-24 19:27）：S09「正式發出」同 S10「改動後重發」
+    // 兩條首次 PASSED——而 S09 做嘅事**就係**把季度推到 OFFICIAL_SENT。
+    // 跟住撳「繼續跑自測」：
+    //
+    //     自測機沒有執行。
+    //     ・「2028T3」的 Stage 已經是 OFFICIAL_SENT。
+    //       那代表這一季已經正式發出給全體，不是一個沙盒季度。
+    //
+    // 於是 S11／S12／S13／S16／S17 五條永遠跑唔到（全部標 NOT_RUN）。
+    //
+    // ⚠️ 呢一道閘嘅原意係啱嘅：唔好喺一個已經正式發出嘅**真**季度
+    // 上面亂跑。但佢用 Stage 做判斷，而沙盒季度嘅 OFFICIAL_SENT
+    // 正正係預期中嘅正常狀態。
+    //
+    // ─────────────────────────────────────────────────────────────────
+    // 兩個條件都要中先放行
+    // ─────────────────────────────────────────────────────────────────
+    //
+    //   一、佢真係 `SELFTEST_QUARTER_ID` 指住嗰一季
+    //   二、**一封真信都冇寄過**（`SendLog` 冇 `SENT`，只有 `DRY_RUN`）
+    //
+    // ⚠️ 第二條唔可以省。呢一支嘅兩個呼叫端都係傳沙盒季度 ID 入嚟，
+    // 所以單靠第一條係一句恆真句——攔唔到任何嘢。
+    //
+    // 而佢要攔嘅係一個真實會發生嘅錯：有人把 `SELFTEST_QUARTER_ID`
+    // 填成一個**真嘅、已經寄咗信嘅**季度（而嗰季又唔喺兩張保護清單上）。
+    // 嗰陣自測機開跑第一件事就係清乾淨——版本、派工、SendLog 全部刪。
+    //
+    // ⚠️ 第二條直接驗呢一道閘自己講嗰句話：「已經正式發出給全體」。
+    // 全部係 `DRY_RUN` 嘅話，冇一個人收過嘢。
+    const sandboxId = String(readSelfTestQuarterDetail_().value || '')
+      .trim().toUpperCase();
+    const realSends = countRealSendsForQuarter_(quarterId);
+    if (upper !== sandboxId) {
+      reasons.push('「' + quarterId + '」的 Stage 已經是 '
+        + QUARTER_STAGE.OFFICIAL_SENT + '，而它不是 '
+        + CONFIG_KEYS.SELFTEST_QUARTER_ID + ' 指著的那一季（' + sandboxId + '）。'
+        + '那代表這一季已經正式發出給全體，不是一個沙盒季度。');
+    } else if (realSends !== 0) {
+      reasons.push('「' + quarterId + '」的 Stage 已經是 '
+        + QUARTER_STAGE.OFFICIAL_SENT + '，而且 SendLog 裡面'
+        + (realSends < 0
+          ? '讀不到（不能確認有沒有真的寄過信）'
+          : '有 ' + realSends + ' 封是真的寄出去的（Status=' + MAIL_STATUS.SENT + '）')
+        + '。'
+        + '這一季不是沙盒——自測機開跑第一件事就是把季度清乾淨，'
+        + '在這一季上面跑會刪掉真實資料。'
+        + '請先確認 ' + CONFIG_KEYS.SELFTEST_QUARTER_ID + ' 填對了。');
+    }
+    // 兩個條件都中 ⇒ 放行。沙盒季度嘅 OFFICIAL_SENT 係 S09 造成嘅，
+    // 而 S09 跑喺 DRY_RUN 之下，一封真信都冇寄過。
   }
 
   // ── 閘 4　真實入口要求 Web UI 開著 ───────────────────────────
@@ -3075,6 +3158,12 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     quarterId: quarterId,
     quarterSource: quarter.source,
     resetSummary: resetSummary,
+    // 第五十九輪批次 A3 組：開跑嗰陣嘅 Stage。
+    // 沙盒季度嘅 OFFICIAL_SENT 係 S09 造成嘅正常狀態，要講一句，
+    // 免得下次又以為壞咗。
+    stageAtStart: (function () {
+      try { return getQuarterStage_(quarterId); } catch (err) { return ''; }
+    })(),
     rerunFailedOnly: !!rerunFailedOnly,
     rerunIds: rerunIds,
     results: results,
@@ -3133,6 +3222,18 @@ function describeSelfTestReport_(report) {
     + skippedCount + ' 跳過　'
     + report.notRunCount + ' 未跑'];
   lines.push('沙盒季度：' + report.quarterId + '　' + report.resetSummary);
+  // ── 第五十九輪批次 A3 組：**Stage 已經係 OFFICIAL_SENT 要講一句。** ──
+  //
+  // ⚠️ 現場：撳「繼續跑自測」被前置閘拒絕，訊息係
+  // 「那代表這一季已經正式發出給全體，不是一個沙盒季度」——
+  // 而佢其實只係 S09 做完嘢之後嘅正常狀態。
+  // 唔講嘅話，下次見到又會以為部機器壞咗。
+  if (report.stageAtStart === QUARTER_STAGE.OFFICIAL_SENT) {
+    lines.push('沙盒季度目前 Stage=' + QUARTER_STAGE.OFFICIAL_SENT
+      + '（S09 造成，正常）。'
+      + '撳「⚠️ 跑自測」重頭跑的話，重設那一步會把它帶回 '
+      + QUARTER_STAGE.DRAFT + '。');
+  }
   if (report.rerunFailedOnly) {
     lines.push('（只重跑紅色情境：'
       + ((report.rerunIds || []).join('、') || '沒有紅色情境可以重跑')

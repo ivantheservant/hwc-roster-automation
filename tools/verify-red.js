@@ -3240,6 +3240,67 @@ const MUTATIONS = [
     replace: '  if (false) {',
     tests: ['tests/selftest_incomplete_status.test.js']
   },
+  // ── 第五十九輪批次：自測機把自己鎖死嗺門外 ────
+  {
+    id: 'gate-locks-self-out',
+    why: '沙盒季度到咗 OFFICIAL_SENT 就拒絕跑'
+      + '——S09 做嘅事**就係**把季度推到嗰度，'
+      + '於是 S11／S12／S13／S16／S17 五條永遠跑唔到',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (upper !== sandboxId) {',
+    replace: '    if (true) {',
+    tests: ['tests/selftest_gate_official_sent.test.js']
+  },
+  {
+    id: 'gate-lets-real-through',
+    why: '不再數 SendLog 裏面有冇真信'
+      + '——兩個呼叫端都係傳沙盒季度 ID 入嘅，'
+      + '所以「係唔係沙盒季度」單獨用嘅話係一句恆真句。'
+      + '拆走嗰條，一個 `SELFTEST_QUARTER_ID` 填錯成真季度嘅'
+      + '情況就會被放行，而自測機開跑第一件事就係清乾淨',
+    file: 'src/SelfTestRunner.gs',
+    find: '    } else if (realSends !== 0) {',
+    replace: '    } else if (false) {',
+    tests: ['tests/selftest_gate_official_sent.test.js']
+  },
+  {
+    id: 'gate-unreadable-ok',
+    why: '讀唔到 SendLog 就當成「冇寄過信」'
+      + '——「查不到」同「查到係 0」係兩件事，'
+      + '而估錯嗰邊嘅代價係一個真季度被清乾淨',
+    file: 'src/SelfTestRunner.gs',
+    find: "      + ' 有沒有真的寄過信：' + err.message);\n    return -1;",
+    replace: "      + ' 有沒有真的寄過信：' + err.message);\n    return 0;",
+    tests: ['tests/selftest_gate_official_sent.test.js']
+  },
+  {
+    id: 'gate-counts-dryrun',
+    why: '數 SendLog 嗰陣連 `DRY_RUN` 都數入去'
+      + '——嗰部機器一定嗺 DRY_RUN 之下跑，'
+      + '數埋嘅話沙盒季度永遠被攛住',
+    file: 'src/SelfTestRunner.gs',
+    find: "        && String(row[C.STATUS] || '').trim().toUpperCase() === MAIL_STATUS.SENT;",
+    replace: '        && true;',
+    tests: ['tests/selftest_gate_official_sent.test.js']
+  },
+  {
+    id: 'gate-counts-all-quarters',
+    why: '數 SendLog 嗰陣唔分季度'
+      + '——第二季寄過信就會連沙盒季度一齊攛住',
+    file: 'src/SelfTestRunner.gs',
+    find: "      return String(row[C.QUARTER_ID] || '').trim().toUpperCase() === upper",
+    replace: '      return true',
+    tests: ['tests/selftest_gate_official_sent.test.js']
+  },
+  {
+    id: 'gate-a3-line-gone',
+    why: '報告開頭唔講「Stage=OFFICIAL_SENT（S09 造成，正常）」'
+      + '——下次見到嗰個 Stage 又會以為部機器壞咗',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (report.stageAtStart === QUARTER_STAGE.OFFICIAL_SENT) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_gate_official_sent.test.js']
+  },
 ];
 
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。
