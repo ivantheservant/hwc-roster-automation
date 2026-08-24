@@ -2026,9 +2026,11 @@ const MUTATIONS = [
     why: '「只重跑紅色情境」連通過咗嗰啲都清走'
       + '——噉就同「由頭再跑一次」冇分別，而時間預算又會爆',
     file: 'src/SelfTestRunner.gs',
-    find: '    if (status === SELFTEST_STATUS.FAILED || status === SELFTEST_STATUS.ERROR' + '\n'
-      + '        || status === SELFTEST_STATUS.BLOCKED) {',
-    replace: '    if (true) {',
+    // ⚠️ 唔要搵那個多行條件——中間夾住註釋，而只接一半
+    // 會留下一個懸空嘅 `|| …`，嗰樣係語法錯而唔係回歸。
+    // 搵住「留綠色嗰一句」就精準得多。
+    find: '    kept[id] = state[id];',
+    replace: '    clearedIds.push(id);',
     tests: ['tests/selftest_resume_deadlock.test.js']
   },
   {
@@ -2267,8 +2269,8 @@ const MUTATIONS = [
       + '——修好上游之後，被擋住嗰幾條仍然唔會跑，'
       + '而嗰幾條先係整件事嘅重點',
     file: 'src/SelfTestRunner.gs',
-    find: '        || status === SELFTEST_STATUS.BLOCKED) {',
-    replace: '        || (false && status === SELFTEST_STATUS.BLOCKED)) {',
+    find: '        || status === SELFTEST_STATUS.BLOCKED',
+    replace: '        || (false && status === SELFTEST_STATUS.BLOCKED)',
     tests: ['tests/selftest_mainflow.test.js']
   },
   {
@@ -3145,6 +3147,98 @@ const MUTATIONS = [
     find: '  const changedIds = (plan.changed || []).map(function (c) { return c.personId; });',
     replace: '  const changedIds = (plan.changedList || []).map(function (c) { return c.personId; });',
     tests: ['tests/selftest_reads_real_api_fields.test.js']
+  },
+  // ── 第五十八輪批次：S08 未做完唔可以報綠 ──────
+  {
+    id: 'inc-settled',
+    why: '把 `INCOMPLETE` 加落 `settled` 清單'
+      + '——續跑會永遠跳過 S08，PDF 永遠補唔齊，'
+      + 'S09 永遠被擋。即係第五十輪嗰種死鎖翻生',
+    file: 'src/SelfTestRunner.gs',
+    find: '      || previous.status === SELFTEST_STATUS.SKIPPED);',
+    replace: '      || previous.status === SELFTEST_STATUS.SKIPPED\n'
+      + '      || previous.status === SELFTEST_STATUS.INCOMPLETE);',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-s08-accepts',
+    why: 'S08 又接受「未做完」為合格'
+      + '——做咗 7 份就報綠收工，而 S09 會 ERROR：'
+      + '「缺個人 PDF 的人數是 51 / 58（87.9%）」',
+    file: 'src/SelfTestRunner.gs',
+    find: "  if (!(done && done.done === true)) {",
+    replace: '  if (false) {',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-s08-cap',
+    why: '把 `rounds` 硬上限加回'
+      + '——58 份分批做，20 批唔一定夠',
+    file: 'src/SelfTestRunner.gs',
+    find: '  while (true) {',
+    replace: '  while (rounds < 20) {',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-s08-stall',
+    why: '拆走「一批都冇前進就停手」道門'
+      + '——一個永遠唔 done 又永遠唔前進嘅批次入口'
+      + '會食光成個時間預算，然後報 INCOMPLETE，'
+      + '而下一次續跑一樣。嗬個係死循環，唔係進度',
+    file: 'src/SelfTestRunner.gs',
+    find: '    if (nowCount <= lastCount) { stalledAt = nowCount; break; }',
+    replace: '    if (false) { stalledAt = nowCount; break; }',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-block-skip',
+    why: '上游 `INCOMPLETE` 唔擋住下游'
+      + '——S09 會嗺一個 PDF 未產齊嘅現場下硬跑，'
+      + '然後把一個啱嘅攛截記成佢自己嘅紅',
+    file: 'src/SelfTestRunner.gs',
+    find: '        || r.status === SELFTEST_STATUS.INCOMPLETE);',
+    replace: '        || false);',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-block-same-note',
+    why: '上游未做完同上游紅咗用同一句註記'
+      + '——講成「修好上游」嘅話，Ivan 會去搵一個'
+      + '唔存在嘅 bug，而佢真正要做嘅只係再搳一次續跑',
+    file: 'src/SelfTestRunner.gs',
+    find: '        note: incompleteUp.length > 0',
+    replace: '        note: false',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-not-cleared',
+    why: '「只重跑紅色情境」唔清走 `INCOMPLETE`'
+      + '——修完碼之後佢唔會重跑，'
+      + '而佢正正就係要接住做嗰條',
+    file: 'src/SelfTestRunner.gs',
+    find: '        || status === SELFTEST_STATUS.INCOMPLETE) {',
+    replace: '        || false) {',
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-summary-hides',
+    why: '摘要行唔數「未完成」'
+      + '——一份「2 綠 0 紅」嘅報告睇落情況良好，'
+      + '而實際上有一條未做完、一條被佢擋住',
+    file: 'src/SelfTestRunner.gs',
+    find: "    + incompleteCount + ' 未完成　'",
+    replace: "    + ''",
+    tests: ['tests/selftest_incomplete_status.test.js']
+  },
+  {
+    id: 'inc-nextstep-gone',
+    why: '尾句唔印「還有 N 條未做完」'
+      + '——Ivan 會照住後面嘸句搳「只重跑紅色情境」，'
+      + '而嗰粒會把 INCOMPLETE 清走再由頭產一次 58 份',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (incompleteCount > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/selftest_incomplete_status.test.js']
   },
 ];
 

@@ -76,7 +76,27 @@ const SELFTEST_STATUS = {
   // 唔係紅。S01 驗嘅係「季度啱啱清乾淨嗰陣 dashboard 講咩」，
   // 而喺一個已經有 v0 嘅季度上面跑佢，三條斷言一定紅——
   // 而嗰三條紅**全部係自測機自己嘅問題，唔係系統嘅問題**。
-  SKIPPED: 'SKIPPED'
+  SKIPPED: 'SKIPPED',
+  // ⚠️⚠️ 第五十八輪批次 A1 組：**「跑過，有進度，但未做完。」**
+  //
+  // 現場（2026-08-24）：S08 分批產 58 份個人 PDF，做咗 7 份就報綠收工，
+  // 把缺件丟畀下游。S09 於是 ERROR：
+  //
+  //     步驟 4：正式發出——因為個人 PDF 缺件太多而中止。
+  //     缺個人 PDF 的人數是 51 / 58（87.9%），超過容許上限 20%。
+  //
+  // 系統攔得完全正確。錯嘅係 S08 把「未做完」當成合格。
+  //
+  // ⚠️⚠️ **一定要新開一個狀態，唔可以用 `FAILED`。**
+  //
+  // 下面 `settled` 嗰個判斷把 `FAILED` 當成「已經有結論」而跳過。
+  // 用 `FAILED` 嘅話，續跑會永遠跳過 S08，PDF 永遠補唔齊——
+  // 即係第五十輪嗰種死鎖翻生。
+  //
+  // ⇒ `settled` 嘅清單**唔可以**包含 `INCOMPLETE`。有一條測試守住。
+  //
+  // ⚠️ `INCOMPLETE` 唔等於通過。報告摘要要獨立數出嚟。
+  INCOMPLETE: 'INCOMPLETE'
 };
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -227,6 +247,25 @@ function selfTestCollector_(scenarioId) {
       return {
         id: scenarioId, status: SELFTEST_STATUS.SKIPPED,
         checks: checks, failedChecks: [], note: note
+      };
+    },
+    /**
+     * 第五十八輪批次 A2 組：**跑過，有進度，但未做完。**
+     *
+     * ⚠️ 已經紅咗嘅斷言**優先**：有斷言紅就照報 `FAILED`。
+     * 一條「有真問題 ＋ 順便未做完」嘅情境報成 `INCOMPLETE`，
+     * 就會令嗰個真問題被一句「下次接住做」蓋住。
+     *
+     * @param {string} note 要喺報告講嘅一句（要講得出仲差幾多）
+     * @returns {Object} 冇斷言紅就 `INCOMPLETE`，有就 `FAILED`
+     */
+    incomplete: function (note) {
+      const failed = checks.filter(function (c) { return !c.ok; });
+      return {
+        id: scenarioId,
+        status: failed.length === 0
+          ? SELFTEST_STATUS.INCOMPLETE : SELFTEST_STATUS.FAILED,
+        checks: checks, failedChecks: failed, note: note
       };
     }
   };
@@ -1427,24 +1466,86 @@ function selfTestS08_(quarterId) {
   const t = selfTestCollector_('S08');
   const versionNo = findLatestVersionNo(quarterId);
 
-  // ⚠️ 分批。一次執行做唔晒 59 份——既有嘅批次入口本來就係為咗呢件事。
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第五十八輪批次 A2 組：**做唔完唔可以報綠。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 舊寫法嘅第二條斷言係：
+  //
+  //     done.done === true || Number(done.totalPeople) > Number(done.doneCount)
+  //
+  // 即係「做完」同「未做完」兩樣都收貨。於是做咗 7 份就報綠收工，
+  // 而缺件問題丟畀下游 S09 撞——S09 ERROR，S10／S11 連環被擋住。
+  //
+  // ⚠️ Ivan 嘅決定：**必須真嘅做完 58 份先算綠。**
+  // 做唔完就乾淨停低、報 `INCOMPLETE`，下一次「繼續跑自測」接住做。
+  // 呢個忠實反映真實情況——幹事真實使用時一樣要撳幾次先產得完。
+  //
+  // ⚠️ 停機條件係 `done === true` 或者時間到，**唔再有 `rounds < 20`
+  // 嗰個硬上限**（58 份分批做，20 批唔一定夠）。
   let done = null;
   let rounds = 0;
-  while (rounds < 20) {
+  let stalledAt = -1;
+  let lastCount = -1;
+  while (true) {
     done = selfTestCall_('S08', 'apiGeneratePersonalPdfBatch',
       function () { return apiGeneratePersonalPdfBatch(quarterId, versionNo); });
     rounds++;
     if (done && done.done) break;
+
+    // ⚠️ **一批都冇前進 ⇒ 停手。**
+    //
+    // 冇呢一道，一個「永遠唔會 `done`、又永遠唔前進」嘅批次入口
+    // 會食光成個時間預算，然後報 `INCOMPLETE`——而下一次續跑
+    // 一樣食光，一樣報 `INCOMPLETE`。嗰個係死循環，唔係進度。
+    const nowCount = Number((done || {}).doneCount || 0);
+    if (nowCount <= lastCount) { stalledAt = nowCount; break; }
+    lastCount = nowCount;
+
     if (selfTestOutOfTime_()) break;
   }
+
+  const doneCount = Number((done || {}).doneCount || 0);
+  const totalPeople = Number((done || {}).totalPeople || 0);
+  const remaining = Math.max(0, totalPeople - doneCount);
+  const progress = '已產生 ' + doneCount + ' / ' + totalPeople + ' 份';
+
+  // ⚠️ 逐批嘅回傳 `selfTestCall_()` 已經錄咗。呢一句係**最終數字**——
+  // 唔記嘅話，下一輪落手查嗰個要自己由 N 批回傳裡面拼返出嚟。
+  selfTestRecordPayload_('S08', 'S08 總結', {
+    done: !!(done && done.done), doneCount: doneCount,
+    totalPeople: totalPeople, remaining: remaining,
+    rounds: rounds, stalledAt: stalledAt
+  });
+
   t.expect('個人 PDF 有真的產生出來',
-    !!done && Number(done.doneCount || 0) > 0, '> 0 份',
-    JSON.stringify(done), 'apiGeneratePersonalPdfBatch()');
-  // ⚠️ 做唔晒**唔可以**報成完成。
-  t.expect('批次要嘛做完，要嘛明確講還有幾多份未做',
-    !!done && (done.done === true || Number(done.totalPeople || 0) > Number(done.doneCount || 0)),
-    'done=true 或者講得出還差多少', JSON.stringify(done),
-    '跑了 ' + rounds + ' 批');
+    doneCount > 0, '> 0 份', progress,
+    'apiGeneratePersonalPdfBatch()　跑了 ' + rounds + ' 批');
+
+  if (stalledAt >= 0) {
+    // 一批都冇前進 ⇒ 呢個係真問題，唔係「未做完」。
+    t.expect('每一批都要有進度', false,
+      '每一批 doneCount 都要增加',
+      '第 ' + rounds + ' 批之後仍然是 ' + stalledAt + ' 份',
+      '批次入口叫得到但一份都沒有多產生。'
+        + '這不是「還沒做完」，是它不會再前進——'
+        + '再撳「繼續跑自測」也不會有分別。');
+    return t.result();
+  }
+
+  if (!(done && done.done === true)) {
+    // ⚠️ **未做完 ⇒ `INCOMPLETE`，唔係綠、亦唔係紅。**
+    return t.incomplete('（未做完）' + progress + '，還差 ' + remaining + ' 份。'
+      + '撳「測試工具 ▸ ▶️ 繼續跑自測」接住做。'
+      + '　⚠️ 補齊之前 S09「正式發出」會被系統攔住'
+      + '（缺個人 PDF 超過 20% 就中止），那是正確的攔截。');
+  }
+
+  t.equal('批次做完了（done = true）'
+    + '——做不完就報 INCOMPLETE，不可以報綠：'
+    + '第五十八輪之前做了 7 份就收工，缺件丟給下游 S09 撞',
+    done.done, true, progress + '，跑了 ' + rounds + ' 批');
+  t.equal('而且一份都不差', remaining, 0, progress);
   return t.result();
 }
 
@@ -2470,7 +2571,10 @@ function clearFailedSelfTestState_(state) {
     // 唔清嘅話，修好上游之後，被擋住嗰幾條仍然唔會跑——
     // 而嗰幾條先係整件事嘅重點。
     if (status === SELFTEST_STATUS.FAILED || status === SELFTEST_STATUS.ERROR
-        || status === SELFTEST_STATUS.BLOCKED) {
+        || status === SELFTEST_STATUS.BLOCKED
+        // ⚠️ 第五十八輪批次 A5 組：`INCOMPLETE` 一樣要清走。
+        // 唔清嘅話，修完碼之後佢唔會重跑，而佢正正就係要接住做嗰條。
+        || status === SELFTEST_STATUS.INCOMPLETE) {
       clearedIds.push(id);
       return;
     }
@@ -2697,6 +2801,11 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       || previous.status === SELFTEST_STATUS.ERROR
       // 「跳過」都算有結論——續跑再跑一次一樣會跳過。
       || previous.status === SELFTEST_STATUS.SKIPPED);
+    // ⚠️⚠️ 第五十八輪批次 A1 組：**`INCOMPLETE` 唔可以加落上面。**
+    //
+    // 佢嘅意思正正就係「下一次續跑要由佢接住再做」。當成「已經有結論」
+    // 而跳過嘅話，S08 永遠補唔齊 58 份 PDF，S09 永遠被擋——
+    // 即係第五十輪嗰種死鎖翻生。有一條測試守住呢一點。
     if (resume && settled) {
       byId[scenario.id] = previous;
       results.push({
@@ -2729,14 +2838,28 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       const r = byId[dep];
       return r && (r.status === SELFTEST_STATUS.FAILED
         || r.status === SELFTEST_STATUS.ERROR
-        || r.status === SELFTEST_STATUS.BLOCKED);
+        || r.status === SELFTEST_STATUS.BLOCKED
+        // ⚠️ 第五十八輪批次 A3 組：上游**未做完**一樣要擋住。
+        // S09 喺 S08 未產齊個人 PDF 之下跑，系統會攔住佢——
+        // 而嗰個攔截係啱嘅，唔應該被記成 S09 自己嘅紅。
+        || r.status === SELFTEST_STATUS.INCOMPLETE);
     });
     if (blockedBy.length > 0) {
+      // ⚠️ 「上游未做完」同「上游紅咗」要講得唔同。
+      // 講成「修好上游」嘅話，Ivan 會去搵一個唔存在嘅 bug——
+      // 而佢真正要做嘅只係再撳一次「繼續跑自測」。
+      const incompleteUp = blockedBy.filter(function (dep) {
+        return byId[dep] && byId[dep].status === SELFTEST_STATUS.INCOMPLETE;
+      });
       const outcome = {
         id: scenario.id, title: scenario.title,
         status: SELFTEST_STATUS.BLOCKED, checks: [], failedChecks: [],
-        note: '（被 ' + blockedBy.join('、') + ' 擋住，沒有跑。'
-          + '修好上游之後撳「▶️ 只重跑紅色情境」就會跑。）'
+        note: incompleteUp.length > 0
+          ? '（被 ' + incompleteUp.join('、') + ' 擋住，沒有跑。'
+            + '⚠️ 上游是「未做完」，不是失敗——'
+            + '撳「▶️ 繼續跑自測」讓它接住做完，這一條就會跑。）'
+          : '（被 ' + blockedBy.join('、') + ' 擋住，沒有跑。'
+            + '修好上游之後撳「▶️ 只重跑紅色情境」就會跑。）'
       };
       results.push(outcome);
       byId[scenario.id] = outcome;
@@ -2903,7 +3026,10 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       // ⚠️ `SKIPPED` 唔可以報成「0 條斷言失敗」——嗰句睇落似通過。
       summary: outcome.status === SELFTEST_STATUS.PASSED ? '通過'
         : (outcome.status === SELFTEST_STATUS.SKIPPED ? '跳過'
-          : (outcome.error || ((outcome.failedChecks || []).length + ' 條斷言失敗'))),
+          // ⚠️ `INCOMPLETE` 報成「0 條斷言失敗」嘅話睇落似通過。
+          : (outcome.status === SELFTEST_STATUS.INCOMPLETE
+            ? String(outcome.note || '未做完')
+            : (outcome.error || ((outcome.failedChecks || []).length + ' 條斷言失敗')))),
       // 第五十輪批次 A1 組：跳過嗰陣要拎得返上一次嘅證據。
       failedChecks: outcome.failedChecks || [],
       invariantDetail: outcome.invariantDetail || [],
@@ -2964,7 +3090,11 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     passedCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.PASSED; }).length,
     failedCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.FAILED; }).length,
     errorCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.ERROR; }).length,
-    notRunCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.NOT_RUN; }).length
+    notRunCount: results.filter(function (r) { return r.status === SELFTEST_STATUS.NOT_RUN; }).length,
+    // 第五十八輪批次 A4 組：`INCOMPLETE` 要獨立數。
+    incompleteCount: results.filter(function (r) {
+      return r.status === SELFTEST_STATUS.INCOMPLETE;
+    }).length
   };
 }
 
@@ -2988,6 +3118,9 @@ function describeSelfTestReport_(report) {
   };
   const skippedCount = countBy(SELFTEST_STATUS.SKIPPED);
   const blockedCount = countBy(SELFTEST_STATUS.BLOCKED);
+  // ⚠️ 第五十八輪批次 A4 組：`INCOMPLETE` 唔等於通過，
+  // 摘要唔可以只數綠紅令人以為情況良好。
+  const incompleteCount = countBy(SELFTEST_STATUS.INCOMPLETE);
   // ⚠️ 第五十一輪批次 D2 組：**「被擋住」要獨立數出嚟。**
   //
   // `BLOCKED` 唔等於通過。只數綠同紅嘅話，一份「6 綠 2 紅」嘅報告
@@ -2995,6 +3128,7 @@ function describeSelfTestReport_(report) {
   const lines = ['自測機：' + report.results.length + ' 個情境　'
     + report.passedCount + ' 綠　'
     + (report.failedCount + report.errorCount) + ' 紅　'
+    + incompleteCount + ' 未完成　'
     + blockedCount + ' 被擋住　'
     + skippedCount + ' 跳過　'
     + report.notRunCount + ' 未跑'];
@@ -3078,6 +3212,10 @@ function describeSelfTestReport_(report) {
   const blocked = report.results.filter(function (r) {
     return r.status === SELFTEST_STATUS.BLOCKED;
   });
+  // 第五十八輪批次 A4 組：未做完嗰批自己一節。
+  const incomplete = report.results.filter(function (r) {
+    return r.status === SELFTEST_STATUS.INCOMPLETE;
+  });
   const others = report.results.filter(function (r) {
     return r.status === SELFTEST_STATUS.SKIPPED || r.status === SELFTEST_STATUS.NOT_RUN;
   });
@@ -3086,6 +3224,14 @@ function describeSelfTestReport_(report) {
     lines.push('🔴 真正失敗（' + real.length + ' 條）');
     lines.push('');
     real.forEach(function (r) { printOne(r, '🔴'); });
+  }
+  if (incomplete.length > 0) {
+    // ⚠️ 排喺「被擋住」**前面**——被擋住嗰幾條通常就係佢擋住嘅，
+    // 先睇到根因，後面嗰批就唔使逐條查。
+    lines.push('⏳ 未做完（' + incomplete.length + ' 條，'
+      + '撳「▶️ 繼續跑自測」接住做）');
+    lines.push('');
+    incomplete.forEach(function (r) { printOne(r, '⏳'); });
   }
   if (blocked.length > 0) {
     // ⚠️ 分開一節，而且講明「修好上游就會重跑」——
@@ -3132,6 +3278,20 @@ function describeSelfTestReport_(report) {
   // 現場：Ivan 就是照着那一句撳了三次，三次報告一模一樣。
   // 一句寫錯的指示，代價是實實在在的——他白撳了三次。
   lines.push('━━━ 下一步 ━━━');
+  // ── 第五十八輪批次 A4 組：**有未做完嗰批 ⇒ 固定印呢一句。** ────
+  //
+  // ⚠️ 排喺最前，而且明講「唔係只重跑紅色情境」——
+  // 「只重跑紅色情境」會把 `INCOMPLETE` 清走再由頭跑嗰一條，
+  // 而 S08 要嘅係**接住做**，唔係由頭再產一次。
+  if (incompleteCount > 0) {
+    lines.push('還有 ' + incompleteCount + ' 條未做完 ⇒ '
+      + '撳「▶️ 繼續跑自測」接住做（不是「只重跑紅色情境」）');
+    if (report.notRunCount > 0) {
+      lines.push('（另外還有 ' + report.notRunCount + ' 個情境沒有跑，'
+        + '同一粒掣一齊接住。）');
+    }
+    return lines;
+  }
   if (report.notRunCount > 0) {
     lines.push('還有 ' + report.notRunCount + ' 個情境沒有跑。');
     lines.push('撳「測試工具 ▸ ▶️ 繼續跑自測」由停下來的地方接住。');
