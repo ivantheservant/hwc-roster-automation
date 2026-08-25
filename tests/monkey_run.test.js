@@ -92,7 +92,12 @@ console.log('\n=== 二【核心】續跑要真係接得返 ===');
   check('★★★★★★ `runMonkey_()` 會把抽數回埋出嚟畀續跑用',
     /drawnCount: rnd\.drawnCount\(\)/.test(CODE), '');
   check('★★★★★★ 而且續跑入口真係用返上一次嘅抽數',
-    /runMonkey_\(steps, state\.seed, state\.drawnCount\)/.test(CODE), '');
+    /runMonkey_\(steps, state\.seed, state\.drawnCount, /.test(CODE), '');
+  // 第六十二輪批次 B1 組：累計步數都要傳落去，否則每批步號由 1 開始，
+  // 而報告嗰句「跑了 N / 50 步」永遠去唔到 50。
+  check('★★★★★★ **而且傳埋累計步數落去**',
+    /runMonkey_\(steps, state\.seed, state\.drawnCount, state\.totalSteps\)/
+      .test(CODE), '');
   check('★★★★★ 第一次跑完都要寫低狀態，否則第一次之後就續唔到',
     /writeMonkeyLog_\(report\);\s*\n\s*writeMonkeyState_\(report\);/.test(CODE), '');
 }
@@ -126,7 +131,7 @@ console.log('\n=== 三【核心】五樣絕對唔准做嘅嘢 ===');
     /MONKEY_DRY_RUN_RECHECK_EVERY/.test(CODE)
       && /getConfig\(CONFIG_KEYS\.DRY_RUN, true\) !== true/.test(CODE), '');
   check('★★★★★★ 而且一發現就即刻 `break`，唔係記一筆繼續行',
-    /DRY_RUN 已經不是 TRUE。已立刻停手。[\s\S]{0,200}break;/.test(SRC), '');
+    /DRY_RUN 已經不是 TRUE。'[\s\S]{0,400}break;/.test(SRC), '');
 
   check('★★★★★ 開跑之前行同一套閘（同自測機共用）',
     /checkSelfTestPreconditions_\(quarterId\)/.test(CODE), '');

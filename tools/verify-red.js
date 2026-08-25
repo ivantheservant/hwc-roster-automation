@@ -1851,8 +1851,8 @@ const MUTATIONS = [
       + '——一個 `legal` 講得通而執行起上嚟拋錯嘅動作，'
       + '就係「畫面話得而系統話唔得」，嗰個本身就係一個發現',
     file: 'src/MonkeyRun.gs',
-    find: "        step: i, kind: '合法動作拋錯',",
-    replace: "        step: i, kind: '（略過）',",
+    find: "        step: absStep, kind: '合法動作拋錯',",
+    replace: "        step: absStep, kind: '（略過）',",
     tests: ['tests/monkey_run.test.js']
   },
   {
@@ -3356,8 +3356,10 @@ const MUTATIONS = [
     why: '偵測到打轉之後靜靜停低，唔記成失敗'
       + '——一份「跑咗 5 步、0 項失敗」嘅報告睇落好似冇事',
     file: 'src/MonkeyRun.gs',
-    find: "      failures.push({\n        step: i, kind: '偵測到原地打轉，已停止',",
-    replace: "      [].push({\n        step: i, kind: '偵測到原地打轉，已停止',",
+    find: "      failures.push({\n"
+      + "        step: absStep, kind: '偵測到原地打轉，已停止',",
+    replace: "      [].push({\n"
+      + "        step: absStep, kind: '偵測到原地打轉，已停止',",
     tests: ['tests/monkey_no_spin.test.js']
   },
   {
@@ -3529,9 +3531,9 @@ const MUTATIONS = [
       + '而冇人知道點解得 1 步、亦都重現唔到',
     file: 'src/MonkeyRun.gs',
     find: "      failures.push({\n"
-      + "        step: i, kind: '這個狀態下沒有任何合法動作',",
+      + "        step: absStep, kind: '這個狀態下沒有任何合法動作',",
     replace: "      [].push({\n"
-      + "        step: i, kind: '這個狀態下沒有任何合法動作',",
+      + "        step: absStep, kind: '這個狀態下沒有任何合法動作',",
     tests: ['tests/monkey_speed.test.js']
   },
   {
@@ -3557,8 +3559,8 @@ const MUTATIONS = [
     why: '時間只印一個總數，唔分動作／不變量'
       + '——樽頸喺邊就要靠估',
     file: 'src/MonkeyRun.gs',
-    find: "    + '（動作 ' + sec(report.actionMs) + ' 秒／不變量 '\n"
-      + "    + sec(report.invariantMs) + ' 秒）';",
+    find: "    + '（動作 ' + monkeyFormatDuration_(report.actionMs)\n"
+      + "    + '／不變量 ' + monkeyFormatDuration_(report.invariantMs) + '）';",
     replace: "    + '';",
     tests: ['tests/monkey_speed.test.js']
   },
@@ -3585,19 +3587,243 @@ const MUTATIONS = [
       + '——報告會講「全套跑了 0 次」，而實際跑過；'
       + '一個講錯咗嘅數字比冇數字更差',
     file: 'src/MonkeyRun.gs',
-    find: '        fullSweepCount++;\n        lastFullSweepStep = i;',
-    replace: '        lastFullSweepStep = i;',
+    find: '        fullSweepCount++;\n        lastFullSweepStep = absStep;',
+    replace: '        lastFullSweepStep = absStep;',
     tests: ['tests/monkey_speed.test.js']
+  },
+  // ── 第六十二輪批次 B 組：步數計錯，永遠撳唔到 50/50 ────────────
+  {
+    id: 'mky-state-batch-steps',
+    why: '`MonkeyState` 寫返當前批次嘅步數（唔係累計）'
+      + '——實測 10→32→70 抽數一路加，而步數 2→4→3 跌返落去。'
+      + '報告嗰句「跑了 N / 50 步」用嘅就係佢，'
+      + '所以撳幾多次分子都喺 2–4 之間浮動，永遠去唔到 50',
+    file: 'src/MonkeyRun.gs',
+    find: '  sheet.appendRow([report.seed, report.drawnCount, report.totalSteps,',
+    replace: '  sheet.appendRow([report.seed, report.drawnCount, report.ranSteps,',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-state-no-total',
+    why: '`readMonkeyState_()` 唔讀返累計步數'
+      + '——寫落表冇人讀，就等於冇寫。舊寫法就係噉',
+    file: 'src/MonkeyRun.gs',
+    find: "    totalSteps: pick('累計步數')",
+    replace: '    totalSteps: 0',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-state-by-index',
+    why: '`MonkeyState` 照位置讀唔照欄名'
+      + '——舊表第 3 欄叫「已跑步數」（只計當前批次），'
+      + '照位置讀會把一個批次數當成累計。'
+      + '一個講錯咗嘅數字比冇數字更差',
+    file: 'src/MonkeyRun.gs',
+    find: '    const at = headers.indexOf(name);',
+    replace: '    const at = MONKEY_STATE_HEADERS.indexOf(name);',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-resume-no-prior',
+    why: '續跑唔傳累計步數落 `runMonkey_()`'
+      + '——每批嘅步號都由 1 開始，而累計永遠等於當前批次',
+    file: 'src/MonkeyRun.gs',
+    find: '    report = runMonkey_(steps, state.seed, state.drawnCount, state.totalSteps);',
+    replace: '    report = runMonkey_(steps, state.seed, state.drawnCount);',
+    // ⚠️ 續跑入口喺一個選單函式入面（要 `SpreadsheetApp.getUi()`），
+    // 離線行唔到，所以守佢嗰條斷言喺 monkey_run 嗰邊做原始碼形狀檢查。
+    tests: ['tests/monkey_run.test.js']
+  },
+  {
+    id: 'mky-abs-step-is-batch',
+    why: '步號用返批次序號，唔加上之前跑過嘅'
+      + '——`MonkeyLog` 會出現 1,2,3 之後又 1,2,3，跨批路徑砌唔返',
+    file: 'src/MonkeyRun.gs',
+    find: '    const absStep = priorStepCount + i;',
+    replace: '    const absStep = i;',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-log-clears',
+    why: '`MonkeyLog` 每批覆寫'
+      + '——實測續跑之後成張 log 只剩 3 行，而之前明明跑過 4 步。'
+      + '一份會自己刪走歷史嘅紀錄等於冇紀錄',
+    file: 'src/MonkeyRun.gs',
+    find: '  const freshRun = Number(report.priorSteps || 0) === 0;',
+    replace: '  const freshRun = true;',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-log-no-cap',
+    why: '`MonkeyLog` append 而冇上限'
+      + '——跑得耐就會撐爆張表',
+    file: 'src/MonkeyRun.gs',
+    find: '  if (dataRows > MONKEY_LOG_MAX_ROWS) {',
+    replace: '  if (false) {',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-log-trims-new',
+    why: '剪走嘅係最新嗰幾行，唔係最舊'
+      + '——一跑滿上限就再冇最近嘅紀錄，而最近嗰啲先至係查緊嗰批',
+    file: 'src/MonkeyRun.gs',
+    find: '    sheet.deleteRows(2, dataRows - MONKEY_LOG_MAX_ROWS);',
+    replace: '    sheet.deleteRows(MONKEY_LOG_MAX_ROWS + 2,'
+      + ' dataRows - MONKEY_LOG_MAX_ROWS);',
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-headline-batch',
+    why: '報告第一句用返當前批次嘅步數'
+      + '——就係呢一句令人以為部機器打緊轉。'
+      + '一個會歸零嘅進度計數器比冇計數器更差',
+    file: 'src/MonkeyRun.gs',
+    find: "    '亂行機：累計 ' + report.totalSteps + ' / ' + report.requestedSteps",
+    replace: "    '亂行機：累計 ' + report.ranSteps + ' / ' + report.requestedSteps",
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-no-step-range',
+    why: '「這一批」唔講步號範圍'
+      + '——連續兩批各三步睇落一模一樣，分唔出有冇行前過',
+    file: 'src/MonkeyRun.gs',
+    find: "    ? '（第 ' + report.firstStepNo + ' – ' + report.lastStepNo + ' 步）'",
+    replace: "    ? ''",
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-duration-raw-sec',
+    why: '時間唔轉「X 分 Y 秒」'
+      + '——`252.0 秒` 讀落要自己心算',
+    file: 'src/MonkeyRun.gs',
+    find: "  return Math.floor(total / 60) + ' 分 ' + (total % 60) + ' 秒';",
+    replace: "  return total + ' 秒';",
+    tests: ['tests/monkey_total_steps.test.js']
+  },
+  {
+    id: 'mky-fails-unlabelled',
+    why: '報告唔講明失敗數只計當前批次'
+      + '——一個累計 10 步而今批 0 失敗嘅報告，'
+      + '會被當成「10 步都冇失敗過」',
+    file: 'src/MonkeyRun.gs',
+    find: "      + report.failures.length + ' 項失敗（這一批）',",
+    replace: "      + report.failures.length + ' 項失敗',",
+    tests: ['tests/monkey_total_steps.test.js']
   },
 ];
 
+/**
+ * 第六十二輪批次 A2 組：**比對之前先把 CRLF 正規化成 LF。**
+ *
+ * ⚠️ 呢個 repo 係 `core.autocrlf=true` 而且（第六十二輪之前）冇
+ * `.gitattributes`，所以任何一次 `git checkout` 都會令工作區嘅檔案
+ * 變成 CRLF。而突變表入面有一批**跨行**嘅 `find`，佢哋寫嘅係 `\n`。
+ *
+ * 實測（第六十一輪）：`git checkout -- src/Mailer.gs` 之後，
+ * `sendlog-no-block` 報「喺 src/Mailer.gs 搵到 0 次 find（要求剛好 1 次）」
+ * ——程式一個字都冇改過，而推送閘紅咗。
+ *
+ * ⚠️ **只喺比對同突變嗰陣正規化，還原一律寫返原文。**
+ * 正規化寫入檔案就變成「一個檢查工具順手改咗你成個 repo 嘅行尾」。
+ *
+ * @param {string} text 原文
+ * @returns {string} LF 版本
+ */
+function normalizeEol_(text) {
+  return String(text).replace(/\r\n/g, '\n');
+}
+
 // 開跑之前先記低每個會被改嘅檔案——收工用嚟核對有冇還原乾淨。
+//
+// ⚠️ 記嘅係**原文**（連原本嘅行尾），因為還原要一個字都唔差。
 const ORIGINALS = {};
 MUTATIONS.forEach(function (m) {
   if (!ORIGINALS[m.file]) ORIGINALS[m.file] = fs.readFileSync(path.join(ROOT, m.file), 'utf8');
 });
 
 let fail = 0;
+
+/**
+ * 第六十二輪批次 A1 組：還原失敗嘅現場。
+ *
+ * `null` ＝ 未出過事。
+ */
+let restoreFailure = null;
+
+/* ═════════════════════════════════════════════════════════════════════
+ * ⚠️⚠️ 第六十二輪批次 A1 組：**收尾檢查要無論點死都跑到。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 現場（第六十一輪實測，兩次）：
+ *
+ *   node:fs:2430
+ *   Error: UNKNOWN: unknown error, open
+ *     'C:\HWC\SynologyDrive\Roster\claudecode\src\Mailer.gs'
+ *       at Object.writeFileSync (node:fs:2430:20)
+ *       at C:\...\tools\verify-red.js:3638:8
+ *
+ * 嗰一下係**還原**嗰個寫入拋錯（Synology 同步鎖住咗個檔）。
+ * 程式就噉死咗，`src/Mailer.gs` 留住突變版本——
+ * 而下面嗰道「src/ 冇殘留」自我檢查**排喺最尾，根本跑唔到**。
+ *
+ * ⚠️ 即係「最需要佢嗰陣佢唔喺度」。
+ *
+ * 所以改成掛喺 `process.on('exit')`：正常收工、拋錯死、
+ * `process.exit()` 都一樣會行一次。實測過喺 `exit` 事件入面
+ * 設 `process.exitCode` 係生效嘅。
+ */
+let finalCheckDone = false;
+
+function finalResidueCheck_() {
+  if (finalCheckDone) return;
+  finalCheckDone = true;
+
+  console.log('\n=== C 組：工具本身唔可以留低任何改動 ===');
+
+  let dirty = [];
+  try {
+    dirty = Object.keys(ORIGINALS).filter(function (rel) {
+      return fs.readFileSync(path.join(ROOT, rel), 'utf8') !== ORIGINALS[rel];
+    });
+  } catch (err) {
+    dirty = Object.keys(ORIGINALS);
+    console.log('（連核對都讀唔到檔案：' + err.message + '——當成全部有嫌疑）');
+  }
+
+  if (!restoreFailure && dirty.length === 0) {
+    console.log('RED OK  src/ 冇殘留任何 verify-red 改動');
+    return;
+  }
+
+  // ⚠️ 呢一段要**極顯眼**。一個被改壞嘅 src/ commit 咗上去，
+  // 係呢個工具可以造成嘅最大傷害。
+  process.exitCode = 1;
+  const bar = '━'.repeat(66);
+  console.log('\n' + bar);
+  console.log('⛔⛔ 停手：src/ 可能仲留住 verify-red 改壞咗嘅內容');
+  console.log(bar);
+  if (restoreFailure) {
+    console.log('還原失敗嘅檔案：' + restoreFailure.file);
+    console.log('原本嘅錯誤：' + restoreFailure.message);
+    console.log('（出事嗰條突變：' + restoreFailure.mutationId + '）');
+  }
+  if (dirty.length > 0) {
+    console.log('同開跑之前唔一樣嘅檔案：');
+    dirty.forEach(function (rel) { console.log('  ・' + rel); });
+  }
+  console.log('');
+  console.log('點樣救——逐個檔案跑：');
+  (dirty.length > 0 ? dirty
+    : [restoreFailure ? restoreFailure.file : '<檔案>']).forEach(function (rel) {
+    console.log('  git checkout -- ' + rel);
+  });
+  console.log('');
+  console.log('⚠️ 救返之後先再 commit。呢一刻嘅 src/ **唔可以** commit。');
+  console.log(bar);
+}
+
+// ⚠️ 一定要喺呢度掛，唔可以等到最尾——中間拋錯就登記唔到。
+process.on('exit', finalResidueCheck_);
 function report(ok, label, extra) {
   if (!ok) fail++;
   console.log(`${ok ? 'RED OK' : 'FAIL  '}  ${label}`);
@@ -3615,9 +3841,20 @@ function runTest(rel) {
 
 console.log('=== C 組：逐條防線特登整壞，要求佢變紅 ===\n');
 
-MUTATIONS.forEach(function (m) {
+// ⚠️ 用 `for` 唔用 `forEach`——還原失敗嗰陣要**即刻停低成支工具**，
+// 而 `forEach` 停唔到。繼續跑落去嘅話，下一條突變會喺一個
+// 已經改壞咗嘅檔案上面再改一次，越搞越亂。
+for (let mi = 0; mi < MUTATIONS.length; mi++) {
+  if (restoreFailure) break;
+  const m = MUTATIONS[mi];
   const abs = path.join(ROOT, m.file);
-  const before = fs.readFileSync(abs, 'utf8');
+
+  // ⚠️ `raw` 係還原用（一個字都唔差）；`before` 係比對同突變用
+  //（CRLF 正規化過）。兩者唔可以掉亂：
+  //   ・用 `before` 還原　⇒ 一個檢查工具順手改咗你成個 repo 嘅行尾
+  //   ・用 `raw` 比對　　⇒ 跨行嘅 `find` 喺 CRLF 檔案上面永遠搵唔到
+  const raw = fs.readFileSync(abs, 'utf8');
+  const before = normalizeEol_(raw);
 
   // ⚠️ 先落一個本地變數再用。直接喺樣板字串入面寫「物件點 id」
   //  會被敏感資料掃描當成一個網域而擋住 commit（id 係真嘅頂層網域）。
@@ -3628,11 +3865,13 @@ MUTATIONS.forEach(function (m) {
       `喺 ${m.file} 搵到 ${hits} 次 \`find\`（要求剛好 1 次）。\n`
       + '程式碼改過就要同步更新 tools/verify-red.js 嘅註冊表——'
       + '唔可以由得佢靜靜略過。');
-    return;
+    continue;
   }
 
+  let mutated = false;
   try {
     fs.writeFileSync(abs, before.split(m.find).join(m.replace));
+    mutated = true;
     const results = m.tests.map(function (t) { return { t: t, r: runTest(t) }; });
     const stillGreen = results.filter(function (x) { return x.r.passed; });
     report(stillGreen.length === 0, `[${mutationId}] ${m.why}`,
@@ -3642,22 +3881,24 @@ MUTATIONS.forEach(function (m) {
           + '\n⇒ 呢條防線根本冇踩到嗰段程式，佢嘅綠燈冇意義。'
         : '');
   } finally {
-    fs.writeFileSync(abs, before);
+    // ⚠️⚠️ 第六十二輪批次 A1 組：**還原嗰個寫入會失敗。**
+    //
+    // 實測撞過兩次：`UNKNOWN: unknown error, open …src\Mailer.gs`
+    //（Synology 同步鎖住個檔）。舊寫法冇包 try／catch，所以拋錯
+    // 直接殺死成支工具，而個檔案就噉留住突變版本。
+    if (mutated) {
+      try {
+        fs.writeFileSync(abs, raw);
+      } catch (err) {
+        restoreFailure = {
+          file: m.file, mutationId: mutationId, message: err.message
+        };
+        fail++;
+        console.log('FAIL    [' + mutationId + '] 還原唔到 ' + m.file
+          + '：' + err.message);
+      }
+    }
   }
-});
-
-// ── 自我核對：一定要還原乾淨 ──────────────────────────────────────
-//
-// ⚠️ 唔可以用 `git diff` 做呢一項——commit 之前本來就有未提交嘅 src/ 改動，
-// 咁樣分唔出「工具留低嘅」同「你自己改緊嘅」，會變成一條日日誤報嘅假警報。
-// 改為喺工具**開跑之前**先記低每個會被改嘅檔案嘅內容，跑完逐個字比對。
-console.log('\n=== C 組：工具本身唔可以留低任何改動 ===');
-{
-  const dirty = Object.keys(ORIGINALS).filter(function (rel) {
-    return fs.readFileSync(path.join(ROOT, rel), 'utf8') !== ORIGINALS[rel];
-  });
-  report(dirty.length === 0, 'src/ 冇殘留任何 verify-red 改動',
-    dirty.length === 0 ? '' : '呢啲檔案同開跑之前唔一樣：\n' + dirty.join('\n'));
 }
 
 // ── 結論同退出碼 ────────────────────────────────────────────────
@@ -3668,9 +3909,16 @@ console.log('\n=== C 組：工具本身唔可以留低任何改動 ===');
 //
 // 呢個正正就係呢個專案由第一輪殺到而家嗰種錯：**靜靜失敗**。
 // 一個永遠回 0 嘅檢查工具，比冇呢個工具更差——因為佢令人以為檢查過。
-console.log('\n' + (fail === 0
-  ? ('ALL RED OK（' + MUTATIONS.length + ' 條突變）')
-  : (fail + ' 條唔合格——唔可以 commit')));
-process.exit(fail === 0 ? 0 : 1);
+// ⚠️ 用 `process.exitCode` 唔用 `process.exit()`——
+// `process.exit()` 會即刻走，而我哋要畀上面嗰個 `exit` 鈎
+// 行完最後嗰道「src/ 有冇殘留」檢查先。
+if (restoreFailure) {
+  console.log('\n⛔ 因為還原失敗，已經停低，冇跑晒 ' + MUTATIONS.length + ' 條突變。');
+} else {
+  console.log('\n' + (fail === 0
+    ? ('ALL RED OK（' + MUTATIONS.length + ' 條突變）')
+    : (fail + ' 條唔合格——唔可以 commit')));
+}
+process.exitCode = fail === 0 ? 0 : 1;
 
 

@@ -17,6 +17,10 @@
 !/docs/
 !/tests/
 !/.gitignore
+# 第六十二輪批次 A3 組：.gitattributes 把行尾釘死做 LF。
+# 白名單制之下唔明確放行就等於冇——而佢冇入到 repo 嘅話，
+# 換一部機 clone 落嚟又會變返 CRLF。檔案本身冇任何資料。
+!/.gitattributes
 !/README.md
 
 # tools/：第十八輪批次新增的 commit 前敏感資料掃描 script

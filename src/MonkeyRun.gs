@@ -53,6 +53,29 @@ const MONKEY_DRY_RUN_RECHECK_EVERY = 10;
 const MONKEY_SHEETS = { LOG: 'MonkeyLog', STATE: 'MonkeyState' };
 
 /**
+ * 第六十二輪批次 B2 組：`MonkeyLog` 最多留幾多行資料。
+ *
+ * ⚠️ 佢而家係 append（唔再每批覆寫），所以一定要有上限，
+ * 否則跑得耐就會撐爆張表。超過就由**最舊**嗰幾行剪起。
+ */
+const MONKEY_LOG_MAX_ROWS = 1000;
+
+/**
+ * `MonkeyState` 嘅欄名。
+ *
+ * ⚠️ 讀嗰陣**照欄名搵**，唔係照位置。
+ *
+ * 舊版嘅第 3 欄叫「已跑步數」（只計當前嗰一批），新版叫「累計步數」。
+ * 照位置讀嘅話，一張舊表會被當成「累計已經跑咗 3 步」——
+ * 而嗰個 3 其實係上一批嘅批次數。**一個講錯咗嘅數字比冇數字更差**，
+ * 所以搵唔到就當 0，唔猜。
+ */
+const MONKEY_STATE_HEADERS = ['種子', '已抽次數', '累計步數', '季度'];
+
+/** `MonkeyLog` 嘅欄名。 */
+const MONKEY_LOG_HEADERS = ['第幾步', '選了什麼', '結果', '不變量', '種子', '季度'];
+
+/**
  * 一次執行最多用幾多毫秒。同自測機一樣留 1.5 分鐘收尾。
  */
 const MONKEY_TIME_BUDGET_MS = 4.5 * 60 * 1000;
@@ -589,8 +612,31 @@ let monkeyStartedAt_ = 0;
  * @param {number} seed 隨機種子
  * @returns {Object} 報告
  */
-function runMonkey_(steps, seed, skipDraws) {
+function runMonkey_(steps, seed, skipDraws, priorSteps) {
   monkeyStartedAt_ = new Date().getTime();
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第六十二輪批次 B1 組：**步數要跨批累計。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 現場（由試算表直接讀到）：
+  //
+  //   時間　　已抽次數　已跑步數
+  //   早前　　10　　　　2
+  //   之後　　32　　　　4
+  //   而家　　70　　　　3   ← 跌返落去
+  //
+  // 已抽次數一路加（證明隨機序列真係接住走），但「已跑步數」
+  // 由 4 跌到 3——因為佢寫落表嗰個係 `report.ranSteps`，
+  // 即係**當前呢一批**跑咗幾多步，而 `readMonkeyState_()` 由頭到尾
+  // 冇讀返佢。而報告第一句「跑了 N / 50 步」用嘅就係呢個數。
+  //
+  // ⇒ Ivan 撳幾多次，分子都只會喺 2–4 之間浮動，永遠去唔到 50。
+  //
+  // ⚠️ 底層其實一直有進展（季度行到 v7、每批動作都唔同、零失敗）。
+  // **唔係部機器唔郁，係個計數器呃人。**
+  // 而一個會歸零嘅進度計數器比冇計數器更差——佢會令人以為
+  // 部機器打緊轉，然後放棄。
+  const priorStepCount = Math.max(0, Number(priorSteps) || 0);
 
   const quarter = readSelfTestQuarterDetail_();
   const quarterId = quarter.value;
@@ -640,6 +686,10 @@ function runMonkey_(steps, seed, skipDraws) {
   const total = Math.max(1, Math.min(MONKEY_MAX_STEPS, Number(steps) || 50));
 
   for (let i = 1; i <= total; i++) {
+    // ⚠️ `i` 係**呢一批**嘅第幾步（時間閘、`DRY_RUN` 複查、
+    // 全套不變量嘅節奏全部靠佢）；`absStep` 係**跨批累計**嘅第幾步
+    //（寫落報告、`MonkeyLog`、失敗紀錄嗰個）。兩者唔可以掉亂。
+    const absStep = priorStepCount + i;
     if (selfTestOutOfTime_ && (new Date().getTime() - monkeyStartedAt_) > MONKEY_TIME_BUDGET_MS) {
       stoppedForTime = true;
       break;
@@ -651,8 +701,9 @@ function runMonkey_(steps, seed, skipDraws) {
     if (i % MONKEY_DRY_RUN_RECHECK_EVERY === 1 && i > 1) {
       if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {
         failures.push({
-          step: i, kind: 'DRY_RUN',
-          detail: '第 ' + i + ' 步之前重新檢查，DRY_RUN 已經不是 TRUE。已立刻停手。',
+          step: absStep, kind: 'DRY_RUN',
+          detail: '第 ' + absStep + ' 步之前重新檢查，DRY_RUN 已經不是 TRUE。'
+            + '已立刻停手。',
           path: path.slice()
         });
         break;
@@ -663,7 +714,8 @@ function runMonkey_(steps, seed, skipDraws) {
     try {
       facts = monkeyReadFacts_(quarterId);
     } catch (err) {
-      failures.push({ step: i, kind: '讀不到狀態', detail: err.message, path: path.slice() });
+      failures.push({ step: absStep, kind: '讀不到狀態',
+        detail: err.message, path: path.slice() });
       break;
     }
 
@@ -682,19 +734,19 @@ function runMonkey_(steps, seed, skipDraws) {
       // ⚠️ 同 A3 防打轉閘一樣：**一份「跑咗幾步、零失敗」嘅報告
       // 睇落好似冇事**——嗰個先係最危險嘅輸出。
       noLegalAction = {
-        step: i,
+        step: absStep,
         state: monkeyStateFingerprint_(facts),
         actionCount: actions.length
       };
       failures.push({
-        step: i, kind: '這個狀態下沒有任何合法動作',
+        step: absStep, kind: '這個狀態下沒有任何合法動作',
         detail: '停在 ' + monkeyStateFingerprint_(facts)
           + '（Stage｜最新版本號｜認不出的格數）。'
           + '這一批可以撳的動作有 ' + actions.length + ' 個，'
           + '而沒有一個在這個狀態下合法，所以乾淨停手。',
         path: path.slice()
       });
-      stepLog.push({ step: i, action: '（沒有合法動作）',
+      stepLog.push({ step: absStep, action: '（沒有合法動作）',
         outcome: '乾淨停手', invariant: '' });
       break;
     }
@@ -720,13 +772,13 @@ function runMonkey_(steps, seed, skipDraws) {
       try {
         after = monkeyReadFacts_(quarterId);
       } catch (err) {
-        failures.push({ step: i, kind: '撳完讀不到狀態',
+        failures.push({ step: absStep, kind: '撳完讀不到狀態',
           detail: picked.id + '　' + err.message,
           path: path.slice().concat([picked.id]) });
       }
       monkeyCheckOutcome_(picked, result, facts, after).forEach(function (complaint) {
         failures.push({
-          step: i, kind: '合法動作靜靜地沒有做事',
+          step: absStep, kind: '合法動作靜靜地沒有做事',
           detail: picked.id + '　' + complaint,
           path: path.slice().concat([picked.id])
         });
@@ -737,7 +789,7 @@ function runMonkey_(steps, seed, skipDraws) {
       threw = err.message;
       outcome = '拋錯：' + err.message;
       failures.push({
-        step: i, kind: '合法動作拋錯',
+        step: absStep, kind: '合法動作拋錯',
         detail: picked.id + '　' + err.message,
         path: path.slice().concat([picked.id])
       });
@@ -774,7 +826,7 @@ function runMonkey_(steps, seed, skipDraws) {
         state: monkeyStateFingerprint_(after || facts)
       };
       failures.push({
-        step: i, kind: '偵測到原地打轉，已停止',
+        step: absStep, kind: '偵測到原地打轉，已停止',
         detail: '連續 ' + sameFingerprintRun + ' 步都選中「' + picked.id
           + '」，而且 Stage／最新版本號／認不出的格數完全沒有變過（'
           + monkeyStateFingerprint_(after || facts) + '）。'
@@ -782,7 +834,7 @@ function runMonkey_(steps, seed, skipDraws) {
         path: path.slice()
       });
       stepLog.push({
-        step: i, action: picked.id, outcome: outcome,
+        step: absStep, action: picked.id, outcome: outcome,
         invariant: '（原地打轉，已停止）', threw: threw
       });
       break;
@@ -804,7 +856,7 @@ function runMonkey_(steps, seed, skipDraws) {
         isFullSweep ? INVARIANT_SET.ALL : INVARIANT_SET.PER_SCENARIO);
       if (isFullSweep) {
         fullSweepCount++;
-        lastFullSweepStep = i;
+        lastFullSweepStep = absStep;
       } else if (fastInvariantIds.length === 0) {
         fastInvariantIds = inv.results.map(function (r) { return r.id; });
       }
@@ -816,7 +868,7 @@ function runMonkey_(steps, seed, skipDraws) {
         + (isFullSweep ? '（全套）' : '（逐步）');
       broken.forEach(function (r) {
         failures.push({
-          step: i, kind: '不變量 ' + r.id,
+          step: absStep, kind: '不變量 ' + r.id,
           // ⚠️ 分開講「逐步」同「全套」：一條只喺全套先驗到嘅不變量
           // 紅咗，代表佢係喺前面某幾步之內壞嘅，唔一定係呢一步。
           sweep: isFullSweep ? '全套' : '逐步',
@@ -826,14 +878,14 @@ function runMonkey_(steps, seed, skipDraws) {
       });
     } catch (err) {
       invariantText = '算不出：' + err.message;
-      failures.push({ step: i, kind: '不變量算不出',
+      failures.push({ step: absStep, kind: '不變量算不出',
         sweep: isFullSweep ? '全套' : '逐步',
         detail: err.message, path: path.slice() });
     }
     invariantMs += new Date().getTime() - invariantStartedAt;
 
     stepLog.push({
-      step: i, action: picked.id, outcome: outcome,
+      step: absStep, action: picked.id, outcome: outcome,
       invariant: invariantText, threw: threw
     });
   }
@@ -876,6 +928,11 @@ function runMonkey_(steps, seed, skipDraws) {
     seed: seed,
     requestedSteps: total,
     ranSteps: stepLog.length,
+    // 第六十二輪批次 B1 組：跨批累計。
+    priorSteps: priorStepCount,
+    totalSteps: priorStepCount + stepLog.length,
+    firstStepNo: stepLog.length > 0 ? stepLog[0].step : 0,
+    lastStepNo: stepLog.length > 0 ? stepLog[stepLog.length - 1].step : 0,
     stoppedForTime: stoppedForTime,
     // 第六十輪批次 A3 組：有嘅話，報告要大聲講。
     spinning: spinning,
@@ -909,15 +966,28 @@ function runMonkey_(steps, seed, skipDraws) {
  * @param {Object} report `runMonkey_()` 的結果
  * @returns {string} 一行
  */
+function monkeyFormatDuration_(ms) {
+  const total = Math.round(Number(ms || 0) / 1000);
+  if (total < 60) return (Number(ms || 0) / 1000).toFixed(1) + ' 秒';
+  return Math.floor(total / 60) + ' 分 ' + (total % 60) + ' 秒';
+}
+
 function monkeyDescribeSpeed_(report) {
-  const sec = function (ms) { return (Number(ms || 0) / 1000).toFixed(1); };
   const steps = Number(report.ranSteps) || 0;
-  const per = steps > 0 ? (Number(report.totalMs || 0) / steps / 1000).toFixed(1)
+  const perSec = steps > 0 ? Number(report.totalMs || 0) / steps / 1000 : 0;
+  const per = steps > 0
+    ? (perSec >= 10 ? String(Math.round(perSec)) : perSec.toFixed(1)) + ' 秒'
     : '—';
-  return '這一批：跑了 ' + steps + ' 步／用了 ' + sec(report.totalMs)
-    + ' 秒／平均每步 ' + per + ' 秒'
-    + '（動作 ' + sec(report.actionMs) + ' 秒／不變量 '
-    + sec(report.invariantMs) + ' 秒）';
+  // ⚠️ 印出「第 X – Y 步」——用嘅係**累計**步號。
+  // 冇呢個範圍嘅話，連續兩批各三步睇落一模一樣。
+  const range = steps > 0
+    ? '（第 ' + report.firstStepNo + ' – ' + report.lastStepNo + ' 步）'
+    : '';
+  return '這一批：跑了 ' + steps + ' 步' + range
+    + '／用了 ' + monkeyFormatDuration_(report.totalMs)
+    + '／平均每步 ' + per
+    + '（動作 ' + monkeyFormatDuration_(report.actionMs)
+    + '／不變量 ' + monkeyFormatDuration_(report.invariantMs) + '）';
 }
 
 /**
@@ -935,9 +1005,19 @@ function describeMonkeyReport_(report) {
     return ['亂行機沒有執行。', ''].concat(
       report.reasons.map(function (r) { return '・' + r; }));
   }
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️⚠️ 第六十二輪批次 B3 組：**兩個數要分開講。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 舊寫法第一句用嘅係 `report.ranSteps`——**只計當前呢一批**。
+  // 於是撳幾多次「繼續亂行」，分子都只會喺 2–4 之間浮動，
+  // 永遠去唔到 50，睇落就好似原地踏步。
+  //
+  // ⚠️ 一個會歸零嘅進度計數器比冇計數器更差——
+  // 佢會令人以為部機器打緊轉，然後放棄。
   const lines = [
-    '亂行機：跑了 ' + report.ranSteps + ' / ' + report.requestedSteps + ' 步，'
-      + report.failures.length + ' 項失敗',
+    '亂行機：累計 ' + report.totalSteps + ' / ' + report.requestedSteps + ' 步，'
+      + report.failures.length + ' 項失敗（這一批）',
     '沙盒季度：' + report.quarterId,
     // ⚠️ seed 一定要印。同一個 seed 重跑一定同一條路。
     '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）'
@@ -1040,6 +1120,25 @@ function describeMonkeyReport_(report) {
 
 /**
  * 把逐步紀錄寫入工作表。
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️⚠️ 第六十二輪批次 B2 組：**唔可以每批覆寫。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 舊寫法第一句就係 `sheet.clear()`。所以撳完「繼續亂行」之後，
+ * 成張 log 只剩當前嗰一批——實測讀到得 3 行，而之前明明跑過 4 步。
+ *
+ * ⚠️ 一份會自己刪走歷史嘅紀錄，等於冇紀錄。
+ * 亂行機最有價值嘅輸出就係「走到這裡的完整步驟」，
+ * 而佢每批清一次嘅話，跨批嘅路徑永遠砌唔返。
+ *
+ * 而家：append，第一欄用**累計**步號，超過 `MONKEY_LOG_MAX_ROWS`
+ * 就由最舊嗰幾行剪起。
+ *
+ * ⚠️ 舊表嘅表頭係兩行（`種子 / 季度` 一行，欄名一行），同新格式對唔上。
+ * 硬 append 落去會變成兩種格式撈埋一齊，所以偵測到唔啱就重建——
+ * 反正舊表入面本來就只剩最後一批。
+ *
  * @param {Object} report `runMonkey_()` 的結果
  * @returns {void}
  */
@@ -1047,13 +1146,28 @@ function writeMonkeyLog_(report) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(MONKEY_SHEETS.LOG);
   if (!sheet) sheet = ss.insertSheet(MONKEY_SHEETS.LOG);
-  sheet.clear();
-  sheet.appendRow(['種子', report.seed, '季度', report.quarterId]);
-  sheet.appendRow(['第幾步', '選了什麼', '結果', '不變量']);
-  sheet.setFrozenRows(2);
+
+  // 由頭開始跑（唔係續跑）⇒ 新一條路，舊 log 冇意義。
+  const freshRun = Number(report.priorSteps || 0) === 0;
+  const headerOk = !freshRun && sheet.getLastRow() >= 1
+    && sheet.getRange(1, 1, 1, MONKEY_LOG_HEADERS.length).getValues()[0]
+      .join('|') === MONKEY_LOG_HEADERS.join('|');
+  if (!headerOk) {
+    sheet.clear();
+    sheet.appendRow(MONKEY_LOG_HEADERS);
+    sheet.setFrozenRows(1);
+  }
+
   (report.steps || []).forEach(function (s) {
-    sheet.appendRow([s.step, s.action, s.outcome, s.invariant]);
+    sheet.appendRow([s.step, s.action, s.outcome, s.invariant,
+      report.seed, report.quarterId]);
   });
+
+  // ⚠️ 有上限先至可以 append。超過就剪最舊嗰幾行（第 2 行起）。
+  const dataRows = sheet.getLastRow() - 1;
+  if (dataRows > MONKEY_LOG_MAX_ROWS) {
+    sheet.deleteRows(2, dataRows - MONKEY_LOG_MAX_ROWS);
+  }
 }
 
 /**
@@ -1070,21 +1184,44 @@ function writeMonkeyState_(report) {
   let sheet = ss.getSheetByName(MONKEY_SHEETS.STATE);
   if (!sheet) sheet = ss.insertSheet(MONKEY_SHEETS.STATE);
   sheet.clear();
-  sheet.appendRow(['種子', '已抽次數', '已跑步數', '季度']);
+  sheet.appendRow(MONKEY_STATE_HEADERS);
   sheet.setFrozenRows(1);
-  sheet.appendRow([report.seed, report.drawnCount, report.ranSteps, report.quarterId]);
+  // ⚠️ 第三格寫嘅係**累計**（`totalSteps`），唔係當前批次（`ranSteps`）。
+  // 舊寫法寫 `ranSteps`，而讀嗰邊由頭到尾冇讀返佢——
+  // 即係個數字寫落表淨係畀人睇，而佢每批歸零。
+  sheet.appendRow([report.seed, report.drawnCount, report.totalSteps,
+    report.quarterId]);
 }
 
 /**
- * 讀返上一次亂行嘅種子同抽數。
- * @returns {{seed: number, drawnCount: number}} 冇紀錄就回 `{seed: 0, drawnCount: 0}`
+ * 讀返上一次亂行嘅種子、抽數同累計步數。
+ *
+ * ⚠️ **照欄名搵，唔係照位置。** 舊版第 3 欄叫「已跑步數」
+ *（只計當前批次），新版叫「累計步數」。照位置讀嘅話，
+ * 一張舊表會被當成「累計已經跑咗 3 步」——而嗰個 3 其實係上一批
+ * 嘅批次數。搵唔到就當 0，唔猜。
+ *
+ * @returns {{seed: number, drawnCount: number, totalSteps: number}}
+ *   冇紀錄就全部 0
  */
 function readMonkeyState_() {
+  const empty = { seed: 0, drawnCount: 0, totalSteps: 0 };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(MONKEY_SHEETS.STATE);
-  if (!sheet || sheet.getLastRow() < 2) return { seed: 0, drawnCount: 0 };
-  const row = sheet.getRange(2, 1, 1, 2).getValues()[0];
-  return { seed: Number(row[0]) || 0, drawnCount: Number(row[1]) || 0 };
+  if (!sheet || sheet.getLastRow() < 2) return empty;
+  const width = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(1, 1, 1, width).getValues()[0]
+    .map(function (h) { return String(h || '').trim(); });
+  const row = sheet.getRange(2, 1, 1, width).getValues()[0];
+  const pick = function (name) {
+    const at = headers.indexOf(name);
+    return at === -1 ? 0 : (Number(row[at]) || 0);
+  };
+  return {
+    seed: pick('種子'),
+    drawnCount: pick('已抽次數'),
+    totalSteps: pick('累計步數')
+  };
 }
 
 /**
@@ -1107,7 +1244,8 @@ function runMonkeyResumeFromMenu_() {
     return;
   }
   const response = ui.prompt(title,
-    '上一次的種子：' + state.seed + '，已經抽了 ' + state.drawnCount + ' 次。\n\n'
+    '上一次的種子：' + state.seed + '，累計已經跑了 ' + state.totalSteps
+      + ' 步（用了 ' + state.drawnCount + ' 個亂數）。\n\n'
       + '這一次會用同一個種子接住上一條路走下去。\n\n'
       + '要再跑幾多步？（留空 ＝ 50）',
     ui.ButtonSet.OK_CANCEL);
@@ -1117,7 +1255,9 @@ function runMonkeyResumeFromMenu_() {
   SpreadsheetApp.getActiveSpreadsheet().toast('亂行中，請稍候…', '亂行機', 300);
   let report;
   try {
-    report = runMonkey_(steps, state.seed, state.drawnCount);
+    // ⚠️ 第四個參數係累計步數。唔傳嘅話，每批嘅步號都由 1 開始，
+    // 而報告嗰句「跑了 N / 50 步」永遠去唔到 50。
+    report = runMonkey_(steps, state.seed, state.drawnCount, state.totalSteps);
   } catch (err) {
     log_('ERROR', 'runMonkey_（續跑）失敗：' + err.message);
     ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);

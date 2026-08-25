@@ -324,13 +324,17 @@ console.log('\n=== D【核心】報告要講得出時間去咗邊 ===');
 {
   const gas = loadGasSource(FILES);
   const line = gas.monkeyDescribeSpeed_({
-    ranSteps: 2, totalMs: 270000, actionMs: 40000, invariantMs: 225000
+    ranSteps: 2, totalMs: 270000, actionMs: 40000, invariantMs: 225000,
+    firstStepNo: 8, lastStepNo: 9
   });
-  checkEqual('★★★★★★ **一行講齊：幾多步／幾多秒／每步幾多秒／動作同不變量各佔幾多**'
+  // ⚠️ 第六十二輪批次 B3 組：多咗「（第 X – Y 步）」，而且時間
+  // 超過一分鐘就寫「M 分 S 秒」——`270.0 秒` 讀落要自己心算。
+  checkEqual('★★★★★★ **一行講齊：幾多步／邊幾步／幾多秒／每步幾多秒／'
+    + '動作同不變量各佔幾多**'
     + '——冇呢一行嘅話，「一批 4.5 分鐘得 2 步」每次都要重新估樽頸喺邊',
     line,
-    '這一批：跑了 2 步／用了 270.0 秒／平均每步 135.0 秒'
-      + '（動作 40.0 秒／不變量 225.0 秒）');
+    '這一批：跑了 2 步（第 8 – 9 步）／用了 4 分 30 秒／平均每步 135 秒'
+      + '（動作 40.0 秒／不變量 3 分 45 秒）');
   check('★★★★★ 零步都唔會爆（除零）',
     /平均每步 —/.test(gas.monkeyDescribeSpeed_(
       { ranSteps: 0, totalMs: 0, actionMs: 0, invariantMs: 0 })), '');
@@ -348,7 +352,8 @@ console.log('\n=== D【核心】報告要講得出時間去咗邊 ===');
     JSON.stringify({ totalMs: box.report.totalMs, actionMs: box.report.actionMs,
       invariantMs: box.report.invariantMs }));
   const lines = box.gas.describeMonkeyReport_(box.report).join('\n');
-  check('★★★★★★ 而且真係印咗出嚟', /這一批：跑了 3 步／用了 /.test(lines),
+  check('★★★★★★ 而且真係印咗出嚟',
+    /這一批：跑了 3 步（第 1 – 3 步）／用了 /.test(lines),
     lines.slice(0, 500));
   check('★★★★★★ 逐步同全套要分開講'
     + '——「跑了 50 步」唔等於「驗了 50 次全套」',

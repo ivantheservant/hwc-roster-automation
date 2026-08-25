@@ -1,0 +1,25 @@
+# 第六十二輪批次 A3 組：把行尾釘死做 LF。
+#
+# 背景：呢個 repo 一直係 `core.autocrlf=true` 而且冇 .gitattributes，
+# 所以任何一次 `git checkout` 都會把工作區嘅檔案寫成 CRLF。
+#
+# 實測（第六十一輪）：`git checkout -- src/Mailer.gs` 之後，
+# tools/verify-red.js 入面一批**跨行**嘅 `find`（佢哋寫嘅係 \n）
+# 就對唔上，於是報「喺 src/Mailer.gs 搵到 0 次 find（要求剛好 1 次）」。
+# 程式一個字都冇改過，而推送閘紅咗。
+#
+# ⚠️ verify-red 嗰邊已經自己做咗 CRLF → LF 正規化（A2 組），
+# 呢個檔案係另一道：由源頭令新簽出嘅檔案本來就係 LF。
+# 兩道都要——一道守工具，一道守 repo。
+#
+# ⚠️⚠️ 加咗呢個檔案之後**冇**跑 `git add --renormalize .`。
+# 嗰個會一次過改寫成個 repo 每一個檔案嘅行尾，造出一個
+# 幾萬行嘅 diff，而家唔係做呢件事嘅時候（Ivan 今日收工）。
+# 所以：**已經 commit 咗嘅檔案維持原狀，只有日後新改動先會跟呢度。**
+# 想一次過統一，十月揀一個乾淨嘅時間自己跑 renormalize。
+
+*.gs    text eol=lf
+*.js    text eol=lf
+*.html  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
