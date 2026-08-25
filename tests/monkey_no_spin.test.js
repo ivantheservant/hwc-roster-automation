@@ -53,9 +53,13 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const SRC = read('src/MonkeyRun.gs');
 const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
+// ⚠️ 第六十一輪批次 B 組之後，`runMonkey_()` 用到 `INVARIANT_SET`，
+// 所以一定要載 `Invariants.gs`。唔載嘅話，每一步都會靜靜噉多咗一項
+//「不變量算不出：INVARIANT_SET is not defined」——
+// 而下面幾條斷言仍然會綠，即係一個假綠。
 const FILES = ['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
   'QuarterStage.gs', 'SeasonRehearsal.gs', 'QuarterReset.gs',
-  'SelfTestRunner.gs', 'MonkeyRun.gs'];
+  'SelfTestRunner.gs', 'Invariants.gs', 'MonkeyRun.gs'];
 
 // =====================================================================
 console.log('\n=== A1【核心】「改 grid」唔再寫認唔出嘅字 ===');

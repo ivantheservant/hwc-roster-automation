@@ -1831,8 +1831,8 @@ const MUTATIONS = [
     id: 'mk-no-seed-in-report',
     why: '報告唔印 seed——冇 seed 就重現唔到',
     file: 'src/MonkeyRun.gs',
-    find: "    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）',",
-    replace: "    '（隨機）',",
+    find: "    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）'",
+    replace: "    '（隨機）'",
     tests: ['tests/monkey_run.test.js']
   },
   {
@@ -1870,7 +1870,8 @@ const MUTATIONS = [
       + '——亂行機自己冇斷言，佢全部靠不變量出力。'
       + '拆走咗就變成「隨機撳嘢，而冇人睇結果」',
     file: 'src/MonkeyRun.gs',
-    find: '      const inv = runAllInvariants_(quarterId);',
+    find: '      const inv = runAllInvariants_(quarterId,\n'
+      + '        isFullSweep ? INVARIANT_SET.ALL : INVARIANT_SET.PER_SCENARIO);',
     replace: '      const inv = { results: [] };',
     tests: ['tests/monkey_run.test.js']
   },
@@ -3431,6 +3432,162 @@ const MUTATIONS = [
     find: '    total += Math.max(1, Number(a.weight) || MONKEY_DEFAULT_WEIGHT);',
     replace: '    total += 1;',
     tests: ['tests/monkey_no_spin.test.js']
+  },
+  // ── 第六十一輪批次：亂行機跑得郁，但太慢 ──────────────────────
+  {
+    id: 'mky-inv-all-per-step',
+    why: '每一步都跑全套不變量'
+      + '——入面有 I04（`RosterAssignments` 成萬行）同 I08'
+      + '（每條要行一次完整 plan）。一批 4.5 分鐘得 2 步，樽頸就係呢度',
+    file: 'src/MonkeyRun.gs',
+    find: '        isFullSweep ? INVARIANT_SET.ALL : INVARIANT_SET.PER_SCENARIO);',
+    replace: '        INVARIANT_SET.ALL);',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-inv-never-full',
+    why: '慳到唔再跑全套'
+      + '——慳時間唔可以變成唔驗。I04／I08 只喺全套嗰批，'
+      + '唔跑嘅話「有重複嘅格」呢類問題永遠捉唔到',
+    file: 'src/MonkeyRun.gs',
+    find: '    const isFullSweep = (i % MONKEY_FULL_INVARIANT_EVERY === 0)'
+      + ' || (i === total);',
+    replace: '    const isFullSweep = false;',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-no-tail-sweep',
+    why: '收尾唔補跑全套'
+      + '——迴圈會因為時間到／原地打轉／冇合法動作而中途 break，'
+      + '省咗嘅話最尾嗰段改動一次全套都冇驗過',
+    file: 'src/MonkeyRun.gs',
+    find: '  if (ranSteps > 0 && lastFullSweepStep !== stepLog[ranSteps - 1].step) {',
+    replace: '  if (false) {',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-sweep-label-gone',
+    why: '唔再分「逐步」同「全套」'
+      + '——一條只喺全套先驗到嘅不變量紅咗，係喺前面某幾步之內壞嘅，'
+      + '唔標明嘅話人會淨係盯住最後嗰一步',
+    file: 'src/MonkeyRun.gs',
+    find: "          sweep: isFullSweep ? '全套' : '逐步',",
+    replace: "          sweep: '逐步',",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-sweep-not-printed',
+    why: '報告唔講「可能是前面幾步之內壞的」'
+      + '——揾錯方向嘅代價係由頭再查一次',
+    file: 'src/MonkeyRun.gs',
+    find: "      + (f.sweep === '全套' ? '（全套那一次驗到；可能是前面幾步之內壞的）'",
+    replace: "      + (false ? '（全套那一次驗到；可能是前面幾步之內壞的）'",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-slow-hardcoded',
+    why: '慢動作寫死跳過，唔讀 Config'
+      + '——Ivan 明確講過之後要改得返。寫死咗就改唔返',
+    file: 'src/MonkeyRun.gs',
+    find: '  return getConfig(CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, true) === true;',
+    replace: '  return true;',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-slow-marker-gone',
+    why: '拆走「正式發出給全體（模擬）」嗰個 `slow` 標記'
+      + '——冇標記就冇得跳，開關變成一個乜都唔做嘅開關',
+    file: 'src/MonkeyRun.gs',
+    find: "      slow: '要逐個收件人（≈58 位）砌信同查個人 PDF；'",
+    replace: "      slowDisabled: '要逐個收件人（≈58 位）砌信同查個人 PDF；'",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-slow-not-printed',
+    why: '報告唔印「已跳過的慢動作」'
+      + '——一份「跑咗 50 步、零失敗」而冇講跳過乜嘅報告，'
+      + '會令人以為嗰條路驗過',
+    file: 'src/MonkeyRun.gs',
+    find: '  if (report.skipSlow && (report.skippedSlow || []).length > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-slow-side-mute',
+    why: '唔講跳過嘅連帶後果'
+      + '——Stage 上唔到「已正式發出」，所以「改動後重發」亦都抽唔到。'
+      + '唔講嘅話，下次會以為嗰一步壞咗',
+    file: 'src/MonkeyRun.gs',
+    find: "    lines.push('　 ⚠️ 連帶：Stage 上不到「已正式發出」，'",
+    replace: "    if (false) lines.push('　 ⚠️ 連帶：Stage 上不到「已正式發出」，'",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-no-legal-silent',
+    why: '冇合法動作就靜靜 break，唔記成失敗'
+      + '——報告會寫「跑了 1 / 20 步，0 項失敗」，'
+      + '而冇人知道點解得 1 步、亦都重現唔到',
+    file: 'src/MonkeyRun.gs',
+    find: "      failures.push({\n"
+      + "        step: i, kind: '這個狀態下沒有任何合法動作',",
+    replace: "      [].push({\n"
+      + "        step: i, kind: '這個狀態下沒有任何合法動作',",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-no-legal-not-printed',
+    why: '報告唔印「這個狀態下沒有任何合法動作」'
+      + '——嗰句係「點解跑到一半就停」嘅答案',
+    file: 'src/MonkeyRun.gs',
+    find: '  if (report.noLegalAction) {',
+    replace: '  if (false) {',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-speed-line-gone',
+    why: '報告唔印時間分佈'
+      + '——落一輪又要重新估樽頸喺邊',
+    file: 'src/MonkeyRun.gs',
+    find: '  lines.push(monkeyDescribeSpeed_(report));',
+    replace: '  lines.push(\'\');',
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-speed-no-split',
+    why: '時間只印一個總數，唔分動作／不變量'
+      + '——樽頸喺邊就要靠估',
+    file: 'src/MonkeyRun.gs',
+    find: "    + '（動作 ' + sec(report.actionMs) + ' 秒／不變量 '\n"
+      + "    + sec(report.invariantMs) + ' 秒）';",
+    replace: "    + '';",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-fast-ids-guessed',
+    why: '快嗰批嘅 id 喺亂行機度另寫一份清單'
+      + '——`INVARIANT_SET.PER_SCENARIO` 日後加減一條，'
+      + '報告就會講一個唔存在嘅事實，而冇人會發現',
+    file: 'src/MonkeyRun.gs',
+    // ⚠️ `find` 特登唔寫到成句完——寫齊嘅話，句字面量入面會有一串
+    // 「物件.屬性」，而嗰個屬性名啱啱好係一個真實 TLD，
+    // 於是 `scan-staged-secrets.js` 會當佢係網域擋住 commit。
+    find: '        fastInvariantIds = inv.results.map(function (r) {',
+    // ⚠️ 保留後半截，句嘢先至仍然係合法 JS：
+    //   `['I01', …] || inv.results.map(function (r) { … });`
+    // 左邊永遠 truthy，所以真正效果就係「另寫一份清單」。
+    replace: "        fastInvariantIds = ['I01', 'I05', 'I09', 'I10']"
+      + " || inv.results.map(function (r) {",
+    tests: ['tests/monkey_speed.test.js']
+  },
+  {
+    id: 'mky-sweep-count-wrong',
+    why: '唔數全套跑咗幾多次'
+      + '——報告會講「全套跑了 0 次」，而實際跑過；'
+      + '一個講錯咗嘅數字比冇數字更差',
+    file: 'src/MonkeyRun.gs',
+    find: '        fullSweepCount++;\n        lastFullSweepStep = i;',
+    replace: '        lastFullSweepStep = i;',
+    tests: ['tests/monkey_speed.test.js']
   },
 ];
 

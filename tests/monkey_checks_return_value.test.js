@@ -52,7 +52,11 @@ function checkEqual(label, actual, expected) {
 function runOneStep(opts) {
   const gas = loadGasSource([
     'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs', 'QuarterStage.gs',
-    'SeasonRehearsal.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'MonkeyRun.gs'
+    'SeasonRehearsal.gs', 'QuarterReset.gs', 'SelfTestRunner.gs',
+    // ⚠️ 第六十一輪批次 B 組之後，`runMonkey_()` 用到 `INVARIANT_SET`。
+    // 唔載 `Invariants.gs` 嘅話，每一步都會靜靜噉多咗一項
+    //「不變量算不出：INVARIANT_SET is not defined」。
+    'Invariants.gs', 'MonkeyRun.gs'
   ]);
   gas.log_ = function () {};
   gas.readSelfTestQuarterDetail_ = function () {
@@ -66,6 +70,10 @@ function runOneStep(opts) {
     };
   };
   gas.assertMonkeyDryRunStillOn_ = function () {};
+  // 第六十一輪批次 C 組：`runMonkey_()` 開跑就讀一次 Config
+  //（跳唔跳過慢動作），而 Config 行 `CacheService`——沙箱唔提供。
+  gas.readConfig = function () { return {}; };
+  gas.getConfig = function (key, dflt) { return dflt; };
 
   // ⚠️ **唔換 `monkeyActions_()`**——要驗嘅正正係真嗰張表上面
   // 嗰個 `expect`。淨係換佢底下嗰個真實入口。
@@ -224,7 +232,11 @@ console.log('\n=== C 九個動作全部有查證，一個都唔可以漏 ===');
 {
   const gas = loadGasSource([
     'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs', 'QuarterStage.gs',
-    'SeasonRehearsal.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'MonkeyRun.gs'
+    'SeasonRehearsal.gs', 'QuarterReset.gs', 'SelfTestRunner.gs',
+    // ⚠️ 第六十一輪批次 B 組之後，`runMonkey_()` 用到 `INVARIANT_SET`。
+    // 唔載 `Invariants.gs` 嘅話，每一步都會靜靜噉多咗一項
+    //「不變量算不出：INVARIANT_SET is not defined」。
+    'Invariants.gs', 'MonkeyRun.gs'
   ]);
   const actions = gas.monkeyActions_();
   const missing = actions.filter(function (a) {
@@ -243,7 +255,11 @@ console.log('\n=== C 純算／純讀嘅動作改咗嘢 ⇒ 要記低 ===');
 {
   const gas = loadGasSource([
     'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs', 'QuarterStage.gs',
-    'SeasonRehearsal.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'MonkeyRun.gs'
+    'SeasonRehearsal.gs', 'QuarterReset.gs', 'SelfTestRunner.gs',
+    // ⚠️ 第六十一輪批次 B 組之後，`runMonkey_()` 用到 `INVARIANT_SET`。
+    // 唔載 `Invariants.gs` 嘅話，每一步都會靜靜噉多咗一項
+    //「不變量算不出：INVARIANT_SET is not defined」。
+    'Invariants.gs', 'MonkeyRun.gs'
   ]);
   const before = { stage: 'DRAFT', latestVersionNo: 1, gridChangeCount: 0 };
 

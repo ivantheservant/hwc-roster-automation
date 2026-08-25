@@ -140,6 +140,23 @@ const MONKEY_UNRESOLVED_TEXT = '一個系統認不出的名字';
  */
 const MONKEY_SPIN_LIMIT = 5;
 
+/**
+ * 第六十一輪批次 B 組：每幾多步跑一次**全套**不變量。
+ *
+ * ⚠️ 背景：亂行機每一步都跑 `runAllInvariants_(quarterId)`——冇傳 set
+ * 即係 `ALL`，入面包住 I04（`RosterAssignments` 成萬行）同 I08
+ * （每一條要行一次完整 plan）。一步跑一次，行 50 步就跑 50 次。
+ *
+ * ⚠️ **唔可以因為慳時間就唔跑全套。** 只係唔使每步都跑：
+ *   ・每一步　　　跑快嗰批（I01／I05／I09／I10）
+ *   ・每 10 步　　跑全套一次
+ *   ・收尾　　　　如果最後一步唔係全套嗰一步，補跑一次
+ *
+ * 「收尾補跑」唔可以省。迴圈會因為時間到、原地打轉、冇合法動作
+ * 而中途 break——省咗嘅話，最尾嗰段改動就冇任何一次全套驗過。
+ */
+const MONKEY_FULL_INVARIANT_EVERY = 10;
+
 function monkeyActions_() {
   return [
     {
@@ -320,6 +337,28 @@ function monkeyActions_() {
     },
     {
       id: '正式發出給全體（模擬）',
+      // ═══════════════════════════════════════════════════════════════
+      // 第六十一輪批次 C 組：**呢個係亂行機入面最慢嗰一個動作。**
+      // ═══════════════════════════════════════════════════════════════
+      //
+      // `apiStep4Confirm()` → `executeStep4Send_()` 要逐個收件人
+      // （全體 ≈ 58 位）行一次：解析收件人、砌信、查嗰個人嘅個人 PDF。
+      // 就算 `DRY_RUN` 唔真寄，上面嗰幾樣一樣要做足。
+      //
+      // ⚠️ 佢**唔會**產生個人 PDF——佢係讀返「準備工作 ▸ 產生個人 PDF」
+      // 已經整好嗰啲；查唔到就記 `errorPdfMissing`。產生嗰一支係
+      // `generatePersonalPdfBatch_()`（`PdfBatch.gs`），
+      // 而亂行機由頭到尾冇一個動作叫得到佢。
+      //
+      // ⚠️ 跳過佢**唔等於**呢條路冇驗過：自測機 S08（產生個人 PDF）
+      // ＋ S09（正式發出，DRY_RUN）行嘅就係同一條路，而且係
+      // 由頭到尾一整條，比亂行機隨機撞到嗰一下完整。
+      //
+      // ⚠️ 但跳過佢有一個**連帶後果**，報告要講明：Stage 上唔到
+      // `OFFICIAL_SENT`，所以「改動後重發（只算，不寄）」亦都
+      // 永遠合法唔到。呢個唔係 bug，係開關嘅代價。
+      slow: '要逐個收件人（≈58 位）砌信同查個人 PDF；'
+        + '自測機 S08 ＋ S09 已完整驗過同一條路',
       legal: function (facts) {
         return !!(facts.buttons.official && facts.buttons.official.enabled);
       },
@@ -487,6 +526,17 @@ function monkeyPickWeighted_(legal, rnd) {
 }
 
 /**
+ * 第六十一輪批次 C 組：亂行機跳唔跳過慢動作。
+ *
+ * ⚠️ 讀 Config，唔係寫死。見 `CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS`。
+ *
+ * @returns {boolean} `true` ＝ 跳過
+ */
+function monkeySkipSlowActions_() {
+  return getConfig(CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, true) === true;
+}
+
+/**
  * 系統狀態嘅指紋——防打轉閘用。
  *
  * ⚠️ 三樣嘢：Stage、最新版本號、認唔出嘅格數。
@@ -554,11 +604,35 @@ function runMonkey_(steps, seed, skipDraws) {
   }
 
   const rnd = makeMonkeyRandom_(seed, skipDraws);
-  const actions = monkeyActions_();
+
+  // ── 第六十一輪批次 C 組：慢動作 ────────────────────────────────
+  //
+  // ⚠️ 篩走咗邊幾個，一定要帶落報告。一份「跑咗 50 步、零失敗」
+  // 而冇講跳過乜嘅報告，會令人以為嗰條路驗過。
+  const allActions = monkeyActions_();
+  const skipSlow = monkeySkipSlowActions_();
+  const skippedSlow = allActions.filter(function (a) { return !!a.slow; })
+    .map(function (a) { return { id: a.id, why: String(a.slow) }; });
+  const actions = skipSlow
+    ? allActions.filter(function (a) { return !a.slow; })
+    : allActions;
+
   const path = [];
   const stepLog = [];
   const failures = [];
   let stoppedForTime = false;
+  // 第六十一輪批次 A 組：冇一個動作合法嗰陣，要講得出停喺邊。
+  let noLegalAction = null;
+  // 第六十一輪批次 B 組：全套不變量跑咗幾多次、最後一次係第幾步。
+  let fullSweepCount = 0;
+  let lastFullSweepStep = 0;
+  // ⚠️ 由**真正跑過嗰一批**攞返 id，唔喺呢度另寫一份清單。
+  // 另寫一份嘅話，`INVARIANT_SET.PER_SCENARIO` 日後加減一條，
+  // 報告就會講一個唔存在嘅事實——而冇人會發現。
+  let fastInvariantIds = [];
+  // 第六十一輪批次 D 組：時間去咗邊。
+  let actionMs = 0;
+  let invariantMs = 0;
   // 第六十輪批次 A3 組：防打轉閘。
   let lastFingerprint = '';
   let sameFingerprintRun = 0;
@@ -597,7 +671,31 @@ function runMonkey_(steps, seed, skipDraws) {
       try { return a.legal(facts); } catch (err) { return false; }
     });
     if (legal.length === 0) {
-      stepLog.push({ step: i, action: '（沒有合法動作）', outcome: '停手', invariant: '' });
+      // ═════════════════════════════════════════════════════════════
+      // 第六十一輪批次 A 組：**唔可以靜靜停低。**
+      // ═════════════════════════════════════════════════════════════
+      //
+      // 舊寫法只係 `stepLog.push(...)` 然後 `break`——冇記低失敗、
+      // 冇印路徑。於是報告會寫「跑了 3 / 50 步，0 項失敗」，
+      // 而冇人知道點解得 3 步、亦都重現唔到。
+      //
+      // ⚠️ 同 A3 防打轉閘一樣：**一份「跑咗幾步、零失敗」嘅報告
+      // 睇落好似冇事**——嗰個先係最危險嘅輸出。
+      noLegalAction = {
+        step: i,
+        state: monkeyStateFingerprint_(facts),
+        actionCount: actions.length
+      };
+      failures.push({
+        step: i, kind: '這個狀態下沒有任何合法動作',
+        detail: '停在 ' + monkeyStateFingerprint_(facts)
+          + '（Stage｜最新版本號｜認不出的格數）。'
+          + '這一批可以撳的動作有 ' + actions.length + ' 個，'
+          + '而沒有一個在這個狀態下合法，所以乾淨停手。',
+        path: path.slice()
+      });
+      stepLog.push({ step: i, action: '（沒有合法動作）',
+        outcome: '乾淨停手', invariant: '' });
       break;
     }
 
@@ -607,6 +705,8 @@ function runMonkey_(steps, seed, skipDraws) {
     // ⚠️ 喺迴圈嗰層宣告，唔可以留喺下面個 `try` 入面——
     // 下面防打轉嗰段喺 `try` 之後先用到佢。
     let after = null;
+    // 第六十一輪批次 D 組：呢一步嘅動作用咗幾耐（包括之後讀返狀態嗰下）。
+    const actionStartedAt = new Date().getTime();
     try {
       const result = picked.run(quarterId, rnd);
       outcome = JSON.stringify(result).slice(0, 300);
@@ -642,6 +742,7 @@ function runMonkey_(steps, seed, skipDraws) {
         path: path.slice().concat([picked.id])
       });
     }
+    actionMs += new Date().getTime() - actionStartedAt;
     path.push(picked.id);
 
     // ═══════════════════════════════════════════════════════════════
@@ -687,31 +788,86 @@ function runMonkey_(steps, seed, skipDraws) {
       break;
     }
 
-    // ── 每一步跑一次全部不變量 ──────────────────────────────────
+    // ── 第六十一輪批次 B 組：抽驗 ＋ 定期全驗 ────────────────────
+    //
+    // ⚠️ 之前每一步都 `runAllInvariants_(quarterId)`（冇傳 set ＝ ALL），
+    // 入面包住 I04（成萬行）同 I08（每條行一次完整 plan）。
+    // 一步跑一次，50 步就跑 50 次——而狀態一步之內改到嘅嘢，
+    // 快嗰四條已經捉得到大部分。
+    //
+    // ⚠️ **唔係唔跑全套**，係唔使每步都跑：每 10 步一次，收尾補一次。
+    const isFullSweep = (i % MONKEY_FULL_INVARIANT_EVERY === 0) || (i === total);
+    const invariantStartedAt = new Date().getTime();
     let invariantText = '';
     try {
-      const inv = runAllInvariants_(quarterId);
+      const inv = runAllInvariants_(quarterId,
+        isFullSweep ? INVARIANT_SET.ALL : INVARIANT_SET.PER_SCENARIO);
+      if (isFullSweep) {
+        fullSweepCount++;
+        lastFullSweepStep = i;
+      } else if (fastInvariantIds.length === 0) {
+        fastInvariantIds = inv.results.map(function (r) { return r.id; });
+      }
       const broken = inv.results.filter(function (r) {
         return r.status === INVARIANT_STATUS.FAILED || r.status === INVARIANT_STATUS.ERROR;
       });
-      invariantText = broken.length === 0 ? 'OK'
-        : broken.map(function (r) { return r.id; }).join('、');
+      invariantText = (broken.length === 0 ? 'OK'
+        : broken.map(function (r) { return r.id; }).join('、'))
+        + (isFullSweep ? '（全套）' : '（逐步）');
       broken.forEach(function (r) {
         failures.push({
           step: i, kind: '不變量 ' + r.id,
+          // ⚠️ 分開講「逐步」同「全套」：一條只喺全套先驗到嘅不變量
+          // 紅咗，代表佢係喺前面某幾步之內壞嘅，唔一定係呢一步。
+          sweep: isFullSweep ? '全套' : '逐步',
           detail: r.label + '｜預期 ' + r.expected + '｜實際 ' + r.actual + '｜' + r.evidence,
           path: path.slice()
         });
       });
     } catch (err) {
       invariantText = '算不出：' + err.message;
-      failures.push({ step: i, kind: '不變量算不出', detail: err.message, path: path.slice() });
+      failures.push({ step: i, kind: '不變量算不出',
+        sweep: isFullSweep ? '全套' : '逐步',
+        detail: err.message, path: path.slice() });
     }
+    invariantMs += new Date().getTime() - invariantStartedAt;
 
     stepLog.push({
       step: i, action: picked.id, outcome: outcome,
       invariant: invariantText, threw: threw
     });
+  }
+
+  // ── 第六十一輪批次 B 組：收尾一定要有一次全套 ──────────────────
+  //
+  // ⚠️ 迴圈會因為時間到、原地打轉、冇合法動作、DRY_RUN 變咗
+  // 而中途 `break`。省咗呢一段嘅話，最尾嗰幾步改到嘅嘢
+  // 就冇任何一次全套驗過——而「慳時間」唔係唔驗嘅理由。
+  const ranSteps = stepLog.length;
+  let tailSweepStep = 0;
+  if (ranSteps > 0 && lastFullSweepStep !== stepLog[ranSteps - 1].step) {
+    const tailStep = stepLog[ranSteps - 1].step;
+    const tailStartedAt = new Date().getTime();
+    try {
+      const inv = runAllInvariants_(quarterId, INVARIANT_SET.ALL);
+      fullSweepCount++;
+      lastFullSweepStep = tailStep;
+      tailSweepStep = tailStep;
+      inv.results.filter(function (r) {
+        return r.status === INVARIANT_STATUS.FAILED || r.status === INVARIANT_STATUS.ERROR;
+      }).forEach(function (r) {
+        failures.push({
+          step: tailStep, kind: '不變量 ' + r.id, sweep: '全套',
+          detail: r.label + '｜預期 ' + r.expected + '｜實際 ' + r.actual
+            + '｜' + r.evidence,
+          path: path.slice()
+        });
+      });
+    } catch (err) {
+      failures.push({ step: tailStep, kind: '不變量算不出', sweep: '全套',
+        detail: '收尾那一次全套：' + err.message, path: path.slice() });
+    }
+    invariantMs += new Date().getTime() - tailStartedAt;
   }
 
   return {
@@ -723,12 +879,45 @@ function runMonkey_(steps, seed, skipDraws) {
     stoppedForTime: stoppedForTime,
     // 第六十輪批次 A3 組：有嘅話，報告要大聲講。
     spinning: spinning,
+    // 第六十一輪批次 A 組：停喺一個冇任何合法動作嘅狀態。
+    noLegalAction: noLegalAction,
+    // 第六十一輪批次 C 組：跳咗邊幾個慢動作。
+    skipSlow: skipSlow,
+    skippedSlow: skippedSlow,
+    // 第六十一輪批次 B 組：全套不變量跑咗幾多次。
+    fullSweepCount: fullSweepCount,
+    tailSweepStep: tailSweepStep,
+    fastInvariantIds: fastInvariantIds,
+    // 第六十一輪批次 D 組：時間去咗邊。
+    totalMs: new Date().getTime() - monkeyStartedAt_,
+    actionMs: actionMs,
+    invariantMs: invariantMs,
     steps: stepLog,
     failures: failures,
     path: path,
     // 續跑要用：下一次由第幾抽開始。
     drawnCount: rnd.drawnCount()
   };
+}
+
+/**
+ * 第六十一輪批次 D 組：一行講清楚時間去咗邊。
+ *
+ * ⚠️ 分開講「動作」同「不變量」——樽頸喺邊，一眼睇得出。
+ * 只印一個總數嘅話，落一輪又要重新估。
+ *
+ * @param {Object} report `runMonkey_()` 的結果
+ * @returns {string} 一行
+ */
+function monkeyDescribeSpeed_(report) {
+  const sec = function (ms) { return (Number(ms || 0) / 1000).toFixed(1); };
+  const steps = Number(report.ranSteps) || 0;
+  const per = steps > 0 ? (Number(report.totalMs || 0) / steps / 1000).toFixed(1)
+    : '—';
+  return '這一批：跑了 ' + steps + ' 步／用了 ' + sec(report.totalMs)
+    + ' 秒／平均每步 ' + per + ' 秒'
+    + '（動作 ' + sec(report.actionMs) + ' 秒／不變量 '
+    + sec(report.invariantMs) + ' 秒）';
 }
 
 /**
@@ -751,9 +940,64 @@ function describeMonkeyReport_(report) {
       + report.failures.length + ' 項失敗',
     '沙盒季度：' + report.quarterId,
     // ⚠️ seed 一定要印。同一個 seed 重跑一定同一條路。
-    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）',
-    ''
+    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）'
   ];
+
+  // ── 第六十一輪批次 D 組：時間去咗邊 ──────────────────────────
+  //
+  // ⚠️ 冇呢一行嘅話，「一批 4.5 分鐘得 2 步」呢種事，
+  // 每一次都要重新估一次樽頸喺邊。
+  lines.push(monkeyDescribeSpeed_(report));
+
+  // ── 第六十一輪批次 B 組：逐步 vs 全套 ────────────────────────
+  //
+  // ⚠️ 兩者要分開講。「跑了 50 步」唔等於「驗了 50 次全套」——
+  // 混做一句嘅話，一個「全套只跑過 1 次」嘅批次睇落同
+  // 「每步都跑全套」一模一樣。
+  lines.push('不變量：逐步跑快的那批（'
+    + ((report.fastInvariantIds || []).join('／') || '—') + '）；'
+    + '全套跑了 ' + report.fullSweepCount + ' 次（每 '
+    + MONKEY_FULL_INVARIANT_EVERY + ' 步一次'
+    + (report.tailSweepStep ? '，另加收尾補跑第 ' + report.tailSweepStep + ' 步'
+      : '') + '）。');
+
+  // ── 第六十一輪批次 C 組：跳咗邊幾個慢動作 ────────────────────
+  //
+  // ⚠️⚠️ **這一行不可以省。** 一份「跑了 50 步、零失敗」而沒有講
+  // 跳過什麼的報告，會令人以為那條路驗過了。
+  if (report.skipSlow && (report.skippedSlow || []).length > 0) {
+    lines.push('已跳過的慢動作：'
+      + report.skippedSlow.map(function (a) { return a.id; }).join('、')
+      + '（' + CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS + '=TRUE）');
+    report.skippedSlow.forEach(function (a) {
+      lines.push('　 ・' + a.id + '：' + a.why);
+    });
+    // ⚠️ 連帶後果都要講：跳過「正式發出」⇒ Stage 上不到 OFFICIAL_SENT
+    // ⇒「改動後重發」也永遠合法不了。這不是 bug，是開關的代價。
+    lines.push('　 ⚠️ 連帶：Stage 上不到「已正式發出」，'
+      + '所以「改動後重發（只算，不寄）」這一步也不會被抽到。');
+    lines.push('　 想它也一起亂行，把 ' + CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS
+      + ' 改成 FALSE。');
+  } else if ((report.skippedSlow || []).length > 0) {
+    lines.push('慢動作沒有跳過（' + CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS
+      + '=FALSE），這一批會慢很多。');
+  }
+  lines.push('');
+
+  // ── 第六十一輪批次 A 組：冇一個動作合法，要講得出停喺邊。 ────
+  //
+  // ⚠️ 舊寫法只係靜靜 `break`，報告會寫「跑了 3 / 50 步，0 項失敗」，
+  // 而冇人知道點解得 3 步、亦都重現唔到。
+  if (report.noLegalAction) {
+    lines.push('⛔ 這個狀態下沒有任何合法動作，已乾淨停手。');
+    lines.push('　 停在第 ' + report.noLegalAction.step + ' 步，狀態 '
+      + report.noLegalAction.state + '（Stage｜最新版本號｜認不出的格數）');
+    lines.push('　 這一批可以撳的動作有 ' + report.noLegalAction.actionCount
+      + ' 個，沒有一個在這個狀態下合法。');
+    lines.push('　 完整重現路徑：' + (report.path.join(' → ') || '（第一步）'));
+    lines.push('　 用同一個種子（' + report.seed + '）重跑會走同一條路。');
+    lines.push('');
+  }
 
   // ── 第六十輪批次 A3 組：原地打轉要排喺最頂，大聲講。 ─────────
   //
@@ -775,7 +1019,11 @@ function describeMonkeyReport_(report) {
     lines.push('沒有一步令不變量失敗。');
   }
   report.failures.forEach(function (f) {
-    lines.push('🔴 第 ' + f.step + ' 步　' + f.kind);
+    // ⚠️ 一條**只喺全套先驗到**嘅不變量紅咗，代表佢係喺前面
+    // 某幾步之內壞嘅，唔一定係呢一步——唔講明嘅話會揾錯方向。
+    lines.push('🔴 第 ' + f.step + ' 步　' + f.kind
+      + (f.sweep === '全套' ? '（全套那一次驗到；可能是前面幾步之內壞的）'
+        : ''));
     lines.push('　 ' + f.detail);
     lines.push('　 走到這裡的完整步驟：' + (f.path.join(' → ') || '（第一步）'));
     lines.push('');

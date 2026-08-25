@@ -269,6 +269,19 @@ function getConfigKeySeeds_() {
         + '不會變成「隨便挑一季」。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, type: CONFIG_TYPES.BOOL,
+      group: 'SYSTEM',
+      defaultValue: 'TRUE',
+      description: '「測試工具 ▸ ⚠️ 亂行機（沙盒季度，DRY_RUN）」'
+        + '是否跳過產生個人 PDF 這一類很慢的動作。'
+        + 'TRUE（預設）＝跳過。那條路自測機 S08（產生個人 PDF）'
+        + '和 S09（正式發出，DRY_RUN）已完整驗過，不會漏測。'
+        + '想它也一起亂行，就改 FALSE。'
+        + '⚠️ 跳過的話，亂行機報告開頭會印一行講明跳了哪幾個動作，'
+        + '不會讓人以為那條路驗過了。',
+      editable: 'TRUE'
+    },
     // ---- MAIL ----
     {
       key: CONFIG_KEYS.MAIL_ADMIN_NOTIFY, type: CONFIG_TYPES.EMAIL, group: 'MAIL',

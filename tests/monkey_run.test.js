@@ -181,11 +181,27 @@ console.log('\n=== 五【核心】報告要印「走到這裡的完整步驟」 
 }
 
 // =====================================================================
-console.log('\n=== 六 每一步都要跑一次全部不變量 ===');
+console.log('\n=== 六 每一步都要驗不變量（第六十一輪批次：抽驗 ＋ 定期全驗）===');
 {
-  check('★★★★★★ 每一步跑一次 `runAllInvariants_()`'
+  // ⚠️ 第六十一輪批次 B 組之前，呢度係「每一步跑一次全套」。
+  // 全套入面有 I04（`RosterAssignments` 成萬行）同 I08（每條行一次
+  // 完整 plan），一步跑一次，50 步就跑 50 次。
+  //
+  // ⚠️ 改成抽驗**唔等於**唔驗：每一步照跑快嗰批，
+  // 每 10 步一次全套，收尾再補一次。三樣缺一不可，所以三條都驗。
+  check('★★★★★★ 每一步都有跑不變量'
     + '——亂行機自己冇斷言，佢全部靠不變量出力',
-    /path\.push\(picked\.id\);[\s\S]{0,2000}runAllInvariants_\(quarterId\)/.test(CODE), '');
+    /path\.push\(picked\.id\);[\s\S]{0,3000}runAllInvariants_\(quarterId,/.test(CODE), '');
+  check('★★★★★★ 逐步嗰批係快嗰批（`PER_SCENARIO`）',
+    /isFullSweep \? INVARIANT_SET\.ALL : INVARIANT_SET\.PER_SCENARIO/.test(CODE), '');
+  check('★★★★★★ **每 `MONKEY_FULL_INVARIANT_EVERY` 步跑一次全套**'
+    + '——慳時間唔可以變成唔跑全套',
+    /i % MONKEY_FULL_INVARIANT_EVERY === 0/.test(CODE), '');
+  check('★★★★★★ **收尾一定補一次全套**'
+    + '——迴圈會因為時間到／原地打轉／冇合法動作而中途 break，'
+    + '省咗嘅話最尾嗰段改動就冇任何一次全套驗過',
+    /lastFullSweepStep !== stepLog\[ranSteps - 1\]\.step/.test(CODE)
+      && /runAllInvariants_\(quarterId, INVARIANT_SET\.ALL\)/.test(CODE), '');
   check('★★★★★ 逐步紀錄寫入 `MonkeyLog`',
     /function writeMonkeyLog_\(/.test(CODE) && /第幾步/.test(SRC), '');
   check('★★★★★ 有選單入口（兩個：開跑同續跑）',

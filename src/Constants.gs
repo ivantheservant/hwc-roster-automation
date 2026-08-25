@@ -1283,6 +1283,16 @@ const CONFIG_KEYS = {
   // 真係清咗一季真資料。開跑之前有三道閘（受保護清單 ×2、Stage）擋住，
   // 但最後一道防線仍然係呢一格填得啱。
   SELFTEST_QUARTER_ID: 'SELFTEST_QUARTER_ID',
+
+  // 第六十一輪批次 C 組：亂行機跳唔跳過「好慢」嗰幾個動作。
+  //
+  // ⚠️ **一定要做成開關，唔可以寫死或者刪走嗰個動作。**
+  // 「而家唔跑」同「以後都唔跑」係兩件事。刪走咗嘅話，
+  // 兩個月之後冇人記得亂行機本來行過嗰條路。
+  //
+  // ⚠️ 亦都因為噉，報告開頭一定要印一行講明跳咗邊幾個——
+  // 否則一份「50 步、零失敗」嘅報告會令人以為嗰條路驗過。
+  MONKEY_SKIP_SLOW_ACTIONS: 'MONKEY_SKIP_SLOW_ACTIONS',
   PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
   // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
