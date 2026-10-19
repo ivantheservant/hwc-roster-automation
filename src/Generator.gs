@@ -31,17 +31,8 @@ function buildGeneratorContext_(quarterId) {
   const unavailable = readUnavailableNormalized(timezone);
 
   // Active=FALSE 的特別主日（例如範例列）不套用。
-  const specialByDate = {};
-  readSpecialSundays(quarterId)
-    .filter(function (row) { return isTrueValue_(row[COLUMNS.SPECIAL_SUNDAYS.ACTIVE]); })
-    .forEach(function (row) {
-      const dateStr = toDateString(row[COLUMNS.SPECIAL_SUNDAYS.SERVICE_DATE], timezone);
-      specialByDate[dateStr] = {
-        specialId: row[COLUMNS.SPECIAL_SUNDAYS.SPECIAL_ID],
-        skipPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.SKIP_POST_IDS]),
-        lockPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.LOCK_POST_IDS])
-      };
-    });
+  // 第六十三輪批次 B 組：同「開季前準備」用同一個函式（buildSpecialSundayByDate_）。
+  const specialByDate = buildSpecialSundayByDate_(readSpecialSundays(quarterId), timezone);
 
   const carryOverWeeks = Number(config[CONFIG_KEYS.CARRY_OVER_WEEKS]) || 0;
   const quarterStart = toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone);
@@ -441,22 +432,38 @@ function buildRoster_(context) {
  * @returns {?{ruleId: string, reason: string}} 需留空時回傳原因；否則回傳 null
  */
 function getSkipReason_(post, serviceDate, special, rules) {
-  if (!post.autoGenerate && isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)) {
-    return { ruleId: RULE_IDS.NO_AUTO_GENERATE, reason: '此崗位 AutoGenerate=FALSE，系統不自動派人' };
-  }
+  // ⚠️⚠️ 第六十三輪批次 B 組：**次序係重點。**
+  //
+  //   1. 每月第一主日限定（結構性不適用）——永遠排最前
+  //   2. 特別主日嘅 `SkipPostIDs`
+  //   3. `AutoGenerate = FALSE`／`AS_NEEDED`
+  //
+  // 舊次序係 3 排喺 2 前面。講員、翻譯、獻花 `AutoGenerate = FALSE`，
+  // 所以永遠拎到 `HARD_NO_AUTO_PREACHER`，`SkipPostIDs` 寫咗
+  // `PREACHER,TRANSLATOR` 都冇作用。
+  //
+  // 現場（`2027T4` v0，2027-10-03，`SkipPostIDs=CHAIR,PREACHER,TRANSLATOR,WORSHIP,PIANO`）：
+  // CHAIR／WORSHIP／PIANO 係 `HARD_SPECIAL_SUNDAY_SKIP`，但 PREACHER／TRANSLATOR
+  // 係 `HARD_NO_AUTO_PREACHER`，公開版顯示「待確認」；「講員未填」永遠多數一週，
+  // 填講員畫面叫幹事去填一個本來唔設嘅講員。
+  //
+  // ⚠️ 已經生成咗嘅版本**唔回頭改**——呢個只影響之後生成嘅。
   if (post.frequency === POST_FREQUENCY.FIRST_SUNDAY
       && !serviceDate.isFirstSundayOfMonth
       && isRuleEnabled_(rules, RULE_IDS.COMMUNION_FIRST_SUNDAY)) {
     return { ruleId: RULE_IDS.COMMUNION_FIRST_SUNDAY, reason: '此崗位只在每月第一個主日安排' };
-  }
-  if (post.frequency === POST_FREQUENCY.AS_NEEDED) {
-    return { ruleId: RULE_IDS.NO_AUTO_GENERATE, reason: '此崗位 Frequency=AS_NEEDED，按需要人手安排' };
   }
   if (special.skipPostIds.indexOf(post.postId) !== -1) {
     // 階段 A：獨立的 ruleId（不共用 NO_AUTO_GENERATE），讓顯示層可以把「這個崗位
     // 平常會自動生成，只是這一週因為特別主日而跳過」跟「這個崗位本來就永遠不
     // 自動生成」分開標示，見 SPECIAL_SKIP_RULE_IDS。
     return { ruleId: RULE_IDS.SPECIAL_SUNDAY_SKIP, reason: '此崗位在該特別主日的 SkipPostIDs 名單內' };
+  }
+  if (!post.autoGenerate && isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)) {
+    return { ruleId: RULE_IDS.NO_AUTO_GENERATE, reason: '此崗位 AutoGenerate=FALSE，系統不自動派人' };
+  }
+  if (post.frequency === POST_FREQUENCY.AS_NEEDED) {
+    return { ruleId: RULE_IDS.NO_AUTO_GENERATE, reason: '此崗位 Frequency=AS_NEEDED，按需要人手安排' };
   }
   if (!serviceDate.autoGenerate) {
     return { ruleId: RULE_IDS.NO_AUTO_GENERATE, reason: '該主日 AutoGenerate=FALSE' };

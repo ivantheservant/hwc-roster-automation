@@ -227,7 +227,7 @@ function buildGas() {
     }
   };
   const gas = loadGasSource(
-    ['Constants.gs', 'Utils.gs', 'Config.gs', 'SheetReader.gs', 'QuarterStage.gs', 'RosterWriter.gs', 'PreacherTranslationFill.gs'],
+    ['Constants.gs', 'MutationLock.gs', 'Utils.gs', 'Config.gs', 'SheetReader.gs', 'QuarterStage.gs', 'RosterWriter.gs', 'PreacherTranslationFill.gs'],
     overrides
   );
   return { gas: gas, scenario: scenario };

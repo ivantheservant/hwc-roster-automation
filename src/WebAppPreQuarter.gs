@@ -68,10 +68,19 @@ function planPreQuarterChecklist_(input) {
       && String(row[S.SKIP_POST_IDS] || '').trim() === '';
   }).length;
 
+  // ⚠️ 第六十三輪批次 B 組：特別主日 `SkipPostIDs` 入面嘅崗位，嗰週**本來就唔設**，
+  // 唔計「未填」。讀同生成器同一份（`buildSpecialSundayByDate_()`）。
+  const specialByDate = buildSpecialSundayByDate_(specialRows, input.timezone);
+  const isSkipped = function (serviceDate, postId) {
+    const special = specialByDate[serviceDate];
+    return !!special && special.skipPostIds.indexOf(postId) !== -1;
+  };
+
   const countEmptyWeeks = function (postId, onlyWhen) {
     if (!postId) return 0;   // 搵唔到呢個崗位 ⇒ 冇嘢可以未填
     return serviceDates.filter(function (d) {
       if (onlyWhen && !onlyWhen(d)) return false;
+      if (isSkipped(d.serviceDate, postId)) return false;
       return !filled[d.serviceDate + '|' + postId];
     }).length;
   };

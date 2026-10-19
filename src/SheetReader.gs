@@ -389,3 +389,33 @@ function readLatestAssignmentUpdatedAt_(quarterId, versionNo, timezone) {
   });
   return max;
 }
+
+/**
+ * 第六十三輪批次 B 組：**特別主日逐日嘅安排——生成器同「開季前準備」共用。**
+ *
+ * 只計 `Active = TRUE`（Active=FALSE 代表幹事已經決定唔用呢一列）。
+ *
+ * ⚠️ 「開季前準備」本來自己數「講員未填」，完全唔理特別主日
+ *（`SkipPostIDs` 有 `PREACHER` 嗰週照計「未填」）。佢同生成器一定要讀
+ * 同一份——各寫一份嘅話，生成器話嗰週唔設講員，開季前準備就話未填。
+ *
+ * @param {Object[]} specialRows `SpecialSundays` 嘅列（呼叫端已篩季度）
+ * @param {string} timezone 時區
+ * @returns {Object.<string, {specialId: string, skipPostIds: string[], lockPostIds: string[]}>}
+ */
+function buildSpecialSundayByDate_(specialRows, timezone) {
+  const S = COLUMNS.SPECIAL_SUNDAYS;
+  const byDate = {};
+  (specialRows || [])
+    .filter(function (row) { return isTrueValue_(row[S.ACTIVE]); })
+    .forEach(function (row) {
+      const dateStr = toDateString(row[S.SERVICE_DATE], timezone);
+      if (!dateStr) return;
+      byDate[dateStr] = {
+        specialId: row[S.SPECIAL_ID],
+        skipPostIds: splitList_(row[S.SKIP_POST_IDS]),
+        lockPostIds: splitList_(row[S.LOCK_POST_IDS])
+      };
+    });
+  return byDate;
+}

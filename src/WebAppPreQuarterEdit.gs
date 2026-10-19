@@ -304,7 +304,17 @@ function apiWebListPreacherPending(quarterId) {
  * @param {string} name 姓名
  * @returns {Object} 同 `apiSavePreacherTranslationEntry()`
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiWebSavePreacherEntry_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiWebSavePreacherEntry(quarterId, serviceDate, postId, slotIndex, name) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('填講員／翻譯／獻花', function () {
+    return apiWebSavePreacherEntry_locked_(quarterId, serviceDate, postId, slotIndex, name);
+  });
+}
+
+function apiWebSavePreacherEntry_locked_(quarterId, serviceDate, postId, slotIndex, name) {
   assertWebAppRequestAllowed_();
   return apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotIndex, name);
 }

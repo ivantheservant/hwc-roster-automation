@@ -126,6 +126,10 @@ function apiListPreacherTranslationPending(quarterId) {
     const postId = row[COLUMNS.ROSTER_ASSIGNMENTS.POST_ID];
     if (targetPostIds.indexOf(postId) === -1) return;
     if (row[COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID] || row[COLUMNS.ROSTER_ASSIGNMENTS.PERSON_NAME_SNAPSHOT]) return;
+    // ⚠️ 第六十三輪批次 B 組：特別主日嗰週唔設呢個崗位（例如合堂由英語堂講道）
+    // ⇒ 唔列。列咗就係叫幹事去填一個本來唔設嘅講員。
+    if (splitList_(row[COLUMNS.ROSTER_ASSIGNMENTS.RULE_FLAGS])
+      .indexOf(RULE_IDS.SPECIAL_SUNDAY_SKIP) !== -1) return;
 
     const serviceDate = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
     pending.push({
@@ -164,7 +168,16 @@ function apiListPreacherTranslationPending(quarterId) {
  * @param {string} name 要填入的姓名（自由文字，不強制對應 NameMapping）
  * @returns {{personId: string, linkedToNameMapping: boolean}}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiSavePreacherTranslationEntry_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotIndex, name) {
+  return withMutationLock_('填講員／翻譯／獻花', function () {
+    return apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId, slotIndex, name);
+  });
+}
+
+function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId, slotIndex, name) {
   const trimmedName = String(name || '').trim();
   if (!trimmedName) throw new Error('姓名不可留空。');
 

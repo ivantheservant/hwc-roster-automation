@@ -1048,7 +1048,16 @@ function runExportPdf_() {
  * 除非 Config 的 PDF_REGENERATE_IF_EXISTS=TRUE。
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runGeneratePersonalPdfBatch_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runGeneratePersonalPdfBatch_() {
+  return withMutationLock_('產生個人 PDF', function () {
+    return runGeneratePersonalPdfBatch_locked_();
+  });
+}
+
+function runGeneratePersonalPdfBatch_locked_() {
   const ui = SpreadsheetApp.getUi();
   const target = promptQuarterAndVersion_('產生個人 PDF');
   if (!target) return;
@@ -2216,7 +2225,16 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
  * 危險程度與「安裝自動排程」同級，所以標 ⚠️⚠️。
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runResetQuarterTestData_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runResetQuarterTestData_() {
+  return withMutationLock_('重設季度測試資料', function () {
+    return runResetQuarterTestData_locked_();
+  });
+}
+
+function runResetQuarterTestData_locked_() {
   const ui = SpreadsheetApp.getUi();
   const TITLE = '⚠️⚠️ 重設季度測試資料';
 

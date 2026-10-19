@@ -250,7 +250,17 @@ function logSendWithUnsavedRelease_(quarterId, actionName, guard) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 寄送結果統計，欄位與選單版本完成對話框一致
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep2Confirm_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep2Confirm(quarterId, sendOptions) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('寄給堂委審閱', function () {
+    return apiStep2Confirm_locked_(quarterId, sendOptions);
+  });
+}
+
+function apiStep2Confirm_locked_(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 2／3／4 永不改動職事表內容，
   // 所以有未儲存改動時一律拒絕，指去掣 1。
@@ -324,7 +334,17 @@ function apiStep3Decline(quarterId) {
  * @param {boolean} acceptConfirmList 是否接受全部 CONFIRM 類別的申報
  * @returns {Object} 套用結果，含是否已經前進、是否仍需要放行
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep3Apply_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep3Apply(quarterId, acceptConfirmList) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('套用修改申報', function () {
+    return apiStep3Apply_locked_(quarterId, acceptConfirmList);
+  });
+}
+
+function apiStep3Apply_locked_(quarterId, acceptConfirmList) {
   assertWebAppRequestAllowed_();
   requireQuarterStage_(
     quarterId, [QUARTER_STAGE.REVIEW_SENT, QUARTER_STAGE.REQUESTS_APPLIED], '步驟 3：套用修改申報');
@@ -356,7 +376,17 @@ function apiStep3Apply(quarterId, acceptConfirmList) {
  * @param {string} releaseText 使用者輸入的放行文字
  * @returns {Object} 是否已經前進；未前進時附上目前的違規清單供前端重新顯示
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep3Release_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep3Release(quarterId, releaseText) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('放行規則違反並推進進度', function () {
+    return apiStep3Release_locked_(quarterId, releaseText);
+  });
+}
+
+function apiStep3Release_locked_(quarterId, releaseText) {
   assertWebAppRequestAllowed_();
   const result = executeStep3Release_(quarterId, releaseText);
   if (result.violations) result.violations = result.violations.map(mapViolationForClient_);
@@ -427,7 +457,17 @@ function apiStep4GetSendPreview(quarterId, versionNo, sendOptions) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} 寄送結果統計
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep4Confirm_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep4Confirm(quarterId, sendOptions) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('正式發出給全體', function () {
+    return apiStep4Confirm_locked_(quarterId, sendOptions);
+  });
+}
+
+function apiStep4Confirm_locked_(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2／E3：規格 2.6 三層防重複嘅第 2、3 層。
   // 第 1 層（Stage）由 executeStep4Send_() 內部嘅 requireQuarterStage_() 負責。
@@ -522,7 +562,17 @@ function apiStep5Decline(quarterId) {
  * @param {boolean} acceptConfirmList 是否接受全部 CONFIRM 類別的申報
  * @returns {Object} 套用結果
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep5Apply_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep5Apply(quarterId, acceptConfirmList) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('套用修改申報（改動後重發）', function () {
+    return apiStep5Apply_locked_(quarterId, acceptConfirmList);
+  });
+}
+
+function apiStep5Apply_locked_(quarterId, acceptConfirmList) {
   assertWebAppRequestAllowed_();
   requireQuarterStage_(quarterId, [QUARTER_STAGE.OFFICIAL_SENT], '步驟 5：改動後重發');
 
@@ -571,7 +621,17 @@ function apiStep5CheckRelease(quarterId, releaseText) {
  * @param {string} releaseText 硬規則放行文字（沒有硬規則違反時可傳空字串）
  * @returns {Object} 這一批的產生進度；`blocked:true` 時代表被硬規則關卡擋住
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep5GeneratePdfs_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep5GeneratePdfs(quarterId, releaseText) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('產生個人 PDF（改動後重發）', function () {
+    return apiStep5GeneratePdfs_locked_(quarterId, releaseText);
+  });
+}
+
+function apiStep5GeneratePdfs_locked_(quarterId, releaseText) {
   assertWebAppRequestAllowed_();
   const changed = planStep5ChangedList_(quarterId);
   const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
@@ -638,7 +698,17 @@ function apiStep5SendPreview(quarterId, sendOptions) {
  * @param {string} releaseText 硬規則放行文字（沒有硬規則違反時可傳空字串）
  * @returns {Object} 寄送結果；`blocked:true` 時代表被硬規則關卡擋住，或沒有改動需要重發
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiStep5SendConfirm_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiStep5SendConfirm(quarterId, releaseText, sendOptions) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('改動後重發', function () {
+    return apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions);
+  });
+}
+
+function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 4 一樣唔可以喺有未儲存改動嘅
   // 情況下寄——否則義工會收到一封「最新安排」，但實際上仲有嘢未儲存。

@@ -4021,6 +4021,80 @@ const MUTATIONS = [
       + '  }\n  const text = String(value).trim();\n  if (text === \'\') return null;',
     tests: ['tests/stale_after_fill.test.js']
   },
+  // ── 第六十三輪批次 B 組：特別主日 SkipPostIDs 對講員／翻譯無效 ──────
+  {
+    id: 'b-skip-after-no-auto',
+    why: '`getSkipReason_()` 把 NO_AUTO 排返去特別主日前面'
+      + '——現場：合堂嗰週 SkipPostIDs 有 PREACHER，講員照樣「待確認」',
+    file: 'src/Generator.gs',
+    find: '  if (special.skipPostIds.indexOf(post.postId) !== -1) {\n'
+      + '    // 階段 A：獨立的 ruleId（不共用 NO_AUTO_GENERATE），讓顯示層可以把「這個崗位',
+    replace: '  if (!post.autoGenerate && isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)) {\n'
+      + "    return { ruleId: RULE_IDS.NO_AUTO_GENERATE, reason: 'x' };\n  }\n"
+      + '  if (special.skipPostIds.indexOf(post.postId) !== -1) {\n'
+      + '    // 階段 A：獨立的 ruleId（不共用 NO_AUTO_GENERATE），讓顯示層可以把「這個崗位',
+    tests: ['tests/special_skip_preacher.test.js']
+  },
+  {
+    id: 'b-pending-lists-skipped',
+    why: '填講員畫面照列特別主日跳過嘅格'
+      + '——叫幹事去填一個本來唔設嘅講員',
+    file: 'src/PreacherTranslationFill.gs',
+    find: '    if (splitList_(row[COLUMNS.ROSTER_ASSIGNMENTS.RULE_FLAGS])\n'
+      + '      .indexOf(RULE_IDS.SPECIAL_SUNDAY_SKIP) !== -1) return;\n',
+    replace: '',
+    tests: ['tests/special_skip_preacher.test.js']
+  },
+  {
+    id: 'b-checklist-counts-skip',
+    why: '「講員未填」照計特別主日唔設講員嗰週'
+      + '——永遠多數一週，幹事清極都清唔到零',
+    file: 'src/WebAppPreQuarter.gs',
+    find: '      if (isSkipped(d.serviceDate, postId)) return false;\n',
+    replace: '',
+    tests: ['tests/special_skip_preacher.test.js']
+  },
+  {
+    id: 'b-special-ignores-active',
+    why: '特別主日 Active=FALSE 都當生效'
+      + '——幹事已經決定唔用嗰一列，系統照樣跳過崗位',
+    file: 'src/SheetReader.gs',
+    find: '    .filter(function (row) { return isTrueValue_(row[S.ACTIVE]); })\n'
+      + '    .forEach(function (row) {\n'
+      + '      const dateStr = toDateString(row[S.SERVICE_DATE], timezone);\n'
+      + '      if (!dateStr) return;',
+    replace: '    .forEach(function (row) {\n'
+      + '      const dateStr = toDateString(row[S.SERVICE_DATE], timezone);\n'
+      + '      if (!dateStr) return;',
+    tests: ['tests/special_skip_preacher.test.js']
+  },
+  // ── 第六十三輪批次 C／D 組：會改資料嘅入口要攞鎖；側邊欄逐格依次 ──
+  {
+    id: 'c-step4-no-lock',
+    why: '正式發出唔攞鎖——並發兩次 ⇒ 真寄時全體收兩封',
+    file: 'src/WebAppFlow.gs',
+    find: "  return withMutationLock_('正式發出給全體', function () {\n"
+      + '    return apiStep4Confirm_locked_(quarterId, sendOptions);\n  });',
+    replace: '  return apiStep4Confirm_locked_(quarterId, sendOptions);',
+    tests: ['tests/mutation_lock_coverage.test.js']
+  },
+  {
+    id: 'c-fill-no-lock',
+    why: '填講員唔攞鎖——同儲存並確認並發會寫亂長表同 grid',
+    file: 'src/PreacherTranslationFill.gs',
+    find: "  return withMutationLock_('填講員／翻譯／獻花', function () {\n"
+      + '    return apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId, slotIndex, name);\n  });',
+    replace: '  return apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId, slotIndex, name);',
+    tests: ['tests/mutation_lock_coverage.test.js']
+  },
+  {
+    id: 'd-saveall-parallel',
+    why: '側邊欄「一次過儲存全部」返返去一次過發晒——有鎖之後大半格會被擋',
+    file: 'src/ui/PreacherFillSidebar.html',
+    find: '      return chain.then(function () {',
+    replace: '      chain.then(function () {}); return Promise.resolve().then(function () {',
+    tests: ['tests/mutation_lock_coverage.test.js']
+  },
 ];
 
 /**

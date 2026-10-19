@@ -52,7 +52,13 @@ function bodyOf(src, fnName) {
   if (start === -1) return '';
   const rest = src.slice(start);
   const end = rest.indexOf('\n}\n');
-  return end === -1 ? rest : rest.slice(0, end + 3);
+  const body = end === -1 ? rest : rest.slice(0, end + 3);
+  // 第六十三輪批次 C 組：入口而家係「薄殼 ＋ `_locked_`」——薄殼只拿鎖，
+  // 真正內容喺 `_locked_` 嗰支，所以兩支一齊睇。
+  if (/withMutationLock_\(/.test(body) && src.indexOf('function ' + fnName + '_locked_(') !== -1) {
+    return body + bodyOf(src, fnName + '_locked_');
+  }
+  return body;
 }
 
 console.log('\n=== A2-1：生成初稿之後順手發佈 ===');

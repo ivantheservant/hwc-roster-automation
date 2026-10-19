@@ -333,7 +333,17 @@ function apiExportRosterPdf(quarterId, versionNo) {
  * @param {number} versionNo
  * @returns {Object}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiGeneratePersonalPdfBatch_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiGeneratePersonalPdfBatch(quarterId, versionNo) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('產生個人 PDF', function () {
+    return apiGeneratePersonalPdfBatch_locked_(quarterId, versionNo);
+  });
+}
+
+function apiGeneratePersonalPdfBatch_locked_(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
   try {
     const result = generatePersonalPdfBatch_(String(quarterId || '').trim(), Number(versionNo));
@@ -449,7 +459,17 @@ function apiMakeupSendPlan(quarterId, stage) {
  * @param {string} stage
  * @returns {Object}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `apiMakeupSendExecute_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiMakeupSendExecute(quarterId, stage) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('補寄未收到的人', function () {
+    return apiMakeupSendExecute_locked_(quarterId, stage);
+  });
+}
+
+function apiMakeupSendExecute_locked_(quarterId, stage) {
   assertWebAppRequestAllowed_();
   try {
     const id = String(quarterId || '').trim();

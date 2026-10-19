@@ -116,7 +116,7 @@
 
   /**
    * 送出單一格子的儲存請求，回傳一個 Promise（google.script.run 本身唔支援
-   * Promise，呢度包一層方便 saveAll() 用 Promise.all 一次過等全部完成）。
+   * Promise，呢度包一層方便 saveAll() 逐格串起嚟依次送）。
    * @param {string} cellId
    * @param {string} serviceDate
    * @param {string} postId
@@ -185,35 +185,47 @@
     bulkStatus.textContent = '儲存緊 0 / ' + targets.length + ' 格……';
     var done = 0;
     var failed = [];
-    targets.forEach(function (t) {
-      var input = document.getElementById(t.cellId + '_input');
-      var status = document.getElementById(t.cellId + '_status');
-      var saveBtn = document.querySelector('#' + t.cellId + ' .save-btn');
-      var name = input.value.trim();
-      saveBtn.disabled = true;
-      input.disabled = true;
-      status.textContent = '儲存中…';
-      saveOne(t.cellId, t.serviceDate, t.postId, t.slotIndex, name)
-        .then(function () {
-          document.getElementById(t.cellId).style.opacity = '0.5';
-          status.textContent = '✓ 已儲存';
-        })
-        .catch(function (err) {
-          status.textContent = '失敗：' + (err.message || String(err));
-          saveBtn.disabled = false;
-          input.disabled = false;
-          failed.push(t.cellId);
-        })
-        .then(function () {
-          done++;
-          bulkStatus.textContent = '儲存緊 ' + done + ' / ' + targets.length + ' 格……';
-          if (done === targets.length) {
-            bulkBtn.disabled = false;
-            bulkStatus.textContent = failed.length === 0
-              ? '✅ 已儲存 ' + targets.length + ' 格。'
-              : '完成，但有 ' + failed.length + ' 格失敗，請檢查對應格子的狀態文字。';
-          }
-        });
+    // ⚠️⚠️ 第六十三輪批次 D 組：**逐格依次**——上一格完成先送下一格。
+    //
+    // 舊寫法用 `forEach` 一次過發晒（最多 39 個並發執行）。每一個都會：
+    // 讀成張 `RosterAssignments`；對受保護嘅 v0 grid「移除保護 → 寫 →
+    // 重新加保護」；`AuditLog` 用 `getLastRow()+1` 附加。並發落去保護可能
+    // 被重複加或者移除時拋錯（`RosterAssignments` 寫咗而 grid 未寫 ⇒ 兩邊
+    // 唔一致），`AuditLog` 亦可能互相覆蓋。
+    //
+    // 而且第六十三輪 C 組把 `apiSavePreacherTranslationEntry()` 包咗
+    // 互斥鎖（攞唔到即刻拒絕），並發嘅話大半格會被鎖擋住。
+    // 所以兩件事一定要一齊做。進度文字照舊。
+    targets.reduce(function (chain, t) {
+      return chain.then(function () {
+        var input = document.getElementById(t.cellId + '_input');
+        var status = document.getElementById(t.cellId + '_status');
+        var saveBtn = document.querySelector('#' + t.cellId + ' .save-btn');
+        var name = input.value.trim();
+        saveBtn.disabled = true;
+        input.disabled = true;
+        status.textContent = '儲存中…';
+        return saveOne(t.cellId, t.serviceDate, t.postId, t.slotIndex, name)
+          .then(function () {
+            document.getElementById(t.cellId).style.opacity = '0.5';
+            status.textContent = '✓ 已儲存';
+          })
+          .catch(function (err) {
+            status.textContent = '失敗：' + (err.message || String(err));
+            saveBtn.disabled = false;
+            input.disabled = false;
+            failed.push(t.cellId);
+          })
+          .then(function () {
+            done++;
+            bulkStatus.textContent = '儲存緊 ' + done + ' / ' + targets.length + ' 格……';
+          });
+      });
+    }, Promise.resolve()).then(function () {
+      bulkBtn.disabled = false;
+      bulkStatus.textContent = failed.length === 0
+        ? '✅ 已儲存 ' + targets.length + ' 格。'
+        : '完成，但有 ' + failed.length + ' 格失敗，請檢查對應格子的狀態文字。';
     });
   }
 

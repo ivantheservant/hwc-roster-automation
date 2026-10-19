@@ -115,7 +115,8 @@ console.log('\n=== B3【核心】儲存之後要講「有冇對上名單」 ==='
 
 console.log('\n=== B3 後端一直都有回 linkedToNameMapping ===');
 {
-  const fn = backend.slice(backend.indexOf('function apiSavePreacherTranslationEntry'));
+  // 第六十三輪批次 C 組：入口係薄殼（拿鎖），內容喺 `_locked_` 嗰支
+  const fn = backend.slice(backend.indexOf('function apiSavePreacherTranslationEntry_locked_'));
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3);
   check('★★★★★ 回傳有 linkedToNameMapping', /linkedToNameMapping/.test(body));
   check('★★★★ 判斷準則係 resolvePersonId() 有冇搵到人',

@@ -401,7 +401,16 @@ function runMakeupSendPlan_() {
  * 選單項目「四階段流程 ▸ ⚠️ 執行補寄未收到的人」的執行入口。
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runMakeupSendExecute_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runMakeupSendExecute_() {
+  return withMutationLock_('執行補寄未收到的人', function () {
+    return runMakeupSendExecute_locked_();
+  });
+}
+
+function runMakeupSendExecute_locked_() {
   const ui = SpreadsheetApp.getUi();
   const target = promptMakeupTarget_(ui, '執行補寄未收到的人');
   if (!target) return;

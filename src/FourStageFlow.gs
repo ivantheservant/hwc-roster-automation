@@ -108,7 +108,16 @@ function runFourStageStep1_() {
  * 收件人為 EmailRecipients 中 Role=REVIEWER 且 Active=TRUE 的人。成功後 Stage → REVIEW_SENT。
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runFourStageStep2_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runFourStageStep2_() {
+  return withMutationLock_('步驟 2：寄給堂委審閱', function () {
+    return runFourStageStep2_locked_();
+  });
+}
+
+function runFourStageStep2_locked_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 2：寄給堂委審閱', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
@@ -174,7 +183,16 @@ function runFourStageStep2_() {
  * 成功後 Stage → REQUESTS_APPLIED。
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runFourStageStep3_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runFourStageStep3_() {
+  return withMutationLock_('步驟 3：套用修改申報', function () {
+    return runFourStageStep3_locked_();
+  });
+}
+
+function runFourStageStep3_locked_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 3：套用修改申報', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
@@ -477,7 +495,16 @@ function reportCancelledWithNeedsInput_(ui, title, plan) {
  * 成功後 Stage → OFFICIAL_SENT。
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runFourStageStep4_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runFourStageStep4_() {
+  return withMutationLock_('步驟 4：正式發出', function () {
+    return runFourStageStep4_locked_();
+  });
+}
+
+function runFourStageStep4_locked_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 4：正式發出', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
@@ -624,7 +651,16 @@ function runFourStageStep4_() {
  *
  * @returns {void}
  */
+// ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
+// `runFourStageStep5_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
 function runFourStageStep5_() {
+  return withMutationLock_('步驟 5：改動後重發', function () {
+    return runFourStageStep5_locked_();
+  });
+}
+
+function runFourStageStep5_locked_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('步驟 5：改動後重發', '請輸入 QuarterID（例如 2026T4）：', ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
