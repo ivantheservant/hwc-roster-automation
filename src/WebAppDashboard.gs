@@ -489,6 +489,18 @@ function buildDashboardState_(quarterId) {
   // 第二十六輪批次階段 A2：公開連結狀態。前端用嚟喺掣 2 旁邊提早講，
   // 唔使等幹事撳落去先發現。
   const publicLink = readPublicLinkState_(quarterId);
+  // ⚠️ 第六十三輪批次 A 組：有連結**唔等於**連結係最新。
+  // 填咗講員而未重發佈，堂委開連結見到嘅講員係「待確認」。
+  // 判斷唔到 ⇒ 唔顯示（`stale: false`），寄出前嗰道會照樣補發。
+  publicLink.stale = false;
+  publicLink.staleMessage = '';
+  try {
+    const freshness = evaluatePublicLinkFreshness_(quarterId);
+    publicLink.stale = !!(freshness.hasLink && freshness.stale);
+    publicLink.staleMessage = publicLink.stale ? freshness.message : '';
+  } catch (err) {
+    log_('WARN', 'apiGetDashboardState：查不到公開連結是不是最新：' + err.message);
+  }
 
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
   const officialCounts = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);

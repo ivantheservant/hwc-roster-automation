@@ -414,13 +414,23 @@ function apiMakeupSendPlan(quarterId, stage) {
       stage: plan.stage,
       versionNo: plan.versionNo,
       isDryRun: plan.isDryRun,
+      // 第六十三輪批次 Q 組：預覽要講明「會寄第 N 版」同附甚麼
+      attachType: plan.attachType,
+      attachLabel: plan.attachType ? describeAttachOption_(plan.attachType) : '',
       people: plan.needsResend.map(function (r) {
         return {
           nameTC: r.displayName || r.personId || r.email,
           hasEmail: !!String(r.email || '').trim(),
+          // `EmailRecipients` 嘅名單收件人（例如辦公室、系統管理）——
+          // 唔標明嘅話，幹事會以為係兩個唔認得嘅義工
+          isListRecipient: r.type === RECIPIENT_TYPE.LIST,
           lastStatus: r.lastStatus,
           reason: r.reason
         };
+      }),
+      // 冇電郵嘅另外一段列，唔可以淨係一個數字
+      cannotSend: plan.cannotSend.map(function (r) {
+        return { nameTC: r.displayName || r.personId || r.email, reason: r.reason };
       }),
       alreadySentCount: plan.alreadySent.length,
       cannotSendCount: plan.cannotSend.length

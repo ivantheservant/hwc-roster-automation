@@ -117,6 +117,25 @@ console.log('\n=== E：兩處用同一個函式（唔可以各寫一句然後慢
   checkEqual('★★★★★ 兩個檔案都冇自己手寫「實際只有…」嗰句', handRolled, []);
 }
 
+/**
+ * 第六十三輪批次 H 組：抽出一個 top-level 函式嘅本體。
+ *
+ * GAS 專案嘅慣例：top-level 函式嘅收尾 `}` 一定喺行首，入面嘅一律有縮排。
+ * 所以由 `function 名(` 搵到第一個「換行＋行首 `}`」就係本體。
+ * ⚠️ 唔理 `\r`：CRLF 下 `\r\n}` 一樣配中 `\n}`。
+ *
+ * @param {string} src 原始碼
+ * @param {string} name 函式名
+ * @returns {?string} 本體（由 `function` 到收尾 `}`）；搵唔到 ⇒ null
+ */
+function functionBody_(src, name) {
+  const start = src.indexOf('function ' + name + '(');
+  if (start === -1) return null;
+  const end = src.indexOf('\n}', start);
+  if (end === -1) return null;
+  return src.slice(start, end + 2);
+}
+
 console.log('\n=== E：computeAnnounceConsecutiveRatio_() 要帶埋解釋所需嘅資料出嚟 ===');
 {
   const verify = fs.readFileSync(path.join(__dirname, '..', 'src', 'Verify.gs'), 'utf8');
@@ -131,8 +150,34 @@ console.log('\n=== 唔准改嘅嘢：引擎分母維持 weeksCounted ===');
   const gen = fs.readFileSync(path.join(__dirname, '..', 'src', 'Generator.gs'), 'utf8');
   // 第三十二輪已經拍板：引擎嗰個係 greedy pass 內部嘅節流參數，唔係量度。
   // 呢一輪明確唔准改。
+  // ⚠️⚠️ 第六十三輪批次 H 組：**先抽出函式本體，再喺本體入面搵。**
+  //
+  // 舊寫法：`/isBehindTargetPace_[\s\S]{0,600}adjacentPairCount_/`
+  // ——由檔案入面**第一個** `isBehindTargetPace_` 開始數 600 個字元，
+  // 會跨過函式邊界：配中咗下面嘅**呼叫**，同埋後面註解入面嘅
+  // `adjacentPairCount_`。
+  //
+  // 後果：LF 行尾下距離喺 600 以內 ⇒ 紅；CRLF 多咗十幾個 `\r`
+  // ⇒ 啱啱超出 ⇒ 綠。即係呢條測試嘅結果**由行尾決定**，同程式啱唔啱
+  // 無關。由第三十三輪（2026-08-20）引入至今喺 LF 下一直紅，
+  // 只係 Ivan 部機（CRLF）睇唔到。
+  const body = functionBody_(gen, 'isBehindTargetPace_');
+  check('★★★★★ 搵到 isBehindTargetPace_() 嘅函式本體（搵唔到就唔可以當冇用）',
+    body !== null && /return\s/.test(body));
   check('★★★★★ Generator.gs 嘅 isBehindTargetPace_() 仍然冇用 adjacentPairCount_()',
-    !/isBehindTargetPace_[\s\S]{0,600}adjacentPairCount_/.test(gen));
+    body !== null && !/adjacentPairCount_/.test(body));
+}
+
+console.log('\n=== H 組：函式本體抽取本身要啱（唔可以靠行尾）===');
+{
+  const sample = 'function a_() {\n  return 1;\n}\n\nfunction b_() {\n  return adjacentPairCount_();\n}\n';
+  check('LF：只抽到 a_ 自己，唔會跨入 b_',
+    functionBody_(sample, 'a_') === 'function a_() {\n  return 1;\n}');
+  check('CRLF：結果一樣（只係每行多咗一個回車字元）',
+    functionBody_(sample.replace(/\n/g, '\r\n'), 'a_').replace(/\r/g, '')
+      === 'function a_() {\n  return 1;\n}');
+  check('b_ 抽得到 adjacentPairCount_', /adjacentPairCount_/.test(functionBody_(sample, 'b_')));
+  check('搵唔到嘅函式 ⇒ null', functionBody_(sample, 'c_') === null);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

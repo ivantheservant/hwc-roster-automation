@@ -96,6 +96,9 @@ function findPublicLinkRow_(quarterId) {
         fileId: String(rows[i][C.FILE_ID] || '').trim(),
         fileUrl: String(rows[i][C.FILE_URL] || '').trim(),
         lastPublishedAt: String(rows[i][C.LAST_PUBLISHED_AT] || '').trim(),
+        // 第六十三輪批次 A 組：判斷「過期」要比時間，唔可以用 String() 之後嘅值
+        //（Date 轉字串係英文長句）。見 `normalizeSheetTimestamp_()`。
+        lastPublishedAtRaw: rows[i][C.LAST_PUBLISHED_AT],
         lastPublishedVersion: rows[i][C.LAST_PUBLISHED_VERSION],
         sharingAccess: String(rows[i][C.SHARING_ACCESS] || '').trim(),
         sharingPermission: String(rows[i][C.SHARING_PERMISSION] || '').trim(),

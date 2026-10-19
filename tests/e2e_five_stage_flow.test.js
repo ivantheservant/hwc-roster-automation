@@ -156,7 +156,7 @@ const gas = loadGasSource([
   // 第四十一輪批次 E 組：個人專屬連結（buildMailContext_ 會叫 indexPersonalLinkTokens_）。
   'PersonalLinkInMail.gs', 'Trigger.gs',
   'WebAppGuards.gs', 'WebAppDashboard.gs',
-  'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs'
+  'FiveStageCore.gs', 'WebAppSaveConfirm.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs'
 ]);
 
 const Q = '2027T1';

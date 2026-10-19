@@ -179,7 +179,9 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
         postId: a.postId,
         slotIndex: a.slotIndex,
         personId: a.personId,
-        isManual: false
+        isManual: false,
+        // 第六十三輪批次 K 組：目標版本嘅來源。唔帶嘅話會搬**現時版本**嘅來源
+        assignSource: a.assignSource
       };
     });
     // ⚠️ 參數次序：`findStateViolations_(state, context)`——**派工狀態行先**。

@@ -883,6 +883,19 @@ function lookupExistingPersonalPdf_(context, recipient) {
     error.missing = true;
     throw error;
   }
+  // ⚠️ 第六十三輪批次 A2 組：檔案喺度、大小正常，但係**這一版內容改咗之前**
+  // 產生嘅（例如先產 PDF、後填講員）⇒ 當缺件，唔可以寄一份印住「待確認」嘅舊表。
+  // 內容時間一次寄送只讀一次（要讀成張 `RosterAssignments`）。
+  if (!context._pdfContentStamp) {
+    context._pdfContentStamp = readPersonalPdfContentStamp_(context.quarterId, context.versionNo);
+  }
+  const stamp = context._pdfContentStamp;
+  if (isPersonalPdfStale_(file.getLastUpdated(), stamp.updatedAt, stamp.timezone)) {
+    const error = new Error('這份 PDF（' + fileName + '）是填講員／翻譯／獻花之前產生的，'
+      + '內容已經過期。請重新執行『產生個人 PDF』（過期的會自動重新產生）。');
+    error.missing = true;
+    throw error;
+  }
 
   return {
     blob: file.getBlob(),

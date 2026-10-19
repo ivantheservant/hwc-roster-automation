@@ -137,7 +137,12 @@ console.log('\n=== B3【核心】掃描／清理工具一律經共用入口 ==='
   check('★★★★★ 缺件檢查用 listRosterPdfSizesForQuarter_()'
     + '——舊季度嘅檔平舖喺根，淨係睇子資料夾會全部報「缺件」，'
     + '而「報告話缺、實際唔缺」比漏報更難查',
-    /listRosterPdfSizesForQuarter_\(quarterId\)/.test(batch));
+    // 第六十三輪批次 A2 組：而家用帶最後更新時間嘅版本（判斷過期要用），
+    // 佢一樣係經 `listRosterPdfFilesForQuarter_()`，新舊兩處都掃。
+    /listRosterPdf(Sizes|Info)ForQuarter_\(quarterId\)/.test(batch));
+  check('★★★★★ 帶時間嘅版本（listRosterPdfInfoForQuarter_）都係經共用入口，新舊兩處都掃',
+    /function listRosterPdfInfoForQuarter_\(quarterId\) \{[\s\S]{0,200}listRosterPdfFilesForQuarter_\(quarterId, \{ withLastUpdated: true \}\)/
+      .test(fs.readFileSync(path.join(__dirname, '..', 'src', 'PdfFolders.gs'), 'utf8')));
 }
 
 console.log('\n=== B3 清理之後只刪**空**資料夾 ===');

@@ -623,7 +623,9 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
   const violationCheckState = assignments.map(function (a) {
     return {
       serviceDateId: a.serviceDateId, serviceDate: a.serviceDate, postId: a.postId,
-      slotIndex: a.slotIndex, personId: a.personId, isManual: false
+      slotIndex: a.slotIndex, personId: a.personId, isManual: false,
+      // 第六十三輪批次 K 組：申報指定嘅人係 MANUAL，唔係違反
+      assignSource: a.assignSource
     };
   });
   const violations = decorateViolations_(
@@ -929,7 +931,8 @@ function applyCannotServe_(r, context, workingByKey, outcomes, newUnavailableRow
       const a = workingByKey[k];
       return {
         serviceDateId: a.serviceDateId, serviceDate: a.serviceDate, postId: a.postId,
-        slotIndex: a.slotIndex, personId: a.personId, isManual: false
+        slotIndex: a.slotIndex, personId: a.personId, isManual: false,
+        assignSource: a.assignSource
       };
     });
     // 追加階段 AR 修正 3：personId 填回申報人本人，讓 findReplacementPerson_() 的

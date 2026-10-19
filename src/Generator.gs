@@ -465,6 +465,43 @@ function getSkipReason_(post, serviceDate, special, rules) {
 }
 
 /**
+ * ⚠️⚠️ 第六十三輪批次 K 組：**`NO_AUTO_GENERATE` 嘅唯一判斷。**
+ *
+ * 現場（2026-10-20 瀏覽器實測，`2028T2` v0）：經「填講員／翻譯／獻花」
+ * 填咗 3 格獻花（人名喺 `NameMapping`，所以有 PersonID）。之後撳
+ * 「儲存及寄出」，確認畫面列出：
+ *
+ *   ⚠ 違反了一定要遵守的規則：3 格
+ *   4 月 2 日　FLOWER——這個崗位不由系統排，要你自己填
+ *
+ * ——幹事**正正就係**自己填咗，系統反而話佢違反「要你自己填」。
+ * 之後**每一次**儲存、套用申報都要打字「確認」放行。放行本來係畀
+ * 「真正違反規則」用嘅，變成日常噪音，幹事會習慣性亂放行。
+ *
+ * 成因：舊寫法係「`AutoGenerate = FALSE` 嘅崗位**凡有 PersonID 就報**」，
+ * 唔理係邊個放落去。外請講員冇 PersonID 所以冇事；獻花、會友做講員／翻譯
+ * 全部中招。
+ *
+ * 規則：**系統自己排咗**先算違反；人手放（`HUMAN_ASSIGN_SOURCES`）一律唔算。
+ *
+ * ⚠️ 來源**唔知**（`null`／空）一律當系統排——即係保留舊行為。
+ * 呢個係刻意嘅：fine-tune 搵替補嗰陣試放一個人落去，嗰格就係
+ * 「系統揀嘅人」，一定要照報，否則系統會自己建議一個講員。
+ *
+ * ⚠️ 兩個入口都要叫呢支，唔可以各自寫：
+ *   `findStateViolations_()`（FineTune.gs）——儲存、套用申報、提案、回退
+ *   `checkHardRuleViolations_()`（Verify.gs）——核對職事表
+ *
+ * @param {?Object} post 崗位（`readPostsNormalized()` 形狀）
+ * @param {?string} assignSource 呢一格嘅來源；唔知就傳 `null`
+ * @returns {boolean} 係咪違反
+ */
+function isNoAutoGenerateViolation_(post, assignSource) {
+  if (!post || post.autoGenerate) return false;
+  return HUMAN_ASSIGN_SOURCES.indexOf(assignSource) === -1;
+}
+
+/**
  * 為單一 slot 挑選人選：先以 HARD 規則篩選，再依違規扣分與選人策略排序。
  *
  * 階段 A（Opus 深度輪）修正：若所有候選人都違反 HARD 規則，**留空並發出

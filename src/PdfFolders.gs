@@ -113,23 +113,28 @@ function findOrCreateChildFolder_(parent, name) {
  * @param {string} quarterId 季度 ID
  * @returns {Object[]} 每項 {id, name, sizeBytes, folderName, inSubfolder, versionFolderId}
  */
-function listRosterPdfFilesForQuarter_(quarterId) {
+function listRosterPdfFilesForQuarter_(quarterId, opts) {
   const root = resolveMailAttachmentFolder_();
   const quarterName = String(quarterId || '').trim();
   const out = [];
+  // 第六十三輪批次 A2 組：要判斷「過期」先讀最後更新時間——每個檔多一次
+  // Drive 呼叫，所以唔要就唔讀（清理、重設嗰幾個用途用唔着）。
+  const withLastUpdated = !!(opts && opts.withLastUpdated);
 
   const collect = function (folder, inSubfolder, versionFolderId) {
     const iter = folder.getFiles();
     while (iter.hasNext()) {
       const file = iter.next();
-      out.push({
+      const entry = {
         id: file.getId(),
         name: file.getName(),
         sizeBytes: file.getSize(),
         folderName: folder.getName(),
         inSubfolder: inSubfolder,
         versionFolderId: versionFolderId || ''
-      });
+      };
+      if (withLastUpdated) entry.lastUpdated = file.getLastUpdated();
+      out.push(entry);
     }
   };
 
@@ -170,6 +175,25 @@ function listRosterPdfSizesForQuarter_(quarterId) {
     if (existing === undefined || f.sizeBytes > existing) sizes.set(f.name, f.sizeBytes);
   });
   return sizes;
+}
+
+/**
+ * 第六十三輪批次 A2 組：同上，但每個檔名帶埋大小同最後更新時間
+ * （`{sizeBytes, lastUpdated}`），用嚟判斷「過期」。
+ *
+ * ⚠️ 同名檔案保留**較大**嗰個（同 `listRosterPdfSizesForQuarter_()` 一樣嘅理由）。
+ * @param {string} quarterId 季度 ID
+ * @returns {Map<string, {sizeBytes: number, lastUpdated: *}>}
+ */
+function listRosterPdfInfoForQuarter_(quarterId) {
+  const info = new Map();
+  listRosterPdfFilesForQuarter_(quarterId, { withLastUpdated: true }).forEach(function (f) {
+    const existing = info.get(f.name);
+    if (existing === undefined || f.sizeBytes > existing.sizeBytes) {
+      info.set(f.name, { sizeBytes: f.sizeBytes, lastUpdated: f.lastUpdated });
+    }
+  });
+  return info;
 }
 
 /**

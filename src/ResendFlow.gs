@@ -75,6 +75,37 @@ function computeResendDiff_(context) {
 }
 
 /**
+ * 第六十三輪批次 P 組：**這一次重發，有邊幾位係「這一版冇任何安排」。**
+ *
+ * 呢啲人收到嘅係「你原本嗰幾格已經改由別人負責」——幹事要知道佢哋有收到，
+ * 唔可以淨係見到一個總數。
+ *
+ * ⚠️ 只列**真正會寄**嘅人（`targetPersonIds` 由
+ * `resolveActualRecipientsFromContext_()` 出，同寄信嗰一刻行同一個算法）。
+ * 幹事冇揀佢嘅話，佢唔會出現喺呢度——唔可以話「已通知」一個冇寄過嘅人。
+ *
+ * @param {Object[]} changedList `computeResendDiff_()` 的結果
+ * @param {string[]} targetPersonIds 這一次真正會寄的 PersonID
+ * @param {Object} context `buildMailContext_()` 的結果（要 `lastSummaryByPerson`）
+ * @returns {Object[]} 每項 {personId, nameTC, previousSummary, hasEmail}
+ */
+function listZeroAssignmentResendTargets_(changedList, targetPersonIds, context) {
+  const wanted = {};
+  (targetPersonIds || []).forEach(function (id) { wanted[id] = true; });
+  return (changedList || []).filter(function (c) {
+    return !c.hasAssignments && wanted[c.personId] === true;
+  }).map(function (c) {
+    const person = (context.peopleById || {})[c.personId];
+    return {
+      personId: c.personId,
+      nameTC: c.nameTC,
+      previousSummary: (context.lastSummaryByPerson || {})[c.personId] || '',
+      hasEmail: !!(person && person.email)
+    };
+  });
+}
+
+/**
  * 把被改動者名單整理成 TPL_RESEND_LIST_TC 的 {ChangedPeopleSummary} 內容：
  * 每人一行「姓名：日期 崗位；日期 崗位」。完全沒有派工的人（被整個頂走）
  * 另外用一句話說明，不直接接 buildAssignmentSummary_([]) 的空字串——

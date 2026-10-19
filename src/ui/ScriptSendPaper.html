@@ -788,7 +788,11 @@
       key: c.key,
       label: c.displayName,
       disabled: c.selectable === false,
-      note: (c.type === 'LIST' ? '（收件人名單）' : ('（這一季 ' + c.cellCount + ' 格）'))
+      // 第六十三輪批次 P 組：被整個換走嘅人（呢一版 0 格）要講明，
+      // 唔係寫「這一季 0 格」——幹事會以為佢本來就冇份。
+      note: (c.type === 'LIST' ? '（收件人名單）'
+        : (c.noAssignmentThisVersion ? '（這一版沒有任何安排）'
+          : ('（這一季 ' + c.cellCount + ' 格）')))
         + describeRoleTags(c.roles)
         // B2：勾咗「只寄有改動」之後，逐個要講明**改咗乜**。
         + ((c.changeNotes && c.changeNotes.length > 0)

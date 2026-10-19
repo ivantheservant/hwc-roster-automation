@@ -1516,6 +1516,27 @@
       linkBox.hidden = true;
     }
 
+    // ⚠️ 第六十三輪批次 A 組：公開連結未跟上（例如填咗講員而未重發佈）。
+    // 寄出前系統會自動補發，但幹事要知——佢可能已經把連結貼咗出去。
+    const staleBox = clear(el('statusStaleLink'));
+    const pl = d.publicLink || {};
+    if (pl.stale) {
+      staleBox.appendChild(make('div', {
+        text: '公開連結未更新到最新內容。' + (pl.staleMessage || ''), className: 'err-text'
+      }));
+      staleBox.appendChild(button('立即重新發佈', () => {
+        runAction('發佈公開連結', async () => {
+          const res = await callServerMutating('apiRepublishPublicLink', currentQuarterId);
+          if (!res.ok) { showErrorModal('重新發佈公開連結', new Error(res.message)); return; }
+          setStatus('公開連結已經更新到第 ' + res.versionNo + ' 版的最新內容。');
+          await loadDashboard();
+        });
+      }, ''));
+      staleBox.hidden = false;
+    } else {
+      staleBox.hidden = true;
+    }
+
     const badge = el('dryRunBadge');
     badge.hidden = !d.isDryRun;
     badge.textContent = '測試模式：不會真的寄出任何電郵';

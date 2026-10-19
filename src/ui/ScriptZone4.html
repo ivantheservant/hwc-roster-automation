@@ -387,36 +387,70 @@
     });
   }
 
+  /**
+   * 第六十三輪批次 Q 組：冇電郵嘅人另外一段列（唔可以淨係一個數字）。
+   * @param {Object[]} rows plan.cannotSend
+   * @returns {?Element}
+   */
+  function makeupCannotSendBox(rows) {
+    if (!rows || rows.length === 0) return null;
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle('這 ' + rows.length + ' 位沒有電郵，補寄一樣寄不到，請另外通知')
+    ]);
+    rows.forEach((r) => {
+      box.appendChild(make('div', { text: r.nameTC, className: 'vio-row muted' }));
+    });
+    return box;
+  }
+
   function renderMakeupPlan(stage, plan) {
     if (!plan.ok) { showErrorModal('補寄未收到的人', new Error(plan.message)); return; }
     if (plan.people.length === 0) {
-      openModal('補寄未收到的人', [
+      const nodes = [
         make('div', { text: '這一次所有人都已經收到了，不用補寄。', className: 'ok-line' })
-      ], [button('知道了', () => closeModal(), '')]);
+      ];
+      const noEmail = makeupCannotSendBox(plan.cannotSend);
+      if (noEmail) nodes.push(noEmail);
+      openModal('補寄未收到的人', nodes, [button('知道了', () => closeModal(), '')]);
       return;
     }
+
+    // 第六十三輪批次 Q 組：講明寄第幾版、附甚麼——
+    // 唔講嘅話，幹事唔知收件人會收到乜。
+    const what = make('div', { className: 'sec' }, [
+      make('div', { text: '會寄第 ' + plan.versionNo + ' 版（現時最新一版）。', className: 'ok-line' })
+    ]);
+    if (plan.attachLabel) what.appendChild(make('div', { text: '附件：' + plan.attachLabel, className: 'muted' }));
+    what.appendChild(make('div', {
+      text: '任何一版收過都算已經收到；收過舊版而之後有改動的人，要用區一的「改動後重發」。',
+      className: 'muted'
+    }));
 
     const list = make('div', { className: 'sec' }, [
       sectionTitle('這 ' + plan.people.length + ' 位還沒有收到')
     ]);
     plan.people.forEach((p) => {
       list.appendChild(make('div', {
-        text: p.nameTC + (p.hasEmail ? '' : '（沒有電郵，會略過）'),
+        text: p.nameTC + (p.isListRecipient ? '（名單收件人）' : '')
+          + (p.hasEmail ? '' : '（沒有電郵，會略過）'),
         className: p.hasEmail ? 'vio-row' : 'vio-row muted'
       }));
     });
+    const noEmailBox = makeupCannotSendBox(plan.cannotSend);
 
     openConfirm({
       title: '補寄未收到的人',
       bodyNodes: [
-        list,
+        what,
+        list
+      ].concat(noEmailBox ? [noEmailBox] : []).concat([
         make('div', { className: 'sec' }, [
           sectionTitle('不會做的事：'),
           make('div', { text: '・不會再寄給已經收到的人', className: 'vio-row' }),
           make('div', { text: '・不會改動職事表任何一格', className: 'vio-row' }),
           make('div', { text: '・不會推前這一季的進度', className: 'vio-row' })
         ])
-      ],
+      ]),
       confirmLabel: '確定補寄',
       onConfirm: () => runAction('寄送中，請稍候', async () => {
         const res = await callServerMutating('apiMakeupSendExecute', currentQuarterId, stage);

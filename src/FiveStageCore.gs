@@ -239,7 +239,11 @@ function executeStep2_(quarterId, sendOptions) {
   requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
+  // ⚠️ 第六十三輪批次 A 組：填咗講員而公開連結未跟上 ⇒ 先重發佈。
+  // 堂委收到嘅審閱信信末就係嗰條連結。
+  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
   const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);
+  result.publicLinkRepublished = fresh.republished;
 
   // 第二十三輪批次階段 E1（決定 D2）：**一律設為 `REVIEW_SENT`，唔係「前進一格」。**
   // 由 `REQUESTS_APPLIED` 撳掣 2 係第二輪審閱，Stage 要退回 `REVIEW_SENT`
@@ -445,7 +449,10 @@ function executeStep4Send_(quarterId, sendOptions) {
     throw new Error('步驟 4：正式發出——因為個人 PDF 缺件太多而中止。\n\n' + gate.message);
   }
 
+  // ⚠️ 第六十三輪批次 A 組：見 `ensurePublicLinkFreshBeforeSend_()`。
+  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
   const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
+  result.publicLinkRepublished = fresh.republished;
 
   // 第十九輪批次階段 C2：**寄送結果唔理想就唔前進 Stage。**
   //
@@ -582,8 +589,12 @@ function planStep5SendPreview_(quarterId, versionNo, context, changedList, sendO
  * @returns {Object} `sendResendStage_()` 的結果
  */
 function executeStep5Send_(quarterId, versionNo, changedList, sendOptions) {
-  return sendResendStage_(quarterId, versionNo,
+  // ⚠️ 第六十三輪批次 A 組：見 `ensurePublicLinkFreshBeforeSend_()`。
+  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
+  const result = sendResendStage_(quarterId, versionNo,
     changedList.map(function (c) { return c.personId; }), sendOptions);
+  result.publicLinkRepublished = fresh.republished;
+  return result;
 }
 
 /* ============================================================
@@ -640,6 +651,10 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
     blocked: true, ratio: ratio, missingCount: missingCount,
     total: missingResult.total, maxRatio: limit,
     message: '缺個人 PDF 的人數是 ' + missingCount + ' / ' + missingResult.total
+      // 第六十三輪批次 A2 組：過期（內容改咗之後未重做）分開講
+      + ((missingResult.stale || []).length > 0
+        ? ('（其中 ' + missingResult.stale.length + ' 人有檔，但係這一版內容改動之前產生的，已經過期）')
+        : '')
       + '（' + (ratio * 100).toFixed(1) + '%），超過容許上限 '
       + (limit * 100).toFixed(0) + '%。\n\n'
       + '⚠️ 這一步不能繼續——照樣寄出的話，這 ' + missingCount

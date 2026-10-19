@@ -265,7 +265,8 @@ function apiStep2Confirm(quarterId, sendOptions) {
   const result = executeStep2_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
-    skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf
+    skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf,
+    publicLinkRepublished: !!result.publicLinkRepublished
   };
 }
 
@@ -398,6 +399,9 @@ function apiStep4GetMissingPdfWarnings(quarterId, versionNo) {
     total: missingCheck.total,
     missing: missingCheck.missing.slice(0, 30).map(function (p) { return { nameTC: p.nameTC, personId: p.personId }; }),
     missingTotal: missingCheck.missing.length,
+    // 第六十三輪批次 A2 組：分開講「冇檔」同「過期」
+    absentTotal: (missingCheck.absent || missingCheck.missing).length,
+    staleTotal: (missingCheck.stale || []).length,
     // 第十九輪批次階段 C1：`blocked = true` 時前端唔應該顯示「繼續」按鈕。
     // 就算前端唔跟，`executeStep4Send_()` 入面仲有一道同樣嘅檢查——
     // Web UI 每次請求都係獨立嘅，唔可以靠畫面順序做關卡。
@@ -445,7 +449,8 @@ function apiStep4Confirm(quarterId, sendOptions) {
     advanced: !!result.advanced,
     outcomeSentence: result.outcomeSentence || '',
     outcomeMessage: result.outcome ? result.outcome.message : '',
-    unhandledCount: result.outcome ? result.outcome.unhandledCount : 0
+    unhandledCount: result.outcome ? result.outcome.unhandledCount : 0,
+    publicLinkRepublished: !!result.publicLinkRepublished
   };
 }
 
@@ -649,12 +654,25 @@ function apiStep5SendConfirm(quarterId, releaseText, sendOptions) {
   if (hardForSend.length > 0) logHardViolationRelease_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', hardForSend);
   if (changed.changedList.length === 0) return { blocked: false, noChanges: true };
 
+  // ⚠️ 第六十三輪批次 P 組：「這一版冇任何安排」而又會收到通知嘅人。
+  // 用**寄信嗰一刻同一個**收件人解析器（唔寫 `notifyReasonByPerson`），
+  // 喺寄之前計——寄完 `context` 已經被寫過。
+  const changedIds = changed.changedList.map(function (c) { return c.personId; });
+  const targetIds = resolveActualRecipientsFromContext_(
+    changed.context, MAIL_STAGES.RESEND, sendOptions, changedIds)
+    .filter(function (r) { return r.type === RECIPIENT_TYPE.PERSON; })
+    .map(function (r) { return r.personId; });
+  const zeroAssignmentPeople = listZeroAssignmentResendTargets_(
+    changed.changedList, targetIds, changed.context);
+
   const sendResult = executeStep5Send_(quarterId, changed.versionNo, changed.changedList,
     withUnsavedReleaseNote_(sendOptions, guard));
   return {
     blocked: false,
     isDryRun: sendResult.isDryRun, sent: sendResult.sent, dryRun: sendResult.dryRun,
     skipped: sendResult.skipped, failed: sendResult.failed,
-    errorPdf: sendResult.errorPdf, errorPdfMissing: sendResult.errorPdfMissing
+    errorPdf: sendResult.errorPdf, errorPdfMissing: sendResult.errorPdfMissing,
+    zeroAssignmentPeople: zeroAssignmentPeople,
+    publicLinkRepublished: !!sendResult.publicLinkRepublished
   };
 }

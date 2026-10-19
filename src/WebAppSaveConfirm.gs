@@ -817,13 +817,134 @@ function tryPublishPublicRoster_(quarterId) {
  * @returns {boolean}
  */
 function publicLinkAlreadyAtLatest_(quarterId) {
+  // ⚠️ 第六十三輪批次 A 組：「最新」唔止係版本號一樣——
+  // 同一版之後有人改過（填講員／翻譯／獻花）都唔係最新。
+  // 判斷只有一份：`evaluatePublicLinkFreshness_()`。
+  const f = evaluatePublicLinkFreshness_(quarterId);
+  return f.latestVersionNo >= 0 && f.rowExists && !f.stale;
+}
+
+/**
+ * ⚠️⚠️ 第六十三輪批次 A 組：**公開連結係咪「過期」——唯一嘅判斷。**
+ *
+ * 現場（`2027T4`）：v0 喺 11:20:43 生成，公開連結 11:20:51 自動發佈；
+ * 之後 11:21–11:23 經「填講員／翻譯／獻花」填咗 12 週講員、4 週獻花。
+ * 一個月之後讀公開試算表：標題仍然係「更新時間：2026-09-08 11:20:51」，
+ * **13 週講員全部「待確認」**。
+ *
+ * 成因：填講員係直接改最新版本（唔造新版本），而全系統只有「造新版本」
+ * 嗰幾條路先會發佈；`publicLinkAlreadyAtLatest_()` 舊寫法只比版本號，
+ * 所以就算有人叫佢發佈，佢都會以為「已經係最新」而略過。
+ *
+ * 實際後果：正常流程「生成 → 填講員 → 寄給堂委審閱」，審閱信信末嗰條
+ * 永久連結開出嚟，講員一欄全部「待確認」——堂委會以為幹事未填。
+ *
+ * 「過期」＝任何一樣：
+ *   ・`LastPublishedVersion` ≠ 最新版本號（`VERSION`）
+ *   ・最新版本喺 `RosterAssignments` 嘅最大 `UpdatedAt` ＞ `LastPublishedAt`
+ *     （`EDITED_AFTER_PUBLISH`）
+ *   ・`LastPublishedAt` 讀唔到（`UNKNOWN_PUBLISH_TIME`）——寧可重發一次
+ *
+ * ⚠️ 冇連結（從來未發佈過）**唔叫過期**，係另一個狀態（`hasLink: false`），
+ * 由 `assertPublicLinkReady_()` 同 Mailer 嗰道關卡處理。
+ *
+ * ⚠️ 下面每一處都叫呢一支，唔可以各自寫：
+ *   `tryPublishPublicRoster_()` 嘅「已經係最新」、寄出前
+ *   （`ensurePublicLinkFreshBeforeSend_()`）、Dashboard 嘅 `publicLink.stale`。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {{hasLink: boolean, rowExists: boolean, stale: boolean, reason: string, message: string,
+ *   latestVersionNo: number, publishedVersionNo: ?number,
+ *   lastEditAt: string, lastPublishedAt: string}}
+ */
+function evaluatePublicLinkFreshness_(quarterId) {
   const latest = findLatestVersionNo(quarterId);
-  if (latest < 0) return false;
   const row = findPublicLinkRow_(quarterId);
-  if (!row) return false;
-  const published = Number(row.lastPublishedVersion);
-  if (!isFinite(published)) return false;
-  return published === latest;
+  const hasLink = !!(row && String(row.fileUrl || '').trim());
+  const publishedNo = row ? Number(row.lastPublishedVersion) : NaN;
+  const out = {
+    hasLink: hasLink, rowExists: !!row, stale: false, reason: '', message: '',
+    latestVersionNo: latest,
+    publishedVersionNo: isFinite(publishedNo) && row && row.lastPublishedVersion !== ''
+      ? publishedNo : null,
+    lastEditAt: '', lastPublishedAt: ''
+  };
+  if (latest < 0 || !row) return out;
+
+  if (out.publishedVersionNo === null || out.publishedVersionNo !== latest) {
+    out.stale = true;
+    out.reason = 'VERSION';
+    out.message = '公開連結顯示的是'
+      + (out.publishedVersionNo === null ? '一個查不到的版本' : ('第 ' + out.publishedVersionNo + ' 版'))
+      + '，最新是第 ' + latest + ' 版。';
+    return out;
+  }
+
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const publishedAt = normalizeSheetTimestamp_(
+    row.lastPublishedAtRaw !== undefined ? row.lastPublishedAtRaw : row.lastPublishedAt, timezone);
+  const lastEditAt = readLatestAssignmentUpdatedAt_(quarterId, latest, timezone);
+  out.lastPublishedAt = publishedAt || '';
+  out.lastEditAt = lastEditAt || '';
+
+  // 冇任何 `UpdatedAt` ⇒ 判斷唔到內容新舊，只可以靠版本號（上面已經過咗）
+  if (!lastEditAt) return out;
+
+  if (!publishedAt) {
+    out.stale = true;
+    out.reason = 'UNKNOWN_PUBLISH_TIME';
+    out.message = '查不到公開連結上一次是幾時發佈的，為安全起見當作未更新。';
+    return out;
+  }
+  if (lastEditAt > publishedAt) {
+    out.stale = true;
+    out.reason = 'EDITED_AFTER_PUBLISH';
+    out.message = '公開連結在 ' + publishedAt + ' 發佈，之後在 ' + lastEditAt
+      + ' 這一版有格子改過（例如填講員／翻譯／獻花），公開連結上看不到。';
+  }
+  return out;
+}
+
+/**
+ * ⚠️⚠️ 第六十三輪批次 A 組：**寄出之前，公開連結一定要係最新。**
+ *
+ * 步驟 2／4／5 嘅寄出（`executeStep2_()`／`executeStep4Send_()`／
+ * `executeStep5Send_()`——網頁、選單、彩排全部行呢三支）一開頭叫。
+ *
+ *   過期 ⇒ 先 `tryPublishPublicRoster_()`
+ *   發佈失敗 ⇒ 三段式訊息擋住，**一封都唔寄**
+ *   冇連結 ⇒ 唔理（`assertPublicLinkReady_()`／Mailer 嗰道會擋）
+ *   查唔到係咪最新 ⇒ 照發一次（同 `tryPublishPublicRoster_()` 一樣嘅取向）
+ *
+ * ⚠️ 填講員之後**唔會**每一格都重發佈——一格一次會慢到用唔到。
+ * 所以先至要喺「寄出」呢個收件人真係會開連結嘅時刻補。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {{republished: boolean, freshness: Object}}
+ */
+function ensurePublicLinkFreshBeforeSend_(quarterId) {
+  let freshness;
+  try {
+    freshness = evaluatePublicLinkFreshness_(quarterId);
+  } catch (err) {
+    log_('WARN', '寄出前查不到公開連結是不是最新，照樣重新發佈一次：' + err.message);
+    freshness = { hasLink: true, stale: true, reason: 'CHECK_FAILED',
+      message: '查不到公開連結是不是最新（' + err.message + '）。' };
+  }
+  if (!freshness.hasLink || !freshness.stale) return { republished: false, freshness: freshness };
+
+  const publish = tryPublishPublicRoster_(quarterId);
+  if (publish.failed) {
+    throw new Error(buildThreePartMessage_(
+      '公開連結未更新到最新內容（' + freshness.message + '），而重新發佈失敗（' + publish.message + '）。',
+      '一封都沒有寄出。如果照樣寄，收件人開連結見到的是舊內容。',
+      [
+        '撳主畫面上的「立即重新發佈」再試',
+        '或者去「進階與診斷 ▸ 重新發佈公開連結」',
+        '發佈好之後再寄一次'
+      ]));
+  }
+  return { republished: !publish.skipped, freshness: freshness };
 }
 
 /**

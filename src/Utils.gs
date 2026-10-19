@@ -473,6 +473,34 @@ function nowTimestamp_(date) {
 }
 
 /**
+ * 第六十三輪批次 A 組：把試算表讀返嚟嘅時間值統一成 `yyyy-MM-dd HH:mm:ss`。
+ *
+ * ⚠️ 同一欄可能係兩種形狀：
+ *   字串　`nowTimestamp_()` 寫入嘅原樣（例如 `2026-09-08 11:20:51`）
+ *   Date　試算表自動把字串認成日期之後讀返嚟
+ * 兩種直接比較會錯（Date 轉字串係英文長句），所以先統一。
+ * 統一之後兩個值可以直接用字串比大細（同一個格式、同一個時區）。
+ *
+ * @param {*} value 時間值
+ * @param {string} timezone 時區（`Config` 嘅 `SYS_TIMEZONE`）
+ * @returns {?string} `yyyy-MM-dd HH:mm:ss`；判斷唔到回傳 null（唔係空字串，唔係「好舊」）
+ */
+function normalizeSheetTimestamp_(value, timezone) {
+  if (value === null || value === undefined || value === '') return null;
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    if (isNaN(value.getTime())) return null;
+    return Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');
+  }
+  const text = String(value).trim();
+  if (text === '') return null;
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3] + ' ' + m[4] + ':' + m[5] + ':' + (m[6] || '00');
+  const parsed = new Date(text);
+  if (isNaN(parsed.getTime())) return null;
+  return Utilities.formatDate(parsed, timezone, 'yyyy-MM-dd HH:mm:ss');
+}
+
+/**
  * 產生用於 ID 的緊湊時間戳（yyyyMMddHHmmss），時區同樣取自 Config。
  * @param {Date=} date 要格式化的時間；省略時採用現在時間
  * @returns {string} yyyyMMddHHmmss 格式的字串

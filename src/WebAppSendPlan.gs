@@ -269,6 +269,10 @@ function apiGetSendRecipientPool(quarterId) {
         item.sources = item.sources.concat([SEND_SOURCE.CHANGED]);
       }
     });
+    // ⚠️ 第六十三輪批次 P 組：有改動、但唔喺池入面嘅人（呢一版 0 格、
+    // 又唔係身分持有人）⇒ 加返入池。唔加嘅話「有 3 位改過」而
+    // 「只寄給安排有改動的人」得 2 位，被整個換走嗰個揀都揀唔到。
+    addChangedPersonsMissingFromPool_(pool, changedByPerson, context.peopleById);
 
     // ── 六個來源逐個數人（**唔可以寫死**）────────────────────
     const groups = SEND_SOURCE_LABELS.map(function (g) {

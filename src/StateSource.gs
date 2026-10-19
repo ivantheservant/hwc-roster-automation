@@ -124,7 +124,9 @@ function resolveAuthoritativeState_(context, mode, callerName) {
           postId: a.postId,
           slotIndex: a.slotIndex,
           personId: a.personId,
-          isManual: false
+          isManual: false,
+          // 第六十三輪批次 K 組：`NO_AUTO_GENERATE` 要分系統排定人手放
+          assignSource: a.assignSource
         };
       }),
       changes: [],

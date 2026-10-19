@@ -56,32 +56,59 @@ const MAKEUP_CONFIRM_TEXT = '確認補寄';
 const MAKEUP_SUPPORTED_STAGES = [MAIL_STAGES.REVIEW, MAIL_STAGES.OFFICIAL];
 
 /**
- * 把 SendLog 中某個「季度＋版本＋階段」的紀錄，整理成每個收件人的最終狀態。
+ * 第六十三輪批次 Q 組：邊幾個 Status 代表「已經收過」。
+ * 同 `classifyMakeupRecipient_()` 嘅 `ALREADY_SENT` 一致。
+ */
+const MAKEUP_RECEIVED_STATUSES = [
+  MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.SKIPPED_UNCHANGED
+];
+
+/**
+ * 把 SendLog 中某個「季度＋階段」的紀錄，整理成每個收件人的最終狀態。
  *
- * 同一個收件人可能有多筆紀錄（例如先 FAILED 後來補寄成功），一律以**最後
- * 一筆**為準——SendLog 一律 append，後出現的就是較新的，跟
- * readLastSendRecordByPerson_()（Mailer.gs）用同一個假設。
+ * ⚠️⚠️ 第六十三輪批次 Q 組：**唔再按版本號篩。**
+ *
+ * 現場（2026-10-20 瀏覽器實測，`2028T2`）：`SendLog` 嘅 OFFICIAL 只有兩行，
+ * 都係第 2 版（P0005、P0011，`DRY_RUN`）。之後儲存咗第 3 版。
+ * 「補寄未收到的人 ▸ 正式發出給全體 ▸ 先看預覽」：「這 53 位還沒有收到」
+ * ——**P0005 都喺入面**，而佢已經收過。
+ *
+ * 成因：舊寫法只搵**最新版本**（第 3 版）嘅紀錄 ⇒ 一筆都冇 ⇒ 全部人都
+ * 「未收到」。真實使用：全體收咗第 2 版 → 改一格存成第 3 版 → 幹事以為
+ * 某人漏收，開補寄 ⇒ 預覽列出**全部人**；照撳嘅話，全體再收一封「正式發出」。
+ *
+ * 規則：這一季、這一個階段，**任何一個版本**收過（`MAKEUP_RECEIVED_STATUSES`）
+ * ⇒ 已收。收過之後再有一次失敗（例如補寄嗰次 FAILED）唔會抹走「收過」。
+ * 未收過嘅人，以**最後一筆**為準（SendLog 一律 append，後出現就係較新，
+ * 同 `readLastSendRecordByPerson_()`（Mailer.gs）同一個假設）。
+ *
+ * ⚠️ 「收過舊版、而之後有改動」嘅人**唔係**補寄嘅對象——佢哋要收嘅係
+ * 「改動後重發」（只講改咗乜）。補寄係畀「從來未收過」嘅人。
  *
  * @param {Object[]} sendLogRows readSheet(SHEETS.SEND_LOG) 的結果
  * @param {string} quarterId 季度 ID
- * @param {number} versionNo 版本號
  * @param {string} stage 階段
- * @returns {Object.<string, string>} {收件人識別鍵: 最後一次的 Status}
+ * @returns {Object.<string, {status: string, versionNo: number}>}
+ *   {收件人識別鍵: 判斷用嘅 Status ＋ 嗰一筆嘅版本號}
  */
-function buildSendStatusByRecipient_(sendLogRows, quarterId, versionNo, stage) {
+function buildSendStatusByRecipient_(sendLogRows, quarterId, stage) {
   const C = COLUMNS.SEND_LOG;
-  const statusByKey = {};
+  const byKey = {};
   sendLogRows.forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
-    if (Number(row[C.VERSION_NO]) !== versionNo) return;
     if (row[C.STAGE] !== stage) return;
     // PERSON 收件人用 PersonID、LIST 收件人沒有 PersonID 就用 Email——
     // 跟 listRecipients_() 產生收件人的方式對應。
     const key = row[C.PERSON_ID] || String(row[C.EMAIL] || '').trim().toLowerCase();
     if (!key) return;
-    statusByKey[key] = String(row[C.STATUS] || '').toUpperCase();
+    const status = String(row[C.STATUS] || '').toUpperCase();
+    const prev = byKey[key];
+    // 收過就係收過——之後一次唔成功唔可以把佢變返「未收到」
+    if (prev && MAKEUP_RECEIVED_STATUSES.indexOf(prev.status) !== -1
+        && MAKEUP_RECEIVED_STATUSES.indexOf(status) === -1) return;
+    byKey[key] = { status: status, versionNo: Number(row[C.VERSION_NO]) };
   });
-  return statusByKey;
+  return byKey;
 }
 
 /**
@@ -142,8 +169,9 @@ function planMakeupSend_(quarterId, versionNo, stage) {
 
   const context = buildMailContext_(quarterId, versionNo, stage);
   const recipients = listRecipients_(stage, context);
-  const statusByKey = buildSendStatusByRecipient_(
-    readSheet(SHEETS.SEND_LOG), quarterId, versionNo, stage);
+  // ⚠️ 第六十三輪批次 Q 組：任何一個版本收過都算——見 buildSendStatusByRecipient_()
+  const recordByKey = buildSendStatusByRecipient_(
+    readSheet(SHEETS.SEND_LOG), quarterId, stage);
 
   const alreadySent = [];
   const needsResend = [];
@@ -151,25 +179,44 @@ function planMakeupSend_(quarterId, versionNo, stage) {
 
   recipients.forEach(function (recipient) {
     const key = recipient.personId || String(recipient.email || '').trim().toLowerCase();
-    const lastStatus = key ? (statusByKey[key] === undefined ? null : statusByKey[key]) : null;
+    const record = key ? (recordByKey[key] || null) : null;
+    const lastStatus = record ? record.status : null;
     const verdict = classifyMakeupRecipient_(recipient, lastStatus);
+    let reason = verdict.reason;
+    // 收過**舊版** ⇒ 唔補寄，講明之後嘅改動行邊條路
+    if (verdict.category === 'ALREADY_SENT' && record && record.versionNo !== versionNo) {
+      reason = '已經收過第 ' + record.versionNo + ' 版。之後的改動要用區一的「改動後重發」'
+        + '（只講改了甚麼），補寄不會再寄給他';
+    }
     const entry = {
       type: recipient.type,
       personId: recipient.personId,
       email: recipient.email,
       displayName: recipient.displayName,
       lastStatus: lastStatus === null ? '（無紀錄）' : lastStatus,
-      reason: verdict.reason
+      receivedVersionNo: record && verdict.category === 'ALREADY_SENT' ? record.versionNo : null,
+      reason: reason
     };
     if (verdict.category === 'ALREADY_SENT') alreadySent.push(entry);
     else if (verdict.category === 'CANNOT_SEND') cannotSend.push(entry);
     else needsResend.push(entry);
   });
 
+  // 第六十三輪批次 Q 組：預覽要講明附甚麼。補寄用嘅係呢個階段嘅範本
+  //（`executeMakeupSend_()` 同樣用 `findEmailTemplate_(stage)`），唔係上次幹事揀嘅選項。
+  let attachType = '';
+  try {
+    const template = findEmailTemplate_(stage);
+    attachType = template ? String(template.attachType || ATTACH_TYPE.NONE).toUpperCase() : '';
+  } catch (err) {
+    attachType = '';
+  }
+
   return {
     quarterId: quarterId,
     versionNo: versionNo,
     stage: stage,
+    attachType: attachType,
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     totalExpected: recipients.length,
     alreadySent: alreadySent,
@@ -220,13 +267,13 @@ function executeMakeupSend_(plan) {
   plan.needsResend.forEach(function (r) {
     needKeys[r.personId || String(r.email || '').trim().toLowerCase()] = true;
   });
-  const statusByKey = buildSendStatusByRecipient_(
-    readSheet(SHEETS.SEND_LOG), plan.quarterId, plan.versionNo, plan.stage);
+  const recordByKey = buildSendStatusByRecipient_(
+    readSheet(SHEETS.SEND_LOG), plan.quarterId, plan.stage);
 
   const targets = listRecipients_(plan.stage, context).filter(function (recipient) {
     const key = recipient.personId || String(recipient.email || '').trim().toLowerCase();
     if (!needKeys[key]) return false;
-    const lastStatus = statusByKey[key] === undefined ? null : statusByKey[key];
+    const lastStatus = recordByKey[key] ? recordByKey[key].status : null;
     return classifyMakeupRecipient_(recipient, lastStatus).category === 'NEEDS_RESEND';
   });
 
@@ -305,6 +352,8 @@ function buildMakeupPlanLines_(plan) {
     lines.push('');
   }
 
+  lines.push('會寄的是第 ' + plan.versionNo + ' 版（現時最新一版）。');
+  lines.push('任何一版收過都算「已收」；收過舊版而之後有改動的人，要用「改動後重發」，補寄不會再寄。');
   lines.push('這個工具不會改動流程階段（Stage 保持不變），純粹補寄。');
   return lines;
 }

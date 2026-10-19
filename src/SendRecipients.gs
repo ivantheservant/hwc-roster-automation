@@ -176,6 +176,65 @@ function buildSendRecipientPool_(context, timezone) {
 }
 
 /**
+ * ⚠️⚠️ 第六十三輪批次 P 組：**被整個換走嘅人一定要喺池入面。**
+ *
+ * 現場（2026-10-20 瀏覽器實測，`2028T2`）：第 2 版正式發出（模擬）給
+ * P0005、P0011。第 3 版把 P0011 嘅兩格換咗畀 P0028、P0050，P0011 呢一版
+ * 變成 0 格。寄出彈窗 ▸ 選擇收件人：
+ *
+ *   「同 第 2 版……比較，有 **3** 位的安排改過」
+ *   「只寄給安排有改動的人（**2** 位）」
+ *
+ * ——P0011 唔喺名單入面，揀都揀唔到。佢永遠收唔到「你嗰兩格已經改由
+ * 別人負責」，當日照樣出現；接手嘅人只見到「新增，本來是 X」。
+ *
+ * 成因：個池只收三批人（有派工嘅、現任身分持有人、`EmailRecipients`）。
+ * 呢一版 0 格而又唔係堂委／執事嘅人根本唔喺池內，所以替池內嘅人打
+ * `CHANGED` 標記嗰陣就漏咗佢。後端（`computeResendDiff_()`、
+ * `deliverOne_()` 嘅零派工替代句）本來就支持——只係前端揀人嗰一步
+ * 把佢過濾走，而 `PICK` 只寄揀中嘅人。
+ *
+ * ⚠️ 冇電郵嘅照現有規則勾唔到（`selectable: false`）。
+ *
+ * @param {Object[]} pool `buildSendRecipientPool_()` 嘅結果（**就地加**）
+ * @param {Object.<string, string[]>} changedByPerson
+ *   `listChangedPersonsBetweenVersions_()` 嘅結果
+ * @param {Object.<string, Object>} peopleById `context.peopleById`
+ * @returns {Object[]} 新加入池嘅項目
+ */
+function addChangedPersonsMissingFromPool_(pool, changedByPerson, peopleById) {
+  const inPool = {};
+  pool.forEach(function (item) { if (item.personId) inPool[item.personId] = true; });
+  const added = [];
+  Object.keys(changedByPerson || {}).sort().forEach(function (personId) {
+    if (inPool[personId]) return;
+    const notes = changedByPerson[personId];
+    if (!notes || notes.length === 0) return;
+    const person = (peopleById || {})[personId];
+    const email = person ? String(person.email || '').trim() : '';
+    const item = {
+      key: personId,
+      type: RECIPIENT_TYPE.PERSON,
+      personId: personId,
+      email: email,
+      displayName: person ? (person.nameTC || personId) : personId,
+      sendAs: SEND_AS.TO,
+      cellCount: 0,
+      hasEmail: !!email,
+      selectable: !!email,
+      roles: [],
+      sources: [SEND_SOURCE.CHANGED],
+      changeNotes: notes,
+      // 畫面喺名字旁邊寫「這一版沒有任何安排」
+      noAssignmentThisVersion: true
+    };
+    pool.push(item);
+    added.push(item);
+  });
+  return added;
+}
+
+/**
  * `Mailer.gs` 用嘅版本：把池收窄成寄信要嘅幾個欄位。
  *
  * ⚠️ 形狀要同 `listRecipients_()` 一模一樣——下游

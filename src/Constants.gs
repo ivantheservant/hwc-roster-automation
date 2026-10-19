@@ -824,6 +824,20 @@ const ASSIGN_SOURCE = {
 };
 
 /**
+ * 第六十三輪批次 K 組：**邊啲來源係「人決定嘅」。**
+ *
+ * `MANUAL`　幹事喺 grid 改、經「填講員／翻譯／獻花」寫入、申報指定嘅人
+ * `LOCKED`　幹事喺 `Locks` 預先鎖定
+ *
+ * 其餘（`AUTO`／`FORCED`／`FINE_TUNED`）係系統自己揀嘅人。
+ *
+ * ⚠️ 用途只得一個：`isNoAutoGenerateViolation_()`（Generator.gs）。
+ * `AutoGenerate = FALSE` 嘅崗位（講員／翻譯／獻花）本來就係**要人手填**，
+ * 人手填咗唔係違反——系統自己排咗先係。
+ */
+const HUMAN_ASSIGN_SOURCES = [ASSIGN_SOURCE.MANUAL, ASSIGN_SOURCE.LOCKED];
+
+/**
  * Quarters.Stage 欄可能出現的值：四階段流程的狀態機，只能依此順序前進，不可倒退。
  * REQUESTS_APPLIED 可以重複停留（步驟 3「套用修改申報」可以執行多次）。
  * Stage 只可由 FourStageFlow.gs 的四個步驟函式改動，其他地方一律只讀。

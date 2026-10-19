@@ -1159,6 +1159,8 @@
       '寄出 ' + r.sent + ' 封　模擬 ' + r.dryRun + ' 封　查無電郵略過 ' + r.skipped + ' 位',
       '這一季的進度現在是「已寄給堂委，等他們的意見」。'
     ];
+    // 第六十三輪批次 A 組：寄之前補發咗公開連結 ⇒ 講一句
+    if (r.publicLinkRepublished) lines.push('寄出之前，系統已經自動把公開連結更新到最新內容。');
     const nodes = lines.map((t) => make('div', { text: t, className: 'ok-line' }));
 
     // 規格 2.5 最後一段：區二未做完 >0 就提一提。
@@ -1208,9 +1210,14 @@
    */
   function openMissingPdfBlock(missing, versionNo, sendOpts) {
     openModal('正式發出：還沒有個人 PDF', [
+      // 第六十三輪批次 A2 組：「冇檔」同「過期」分開講——過期嗰啲係
+      // 內容改咗之前產生嘅（例如填講員之前），寄出去會印住舊內容。
       errorPart(ERR_LABEL_WHAT,
-        '有 ' + missing.missingTotal + ' / ' + missing.total + ' 人還沒有個人 PDF，'
-        + '超過了容許的缺件上限。'),
+        '有 ' + missing.missingTotal + ' / ' + missing.total + ' 人的個人 PDF 不能用'
+        + (missing.staleTotal > 0
+          ? ('（' + (missing.absentTotal || 0) + ' 人還沒有、' + missing.staleTotal
+            + ' 人的是內容改動之前產生的，已經過期）') : '')
+        + '，超過了容許的缺件上限。'),
       errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
       make('div', { className: 'err-part' }, [
         make('div', { text: '你可以怎樣做', className: 'err-label' }),
@@ -1444,6 +1451,10 @@
     if (r.outcomeSentence) {
       nodes.push(make('div', { text: r.outcomeSentence, className: 'ok-line strong' }));
     }
+    // 第六十三輪批次 A 組
+    if (r.publicLinkRepublished) {
+      nodes.push(make('div', { text: '寄出之前，系統已經自動把公開連結更新到最新內容。', className: 'ok-line' }));
+    }
     if (!r.advanced) {
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
@@ -1527,8 +1538,11 @@
           text: '原本：' + (c.previousSummary || '（上次的安排沒有記錄，無法對照）'),
           className: c.previousSummary ? 'vio-row' : 'vio-row muted'
         }));
+        // 第六十三輪批次 P 組：被整個換走嘅人明寫「這一季沒有安排」，
+        // 唔靠 currentSummary 剛好係空字串。
         item.appendChild(make('div', {
-          text: '現在：' + (c.currentSummary || '（這一季沒有安排）'),
+          text: '現在：' + (c.hasAssignments === false
+            ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）')),
           className: 'vio-row'
         }));
         list.appendChild(item);
@@ -1584,7 +1598,7 @@
       showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，尚未寄出任何電郵。'));
       return;
     }
-    openModal('改動後重發：完成', [
+    const doneNodes = [
       make('div', {
         text: result.isDryRun ? '測試模式：沒有真的寄出任何電郵。' : '已經重發。',
         className: 'ok-line'
@@ -1593,8 +1607,31 @@
         text: '寄出 ' + result.sent + ' 封　模擬 ' + result.dryRun + ' 封　'
           + '查無電郵略過 ' + result.skipped + ' 位',
         className: 'ok-line'
-      }),
-      make('div', { text: '這一季的進度不變，仍然是「已正式發出給全體」。', className: 'ok-line' })
-    ], [button('完成', () => closeModalAndRefresh(), '')]);
+      })
+    ];
+    // ⚠️ 第六十三輪批次 P 組：被整個換走嘅人要逐個列出——
+    // 佢哋收到嘅係「你原本嗰幾格已經改由別人負責」，淨係一個總數睇唔出。
+    const zero = result.zeroAssignmentPeople || [];
+    if (zero.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('這一版沒有任何安排的 ' + zero.length + ' 位（'
+          + (result.isDryRun ? '已模擬通知' : '已通知') + '他們原本的安排已經改由別人負責）')
+      ]);
+      zero.forEach((z) => {
+        box.appendChild(make('div', {
+          text: z.nameTC + '　原本：' + (z.previousSummary || '（上次的安排沒有記錄）')
+            + '／現在：這一季沒有安排'
+            + (z.hasEmail ? '' : '　⚠ 沒有電郵，要另外通知'),
+          className: 'vio-row'
+        }));
+      });
+      doneNodes.push(box);
+    }
+    // 第六十三輪批次 A 組
+    if (result.publicLinkRepublished) {
+      doneNodes.push(make('div', { text: '寄出之前，系統已經自動把公開連結更新到最新內容。', className: 'ok-line' }));
+    }
+    doneNodes.push(make('div', { text: '這一季的進度不變，仍然是「已正式發出給全體」。', className: 'ok-line' }));
+    openModal('改動後重發：完成', doneNodes, [button('完成', () => closeModalAndRefresh(), '')]);
   }
 </script>

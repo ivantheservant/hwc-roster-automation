@@ -342,6 +342,32 @@ function findStateViolations_(state, context) {
     quarterCount[s.personId] = (quarterCount[s.personId] || 0) + 1;
   });
 
+  // ⚠️ 第六十三輪批次 K 組：每一格嘅來源（系統排定定人手放）。
+  // 只有 `NO_AUTO_GENERATE` 用到，所以上一版嘅索引**要用先整**——
+  // 呢個函式喺搵替補嘅迴圈入面會被叫好多次。
+  //
+  // 次序：
+  //   1. 格本身帶住 `assignSource` ⇒ 用佢（搵替補試放嘅格係 `FINE_TUNED`）
+  //   2. `isManual` ⇒ 幹事喺 grid 改嘅
+  //   3. 同上一版**同一個人** ⇒ 搬上一版嘅來源
+  //   4. 其餘 ⇒ 唔知（`isNoAutoGenerateViolation_()` 當系統排，即舊行為）
+  let originalByKey = null;
+  const sourceOf = function (cell) {
+    if (cell.assignSource) return cell.assignSource;
+    if (cell.isManual) return ASSIGN_SOURCE.MANUAL;
+    if (!Array.isArray(context.original)) return null;
+    if (!originalByKey) {
+      originalByKey = {};
+      context.original.forEach(function (a) {
+        originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
+      });
+    }
+    const o = originalByKey[cellKey_(cell.serviceDate, cell.postId, cell.slotIndex)];
+    // ⚠️ 換咗人就唔可以搬上一版嘅來源——上一版係人手填，唔等於今次都係
+    if (o && o.personId === cell.personId) return o.assignSource || null;
+    return null;
+  };
+
   const add = function (cell, ruleId, reason) {
     const rule = rules[ruleId] || {};
     violations.push({
@@ -381,7 +407,10 @@ function findStateViolations_(state, context) {
         add(cell, RULE_IDS.COMMUNION_FIRST_SUNDAY, '出現在非每月第一主日');
       }
     }
-    if (post && !post.autoGenerate && isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)) {
+    // ⚠️ 第六十三輪批次 K 組：人手填嘅講員／翻譯／獻花**唔係**違反。
+    // 判斷只有一份——見 `isNoAutoGenerateViolation_()`（Generator.gs）。
+    if (isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)
+        && isNoAutoGenerateViolation_(post, sourceOf(cell))) {
       add(cell, RULE_IDS.NO_AUTO_GENERATE, 'AutoGenerate=FALSE 的崗位被派人');
     }
 
@@ -641,7 +670,11 @@ function substituteCell_(state, key, personId) {
       postId: s.postId,
       slotIndex: s.slotIndex,
       personId: personId,
-      isManual: s.isManual
+      isManual: s.isManual,
+      // ⚠️ 第六十三輪批次 K 組：呢個人係**系統揀**嘅（搵替補／提案）。
+      // 唔寫明嘅話，`findStateViolations_()` 會搬上一版嘅來源——
+      // 上一版係人手填嘅講員，就會當成人手，然後系統自己建議一個講員。
+      assignSource: ASSIGN_SOURCE.FINE_TUNED
     };
   });
 }

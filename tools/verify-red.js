@@ -3710,6 +3710,317 @@ const MUTATIONS = [
     replace: "      + report.failures.length + ' 項失敗',",
     tests: ['tests/monkey_total_steps.test.js']
   },
+  // ── 第六十三輪批次 K 組：人手填嘅講員／翻譯／獻花被當成硬規則違反 ──
+  {
+    id: 'k-helper-ignores-source',
+    why: '`isNoAutoGenerateViolation_()` 唔理來源，凡有人就報'
+      + '——現場：經「填講員／翻譯／獻花」填咗 3 格獻花，'
+      + '「儲存及寄出」話佢違反「要你自己填」，每次儲存都要打字放行',
+    file: 'src/Generator.gs',
+    find: '  return HUMAN_ASSIGN_SOURCES.indexOf(assignSource) === -1;',
+    replace: '  return true;',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  {
+    id: 'k-findstate-own-check',
+    why: '`findStateViolations_()` 唔叫共用判斷，自己寫返「冇 AutoGenerate 就報」'
+      + '——儲存、套用申報、提案、回退四條路全部打回原形',
+    file: 'src/FineTune.gs',
+    find: '        && isNoAutoGenerateViolation_(post, sourceOf(cell))) {',
+    replace: '        && post && !post.autoGenerate) {',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  {
+    id: 'k-verify-own-check',
+    why: '「核對職事表」唔叫共用判斷'
+      + '——同一格喺儲存確認冇事、喺核對報告就話違反，兩個講法',
+    file: 'src/Verify.gs',
+    find: '    if (isNoAutoGenerateViolation_(post, a.assignSource || null)) {',
+    replace: '    if (post && !post.autoGenerate) {',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  {
+    id: 'k-carry-src-new-person',
+    why: '換咗人都照搬上一版嘅來源'
+      + '——上一版係人手填嘅講員，系統試放另一個人就會被當成人手，'
+      + '於是系統會自己建議一個講員',
+    file: 'src/FineTune.gs',
+    find: '    if (o && o.personId === cell.personId) return o.assignSource || null;',
+    replace: '    if (o) return o.assignSource || null;',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  {
+    id: 'k-substitute-no-source',
+    why: '`substituteCell_()` 唔講明係系統揀嘅人'
+      + '——搵替補試放嘅格就要靠「換咗人」嗰條後備判斷，一層防線變冇',
+    file: 'src/FineTune.gs',
+    find: '      assignSource: ASSIGN_SOURCE.FINE_TUNED\n    };',
+    replace: '    };',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  {
+    id: 'k-requests-no-source',
+    why: '套用申報之後重跑檢查嘅狀態唔帶來源'
+      + '——申報指定一位會友做獻花，套用完就話佢違反「要你自己填」',
+    file: 'src/RequestsApply.gs',
+    find: '      // 第六十三輪批次 K 組：申報指定嘅人係 MANUAL，唔係違反\n'
+      + '      assignSource: a.assignSource\n',
+    replace: '',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  {
+    id: 'k-record-state-no-source',
+    why: '已定案版本嘅狀態唔帶來源'
+      + '——寄出、回退預覽要靠上一版估，估錯就會亂報',
+    file: 'src/StateSource.gs',
+    find: '          // 第六十三輪批次 K 組：`NO_AUTO_GENERATE` 要分系統排定人手放\n'
+      + '          assignSource: a.assignSource\n',
+    replace: '',
+    tests: ['tests/manual_fill_not_violation.test.js']
+  },
+  // ── 第六十三輪批次 H 組：一條只喺 LF 行尾下會紅嘅測試 ──────────
+  {
+    id: 'h-pace-uses-pair-count',
+    why: '引擎嘅進度控制真係用咗 `adjacentPairCount_()`'
+      + '——呢條係「唔准改」嘅嘢；舊測試用跨函式邊界嘅正則，'
+      + '結果由行尾決定，同程式啱唔啱無關',
+    file: 'src/Generator.gs',
+    find: '  return count < target * weeksCounted;',
+    replace: '  return count < target * adjacentPairCount_(weeksCounted);',
+    tests: ['tests/adjacent_pair_denominator_gap.test.js']
+  },
+  // ── 第六十三輪批次 P 組：改動後重發漏咗「被整個換走」嘅人 ──────
+  {
+    id: 'p-pool-skips-dropped',
+    why: '收件人池唔加返「呢一版 0 格」而又有改動嘅人'
+      + '——現場：「有 3 位的安排改過」但「只寄給安排有改動的人」得 2 位，'
+      + '被換走嗰位揀都揀唔到，永遠收唔到「你嗰兩格已經改由別人負責」',
+    file: 'src/WebAppSendPlan.gs',
+    find: '    addChangedPersonsMissingFromPool_(pool, changedByPerson, context.peopleById);\n',
+    replace: '',
+    tests: ['tests/resend_dropped_person.test.js']
+  },
+  {
+    id: 'p-zero-list-no-targets',
+    why: '完成訊息嘅「已通知」名單唔理有冇真係寄'
+      + '——幹事冇揀佢都話「已通知」，即係講大話',
+    file: 'src/ResendFlow.gs',
+    find: '    return !c.hasAssignments && wanted[c.personId] === true;',
+    replace: '    return !c.hasAssignments;',
+    tests: ['tests/resend_dropped_person.test.js']
+  },
+  {
+    id: 'p-done-no-zero-list',
+    why: '完成訊息唔帶零派工嗰幾位'
+      + '——幹事只見到一個總數，睇唔出被換走嘅人有冇收到',
+    file: 'src/WebAppFlow.gs',
+    find: '    errorPdf: sendResult.errorPdf, errorPdfMissing: sendResult.errorPdfMissing,\n'
+      + '    zeroAssignmentPeople: zeroAssignmentPeople\n',
+    replace: '    errorPdf: sendResult.errorPdf, errorPdfMissing: sendResult.errorPdfMissing\n',
+    tests: ['tests/resend_dropped_person.test.js']
+  },
+  {
+    id: 'p-ui-no-dropped-note',
+    why: '揀人畫面寫返「這一季 0 格」'
+      + '——幹事會以為佢本來就冇份，唔知佢係被換走',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "        : (c.noAssignmentThisVersion ? '（這一版沒有任何安排）'\n"
+      + "          : ('（這一季 ' + c.cellCount + ' 格）')))",
+    replace: "        : ('（這一季 ' + c.cellCount + ' 格）'))",
+    tests: ['tests/resend_dropped_person.test.js']
+  },
+  {
+    id: 'p-confirm-implicit-none',
+    why: '確認框零派工嗰行靠 currentSummary 啱啱係空字串'
+      + '——日後摘要格式一改，被換走嘅人就會顯示一句古怪嘢',
+    file: 'src/ui/ScriptZone1.html',
+    find: "          text: '現在：' + (c.hasAssignments === false\n"
+      + "            ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）')),",
+    replace: "          text: '現在：' + (c.currentSummary || '（這一季沒有安排）'),",
+    tests: ['tests/resend_dropped_person.test.js']
+  },
+  // ── 第六十三輪批次 Q 組：補寄用最新版本查寄出紀錄 ──────────────
+  {
+    id: 'q-plan-latest-only',
+    why: '補寄預覽返返去只睇最新版本嘅寄出紀錄'
+      + '——現場：全體收咗第 2 版、存咗第 3 版，預覽話「這 53 位還沒有收到」，'
+      + '連收過嗰位都喺入面；照撳全體會再收一封正式發出',
+    file: 'src/MakeupSend.gs',
+    find: '  const recordByKey = buildSendStatusByRecipient_(\n'
+      + '    readSheet(SHEETS.SEND_LOG), quarterId, stage);',
+    replace: '  const recordByKey = buildSendStatusByRecipient_(\n'
+      + '    readSheet(SHEETS.SEND_LOG).filter(function (r) {'
+      + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === versionNo; }), quarterId, stage);',
+    tests: ['tests/makeup_any_version.test.js']
+  },
+  {
+    id: 'q-exec-latest-only',
+    why: '執行補寄嗰陣重新篩返去只睇最新版本'
+      + '——預覽啱咗，但撳落去嗰一刻照樣寄畀收過嘅人',
+    file: 'src/MakeupSend.gs',
+    find: '    readSheet(SHEETS.SEND_LOG), plan.quarterId, plan.stage);',
+    replace: '    readSheet(SHEETS.SEND_LOG).filter(function (r) {'
+      + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === plan.versionNo; }),'
+      + ' plan.quarterId, plan.stage);',
+    tests: ['tests/makeup_any_version.test.js']
+  },
+  {
+    id: 'q-fail-erases-received',
+    why: '收過之後再失敗一次就當返「未收到」'
+      + '——一次補寄失敗會令一個早已收過嘅人再收一封',
+    file: 'src/MakeupSend.gs',
+    find: '    if (prev && MAKEUP_RECEIVED_STATUSES.indexOf(prev.status) !== -1\n'
+      + '        && MAKEUP_RECEIVED_STATUSES.indexOf(status) === -1) return;\n',
+    replace: '',
+    tests: ['tests/makeup_any_version.test.js']
+  },
+  {
+    id: 'q-preview-no-attach',
+    why: '補寄預覽唔講附甚麼'
+      + '——幹事唔知收件人會收到乜',
+    file: 'src/MakeupSend.gs',
+    find: '    attachType: attachType,\n',
+    replace: "    attachType: '',\n",
+    tests: ['tests/makeup_any_version.test.js']
+  },
+  {
+    id: 'q-preview-no-list-label',
+    why: '補寄預覽唔標「名單收件人」'
+      + '——現場：名單頭兩個係「教會辦公室」「系統管理」，冇說明',
+    file: 'src/WebAppZone4.gs',
+    find: '          isListRecipient: r.type === RECIPIENT_TYPE.LIST,\n',
+    replace: '',
+    tests: ['tests/makeup_any_version.test.js']
+  },
+  {
+    id: 'q-preview-no-cannot-send',
+    why: '補寄預覽唔列冇電郵嘅人'
+      + '——佢哋補寄一樣寄唔到，要另外通知，淨係一個數字幹事唔知係邊個',
+    file: 'src/WebAppZone4.gs',
+    find: '      cannotSend: plan.cannotSend.map(function (r) {',
+    replace: '      cannotSend: [].map(function (r) {',
+    tests: ['tests/makeup_any_version.test.js']
+  },
+  // ── 第六十三輪批次 A 組：填講員之後，公開連結同個人 PDF 都冇跟上 ──
+  {
+    id: 'a-link-version-only',
+    why: '公開連結「過期」只比版本號，唔比改動時間'
+      + '——現場：生成 → 填講員 → 一個月後開連結，13 週講員全部「待確認」',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  if (lastEditAt > publishedAt) {',
+    replace: '  if (false) {',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-try-publish-skips',
+    why: '`tryPublishPublicRoster_()` 返返去「版本號一樣就當最新」'
+      + '——有人叫佢發佈都會略過，即係舊病',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  return f.latestVersionNo >= 0 && f.rowExists && !f.stale;',
+    replace: '  return f.latestVersionNo >= 0 && f.rowExists'
+      + ' && f.publishedVersionNo === f.latestVersionNo;',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-step2-no-ensure',
+    why: '寄給堂委審閱之前唔確保公開連結係最新'
+      + '——審閱信信末嗰條連結開出嚟，講員一欄全部「待確認」',
+    file: 'src/FiveStageCore.gs',
+    find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
+      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
+    replace: '  const fresh = { republished: false };\n'
+      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-step4-no-ensure',
+    why: '正式發出之前唔確保公開連結係最新',
+    file: 'src/FiveStageCore.gs',
+    find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
+      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+    replace: '  const fresh = { republished: false };\n'
+      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-step5-no-ensure',
+    why: '改動後重發之前唔確保公開連結係最新',
+    file: 'src/FiveStageCore.gs',
+    find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
+      + '  const result = sendResendStage_(quarterId, versionNo,',
+    replace: '  const fresh = { republished: false };\n'
+      + '  const result = sendResendStage_(quarterId, versionNo,',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-ensure-ignores-fail',
+    why: '重發佈失敗都照寄'
+      + '——收件人開連結見到嘅係舊內容，而畫面冇任何提示',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  const publish = tryPublishPublicRoster_(quarterId);\n  if (publish.failed) {\n'
+      + '    throw new Error(buildThreePartMessage_(\n'
+      + "      '公開連結未更新到最新內容（'",
+    replace: '  const publish = tryPublishPublicRoster_(quarterId);\n  if (false) {\n'
+      + '    throw new Error(buildThreePartMessage_(\n'
+      + "      '公開連結未更新到最新內容（'",
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-dash-no-stale',
+    why: 'Dashboard 唔講公開連結過期'
+      + '——幹事可能已經把連結貼咗出去，佢要知',
+    file: 'src/WebAppDashboard.gs',
+    find: '    publicLink.stale = !!(freshness.hasLink && freshness.stale);',
+    replace: '    publicLink.stale = false;',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-pdf-gen-ignores-stale',
+    why: '產生個人 PDF 照樣把過期嘅檔當「已存在」'
+      + '——先產 PDF、後填講員 ⇒ 57 份 PDF 永遠印住「待確認」',
+    file: 'src/PdfBatch.gs',
+    find: '    const alreadyExists = !!existing && existing.sizeBytes >= minBytes && !staleExisting;',
+    replace: '    const alreadyExists = !!existing && existing.sizeBytes >= minBytes;',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-pdf-missing-no-stale',
+    why: '寄前缺件檢查唔計過期'
+      + '——正式發出會寄一份印住舊內容嘅 PDF，冇任何警告',
+    file: 'src/PdfBatch.gs',
+    find: '    if (isPersonalPdfStale_(info.lastUpdated, stamp.updatedAt, stamp.timezone)) stale.push(p);',
+    replace: '    if (false) stale.push(p);',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-mail-ignores-stale',
+    why: '寄信嗰刻唔理 PDF 過期'
+      + '——最後一道防線冇咗',
+    file: 'src/Mailer.gs',
+    find: '  if (isPersonalPdfStale_(file.getLastUpdated(), stamp.updatedAt, stamp.timezone)) {',
+    replace: '  if (false) {',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-stale-judge-false',
+    why: '`isPersonalPdfStale_()` 永遠話唔過期'
+      + '——三個入口一齊失效',
+    file: 'src/PdfBatch.gs',
+    find: '  return fileAt < contentUpdatedAt;',
+    replace: '  return false;',
+    tests: ['tests/stale_after_fill.test.js']
+  },
+  {
+    id: 'a-normalize-date-raw',
+    why: '時間值唔統一，Date 直接轉字串'
+      + '——試算表自動把字串認成日期之後，兩邊比較會靜靜錯',
+    file: 'src/Utils.gs',
+    find: "    return Utilities.formatDate(value, timezone, 'yyyy-MM-dd HH:mm:ss');\n"
+      + '  }\n  const text = String(value).trim();\n  if (text === \'\') return null;',
+    replace: '    return String(value);\n'
+      + '  }\n  const text = String(value).trim();\n  if (text === \'\') return null;',
+    tests: ['tests/stale_after_fill.test.js']
+  },
 ];
 
 /**

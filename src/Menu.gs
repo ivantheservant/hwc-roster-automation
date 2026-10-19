@@ -435,7 +435,19 @@ function runCheckPersonalPdfIntegrity_() {
       lines.push('');
     }
 
-    if (result.missing.length === 0 && result.tooSmall.length === 0) {
+    // 第六十三輪批次 A2 組：內容改咗之後未重做嘅
+    const stale = result.stale || [];
+    if (stale.length > 0) {
+      lines.push('⚠️ 檔案存在但已經過期（這一版內容在 ' + result.contentUpdatedAt
+        + ' 改過，例如填講員／翻譯／獻花，這些 PDF 在那之前產生）：' + stale.length + ' 人');
+      stale.slice(0, 30).forEach(function (p) {
+        lines.push('　' + p.nameTC + '（' + p.personId + '）　' + p.fileName);
+      });
+      if (stale.length > 30) lines.push('　……另有 ' + (stale.length - 30) + ' 人');
+      lines.push('');
+    }
+
+    if (result.missing.length === 0 && result.tooSmall.length === 0 && stale.length === 0) {
       lines.push('沒有發現任何問題，全部 ' + result.totalPeople + ' 人的 PDF 都存在且大小正常。');
     } else {
       lines.push('請重新執行「產生個人 PDF」補齊（已存在但大小不足的檔案會自動重新產生，'
@@ -449,7 +461,8 @@ function runCheckPersonalPdfIntegrity_() {
       diagRow_('個人 PDF 完整性', '大小門檻 bytes', result.minBytes, ''),
       diagRow_('個人 PDF 完整性', '找到且大小正常', result.okCount + ' 人', ''),
       diagRow_('個人 PDF 完整性', '完全缺檔', result.missing.length + ' 人', ''),
-      diagRow_('個人 PDF 完整性', '大小異常', result.tooSmall.length + ' 人', '')
+      diagRow_('個人 PDF 完整性', '大小異常', result.tooSmall.length + ' 人', ''),
+      diagRow_('個人 PDF 完整性', '已過期', stale.length + ' 人', '內容改動之前產生')
     ];
     result.missing.forEach(function (p) {
       rows.push(diagRow_('個人 PDF 完整性', '缺檔：' + p.nameTC, p.personId, p.fileName));
@@ -1361,7 +1374,9 @@ function runSendStage_() {
       const extra = missingCheck.missing.length > 30
         ? '\n　……另有 ' + (missingCheck.missing.length - 30) + ' 人' : '';
       const proceed = ui.alert(
-        '有 ' + missingCheck.missing.length + ' / ' + missingCheck.total + ' 人缺個人 PDF',
+        '有 ' + missingCheck.missing.length + ' / ' + missingCheck.total + ' 人缺個人 PDF'
+          + ((missingCheck.stale || []).length > 0
+            ? ('（其中 ' + missingCheck.stale.length + ' 人的已經過期）') : ''),
         names.join('\n') + extra + '\n\n'
           + '這些人會記為 ERROR_PDF_MISSING，不會寄出。\n\n'
           + '要先取消、去執行「產生個人 PDF」補齊，還是現在繼續（其餘的人正常處理）？\n'

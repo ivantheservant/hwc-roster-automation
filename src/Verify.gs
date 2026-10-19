@@ -519,7 +519,9 @@ function checkHardRuleViolations_(context) {
         notFirstSunday.push(mk(a, RULE_IDS.COMMUNION_FIRST_SUNDAY, '出現在非每月第一主日'));
       }
     }
-    if (post && !post.autoGenerate) {
+    // ⚠️ 第六十三輪批次 K 組：人手填嘅講員／翻譯／獻花唔係違反。
+    // 同 `findStateViolations_()` 叫同一支——見 `isNoAutoGenerateViolation_()`。
+    if (isNoAutoGenerateViolation_(post, a.assignSource || null)) {
       autoGenerateHits.push(mk(a, RULE_IDS.NO_AUTO_GENERATE, 'AutoGenerate=FALSE 的崗位卻被派人'));
     }
   });

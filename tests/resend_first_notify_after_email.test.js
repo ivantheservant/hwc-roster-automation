@@ -76,7 +76,7 @@ const gas = loadGasSource([
   // 第四十一輪批次 E 組：個人專屬連結（buildMailContext_ 會叫 indexPersonalLinkTokens_）。
   'PersonalLinkInMail.gs', 'Trigger.gs',
   'WebAppGuards.gs', 'WebAppDashboard.gs',
-  'FiveStageCore.gs', 'WebAppFlow.gs'
+  'FiveStageCore.gs', 'WebAppSaveConfirm.gs', 'WebAppFlow.gs'
 ]);
 
 const Q = '2027T4';
@@ -194,6 +194,9 @@ gas.resolveAuthoritativeState_ = function (context) {
     changes: [], unresolved: []
   };
 };
+// 第六十三輪批次 A 組：寄出前會先確保公開連結係最新（`ensurePublicLinkFreshBeforeSend_()`）。
+// 呢份測試唔係測發佈，所以同 e2e 一樣當成「發佈成功」。
+gas.tryPublishPublicRoster_ = function () { return { failed: false, message: '' }; };
 gas.findPublicLinkRow_ = function (quarterId) {
   return { quarterId: quarterId, fileId: 'mock', fileUrl: 'https://example.invalid/mock',
     lastPublishedAt: '', lastPublishedVersion: '', sharingAccess: '', sharingPermission: '', createdAt: '' };

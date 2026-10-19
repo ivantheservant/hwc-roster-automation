@@ -366,3 +366,26 @@ function isTrueValue_(value) {
   if (value === true) return true;
   return String(value).trim().toUpperCase() === 'TRUE';
 }
+
+/**
+ * 第六十三輪批次 A 組：這一季某一版喺 `RosterAssignments` 最後一次改動嘅時間。
+ *
+ * 「過期」嘅兩個判斷都靠佢：公開連結（`evaluatePublicLinkFreshness_()`）
+ * 同個人 PDF（`isPersonalPdfStale_()`）。填講員／翻譯／獻花係直接改最新版本
+ *（唔造新版本），所以只有 `UpdatedAt` 先睇得出「內容喺發佈／產生之後改過」。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} timezone 時區
+ * @returns {?string} `yyyy-MM-dd HH:mm:ss`；一格都冇時間就回 null
+ */
+function readLatestAssignmentUpdatedAt_(quarterId, versionNo, timezone) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  let max = null;
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== Number(versionNo)) return;
+    const t = normalizeSheetTimestamp_(row[A.UPDATED_AT], timezone);
+    if (t && (max === null || t > max)) max = t;
+  });
+  return max;
+}

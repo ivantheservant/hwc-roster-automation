@@ -51,7 +51,8 @@ function generatePersonalPdfBatch_(quarterId, versionNo) {
   // 追加階段 AG：改用 listExistingFileSizes_()（連大小一併記錄），不再只記檔名——
   // 「已存在」現在要求大小也達標，否則視為缺件重新產生，避免一個曾經失敗留下的
   // 0 bytes 舊檔被永遠當成「已經產生過」而略過。
-  const existingFileSizes = forceRegenerate ? null : listExistingFileSizes_(folder);
+  // ⚠️ 第六十三輪批次 A2 組：連最後更新時間一齊列——「已存在」仲要「唔係過期」
+  const existingFileSizes = forceRegenerate ? null : listExistingFileInfo_(folder);
   const versionAssignments = readVersionAssignmentsRaw_(quarterId, versionNo);
 
   runPersonalPdfBatchLoop_(
@@ -98,6 +99,8 @@ function runPersonalPdfBatchLoop_(
   // 這一批處理完（無論是做完全部人、到達批次上限、時間預算用盡，還是中途拋錯）
   // 都會在 finally 刪除暫存工作表，不會留下垃圾。
   const renderContext = openPersonalPdfRenderContext_(quarterId, versionNo);
+  // 第六十三輪批次 A2 組：整批共用一個「內容最後改動時間」
+  renderContext.contentStamp = forceRegenerate ? null : readPersonalPdfContentStamp_(quarterId, versionNo);
   try {
     runPersonalPdfBatchLoopInner_(
       quarterId, versionNo, progress, folder, forceRegenerate, existingFileSizes,
@@ -139,6 +142,8 @@ function runPersonalPdfBatchLoopInner_(
     } else {
       progress.generatedCount++;
     }
+    // 第六十三輪批次 A2 組：舊檔過期而重做嘅份數，報告要講出嚟
+    if (outcome.regeneratedStale) progress.staleRegeneratedCount = (progress.staleRegeneratedCount || 0) + 1;
     progress.totalRetries += outcome.retries;
     progress.totalHighlightMs += outcome.highlightMs;
     progress.totalExportMs += outcome.exportMs;
@@ -185,7 +190,8 @@ function generatePersonalPdfBatchForPeople_(quarterId, versionNo, personIds) {
   const batchSize = Math.max(1, Math.round(
     getConfig(CONFIG_KEYS.PDF_BATCH_SIZE, DEFAULTS.PDF_BATCH_SIZE)));
 
-  const existingFileSizes = forceRegenerate ? null : listExistingFileSizes_(folder);
+  // ⚠️ 第六十三輪批次 A2 組：連最後更新時間一齊列——「已存在」仲要「唔係過期」
+  const existingFileSizes = forceRegenerate ? null : listExistingFileInfo_(folder);
   const versionAssignments = readVersionAssignmentsRaw_(quarterId, versionNo);
 
   runPersonalPdfBatchLoop_(
@@ -215,12 +221,64 @@ function generatePersonalPdfBatchForPeople_(quarterId, versionNo, personIds) {
  */
 function listExistingFileSizes_(folder) {
   const sizes = new Map();
+  listExistingFileInfo_(folder).forEach(function (info, name) { sizes.set(name, info.sizeBytes); });
+  return sizes;
+}
+
+/**
+ * 第六十三輪批次 A2 組：同上，但連最後更新時間一齊記（`{sizeBytes, lastUpdated}`）。
+ * 一次列舉，唔會逐個檔再問 Drive。
+ * @param {Folder} folder 要列出的資料夾
+ * @returns {Map<string, {sizeBytes: number, lastUpdated: *}>}
+ */
+function listExistingFileInfo_(folder) {
+  const info = new Map();
   const files = folder.getFiles();
   while (files.hasNext()) {
     const file = files.next();
-    sizes.set(file.getName(), file.getSize());
+    info.set(file.getName(), { sizeBytes: file.getSize(), lastUpdated: file.getLastUpdated() });
   }
-  return sizes;
+  return info;
+}
+
+/**
+ * ⚠️⚠️ 第六十三輪批次 A2 組：**個人 PDF 係咪「過期」——唯一嘅判斷。**
+ *
+ * 舊做法：「已存在」只睇檔名＋大小。先產 PDF、後填講員 ⇒ 57 份 PDF
+ * 永遠印住「待確認」，寄出時冇任何警告（填講員唔造新版本，所以檔名唔變）。
+ *
+ * 規則：檔案最後更新時間**早過**呢一版 `RosterAssignments` 最大 `UpdatedAt`
+ * ⇒ 過期。PDF 印嘅係**整張表**，任何一格改咗，全部人嘅 PDF 都過期。
+ *
+ * ⚠️ 三處共用，唔可以各自寫：
+ *   `generateOnePersonalPdf_()`　　過期 ⇒ 唔當「已存在」，重新產生
+ *   `checkMissingPersonalPdfs_()`　過期計入缺件（分開講「缺」同「過期」）
+ *   `lookupExistingPersonalPdf_()`（Mailer.gs）過期 ⇒ `missing = true`
+ *
+ * ⚠️ 判斷唔到（長表冇時間、檔案冇時間）⇒ **唔當過期**。
+ * 冇時間嗰陣「過期」係猜，而猜錯嘅代價係每次寄出都重做 57 份 PDF。
+ *
+ * @param {*} fileLastUpdated 檔案嘅 `getLastUpdated()`（Date）
+ * @param {?string} contentUpdatedAt `readLatestAssignmentUpdatedAt_()` 嘅結果
+ * @param {string} timezone 時區
+ * @returns {boolean} 係咪過期
+ */
+function isPersonalPdfStale_(fileLastUpdated, contentUpdatedAt, timezone) {
+  if (!contentUpdatedAt) return false;
+  const fileAt = normalizeSheetTimestamp_(fileLastUpdated, timezone);
+  if (!fileAt) return false;
+  return fileAt < contentUpdatedAt;
+}
+
+/**
+ * 一版嘅「內容最後改動時間」。一批只讀一次（要讀成張 `RosterAssignments`）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {{timezone: string, updatedAt: ?string}}
+ */
+function readPersonalPdfContentStamp_(quarterId, versionNo) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return { timezone: timezone, updatedAt: readLatestAssignmentUpdatedAt_(quarterId, versionNo, timezone) };
 }
 
 /**
@@ -283,15 +341,29 @@ function generateOnePersonalPdf_(
   // 時本來就是 null（見 generatePersonalPdfBatch_() 的呼叫端），於是每人都會
   // 白白多一次 `folder.getFilesByName()` 的 Drive 查詢，查完卻完全用不到結果。
   // 改成 forceRegenerate 時整段跳過，不查也不判斷。
-  let existingSize;
+  let existing;
+  let staleExisting = false;
   if (!forceRegenerate) {
     if (existingFileSizes) {
-      existingSize = existingFileSizes.has(fileName) ? existingFileSizes.get(fileName) : undefined;
+      // 第六十三輪批次 A2 組：呢個 Map 而家係 `listExistingFileInfo_()` 嘅結果
+      //（`{sizeBytes, lastUpdated}`）；舊式（淨係大小）一樣收得落。
+      const v = existingFileSizes.has(fileName) ? existingFileSizes.get(fileName) : undefined;
+      existing = v === undefined ? undefined
+        : (typeof v === 'number' ? { sizeBytes: v, lastUpdated: null } : v);
     } else {
       const found = folder.getFilesByName(fileName);
-      existingSize = found.hasNext() ? found.next().getSize() : undefined;
+      if (found.hasNext()) {
+        const f = found.next();
+        existing = { sizeBytes: f.getSize(), lastUpdated: f.getLastUpdated() };
+      }
     }
-    const alreadyExists = existingSize !== undefined && existingSize >= minBytes;
+    // ⚠️ 第六十三輪批次 A2 組：檔名同大小都啱，但係**內容改咗之前**產生嘅
+    // （例如先產 PDF、後填講員）⇒ 唔當已存在，要重做。
+    const stamp = (renderContext && renderContext.contentStamp)
+      || readPersonalPdfContentStamp_(quarterId, versionNo);
+    staleExisting = !!existing && existing.sizeBytes >= minBytes
+      && isPersonalPdfStale_(existing.lastUpdated, stamp.updatedAt, stamp.timezone);
+    const alreadyExists = !!existing && existing.sizeBytes >= minBytes && !staleExisting;
     if (alreadyExists) {
       return { skippedExisting: true, retries: 0, highlightMs: 0, exportMs: 0, nameTC: personName };
     }
@@ -310,7 +382,8 @@ function generateOnePersonalPdf_(
       retries: built.retries || 0,
       highlightMs: built.highlightMs || 0,
       exportMs: built.exportMs || 0,
-      nameTC: personName
+      nameTC: personName,
+      regeneratedStale: staleExisting
     };
   } catch (err) {
     const recovered = checkFileActuallySucceeded_(folder, fileName, attemptStartedAt);
@@ -343,21 +416,28 @@ function planPersonalPdfIntegrityCheck_(quarterId, versionNo) {
   // 淨係睇子資料夾嘅話，舊季度（檔案平舖喺根）會全部報「缺件」——
   // 而檔案其實好地地喺度。呢種「報告話缺，實際唔缺」比漏報更難查。
   const folder = { getName: function () { return resolveMailAttachmentFolder_().getName(); } };
-  const existingFileSizes = listRosterPdfSizesForQuarter_(quarterId);
+  const existingFileInfo = listRosterPdfInfoForQuarter_(quarterId);
+  // 第六十三輪批次 A2 組：順手報出過期數目（判斷同寄出嗰陣同一支）
+  const stamp = readPersonalPdfContentStamp_(quarterId, versionNo);
 
   const missing = [];
   const tooSmall = [];
+  const stale = [];
   let okCount = 0;
 
   people.forEach(function (p) {
     const fileName = buildAttachmentName_(quarterId, versionNo, p.nameTC);
-    if (!existingFileSizes.has(fileName)) {
+    if (!existingFileInfo.has(fileName)) {
       missing.push({ personId: p.personId, nameTC: p.nameTC, fileName: fileName });
       return;
     }
-    const size = existingFileSizes.get(fileName);
-    if (size < minBytes) {
-      tooSmall.push({ personId: p.personId, nameTC: p.nameTC, fileName: fileName, sizeBytes: size });
+    const info = existingFileInfo.get(fileName);
+    if (info.sizeBytes < minBytes) {
+      tooSmall.push({ personId: p.personId, nameTC: p.nameTC, fileName: fileName, sizeBytes: info.sizeBytes });
+      return;
+    }
+    if (isPersonalPdfStale_(info.lastUpdated, stamp.updatedAt, stamp.timezone)) {
+      stale.push({ personId: p.personId, nameTC: p.nameTC, fileName: fileName });
       return;
     }
     okCount++;
@@ -365,7 +445,8 @@ function planPersonalPdfIntegrityCheck_(quarterId, versionNo) {
 
   return {
     folderName: folder.getName(), totalPeople: people.length, minBytes: minBytes,
-    missing: missing, tooSmall: tooSmall, okCount: okCount
+    missing: missing, tooSmall: tooSmall, stale: stale, okCount: okCount,
+    contentUpdatedAt: stamp.updatedAt || ''
   };
 }
 
@@ -422,14 +503,25 @@ function checkMissingPersonalPdfs_(quarterId, versionNo, stage) {
   // 追加階段 AG：大小不足門檻的檔案也算缺件——0 bytes 的檔案存在不代表可用。
   // 第二十六輪批次階段 B：新舊兩處都睇（見 planPersonalPdfIntegrityCheck_ 嘅說明）。
   const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
-  const existingFileSizes = listRosterPdfSizesForQuarter_(quarterId);
-  const missing = people.filter(function (p) {
+  const existingFileInfo = listRosterPdfInfoForQuarter_(quarterId);
+  // ⚠️ 第六十三輪批次 A2 組：過期（內容改咗之後未重做）都算缺件——
+  // 寄出去嘅會係一份印住「待確認」嘅舊表。但**分開講**：
+  //   `absent`　　冇檔／檔案太細
+  //   `stale`　　 有檔，但係內容改咗之前產生嘅（例如填講員之前）
+  const stamp = readPersonalPdfContentStamp_(quarterId, versionNo);
+  const absent = [];
+  const stale = [];
+  people.forEach(function (p) {
     const fileName = buildAttachmentName_(quarterId, versionNo, p.nameTC);
-    const size = existingFileSizes.get(fileName);
-    return size === undefined || size < minBytes;
+    const info = existingFileInfo.get(fileName);
+    if (info === undefined || info.sizeBytes < minBytes) { absent.push(p); return; }
+    if (isPersonalPdfStale_(info.lastUpdated, stamp.updatedAt, stamp.timezone)) stale.push(p);
   });
 
-  return { applicable: true, missing: missing, total: people.length };
+  return {
+    applicable: true, missing: absent.concat(stale), absent: absent, stale: stale,
+    total: people.length
+  };
 }
 
 /**
@@ -611,13 +703,19 @@ function diagnosePersonalPdfVersions_(quarterId) {
   // 就唔使喺呢度重新拼一次 pattern（重複實作＝遲早分岔）。
   const counts = {};
   let totalFiles = 0;
-  listRosterPdfFilesForQuarter_(quarterId).forEach(function (f) {
+  // 第六十三輪批次 A2 組：最新版本嗰批之中，有幾多份係內容改咗之前產生嘅
+  const stamp = latestVersionNo >= 0
+    ? readPersonalPdfContentStamp_(quarterId, latestVersionNo) : { updatedAt: null, timezone: '' };
+  let latestStaleCount = 0;
+  listRosterPdfFilesForQuarter_(quarterId, { withLastUpdated: true }).forEach(function (f) {
     const name = f.name;
     if (name.indexOf(quarterId) === -1) return;
     totalFiles++;
     const match = /_v(\d+)_/.exec(name);
     const key = match ? 'v' + match[1] : '（檔名裡看不到版本號）';
     counts[key] = (counts[key] || 0) + 1;
+    if (key === 'v' + latestVersionNo
+        && isPersonalPdfStale_(f.lastUpdated, stamp.updatedAt, stamp.timezone)) latestStaleCount++;
   });
 
   const byVersion = Object.keys(counts).sort().map(function (k) {
@@ -629,6 +727,7 @@ function diagnosePersonalPdfVersions_(quarterId) {
     latestVersionNo: latestVersionNo,
     byVersion: byVersion,
     totalFiles: totalFiles,
+    latestStaleCount: latestStaleCount,
     folderName: folder.getName()
   };
 }
@@ -673,8 +772,15 @@ function buildPersonalPdfVersionReport_(diag) {
   } else if (staleCount > 0) {
     lines.push('　最新版本已有 ' + latestCount + ' 個，另有 ' + staleCount
       + ' 個是舊版本的檔案（不會被寄出，可以用「清理舊 PDF」移除）。');
-  } else {
+  } else if (!diag.latestStaleCount) {
     lines.push('✅ 全部檔案都是最新版本，下一次寄送會略過已存在的，不會重做。');
+  }
+  // ⚠️ 第六十三輪批次 A2 組：版本號啱，但內容改咗之後未重做（例如填講員之後）
+  if (diag.latestStaleCount > 0) {
+    lines.push('');
+    lines.push('⚠️ 最新版本 ' + latestKey + ' 之中有 ' + diag.latestStaleCount
+      + ' 份是這一版內容改動之前產生的（例如填講員／翻譯／獻花之前），已經過期。');
+    lines.push('請重新執行「產生個人 PDF」——過期的會自動重新產生，不需要先手動刪除。');
   }
   return lines.join('\n');
 }

@@ -230,6 +230,11 @@ console.log('\n=== A1【核心】已經發佈咗最新嗰版 ⇒ 唔使再發一
   gas.publishPublicRoster_ = function () { published++; };
   gas.findLatestVersionNo = function () { return 3; };
   gas.findPublicLinkRow_ = function () { return { lastPublishedVersion: 3 }; };
+  // 第六十三輪批次 A 組：「已經係最新」而家仲要睇同一版發佈之後有冇人改過
+  //（`evaluatePublicLinkFreshness_()`）。呢度嘅情境係「冇人改過」，
+  // 所以長表一格都冇 UpdatedAt。
+  gas.readSheet = function () { return []; };
+  gas.getConfig = function (_k, d) { return d; };
 
   const first = gas.tryPublishPublicRoster_('2028T3');
   checkEqual('★★★★★★ 已經係第 3 版 ⇒ **唔再發一次**', published, 0);
