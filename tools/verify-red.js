@@ -1936,8 +1936,9 @@ const MUTATIONS = [
     why: '做完之後唔畀路行返轉頭去正式發出'
       + '——佢又要自己搵路返嚟，而嗰個就係本來要修嗰件事',
     file: 'src/ui/ScriptZone1.html',
-    find: "        button('回到正式發出', () => { closeModal(); openOfficial(sendOpts); }, ''),",
-    replace: "        button('知道了', () => closeModal(), ''),",
+    // 第六十五輪批次 W 組：迴圈抽成共用嘅 `runPdfBatchToCompletion()`
+    find: '      onBack: () => { closeModal(); openOfficial(sendOpts); }',
+    replace: '      onBack: () => closeModal()',
     tests: ['tests/missing_pdf_inline.test.js']
   },
   {
@@ -3067,9 +3068,11 @@ const MUTATIONS = [
     why: '由上而下刪行'
       + '——刪完一行之後下面每一行都會向上移一格，'
       + '而之後嗰幾個行號就全部錯晒：會刪錯行',
-    file: 'src/SelfTestRunner.gs',
-    find: '  doomed.slice().reverse().forEach(function (d) {',
-    replace: '  doomed.slice().forEach(function (d) {',
+    // 第六十五輪批次 AA 組：逐行刪改成共用 deleteSheetRowsInRuns_()（Utils.gs），
+    // 「由下而上」嗰個迴圈搬咗去嗰度——突變跟住搬，仍然用自測重設嗰支測試驗
+    file: 'src/Utils.gs',
+    find: '  for (let i = runs.length - 1; i >= 0; i--) {',
+    replace: '  for (let i = 0; i < runs.length; i++) {',
     tests: ['tests/selftest_reset_and_clock.test.js']
   },
   {
@@ -3836,9 +3839,10 @@ const MUTATIONS = [
     why: '確認框零派工嗰行靠 currentSummary 啱啱係空字串'
       + '——日後摘要格式一改，被換走嘅人就會顯示一句古怪嘢',
     file: 'src/ui/ScriptZone1.html',
-    find: "          text: '現在：' + (c.hasAssignments === false\n"
-      + "            ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）')),",
-    replace: "          text: '現在：' + (c.currentSummary || '（這一季沒有安排）'),",
+    // 第六十五輪批次 Y 組：抽成 resendCurrentText()
+    find: "    return '現在：' + (c.hasAssignments === false\n"
+      + "      ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'));",
+    replace: "    return '現在：' + (c.currentSummary || '（這一季沒有安排）');",
     tests: ['tests/resend_dropped_person.test.js']
   },
   // ── 第六十三輪批次 Q 組：補寄用最新版本查寄出紀錄 ──────────────
@@ -3848,11 +3852,11 @@ const MUTATIONS = [
       + '——現場：全體收咗第 2 版、存咗第 3 版，預覽話「這 53 位還沒有收到」，'
       + '連收過嗰位都喺入面；照撳全體會再收一封正式發出',
     file: 'src/MakeupSend.gs',
-    find: '  const recordByKey = buildSendStatusByRecipient_(\n'
-      + '    readSheet(SHEETS.SEND_LOG), quarterId, stage);',
-    replace: '  const recordByKey = buildSendStatusByRecipient_(\n'
-      + '    readSheet(SHEETS.SEND_LOG).filter(function (r) {'
-      + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === versionNo; }), quarterId, stage);',
+    // 第六十五輪批次 X 組：改為經 `buildQuarterNoticeReceivedIndex_()`
+    find: '  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage);',
+    replace: '  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage,'
+      + ' readSheet(SHEETS.SEND_LOG).filter(function (r) {'
+      + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === versionNo; }));',
     tests: ['tests/makeup_any_version.test.js']
   },
   {
@@ -3860,10 +3864,11 @@ const MUTATIONS = [
     why: '執行補寄嗰陣重新篩返去只睇最新版本'
       + '——預覽啱咗，但撳落去嗰一刻照樣寄畀收過嘅人',
     file: 'src/MakeupSend.gs',
-    find: '    readSheet(SHEETS.SEND_LOG), plan.quarterId, plan.stage);',
-    replace: '    readSheet(SHEETS.SEND_LOG).filter(function (r) {'
-      + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === plan.versionNo; }),'
-      + ' plan.quarterId, plan.stage);',
+    // 第六十五輪批次 X 組：改為經 `buildQuarterNoticeReceivedIndex_()`
+    find: '  const recordByKey = buildQuarterNoticeReceivedIndex_(plan.quarterId, plan.stage);',
+    replace: '  const recordByKey = buildQuarterNoticeReceivedIndex_(plan.quarterId, plan.stage,'
+      + ' readSheet(SHEETS.SEND_LOG).filter(function (r) {'
+      + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === plan.versionNo; }));',
     tests: ['tests/makeup_any_version.test.js']
   },
   {
@@ -4148,10 +4153,11 @@ const MUTATIONS = [
     id: 'f-reach-counts-failed',
     why: '「已收」連 FAILED 都計'
       + '——寄失敗嘅人當成收咗，補寄提示就少咗佢',
-    file: 'src/FiveStageCore.gs',
-    find: '    if (status !== MAIL_STATUS.SENT && status !== MAIL_STATUS.DRY_RUN) return;',
-    replace: '    if (false) return;',
-    tests: ['tests/official_partial_send.test.js']
+    // 第六十五輪批次 X 組：「收過」嘅判斷搬咗去共用嘅 `isNoticeReceivedRecord_()`
+    file: 'src/MakeupSend.gs',
+    find: '  return !!record && MAKEUP_RECEIVED_STATUSES.indexOf(record.status) !== -1;',
+    replace: '  return !!record;',
+    tests: ['tests/official_partial_send.test.js', 'tests/notice_received_index.test.js']
   },
   {
     id: 'f-no-shortfall-line',
@@ -4331,8 +4337,9 @@ const MUTATIONS = [
     id: 'r-ui-title-total',
     why: '確認框標題照用總數——上次冇收到嘅人都算入「安排改了」',
     file: 'src/ui/ScriptZone1.html',
-    find: "          sectionTitle('自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了'),",
-    replace: "          sectionTitle('自上次發出之後，這 ' + plan.changed.length + ' 個人的安排改了'),",
+    // 第六十五輪批次 Y 組：搬入 buildResendConfirmNodes() 第一段
+    find: "        text: '自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了。'",
+    replace: "        text: '自上次發出之後，這 ' + plan.changed.length + ' 個人的安排改了。'",
     tests: ['tests/resend_partial_baseline.test.js']
   },
   {
@@ -4458,6 +4465,241 @@ const MUTATIONS = [
     find: "callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText, sendOpts);",
     replace: "callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText);",
     tests: ['tests/resend_pdf_targets.test.js']
+  },
+  // ── 第六十五輪批次 W 組：補寄唔補產生缺嘅個人 PDF，完成窗吞掉缺件 ──
+  {
+    id: 'w-exec-no-pdf-guard',
+    why: '拆走後端「缺個人 PDF 就唔寄」——現場：預覽 53 位，寄出 4 封，'
+      + '49 位 ERROR_PDF_MISSING，完成窗淨係出綠色',
+    file: 'src/MakeupSend.gs',
+    find: '  if (pdfGaps.people.length > 0) {\n    const gapErr',
+    replace: '  if (false) {\n    const gapErr',
+    tests: ['tests/makeup_pdf_gap.test.js']
+  },
+  {
+    id: 'w-gaps-all-people',
+    why: '缺件名單唔限於這一次要寄嘅人——唔關事嘅人都要等佢哋嘅 PDF（V 組原則）',
+    file: 'src/MakeupSend.gs',
+    find: '  const pick = function (p) { return !!wanted[p.personId]; };',
+    replace: '  const pick = function () { return true; };',
+    tests: ['tests/makeup_pdf_gap.test.js']
+  },
+  {
+    id: 'w-plan-no-gap-gate',
+    why: '預覽有缺件都照畀〔確定補寄〕——撳落去就係現場嗰 49 位收唔到',
+    file: 'src/ui/ScriptZone4.html',
+    find: '    if (plan.pdfGaps && plan.pdfGaps.count > 0) {',
+    replace: '    if (false) {',
+    tests: ['tests/makeup_pdf_gap.test.js']
+  },
+  {
+    id: 'w-result-no-missing-cnt',
+    why: '完成窗唔顯示「PDF 缺件 N」——現場就係只寫「失敗 0」',
+    file: 'src/ui/ScriptZone4.html',
+    find: "        text: '失敗 ' + failed + '　PDF 失敗 ' + errorPdf + '　PDF 缺件 ' + missing,",
+    replace: "        text: '失敗 ' + failed,",
+    tests: ['tests/makeup_pdf_gap.test.js']
+  },
+  {
+    id: 'w-result-no-conclusion',
+    why: '有缺件都冇結論句——幹事以為補寄完成，49 位一封都冇收到',
+    file: 'src/ui/ScriptZone4.html',
+    find: '    if (missing > 0) {',
+    replace: '    if (false) {',
+    tests: ['tests/makeup_pdf_gap.test.js']
+  },
+  {
+    id: 'w-api-drops-missing',
+    why: '網頁執行入口唔回傳 errorPdfMissing——畫面想顯示都冇數',
+    file: 'src/WebAppZone4.gs',
+    find: '      errorPdfMissing: result.errorPdfMissing,\n',
+    replace: '',
+    tests: ['tests/makeup_pdf_gap.test.js']
+  },
+  // ── 第六十五輪批次 X 組：「收過沒有」有兩個定義 ─────────────────────
+  {
+    id: 'x-index-official-only',
+    why: '「收過」返返去只睇 OFFICIAL——現場：改動後重發收過第 3 版嘅兩位，'
+      + '補寄預覽照列「還沒有收到」，照撳會收兩次',
+    file: 'src/MakeupSend.gs',
+    find: '    ? [MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND]',
+    replace: '    ? [MAIL_STAGES.OFFICIAL]',
+    tests: ['tests/notice_received_index.test.js']
+  },
+  {
+    id: 'x-reach-own-official',
+    why: '狀態卡自己另外只睇 OFFICIAL——同補寄講兩個唔同嘅「已收」數',
+    file: 'src/FiveStageCore.gs',
+    find: '  const received = buildQuarterNoticeReceivedIndex_(quarterId, MAIL_STAGES.OFFICIAL);',
+    replace: '  const received = buildSendStatusByRecipient_('
+      + 'readSheet(SHEETS.SEND_LOG), quarterId, MAIL_STAGES.OFFICIAL);',
+    tests: ['tests/notice_received_index.test.js']
+  },
+  {
+    id: 'x-plan-own-official',
+    why: '補寄預覽自己另外只睇 OFFICIAL',
+    file: 'src/MakeupSend.gs',
+    find: '  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage);',
+    replace: '  const recordByKey = buildSendStatusByRecipient_(readSheet(SHEETS.SEND_LOG), quarterId, stage);',
+    tests: ['tests/notice_received_index.test.js']
+  },
+  {
+    id: 'x-review-counts-resend',
+    why: '審閱信嘅補寄連正式／重發都當收過——審閱信係另一封信',
+    file: 'src/MakeupSend.gs',
+    find: '    : [stage];',
+    replace: '    : [stage, MAIL_STAGES.RESEND, MAIL_STAGES.OFFICIAL];',
+    tests: ['tests/notice_received_index.test.js']
+  },
+  // ── 第六十五輪批次 AA 組：逐行刪除，有超時風險 ─────────────────────
+  {
+    id: 'aa-runs-per-row',
+    why: '唔合併連續區段，一行一次 deleteRows——現場：2184 行用咗 30 多分鐘',
+    file: 'src/Utils.gs',
+    find: '    if (last && r === last.start + last.count) last.count++;',
+    replace: '    if (false) last.count++;',
+    tests: ['tests/delete_rows_in_runs.test.js']
+  },
+  {
+    id: 'aa-runs-top-down',
+    why: '由上而下刪區段——刪咗上面一段，下面嗰幾段嘅行號全部移位，刪錯行',
+    file: 'src/Utils.gs',
+    find: '  for (let i = runs.length - 1; i >= 0; i--) {',
+    replace: '  for (let i = 0; i < runs.length; i++) {',
+    tests: ['tests/delete_rows_in_runs.test.js']
+  },
+  {
+    id: 'aa-reset-per-row',
+    why: '重設季度返返去逐行 deleteRow——撞 Apps Script 時間上限，停喺半途',
+    file: 'src/QuarterReset.gs',
+    find: '    return deleteSheetRowsInRuns_(sheet, targetRows);',
+    replace: '    targetRows.sort(function (a, b) { return b - a; });\n'
+      + '    targetRows.forEach(function (r) { sheet.deleteRow(r); });\n'
+      + '    return targetRows.length;',
+    tests: ['tests/delete_rows_in_runs.test.js']
+  },
+  // ── 第六十五輪批次 Y 組：改動後重發確認框逐個列出全部未收人 ───────
+  {
+    id: 'y-notrecv-listed',
+    why: '上次冇收到、這一次都唔寄嘅人逐個列出——現場：54 位逐行，要捲好長先見到輸入格',
+    file: 'src/WebAppGuards.gs',
+    find: '    if (c.arrangementChanged === false) {\n      notReceivedNotSentNames.push',
+    replace: '    if (false) {\n      notReceivedNotSentNames.push',
+    tests: ['tests/resend_confirm_groups.test.js']
+  },
+  {
+    id: 'y-willsend-from-changed',
+    why: '最上面一段列成個「有改動」名單而唔係這一次會寄嘅人——接手人又會藏喺幾十人入面',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    g.willSend.forEach((c) => list.appendChild(resendConfirmPersonItem(c, false)));',
+    replace: '    (plan.changed || []).forEach((c) => list.appendChild(resendConfirmPersonItem(c, false)));',
+    tests: ['tests/resend_confirm_groups.test.js']
+  },
+  {
+    id: 'y-no-change-notes',
+    why: '冇舊 hash 嘅人唔帶版本比較——接手人淨係見「現在：…」，睇唔出改咗乜',
+    file: 'src/WebAppGuards.gs',
+    find: '      changeNotes: (c.personId && notes[c.personId]) ? notes[c.personId].slice() : []',
+    replace: '      changeNotes: []',
+    tests: ['tests/resend_confirm_groups.test.js']
+  },
+  {
+    id: 'y-names-not-collapsed',
+    why: '未收人嘅名單攤開——同一個長名單問題返返嚟',
+    file: 'src/ui/ScriptZone1.html',
+    find: "      const names = make('details', {}, [make('summary', { text: '顯示名單' })]);",
+    replace: "      const names = make('div', {}, [make('div', { text: '顯示名單' })]);",
+    tests: ['tests/resend_confirm_groups.test.js']
+  },
+  // ── 第六十五輪批次 Z 組：替補人選永遠揀 PersonID 最細嗰個 ──────────
+  {
+    id: 'z-rank-by-id-only',
+    why: '替補返返去按 PersonID 揀第一個——現場兩次都揀咗同日做主席嘅人去做司事',
+    file: 'src/FineTune.gs',
+    find: '  const pool = ranking.order;',
+    replace: '  const pool = (context.eligibility.byPost[violation.postId] || []).slice().sort();',
+    tests: ['tests/replacement_ranking.test.js']
+  },
+  {
+    id: 'z-ignore-same-day',
+    why: '唔理同日有冇其他崗位——一人一日兩個崗位',
+    file: 'src/FineTune.gs',
+    find: '  const busy = function (id) { return sameDay[id] && sameDay[id].length > 0 ? 1 : 0; };',
+    replace: '  const busy = function () { return 0; };',
+    tests: ['tests/replacement_ranking.test.js']
+  },
+  {
+    id: 'z-ignore-load',
+    why: '唔理這一季格數——替補永遠落喺同一批人身上',
+    file: 'src/FineTune.gs',
+    find: '    const dq = (quarterCount[a] || 0) - (quarterCount[b] || 0);',
+    replace: '    const dq = 0;',
+    tests: ['tests/replacement_ranking.test.js']
+  },
+  {
+    id: 'z-partner-is-busy',
+    why: '主席兼報告嘅拍檔崗位都當「同日有其他崗位」——規則鼓勵嘅配搭被推到最後',
+    file: 'src/FineTune.gs',
+    find: '    if (partner && s.postId === partner) return;\n',
+    replace: '',
+    tests: ['tests/replacement_ranking.test.js']
+  },
+  {
+    id: 'z-no-same-day-note',
+    why: '揀咗同日有崗位嘅人都唔講——幹事唔知一人一日做兩樣',
+    file: 'src/FineTune.gs',
+    find: '    const sameDayNote = describeSameDayDuty_(name, sameDayPostIds, context);',
+    replace: "    const sameDayNote = '';",
+    tests: ['tests/replacement_ranking.test.js']
+  },
+  {
+    id: 'z-save-no-note-call',
+    why: '儲存完成畫面唔標「同日亦擔任」——申報帶嚟嘅雙崗位靜靜過咗',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '    noteRequestSameDayDuties_(fromRequests, diffs, quarterId, newVersionNo, postNames);\n',
+    replace: '',
+    tests: ['tests/replacement_ranking.test.js']
+  },
+  // ── 第六十五輪批次 AB 組：四個細位 ───────────────────────────────
+  {
+    id: 'ab-api-no-quarter-note',
+    why: '後端唔再把 quarterNote 帶去前端——儲存確認畫面唔知嗰筆係按日期認出季度',
+    file: 'src/WebAppFlow.gs',
+    find: "    quarterNote: r.quarterNote || ''",
+    replace: "    quarterNote: ''",
+    tests: ['tests/ab_ui_details.test.js']
+  },
+  {
+    id: 'ab-row-no-quarter-note',
+    why: '「會自動套用的修改申報」嗰行唔顯示「（QuarterID 空白，按日期判斷為…）」',
+    file: 'src/ui/ScriptZone1.html',
+    find: "        + (r.quarterNote ? '（' + r.quarterNote + '）' : ''),",
+    replace: "        + '',",
+    tests: ['tests/ab_ui_details.test.js']
+  },
+  {
+    id: 'ab-speaker-orange',
+    why: '講員、翻譯對唔上名單又變返橙色警告——外請講員係常態',
+    file: 'src/ui/ScriptZone2.html',
+    find: '            renderLinkFeedback(linkNote, res, name, !c.optional);',
+    replace: '            renderLinkFeedback(linkNote, res, name);',
+    tests: ['tests/ab_ui_details.test.js']
+  },
+  {
+    id: 'ab-step1-stale-count',
+    why: '第 1 步「現時有 N 個版本」用返快取——儲存新版本之後唔更新',
+    file: 'src/ui/ScriptMainFlow.html',
+    find: '      t.versionCount = Number(d.latestVersion.versionNo) + 1;',
+    replace: '      t.versionCount = t.versionCount;',
+    tests: ['tests/ab_ui_details.test.js']
+  },
+  {
+    id: 'ab-busy-over-result',
+    why: '開咗結果窗都等刷新完先收處理中牌——「寄送中」疊住補寄完成窗成分鐘',
+    file: 'src/ui/Script.html',
+    find: '      if (resultShown) busyHide();',
+    replace: '      if (false) busyHide();',
+    tests: ['tests/ab_ui_details.test.js']
   },
 ];
 

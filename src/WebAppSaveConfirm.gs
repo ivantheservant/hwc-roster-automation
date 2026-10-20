@@ -953,6 +953,49 @@ function ensurePublicLinkFreshBeforeSend_(quarterId) {
 }
 
 /**
+ * ⚠️ 第六十五輪批次 Z 組：申報帶嚟嘅改動，接手嘅人同日喺新版本仲有其他崗位 ⇒
+ * 喺嗰一行加 `sameDayNote`（例如「P9012 同日亦擔任 主席」——畫面用中文名）。
+ *
+ * 現場：兩次實測「不能服侍」嘅替補都揀咗同日已經做主席嘅人去做司事，
+ * 儲存完成畫面一個字都冇提。
+ *
+ * @param {Object[]} rows `buildSavedChangeRows_(diffs, …)` 嘅結果（同 `diffs` 一一對應，**就地加**）
+ * @param {Object[]} diffs `diffVersionAssignments_()` 嘅結果
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 新版本
+ * @param {Object.<string, string>} postNames `postId` → 崗位中文名
+ * @returns {Object[]} 同一個 `rows`
+ */
+function noteRequestSameDayDuties_(rows, diffs, quarterId, versionNo, postNames) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const byPersonDate = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== Number(versionNo)) return;
+    const personId = String(row[A.PERSON_ID] || '').trim();
+    if (!personId) return;
+    const k = personId + '|' + toDateString(row[A.SERVICE_DATE], timezone);
+    (byPersonDate[k] = byPersonDate[k] || []).push({ postId: row[A.POST_ID], slotIndex: Number(row[A.SLOT_INDEX]) });
+  });
+  (diffs || []).forEach(function (d, i) {
+    const row = rows[i];
+    if (!row || !d.toPersonId) return;
+    const others = (byPersonDate[d.toPersonId + '|' + d.serviceDate] || []).filter(function (c) {
+      return !(c.postId === d.postId && Number(c.slotIndex) === Number(d.slotIndex));
+    });
+    if (others.length === 0) return;
+    const names = [];
+    others.forEach(function (c) {
+      const n = (postNames || {})[c.postId] || c.postId;
+      if (names.indexOf(n) === -1) names.push(n);
+    });
+    row.sameDayNote = (row.toName || d.toPersonId) + ' 同日亦擔任 ' + names.join('、');
+  });
+  return rows;
+}
+
+/**
  * 第四十二輪批次 D 組：這一次儲存了什麼，逐格。
  *
  * ⚠️ 兩批來源要分得清：
@@ -981,8 +1024,10 @@ function buildSavedChangeRowsForSave_(
 
   let fromRequests = [];
   try {
-    fromRequests = buildSavedChangeRows_(
-      diffVersionAssignments_(quarterId, baseVersionNo, newVersionNo), postNames, 'REQUEST');
+    const diffs = diffVersionAssignments_(quarterId, baseVersionNo, newVersionNo);
+    fromRequests = buildSavedChangeRows_(diffs, postNames, 'REQUEST');
+    // 第六十五輪批次 Z 組：申報帶嚟嘅替補同日已經有另一個崗位 ⇒ 儲存完成畫面講出嚟
+    noteRequestSameDayDuties_(fromRequests, diffs, quarterId, newVersionNo, postNames);
   } catch (err) {
     log_('WARN', 'buildSavedChangeRowsForSave_ 比對唔到兩個版本（版本本身已經儲存好）：'
       + err.message);

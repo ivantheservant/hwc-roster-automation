@@ -281,7 +281,14 @@ class RealisticMockSheet {
   clearContents() { return this.clear(); }
   clearFormats() { return this; }
   deleteColumns() { return this; }
-  deleteRows() { return this; }
+  // 第六十五輪批次 AA 組：`deleteSheetRowsInRuns_()`（Utils.gs）一段一段刪——
+  // ⚠️ 同 `deleteRow()` 一樣要真係刪而且下面嘅行上移，唔係嘅話
+  // 「合併區段、由下而上」呢個做法喺測試入面驗唔到。
+  deleteRows(startRow, numRows) {
+    this.deleteRowsCalls = (this.deleteRowsCalls || 0) + 1;
+    for (let r = startRow + numRows - 1; r >= startRow; r--) this.deleteRow(r);
+    return this;
+  }
   // 第六十三輪批次 J 組：`deleteRowsMatching_()`（QuarterReset.gs）逐行刪。
   // ⚠️ 要真係刪，而且下面嘅行要上移——唔係嘅話「由下往上刪」呢個做法
   // 喺測試入面根本驗唔到。

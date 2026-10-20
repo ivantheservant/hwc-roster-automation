@@ -744,16 +744,23 @@
     return cleaned ? ('「' + cleaned + '」做不到') : '這一步做不到';
   }
 
+  // ⚠️ 第六十五輪批次 AB 組第 4 點：動作已經開咗結果窗（例如「補寄完成」）⇒
+  // 結果窗本身就係「完成」嘅回饋，處理中牌要**即刻**收。唔收嘅話佢會疊喺
+  // 結果窗上面，等 finally 嘅刷新（可以成分鐘）完先消失——現場見到「寄送中，
+  // 請稍候　已經 168 秒」蓋住完成窗。冇結果窗嘅動作照舊：刷新完先收（見 finally）。
   async function runAction(label, action, steps) {
     setBusy(true);
     // 第三十九輪 B 組：細灰字留住（俾睇慣咗嘅人），但真正嘅回饋係中央嗰塊牌。
     setStatus(label + '…');
     busyShow(label, undefined, steps);
     let ok = false;
+    let resultShown = false;
     try {
       await action();
       ok = true;
       setStatus('');
+      resultShown = modalOpen;  // AB 組第 4 點，見函式上面
+      if (resultShown) busyHide();
     } catch (err) {
       busyHide('fail');
       showErrorModal(actionErrorTitle_(label), err);
@@ -773,7 +780,7 @@
       }
       // ⚠️ 收牌一定要喺刷新之後——刷新本身可能要幾秒，
       // 喺嗰之前收牌就會出現「講咗已完成、但畫面仲係舊數字」嘅空窗。
-      if (ok) busyHide('done');
+      if (ok && !resultShown) busyHide('done');
       setBusy(false);
     }
   }
@@ -930,7 +937,9 @@
           + '　' + c.fromName + ' → ' + c.toName
           // ⚠️ 申報帶嚟嗰啲一定要標出嚟。唔標嘅話，幹事會以為
           // 嗰幾格係佢自己改嘅——然後去搵一個唔存在嘅記憶。
-          + (c.source === 'REQUEST' ? '（來自修改申報）' : ''),
+          + (c.source === 'REQUEST' ? '（來自修改申報）' : '')
+          // 第六十五輪批次 Z 組：接手嘅人同日已經有另一個崗位
+          + (c.sameDayNote ? '　⚠ ' + c.sameDayNote : ''),
         className: 'ok-line'
       }));
     });

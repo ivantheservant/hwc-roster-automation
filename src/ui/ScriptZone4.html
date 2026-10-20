@@ -378,13 +378,118 @@
         para('先看看有誰還沒收到，確認之後才會寄。'),
         make('div', { className: 'prop-head' }, [make('span', { text: '哪一次' }), sel])
       ], [
-        button('先看預覽', () => runAction('比對誰未收到', async () => {
-          const plan = await callServer('apiMakeupSendPlan', currentQuarterId, sel.value);
-          renderMakeupPlan(sel.value, plan);
-        }), ''),
+        button('先看預覽', () => openMakeupPreview(sel.value), ''),
         button('取消', () => closeModal(), 'secondary')
       ]);
     });
+  }
+
+  /**
+   * 補寄預覽（第六十五輪批次 W 組抽出嚟：產生完個人 PDF 之後要行返嚟呢度）。
+   * @param {string} stage
+   * @returns {void}
+   */
+  function openMakeupPreview(stage) {
+    runAction('比對誰未收到', async () => {
+      const plan = await callServer('apiMakeupSendPlan', currentQuarterId, stage);
+      renderMakeupPlan(stage, plan);
+    });
+  }
+
+  /**
+   * ⚠️⚠️ 第六十五輪批次 W 組：補寄目標當中有人未有可用嘅個人 PDF ⇒
+   * **唔畀〔確定補寄〕**，就地畀〔現在就產生個人 PDF〕（只為呢幾位）。
+   *
+   * 現場（回歸測試 R1.4、R4.21）：預覽 53 位，撳〔確定補寄〕之後只寄出 4 封，
+   * 其餘 49 位因為冇第 3 版 PDF 而 `ERROR_PDF_MISSING`，完成窗淨係出綠色。
+   *
+   * @param {string} stage
+   * @param {{count: number, absentCount: number, staleCount: number, names: string[]}} gaps
+   * @param {number} versionNo
+   * @returns {void}
+   */
+  function openMakeupPdfGapBlock(stage, gaps, versionNo) {
+    const nodes = [
+      errorPart(ERR_LABEL_WHAT,
+        gaps.count + ' 位還沒有第 ' + versionNo + ' 版的個人 PDF'
+        + (gaps.staleCount > 0
+          ? ('（' + gaps.absentCount + ' 位還沒有、' + gaps.staleCount
+            + ' 位的是內容改動之前產生的，已經過期）') : '')
+        + '。不先產生的話，補寄時這幾位會收不到信。'),
+      errorPart('現在的情況', '沒有寄出任何電郵。')
+    ];
+    if (gaps.names && gaps.names.length > 0) {
+      const list = make('div', { className: 'sec' });
+      gaps.names.forEach((n) => list.appendChild(make('div', { text: n, className: 'vio-row' })));
+      if (gaps.count > gaps.names.length) {
+        list.appendChild(make('div', {
+          text: '……另有 ' + (gaps.count - gaps.names.length) + ' 位', className: 'muted'
+        }));
+      }
+      nodes.push(list);
+    }
+    nodes.push(para('撳下面那一粒，只為這 ' + gaps.count + ' 位產生。人數多的時候要跑幾分鐘，'
+      + '而且可能會分幾次跑完——畫面會自己接住跑，不要關掉視窗。', 'muted'));
+    openModal('補寄：還沒有個人 PDF', nodes, [
+      button('現在就產生個人 PDF', () => runMakeupPdfBatch(stage), ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  /**
+   * 只為補寄缺件嗰幾位產生個人 PDF；做完行返轉頭去補寄確認。
+   * 迴圈係同正式發出共用嗰支 `runPdfBatchToCompletion()`（ScriptZone1.html）。
+   * @param {string} stage
+   * @returns {void}
+   */
+  function runMakeupPdfBatch(stage) {
+    runPdfBatchToCompletion({
+      callBatch: () => callServerMutating('apiMakeupGenerateMissingPdfs', currentQuarterId, stage),
+      onContinue: () => runMakeupPdfBatch(stage),
+      doneText: '現在可以回到補寄確認。',
+      backLabel: '回到補寄確認',
+      onBack: () => { closeModal(); openMakeupPreview(stage); }
+    });
+  }
+
+  /**
+   * ⚠️ 第六十五輪批次 W 組：補寄完成窗。**任何一個失敗數 ＞0 都唔可以淨係出綠色。**
+   * @param {Object} res `apiMakeupSendExecute()` 嘅結果
+   * @returns {Element[]}
+   */
+  function buildMakeupResultNodes(res) {
+    const failed = Number(res.failed) || 0;
+    const errorPdf = Number(res.errorPdf) || 0;
+    const missing = Number(res.errorPdfMissing) || 0;
+    const problems = failed + errorPdf + missing;
+    const nodes = [
+      make('div', {
+        text: res.isDryRun ? '測試模式：沒有真的寄出任何電郵。' : '已經補寄。',
+        className: problems > 0 ? 'muted' : 'ok-line'
+      }),
+      make('div', {
+        text: '寄出 ' + res.sent + ' 封　模擬 ' + res.dryRun + ' 封　'
+          + '查無電郵略過 ' + res.skipped + ' 位',
+        className: problems > 0 ? 'lines' : 'ok-line'
+      }),
+      make('div', {
+        text: '失敗 ' + failed + '　PDF 失敗 ' + errorPdf + '　PDF 缺件 ' + missing,
+        className: problems > 0 ? 'err-text' : 'muted'
+      })
+    ];
+    if (missing > 0) {
+      nodes.push(make('div', {
+        text: missing + ' 位因為沒有個人 PDF 而沒有寄出。先產生個人 PDF，再補寄一次。',
+        className: 'err-text'
+      }));
+    }
+    if (failed + errorPdf > 0) {
+      nodes.push(make('div', {
+        text: (failed + errorPdf) + ' 位寄送失敗。再補寄一次會只寄給還沒有收到的人。',
+        className: 'err-text'
+      }));
+    }
+    return nodes;
   }
 
   /**
@@ -405,6 +510,11 @@
 
   function renderMakeupPlan(stage, plan) {
     if (!plan.ok) { showErrorModal('補寄未收到的人', new Error(plan.message)); return; }
+    // ⚠️ 第六十五輪批次 W 組：有人未有可用嘅個人 PDF ⇒ 先產生，唔畀〔確定補寄〕
+    if (plan.pdfGaps && plan.pdfGaps.count > 0) {
+      openMakeupPdfGapBlock(stage, plan.pdfGaps, plan.versionNo);
+      return;
+    }
     if (plan.people.length === 0) {
       const nodes = [
         make('div', { text: '這一次所有人都已經收到了，不用補寄。', className: 'ok-line' })
@@ -454,18 +564,14 @@
       confirmLabel: '確定補寄',
       onConfirm: () => runAction('寄送中，請稍候', async () => {
         const res = await callServerMutating('apiMakeupSendExecute', currentQuarterId, stage);
+        // 第六十五輪批次 W 組：後端都擋（預覽之後先至有人個 PDF 唔見咗／過期）
+        if (!res.ok && res.pdfGapBlocked && res.pdfGaps) {
+          openMakeupPdfGapBlock(stage, res.pdfGaps, plan.versionNo);
+          return;
+        }
         if (!res.ok) { showErrorModal('補寄未收到的人', new Error(res.message)); return; }
-        openModal('補寄完成', [
-          make('div', {
-            text: res.isDryRun ? '測試模式：沒有真的寄出任何電郵。' : '已經補寄。',
-            className: 'ok-line'
-          }),
-          make('div', {
-            text: '寄出 ' + res.sent + ' 封　模擬 ' + res.dryRun + ' 封　'
-              + '查無電郵略過 ' + res.skipped + ' 位　失敗 ' + res.failed,
-            className: 'ok-line'
-          })
-        ], [button('完成', () => closeModalAndRefresh(), '')]);
+        openModal('補寄完成', buildMakeupResultNodes(res),
+          [button('完成', () => closeModalAndRefresh(), '')]);
       })
     });
   }

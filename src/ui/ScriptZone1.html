@@ -737,7 +737,9 @@
   function requestRow(r) {
     return make('div', {
       text: r.serviceDateText + '　' + r.postNameText + '　' + r.personNameText
-        + (r.reason ? '：' + r.reason : ''),
+        + (r.reason ? '：' + r.reason : '')
+        // 第六十五輪批次 AB 組第 1 點：例如「（QuarterID 空白，按日期判斷為 2028T2）」
+        + (r.quarterNote ? '（' + r.quarterNote + '）' : ''),
       className: 'vio-row'
     });
   }
@@ -1247,14 +1249,36 @@
    * @returns {void}
    */
   function runMissingPdfBatch(versionNo, sendOpts) {
+    runPdfBatchToCompletion({
+      callBatch: () => callServerMutating(
+        'apiGeneratePersonalPdfBatch', currentQuarterId, versionNo),
+      onContinue: () => runMissingPdfBatch(versionNo, sendOpts),
+      doneText: '現在可以繼續「正式發出給全體」了。',
+      backLabel: '回到正式發出',
+      onBack: () => { closeModal(); openOfficial(sendOpts); }
+    });
+  }
+
+  /**
+   * ⚠️ 第六十五輪批次 W 組：分批產生個人 PDF 嘅**共用**迴圈——
+   * 正式發出（上面 `runMissingPdfBatch()`）同補寄未收到的人
+   *（ScriptZone4.html `runMakeupPdfBatch()`）都行呢一支，唔各自寫一份。
+   *
+   * 分批接駁、上限（`MISSING_PDF_MAX_ROUNDS`，到咗係 `break` 唔係 `throw`）、
+   * 做唔完畀〔繼續產生〕、做完畀一粒行返轉頭嘅掣——全部喺呢度。
+   *
+   * @param {{callBatch: function(): Promise<Object>, onContinue: function(): void,
+   *   doneText: string, backLabel: string, onBack: function(): void}} opts
+   * @returns {void}
+   */
+  function runPdfBatchToCompletion(opts) {
     closeModal();
     runAction('產生個人 PDF，請稍候', async () => {
       let guard = 0;
       let last = null;
       for (;;) {
         guard++;
-        last = await callServerMutating(
-          'apiGeneratePersonalPdfBatch', currentQuarterId, versionNo);
+        last = await opts.callBatch();
         if (!last.ok) { showErrorModal('產生個人 PDF', new Error(last.message)); return; }
         if (last.done) break;
         setStatus('產生個人 PDF：' + last.doneCount + ' / ' + last.totalPeople + ' 份…');
@@ -1280,13 +1304,13 @@
           }),
           para('一次執行有時間上限，所以要分幾次。撳「繼續產生」接住做。', 'muted')
         ], [
-          button('繼續產生', () => runMissingPdfBatch(versionNo, sendOpts), ''),
+          button('繼續產生', () => opts.onContinue(), ''),
           button('之後再說', () => closeModal(), 'secondary')
         ]);
         return;
       }
 
-      // ── 做完 ⇒ **行返轉頭去正式發出**，唔使佢自己搵路返嚟 ──────
+      // ── 做完 ⇒ **行返轉頭**（正式發出／補寄確認），唔使佢自己搵路返嚟 ──
       openModal('個人 PDF：已經產生好', [
         make('div', {
           text: '已完成 ' + last.doneCount + ' / ' + last.totalPeople + ' 位。',
@@ -1297,9 +1321,9 @@
             + last.skippedExistingCount + ' 份',
           className: 'muted'
         }),
-        para('現在可以繼續「正式發出給全體」了。', 'muted')
+        para(opts.doneText, 'muted')
       ], [
-        button('回到正式發出', () => { closeModal(); openOfficial(sendOpts); }, ''),
+        button(opts.backLabel, () => opts.onBack(), ''),
         button('之後再說', () => closeModal(), 'secondary')
       ]);
     });
@@ -1521,6 +1545,125 @@
     return out;
   }
 
+  /**
+   * 第六十五輪批次 Y 組：改動後重發確認框「現在」嗰一行。
+   * 第六十三輪批次 P 組：被整個換走嘅人明寫「這一季沒有安排」，
+   * 唔靠 currentSummary 剛好係空字串。
+   * @param {Object} c 一個人
+   * @returns {string}
+   */
+  function resendCurrentText(c) {
+    return '現在：' + (c.hasAssignments === false
+      ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'));
+  }
+
+  /**
+   * 第六十五輪批次 Y 組：確認框入面一個人（會寄嘅、或者「改咗但這一次唔寄」嘅）。
+   * @param {Object} c `buildResendConfirmGroups_()` 嘅一項
+   * @param {boolean} notSent 這一次唔會收到
+   * @returns {Element}
+   */
+  function resendConfirmPersonItem(c, notSent) {
+    const item = make('div', { className: 'prop' });
+    const head = make('div', { className: 'prop-head' });
+    head.appendChild(make('span', { text: c.nameTC }));
+    if (c.isListRecipient) head.appendChild(make('span', { text: '名單收件人', className: 'tag' }));
+    if (!c.isListRecipient && c.hasAssignments === false) {
+      head.appendChild(make('span', { text: '本季已無服侍安排', className: 'tag' }));
+    }
+    if (c.firstNotifyDueToEmail) head.appendChild(make('span', { text: '首次通知（之前沒有電郵）', className: 'tag' }));
+    if (!c.hasEmail) head.appendChild(make('span', { text: '沒有電郵，無法通知', className: 'tag tag-bad' }));
+    if (notSent) head.appendChild(make('span', { text: '這一次不會收到', className: 'tag tag-bad' }));
+    item.appendChild(head);
+    if (c.isListRecipient) return item;
+
+    if (c.arrangementChanged) {
+      // 第二十五輪批次階段 D：**原本擺上面、現在擺下面**——人眼由上而下讀，
+      // 「舊 → 新」先讀得出改咗啲乜。攞唔到仍然誠實講「沒有記錄」。
+      item.appendChild(make('div', {
+        text: '原本：' + (c.previousSummary || '（上次的安排沒有記錄，無法對照）'),
+        className: c.previousSummary ? 'vio-row' : 'vio-row muted'
+      }));
+      item.appendChild(make('div', { text: resendCurrentText(c), className: 'vio-row' }));
+    } else if (c.changeNotes && c.changeNotes.length > 0) {
+      // 冇舊 hash（上次冇收到）⇒ 用收件人頁同一份版本比較，例如「5 月 14 日　領詩（新增，本來是 …）」
+      item.appendChild(make('div', { text: '改動：' + c.changeNotes.join('、'), className: 'vio-row' }));
+      item.appendChild(make('div', { text: resendCurrentText(c), className: 'vio-row muted' }));
+    } else {
+      item.appendChild(make('div', { text: resendCurrentText(c), className: 'vio-row' }));
+    }
+    return item;
+  }
+
+  /**
+   * ⚠️⚠️ 第六十五輪批次 Y 組：改動後重發確認框嘅內容（唔包輸入格——嗰個由
+   * `openConfirm()` 加喺最尾）。
+   *
+   * 現場（回歸測試 R1.2、R4.20）：「上次正式發出時沒有收到的 54 位」逐人一行，
+   * 要捲好長先見到輸入格；真正會收到信嘅兩個接手人藏喺嗰 54 人入面。
+   *
+   *   一　這一次會寄給的 N 位——逐個列，每人寫佢嘅改動
+   *   二　安排改咗、但這一次冇揀——逐個列，寫明「這一次不會收到」
+   *   三　上次冇收到、這一次都唔寄——**只出人數一行**，名單收埋喺〔顯示名單〕
+   *
+   * 第六十三輪批次 R 組嘅分類照用：「安排改了」嘅數字只計有舊 hash 而且唔同嘅人。
+   *
+   * @param {Object} plan `apiStep5Plan()` 嘅結果
+   * @returns {Element[]}
+   */
+  function buildResendConfirmNodes(plan) {
+    const g = plan.confirmGroups
+      || { willSend: [], changedNotSent: [], notReceivedNotSentCount: 0, notReceivedNotSentNames: [] };
+    const groups = splitResendPlanGroups(plan.changed);
+    const nodes = [];
+
+    // ── 一：這一次會寄給的 N 位 ───────────────────────────────
+    const top = make('div', { className: 'sec' }, [
+      sectionTitle('這一次會寄給的 ' + plan.recipientCount + ' 位'),
+      make('div', {
+        text: '這一份就是撳落去之後真正會收到信的人（包括堂委名單）。',
+        className: 'muted'
+      })
+    ]);
+    if (groups.changed.length > 0) {
+      top.appendChild(make('div', {
+        text: '自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了。'
+          + '請逐個看一次，確認是不是真的想改這麼多人。',
+        className: 'muted'
+      }));
+    }
+    nodes.push(top);
+    const list = make('div', { className: 'sec' });
+    g.willSend.forEach((c) => list.appendChild(resendConfirmPersonItem(c, false)));
+    nodes.push(list);
+    // 第六十三輪批次 T 組：附件同日曆檔
+    if (plan.contents) nodes.push(sendContentsBox(plan.contents));
+
+    // ── 二：安排改咗、但這一次冇揀 ────────────────────────────
+    if (g.changedNotSent.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle('這 ' + g.changedNotSent.length + ' 位的安排改了，但這一次不會收到')
+      ]);
+      g.changedNotSent.forEach((c) => box.appendChild(resendConfirmPersonItem(c, true)));
+      nodes.push(box);
+    }
+
+    // ── 三：上次冇收到、這一次都唔寄——只出人數 ──────────────
+    if (g.notReceivedNotSentCount > 0) {
+      const names = make('details', {}, [make('summary', { text: '顯示名單' })]);
+      g.notReceivedNotSentNames.forEach((n) => names.appendChild(make('div', { text: n, className: 'vio-row muted' })));
+      nodes.push(make('div', { className: 'sec' }, [
+        make('div', {
+          text: '另外 ' + g.notReceivedNotSentCount + ' 位上次正式發出時沒有收到，這一次也不會寄給他們。'
+            + '要寄第一次通知給他們，用「補寄未收到的人」。',
+          className: 'muted'
+        }),
+        names
+      ]));
+    }
+    return nodes;
+  }
+
   function openResend(sendOptions) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
@@ -1540,92 +1683,9 @@
         return;
       }
 
-      // 規格 2.7：**逐個列出**有改動的人，唔可以淨係寫數字。
-      // 呢度係幹事唯一一次可以人眼睇出「係咪真係想改咁多人」嘅關口。
-      //
-      // ⚠️⚠️ 第六十三輪批次 R 組：**分兩段。** 上次正式發出只寄咗部分人嘅話，
-      // 其餘人冇舊紀錄——佢哋唔係「呢一次改咗」，係「上次冇收到」。
-      // 現場：第 2 版只寄咗 2 位，呢度寫「這 54 個人的安排改了……確認是不是
-      // 真的想改這麼多人」。標題數字只計第一段；第二段唔放入嗰句警告。
-      const groups = splitResendPlanGroups(plan.changed);
-      const nodes = [];
-      if (groups.changed.length > 0) {
-        nodes.push(make('div', { className: 'sec' }, [
-          sectionTitle('自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了'),
-          make('div', {
-            text: '請逐個看一次，確認是不是真的想改這麼多人。',
-            className: 'muted'
-          })
-        ]));
-      } else {
-        nodes.push(make('div', { className: 'sec' }, [
-          sectionTitle('自上次發出之後，沒有人的安排改過')
-        ]));
-      }
-
-      // ⚠️ 第四十七輪批次 B2／B3 組：「有改動嘅人」**唔等於**「會收到信嘅人」。
-      //
-      // 名單收件人（堂委地址）都會收到，而幹事亦都可以勾一個唔喺
-      //「有改動」名單入面嘅人。上面嗰句「只會寄給這幾位和堂委」
-      // 一直冇俾過一個真正嘅數字。
-      nodes.push(recipientPreviewBox(plan.recipientPreview,
-        '會寄給這 ' + plan.recipientCount + ' 位',
-        '這一份就是撳落去之後真正會收到信的人（包括堂委名單）。'));
-      // 第六十三輪批次 T 組：附件同日曆檔
-      if (plan.contents) nodes.push(sendContentsBox(plan.contents));
-
-      const list = make('div', { className: 'sec' });
-      groups.changed.forEach((c) => {
-        const item = make('div', { className: 'prop' });
-        const head = make('div', { className: 'prop-head' });
-        head.appendChild(make('span', { text: c.nameTC }));
-        if (!c.hasAssignments) head.appendChild(make('span', { text: '本季已無服侍安排', className: 'tag' }));
-        if (c.firstNotifyDueToEmail) head.appendChild(make('span', { text: '首次通知（之前沒有電郵）', className: 'tag' }));
-        if (!c.hasEmail) head.appendChild(make('span', { text: '沒有電郵，無法通知', className: 'tag tag-bad' }));
-        item.appendChild(head);
-
-        // 第二十五輪批次階段 D：「原本」而家真係攞到（由 SendLog 嘅
-        // AssignmentSummary），所以**原本擺上面、現在擺下面**——
-        // 人眼由上而下讀，「舊 → 新」先讀得出改咗啲乜。
-        //
-        // ⚠️ 攞唔到嗰啲仍然誠實講「沒有記錄」，唔會擺個假值扮到有得比較。
-        // 「第一次收信」同「舊紀錄冇留底」都會落呢一格。
-        item.appendChild(make('div', {
-          text: '原本：' + (c.previousSummary || '（上次的安排沒有記錄，無法對照）'),
-          className: c.previousSummary ? 'vio-row' : 'vio-row muted'
-        }));
-        // 第六十三輪批次 P 組：被整個換走嘅人明寫「這一季沒有安排」，
-        // 唔靠 currentSummary 剛好係空字串。
-        item.appendChild(make('div', {
-          text: '現在：' + (c.hasAssignments === false
-            ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）')),
-          className: 'vio-row'
-        }));
-        list.appendChild(item);
-      });
-      if (groups.changed.length > 0) nodes.push(list);
-
-      // 第六十三輪批次 R 組：第二段——上次正式發出時冇收到嘅人。
-      // 佢哋冇「原本」可以對照，所以只列「現在」。唔放入上面嗰句警告。
-      if (groups.notReceived.length > 0) {
-        const box = make('div', { className: 'sec' }, [
-          sectionTitle('上次正式發出時沒有收到的 ' + groups.notReceived.length + ' 位'),
-          make('div', {
-            text: '他們上次沒有收到信，所以沒有舊的安排可以對照——不是這一次改了他們。'
-              + '要寄第一次通知給他們，用「補寄未收到的人」。',
-            className: 'muted'
-          })
-        ]);
-        groups.notReceived.forEach((c) => {
-          box.appendChild(make('div', {
-            text: c.nameTC + '　現在：' + (c.hasAssignments === false
-              ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'))
-              + (c.hasEmail ? '' : '　⚠ 沒有電郵'),
-            className: 'vio-row'
-          }));
-        });
-        nodes.push(box);
-      }
+      // 規格 2.7：**逐個列出**，唔可以淨係寫數字。
+      // ⚠️⚠️ 第六十五輪批次 Y 組：最上面係「這一次會寄給的 N 位」，見 buildResendConfirmNodes()
+      const nodes = buildResendConfirmNodes(plan);
 
       if (d.isDryRun) {
         nodes.push(make('div', {

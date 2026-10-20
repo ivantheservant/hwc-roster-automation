@@ -427,9 +427,9 @@ function executeQuarterReset_(plan) {
 }
 
 /**
- * 通用的「按條件刪除資料列」：讀出整張表，找出符合條件的列號，**由下往上**逐行刪除
- * （避免刪除時後面的行號往上移導致刪錯，手法與 SendLogMaintenance.gs 的
- * `deleteSendLogBatch_()` 一致）。
+ * 通用的「按條件刪除資料列」：讀出整張表，找出符合條件的列號，**由下往上**刪除
+ * （避免刪除時後面的行號往上移導致刪錯）。第六十五輪批次 AA 組起用
+ * `deleteSheetRowsInRuns_()`（Utils.gs）一段一段刪。
  * @param {string} sheetName 工作表名稱
  * @param {function(Object): boolean} matcher 傳入一列的物件，回傳是否要刪
  * @param {string[]} errors 出錯時把訊息 push 進來
@@ -459,9 +459,9 @@ function deleteRowsMatching_(sheetName, matcher, errors) {
       if (matched) targetRows.push(i + 3);
     });
 
-    targetRows.sort(function (a, b) { return b - a; }); // 由下往上刪
-    targetRows.forEach(function (rowNum) { sheet.deleteRow(rowNum); });
-    return targetRows.length;
+    // ⚠️ 第六十五輪批次 AA 組：合併成連續區段、由下而上一段一段刪
+    // （逐行 deleteRow 一行一次 API 呼叫，2184 行用咗 30 多分鐘）
+    return deleteSheetRowsInRuns_(sheet, targetRows);
   } catch (err) {
     if (errors) errors.push('清理 ' + sheetName + ' 失敗：' + err.message);
     return 0;

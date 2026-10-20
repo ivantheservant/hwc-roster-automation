@@ -404,3 +404,94 @@ function planResendChangedPersons_(quarterId) {
     notReceivedCount: changed.length - arrangementChangedCount
   };
 }
+
+/**
+ * ⚠️⚠️ 第六十五輪批次 Y 組：改動後重發確認框——**「這一次會寄」同「這一次唔寄」分開。**
+ *
+ * 現場（回歸測試 R1.2、R4.20）：確認框「上次正式發出時沒有收到的 54 位」逐人一行
+ * 「現在：……」，整個框要捲好長先見到輸入格；真正會收到信嘅兩個接手人藏喺嗰
+ * 54 人入面；「安排有改動」一段只得失去兩格嗰一位。第六十三輪 R 組把兩類人分開咗，
+ * 但冇分「這一次會寄」同「這一次唔寄」。
+ *
+ *   willSend　　　　　　　　這一次真正會收到信嘅人（＝ 收件人解析器嘅結果），逐個列，
+ *   　　　　　　　　　　　　每人帶佢嘅改動：有舊 hash ⇒ 原本／現在；冇舊 hash ⇒
+ *   　　　　　　　　　　　　收件人頁同一份 `changeNotes`（版本比較）
+ *   changedNotSent　　　　　安排真係改咗、但這一次冇揀嘅人——逐個列，寫明唔會收到
+ *   notReceivedNotSent*　　上次冇收到、這一次都唔寄——**只出人數**（名另外收埋）
+ *
+ * 純函式，唔讀任何工作表。
+ *
+ * @param {Object[]} changed `planResendChangedPersons_().changed`
+ * @param {Object[]} recipients `resolveActualRecipientsFromContext_()` 嘅結果
+ * @param {Object.<string, string[]>} changeNotesByPerson
+ *   `listChangedPersonsBetweenVersions_()` 嘅結果（攞唔到就傳 `{}`）
+ * @returns {{willSend: Object[], changedNotSent: Object[],
+ *   notReceivedNotSentCount: number, notReceivedNotSentNames: string[]}}
+ */
+function buildResendConfirmGroups_(changed, recipients, changeNotesByPerson) {
+  const notes = changeNotesByPerson || {};
+  const changedById = {};
+  (changed || []).forEach(function (c) { changedById[c.personId] = c; });
+  const describe = function (c, extra) {
+    return {
+      personId: c.personId || '',
+      nameTC: extra.nameTC || c.nameTC || c.personId || '',
+      isListRecipient: !!extra.isListRecipient,
+      inChangedList: !!extra.inChangedList,
+      arrangementChanged: !!extra.inChangedList && c.arrangementChanged !== false,
+      hasAssignments: c.hasAssignments !== false,
+      hasEmail: extra.hasEmail,
+      firstNotifyDueToEmail: !!c.firstNotifyDueToEmail,
+      previousSummary: c.previousSummary || '',
+      currentSummary: c.currentSummary || '',
+      changeNotes: (c.personId && notes[c.personId]) ? notes[c.personId].slice() : []
+    };
+  };
+
+  const willSendIds = {};
+  const willSend = (recipients || []).map(function (r) {
+    if (r.personId) willSendIds[r.personId] = true;
+    const c = r.personId ? changedById[r.personId] : null;
+    return describe(c || { personId: r.personId || '', nameTC: '' }, {
+      nameTC: r.displayName || (c ? c.nameTC : '') || r.personId || r.email,
+      isListRecipient: r.type === RECIPIENT_TYPE.LIST,
+      inChangedList: !!c,
+      hasEmail: !!String(r.email || '').trim()
+    });
+  });
+
+  const changedNotSent = [];
+  const notReceivedNotSentNames = [];
+  (changed || []).forEach(function (c) {
+    if (willSendIds[c.personId]) return;
+    if (c.arrangementChanged === false) {
+      notReceivedNotSentNames.push(c.nameTC || c.personId);
+      return;
+    }
+    changedNotSent.push(describe(c, { inChangedList: true, hasEmail: !!c.hasEmail }));
+  });
+
+  return {
+    willSend: willSend,
+    changedNotSent: changedNotSent,
+    notReceivedNotSentCount: notReceivedNotSentNames.length,
+    notReceivedNotSentNames: notReceivedNotSentNames
+  };
+}
+
+/**
+ * 第六十五輪批次 Y 組：相對上一次寄出嗰版，逐個人改咗乜（收件人頁同一份）。
+ * 攞唔到（從來未寄過、讀表失敗）⇒ `{}`，確認框退回顯示「現在：……」。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 最新版本號
+ * @returns {Object.<string, string[]>}
+ */
+function readResendChangeNotes_(quarterId, versionNo) {
+  try {
+    const lastSent = findLastSentSnapshot_(quarterId);
+    return lastSent ? listChangedPersonsBetweenVersions_(quarterId, lastSent.versionNo, versionNo) : {};
+  } catch (err) {
+    log_('WARN', '改動後重發確認框：讀不到版本比較（' + err.message + '），改為只顯示現在的安排');
+    return {};
+  }
+}

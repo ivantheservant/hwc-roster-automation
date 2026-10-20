@@ -1003,7 +1003,9 @@ function applyCannotServe_(r, context, workingByKey, outcomes, newUnavailableRow
       workingByKey[key].personName = rName;
       workingByKey[key].assignSource = ASSIGN_SOURCE.MANUAL;
       workingByKey[key].ruleFlags = [];
-      clearedNotes.push(postLabel + ' 已由 ' + rName + ' 替補');
+      // 第六十五輪批次 Z 組：替補同日已經有另一個崗位 ⇒ 處理結果講出嚟
+      clearedNotes.push(postLabel + ' 已由 ' + rName + ' 替補'
+        + (replacement.sameDayNote ? '；' + replacement.sameDayNote : ''));
     } else {
       workingByKey[key].assignSource = ASSIGN_SOURCE.SKIPPED;
       workingByKey[key].ruleFlags = [RULE_IDS.ELIGIBILITY];

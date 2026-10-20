@@ -117,8 +117,11 @@ console.log('\n=== 四【核心】做唔完唔可以顯示「完成了」 ===');
   const notDone = CODE.slice(CODE.indexOf('if (!last.done) {'));
   check('★★★★★★ 做唔完 ⇒ 講明仲差幾多份',
     /還差 ' \+ \(last\.totalPeople - last\.doneCount\) \+ ' 份/.test(SRC), '');
+  // 第六十五輪批次 W 組：迴圈抽成共用嘅 `runPdfBatchToCompletion()`（補寄都用），
+  // 〔繼續產生〕叫返 `opts.onContinue()`，正式發出嗰邊嘅 onContinue 就係再跑一次
   check('★★★★★★ 而且畀一粒〔繼續產生〕',
-    /button\('繼續產生', \(\) => runMissingPdfBatch\(versionNo, sendOpts\)/.test(CODE), '');
+    /button\('繼續產生', \(\) => opts\.onContinue\(\)/.test(CODE)
+      && /onContinue: \(\) => runMissingPdfBatch\(versionNo, sendOpts\)/.test(CODE), '');
   check('★★★★★★ 做唔完嗰條路**唔會**行到「已經產生好」嗰個窗',
     notDone.indexOf('return;') !== -1
       && notDone.indexOf('return;') < notDone.indexOf('已經產生好'),
@@ -133,7 +136,8 @@ console.log('\n=== 五【核心】做完要行返轉頭去正式發出 ===');
   check('★★★★★★ 做完之後有一粒〔回到正式發出〕'
     + '——唔使佢自己搵路返嚟。'
     + '呢個就係第四十四輪「做齊咗但仲有幾份唔見」嗰個修正嘅同一條道理',
-    /button\('回到正式發出', \(\) => \{ closeModal\(\); openOfficial\(sendOpts\); \}/.test(CODE), '');
+    /backLabel: '回到正式發出',\s*\n\s*onBack: \(\) => \{ closeModal\(\); openOfficial\(sendOpts\); \}/.test(CODE)
+      && /button\(opts\.backLabel, \(\) => opts\.onBack\(\)/.test(CODE), '');
   check('★★★★★ 而且會把原本嗰一次嘅 `sendOptions` 帶返去'
     + '——唔帶嘅話，佢啱啱喺寄出彈窗揀嗰幾個決定會靜靜冇咗',
     /function runMissingPdfBatch\(versionNo, sendOpts\)/.test(CODE)

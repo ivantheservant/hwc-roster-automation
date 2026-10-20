@@ -520,18 +520,23 @@
    * ⚠️ 對唔上**唔一定係錯**——外請講員本來就唔喺名單入面，
    * 所以文案要講清楚「外請講員屬正常」，唔可以寫成一個錯誤。
    * 寫成錯誤嘅話幹事會去「修正」一個根本冇問題嘅嘢。
+   * ⚠️ 第六十五輪批次 AB 組第 2 點：講員、翻譯（必填、`AutoGenerate=FALSE`）對唔上
+   * 名單係常態（外請講員），用**中性灰色**；橙色警告會令幹事以為填錯。
+   * 其他崗位（獻花，`optional`）維持橙色——佢哋多數係會友，對唔上多數係打錯字。
+   *
    * @param {HTMLElement} node 要寫入嘅元素
    * @param {Object} res `apiSavePreacherTranslationEntry()` 嘅回傳
    * @param {string} typedName 幹事打嘅名
+   * @param {boolean=} neutralWhenUnlinked 對唔上名單時用中性灰色（講員、翻譯）
    */
-  function renderLinkFeedback(node, res, typedName) {
+  function renderLinkFeedback(node, res, typedName, neutralWhenUnlinked) {
     clear(node);
     if (!res) { node.className = 'muted'; return; }
     if (res.linkedToNameMapping) {
       node.className = 'link-ok';
       node.textContent = '已對上名單上的「' + typedName + '」，正式發出時他會收到通知。';
     } else {
-      node.className = 'link-warn';
+      node.className = neutralWhenUnlinked ? 'muted' : 'link-warn';
       node.textContent = '名單上沒有這個名字，正式發出時不會寄給他。外請講員屬正常。';
     }
   }
@@ -606,7 +611,7 @@
             const res = await callServerMutating('apiWebSavePreacherEntry',
               currentQuarterId, c.serviceDate, c.postId, c.slotIndex, name);
             statusSpan.textContent = '已儲存 ✓';
-            renderLinkFeedback(linkNote, res, name);
+            renderLinkFeedback(linkNote, res, name, !c.optional);
           });
         }, ''),
         statusSpan

@@ -989,3 +989,43 @@ function mergeSavedChangeRows_(primary, extra) {
   });
   return out;
 }
+
+/**
+ * ⚠️⚠️ 第六十五輪批次 AA 組：**一次刪一段，唔好一行一行刪。**
+ *
+ * 現場（2026-10-20 回歸測試）：「⚠️⚠️ 重設季度測試資料」2028T3
+ * （`RosterAssignments` 2184 行）用咗 30 多分鐘、2028T2（1092 行）約 11 分鐘、
+ * 清理孤兒版本（273 行）約 5 分鐘；行數以約每秒 2.5 行下降。成因係
+ * `targetRows.forEach(sheet.deleteRow)`——每行一次 API 呼叫。再大少少就撞
+ * Apps Script 執行時間上限，停喺半途：派工紀錄刪咗、版本登記同 grid 工作表未刪。
+ *
+ * 做法：行號去重、排序，合併成連續區段，**由下而上**一段一段
+ * `sheet.deleteRows(start, count)`。由下而上 ⇒ 刪一段唔會令上面嗰幾段嘅行號移位。
+ * 刪邊幾行同逐行刪完全一樣，只係 API 呼叫次數由「行數」變成「區段數」。
+ *
+ * @param {Sheet} sheet 工作表
+ * @param {number[]} rowNumbers 要刪嘅列號（1 起計；可以亂序、可以重複）
+ * @returns {number} 實際刪除嘅列數（去重之後）
+ */
+function deleteSheetRowsInRuns_(sheet, rowNumbers) {
+  const seen = {};
+  const rows = [];
+  (rowNumbers || []).forEach(function (n) {
+    const r = Number(n);
+    if (!(r >= 1) || Math.floor(r) !== r || seen[r]) return;
+    seen[r] = true;
+    rows.push(r);
+  });
+  rows.sort(function (a, b) { return a - b; });
+
+  const runs = [];
+  rows.forEach(function (r) {
+    const last = runs[runs.length - 1];
+    if (last && r === last.start + last.count) last.count++;
+    else runs.push({ start: r, count: 1 });
+  });
+  for (let i = runs.length - 1; i >= 0; i--) {
+    sheet.deleteRows(runs[i].start, runs[i].count);
+  }
+  return rows.length;
+}

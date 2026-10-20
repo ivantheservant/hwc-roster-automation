@@ -138,8 +138,12 @@ console.log('\n=== D 前端：原本擺上面、現在擺下面，攞唔到要�
 {
   const zone1 = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'ui', 'ScriptZone1.html'), 'utf8');
-  const prevAt = zone1.indexOf("'原本：'");
-  const currAt = zone1.indexOf("'現在：'");
+  // 第六十五輪批次 Y 組：一個人嗰格抽成 resendConfirmPersonItem()，「現在：」嗰行抽成
+  // resendCurrentText()——喺嗰個函式入面睇次序
+  const item = zone1.slice(zone1.indexOf('function resendConfirmPersonItem('),
+    zone1.indexOf('function buildResendConfirmNodes('));
+  const prevAt = item.indexOf("'原本：'");
+  const currAt = item.indexOf('resendCurrentText(c)');
 
   check('★★★★ 兩行都有', prevAt !== -1 && currAt !== -1);
   check('★★★★★ 「原本」排喺「現在」之前'

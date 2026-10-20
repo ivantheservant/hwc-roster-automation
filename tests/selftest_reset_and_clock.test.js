@@ -244,11 +244,13 @@ console.log('\n=== B3【核心】清 SpecialSundays：兩個條件都要中先�
   const S = gas.COLUMNS.SPECIAL_SUNDAYS;
   const headers = [S.SPECIAL_ID, S.QUARTER_ID, S.SERVICE_DATE, S.TYPE,
     S.TITLE, S.SKIP_POST_IDS, S.ACTIVE, S.CONFIRMED];
+  // 第六十五輪批次 AA 組：改成一段一段刪之後，相連嘅兩行會變成一段，
+  // 「由下而上」就驗唔到——所以兩行 SELFTEST 中間夾一行真資料（第 3、5 行，兩段）。
   const rows = [
     ['2028T3-SELFTEST', '2028T3', '2028-07-02', '合堂', 'x', 'CHAIR', 'TRUE', 'FALSE'],
-    ['2028T3-SELFTEST', '2028T3', '2028-07-09', '合堂', 'x', 'CHAIR', 'TRUE', 'FALSE'],
     // ⚠️ 沙盒季度，但**唔係** -SELFTEST ⇒ 真資料，唔准刪。
     ['2028T3-EASTER', '2028T3', '2028-07-16', '節期', '復活節', '', 'TRUE', 'TRUE'],
+    ['2028T3-SELFTEST', '2028T3', '2028-07-09', '合堂', 'x', 'CHAIR', 'TRUE', 'FALSE'],
     // ⚠️ 係 -SELFTEST，但**唔係**沙盒季度 ⇒ 唔准刪。
     ['2026T4-SELFTEST', '2026T4', '2026-11-01', '合堂', 'x', 'CHAIR', 'TRUE', 'FALSE']
   ];
@@ -271,7 +273,11 @@ console.log('\n=== B3【核心】清 SpecialSundays：兩個條件都要中先�
                 }
               };
             },
-            deleteRow: function (r) { deleted.push(r); }
+            deleteRow: function (r) { deleted.push(r); },
+            // 第六十五輪批次 AA 組：一段一段刪——逐行記低（由下而上）
+            deleteRows: function (from, count) {
+              for (let r = from + count - 1; r >= from; r--) deleted.push(r);
+            }
           };
         }
       };
@@ -283,11 +289,11 @@ console.log('\n=== B3【核心】清 SpecialSundays：兩個條件都要中先�
   checkEqual('★★★★★★ **由下而上刪**'
     + '——由上而下刪嘅話，刪完一行之後下面每一行都會向上移一格，'
     + '而之後嗰幾個行號就全部錯晒',
-    deleted.join('、'), '4、3');
+    deleted.join('、'), '5、3');
   check('★★★★★★ **一行真資料都冇刪到**'
     + '——只對 `-SELFTEST` 嘅話，一行改錯咗名嘅真資料就會被刪；'
     + '只對季度嘅話，沙盒季度入面一行真嘅特殊主日就會被刪',
-    deleted.indexOf(5) === -1 && deleted.indexOf(6) === -1, deleted.join('、'));
+    deleted.indexOf(4) === -1 && deleted.indexOf(6) === -1, deleted.join('、'));
   checkEqual('★★★★★ 而且寫咗一筆 AuditLog', audits.length, 1);
   check('★★★★★ 佢講得出刪咗邊幾行',
     /2028T3-SELFTEST/.test(audits[0].oldValue)
@@ -316,7 +322,10 @@ console.log('\n=== B3 一行 SELFTEST 都冇 ⇒ 唔好刪、唔好寫 AuditLog 
               return row === 2 ? [headers] : rows.slice(row - 3, row - 3 + numRows);
             } };
           },
-          deleteRow: function (r) { deleted.push(r); }
+          deleteRow: function (r) { deleted.push(r); },
+          deleteRows: function (from, count) {
+            for (let r = from + count - 1; r >= from; r--) deleted.push(r);
+          }
         };
       } };
     }

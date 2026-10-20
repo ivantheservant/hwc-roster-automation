@@ -157,7 +157,8 @@ console.log('\n=== E4：planResendChangedPersons_ 嘅結構性要求（靜態檢
   }
 
   const flow = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppFlow.gs'), 'utf8');
-  const step5Plan = flow.slice(flow.indexOf('function apiStep5Plan('), flow.indexOf('function apiStep5Plan(') + 1400);
+  // 第六十五輪批次 Y 組：apiStep5Plan() 長咗（confirmGroups），切到函式尾而唔係固定 1400 字
+  const step5Plan = flow.slice(flow.indexOf('function apiStep5Plan('), flow.indexOf('function apiStep5Decline('));
   check('★★★★★ E5：apiStep5Plan 已經改用 planResendChangedPersons_',
     /planResendChangedPersons_\(quarterId\)/.test(step5Plan));
   check('★★★★★ E5：apiStep5Plan 唔再處理申報（已歸掣 1，決定 D1）',

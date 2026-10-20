@@ -343,8 +343,8 @@ function moveRowsToArchive_(sourceName, archiveName, rowIndexes) {
   }
 
   // 由下而上刪除，避免刪除過程中列號位移
-  targets.sort(function (a, b) { return b.sheetRow - a.sheetRow; });
-  targets.forEach(function (t) { source.deleteRow(t.sheetRow); });
+  // ⚠️ 第六十五輪批次 AA 組：連續嘅一段一次刪（逐行刪一行一次 API 呼叫，會撞時間上限）
+  deleteSheetRowsInRuns_(source, targets.map(function (t) { return t.sheetRow; }));
 
   return targets.length;
 }

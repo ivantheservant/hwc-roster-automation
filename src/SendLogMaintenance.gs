@@ -102,8 +102,9 @@ function formatSendLogStatusSummary_(statusCounts) {
 }
 
 /**
- * 依批次前綴刪除 SendLog 對應的全部列。逐行由下往上刪（deleteRow()），
- * 不假設同一批次的列一定連續，確保無論實際排列方式都刪對行、不會刪錯鄰近列。
+ * 依批次前綴刪除 SendLog 對應的全部列。由下往上、連續的一段一次刪
+ * （第六十五輪批次 AA 組：`deleteSheetRowsInRuns_()`），不假設同一批次的列
+ * 一定連續，確保無論實際排列方式都刪對行、不會刪錯鄰近列。
  * @param {string} prefix 要刪除的批次前綴（完整字串）
  * @returns {number} 實際刪除的行數；找不到符合的批次時回傳 0
  */
@@ -115,9 +116,9 @@ function deleteSendLogBatch_(prefix) {
   const C = COLUMNS.SEND_LOG;
   const targetRows = data.rows
     .filter(function (r) { return extractSendLogBatchPrefix_(r[C.SEND_ID]) === prefix; })
-    .map(function (r) { return r.sheetRow; })
-    .sort(function (a, b) { return b - a; }); // 由下往上刪，避免行號位移
+    .map(function (r) { return r.sheetRow; });
 
-  targetRows.forEach(function (rowNum) { sheet.deleteRow(rowNum); });
-  return targetRows.length;
+  // ⚠️ 第六十五輪批次 AA 組：一段一段刪（同一批次嘅列多數連續）——
+  // 唔假設連續，`deleteSheetRowsInRuns_()` 會自己分段、由下往上
+  return deleteSheetRowsInRuns_(sheet, targetRows);
 }

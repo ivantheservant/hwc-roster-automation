@@ -692,8 +692,12 @@ function findReplacementPerson_(violation, state, context) {
   requireStateArg_('findReplacementPerson_', 2, state, 'context');
   requireContextArg_('findReplacementPerson_', 3, context, ['eligibility']);
 
-  const pool = (context.eligibility.byPost[violation.postId] || []).slice().sort();
   const key = cellKey_(violation.serviceDate, violation.postId, violation.slotIndex);
+  // ⚠️ 第六十五輪批次 Z 組：合資格嘅人之間點揀——見 rankReplacementCandidates_()。
+  // 「邊個合資格」下面嘅檢查一個都冇改。
+  const ranking = rankReplacementCandidates_(
+    context.eligibility.byPost[violation.postId] || [], violation, state, context);
+  const pool = ranking.order;
 
   // 先記下目前已存在的違規，之後只拒絕「新增」的違規，
   // 不會因為表上別處本來就有的問題而否決一個本身可行的人選。
@@ -735,7 +739,16 @@ function findReplacementPerson_(violation, state, context) {
     }
 
     const person = context.peopleById[candidate];
-    return { personId: candidate, reason: '建議改派 ' + (person ? person.nameTC : candidate) };
+    const name = person ? person.nameTC : candidate;
+    // 第六十五輪批次 Z 組：冇更好嘅人選、揀中嘅人同日已經有另一個崗位 ⇒ 講出嚟
+    const sameDayPostIds = ranking.sameDayPostIds[candidate] || [];
+    const sameDayNote = describeSameDayDuty_(name, sameDayPostIds, context);
+    return {
+      personId: candidate,
+      reason: '建議改派 ' + name + (sameDayNote ? '（' + sameDayNote + '）' : ''),
+      sameDayPostIds: sameDayPostIds,
+      sameDayNote: sameDayNote
+    };
   }
 
   const notes = [];
@@ -745,6 +758,91 @@ function findReplacementPerson_(violation, state, context) {
     personId: '',
     reason: '找不到不衝突的人選' + (notes.length > 0 ? '（' + notes.join('、') + '）' : '') + '，需要人手處理'
   };
+}
+
+/**
+ * ⚠️⚠️ 第六十五輪批次 Z 組：**替補人選嘅排序**（只決定「幾個合資格嘅人之間揀邊個」）。
+ *
+ * 現場：`findReplacementPerson_()` 本來把候選池按 PersonID 排序，**第一個**通過全部
+ * 檢查嘅人就係答案 ⇒ 替補永遠落喺同一批 PersonID 較細嘅人身上，直到撞次數上限或者
+ * 連續兩週先換人。兩次實測都揀咗同日已經做主席嘅同一位會友去做司事（`Posts` 冇設
+ * `MutexGroup`，所以唔算違反任何規則）。
+ *
+ * 生成器嘅計分（`pickPerson_()`，Generator.gs）靠住排表過程中嘅狀態（`weekByPost`、
+ * `ratioState`、`lastServed`……），fine-tune 嘅 state 冇呢啲，搬唔過嚟——所以寫一個
+ * 簡單、可重現嘅排序：
+ *
+ *   ① 同日冇其他崗位優先
+ *   ② 這一季格數少優先（負荷平衡，同生成器「平均分配」嘅方向一致）
+ *   ③ PersonID（保證同一個輸入永遠同一個答案）
+ *
+ * ⚠️ 主席兼報告（`SOFT_CHAIR_EQ_ANNOUNCE`）：規則啟用而且空格係主席／報告其中一個時，
+ * 同日做緊**另一個**嘅人唔當作「同日有其他崗位」——嗰個係規則鼓勵嘅配搭，
+ * 唔可以因為第①點而被推到後面；亦唔會出「同日亦擔任」提示。
+ *
+ * 純函式，唔改 state。
+ *
+ * @param {string[]} pool 合資格嘅 PersonID
+ * @param {Object} violation 要填嘅格（`serviceDate`／`postId`／`slotIndex`）
+ * @param {Object[]} state 派工狀態
+ * @param {Object} context fine-tune 的資料集
+ * @returns {{order: string[], sameDayPostIds: Object.<string, string[]>}}
+ */
+function rankReplacementCandidates_(pool, violation, state, context) {
+  const key = cellKey_(violation.serviceDate, violation.postId, violation.slotIndex);
+  const partner = chairAnnouncePartnerPostId_(violation.postId, context);
+  const sameDay = {};
+  const quarterCount = {};
+  state.forEach(function (s) {
+    if (!s.personId) return;
+    quarterCount[s.personId] = (quarterCount[s.personId] || 0) + 1;
+    if (s.serviceDate !== violation.serviceDate) return;
+    if (cellKey_(s.serviceDate, s.postId, s.slotIndex) === key) return;
+    if (partner && s.postId === partner) return;
+    if (!sameDay[s.personId]) sameDay[s.personId] = [];
+    if (sameDay[s.personId].indexOf(s.postId) === -1) sameDay[s.personId].push(s.postId);
+  });
+  const busy = function (id) { return sameDay[id] && sameDay[id].length > 0 ? 1 : 0; };
+  const order = pool.slice().sort(function (a, b) {
+    const da = busy(a) - busy(b);
+    if (da !== 0) return da;
+    const dq = (quarterCount[a] || 0) - (quarterCount[b] || 0);
+    if (dq !== 0) return dq;
+    return a < b ? -1 : (a > b ? 1 : 0);
+  });
+  return { order: order, sameDayPostIds: sameDay };
+}
+
+/**
+ * 第六十五輪批次 Z 組：主席兼報告規則下，`postId` 嘅拍檔崗位；唔適用回空字串。
+ * @param {string} postId 崗位
+ * @param {Object} context fine-tune 的資料集
+ * @returns {string}
+ */
+function chairAnnouncePartnerPostId_(postId, context) {
+  const rules = context.rules || {};
+  if (!isRuleEnabled_(rules, RULE_IDS.CHAIR_EQ_ANNOUNCE)) return '';
+  const scope = splitList_(rules[RULE_IDS.CHAIR_EQ_ANNOUNCE][COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]);
+  if (scope.length < 2) return '';
+  if (postId === scope[0]) return scope[1];
+  if (postId === scope[1]) return scope[0];
+  return '';
+}
+
+/**
+ * 第六十五輪批次 Z 組：例如「P9012 同日亦擔任 主席」（畫面用中文名）。冇就回空字串。
+ * @param {string} name 被揀中嘅人嘅名
+ * @param {string[]} postIds 同日其他崗位
+ * @param {Object} context fine-tune 的資料集（用 `posts` 揾中文名）
+ * @returns {string}
+ */
+function describeSameDayDuty_(name, postIds, context) {
+  if (!postIds || postIds.length === 0) return '';
+  const names = postIds.map(function (postId) {
+    const post = (context.posts || []).filter(function (p) { return p.postId === postId; })[0];
+    return post ? (post.postNameTC || postId) : postId;
+  });
+  return name + ' 同日亦擔任 ' + names.join('、');
 }
 
 /**

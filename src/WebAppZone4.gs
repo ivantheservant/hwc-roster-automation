@@ -443,10 +443,79 @@ function apiMakeupSendPlan(quarterId, stage) {
         return { nameTC: r.displayName || r.personId || r.email, reason: r.reason };
       }),
       alreadySentCount: plan.alreadySent.length,
-      cannotSendCount: plan.cannotSend.length
+      cannotSendCount: plan.cannotSend.length,
+      // ⚠️ 第六十五輪批次 W 組：這一次要寄嘅人當中，邊幾位未有可用嘅個人 PDF。
+      // `count > 0` ⇒ 前端唔畀〔確定補寄〕，改畀〔現在就產生個人 PDF〕。
+      pdfGaps: describeMakeupPdfGapsForUi_(findMakeupPdfGaps_(plan))
     };
   } catch (err) {
     return zone4Failure_('比對誰未收到', err);
+  }
+}
+
+/**
+ * 第六十五輪批次 W 組：缺 PDF 名單畀前端嘅樣子（名最多 30 個）。
+ * @param {Object} gaps `findMakeupPdfGaps_()` 嘅結果
+ * @returns {{count: number, absentCount: number, staleCount: number, names: string[]}}
+ */
+function describeMakeupPdfGapsForUi_(gaps) {
+  return {
+    count: gaps.people.length,
+    absentCount: gaps.absentCount,
+    staleCount: gaps.staleCount,
+    names: gaps.people.slice(0, 30).map(function (p) { return p.nameTC || p.personId; })
+  };
+}
+
+/**
+ * ⚠️ 第六十五輪批次 W 組：補寄之前，**只為缺件嗰幾位**產生個人 PDF（分批）。
+ *
+ * 名單由後端自己重新算（`planMakeupSend_()` → `findMakeupPdfGaps_()`），
+ * 唔信前端傳嚟嘅名單。用嘅係 V 組同一支
+ * `generatePersonalPdfBatchForPeople_()`：一次只做一批，`done=false` 就要再叫，
+ * 前端 `runPdfBatchToCompletion()`（ScriptZone1.html）負責接住跑——同正式發出
+ * 〔現在就產生個人 PDF〕同一個迴圈。
+ *
+ * @param {string} quarterId
+ * @param {string} stage
+ * @returns {Object}
+ */
+// ⚠️ 薄殼——只做權限檢查同拿鎖，真正內容喺 `apiMakeupGenerateMissingPdfs_locked_()`。
+// 理由全文喺 `src/MutationLock.gs` 檔頭。
+function apiMakeupGenerateMissingPdfs(quarterId, stage) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('產生個人 PDF（補寄用）', function () {
+    return apiMakeupGenerateMissingPdfs_locked_(quarterId, stage);
+  });
+}
+
+function apiMakeupGenerateMissingPdfs_locked_(quarterId, stage) {
+  assertWebAppRequestAllowed_();
+  try {
+    const id = String(quarterId || '').trim();
+    const versionNo = findLatestVersionNo(id);
+    if (versionNo < 0) {
+      return { ok: false, message: '這一季還沒有生成過任何版本。' };
+    }
+    const plan = planMakeupSend_(id, versionNo, String(stage || '').trim());
+    const gaps = findMakeupPdfGaps_(plan);
+    if (gaps.people.length === 0) {
+      return { ok: true, done: true, doneCount: 0, totalPeople: 0, generatedCount: 0,
+        skippedExistingCount: 0, versionNo: versionNo };
+    }
+    const result = generatePersonalPdfBatchForPeople_(id, versionNo,
+      gaps.people.map(function (p) { return p.personId; }));
+    return {
+      ok: true,
+      done: !!result.done,
+      doneCount: result.doneCount,
+      totalPeople: result.totalPeople,
+      generatedCount: result.generatedCount,
+      skippedExistingCount: result.skippedExistingCount,
+      versionNo: versionNo
+    };
+  } catch (err) {
+    return zone4Failure_('產生個人 PDF', err);
   }
 }
 
@@ -493,9 +562,19 @@ function apiMakeupSendExecute_locked_(quarterId, stage) {
       sent: result.sent,
       dryRun: result.dryRun,
       skipped: result.skipped,
-      failed: result.failed
+      failed: result.failed,
+      // ⚠️ 第六十五輪批次 W 組：後端一直有回傳，但畫面冇顯示——
+      // 49 位因為冇 PDF 而冇寄出，完成窗淨係出綠色。
+      errorPdf: result.errorPdf,
+      errorPdfMissing: result.errorPdfMissing,
+      attempted: result.attempted
     };
   } catch (err) {
+    // 第六十五輪批次 W 組：缺 PDF 被擋——訊息本身已經係三段式，唔好再包一層
+    if (err && err.makeupPdfGap) {
+      return { ok: false, pdfGapBlocked: true, message: err.message,
+        pdfGaps: describeMakeupPdfGapsForUi_(err.pdfGaps) };
+    }
     return zone4Failure_('補寄未收到的人', err);
   }
 }

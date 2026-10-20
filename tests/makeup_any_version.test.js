@@ -32,7 +32,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const gas = loadGasSource([
   'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'PersonalLinkInMail.gs',
-  'MakeupSend.gs', 'WebAppZone4.gs'
+  'WebAppGuards.gs', 'MakeupSend.gs', 'WebAppZone4.gs'
 ]);
 
 const Q = '2099T3';
@@ -60,6 +60,8 @@ gas.getConfig = function (_k, d) { return d; };
 gas.findEmailTemplate_ = function () { return { attachType: 'PERSONAL_PDF' }; };
 gas.findLatestVersionNo = function () { return 3; };
 gas.assertWebAppRequestAllowed_ = function () {};
+// 第六十五輪批次 W 組：預覽會問個人 PDF 有冇缺——呢份測試唔關 PDF 事，當全部齊
+gas.checkMissingPersonalPdfs_ = function () { return { applicable: true, missing: [], absent: [], stale: [] }; };
 
 const keysOf = function (list) {
   return list.map(function (r) { return r.personId || r.email; }).sort();
@@ -135,10 +137,13 @@ console.log('\n=== Q2：預覽畫面講明寄第幾版、附甚麼、名單收�
 
 console.log('\n=== Q：執行補寄嗰陣重新篩，都係用同一個規則 ===');
 {
-  const src = read('src/MakeupSend.gs').replace(/\/\*[\s\S]*?\*\//g, '');
-  check('★★★★★ 兩處都唔再傳版本號落 buildSendStatusByRecipient_()',
-    (src.match(/buildSendStatusByRecipient_\(\s*readSheet\(SHEETS\.SEND_LOG\), (plan\.)?quarterId, (plan\.)?stage\)/g) || []).length === 2,
-    (src.match(/buildSendStatusByRecipient_\([^)]*\)/g) || []).join(' | '));
+  const src = read('src/MakeupSend.gs').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  // 第六十五輪批次 X 組：兩處改為經 `buildQuarterNoticeReceivedIndex_()`（唔傳版本號），
+  // 而 `buildSendStatusByRecipient_()` 只喺嗰一支入面被叫一次
+  check('★★★★★ 兩處都唔再傳版本號（經共用嘅 buildQuarterNoticeReceivedIndex_()）',
+    (src.match(/buildQuarterNoticeReceivedIndex_\((plan\.)?quarterId, (plan\.)?stage\)/g) || []).length === 2
+      && (src.match(/buildSendStatusByRecipient_\(/g) || []).length === 2,
+    (src.match(/buildQuarterNoticeReceivedIndex_\([^)]*\)/g) || []).join(' | '));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

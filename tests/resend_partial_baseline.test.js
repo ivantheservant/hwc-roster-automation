@@ -121,18 +121,20 @@ const ui = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone1.
   check('★★★ 舊後端（冇 arrangementChanged 欄）⇒ 當有改動，同舊畫面一樣',
     legacy.changed.length === 1 && legacy.notReceived.length === 0);
 
-  const openResend = ui.slice(ui.indexOf('function openResend('), ui.indexOf('openConfirm({', ui.indexOf('function openResend(')));
+  // 第六十五輪批次 Y 組：確認框內容搬咗去 buildResendConfirmNodes()
+  const openResend = ui.slice(ui.indexOf('function buildResendConfirmNodes('), ui.indexOf('function openResend('));
   check('★★★★★★ 標題數字用第一段（唔再用 plan.changed.length）',
-    /sectionTitle\('自上次發出之後，這 ' \+ groups\.changed\.length \+ ' 個人的安排改了'\)/.test(openResend)
+    /'自上次發出之後，這 ' \+ groups\.changed\.length \+ ' 個人的安排改了/.test(openResend)
     && !/'自上次發出之後，這 ' \+ plan\.changed\.length/.test(openResend));
   const warnAt = openResend.indexOf('確認是不是真的想改這麼多人');
-  const secondAt = openResend.indexOf('上次正式發出時沒有收到的 ');
+  const secondAt = openResend.indexOf('上次正式發出時沒有收到');
   check('★★★★★ 第二段有自己嘅標題，而且指去「補寄未收到的人」',
     secondAt !== -1 && /要寄第一次通知給他們，用「補寄未收到的人」/.test(openResend));
   check('★★★★★ 「真的想改這麼多人」只喺第一段（第二段唔放入嗰句警告）',
     warnAt !== -1 && warnAt < secondAt
     && openResend.split('確認是不是真的想改這麼多人').length === 2);
-  check('★★★★ 第一段淨係列 groups.changed', /groups\.changed\.forEach\(/.test(openResend)
+  // 第六十五輪批次 Y 組：第一段改為「這一次會寄給的 N 位」（後端分好組）
+  check('★★★★ 第一段淨係列會寄嘅人（唔係 plan.changed 全部）', /g\.willSend\.forEach\(/.test(openResend)
     && !/plan\.changed\.forEach\(/.test(openResend));
 }
 

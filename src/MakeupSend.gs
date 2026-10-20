@@ -85,18 +85,23 @@ const MAKEUP_RECEIVED_STATUSES = [
  * ⚠️ 「收過舊版、而之後有改動」嘅人**唔係**補寄嘅對象——佢哋要收嘅係
  * 「改動後重發」（只講改咗乜）。補寄係畀「從來未收過」嘅人。
  *
+ * ⚠️ 第六十五輪批次 X 組：`stage` 可以係一個陣列（幾個階段一齊睇）。
+ * 唔好直接叫呢一支——用 `buildQuarterNoticeReceivedIndex_()`，
+ * 「邊幾個階段算收過」只可以喺嗰度決定。
+ *
  * @param {Object[]} sendLogRows readSheet(SHEETS.SEND_LOG) 的結果
  * @param {string} quarterId 季度 ID
- * @param {string} stage 階段
- * @returns {Object.<string, {status: string, versionNo: number}>}
- *   {收件人識別鍵: 判斷用嘅 Status ＋ 嗰一筆嘅版本號}
+ * @param {(string|string[])} stage 階段（或者幾個階段）
+ * @returns {Object.<string, {status: string, versionNo: number, stage: string}>}
+ *   {收件人識別鍵: 判斷用嘅 Status ＋ 嗰一筆嘅版本號 ＋ 嗰一筆嘅階段}
  */
 function buildSendStatusByRecipient_(sendLogRows, quarterId, stage) {
   const C = COLUMNS.SEND_LOG;
+  const stages = Array.isArray(stage) ? stage : [stage];
   const byKey = {};
   sendLogRows.forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
-    if (row[C.STAGE] !== stage) return;
+    if (stages.indexOf(row[C.STAGE]) === -1) return;
     // PERSON 收件人用 PersonID、LIST 收件人沒有 PersonID 就用 Email——
     // 跟 listRecipients_() 產生收件人的方式對應。
     const key = row[C.PERSON_ID] || String(row[C.EMAIL] || '').trim().toLowerCase();
@@ -106,9 +111,52 @@ function buildSendStatusByRecipient_(sendLogRows, quarterId, stage) {
     // 收過就係收過——之後一次唔成功唔可以把佢變返「未收到」
     if (prev && MAKEUP_RECEIVED_STATUSES.indexOf(prev.status) !== -1
         && MAKEUP_RECEIVED_STATUSES.indexOf(status) === -1) return;
-    byKey[key] = { status: status, versionNo: Number(row[C.VERSION_NO]) };
+    byKey[key] = { status: status, versionNo: Number(row[C.VERSION_NO]), stage: String(row[C.STAGE] || '') };
   });
   return byKey;
+}
+
+/**
+ * ⚠️⚠️ 第六十五輪批次 X 組：**「呢一季收過通知未」——唯一嘅定義。**
+ *
+ * 現場（2026-10-20 回歸測試 R4.20、R4.21，`2028T2`）：兩位會友剛經
+ * 「改動後重發」收到第 3 版（`RESEND`，`DRY_RUN`）。補寄預覽仍然把佢哋列為
+ * 「還沒有收到」——預覽自己寫住「任何一版收過都算已經收到」；照撳嘅話佢哋會
+ * 收兩次第 3 版。狀態卡亦唔把佢哋算作已收。
+ *
+ * 成因：補寄（`buildSendStatusByRecipient_()`）同狀態卡（`countOfficialReach_()`）
+ * 各自只睇 `OFFICIAL`。但改動後重發嘅信包含收件人這一季**全部**安排同個人 PDF
+ * （`buildAssignmentSummary_()` 用該人全部派工），所以對「正式發出」而言，
+ * 收過 `RESEND` 就等於收過通知。
+ *
+ *   `OFFICIAL` ⇒ `OFFICIAL` ∪ `RESEND`（任何一版）
+ *   `REVIEW`   ⇒ 只睇 `REVIEW`（審閱信只係一條唯讀連結，唔係通知）
+ *
+ * 收過 ＝ Status 屬 `MAKEUP_RECEIVED_STATUSES`（SENT／DRY_RUN／SKIPPED_UNCHANGED）。
+ *
+ * ⚠️ 三處共用，唔可以各自寫：`planMakeupSend_()`、`executeMakeupSend_()`、
+ * `countOfficialReach_()`（FiveStageCore.gs）。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {string} stage `MAIL_STAGES.OFFICIAL` 或 `MAIL_STAGES.REVIEW`
+ * @param {Object[]=} sendLogRows 選填；唔傳就自己讀 SendLog
+ * @returns {Object.<string, {status: string, versionNo: number, stage: string}>}
+ */
+function buildQuarterNoticeReceivedIndex_(quarterId, stage, sendLogRows) {
+  const stages = stage === MAIL_STAGES.OFFICIAL
+    ? [MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND]
+    : [stage];
+  return buildSendStatusByRecipient_(
+    sendLogRows || readSheet(SHEETS.SEND_LOG), quarterId, stages);
+}
+
+/**
+ * 第六十五輪批次 X 組：一筆紀錄算唔算「收過」。
+ * @param {?Object} record `buildQuarterNoticeReceivedIndex_()` 入面嘅一項
+ * @returns {boolean}
+ */
+function isNoticeReceivedRecord_(record) {
+  return !!record && MAKEUP_RECEIVED_STATUSES.indexOf(record.status) !== -1;
 }
 
 /**
@@ -170,8 +218,8 @@ function planMakeupSend_(quarterId, versionNo, stage) {
   const context = buildMailContext_(quarterId, versionNo, stage);
   const recipients = listRecipients_(stage, context);
   // ⚠️ 第六十三輪批次 Q 組：任何一個版本收過都算——見 buildSendStatusByRecipient_()
-  const recordByKey = buildSendStatusByRecipient_(
-    readSheet(SHEETS.SEND_LOG), quarterId, stage);
+  // ⚠️ 第六十五輪批次 X 組：改動後重發收過亦算——見 buildQuarterNoticeReceivedIndex_()
+  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage);
 
   const alreadySent = [];
   const needsResend = [];
@@ -183,8 +231,12 @@ function planMakeupSend_(quarterId, versionNo, stage) {
     const lastStatus = record ? record.status : null;
     const verdict = classifyMakeupRecipient_(recipient, lastStatus);
     let reason = verdict.reason;
-    // 收過**舊版** ⇒ 唔補寄，講明之後嘅改動行邊條路
-    if (verdict.category === 'ALREADY_SENT' && record && record.versionNo !== versionNo) {
+    // 第六十五輪批次 X 組：喺改動後重發收過 ⇒ 講明係邊一次
+    if (verdict.category === 'ALREADY_SENT' && record && record.stage === MAIL_STAGES.RESEND) {
+      reason = '已經在「改動後重發」收到第 ' + record.versionNo + ' 版（信入面有他這一季全部安排）'
+        + '，補寄不會再寄給他';
+    } else if (verdict.category === 'ALREADY_SENT' && record && record.versionNo !== versionNo) {
+      // 收過**舊版** ⇒ 唔補寄，講明之後嘅改動行邊條路
       reason = '已經收過第 ' + record.versionNo + ' 版。之後的改動要用區一的「改動後重發」'
         + '（只講改了甚麼），補寄不會再寄給他';
     }
@@ -248,6 +300,19 @@ function executeMakeupSend_(plan) {
       isDryRun: plan.isDryRun, attempted: 0 };
   }
 
+  // ⚠️⚠️ 第六十五輪批次 W 組：**缺個人 PDF 就一封都唔寄。**
+  // 唔信前端——前端有一道同樣嘅檢查（〔現在就產生個人 PDF〕），但
+  // Web UI 每次請求都係獨立嘅，選單版本亦都行呢一支。
+  // 現場（回歸測試 R1.4、R4.21）：預覽 53 位，寄出 4 封，其餘 49 行全部
+  // `ERROR_PDF_MISSING`，完成窗只顯示綠色。
+  const pdfGaps = findMakeupPdfGaps_(plan);
+  if (pdfGaps.people.length > 0) {
+    const gapErr = new Error(buildMakeupPdfGapMessage_(plan, pdfGaps));
+    gapErr.makeupPdfGap = true;
+    gapErr.pdfGaps = pdfGaps;
+    throw gapErr;
+  }
+
   const template = findEmailTemplate_(plan.stage);
   if (!template) throw new Error('EmailTemplates 中找不到 Stage=' + plan.stage + ' 的範本');
 
@@ -267,8 +332,7 @@ function executeMakeupSend_(plan) {
   plan.needsResend.forEach(function (r) {
     needKeys[r.personId || String(r.email || '').trim().toLowerCase()] = true;
   });
-  const recordByKey = buildSendStatusByRecipient_(
-    readSheet(SHEETS.SEND_LOG), plan.quarterId, plan.stage);
+  const recordByKey = buildQuarterNoticeReceivedIndex_(plan.quarterId, plan.stage);
 
   const targets = listRecipients_(plan.stage, context).filter(function (recipient) {
     const key = recipient.personId || String(recipient.email || '').trim().toLowerCase();
@@ -315,6 +379,64 @@ function executeMakeupSend_(plan) {
     isDryRun: isDryRun,
     attempted: outcomes.length
   };
+}
+
+/**
+ * ⚠️⚠️ 第六十五輪批次 W 組：補寄目標當中，**邊幾位仲未有可用嘅個人 PDF**。
+ *
+ * 只計「這一次要寄（`needsResend`）、而且附件係個人版 PDF、而且這一版有派工」
+ * 嘅人——同 V 組一樣：唔關事嘅人唔使等佢哋嘅 PDF。
+ *
+ * 「缺」同「過期」用 `checkMissingPersonalPdfs_()`（第六十三輪 A2 組同一支
+ * `isPersonalPdfStale_()` 判斷），唔另寫一份。
+ *
+ * @param {Object} plan `planMakeupSend_()` 嘅結果
+ * @returns {{applicable: boolean, people: Object[], absentCount: number, staleCount: number}}
+ *   `people` 每項 `{personId, nameTC}`
+ */
+function findMakeupPdfGaps_(plan) {
+  const none = { applicable: false, people: [], absentCount: 0, staleCount: 0 };
+  if (!plan || plan.stage !== MAIL_STAGES.OFFICIAL) return none;
+  if (String(plan.attachType || '').toUpperCase() !== ATTACH_TYPE.PERSONAL_PDF) return none;
+
+  const wanted = {};
+  (plan.needsResend || []).forEach(function (r) {
+    if (r.type === RECIPIENT_TYPE.LIST) return;
+    if (r.personId && String(r.email || '').trim()) wanted[r.personId] = true;
+  });
+  if (Object.keys(wanted).length === 0) {
+    return { applicable: true, people: [], absentCount: 0, staleCount: 0 };
+  }
+
+  const check = checkMissingPersonalPdfs_(plan.quarterId, plan.versionNo, plan.stage);
+  if (!check.applicable) return none;
+  const pick = function (p) { return !!wanted[p.personId]; };
+  const absent = (check.absent || check.missing || []).filter(pick);
+  const stale = (check.stale || []).filter(pick);
+  return {
+    applicable: true,
+    people: absent.concat(stale).map(function (p) { return { personId: p.personId, nameTC: p.nameTC }; }),
+    absentCount: absent.length,
+    staleCount: stale.length
+  };
+}
+
+/**
+ * 第六十五輪批次 W 組：缺 PDF 時拒寄嘅三段式訊息（選單同網頁共用）。
+ * @param {Object} plan `planMakeupSend_()` 嘅結果
+ * @param {Object} gaps `findMakeupPdfGaps_()` 嘅結果
+ * @returns {string}
+ */
+function buildMakeupPdfGapMessage_(plan, gaps) {
+  const n = gaps.people.length;
+  const detail = gaps.staleCount > 0
+    ? '（' + gaps.absentCount + ' 位還沒有、' + gaps.staleCount + ' 位的是內容改動之前產生的，已經過期）'
+    : '';
+  return buildThreePartMessage_(
+    '這一次要補寄的人當中，有 ' + n + ' 位還沒有第 ' + plan.versionNo + ' 版的個人 PDF' + detail + '。',
+    '沒有寄出任何電郵。',
+    ['先為這 ' + n + ' 位產生個人 PDF（網頁補寄畫面有〔現在就產生個人 PDF〕；'
+      + '或者用「產生個人 PDF」），再補寄一次']);
 }
 
 /**
@@ -427,6 +549,13 @@ function runMakeupSendExecute_locked_() {
   if (plan.needsResend.length === 0) {
     ui.alert('執行補寄未收到的人',
       buildMakeupPlanLines_(plan).join('\n') + '\n\n沒有任何人需要補寄，已結束。', ui.ButtonSet.OK);
+    return;
+  }
+
+  // 第六十五輪批次 W 組：缺個人 PDF ⇒ 未打字確認之前就講（`executeMakeupSend_()` 都會再擋）
+  const pdfGaps = findMakeupPdfGaps_(plan);
+  if (pdfGaps.people.length > 0) {
+    ui.alert('執行補寄未收到的人', buildMakeupPdfGapMessage_(plan, pdfGaps), ui.ButtonSet.OK);
     return;
   }
 

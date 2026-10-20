@@ -954,9 +954,8 @@ function deleteSelfTestSpecialSundays_(quarterId) {
 
   // ⚠️ 由下而上刪——由上而下刪嘅話，刪完一行之後下面每一行都會
   // 向上移一格，而之後嗰幾個行號就全部錯晒。
-  doomed.slice().reverse().forEach(function (d) {
-    sheet.deleteRow(d.sheetRow);
-  });
+  // ⚠️ 第六十五輪批次 AA 組：連續嘅一段一次刪（`deleteSheetRowsInRuns_()` 自己由下而上）
+  deleteSheetRowsInRuns_(sheet, doomed.map(function (d) { return d.sheetRow; }));
   try {
     writeAuditLog_({
       action: '清走自測用的特殊主日',

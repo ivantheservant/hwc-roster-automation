@@ -417,8 +417,8 @@ function planStep4MissingPdf_(quarterId, versionNo) {
  * ⚠️ 唔改 Stage 前進規則（Ivan 嘅決定）。呢支只係畀畫面講真話。
  *
  *   應收　這一版有派工、而且有電郵嘅人
- *   已收　SendLog 入面這一季 OFFICIAL、**任何一個版本** SENT／DRY_RUN 過
- *        （同「補寄未收到的人」同一個「收過」定義，見 `MAKEUP_RECEIVED_STATUSES`）
+ *   已收　SendLog 入面這一季 OFFICIAL 或 RESEND、**任何一個版本** 收過
+ *        （同「補寄未收到的人」同一個「收過」定義，見 `buildQuarterNoticeReceivedIndex_()`）
  *
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -426,7 +426,6 @@ function planStep4MissingPdf_(quarterId, versionNo) {
  */
 function countOfficialReach_(quarterId, versionNo) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const L = COLUMNS.SEND_LOG;
   const peopleById = indexPeopleById_();
   const expected = {};
   readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
@@ -436,17 +435,11 @@ function countOfficialReach_(quarterId, versionNo) {
     const person = personId ? peopleById[personId] : null;
     if (person && String(person.email || '').trim()) expected[personId] = true;
   });
-  const reached = {};
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
-    if (String(row[L.QUARTER_ID] || '').trim() !== quarterId) return;
-    if (String(row[L.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;
-    const status = String(row[L.STATUS] || '').trim().toUpperCase();
-    if (status !== MAIL_STATUS.SENT && status !== MAIL_STATUS.DRY_RUN) return;
-    const personId = String(row[L.PERSON_ID] || '').trim();
-    if (personId) reached[personId] = true;
-  });
+  // ⚠️ 第六十五輪批次 X 組：同補寄同一個「收過」定義（`OFFICIAL` ∪ `RESEND`）——
+  // 唔可以喺呢度另外寫一份只睇 `OFFICIAL` 嘅。
+  const received = buildQuarterNoticeReceivedIndex_(quarterId, MAIL_STAGES.OFFICIAL);
   const ids = Object.keys(expected);
-  const reachedCount = ids.filter(function (id) { return reached[id]; }).length;
+  const reachedCount = ids.filter(function (id) { return isNoticeReceivedRecord_(received[id]); }).length;
   return { expected: ids.length, reached: reachedCount, notReached: ids.length - reachedCount };
 }
 

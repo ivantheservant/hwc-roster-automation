@@ -132,8 +132,27 @@
 
   /* ── 第 1 步：生成下一季職事表 ─────────────────────────────── */
 
+  /**
+   * ⚠️ 第六十五輪批次 AB 組第 3 點：「現時有 N 個版本」用**儲存後已刷新嘅 dashboard**。
+   *
+   * 現場：儲存成第 2、3 版之後，第 1 步仍然寫「現時有 2 個版本」，要撳「重新整理」先變。
+   * 成因：版本數嚟自 `apiGetMainFlowState()`（`mainFlowState_` 快取），而寫入動作
+   * 之後只有 dashboard 會重讀。目標季度就係而家睇緊嗰季時，用 dashboard 嘅最新版本號。
+   * @param {Object} target `flow.generateTarget`
+   * @param {Object} d dashboard
+   * @returns {Object} 一份新物件（唔改快取）
+   */
+  function withFreshVersionCount(target, d) {
+    const t = Object.assign({}, target || {});
+    if (t.quarterId && t.quarterId === currentQuarterId && d && d.latestVersion
+        && !isNaN(Number(d.latestVersion.versionNo))) {
+      t.versionCount = Number(d.latestVersion.versionNo) + 1;
+    }
+    return t;
+  }
+
   function renderStep1(d, flow) {
-    const t = (flow && flow.generateTarget) || {};
+    const t = withFreshVersionCount(flow && flow.generateTarget, d);
     const acts = [];
 
     if (!t.found) {

@@ -137,7 +137,10 @@ function mapRequestForClient_(r) {
     postNameText: r.postNameText,
     personNameText: r.personNameText,
     requestType: r.requestType,
-    reason: r.reason || ''
+    reason: r.reason || '',
+    // 第六十五輪批次 AB 組第 1 點：QuarterID 空白、按日期認出嗰筆——儲存確認畫面要講明，
+    // 唔係淨係 `Requests` H 欄先有
+    quarterNote: r.quarterNote || ''
   };
 }
 
@@ -522,6 +525,8 @@ function apiStep5Plan(quarterId, sendOptions) {
   // 唔喺「有改動」名單入面嘅人。所以要用同一個解析器再出一個總數。
   let recipientCount = 0;
   let recipientPreview = { total: 0, shown: [], moreCount: 0 };
+  // 第六十五輪批次 Y 組：「這一次會寄」同「這一次唔寄」分開（見 buildResendConfirmGroups_()）
+  let confirmGroups = { willSend: [], changedNotSent: [], notReceivedNotSentCount: 0, notReceivedNotSentNames: [] };
   if (changedPlan.changed.length > 0) {
     const context = buildMailContext_(
       quarterId, changedPlan.versionNo, MAIL_STAGES.RESEND);
@@ -530,6 +535,8 @@ function apiStep5Plan(quarterId, sendOptions) {
       changedPlan.changed.map(function (c) { return c.personId; }));
     recipientCount = recipients.length;
     recipientPreview = summariseRecipientsForPreview_(recipients);
+    confirmGroups = buildResendConfirmGroups_(changedPlan.changed, recipients,
+      readResendChangeNotes_(quarterId, changedPlan.versionNo));
   }
 
   return {
@@ -542,6 +549,7 @@ function apiStep5Plan(quarterId, sendOptions) {
     notReceivedCount: changedPlan.notReceivedCount,
     recipientCount: recipientCount,
     recipientPreview: recipientPreview,
+    confirmGroups: confirmGroups,
     // 第六十三輪批次 T 組：附件同日曆檔
     contents: describeConfirmContents_(MAIL_STAGES.RESEND, sendOptions),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false

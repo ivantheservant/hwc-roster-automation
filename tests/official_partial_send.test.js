@@ -33,7 +33,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 const gas = loadGasSource([
   'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs', 'WebAppGuards.gs',
   'SendOptions.gs', 'PersonalLinkInMail.gs', 'SendRecipients.gs', 'WebAppSendPlan.gs',
-  'FiveStageCore.gs', 'WebAppDashboard.gs'
+  'FiveStageCore.gs', 'WebAppDashboard.gs', 'MakeupSend.gs'
 ]);
 const Q = '2099T2';
 const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;

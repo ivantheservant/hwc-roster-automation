@@ -110,7 +110,8 @@ console.log('\n=== B3【核心】儲存之後要講「有冇對上名單」 ==='
     + '——寫成錯誤嘅話，幹事會去「修正」一件根本冇問題嘅事',
     zone2.indexOf('名單上沒有這個名字，正式發出時不會寄給他。外請講員屬正常。') !== -1);
   check('★★★★ 兩種都唔用紅色（對唔上唔係錯誤）',
-    /className = 'link-warn'/.test(zone2) && !/link-err/.test(zone2));
+    // 第六十五輪批次 AB 組第 2 點：講員、翻譯對唔上改用中性灰色（muted），獻花仍然橙色
+    /className = neutralWhenUnlinked \? 'muted' : 'link-warn'/.test(zone2) && !/link-err/.test(zone2));
 }
 
 console.log('\n=== B3 後端一直都有回 linkedToNameMapping ===');

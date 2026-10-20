@@ -359,8 +359,9 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
     !!fixNote && fixNote.indexOf('上一週同崗位已是此人') !== -1,
     JSON.stringify(notes2.slice(0, 3)));
   check('★★★★ 而且照樣講埋改成邊個（兩樣都要，唔係二選一）',
-    !!fixNote && fixNote.indexOf('建議改派') !== -1
-      && fixNote.indexOf('改成「試甲」') !== -1, String(fixNote));
+    // 第六十五輪批次 Z 組：替補唔再係「PersonID 最細嗰個」，所以唔寫死係邊個——
+    // 要驗嘅係「建議改派 X」同「改成「X」」講緊同一個人
+    !!fixNote && /建議改派 (\S+?)。[\s\S]*改成「\1」/.test(fixNote), String(fixNote));
 }
 
 console.log('\n=== C2：建議表都要有下拉選單 ===');

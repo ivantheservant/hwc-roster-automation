@@ -264,7 +264,9 @@ console.log('\n=== B：載入回饋要大而明確 ===');
     /\.busy-card\.is-fail/.test(style) && /busyHide\('fail'\)/.test(common));
   check('★★★★★ 收牌一定要喺刷新之後'
     + '——喺之前收就會出現「講咗已完成、但畫面仲係舊數字」嘅空窗',
-    /loadDashboard\(\{ keepModal: true \}\)[\s\S]{0,400}if \(ok\) busyHide\('done'\)/.test(common), '');
+    // 第六十五輪批次 AB 組第 4 點：已經開咗結果窗嘅動作例外（結果窗本身就係「完成」），
+    // 所以條件多咗 `!resultShown`——冇結果窗嘅動作仍然係刷新完先收
+    /loadDashboard\(\{ keepModal: true \}\)[\s\S]{0,400}if \(ok && !resultShown\) busyHide\('done'\)/.test(common), '');
 }
 
 console.log('\n=== B：手機／平板讀得到 ===');

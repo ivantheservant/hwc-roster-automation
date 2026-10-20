@@ -198,8 +198,9 @@ console.log('\n=== P：畫面文字 ===');
     /c\.noAssignmentThisVersion \? '（這一版沒有任何安排）'/.test(send));
   // ⚠️ 收窄到「安排有改動」嗰段嘅 `text: '現在：' + (…)`——第六十三輪批次 R 組
   // 第二段（上次冇收到）都有一句類似嘅字，闊鬆嘅寫法會被嗰句配中而永遠綠。
+  // 第六十五輪批次 Y 組：「現在：」嗰行抽成 resendCurrentText()，會寄／唔寄兩段共用
   check('★★★★★ 確認框：零派工嘅人「現在：這一季沒有安排」',
-    /text: '現在：' \+ \(c\.hasAssignments === false\s*\? '這一季沒有安排'/.test(zone1));
+    /return '現在：' \+ \(c\.hasAssignments === false\s*\? '這一季沒有安排'/.test(zone1));
   check('★★★★★ 完成訊息：逐個列出「原本：…／現在：這一季沒有安排」',
     /result\.zeroAssignmentPeople/.test(zone1) && /'／現在：這一季沒有安排'/.test(zone1));
 }
