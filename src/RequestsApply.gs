@@ -52,10 +52,44 @@ function readPendingRequests_(quarterId) {
   // 跟已正規化的 ServiceDates 永遠對不上，令所有申報被誤判成 NEEDS_INPUT。
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
+  // ⚠️⚠️ 第六十三輪批次 E 組：**QuarterID 唔可以一對唔上就靜靜略過。**
+  //
+  // 舊寫法：`String(row[qCol]).trim() !== quarterId ⇒ return`，而且排喺
+  // 「不完整計數」之前。所以 QuarterID 空白、小寫 `2027t3`、全形字元、
+  // 前後有不可見字元嘅申報**完全唔出現**：唔套用、唔計入
+  // `skippedIncompleteCount`、唔顯示 NEEDS_INPUT。呢個正正係下面第 67–72 行
+  // 註解自己講嘅那種錯：「認唔到嘅日期唔可以當成空白略過——噉樣就變成
+  // 靜靜咁吞咗一筆申報。」
+  //
+  // 而家：
+  //   1. 先經 `normalizeIdInput_()`（全形、零闊度字元、空白）再比，而且唔分大細楷
+  //   2. 空白 ⇒ 日期屬於呢一季就當呢一季，處理結果寫明「按日期判斷」
+  //   3. 寫咗另一季、但日期屬於呢一季 ⇒ NEEDS_INPUT，講明兩個值
+  //
+  // ⚠️ 空白而日期又認唔到 ⇒ 判斷唔到屬於邊一季，仍然唔會喺呢一季出現。
+  const targetQuarter = String(quarterId || '').toUpperCase();
+  const quarterDates = {};
+  readServiceDatesNormalized(quarterId, timezone).forEach(function (d) {
+    if (d.serviceDate) quarterDates[d.serviceDate] = true;
+  });
+
   const results = [];
   let skippedIncompleteCount = 0;
   values.forEach(function (row, i) {
-    if (String(row[qCol] || '').trim() !== quarterId) return;
+    const writtenQuarter = normalizeIdInput_(row[qCol]).toUpperCase();
+    let quarterNote = '';
+    let quarterMismatch = '';
+    if (writtenQuarter !== targetQuarter) {
+      const byDate = parseOfficerDateInput_(row[dateCol], timezone);
+      if (!byDate.ok || !quarterDates[byDate.dateStr]) return;
+      if (writtenQuarter === '') {
+        quarterNote = 'QuarterID 空白，按日期判斷為 ' + quarterId;
+      } else {
+        quarterMismatch = 'QuarterID 寫「' + String(row[qCol]).trim() + '」，但日期 '
+          + byDate.dateStr + ' 屬於 ' + quarterId + '。兩個值對不上，系統不會自行判斷是哪一個寫錯，'
+          + '請改正其中一個（或者把 QuarterID 留空，讓系統按日期判斷），再重新執行。';
+      }
+    }
 
     // 用 RequestID 是否空白判斷「系統是否已經真正處理過」，不是看 Status 的文字。
     // RequestID 只會在這裡（處理的同一次）指派，Status 是幹事看得到、也打得到的欄位，
@@ -94,7 +128,10 @@ function readPendingRequests_(quarterId) {
       serviceDateParseFailed: !parsedDate.ok,
       postNameText: postText,
       personNameText: personText,
-      requestType: typeText
+      requestType: typeText,
+      // 第六十三輪批次 E 組
+      quarterNote: quarterNote,
+      quarterMismatch: quarterMismatch
     });
   });
   results.skippedIncompleteCount = skippedIncompleteCount;
@@ -231,6 +268,10 @@ function scanPendingRequestsAllQuarters_() {
  * @returns {Object} 驗證結果，至少含 category；APPLY／CONFIRM 另含 personId/post/serviceDate 等
  */
 function validateRequest_(req, context, assignByKey, conflictKeys) {
+  // 第六十三輪批次 E 組：QuarterID 同日期所屬季度對唔上 ⇒ 唔估，請幹事改
+  if (req.quarterMismatch) {
+    return { category: 'NEEDS_INPUT', reason: req.quarterMismatch };
+  }
   const dateText = req.serviceDateText;
   const dateInfo = context.serviceDates.filter(function (d) { return d.serviceDate === dateText; })[0];
   if (!dateInfo) {
@@ -568,6 +609,16 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
     } else {
       applyDesignatedServe_(r, plan.context, workingByKey, outcomes);
     }
+  });
+
+  // 第六十三輪批次 E 組：QuarterID 空白、按日期判斷為呢一季嘅申報，
+  // 處理結果要講明——唔講嘅話幹事唔知系統幫佢估咗。
+  const quarterNoteByRow = {};
+  plan.results.forEach(function (r) {
+    if (r.quarterNote) quarterNoteByRow[r.sheetRow] = r.quarterNote;
+  });
+  outcomes.forEach(function (o) {
+    if (quarterNoteByRow[o.sheetRow]) o.resultNote = quarterNoteByRow[o.sheetRow] + '；' + o.resultNote;
   });
 
   // 被頂走的人若因此本季完全沒有服侍，附加提示在對應那筆申報的處理結果

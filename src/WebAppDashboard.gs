@@ -61,7 +61,26 @@ function buildQuarterLabel_(quarterId) {
  * @param {string} generateOnText 建議生成日期（Quarters.GenerateOn），冇就傳空字串
  * @returns {string}
  */
-function buildDashboardStatusText_(stage, versionExists, generateOnText) {
+function buildDashboardStatusText_(stage, versionExists, generateOnText, extras) {
+  // ⚠️ 第六十三輪批次 F 組：狀態卡要講真話。
+  //   ・正式發出咗但未寄晒 ⇒「已正式發出：N／M 位」＋ 指去補寄
+  //   ・最新一版未寄過 ⇒ 直接重用 `buildSendHistoryView_()` 嘅 `warnSentence`
+  //   （唔另寫一份判斷）
+  const base = buildDashboardStatusBase_(stage, versionExists, generateOnText, extras);
+  const unsent = extras && extras.unsentWarn ? ' ' + extras.unsentWarn : '';
+  return base + unsent;
+}
+
+function buildDashboardStatusBase_(stage, versionExists, generateOnText, extras) {
+  if (stage === QUARTER_STAGE.OFFICIAL_SENT && extras && extras.officialReach
+      && extras.officialReach.expected > 0) {
+    const r = extras.officialReach;
+    if (r.notReached > 0) {
+      return '已正式發出：' + r.reached + '／' + r.expected + ' 位。還有 ' + r.notReached
+        + ' 位未收到，要用「進階與診斷 ▸ 補寄未收到的人」補寄。';
+    }
+    return '已正式發出給全體（' + r.reached + '／' + r.expected + ' 位）。';
+  }
   if (stage === QUARTER_STAGE.DRAFT && !versionExists) {
     return generateOnText
       ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，撳下面的「生成初稿」。'
@@ -548,7 +567,8 @@ function buildDashboardState_(quarterId) {
     // 第四十八輪批次 A4 組第 3 點：寄完之後一直顯示，直到佢儲存為止。
     sentWithUnsavedWarning: buildSentWithUnsavedWarning_(
       sendLog.unsavedRelease, unsaved),
-    statusText: buildDashboardStatusText_(stage, versionExists, generateOnText),
+    statusText: buildDashboardStatusText_(stage, versionExists, generateOnText,
+      readDashboardStatusExtras_(quarterId, versionNo, stage, versionExists)),
     latestVersion: latestVersion,
     isDryRun: isDryRun,
     // 第四十一輪批次 H 組：轉寄測試地址有值嗰陣，介面頂部要有一個標籤。
@@ -773,6 +793,38 @@ function countDashboardOfficialTargets_(quarterId, versionNo, versionExists) {
     log_('WARN', 'countDashboardOfficialTargets_ 失敗：' + err.message);
     return { total: 0, noEmail: 0 };
   }
+}
+
+/**
+ * 第六十三輪批次 F 組：狀態卡嗰兩句額外嘅真話。
+ *
+ * ⚠️ 數唔到唔可以令成個 dashboard 冧，亦唔可以扮成「冇問題」——
+ * 數唔到就淨係顯示原本嗰句（同改之前一樣），並且寫 log。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 最新版本號
+ * @param {string} stage Stage
+ * @param {boolean} versionExists 有冇版本
+ * @returns {{officialReach: ?Object, unsentWarn: string}}
+ */
+function readDashboardStatusExtras_(quarterId, versionNo, stage, versionExists) {
+  const out = { officialReach: null, unsentWarn: '' };
+  if (!versionExists) return out;
+  if (stage === QUARTER_STAGE.OFFICIAL_SENT) {
+    try {
+      out.officialReach = countOfficialReach_(quarterId, versionNo);
+    } catch (err) {
+      log_('WARN', 'readDashboardStatusExtras_：數不到正式發出人數：' + err.message);
+    }
+  }
+  try {
+    const history = buildSendHistoryView_(quarterId);
+    const anySent = history.batches.some(function (b) { return b.sent > 0; });
+    // 「最新版本號 ＞ 最後一次寄出嘅版本號」先講——從來未寄過唔關事
+    if (anySent) out.unsentWarn = history.warnSentence || '';
+  } catch (err) {
+    log_('WARN', 'readDashboardStatusExtras_：讀不到寄出紀錄：' + err.message);
+  }
+  return out;
 }
 
 /** 掣 4 要顯示嘅「有幾多人嘅安排改咗」。只喺 OFFICIAL_SENT 先會呼叫。 */

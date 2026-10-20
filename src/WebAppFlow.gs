@@ -539,6 +539,8 @@ function apiStep5Plan(quarterId, sendOptions) {
     changedPersonCount: changedPlan.changed.length,
     recipientCount: recipientCount,
     recipientPreview: recipientPreview,
+    // 第六十三輪批次 T 組：附件同日曆檔
+    contents: describeConfirmContents_(MAIL_STAGES.RESEND, sendOptions),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
   };
 }

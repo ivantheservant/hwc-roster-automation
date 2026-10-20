@@ -114,11 +114,16 @@ function applyRequestTypeValidation_(sheet) {
  */
 function applyRequestsValidations_(sheet, quarterId) {
   const keys = getRequestsHeaderKeys_();
+  const quarterCol = keys.indexOf(COLUMNS.REQUESTS.QUARTER_ID) + 1;
   const dateCol = keys.indexOf(COLUMNS.REQUESTS.SERVICE_DATE) + 1;
   const postCol = keys.indexOf(COLUMNS.REQUESTS.POST_NAME) + 1;
   const personCol = keys.indexOf(COLUMNS.REQUESTS.PERSON_NAME) + 1;
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  // ⚠️ 第六十三輪批次 E 組：QuarterID 欄都要下拉（之前冇），季度同日期下拉
+  // 用同一個 `selectValidQuarterIdsForRequests_()`——兩邊唔可以各揀一套。
+  const quarterOptions = selectValidQuarterIdsForRequests_(
+    readSheet(SHEETS.QUARTERS), quarterId, toDateString(new Date(), timezone), timezone);
   // 第十九輪批次階段 F1：`Requests` 係**跨季度共用嘅一張表**，
   // 但日期下拉選單之前只讀一個季度，所以幹事處理 2026T4 嘅申報嗰陣，
   // 選單只有 2027T1 嘅日期，要人手打字，打完格右上角出紅色三角。
@@ -127,6 +132,7 @@ function applyRequestsValidations_(sheet, quarterId) {
   const personOptions = readPeople().map(function (row) { return row[COLUMNS.NAME_MAPPING.NAME_TC]; });
 
   const dataRowCount = Math.max(1, sheet.getMaxRows() - 2);
+  applyWarningListValidation_(sheet, quarterCol, dataRowCount, quarterOptions);
   applyWarningListValidation_(sheet, dateCol, dataRowCount, dateOptions);
   applyWarningListValidation_(sheet, postCol, dataRowCount, postOptions);
   applyWarningListValidation_(sheet, personCol, dataRowCount, personOptions);

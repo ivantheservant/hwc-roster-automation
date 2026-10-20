@@ -45,7 +45,7 @@ const gas = loadGasSource([
   // 事前預覽自然要載入寄信嗰邊嘅嘢——載入清單長咗，
   // 但兩個數字唔會再各自漂走。
   'SendOptions.gs', 'MailRedirect.gs', 'SendRecipients.gs', 'Mailer.gs',
-  'FiveStageCore.gs',
+  'FiveStageCore.gs', 'PersonalLinkInMail.gs',
   // 第三十九輪批次（順手）：「同一格既有 grid 改動又有申報 ⇒ grid 贏」
   // 嗰個判斷本來喺兩個檔各寫一次，而家合併成 `findRequestGridOverlaps_()`
   //（RequestsApply.gs）。`buildSaveAndConfirmPlan_()` 會叫佢，

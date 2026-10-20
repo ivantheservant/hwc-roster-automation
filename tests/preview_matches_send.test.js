@@ -59,7 +59,7 @@ const gas = loadGasSource([
   'EmailRecipientsSeed.gs',
   // `resolveResendTargetPersonIds_()` 喺呢度——事前預覽同真正寄出
   // 行同一個，所以呢份測試兩邊都要載入。
-  'SendRecipients.gs', 'Mailer.gs', 'ResendFlow.gs', 'FiveStageCore.gs'
+  'SendRecipients.gs', 'Mailer.gs', 'ResendFlow.gs', 'FiveStageCore.gs', 'PersonalLinkInMail.gs'
 ]);
 
 const TZ = 'Pacific/Auckland';

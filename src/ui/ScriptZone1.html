@@ -1109,6 +1109,8 @@
           '會寄給這 ' + preview.recipientCount + ' 位',
           '他們會收到一條唯讀連結，可以看到目前第 ' + preview.versionNo + ' 版的職事表。')
       ];
+      // 第六十三輪批次 T 組：講明附件同日曆檔（同寄信嗰刻同一個解析）
+      if (preview.contents) nodes.push(sendContentsBox(preview.contents));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1377,14 +1379,24 @@
         ]));
       }
 
+      // ⚠️ 第六十三輪批次 F 組：揀中人數 ＜ 應收人數 ⇒ **唔再顯示**
+      // 「會寄給表上 M 個人中的 X 人」（同下面「會寄給這 2 位」並列，兩個數字
+      // 幹事唔知邊個準），改為一段警告講明寄出之後會點。
+      if (preview.partial) {
+        nodes.push(make('div', { className: 'warnbox' }, [
+          make('div', { text: preview.partialWarning, className: 'err-text' })
+        ]));
+      }
       const detail = make('div', { className: 'sec' }, [
-        sectionTitle('會寄給表上 ' + b.targetPersonCount + ' 個人中的 ' + willReceive + ' 人')
+        sectionTitle(preview.partial
+          ? '這一次寄出的內容'
+          : ('會寄給表上 ' + b.targetPersonCount + ' 個人中的 ' + willReceive + ' 人'))
       ]);
-      [
-        '每人一封信，附自己那份標示了名字的 PDF',
-        '附月曆檔（.ics），紐西蘭時間，已計夏令時間',
-        '附個人專屬連結（永遠顯示最新安排）'
-      ].forEach((t) => detail.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
+      // 第六十三輪批次 T 組：附件同日曆檔跟幹事揀嘅，唔再寫死
+      const contentLines = preview.contents
+        ? [preview.contents.attachLine, preview.contents.icsLine]
+        : ['每人一封信，附自己那份標示了名字的 PDF', '附月曆檔（.ics），紐西蘭時間，已計夏令時間'];
+      contentLines.forEach((t) => detail.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
       if (b.noEmailCount > 0) {
         detail.appendChild(make('div', {
           text: '・' + b.noEmailCount + ' 人沒有電郵，會略過',
@@ -1478,6 +1490,19 @@
   // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
   // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
   // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
+  /**
+   * 第六十三輪批次 T 組：確認框入面「附件：…」「日曆檔：附／不附」兩行。
+   * 三種寄出共用一份。
+   * @param {{attachLine: string, icsLine: string}} contents 後端 `describeConfirmContents_()` 嘅結果
+   * @returns {Element}
+   */
+  function sendContentsBox(contents) {
+    return make('div', { className: 'sec' }, [
+      make('div', { text: contents.attachLine, className: 'vio-row' }),
+      make('div', { text: contents.icsLine, className: 'vio-row' })
+    ]);
+  }
+
   function openResend(sendOptions) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
@@ -1517,6 +1542,8 @@
       nodes.push(recipientPreviewBox(plan.recipientPreview,
         '會寄給這 ' + plan.recipientCount + ' 位',
         '這一份就是撳落去之後真正會收到信的人（包括堂委名單）。'));
+      // 第六十三輪批次 T 組：附件同日曆檔
+      if (plan.contents) nodes.push(sendContentsBox(plan.contents));
 
       const list = make('div', { className: 'sec' });
       plan.changed.forEach((c) => {

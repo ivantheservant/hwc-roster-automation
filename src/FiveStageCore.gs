@@ -222,6 +222,8 @@ function planStep2_(quarterId, sendOptions) {
     recipientCount: recipients.length,
     // 第四十七輪批次 B3 組：**列出名字**，唔淨係一個數字。
     recipientPreview: summariseRecipientsForPreview_(recipients),
+    // 第六十三輪批次 T 組：附件同日曆檔
+    contents: describeConfirmContents_(MAIL_STAGES.REVIEW, sendOptions),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 階段 A（收尾輪）新增：>0 代表這個版本＋這個階段在 SendLog 已經有人收過信，
     // 很可能是上次執行中途中斷後重新執行——見 Mailer.gs 的
@@ -405,6 +407,89 @@ function planStep4MissingPdf_(quarterId, versionNo) {
 }
 
 /**
+ * ⚠️⚠️ 第六十三輪批次 F 組：**正式發出：應收幾多位、已經收咗幾多位。**
+ *
+ * 現場（2026-09-03 實測 2028T3；2026-10-20 瀏覽器實測 2028T2）：正式發出
+ * 只揀 2 位，結論寫「沒有任何一位是因為系統出錯而漏掉」，狀態卡寫
+ * 「已正式發出給全體。」，「正式發出給全體」掣從此鎖死——其餘 55 位只能靠
+ * 「補寄未收到的人」，但畫面完全冇提示要去嗰度。
+ *
+ * ⚠️ 唔改 Stage 前進規則（Ivan 嘅決定）。呢支只係畀畫面講真話。
+ *
+ *   應收　這一版有派工、而且有電郵嘅人
+ *   已收　SendLog 入面這一季 OFFICIAL、**任何一個版本** SENT／DRY_RUN 過
+ *        （同「補寄未收到的人」同一個「收過」定義，見 `MAKEUP_RECEIVED_STATUSES`）
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {{expected: number, reached: number, notReached: number}}
+ */
+function countOfficialReach_(quarterId, versionNo) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const L = COLUMNS.SEND_LOG;
+  const peopleById = indexPeopleById_();
+  const expected = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== Number(versionNo)) return;
+    const personId = String(row[A.PERSON_ID] || '').trim();
+    const person = personId ? peopleById[personId] : null;
+    if (person && String(person.email || '').trim()) expected[personId] = true;
+  });
+  const reached = {};
+  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+    if (String(row[L.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (String(row[L.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;
+    const status = String(row[L.STATUS] || '').trim().toUpperCase();
+    if (status !== MAIL_STATUS.SENT && status !== MAIL_STATUS.DRY_RUN) return;
+    const personId = String(row[L.PERSON_ID] || '').trim();
+    if (personId) reached[personId] = true;
+  });
+  const ids = Object.keys(expected);
+  const reachedCount = ids.filter(function (id) { return reached[id]; }).length;
+  return { expected: ids.length, reached: reachedCount, notReached: ids.length - reachedCount };
+}
+
+/**
+ * 第六十三輪批次 F 組：「仲有幾多位未收到、去邊度補」嗰一句。冇短缺就回空字串。
+ * @param {?Object} reach `countOfficialReach_()` 嘅結果
+ * @returns {string}
+ */
+function describeOfficialShortfall_(reach) {
+  if (!reach || !(reach.notReached > 0)) return '';
+  return '　⚠️ 這一季應收 ' + reach.expected + ' 位，已經收到 ' + reach.reached
+    + ' 位，還有 ' + reach.notReached + ' 位未寄。「正式發出給全體」已經鎖住，'
+    + '其餘 ' + reach.notReached + ' 位要用「進階與診斷 ▸ 補寄未收到的人」。';
+}
+
+/**
+ * 第六十三輪批次 T 組：確認框要講明「附件」同「日曆檔」——用寄信嗰一刻
+ * 同一個解析（`resolveSendOptions_()`），唔可以喺畫面寫死。
+ *
+ * 現場（2026-10-20）：寄給堂委審閱嘅確認框只寫「他們會收到一條唯讀連結」，
+ * 冇提幹事揀咗嘅整季 PDF 同 .ics；正式發出嗰個寫死「附自己那份 PDF／附月曆檔」，
+ * 唔理幹事揀咗乜。
+ *
+ * @param {string} stage `MAIL_STAGES` 之一
+ * @param {Object=} sendOptions 幹事喺寄出彈窗嘅決定
+ * @returns {{attachType: string, attachLine: string, includeIcs: boolean, icsLine: string}}
+ */
+function describeConfirmContents_(stage, sendOptions) {
+  const decision = resolveSendOptions_(stage, sendOptions, resolveStageTemplates_(stage));
+  const names = {};
+  names[ATTACH_TYPE.NONE] = '不附';
+  names[ATTACH_TYPE.PERSONAL_PDF] = '個人版 PDF';
+  names[ATTACH_TYPE.FULL_PDF] = '整季 PDF';
+  return {
+    attachType: decision.attachType,
+    attachLine: '附件：' + (names[decision.attachType] || decision.attachType)
+      + '——' + describeAttachOption_(decision.attachType),
+    includeIcs: decision.includeIcs === true,
+    icsLine: '日曆檔：' + (decision.includeIcs === true ? '附 .ics 日曆檔' : '不附')
+  };
+}
+
+/**
  * 步驟 4 最終確認畫面：收件人數、DRY_RUN。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -417,11 +502,38 @@ function planStep4SendPreview_(quarterId, versionNo, sendOptions) {
   // 本來係 `listRecipients_(OFFICIAL, …)`——即係完全唔理 `sendOptions`。
   // 幹事喺寄出彈窗勾咗人之後，呢個數字仍然係「全部應收嘅人」，
   // 同實際寄出嘅唔同。改為行同一個 `resolveActualRecipients_()`。
-  const recipients = resolveActualRecipients_(
-    quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
+  const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+  const recipients = resolveActualRecipientsFromContext_(
+    context, MAIL_STAGES.OFFICIAL, sendOptions);
+
+  // ⚠️ 第六十三輪批次 F 組：揀中人數 ＜ 應收人數 ⇒ 要講明寄出之後會點。
+  // 「應收」＝ 幹事**冇揀人**嗰陣會寄、而且有電郵嘅義工。用同一個解析器
+  //（`resolveActualRecipientsFromContext_()`，唔傳選項）計——唔自己叫
+  // `listRecipients_()`，順手數一次就係多一個分岔點。
+  const expected = {};
+  resolveActualRecipientsFromContext_(context, MAIL_STAGES.OFFICIAL, null).forEach(function (r) {
+    if (r.type === RECIPIENT_TYPE.PERSON && r.personId && String(r.email || '').trim()) {
+      expected[r.personId] = true;
+    }
+  });
+  const expectedCount = Object.keys(expected).length;
+  const selectedCount = recipients.filter(function (r) {
+    return r.type === RECIPIENT_TYPE.PERSON && expected[r.personId];
+  }).length;
+  const partial = selectedCount < expectedCount;
+
   return {
     recipientCount: recipients.length,
     recipientPreview: summariseRecipientsForPreview_(recipients),
+    expectedPersonCount: expectedCount,
+    selectedPersonCount: selectedCount,
+    partial: partial,
+    partialWarning: partial
+      ? ('你只選了 ' + selectedCount + '／' + expectedCount + ' 位。寄出後「正式發出給全體」會鎖住，'
+        + '其餘 ' + (expectedCount - selectedCount) + ' 位要用「補寄未收到的人」。')
+      : '',
+    // 第六十三輪批次 T 組
+    contents: describeConfirmContents_(MAIL_STAGES.OFFICIAL, sendOptions),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 階段 A（收尾輪）新增：見 planStep2_() 同一段說明——步驟 4 的收件人數量
     // 遠多於步驟 2（約 60 人 vs 幾位堂委），實際撞到 Apps Script 執行逾時的
@@ -465,7 +577,15 @@ function executeStep4Send_(quarterId, sendOptions) {
   // （已知而且無解），其餘「試過但未成功」一律算未處理。
   const outcome = evaluateStep4SendOutcome_(result);
   result.outcome = outcome;
-  result.outcomeSentence = buildStep4OutcomeSentence_(result);
+  // ⚠️ 第六十三輪批次 F 組：結論要分開講「這次寄了 N 位」同「應收 M 位、未寄 K 位」。
+  // 數唔到唔可以令一次已經寄咗嘅發出變成失敗——只係少咗嗰一句。
+  try {
+    result.officialReach = countOfficialReach_(quarterId, versionNo);
+  } catch (err) {
+    log_('WARN', '正式發出之後數不到應收／已收人數：' + err.message);
+    result.officialReach = null;
+  }
+  result.outcomeSentence = buildStep4OutcomeSentence_(result, result.officialReach);
   result.advanced = outcome.ok;
   if (outcome.ok) {
     advanceQuarterStage_(quarterId, QUARTER_STAGE.OFFICIAL_SENT);
@@ -734,7 +854,7 @@ function evaluateStep4SendOutcome_(sendResult) {
  * @param {Object} sendResult `sendStage()` 嘅結果
  * @returns {string} 一句結論
  */
-function buildStep4OutcomeSentence_(sendResult) {
+function buildStep4OutcomeSentence_(sendResult, reach) {
   const outcome = evaluateStep4SendOutcome_(sendResult);
   const reached = Number(sendResult.sent || 0) + Number(sendResult.dryRun || 0);
   const noEmail = Number(sendResult.skipped || 0);
@@ -743,7 +863,8 @@ function buildStep4OutcomeSentence_(sendResult) {
     return '✅ 結論：' + reached + ' 位義工已'
       + (sendResult.isDryRun ? '模擬通知（DRY_RUN，沒有真正寄出）' : '收到通知')
       + (noEmail > 0 ? '；另有 ' + noEmail + ' 位查無電郵，本來就寄不到' : '')
-      + '，沒有任何一位是因為系統出錯而漏掉。';
+      + '，沒有任何一位是因為系統出錯而漏掉。'
+      + describeOfficialShortfall_(reach);
   }
 
   return '⚠️ 結論：' + outcome.unhandledCount + ' 位義工未收到通知。'

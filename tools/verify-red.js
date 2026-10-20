@@ -4095,6 +4095,108 @@ const MUTATIONS = [
     replace: '      chain.then(function () {}); return Promise.resolve().then(function () {',
     tests: ['tests/mutation_lock_coverage.test.js']
   },
+  // ── 第六十三輪批次 E 組：QuarterID 空白或打錯 ⇒ 申報被靜靜吞掉 ──
+  {
+    id: 'e-quarter-raw-compare',
+    why: 'QuarterID 唔正規化就比'
+      + '——小寫、全形、前後有不可見字元嘅申報對唔上',
+    file: 'src/RequestsApply.gs',
+    find: '    const writtenQuarter = normalizeIdInput_(row[qCol]).toUpperCase();',
+    replace: "    const writtenQuarter = String(row[qCol] || '').trim();",
+    tests: ['tests/requests_quarter_id.test.js']
+  },
+  {
+    id: 'e-other-q-swallowed',
+    why: 'QuarterID 對唔上就靜靜略過（舊寫法）'
+      + '——空白嗰筆唔套用、唔計略過數、唔顯示 NEEDS_INPUT',
+    file: 'src/RequestsApply.gs',
+    find: '      if (!byDate.ok || !quarterDates[byDate.dateStr]) return;',
+    replace: '      return;',
+    tests: ['tests/requests_quarter_id.test.js']
+  },
+  {
+    id: 'e-mismatch-applied',
+    why: 'QuarterID 同日期所屬季度對唔上都照樣套用'
+      + '——系統自己估咗邊個寫錯',
+    file: 'src/RequestsApply.gs',
+    find: '  if (req.quarterMismatch) {\n'
+      + "    return { category: 'NEEDS_INPUT', reason: req.quarterMismatch };\n  }\n",
+    replace: '',
+    tests: ['tests/requests_quarter_id.test.js']
+  },
+  {
+    id: 'e-no-quarter-note',
+    why: '按日期判斷季度而處理結果唔講'
+      + '——幹事唔知系統幫佢估咗',
+    file: 'src/RequestsApply.gs',
+    find: "    if (quarterNoteByRow[o.sheetRow]) o.resultNote = quarterNoteByRow[o.sheetRow] + '；' + o.resultNote;\n",
+    replace: '',
+    tests: ['tests/requests_quarter_id.test.js']
+  },
+  {
+    id: 'e-no-quarter-dropdown',
+    why: 'QuarterID 欄冇下拉——打錯字嘅機會冇人擋',
+    file: 'src/RequestsSheet.gs',
+    find: '  applyWarningListValidation_(sheet, quarterCol, dataRowCount, quarterOptions);\n',
+    replace: '',
+    tests: ['tests/requests_quarter_id.test.js']
+  },
+  // ── 第六十三輪批次 F 組（＋ T1）：只揀部分人仍然講「已正式發出給全體」──
+  {
+    id: 'f-reach-counts-failed',
+    why: '「已收」連 FAILED 都計'
+      + '——寄失敗嘅人當成收咗，補寄提示就少咗佢',
+    file: 'src/FiveStageCore.gs',
+    find: '    if (status !== MAIL_STATUS.SENT && status !== MAIL_STATUS.DRY_RUN) return;',
+    replace: '    if (false) return;',
+    tests: ['tests/official_partial_send.test.js']
+  },
+  {
+    id: 'f-no-shortfall-line',
+    why: '完成結論唔講「應收 M 位、未寄 K 位」'
+      + '——現場：寄咗 2／57 位，結論話「沒有任何一位漏掉」',
+    file: 'src/FiveStageCore.gs',
+    find: "  if (!reach || !(reach.notReached > 0)) return '';",
+    replace: "  return '';",
+    tests: ['tests/official_partial_send.test.js']
+  },
+  {
+    id: 'f-status-ignores-reach',
+    why: '狀態卡照寫「已正式發出給全體。」'
+      + '——其餘 55 位只能靠補寄，但畫面冇提示要去嗰度',
+    file: 'src/WebAppDashboard.gs',
+    find: '  if (stage === QUARTER_STAGE.OFFICIAL_SENT && extras && extras.officialReach\n'
+      + '      && extras.officialReach.expected > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/official_partial_send.test.js']
+  },
+  {
+    id: 'f-status-no-unsent',
+    why: '狀態卡唔講最新一版未寄過'
+      + '——寄出彈窗有講，狀態卡就冇，兩個畫面講兩件事',
+    file: 'src/WebAppDashboard.gs',
+    find: "  const unsent = extras && extras.unsentWarn ? ' ' + extras.unsentWarn : '';",
+    replace: "  const unsent = '';",
+    tests: ['tests/official_partial_send.test.js']
+  },
+  {
+    id: 'f-preview-no-partial',
+    why: '確認框唔警告「只揀了 2／57 位」'
+      + '——寄出後正式發出就鎖住，幹事唔知其餘要用補寄',
+    file: 'src/FiveStageCore.gs',
+    find: '  const partial = selectedCount < expectedCount;',
+    replace: '  const partial = false;',
+    tests: ['tests/official_partial_send.test.js']
+  },
+  {
+    id: 't-contents-hardcoded',
+    why: '確認框嘅附件寫死個人版 PDF'
+      + '——現場：幹事揀咗整季 PDF，確認框照寫「附自己那份 PDF」',
+    file: 'src/FiveStageCore.gs',
+    find: "    attachLine: '附件：' + (names[decision.attachType] || decision.attachType)",
+    replace: "    attachLine: '附件：' + names[ATTACH_TYPE.PERSONAL_PDF]",
+    tests: ['tests/official_partial_send.test.js']
+  },
 ];
 
 /**
