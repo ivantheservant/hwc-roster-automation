@@ -55,16 +55,18 @@ function generatePersonalPdfBatch_(quarterId, versionNo) {
   const existingFileSizes = forceRegenerate ? null : listExistingFileInfo_(folder);
   const versionAssignments = readVersionAssignmentsRaw_(quarterId, versionNo);
 
-  runPersonalPdfBatchLoop_(
+  const before = snapshotPdfBatchCounts_(progress);
+  const run = runPersonalPdfBatchLoop_(
     quarterId, versionNo, progress, folder, forceRegenerate, existingFileSizes, versionAssignments, batchSize);
+  const callInfo = buildPdfBatchCallInfo_(before, progress, run);
 
   if (progress.remainingPersonIds.length === 0) {
     clearPdfBatchProgress_();
-    return buildPdfBatchResult_(progress, true);
+    return buildPdfBatchResult_(progress, true, callInfo);
   }
 
   savePdfBatchProgress_(progress);
-  return buildPdfBatchResult_(progress, false);
+  return buildPdfBatchResult_(progress, false, callInfo);
 }
 
 /**
@@ -85,7 +87,7 @@ function generatePersonalPdfBatch_(quarterId, versionNo) {
  * @param {?Map<string, number>} existingFileSizes listExistingFileSizes_() 的結果，或 null
  * @param {Object[]} versionAssignments readVersionAssignmentsRaw_() 的結果
  * @param {number} batchSize 這次呼叫最多處理幾人
- * @returns {void}
+ * @returns {{attemptedIds: string[]}} 這一次呼叫處理過（含自動再試）嘅 personId
  */
 function runPersonalPdfBatchLoop_(
   quarterId, versionNo, progress, folder, forceRegenerate, existingFileSizes, versionAssignments, batchSize
@@ -102,7 +104,7 @@ function runPersonalPdfBatchLoop_(
   // 第六十三輪批次 A2 組：整批共用一個「內容最後改動時間」
   renderContext.contentStamp = forceRegenerate ? null : readPersonalPdfContentStamp_(quarterId, versionNo);
   try {
-    runPersonalPdfBatchLoopInner_(
+    return runPersonalPdfBatchLoopInner_(
       quarterId, versionNo, progress, folder, forceRegenerate, existingFileSizes,
       versionAssignments, batchSize, renderContext, runStartedAt, processedThisRun);
   } finally {
@@ -124,14 +126,17 @@ function runPersonalPdfBatchLoop_(
  * @param {Object} renderContext openPersonalPdfRenderContext_() 的結果
  * @param {number} runStartedAt 這次執行開始的時間戳
  * @param {number} processedThisRun 已處理人數的起始值
- * @returns {void}
+ * @returns {{attemptedIds: string[]}}
  */
 function runPersonalPdfBatchLoopInner_(
   quarterId, versionNo, progress, folder, forceRegenerate, existingFileSizes,
   versionAssignments, batchSize, renderContext, runStartedAt, processedThisRun
 ) {
+  const attemptedIds = [];
+  const failedThisRun = [];
   while (progress.remainingPersonIds.length > 0 && processedThisRun < batchSize) {
     const personId = progress.remainingPersonIds.shift();
+    attemptedIds.push(personId);
     const outcome = generateOnePersonalPdf_(
       quarterId, versionNo, personId, folder, forceRegenerate, existingFileSizes,
       versionAssignments, renderContext);
@@ -139,7 +144,10 @@ function runPersonalPdfBatchLoopInner_(
     progress.doneCount++;
     if (outcome.skippedExisting) {
       progress.skippedExistingCount++;
-    } else {
+    } else if (!outcome.error) {
+      // ⚠️ 第六十六輪批次 AC 組：**失敗唔計入「新產生」**。
+      // 之前 `else` 一律 `generatedCount++`，失敗嗰份混咗入去——
+      // 現場（2026-10-21 自測 S08）報「59／59 新產生 59 份」而 Drive 淨係 58 個檔。
       progress.generatedCount++;
     }
     // 第六十三輪批次 A2 組：舊檔過期而重做嘅份數，報告要講出嚟
@@ -149,6 +157,7 @@ function runPersonalPdfBatchLoopInner_(
     progress.totalExportMs += outcome.exportMs;
     if (outcome.error) {
       progress.errors.push({ personId: personId, nameTC: outcome.nameTC, message: outcome.error });
+      failedThisRun.push(personId);
     }
     // 追加階段 AG：記錄「曾經拋錯、但核對後確認其實已經成功」的人數，
     // 供完成報告透明顯示這件事發生過幾次——這不是失敗，不進 errors 清單，
@@ -163,6 +172,89 @@ function runPersonalPdfBatchLoopInner_(
       break;
     }
   }
+
+  retryFailedPersonalPdfsOnce_(
+    quarterId, versionNo, progress, folder, existingFileSizes, versionAssignments,
+    renderContext, runStartedAt, failedThisRun, processedThisRun);
+  return { attemptedIds: attemptedIds };
+}
+
+/**
+ * ⚠️ 第六十六輪批次 AC 組：一批做完、仲有時間 ⇒ 把**這一輪失敗**嘅人自動再試**一次**。
+ *
+ * 做喺共用核心迴圈呢一層（`runPersonalPdfBatchLoopInner_()`），所以全體版、指定人版
+ *（改動後重發、補寄、紙本）、選單版、自測機全部一次過受惠。
+ *
+ * - 只試一次；仍然失敗就留喺 `progress.errors`（原本嗰條，唔重複記）。
+ * - 時間預算用同主迴圈一樣嘅判斷（`elapsed + 平均每人 > PDF_BATCH_TIME_BUDGET_MS` 就唔試），
+ *   唔會為咗再試撞 Apps Script 六分鐘上限。
+ * - 再試用 `forceRegenerate=true`：唔好因為「已存在」而略過；殘留嘅半成品檔會被覆寫。
+ * - 成功 ⇒ 由 `errors` 拎走、`generatedCount++`；`doneCount` 唔再加（嗰個人已經算過一次）。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object} progress 進度物件（就地修改）
+ * @param {Folder} folder 資料夾
+ * @param {?Map} existingFileSizes 同主迴圈一樣
+ * @param {Object[]} versionAssignments 同主迴圈一樣
+ * @param {Object} renderContext 同主迴圈一樣
+ * @param {number} runStartedAt 這次執行開始嘅時間戳
+ * @param {string[]} failedIds 這一次執行入面失敗嘅 personId
+ * @param {number} processedThisRun 這一次執行主迴圈處理咗幾多人（計平均用時）
+ * @returns {void}
+ */
+function retryFailedPersonalPdfsOnce_(
+  quarterId, versionNo, progress, folder, existingFileSizes, versionAssignments,
+  renderContext, runStartedAt, failedIds, processedThisRun
+) {
+  for (let i = 0; i < failedIds.length; i++) {
+    const elapsed = Date.now() - runStartedAt;
+    const avgPerPerson = elapsed / Math.max(1, processedThisRun);
+    if (elapsed + avgPerPerson > PDF_BATCH_TIME_BUDGET_MS) return;
+
+    const personId = failedIds[i];
+    const outcome = generateOnePersonalPdf_(
+      quarterId, versionNo, personId, folder, true, existingFileSizes,
+      versionAssignments, renderContext);
+    progress.totalRetries += outcome.retries || 0;
+    if (outcome.error) continue;
+
+    progress.errors = progress.errors.filter(function (e) { return e.personId !== personId; });
+    progress.generatedCount++;
+    progress.retriedOkCount = (progress.retriedOkCount || 0) + 1;
+    progress.totalHighlightMs += outcome.highlightMs || 0;
+    progress.totalExportMs += outcome.exportMs || 0;
+  }
+}
+
+/**
+ * 第六十六輪批次 AC／AD 組：呢一次呼叫**之前**嘅計數，用嚟計「呢一次呼叫做咗幾多」。
+ * @param {Object} progress 進度物件
+ * @returns {{generated: number, skipped: number}}
+ */
+function snapshotPdfBatchCounts_(progress) {
+  return { generated: progress.generatedCount || 0, skipped: progress.skippedExistingCount || 0 };
+}
+
+/**
+ * 第六十六輪批次 AD 組：呢一次呼叫自己嘅增量（唔係累計）。
+ *
+ * 前端要由「一次操作」嘅角度報數字（開頭 48 位、總共新產生幾份、失敗幾份）。
+ * 指定人版（補寄）每次接駁都重新計「還差誰」，`totalPeople`／`generatedCount` 係
+ * **嗰一次**嘅數——前端若直接顯示最後一次回傳，就會見到「23 / 23」而實際做咗 48 份。
+ * 所以後端逐次交出增量，由前端累加（見 ScriptZone1.html `addPdfBatchResult_()`）。
+ *
+ * @param {{generated: number, skipped: number}} before `snapshotPdfBatchCounts_()` 嘅結果
+ * @param {Object} progress 進度物件（呢一次呼叫之後）
+ * @param {{attemptedIds: string[]}} run 核心迴圈嘅回傳
+ * @returns {{callGeneratedCount: number, callSkippedCount: number, attemptedIds: string[]}}
+ */
+function buildPdfBatchCallInfo_(before, progress, run) {
+  return {
+    callGeneratedCount: (progress.generatedCount || 0) - before.generated,
+    callSkippedCount: (progress.skippedExistingCount || 0) - before.skipped,
+    attemptedIds: (run && run.attemptedIds) || []
+  };
 }
 
 /**
@@ -194,16 +286,18 @@ function generatePersonalPdfBatchForPeople_(quarterId, versionNo, personIds) {
   const existingFileSizes = forceRegenerate ? null : listExistingFileInfo_(folder);
   const versionAssignments = readVersionAssignmentsRaw_(quarterId, versionNo);
 
-  runPersonalPdfBatchLoop_(
+  const before = snapshotPdfBatchCounts_(progress);
+  const run = runPersonalPdfBatchLoop_(
     quarterId, versionNo, progress, folder, forceRegenerate, existingFileSizes, versionAssignments, batchSize);
+  const callInfo = buildPdfBatchCallInfo_(before, progress, run);
 
   if (progress.remainingPersonIds.length === 0) {
     clearPdfResendBatchProgress_();
-    return buildPdfBatchResult_(progress, true);
+    return buildPdfBatchResult_(progress, true, callInfo);
   }
 
   savePdfResendBatchProgress_(progress);
-  return buildPdfBatchResult_(progress, false);
+  return buildPdfBatchResult_(progress, false, callInfo);
 }
 
 /**
@@ -642,7 +736,8 @@ function clearPdfResendBatchProgress_() {
  * @param {boolean} done 是否已全部完成
  * @returns {Object} 對外結果
  */
-function buildPdfBatchResult_(progress, done) {
+function buildPdfBatchResult_(progress, done, callInfo) {
+  const info = callInfo || {};
   return {
     done: done,
     quarterId: progress.quarterId,
@@ -655,8 +750,36 @@ function buildPdfBatchResult_(progress, done) {
     totalHighlightMs: progress.totalHighlightMs,
     totalExportMs: progress.totalExportMs,
     errors: progress.errors,
+    // ⚠️ 第六十六輪批次 AC 組：失敗份數單獨列出（`generatedCount` 唔包失敗）
+    failedCount: (progress.errors || []).length,
+    retriedOkCount: progress.retriedOkCount || 0,
+    // 第六十六輪批次 AD 組：呢一次呼叫自己嘅增量，見 `buildPdfBatchCallInfo_()`
+    callGeneratedCount: info.callGeneratedCount === undefined ? progress.generatedCount : info.callGeneratedCount,
+    callSkippedCount: info.callSkippedCount === undefined ? progress.skippedExistingCount : info.callSkippedCount,
+    attemptedIds: info.attemptedIds || [],
     recoveredCount: progress.recoveredCount || 0,
     elapsedMs: Date.now() - progress.startedAtMs
+  };
+}
+
+/**
+ * 第六十六輪批次 AC／AD 組：Web API 回畀前端嘅「產生個人 PDF」欄位——
+ * 全體版、改動後重發、補寄**全部經呢一支**，前端先至可以用同一個顯示。
+ * `errors` 只出 personId／姓名／訊息。
+ * @param {Object} result `buildPdfBatchResult_()` 嘅結果
+ * @returns {{failedCount: number, errors: Object[], callGeneratedCount: number,
+ *   callSkippedCount: number, attemptedIds: string[]}}
+ */
+function pdfBatchClientFields_(result) {
+  const errors = (result.errors || []).map(function (e) {
+    return { personId: e.personId, nameTC: e.nameTC || e.personId, message: e.message || '' };
+  });
+  return {
+    failedCount: errors.length,
+    errors: errors,
+    callGeneratedCount: result.callGeneratedCount === undefined ? (result.generatedCount || 0) : result.callGeneratedCount,
+    callSkippedCount: result.callSkippedCount === undefined ? (result.skippedExistingCount || 0) : result.callSkippedCount,
+    attemptedIds: result.attemptedIds || []
   };
 }
 

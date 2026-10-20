@@ -322,34 +322,39 @@
         para('人數多的時候要跑幾分鐘，而且可能會分幾次跑完——'
           + '畫面會自己接住跑，不要關掉視窗。', 'muted')
       ],
-      onRun: (versionNo) => runAction('產生個人 PDF，請稍候', async () => {
-        let guard = 0;
-        let last = null;
-        for (;;) {
-          guard++;
-          if (guard > 40) {
-            throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。'
-              + '請重新整理再試一次。');
-          }
-          last = await callServerMutating('apiGeneratePersonalPdfBatch', currentQuarterId, versionNo);
-          if (!last.ok) { showErrorModal('產生個人 PDF', new Error(last.message)); return; }
-          if (last.done) break;
-          setStatus('產生個人 PDF：' + last.doneCount + ' / ' + last.totalPeople + ' 份…');
+      onRun: (versionNo) => runPersonalPdfTool(versionNo)
+    });
+  }
+
+  /**
+   * 「進階與診斷 ▸ 產生個人 PDF」。⚠️ 第六十六輪批次 AC／AD 組：完成窗同正式發出、補寄
+   * 一樣經 `describePdfBatchOutcome_()`（ScriptZone1.html）——有失敗就唔准出「已完成 N / N」。
+   */
+  function runPersonalPdfTool(versionNo) {
+    return runAction('產生個人 PDF，請稍候', async () => {
+      let guard = 0;
+      let last = null;
+      const tally = newPdfBatchTally_();
+      for (;;) {
+        guard++;
+        if (guard > 40) {
+          throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。'
+            + '請重新整理再試一次。');
         }
-        openModal('產生完成', [
-          make('div', {
-            text: '已完成 ' + last.doneCount + ' / ' + last.totalPeople + ' 位。',
-            className: 'ok-line'
-          }),
-          // 「略過已存在」一定要出數字。唔出嘅話，幹事會以為
-          // 「明明有 57 人，點解只新產生咗 3 個」。
-          make('div', {
-            text: '新產生 ' + last.generatedCount + ' 份　略過（已經有同一版的檔案）'
-              + last.skippedExistingCount + ' 份',
-            className: 'muted'
-          })
-        ], [button('完成', () => closeModalAndRefresh(), '')]);
-      })
+        last = await callServerMutating('apiGeneratePersonalPdfBatch', currentQuarterId, versionNo);
+        if (!last.ok) { showErrorModal('產生個人 PDF', new Error(last.message)); return; }
+        addPdfBatchResult_(tally, last);
+        if (last.done) break;
+        setStatus('產生個人 PDF：' + pdfBatchTallyDone_(tally) + ' / ' + tally.total + ' 份…');
+      }
+      // 「略過已存在」一定要出數字。唔出嘅話，幹事會以為
+      // 「明明有 57 人，點解只新產生咗 3 個」。
+      const outcome = describePdfBatchOutcome_(tally, true, '');
+      const buttons = outcome.kind === 'FAILED'
+        ? [button('再試失敗的 ' + outcome.failedCount + ' 份', () => { closeModal(); runPersonalPdfTool(versionNo); }, ''),
+          button('完成', () => closeModalAndRefresh(), 'secondary')]
+        : [button('完成', () => closeModalAndRefresh(), '')];
+      openModal(outcome.kind === 'FAILED' ? outcome.title : '產生完成', outcome.nodes, buttons);
     });
   }
 

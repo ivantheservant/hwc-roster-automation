@@ -1276,12 +1276,15 @@
     runAction('產生個人 PDF，請稍候', async () => {
       let guard = 0;
       let last = null;
+      // ⚠️ 第六十六輪批次 AD 組：**整次操作**嘅累計數字（見 `addPdfBatchResult_()`）
+      const tally = newPdfBatchTally_();
       for (;;) {
         guard++;
         last = await opts.callBatch();
         if (!last.ok) { showErrorModal('產生個人 PDF', new Error(last.message)); return; }
+        addPdfBatchResult_(tally, last);
         if (last.done) break;
-        setStatus('產生個人 PDF：' + last.doneCount + ' / ' + last.totalPeople + ' 份…');
+        setStatus('產生個人 PDF：' + pdfBatchTallyDone_(tally) + ' / ' + tally.total + ' 份…');
         // ⚠️ 上限：冇呢一句，一個永遠回 `done:false` 嘅後端會令畫面
         // 轉到天荒地老。
         //
@@ -1293,40 +1296,139 @@
         if (guard >= MISSING_PDF_MAX_ROUNDS) break;
       }
 
-      if (!last.done) {
+      // ⚠️ 第六十六輪批次 AC／AD 組：三種結局（未做完／有失敗／真係做齊）
+      // 全部經 `describePdfBatchOutcome_()`——正式發出、補寄、「產生個人 PDF」同一個樣。
+      const outcome = describePdfBatchOutcome_(tally, last.done, opts.doneText);
+      if (outcome.kind === 'INCOMPLETE') {
         // ⚠️ 做唔完 ⇒ 講明仲差幾多，畀一粒〔繼續產生〕。
         // 顯示「完成了」而實際只做咗一半，就係第四十四輪嗰個錯。
-        openModal('個人 PDF：還沒有做完', [
-          make('div', {
-            text: '已經做了 ' + last.doneCount + ' / ' + last.totalPeople + ' 份，'
-              + '還差 ' + (last.totalPeople - last.doneCount) + ' 份。',
-            className: 'lines'
-          }),
-          para('一次執行有時間上限，所以要分幾次。撳「繼續產生」接住做。', 'muted')
-        ], [
+        openModal(outcome.title, outcome.nodes, [
           button('繼續產生', () => opts.onContinue(), ''),
+          button('之後再說', () => closeModal(), 'secondary')
+        ]);
+        return;
+      }
+      if (outcome.kind === 'FAILED') {
+        // ⚠️ 有失敗 ⇒ **唔准**畀〔回到…〕行返轉頭，更加唔准出綠色。
+        // 〔再試失敗的 N 份〕就係再行一次同一個迴圈：後端只會重做缺嗰幾份。
+        openModal(outcome.title, outcome.nodes, [
+          button('再試失敗的 ' + outcome.failedCount + ' 份', () => opts.onContinue(), ''),
           button('之後再說', () => closeModal(), 'secondary')
         ]);
         return;
       }
 
       // ── 做完 ⇒ **行返轉頭**（正式發出／補寄確認），唔使佢自己搵路返嚟 ──
-      openModal('個人 PDF：已經產生好', [
-        make('div', {
-          text: '已完成 ' + last.doneCount + ' / ' + last.totalPeople + ' 位。',
-          className: 'ok-line'
-        }),
-        make('div', {
-          text: '新產生 ' + last.generatedCount + ' 份　略過（已經有同一版的檔案）'
-            + last.skippedExistingCount + ' 份',
-          className: 'muted'
-        }),
-        para(opts.doneText, 'muted')
-      ], [
+      openModal(outcome.title, outcome.nodes, [
         button(opts.backLabel, () => opts.onBack(), ''),
         button('之後再說', () => closeModal(), 'secondary')
       ]);
     });
+  }
+
+  /**
+   * ⚠️ 第六十六輪批次 AD 組：一次「產生個人 PDF」操作嘅**累計**數字。
+   *
+   * 現場（2026-10-21 R1.5）：補寄先產生 PDF，開頭寫「48 位還沒有第 4 版的個人 PDF」，
+   * 完成窗卻寫「已完成 23 / 23 位。新產生 23 份」。指定人版每次接駁都重新計
+   * 「還差誰」，`totalPeople`／`generatedCount` 係**嗰一次**嘅數——顯示最後一次回傳就錯。
+   *
+   * 做法（揀咗前端累加）：後端每次交出**呢一次呼叫自己嘅增量**
+   * （`callGeneratedCount`／`callSkippedCount`／`attemptedIds`／`errors`，見 `PdfBatch.gs`
+   * `buildPdfBatchCallInfo_()`），前端逐次累加；開頭人數取第一次回傳嘅 `totalPeople`。
+   * 失敗名單按 personId 記：之後嗰次再試過（`attemptedIds`）就先清走，再按今次嘅 `errors` 補返。
+   * @returns {{total: ?number, generated: number, skipped: number, errorsById: Object}}
+   */
+  function newPdfBatchTally_() {
+    return { total: null, generated: 0, skipped: 0, errorsById: {} };
+  }
+
+  function addPdfBatchResult_(tally, res) {
+    if (tally.total === null) tally.total = Number(res.totalPeople) || 0;
+    tally.generated += Number(res.callGeneratedCount !== undefined
+      ? res.callGeneratedCount : res.generatedCount) || 0;
+    tally.skipped += Number(res.callSkippedCount !== undefined
+      ? res.callSkippedCount : res.skippedExistingCount) || 0;
+    (res.attemptedIds || []).forEach((id) => { delete tally.errorsById[id]; });
+    (res.errors || []).forEach((e) => { tally.errorsById[e.personId] = e; });
+  }
+
+  function pdfBatchTallyFailed_(tally) {
+    return Object.keys(tally.errorsById).map((k) => tally.errorsById[k]);
+  }
+
+  /** 已經處理過幾多位（新產生＋本來就有＋失敗）。 */
+  function pdfBatchTallyDone_(tally) {
+    return tally.generated + tally.skipped + pdfBatchTallyFailed_(tally).length;
+  }
+
+  /**
+   * ⚠️ 第六十六輪批次 AC／AD 組：「產生個人 PDF」完成窗嘅內容——**一處**砌，
+   * 三個流程（正式發出、改動後重發、補寄）加「進階與診斷 ▸ 產生個人 PDF」都用。
+   *
+   * 有失敗 ⇒ 唔可以寫「已完成 N / N」，唔可以出綠色：
+   * 「已產生 X 份，Y 份失敗：<姓名>」。
+   *
+   * @param {Object} tally `newPdfBatchTally_()` 嘅結果（已累加）
+   * @param {boolean} done 後端最後一次有冇講 `done`
+   * @param {string} doneText 做齊之後嗰句（例如「現在可以回到補寄確認。」）
+   * @returns {{kind: string, title: string, nodes: Element[], failedCount: number}}
+   */
+  function describePdfBatchOutcome_(tally, done, doneText) {
+    const failed = pdfBatchTallyFailed_(tally);
+    const total = tally.total || 0;
+    const handled = pdfBatchTallyDone_(tally);
+
+    if (!done) {
+      return {
+        kind: 'INCOMPLETE', title: '個人 PDF：還沒有做完', failedCount: failed.length,
+        nodes: [
+          make('div', {
+            text: '已經做了 ' + handled + ' / ' + total + ' 份，'
+              + '還差 ' + Math.max(0, total - handled) + ' 份。'
+              + (failed.length > 0 ? '（其中 ' + failed.length + ' 份失敗，之後會再試。）' : ''),
+            className: 'lines'
+          }),
+          para('一次執行有時間上限，所以要分幾次。撳「繼續產生」接住做。', 'muted')
+        ]
+      };
+    }
+
+    if (failed.length > 0) {
+      const names = failed.slice(0, 10).map((e) => e.nameTC || e.personId);
+      return {
+        kind: 'FAILED', title: '個人 PDF：有 ' + failed.length + ' 份沒有產生好', failedCount: failed.length,
+        nodes: [
+          make('div', {
+            text: '已產生 ' + tally.generated + ' 份，' + failed.length + ' 份失敗：'
+              + names.join('、') + (failed.length > 10 ? '……另有 ' + (failed.length - 10) + ' 位' : ''),
+            className: 'err-text'
+          }),
+          make('div', {
+            text: '系統已經自動再試過一次，仍然失敗。通常是 Google 暫時出錯，再試一次多數會成功。'
+              + '沒有產生好的人，寄出時會收不到個人 PDF。',
+            className: 'muted'
+          }),
+          buildTechDetails(failed.map((e) => (e.nameTC || e.personId) + '（' + e.personId + '）：' + e.message).join('\n'))
+        ]
+      };
+    }
+
+    return {
+      kind: 'DONE', title: '個人 PDF：已經產生好', failedCount: 0,
+      nodes: [
+        make('div', {
+          text: '已完成 ' + handled + ' / ' + total + ' 位。',
+          className: 'ok-line'
+        }),
+        make('div', {
+          text: '新產生 ' + tally.generated + ' 份　略過（已經有同一版的檔案）'
+            + tally.skipped + ' 份',
+          className: 'muted'
+        }),
+        para(doneText || '', 'muted')
+      ]
+    };
   }
 
   // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
@@ -1558,6 +1660,33 @@
   }
 
   /**
+   * ⚠️ 第六十六輪批次 AE 組：呢個人喺改動名單入面屬邊一類。
+   * 名單收件人、以及唔喺改動名單入面嘅人（例如另外揀嘅）⇒ 空字串（唔標）。
+   * @param {Object} c `buildResendConfirmGroups_()` 嘅一項
+   * @returns {string} '安排改了' | '上次沒有收到' | ''
+   */
+  function resendPersonKind_(c) {
+    if (c.isListRecipient || !c.inChangedList) return '';
+    return c.arrangementChanged ? '安排改了' : '上次沒有收到';
+  }
+
+  /**
+   * ⚠️ 第六十六輪批次 AE 組：段首句嘅數字**由下面實際列出嘅人數出**（同一份 `willSend`），
+   * 所以永遠同標題「這一次會寄給的 N 位」對得上。
+   * @param {Object[]} willSend `confirmGroups.willSend`
+   * @returns {{changed: number, notReceived: number}}
+   */
+  function countResendWillSendKinds_(willSend) {
+    const out = { changed: 0, notReceived: 0 };
+    (willSend || []).forEach((c) => {
+      const k = resendPersonKind_(c);
+      if (k === '安排改了') out.changed++;
+      else if (k === '上次沒有收到') out.notReceived++;
+    });
+    return out;
+  }
+
+  /**
    * 第六十五輪批次 Y 組：確認框入面一個人（會寄嘅、或者「改咗但這一次唔寄」嘅）。
    * @param {Object} c `buildResendConfirmGroups_()` 嘅一項
    * @param {boolean} notSent 這一次唔會收到
@@ -1573,6 +1702,10 @@
     }
     if (c.firstNotifyDueToEmail) head.appendChild(make('span', { text: '首次通知（之前沒有電郵）', className: 'tag' }));
     if (!c.hasEmail) head.appendChild(make('span', { text: '沒有電郵，無法通知', className: 'tag tag-bad' }));
+    // ⚠️ 第六十六輪批次 AE 組：每人旁邊標明點解喺度——「安排改了」（上次有收到而且有舊紀錄）
+    // 定係「上次沒有收到」。之前段首寫「這 1 個人的安排改了」而下面列 2 位，數字對唔上。
+    const kind = resendPersonKind_(c);
+    if (kind) head.appendChild(make('span', { text: kind, className: 'tag' }));
     if (notSent) head.appendChild(make('span', { text: '這一次不會收到', className: 'tag tag-bad' }));
     item.appendChild(head);
     if (c.isListRecipient) return item;
@@ -1625,10 +1758,13 @@
         className: 'muted'
       })
     ]);
-    if (groups.changed.length > 0) {
+    const kinds = countResendWillSendKinds_(g.willSend);
+    if (kinds.changed + kinds.notReceived > 0) {
+      const parts = [];
+      if (kinds.changed > 0) parts.push(kinds.changed + ' 位是自上次發出之後安排改了');
+      if (kinds.notReceived > 0) parts.push(kinds.notReceived + ' 位是上次正式發出時沒有收到');
       top.appendChild(make('div', {
-        text: '自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了。'
-          + '請逐個看一次，確認是不是真的想改這麼多人。',
+        text: '當中 ' + parts.join('、') + '。請逐個看一次，確認是不是真的想這樣寄。',
         className: 'muted'
       }));
     }
@@ -1717,6 +1853,7 @@
     // 本來參數叫 `sendOptions` 而第二個呼叫寫 `sendOpts`，會 ReferenceError。
     const sendOpts = plainObjectOrNull_(sendOptions);
     let guard = 0;
+    const tally = newPdfBatchTally_();
     for (;;) {
       guard++;
       if (guard > 40) throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。請重新整理再試一次。');
@@ -1731,8 +1868,27 @@
           [button('關閉', () => closeModalAndRefresh(), '')]);
         return;
       }
+      addPdfBatchResult_(tally, r);
       if (r.done) break;
-      setStatus('產生個人 PDF：' + r.doneCount + ' / ' + r.totalPeople + ' 份…');
+      setStatus('產生個人 PDF：' + pdfBatchTallyDone_(tally) + ' / ' + tally.total + ' 份…');
+    }
+
+    // ⚠️ 第六十六輪批次 AC 組：有人個人 PDF 產生失敗 ⇒ **唔好照寄**
+    // （寄出去嗰幾位會 `ERROR_PDF_MISSING`，而完成窗又冇講）。
+    // 同正式發出、補寄用同一個顯示；〔再試失敗的 N 份〕再行一次整個流程，
+    // 後端只會重做缺嗰幾份，然後先寄。
+    const pdfOutcome = describePdfBatchOutcome_(tally, true, '');
+    if (pdfOutcome.kind === 'FAILED') {
+      openModal(pdfOutcome.title, pdfOutcome.nodes.concat([
+        make('div', { text: '還沒有寄出任何電郵。', className: 'err-text' })
+      ]), [
+        button('再試失敗的 ' + pdfOutcome.failedCount + ' 份',
+          () => runAction('產生 PDF 並寄送，請稍候', async () => {
+            await resendGeneratePdfsThenSend(releaseText, sendOpts);
+          }), ''),
+        button('之後再說', () => closeModal(), 'secondary')
+      ]);
+      return;
     }
 
     const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText, sendOpts);

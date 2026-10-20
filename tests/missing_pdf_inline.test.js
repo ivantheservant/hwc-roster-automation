@@ -114,9 +114,11 @@ console.log('\n=== 三【核心】用返既有嗰個分批入口，唔另寫一�
 console.log('\n=== 四【核心】做唔完唔可以顯示「完成了」 ===');
 {
   // ⚠️ 第四十四輪已經為「寄紙本」修過同一個毛病。
-  const notDone = CODE.slice(CODE.indexOf('if (!last.done) {'));
+  // 第六十六輪批次 AC／AD 組：「未做完」嘅窗內容抽咗去 `describePdfBatchOutcome_()`（用累計數字），
+  // 迴圈入面按 `outcome.kind` 分三路——意圖不變：做唔完 ⇒ 講明仲差幾多、唔行去「已經產生好」
+  const notDone = CODE.slice(CODE.indexOf("if (outcome.kind === 'INCOMPLETE') {"));
   check('★★★★★★ 做唔完 ⇒ 講明仲差幾多份',
-    /還差 ' \+ \(last\.totalPeople - last\.doneCount\) \+ ' 份/.test(SRC), '');
+    /還差 ' \+ Math\.max\(0, total - handled\) \+ ' 份/.test(SRC), '');
   // 第六十五輪批次 W 組：迴圈抽成共用嘅 `runPdfBatchToCompletion()`（補寄都用），
   // 〔繼續產生〕叫返 `opts.onContinue()`，正式發出嗰邊嘅 onContinue 就係再跑一次
   check('★★★★★★ 而且畀一粒〔繼續產生〕',
@@ -124,7 +126,7 @@ console.log('\n=== 四【核心】做唔完唔可以顯示「完成了」 ===');
       && /onContinue: \(\) => runMissingPdfBatch\(versionNo, sendOpts\)/.test(CODE), '');
   check('★★★★★★ 做唔完嗰條路**唔會**行到「已經產生好」嗰個窗',
     notDone.indexOf('return;') !== -1
-      && notDone.indexOf('return;') < notDone.indexOf('已經產生好'),
+      && notDone.indexOf('return;') < notDone.indexOf("kind === 'FAILED'"),
     notDone.slice(0, 300));
 }
 

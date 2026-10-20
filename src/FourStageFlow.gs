@@ -830,6 +830,19 @@ function runFourStageStep5_locked_() {
       ui.alert('步驟 5：改動後重發', '產生個人 PDF 時失敗：\n\n' + err.message, ui.ButtonSet.OK);
       return;
     }
+    // ⚠️ 第六十六輪批次 AC 組：有人產生失敗 ⇒ 唔好當成功繼續寄（寄出去會 ERROR_PDF_MISSING）
+    if (pdfResult.errors && pdfResult.errors.length > 0) {
+      ui.alert(
+        '步驟 5：改動後重發（有個人 PDF 產生失敗）',
+        pdfResult.errors.length + ' 人的個人 PDF 產生失敗（系統已自動再試過一次）：\n\n'
+          + pdfResult.errors.slice(0, 10).map(function (e) {
+            return '　' + (e.nameTC || e.personId) + '（' + e.personId + '）：' + e.message;
+          }).join('\n')
+          + '\n\n沒有寄出任何電郵。請再執行一次「步驟 5：改動後重發」，系統會只重做缺的檔案。',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
     if (!pdfResult.done) {
       ui.alert(
         '步驟 5：改動後重發（PDF 尚未完成）',

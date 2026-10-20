@@ -347,7 +347,7 @@ function apiGeneratePersonalPdfBatch_locked_(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
   try {
     const result = generatePersonalPdfBatch_(String(quarterId || '').trim(), Number(versionNo));
-    return {
+    return Object.assign({
       ok: true,
       done: !!result.done,
       doneCount: result.doneCount,
@@ -357,7 +357,10 @@ function apiGeneratePersonalPdfBatch_locked_(quarterId, versionNo) {
       // 幹事會以為「明明有 57 人，點解只產生咗 3 個」。
       skippedExistingCount: result.skippedExistingCount,
       totalRetries: result.totalRetries || 0
-    };
+    },
+    // ⚠️ 第六十六輪批次 AC／AD 組：失敗份數同名單、呢一次呼叫嘅增量——
+    // 之前完全冇交出 `errors`，前端同自測機都見唔到失敗。
+    pdfBatchClientFields_(result));
   } catch (err) {
     return zone4Failure_('產生個人 PDF', err);
   }
@@ -505,7 +508,7 @@ function apiMakeupGenerateMissingPdfs_locked_(quarterId, stage) {
     }
     const result = generatePersonalPdfBatchForPeople_(id, versionNo,
       gaps.people.map(function (p) { return p.personId; }));
-    return {
+    return Object.assign({
       ok: true,
       done: !!result.done,
       doneCount: result.doneCount,
@@ -513,7 +516,7 @@ function apiMakeupGenerateMissingPdfs_locked_(quarterId, stage) {
       generatedCount: result.generatedCount,
       skippedExistingCount: result.skippedExistingCount,
       versionNo: versionNo
-    };
+    }, pdfBatchClientFields_(result));
   } catch (err) {
     return zone4Failure_('產生個人 PDF', err);
   }

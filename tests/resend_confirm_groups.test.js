@@ -91,8 +91,11 @@ console.log('\n=== Y【核心】畫面：逐個列出嘅人 ＝ 3，未收人只
   check('★★★★★ 接手人寫佢嘅改動（版本比較）', /改動：5 月 14 日　領詩（新增，本來是 假一）/.test(list.textContent), list.textContent);
   check('★★★★★ 失去兩格嗰位：原本／現在：這一季沒有安排',
     /原本：14\/05 領詩；11\/06 領詩/.test(list.textContent) && /現在：這一季沒有安排/.test(list.textContent), list.textContent);
-  check('★★★★ 「安排改了」數字只計有舊 hash 嘅（2 位：P9601、P9690）',
-    /這 2 個人的安排改了/.test(top.textContent), top.textContent);
+  // 第六十六輪批次 AE 組：段首句嘅數字改為由下面實際列出嘅 3 位出（1 位安排改了、2 位上次沒有收到），
+  // 唔再寫「這 N 個人的安排改了」同標題對唔上
+  check('★★★★ 段首句同下面列出嘅 3 位對得上（1 位安排改了、2 位上次沒有收到）',
+    /當中 1 位是自上次發出之後安排改了、2 位是上次正式發出時沒有收到/.test(top.textContent)
+      && !/個人的安排改了/.test(top.textContent), top.textContent);
 
   // 收埋喺〔顯示名單〕(details) 入面嘅唔計
   function textOutsideDetails(node) {

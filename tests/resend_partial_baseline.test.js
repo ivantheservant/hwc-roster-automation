@@ -123,16 +123,19 @@ const ui = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone1.
 
   // 第六十五輪批次 Y 組：確認框內容搬咗去 buildResendConfirmNodes()
   const openResend = ui.slice(ui.indexOf('function buildResendConfirmNodes('), ui.indexOf('function openResend('));
-  check('★★★★★★ 標題數字用第一段（唔再用 plan.changed.length）',
-    /'自上次發出之後，這 ' \+ groups\.changed\.length \+ ' 個人的安排改了/.test(openResend)
-    && !/'自上次發出之後，這 ' \+ plan\.changed\.length/.test(openResend));
-  const warnAt = openResend.indexOf('確認是不是真的想改這麼多人');
-  const secondAt = openResend.indexOf('上次正式發出時沒有收到');
+  // 第六十六輪批次 AE 組：段首句數字改為由實際列出嘅 `g.willSend` 出（`countResendWillSendKinds_()`），
+  // 意圖不變——唔再用 plan.changed.length（包埋未收嘅人）
+  check('★★★★★★ 標題數字由實際列出嘅人出（唔再用 plan.changed.length）',
+    /countResendWillSendKinds_\(g\.willSend\)/.test(openResend)
+    && !/plan\.changed\.length/.test(openResend));
+  const warnAt = openResend.indexOf('確認是不是真的想這樣寄');
+  // 第六十六輪批次 AE 組：段首句亦有「上次正式發出時沒有收到」，所以改用第二段獨有嘅尾句定位
+  const secondAt = openResend.indexOf('要寄第一次通知給他們');
   check('★★★★★ 第二段有自己嘅標題，而且指去「補寄未收到的人」',
     secondAt !== -1 && /要寄第一次通知給他們，用「補寄未收到的人」/.test(openResend));
   check('★★★★★ 「真的想改這麼多人」只喺第一段（第二段唔放入嗰句警告）',
     warnAt !== -1 && warnAt < secondAt
-    && openResend.split('確認是不是真的想改這麼多人').length === 2);
+    && openResend.split('確認是不是真的想這樣寄').length === 2);
   // 第六十五輪批次 Y 組：第一段改為「這一次會寄給的 N 位」（後端分好組）
   check('★★★★ 第一段淨係列會寄嘅人（唔係 plan.changed 全部）', /g\.willSend\.forEach\(/.test(openResend)
     && !/plan\.changed\.forEach\(/.test(openResend));

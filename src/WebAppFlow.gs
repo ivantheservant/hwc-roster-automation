@@ -664,10 +664,11 @@ function apiStep5GeneratePdfs_locked_(quarterId, releaseText, sendOptions) {
     changed.changedList.map(function (c) { return c.personId; }));
   const pdfResult = executeStep5GeneratePdfs_(
     quarterId, changed.versionNo, changed.changedList, pdfTargets);
-  return {
+  // 第六十六輪批次 AC／AD 組：同全體版、補寄用同一組欄位（`pdfBatchClientFields_()`）
+  return Object.assign({
     blocked: false, done: pdfResult.done, doneCount: pdfResult.doneCount, totalPeople: pdfResult.totalPeople,
-    errors: pdfResult.errors
-  };
+    generatedCount: pdfResult.generatedCount || 0, skippedExistingCount: pdfResult.skippedExistingCount || 0
+  }, pdfBatchClientFields_(pdfResult));
 }
 
 /**

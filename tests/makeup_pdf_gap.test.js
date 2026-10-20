@@ -32,7 +32,8 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const gas = loadGasSource([
   'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebAppGuards.gs', 'PersonalLinkInMail.gs',
-  'MakeupSend.gs', 'WebAppZone4.gs'
+  // 第六十六輪批次 AC 組：`apiMakeupGenerateMissingPdfs()` 經 `pdfBatchClientFields_()`（PdfBatch.gs）回傳失敗欄位
+  'PdfBatch.gs', 'MakeupSend.gs', 'WebAppZone4.gs'
 ]);
 
 const Q = '2099T4';

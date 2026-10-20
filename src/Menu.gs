@@ -1080,7 +1080,10 @@ function runGeneratePersonalPdfBatch_locked_() {
     }
 
     const lines = [
-      '已全部完成：' + result.totalPeople + ' 人',
+      // 第六十六輪批次 AC 組：有失敗就唔可以寫「已全部完成」
+      (result.errors.length > 0
+        ? '已處理完 ' + result.totalPeople + ' 人，其中 ' + result.errors.length + ' 人失敗（見下面）'
+        : '已全部完成：' + result.totalPeople + ' 人'),
       '新產生：' + result.generatedCount + ' 個',
       '略過（已存在同版本且大小正常）：' + result.skippedExistingCount + ' 個',
       '重試次數：' + result.totalRetries,

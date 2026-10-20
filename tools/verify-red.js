@@ -1927,7 +1927,8 @@ const MUTATIONS = [
     why: '做唔完都顯示「已經產生好」'
       + '——第四十四輪嗰個「做齊咗但仲有幾份唔見」就係同一種錯',
     file: 'src/ui/ScriptZone1.html',
-    find: '      if (!last.done) {',
+    // 第六十六輪批次 AC／AD 組：「未做完」分支改按 outcome.kind 判斷，突變跟住搬
+    find: "      if (outcome.kind === 'INCOMPLETE') {",
     replace: '      if (false) {',
     tests: ['tests/missing_pdf_inline.test.js']
   },
@@ -4337,10 +4338,10 @@ const MUTATIONS = [
     id: 'r-ui-title-total',
     why: '確認框標題照用總數——上次冇收到嘅人都算入「安排改了」',
     file: 'src/ui/ScriptZone1.html',
-    // 第六十五輪批次 Y 組：搬入 buildResendConfirmNodes() 第一段
-    find: "        text: '自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了。'",
-    replace: "        text: '自上次發出之後，這 ' + plan.changed.length + ' 個人的安排改了。'",
-    tests: ['tests/resend_partial_baseline.test.js']
+    // 第六十六輪批次 AE 組：數字改由 countResendWillSendKinds_(g.willSend) 出，突變跟住搬
+    find: "    const kinds = countResendWillSendKinds_(g.willSend);",
+    replace: "    const kinds = { changed: plan.changed.length, notReceived: 0 };",
+    tests: ['tests/resend_partial_baseline.test.js', 'tests/resend_confirm_kind_tags.test.js']
   },
   {
     id: 'r-ui-no-split',
@@ -4700,6 +4701,121 @@ const MUTATIONS = [
     find: '      if (resultShown) busyHide();',
     replace: '      if (false) busyHide();',
     tests: ['tests/ab_ui_details.test.js']
+  },
+  // ── 第六十六輪批次 AC 組：個人 PDF 產生失敗唔可以被吞咗 ──────────
+  {
+    id: 'ac-failed-counted-ok',
+    why: '失敗嗰份照計入 generatedCount——自測 S08 報「59／59」而 Drive 淨係 58 個檔',
+    file: 'src/PdfBatch.gs',
+    find: '    } else if (!outcome.error) {',
+    replace: '    } else {',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  {
+    id: 'ac-no-auto-retry',
+    why: '一批做完唔再自動試失敗嗰幾份——暫時性匯出錯誤要幹事自己撳',
+    file: 'src/PdfBatch.gs',
+    find: '  for (let i = 0; i < failedIds.length; i++) {',
+    replace: '  for (let i = 0; i < 0; i++) {',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  {
+    id: 'ac-retry-ignored',
+    why: '再試成功都當失敗——errors 唔清走、generatedCount 唔加',
+    file: 'src/PdfBatch.gs',
+    find: '    if (outcome.error) continue;',
+    replace: '    continue;',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  {
+    id: 'ac-api-drops-errors',
+    why: '全體版 Web API 回傳冇 failedCount／errors——前端同自測機見唔到失敗',
+    file: 'src/WebAppZone4.gs',
+    find: '    pdfBatchClientFields_(result));',
+    replace: '    {});',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  {
+    id: 'ac-makeup-drops-errors',
+    why: '補寄用嘅指定人版 API 回傳冇 failedCount／errors',
+    file: 'src/WebAppZone4.gs',
+    find: '    }, pdfBatchClientFields_(result));',
+    replace: '    }, {});',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  {
+    id: 'ac-resend-drops-errors',
+    why: '改動後重發嘅 PDF API 回傳冇 failedCount／errors',
+    file: 'src/WebAppFlow.gs',
+    find: '  }, pdfBatchClientFields_(pdfResult));',
+    replace: '  }, {});',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  {
+    id: 'ac-ui-failed-is-done',
+    why: '完成窗有失敗都照出「已完成 N / N」綠色——拆走失敗分支',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    if (failed.length > 0) {\n      const names',
+    replace: '    if (false) {\n      const names',
+    tests: ['tests/pdf_batch_tally_ui.test.js']
+  },
+  {
+    id: 'ac-resend-sends-anyway',
+    why: '改動後重發：PDF 有失敗都照寄——寄出去嗰幾位 ERROR_PDF_MISSING 而完成窗唔講',
+    file: 'src/ui/ScriptZone1.html',
+    find: "    if (pdfOutcome.kind === 'FAILED') {",
+    replace: '    if (false) {',
+    tests: ['tests/pdf_batch_tally_ui.test.js']
+  },
+  {
+    id: 'ac-selftest-green',
+    why: '自測 S08 有失敗都報綠——紅燈跑去下游 S09，S10／S11 被擋住',
+    file: 'src/SelfTestRunner.gs',
+    find: '  if (failedCount > 0) {',
+    replace: '  if (false) {',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  // ── 第六十六輪批次 AD 組：「先產生 PDF」完成窗報整次操作嘅累計 ────
+  {
+    id: 'ad-total-last-only',
+    why: '開頭人數取最後一次回傳——補寄 48 位分三輪，完成窗寫「8 / 8」',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    if (tally.total === null) tally.total = Number(res.totalPeople) || 0;',
+    replace: '    tally.total = Number(res.totalPeople) || 0;',
+    tests: ['tests/pdf_batch_tally_ui.test.js']
+  },
+  {
+    id: 'ad-generated-last-only',
+    why: '新產生份數唔累加（取最後一次）——完成窗「新產生 8 份」',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    tally.generated += Number(res.callGeneratedCount !== undefined\n      ? res.callGeneratedCount : res.generatedCount) || 0;',
+    replace: '    tally.generated = Number(res.generatedCount) || 0;',
+    tests: ['tests/pdf_batch_tally_ui.test.js']
+  },
+  {
+    id: 'ad-call-not-delta',
+    why: '後端交出嘅「呢一次增量」其實係累計——前端累加就會多算',
+    file: 'src/PdfBatch.gs',
+    find: '    callGeneratedCount: (progress.generatedCount || 0) - before.generated,',
+    replace: '    callGeneratedCount: progress.generatedCount || 0,',
+    tests: ['tests/pdf_failure_not_swallowed.test.js']
+  },
+  // ── 第六十六輪批次 AE 組：重發確認框兩個數字要一致 ────────────
+  {
+    id: 'ae-no-kind-tag',
+    why: '確認框每人旁邊唔標「安排改了」／「上次沒有收到」',
+    file: 'src/ui/ScriptZone1.html',
+    find: "    if (kind) head.appendChild(make('span', { text: kind, className: 'tag' }));",
+    replace: '    if (false) head.appendChild(null);',
+    tests: ['tests/resend_confirm_kind_tags.test.js']
+  },
+  {
+    id: 'ae-kind-not-listed',
+    why: '「上次沒有收到」嘅人唔計入段首句（又變返 1 同 2 對唔上）',
+    file: 'src/ui/ScriptZone1.html',
+    find: "      else if (k === '上次沒有收到') out.notReceived++;",
+    replace: '      else if (k === "x") out.notReceived++;',
+    tests: ['tests/resend_confirm_kind_tags.test.js']
   },
 ];
 

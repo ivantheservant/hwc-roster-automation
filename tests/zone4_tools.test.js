@@ -186,7 +186,9 @@ console.log('\n=== F 產生個人 PDF：分批要接住跑，而且數字唔可�
     /guard > 40/.test(zone4));
   check('★★★★★ 「略過已存在」有出數字'
     + '——唔出嘅話，幹事會以為「明明有 57 人，點解只新產生咗 3 個」',
-    /last\.skippedExistingCount/.test(zone4));
+    // 第六十六輪批次 AD 組：完成窗改由共用嘅 `describePdfBatchOutcome_()` 砌（用累計數字 `tally.skipped`）
+    /describePdfBatchOutcome_\(/.test(zone4)
+      && /tally\.skipped \+ ' 份'/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone1.html'), 'utf8')));
 }
 
 console.log('\n=== F【核心】補寄：先預覽後執行，而且後端自己重算 ===');

@@ -1597,7 +1597,8 @@ function selfTestS08_(quarterId) {
   selfTestRecordPayload_('S08', 'S08 總結', {
     done: !!(done && done.done), doneCount: doneCount,
     totalPeople: totalPeople, remaining: remaining,
-    rounds: rounds, stalledAt: stalledAt
+    rounds: rounds, stalledAt: stalledAt,
+    failedCount: Number((done || {}).failedCount || 0)
   });
 
   t.expect('個人 PDF 有真的產生出來',
@@ -1621,6 +1622,29 @@ function selfTestS08_(quarterId) {
       + '撳「測試工具 ▸ ▶️ 繼續跑自測」接住做。'
       + '　⚠️ 補齊之前 S09「正式發出」會被系統攔住'
       + '（缺個人 PDF 超過 20% 就中止），那是正確的攔截。');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // ⚠️ 第六十六輪批次 AC 組：**有一份產生失敗 ⇒ S08 要紅，唔可以報綠。**
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // 現場（2026-10-21，沙盒 2028T3 第 3 版）：S08 最後一次回傳
+  // `{"done":true,"doneCount":59,"totalPeople":59,"generatedCount":59}` ⇒ 判綠；
+  // 但 Drive 淨係 58 個個人檔，缺 1 位。原因：批次迴圈把失敗都計入 `generatedCount`，
+  // 而 `apiGeneratePersonalPdfBatch()` 回傳又冇 `errors`——呢度見到嘅就係「全部成功」。
+  // 下游 S09 撞 `ERROR_PDF_MISSING` 變成「真正失敗」，S10／S11 被擋住——
+  // 紅燈喺錯嘅位置。而家上游（呢度）自己報紅，S09 就會係 `BLOCKED`（唔係紅）。
+  const failedCount = Number(done.failedCount || 0);
+  if (failedCount > 0) {
+    const detail = (done.errors || []).map(function (e) {
+      return e.personId + '：' + e.message;
+    }).join('；');
+    t.expect('一份個人 PDF 都不可以產生失敗'
+      + '（系統已自動再試過一次）', false, '0 份失敗',
+      failedCount + ' 份失敗——' + detail,
+      '批次回報 done = true，但有人的檔案沒有產生出來。'
+        + '不處理的話，下游 S09「正式發出」會因為缺個人 PDF 而被擋住。');
+    return t.result();
   }
 
   t.equal('批次做完了（done = true）'
