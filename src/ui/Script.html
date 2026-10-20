@@ -358,6 +358,55 @@
     });
   }
 
+  /* ══════════════════════════════════════════════════════════════
+   * ⚠️⚠️ 第六十三輪批次 O 組：Google 暫時性錯誤
+   * ══════════════════════════════════════════════════════════════
+   *
+   * 實測「儲存及寄出」第一次撳：
+   *   「Exception: Service Spreadsheets failed while accessing document with id …」
+   * 重試即成功。幹事見到嘅係一句英文技術訊息。
+   *
+   * ⚠️ **只可以重試「未寫入任何東西就失敗」嘅情況。**
+   * 點樣判斷：**睇係咪唯讀呼叫。** `callServer()` 只准 `READ_ONLY_APIS`
+   * 白名單入面嘅函式（預設拒絕，見檔頭），佢哋一格都唔寫——喺邊一步失敗
+   * 都一定冇寫過嘢，所以自動等幾秒重試一次一定安全。
+   *
+   * 會寫入嘅（`callServerMutating()`）**唔自動重試**：前端分唔出佢係喺寫之前
+   * 定寫咗一半之後失敗，重試一次可能造多一個版本、寄多一封信。寧願顯示錯誤
+   * ——但第一句用中文講「Google 試算表暫時沒有回應」（見 `showErrorModal()`）。
+   */
+  const TRANSIENT_ERROR_PATTERNS = [
+    /Service Spreadsheets failed/i,
+    /Service invoked too many times/i,
+    /timed out/i
+  ];
+  const TRANSIENT_RETRY_DELAY_MS = 2500;
+
+  /** 係咪 Google 嗰邊嘅暫時性錯誤。 */
+  function isTransientServerError_(err) {
+    const msg = err && err.message ? err.message : String(err || '');
+    return TRANSIENT_ERROR_PATTERNS.some((re) => re.test(msg));
+  }
+
+  function sleepMs_(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 暫時性錯誤就等一陣再試**一次**；其他錯誤照拋。**只可以包唯讀呼叫。**
+   * @param {Function} fn 回 Promise 嘅呼叫
+   * @returns {Promise<*>}
+   */
+  async function withTransientRetry_(fn) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isTransientServerError_(err)) throw err;
+      await sleepMs_(TRANSIENT_RETRY_DELAY_MS);
+      return fn();
+    }
+  }
+
   /** 唯讀呼叫。唔喺白名單就即刻拒絕——呢個係一個程式錯誤，唔係使用者錯。 */
   function callServer(fnName, ...args) {
     if (READ_ONLY_APIS.indexOf(fnName) === -1) {
@@ -366,7 +415,8 @@
         + '會改動資料的呼叫要用 callServerMutating()（它會自動把狀態快取標記為過期）；'
         + '如果它真的一格都不會寫，請把它加入 READ_ONLY_APIS。'));
     }
-    return callServerRaw_(fnName, ...args);
+    // 第六十三輪批次 O 組：唯讀 ⇒ Google 暫時性錯誤自動重試一次（理由見上）
+    return withTransientRetry_(() => callServerRaw_(fnName, ...args));
   }
 
   /**
@@ -1176,7 +1226,23 @@
     const nodes = [];
     const parsed = parseThreePartMessage(raw);
 
-    if (parsed) {
+    if (!parsed && isTransientServerError_(err)) {
+      // ⚠️ 第六十三輪批次 O 組：Google 暫時性錯誤，第一句用中文講。
+      // 唯讀嘅已經自動重試過一次；去到呢度即係重試都唔得，或者係一個會寫入嘅
+      // 動作（唔自動重試，因為唔知寫咗幾多）。
+      nodes.push(errorPart(ERR_LABEL_WHAT,
+        'Google 試算表暫時沒有回應（這是 Google 那邊的暫時問題，不是你做錯了）。'));
+      nodes.push(errorPart('現在的情況',
+        '如果剛才是在看資料，什麼都沒有改動。如果剛才是在儲存、套用或寄出，'
+        + '可能已經做了一部分——先撳「重新整理」看看狀態卡和版本號，再決定要不要重做。'));
+      const doBox = make('div', { className: 'err-part' });
+      doBox.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
+      const ul = make('ul', { className: 'err-list' });
+      ul.appendChild(make('li', { text: '等十秒，撳「重新整理」，確認狀態之後再試一次' }));
+      ul.appendChild(make('li', { text: '一直這樣的話，把下面的技術詳情複製給開發者' }));
+      doBox.appendChild(ul);
+      nodes.push(doBox);
+    } else if (parsed) {
       nodes.push(errorPart(ERR_LABEL_WHAT, parsed.what));
       nodes.push(errorPart('現在的情況', parsed.state));
       const doBox = make('div', { className: 'err-part' });

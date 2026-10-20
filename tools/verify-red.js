@@ -4282,6 +4282,40 @@ const MUTATIONS = [
     replace: '  } else if (false) {',
     tests: ['tests/main_flow_six_steps.test.js']
   },
+  // ── 第六十三輪批次 N 組：錯字名稱提示指向不存在嘅位置 ──────────────
+  {
+    id: 'n-alias-dev-wording',
+    why: '錯字提示寫返「下一輪才搬上來」——開發者用語，而且位置早已搬咗上嚟',
+    file: 'src/ui/ScriptZone1.html',
+    find: "去下面「名單維護」撳「人員與電郵」，再撳「別名」加一個別名' }));",
+    replace: "去「名單維護 ▸ 人員與電郵 ▸ 別名」加別名（下一輪才搬上來，暫時請用試算表的 NameAlias 工作表）' }));",
+    tests: ['tests/ui_no_dev_wording.test.js']
+  },
+  // ── 第六十三輪批次 O 組：Google 暫時性錯誤 ───────────────────────────
+  {
+    id: 'o-read-no-retry',
+    why: '唯讀呼叫撞到 Google 暫時性錯誤唔重試——幹事見到一句英文，而重試一次就得',
+    file: 'src/ui/Script.html',
+    find: '    return withTransientRetry_(() => callServerRaw_(fnName, ...args));',
+    replace: '    return callServerRaw_(fnName, ...args);',
+    tests: ['tests/transient_retry.test.js']
+  },
+  {
+    id: 'o-retry-any-error',
+    why: '乜錯都重試——一個真錯誤會被做多一次，而且延遲幹事見到原因',
+    file: 'src/ui/Script.html',
+    find: '      if (!isTransientServerError_(err)) throw err;\n',
+    replace: '',
+    tests: ['tests/transient_retry.test.js']
+  },
+  {
+    id: 'o-modal-english',
+    why: '暫時性錯誤嘅彈窗照顯示英文技術訊息做第一句',
+    file: 'src/ui/Script.html',
+    find: '    if (!parsed && isTransientServerError_(err)) {',
+    replace: '    if (false) {',
+    tests: ['tests/transient_retry.test.js']
+  },
 ];
 
 /**
