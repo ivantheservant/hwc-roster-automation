@@ -401,6 +401,8 @@ function buildFullHealthCheckReport_(quarterId) {
   run(function () { return classifyConfigRowHealth_(planConfigRowAudit_()); });
   run(function () { return classifyConfigValueTypeHealth_(readSheet(SHEETS.CONFIG)); });
   run(function () { return classifyAssignmentVersionsHealth_(summariseAssignmentVersions_()); });
+  // 第六十三輪批次 J 組：未登記嘅孤兒版本（見 OrphanVersions.gs）
+  run(function () { return classifyOrphanVersionsHealth_(findOrphanVersions_()); });
   run(function () { return classifyEmailTemplatesHealth_(buildEmailTemplateSelfCheckReport_()); });
   run(function () { return classifyAuditLogHealth_(buildAuditLogSummaryReport_(200)); });
   run(function () {

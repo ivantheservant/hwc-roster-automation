@@ -112,6 +112,7 @@ function onOpen() {
         .addItem('⚠️⚠️ 按季度清理 PDF', 'runQuarterPdfCleanup_')
         .addItem('⚠️ 清除一批 SendLog 記錄', 'runDeleteSendLogBatch_')
         .addItem('⚠️⚠️ 重設季度測試資料', 'runResetQuarterTestData_')
+        .addItem('⚠️ 清理未登記的孤兒版本', 'runCleanupOrphanVersions_')
         .addSeparator()
         .addItem('封存舊季度資料（唯讀預覽）', 'runArchivePlan_')
         .addItem('⚠️⚠️ 執行封存舊季度資料', 'runArchiveExecute_')

@@ -63,6 +63,14 @@ const GENERATE_TARGET_WARN_TOO_EARLY = 'TOO_EARLY';
 const GENERATE_TARGET_WARN_ALL_GENERATED = 'ALL_GENERATED';
 
 /**
+ * 第 1 步的目標季度：**幹事揀住嗰一季已經生成過。**
+ *
+ * ⚠️ 第六十三輪批次 M 組。掣灰、講明「這一季已經生成過了」——
+ * **唔再自動改指其他季度**。理由見 `resolveGenerateTargetQuarter_()`。
+ */
+const GENERATE_TARGET_WARN_SELECTED_GENERATED = 'SELECTED_GENERATED';
+
+/**
  * 決定第 1 步那粒掣要生成哪一季。**純讀取。**
  *
  * ═════════════════════════════════════════════════════════════════════
@@ -136,7 +144,20 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
 
   let target = null;
   let allGenerated = false;
+  let selectedGenerated = false;
   if (selected && selected.versionNo < 0) {
+    target = selected;
+  } else if (selected) {
+    // ⚠️⚠️ 第六十三輪批次 M 組：**揀住嘅季度已經生成過 ⇒ 留喺佢度，掣變灰。**
+    //
+    // 舊寫法退回「最早未生成嘅季度」。現場（2026-10-20 瀏覽器實測）：季度選單
+    // 係 2028年4-6月（已生成第 0 版），第 1 步嘅掣卻寫「生成2027年1-3月職事表」
+    // ——嗰個係**正式上線季**。幹事以為係呢一季嘅下一步，一撳就用咗上線季。
+    //
+    // 揀咗「唔再自動改指」（prompt 嘅第一個做法），唔係「改指但加紅字＋打字
+    // 確認」：一粒會指去另一季嘅掣，紅字寫幾大都會有人撳；要生成另一季，
+    // 幹事先喺季度選單揀嗰一季——佢做嘅決定先至係佢睇住嗰一季。
+    selectedGenerated = true;
     target = selected;
   } else if (upcoming.length > 0) {
     target = upcoming[0];
@@ -159,7 +180,15 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
 
   let warn = '';
   let warnMessage = '';
-  if (allGenerated) {
+  if (selectedGenerated) {
+    // 同 `allGenerated` 一樣：掣係灰嘅，**唔算任何日期警告**，只講下一步去邊。
+    warn = GENERATE_TARGET_WARN_SELECTED_GENERATED;
+    warnMessage = buildThreePartMessage_(
+      '「' + buildQuarterLabel_(target.quarterId) + '」已經生成過了。',
+      '什麼都沒有改動。',
+      ['要生成另一季，先在最上面的季度選單選那一季',
+        '要重新生成這一季（會覆蓋現有安排），請去「進階與診斷 ▸ 重新生成職事表」']);
+  } else if (allGenerated) {
     // ⚠️ 什麼日期警告都不算。掣是灰的，他做不到任何事——
     // 這時候唯一有用的資訊是「下一步去哪裡」。
     warn = GENERATE_TARGET_WARN_ALL_GENERATED;
@@ -212,6 +241,8 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     versionCount: target.versionNo >= 0 ? target.versionNo + 1 : 0,
     latestVersionNo: target.versionNo,
     allGenerated: allGenerated,
+    // 第六十三輪批次 M 組：揀住嘅季度已經生成過（掣灰，唔改指其他季度）
+    selectedGenerated: selectedGenerated,
     // ⚠️ 第四十二輪批次 C 組：這一季是不是真正要上線那一季。
     // 由 Config 的 `GO_LIVE_QUARTER_ID` 決定——**不可以寫死**，
     // 那是教會的資料，而且每年都不同。留空就永遠是 false。

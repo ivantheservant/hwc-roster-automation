@@ -286,16 +286,20 @@ check('★★★★ 生成成功', gas.apiGenerateDraftExecute(Q_NOW) !== undefi
 check('（前置）用真入口填一格講員',
   gas.apiSavePreacherTranslationEntry(Q_NOW, DATES_NOW[0], 'PREACH', 1, '客席甲牧師') !== undefined);
 
-console.log('\n=== A1：生成咗之後，目標會跳去下一個未生成嘅季度 ===');
+console.log('\n=== A1（第六十三輪 M 組改咗）：揀住嘅季度生成咗之後，**唔會**跳去另一季 ===');
 {
+  // ⚠️ 第六十三輪批次 M 組：舊規則係「跳去下一個未生成嘅季度」。
+  // 現場：季度選單係 2028年4-6月（已生成），掣卻寫「生成2027年1-3月職事表」
+  // ——嗰個係正式上線季。而家留喺揀住嗰一季，掣變灰，講明點做。
   const t = gas.resolveGenerateTargetQuarter_(Q_NOW);
-  checkEqual('★★★★★ 唔會再指住已經生成過嗰一季', t.quarterId, Q_NEXT);
-  check('★★★★★ 而且撳得到'
-    + '——第四十二輪批次 C 組現場：粒掣指住一個已經生成過嘅季度然後灰晒，'
-    + '幹事永遠做唔到第 1 步',
-    t.alreadyGenerated === false, JSON.stringify(t));
-  checkEqual('★★★★ 掣旁邊講得出而家有幾多個版本（未生成 ⇒ 0）',
-    t.versionCount, 0);
+  checkEqual('★★★★★★ 仍然係揀住嗰一季（唔再自動改指）', t.quarterId, Q_NOW);
+  check('★★★★★ 掣灰（alreadyGenerated）', t.alreadyGenerated === true, JSON.stringify(t));
+  checkEqual('★★★★★ 獨立嘅警告種類，唔算日期警告', t.warn, 'SELECTED_GENERATED');
+  check('★★★★★ 講明「先在季度選單揀那一季」',
+    t.warnMessage.indexOf('先在最上面的季度選單選那一季') !== -1, t.warnMessage);
+  check('★★★★ 掣旁邊講得出而家有幾多個版本', t.versionCount >= 1, 'v=' + t.versionCount);
+  const none = gas.resolveGenerateTargetQuarter_('');
+  checkEqual('★★★★ 冇揀季度 ⇒ 照舊由今日起計第一個未生成過嘅', none.quarterId, Q_NEXT);
 }
 
 console.log('\n=== A1【核心】全部季度都生成過 ⇒ 灰掣，而且講清楚下一步去邊 ===');

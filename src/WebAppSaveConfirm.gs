@@ -192,7 +192,12 @@ function buildSaveAndConfirmPlan_(quarterId) {
   //（`Cannot read properties of undefined (reading 'forEach')`）。
   // 由 Prompt B 寫出嚟到第二十九輪，114 個測試冇一個經過呢條路
   // ——全部都直接叫 `findStateViolations_()`，冇一個由端點入口叫落去。
-  const allViolations = findStateViolations_(resolved.state, context);
+  // ⚠️ 第六十三輪批次 L 組：違規物件要補上中文崗位名同人名再回傳。
+  // 舊寫法冇補，`humanViolationLine()` 於是退回顯示 `FLOWER／CHAIR／USHER`，
+  // 亦冇人名——同一批改動，「檢查我的改動」係中文，「儲存及寄出」就變英文。
+  // 用現成嘅 `decorateViolations_()`（RequestsApply.gs），唔另寫一份。
+  const rawViolations = findStateViolations_(resolved.state, context);
+  const allViolations = decorateViolations_(rawViolations, context);
   const violations = classifySaveConfirmViolations_(quarterId, versionNo, allViolations);
 
   // ── 步 1.6　三欄對照 ─────────────────────────────────────────

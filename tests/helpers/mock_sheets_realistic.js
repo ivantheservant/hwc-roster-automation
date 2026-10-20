@@ -282,6 +282,26 @@ class RealisticMockSheet {
   clearFormats() { return this; }
   deleteColumns() { return this; }
   deleteRows() { return this; }
+  // 第六十三輪批次 J 組：`deleteRowsMatching_()`（QuarterReset.gs）逐行刪。
+  // ⚠️ 要真係刪，而且下面嘅行要上移——唔係嘅話「由下往上刪」呢個做法
+  // 喺測試入面根本驗唔到。
+  deleteRow(rowNum) {
+    const shift = function (map) {
+      const next = new Map();
+      map.forEach(function (v, key) {
+        const parts = key.split(',');
+        const r = Number(parts[0]);
+        if (r === rowNum) return;
+        next.set((r > rowNum ? r - 1 : r) + ',' + parts[1], v);
+      });
+      return next;
+    };
+    this._cells = shift(this._cells);
+    this._bg = shift(this._bg);
+    this._notes = shift(this._notes);
+    if (this._maxRow >= rowNum) this._maxRow--;
+    return this;
+  }
   insertColumnsAfter() { return this; }
   insertRowsAfter() { return this; }
   getSheetId() { return Math.abs(hashString_(this._name)); }

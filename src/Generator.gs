@@ -236,9 +236,20 @@ function findQuarter_(quarterId) {
 function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
   if (carryOverWeeks <= 0) return [];
 
+  // ⚠️⚠️ 第六十三輪批次 I 組：**只用 `RosterVersions` 有登記嘅版本。**
+  //
+  // 舊寫法按「每個主日最大 VersionNo」取上季最後幾週，**唔核對有冇登記**。
+  // 現場：`RosterAssignments` 有 273 行 `2026T4 VersionNo=2`，而 `RosterVersions`
+  // 只有 2026T4 嘅 v0／v1（一個寫咗一半嘅孤兒版本，見 J 組）。今次剛好只差
+  // 2026-11-15 一格，唔喺 `CARRY_OVER_WEEKS=2` 範圍內，所以 2027T1 生成冇受
+  // 影響——但嗰個係運氣：差嘅格一落喺最後兩週，「連續兩週」就會用一份
+  // 從來冇確認過嘅安排去判斷。
+  const registered = readRegisteredVersionKeys_();
   const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
     const dateStr = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
-    return dateStr && dateStr < quarterStartDate;
+    if (!dateStr || dateStr >= quarterStartDate) return false;
+    return registered[registeredVersionKey_(
+      row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID], row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO])] === true;
   });
   if (rows.length === 0) return [];
 
@@ -266,6 +277,29 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
 
   const sortedDates = Object.keys(byDate).sort();
   return sortedDates.slice(-carryOverWeeks).map(function (d) { return byDate[d]; });
+}
+
+/**
+ * 第六十三輪批次 I／J 組：`RosterVersions` 登記咗嘅（季度, 版本）。
+ * @returns {Object.<string, boolean>} `registeredVersionKey_()` 為鍵
+ */
+function readRegisteredVersionKeys_() {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  const out = {};
+  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+    out[registeredVersionKey_(row[V.QUARTER_ID], row[V.VERSION_NO])] = true;
+  });
+  return out;
+}
+
+/**
+ * （季度, 版本）嘅鍵。版本號一律轉數字，`'2'` 同 `2` 係同一個。
+ * @param {*} quarterId 季度 ID
+ * @param {*} versionNo 版本號
+ * @returns {string}
+ */
+function registeredVersionKey_(quarterId, versionNo) {
+  return String(quarterId || '').trim() + '|' + Number(versionNo);
 }
 
 /**

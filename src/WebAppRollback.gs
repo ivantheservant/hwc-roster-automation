@@ -187,8 +187,10 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
     // ⚠️ 參數次序：`findStateViolations_(state, context)`——**派工狀態行先**。
     // 同 `WebAppSaveConfirm.gs` 一樣寫反咗；只係「回到上一個版本」嘅預覽
     // 冇人撳過，所以未爆出嚟。兩個錯嘅都係新寫嘅 Web UI 端點。
+    // 第六十三輪批次 L 組：同儲存確認一樣補上中文崗位名同人名
+    const rawViolations = findStateViolations_(targetState, context);
     violations = classifySaveConfirmViolations_(
-      quarterId, target, findStateViolations_(targetState, context));
+      quarterId, target, decorateViolations_(rawViolations, context));
   } catch (err) {
     // 檢查唔到 ⇒ 誠實講「查唔到」，**唔可以顯示「0 項違反」**
     // ——嗰個等於話「檢查過，冇問題」，同「檢查唔到」係兩件事。

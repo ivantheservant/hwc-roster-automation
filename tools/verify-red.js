@@ -4197,6 +4197,91 @@ const MUTATIONS = [
     replace: "    attachLine: '附件：' + names[ATTACH_TYPE.PERSONAL_PDF]",
     tests: ['tests/official_partial_send.test.js']
   },
+  // ── 第六十三輪批次 G 組：改 Config 唔會自動清快取 ────────────────
+  {
+    id: 'g-onedit-any-sheet',
+    why: '`onEdit` 改乜表都清 Config 快取——每改一格都要重讀 Config',
+    file: 'src/Config.gs',
+    find: '    if (!sheet || sheet.getName() !== SHEETS.CONFIG) return;',
+    replace: '    if (!sheet) return;',
+    tests: ['tests/config_onedit.test.js']
+  },
+  {
+    id: 'g-onedit-no-reload',
+    why: '`onEdit` 唔清快取'
+      + '——DRY_RUN 改返 TRUE 之後五分鐘之內寄送路徑仍然讀到 FALSE',
+    file: 'src/Config.gs',
+    find: "    reloadConfigCache();\n  } catch (err) {\n    log_('WARN', 'onEdit",
+    replace: "  } catch (err) {\n    log_('WARN', 'onEdit",
+    tests: ['tests/config_onedit.test.js']
+  },
+  // ── 第六十三輪批次 I 組：跨季「連續兩週」讀到未登記版本 ──────────
+  {
+    id: 'i-prior-unregistered',
+    why: '`readPriorWeeks_()` 唔核對 `RosterVersions`'
+      + '——一個寫咗一半嘅孤兒版本會被當成上一季嘅最終安排',
+    file: 'src/Generator.gs',
+    find: '    return registered[registeredVersionKey_(\n'
+      + '      row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID], row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO])] === true;',
+    replace: '    return true;',
+    tests: ['tests/prior_weeks_registered.test.js']
+  },
+  // ── 第六十三輪批次 J 組：孤兒版本（偵測 ＋ 受保護嘅清理）─────────
+  {
+    id: 'j-orphan-no-registry',
+    why: '偵測唔理 `RosterVersions`，凡有派工紀錄就當孤兒'
+      + '——清理工具會連已登記嘅版本一齊刪',
+    file: 'src/OrphanVersions.gs',
+    find: '    if (registered[registeredVersionKey_(quarterId, versionNo)]) return;\n'
+      + '    touch(quarterId, versionNo).assignmentRows++;',
+    replace: '    touch(quarterId, versionNo).assignmentRows++;',
+    tests: ['tests/orphan_versions.test.js']
+  },
+  {
+    id: 'j-cleanup-no-recheck',
+    why: '執行嗰刻唔重新算——預覽之後有人登記咗某一版都照刪',
+    file: 'src/OrphanVersions.gs',
+    find: '  if (freshKeys !== planKeys) {',
+    replace: '  if (false) {',
+    tests: ['tests/orphan_versions.test.js']
+  },
+  {
+    id: 'j-grid-only-missed',
+    why: '淨係得一張 grid（冇派工紀錄）嘅孤兒搵唔到'
+      + '——佢一樣會令下一次造版本撞名',
+    file: 'src/OrphanVersions.gs',
+    find: '    touch(m[1], m[2]).gridExists = true;',
+    replace: '    if (byKey[registeredVersionKey_(m[1], m[2])]) touch(m[1], m[2]).gridExists = true;',
+    tests: ['tests/orphan_versions.test.js']
+  },
+  // ── 第六十三輪批次 L 組：儲存確認畫面嘅違規行顯示英文 PostID ──────
+  {
+    id: 'l-plan-no-names',
+    why: '儲存確認嘅違規唔補中文崗位名同人名'
+      + '——現場：「儲存及寄出」確認畫面寫 FLOWER，冇人名',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: '  const allViolations = decorateViolations_(rawViolations, context);',
+    replace: '  const allViolations = rawViolations;',
+    tests: ['tests/save_confirm_violation_names.test.js']
+  },
+  {
+    id: 'l-rollback-no-names',
+    why: '回退預覽嘅違規唔補中文崗位名——同儲存確認兩個講法',
+    file: 'src/WebAppRollback.gs',
+    find: '      quarterId, target, decorateViolations_(rawViolations, context));',
+    replace: '      quarterId, target, rawViolations);',
+    tests: ['tests/save_confirm_violation_names.test.js']
+  },
+  // ── 第六十三輪批次 M 組：第 1 步嘅掣指向另一季（正式上線季）──────
+  {
+    id: 'm-selected-redirects',
+    why: '揀住嘅季度已生成就自動改指「最早未生成」嗰季'
+      + '——現場：選單係 2028年4-6月，掣寫「生成2027年1-3月職事表」（正式上線季）',
+    file: 'src/WebAppMainFlow.gs',
+    find: '  } else if (selected) {',
+    replace: '  } else if (false) {',
+    tests: ['tests/main_flow_six_steps.test.js']
+  },
 ];
 
 /**

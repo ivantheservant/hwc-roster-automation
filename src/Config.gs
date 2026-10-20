@@ -62,6 +62,33 @@ function reloadConfigCache() {
 }
 
 /**
+ * ⚠️ 第六十三輪批次 G 組：**改 `Config` 工作表就即刻清快取。**（簡單觸發器）
+ *
+ * `readConfig()` 快取 300 秒，而全專案之前冇任何 `onEdit`。把 `DRY_RUN`
+ * 由 FALSE 改返 TRUE 而唔記得撳「重新載入設定」⇒ 最多五分鐘之內，寄送
+ * 路徑仍然讀到 FALSE——即係以為已經閂咗真寄，其實仲開緊。
+ *
+ * 呢個係**簡單觸發器**（函式名叫 `onEdit` 就自動生效），唔使安裝，
+ * `CacheService` 喺簡單觸發器入面用得。只對 `Config` 工作表生效，
+ * 改其他表一律唔理（唔好每改一格都清快取）。
+ *
+ * ⚠️ 簡單觸發器入面拋錯冇人會見到，所以全部包住，只寫 log。
+ *
+ * @param {Object} e 試算表傳入嘅編輯事件
+ * @returns {void}
+ */
+function onEdit(e) {
+  try {
+    const range = e && e.range;
+    const sheet = range && typeof range.getSheet === 'function' ? range.getSheet() : null;
+    if (!sheet || sheet.getName() !== SHEETS.CONFIG) return;
+    reloadConfigCache();
+  } catch (err) {
+    log_('WARN', 'onEdit：清 Config 快取失敗：' + err.message);
+  }
+}
+
+/**
  * 讀取單一 Config 值；找不到該 Key 或值為空時回傳 fallback。
  * @param {string} key Config 的 Key
  * @param {*} fallback 找不到或值為空時要回傳的預設值
