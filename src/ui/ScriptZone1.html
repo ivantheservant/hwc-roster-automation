@@ -1652,12 +1652,16 @@
    * 放行文字全程帶住——後端每次都會用「目前最新版本」重新驗一次。
    */
   async function resendGeneratePdfsThenSend(releaseText, sendOptions) {
+    // 第六十四輪批次 V 組：`undefined`／`MouseEvent` 過唔到 `google.script.run`，
+    // 收成純物件或 null（同 `openResend()` 一樣）。下面兩個呼叫都用 `sendOpts`——
+    // 本來參數叫 `sendOptions` 而第二個呼叫寫 `sendOpts`，會 ReferenceError。
+    const sendOpts = plainObjectOrNull_(sendOptions);
     let guard = 0;
     for (;;) {
       guard++;
       if (guard > 40) throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。請重新整理再試一次。');
 
-      const r = await callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText);
+      const r = await callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText, sendOpts);
       if (r.blocked) {
         showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，需要先在「儲存並確認」處理。'));
         return;

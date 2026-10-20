@@ -4385,6 +4385,80 @@ const MUTATIONS = [
     replace: '',
     tests: ['tests/dashboard_unsaved_consistency.test.js']
   },
+  // ── 第六十四輪批次 U 組：寄出彈窗收件摘要加起來多過總數 ───────────────
+  {
+    id: 'u-join-plus',
+    why: '收件摘要用「＋」串各組——令人以為係加數（5＋6＋2＝13，總數 6）',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: "      + (bits.length > 0 ? ('：' + bits.join('、')) : '')",
+    replace: "      + (bits.length > 0 ? ('：' + bits.join(' ＋ ')) : '')",
+    tests: ['tests/send_selection_sentence.test.js']
+  },
+  {
+    id: 'u-count-twice',
+    why: '一個人喺每一組都數一次——各組加埋多過總數',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '      const n = keys.filter((k) => !counted[k] && byKey[k]',
+    replace: '      const n = keys.filter((k) => byKey[k]',
+    tests: ['tests/send_selection_sentence.test.js']
+  },
+  // ── 第六十四輪批次 V 組：改動後重發為「不會收到信的人」產生個人 PDF ────
+  {
+    id: 'v-api-all-changed',
+    why: '產生 PDF 照用全部 changedList——幹事只揀 3 位卻要等五十多人（約 10 分鐘）',
+    file: 'src/WebAppFlow.gs',
+    find: '    quarterId, changed.versionNo, changed.changedList, pdfTargets);',
+    replace: '    quarterId, changed.versionNo, changed.changedList);',
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
+  {
+    id: 'v-no-picked-filter',
+    why: '要產 PDF 嘅名單唔跟收件範圍，直接用 changedList',
+    file: 'src/ResendFlow.gs',
+    find: '  return resolveResendTargetPersonIds_(context, decision, changedPersonIds || [], true)\n',
+    replace: '  return (changedPersonIds || []).slice()\n',
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
+  {
+    id: 'v-no-assign-intersect',
+    why: '拆走「這一版有派工」嘅交集——零派工嘅人亦被叫去產 PDF',
+    file: 'src/ResendFlow.gs',
+    find: '      return ((context.assignmentsByPerson || {})[id] || []).length > 0;',
+    replace: '      return true;',
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
+  {
+    id: 'v-ignore-attach-type',
+    why: '附件揀咗「不附」仍然產生個人 PDF',
+    file: 'src/ResendFlow.gs',
+    find: '  if (decision.attachType !== ATTACH_TYPE.PERSONAL_PDF) return [];\n',
+    replace: '',
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
+  {
+    id: 'v-preview-writes-reason',
+    why: '預覽順手寫 notifyReasonByPerson——「看一眼」改變咗「做出來」嘅結果',
+    file: 'src/ResendFlow.gs',
+    find: '  return resolveResendTargetPersonIds_(context, decision, changedPersonIds || [], true)\n',
+    replace: '  return resolveResendTargetPersonIds_(context, decision, changedPersonIds || [], false)\n',
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
+  {
+    id: 'v-empty-falls-back',
+    why: '指定空名單時退回全部 changedList——「不附」會變成全部重產',
+    file: 'src/FiveStageCore.gs',
+    find: '  const peopleNeedingPdf = Array.isArray(pdfPersonIds)',
+    replace: '  const peopleNeedingPdf = (Array.isArray(pdfPersonIds) && pdfPersonIds.length > 0)',
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
+  {
+    id: 'v-ui-no-send-opts',
+    why: '前端產生 PDF 嗰個呼叫唔傳 sendOpts——後端睇唔到幹事揀咗邊個',
+    file: 'src/ui/ScriptZone1.html',
+    find: "callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText, sendOpts);",
+    replace: "callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText);",
+    tests: ['tests/resend_pdf_targets.test.js']
+  },
 ];
 
 /**

@@ -629,14 +629,16 @@ function apiStep5CheckRelease(quarterId, releaseText) {
 // ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
 // `apiStep5GeneratePdfs_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
 // 理由全文喺 `src/MutationLock.gs` 檔頭。
-function apiStep5GeneratePdfs(quarterId, releaseText) {
+// ⚠️ 第六十四輪批次 V 組：加 `sendOptions`，只為真正會收信嘅人產生 PDF
+// （理由見 `listResendPdfTargetPersonIds_()`）。前端要用 `plainObjectOrNull_()` 收成純物件或 null。
+function apiStep5GeneratePdfs(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('產生個人 PDF（改動後重發）', function () {
-    return apiStep5GeneratePdfs_locked_(quarterId, releaseText);
+    return apiStep5GeneratePdfs_locked_(quarterId, releaseText, sendOptions);
   });
 }
 
-function apiStep5GeneratePdfs_locked_(quarterId, releaseText) {
+function apiStep5GeneratePdfs_locked_(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
   const changed = planStep5ChangedList_(quarterId);
   const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
@@ -648,7 +650,12 @@ function apiStep5GeneratePdfs_locked_(quarterId, releaseText) {
   if (changed.changedList.length === 0) {
     return { blocked: false, done: true, doneCount: 0, totalPeople: 0, noChanges: true };
   }
-  const pdfResult = executeStep5GeneratePdfs_(quarterId, changed.versionNo, changed.changedList);
+  // 第六十四輪批次 V 組：只為「真正會收到信、而且有派工」嘅人產生 PDF
+  const pdfTargets = listResendPdfTargetPersonIds_(
+    changed.context, sendOptions,
+    changed.changedList.map(function (c) { return c.personId; }));
+  const pdfResult = executeStep5GeneratePdfs_(
+    quarterId, changed.versionNo, changed.changedList, pdfTargets);
   return {
     blocked: false, done: pdfResult.done, doneCount: pdfResult.doneCount, totalPeople: pdfResult.totalPeople,
     errors: pdfResult.errors

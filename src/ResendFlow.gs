@@ -207,6 +207,41 @@ function resolveResendTargetPersonIds_(context, decision, changedPersonIds, prev
 }
 
 /**
+ * 第六十四輪批次 V 組：**改動後重發，邊幾位需要先產生個人 PDF。**
+ *
+ * 現場：正式發出只寄咗 2 位，之後改 2 格存成新版本。`computeResendDiff_()` 把其餘
+ * 沒有舊 hash 嘅人全部列入 `changedList`，幹事只揀 3 位寄，卻要先等系統為五十多人
+ * 產生 PDF（約 10 分鐘）。
+ *
+ * 要產 PDF 嘅人 ＝ 真正會收到信嘅人（同 `sendResendStage_()` 行同一個
+ * `resolveResendTargetPersonIds_()`，`previewOnly=true` 所以**唔寫**
+ * `notifyReasonByPerson`）∩ 這一版有派工嘅人。附件唔係個人版 PDF ⇒ 一份都唔使產生。
+ * 零派工嘅人唔使 PDF（`generateMailAttachment_()` 本來就略過）。
+ *
+ * ⚠️ 冇傳 `sendOptions`（選單版本、舊呼叫端）⇒ 預設收件範圍（只寄有改動嘅人）
+ * 加範本預設附件，即係同以前一樣：`changedList` 入面有派工嘅人。
+ *
+ * @param {Object} context `buildMailContext_(…, RESEND)` 的結果
+ * @param {Object=} sendOptions 幹事喺寄出彈窗揀嘅選項
+ * @param {string[]} changedPersonIds `computeResendDiff_()` 算出來有改動的 PersonID
+ * @returns {string[]} 要產生個人 PDF 的 PersonID（已排序）
+ */
+function listResendPdfTargetPersonIds_(context, sendOptions, changedPersonIds) {
+  // 範本同 `sendResendStage_()` 用同一組，附件預設先會一致
+  const templates = {
+    person: findEmailTemplateById_('TPL_RESEND_TC') || findEmailTemplate_(MAIL_STAGES.RESEND),
+    list: findEmailTemplateById_('TPL_RESEND_LIST_TC')
+  };
+  const decision = resolveSendOptions_(MAIL_STAGES.RESEND, sendOptions, templates);
+  if (decision.attachType !== ATTACH_TYPE.PERSONAL_PDF) return [];
+  return resolveResendTargetPersonIds_(context, decision, changedPersonIds || [], true)
+    .filter(function (id) {
+      return ((context.assignmentsByPerson || {})[id] || []).length > 0;
+    })
+    .sort();
+}
+
+/**
  * 步驟 5「改動後重發」的實際寄送：只寄給 changedPersonIds 名單中的人
  * （PERSON，用 TPL_RESEND_TC）＋ EmailRecipients 中 Stage 欄含 RESEND 的名單
  * （LIST，用 TPL_RESEND_LIST_TC，內容為本輪異動摘要）。

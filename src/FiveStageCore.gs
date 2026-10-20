@@ -652,11 +652,16 @@ function planStep5ChangedList_(quarterId) {
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
  * @param {Object[]} changedList `computeResendDiff_()` 的結果
+ * @param {string[]=} pdfPersonIds 第六十四輪 V 組：指定要產生 PDF 的人；冇傳 ⇒ `changedList` 入面有派工的人
  * @returns {Object} `generatePersonalPdfBatchForPeople_()` 的結果；改動者全部零派工時
  *   回傳 `{done: true, doneCount: 0, totalPeople: 0}`
  */
-function executeStep5GeneratePdfs_(quarterId, versionNo, changedList) {
-  const peopleNeedingPdf = changedList.filter(function (c) { return c.hasAssignments; }).map(function (c) { return c.personId; });
+function executeStep5GeneratePdfs_(quarterId, versionNo, changedList, pdfPersonIds) {
+  // 第六十四輪批次 V 組：網頁版會傳 `pdfPersonIds`（`listResendPdfTargetPersonIds_()`
+  // 算出嚟、真正會收信而且有派工嘅人）；選單版本冇揀人介面，維持全部 `changedList`。
+  const peopleNeedingPdf = Array.isArray(pdfPersonIds)
+    ? pdfPersonIds.slice()
+    : changedList.filter(function (c) { return c.hasAssignments; }).map(function (c) { return c.personId; });
   if (peopleNeedingPdf.length === 0) return { done: true, doneCount: 0, totalPeople: 0 };
   return generatePersonalPdfBatchForPeople_(quarterId, versionNo, peopleNeedingPdf);
 }

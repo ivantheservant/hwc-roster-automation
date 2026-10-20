@@ -101,7 +101,7 @@ console.log('\n=== C【核心】攞唔到鎖嗰陣，真入口真係唔會做嘢
     ['apiStep3Apply', ['2099T1', true]],
     ['apiStep4Confirm', ['2099T1', null]],
     ['apiStep5Apply', ['2099T1', true]],
-    ['apiStep5GeneratePdfs', ['2099T1', '']],
+    ['apiStep5GeneratePdfs', ['2099T1', '', null]],
     ['apiStep5SendConfirm', ['2099T1', '', null]],
     ['apiSavePreacherTranslationEntry', ['2099T1', '2099-01-04', 'PREACH', 1, '某人']],
     ['apiWebSavePreacherEntry', ['2099T1', '2099-01-04', 'PREACH', 1, '某人']],

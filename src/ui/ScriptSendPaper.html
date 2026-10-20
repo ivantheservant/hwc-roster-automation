@@ -647,20 +647,36 @@
     const byKey = {};
     (sendPool_ || []).forEach((c) => { byKey[c.key] = c; });
 
-    // 逐個來源數「呢一次揀咗嘅人入面，有幾多個屬於呢一組」。
-    // 一個人可以同時屬於幾組（例如一個堂委今季又有服侍），所以
-    // 各組加埋可以多過總數——所以總數要另外數，唔可以加埋。
+    // ⚠️⚠️ 第六十四輪批次 U 組：**每個人只算一次，各組加埋一定等於總數。**
+    //
+    // 舊寫法逐組數「揀咗嘅人入面有幾多個屬於呢一組」，再用「＋」串起嚟：
+    // 「這一次會寄給 6 位：職事表上全部人 5 位 ＋ 堂委 6 位 ＋ 執事 2 位」
+    // （5＋6＋2＝13，總數 6）。一個人可以同時屬於幾組，所以各組加埋會多過
+    // 總數，而「＋」令人以為係加數。
+    //
+    // 揀咗「甲」：每個人按 `sendPoolGroups_` 嘅次序（職事表上的人 → 堂委 →
+    // 執事 → IT → 幹事 → 只寄有改動的人）歸入**第一個**佢屬於嘅組，
+    // 後面嘅組用「另外」字眼，只數「前面各組都冇數過」嘅人。
+    // 自訂地址最尾，亦係「另外」。
+    const counted = {};
     const bits = [];
     (sendPoolGroups_ || []).forEach((g) => {
-      const n = keys.filter((k) => byKey[k]
+      const n = keys.filter((k) => !counted[k] && byKey[k]
         && (byKey[k].sources || []).indexOf(g.key) !== -1).length;
-      if (n > 0) bits.push(g.label + ' ' + n + ' 位');
+      if (n === 0) return;
+      keys.forEach((k) => {
+        if (!counted[k] && byKey[k] && (byKey[k].sources || []).indexOf(g.key) !== -1) counted[k] = true;
+      });
+      bits.push((bits.length > 0 ? '另外' : '') + g.label + ' ' + n + ' 位');
     });
-    if (extra > 0) bits.push('自訂 ' + extra + ' 個地址');
+    // 揀咗、但唔屬於任何一組嘅（不應該發生；發生嘅話都要計入，總數先對得上）
+    const ungrouped = keys.filter((k) => !counted[k]).length;
+    if (ungrouped > 0) bits.push((bits.length > 0 ? '另外' : '') + '其他 ' + ungrouped + ' 位');
+    if (extra > 0) bits.push((bits.length > 0 ? '另外' : '') + '自訂 ' + extra + ' 個地址');
 
     const total = keys.length + extra;
     return '這一次會寄給 ' + total + ' 位'
-      + (bits.length > 0 ? ('：' + bits.join(' ＋ ')) : '')
+      + (bits.length > 0 ? ('：' + bits.join('、')) : '')
       + '。';
   }
 
