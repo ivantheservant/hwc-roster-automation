@@ -537,6 +537,9 @@ function apiStep5Plan(quarterId, sendOptions) {
     versionNo: changedPlan.versionNo,
     changed: changedPlan.changed,
     changedPersonCount: changedPlan.changed.length,
+    // 第六十三輪批次 R 組：確認框分兩段——「安排有改動」同「上次正式發出時冇收到」。
+    arrangementChangedCount: changedPlan.arrangementChangedCount,
+    notReceivedCount: changedPlan.notReceivedCount,
     recipientCount: recipientCount,
     recipientPreview: recipientPreview,
     // 第六十三輪批次 T 組：附件同日曆檔

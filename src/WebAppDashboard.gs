@@ -334,6 +334,8 @@ function computeDashboardButtons_(s) {
         : (s.changedPersonCount === 0 ? '沒有人的安排改過，不需要重發。' : '')),
     dynamicText: buildResendButtonText_(s),
     changedPersonCount: s.changedPersonCount,
+    arrangementChangedCount: s.arrangementChangedCount,
+    notReceivedCount: s.notReceivedCount,
     lastSentAt: s.lastSentAt[MAIL_STAGES.RESEND]
   };
 
@@ -427,8 +429,20 @@ function buildOfficialButtonText_(s) {
 /** 規格 2.3 掣 4 嘅動態文字。 */
 function buildResendButtonText_(s) {
   if (s.changedPersonCount === 0) return '自上次發出之後沒有人的安排改過，不需要重發。';
-  return '自上次發出之後，有 ' + s.changedPersonCount + ' 個人的安排改了。只會寄給這 '
-    + s.changedPersonCount + ' 人和堂委。';
+  // ⚠️ 第六十三輪批次 R 組：**「上次冇收到」嘅人唔計入「安排改了」。**
+  // 上次正式發出只寄咗部分人嘅話，其餘人冇舊紀錄，舊寫法會講
+  // 「有 54 個人的安排改了」。冇提供分類（舊呼叫端）⇒ 照舊用總數。
+  const changedN = typeof s.arrangementChangedCount === 'number'
+    ? s.arrangementChangedCount : s.changedPersonCount;
+  const notReceived = typeof s.notReceivedCount === 'number' ? s.notReceivedCount : 0;
+  const head = changedN > 0
+    ? '自上次發出之後，有 ' + changedN + ' 個人的安排改了。'
+    : '自上次發出之後沒有人的安排改過。';
+  if (notReceived > 0) {
+    return head + '另外 ' + notReceived + ' 位上次正式發出時沒有收到——'
+      + '要寄第一次通知給他們，用「補寄未收到的人」。';
+  }
+  return head + '只會寄給這 ' + changedN + ' 人和堂委。';
 }
 
 /**
@@ -523,9 +537,10 @@ function buildDashboardState_(quarterId) {
 
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
   const officialCounts = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);
-  const changedPersonCount = stage === QUARTER_STAGE.OFFICIAL_SENT
-    ? countDashboardChangedPersons_(quarterId, versionNo)
-    : 0;
+  const resendBreakdown = stage === QUARTER_STAGE.OFFICIAL_SENT
+    ? countDashboardResendBreakdown_(quarterId)
+    : { total: 0, arrangementChanged: 0, notReceived: 0 };
+  const changedPersonCount = resendBreakdown.total;
 
   const facts = {
     stage: stage,
@@ -537,6 +552,9 @@ function buildDashboardState_(quarterId) {
     officialTargetCount: officialCounts.total,
     officialNoEmailCount: officialCounts.noEmail,
     changedPersonCount: changedPersonCount,
+    // 第六十三輪批次 R 組：「安排有改動」同「上次正式發出時冇收到」分開數
+    arrangementChangedCount: resendBreakdown.arrangementChanged,
+    notReceivedCount: resendBreakdown.notReceived,
     hasOfficialRecord: sendLog.hasOfficialRecord,
     lastSentAt: sendLog.lastSentAt
   };
@@ -690,6 +708,8 @@ function buildSentWithUnsavedWarning_(release, unsaved) {
  *   pendingRequestCount: number, hasAny: boolean}}
  */
 function readDashboardUnsavedState_(quarterId, versionNo) {
+  // 第六十三輪批次 S 組：診斷用（見 `logDashboardUnsavedDiag_()`）
+  const diagStartedAtMs = Date.now();
   let gridChangeCount = 0;
   let unresolvedCount = 0;
 
@@ -705,10 +725,12 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
       // 零改動會令掣 2／3／4 全部亮起，等於話「冇嘢未處理」，
       // 但實情係我哋根本睇唔到有冇嘢未處理。
       log_('WARN', 'readDashboardUnsavedState_ 讀不到 grid 狀態：' + err.message);
-      return {
+      const gridFailed = {
         gridChangeCount: -1, unresolvedCount: -1, pendingRequestCount: -1,
         hasAny: true, error: err.message
       };
+      logDashboardUnsavedDiag_(quarterId, versionNo, gridFailed, diagStartedAtMs, null);
+      return gridFailed;
     }
   }
 
@@ -734,9 +756,11 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
   // 唔可以變成靜靜消失——嗰個就會變成另一個「缺失被當成正常值」。
   let pendingRequestCount = 0;
   let needsInputCount = 0;
+  let skippedIncompleteCount = null;
   try {
     if (versionNo >= 0) {
       const requestPlan = planApplyRequests_(quarterId);
+      skippedIncompleteCount = requestPlan.skippedIncompleteCount;
       requestPlan.results.forEach(function (r) {
         if (r.category === 'NEEDS_INPUT') needsInputCount++;
         else pendingRequestCount++;
@@ -748,13 +772,15 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
     }
   } catch (err) {
     log_('WARN', 'readDashboardUnsavedState_ 讀不到待處理申報：' + err.message);
-    return {
+    const requestsFailed = {
       gridChangeCount: gridChangeCount, unresolvedCount: unresolvedCount,
       pendingRequestCount: -1, needsInputCount: -1, hasAny: true, error: err.message
     };
+    logDashboardUnsavedDiag_(quarterId, versionNo, requestsFailed, diagStartedAtMs, null);
+    return requestsFailed;
   }
 
-  return {
+  const state = {
     gridChangeCount: gridChangeCount,
     unresolvedCount: unresolvedCount,
     pendingRequestCount: pendingRequestCount,
@@ -762,6 +788,59 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
     // ⚠️ `needsInputCount` **刻意唔計入 `hasAny`**——見上面嘅判斷。
     hasAny: gridChangeCount > 0 || unresolvedCount > 0 || pendingRequestCount > 0
   };
+  logDashboardUnsavedDiag_(quarterId, versionNo, state, diagStartedAtMs, skippedIncompleteCount);
+  return state;
+}
+
+/**
+ * ═════════════════════════════════════════════════════════════════════
+ * ⚠️ 第六十三輪批次 S 組：**診斷 log——原因未查明，所以只記錄，唔改邏輯。**
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 現場（2026-10-20 瀏覽器實測，兩次）：
+ *   ・`Requests` 加咗 3 行申報，撳「重新整理」，第 2 步寫「堂委沒有提出改動」
+ *     （即係讀到 0 筆）；30 秒後撳「儲存及寄出」，確認畫面正確列出 2＋1 筆
+ *   ・grid 用下拉改咗 1 格，撳「重新整理」，第 2 步寫「未偵測到你在表上改過
+ *     任何格」；隨即撳「寄出」，卻正確攔住「你有 1 格改動還未儲存」
+ * 同一次測試另外兩次就顯示正確。
+ *
+ * 已經查過（詳見 docs 第六十三輪 S 組）：
+ *   ・前端冇快取：「重新整理」每次都叫 `apiGetDashboardState()`
+ *   ・伺服器冇快取：`readSheet()` 嘅記憶只喺同一次呼叫入面生效
+ *   ・用真程式＋擬真試算表重現（`tests/dashboard_unsaved_consistency.test.js`）：
+ *     狀態卡（開記憶）同寄出閘（冇記憶）三個情境都讀到一樣嘅數字
+ * 所以未搵到程式上嘅原因。最可能係試算表改動未寫到伺服器就被讀——但未證實。
+ *
+ * 呢一行寫入 Apps Script「執行項目」嘅 log（`Logger`），**唔寫任何工作表**
+ * （呢條路喺 `apiGetDashboardState()` 嘅唯讀記憶入面行，唔可以寫入）。
+ * 下次再撞到：喺 Apps Script 編輯器 ▸ 執行項目，搵嗰次 `apiGetDashboardState`
+ * 同之後嗰次寄出，對照兩行 `[DIAG] 未儲存狀態` 嘅讀取時間同數字。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object} state `readDashboardUnsavedState_()` 準備回傳嘅結果
+ * @param {number} startedAtMs 開始讀取嘅時間（`Date.now()`）
+ * @param {?number} skippedIncompleteCount 申報表入面唔完整（略過）嘅行數；查唔到就 null
+ * @returns {string} 寫咗出去嗰一行（測試用）
+ */
+function logDashboardUnsavedDiag_(quarterId, versionNo, state, startedAtMs, skippedIncompleteCount) {
+  const line = '[DIAG] 未儲存狀態 ' + quarterId + ' v' + versionNo
+    + ' grid=' + (versionNo >= 0 ? buildRosterSheetName_(quarterId, versionNo) : '（未有版本）')
+    + ' 改動格=' + state.gridChangeCount
+    + ' 認不出=' + state.unresolvedCount
+    + ' 待處理申報=' + state.pendingRequestCount
+    + ' 看不懂申報=' + (state.needsInputCount === undefined ? '?' : state.needsInputCount)
+    + ' 不完整申報=' + (skippedIncompleteCount === null || skippedIncompleteCount === undefined
+      ? '?' : skippedIncompleteCount)
+    + ' 讀取開始=' + new Date(startedAtMs).toISOString()
+    + ' 用時=' + (Date.now() - startedAtMs) + 'ms'
+    + (state.error ? ' 錯誤=' + state.error : '');
+  try {
+    Logger.log(line);
+  } catch (err) {
+    // 診斷本身唔可以令狀態卡失敗
+  }
+  return line;
 }
 
 /**
@@ -828,12 +907,19 @@ function readDashboardStatusExtras_(quarterId, versionNo, stage, versionExists) 
 }
 
 /** 掣 4 要顯示嘅「有幾多人嘅安排改咗」。只喺 OFFICIAL_SENT 先會呼叫。 */
-function countDashboardChangedPersons_(quarterId, versionNo) {
+function countDashboardResendBreakdown_(quarterId) {
+  // 第六十三輪批次 R 組：除咗總數，仲要分「安排有改動」同「上次冇收到」。
+  // 掣亮唔亮仍然睇總數（上次冇收到嘅人一樣可以喺重發揀）；文字只講前者。
   try {
-    return planResendChangedPersons_(quarterId).changed.length;
+    const plan = planResendChangedPersons_(quarterId);
+    return {
+      total: plan.changed.length,
+      arrangementChanged: plan.arrangementChangedCount,
+      notReceived: plan.notReceivedCount
+    };
   } catch (err) {
-    log_('WARN', 'countDashboardChangedPersons_ 失敗：' + err.message);
-    return 0;
+    log_('WARN', 'countDashboardResendBreakdown_ 失敗：' + err.message);
+    return { total: 0, arrangementChanged: 0, notReceived: 0 };
   }
 }
 

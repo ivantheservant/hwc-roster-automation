@@ -223,6 +223,10 @@
       title: '回到第 ' + plan.targetVersionNo + ' 版',
       bodyNodes: nodes,
       requireTyping: true,
+      // ⚠️ 第六十三輪批次 T 組第 3 點：**回退唔係不可逆。** 預設提示寫「這個動作
+      // 不可逆」，而上面同一個框寫「第 N 版不會被刪除，仍然可以再回去」——
+      // 兩句互相矛盾。回退唔刪任何版本，所以只講「確定的話」。
+      typingHint: '確定的話，請在下面輸入「' + CONFIRM_PHRASE + '」兩個字：',
       confirmLabel: '確定回退',
       danger: true,
       onConfirm: (typed) => runAction('回退中，請稍候', async () => {

@@ -545,6 +545,11 @@
    * @param {string=} sub 補充一句（可以慳）
    * @param {string[]=} steps 會做嘅事（可以慳）
    */
+  /** 等咗幾多秒先出「要等」嗰句。 */
+  const BUSY_SLOW_HINT_AFTER_SECS = 25;
+  /** 第六十三輪批次 T 組第 2 點：唔講秒數（理由見 `busyShow()` 入面）。 */
+  const BUSY_SLOW_HINT_TEXT = '系統仍在處理。有些步驟要等幾分鐘，請不要關掉這一頁。';
+
   function busyShow(title, sub, steps) {
     const node = busyEnsure_();
     if (busyHideTimer_) { clearTimeout(busyHideTimer_); busyHideTimer_ = null; }
@@ -572,10 +577,15 @@
     busyTickTimer_ = setInterval(() => {
       if (!busyNode_ || busyNode_.hidden) return;
       const secs = Math.round((Date.now() - busyStartedAt_) / 1000);
-      el('busyElapsed').textContent = secs >= 25
-        // ⚠️ 二十五秒之後先講「通常要三十幾秒」。一開始就講，
-        // 佢會覺得每一個動作都要等咁耐（大部分其實一兩秒）。
-        ? ('已經 ' + secs + ' 秒　這一步通常要三十幾秒，不要關掉這一頁。')
+      el('busyElapsed').textContent = secs >= BUSY_SLOW_HINT_AFTER_SECS
+        // ⚠️ 二十五秒之後先講「要等」。一開始就講，佢會覺得每一個動作都要等
+        // 咁耐（大部分其實一兩秒）。
+        //
+        // ⚠️ 第六十三輪批次 T 組第 2 點：**唔再講一個秒數。** 舊句「這一步通常要
+        // 三十幾秒」對所有動作都顯示，但實測儲存要 70–160 秒、讀取確認資料
+        // 30–55 秒、產生個人 PDF 約 10 分鐘——一個講錯嘅數字會令幹事以為
+        // 系統壞咗，喺中途關頁。冇一個數字啱晒所有動作，所以句子唔講秒數。
+        ? ('已經 ' + secs + ' 秒　' + BUSY_SLOW_HINT_TEXT)
         : ('已經 ' + secs + ' 秒');
     }, 1000);
 

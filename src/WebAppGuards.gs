@@ -355,6 +355,9 @@ function planResendChangedPersons_(quarterId) {
       personId: c.personId,
       nameTC: c.nameTC,
       hasAssignments: c.hasAssignments,
+      // 第六十三輪批次 R 組：安排真係改咗（有舊 hash 而且唔同），定係上次冇收到。
+      // 確認框同狀態卡嘅標題數字只計前者。理由見 `isArrangementChangedSinceLastSend_()`。
+      arrangementChanged: isArrangementChangedSinceLastSend_(c),
       firstNotifyDueToEmail: !!c.firstNotifyDueToEmail,
       hasEmail: !!(context.peopleById[c.personId] && context.peopleById[c.personId].email),
       // 規格 2.7：確認畫面要列得出「改了哪幾格」，唔可以只寫數字——
@@ -391,5 +394,13 @@ function planResendChangedPersons_(quarterId) {
     };
   });
 
-  return { versionNo: versionNo, changed: changed, context: context };
+  const arrangementChangedCount = changed.filter(function (c) { return c.arrangementChanged; }).length;
+  return {
+    versionNo: versionNo,
+    changed: changed,
+    context: context,
+    // 第六十三輪批次 R 組
+    arrangementChangedCount: arrangementChangedCount,
+    notReceivedCount: changed.length - arrangementChangedCount
+  };
 }

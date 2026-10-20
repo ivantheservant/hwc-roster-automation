@@ -1506,6 +1506,21 @@
     ]);
   }
 
+  /**
+   * 第六十三輪批次 R 組：把重發清單分成「安排有改動」同「上次正式發出時冇收到」。
+   * 後端 `planResendChangedPersons_()` 每項有 `arrangementChanged`；冇呢個欄位
+   * （舊後端）⇒ 當有改動，即係同舊畫面一樣。
+   * @param {Object[]} changed `apiStep5Plan()` 嘅 `changed`
+   * @returns {{changed: Object[], notReceived: Object[]}}
+   */
+  function splitResendPlanGroups(changed) {
+    const out = { changed: [], notReceived: [] };
+    (changed || []).forEach((c) => {
+      (c.arrangementChanged === false ? out.notReceived : out.changed).push(c);
+    });
+    return out;
+  }
+
   function openResend(sendOptions) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
@@ -1527,15 +1542,26 @@
 
       // 規格 2.7：**逐個列出**有改動的人，唔可以淨係寫數字。
       // 呢度係幹事唯一一次可以人眼睇出「係咪真係想改咁多人」嘅關口。
-      const nodes = [
-        make('div', { className: 'sec' }, [
-          sectionTitle('自上次發出之後，這 ' + plan.changed.length + ' 個人的安排改了'),
+      //
+      // ⚠️⚠️ 第六十三輪批次 R 組：**分兩段。** 上次正式發出只寄咗部分人嘅話，
+      // 其餘人冇舊紀錄——佢哋唔係「呢一次改咗」，係「上次冇收到」。
+      // 現場：第 2 版只寄咗 2 位，呢度寫「這 54 個人的安排改了……確認是不是
+      // 真的想改這麼多人」。標題數字只計第一段；第二段唔放入嗰句警告。
+      const groups = splitResendPlanGroups(plan.changed);
+      const nodes = [];
+      if (groups.changed.length > 0) {
+        nodes.push(make('div', { className: 'sec' }, [
+          sectionTitle('自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了'),
           make('div', {
-            text: '只會寄給這幾位和堂委。請逐個看一次，確認是不是真的想改這麼多人。',
+            text: '請逐個看一次，確認是不是真的想改這麼多人。',
             className: 'muted'
           })
-        ])
-      ];
+        ]));
+      } else {
+        nodes.push(make('div', { className: 'sec' }, [
+          sectionTitle('自上次發出之後，沒有人的安排改過')
+        ]));
+      }
 
       // ⚠️ 第四十七輪批次 B2／B3 組：「有改動嘅人」**唔等於**「會收到信嘅人」。
       //
@@ -1549,7 +1575,7 @@
       if (plan.contents) nodes.push(sendContentsBox(plan.contents));
 
       const list = make('div', { className: 'sec' });
-      plan.changed.forEach((c) => {
+      groups.changed.forEach((c) => {
         const item = make('div', { className: 'prop' });
         const head = make('div', { className: 'prop-head' });
         head.appendChild(make('span', { text: c.nameTC }));
@@ -1577,7 +1603,29 @@
         }));
         list.appendChild(item);
       });
-      nodes.push(list);
+      if (groups.changed.length > 0) nodes.push(list);
+
+      // 第六十三輪批次 R 組：第二段——上次正式發出時冇收到嘅人。
+      // 佢哋冇「原本」可以對照，所以只列「現在」。唔放入上面嗰句警告。
+      if (groups.notReceived.length > 0) {
+        const box = make('div', { className: 'sec' }, [
+          sectionTitle('上次正式發出時沒有收到的 ' + groups.notReceived.length + ' 位'),
+          make('div', {
+            text: '他們上次沒有收到信，所以沒有舊的安排可以對照——不是這一次改了他們。'
+              + '要寄第一次通知給他們，用「補寄未收到的人」。',
+            className: 'muted'
+          })
+        ]);
+        groups.notReceived.forEach((c) => {
+          box.appendChild(make('div', {
+            text: c.nameTC + '　現在：' + (c.hasAssignments === false
+              ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'))
+              + (c.hasEmail ? '' : '　⚠ 沒有電郵'),
+            className: 'vio-row'
+          }));
+        });
+        nodes.push(box);
+      }
 
       if (d.isDryRun) {
         nodes.push(make('div', {

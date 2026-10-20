@@ -4316,6 +4316,73 @@ const MUTATIONS = [
     replace: '    if (false) {',
     tests: ['tests/transient_retry.test.js']
   },
+  // ── 第六十三輪批次 R 組：重發確認框用 hash 基準，上次冇收到嘅人當成「改咗」──
+  {
+    id: 'r-no-hash-is-changed',
+    why: '冇舊 hash 都當「安排改咗」——現場：只寄咗 2 位，確認框寫「這 54 個人的安排改了」',
+    file: 'src/ResendFlow.gs',
+    find: '  return !!(c && c.oldHash) && c.oldHash !== c.newHash;',
+    replace: '  return !!c && c.oldHash !== c.newHash;',
+    tests: ['tests/resend_partial_baseline.test.js']
+  },
+  {
+    id: 'r-ui-title-total',
+    why: '確認框標題照用總數——上次冇收到嘅人都算入「安排改了」',
+    file: 'src/ui/ScriptZone1.html',
+    find: "          sectionTitle('自上次發出之後，這 ' + groups.changed.length + ' 個人的安排改了'),",
+    replace: "          sectionTitle('自上次發出之後，這 ' + plan.changed.length + ' 個人的安排改了'),",
+    tests: ['tests/resend_partial_baseline.test.js']
+  },
+  {
+    id: 'r-ui-no-split',
+    why: '確認框唔分兩段——上次冇收到嘅人都放入「真的想改這麼多人」嗰句警告',
+    file: 'src/ui/ScriptZone1.html',
+    find: '      (c.arrangementChanged === false ? out.notReceived : out.changed).push(c);',
+    replace: '      out.changed.push(c);',
+    tests: ['tests/resend_partial_baseline.test.js']
+  },
+  {
+    id: 'r-dash-total',
+    why: '狀態卡掣 4 文字照用總數——講「有 54 個人的安排改了」',
+    file: 'src/WebAppDashboard.gs',
+    find: '    ? s.arrangementChangedCount : s.changedPersonCount;',
+    replace: '    ? s.changedPersonCount : s.changedPersonCount;',
+    tests: ['tests/resend_partial_baseline.test.js']
+  },
+  // ── 第六十三輪批次 T 組第 2、3 點：畫面文字 ──────────────────────────
+  {
+    id: 't-busy-fixed-secs',
+    why: '等候牌照講「通常要三十幾秒」——儲存實測 70–160 秒、PDF 約 10 分鐘，幹事以為壞咗',
+    file: 'src/ui/Script.html',
+    find: "  const BUSY_SLOW_HINT_TEXT = '系統仍在處理。有些步驟要等幾分鐘，請不要關掉這一頁。';",
+    replace: "  const BUSY_SLOW_HINT_TEXT = '這一步通常要三十幾秒，不要關掉這一頁。';",
+    tests: ['tests/ui_wording_t_group.test.js']
+  },
+  {
+    id: 't-rollback-irreversible',
+    why: '回退確認框用返預設「這個動作不可逆」——同一個框又話「仍然可以再回去」',
+    file: 'src/ui/ScriptRollback.html',
+    find: "      typingHint: '確定的話，請在下面輸入「' + CONFIRM_PHRASE + '」兩個字：',\n",
+    replace: '',
+    tests: ['tests/ui_wording_t_group.test.js']
+  },
+  // ── 第六十三輪批次 S 組：第 2 步提示同寄出閘讀到唔同嘅未儲存改動（重現測試＋診斷）──
+  {
+    id: 's-dash-reads-other-ver',
+    why: '狀態卡讀咗另一個版本嘅 grid——第 2 步寫「未偵測到」而寄出閘攔到 1 格',
+    file: 'src/WebAppDashboard.gs',
+    find: '  const unsaved = readDashboardUnsavedState_(quarterId, versionNo);',
+    replace: '  const unsaved = readDashboardUnsavedState_(quarterId, Math.max(0, versionNo - 1));',
+    tests: ['tests/dashboard_unsaved_consistency.test.js']
+  },
+  {
+    id: 's-diag-not-logged',
+    why: '成功讀到都唔寫診斷 log——下次現場再撞到就冇嘢可以對照',
+    file: 'src/WebAppDashboard.gs',
+    find: '  logDashboardUnsavedDiag_(quarterId, versionNo, state, diagStartedAtMs, skippedIncompleteCount);\n',
+    replace: '',
+    tests: ['tests/dashboard_unsaved_consistency.test.js']
+  },
 ];
 
 /**

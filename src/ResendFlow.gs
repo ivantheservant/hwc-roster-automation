@@ -75,6 +75,30 @@ function computeResendDiff_(context) {
 }
 
 /**
+ * 第六十三輪批次 R 組：**呢個人係「安排真係改咗」，定係「上次冇收到」。**
+ *
+ * `computeResendDiff_()` 按每人 `SendLog` 嘅 hash 比較。上次正式發出只寄咗
+ * 部分人（F 組同一個場景）嘅話，其餘人**冇舊 hash**——佢哋一樣會喺清單
+ * 入面，但唔係「呢一次改咗佢哋」，而係「上次冇收到，冇嘢可以對照」。
+ *
+ * 現場（2026-10-20）：第 2 版只寄咗 2 位，確認框寫「這 54 個人的安排改了……
+ * 確認是不是真的想改這麼多人」，每人一行「上次的安排沒有記錄」。
+ *
+ *   有舊 hash 而且唔同　　　　　⇒ true（安排有改動）
+ *   冇舊 hash　　　　　　　　　⇒ false（上次冇收到）
+ *   hash 一樣（首次通知，之前冇電郵）⇒ false（佢上次一樣冇收到）
+ *
+ * ⚠️ **只影響點樣講，唔影響寄畀邊個**——寄畀邊個仍然由
+ * `resolveActualRecipientsFromContext_()` 決定。
+ *
+ * @param {Object} c `computeResendDiff_()` 其中一項
+ * @returns {boolean}
+ */
+function isArrangementChangedSinceLastSend_(c) {
+  return !!(c && c.oldHash) && c.oldHash !== c.newHash;
+}
+
+/**
  * 第六十三輪批次 P 組：**這一次重發，有邊幾位係「這一版冇任何安排」。**
  *
  * 呢啲人收到嘅係「你原本嗰幾格已經改由別人負責」——幹事要知道佢哋有收到，
