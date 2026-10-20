@@ -587,8 +587,9 @@ const MUTATIONS = [
       + '——粒掣灰晒，而下面同時講「已經生成過了」同「仲有 9 天到生成日期」，'
       + '幹事讀出嚟只會覺得系統壞咗',
     file: 'src/WebAppMainFlow.gs',
-    find: '  if (allGenerated) {',
-    replace: '  if (false) {',
+    // 第六十三輪批次 M 組喺前面加咗 `selectedGenerated` 分支，所以而家係 `} else if`
+    find: '  } else if (allGenerated) {',
+    replace: '  } else if (false) {',
     tests: ['tests/main_flow_six_steps.test.js']
   },
   {
@@ -1211,10 +1212,10 @@ const MUTATIONS = [
       + '——幹事喺寄出彈窗勾咗人之後，'
       + '個數字仍然係「全部應收嘅人」，同實際寄出唔同',
     file: 'src/FiveStageCore.gs',
-    find: '  const recipients = resolveActualRecipients_(\n'
-      + '    quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
-    replace: '  const recipients = listRecipients_(MAIL_STAGES.OFFICIAL,\n'
-      + '    buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL));',
+    // 第六十三輪批次 F 組：context 只砌一次，改叫 `resolveActualRecipientsFromContext_()`
+    find: '  const recipients = resolveActualRecipientsFromContext_(\n'
+      + '    context, MAIL_STAGES.OFFICIAL, sendOptions);',
+    replace: '  const recipients = listRecipients_(MAIL_STAGES.OFFICIAL, context);',
     // ⚠️ **只列 `preview_matches_send.test.js`。**
     // `e2e_five_stage_flow.test.js` 喺呢幾條突變下面仍然綠——
     // 因為佢**冇傳 `sendOptions`**，而冇傳嘅時候兩個算法
@@ -2810,10 +2811,9 @@ const MUTATIONS = [
     why: '一律當成「已經發咗」，永遠唔發'
       + '——一部乜都唔發嘅機器同冇呢個功能一樣',
     file: 'src/WebAppSaveConfirm.gs',
-    find: '  const row = findPublicLinkRow_(quarterId);' + '\n'
-      + '  if (!row) return false;',
-    replace: '  const row = findPublicLinkRow_(quarterId);' + '\n'
-      + '  if (!row) return true;',
+    // 第六十三輪批次 A 組：「最新」改由 `evaluatePublicLinkFreshness_()` 判斷
+    find: '  return f.latestVersionNo >= 0 && f.rowExists && !f.stale;',
+    replace: '  return true;',
     tests: ['tests/every_version_publishes.test.js']
   },
   {
@@ -2921,10 +2921,11 @@ const MUTATIONS = [
       + '——回退會蓋走現況，撳一下就做嘅話，'
       + '幹事會當成「睇一睇」噉撳落去',
     file: 'src/ui/ScriptRollback.html',
+    // 第六十三輪批次 T 組第 3 點喺中間加咗 typingHint（同註解）
     find: '      requireTyping: true,' + '\n'
-      + "      confirmLabel: '確定回退',",
+      + '      // ⚠️ 第六十三輪批次 T 組第 3 點：**回退唔係不可逆。**',
     replace: '      requireTyping: false,' + '\n'
-      + "      confirmLabel: '確定回退',",
+      + '      // ⚠️ 第六十三輪批次 T 組第 3 點：**回退唔係不可逆。**',
     tests: ['tests/rollback_preview_replay.test.js']
   },
   {
@@ -3814,9 +3815,10 @@ const MUTATIONS = [
     why: '完成訊息唔帶零派工嗰幾位'
       + '——幹事只見到一個總數，睇唔出被換走嘅人有冇收到',
     file: 'src/WebAppFlow.gs',
-    find: '    errorPdf: sendResult.errorPdf, errorPdfMissing: sendResult.errorPdfMissing,\n'
-      + '    zeroAssignmentPeople: zeroAssignmentPeople\n',
-    replace: '    errorPdf: sendResult.errorPdf, errorPdfMissing: sendResult.errorPdfMissing\n',
+    // 第六十三輪批次 A 組喺後面加咗 publicLinkRepublished
+    find: '    zeroAssignmentPeople: zeroAssignmentPeople,\n'
+      + '    publicLinkRepublished: !!sendResult.publicLinkRepublished\n',
+    replace: '    publicLinkRepublished: !!sendResult.publicLinkRepublished\n',
     tests: ['tests/resend_dropped_person.test.js']
   },
   {
