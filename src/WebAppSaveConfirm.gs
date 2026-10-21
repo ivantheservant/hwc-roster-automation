@@ -514,6 +514,16 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   // ⚠️ 排喺版本真係建立咗之後先寫。建立失敗嗰條路喺上面就 return 咗，
   // 唔會行到呢度——唔可以記低一次冇發生過嘅放行。
   if (plan.needsRelease) {
+    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**（`logHardViolationRelease_()`，
+    // 同步驟 3／5、選單版本同一個格式：action=「硬規則放行」、targetKey=季度、
+    // notes 有 `RELEASED_KEYS:` 6 欄 key）。之前只寫下面嗰行人類可讀嘅紀錄，
+    // `readReleasedHardViolationKeys_()` 認唔出 ⇒ 同樣 3 格每一次儲存都要重新打字放行。
+    try {
+      logHardViolationRelease_(quarterId, 'apiSaveAndConfirmExecute（儲存及寄出）',
+        plan.violations.real, created.versionNo);
+    } catch (err) {
+      log_('WARN', '機器可讀放行紀錄寫不進 AuditLog：' + err.message);
+    }
     try {
       writeAuditLog_({
         action: '放行硬規則違反',

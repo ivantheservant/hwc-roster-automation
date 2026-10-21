@@ -156,7 +156,10 @@ function buildGasStubs_() {
 // 真正嘅成因喺 client 端（`google.script.run` 序列化參數），後端一次都冇被叫到。
 // 而嗰個收窄點本身嘅行為係「壞值換成空字串 ＋ 寫一句 WARN」——
 // 即係把一個大聲嘅失敗變成一個靜靜嘅失敗，同呢個專案一直守嘅原則相反。
-const ALWAYS_LOADED = ['ArgShape.gs'];
+// 第六十七輪批次 AG／AH 組：`SendWarnings.gs` 畀三個寄出計畫同 dashboard 叫，而佢入面全部
+// 包喺 try/catch（依賴嘅 FineTune 函式冇載入就回 `error`、數字 0），所以一律載入——
+// 否則每一份載 FiveStageCore／WebAppDashboard 嘅測試都要自己記得加。
+const ALWAYS_LOADED = ['ArgShape.gs', 'SendWarnings.gs'];
 
 function loadGasSource(files, overrides) {
   const requested = files || FILES_FOR_GENERATOR;

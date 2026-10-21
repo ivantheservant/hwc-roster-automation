@@ -809,6 +809,85 @@
     return make('p', { text: text, className: className || 'lines' });
   }
   function sectionTitle(text) { return make('div', { text: text, className: 'sec-title' }); }
+
+  /**
+   * ⚠️ 第六十七輪批次 AG／AH 組：寄出前嘅兩個警告——**三個寄出確認框（寄審閱、正式發出、
+   * 改動後重發）同狀態卡都用呢一支**，唔各自寫。資料由後端 `summariseVersionSendWarnings_()`
+   * 一支出（空格＝儲存確認同一個定義；已放行＝儲存確認同一套分類）。
+   *
+   *   AH　「這一版還有 N 格沒有人，收到的人會見到空格」＋清單（最多 10 格＋另有 N 格）——**不阻擋**
+   *   AG　「這一季有 N 格是你放行的違反規則安排」＋〔顯示清單〕
+   *
+   * @param {Object} w `sendWarnings`
+   * @param {{compact: boolean}=} opts `compact` ⇒ 狀態卡用（兩行字，清單收埋）
+   * @returns {Element[]} 冇嘢要講就係空陣列
+   */
+  function buildSendWarningNodes(w, opts) {
+    const nodes = [];
+    if (!w) return nodes;
+    const compact = !!(opts && opts.compact);
+    const cellLabel = (b) => humanDate(b.serviceDate) + '　' + (b.postNameTC || b.postId)
+      + (Number(b.slotIndex) > 1 ? (' ' + b.slotIndex) : '');
+
+    const blank = w.blank || { count: 0, items: [], moreCount: 0 };
+    if (blank.count > 0) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '⚠ 這一版還有 ' + blank.count + ' 格沒有人，收到的人會見到空格。',
+          className: 'warn-head'
+        })
+      ]);
+      const list = compact
+        ? make('details', {}, [make('summary', { text: '顯示清單' })])
+        : box;
+      (blank.items || []).forEach((b) => {
+        list.appendChild(make('div', { text: cellLabel(b), className: 'vio-row' }));
+      });
+      if (blank.moreCount > 0) {
+        list.appendChild(make('div', { text: '另有 ' + blank.moreCount + ' 格。', className: 'muted' }));
+      }
+      if (compact) box.appendChild(list);
+      box.appendChild(make('div', {
+        text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。這不會阻擋你寄出。',
+        className: 'muted'
+      }));
+      nodes.push(box);
+    }
+
+    const released = w.released || { count: 0, items: [], moreCount: 0 };
+    if (released.count > 0) {
+      const box = make('div', { className: 'sec' }, [
+        make('div', {
+          text: '這一季有 ' + released.count + ' 格是你放行的違反規則安排。',
+          className: 'muted'
+        })
+      ]);
+      const list = make('details', {}, [make('summary', { text: '顯示清單' })]);
+      (released.items || []).forEach((r) => {
+        list.appendChild(make('div', {
+          text: cellLabel(r) + '　' + (r.personName || r.personId) + '——' + (r.reason || r.ruleId)
+            + (r.releasedVersionNo === null || r.releasedVersionNo === undefined
+              ? '（已放行）' : '（第 ' + r.releasedVersionNo + ' 版放行）'),
+          className: 'vio-row'
+        }));
+      });
+      if (released.moreCount > 0) {
+        list.appendChild(make('div', { text: '另有 ' + released.moreCount + ' 格。', className: 'muted' }));
+      }
+      box.appendChild(list);
+      nodes.push(box);
+    }
+
+    // ⚠️ 算唔到**唔可以**當成「冇問題」——講一句
+    if (w.error) {
+      nodes.push(make('div', {
+        text: '（這一次算不到空格和放行紀錄：' + w.error + '）',
+        className: 'muted'
+      }));
+    }
+    return nodes;
+  }
+
   function row(nodes, className) { return make('div', { className: className || 'row' }, nodes); }
 
   /** 一個唔會被 innerHTML 影響嘅清空。 */
@@ -1603,6 +1682,12 @@
 
     // ⚠️ 第六十三輪批次 A 組：公開連結未跟上（例如填咗講員而未重發佈）。
     // 寄出前系統會自動補發，但幹事要知——佢可能已經把連結貼咗出去。
+    // 第六十七輪批次 AG／AH 組：狀態卡常駐「還有 N 格沒有人」「有 N 格是你放行的」
+    const warnBox = clear(el('statusWarnings'));
+    const warnNodes = buildSendWarningNodes(d.sendWarnings, { compact: true });
+    warnNodes.forEach((n) => warnBox.appendChild(n));
+    warnBox.hidden = warnNodes.length === 0;
+
     const staleBox = clear(el('statusStaleLink'));
     const pl = d.publicLink || {};
     if (pl.stale) {

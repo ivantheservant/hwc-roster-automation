@@ -81,6 +81,19 @@ const HARD_VIOLATION_CLASS_LABEL = {
 const HARD_RELEASE_KEY_PREFIX = 'RELEASED_KEYS:';
 
 /**
+ * 第六十七輪批次 AG 組：放行紀錄入面「儲存成邊一版」嘅前綴（自己一行）。
+ * 冇呢一行嘅舊紀錄照認，只係講唔出版本。
+ */
+const HARD_RELEASE_VERSION_PREFIX = 'RELEASED_VERSION:';
+
+/**
+ * 第六十七輪批次 AG 組：主流程「儲存及寄出」第五十三輪至第六十六輪寫嘅**舊格式**放行紀錄嘅
+ * Action 值（`WebAppSaveConfirm.gs`）。`targetKey` 係 `<季度> v<版本>`，`notes` 每段係
+ * `日期　PostID#slot　RuleID`（冇 PersonID）。
+ */
+const HARD_RELEASE_MAINFLOW_LEGACY_ACTION = '放行硬規則違反';
+
+/**
  * 造一個違反項目嘅比對 key。
  *
  * ⚠️ **一定要用結構化欄位，唔可以用顯示文字。** 顯示文字係會改嘅
@@ -110,6 +123,19 @@ function buildHardViolationKey_(quarterId, v) {
  * @returns {Object.<string, boolean>} 已放行嘅 key 集合
  */
 function readReleasedHardViolationKeys_(auditRows, quarterId) {
+  const info = readReleasedHardViolationInfo_(auditRows, quarterId);
+  const released = {};
+  Object.keys(info).forEach(function (k) { released[k] = true; });
+  return released;
+}
+
+/**
+ * 第六十七輪批次 AG 組：同上，但每個 key 帶返「放行嗰陣儲存成邊一版」。
+ * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)` 嘅結果
+ * @param {string} quarterId 季度 ID
+ * @returns {Object.<string, {versionNo: ?number}>}
+ */
+function readReleasedHardViolationInfo_(auditRows, quarterId) {
   const C = COLUMNS.AUDIT_LOG;
   const released = {};
 
@@ -121,14 +147,76 @@ function readReleasedHardViolationKeys_(auditRows, quarterId) {
     const at = notes.indexOf(HARD_RELEASE_KEY_PREFIX);
     if (at === -1) return;   // 舊格式，見下面 readLegacyReleasedHardViolations_()
 
-    notes.slice(at + HARD_RELEASE_KEY_PREFIX.length)
-      .split('；')
-      .forEach(function (key) {
-        const trimmed = key.trim();
-        if (trimmed) released[trimmed] = true;
-      });
+    // key 清單喺 `RELEASED_KEYS:` 之後、去到行尾；版本（如有）自己一行。
+    const rest = notes.slice(at + HARD_RELEASE_KEY_PREFIX.length);
+    const lineEnd = rest.indexOf('\n');
+    const keysPart = lineEnd === -1 ? rest : rest.slice(0, lineEnd);
+    const vAt = notes.indexOf(HARD_RELEASE_VERSION_PREFIX);
+    const versionNo = vAt === -1 ? null
+      : Number(String(notes.slice(vAt + HARD_RELEASE_VERSION_PREFIX.length)).split(/\s/)[0]);
+
+    keysPart.split('；').forEach(function (key) {
+      const trimmed = key.trim();
+      if (!trimmed) return;
+      // 同一個 key 放行過多次 ⇒ 記最早嗰一版（「第 X 版放行」要係第一次）
+      if (!released[trimmed] || (released[trimmed].versionNo === null && versionNo !== null)) {
+        released[trimmed] = { versionNo: (versionNo === null || isNaN(versionNo)) ? null : versionNo };
+      }
+    });
   });
 
+  return released;
+}
+
+/**
+ * 第六十七輪批次 AG 組：認主流程「儲存及寄出」**舊格式**放行紀錄（第五十三輪至第六十六輪）。
+ *
+ * 舊格式：`action='放行硬規則違反'`、`targetKey='<季度> v<版本>'`、`notes` 每段
+ * `日期　PostID#slot　RuleID`——冇 PersonID。所以只可以喺「同一格、同一條規則，**而且**
+ * 嗰一版派工紀錄入面嗰格嘅人就係而家呢個人」時先算已放行：由該版本嘅 `RosterAssignments`
+ * 取回當時嘅 PersonID 砌成完整 6 欄 key。嗰一版冇紀錄（例如已被重設）⇒ 唔認。
+ *
+ * 用 6 欄 key 比對，所以格內換咗人就自然唔再算已放行——同新格式一樣嘅語意。
+ *
+ * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)` 嘅結果
+ * @param {string} quarterId 季度 ID
+ * @returns {Object.<string, {versionNo: ?number}>} 完整 6 欄 key → 放行版本
+ */
+function readMainFlowLegacyReleasedInfo_(auditRows, quarterId) {
+  const C = COLUMNS.AUDIT_LOG;
+  const prefix = quarterId + ' v';
+  const rows = (auditRows || []).filter(function (row) {
+    return String(row[C.ACTION] || '') === HARD_RELEASE_MAINFLOW_LEGACY_ACTION
+      && String(row[C.TARGET_KEY] || '').indexOf(prefix) === 0;
+  });
+  const released = {};
+  if (rows.length === 0) return released;
+
+  // 淨係有舊紀錄先讀派工表（一次），按版本索引「日期|PostID|slot → PersonID」
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const personByVersionCell = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    const k = Number(row[A.VERSION_NO]) + '|' + toDateString(row[A.SERVICE_DATE], timezone)
+      + '|' + row[A.POST_ID] + '|' + String(row[A.SLOT_INDEX]);
+    personByVersionCell[k] = String(row[A.PERSON_ID] || '').trim();
+  });
+
+  rows.forEach(function (row) {
+    const versionNo = Number(String(row[C.TARGET_KEY]).slice(prefix.length).trim());
+    if (isNaN(versionNo)) return;
+    String(row[C.NOTES] || '').split('；').forEach(function (part) {
+      // `yyyy-MM-dd　POSTID#slot　RULE_ID`（全形空格或半形都收）
+      const m = /^\s*(\d{4}-\d{2}-\d{2})[\s\u3000]+([A-Za-z0-9_]+)#(\d+)[\s\u3000]+([A-Z][A-Z0-9_]+)\s*$/.exec(part);
+      if (!m) return;
+      const personId = personByVersionCell[versionNo + '|' + m[1] + '|' + m[2] + '|' + m[3]];
+      if (!personId) return;   // 嗰一版嗰格冇人／冇紀錄 ⇒ 核對唔到，唔認
+      const key = buildHardViolationKey_(quarterId,
+        { serviceDate: m[1], postId: m[2], slotIndex: Number(m[3]), personId: personId, ruleId: m[4] });
+      if (!released[key]) released[key] = { versionNo: versionNo };
+    });
+  });
   return released;
 }
 
@@ -214,7 +302,13 @@ function classifyHardViolations_(violations, context) {
     const key = buildHardViolationKey_(context.quarterId, v);
 
     if (context.releasedKeys[key]) {
-      return decorateHardViolation_(v, HARD_VIOLATION_CLASS.RELEASED, key, '已由幹事打字放行');
+      // 第六十七輪批次 AG 組：有版本就講「第 X 版放行」
+      const info = (context.releasedVersionByKey || {})[key];
+      const vNo = info && info.versionNo !== null && info.versionNo !== undefined ? info.versionNo : null;
+      const item = decorateHardViolation_(v, HARD_VIOLATION_CLASS.RELEASED, key,
+        vNo === null ? '已由幹事打字放行' : '已由幹事打字放行（第 ' + vNo + ' 版）');
+      item.releasedVersionNo = vNo;
+      return item;
     }
     const legacyKey = v.serviceDate + '|' + (v.ruleId || '');
     if (context.legacyReleasedKeys[legacyKey]) {
@@ -357,9 +451,18 @@ function buildHardViolationClassContext_(quarterId, versionNo, unavailableRows) 
     });
   });
 
+  // 第六十七輪批次 AG 組：新格式 ＋ 主流程舊格式（核對過 PersonID 嘅）合埋一份，
+  // 每個 key 帶放行版本。
+  const info = readReleasedHardViolationInfo_(auditRows, quarterId);
+  const mainFlowLegacy = readMainFlowLegacyReleasedInfo_(auditRows, quarterId);
+  Object.keys(mainFlowLegacy).forEach(function (k) { if (!info[k]) info[k] = mainFlowLegacy[k]; });
+  const releasedKeys = {};
+  Object.keys(info).forEach(function (k) { releasedKeys[k] = true; });
+
   return {
     quarterId: quarterId,
-    releasedKeys: readReleasedHardViolationKeys_(auditRows, quarterId),
+    releasedKeys: releasedKeys,
+    releasedVersionByKey: info,
     legacyReleasedKeys: readLegacyReleasedHardViolations_(auditRows, quarterId),
     unavailableCreatedAtByPerson: createdAtByPerson,
     versionCreatedAtMs: readVersionCreatedAtMs_(quarterId, versionNo)

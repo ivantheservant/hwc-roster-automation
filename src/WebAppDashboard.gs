@@ -596,7 +596,10 @@ function buildDashboardState_(quarterId) {
     unsaved: unsaved,
     buttons: computeDashboardButtons_(facts),
     preQuarter: preQuarter,
-    publicLink: publicLink
+    publicLink: publicLink,
+    // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反
+    sendWarnings: versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
+      : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' }
   };
 }
 

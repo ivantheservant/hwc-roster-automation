@@ -2,9 +2,12 @@
  * 讀取 fine-tune 所需的全部資料：原始版本、grid 現況、規則與名單。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
+ * @param {{skipGrid: boolean}=} opts 第六十七輪批次 AG／AH 組：`skipGrid=true` ⇒ 唔讀 grid 工作表
+ *   （`gridValues` 係空物件）。只供**唔會疊加 grid** 嘅唯讀用途（`summariseVersionSendWarnings_()`）。
  * @returns {Object} 供 fine-tune 運算使用的 context
  */
-function buildFineTuneContext_(quarterId, versionNo) {
+function buildFineTuneContext_(quarterId, versionNo, opts) {
+  const skipGrid = !!(opts && opts.skipGrid);
   const config = readConfig();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
@@ -49,7 +52,7 @@ function buildFineTuneContext_(quarterId, versionNo) {
     versionNo: versionNo,
     timezone: timezone,
     original: original,
-    gridValues: readGridPersonIds_(quarterId, versionNo, timezone),
+    gridValues: skipGrid ? {} : readGridPersonIds_(quarterId, versionNo, timezone),
     // 第二十輪批次階段 A2：算「呢一格本來應該渲染成咩」要用嘅三樣嘢
     // （顯示標籤、逐崗位 EmptyDisplay、逐日期 ExternalOwner）。
     gridRender: buildGridRenderContext_(quarterId, timezone, posts),

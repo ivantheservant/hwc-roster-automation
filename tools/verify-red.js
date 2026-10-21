@@ -4817,6 +4817,161 @@ const MUTATIONS = [
     replace: '      else if (k === "x") out.notReceived++;',
     tests: ['tests/resend_confirm_kind_tags.test.js']
   },
+  // ── 第六十七輪批次 AK 組：未獲授權頁面只講中性句子 ────────────
+  {
+    id: 'ak-disabled-old-text',
+    why: '停用頁又提 Config／WEBAPP_ENABLED——義工見到內部設定名稱',
+    file: 'src/WebApp.gs',
+    find: '    return renderWebAppDisabledPage_();',
+    replace: "    return HtmlService.createHtmlOutput('<p>請在 Config 工作表把 WEBAPP_ENABLED 設為 TRUE</p>').setTitle('x');",
+    tests: ['tests/webapp_neutral_pages.test.js']
+  },
+  {
+    id: 'ak-forbidden-old-text',
+    why: '無權限頁又叫人「在 Config 工作表加入你的電郵」',
+    file: 'src/WebApp.gs',
+    find: '    return renderWebAppForbiddenPage_();',
+    replace: "    return HtmlService.createHtmlOutput('<p>請聯絡管理員在 Config 工作表加入你的電郵</p>').setTitle('x');",
+    tests: ['tests/webapp_neutral_pages.test.js']
+  },
+  {
+    id: 'ak-no-current-email',
+    why: '已登入嘅幹事見唔到「（目前登入：…）」——用錯帳戶都唔知',
+    file: 'src/WebApp.gs',
+    find: "      + (escaped ? '<p>（目前登入：' + escaped + '）</p>' : '')",
+    replace: "      + ''",
+    tests: ['tests/webapp_neutral_pages.test.js']
+  },
+  // ── 第六十七輪批次 AG 組：放行整季記住 ──────────────────────────
+  {
+    id: 'ag-mainflow-no-log',
+    why: '主流程放行唔寫機器可讀紀錄（拆走第 1 點）——每次儲存都要重新打字',
+    file: 'src/WebAppSaveConfirm.gs',
+    find: "      logHardViolationRelease_(quarterId, 'apiSaveAndConfirmExecute（儲存及寄出）',\n        plan.violations.real, created.versionNo);",
+    replace: '      void 0;',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ag-no-version-line',
+    why: '放行紀錄唔寫版本——畫面講唔出「第 X 版放行」',
+    file: 'src/FourStageFlow.gs',
+    find: "        ? '' : '\\n' + HARD_RELEASE_VERSION_PREFIX + Number(versionNo))",
+    replace: "        ? '' : '')",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ag-legacy-ignored',
+    why: '唔認主流程舊格式放行紀錄——第五十三至六十六輪放行過嘅全部要重新打字',
+    file: 'src/HardViolationClass.gs',
+    find: '  const mainFlowLegacy = readMainFlowLegacyReleasedInfo_(auditRows, quarterId);',
+    replace: '  const mainFlowLegacy = {};',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ag-legacy-no-person',
+    why: '舊格式紀錄唔用紀錄上嗰一版核對、改用最新版——指向舊版本嗰格另一個人都當已放行',
+    file: 'src/HardViolationClass.gs',
+    find: "      const personId = personByVersionCell[versionNo + '|' + m[1] + '|' + m[2] + '|' + m[3]];",
+    replace: "      const personId = personByVersionCell[findLatestVersionNo(quarterId) + '|' + m[1] + '|' + m[2] + '|' + m[3]];",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ag-suggest-releasd-off',
+    why: '「請系統幫我調整」唔認已放行——建議改走幹事放行咗嘅格',
+    file: 'src/SuggestionSheet.gs',
+    find: '    const releasedItem = isReleased(violation);',
+    replace: '    const releasedItem = null;',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ag-api-no-released',
+    why: '回前端嗰陣唔帶 released——畫面照畫勾選框',
+    file: 'src/SuggestionSheet.gs',
+    find: '        released: u.released === true,',
+    replace: '        released: false,',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ag-ui-released-cb',
+    why: '結果窗已放行嘅格照畫勾選框、冇「已放行」標籤',
+    file: 'src/ui/ScriptSuggestion.html',
+    find: '        if (u.released) {',
+    replace: '        if (false) {',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  // ── 第六十七輪批次 AH 組：寄出前講空格 ──────────────────────────
+  {
+    id: 'ah-blank-not-counted',
+    why: '寄出前唔數空格——義工收到有空格嘅表而幹事冇被提醒',
+    file: 'src/SendWarnings.gs',
+    find: '    const blanks = listGenuineBlankCells_(state, context).map(function (b) {',
+    replace: '    const blanks = [].map(function (b) {',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-step2-no-warn',
+    why: '寄審閱確認框冇空格／已放行資料',
+    file: 'src/FiveStageCore.gs',
+    find: "    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.REVIEW),\n    // 第六十七輪批次 AG／AH 組：空格同已放行嘅違反（三個寄出確認框同一支）\n    sendWarnings: summariseVersionSendWarnings_(quarterId, versionNo)",
+    replace: "    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.REVIEW),\n    sendWarnings: { blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' }",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-step4-no-warn',
+    why: '正式發出確認框冇空格／已放行資料',
+    file: 'src/FiveStageCore.gs',
+    find: "    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL),\n    // 第六十七輪批次 AG／AH 組\n    sendWarnings: summariseVersionSendWarnings_(quarterId, versionNo)",
+    replace: "    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL),\n    sendWarnings: { blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' }",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-step5-no-warn',
+    why: '改動後重發確認框冇空格／已放行資料',
+    file: 'src/WebAppFlow.gs',
+    find: '    sendWarnings: summariseVersionSendWarnings_(quarterId, changedPlan.versionNo)',
+    replace: "    sendWarnings: { blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' }",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-dashboard-no-warn',
+    why: '狀態卡冇空格／已放行資料',
+    file: 'src/WebAppDashboard.gs',
+    find: '    sendWarnings: versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)',
+    replace: '    sendWarnings: !versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-ui-no-blank-head',
+    why: '畫面唔講「這一版還有 N 格沒有人」',
+    file: 'src/ui/Script.html',
+    find: "          text: '⚠ 這一版還有 ' + blank.count + ' 格沒有人，收到的人會見到空格。',",
+    replace: "          text: '',",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-ui-no-released-head',
+    why: '畫面唔講「這一季有 N 格是你放行的違反規則安排」',
+    file: 'src/ui/Script.html',
+    find: "          text: '這一季有 ' + released.count + ' 格是你放行的違反規則安排。',",
+    replace: "          text: '',",
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-review-box-no-call',
+    why: '寄審閱確認框唔叫共用函式——三個框各自一套',
+    file: 'src/ui/ScriptZone1.html',
+    find: "      if (preview.contents) nodes.push(sendContentsBox(preview.contents));\n      // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）\n      buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));",
+    replace: '      if (preview.contents) nodes.push(sendContentsBox(preview.contents));',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ah-resend-box-no-call',
+    why: '改動後重發確認框唔叫共用函式',
+    file: 'src/ui/ScriptZone1.html',
+    find: "    // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）\n    buildSendWarningNodes(plan.sendWarnings).forEach((n) => nodes.push(n));\n",
+    replace: '',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
 ];
 
 /**

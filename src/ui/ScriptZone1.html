@@ -1116,6 +1116,8 @@
       ];
       // 第六十三輪批次 T 組：講明附件同日曆檔（同寄信嗰刻同一個解析）
       if (preview.contents) nodes.push(sendContentsBox(preview.contents));
+      // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
+      buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1471,7 +1473,11 @@
 
       const nodes = [];
 
-      if (warnings.pendingRequests.length > 0 || warnings.pendingCellsTotal > 0) {
+      // ⚠️ 第六十七輪批次 AH 組：「待補（黃底）」嗰句併入下面共用嘅空格一段
+      // （`sendWarnings.blank` 包埋待補格——同一件事唔講兩次）。
+      // 後端攞唔到 `sendWarnings` 嗰陣先退回舊句子。
+      const hasShared = !!(preview.sendWarnings && !preview.sendWarnings.error);
+      if (warnings.pendingRequests.length > 0 || (!hasShared && warnings.pendingCellsTotal > 0)) {
         const box = make('div', { className: 'warnbox' });
         if (warnings.pendingRequests.length > 0) {
           box.appendChild(make('div', {
@@ -1479,7 +1485,7 @@
             className: 'err-text'
           }));
         }
-        if (warnings.pendingCellsTotal > 0) {
+        if (!hasShared && warnings.pendingCellsTotal > 0) {
           box.appendChild(make('div', {
             text: '仍然有 ' + warnings.pendingCellsTotal + ' 格待補（黃底）。',
             className: 'err-text'
@@ -1491,6 +1497,8 @@
         }));
         nodes.push(box);
       }
+      // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
+      buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1774,6 +1782,8 @@
     nodes.push(list);
     // 第六十三輪批次 T 組：附件同日曆檔
     if (plan.contents) nodes.push(sendContentsBox(plan.contents));
+    // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
+    buildSendWarningNodes(plan.sendWarnings).forEach((n) => nodes.push(n));
 
     // ── 二：安排改咗、但這一次冇揀 ────────────────────────────
     if (g.changedNotSent.length > 0) {

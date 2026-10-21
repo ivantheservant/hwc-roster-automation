@@ -552,7 +552,9 @@ function apiStep5Plan(quarterId, sendOptions) {
     confirmGroups: confirmGroups,
     // 第六十三輪批次 T 組：附件同日曆檔
     contents: describeConfirmContents_(MAIL_STAGES.RESEND, sendOptions),
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
+    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    // 第六十七輪批次 AG／AH 組
+    sendWarnings: summariseVersionSendWarnings_(quarterId, changedPlan.versionNo)
   };
 }
 

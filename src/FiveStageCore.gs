@@ -228,7 +228,9 @@ function planStep2_(quarterId, sendOptions) {
     // 階段 A（收尾輪）新增：>0 代表這個版本＋這個階段在 SendLog 已經有人收過信，
     // 很可能是上次執行中途中斷後重新執行——見 Mailer.gs 的
     // countAlreadySentForStage_() 說明，只示警不阻擋。
-    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.REVIEW)
+    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.REVIEW),
+    // 第六十七輪批次 AG／AH 組：空格同已放行嘅違反（三個寄出確認框同一支）
+    sendWarnings: summariseVersionSendWarnings_(quarterId, versionNo)
   };
 }
 
@@ -531,7 +533,9 @@ function planStep4SendPreview_(quarterId, versionNo, sendOptions) {
     // 階段 A（收尾輪）新增：見 planStep2_() 同一段說明——步驟 4 的收件人數量
     // 遠多於步驟 2（約 60 人 vs 幾位堂委），實際撞到 Apps Script 執行逾時的
     // 風險也高得多，這個警示對步驟 4 更重要。
-    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL)
+    alreadySentCount: countAlreadySentForStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL),
+    // 第六十七輪批次 AG／AH 組
+    sendWarnings: summariseVersionSendWarnings_(quarterId, versionNo)
   };
 }
 

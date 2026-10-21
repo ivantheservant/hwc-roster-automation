@@ -1041,9 +1041,11 @@ function confirmHardViolationOverride_(ui, quarterId, title, violations, consequ
  * @param {string} quarterId 季度 ID
  * @param {string} stepLabel 對話框標題／步驟名稱，用於區分是哪一步放行的
  * @param {Object[]} hardViolations 被放行的硬規則違反清單（已經篩過 severity=HARD）
+ * @param {number=} versionNo 第六十七輪批次 AG 組：放行嗰陣儲存成邊一版（有就寫入
+ *   `RELEASED_VERSION:N`，畫面先講得出「已放行（第 N 版）」）
  * @returns {void}
  */
-function logHardViolationRelease_(quarterId, stepLabel, hardViolations) {
+function logHardViolationRelease_(quarterId, stepLabel, hardViolations, versionNo) {
   // ── 第二十一輪批次階段 A：改寫成**機器可讀**嘅 key 清單 ──
   //
   // 修正之前只寫一句人類可讀嘅句子，入面冇 PersonID、崗位又可能係中文名，
@@ -1075,6 +1077,8 @@ function logHardViolationRelease_(quarterId, stepLabel, hardViolations) {
     newValue: '已放行（打字輸入「確認放行」）',
     source: stepLabel,
     notes: humanReadable + '\n' + HARD_RELEASE_KEY_PREFIX + keys.join('；')
+      + (versionNo === undefined || versionNo === null || versionNo === ''
+        ? '' : '\n' + HARD_RELEASE_VERSION_PREFIX + Number(versionNo))
   });
 }
 

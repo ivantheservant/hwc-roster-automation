@@ -315,7 +315,14 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   // 重寫一定會分岔。
   // ⚠️ 第四十六輪批次 C 組：把「邊幾格係幹事親手改嘅」同
   // 「邊幾格佢准咗系統動」一齊傳落去。冇傳嘅話，系統會照舊改走佢改嘅嘢。
-  const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys);
+  // 第六十七輪批次 AG 組：帶埋放行紀錄落去，已放行嘅格唔會被建議改走
+  let releaseContext = null;
+  try {
+    releaseContext = buildHardViolationClassContext_(quarterId, versionNo, context.unavailable);
+  } catch (err) {
+    log_('WARN', 'buildSuggestionState_：讀不到放行紀錄，已放行的格會被當成普通違反：' + err.message);
+  }
+  const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext);
 
   const systemKeys = {};
   const notes = {};
@@ -332,9 +339,13 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   const blockedKeys = {};
   (fix.untouchedManual || []).forEach(function (u) {
     blockedKeys[u.key] = true;
-    notes[u.key] = '你改的這一格違反了規則（' + u.reason + '）。'
-      + '系統沒有動它——你改的東西系統不會自己改走。'
-      + '如果要系統一併調整，回介面在那張清單勾選這一格，再撳一次「請系統幫我調整」。';
+    notes[u.key] = u.released
+      ? ('這一格違反了規則（' + u.reason + '），但你已經放行'
+        + (u.releasedVersionNo === null || u.releasedVersionNo === undefined ? '' : '（第 ' + u.releasedVersionNo + ' 版）')
+        + '——系統不會改動這一格。')
+      : ('你改的這一格違反了規則（' + u.reason + '）。'
+        + '系統沒有動它——你改的東西系統不會自己改走。'
+        + '如果要系統一併調整，回介面在那張清單勾選這一格，再撳一次「請系統幫我調整」。');
   });
 
   fix.proposals.forEach(function (p) {
@@ -407,9 +418,21 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
  * @param {Object} analysis `analyseManualState_(context)` 的結果
  * @returns {Object} {proposals, unfixable}
  */
-function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys) {
+function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext) {
   const proposals = [];
   const unfixable = [];
+  // ⚠️ 第六十七輪批次 AG 組：**已放行嘅格一律唔動**（就算幹事勾咗「准系統調整」）。
+  // 放行嘅意思係「我知道呢度違規，我照樣要」；系統調整嗰陣自己改走佢，
+  // 等於推翻一個佢已經明確做咗嘅決定。列出嚟，標「已放行（第 X 版）」。
+  const isReleased = function (violation) {
+    if (!releaseContext || violation.severity !== RULE_LEVELS.HARD) return null;
+    try {
+      const c = classifyHardViolations_([violation], releaseContext);
+      return c.released.length > 0 ? c.released[0] : null;
+    } catch (err) {
+      return null;
+    }
+  };
   // ⚠️ 第四十六輪批次 C 組：**幹事親手改過嘅格，一律唔動。**
   //
   // Ivan 嘅原話：「如果 admin 輸入了違反規則的東西，〔請系統幫我調整〕
@@ -440,6 +463,26 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys)
 
     const key = cellKey_(violation.serviceDate, violation.postId, violation.slotIndex);
     handled[key] = true;
+
+    const releasedItem = isReleased(violation);
+    if (releasedItem) {
+      const postR = findPostById_(context.posts, violation.postId);
+      untouchedManual.push({
+        key: key,
+        serviceDate: violation.serviceDate,
+        postId: violation.postId,
+        postNameTC: postR ? postR.postNameTC : violation.postId,
+        slotIndex: violation.slotIndex,
+        personId: violation.personId,
+        personName: nameOfPersonId_(context, violation.personId),
+        ruleId: violation.ruleId,
+        severity: violation.severity,
+        reason: violation.reason || violation.ruleId,
+        released: true,
+        releasedVersionNo: releasedItem.releasedVersionNo === undefined ? null : releasedItem.releasedVersionNo
+      });
+      continue;
+    }
 
     // ⚠️ 幹事親手改過而佢又冇明確准許 ⇒ **唔改，改為提示**。
     // 唔可以靜靜略過——靜靜略過等於「系統睇唔到嗰個問題」，
@@ -707,7 +750,10 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
         slotIndex: u.slotIndex,
         personName: u.personName,
         ruleId: u.ruleId,
-        reason: u.reason
+        reason: u.reason,
+        // 第六十七輪批次 AG 組：已放行嘅格——畫面標「已放行（第 X 版）」、冇勾選框
+        released: u.released === true,
+        releasedVersionNo: u.releasedVersionNo === undefined ? null : u.releasedVersionNo
       };
     }),
     // ⚠️ 系統改完之後仍然違反規則的格**一定要講出來**。

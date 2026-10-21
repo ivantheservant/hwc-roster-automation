@@ -278,26 +278,41 @@
     const allowSelected = {};
     let blockedBox = null;
     if (untouched.length > 0) {
+      // ⚠️ 第六十七輪批次 AG 組：已放行嘅格**冇勾選框**，標「已放行（第 X 版）——系統不會改動這一格」；
+      // 未放行嘅照舊勾選。
+      const releasedCount = untouched.filter((u) => u.released).length;
       blockedBox = make('div', { className: 'sec sec-warn' }, [
-        sectionTitle('你改的 ' + untouched.length + ' 格違反了規則，系統沒有動它們'),
+        sectionTitle('你改過、而違反規則的格（' + untouched.length + ' 格）'),
         make('div', {
-          text: '系統不會自己改走你親手做的決定。要它一併調整的，'
-            + '在下面勾選，然後撳〔准系統調整我勾了的〕。',
+          text: '系統不會自己改走你親手做的決定。'
+            + (releasedCount < untouched.length
+              ? '要它一併調整的，在下面勾選，然後撳〔准系統調整我勾了的〕。' : '')
+            + (releasedCount > 0 ? '已放行的格系統不會改動。' : ''),
           className: 'muted'
         })
       ]);
       untouched.forEach((u) => {
+        const label = humanDate(u.serviceDate) + '　' + u.postNameTC
+          + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '')
+          + '　' + u.personName + '——' + u.reason;
+        if (u.released) {
+          blockedBox.appendChild(make('div', { className: 'vio-row' }, [
+            make('span', { text: label }),
+            make('span', {
+              text: '已放行' + (u.releasedVersionNo === null || u.releasedVersionNo === undefined
+                ? '' : '（第 ' + u.releasedVersionNo + ' 版）') + '——系統不會改動這一格',
+              className: 'tag'
+            })
+          ]));
+          return;
+        }
         const line = make('label', { className: 'check-row' });
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = false;   // ⚠️ 預設不勾
         cb.addEventListener('change', () => { allowSelected[u.key] = cb.checked; });
         line.appendChild(cb);
-        line.appendChild(make('span', {
-          text: humanDate(u.serviceDate) + '　' + u.postNameTC
-            + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '')
-            + '　' + u.personName + '——' + u.reason
-        }));
+        line.appendChild(make('span', { text: label }));
         blockedBox.appendChild(line);
       });
     }

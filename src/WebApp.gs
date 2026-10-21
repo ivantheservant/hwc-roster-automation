@@ -99,30 +99,62 @@ function doGet(e) {
     return renderPersonalRosterPage_(e);
   }
 
+  // ⚠️ 第六十七輪批次 AK 組：呢兩個頁面**對外**只可以講中性句子。
+  //
+  // 現場（2026-10-21 無痕視窗開個人連結基底、冇參數）：見到「……在 Config 工作表的
+  // WEBAPP_ALLOWED_EMAILS 加入你的電郵」。義工刪走網址參數就會見到，而且叫佢搵人把自己
+  // 加入白名單係錯嘅指示。詳細原因照舊寫入執行記錄（`log_()`），畫面唔提任何工作表、
+  // Config 鍵或部署設定——見 `renderWebAppDisabledPage_()`／`renderWebAppForbiddenPage_()`。
   try {
     assertWebAppEnabled_();
   } catch (err) {
-    return HtmlService.createHtmlOutput(
-      '<p>Web UI 目前已停用。</p>'
-        + '<p>如需啟用，請在試算表的 Config 工作表把 <code>WEBAPP_ENABLED</code> 設為 '
-        + '<code>TRUE</code>，並確認 Apps Script 的部署存取權限設定正確。</p>'
-    ).setTitle('粵語堂職事表系統（已停用）');
+    log_('WARN', 'doGet：Web UI 已停用，回中性頁。原因：' + err.message);
+    return renderWebAppDisabledPage_();
   }
 
   try {
     assertApiCallerAuthorized_();
   } catch (err) {
-    return HtmlService.createHtmlOutput(
-      '<p>你沒有權限使用這個頁面。</p>'
-        + '<p>如果你認為這是錯誤，請聯絡系統管理員，'
-        + '在 Config 工作表的 <code>WEBAPP_ALLOWED_EMAILS</code> 加入你的電郵。</p>'
-    ).setTitle('粵語堂職事表系統（無權限）');
+    log_('WARN', 'doGet：呼叫者不在允許名單，回中性頁。原因：' + err.message);
+    return renderWebAppForbiddenPage_();
   }
 
   return HtmlService.createTemplateFromFile(UI_FILES.INDEX)
     .evaluate()
     .setTitle('粵語堂職事表系統')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * 第六十七輪批次 AK 組：Web UI 停用時對外顯示嘅頁。**唔提工作表、Config 鍵、部署設定。**
+ * @returns {HtmlOutput}
+ */
+function renderWebAppDisabledPage_() {
+  return HtmlService.createHtmlOutput(
+    '<p>系統暫時停用，請稍後再試或聯絡幹事。</p>'
+  ).setTitle('粵語堂職事表系統');
+}
+
+/**
+ * 第六十七輪批次 AK 組：呼叫者不在允許名單時對外顯示嘅頁。
+ *
+ * - 義工（多數係刪走咗網址參數先會見到）⇒ 叫佢用電郵內嘅個人專屬連結。
+ * - 已登入但用錯帳戶嘅幹事 ⇒ 多一句「（目前登入：<電郵>）」方便自己發現；
+ *   **仍然唔提 Config**。讀唔到電郵就唔出呢一句。
+ * @returns {HtmlOutput}
+ */
+function renderWebAppForbiddenPage_() {
+  let email = '';
+  try {
+    email = String(Session.getActiveUser().getEmail() || '').trim();
+  } catch (err) {
+    email = '';
+  }
+  const escaped = email.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return HtmlService.createHtmlOutput(
+    '<p>這個網址只供幹事使用。如果你是義工，請用電郵內的個人專屬連結。</p>'
+      + (escaped ? '<p>（目前登入：' + escaped + '）</p>' : '')
+  ).setTitle('粵語堂職事表系統');
 }
 
 /**
