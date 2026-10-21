@@ -5029,6 +5029,87 @@ const MUTATIONS = [
     replace: "          const res = await callServerMutating('apiSaveEligibilityBatch', changes);",
     tests: ['tests/eligibility_impact.test.js']
   },
+  // ── 第六十七輪批次 AJ 組：可編輯副本＋系統出問題時怎樣做 ──────────
+  {
+    id: 'aj-name-no-version',
+    why: '副本檔名漏版本號——幹事分唔出邊一份係邊一版',
+    file: 'src/EditableCopy.gs',
+    find: "  return String(quarterId).trim() + '_第' + Number(versionNo) + '版_' + EDITABLE_COPY_FILE_LABEL",
+    replace: "  return String(quarterId).trim() + '_' + EDITABLE_COPY_FILE_LABEL",
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-copy-not-moved',
+    why: '副本留喺 My Drive 根，唔搬入 Shared Drive 嘅 <季度>/可編輯副本/',
+    file: 'src/EditableCopy.gs',
+    find: '  file.moveTo(folder);\n',
+    replace: '',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-rename-original',
+    why: '改名改咗原表而唔係副本——原表一格都唔准動',
+    file: 'src/EditableCopy.gs',
+    find: '  copied.setName(sheetName);',
+    replace: '  sheet.setName(sheetName + \'_副本\');',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-blank-sheet-kept',
+    why: '新檔留住自帶嘅空白第一張——幹事開檔第一眼係空表',
+    file: 'src/EditableCopy.gs',
+    find: '    if (s.getSheetId() !== copied.getSheetId()) copy.deleteSheet(s);',
+    replace: '    if (false) copy.deleteSheet(s);',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-autocopy-rethrows',
+    why: '自動副本失敗令整次正式發出拋錯——信已經寄咗出去',
+    file: 'src/EditableCopy.gs',
+    find: "    log_('WARN', '正式發出之後自動建立可編輯副本失敗（' + quarterId + ' v' + versionNo + '）：' + err.message);",
+    replace: '    throw err;',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-no-autocopy',
+    why: '正式發出之後唔自動做副本',
+    file: 'src/FiveStageCore.gs',
+    find: '    result.editableCopy = tryCreateEditableCopyAfterSend_(quarterId, versionNo);\n',
+    replace: '',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-api-drops-copy',
+    why: '前端收唔到自動副本結果——完成窗一句都冇',
+    file: 'src/WebAppFlow.gs',
+    find: '    editableCopy: result.editableCopy || null',
+    replace: '    editableCopy: null',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-links-create-dir',
+    why: '「系統出問題時怎樣做」唔應該建資料夾（唯讀）',
+    file: 'src/EditableCopy.gs',
+    find: "  const quarterFolders = root.getFoldersByName(q);\n  const quarterFolder = quarterFolders.hasNext() ? quarterFolders.next() : null;",
+    replace: '  const quarterFolder = findOrCreateChildFolder_(root, q);',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-links-oldest-copy',
+    why: '可編輯副本連結揀咗最舊一份',
+    file: 'src/EditableCopy.gs',
+    find: '          if (!latest || String(f.getName()) > String(latest.getName())) latest = f;   // 檔名尾係時間戳',
+    replace: '          if (!latest || String(f.getName()) < String(latest.getName())) latest = f;',
+    tests: ['tests/editable_copy.test.js']
+  },
+  {
+    id: 'aj-ui-no-copy-line',
+    why: '正式發出完成窗唔講自動副本',
+    file: 'src/ui/ScriptZone1.html',
+    find: "    if (r.editableCopy && r.editableCopy.ok) {",
+    replace: "    if (false) {",
+    tests: ['tests/editable_copy.test.js']
+  },
 ];
 
 /**

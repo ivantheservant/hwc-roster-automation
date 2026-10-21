@@ -586,6 +586,9 @@ function executeStep4Send_(quarterId, sendOptions) {
   result.advanced = outcome.ok;
   if (outcome.ok) {
     advanceQuarterStage_(quarterId, QUARTER_STAGE.OFFICIAL_SENT);
+    // 第六十七輪批次 AJ 組：正式發出成功之後自動做一份可編輯副本（快照）。
+    // ⚠️ 失敗唔影響寄出——信已經寄咗，呢度只係多一份保險（`tryCreateEditableCopyAfterSend_()` 自己吞錯）。
+    result.editableCopy = tryCreateEditableCopyAfterSend_(quarterId, versionNo);
   }
   return result;
 }

@@ -68,10 +68,64 @@
         () => openRuleImport(), false)
     ]));
 
+    // 第六十七輪批次 AJ 組：系統出問題時怎樣做（三個位置嘅連結由後端讀出，唔寫死）
+    body.appendChild(make('div', { className: 'sec' }, [
+      sectionTitle('系統出問題時'),
+      zone4Row('系統出問題時怎樣做',
+        '去哪裡找最新版（公開連結、完整版 PDF、可編輯副本）、怎樣自己手動繼續、改完怎樣回到系統。',
+        () => openRecoveryHelp(), false)
+    ]));
+
     body.appendChild(make('p', {
       text: '其餘工具（體檢、上線前檢查、匯出關鍵狀態等）請用試算表上方的選單。',
       className: 'muted'
     }));
+  }
+
+  /**
+   * 第六十七輪批次 AJ 組：「系統出問題時怎樣做」——重點＋三個位置嘅實際連結。
+   * 全文喺公開 repo 嘅 `docs/系統出問題時手動繼續.md`；呢度只係重點。
+   */
+  function openRecoveryHelp() {
+    runAction('讀取位置', async () => {
+      const r = await callServer('apiGetRecoveryLinks', currentQuarterId);
+      const nodes = [
+        para('系統壞了、或者一時打不開的時候，這一季的最新版在三個地方都有。'
+          + '先看這三個位置，不用急著改任何東西。'),
+        make('div', { className: 'sec' }, [sectionTitle('三個位置')])
+      ];
+      const place = (title, link, note) => {
+        const box = make('div', { className: 'vio-row' });
+        box.appendChild(make('div', { text: title, className: 'strong' }));
+        if (link && link.url) {
+          const a = make('a', { text: '開啟', className: 'sheetlink' });
+          a.href = link.url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          box.appendChild(a);
+        }
+        if (link && link.folderUrl && link.folderUrl !== link.url) {
+          const f = make('a', { text: '開啟資料夾', className: 'sheetlink' });
+          f.href = link.folderUrl;
+          f.target = '_blank';
+          f.rel = 'noopener';
+          box.appendChild(f);
+        }
+        box.appendChild(make('div', { text: note || '', className: 'muted' }));
+        return box;
+      };
+      nodes.push(place('一、公開連結試算表（唯讀）', r.publicLink, r.publicLink.note));
+      nodes.push(place('二、完整版 PDF', r.fullPdf, r.fullPdf.note));
+      nodes.push(place('三、可編輯的試算表副本', r.editableCopy, r.editableCopy.note));
+      nodes.push(make('div', { className: 'sec' }, [
+        sectionTitle('怎樣手動繼續'),
+        make('div', { text: '1. 開「可編輯副本」最新一份（沒有的話，用公開連結試算表「檔案 ▸ 建立副本」）。', className: 'lines' }),
+        make('div', { text: '2. 在副本上直接改格子，改完自己寄給義工或印出來。系統裡的版本不會跟著變。', className: 'lines' }),
+        make('div', { text: '3. 系統回復之後，用「進階與診斷 ▸ 匯入人手職事表」把副本讀回系統，之後照常用介面。', className: 'lines' }),
+        make('div', { text: '詳細步驟在公開文件 ' + r.guideDoc + '。', className: 'muted' })
+      ]));
+      openModal('系統出問題時怎樣做', nodes, [button('知道了', () => closeModal(), '')]);
+    });
   }
 
   /**

@@ -1782,3 +1782,17 @@ const PERSONAL_PDF_SECONDS_PER_FILE = 9.3;
  * （例如 2 / 57 ≈ 0.04）係正常波動，唔應該每次都嘈。
  */
 const PDF_RETRY_RATIO_HINT_THRESHOLD = 0.5;
+
+/**
+ * 第六十七輪批次 AJ 組：可編輯試算表副本（系統出問題時手動繼續用）。
+ *
+ * 放喺現有 PDF 根資料夾（`ROSTER_DRIVE_FOLDER_ID`，一定係 Shared Drive）下面
+ * `<季度>/<EDITABLE_COPY_FOLDER_NAME>/`，檔名
+ * `<季度>_第<N>版_<EDITABLE_COPY_FILE_LABEL>_<yyyyMMdd-HHmm>`。見 `EditableCopy.gs`。
+ */
+const EDITABLE_COPY_FOLDER_NAME = '可編輯副本';
+const EDITABLE_COPY_FILE_LABEL = '職事表_可編輯副本';
+/** 檔名尾嗰個時間戳格式（`Utilities.formatDate`）。 */
+const EDITABLE_COPY_TIMESTAMP_FORMAT = 'yyyyMMdd-HHmm';
+/** 公開 repo 入面嗰份指引嘅檔名——「進階與診斷 ▸ 系統出問題時怎樣做」會提。 */
+const RECOVERY_GUIDE_DOC_NAME = 'docs/系統出問題時手動繼續.md';

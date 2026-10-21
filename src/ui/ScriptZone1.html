@@ -1604,6 +1604,18 @@
     if (r.publicLinkRepublished) {
       nodes.push(make('div', { text: '寄出之前，系統已經自動把公開連結更新到最新內容。', className: 'ok-line' }));
     }
+    // 第六十七輪批次 AJ 組：自動可編輯副本——成功畀連結，失敗提一句（寄出不受影響）
+    if (r.editableCopy && r.editableCopy.ok) {
+      const copyLink = make('a', { text: '開啟可編輯副本（' + r.editableCopy.fileName + '）', className: 'sheetlink' });
+      copyLink.href = r.editableCopy.fileUrl;
+      copyLink.target = '_blank';
+      copyLink.rel = 'noopener';
+      nodes.push(make('div', { className: 'ok-line' }, [
+        make('span', { text: '系統已經自動在 Drive 放了一份這一版的可編輯副本（快照）。' }), copyLink
+      ]));
+    } else if (r.editableCopy && !r.editableCopy.ok) {
+      nodes.push(make('div', { text: r.editableCopy.message, className: 'muted' }));
+    }
     if (!r.advanced) {
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {

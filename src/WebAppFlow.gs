@@ -493,7 +493,9 @@ function apiStep4Confirm_locked_(quarterId, sendOptions) {
     outcomeSentence: result.outcomeSentence || '',
     outcomeMessage: result.outcome ? result.outcome.message : '',
     unhandledCount: result.outcome ? result.outcome.unhandledCount : 0,
-    publicLinkRepublished: !!result.publicLinkRepublished
+    publicLinkRepublished: !!result.publicLinkRepublished,
+    // 第六十七輪批次 AJ 組：自動副本結果（冇前進 Stage 就係 null）
+    editableCopy: result.editableCopy || null
   };
 }
 
