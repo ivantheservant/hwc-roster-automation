@@ -5281,6 +5281,30 @@ const MUTATIONS = [
     replace: '  return withMutationLock_(\'匯入人手職事表\', function () {',
     tests: ['tests/roster_import.test.js']
   },
+  {
+    id: 'aq-remain-has-released',
+    why: '「系統改完之後仍然違反」又把已放行嘅格計入——同「已放行」段重複列出',
+    file: 'src/SuggestionSheet.gs',
+    find: '      return !releasedCellKeys[cellKey_(v.serviceDate, v.postId, v.slotIndex)];',
+    replace: '      return true;',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ar-released-no-version',
+    why: '儲存確認畫面已放行分組唔寫「（第 N 版放行）」',
+    file: 'src/ui/Script.html',
+    find: '          ? \'\' : \'（第 \' + x.releasedVersionNo + \' 版放行）\'),',
+    replace: '          ? \'\' : \'\'),',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'ar-legacy-writes-null',
+    why: '舊格式紀錄（冇版本號）都寫「第 null 版放行」',
+    file: 'src/ui/Script.html',
+    find: '        text: describe(x) + ((x.releasedVersionNo === null || x.releasedVersionNo === undefined)\n          ? \'\' :',
+    replace: '        text: describe(x) + (false\n          ? \'\' :',
+    tests: ['tests/hard_release_remembered.test.js']
+  },
 ];
 
 /**

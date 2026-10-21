@@ -323,6 +323,10 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     log_('WARN', 'buildSuggestionState_：讀不到放行紀錄，已放行的格會被當成普通違反：' + err.message);
   }
   const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext);
+  const releasedCellKeys = {};
+  (fix.untouchedManual || []).forEach(function (u) {
+    if (u.released) releasedCellKeys[u.key] = true;
+  });
 
   const systemKeys = {};
   const notes = {};
@@ -401,7 +405,13 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     unfillable: fix.unfillable || [],
     gapCapped: !!fix.gapCapped,
     gapCount: fix.gapCount || 0,
-    remainingViolations: findStateViolations_(analysis.manualState, context)
+    // 第六十九輪批次 AQ 組：「系統改完之後仍然違反」**唔計已放行嘅格**——嗰啲格已經喺
+    // 「你改過、而違反規則嘅格」嗰段標咗「已放行（第 X 版）」，再喺呢度列一次，幹事會以為
+    // 仲有一格未處理。「已放行」用 `proposeMinimalFixFromState_()` 判好嘅 `untouchedManual[].released`
+    // （第六十七輪 AG 組同一支判斷），唔另寫一份。
+    remainingViolations: findStateViolations_(analysis.manualState, context).filter(function (v) {
+      return !releasedCellKeys[cellKey_(v.serviceDate, v.postId, v.slotIndex)];
+    })
   };
 }
 

@@ -1611,7 +1611,13 @@
           + v.released.length + ' 格（不用再處理）',
         className: 'vio-head'
       }));
-      v.released.forEach((x) => box.appendChild(make('div', { text: describe(x), className: 'vio-row' })));
+      // 第六十九輪批次 AR 組：每一行寫「（第 N 版放行）」——同狀態卡展開清單同一份資料
+      //（`releasedVersionNo`，來自放行紀錄的 RELEASED_VERSION）。舊格式紀錄沒有版本號就不寫。
+      v.released.forEach((x) => box.appendChild(make('div', {
+        text: describe(x) + ((x.releasedVersionNo === null || x.releasedVersionNo === undefined)
+          ? '' : '（第 ' + x.releasedVersionNo + ' 版放行）'),
+        className: 'vio-row'
+      })));
       nodes.push(box);
     }
     if (v.structural && v.structural.length > 0) {

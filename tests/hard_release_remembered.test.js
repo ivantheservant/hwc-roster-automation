@@ -342,6 +342,19 @@ console.log('\n=== AG1【核心】再儲存同一狀態 ⇒ 唔使打字，清�
   let threw = null;
   try { gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] }); } catch (e) { threw = e; }
   check('★★★★★ 唔打字都儲存得到（零改動路徑）', threw === null, threw && threw.message);
+
+  // 第六十九輪批次 AR 組：確認畫面「已放行」分組每一行寫「（第 N 版放行）」（同狀態卡同一份 releasedVersionNo）；
+  // 舊格式紀錄（冇版本號）唔寫。用真 plan 餵真函式。
+  const uiAr = loadUiScripts(['Script.html']);
+  const textOf = function (node) {
+    return String(node.textContent || '') + (node.children || []).map(textOf).join('\n');
+  };
+  const shown = textOf(uiAr.renderViolations(plan.violations));
+  check('★★★★★★ 已放行嗰行寫「（第 ' + V1 + ' 版放行）」', shown.indexOf('（第 ' + V1 + ' 版放行）') !== -1, shown);
+  const legacy = textOf(uiAr.renderViolations({ real: [], structural: [], semiHard: [], released: [
+    { serviceDate: DATES[CELL_DATE], postNameTC: '主席', slotIndex: 1, personName: PEOPLE.P9604, ruleId: 'HARD_ELIGIBILITY' }] }));
+  check('★★★★★ 舊格式紀錄（冇版本號）：照列嗰格、但唔寫「版放行」',
+    legacy.indexOf(PEOPLE.P9604) !== -1 && legacy.indexOf('版放行') === -1, legacy);
 }
 
 console.log('\n=== AG3【核心】「請系統幫我調整」唔動已放行嘅格 ===');
@@ -365,6 +378,22 @@ console.log('\n=== AG3【核心】「請系統幫我調整」唔動已放行嘅�
   check('★★★★★★ 勾咗都唔動', r2.ok === true && r2.systemCount === 0
     && (r2.untouchedManual || []).some(function (x) { return x.released === true; }),
     JSON.stringify(r2).slice(0, 300));
+
+  // 第六十九輪批次 AQ 組：已放行嘅格只喺「已放行」嗰段出現，「系統改完之後仍然違反」唔計佢。
+  // 另外放一格**未放行**嘅真違反（同一個唔合資格嘅人，另一個主日）——「仍然違反」要剛好只有呢一格。
+  const otherDate = DATES[5];
+  const otherChairBefore = whoIsOn(V1, otherDate, 'CHAIR');
+  check('（前置）另一個主日主席格：假丁（唔合資格、未放行）', setGrid(gridOf(V1), otherDate, 'CHAIR', PEOPLE.P9604));
+  const rq = gas.apiBuildSuggestion(Q);
+  check('★★★★ 建議表建立成功', rq.ok === true, JSON.stringify(rq).slice(0, 300));
+  const remainingDates = (rq.remaining || []).map(function (x) { return x.serviceDate + '|' + x.postNameTC; });
+  checkEqual('★★★★★★ 「仍然違反」剛好 1 格＝未放行嗰格；已放行嗰格唔計',
+    remainingDates, [otherDate + '|主席']);
+  check('★★★★★ 已放行嗰格仍然喺「你改過、而違反規則的格」標 released',
+    (rq.untouchedManual || []).some(function (x) { return x.serviceDate === DATES[CELL_DATE] && x.released === true; })
+    && (rq.untouchedManual || []).some(function (x) { return x.serviceDate === otherDate && x.released === false; }),
+    JSON.stringify(rq.untouchedManual));
+  check('（收尾）另一個主日主席格改返', setGrid(gridOf(V1), otherDate, 'CHAIR', otherChairBefore ? PEOPLE[otherChairBefore] : ''));
   check('（收尾）改返嗰格讀經', setGrid(gridOf(V1), DATES[3], 'READ', PEOPLE[readNow]));
 }
 
