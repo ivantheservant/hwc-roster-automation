@@ -5510,23 +5510,23 @@ const MUTATIONS = [
     id: 'aw-copies-not-planned',
     why: '重設季度唔清可編輯副本',
     file: 'src/QuarterReset.gs',
-    find: '      if (f.versionNo >= 0 && versionNosToClear[f.versionNo]) {',
-    replace: '      if (false) {',
+    find: '      if (f.versionNo >= 0 && (versionNosToClear[f.versionNo] ||',
+    replace: '      if (false && (versionNosToClear[f.versionNo] ||',
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
   {
     id: 'aw-copies-ignore-prot',
     why: '可編輯副本唔理受保護版本，一律清',
     file: 'src/QuarterReset.gs',
-    find: '      if (f.versionNo >= 0 && versionNosToClear[f.versionNo]) {',
-    replace: '      if (true) {',
+    find: '      if (f.versionNo >= 0 && (versionNosToClear[f.versionNo] ||',
+    replace: '      if (true || (versionNosToClear[f.versionNo] ||',
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
   {
     id: 'aw-folders-not-planned',
     why: '清走 PDF 後變空嘅版本資料夾唔列入計畫',
     file: 'src/QuarterReset.gs',
-    find: '    plan.pdfFolders = listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedIds);',
+    find: '    plan.pdfFolders = listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedIds, registeredVersionNos);',
     replace: '    plan.pdfFolders = [];',
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
@@ -5542,8 +5542,8 @@ const MUTATIONS = [
     id: 'aw-folder-any-version',
     why: '受保護版本嘅空資料夾都清',
     file: 'src/EditableCopy.gs',
-    find: '      if (!m || !versionNosToClear[Number(m[1])]) continue;',
-    replace: '      if (!m) continue;',
+    find: '      if (!versionNosToClear[vNo] && !isOrphan) continue;',
+    replace: '',
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
   {
@@ -5697,6 +5697,38 @@ const MUTATIONS = [
     find: '  const personId = resolvePersonId(req.personNameText);\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
     replace: '  const personId = (req.requestType === REQUEST_TYPE.CANNOT_SERVE ? null : resolvePersonId(req.personNameText));\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
     tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'aw-orphan-copy-kept',
+    why: '版本冇登記嘅孤兒副本（上一次重設前留低嘅）重設時唔清',
+    file: 'src/QuarterReset.gs',
+    find: '|| registeredVersionNos[f.versionNo] !== true)',
+    replace: '|| false)',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-orphan-clears-prot',
+    why: '登記咗但受保護／唔清嘅版本副本都當孤兒清走',
+    file: 'src/QuarterReset.gs',
+    find: '|| registeredVersionNos[f.versionNo] !== true)',
+    replace: '|| true)',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-orphan-folder-kept',
+    why: '孤兒空資料夾（版本冇登記）唔清',
+    file: 'src/EditableCopy.gs',
+    find: 'const isOrphan = !!registeredVersionNos && registeredVersionNos[vNo] !== true;',
+    replace: 'const isOrphan = false;',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-orphan-folder-prot',
+    why: '受保護版本嘅空資料夾都當孤兒清',
+    file: 'src/EditableCopy.gs',
+    find: 'const isOrphan = !!registeredVersionNos && registeredVersionNos[vNo] !== true;',
+    replace: 'const isOrphan = true;',
+    tests: ['tests/recovery_and_reset_copies.test.js']
   },
 ];
 

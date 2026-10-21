@@ -232,15 +232,18 @@ function listEditableCopyFilesForQuarter_(quarterId) {
  * 第七十輪批次 AW 組：重設季度清走 PDF 之後會變空嘅「版本 PDF 資料夾」（`v3` 之類）。
  *
  * 現場：版本 PDF 資料夾內嘅 PDF 移到垃圾桶之後，空資料夾仍然留住。
- * 只計**要清嘅版本**嘅資料夾；入面仲有任何唔喺清理計畫嘅檔案或子資料夾 ⇒ 唔計（唔係空）。
+ * 只計**要清嘅版本**嘅資料夾（再加版本已經冇登記嘅孤兒資料夾，只要傳咗
+ * `registeredVersionNos`）；入面仲有任何唔喺清理計畫嘅檔案或子資料夾 ⇒ 唔計（唔係空）。
  * **只讀。**
  *
  * @param {string} quarterId 季度 ID
  * @param {Object.<number, boolean>} versionNosToClear 要清嘅版本號
  * @param {Object.<string, boolean>} plannedFileIds 已列入清理計畫嘅檔案 ID
+ * @param {Object.<number, boolean>=} registeredVersionNos 呢一季登記過嘅全部版本號；
+ *   唔傳 ⇒ 只睇 `versionNosToClear`（舊行為）
  * @returns {Array<{id: string, name: string, versionNo: number}>}
  */
-function listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedFileIds) {
+function listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedFileIds, registeredVersionNos) {
   const root = resolveMailAttachmentFolder_();
   const out = [];
   const quarterFolders = root.getFoldersByName(String(quarterId || '').trim());
@@ -250,7 +253,10 @@ function listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedF
     while (vfs.hasNext()) {
       const vf = vfs.next();
       const m = pattern.exec(vf.getName());
-      if (!m || !versionNosToClear[Number(m[1])]) continue;
+      if (!m) continue;
+      const vNo = Number(m[1]);
+      const isOrphan = !!registeredVersionNos && registeredVersionNos[vNo] !== true;
+      if (!versionNosToClear[vNo] && !isOrphan) continue;
       if (vf.getFolders().hasNext()) continue;
       let willBeEmpty = true;
       const files = vf.getFiles();

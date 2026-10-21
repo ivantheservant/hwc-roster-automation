@@ -87,10 +87,14 @@ function buildDrive() {
   v7.addFile(fakeFile(Q + '_v7_丁.pdf', 'pdf-d', 1));
   // v8：受保護版本嘅**空**資料夾——版本過濾一定要擋住佢（唔係空就唔會被計，所以要空先驗到）
   qf.addFolder(fakeFolder('v8', 'v8'));
+  // v4：版本冇登記（孤兒）嘅**空**資料夾——上一次重設之前留低嘅
+  qf.addFolder(fakeFolder('v4', 'v4'));
   const cf = qf.addFolder(fakeFolder('可編輯副本', 'cf'));
   cf.addFile(fakeFile(Q + '_第9版_職事表_可編輯副本_20991201-0900', 'copy-old-big', 1000));
   cf.addFile(fakeFile(Q + '_第2版_職事表_可編輯副本_20991231-0900', 'copy-new', 2000));
   cf.addFile(fakeFile(Q + '_第7版_職事表_可編輯副本_20991220-0900', 'copy-v7', 1500));
+  // 第 4 版：RosterVersions 冇登記過（孤兒）——就係 s55／s58 截圖時發現嗰份 1608 舊副本
+  cf.addFile(fakeFile(Q + '_第4版_職事表_可編輯副本_20991201-1608', 'copy-orphan', 500));
   cf.addFile(fakeFile('不知哪一版.gsheet', 'copy-unknown', 1200));
   return { root: root, qf: qf, v3: v3, v5: v5Of(qf), v6: v6, v7: v7, cf: cf };
 }
@@ -159,11 +163,13 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
   gas.buildRosterSheetName_ = function (q, v) { return 'Roster_' + q + '_v' + v; };
 
   const plan = gas.planQuarterReset_(Q, false);
-  checkEqual('★★★★★★ 要清嘅副本＝版本 3／5／6 之內嘅（v0 之外、非受保護）——本例只有第 2 版不在清理範圍',
-    plan.editableCopyFiles.map((f) => f.name), []);
-  // 上面：副本版本是 9、2、7、認不出 —— 全部不在 versionNosToClear（3、5、6），所以全部保留
-  check('★★★★★ 不在清理範圍嘅副本全部保留並列入「需要人手處理」',
-    plan.manualAttention.filter((t) => /可編輯副本/.test(t)).length === 4,
+  // 登記咗嘅版本係 3、5、6、7（7 受保護）。副本版本係 9、2（兩個都冇登記＝孤兒）、7（登記咗但受保護）、認不出。
+  checkEqual('★★★★★★ 版本冇登記嘅孤兒副本（第 9、第 2、第 4 版）要清——例如上一次重設之前留低嘅副本',
+    plan.editableCopyFiles.map((f) => f.name).sort(),
+    [Q + '_第2版_職事表_可編輯副本_20991231-0900', Q + '_第4版_職事表_可編輯副本_20991201-1608',
+      Q + '_第9版_職事表_可編輯副本_20991201-0900']);
+  check('★★★★★ 登記咗但受保護（v7）、認不出版本嘅副本保留並列入「需要人手處理」',
+    plan.manualAttention.filter((t) => /可編輯副本/.test(t)).length === 2,
     JSON.stringify(plan.manualAttention));
 }
 {
@@ -179,6 +185,7 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
   // 版本 2、3、5、6、7、9 都登記，7 受保護
   gas.readSheet = function (name) {
     if (name === gas.SHEETS.ROSTER_VERSIONS) {
+      // 版本 4 冇登記（孤兒）
       return [versionRow(2), versionRow(3), versionRow(5), versionRow(6), versionRow(7, true), versionRow(8, true), versionRow(9)];
     }
     return [];
@@ -199,23 +206,24 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
   };
 
   const plan = gas.planQuarterReset_(Q, false);
-  checkEqual('★★★★★★ 要清嘅可編輯副本：第 2 版（新）、第 9 版（舊）；受保護 v7 同認不出版本嗰份保留',
+  checkEqual('★★★★★★ 要清嘅可編輯副本：第 2 版（新）、第 9 版（舊）、第 4 版（孤兒）；受保護 v7 同認不出版本嗰份保留',
     plan.editableCopyFiles.map((f) => f.name).sort(),
-    [Q + '_第2版_職事表_可編輯副本_20991231-0900', Q + '_第9版_職事表_可編輯副本_20991201-0900']);
+    [Q + '_第2版_職事表_可編輯副本_20991231-0900', Q + '_第4版_職事表_可編輯副本_20991201-1608',
+      Q + '_第9版_職事表_可編輯副本_20991201-0900']);
   check('★★★★★ 受保護版本嘅副本、認不出版本嘅副本都在「需要人手處理」',
     plan.manualAttention.some((t) => /第7版/.test(t) && /保留/.test(t))
     && plan.manualAttention.some((t) => /不知哪一版/.test(t)), JSON.stringify(plan.manualAttention));
-  checkEqual('★★★★★★ 清理後變空嘅版本 PDF 資料夾：v3（兩個 PDF 都會清）、v5（本來就空）；v6 入面有認不出嘅檔案 ⇒ 唔係空；v7 受保護 ⇒ 不碰',
-    plan.pdfFolders.map((f) => f.name).sort(), ['v3', 'v5']);
+  checkEqual('★★★★★★ 清理後變空嘅版本 PDF 資料夾：v3（兩個 PDF 都會清）、v5（本來就空）、v4（冇登記嘅孤兒空資料夾）；v6 入面有認不出嘅檔案 ⇒ 唔係空；v7 受保護 ⇒ 不碰',
+    plan.pdfFolders.map((f) => f.name).sort(), ['v3', 'v4', 'v5']);
 
   const lines = gas.describeQuarterResetPlanLines_(Q, plan).join('\n');
   check('★★★★★★ 確認清單「將會清理」列出可編輯副本同空資料夾數目',
-    /可編輯副本：2 個檔案/.test(lines) && /清理後變空的版本 PDF 資料夾：2 個/.test(lines), lines);
+    /可編輯副本：3 個檔案/.test(lines) && /清理後變空的版本 PDF 資料夾：3 個/.test(lines), lines);
   check('★★★★★ 並逐個列出名稱', /將移到垃圾桶的可編輯副本：/.test(lines) && /第9版/.test(lines) && /將移到垃圾桶的空資料夾/.test(lines), lines);
 
   const summary = gas.summariseQuarterResetBatch_([{ quarterId: Q, plan: plan }]);
   check('★★★★★ 批次總數也計入（nothingToDo 唔會誤報）',
-    summary.totals.editableCopies === 2 && summary.totals.pdfFolders === 2 && summary.nothingToDo === false,
+    summary.totals.editableCopies === 3 && summary.totals.pdfFolders === 3 && summary.nothingToDo === false,
     JSON.stringify(summary.totals));
   const onlyCopies = gas.summariseQuarterResetBatch_([{ quarterId: Q, plan: {
     versions: [], editableCopyFiles: [{ id: 'x' }], pdfFolders: [], pdfFiles: [], manualAttention: [] } }]);
@@ -223,11 +231,11 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
 
   // 執行
   const result = gas.executeQuarterReset_(plan);
-  check('★★★★★★ 兩份副本移到垃圾桶', byId['copy-new']._trashed && byId['copy-old-big']._trashed && result.editableCopiesTrashed === 2,
+  check('★★★★★★ 三份副本（新、舊、孤兒）移到垃圾桶', byId['copy-new']._trashed && byId['copy-old-big']._trashed && byId['copy-orphan']._trashed && result.editableCopiesTrashed === 3,
     JSON.stringify(result));
   check('★★★★★★ 受保護 v7 副本、認不出版本嗰份冇動',
     !byId['copy-v7']._trashed && !byId['copy-unknown']._trashed);
-  check('★★★★★★ 空資料夾 v3、v5 移到垃圾桶（v3 先清走 PDF 才變空）', byId['v3']._trashed && byId['v5']._trashed && result.pdfFoldersTrashed === 2,
+  check('★★★★★★ 空資料夾 v3、v4（孤兒）、v5 移到垃圾桶（v3 先清走 PDF 才變空）', byId['v3']._trashed && byId['v4']._trashed && byId['v5']._trashed && result.pdfFoldersTrashed === 3,
     JSON.stringify(result));
   check('★★★★★★ v6（有認不出嘅檔案）、v7（受保護）資料夾冇動', !byId['v6']._trashed && !byId['v7']._trashed);
   check('★★★★ 不碰「可編輯副本」資料夾本身', !byId['cf']._trashed);

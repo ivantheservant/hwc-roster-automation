@@ -76,9 +76,14 @@ function planQuarterReset_(quarterId, includeV0) {
 
   // ---- RosterVersions 與對應的 grid 工作表 ----
   const V = COLUMNS.ROSTER_VERSIONS;
+  // 第七十輪批次 AW 組：呢一季**登記過**嘅全部版本號（包括 v0 唔清、受保護嘅）。
+  // 可編輯副本／版本 PDF 資料夾要靠佢分「孤兒」（版本已經冇登記，例如上一次重設之前留低嘅）
+  // 同「登記咗但今次唔清」（要保留）。
+  const registeredVersionNos = {};
   readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     if (String(row[V.QUARTER_ID] || '').trim() !== quarterId) return;
     const versionNo = Number(row[V.VERSION_NO]);
+    registeredVersionNos[versionNo] = true;
     const isProtected = isTrueValue_(row[V.PROTECTED]);
     const sheetName = String(row[V.SHEET_NAME] || '').trim() || buildRosterSheetName_(quarterId, versionNo);
 
@@ -240,10 +245,12 @@ function planQuarterReset_(quarterId, includeV0) {
   //
   // 現場：重設 2028T3 之後，舊嘅「可編輯副本」仍然留低（令「最新一份」揀錯），
   // 版本 PDF 資料夾入面嘅 PDF 移到垃圾桶之後，空資料夾仍然留住。
-  // 同 PDF 一樣只信 `versionNosToClear`（v0／受保護版本唔清）；認唔出版本嘅副本一律保留。
+  // 清嘅係：版本喺清理範圍內、或者版本已經**冇登記**（孤兒——上一次重設之前留低嘅，
+  // 例如「第 4 版」副本，而 RosterVersions 已經冇 v4）。保留嘅係：版本登記咗但今次唔清
+  // （v0 未選／受保護），以及認唔出版本嘅副本。
   try {
     listEditableCopyFilesForQuarter_(quarterId).forEach(function (f) {
-      if (f.versionNo >= 0 && versionNosToClear[f.versionNo]) {
+      if (f.versionNo >= 0 && (versionNosToClear[f.versionNo] || registeredVersionNos[f.versionNo] !== true)) {
         plan.editableCopyFiles.push({ id: f.id, name: f.name, sizeBytes: f.sizeBytes, versionNo: f.versionNo });
       } else {
         plan.manualAttention.push('可編輯副本「' + f.name + '」'
@@ -253,7 +260,7 @@ function planQuarterReset_(quarterId, includeV0) {
     });
     const plannedIds = {};
     plan.pdfFiles.forEach(function (f) { plannedIds[f.id] = true; });
-    plan.pdfFolders = listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedIds);
+    plan.pdfFolders = listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedIds, registeredVersionNos);
   } catch (err) {
     plan.manualAttention.push('無法檢查可編輯副本／版本 PDF 資料夾，這兩項完全不清：' + err.message);
   }
