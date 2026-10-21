@@ -947,7 +947,7 @@ function buildViolationReportLines_(violations, sheetName) {
 
   const describe = function (v) {
     return '　' + v.serviceDate + '　' + v.postNameTC + '#' + v.slotIndex
-      + '　' + v.personName + '　' + v.ruleId + '：' + v.reason;
+      + '　' + v.personName + '　' + v.reason;
   };
   const listSection = function (items, limit) {
     const lines = items.slice(0, limit).map(describe);

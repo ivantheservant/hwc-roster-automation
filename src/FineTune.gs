@@ -397,7 +397,8 @@ function findStateViolations_(state, context) {
     if (isRuleEnabled_(rules, RULE_IDS.ELIGIBILITY)) {
       const pool = context.eligibility.byPost[cell.postId] || [];
       if (pool.indexOf(cell.personId) === -1) {
-        add(cell, RULE_IDS.ELIGIBILITY, '不在 Eligibility 名單內');
+        // 第七十輪批次 AY 組：畫面文字唔用內部表名
+        add(cell, RULE_IDS.ELIGIBILITY, '不在這個崗位的名單上');
       }
     }
     if (isRuleEnabled_(rules, RULE_IDS.UNAVAILABLE)

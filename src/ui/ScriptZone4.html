@@ -179,7 +179,7 @@
         })
       ]);
       v.real.forEach((x) => {
-        box.appendChild(make('div', { text: cellLabel(x) + '　' + (x.personName || x.personId) + '——' + (x.reason || x.ruleId), className: 'vio-row' }));
+        box.appendChild(make('div', { text: cellLabel(x) + '　' + (x.personName || x.personId) + '——' + (x.reason || plainRuleText(x.ruleId)), className: 'vio-row' }));
       });
       nodes.push(box);
     }
@@ -192,7 +192,7 @@
     if (v.semiHard.length > 0) {
       const box = make('div', { className: 'sec' }, [sectionTitle('提醒（不阻擋）：' + v.semiHard.length + ' 格')]);
       v.semiHard.forEach((x) => {
-        box.appendChild(make('div', { text: cellLabel(x) + '　' + (x.personName || x.personId) + '——' + (x.reason || x.ruleId), className: 'vio-row' }));
+        box.appendChild(make('div', { text: cellLabel(x) + '　' + (x.personName || x.personId) + '——' + (x.reason || plainRuleText(x.ruleId)), className: 'vio-row' }));
       });
       nodes.push(box);
     }
@@ -315,12 +315,22 @@
       nodes.push(place('一、公開連結試算表（唯讀）', r.publicLink, r.publicLink.note));
       nodes.push(place('二、完整版 PDF', r.fullPdf, r.fullPdf.note));
       nodes.push(place('三、可編輯的試算表副本', r.editableCopy, r.editableCopy.note));
+      const guideLine = make('div', { text: r.guideSentence || '', className: 'muted' });
+      if (r.guideUrl) {
+        const g = make('a', { text: '開啟使用指南', className: 'sheetlink' });
+        g.href = r.guideUrl;
+        g.target = '_blank';
+        g.rel = 'noopener';
+        guideLine.appendChild(g);
+      }
       nodes.push(make('div', { className: 'sec' }, [
         sectionTitle('怎樣手動繼續'),
         make('div', { text: '1. 開「可編輯副本」最新一份（沒有的話，用公開連結試算表「檔案 ▸ 建立副本」）。', className: 'lines' }),
         make('div', { text: '2. 在副本上直接改格子，改完自己寄給義工或印出來。系統裡的版本不會跟著變。', className: 'lines' }),
         make('div', { text: '3. 系統回復之後，用「進階與診斷 ▸ 匯入人手編好的職事表」把副本讀回系統，之後照常用介面。', className: 'lines' }),
-        make('div', { text: '詳細步驟在公開文件 ' + r.guideDoc + '。', className: 'muted' })
+        // 第七十輪批次 AW 組：幹事打唔開 repo，唔再叫佢睇 docs/…。
+        // 有 USER_GUIDE_URL ⇒ 連結；冇 ⇒ 指南章名。
+        guideLine
       ]));
       openModal('系統出問題時怎樣做', nodes, [button('知道了', () => closeModal(), '')]);
     });
@@ -926,7 +936,7 @@
       ]);
       plan.hardNotes.forEach((h) => {
         box.appendChild(make('div', {
-          text: h.ruleId + '　' + h.ruleText + '　堂委：' + h.decision
+          text: h.ruleText + '　堂委：' + h.decision
             + (h.note ? '（' + h.note + '）' : ''),
           className: 'vio-row'
         }));

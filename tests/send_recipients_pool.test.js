@@ -182,10 +182,12 @@ console.log('\n=== A1 `IT` 同 `幹事` 兩個身分（本輪新加）===');
     gas.ROLE_CODES.IT === 'IT' && gas.ROLE_CODES.CLERK === 'CLERK');
   check('★★★★★ 而且有中文顯示名（唔係一串英文代號）',
     gas.ROLE_LABELS_TC.IT === 'IT' && gas.ROLE_LABELS_TC.CLERK === '幹事');
-  check('★★★★★ 六個來源嘅次序同名跟 `SEND_SOURCE_LABELS`，唔喺畫面寫死',
-    gas.SEND_SOURCE_LABELS.length === 6
+  // 第七十輪批次 AT 組：加咗「辦公室等固定收件人」（FIXED），來源由六個變七個，CHANGED 仍然排最尾。
+  check('★★★★★ 七個來源嘅次序同名跟 `SEND_SOURCE_LABELS`，唔喺畫面寫死',
+    gas.SEND_SOURCE_LABELS.length === 7
     && gas.SEND_SOURCE_LABELS[0].key === 'ROSTER'
-    && gas.SEND_SOURCE_LABELS[5].key === 'CHANGED',
+    && gas.SEND_SOURCE_LABELS[5].key === 'FIXED'
+    && gas.SEND_SOURCE_LABELS[6].key === 'CHANGED',
     JSON.stringify(gas.SEND_SOURCE_LABELS));
   check('★★★★★★ 畫面**一組零人嗰陣要講點解同去邊度加**'
     + '——`IT` 同 `幹事` 係新加嘅，好可能一個人都未填；'

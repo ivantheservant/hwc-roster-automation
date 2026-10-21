@@ -393,6 +393,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "SYS"
     },
+    "USER_GUIDE_URL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "（第七十輪新增，試算表現時未有這一列）",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
     "ROSTER_SPREADSHEET_ID": {
       "source": "動態值，不比對",
       "currentValue": "",

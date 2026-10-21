@@ -436,6 +436,11 @@ function exportSheetAsPdfBlob_(sheet, fileName, opts) {
     'printtitle=false',
     'sheetnames=false',
     'pagenumbers=true',
+    // 第七十輪批次 AV 組：義工收到嘅 PDF（個人版、整季版、紙本三種都經呢一支匯出）
+    // 唔印批註／腳註——批註係畀幹事自己睇嘅（試算表上照樣保留）。
+    // Google 嘅匯出網址參數冇正式文件，兩個寫法都加；多餘嘅參數會被忽略。
+    'shownotes=false',
+    'printnotes=false',
     'fzr=true',
     'top_margin=0.4',
     'bottom_margin=0.4',

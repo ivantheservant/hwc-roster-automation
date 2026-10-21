@@ -1474,9 +1474,9 @@ const MUTATIONS = [
       + '——2027T1 嗰 13 個主日唔係測試痕跡，係嗰一季本身嘅設定。'
       + '清走咗，主流程即刻顯示「這一季的 Quarters 沒有填生成日期」',
     file: 'src/QuarterReset.gs',
-    find: "  plan.pdfFiles.forEach(function (f) {",
+    find: "  plan.pdfFiles.forEach(function (f) {\n    try {",
     replace: '  deleteRowsMatching_(SHEETS.SERVICE_DATES, function () { return false; }, errors);' + '\n'
-      + '  plan.pdfFiles.forEach(function (f) {',
+      + '  plan.pdfFiles.forEach(function (f) {\n    try {',
     tests: ['tests/quarter_reset_batch.test.js']
   },
   {
@@ -5100,8 +5100,9 @@ const MUTATIONS = [
     id: 'aj-links-oldest-copy',
     why: '可編輯副本連結揀咗最舊一份',
     file: 'src/EditableCopy.gs',
-    find: '          if (!latest || String(f.getName()) > String(latest.getName())) latest = f;   // 檔名尾係時間戳',
-    replace: '          if (!latest || String(f.getName()) < String(latest.getName())) latest = f;',
+    // 第七十輪批次 AW 組：改成按建立時間揀之後，同一建立時間先比版本號——呢度整壞嗰一步
+    find: '      if (ev > bv) best = e;',
+    replace: '      if (ev < bv) best = e;',
     tests: ['tests/editable_copy.test.js']
   },
   {
@@ -5304,6 +5305,398 @@ const MUTATIONS = [
     find: '        text: describe(x) + ((x.releasedVersionNo === null || x.releasedVersionNo === undefined)\n          ? \'\' :',
     replace: '        text: describe(x) + (false\n          ? \'\' :',
     tests: ['tests/hard_release_remembered.test.js']
+  },
+  {
+    id: 'at-no-fixed-group',
+    why: '「選擇收件人」冇「辦公室等固定收件人」呢一組',
+    file: 'src/SendRecipients.gs',
+    find: '  { key: SEND_SOURCE.FIXED, label: \'辦公室等固定收件人\' },\n',
+    replace: '',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-default-all-stages',
+    why: '所有階段都預設勾固定收件人（審閱／重發唔應該預設勾）',
+    file: 'src/SendRecipients.gs',
+    find: '  if (stage !== MAIL_STAGES.OFFICIAL) return [];\n  return (fixedMembers',
+    replace: '  return (fixedMembers',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-fixed-wrong-stage',
+    why: '固定收件人唔跟階段，永遠用正式發出嗰份名單',
+    file: 'src/SendRecipients.gs',
+    find: '  listRecipients_(stage, context).forEach(function (r) {\n    if (r.type !== RECIPIENT_TYPE.LIST) return;',
+    replace: '  listRecipients_(MAIL_STAGES.OFFICIAL, context).forEach(function (r) {\n    if (r.type !== RECIPIENT_TYPE.LIST) return;',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-api-ignores-kind',
+    why: '後端唔理前端傳嚟嘅階段',
+    file: 'src/WebAppSendPlan.gs',
+    find: '    const poolStage = sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL;',
+    replace: '    const poolStage = MAIL_STAGES.OFFICIAL;',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-members-unmasked',
+    why: '固定收件人嗰組列出完整電郵（冇遮蔽）',
+    file: 'src/WebAppSendPlan.gs',
+    find: 'emailMasked: maskEmailForPreview_(m.email) };',
+    replace: 'emailMasked: m.email };',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-ui-default-dropped',
+    why: '前端收到預設勾嘅人但唔加入 pickedKeys',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '        (r.defaultPickedKeys || []).forEach((k) => { picked[k] = true; });\n',
+    replace: '',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-ui-default-reapply',
+    why: '幹事取消咗之後再開窗，預設又被加返',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '      if (!sendOptions_.defaultPickedApplied) {',
+    replace: '      if (true) {',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'at-ui-no-kind',
+    why: '前端攞池唔傳階段',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: 'callServer(\'apiGetSendRecipientPool\', currentQuarterId, s.kind);',
+    replace: 'callServer(\'apiGetSendRecipientPool\', currentQuarterId);',
+    tests: ['tests/send_fixed_recipients.test.js']
+  },
+  {
+    id: 'au-batch-not-latest',
+    why: '最近一批揀錯（揀最早一批，唔係最近一次審閱）',
+    file: 'src/SendRecipients.gs',
+    find: '    if (bestSort === null || b.sortKey >= bestSort) { bestSort = b.sortKey; bestKey = key; }',
+    replace: '    if (bestSort === null) { bestSort = b.sortKey; bestKey = key; }',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-batch-all-statuses',
+    why: '失敗／略過嘅都當成「收過」',
+    file: 'src/SendRecipients.gs',
+    find: '    if (status !== MAIL_STATUS.SENT && status !== MAIL_STATUS.DRY_RUN) return;',
+    replace: '    if (!status) return;',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-batch-any-stage',
+    why: '連正式發出都當成審閱批次',
+    file: 'src/SendRecipients.gs',
+    find: '    if (String(row[C.STAGE] || \'\').trim() !== MAIL_STAGES.REVIEW) return;',
+    replace: '    if (!String(row[C.STAGE] || \'\').trim()) return;',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-api-drop-silent',
+    why: '已唔喺池嘅人靜靜略過，唔點數',
+    file: 'src/WebAppSendPlan.gs',
+    find: '      if (inPool[personId]) pickedKeys.push(personId); else droppedCount++;',
+    replace: '      if (inPool[personId]) pickedKeys.push(personId);',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-api-extra-lost',
+    why: '上次自己輸入嘅地址丟咗',
+    file: 'src/WebAppSendPlan.gs',
+    find: '      else extraEmails.push(email);',
+    replace: '      else droppedCount += 0;',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-ui-button-default',
+    why: '〔改為再寄一次審閱本〕又叫返冇參數嘅 openReview()',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: 'closeModal(); openReviewSameBatch(); }, \'secondary\'));',
+    replace: 'closeModal(); openReview(); }, \'secondary\'));',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-ui-sentence-fixed',
+    why: '句子又寫死「同一批人」（讀唔到上一批都照寫）',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    if (meta && meta.lookupFailed) {\n      return \'查不到上一次的收件人，這一次會寄給預設的審閱名單。\';\n    }',
+    replace: '    if (meta && meta.lookupFailed) {\n      return \'上次在 \' + last + \' 寄過，會再寄一次給同一批人。\';\n    }',
+    tests: ['tests/review_same_batch.test.js']
+  },
+  {
+    id: 'au-dash-text-fixed',
+    why: '儀表板文字又寫死「重新寄給同一批人」',
+    file: 'src/WebAppDashboard.gs',
+    find: '      ? (\'上次在 \' + last + \' 寄過（\' + batch.count + \' 位）。\' + defaultText)',
+    replace: '      ? (\'上次在 \' + last + \' 寄過。再撳一次會重新寄給同一批人。\')',
+    tests: ['tests/review_same_batch.test.js', 'tests/webapp_dashboard_state.test.js']
+  },
+  {
+    id: 'av-note-has-code',
+    why: '批註又寫返規則代號（會印到義工 PDF 腳註）',
+    file: 'src/RosterWriter.gs',
+    find: '      notes[r][c] = cellWarnings.map(function (w) {\n        return w.reason;',
+    replace: '      notes[r][c] = cellWarnings.map(function (w) {\n        return w.ruleId + \': \' + w.reason;',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'av-pdf-shownotes',
+    why: 'PDF 匯出網址冇 shownotes=false',
+    file: 'src/PdfExport.gs',
+    find: '    \'shownotes=false\',\n',
+    replace: '',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'av-pdf-printnotes',
+    why: 'PDF 匯出網址冇 printnotes=false',
+    file: 'src/PdfExport.gs',
+    find: '    \'printnotes=false\',\n',
+    replace: '',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'av-ui-unknown-code',
+    why: '對唔上嘅規則代號又直接印英文代號',
+    file: 'src/ui/Script.html',
+    find: '    return RULE_SENTENCE[ruleId] || \'這一格有一條排表規則沒有符合\';',
+    replace: '    return RULE_SENTENCE[ruleId] || ruleId;',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'av-zone4-rule-code',
+    why: '匯入規則審閱表又印規則代號',
+    file: 'src/ui/ScriptZone4.html',
+    find: '          text: h.ruleText + \'　堂委：\' + h.decision',
+    replace: '          text: h.ruleId + \'　\' + h.ruleText + \'　堂委：\' + h.decision',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'av-menu-report-code',
+    why: '選單違反報告又印規則代號',
+    file: 'src/FourStageFlow.gs',
+    find: '      + \'　\' + v.personName + \'　\' + v.reason;',
+    replace: '      + \'　\' + v.personName + \'　\' + v.ruleId + \'：\' + v.reason;',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'av-prelaunch-code',
+    why: '開季前檢查清單又印規則代號',
+    file: 'src/PreLaunchChecklist.gs',
+    find: '        + \' \' + (v.reason || \'\')',
+    replace: '        + \' \' + v.ruleId + \'：\' + (v.reason || \'\')',
+    tests: ['tests/no_rule_code_on_screen.test.js']
+  },
+  {
+    id: 'aw-pick-by-name',
+    why: '最新一份又唔按建立時間揀',
+    file: 'src/EditableCopy.gs',
+    find: '    if (e.createdMs !== best.createdMs) {',
+    replace: '    if (false) {',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-pick-tie-lower',
+    why: '同一時間揀版本號較細嗰份',
+    file: 'src/EditableCopy.gs',
+    find: '      if (ev > bv) best = e;',
+    replace: '      if (ev < bv) best = e;',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-copies-not-planned',
+    why: '重設季度唔清可編輯副本',
+    file: 'src/QuarterReset.gs',
+    find: '      if (f.versionNo >= 0 && versionNosToClear[f.versionNo]) {',
+    replace: '      if (false) {',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-copies-ignore-prot',
+    why: '可編輯副本唔理受保護版本，一律清',
+    file: 'src/QuarterReset.gs',
+    find: '      if (f.versionNo >= 0 && versionNosToClear[f.versionNo]) {',
+    replace: '      if (true) {',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-folders-not-planned',
+    why: '清走 PDF 後變空嘅版本資料夾唔列入計畫',
+    file: 'src/QuarterReset.gs',
+    find: '    plan.pdfFolders = listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedIds);',
+    replace: '    plan.pdfFolders = [];',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-folder-nonempty',
+    why: '入面有其他檔案嘅資料夾都當成空',
+    file: 'src/EditableCopy.gs',
+    find: '        if (!plannedFileIds[files.next().getId()]) { willBeEmpty = false; break; }',
+    replace: '        if (files.next() && false) { willBeEmpty = false; break; }',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-folder-any-version',
+    why: '受保護版本嘅空資料夾都清',
+    file: 'src/EditableCopy.gs',
+    find: '      if (!m || !versionNosToClear[Number(m[1])]) continue;',
+    replace: '      if (!m) continue;',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-exec-no-recheck',
+    why: '執行時唔再確認資料夾仲係咪空',
+    file: 'src/QuarterReset.gs',
+    find: '      if (folder.getFiles().hasNext() || folder.getFolders().hasNext()) {',
+    replace: '      if (false) {',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-exec-copies-skipped',
+    why: '執行時冇真係移副本去垃圾桶（只計數）',
+    file: 'src/QuarterReset.gs',
+    find: '.setTrashed(true);\n      result.editableCopiesTrashed++;',
+    replace: ';\n      result.editableCopiesTrashed++;',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-guide-docs-again',
+    why: '空白時又叫幹事睇 docs/',
+    file: 'src/EditableCopy.gs',
+    find: '    guideSentence: \'詳細步驟見《職事表系統使用指南》「系統出問題時」一章。\',',
+    replace: '    guideSentence: \'詳細步驟在公開文件 docs/系統出問題時手動繼續.md。\',',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-guide-url-ignored',
+    why: '有 USER_GUIDE_URL 都唔改句子',
+    file: 'src/EditableCopy.gs',
+    find: '    if (out.guideUrl) out.guideSentence = \'詳細步驟見使用指南。\';',
+    replace: '',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-ui-guide-no-link',
+    why: '畫面有 USER_GUIDE_URL 都唔畫連結',
+    file: 'src/ui/ScriptZone4.html',
+    find: '      if (r.guideUrl) {\n        const g = make(\'a\'',
+    replace: '      if (false) {\n        const g = make(\'a\'',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-total-copies-lost',
+    why: '批次總數唔計可編輯副本',
+    file: 'src/QuarterReset.gs',
+    find: '    totals.editableCopies += item.editableCopies;\n',
+    replace: '',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'aw-nothing-ignore-copy',
+    why: '只有副本要清都當成冇嘢做',
+    file: 'src/QuarterReset.gs',
+    find: '\n    && totals.editableCopies === 0 && totals.pdfFolders === 0;',
+    replace: ';',
+    tests: ['tests/recovery_and_reset_copies.test.js']
+  },
+  {
+    id: 'ax-hint-all-stages',
+    why: '所有進度都出「意見收齊」提示',
+    file: 'src/WebAppSendPlan.gs',
+    find: '  return stage === QUARTER_STAGE.REVIEW_SENT ? SEND_REVIEW_SENT_HINT : \'\';',
+    replace: '  return SEND_REVIEW_SENT_HINT;',
+    tests: ['tests/review_sent_hint.test.js']
+  },
+  {
+    id: 'ax-hint-not-in-data',
+    why: '寄出窗資料冇帶提示',
+    file: 'src/WebAppSendPlan.gs',
+    find: '      reviewSentHint: buildReviewSentHint_(state.stage),',
+    replace: '      reviewSentHint: \'\',',
+    tests: ['tests/review_sent_hint.test.js']
+  },
+  {
+    id: 'ax-ui-hint-not-drawn',
+    why: '畫面收到提示但唔畫',
+    file: 'src/ui/ScriptSendPaper.html',
+    find: '    if (s.reviewSentHint) {',
+    replace: '    if (false) {',
+    tests: ['tests/review_sent_hint.test.js']
+  },
+  {
+    id: 'ax-hint-wrong-step',
+    why: '提示寫錯步驟（叫人撳〔儲存〕而唔係〔儲存及寄出〕）',
+    file: 'src/WebAppSendPlan.gs',
+    find: '  + \'請先在第 2 步撳〔儲存及寄出〕（沒有改動也可以撳），\'',
+    replace: '  + \'請先在第 2 步撳〔儲存〕，\'',
+    tests: ['tests/review_sent_hint.test.js']
+  },
+  {
+    id: 'ay-finetune-old-text',
+    why: '微調違反原因又寫返內部表名',
+    file: 'src/FineTune.gs',
+    find: 'add(cell, RULE_IDS.ELIGIBILITY, \'不在這個崗位的名單上\');',
+    replace: 'add(cell, RULE_IDS.ELIGIBILITY, \'不在 Eligibility 名單內\');',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-verify-old-text',
+    why: '核對報告原因又寫返內部表名',
+    file: 'src/Verify.gs',
+    find: 'notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, \'不在這個崗位的名單上\'));',
+    replace: 'notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, \'不在 Eligibility 名單內\'));',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-verify-old-label',
+    why: '核對報告分組標題又寫返內部表名',
+    file: 'src/Verify.gs',
+    find: '{ label: \'不在這個崗位的名單上\', items: notEligible },',
+    replace: '{ label: \'不在 Eligibility 名單內\', items: notEligible },',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-gen-old-text',
+    why: '生成器原因又寫返內部表名',
+    file: 'src/Generator.gs',
+    find: 'reason: \'此崗位在名單上沒有任何在職的合資格人選\'',
+    replace: 'reason: \'此崗位在 Eligibility 中沒有任何在職的合資格人選\'',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-title-old-nochange',
+    why: '沒有改動窗標題又係「儲存並確認」',
+    file: 'src/ui/ScriptZone1.html',
+    find: '    openModal(\'儲存及寄出\', [\n      para(\'沒有偵測到任何改動，不需要儲存。\'',
+    replace: '    openModal(\'儲存並確認\', [\n      para(\'沒有偵測到任何改動，不需要儲存。\'',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-title-old-zero-done',
+    why: '零改動完成窗標題又係「儲存並確認」',
+    file: 'src/ui/ScriptZone1.html',
+    find: '      openModal(\'儲存及寄出\', [\n        make(\'div\', { text: result.message, className: \'ok-line\' })',
+    replace: '      openModal(\'儲存並確認\', [\n        make(\'div\', { text: result.message, className: \'ok-line\' })',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-name-old-sentence',
+    why: '認不到名字又用舊句子',
+    file: 'src/RequestsApply.gs',
+    find: 'reason: \'名單上找不到「\' + req.personNameText + \'」。如果是新人，請先用「新增人員」加入；如果是舊人，請留意同音字或異體字。\' };',
+    replace: 'reason: \'「\' + req.personNameText + \'」不在 NameMapping，請先用「新增人員」加入\' };',
+    tests: ['tests/screen_text_wording.test.js']
+  },
+  {
+    id: 'ay-name-paths-split',
+    why: '「不能服侍」唔經 NameAlias 認名',
+    file: 'src/RequestsApply.gs',
+    find: '  const personId = resolvePersonId(req.personNameText);\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
+    replace: '  const personId = (req.requestType === REQUEST_TYPE.CANNOT_SERVE ? null : resolvePersonId(req.personNameText));\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
+    tests: ['tests/screen_text_wording.test.js']
   },
 ];
 

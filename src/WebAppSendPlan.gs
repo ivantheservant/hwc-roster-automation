@@ -224,9 +224,11 @@ function sendKindToStage_(kind) {
  *   `changed` 　「有改動」係相對邊一版、邊幾位、改咗乜
  *
  * @param {string} quarterId 季度 ID
+ * @param {string=} kind SEND_KIND 之一（第七十輪批次 AT 組：決定「固定收件人」那一組
+ *   是哪一個階段的名單、預設勾不勾）；不傳當正式發出
  * @returns {Object} 收件人池
  */
-function apiGetSendRecipientPool(quarterId) {
+function apiGetSendRecipientPool(quarterId, kind) {
   assertWebAppRequestAllowed_();
   beginSheetReadMemo_();
   try {
@@ -257,6 +259,10 @@ function apiGetSendRecipientPool(quarterId) {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const pool = buildSendRecipientPool_(context, timezone);
 
+    // ── 第七十輪批次 AT 組：辦公室等固定收件人 ─────────────────
+    const poolStage = sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL;
+    const fixedMembers = tagFixedRecipients_(pool, poolStage, context);
+
     // ── 「有改動」相對邊一版 ────────────────────────────────
     const lastSent = findLastSentSnapshot_(quarterId);
     const changedByPerson = lastSent
@@ -284,7 +290,13 @@ function apiGetSendRecipientPool(quarterId) {
         label: g.label,
         total: members.length,
         // 冇電郵嘅勾咗都收唔到，所以「勾呢一組會加幾多位」要數勾得到嗰批。
-        selectable: members.filter(function (m) { return m.selectable; }).length
+        selectable: members.filter(function (m) { return m.selectable; }).length,
+        // 第七十輪批次 AT 組：固定收件人那一組列出每一位（電郵照現有方式遮蔽）
+        members: g.key === SEND_SOURCE.FIXED
+          ? members.map(function (m) {
+            return { displayName: m.displayName, emailMasked: maskEmailForPreview_(m.email) };
+          })
+          : []
       };
     });
 
@@ -293,6 +305,8 @@ function apiGetSendRecipientPool(quarterId) {
       versionNo: versionNo,
       items: pool,
       groups: groups,
+      // 第七十輪批次 AT 組：開窗時預設勾上的人（只有正式發出才有）
+      defaultPickedKeys: defaultPickedKeysForStage_(poolStage, fixedMembers),
       changed: {
         // ⚠️ **一定要講明相對邊一版。** 只講「有 4 位改過」，
         // 幹事無從判斷係相對佢啱啱儲存嗰版定係上一次寄嗰版。
@@ -309,6 +323,65 @@ function apiGetSendRecipientPool(quarterId) {
           : '這一季從來沒有寄出過，所以沒有東西可以比較——'
             + '「只寄給安排有改動的人」現在選不到。'
       }
+    };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
+ * 第七十輪批次 AU 組：〔改為再寄一次審閱本〕要寄給**上一次審閱本實際寄出嘅同一批人**。
+ *
+ * 回傳 `sendOptions`（`PICK`＋`pickedKeys`＋`extraEmails`），前端原封不動交返
+ * `apiStep2Preview`／`apiStep2Confirm`——預覽同真正寄出行同一條解析路。
+ *
+ * - 上一批嘅 PERSON 用 PersonID、LIST 用 `EmailRecipients` 嘅電郵；
+ *   上次幹事自己輸入嘅地址（唔喺 `EmailRecipients`）放入 `extraEmails`。
+ * - 上一批入面而家已經唔喺收件人池嘅人（例如身分已卸任、今季冇服侍）**寄唔到**，
+ *   點數放入 `droppedCount`，畫面講明，唔可以靜靜少寄。
+ * - 讀唔到上一批（從來冇寄過、或舊紀錄全部冇收件人）⇒ `found: false`，
+ *   前端用預設審閱名單並照實講。
+ *
+ * ⚠️ 純讀取，一格都唔寫。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {Object} {ok, found, sentAt, versionNo, count, droppedCount, sendOptions}
+ */
+function apiGetLastReviewSendOptions(quarterId) {
+  assertWebAppRequestAllowed_();
+  beginSheetReadMemo_();
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const batch = findLastReviewBatch_(readSheet(SHEETS.SEND_LOG), quarterId, timezone);
+    if (!batch.found) return { ok: true, found: false };
+
+    const versionNo = findLatestVersionNo(quarterId);
+    if (versionNo < 0) return { ok: true, found: false };
+    const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.REVIEW);
+    const pool = buildSendRecipientPool_(context, timezone);
+    const inPool = {};
+    pool.forEach(function (item) { inPool[item.key] = true; });
+
+    const pickedKeys = [];
+    const extraEmails = [];
+    let droppedCount = 0;
+    batch.personIds.forEach(function (personId) {
+      if (inPool[personId]) pickedKeys.push(personId); else droppedCount++;
+    });
+    batch.listEmails.forEach(function (email) {
+      if (inPool['LIST:' + email]) pickedKeys.push('LIST:' + email);
+      else extraEmails.push(email);
+    });
+    return {
+      ok: true,
+      found: true,
+      sentAt: batch.sentAt,
+      versionNo: batch.versionNo,
+      count: batch.count,
+      droppedCount: droppedCount,
+      sendOptions: { recipientScope: SEND_RECIPIENT_SCOPE.PICK, pickedKeys: pickedKeys, extraEmails: extraEmails }
     };
   } catch (err) {
     return { ok: false, message: err.message };
@@ -442,6 +515,29 @@ function buildUnsavedSendPreview_(quarterId, state) {
 }
 
 /**
+ * 第七十輪批次 AX 組：進度係「已寄給堂委，等他們的意見」（REVIEW_SENT）時，
+ * 「寄出」窗最上面嘅提示。
+ *
+ * 現場：寄咗審閱本之後，第 3 步〔寄出〕開出嘅仍然係「寄給堂委審閱」。要先喺第 2 步
+ * 撳〔儲存及寄出〕（冇改動都得）把進度推到「意見已收齊」，〔寄出〕先會變成正式發出。
+ * 幹事唔知，截圖時連測試工具都走錯過一次。
+ *
+ * ⚠️ 只改顯示，**唔改流程**。文字由後端出（前端唔另寫一套）。
+ */
+const SEND_REVIEW_SENT_HINT = '堂委的意見收齊、要正式發出給全體？'
+  + '請先在第 2 步撳〔儲存及寄出〕（沒有改動也可以撳），'
+  + '之後再撳〔寄出〕，這裡就會變成「正式發出給全體」。';
+
+/**
+ * 這個進度要不要顯示上面那個提示。純函式。
+ * @param {string} stage 季度進度（QUARTER_STAGE）
+ * @returns {string} 提示文字；其他進度回空字串
+ */
+function buildReviewSentHint_(stage) {
+  return stage === QUARTER_STAGE.REVIEW_SENT ? SEND_REVIEW_SENT_HINT : '';
+}
+
+/**
  * 供前端呼叫：「寄出」彈窗要的一切。**純讀取，一格都不會寫。**
  *
  * @param {string} quarterId 季度 ID
@@ -485,6 +581,8 @@ function apiGetSendPlanSummary(quarterId) {
 
     return {
       kind: kind,
+      // 第七十輪批次 AX 組：已寄給堂委、等意見時，「寄出」窗最上面嘅提示（其他進度係空字串）
+      reviewSentHint: buildReviewSentHint_(state.stage),
       // ⚠️ 第四十七輪批次 A1 組：三粒掣唔著嘅**唯一**原因就係未儲存。
       //
       // 前端要靠佢排喺 `kind === NONE` 之前——否則第四十輪寫嘅

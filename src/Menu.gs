@@ -2145,6 +2145,9 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     '　FineTuneProposals（主表）：' + plan.fineTuneProposalRows + ' 行',
     '　FineTuneProposals_Archive（封存表）：' + plan.fineTuneProposalArchiveRows + ' 行',
     '　RosterPDF：' + plan.pdfFiles.length + ' 個檔案（移到垃圾桶，30 日內可復原）',
+    // 第七十輪批次 AW 組
+    '　可編輯副本：' + (plan.editableCopyFiles || []).length + ' 個檔案（移到垃圾桶）',
+    '　清理後變空的版本 PDF 資料夾：' + (plan.pdfFolders || []).length + ' 個（移到垃圾桶）',
     '　Quarters.Stage：重設為 ' + QUARTER_STAGE.DRAFT,
     '',
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
@@ -2170,6 +2173,16 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
       lines.push('　' + f.name + '　' + formatFileSize_(f.sizeBytes));
     });
     if (plan.pdfFiles.length > 20) lines.push('　……另有 ' + (plan.pdfFiles.length - 20) + ' 個');
+  }
+  // 第七十輪批次 AW 組：逐個列出，幹事要睇得到會清走邊啲
+  if ((plan.editableCopyFiles || []).length > 0) {
+    lines.push('', '將移到垃圾桶的可編輯副本：');
+    plan.editableCopyFiles.slice(0, 20).forEach(function (f) { lines.push('　' + f.name); });
+    if (plan.editableCopyFiles.length > 20) lines.push('　……另有 ' + (plan.editableCopyFiles.length - 20) + ' 個');
+  }
+  if ((plan.pdfFolders || []).length > 0) {
+    lines.push('', '將移到垃圾桶的空資料夾（版本 PDF 清走之後）：');
+    plan.pdfFolders.slice(0, 20).forEach(function (f) { lines.push('　' + f.name); });
   }
 
   // 第十輪批次階段 B1：逐行列出「落喺呢季但唔係申報自動加入」嘅 Unavailable。
@@ -2352,6 +2365,9 @@ function runResetQuarterTestData_locked_() {
     + (summary.totals.fineTuneProposalRows
       + summary.totals.fineTuneProposalArchiveRows) + ' 行');
   lines.push('　RosterPDF：' + summary.totals.pdfFiles + ' 個（移到垃圾桶）');
+  // 第七十輪批次 AW 組
+  lines.push('　可編輯副本：' + summary.totals.editableCopies + ' 個（移到垃圾桶）');
+  lines.push('　清理後變空的版本 PDF 資料夾：' + summary.totals.pdfFolders + ' 個（移到垃圾桶）');
   if (summary.totals.manualAttention > 0) {
     lines.push('　⚠ 需要人手判斷的項目：' + summary.totals.manualAttention + ' 項（見下面逐季細項）');
   }
@@ -2421,6 +2437,9 @@ function runResetQuarterTestData_locked_() {
     resultLines.push('　FineTuneProposals_Archive：'
       + result.fineTuneProposalArchiveRowsDeleted + ' 行');
     resultLines.push('　RosterPDF：' + result.pdfTrashed + ' 個已移到垃圾桶');
+    resultLines.push('　可編輯副本：' + (result.editableCopiesTrashed || 0) + ' 個已移到垃圾桶');
+    resultLines.push('　版本 PDF 空資料夾：' + (result.pdfFoldersTrashed || 0) + ' 個已移到垃圾桶'
+      + (result.pdfFoldersKept > 0 ? '（另有 ' + result.pdfFoldersKept + ' 個現在不是空的，保留）' : ''));
     resultLines.push('　Quarters.Stage：'
       + (result.stageReset ? '已重設為 ' + QUARTER_STAGE.DRAFT : '⚠ 重設失敗'));
     // 第十二輪批次階段 D 嘅那一行：**連結唔會變、檔案唔會刪**，只清空內容。

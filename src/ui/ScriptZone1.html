@@ -412,14 +412,14 @@
         })
       ]));
 
-      openModal('儲存並確認：有名字認不出', nodes, [
+      openModal('儲存及寄出：有名字認不出', nodes, [
         button('知道了，我去改', () => closeModal(), '')
       ]);
       return;
     }
 
     // NO_VERSION／GRID_SHEET_MISSING：後端已經俾咗三段式訊息。
-    showErrorModal('儲存並確認', new Error(plan.message || plan.blockReason));
+    showErrorModal('儲存及寄出', new Error(plan.message || plan.blockReason));
   }
 
   /* ── D4／零改動兩種路徑 ─────────────────────────────────── */
@@ -427,7 +427,7 @@
   function renderSaveZeroChange(plan) {
     if (plan.zeroChangeAction === 'ADVANCE_STAGE_ONLY') {
       openConfirm({
-        title: '儲存並確認：堂委沒有提出改動',
+        title: '儲存及寄出：堂委沒有提出改動',
         bodyNodes: [
           para('堂委沒有提出改動。撳下去就當作意見已收齊，'
             + '「正式發出給全體」會亮起。職事表內容不會改變。'),
@@ -447,7 +447,7 @@
       return;
     }
 
-    openModal('儲存並確認', [
+    openModal('儲存及寄出', [
       para('沒有偵測到任何改動，不需要儲存。'
         + (plan.stage === 'REQUESTS_APPLIED' ? '可以撳「正式發出給全體」了。' : '')
         + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : ''))
@@ -903,13 +903,13 @@
   function renderSaveResult(result) {
     // ── 完全失敗（後端回 ok:false，唔係拋錯）────────────────
     if (!result.ok) {
-      showErrorModal('儲存並確認', new Error(result.message || '儲存失敗。'));
+      showErrorModal('儲存及寄出', new Error(result.message || '儲存失敗。'));
       return;
     }
 
     // ── 零改動路徑 ─────────────────────────────────────────
     if (result.zeroChange) {
-      openModal('儲存並確認', [
+      openModal('儲存及寄出', [
         make('div', { text: result.message, className: 'ok-line' })
       ], [button('完成', () => closeModalAndRefresh(), '')]);
       return;
@@ -1071,7 +1071,45 @@
   // ⚠️ 第四十輪批次 A 組：`sendOptions` 一路傳到底。
   // **冇傳嘅時候行為同今日一模一樣**——區一嗰幾粒舊掣就係噉叫（冇參數），
   // 而後端 `resolveSendOptions_()` 見到 undefined 就退回今日嘅預設值。
-  function openReview(sendOptions) {
+  /**
+   * 第七十輪批次 AU 組：〔改為再寄一次審閱本〕——收件人＝上一次審閱本實際寄出嘅同一批人。
+   *
+   * 讀得到 ⇒ 用嗰一批（確認窗列出佢哋）；讀唔到 ⇒ 預設審閱名單，並照實講。
+   * 句子由 `reviewLastSentSentence_()` 按實際情況出，唔寫死「同一批人」。
+   */
+  function openReviewSameBatch() {
+    runAction('讀取上一次審閱本的收件人', async () => {
+      const r = await callServer('apiGetLastReviewSendOptions', currentQuarterId);
+      if (!r.ok) { showErrorModal('寄給堂委審閱', new Error(r.message)); return; }
+      if (r.found) {
+        openReview(r.sendOptions, { sameBatch: true, droppedCount: r.droppedCount || 0 });
+      } else {
+        openReview(null, { lookupFailed: true });
+      }
+    });
+  }
+
+  /**
+   * 確認窗嗰句「上次在……寄過」。
+   * @param {string} last 上次寄出時間（可以係空）
+   * @param {?Object} meta `{sameBatch, droppedCount}` 或 `{lookupFailed}`；其他路徑冇
+   * @returns {string} 一句；冇嘢好講回空字串
+   */
+  function reviewLastSentSentence_(last, meta) {
+    if (meta && meta.lookupFailed) {
+      return '查不到上一次的收件人，這一次會寄給預設的審閱名單。';
+    }
+    if (!last) return '';
+    if (meta && meta.sameBatch) {
+      return '上次在 ' + last + ' 寄過，會再寄一次給同一批人。'
+        + (meta.droppedCount > 0
+          ? ('（上次那批人裡有 ' + meta.droppedCount + ' 位現在已不在收件名單上，這一次不會寄給他們。）')
+          : '');
+    }
+    return '上次在 ' + last + ' 寄過。';
+  }
+
+  function openReview(sendOptions, meta) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
     // `Failed due to illegal value in property: 1`。
@@ -1136,9 +1174,8 @@
       }
 
       const last = d.buttons.review.lastSentAt;
-      if (last) {
-        nodes.push(para('上次在 ' + last + ' 寄過，會再寄一次給同一批人。'));
-      }
+      const lastSentence = reviewLastSentSentence_(last, meta);
+      if (lastSentence) nodes.push(para(lastSentence));
       if (d.isDryRun) {
         nodes.push(make('div', {
           text: '測試模式：不會真的寄出，只會記錄一次。',

@@ -489,7 +489,7 @@ function buildPreLaunchChecklist_(quarterId) {
     (hardClassified ? hardClassified.items : []).slice(0, 20).map(function (v) {
       return '［' + v.classLabel + '］' + v.serviceDate + ' '
         + (v.postNameTC || v.postId) + '#' + v.slotIndex + ' ' + (v.personName || '')
-        + ' ' + v.ruleId + '：' + (v.reason || '')
+        + ' ' + (v.reason || '')
         + (v.classNote ? '（' + v.classNote + '）' : '');
     }).concat(hardViolations.length > 20 ? ['……另有 ' + (hardViolations.length - 20) + ' 項'] : [])
   ));

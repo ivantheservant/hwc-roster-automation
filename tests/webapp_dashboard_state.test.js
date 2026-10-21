@@ -111,9 +111,14 @@ console.log('\n=== 規格 2.3 掣 2 動態文字 ===');
   checkEqual('★★★★★ 收件人為 0 ⇒ 講明寄出去冇人收到，並指去邊度補',
     t({ reviewerCount: 0 }),
     '現時沒有登記任何堂委電郵，寄出去不會有人收到。先去「名單維護」補。');
-  checkEqual('★★★★ 已寄過',
+  // 第七十輪批次 AU 組：呢粒掣寄嘅係預設審閱名單，唔再寫「同一批人」。
+  checkEqual('★★★★ 已寄過（查不到上一批收件人）',
     t({ lastSentAt: { REVIEW: '11月28日 14:30', OFFICIAL: null, RESEND: null } }),
-    '上次在 11月28日 14:30 寄過。再撳一次會重新寄給同一批人。');
+    '上次在 11月28日 14:30 寄過，但查不到當時的收件人。再撳一次會寄給預設的審閱名單（3 位）。');
+  checkEqual('★★★★ 已寄過（讀得到上一批）',
+    t({ lastSentAt: { REVIEW: '11月28日 14:30', OFFICIAL: null, RESEND: null },
+      lastReviewBatch: { found: true, count: 6 } }),
+    '上次在 11月28日 14:30 寄過（6 位）。再撳一次會寄給預設的審閱名單（3 位）。');
 }
 
 console.log('\n=== 規格 2.3 掣 3 動態文字 ===');

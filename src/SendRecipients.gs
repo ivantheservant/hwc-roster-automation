@@ -45,16 +45,19 @@ const SEND_SOURCE = {
   DEACON: 'DEACON',
   IT: 'IT',
   CLERK: 'CLERK',
+  // 第七十輪批次 AT 組：辦公室等固定收件人（`EmailRecipients` 的 LIST 型）
+  FIXED: 'FIXED',
   CHANGED: 'CHANGED'
 };
 
-/** 六個來源嘅中文名同次序。畫面照呢個次序畫。 */
+/** 七個來源嘅中文名同次序。畫面照呢個次序畫。 */
 const SEND_SOURCE_LABELS = [
   { key: SEND_SOURCE.ROSTER, label: '職事表上全部人' },
   { key: SEND_SOURCE.COMMITTEE, label: '堂委' },
   { key: SEND_SOURCE.DEACON, label: '執事' },
   { key: SEND_SOURCE.IT, label: 'IT' },
   { key: SEND_SOURCE.CLERK, label: '幹事' },
+  { key: SEND_SOURCE.FIXED, label: '辦公室等固定收件人' },
   { key: SEND_SOURCE.CHANGED, label: '只寄給安排有改動的人' }
 ];
 
@@ -173,6 +176,56 @@ function buildSendRecipientPool_(context, timezone) {
   });
 
   return order.map(function (key) { return byKey[key]; });
+}
+
+/**
+ * 第七十輪批次 AT 組：**辦公室等固定收件人**（`EmailRecipients` 的 LIST 型）。
+ *
+ * 現場：正式發出揀「職事表上全部人」之後，補寄預覽列出「教會辦公室、系統管理
+ * 還沒有收到」——「選擇收件人」沒有任何一組勾得到他們。
+ *
+ * 成員＝該階段 `listRecipients_(stage, context)` 中 `type=LIST` 的收件人
+ * （**用現有函式，不另寫一份**；REVIEW 階段只有 Role=REVIEWER 那幾行，
+ * 其他階段看 Stage 欄）。就地在池內項目的 `sources` 加上 `FIXED`。
+ *
+ * ⚠️ 池只認 `EmailRecipients` 有電郵、Active 的行；`listRecipients_()` 回來的
+ * LIST 若不在池內（例如電郵空白）就沒有人可以勾，略過。
+ *
+ * @param {Object[]} pool `buildSendRecipientPool_()` 的結果（**就地加**）
+ * @param {string} stage MAIL_STAGES 之一
+ * @param {Object} context `buildMailContext_()` 的結果
+ * @returns {Object[]} 屬於這一組的池項目
+ */
+function tagFixedRecipients_(pool, stage, context) {
+  const byKey = {};
+  pool.forEach(function (item) { byKey[item.key] = item; });
+  const members = [];
+  listRecipients_(stage, context).forEach(function (r) {
+    if (r.type !== RECIPIENT_TYPE.LIST) return;
+    const email = String(r.email || '').trim().toLowerCase();
+    if (!email) return;
+    const item = byKey['LIST:' + email];
+    if (!item || members.indexOf(item) !== -1) return;
+    if (item.sources.indexOf(SEND_SOURCE.FIXED) === -1) item.sources.push(SEND_SOURCE.FIXED);
+    members.push(item);
+  });
+  return members;
+}
+
+/**
+ * 第七十輪批次 AT 組：開「選擇收件人」時預設勾哪些人（由後端定，前端不寫死）。
+ *
+ * 只有**正式發出**預設勾「固定收件人」那一組（幹事可以取消）；
+ * 寄給堂委審閱、改動後重發都有這一組但不預設勾。
+ *
+ * @param {string} stage MAIL_STAGES 之一
+ * @param {Object[]} fixedMembers `tagFixedRecipients_()` 的結果
+ * @returns {string[]} 預設勾上的池鍵
+ */
+function defaultPickedKeysForStage_(stage, fixedMembers) {
+  if (stage !== MAIL_STAGES.OFFICIAL) return [];
+  return (fixedMembers || []).filter(function (m) { return m.selectable !== false; })
+    .map(function (m) { return m.key; });
 }
 
 /**
@@ -483,6 +536,79 @@ function listSendHistory_(quarterId) {
 
   return order.map(function (k) { return byBatch[k]; })
     .sort(function (a, b) { return a.sentAt < b.sentAt ? -1 : (a.sentAt > b.sentAt ? 1 : 0); });
+}
+
+/**
+ * 第七十輪批次 AU 組：**最近一次「寄給堂委審閱」實際寄給咗邊一批人。**
+ *
+ * 現場（2026-10-21 截圖 s31）：第一次審閱本寄給 6 位堂委（幹事自己勾）。之後撳
+ * 〔改為再寄一次審閱本〕，確認窗寫「會再寄一次給同一批人」，列出嘅卻係
+ * `EmailRecipients` 的 3 個 REVIEWER 預設名單——句子寫死，收件人用預設。
+ *
+ * 批次點認：`SendLog.SendID` 係 `季度-v版本-階段-批次時間戳-序號`
+ * （見 `writeSendLogRows_()`），同一次寄送嘅所有行**共用「批次時間戳」**，
+ * 所以去掉尾嗰個序號就係批次鍵。**唔使新增欄位。** 舊紀錄冇 SendID ⇒ 退回
+ * 「版本＋分鐘」（同 `listSendHistory_()` 同一個近似）。
+ *
+ * 只計實際寄出（SENT／DRY_RUN）嘅行——查無電郵略過、失敗嘅唔算「收過」。
+ * PERSON 用 PersonID、LIST 用 Email（同 `sendRecipientKey_()` 一致）。
+ *
+ * ⚠️ **純函式**：由呼叫端傳入 SendLog 行（`WebAppDashboard.gs` 要求 SendLog
+ * 整個檔只讀一次，所以呢度唔自己讀）。
+ *
+ * @param {Object[]} rows `readSheet(SHEETS.SEND_LOG)` 的結果
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {{found: boolean, sentAt: string, versionNo: ?number, count: number,
+ *   personIds: string[], listEmails: string[]}}
+ */
+function findLastReviewBatch_(rows, quarterId, timezone) {
+  const C = COLUMNS.SEND_LOG;
+  const none = { found: false, sentAt: '', versionNo: null, count: 0, personIds: [], listEmails: [] };
+  const batches = {};
+  let bestKey = null;
+  let bestSort = null;
+
+  (rows || []).forEach(function (row) {
+    if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.REVIEW) return;
+    const status = String(row[C.STATUS] || '').trim().toUpperCase();
+    if (status !== MAIL_STATUS.SENT && status !== MAIL_STATUS.DRY_RUN) return;
+    const sentAt = normalizeSentAt_(row[C.SENT_AT], timezone);
+    const sortKey = sentAt ? sentAt.sortKey : 0;
+
+    const sendId = String(row[C.SEND_ID] || '').trim();
+    const key = sendId
+      ? sendId.replace(/-\d+$/, '')
+      : ('T|' + row[C.VERSION_NO] + '|' + (sentAt ? sentAt.text : ''));
+    if (!batches[key]) {
+      batches[key] = { sortKey: sortKey, sentAt: sentAt ? sentAt.text : '',
+        versionNo: isNaN(Number(row[C.VERSION_NO])) ? null : Number(row[C.VERSION_NO]),
+        personIds: [], listEmails: [] };
+    }
+    const b = batches[key];
+    if (sortKey > b.sortKey) { b.sortKey = sortKey; b.sentAt = sentAt.text; }
+    const personId = String(row[C.PERSON_ID] || '').trim();
+    const email = String(row[C.EMAIL] || '').trim();
+    if (personId) {
+      if (b.personIds.indexOf(personId) === -1) b.personIds.push(personId);
+    } else if (email) {
+      const lower = email.toLowerCase();
+      if (b.listEmails.indexOf(lower) === -1) b.listEmails.push(lower);
+    }
+    if (bestSort === null || b.sortKey >= bestSort) { bestSort = b.sortKey; bestKey = key; }
+  });
+
+  if (bestKey === null) return none;
+  const best = batches[bestKey];
+  return {
+    found: best.personIds.length + best.listEmails.length > 0,
+    sentAt: best.sentAt,
+    versionNo: best.versionNo,
+    count: best.personIds.length + best.listEmails.length,
+    personIds: best.personIds,
+    listEmails: best.listEmails
+  };
 }
 
 /**

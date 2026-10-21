@@ -491,7 +491,7 @@ function checkHardRuleViolations_(context) {
 
     const pool = context.eligibility.byPost[a.postId] || [];
     if (pool.indexOf(a.personId) === -1) {
-      notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, '不在 Eligibility 名單內'));
+      notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, '不在這個崗位的名單上'));
     }
 
     if (post) {
@@ -555,7 +555,7 @@ function checkHardRuleViolations_(context) {
   });
 
   const groups = [
-    { label: '不在 Eligibility 名單內', items: notEligible },
+    { label: '不在這個崗位的名單上', items: notEligible },
     { label: '違反 Unavailable', items: unavailableHits },
     { label: '同週 DistinctWithinPost 重複', items: duplicates },
     { label: '第一主日限定崗位出現在其他週', items: notFirstSunday },

@@ -451,7 +451,7 @@ function buildRoleImpactRows_(o) {
 
     if (it.added.length > 0) {
       rows.push(diagRow_('4. 因身分而新加入候選池', label, it.added.length + ' 人',
-        it.added.join('、') + '（這些人在 Eligibility 沒有這個崗位的紀錄，'
+        it.added.join('、') + '（這些人不在這個崗位的名單上，'
           + '但持有所需身分，例如新任堂委——這正是採用「聯集」而不是「交集」的目的）'));
     }
 

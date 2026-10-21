@@ -303,7 +303,7 @@ function validateRequest_(req, context, assignByKey, conflictKeys) {
 
   const personId = resolvePersonId(req.personNameText);
   if (!personId) {
-    return { category: 'NEEDS_INPUT', reason: '「' + req.personNameText + '」不在 NameMapping，請先用「新增人員」加入' };
+    return { category: 'NEEDS_INPUT', reason: '名單上找不到「' + req.personNameText + '」。如果是新人，請先用「新增人員」加入；如果是舊人，請留意同音字或異體字。' };
   }
 
   // 追加階段 AS：矛盾組合一律攔下，兩筆都不套用（見 buildRequestConflictKeys_()）。

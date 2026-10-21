@@ -103,6 +103,8 @@ function getConfigBaselineSnapshot_() {
       WEBAPP_STEWARD_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       RESEND_ONLY_CHANGED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROSTER_DRIVE_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
+      // 第七十輪批次 AW 組新增。上線目標值刻意係空白——網址由管理員貼。
+      USER_GUIDE_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 動態值：安裝時自動偵測填入本試算表自己的 ID，唔可能有固定嘅「上線目標值」，
       // 比對時一律略過（見 planConfigBaselineCheck_() 的 dynamic 判斷）。
       ROSTER_SPREADSHEET_ID: { launchTargetValue: '', source: '動態值，不比對', dynamic: true },

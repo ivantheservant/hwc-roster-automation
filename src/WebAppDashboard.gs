@@ -223,11 +223,14 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   // 而畫面上兩個數字就會對唔上。
   let latestOptions = '';
   let latestSortKey = null;
+  // 第七十輪批次 AU 組：上一批審閱本實際寄給咗幾多位（同一次讀入面順手收集）
+  const reviewRows = [];
 
   readSheet(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     const stage = String(row[C.STAGE] || '').trim();
     if (stage === MAIL_STAGES.OFFICIAL) hasOfficialRecord = true;
+    if (stage === MAIL_STAGES.REVIEW) reviewRows.push(row);
 
     const sentAt = normalizeSentAt_(row[C.SENT_AT], tz);
     // ⚠️ 「最近一筆」唔篩階段——三個階段任何一次寄出都算數。
@@ -250,7 +253,8 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   return {
     lastSentAt: lastSentAt,
     hasOfficialRecord: hasOfficialRecord,
-    unsavedRelease: parseUnsavedReleaseNote_(latestOptions)
+    unsavedRelease: parseUnsavedReleaseNote_(latestOptions),
+    lastReviewBatch: findLastReviewBatch_(reviewRows, quarterId, tz)
   };
 }
 
@@ -403,7 +407,15 @@ function buildReviewButtonText_(s) {
     return '現時沒有登記任何堂委電郵，寄出去不會有人收到。先去「名單維護」補。';
   }
   const last = s.lastSentAt[MAIL_STAGES.REVIEW];
-  if (last) return '上次在 ' + last + ' 寄過。再撳一次會重新寄給同一批人。';
+  // 第七十輪批次 AU 組：呢粒掣寄嘅係**預設審閱名單**（`Role=REVIEWER`），
+  // 唔係「上一批」——上一批可能係幹事自己勾嘅另一班人。照實講。
+  if (last) {
+    const batch = s.lastReviewBatch;
+    const defaultText = '再撳一次會寄給預設的審閱名單（' + s.reviewerCount + ' 位）。';
+    return (batch && batch.found)
+      ? ('上次在 ' + last + ' 寄過（' + batch.count + ' 位）。' + defaultText)
+      : ('上次在 ' + last + ' 寄過，但查不到當時的收件人。' + defaultText);
+  }
   return '把唯讀連結寄給 ' + s.reviewerCount + ' 位收件人。';
 }
 
@@ -558,7 +570,8 @@ function buildDashboardState_(quarterId) {
     arrangementChangedCount: resendBreakdown.arrangementChanged,
     notReceivedCount: resendBreakdown.notReceived,
     hasOfficialRecord: sendLog.hasOfficialRecord,
-    lastSentAt: sendLog.lastSentAt
+    lastSentAt: sendLog.lastSentAt,
+    lastReviewBatch: sendLog.lastReviewBatch
   };
 
   let preQuarter = { undoneItemCount: 0, items: [] };

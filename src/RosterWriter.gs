@@ -483,8 +483,10 @@ function applyCellMarks_(sheet, layout, warningIndex) {
     // 只有真正的規則警告才加批註（例如某崗位完全沒有合資格人選）。
     // 正常留空的格即使有 ruleFlags 也不加，避免 PDF 產生大量註腳。
     if (cellWarnings && cellWarnings.length > 0) {
+      // 第七十輪批次 AV 組：批註只寫中文原因，**不寫規則代號**——
+      // 內部代號（SEMI_NO_CONSECUTIVE 之類）曾經印到義工收到嘅 PDF 腳註上。
       notes[r][c] = cellWarnings.map(function (w) {
-        return w.ruleId + ': ' + w.reason;
+        return w.reason;
       }).join('\n');
     }
   });

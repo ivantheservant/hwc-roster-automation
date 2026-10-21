@@ -49,6 +49,10 @@ function planQuarterReset_(quarterId, includeV0) {
     // （嗰個人由此對嗰個崗位變成合資格），所以一定要列出嚟俾幹事知。
     eligibilityRequestRows: [],
     pdfFiles: [],          // {id, name, sizeBytes}
+    // 第七十輪批次 AW 組：該季「可編輯副本」資料夾內要清嘅檔案、
+    // 及清走 PDF 之後會變空嘅版本 PDF 資料夾（一併移到垃圾桶）。
+    editableCopyFiles: [], // {id, name, sizeBytes, versionNo}
+    pdfFolders: [],        // {id, name, versionNo}
     pdfUnrecognised: [],   // 不確定屬於哪個季度的檔案，一律不刪
     quarterStage: '',
     // 第十四輪批次階段 E【新發現的缺口】：FineTuneProposals（主表，「步驟 3：
@@ -232,6 +236,28 @@ function planQuarterReset_(quarterId, includeV0) {
       + '（如果 Config 的 ROSTER_DRIVE_FOLDER_ID 未設定，這是預期行為）');
   }
 
+  // ---- 第七十輪批次 AW 組：可編輯副本 ＋ 清理後變空嘅版本 PDF 資料夾 ----
+  //
+  // 現場：重設 2028T3 之後，舊嘅「可編輯副本」仍然留低（令「最新一份」揀錯），
+  // 版本 PDF 資料夾入面嘅 PDF 移到垃圾桶之後，空資料夾仍然留住。
+  // 同 PDF 一樣只信 `versionNosToClear`（v0／受保護版本唔清）；認唔出版本嘅副本一律保留。
+  try {
+    listEditableCopyFilesForQuarter_(quarterId).forEach(function (f) {
+      if (f.versionNo >= 0 && versionNosToClear[f.versionNo]) {
+        plan.editableCopyFiles.push({ id: f.id, name: f.name, sizeBytes: f.sizeBytes, versionNo: f.versionNo });
+      } else {
+        plan.manualAttention.push('可編輯副本「' + f.name + '」'
+          + (f.versionNo >= 0 ? '屬於不清理的 v' + f.versionNo : '認不出屬於哪一版')
+          + '，保留不清。');
+      }
+    });
+    const plannedIds = {};
+    plan.pdfFiles.forEach(function (f) { plannedIds[f.id] = true; });
+    plan.pdfFolders = listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedIds);
+  } catch (err) {
+    plan.manualAttention.push('無法檢查可編輯副本／版本 PDF 資料夾，這兩項完全不清：' + err.message);
+  }
+
   // ---- Quarters.Stage ----
   try {
     plan.quarterStage = getQuarterStage_(quarterId);
@@ -302,7 +328,8 @@ function executeQuarterReset_(plan) {
     versionRowsDeleted: 0, versionSheetsDeleted: 0, assignmentRowsDeleted: 0,
     sendLogRowsDeleted: 0, requestRowsDeleted: 0, unavailableRowsDeleted: 0,
     fineTuneProposalRowsDeleted: 0, fineTuneProposalArchiveRowsDeleted: 0,
-    pdfTrashed: 0, stageReset: false, publicRosterCleared: false, errors: []
+    pdfTrashed: 0, editableCopiesTrashed: 0, pdfFoldersTrashed: 0, pdfFoldersKept: 0,
+    stageReset: false, publicRosterCleared: false, errors: []
   };
 
   // 先留底：刪之前把打算刪什麼寫入 AuditLog
@@ -318,7 +345,9 @@ function executeQuarterReset_(plan) {
       + '　Unavailable(Source=REQUEST)=' + plan.unavailableRequestRows + ' 行'
       + '　FineTuneProposals=' + plan.fineTuneProposalRows + ' 行'
       + '　FineTuneProposals_Archive=' + plan.fineTuneProposalArchiveRows + ' 行'
-      + '　PDF=' + plan.pdfFiles.length + ' 個',
+      + '　PDF=' + plan.pdfFiles.length + ' 個'
+      + '　可編輯副本=' + (plan.editableCopyFiles || []).length + ' 個'
+      + '　版本PDF資料夾=' + (plan.pdfFolders || []).length + ' 個',
     newValue: '（全部清除，Stage 重設為 ' + QUARTER_STAGE.DRAFT + '）',
     source: 'MENU',
     notes: '連 v0 一齊清：' + (plan.includeV0 ? 'YES' : 'NO')
@@ -400,6 +429,30 @@ function executeQuarterReset_(plan) {
       result.pdfTrashed++;
     } catch (err) {
       result.errors.push('移除 PDF ' + f.name + ' 失敗：' + err.message);
+    }
+  });
+
+  // ---- 第七十輪批次 AW 組：可編輯副本 ＋ 變空嘅版本 PDF 資料夾（同 PDF 一樣只移到垃圾桶）----
+  (plan.editableCopyFiles || []).forEach(function (f) {
+    try {
+      DriveApp.getFileById(f.id).setTrashed(true);
+      result.editableCopiesTrashed++;
+    } catch (err) {
+      result.errors.push('移除可編輯副本 ' + f.name + ' 失敗：' + err.message);
+    }
+  });
+  (plan.pdfFolders || []).forEach(function (f) {
+    try {
+      const folder = DriveApp.getFolderById(f.id);
+      // 計畫到執行之間資料夾內容可能變過：現在唔係空嘅就唔動佢。
+      if (folder.getFiles().hasNext() || folder.getFolders().hasNext()) {
+        result.pdfFoldersKept++;
+        return;
+      }
+      folder.setTrashed(true);
+      result.pdfFoldersTrashed++;
+    } catch (err) {
+      result.errors.push('移除空資料夾 ' + f.name + ' 失敗：' + err.message);
     }
   });
 
@@ -616,7 +669,7 @@ function summariseQuarterResetBatch_(entries) {
     quarters: 0, versions: 0, assignmentRows: 0, sendLogRows: 0,
     requestRows: 0, unavailableRequestRows: 0,
     fineTuneProposalRows: 0, fineTuneProposalArchiveRows: 0,
-    pdfFiles: 0, manualAttention: 0
+    pdfFiles: 0, editableCopies: 0, pdfFolders: 0, manualAttention: 0
   };
 
   (entries || []).forEach(function (entry) {
@@ -633,6 +686,8 @@ function summariseQuarterResetBatch_(entries) {
       fineTuneProposalRows: plan.fineTuneProposalRows || 0,
       fineTuneProposalArchiveRows: plan.fineTuneProposalArchiveRows || 0,
       pdfFiles: (plan.pdfFiles || []).length,
+      editableCopies: (plan.editableCopyFiles || []).length,
+      pdfFolders: (plan.pdfFolders || []).length,
       manualAttention: (plan.manualAttention || []).slice()
     };
     perQuarter.push(item);
@@ -646,13 +701,16 @@ function summariseQuarterResetBatch_(entries) {
     totals.fineTuneProposalRows += item.fineTuneProposalRows;
     totals.fineTuneProposalArchiveRows += item.fineTuneProposalArchiveRows;
     totals.pdfFiles += item.pdfFiles;
+    totals.editableCopies += item.editableCopies;
+    totals.pdfFolders += item.pdfFolders;
     totals.manualAttention += item.manualAttention.length;
   });
 
   const nothingToDo = totals.versions === 0 && totals.assignmentRows === 0
     && totals.sendLogRows === 0 && totals.requestRows === 0
     && totals.unavailableRequestRows === 0 && totals.fineTuneProposalRows === 0
-    && totals.fineTuneProposalArchiveRows === 0 && totals.pdfFiles === 0;
+    && totals.fineTuneProposalArchiveRows === 0 && totals.pdfFiles === 0
+    && totals.editableCopies === 0 && totals.pdfFolders === 0;
 
   return { perQuarter: perQuarter, totals: totals, nothingToDo: nothingToDo };
 }
@@ -690,7 +748,9 @@ function executeQuarterResetBatch_(entries) {
           }).join(',')
           + '　RosterAssignments=' + (plan.assignmentRows || 0) + ' 行'
           + '　SendLog=' + (plan.sendLogRows || 0) + ' 行'
-          + '　PDF=' + (plan.pdfFiles || []).length + ' 個',
+          + '　PDF=' + (plan.pdfFiles || []).length + ' 個'
+          + '　可編輯副本=' + (plan.editableCopyFiles || []).length + ' 個'
+          + '　版本PDF資料夾=' + (plan.pdfFolders || []).length + ' 個',
         newValue: '（準備清理）',
         source: 'executeQuarterResetBatch_',
         notes: '批次清理，這一批共 ' + (entries || []).length + ' 季'

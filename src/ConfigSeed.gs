@@ -375,6 +375,14 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.USER_GUIDE_URL, type: CONFIG_TYPES.STR, group: 'SYS',
+      defaultValue: '',
+      description: '《職事表系統使用指南》的網址（例如放在 Drive 的 Google 文件連結）。'
+        + '「進階與診斷 ▸ 系統出問題時怎樣做」彈窗有值時會顯示「詳細步驟見使用指南」連結；'
+        + '留空時只寫指南章名。由管理員貼一次，不可以由程式自己猜。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, type: CONFIG_TYPES.EMAIL, group: 'SYS',
       defaultValue: '',
       description: '必填，操作者帳號，用於 v0 保護等機制的編輯者白名單。屬於帳號設定，'

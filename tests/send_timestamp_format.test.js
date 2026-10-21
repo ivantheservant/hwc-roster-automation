@@ -21,7 +21,7 @@ const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource([
   'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs',
-  'WebAppGuards.gs', 'WebAppPreQuarter.gs', 'WebAppDashboard.gs'
+  'WebAppGuards.gs', 'WebAppPreQuarter.gs', 'SendRecipients.gs', 'WebAppDashboard.gs'
 ]);
 
 let fail = 0;
@@ -130,9 +130,10 @@ console.log('\n=== B2 掣 2／掣 3 嘅動態文字用嘅係格式化後嘅值 =
   facts.lastSentAt[M.OFFICIAL] = null;
   facts.lastSentAt[M.RESEND] = null;
 
+  // 第七十輪批次 AU 組：呢粒掣寄嘅係預設審閱名單，唔再寫「同一批人」。
   const t = gas.buildReviewButtonText_(facts);
-  checkEqual('★★★★★ 掣 2：「上次在 2026-08-17 04:35 寄過」',
-    t, '上次在 2026-08-17 04:35 寄過。再撳一次會重新寄給同一批人。');
+  checkEqual('★★★★★ 掣 2：「上次在 2026-08-17 04:35 寄過」（查不到上一批收件人就照實講）',
+    t, '上次在 2026-08-17 04:35 寄過，但查不到當時的收件人。再撳一次會寄給預設的審閱名單（5 位）。');
 }
 
 console.log('\n=== B3【核心】冇版本時唔可以報一個「0」 ===');

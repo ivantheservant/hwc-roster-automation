@@ -151,6 +151,119 @@ function tryCreateEditableCopyAfterSend_(quarterId, versionNo) {
 }
 
 /**
+ * 第七十輪批次 AW 組：副本檔名入面嘅版本號（`<季度>_第<N>版_…`）；認唔出回 -1。
+ * @param {string} name 檔名
+ * @returns {number} 版本號
+ */
+function parseEditableCopyVersion_(name) {
+  const m = /第(\d+)版/.exec(String(name || ''));
+  return m ? Number(m[1]) : -1;
+}
+
+/**
+ * 第七十輪批次 AW 組：揀「最新一份」可編輯副本。
+ *
+ * 現場：重設季度再重新走一季之後，彈窗寫「最新一份：2028T3_第4版_…_20261021-1608」——
+ * 那是重設之前留下的舊副本；真正最新的是後來正式發出時自動建立的第 2 版副本。
+ * 舊寫法按檔名（版本號）揀，版本號大不等於較新。
+ *
+ * 規矩：**按建立時間**；同一時間先比版本號，最後比檔名。純函式。
+ *
+ * @param {Array<{name: string, createdMs: number}>} entries 副本（可以帶任何其他欄位）
+ * @returns {?Object} 最新嗰項；空陣列回 null
+ */
+function pickLatestEditableCopy_(entries) {
+  let best = null;
+  (entries || []).forEach(function (e) {
+    if (!best) { best = e; return; }
+    if (e.createdMs !== best.createdMs) {
+      if (e.createdMs > best.createdMs) best = e;
+      return;
+    }
+    const ev = parseEditableCopyVersion_(e.name);
+    const bv = parseEditableCopyVersion_(best.name);
+    if (ev !== bv) {
+      if (ev > bv) best = e;
+      return;
+    }
+    if (String(e.name) > String(best.name)) best = e;
+  });
+  return best;
+}
+
+/** 檔案建立時間（毫秒）；讀唔到當 0（唔會令整個彈窗冧）。 */
+function readFileCreatedMs_(file) {
+  try {
+    const d = file.getDateCreated();
+    const ms = (d && typeof d.getTime === 'function') ? d.getTime() : Number(d);
+    return isNaN(ms) ? 0 : ms;
+  } catch (err) {
+    return 0;
+  }
+}
+
+/**
+ * 第七十輪批次 AW 組：一個季度「可編輯副本」資料夾入面嘅全部檔案（重設季度清理用）。
+ * **只讀。** 資料夾唔存在就回空陣列，唔建任何嘢。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {Array<{id: string, name: string, sizeBytes: number, versionNo: number}>}
+ */
+function listEditableCopyFilesForQuarter_(quarterId) {
+  const root = resolveMailAttachmentFolder_();
+  const out = [];
+  const quarterFolders = root.getFoldersByName(String(quarterId || '').trim());
+  while (quarterFolders.hasNext()) {
+    const qf = quarterFolders.next();
+    const copyFolders = qf.getFoldersByName(EDITABLE_COPY_FOLDER_NAME);
+    while (copyFolders.hasNext()) {
+      const files = copyFolders.next().getFiles();
+      while (files.hasNext()) {
+        const f = files.next();
+        out.push({ id: f.getId(), name: f.getName(), sizeBytes: f.getSize(),
+          versionNo: parseEditableCopyVersion_(f.getName()) });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 第七十輪批次 AW 組：重設季度清走 PDF 之後會變空嘅「版本 PDF 資料夾」（`v3` 之類）。
+ *
+ * 現場：版本 PDF 資料夾內嘅 PDF 移到垃圾桶之後，空資料夾仍然留住。
+ * 只計**要清嘅版本**嘅資料夾；入面仲有任何唔喺清理計畫嘅檔案或子資料夾 ⇒ 唔計（唔係空）。
+ * **只讀。**
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {Object.<number, boolean>} versionNosToClear 要清嘅版本號
+ * @param {Object.<string, boolean>} plannedFileIds 已列入清理計畫嘅檔案 ID
+ * @returns {Array<{id: string, name: string, versionNo: number}>}
+ */
+function listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedFileIds) {
+  const root = resolveMailAttachmentFolder_();
+  const out = [];
+  const quarterFolders = root.getFoldersByName(String(quarterId || '').trim());
+  const pattern = new RegExp('^' + escapeRegExp_(PDF_VERSION_FOLDER_PREFIX) + '(\\d+)$');
+  while (quarterFolders.hasNext()) {
+    const vfs = quarterFolders.next().getFolders();
+    while (vfs.hasNext()) {
+      const vf = vfs.next();
+      const m = pattern.exec(vf.getName());
+      if (!m || !versionNosToClear[Number(m[1])]) continue;
+      if (vf.getFolders().hasNext()) continue;
+      let willBeEmpty = true;
+      const files = vf.getFiles();
+      while (files.hasNext()) {
+        if (!plannedFileIds[files.next().getId()]) { willBeEmpty = false; break; }
+      }
+      if (willBeEmpty) out.push({ id: vf.getId(), name: vf.getName(), versionNo: Number(m[1]) });
+    }
+  }
+  return out;
+}
+
+/**
  * 供前端呼叫：「進階與診斷 ▸ 系統出問題時怎樣做」要顯示嘅三個位置。**唯讀**，
  * 冇就講冇，唔會建資料夾。連結一律由程式讀出，唔寫死。
  *
@@ -168,10 +281,21 @@ function apiGetRecoveryLinks(quarterId) {
     quarterId: q,
     versionNo: versionNo,
     guideDoc: RECOVERY_GUIDE_DOC_NAME,
+    // 第七十輪批次 AW 組：幹事打唔開 repo，所以唔再叫佢去睇 `docs/…`。
+    // Config 有 USER_GUIDE_URL ⇒ 畫連結；冇 ⇒ 寫指南章名。
+    guideUrl: '',
+    guideSentence: '詳細步驟見《職事表系統使用指南》「系統出問題時」一章。',
     publicLink: { url: '', note: '' },
     fullPdf: { url: '', note: '' },
     editableCopy: { url: '', folderUrl: '', note: '' }
   };
+
+  try {
+    out.guideUrl = String(getConfig(CONFIG_KEYS.USER_GUIDE_URL, DEFAULTS.USER_GUIDE_URL) || '').trim();
+    if (out.guideUrl) out.guideSentence = '詳細步驟見使用指南。';
+  } catch (err) {
+    // 讀唔到 Config 唔應該令整個彈窗冧：照寫章名
+  }
 
   try {
     const row = findPublicLinkRow_(q);
@@ -224,12 +348,15 @@ function apiGetRecoveryLinks(quarterId) {
       if (cf.hasNext()) {
         const folder = cf.next();
         out.editableCopy.folderUrl = folder.getUrl();
-        let latest = null;
+        // 第七十輪批次 AW 組：按建立時間揀（唔係按檔名／版本號）——見 pickLatestEditableCopy_()
+        const entries = [];
         const iter = folder.getFiles();
         while (iter.hasNext()) {
           const f = iter.next();
-          if (!latest || String(f.getName()) > String(latest.getName())) latest = f;   // 檔名尾係時間戳
+          entries.push({ file: f, name: String(f.getName()), createdMs: readFileCreatedMs_(f) });
         }
+        const picked = pickLatestEditableCopy_(entries);
+        const latest = picked ? picked.file : null;
         if (latest) {
           out.editableCopy.url = latest.getUrl();
           out.editableCopy.note = '最新一份：' + latest.getName() + '（快照，之後的改動不會更新它）。';

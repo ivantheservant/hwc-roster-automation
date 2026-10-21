@@ -90,6 +90,8 @@
     // 第四十六輪批次 A 組：同階段無關嘅收件人池（純讀取）。
     // 取代咗舊嗰個 `apiGetSendCandidates`（按階段出名單），嗰個已經刪走。
     'apiGetSendRecipientPool',
+    // 第七十輪批次 AU 組：上一次審閱本實際寄給邊一批人（純讀取）
+    'apiGetLastReviewSendOptions',
     // 第四十一輪批次 B 組：〔檢查我的改動〕係唯讀——佢乜都唔改，
     // 呢一點喺畫面上都要講明（幹事撳完唔敢再撳第二次，驚改咗嘢）。
     'apiCheckMyChanges',
@@ -869,7 +871,7 @@
       const list = make('details', {}, [make('summary', { text: '顯示清單' })]);
       (released.items || []).forEach((r) => {
         list.appendChild(make('div', {
-          text: cellLabel(r) + '　' + (r.personName || r.personId) + '——' + (r.reason || r.ruleId)
+          text: cellLabel(r) + '　' + (r.personName || r.personId) + '——' + (r.reason || plainRuleText(r.ruleId))
             + (r.releasedVersionNo === null || r.releasedVersionNo === undefined
               ? '（已放行）' : '（第 ' + r.releasedVersionNo + ' 版放行）'),
           className: 'vio-row'
@@ -1556,7 +1558,15 @@
    * 印一個代號，最少查得返；印空白就等於話「呢一格冇問題」。
    */
 
-  /** 規則代號 → 一句人話。對唔上就回原文（見上面）。 */
+  /**
+   * 第七十輪批次 AV 組：規則代號**唔可以直接印畀幹事睇**。
+   * 對唔上嘅代號用一句通用嘅人話，唔再印英文代號。
+   */
+  function plainRuleText(ruleId) {
+    return RULE_SENTENCE[ruleId] || '這一格有一條排表規則沒有符合';
+  }
+
+  /** 規則代號 → 一句人話。對唔上就用通用一句（見上面）。 */
   const RULE_SENTENCE = {
     HARD_ELIGIBILITY: '他未做過這個崗位',
     HARD_DISTINCT_SLOT: '同一日這個崗位排了同一個人兩次',
@@ -1586,7 +1596,7 @@
     // 單一 slot 嘅崗位唔使寫 `#1`——嗰個編號對幹事冇意義。
     const slot = (Number(x.slotIndex) > 1) ? (' ' + x.slotIndex) : '';
     const who = x.personName ? ('　' + x.personName) : '';
-    const why = RULE_SENTENCE[x.ruleId] || x.reason || x.ruleId || '';
+    const why = RULE_SENTENCE[x.ruleId] || x.reason || plainRuleText(x.ruleId);
     return humanDate(x.serviceDate) + '　' + post + slot + who
       + (why ? ('——' + why) : '');
   }

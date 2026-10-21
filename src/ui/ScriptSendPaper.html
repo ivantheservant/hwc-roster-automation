@@ -424,6 +424,14 @@
   function drawSendMain(s) {
     const nodes = [];
 
+    // 第七十輪批次 AX 組：已寄給堂委、等意見 ⇒ 告訴幹事點樣進入正式發出（只改顯示，不改流程）。
+    // 文字由後端出（`reviewSentHint`），其他進度係空字串＝不畫。
+    if (s.reviewSentHint) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', { text: s.reviewSentHint, className: 'lines' })
+      ]));
+    }
+
     // ── 頂部：**只講事實，唔再由階段推斷「這一次是⋯⋯」**─────────
     //
     // ⚠️ 第四十六輪批次 A3 組：舊嗰句係
@@ -547,7 +555,7 @@
     // ── 喺 REQUESTS_APPLIED 嗰一步，「再寄一次審閱本」仍然做得到 ──
     const actions = [];
     if (s.alsoReview) {
-      actions.push(button('改為再寄一次審閱本', () => { closeModal(); openReview(); }, 'secondary'));
+      actions.push(button('改為再寄一次審閱本', () => { closeModal(); openReviewSameBatch(); }, 'secondary'));
     }
 
     openConfirm({
@@ -720,11 +728,21 @@
   function openSendRecipients(s, keyword) {
     if (sendPool_) { drawSendRecipients(s, keyword || ''); return; }
     runAction('讀取收件名單', async () => {
-      const r = await callServer('apiGetSendRecipientPool', currentQuarterId);
+      const r = await callServer('apiGetSendRecipientPool', currentQuarterId, s.kind);
       if (!r.ok) { showErrorModal('選擇收件人', new Error(r.message)); return; }
       sendPool_ = r.items || [];
       sendPoolGroups_ = r.groups || [];
       sendChangedInfo_ = r.changed || null;
+      // 第七十輪批次 AT 組：預設勾上的人由後端定（正式發出＝辦公室等固定收件人）。
+      // 只在這一次開窗第一次攞池時加入；幹事之後取消了就不會再被加回去。
+      if (!sendOptions_.defaultPickedApplied) {
+        sendOptions_.defaultPickedApplied = true;
+        const picked = {};
+        (sendOptions_.pickedKeys || []).forEach((k) => { picked[k] = true; });
+        (r.defaultPickedKeys || []).forEach((k) => { picked[k] = true; });
+        sendOptions_.pickedKeys = Object.keys(picked);
+        if (sendOptions_.pickedKeys.length > 0) sendOptions_.recipientScope = 'PICK';
+      }
       drawSendRecipients(s, '');
     });
   }
@@ -769,9 +787,22 @@
           + '）'
       }));
       srcBox.appendChild(line);
+      // 第七十輪批次 AT 組：固定收件人那一組，逐位列出名稱（電郵已遮蔽）
+      (g.members || []).forEach((m) => {
+        srcBox.appendChild(make('div', {
+          text: '　　' + m.displayName + (m.emailMasked ? '（' + m.emailMasked + '）' : ''),
+          className: 'muted'
+        }));
+      });
       // ⚠️ 一組零人嗰陣**要講點解同去邊度加**。靜靜出一個勾唔到嘅框，
       // 幹事只會以為系統壞咗——而真正原因係「身分」那張表未填。
-      if (g.total === 0 && !isChanged) {
+      if (g.total === 0 && !isChanged && g.key === 'FIXED') {
+        srcBox.appendChild(make('div', {
+          text: '　　這個階段沒有設定固定收件人。要用這一組，先去「收件人名單」（EmailRecipients）'
+            + '加上辦公室等地址。',
+          className: 'muted'
+        }));
+      } else if (g.total === 0 && !isChanged) {
         srcBox.appendChild(make('div', {
           text: '　　現時沒有人有這個身分。要用這一組，先去「名單維護 ▸ 身分」'
             + '把「' + g.label + '」加給相關的人。',

@@ -425,9 +425,12 @@ console.log('\n=== 確認清單要講人話 ===');
 {
   check('★★★★★ 規則代號有對應嘅一句人話',
     /HARD_ELIGIBILITY: '他未做過這個崗位'/.test(common));
-  check('★★★★★ 對唔上嘅代號**照樣印出嚟**，唔可以變成空白'
-    + '（印一個代號最少查得返；印空白就等於話「呢一格冇問題」）',
-    /RULE_SENTENCE\[x\.ruleId\] \|\| x\.reason \|\| x\.ruleId \|\| ''/.test(common), '');
+  // 第七十輪批次 AV 組：內部規則代號唔可以直接印畀幹事睇——對唔上嘅用後端中文原因，
+  // 再唔得用一句通用嘅中文（`plainRuleText()`），**仍然唔可以變成空白**。
+  check('★★★★★ 對唔上嘅代號：用中文原因／通用一句，唔印英文代號，亦唔可以變成空白'
+    + '（印空白就等於話「呢一格冇問題」）',
+    /RULE_SENTENCE\[x\.ruleId\] \|\| x\.reason \|\| plainRuleText\(x\.ruleId\)/.test(common)
+    && /return RULE_SENTENCE\[ruleId\] \|\| '這一格有一條排表規則沒有符合';/.test(common), '');
   check('★★★★ 日期寫成「7 月 11 日」，唔係 2027-07-11',
     /function humanDate/.test(common) && /' 月 '/.test(common));
   check('★★★★★ 認唔出格式嘅日期回原文，唔可以回空白',

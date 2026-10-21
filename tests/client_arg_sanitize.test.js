@@ -352,7 +352,8 @@ console.log('\n=== E【核心】區一四粒大掣：同一句錯嘅另外三個
     && /resend: \(\) => openResend\(\)/.test(bare), '');
 
   ['openReview', 'openOfficial', 'openResend'].forEach(function (name) {
-    const fn = grabFn(zone1, '  function ' + name + '(sendOptions) {');
+    // 第七十輪批次 AU 組：openReview 多收一個 `meta`（只管句子，不送後端），sendOptions 照樣收成 sendOpts
+    const fn = grabFn(zone1, '  function ' + name + (name === 'openReview' ? '(sendOptions, meta) {' : '(sendOptions) {'));
     check('★★★★★ `' + name + '()` 收成純物件或者 `null`'
       + '——`undefined` 一樣過唔到 `google.script.run`，'
       + '所以「完全唔傳」嗰條路本身都係壞嘅',

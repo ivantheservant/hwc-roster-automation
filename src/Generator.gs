@@ -574,7 +574,7 @@ function pickPerson_(state) {
       personId: '',
       violations: [],
       forced: false,
-      reason: '此崗位在 Eligibility 中沒有任何在職的合資格人選'
+      reason: '此崗位在名單上沒有任何在職的合資格人選'
     };
   }
 
