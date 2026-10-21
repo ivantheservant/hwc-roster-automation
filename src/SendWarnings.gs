@@ -107,3 +107,56 @@ function limitSendWarningList_(items) {
     moreCount: Math.max(0, items.length - SEND_WARNING_LIST_LIMIT)
   };
 }
+
+/**
+ * 第六十七輪批次 AI 組：**名單改了之後，最新一版有幾多格的人已經唔喺該崗位名單上。**
+ *
+ * Ivan：「改完名單要知道哪幾格要重排。」之前「儲存並套用名單」只講「這幾位已經排在
+ * 現有職事表上」（`stillAssigned`——按**移走嘅人**數），而「名單維護 ▸ 更改各崗位的
+ * 事奉人員」儲存完一句都冇講。兩邊各自算又會對唔上，所以呢度同 `findStateViolations_()`
+ * **同一套判斷**（`RULE_IDS.ELIGIBILITY`），對已儲存嘅最新版本算一次，三個地方
+ *（兩個儲存結果窗、狀態卡／第 2 步）都讀呢一份。
+ *
+ * ⚠️ 已放行嘅格一樣計入——名單改咗之後，放行嗰陣嘅理由可能已經唔成立；
+ * 呢度只係講「有幾多格要你再望一眼」，唔係要求重新放行。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {{versionNo: number, count: number, items: Object[], moreCount: number, error: string}}
+ *   每項 `{serviceDate, postId, postNameTC, slotIndex, personId, personName}`
+ */
+function summariseEligibilityImpact_(quarterId) {
+  const out = { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
+  try {
+    const versionNo = findLatestVersionNo(quarterId);
+    out.versionNo = versionNo;
+    if (!(versionNo >= 0)) return out;
+    const context = buildFineTuneContext_(quarterId, versionNo, { skipGrid: true });
+    const state = versionStateFromOriginal_(context);
+    const postNames = {};
+    (context.posts || []).forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+
+    const seen = {};
+    const items = [];
+    findStateViolations_(state, context).forEach(function (v) {
+      if (v.ruleId !== RULE_IDS.ELIGIBILITY) return;
+      const key = cellKey_(v.serviceDate, v.postId, v.slotIndex);
+      if (seen[key]) return;
+      seen[key] = true;
+      items.push({
+        serviceDate: v.serviceDate, postId: v.postId,
+        postNameTC: postNames[v.postId] || v.postId, slotIndex: v.slotIndex,
+        personId: v.personId || '', personName: nameOfPersonId_(context, v.personId)
+      });
+    });
+    const limited = limitSendWarningList_(items);
+    out.count = limited.count;
+    out.items = limited.items;
+    out.moreCount = limited.moreCount;
+  } catch (err) {
+    if (typeof log_ === 'function') {
+      log_('WARN', 'summariseEligibilityImpact_（' + quarterId + '）算不到：' + err.message);
+    }
+    out.error = err.message;
+  }
+  return out;
+}

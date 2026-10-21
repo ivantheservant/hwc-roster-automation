@@ -4972,6 +4972,63 @@ const MUTATIONS = [
     replace: '',
     tests: ['tests/hard_release_remembered.test.js']
   },
+  // ── 第六十七輪批次 AI 組：改完名單要知道哪幾格要重排 ────────────
+  {
+    id: 'ai-batch-no-impact',
+    why: '名單維護儲存完唔算受影響格——幹事唔知要重排',
+    file: 'src/WebAppEligibility.gs',
+    find: '    eligibilityImpact: q ? summariseEligibilityImpact_(q) : null };\n}',
+    replace: '    eligibilityImpact: null };\n}',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'ai-wrong-rule',
+    why: '只睇錯咗嘅規則——永遠 0 格',
+    file: 'src/SendWarnings.gs',
+    find: '      if (v.ruleId !== RULE_IDS.ELIGIBILITY) return;',
+    replace: '      if (v.ruleId === RULE_IDS.ELIGIBILITY) return;',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'ai-apply-no-impact',
+    why: '開季前第 0 步套用名單唔帶受影響格',
+    file: 'src/EligibilitySheetEditor.gs',
+    find: '    eligibilityImpact: summariseEligibilityImpact_(quarterId),',
+    replace: "    eligibilityImpact: { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' },",
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'ai-dashboard-no-impact',
+    why: '狀態卡／第 2 步唔帶受影響格——兩個數字對唔上',
+    file: 'src/WebAppDashboard.gs',
+    find: '    eligibilityImpact: versionExists ? summariseEligibilityImpact_(quarterId)',
+    replace: '    eligibilityImpact: !versionExists ? summariseEligibilityImpact_(quarterId)',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'ai-ui-no-head',
+    why: '畫面唔講「名單改了之後，這一版有 N 格的人已經不在該崗位的名單上」',
+    file: 'src/ui/Script.html',
+    find: "          text: '名單改了之後，這一版有 ' + impact.count + ' 格的人已經不在該崗位的名單上。',",
+    replace: "          text: '',",
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'ai-ui-no-button',
+    why: '結果窗冇〔請系統幫我調整〕出口',
+    file: 'src/ui/Script.html',
+    find: "      if (withButton) {\n        box.appendChild(make('div', { className: 'row' }, [\n          button('請系統幫我調整', () => { closeModal(); openBuildSuggestion(); }, '')\n        ]));\n      }",
+    replace: '',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'ai-zone3-no-quarter',
+    why: '名單維護儲存唔傳季度——後端算唔到、結果窗永遠唔出',
+    file: 'src/ui/ScriptZone3.html',
+    find: "          const res = await callServerMutating('apiSaveEligibilityBatch', changes, currentQuarterId);",
+    replace: "          const res = await callServerMutating('apiSaveEligibilityBatch', changes);",
+    tests: ['tests/eligibility_impact.test.js']
+  },
 ];
 
 /**

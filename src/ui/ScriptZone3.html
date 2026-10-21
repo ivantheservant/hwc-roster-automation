@@ -830,12 +830,20 @@
             const parts = k.split('|');
             return { personId: parts[0], postId: parts[1], eligible: eligChanges[k] };
           });
-          const res = await callServerMutating('apiSaveEligibilityBatch', changes);
+          // 第六十七輪批次 AI 組：傳埋季度，後端順帶算「這一版有幾多格的人已唔喺名單上」
+          const res = await callServerMutating('apiSaveEligibilityBatch', changes, currentQuarterId);
           if (!res.ok) { showErrorModal('崗位資格', new Error(res.message || '儲存失敗')); return; }
           setStatus('已新增 ' + res.added + ' 項、取消 ' + res.removed + ' 項。');
           eligData = await callServer('apiGetEligibilityMatrix');
           eligChanges = {};
           renderEligibility('');
+          // 名單改咗而現有職事表上有格受影響 ⇒ 要講，而且要有出口
+          const impactNodes = buildEligibilityImpactNodes(res.eligibilityImpact, { withButton: true });
+          if (impactNodes.length > 0) {
+            openModal('名單已儲存', [
+              para('已新增 ' + res.added + ' 項、取消 ' + res.removed + ' 項。')
+            ].concat(impactNodes), [button('知道了', () => closeModal(), '')]);
+          }
         });
       }
     });

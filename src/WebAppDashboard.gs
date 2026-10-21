@@ -599,7 +599,10 @@ function buildDashboardState_(quarterId) {
     publicLink: publicLink,
     // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反
     sendWarnings: versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
-      : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' }
+      : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' },
+    // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
+    eligibilityImpact: versionExists ? summariseEligibilityImpact_(quarterId)
+      : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' }
   };
 }
 

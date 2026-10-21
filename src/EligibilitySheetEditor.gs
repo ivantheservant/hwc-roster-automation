@@ -519,6 +519,8 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
     // 是完全正常的事——但一定要講，否則他以為那幾項套用了。
     vanished: pick.vanished,
     stillAssigned: pick.removed.filter(function (r) { return r.assignedCount > 0; }),
+    // 第六十七輪批次 AI 組：最新一版有幾多格的人已經唔喺該崗位名單上（同狀態卡同一支）
+    eligibilityImpact: summariseEligibilityImpact_(quarterId),
     dropdownNote: dropdownNote,
     message: '已經加入 ' + addedCount + ' 項、停用 ' + removedCount + ' 項。'
       + (pick.skipped.length > 0

@@ -503,6 +503,12 @@
         ]));
     }
 
+    // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已唔喺名單上——
+    // 同狀態卡同一個數字（同一支 `buildEligibilityImpactNodes()`）
+    buildEligibilityImpactNodes(d.eligibilityImpact).forEach((n) => {
+      card.querySelector('.step-body').appendChild(n);
+    });
+
     // ⚠️ 有建議表而畫面唔講，幹事會喺正式表上改，然後發現改動唔見咗
     //（因為下一次調整會以建議表做起點）。所以一定要講，而且要有出口。
     if (suggestion.hasSuggestion) {
@@ -811,6 +817,9 @@
         make('div', { text: r.dropdownNote, className: 'lines' })
       ]));
     }
+
+    // 第六十七輪批次 AI 組：這一版有幾多格的人已經唔喺名單上（同狀態卡同一支）
+    buildEligibilityImpactNodes(r.eligibilityImpact, { withButton: true }).forEach((n) => done.push(n));
 
     openModal('名單已套用', done, [button('知道了', () => closeModal(), '')]);
   }

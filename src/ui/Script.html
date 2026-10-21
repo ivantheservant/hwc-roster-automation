@@ -888,6 +888,56 @@
     return nodes;
   }
 
+  /**
+   * 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經不在該崗位的名單上。
+   * **兩個儲存結果窗（名單維護、開季前第 0 步）同狀態卡／第 2 步都用呢一支**，
+   * 資料由後端 `summariseEligibilityImpact_()` 一支出。
+   *
+   * @param {Object} impact `eligibilityImpact`
+   * @param {{withButton: boolean}=} opts `withButton` ⇒ 多一粒〔請系統幫我調整〕（結果窗用）
+   * @returns {Element[]} 冇嘢要講就係空陣列
+   */
+  function buildEligibilityImpactNodes(impact, opts) {
+    const nodes = [];
+    if (!impact) return nodes;
+    const withButton = !!(opts && opts.withButton);
+    if (impact.count > 0) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '名單改了之後，這一版有 ' + impact.count + ' 格的人已經不在該崗位的名單上。',
+          className: 'warn-head'
+        })
+      ]);
+      (impact.items || []).forEach((it) => {
+        box.appendChild(make('div', {
+          text: humanDate(it.serviceDate) + '　' + (it.postNameTC || it.postId)
+            + (Number(it.slotIndex) > 1 ? (' ' + it.slotIndex) : '') + '　' + (it.personName || it.personId),
+          className: 'vio-row'
+        }));
+      });
+      if (impact.moreCount > 0) {
+        box.appendChild(make('div', { text: '另有 ' + impact.moreCount + ' 格。', className: 'muted' }));
+      }
+      box.appendChild(make('div', {
+        text: '這幾格不會自動改動。要系統幫你重排的話，撳「請系統幫我調整」。',
+        className: 'muted'
+      }));
+      if (withButton) {
+        box.appendChild(make('div', { className: 'row' }, [
+          button('請系統幫我調整', () => { closeModal(); openBuildSuggestion(); }, '')
+        ]));
+      }
+      nodes.push(box);
+    }
+    if (impact.error) {
+      nodes.push(make('div', {
+        text: '（這一次算不到名單改動對職事表的影響：' + impact.error + '）',
+        className: 'muted'
+      }));
+    }
+    return nodes;
+  }
+
   function row(nodes, className) { return make('div', { className: className || 'row' }, nodes); }
 
   /** 一個唔會被 innerHTML 影響嘅清空。 */
@@ -1684,7 +1734,9 @@
     // 寄出前系統會自動補發，但幹事要知——佢可能已經把連結貼咗出去。
     // 第六十七輪批次 AG／AH 組：狀態卡常駐「還有 N 格沒有人」「有 N 格是你放行的」
     const warnBox = clear(el('statusWarnings'));
-    const warnNodes = buildSendWarningNodes(d.sendWarnings, { compact: true });
+    const warnNodes = buildSendWarningNodes(d.sendWarnings, { compact: true })
+      // 第六十七輪批次 AI 組：名單改了之後有幾多格的人已唔喺名單上
+      .concat(buildEligibilityImpactNodes(d.eligibilityImpact));
     warnNodes.forEach((n) => warnBox.appendChild(n));
     warnBox.hidden = warnNodes.length === 0;
 

@@ -188,13 +188,18 @@ function apiGetEligibilityMatrix() {
  * 批次儲存資格改動。**會寫入。**
  *
  * @param {Object[]} changes 每項 {personId, postId, eligible}
- * @returns {Object} {ok, added, removed, skipped}
+ * @param {string=} quarterId 第六十七輪批次 AI 組：有傳就順帶算「最新一版有幾多格的人
+ *   已經唔喺該崗位名單上」（`eligibilityImpact`，見 `summariseEligibilityImpact_()`）。
+ *   冇傳（例如 `UnresolvedNameFix.gs` 嗰條路）就係 `null`。
+ * @returns {Object} {ok, added, removed, skipped, eligibilityImpact}
  */
-function apiSaveEligibilityBatch(changes) {
+function apiSaveEligibilityBatch(changes, quarterId) {
   assertWebAppRequestAllowed_();
   const list = changes || [];
+  const q = String(quarterId || '').trim();
   if (list.length === 0) {
-    return { ok: true, added: 0, removed: 0, skipped: 0, notes: '沒有任何改動。' };
+    return { ok: true, added: 0, removed: 0, skipped: 0, notes: '沒有任何改動。',
+      eligibilityImpact: q ? summariseEligibilityImpact_(q) : null };
   }
 
   const E = COLUMNS.ELIGIBILITY;
@@ -286,5 +291,7 @@ function apiSaveEligibilityBatch(changes) {
     added++;
   });
 
-  return { ok: true, added: added, removed: removed, skipped: skipped };
+  return { ok: true, added: added, removed: removed, skipped: skipped,
+    // 第六十七輪批次 AI 組：儲存**之後**先算——要反映改完名單嘅現況
+    eligibilityImpact: q ? summariseEligibilityImpact_(q) : null };
 }
