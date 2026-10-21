@@ -110,7 +110,9 @@ const VERSION_BASIS_LABELS = {
   FINE_TUNE: '人手調整後',
   REQUESTS_APPLIED: '套用修改申報後',
   RESEND: '改動後重發時建立',
-  VERSION_ROLLBACK: '回到舊版本'
+  VERSION_ROLLBACK: '回到舊版本',
+  // 第六十七輪批次 AF 組
+  IMPORT: '由人手職事表匯入'
 };
 
 /**

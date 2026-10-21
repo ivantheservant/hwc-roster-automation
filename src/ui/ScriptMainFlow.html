@@ -204,6 +204,13 @@
       acts: acts,
       extra: renderPermanentLink(flow)
     });
+    // 第六十七輪批次 AF 組：仲未有版本 ⇒ 提一句「已經用舊方法排好？」，直接帶去匯入
+    if (!t.alreadyGenerated) {
+      card.querySelector('.step-body').appendChild(make('div', { className: 'row' }, [
+        make('span', { text: '已經用舊方法排好？', className: 'muted' }),
+        button('用「匯入」', () => openImportRoster(), 'secondary')
+      ]));
+    }
     return card;
   }
 

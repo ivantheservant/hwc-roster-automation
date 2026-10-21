@@ -953,7 +953,11 @@ const MAIL_STATUS = {
   SKIPPED_UNCHANGED: 'SKIPPED_UNCHANGED',
   FAILED: 'FAILED',
   ERROR_PDF: 'ERROR_PDF',
-  ERROR_PDF_MISSING: 'ERROR_PDF_MISSING'
+  ERROR_PDF_MISSING: 'ERROR_PDF_MISSING',
+  // 第六十七輪批次 AF 組：匯入人手職事表時幹事話「已經在系統外寄給全體」——
+  // 系統**冇寄過**，只係為每一位有派工嘅人寫一行基準（hash 照現有算法），
+  // 令之後「改動後重發」只寄真正改咗嘅人、補寄唔會當佢哋未收到。
+  EXTERNAL: 'EXTERNAL'
 };
 
 /**
@@ -1002,6 +1006,7 @@ const RESEND_NOTIFY_REASON = {
  * | `DRY_RUN` | ✅ | 模擬模式下完整計算過派工與 hash，只是沒有真的寄。 |
  * | `SKIPPED_NO_EMAIL` | ✅ | 查無電郵而略過，但派工與 hash 一樣完整計算過。**必須收**：不收的話，一個本來就沒有電郵、派工又完全沒變的人，會因為「查不到基準」被永遠誤判成「有改動」而重複出現。 |
  * | `SKIPPED_UNCHANGED` | ✅ | 第三十三輪階段 A 修好 `deliverOne_()` 之後，這個狀態的意思才變乾淨：「上一輪確實有基準、而且真的沒有改動」。詳見 `docs/系統範圍稽核.md` 第三十三輪階段 A2 的判斷。 |
+ * | `EXTERNAL` | ✅ | 第六十七輪 AF 組：匯入人手職事表時幹事聲明「已在系統外寄給全體」。系統沒有寄，但那一版的派工與 hash 完整算過，正正就是要拿來做之後「只寄有改動的人」的基準。 |
  * | `FAILED`／`ERROR_PDF`／`ERROR_PDF_MISSING` | ❌ | 處理中途出錯，當時算出來的 hash 可能不完整或不可信，不可以當下次比對的基準。 |
  *
  * ⚠️ 加新 Status 到 `MAIL_STATUS` 時，一定要回來這裡決定它算不算基準。
@@ -1011,7 +1016,8 @@ const RESEND_BASELINE_STATUSES = [
   MAIL_STATUS.SENT,
   MAIL_STATUS.DRY_RUN,
   MAIL_STATUS.SKIPPED_NO_EMAIL,
-  MAIL_STATUS.SKIPPED_UNCHANGED
+  MAIL_STATUS.SKIPPED_UNCHANGED,
+  MAIL_STATUS.EXTERNAL
 ];
 
 /**
@@ -1540,6 +1546,9 @@ const VERSION_VALUES = {
   // 跟步驟 3 的 REQUESTS_APPLIED 區分開來（同樣是套用 Requests，但發生在
   // OFFICIAL_SENT 之後，語意上是「已經正式發出、這是後續改動」）。
   BASIS_RESEND: 'RESEND',
+  // 第六十七輪批次 AF 組：由人手編好嘅職事表匯入（`RosterImport.gs`）。
+  // 版本說明文字見 `VERSION_BASIS_LABELS`（WebAppDashboard.gs）。
+  BASIS_IMPORT: 'IMPORT',
   STATUS_DRAFT: 'DRAFT'
 };
 
@@ -1796,3 +1805,23 @@ const EDITABLE_COPY_FILE_LABEL = '職事表_可編輯副本';
 const EDITABLE_COPY_TIMESTAMP_FORMAT = 'yyyyMMdd-HHmm';
 /** 公開 repo 入面嗰份指引嘅檔名——「進階與診斷 ▸ 系統出問題時怎樣做」會提。 */
 const RECOVERY_GUIDE_DOC_NAME = 'docs/系統出問題時手動繼續.md';
+
+/**
+ * 第六十七輪批次 AF 組：匯入人手編好嘅職事表（`RosterImport.gs`）。
+ *
+ * 匯入範本工作表 `匯入_<季度>`：每一行係一個崗位嘅一個位置、每一欄係一個主日
+ *（同舊式人手職事表同一個方向，方便整塊貼上）。
+ */
+const IMPORT_SHEET_PREFIX = '匯入_';
+/** 範本第 1 欄（崗位名）同第 2 欄（機器鍵 `POST#slot`，隱藏）。 */
+const IMPORT_LABEL_COLUMNS = 2;
+/** 範本第 1 行係日期標題、第 2 行係日期機器鍵（隱藏）；第 3 行起係崗位。 */
+const IMPORT_HEADER_ROWS = 2;
+/** 結構性不適用／特別主日跳過嘅格寫呢個字、塗灰。匯入時入面有人名會被忽略。 */
+const IMPORT_NA_MARK = '—';
+const IMPORT_NA_BACKGROUND = '#E0E0E0';
+/** 匯入成為版本要打字確認；有硬規則違反要放行時改打後者（兼作放行紀錄）。 */
+const IMPORT_CONFIRM_TEXT = '確認匯入';
+const IMPORT_RELEASE_CONFIRM_TEXT = '確認放行';
+/** 版本紀錄上嘅說明文字。 */
+const IMPORT_VERSION_NOTE = '由人手職事表匯入';

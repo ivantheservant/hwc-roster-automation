@@ -68,6 +68,22 @@
         () => openRuleImport(), false)
     ]));
 
+    // 第六十七輪批次 AF 組：把人手編好嘅整季匯入系統
+    body.appendChild(make('div', { className: 'sec' }, [
+      sectionTitle('匯入人手編好的職事表'),
+      make('div', {
+        text: '這一季已經用舊方法（直接在試算表）排好了？先建一張匯入表，把舊表整塊貼進去，'
+          + '再撳「檢查並匯入」。匯入會建立一個新版本（沒有版本就是第 0 版），之後照常用介面。',
+        className: 'muted'
+      }),
+      zone4Row('建立匯入表',
+        '在這個試算表新增「' + '匯入_' + currentQuarterId + '」：一行一個崗位位置、一欄一個主日，每格有名單選單。',
+        () => openCreateImportSheet(), false),
+      zone4Row('檢查並匯入',
+        '讀匯入表、逐格認名字、檢查規則，確認之後匯入成為版本。',
+        () => openImportRoster(), false)
+    ]));
+
     // 第六十七輪批次 AJ 組：系統出問題時怎樣做（三個位置嘅連結由後端讀出，唔寫死）
     body.appendChild(make('div', { className: 'sec' }, [
       sectionTitle('系統出問題時'),
@@ -80,6 +96,188 @@
       text: '其餘工具（體檢、上線前檢查、匯出關鍵狀態等）請用試算表上方的選單。',
       className: 'muted'
     }));
+  }
+
+  /* ── 第六十七輪批次 AF 組：匯入人手編好嘅職事表 ──────────────── */
+
+  function openCreateImportSheet() {
+    runAction('建立匯入表', async () => {
+      const r = await callServerMutating('apiCreateImportSheet', currentQuarterId);
+      const link = make('a', { text: '開啟「' + r.sheetName + '」', className: 'bigLink' });
+      link.href = r.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      openModal('匯入表', [
+        make('div', { text: r.created ? '已經建好了' : '這一季已經有一張匯入表，直接用它', className: 'ok-head' }),
+        para('一行一個崗位位置（' + r.rowCount + ' 行）、一欄一個主日（' + r.dateCount + ' 個）。'
+          + '灰色「—」的格是那一週不設那個崗位，不用填'
+          + (r.naCount > 0 ? '（共 ' + r.naCount + ' 格）' : '') + '。'),
+        link,
+        para('每格有名單選單，但直接貼上名單以外的名字也可以——「檢查並匯入」會逐個列出來。'
+          + '講員、翻譯、獻花照舊自己填。', 'muted'),
+        para('在你撳「檢查並匯入」並且打字確認之前，系統一格派工都不會變。', 'muted')
+      ], [button('知道了', () => closeModal(), '')]);
+    });
+  }
+
+  function openImportRoster() {
+    runAction('讀取匯入表', async () => {
+      const plan = await callServer('apiCheckImportSheet', currentQuarterId);
+      renderImportPlan(plan);
+    });
+  }
+
+  /**
+   * 檢查結果：認唔出 ⇒ 擋；硬規則 ⇒ 要打字放行；空格、灰格有名、自由文字 ⇒ 只講。
+   * 放行紀錄由後端用 AG 組格式寫（`logHardViolationRelease_()`），之後儲存同一狀態唔使再打字。
+   */
+  function renderImportPlan(plan) {
+    const nodes = [];
+    const cellLabel = (c) => humanDate(c.serviceDate) + '　' + (c.postNameTC || c.postId)
+      + (Number(c.slotIndex) > 1 && !/\s\d+$/.test(String(c.postNameTC || '')) ? (' ' + c.slotIndex) : '');
+
+    nodes.push(para('匯入表「' + plan.sheetName + '」：填了 ' + plan.filledCount + ' 格。'
+      + (plan.hasVersion
+        ? '這一季現時最新是第 ' + plan.latestVersionNo + ' 版；匯入會建立第 ' + plan.versionNoToCreate + ' 版，舊版本全部保留。'
+        : '這一季還沒有任何版本；匯入會建立第 0 版。')));
+
+    if (plan.unresolved.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + plan.unresolved.length + ' 個名字系統認不出——處理好之前不會匯入'),
+        make('div', { text: '認不出而照樣匯入，等於那一格靜靜變成空白。', className: 'muted' })
+      ]);
+      plan.unresolved.forEach((u) => {
+        const item = make('div', { className: 'prop' });
+        item.appendChild(make('div', { text: cellLabel(u) + '　你貼了：「' + u.text + '」', className: 'prop-head' }));
+        item.appendChild(row([
+          // 同儲存確認嗰粒係同一個對話框（ScriptZone1.html）；加完自動重新檢查
+          button('立即加入這個人', () => openAddUnresolvedPerson(u, openImportRoster), '')
+        ]));
+        box.appendChild(item);
+      });
+      nodes.push(box);
+      openModal('檢查匯入表', nodes, [
+        button('我改好了，再檢查一次', () => openImportRoster(), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+      return;
+    }
+
+    if (plan.filledCount === 0) {
+      nodes.push(para('匯入表一格都沒有填。先把人手職事表貼進去。', 'muted'));
+      openModal('檢查匯入表', nodes, [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+
+    const v = plan.violations || { real: [], released: [], structural: [], semiHard: [] };
+    if (v.real.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('這 ' + v.real.length + ' 格違反了一定要遵守的規則'),
+        make('div', {
+          text: '人手安排可以違反規則，但要你打字放行。放行之後系統整季記住，之後儲存同一安排不用再打字。',
+          className: 'muted'
+        })
+      ]);
+      v.real.forEach((x) => {
+        box.appendChild(make('div', { text: cellLabel(x) + '　' + (x.personName || x.personId) + '——' + (x.reason || x.ruleId), className: 'vio-row' }));
+      });
+      nodes.push(box);
+    }
+    if (v.released.length > 0) {
+      const box = make('div', { className: 'sec' }, [
+        make('div', { text: '這一季有 ' + v.released.length + ' 格是你之前已經放行的違反規則安排，不用再放行。', className: 'muted' })
+      ]);
+      nodes.push(box);
+    }
+    if (v.semiHard.length > 0) {
+      const box = make('div', { className: 'sec' }, [sectionTitle('提醒（不阻擋）：' + v.semiHard.length + ' 格')]);
+      v.semiHard.forEach((x) => {
+        box.appendChild(make('div', { text: cellLabel(x) + '　' + (x.personName || x.personId) + '——' + (x.reason || x.ruleId), className: 'vio-row' }));
+      });
+      nodes.push(box);
+    }
+
+    // 空格：AH 組同一支畫法
+    const blanks = plan.blankCells || [];
+    buildSendWarningNodes({
+      blank: { count: blanks.length, items: blanks.slice(0, 10), moreCount: Math.max(0, blanks.length - 10) },
+      released: { count: 0, items: [], moreCount: 0 }, error: ''
+    }).forEach((n) => nodes.push(n));
+
+    if ((plan.ignoredNa || []).length > 0) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', { text: '有 ' + plan.ignoredNa.length + ' 個灰色「—」格填了名字。那幾週不設那個崗位，匯入時會忽略它們。', className: 'warn-head' })
+      ]);
+      plan.ignoredNa.forEach((c) => box.appendChild(make('div', { text: cellLabel(c) + '　「' + c.text + '」', className: 'vio-row' })));
+      nodes.push(box);
+    }
+    if ((plan.freeText || []).length > 0) {
+      nodes.push(para('講員／翻譯／獻花那幾欄有 ' + plan.freeText.length + ' 格是名單以外的名字（例如客席講員），會照樣收進去。', 'muted'));
+    }
+
+    // 第四點：這一季在系統外已經寄過嗎？預設「未寄過」
+    let sentExternally = false;
+    const askBox = make('div', { className: 'sec' }, [sectionTitle('這一季已經寄給全體了嗎？')]);
+    [
+      [false, '未寄過', '匯入之後這一季是「草稿」，照常寄審閱或正式發出。'],
+      [true, '已經在系統外寄給全體', '匯入之後記成「已正式發出」。系統不會再寄一次整季；之後改動只會寄給有改動的人。']
+    ].forEach((opt) => {
+      const line = make('label', { className: 'radio-row' });
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'import-sent';
+      input.checked = sentExternally === opt[0];
+      input.addEventListener('change', () => { if (input.checked) sentExternally = opt[0]; });
+      line.appendChild(input);
+      line.appendChild(make('span', { text: opt[1] }));
+      askBox.appendChild(line);
+      askBox.appendChild(make('div', { text: '　　' + opt[2], className: 'muted' }));
+    });
+    nodes.push(askBox);
+
+    // 打字確認（有硬規則違反就係放行字）
+    const typing = make('div', { className: 'confirm-typing' });
+    typing.appendChild(make('p', {
+      text: (plan.needsRelease ? '要放行上面那幾格並匯入，' : '要匯入成為新版本，') + '請在下面輸入「' + plan.confirmText + '」。'
+    }));
+    const typed = document.createElement('input');
+    typed.type = 'text';
+    typing.appendChild(typed);
+    nodes.push(typing);
+
+    openModal('檢查匯入表', nodes, [
+      button(plan.needsRelease ? '放行並匯入' : '匯入', () => {
+        if (String(typed.value || '').trim() !== plan.confirmText) {
+          setStatus('請先輸入「' + plan.confirmText + '」。', true);
+          return;
+        }
+        runAction('匯入中', async () => {
+          const r = await callServerMutating('apiImportRosterExecute', currentQuarterId, {
+            confirmText: String(typed.value || '').trim(), sentExternally: sentExternally
+          });
+          resetMainFlowState();
+          renderImportDone(r);
+        });
+      }, ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  function renderImportDone(r) {
+    const nodes = [make('div', { text: '已匯入', className: 'ok-head' }), para(r.message)];
+    const link = make('a', { text: '開啟第 ' + r.versionNo + ' 版（' + r.sheetName + '）', className: 'bigLink' });
+    link.href = r.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    nodes.push(link);
+    if (r.releasedCount > 0) nodes.push(make('div', { text: '已放行 ' + r.releasedCount + ' 格違反規則的安排，系統整季記住。', className: 'ok-line' }));
+    if (r.blankCount > 0) nodes.push(make('div', { text: '這一版還有 ' + r.blankCount + ' 格沒有人。', className: 'ok-line' }));
+    if (r.externalRows > 0) nodes.push(make('div', { text: '已為 ' + r.externalRows + ' 位有服侍的人記下「已在系統外收到」，沒有寄任何電郵。', className: 'ok-line' }));
+    nodes.push(make('div', {
+      text: r.publishFailed ? ('公開連結未能更新（' + r.publishMessage + '）。') : '公開連結已經更新。',
+      className: r.publishFailed ? 'err-text' : 'ok-line'
+    }));
+    openModal('匯入完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
   }
 
   /**

@@ -60,7 +60,9 @@ const MAKEUP_SUPPORTED_STAGES = [MAIL_STAGES.REVIEW, MAIL_STAGES.OFFICIAL];
  * 同 `classifyMakeupRecipient_()` 嘅 `ALREADY_SENT` 一致。
  */
 const MAKEUP_RECEIVED_STATUSES = [
-  MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.SKIPPED_UNCHANGED
+  MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.SKIPPED_UNCHANGED,
+  // 第六十七輪批次 AF 組：匯入時聲明「已在系統外寄給全體」——收過
+  MAIL_STATUS.EXTERNAL
 ];
 
 /**
@@ -186,6 +188,10 @@ function classifyMakeupRecipient_(recipient, lastStatus) {
   }
   if (lastStatus === MAIL_STATUS.DRY_RUN) {
     return { category: 'ALREADY_SENT', reason: '已在模擬模式處理（DRY_RUN），系統視為已處理' };
+  }
+  // 第六十七輪批次 AF 組
+  if (lastStatus === MAIL_STATUS.EXTERNAL) {
+    return { category: 'ALREADY_SENT', reason: '匯入時已聲明在系統外寄給全體（EXTERNAL），系統視為已收到' };
   }
   if (lastStatus === MAIL_STATUS.SKIPPED_NO_EMAIL) {
     return { category: 'CANNOT_SEND', reason: '上次因查無電郵而略過（SKIPPED_NO_EMAIL）' };

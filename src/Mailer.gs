@@ -39,7 +39,8 @@
  */
 function countAlreadySentForStage_(quarterId, versionNo, stage) {
   const C = COLUMNS.SEND_LOG;
-  const baselineStatuses = [MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN];
+  // 第六十七輪批次 AF 組：匯入時聲明「已在系統外寄給全體」嘅 EXTERNAL 都算收過
+  const baselineStatuses = [MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.EXTERNAL];
   const seen = {};
   readSheet(SHEETS.SEND_LOG).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;

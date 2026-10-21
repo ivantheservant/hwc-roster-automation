@@ -475,7 +475,8 @@ function listSendHistory_(quarterId) {
     const b = byBatch[key];
     b.total++;
     const status = String(row[C.STATUS] || '').trim().toUpperCase();
-    if (status === MAIL_STATUS.SENT || status === MAIL_STATUS.DRY_RUN) b.sent++;
+    // 第六十七輪批次 AF 組：EXTERNAL（系統外寄過）當成功，唔可以當失敗
+    if (status === MAIL_STATUS.SENT || status === MAIL_STATUS.DRY_RUN || status === MAIL_STATUS.EXTERNAL) b.sent++;
     else if (status === MAIL_STATUS.SKIPPED_NO_EMAIL) b.noEmail++;
     else b.failed++;
   });

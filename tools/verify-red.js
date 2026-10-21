@@ -2592,10 +2592,12 @@ const MUTATIONS = [
       + '——一部乜都記嘅機器同一部乜都唔記嘅機器一樣冇用：'
       + '每一版都有一筆嘅話，「放行」就唔再係一個訊號',
     file: 'src/WebAppSaveConfirm.gs',
-    find: '  if (plan.needsRelease) {' + '\n' + '    try {' + '\n'
-      + '      writeAuditLog_({',
-    replace: '  if (true) {' + '\n' + '    try {' + '\n'
-      + '      writeAuditLog_({',
+    // 第六十七輪批次 AG 組：`if (plan.needsRelease) {` 之後而家先有一段註解＋機器可讀紀錄，
+    // 所以錨點改用 `if` 嗰一行本身（檔內只有一處）。
+    find: '  if (plan.needsRelease) {' + '\n'
+      + '    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**',
+    replace: '  if (true) {' + '\n'
+      + '    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**',
     tests: ['tests/selftest_release_scenario.test.js']
   },
   {
@@ -5109,6 +5111,95 @@ const MUTATIONS = [
     find: "    if (r.editableCopy && r.editableCopy.ok) {",
     replace: "    if (false) {",
     tests: ['tests/editable_copy.test.js']
+  },
+  // ── 第六十七輪批次 AF 組：匯入人手編好嘅職事表 ─────────────────
+  {
+    id: 'af-unresolved-no-block',
+    why: '認唔出嘅名字唔擋——嗰格靜靜變成空白',
+    file: 'src/RosterImport.gs',
+    find: '    blocked: unresolved.length > 0,',
+    replace: '    blocked: false,',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-basis-not-import',
+    why: '匯入嘅版本 Basis 寫錯做 FINE_TUNE——狀態卡講唔出係匯入',
+    file: 'src/RosterImport.gs',
+    find: '  registerVersion(q, versionNo, sheetName, VERSION_VALUES.BASIS_IMPORT,',
+    replace: '  registerVersion(q, versionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE,',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-ext-not-received',
+    why: 'EXTERNAL 唔算「收過」——補寄會把全體再寄一次',
+    file: 'src/MakeupSend.gs',
+    find: "  MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.SKIPPED_UNCHANGED,\n  // 第六十七輪批次 AF 組：匯入時聲明「已在系統外寄給全體」——收過\n  MAIL_STATUS.EXTERNAL\n",
+    replace: '  MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.SKIPPED_UNCHANGED\n',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-ext-not-baseline',
+    why: 'EXTERNAL 唔係步驟 5 嘅比對基準——改 1 格會寄給全體',
+    file: 'src/Constants.gs',
+    find: '  MAIL_STATUS.SKIPPED_UNCHANGED,\n  MAIL_STATUS.EXTERNAL\n];',
+    replace: '  MAIL_STATUS.SKIPPED_UNCHANGED\n];',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-no-release-log',
+    why: '匯入放行唔寫 AG 組格式紀錄——之後儲存又要打字',
+    file: 'src/RosterImport.gs',
+    find: "    logHardViolationRelease_(q, 'apiImportRosterExecute（匯入人手職事表）', plan.violations.real, versionNo);",
+    replace: '    void 0;',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-na-not-grey',
+    why: '特別主日跳過嘅格唔標灰「—」——幹事會照填',
+    file: 'src/RosterImport.gs',
+    find: "        return layout.naByKey[cellKey_(d.serviceDate, r.postId, r.slotIndex)] ? IMPORT_NA_MARK : '';",
+    replace: "        return '';",
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-slots-ignored',
+    why: '範本唔理崗位位置數——司事 2 個位置只得 1 行',
+    file: 'src/RosterImport.gs',
+    find: '    for (let slot = 1; slot <= (post.slotCount || 1); slot++) {',
+    replace: '    for (let slot = 1; slot <= 1; slot++) {',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-not-manual',
+    why: '匯入嘅格唔標 MANUAL——之後系統調整會當佢哋係自己排嘅而改走',
+    file: 'src/RosterImport.gs',
+    find: "        assignSource: ASSIGN_SOURCE.MANUAL, ruleFlags: flags\n      }));",
+    replace: "        assignSource: ASSIGN_SOURCE.AUTO, ruleFlags: flags\n      }));",
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-no-typed-confirm',
+    why: '唔使打字就匯入——一撳就多一個版本',
+    file: 'src/RosterImport.gs',
+    find: '  if (typed !== plan.confirmText) {',
+    replace: '  if (false) {',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-ext-no-stage',
+    why: '聲明已寄出但 Stage 唔推到 OFFICIAL_SENT——步驟 5 用唔到',
+    file: 'src/RosterImport.gs',
+    find: "    setQuarterStage_(q, QUARTER_STAGE.OFFICIAL_SENT, '匯入人手職事表：幹事聲明已在系統外寄給全體');\n    stage = QUARTER_STAGE.OFFICIAL_SENT;",
+    replace: '    stage = QUARTER_STAGE.OFFICIAL_SENT;',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'af-ui-no-entry',
+    why: '區四冇「檢查並匯入」入口',
+    file: 'src/ui/ScriptZone4.html',
+    find: "      zone4Row('檢查並匯入',",
+    replace: "      zone4Row('檢查並匯入（停用）',",
+    tests: ['tests/roster_import.test.js']
   },
 ];
 

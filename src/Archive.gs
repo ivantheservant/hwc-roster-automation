@@ -76,7 +76,9 @@ function isBaselineSendStatus_(status) {
   const normalized = String(status || '').toUpperCase();
   return normalized === MAIL_STATUS.SENT
     || normalized === MAIL_STATUS.DRY_RUN
-    || normalized === MAIL_STATUS.SKIPPED_NO_EMAIL;
+    || normalized === MAIL_STATUS.SKIPPED_NO_EMAIL
+    // 第六十七輪批次 AF 組：系統外寄過一樣係「寄過」
+    || normalized === MAIL_STATUS.EXTERNAL;
 }
 
 /**

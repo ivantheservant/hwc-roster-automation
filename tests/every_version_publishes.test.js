@@ -71,14 +71,16 @@ console.log('\n=== A1【核心】由資料嗰邊數：邊個會喺 `RosterVersio
     });
   });
 
-  checkEqual('★★★★★★ **一共六個呼叫點**'
+  // 第六十七輪批次 AF 組：第七個呼叫點——匯入人手職事表（`RosterImport.gs`），
+  // 佢自己發佈（見下面「A2 匯入人手職事表」）。
+  checkEqual('★★★★★★ **一共七個呼叫點**'
     + '——加多一個就要喺呢度改，而改嗰陣就會見到下面「每一個都要發佈」'
-    + '嗰幾條。第五十二輪由函式數起，所以呢六個入面只數過一個',
-    sites.length, 6);
+    + '嗰幾條。第五十二輪由函式數起，所以嗰六個入面只數過一個',
+    sites.length, 7);
   const byFile = sites.map(function (s) { return s.split(':')[0]; }).sort().join('、');
-  checkEqual('★★★★★★ 而且係呢六個檔案',
+  checkEqual('★★★★★★ 而且係呢七個檔案',
     byFile,
-    'FineTune.gs、MultiRun.gs、RequestsApply.gs、SuggestionSheet.gs、'
+    'FineTune.gs、MultiRun.gs、RequestsApply.gs、RosterImport.gs、SuggestionSheet.gs、'
       + 'WebAppRollback.gs、WebAppSaveConfirm.gs');
 }
 
@@ -198,7 +200,9 @@ console.log('\n=== A2 其餘四條：核實佢哋本來就有 ===');
         'src/FourStageFlow.gs'] },
     { id: '儲存並確認', file: 'src/WebAppSaveConfirm.gs' },
     { id: '接受系統建議', file: 'src/SuggestionSheet.gs' },
-    { id: '回退執行', file: 'src/WebAppRollback.gs' }
+    { id: '回退執行', file: 'src/WebAppRollback.gs' },
+    // 第六十七輪批次 AF 組
+    { id: '匯入人手職事表', file: 'src/RosterImport.gs' }
   ];
   cases.forEach(function (c) {
     if (c.callers) {
@@ -213,6 +217,36 @@ console.log('\n=== A2 其餘四條：核實佢哋本來就有 ===');
       + ' 同一個檔案入面有 `tryPublishPublicRoster_()`',
       /tryPublishPublicRoster_\(/.test(CODE(c.file)), '');
   });
+}
+
+// =====================================================================
+console.log('\n=== A2 匯入人手職事表：加完行一定跟住發佈（第六十七輪批次 AF 組）===');
+{
+  const box = sandbox([
+    'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs', 'QuarterStage.gs',
+    'WebAppGuards.gs', 'WebAppSaveConfirm.gs', 'RosterImport.gs'
+  ]);
+  const gas = box.gas;
+  // 只留住「造版本 ＋ 發佈」嗰一段，檢查同寫入全部換走。
+  gas.buildImportPlan_ = function () {
+    return {
+      quarterId: '2028T3', sheetName: '匯入_2028T3', blocked: false, filledCount: 5,
+      hasVersion: true, latestVersionNo: 3, versionNoToCreate: 4,
+      confirmText: gas.IMPORT_CONFIRM_TEXT, needsRelease: false,
+      violations: { real: [], released: [], structural: [], semiHard: [] }, blankCells: [],
+      assignments: []
+    };
+  };
+  gas.getConfig = function (k, d) { return d; };
+  gas.createRosterSheet = function () { return 'Roster_2028T3_v4'; };
+  gas.writeAssignments = function () {};
+  gas.protectV0 = function () {};
+  gas.writeAuditLog_ = function () {};
+  gas.getQuarterStage_ = function () { return 'DRAFT'; };
+  gas.buildGridSheetUrl_ = function () { return ''; };
+  const r = gas.apiImportRosterExecute('2028T3', { confirmText: gas.IMPORT_CONFIRM_TEXT, sentExternally: false });
+  checkEqual('★★★★★★ 加行 → 發佈', box.calls.join(' → '), 'register:v4 → publish');
+  check('★★★★★ 而且拎得返個結果出嚟畀呼叫端講', r.publishFailed === false, JSON.stringify(r));
 }
 
 // =====================================================================
