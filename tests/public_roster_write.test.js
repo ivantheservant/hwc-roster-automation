@@ -87,7 +87,7 @@ function buildSampleContent(quarterId, versionNo) {
     postRows: transposed.postRows,
     gapColor: '#F4CCCC',
     legendRows: [
-      ['（姓名）', '系統自動安排，已排定人選', '3 格'],
+      ['（姓名）', '已排定人選', '3 格'],
       ['（待填）', '此崗位不由系統自動安排', '1 格'],
       blankEntry
     ],
@@ -141,7 +141,7 @@ console.log('\n=== A7【核心】首次發佈：逐格核對最終輸出（唔�
   // footerRow = 11 + legendRows.length(3，第十四輪批次新增「（空白）」一行) = 14。
   checkEqual('★ 圖例標題排喺資料列之後', sheet.getRange(10, 1, 1, 1).getValue(), gas.GRID_LABELS.LEGEND_TITLE);
   checkEqual('★ 圖例內容第一行', sheet.getRange(11, 1, 1, 3).getValues()[0],
-    ['（姓名）', '系統自動安排，已排定人選', '3 格']);
+    ['（姓名）', '已排定人選', '3 格']);
   checkEqual('★★★ 圖例第 3 行「（空白）」解釋獻花兩格留空嘅原因（第十四輪批次階段 A 新增）',
     sheet.getRange(13, 1, 1, 3).getValues()[0],
     ['（空白）', gas.DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE, '2 格']);

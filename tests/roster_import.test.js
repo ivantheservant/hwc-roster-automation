@@ -173,9 +173,15 @@ function buildFixture() {
       [C.SPECIAL_SUNDAYS.SERVICE_DATE]: DATES[6], [C.SPECIAL_SUNDAYS.TYPE]: '合堂', [C.SPECIAL_SUNDAYS.TITLE]: '聯合崇拜',
       [C.SPECIAL_SUNDAYS.SKIP_POST_IDS]: 'READ', [C.SPECIAL_SUNDAYS.LOCK_POST_IDS]: '', [C.SPECIAL_SUNDAYS.ACTIVE]: true }]);
   ['ROSTER_VERSIONS', 'ROSTER_ASSIGNMENTS', 'SEND_LOG', 'AUDIT_LOG', 'REQUESTS',
-    'UNAVAILABLE', 'NAME_ALIAS', 'FINE_TUNE_PROPOSALS', 'EMAIL_RECIPIENTS'].forEach(function (k) {
+    'UNAVAILABLE', 'NAME_ALIAS', 'FINE_TUNE_PROPOSALS'].forEach(function (k) {
     seedSheet(ss, S[k], [k], Object.keys(C[k]).map(function (x) { return C[k][x]; }), []);
   });
+  // 第六十八輪批次 AL 組：一個「正式發出」嘅名單收件人（辦公室）——匯入選「已在系統外寄出」之後，
+  // 補寄預覽唔可以再列佢。
+  const ER = C.EMAIL_RECIPIENTS;
+  seedSheet(ss, S.EMAIL_RECIPIENTS, ['RC'], Object.keys(ER).map(function (x) { return ER[x]; }), [
+    { [ER.RECIPIENT_ID]: 'RC1', [ER.EMAIL]: 'office@example.invalid', [ER.DISPLAY_NAME]: '辦公室',
+      [ER.STAGE]: 'OFFICIAL,RESEND', [ER.SEND_AS]: 'TO', [ER.ACTIVE]: true }]);
   seedSheet(ss, S.EMAIL_TEMPLATES, ['T'],
     [C.EMAIL_TEMPLATES.TEMPLATE_ID, C.EMAIL_TEMPLATES.STAGE, C.EMAIL_TEMPLATES.LANG, C.EMAIL_TEMPLATES.SUBJECT,
       C.EMAIL_TEMPLATES.BODY_HTML, C.EMAIL_TEMPLATES.BODY_PLAIN, C.EMAIL_TEMPLATES.ATTACH_TYPE, C.EMAIL_TEMPLATES.ACTIVE],
@@ -230,6 +236,10 @@ console.log('\n=== AF1【核心】範本：崗位、位置數、主日、灰格�
   const na = importCell(DATES[6], 'READ#1');
   check('★★★★★ 灰格寫「—」而且塗灰', na.getValue() === gas.IMPORT_NA_MARK && na.getBackground() === gas.IMPORT_NA_BACKGROUND,
     na.getValue() + ' ' + na.getBackground());
+  // 第六十八輪批次 AN 組：灰格唔可以有資料驗證（否則每格出「不在清單內」紅色小三角）；同一行嘅普通格仍然有下拉
+  check('★★★★★★ 灰格冇資料驗證規則', na.getDataValidation() === null, JSON.stringify(na.getDataValidation()));
+  check('★★★★★ 同一行嘅普通格仍然有下拉（驗證冇被整行清走）',
+    importCell(DATES[0], 'READ#1').getDataValidation() !== null && importCell(DATES[5], 'READ#1').getDataValidation() !== null);
   check('★★★★ 日期標題附特別主日名稱', /聯合崇拜/.test(String(ss.getSheetByName(IMPORT).getRange(1, 2 + 7).getValue())));
   check('★★★★★ 下拉容許名單以外嘅字（貼上唔會被擋）', builtRules.length >= 2 && builtRules.every(function (x) { return x.allowInvalid === true; }),
     JSON.stringify(builtRules));
@@ -359,10 +369,10 @@ console.log('\n=== AF4【核心】「已經在系統外寄給全體」⇒ OFFICI
   const persons = {};
   rowsOf(2).forEach(function (x) { if (x[A.PERSON_ID]) persons[x[A.PERSON_ID]] = true; });
   checkEqual('★★★★★★ 每位有派工嘅人一行、Stage=OFFICIAL、Status=EXTERNAL',
-    { n: ext.length, stages: ext.every(function (x) { return x[L.STAGE] === 'OFFICIAL'; }), status: ext.every(function (x) { return x[L.STATUS] === gas.MAIL_STATUS.EXTERNAL; }) },
+    { n: ext.filter(function (x) { return x[L.PERSON_ID]; }).length, stages: ext.every(function (x) { return x[L.STAGE] === 'OFFICIAL'; }), status: ext.every(function (x) { return x[L.STATUS] === gas.MAIL_STATUS.EXTERNAL; }) },
     { n: Object.keys(persons).length, stages: true, status: true });
   check('★★★★★ hash 照現有算法（同 computeAssignmentHash_ 一致）', ext.every(function (x) {
-    const mine = rowsOf(2).filter(function (y) { return y[A.PERSON_ID] === x[L.PERSON_ID]; }).map(function (y) {
+    const mine = rowsOf(2).filter(function (y) { return x[L.PERSON_ID] && y[A.PERSON_ID] === x[L.PERSON_ID]; }).map(function (y) {
       return { serviceDate: gas.toDateString(y[A.SERVICE_DATE], TZ), postId: y[A.POST_ID], slotIndex: Number(y[A.SLOT_INDEX]) };
     });
     return String(x[L.ASSIGNMENT_HASH]) === gas.computeAssignmentHash_(mine);
@@ -375,8 +385,13 @@ console.log('\n=== AF4【核心】「已經在系統外寄給全體」⇒ OFFICI
 
   // 補寄預覽：一個都唔列
   const makeup = gas.apiMakeupSendPlan(Q, 'OFFICIAL');
-  check('★★★★★★ 補寄預覽一個都唔列（EXTERNAL 算收過）', makeup.ok === true && makeup.people.length === 0
-    && makeup.alreadySentCount === Object.keys(persons).length, JSON.stringify(makeup).slice(0, 300));
+  check('★★★★★★ 補寄預覽一個都唔列（EXTERNAL 算收過）——包括名單收件人（第六十八輪批次 AL 組）',
+    makeup.ok === true && makeup.people.length === 0
+    && makeup.alreadySentCount === Object.keys(persons).length + 1, JSON.stringify(makeup).slice(0, 300));
+  const listRows = ext.filter(function (x) { return !x[L.PERSON_ID]; });
+  check('★★★★★ 名單收件人嗰行：無 PersonID、以 Email 做鍵、Stage=OFFICIAL、Status=EXTERNAL',
+    listRows.length === 1 && String(listRows[0][L.EMAIL]) === 'office@example.invalid'
+    && listRows[0][L.STAGE] === 'OFFICIAL' && listRows[0][L.STATUS] === gas.MAIL_STATUS.EXTERNAL, JSON.stringify(listRows));
 
   // 之後改 1 格（讀經 DATES[1] 假乙 → 假丙）⇒ 步驟 5 只列受影響嘅兩位
   const grid = gas.buildRosterSheetName_(Q, 2);
@@ -414,6 +429,25 @@ console.log('\n=== AF5【核心】畫面 ===');
   check('★★★★★ 第 1 步未有版本時有「已經用舊方法排好？」連去匯入',
     /已經用舊方法排好？/.test(read('ScriptMainFlow.html')) && /openImportRoster\(\)/.test(read('ScriptMainFlow.html')));
   check('★★★★ 唯讀白名單有 apiCheckImportSheet', /'apiCheckImportSheet',/.test(read('Script.html')));
+}
+
+console.log('\n=== AP：入口名稱統一叫「匯入人手編好的職事表」（第六十八輪批次）===');
+{
+  const ENTRY = '匯入人手編好的職事表';
+  const OLD = '匯入人手職事表';
+  const srcDir = path.join(__dirname, '..', 'src');
+  const files = [];
+  fs.readdirSync(srcDir).forEach(function (f) { if (/\.gs$/.test(f)) files.push(path.join(srcDir, f)); });
+  fs.readdirSync(path.join(srcDir, 'ui')).forEach(function (f) { if (/\.html$/.test(f)) files.push(path.join(srcDir, 'ui', f)); });
+  const stale = files.filter(function (f) { return fs.readFileSync(f, 'utf8').indexOf(OLD) !== -1; })
+    .map(function (f) { return path.basename(f); });
+  checkEqual('★★★★★★ src/*.gs 同 src/ui/*.html 冇任何地方仍然寫「' + OLD + '」', stale, []);
+  const zone4 = fs.readFileSync(path.join(srcDir, 'ui', 'ScriptZone4.html'), 'utf8');
+  check('★★★★★ 區四標題同「系統出問題」彈窗指引都用「進階與診斷 ▸ ' + ENTRY + '」',
+    zone4.indexOf("sectionTitle('" + ENTRY + "')") !== -1
+    && zone4.indexOf('進階與診斷 ▸ ' + ENTRY + '」把副本讀回系統') !== -1);
+  const manual = fs.readFileSync(path.join(__dirname, '..', 'docs', '系統出問題時手動繼續.md'), 'utf8');
+  check('★★★★ 手動繼續說明書同一個名稱', manual.indexOf(OLD) === -1 && manual.indexOf('進階與診斷 ▸ ' + ENTRY) !== -1);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

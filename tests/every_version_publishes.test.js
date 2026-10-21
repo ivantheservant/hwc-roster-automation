@@ -71,8 +71,8 @@ console.log('\n=== A1【核心】由資料嗰邊數：邊個會喺 `RosterVersio
     });
   });
 
-  // 第六十七輪批次 AF 組：第七個呼叫點——匯入人手職事表（`RosterImport.gs`），
-  // 佢自己發佈（見下面「A2 匯入人手職事表」）。
+  // 第六十七輪批次 AF 組：第七個呼叫點——匯入人手編好的職事表（`RosterImport.gs`），
+  // 佢自己發佈（見下面「A2 匯入人手編好的職事表」）。
   checkEqual('★★★★★★ **一共七個呼叫點**'
     + '——加多一個就要喺呢度改，而改嗰陣就會見到下面「每一個都要發佈」'
     + '嗰幾條。第五十二輪由函式數起，所以嗰六個入面只數過一個',
@@ -202,7 +202,7 @@ console.log('\n=== A2 其餘四條：核實佢哋本來就有 ===');
     { id: '接受系統建議', file: 'src/SuggestionSheet.gs' },
     { id: '回退執行', file: 'src/WebAppRollback.gs' },
     // 第六十七輪批次 AF 組
-    { id: '匯入人手職事表', file: 'src/RosterImport.gs' }
+    { id: '匯入人手編好的職事表', file: 'src/RosterImport.gs' }
   ];
   cases.forEach(function (c) {
     if (c.callers) {
@@ -220,7 +220,7 @@ console.log('\n=== A2 其餘四條：核實佢哋本來就有 ===');
 }
 
 // =====================================================================
-console.log('\n=== A2 匯入人手職事表：加完行一定跟住發佈（第六十七輪批次 AF 組）===');
+console.log('\n=== A2 匯入人手編好的職事表：加完行一定跟住發佈（第六十七輪批次 AF 組）===');
 {
   const box = sandbox([
     'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs', 'QuarterStage.gs',

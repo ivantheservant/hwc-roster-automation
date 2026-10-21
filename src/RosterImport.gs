@@ -160,6 +160,13 @@ function apiCreateImportSheet(quarterId) {
         .build();
       try {
         sheet.getRange(rowNo, IMPORT_LABEL_COLUMNS + 1, 1, dateCount).setDataValidation(rule);
+        // 第六十八輪批次 AN 組：灰格（特別主日跳過嘅崗位）填「—」，唔係名單上嘅人，
+        // 套咗下拉就每格都出「不在清單內」嘅紅色小三角。整行設完之後，逐個灰格清走驗證。
+        layout.serviceDates.forEach(function (d, j) {
+          if (layout.naByKey[cellKey_(d.serviceDate, r.postId, r.slotIndex)]) {
+            sheet.getRange(rowNo, IMPORT_LABEL_COLUMNS + 1 + j).clearDataValidations();
+          }
+        });
       } catch (err) {
         log_('WARN', '匯入範本 ' + sheetName + ' 第 ' + rowNo + ' 行設不到下拉：' + err.message);
       }
@@ -391,7 +398,7 @@ function apiCheckImportSheet(quarterId) {
  */
 function apiImportRosterExecute(quarterId, payload) {
   assertWebAppRequestAllowed_();
-  return withMutationLock_('匯入人手職事表', function () {
+  return withMutationLock_('匯入人手編好的職事表', function () {
     return apiImportRosterExecute_locked_(quarterId, payload || {});
   });
 }
@@ -438,7 +445,7 @@ function apiImportRosterExecute_locked_(quarterId, input) {
 
   if (plan.needsRelease) {
     // AG 組格式：6 欄 key ＋ 放行版本，之後儲存同一狀態唔使再打字
-    logHardViolationRelease_(q, 'apiImportRosterExecute（匯入人手職事表）', plan.violations.real, versionNo);
+    logHardViolationRelease_(q, 'apiImportRosterExecute（匯入人手編好的職事表）', plan.violations.real, versionNo);
   }
 
   writeAuditLog_({
@@ -455,7 +462,7 @@ function apiImportRosterExecute_locked_(quarterId, input) {
   let stage = getQuarterStage_(q);
   if (input.sentExternally === true) {
     externalRows = writeExternalSendBaseline_(q, versionNo, assignments);
-    setQuarterStage_(q, QUARTER_STAGE.OFFICIAL_SENT, '匯入人手職事表：幹事聲明已在系統外寄給全體');
+    setQuarterStage_(q, QUARTER_STAGE.OFFICIAL_SENT, '匯入人手編好的職事表：幹事聲明已在系統外寄給全體');
     stage = QUARTER_STAGE.OFFICIAL_SENT;
   }
 
@@ -509,9 +516,33 @@ function writeExternalSendBaseline_(quarterId, versionNo, assignments) {
       deliveredTo: ''
     };
   });
+  const personCount = outcomes.length;
+
+  // 第六十八輪批次 AL 組：**名單收件人**（EmailRecipients 上嘅辦公室、系統管理等）正式發出時本來
+  // 都會收一封，所以「已在系統外寄給全體」都要為佢哋記一行——否則補寄預覽會照列佢哋。
+  // 用 `listRecipients_()` 取（同真實寄出同一支，`type=LIST`）；鍵同真實寄出一樣：LIST 收件人
+  // 冇 PersonID、SendLog 以 Email 做鍵（見 `buildSendStatusByRecipient_()`）。
+  listRecipients_(MAIL_STAGES.OFFICIAL, { assignmentsByPerson: {}, peopleById: {} })
+    .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST && r.email; })
+    .forEach(function (r) {
+      outcomes.push({
+        recipientType: RECIPIENT_TYPE.LIST,
+        personId: '',
+        email: r.email,
+        displayName: r.displayName || r.email,
+        hash: computeAssignmentHash_([]),
+        summary: '',
+        attachmentName: '',
+        status: MAIL_STATUS.EXTERNAL,
+        messageId: '',
+        errorMessage: '',
+        intendedEmail: r.email,
+        deliveredTo: ''
+      });
+    });
   if (outcomes.length === 0) return 0;
   writeSendLogRows_(outcomes, {
     quarterId: quarterId, versionNo: versionNo, stage: MAIL_STAGES.OFFICIAL, sendDecision: null
   });
-  return outcomes.length;
+  return personCount;   // 回傳「有服侍的人」嘅行數（完成窗講嘅就係呢個數）
 }

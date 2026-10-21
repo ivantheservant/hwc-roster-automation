@@ -227,8 +227,13 @@ console.log('\n=== AI4【核心】畫面：同一支函式、有〔請系統幫�
   const ui = loadUiScripts(['Script.html']);
   const text = function (nodes) { return nodes.map(function (n) { return n.textContent; }).join('\n'); };
   const plain = text(ui.buildEligibilityImpactNodes(impact));
-  check('★★★★★★ 「名單改了之後，這一版有 N 格的人已經不在該崗位的名單上」',
-    new RegExp('名單改了之後，這一版有 ' + impact.count + ' 格的人已經不在該崗位的名單上').test(plain), plain);
+  // 第六十八輪批次 AM 組：狀態卡／第 2 步唔假設「名單改過」，用中性句
+  check('★★★★★★ 狀態卡版本：「這一版有 N 格的人不在該崗位的名單上（你已放行的不計在內）」，唔講「名單改了之後」',
+    plain.indexOf('這一版有 ' + impact.count + ' 格的人不在該崗位的名單上（你已放行的不計在內）') !== -1
+    && plain.indexOf('名單改了之後') === -1, plain);
+  const plainSaved = text(ui.buildEligibilityImpactNodes(impact, { withButton: true }));
+  check('★★★★★★ 儲存名單後嘅結果窗：保留「名單改了之後，這一版有 N 格的人已經不在該崗位的名單上」',
+    new RegExp('名單改了之後，這一版有 ' + impact.count + ' 格的人已經不在該崗位的名單上').test(plainSaved), plainSaved);
   check('★★★★★ 列出人名同崗位', plain.indexOf(PEOPLE[TARGET]) !== -1 && plain.indexOf('主席') !== -1, plain);
   const hasButton = function (node) {
     if (node.tagName === 'BUTTON' && node.textContent === '請系統幫我調整') return true;
@@ -251,6 +256,33 @@ console.log('\n=== AI4【核心】畫面：同一支函式、有〔請系統幫�
     /buildEligibilityImpactNodes\(d\.eligibilityImpact\)/.test(read('ScriptMainFlow.html')));
   check('★★★★ 狀態卡叫 buildEligibilityImpactNodes(d.eligibilityImpact)',
     /buildEligibilityImpactNodes\(d\.eligibilityImpact\)/.test(read('Script.html')));
+}
+
+console.log('\n=== AM【核心】已放行嘅格唔計入「不在名單上」提示 ===');
+{
+  // 此刻（AI3 之後）：TARGET 已經唔喺主席名單上，佢喺最新一版嘅主席格全部未放行
+  const before = gas.apiGetDashboardState(Q).eligibilityImpact;
+  checkEqual('（前置）未放行 ⇒ 狀態卡數到 TARGET 嘅全部主席格', before.count, TARGET_CELLS.length);
+  // 幹事明知而放行：用真正寫放行紀錄嗰支（匯入、儲存確認放行都係呢支），key 取自狀態卡自己列出嘅違反
+  gas.logHardViolationRelease_(Q, 'eligibility_impact.test（模擬幹事放行）', before.items.map(function (it) {
+    return { serviceDate: it.serviceDate, postId: it.postId, slotIndex: it.slotIndex,
+      personId: it.personId, ruleId: gas.RULE_IDS.ELIGIBILITY, postNameTC: it.postNameTC, personName: it.personName };
+  }), V0);
+  const released = gas.apiGetDashboardState(Q).eligibilityImpact;
+  checkEqual('★★★★★★ 全部放行 ⇒ 狀態卡冇提示（0 格）', released.count, 0);
+  const uiAm = loadUiScripts(['Script.html']);
+  checkEqual('★★★★★ 狀態卡冇節點', uiAm.buildEligibilityImpactNodes(released).length, 0);
+
+  // 另一格（讀經）未放行 ⇒ 只數嗰幾格，唔計已放行嘅主席格
+  const READER = whoIsOn(V0, DATES[2], 'READ');
+  const READ_CELLS = cellsOf(V0, READER, 'READ');
+  check('（前置）有人做過讀經', !!READER && READ_CELLS.length >= 1, JSON.stringify(READ_CELLS));
+  const res = gas.apiSaveEligibilityBatch([{ personId: READER, postId: 'READ', eligible: false }], Q);
+  check('（前置）取消讀經資格成功', res.ok === true, JSON.stringify(res).slice(0, 200));
+  const mixed = gas.apiGetDashboardState(Q).eligibilityImpact;
+  checkEqual('★★★★★★ 另一格未放行 ⇒ 提示只數未放行嗰幾格', mixed.count, READ_CELLS.length);
+  check('★★★★★ 列出嘅全部係讀經，冇主席（已放行）', mixed.items.every(function (it) { return it.postId === 'READ'; }), JSON.stringify(mixed.items));
+  checkEqual('★★★★ 結果窗（儲存名單後）同一個數字', res.eligibilityImpact.count, READ_CELLS.length);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

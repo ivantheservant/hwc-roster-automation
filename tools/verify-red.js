@@ -4987,8 +4987,8 @@ const MUTATIONS = [
     id: 'ai-wrong-rule',
     why: '只睇錯咗嘅規則——永遠 0 格',
     file: 'src/SendWarnings.gs',
-    find: '      if (v.ruleId !== RULE_IDS.ELIGIBILITY) return;',
-    replace: '      if (v.ruleId === RULE_IDS.ELIGIBILITY) return;',
+    find: '      return v.ruleId === RULE_IDS.ELIGIBILITY;',
+    replace: '      return v.ruleId !== RULE_IDS.ELIGIBILITY;',
     tests: ['tests/eligibility_impact.test.js']
   },
   {
@@ -5011,8 +5011,8 @@ const MUTATIONS = [
     id: 'ai-ui-no-head',
     why: '畫面唔講「名單改了之後，這一版有 N 格的人已經不在該崗位的名單上」',
     file: 'src/ui/Script.html',
-    find: "          text: '名單改了之後，這一版有 ' + impact.count + ' 格的人已經不在該崗位的名單上。',",
-    replace: "          text: '',",
+    find: "            ? ('名單改了之後，這一版有 ' + impact.count + ' 格的人已經不在該崗位的名單上。')",
+    replace: "            ? ('')",
     tests: ['tests/eligibility_impact.test.js']
   },
   {
@@ -5149,7 +5149,7 @@ const MUTATIONS = [
     id: 'af-no-release-log',
     why: '匯入放行唔寫 AG 組格式紀錄——之後儲存又要打字',
     file: 'src/RosterImport.gs',
-    find: "    logHardViolationRelease_(q, 'apiImportRosterExecute（匯入人手職事表）', plan.violations.real, versionNo);",
+    find: "    logHardViolationRelease_(q, 'apiImportRosterExecute（匯入人手編好的職事表）', plan.violations.real, versionNo);",
     replace: '    void 0;',
     tests: ['tests/roster_import.test.js']
   },
@@ -5189,7 +5189,7 @@ const MUTATIONS = [
     id: 'af-ext-no-stage',
     why: '聲明已寄出但 Stage 唔推到 OFFICIAL_SENT——步驟 5 用唔到',
     file: 'src/RosterImport.gs',
-    find: "    setQuarterStage_(q, QUARTER_STAGE.OFFICIAL_SENT, '匯入人手職事表：幹事聲明已在系統外寄給全體');\n    stage = QUARTER_STAGE.OFFICIAL_SENT;",
+    find: "    setQuarterStage_(q, QUARTER_STAGE.OFFICIAL_SENT, '匯入人手編好的職事表：幹事聲明已在系統外寄給全體');\n    stage = QUARTER_STAGE.OFFICIAL_SENT;",
     replace: '    stage = QUARTER_STAGE.OFFICIAL_SENT;',
     tests: ['tests/roster_import.test.js']
   },
@@ -5199,6 +5199,86 @@ const MUTATIONS = [
     file: 'src/ui/ScriptZone4.html',
     find: "      zone4Row('檢查並匯入',",
     replace: "      zone4Row('檢查並匯入（停用）',",
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'al-list-no-external',
+    why: '匯入選「已在系統外寄出」只記人、唔記名單收件人——補寄預覽照列辦公室等',
+    file: 'src/RosterImport.gs',
+    find: '    .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST && r.email; })',
+    replace: '    .filter(function () { return false; })',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'al-list-wrong-key',
+    why: '名單收件人 EXTERNAL 行冇寫 Email 鍵——buildSendStatusByRecipient_ 對唔上',
+    file: 'src/RosterImport.gs',
+    find: "        personId: '',\n        email: r.email,\n        displayName: r.displayName || r.email,",
+    replace: "        personId: '',\n        email: '',\n        displayName: r.displayName || r.email,",
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'am-counts-released',
+    why: '已放行嘅格照計入「不在名單上」提示——幹事明知而放行嘅格又被提示一次',
+    file: 'src/SendWarnings.gs',
+    find: '      if (releasedKeys[key]) return;\n',
+    replace: '',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'am-ui-assumes-edit',
+    why: '狀態卡／第 2 步又假設「名單改了之後」——匯入放行嘅格都被講成名單改動',
+    file: 'src/ui/Script.html',
+    find: '          text: withButton\n            ? (\'名單改了之後，這一版有 \' + impact.count + \' 格的人已經不在該崗位的名單上。\')\n            : (\'這一版有 \' + impact.count + \' 格的人不在該崗位的名單上（你已放行的不計在內）。\'),',
+    replace: '          text: (\'名單改了之後，這一版有 \' + impact.count + \' 格的人已經不在該崗位的名單上。\'),',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'am-ui-saved-no-lead',
+    why: '剛儲存完名單嘅結果窗唔再講「名單改了之後」',
+    file: 'src/ui/Script.html',
+    find: '          text: withButton\n            ? (\'名單改了之後，這一版有 \' + impact.count + \' 格的人已經不在該崗位的名單上。\')',
+    replace: '          text: withButton\n            ? (\'這一版有 \' + impact.count + \' 格的人已經不在該崗位的名單上。\')',
+    tests: ['tests/eligibility_impact.test.js']
+  },
+  {
+    id: 'an-na-keeps-dropdown',
+    why: '匯入表灰格仍然套下拉驗證——每格出「不在清單內」紅色小三角',
+    file: 'src/RosterImport.gs',
+    find: '            sheet.getRange(rowNo, IMPORT_LABEL_COLUMNS + 1 + j).clearDataValidations();',
+    replace: '            void 0;',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'an-clears-whole-row',
+    why: '清灰格驗證時把整行嘅驗證都清走——普通格冇下拉',
+    file: 'src/RosterImport.gs',
+    find: '            sheet.getRange(rowNo, IMPORT_LABEL_COLUMNS + 1 + j).clearDataValidations();',
+    replace: '            sheet.getRange(rowNo, IMPORT_LABEL_COLUMNS + 1, 1, dateCount).clearDataValidations();',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'ao-legend-auto-text',
+    why: '圖例第一行又話「系統自動安排」——匯入（人手編好）嘅版本都被講成系統排嘅',
+    file: 'src/RosterWriter.gs',
+    find: '    [\'（姓名）\', \'已排定人選\', countText(GRID_CELL_CLASS.ASSIGNED)],',
+    replace: '    [\'（姓名）\', \'系統自動安排，已排定人選\', countText(GRID_CELL_CLASS.ASSIGNED)],',
+    tests: ['tests/grid_cell_presentation.test.js']
+  },
+  {
+    id: 'ap-ui-old-entry-name',
+    why: '「系統出問題」彈窗指引仍叫「匯入人手職事表」——同實際入口名稱對唔上',
+    file: 'src/ui/ScriptZone4.html',
+    find: '用「進階與診斷 ▸ 匯入人手編好的職事表」把副本讀回系統',
+    replace: '用「進階與診斷 ▸ 匯入人手職事表」把副本讀回系統',
+    tests: ['tests/roster_import.test.js']
+  },
+  {
+    id: 'ap-lock-old-name',
+    why: '匯入嘅鎖標籤（撞鎖時畫面會顯示）仍叫舊名稱',
+    file: 'src/RosterImport.gs',
+    find: '  return withMutationLock_(\'匯入人手編好的職事表\', function () {',
+    replace: '  return withMutationLock_(\'匯入人手職事表\', function () {',
     tests: ['tests/roster_import.test.js']
   },
 ];

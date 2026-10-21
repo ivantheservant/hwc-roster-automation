@@ -117,8 +117,10 @@ function limitSendWarningList_(items) {
  * **同一套判斷**（`RULE_IDS.ELIGIBILITY`），對已儲存嘅最新版本算一次，三個地方
  *（兩個儲存結果窗、狀態卡／第 2 步）都讀呢一份。
  *
- * ⚠️ 已放行嘅格一樣計入——名單改咗之後，放行嗰陣嘅理由可能已經唔成立；
- * 呢度只係講「有幾多格要你再望一眼」，唔係要求重新放行。
+ * 第六十八輪批次 AM 組：**已放行嘅格唔計**。幹事明知而放行嘅格（例如匯入時放行一個
+ * 唔喺名單上嘅人做領詩），狀態卡再話「要你再望一眼」只會令人以為係名單改動做成。
+ * 「已放行」同第六十七輪 AG 組**同一支判斷**（`classifySaveConfirmViolations_()` 的 `released`），
+ * 唔另寫一份；分類失敗時該函式會把全部當真違反，所以最差情況只係多報，唔會漏報。
  *
  * @param {string} quarterId 季度 ID
  * @returns {{versionNo: number, count: number, items: Object[], moreCount: number, error: string}}
@@ -137,9 +139,16 @@ function summariseEligibilityImpact_(quarterId) {
 
     const seen = {};
     const items = [];
-    findStateViolations_(state, context).forEach(function (v) {
-      if (v.ruleId !== RULE_IDS.ELIGIBILITY) return;
+    const eligibility = findStateViolations_(state, context).filter(function (v) {
+      return v.ruleId === RULE_IDS.ELIGIBILITY;
+    });
+    const releasedKeys = {};
+    classifySaveConfirmViolations_(quarterId, versionNo, eligibility).released.forEach(function (v) {
+      releasedKeys[cellKey_(v.serviceDate, v.postId, v.slotIndex)] = true;
+    });
+    eligibility.forEach(function (v) {
       const key = cellKey_(v.serviceDate, v.postId, v.slotIndex);
+      if (releasedKeys[key]) return;
       if (seen[key]) return;
       seen[key] = true;
       items.push({

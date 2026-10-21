@@ -119,8 +119,11 @@ class RealisticMockRange {
   setNumberFormat() { return this; }
   setNumberFormats() { return this; }
   setBorder() { return this; }
-  clearDataValidations() { return this; }
-  setDataValidation() { return this; }
+  // 第六十八輪批次 AN 組：資料驗證而家會記低（逐格），令「灰格有冇下拉驗證」測得到。
+  // 之前兩個都係 no-op，所以匯入表灰格套咗下拉（出紅色小三角）冇一條測試睇得到。
+  clearDataValidations() { this._eachCell((r, c) => this.sheet._setValidation(r, c, null)); return this; }
+  setDataValidation(rule) { this._eachCell((r, c) => this.sheet._setValidation(r, c, rule || null)); return this; }
+  getDataValidation() { return this.sheet._getValidation(this.row, this.col); }
   merge() { return this; }
   mergeAcross() { return this; }
   breakApart() { return this; }
@@ -217,6 +220,7 @@ class RealisticMockSheet {
     this._name = name;
     this._cells = new Map();   // 'r,c' -> value
     this._bg = new Map();      // 'r,c' -> 底色（第四十三輪 C1）
+    this._validations = new Map();   // 'r,c' -> 資料驗證規則（第六十八輪 AN）
     this._notes = new Map();   // 'r,c' -> 格註
     this._maxRow = 0;
     this._maxCol = 0;
@@ -259,6 +263,10 @@ class RealisticMockSheet {
   // 用小階比對（`String(bg).toLowerCase()`）。呢個 mock 唔扮嗰一步，
   // 扮錯咗會令測試對住一個唔存在嘅行為綠燈。
   _setBg(r, c, color) { this._bg.set(this._key(r, c), color); }
+  _setValidation(r, c, rule) {
+    if (rule) this._validations.set(this._key(r, c), rule); else this._validations.delete(this._key(r, c));
+  }
+  _getValidation(r, c) { return this._validations.get(this._key(r, c)) || null; }
   _getBg(r, c) {
     const v = this._bg.get(this._key(r, c));
     return v === undefined ? '#ffffff' : v;

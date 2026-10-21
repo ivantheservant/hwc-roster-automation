@@ -247,6 +247,13 @@ console.log('\n=== A2：圖例逐類都有，而且附上本季實際格數 ==='
   check('★ 待填嗰行有講明係邊幾個崗位（講員／翻譯／獻花）',
     pendingRow && /講員/.test(pendingRow[1]) && /翻譯/.test(pendingRow[1]),
     pendingRow ? pendingRow[1] : '');
+  // 第六十八輪批次 AO 組：匯入嘅版本全部係人手編好（MANUAL），圖例第一行唔可以話「系統自動安排」
+  const assignedLegend = rows.filter(function (r) { return r[0] === '（姓名）'; })[0];
+  check('★★★ 圖例第一行（姓名）：唔含「系統自動安排」，講「已排定人選」',
+    assignedLegend && assignedLegend[1].indexOf('系統自動安排') === -1 && assignedLegend[1] === '已排定人選',
+    assignedLegend ? JSON.stringify(assignedLegend) : '搵唔到嗰一行');
+  check('★ 圖例其他行都唔講「系統自動安排」嚟描述已排定嘅人（待填行講「不由系統自動安排」係另一回事）',
+    rows.filter(function (r) { return r[0] !== gas.DEFAULTS.GRID_PENDING_LABEL && r[1].indexOf('系統自動安排') !== -1; }).length === 0);
   check('★ 不適用嗰行有講明點解（聖餐襄禮只喺每月第一個主日）',
     rows.some(function (r) { return /第一個主日/.test(r[1]); }));
 

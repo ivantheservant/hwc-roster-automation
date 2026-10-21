@@ -514,7 +514,9 @@ function buildLegendRows_(layout) {
   const countText = function (cls) { return (counts[cls] || 0) + ' 格'; };
 
   return [
-    ['（姓名）', '系統自動安排，已排定人選', countText(GRID_CELL_CLASS.ASSIGNED)],
+    // 第六十八輪批次 AO 組：匯入人手編好的版本（Basis=IMPORT，全部 MANUAL）都用呢個圖例，
+    // 「系統自動安排」對佢哋唔啱；改成中性、更短嘅「已排定人選」（只改字，唔改排版／欄寬）。
+    ['（姓名）', '已排定人選', countText(GRID_CELL_CLASS.ASSIGNED)],
     [labels.pending, '此崗位不由系統自動安排（講員、翻譯、獻花），需要人手填寫',
       countText(GRID_CELL_CLASS.MANUAL_PENDING)],
     [labels.na, '這一週不設此崗位（例如聖餐襄禮只在每月第一個主日）',
