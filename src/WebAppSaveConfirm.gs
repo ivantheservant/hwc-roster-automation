@@ -406,7 +406,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
       '職事表沒有任何改動，第 ' + plan.baseVersionNo + ' 版仍然是最新一版。',
       ['如果這些安排是正確的（例如名單還未更新），在放行格輸入「'
         + SAVE_CONFIRM_RELEASE_TEXT + '」再撳一次',
-        '如果是改錯了，回到職事表把那幾格改回去，再撳「儲存並確認」']));
+        '如果是改錯了，回到職事表把那幾格改回去，再撳「儲存及寄出」']));
   }
 
   // ── 零改動路徑（D4）────────────────────────────────────────
@@ -653,7 +653,7 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
         '沒有任何東西被寫入——第 ' + targetVersionNo + ' 版沒有建立，'
           + '職事表、修改申報、Stage 全部維持原樣，第 ' + baseVersionNo + ' 版仍然是最新一版。'
           + '沒有寄出任何電郵。',
-        ['直接再撳一次「儲存並確認」就可以，不需要做任何清理',
+        ['直接再撳一次「儲存及寄出」就可以，不需要做任何清理',
           '如果再試仍然一樣，把上面整段文字交給開發者'])
     };
   }
@@ -730,7 +730,7 @@ function assertSaveConfirmPlanStillFresh_(plan, decisions) {
 
   throw new Error(
     '職事表在你確認的期間被改動過，剛才的預覽已經過期。'
-    + '請關掉這個畫面重新撳一次「儲存並確認」。');
+    + '請關掉這個畫面重新撳一次「儲存及寄出」。');
 }
 
 /**

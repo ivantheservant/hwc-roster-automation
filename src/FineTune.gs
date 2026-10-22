@@ -394,7 +394,8 @@ function findStateViolations_(state, context) {
     if (!cell.personId) return;
     const post = postById[cell.postId];
 
-    if (isRuleEnabled_(rules, RULE_IDS.ELIGIBILITY)) {
+    // 第七十三輪批次 BB 組：人手填嘅崗位（AutoGenerate=FALSE）唔查名單——見 `isEligibilityCheckedPost_()`
+    if (isRuleEnabled_(rules, RULE_IDS.ELIGIBILITY) && isEligibilityCheckedPost_(post)) {
       const pool = context.eligibility.byPost[cell.postId] || [];
       if (pool.indexOf(cell.personId) === -1) {
         // 第七十輪批次 AY 組：畫面文字唔用內部表名

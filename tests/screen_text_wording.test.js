@@ -106,5 +106,32 @@ console.log('\n=== AY3／AY4 申報認不到名字的句子；兩條路認名一
     !/readSheet\(SHEETS\.NAME_MAPPING\)/.test(src) && (src.match(/resolvePersonId\(/g) || []).length >= 3, '');
 }
 
+console.log('\n=== 第七十三輪文字組：畫面上叫幹事去撳「儲存並確認」（舊名）一律改為「儲存及寄出」 ===');
+{
+  // 例外（幹事看不到、或只是內部識別／紀錄）：
+  //   ScriptZone1.html 的 ZONE1_BUTTONS（區一已收起，`hidden`）、MonkeyRun／SelfTestRunner／SeasonRehearsal 的
+  //   內部步驟名、WebAppSaveConfirm.gs 寫入版本備註的「掣 1 儲存並確認：…」。
+  const files = [];
+  const walk = (dir) => fs.readdirSync(path.join(ROOT, dir)).forEach((f) => {
+    const rel = dir + '/' + f;
+    if (fs.statSync(path.join(ROOT, rel)).isDirectory()) return walk(rel);
+    if (/\.(gs|html)$/.test(f)) files.push(rel);
+  });
+  walk('src');
+  const ALLOWED = { 'src/ui/ScriptZone1.html': 1 };
+  const hits = [];
+  files.forEach((f) => {
+    stripComments(read(f)).split('\n').forEach((l, i) => {
+      if (l.indexOf('「儲存並確認」') === -1) return;
+      if (/SelfTest|Rehearsal|MonkeyRun/.test(f)) return;
+      if (ALLOWED[f] && /ZONE1_BUTTONS|name: '儲存並確認'/.test(l)) return;
+      hits.push(f + ':' + (i + 1) + '　' + l.trim());
+    });
+  });
+  check('★★★★★★ src 內所有畫面文字都不再叫幹事撳「儲存並確認」', hits.length === 0, hits.join('\n'));
+  const guards = stripComments(read('src/WebAppGuards.gs'));
+  check('★★★★★ 擋住寄出的訊息（WebAppGuards）指向「儲存及寄出」', guards.indexOf('先撳「儲存及寄出」') !== -1);
+}
+
 console.log(fail === 0 ? '\nOK' : `\n${fail} FAILURE(S)`);
 process.exit(fail === 0 ? 0 : 1);

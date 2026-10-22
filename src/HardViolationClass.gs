@@ -355,6 +355,76 @@ function classifyHardViolations_(violations, context) {
 }
 
 /**
+ * 第七十三輪批次 BA 組：**未放行嘅硬規則違反**（寄出前只提醒，不阻擋）。
+ *
+ * Ivan 嘅決定：改動後重發同正式發出一樣，**唔設硬規則關卡**——每一版喺「儲存及寄出」
+ * 已經過放行關卡；之後先出現嘅違反（例如儲存之後改咗名單）只提醒。呢支就係「提醒」要列嘅嘢：
+ * 同儲存確認（`classifySaveConfirmViolations_()`）嘅「真違反」同一個定義——
+ * 結構性不適用（`STRUCTURAL_NA_RULE_IDS`）、已放行、版本生成後先新增嘅申報都唔計。
+ *
+ * ⚠️ 分類失敗 ⇒ 全部當未放行（只係多提醒一次，唔會漏報），同儲存確認同一個保守做法。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {?number} versionNo 版本號；null＝該季最新版本
+ * @param {Object[]} violations 違反清單（`findStateViolations_()` 或 decorateViolations_() 過都得）
+ * @returns {Object[]} 未放行嘅硬規則違反（保留原本全部欄位）
+ */
+function listUnreleasedHardViolations_(quarterId, versionNo, violations) {
+  const judgeable = (violations || []).filter(function (v) {
+    return v.severity === RULE_LEVELS.HARD && STRUCTURAL_NA_RULE_IDS.indexOf(v.ruleId) === -1;
+  });
+  if (judgeable.length === 0 || !quarterId) return [];
+  try {
+    const vNo = (versionNo === null || versionNo === undefined || isNaN(Number(versionNo)))
+      ? findLatestVersionNo(quarterId) : Number(versionNo);
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const classified = classifyHardViolations_(
+      judgeable, buildHardViolationClassContext_(quarterId, vNo, readUnavailableNormalized(timezone)));
+    return classified.real;
+  } catch (err) {
+    log_('WARN', 'listUnreleasedHardViolations_ 分類失敗，全部當未放行：' + err.message);
+    return judgeable;
+  }
+}
+
+/** AuditLog 入面「寄出時仍有未放行硬規則違反」嘅 Action 值（第七十三輪批次 BA 組）。 */
+const HARD_UNRELEASED_AT_SEND_ACTION = '寄出時有未放行的硬規則違反';
+
+/**
+ * 第七十三輪批次 BA 組：寄出（改動後重發）時仍有未放行嘅硬規則違反 ⇒ 寫一行 AuditLog，方便日後查。
+ *
+ * ⚠️ **唔可以用 `HARD_RELEASE_ACTION`、亦唔可以寫 `RELEASED_KEYS:`**——否則
+ * `readReleasedHardViolationKeys_()` 會把呢啲格當成「幹事已放行」，整季靜靜記住。
+ * 呢一行只係提醒紀錄，唔係放行。寫唔到唔可以令寄出失敗。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {string} stepLabel 步驟名稱
+ * @param {number} versionNo 版本號
+ * @param {Object[]} unreleased `listUnreleasedHardViolations_()` 嘅結果
+ * @returns {void}
+ */
+function logUnreleasedHardViolationsAtSend_(quarterId, stepLabel, versionNo, unreleased) {
+  if (!unreleased || unreleased.length === 0) return;
+  try {
+    const human = unreleased.slice(0, 10).map(function (v) {
+      return v.serviceDate + ' ' + (v.postNameTC || v.postId) + '#' + v.slotIndex
+        + ' ' + (v.personId || '') + ' ' + v.ruleId;
+    }).join('；') + (unreleased.length > 10 ? '；……另有 ' + (unreleased.length - 10) + ' 項' : '');
+    writeAuditLog_({
+      action: HARD_UNRELEASED_AT_SEND_ACTION,
+      targetSheet: SHEETS.ROSTER_ASSIGNMENTS,
+      targetKey: quarterId,
+      oldValue: unreleased.length + ' 項硬規則違反未放行',
+      newValue: '只提醒，沒有阻擋（第 ' + versionNo + ' 版）',
+      source: stepLabel,
+      notes: human
+    });
+  } catch (err) {
+    log_('WARN', '寄出時未放行硬規則違反的紀錄寫不進 AuditLog：' + err.message);
+  }
+}
+
+/**
  * 檢查 `classifyHardViolations_()` 嘅 context 欄位，缺就拋錯。
  * @param {Object} context context 物件
  * @param {string} field 欄位名

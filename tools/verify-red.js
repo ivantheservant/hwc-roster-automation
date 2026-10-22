@@ -5730,6 +5730,142 @@ const MUTATIONS = [
     replace: 'const isOrphan = true;',
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
+  {
+    id: "ba-pdf-no-gate",
+    why: "產生 PDF 那一步還原成「有硬規則違反就擋」——改動後重發又會因已放行／未放行的格死胡同（第七十一輪 s47b）",
+    file: "src/WebAppFlow.gs",
+    find: "  // `releaseText` 參數保留（前端仍會傳），但唔再用。\n",
+    replace: "  // `releaseText` 參數保留（前端仍會傳），但唔再用。\n  if (!resolveHardViolationRelease_(recomputeLatestVersionViolations_(quarterId, 5), releaseText)) { return { blocked: true }; }\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-send-no-gate",
+    why: "寄送那一步遇到未放行嘅違反就擋——改動後重發不應該比正式發出更嚴",
+    file: "src/WebAppFlow.gs",
+    find: "    logUnreleasedHardViolationsAtSend_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', changed.versionNo, unreleased);\n",
+    replace: "    logUnreleasedHardViolationsAtSend_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', changed.versionNo, unreleased);\n    if (unreleased.length > 0) { return { blocked: true, violations: [] }; }\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-swallow-off",
+    why: "提醒紀錄算唔到就令重發拋錯——提醒不可以變成新阻擋",
+    file: "src/WebAppFlow.gs",
+    find: "    log_('WARN', '改動後重發：未放行硬規則違反的提醒紀錄算不到，照常寄出：' + err.message);\n",
+    replace: "    throw err;\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-log-as-release",
+    why: "提醒紀錄用放行嘅 Action——下次會被當成幹事已放行，整季靜靜記住",
+    file: "src/HardViolationClass.gs",
+    find: "      action: HARD_UNRELEASED_AT_SEND_ACTION,\n",
+    replace: "      action: HARD_RELEASE_ACTION,\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-unreleased-all",
+    why: "「未放行」清單唔剔走已放行嘅格——全部已放行嘅重發都會寫提醒",
+    file: "src/HardViolationClass.gs",
+    find: "    return classified.real;\n  } catch (err) {\n    log_('WARN', 'listUnreleasedHardViolations_",
+    replace: "    return judgeable;\n  } catch (err) {\n    log_('WARN', 'listUnreleasedHardViolations_",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-warn-no-field",
+    why: "確認窗資料唔帶 unreleased——黃框永遠出唔到",
+    file: "src/SendWarnings.gs",
+    find: "    out.unreleased = limitSendWarningList_(unreleased);\n",
+    replace: "    out.unreleased = empty;\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-box-hidden",
+    why: "確認窗唔畫未放行黃框",
+    file: "src/ui/Script.html",
+    find: "    if (unreleased.count > 0 && !compact) {\n",
+    replace: "    if (unreleased.count > 0 && !compact && false) {\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-box-in-card",
+    why: "狀態卡（compact）都畫未放行黃框",
+    file: "src/ui/Script.html",
+    find: "    if (unreleased.count > 0 && !compact) {\n",
+    replace: "    if (unreleased.count > 0) {\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-menu-gate",
+    why: "選單版改動後重發還原成要打字「確認放行」",
+    file: "src/FourStageFlow.gs",
+    find: "    remindUnreleasedHardViolations_(ui, quarterId, '步驟 5：改動後重發', applyResult.violations);\n",
+    replace: "    if (!confirmHardViolationOverride_(ui, quarterId, '步驟 5：改動後重發', applyResult.violations, STEP5_HARD_VIOLATION_CONSEQUENCE)) return;\n",
+    tests: ["tests/resend_no_hard_gate.test.js"]
+  },
+  {
+    id: "ba-ui-stale-text",
+    why: "前端 blocked 防衛還原成指去「儲存並確認」",
+    file: "src/ui/ScriptZone1.html",
+    find: "        showErrorModal('改動後重發', new Error('系統沒有執行這一步，尚未寄出任何電郵。請重新整理再試一次。'));\n        return;\n      }\n      if (r.noChanges) {",
+    replace: "        showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，需要先在「儲存並確認」處理。'));\n        return;\n      }\n      if (r.noChanges) {",
+    tests: ["tests/resend_no_hard_gate.test.js", "tests/screen_text_wording.test.js"]
+  },
+  {
+    id: "bb-fine-eligible",
+    why: "儲存／檢查我的改動／請系統幫我調整對人手填崗位照查名單",
+    file: "src/FineTune.gs",
+    find: "isRuleEnabled_(rules, RULE_IDS.ELIGIBILITY) && isEligibilityCheckedPost_(post)",
+    replace: "isRuleEnabled_(rules, RULE_IDS.ELIGIBILITY)",
+    tests: ["tests/manual_post_no_eligibility.test.js"]
+  },
+  {
+    id: "bb-verify-eligible",
+    why: "核對職事表對人手填崗位照查名單",
+    file: "src/Verify.gs",
+    find: "isEligibilityCheckedPost_(post) && pool.indexOf(a.personId) === -1",
+    replace: "pool.indexOf(a.personId) === -1",
+    tests: ["tests/manual_post_no_eligibility.test.js"]
+  },
+  {
+    id: "bb-helper-always",
+    why: "判斷函式永遠要查名單",
+    file: "src/Generator.gs",
+    find: "  return !post || !!post.autoGenerate;\n",
+    replace: "  return true;\n",
+    tests: ["tests/manual_post_no_eligibility.test.js"]
+  },
+  {
+    id: "bb-helper-hardcode",
+    why: "判斷函式寫死一個崗位——Posts 改咗就唔跟",
+    file: "src/Generator.gs",
+    find: "  return !post || !!post.autoGenerate;\n",
+    replace: "  return !post || !!post.autoGenerate || post.postId === 'TRANSLATE';\n",
+    tests: ["tests/manual_post_no_eligibility.test.js"]
+  },
+  {
+    id: "bb-helper-nopost",
+    why: "搵唔到崗位資料時唔查名單（應該保守照查）",
+    file: "src/Generator.gs",
+    find: "  return !post || !!post.autoGenerate;\n",
+    replace: "  return !!post && !!post.autoGenerate;\n",
+    tests: ["tests/manual_post_no_eligibility.test.js"]
+  },
+  {
+    id: "txt-guards-oldname",
+    why: "擋住寄出嘅訊息還原成舊名「儲存並確認」",
+    file: "src/WebAppGuards.gs",
+    find: "      ['先撳「儲存及寄出」，把表上的東西處理好，之後再撳「' + actionName + '」',",
+    replace: "      ['先撳「儲存並確認」，把表上的東西處理好，之後再撳「' + actionName + '」',",
+    tests: ["tests/screen_text_wording.test.js"]
+  },
+  {
+    id: "txt-dash-oldname",
+    why: "狀態卡掣提示還原成舊名「儲存並確認」",
+    file: "src/WebAppDashboard.gs",
+    find: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存及寄出」，這一粒才會著。'",
+    replace: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存並確認」，這一粒才會著。'",
+    tests: ["tests/screen_text_wording.test.js", "tests/webapp_dashboard_state.test.js"]
+  },
 ];
 
 /**

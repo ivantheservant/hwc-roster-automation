@@ -490,7 +490,8 @@ function checkHardRuleViolations_(context) {
     const post = postById[a.postId];
 
     const pool = context.eligibility.byPost[a.postId] || [];
-    if (pool.indexOf(a.personId) === -1) {
+    // 第七十三輪批次 BB 組：人手填嘅崗位（AutoGenerate=FALSE）唔查名單——見 `isEligibilityCheckedPost_()`
+    if (isEligibilityCheckedPost_(post) && pool.indexOf(a.personId) === -1) {
       notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, '不在這個崗位的名單上'));
     }
 

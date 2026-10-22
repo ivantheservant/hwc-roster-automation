@@ -543,6 +543,27 @@ function isNoAutoGenerateViolation_(post, assignSource) {
 }
 
 /**
+ * 第七十三輪批次 BB 組：「不在這個崗位的名單上」（`RULE_IDS.ELIGIBILITY`）要唔要查。
+ *
+ * 講員／翻譯／獻花係人手填（`Posts.AutoGenerate = FALSE`），任何會友都可以做，
+ * 唔存在「要喺名單上」呢回事——查咗只會令放行框變成日常噪音（第七十一輪現場：獻花填一位
+ * 唔喺獻花名單上嘅會友，之後每次儲存都要打字放行）。所以人手填嘅崗位**唔查名單**。
+ * 按 `AutoGenerate` 欄判斷，**唔寫死崗位名或 PostID**（崗位會增減）。
+ * 搵唔到崗位資料（`post` 為空）⇒ 照舊要查（保守）。
+ *
+ * ⚠️ 只有名單呢一條唔查；其他規則（不能服侍、同日衝突、身分限制……）照舊。
+ * 兩個入口都要叫呢支，唔可以各自寫：
+ *   `findStateViolations_()`（FineTune.gs）——儲存、檢查我的改動、請系統幫我調整、匯入檢查、提案、回退
+ *   `checkHardRuleViolations_()`（Verify.gs）——核對職事表
+ *
+ * @param {?Object} post 崗位（`readPostsNormalized()` 形狀）
+ * @returns {boolean} true＝要查名單
+ */
+function isEligibilityCheckedPost_(post) {
+  return !post || !!post.autoGenerate;
+}
+
+/**
  * 為單一 slot 挑選人選：先以 HARD 規則篩選，再依違規扣分與選人策略排序。
  *
  * 階段 A（Opus 深度輪）修正：若所有候選人都違反 HARD 規則，**留空並發出

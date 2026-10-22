@@ -860,6 +860,29 @@
       nodes.push(box);
     }
 
+    // 第七十三輪批次 BA 組：未放行嘅硬規則違反——黃框提醒，**不阻擋**（改動後重發、正式發出同一支）。
+    // 狀態卡（compact）唔顯示，免得同「儲存及寄出」嗰邊嘅提示重複。
+    const unreleased = w.unreleased || { count: 0, items: [], moreCount: 0 };
+    if (unreleased.count > 0 && !compact) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '⚠ 這一版有 ' + unreleased.count + ' 格違反一定要遵守的規則，而且還未放行（例如儲存之後改了名單）。'
+            + '這不會阻擋寄出，但收到的人會見到這些安排。要改的話，先在第 2 步改好再儲存。',
+          className: 'warn-head'
+        })
+      ]);
+      (unreleased.items || []).forEach((r) => {
+        box.appendChild(make('div', {
+          text: cellLabel(r) + '　' + (r.personName || r.personId) + '——' + (r.reason || plainRuleText(r.ruleId)),
+          className: 'vio-row'
+        }));
+      });
+      if (unreleased.moreCount > 0) {
+        box.appendChild(make('div', { text: '另有 ' + unreleased.moreCount + ' 格。', className: 'muted' }));
+      }
+      nodes.push(box);
+    }
+
     const released = w.released || { count: 0, items: [], moreCount: 0 };
     if (released.count > 0) {
       const box = make('div', { className: 'sec' }, [

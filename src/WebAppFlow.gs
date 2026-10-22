@@ -609,7 +609,8 @@ function apiStep5Apply_locked_(quarterId, acceptConfirmList) {
     needsInputCount: result.needsInputCount,
     pendingBackfillCount: result.pendingBackfillCount,
     violations: result.violations.map(mapViolationForClient_),
-    requiresAck: !resolveHardViolationRelease_(result.violations, '')
+    // 第七十三輪批次 BA 組：改動後重發唔設硬規則關卡（同正式發出一樣），只提醒，所以永遠唔使確認
+    requiresAck: false
   };
 }
 
@@ -624,19 +625,19 @@ function apiStep5CheckRelease(quarterId, releaseText) {
   assertWebAppRequestAllowed_();
   const changed = planStep5ChangedList_(quarterId);
   const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
-  return { ok: resolveHardViolationRelease_(violations, releaseText), violations: violations.map(mapViolationForClient_) };
+  // 第七十三輪批次 BA 組：改動後重發唔設硬規則關卡，所以永遠 ok；violations 照回，畀畫面提醒
+  return { ok: true, violations: violations.map(mapViolationForClient_) };
 }
 
 /**
  * 供前端呼叫：產生本輪改動者的個人 PDF（可能要按時間預算分批、重複呼叫）。
  *
- * **這裡是步驟 5 兩個真正的硬規則關卡之一**：如果目前最新版本仍有硬規則違反，
- * 一律要求 `releaseText` 等於「確認放行」才會真正執行，不會因為前端畫面順序
- * 而被繞過——即使有人跳過「看過違規畫面」這一步直接呼叫這個函式，一樣會被擋下來。
+ * 第七十三輪批次 BA 組：**不再設硬規則關卡**（同正式發出一樣，只在確認窗提醒）。
+ * `releaseText` 參數保留但不再使用。
  *
  * @param {string} quarterId 季度 ID
- * @param {string} releaseText 硬規則放行文字（沒有硬規則違反時可傳空字串）
- * @returns {Object} 這一批的產生進度；`blocked:true` 時代表被硬規則關卡擋住
+ * @param {string} releaseText （保留，不再使用）
+ * @returns {Object} 這一批的產生進度；`blocked` 永遠是 false
  */
 // ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
 // `apiStep5GeneratePdfs_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
@@ -652,13 +653,12 @@ function apiStep5GeneratePdfs(quarterId, releaseText, sendOptions) {
 
 function apiStep5GeneratePdfs_locked_(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
+  // ⚠️ 第七十三輪批次 BA 組：**改動後重發唔設硬規則關卡**（Ivan 決定，同正式發出一樣）。
+  // 每一版喺「儲存及寄出」已經過放行關卡；之後先出現嘅違反（例如儲存之後改咗名單）只喺確認窗
+  // 提醒（`summariseVersionSendWarnings_().unreleased`），寄出嗰刻寫一行 AuditLog。
+  // 舊做法要求 `releaseText === '確認放行'`，而畫面永遠傳空字串 ⇒ 一有違反就死胡同（第七十一輪 s47b）。
+  // `releaseText` 參數保留（前端仍會傳），但唔再用。
   const changed = planStep5ChangedList_(quarterId);
-  const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
-  if (!resolveHardViolationRelease_(violations, releaseText)) {
-    return { blocked: true, violations: violations.map(mapViolationForClient_) };
-  }
-  const hardForPdf = violations.filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
-  if (hardForPdf.length > 0) logHardViolationRelease_(quarterId, '步驟 5：改動後重發（Web UI，產生 PDF）', hardForPdf);
   if (changed.changedList.length === 0) {
     return { blocked: false, done: true, doneCount: 0, totalPeople: 0, noChanges: true };
   }
@@ -716,12 +716,11 @@ function apiStep5SendPreview(quarterId, sendOptions) {
 }
 
 /**
- * 供前端呼叫：實際寄送（步驟 5 的最終動作）。**這是步驟 5 第二個、也是最關鍵的
- * 硬規則關卡**——真正會呼叫 `MailApp`（DRY_RUN=FALSE 時）之前，重新讀一次目前
- * 最新版本的違規狀況，沒有正確的放行文字一律拒絕執行。
+ * 供前端呼叫：實際寄送（步驟 5 的最終動作）。第七十三輪批次 BA 組：**不再設硬規則關卡**
+ * （Ivan 決定，同正式發出一樣）；有未放行的違反只寫一行 AuditLog 提醒紀錄。
  * @param {string} quarterId 季度 ID
- * @param {string} releaseText 硬規則放行文字（沒有硬規則違反時可傳空字串）
- * @returns {Object} 寄送結果；`blocked:true` 時代表被硬規則關卡擋住，或沒有改動需要重發
+ * @param {string} releaseText （保留，不再使用）
+ * @returns {Object} 寄送結果；`blocked` 永遠是 false；沒有改動需要重發時回 `noChanges:true`
  */
 // ⚠️ 第六十三輪批次 C 組：薄殼——只做權限檢查同拿鎖，真正內容喺
 // `apiStep5SendConfirm_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
@@ -741,12 +740,16 @@ function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
     resolveAllowUnsavedFlag_(sendOptions));
   logSendWithUnsavedRelease_(quarterId, '改動後重發', guard);
   const changed = planStep5ChangedList_(quarterId);
-  const violations = recomputeLatestVersionViolations_(quarterId, changed.versionNo);
-  if (!resolveHardViolationRelease_(violations, releaseText)) {
-    return { blocked: true, violations: violations.map(mapViolationForClient_) };
+  // ⚠️ 第七十三輪批次 BA 組：唔設硬規則關卡（見 `apiStep5GeneratePdfs_locked_()`）。
+  // 有未放行嘅違反 ⇒ 只寫一行提醒紀錄（`logUnreleasedHardViolationsAtSend_()`，唔係放行紀錄）。
+  // 算唔到 ⇒ 照寄（提醒唔可以變成新嘅阻擋）。
+  try {
+    const unreleased = listUnreleasedHardViolations_(
+      quarterId, changed.versionNo, recomputeLatestVersionViolations_(quarterId, changed.versionNo));
+    logUnreleasedHardViolationsAtSend_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', changed.versionNo, unreleased);
+  } catch (err) {
+    log_('WARN', '改動後重發：未放行硬規則違反的提醒紀錄算不到，照常寄出：' + err.message);
   }
-  const hardForSend = violations.filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
-  if (hardForSend.length > 0) logHardViolationRelease_(quarterId, '步驟 5：改動後重發（Web UI，寄送）', hardForSend);
   if (changed.changedList.length === 0) return { blocked: false, noChanges: true };
 
   // ⚠️ 第六十三輪批次 P 組：「這一版冇任何安排」而又會收到通知嘅人。

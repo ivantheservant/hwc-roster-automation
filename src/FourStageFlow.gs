@@ -763,10 +763,9 @@ function runFourStageStep5_locked_() {
     applyLines.push('', '接下來會比對這一版跟上次寄出時的差異，決定要通知誰。');
     ui.alert('步驟 5：改動後重發（套用申報完成，2/3）', applyLines.join('\n'), ui.ButtonSet.OK);
 
-    // 追加階段 AR：有硬規則違反時不可以只按一個 OK 就繼續走到寄送。
-    // 取消的話新版本一樣保留（跟 3/3 選「否」的語意一致），不會白做。
-    if (!confirmHardViolationOverride_(
-      ui, quarterId, '步驟 5：改動後重發', applyResult.violations, STEP5_HARD_VIOLATION_CONSEQUENCE)) return;
+    // 第七十三輪批次 BA 組：改動後重發同正式發出一樣**唔設硬規則關卡**（Ivan 決定）——
+    // 每一版喺「儲存及寄出」已經過放行關卡。有未放行嘅違反只提醒一次，然後照常繼續。
+    remindUnreleasedHardViolations_(ui, quarterId, '步驟 5：改動後重發', applyResult.violations);
   }
 
   // ---- 第二段：比對改動者、產生 PDF、確認、寄送 ----
@@ -983,6 +982,34 @@ function resolveHardViolationRelease_(violations, releaseText) {
   const hard = (violations || []).filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
   if (hard.length === 0) return true;
   return String(releaseText || '').trim() === '確認放行';
+}
+
+/**
+ * 第七十三輪批次 BA 組：選單版「改動後重發」有未放行嘅硬規則違反時**只提醒、不阻擋**，
+ * 並寫一行 AuditLog（`logUnreleasedHardViolationsAtSend_()`，唔係放行紀錄）。
+ * 同 Web 介面（`apiStep5SendConfirm_locked_()`）一致。
+ * @param {Ui} ui SpreadsheetApp.getUi() 的結果
+ * @param {string} quarterId 季度 ID
+ * @param {string} title 對話框標題
+ * @param {Object[]} violations 違規清單
+ * @returns {number} 未放行的硬規則違反數目
+ */
+function remindUnreleasedHardViolations_(ui, quarterId, title, violations) {
+  let unreleased = [];
+  try {
+    unreleased = listUnreleasedHardViolations_(quarterId, null, violations);
+  } catch (err) {
+    log_('WARN', 'remindUnreleasedHardViolations_ 算不到，照常繼續：' + err.message);
+    return 0;
+  }
+  if (unreleased.length === 0) return 0;
+  logUnreleasedHardViolationsAtSend_(quarterId, title + '（選單）', findLatestVersionNo(quarterId), unreleased);
+  ui.alert(title + '：提醒',
+    '這一版有 ' + unreleased.length + ' 格違反一定要遵守的規則，而且還未放行'
+      + '（例如儲存之後改了名單）。這不會阻擋重發，但收到的人會見到這些安排。\n\n'
+      + '要改的話，先在試算表改好那幾格，再儲存成新版本。',
+    ui.ButtonSet.OK);
+  return unreleased.length;
 }
 
 /**

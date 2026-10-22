@@ -73,7 +73,7 @@ console.log('\n=== D-2 步 2【核心】預覽過期偵測 ===');
       gas.assertSaveConfirmPlanStillFresh_(plan, [
         { serviceDate: '2099-01-01', postId: 'X', slotIndex: 1 }
       ]);
-    }, '重新撳一次「儲存並確認」');
+    }, '重新撳一次「儲存及寄出」');
 
   let noDecisions = true;
   try { gas.assertSaveConfirmPlanStillFresh_(plan, []); } catch (e) { noDecisions = false; }

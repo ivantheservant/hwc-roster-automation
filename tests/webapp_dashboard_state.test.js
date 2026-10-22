@@ -195,9 +195,9 @@ console.log('\n=== 決定 D5【核心】有未儲存改動 ⇒ 掣 2／3／4 全
     facts({ stage: S.OFFICIAL_SENT, changedPersonCount: 6, unsaved: unsaved }));
   check('★★★★★ 掣 4 撳唔到', atOfficial.resend.enabled === false);
 
-  check('★★★★★ 三粒掣嘅 disabledReason 都指去「儲存並確認」',
+  check('★★★★★ 三粒掣嘅 disabledReason 都指去「儲存及寄出」',
     [atReq.review, atReq.official, atOfficial.resend].every(function (btn) {
-      return btn.disabledReason.indexOf('儲存並確認') !== -1;
+      return btn.disabledReason.indexOf('儲存及寄出') !== -1;
     }),
     JSON.stringify([atReq.review.disabledReason, atReq.official.disabledReason, atOfficial.resend.disabledReason]));
 }
@@ -226,7 +226,7 @@ console.log('\n=== 規格 1.6【核心】disabledReason 一律寫「怎樣才撳
 
   checkEqual('★★★★ 掣 3 喺 DRAFT 嘅提示係規格 1.6 嗰句正例',
     gas.computeDashboardButtons_(facts({ stage: S.DRAFT })).official.disabledReason,
-    '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存並確認」，這一粒才會著。');
+    '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存及寄出」，這一粒才會著。');
 }
 
 console.log('\n=== 規格 1.1／5.1：季度與版本一律寫人話 ===');

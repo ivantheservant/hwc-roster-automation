@@ -234,7 +234,7 @@
       a.className = 'bigLink';
       nodes.push(a);
     }
-    nodes.push(para('在試算表直接改格子，改完回來撳「儲存並確認」。'));
+    nodes.push(para('在試算表直接改格子，改完回來撳「儲存及寄出」。'));
 
     // 「還有 N 項未做」——真數字，唔係寫死。
     const pq = res.preQuarter || {};
@@ -1918,8 +1918,10 @@
       if (guard > 40) throw new Error('產生個人 PDF 的次數超出預期，已停下來避免無限重試。請重新整理再試一次。');
 
       const r = await callServerMutating('apiStep5GeneratePdfs', currentQuarterId, releaseText, sendOpts);
+      // 第七十三輪批次 BA 組：改動後重發唔設硬規則關卡，伺服器不會再回 `blocked`。
+      // 呢段只係防衛（舊版伺服器）——不指向任何一個做唔到嘅地方。
       if (r.blocked) {
-        showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，需要先在「儲存並確認」處理。'));
+        showErrorModal('改動後重發', new Error('系統沒有執行這一步，尚未寄出任何電郵。請重新整理再試一次。'));
         return;
       }
       if (r.noChanges) {
@@ -1951,8 +1953,9 @@
     }
 
     const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText, sendOpts);
+    // 第七十三輪批次 BA 組：防衛（伺服器不會再因硬規則違反回 `blocked`）
     if (result.blocked) {
-      showErrorModal('改動後重發', new Error('這一版仍然有違反規則的安排，尚未寄出任何電郵。'));
+      showErrorModal('改動後重發', new Error('系統沒有執行這一步，尚未寄出任何電郵。請重新整理再試一次。'));
       return;
     }
     const doneNodes = [

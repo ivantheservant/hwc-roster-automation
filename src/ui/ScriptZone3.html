@@ -139,7 +139,7 @@
       // ——Style.html 冇一條淨係 `.warn` 嘅規則，寫咗會完全冇效果，
       // 變成一句「應該扎眼但其實同普通字一樣」嘅警告。
       make('div', {
-        text: '現有版本不會自己變。要重新檢查，撳「儲存並確認」。',
+        text: '現有版本不會自己變。要重新檢查，撳「儲存及寄出」。',
         className: 'vio vio-warn'
       })
     ], [
@@ -312,7 +312,7 @@
       });
       box.appendChild(make('div', {
         text: '加了這一筆之後，現有的職事表不會自己改。'
-          + '要撳「儲存並確認」系統才會重新檢查。',
+          + '要撳「儲存及寄出」系統才會重新檢查。',
         className: 'vio-row'
       }));
       node.appendChild(box);
@@ -1834,7 +1834,7 @@
             para('會加入 1 行：這一段時間不排 ' + name + ' 做「' + post + '」。'),
             para('生效日：' + (fromInput.value.trim() || '（留空＝即時生效）')
               + '　解除日：' + (toInput.value.trim() || '（留空＝暫時無限期）')),
-            para('已經生成的職事表不會自己改。要撳「儲存並確認」系統才會重新檢查。', 'muted')
+            para('已經生成的職事表不會自己改。要撳「儲存及寄出」系統才會重新檢查。', 'muted')
           ],
           confirmLabel: '確定加入',
           onConfirm: () => runAction('加入中', async () => {

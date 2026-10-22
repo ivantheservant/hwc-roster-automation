@@ -50,13 +50,16 @@ function versionStateFromOriginal_(context) {
  * @returns {{versionNo: number,
  *   blank: {count: number, items: Object[], moreCount: number},
  *   released: {count: number, items: Object[], moreCount: number},
+ *   unreleased: {count: number, items: Object[], moreCount: number},
  *   error: string}}
+ *   第七十三輪批次 BA 組：`unreleased`＝**未放行**嘅硬規則違反（儲存確認嘅「真違反」同一個定義），
+ *   改動後重發／正式發出嘅確認窗用黃框提醒，**不阻擋**。
  *   `items` 最多 `SEND_WARNING_LIST_LIMIT` 項，其餘入 `moreCount`。
  *   每項：`{serviceDate, postId, postNameTC, slotIndex, personId, personName, ruleId, reason, releasedVersionNo}`
  */
 function summariseVersionSendWarnings_(quarterId, versionNo) {
   const empty = { count: 0, items: [], moreCount: 0 };
-  const out = { versionNo: versionNo, blank: empty, released: empty, error: '' };
+  const out = { versionNo: versionNo, blank: empty, released: empty, unreleased: empty, error: '' };
   if (!(versionNo >= 0)) return out;
   try {
     // 唔讀 grid（`skipGrid`）：呢度要嘅係已儲存版本，而且 grid 嗰次讀取係整個 context 最貴嘅一步。
@@ -82,8 +85,18 @@ function summariseVersionSendWarnings_(quarterId, versionNo) {
         releasedVersionNo: v.releasedVersionNo === undefined ? null : v.releasedVersionNo
       };
     });
+    // 第七十三輪批次 BA 組：未放行嘅（`classified.real`）——寄出時只提醒，不阻擋
+    const unreleased = classified.real.map(function (v) {
+      return {
+        serviceDate: v.serviceDate, postId: v.postId,
+        postNameTC: postNames[v.postId] || v.postId, slotIndex: v.slotIndex,
+        personId: v.personId || '', personName: nameOfPersonId_(context, v.personId),
+        ruleId: v.ruleId, reason: v.reason || v.ruleId
+      };
+    });
     out.blank = limitSendWarningList_(blanks);
     out.released = limitSendWarningList_(released);
+    out.unreleased = limitSendWarningList_(unreleased);
   } catch (err) {
     if (typeof log_ === 'function') {
       log_('WARN', 'summariseVersionSendWarnings_（' + quarterId + ' v' + versionNo + '）算不到：' + err.message);

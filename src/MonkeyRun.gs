@@ -323,7 +323,7 @@ function monkeyActions_() {
         // ⚠️ **儲存必定被拒絕。** 唔拒絕嘅話，一個認唔出嘅名
         // 就會靜靜噉入咗版本——而嗰個係系統最嚴厲嗰一道閘。
         if (result.blockReason !== 'UNRESOLVED_NAMES') {
-          return '寫了一個系統認不出的名字，而「儲存並確認」竟然沒有'
+          return '寫了一個系統認不出的名字，而「儲存及寄出」竟然沒有'
             + '因為 UNRESOLVED_NAMES 而擋住（blockReason='
             + (result.blockReason || '（沒有擋）') + '）。';
         }

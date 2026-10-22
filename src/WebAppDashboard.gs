@@ -320,7 +320,7 @@ function computeDashboardButtons_(s) {
     disabledReason: s.hasOfficialRecord
       ? '已經正式發出過。之後有改動請用「改動後重發」。'
       : (!officialStageOk
-        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存並確認」，這一粒才會著。'
+        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存及寄出」，這一粒才會著。'
         : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : '')),
     dynamicText: buildOfficialButtonText_(s),
     targetPersonCount: s.officialTargetCount,
@@ -470,7 +470,7 @@ function buildUnsavedBlockHint_(unsaved) {
   if (unsaved.gridChangeCount > 0) bits.push('你在表上改了 ' + unsaved.gridChangeCount + ' 格');
   if (unsaved.unresolvedCount > 0) bits.push('有 ' + unsaved.unresolvedCount + ' 格的文字系統認不出');
   if (unsaved.pendingRequestCount > 0) bits.push('有 ' + unsaved.pendingRequestCount + ' 筆修改申報未處理');
-  return bits.join('、') + '。先撳「儲存並確認」，這一粒才會著。';
+  return bits.join('、') + '。先撳「儲存及寄出」，這一粒才會著。';
 }
 
 /**
