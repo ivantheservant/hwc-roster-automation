@@ -187,10 +187,18 @@ function materialiseManualEdits_(context, changes, state, source) {
   context.original.forEach(function (a) {
     originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
   });
+  // 第七十四輪批次 BC 組：人手改動嘅格如果係自由文字（講員／翻譯／獻花，認唔到 PersonID），
+  // 名字要由 grid 文字帶落新一版，唔可以蒸發成空字串。
+  const manualTextByKey = {};
+  changes.forEach(function (c) {
+    manualTextByKey[cellKey_(c.serviceDate, c.postId, c.slotIndex)] = String(c.manualText || '').trim();
+  });
 
   const assignments = state.map(function (s) {
     const originalRow = originalByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)] || {};
     const person = context.peopleById[s.personId];
+    const manualFreeText = (!person && s.isManual)
+      ? (manualTextByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)] || '') : '';
     return {
       serviceDateId: s.serviceDateId,
       serviceDate: s.serviceDate,
@@ -219,7 +227,7 @@ function materialiseManualEdits_(context, changes, state, source) {
       //   認到人 ⇒ 用正式姓名（人手改動嘅格會行呢條）
       //   認唔到而且係人手改動 ⇒ 空（`unresolved` 已經擋住，行唔到呢度）
       //   認唔到而且**唔係**人手改動 ⇒ **原封不動搬上一版嗰個字**
-      personName: person ? person.nameTC : (s.isManual ? '' : (originalRow.personName || '')),
+      personName: person ? person.nameTC : (s.isManual ? manualFreeText : (originalRow.personName || '')),
       // ⚠️ 第三十七輪批次 A 組（第二處）：**唔可以淨係睇 `personId` 就當
       // 呢一格係 SKIPPED。**
       //
@@ -232,7 +240,7 @@ function materialiseManualEdits_(context, changes, state, source) {
       //
       // 規則：冇被人手改動嘅格，**來源原封不動搬**（唔理有冇 personId）。
       assignSource: s.isManual
-        ? (s.personId ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)
+        ? ((s.personId || manualFreeText) ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)
         : (originalRow.assignSource
           || (s.personId ? ASSIGN_SOURCE.AUTO : ASSIGN_SOURCE.SKIPPED)),
       // ─────────────────────────────────────────────────────────────

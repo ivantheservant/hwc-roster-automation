@@ -549,7 +549,17 @@
 
     // 第二十五輪批次階段 C：這一季已經正式發出過的話，改動之後要重發。
     // 後端一直都有回 officialSentHint，只係從來冇用到。
-    if (data.officialSentHint) {
+    // 第七十四輪批次 BC 組：最新一版已通知過人（`writesToSheetOnly`）⇒ 這裡填的格只寫在職事表上，
+    // 要撳第 2 步〔儲存及寄出〕才成為新一版——用專屬提示句，取代上面那句較籠統的提醒。
+    if (data.writesToSheetOnly) {
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一季已經正式發出。你在這裡改的格會先寫在職事表上；要撳第 2 步〔儲存及寄出〕才會成為新一版，'
+            + '之後用「改動後重發」通知受影響的人。',
+          className: 'warn-head'
+        })
+      ]));
+    } else if (data.officialSentHint) {
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
           text: '這一季已經正式發出，改動之後記得用「改動後重發」通知受影響的人。',
@@ -598,7 +608,10 @@
       input.name = 'hwc-person-free-text';
       box.appendChild(input);
 
-      const statusSpan = make('span', { text: '', className: 'muted' });
+      const statusSpan = make('span', {
+        text: c.sheetOnly ? '已寫在職事表，未儲存成新版本' : '',
+        className: 'muted'
+      });
       // 「有冇對上名單」嘅回饋（規格 3.3）。獨立一行，唔同 statusSpan 混埋——
       // 前者係「儲存咗未」，後者係「呢個人收唔收到通知」，兩件唔同嘅事。
       const linkNote = make('div', { text: '', className: 'muted' });
@@ -610,7 +623,9 @@
           runAction('儲存中', async () => {
             const res = await callServerMutating('apiWebSavePreacherEntry',
               currentQuarterId, c.serviceDate, c.postId, c.slotIndex, name);
-            statusSpan.textContent = '已儲存 ✓';
+            // 第七十四輪批次 BC 組：已通知過人嘅版本只寫咗工作表，唔可以寫「已儲存 ✓」令人誤會
+            statusSpan.textContent = (res && res.sheetOnly)
+              ? '已寫在職事表，未儲存成新版本' : '已儲存 ✓';
             renderLinkFeedback(linkNote, res, name, !c.optional);
           });
         }, ''),

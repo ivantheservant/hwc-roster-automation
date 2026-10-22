@@ -237,6 +237,17 @@ function buildPreQuarterChecklistInputs_(quarterId) {
         && !String(row[A.PERSON_NAME_SNAPSHOT] || '').trim()) return;
       filledByDatePost[toDateString(row[A.SERVICE_DATE], timezone) + '|' + row[A.POST_ID]] = true;
     });
+    // 第七十四輪批次 BC 組：最新一版已通知過人（正式發出／改動後重發）⇒ 〔填講員／翻譯／獻花〕只寫工作表、
+    // 未寫入 `RosterAssignments`（要撳〔儲存及寄出〕先成為新一版）。「未填」計數要把工作表上已填嘅格
+    // 一併算入，否則填完仍然顯示「未填」。未通知過嘅版本照舊只看資料層。
+    if (isVersionNoticeSent_(quarterId, versionNo)) {
+      const manualPostIds = [postIds.preacherPostId, postIds.translationPostId, postIds.flowerPostId].filter(Boolean);
+      const onSheet = readGridFilledManualCells_(quarterId, versionNo, manualPostIds, timezone);
+      Object.keys(onSheet).forEach(function (key) {
+        const parts = key.split('|');
+        filledByDatePost[parts[0] + '|' + parts[1]] = true;
+      });
+    }
   }
 
   return {

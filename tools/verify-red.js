@@ -229,7 +229,7 @@ const MUTATIONS = [
     why: '把 `materialiseManualEdits_()` 還原成「唔保留上一版嘅 PersonNameSnapshot」'
       + '——即係第三十六輪之前嘅行為：一儲存新版本，自由文字就冇咗',
     file: 'src/StateSource.gs',
-    find: "personName: person ? person.nameTC : (s.isManual ? '' : (originalRow.personName || '')),",
+    find: "personName: person ? person.nameTC : (s.isManual ? manualFreeText : (originalRow.personName || '')),",
     replace: "personName: person ? person.nameTC : '',",
     tests: ['tests/version_carry_over_all_paths.test.js']
   },
@@ -5865,6 +5865,142 @@ const MUTATIONS = [
     find: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存及寄出」，這一粒才會著。'",
     replace: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存並確認」，這一粒才會著。'",
     tests: ["tests/screen_text_wording.test.js", "tests/webapp_dashboard_state.test.js"]
+  },
+  {
+    id: "bc-save-rewrites",
+    why: "已通知過人嘅版本仍然改寫 RosterAssignments",
+    file: "src/PreacherTranslationFill.gs",
+    find: "  if (!sheetOnly) {\n    const sheet =",
+    replace: "  if (true) {\n    const sheet =",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-sent-never",
+    why: "永遠當「未通知過人」——填格工具照舊改寫已寄出嘅版本",
+    file: "src/PreacherTranslationFill.gs",
+    find: "  const sheetOnly = isVersionNoticeSent_(quarterId, versionNo);\n",
+    replace: "  const sheetOnly = false;\n",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-no-write-guard",
+    why: "工作表寫唔到嗰格仍然當成功",
+    file: "src/PreacherTranslationFill.gs",
+    find: "  if (sheetOnly && !gridCellWritten) {",
+    replace: "  if (false) {",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-failed-counts",
+    why: "寄失敗（冇人收到）都當已通知過人",
+    file: "src/SheetReader.gs",
+    find: "    return isNoticeReceivedRecord_({ status: String(row[C.STATUS] || '').trim() });",
+    replace: "    return true;",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-review-counts",
+    why: "只寄過審閱本都當已正式發出",
+    file: "src/SheetReader.gs",
+    find: "    if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND) return false;\n",
+    replace: "",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-any-version",
+    why: "唔按版本判斷（舊版寄過就當最新版都寄過）",
+    file: "src/SheetReader.gs",
+    find: "    if (Number(row[C.VERSION_NO]) !== Number(versionNo)) return false;\n",
+    replace: "",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-list-no-sheet",
+    why: "彈窗讀唔到工作表上嘅值（見到舊值／空格）",
+    file: "src/PreacherTranslationFill.gs",
+    find: "    ? readGridFilledManualCells_(quarterId, versionNo, targetPostIds, timezone) : {};",
+    replace: "    ? {} : {};",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-list-flag-off",
+    why: "彈窗資料永遠唔報 writesToSheetOnly",
+    file: "src/PreacherTranslationFill.gs",
+    find: "    writesToSheetOnly: writesToSheetOnly,",
+    replace: "    writesToSheetOnly: false,",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-preq-no-overlay",
+    why: "「開季前準備」未填計數唔計工作表上已填嘅格",
+    file: "src/WebAppPreQuarter.gs",
+    find: "    if (isVersionNoticeSent_(quarterId, versionNo)) {",
+    replace: "    if (false) {",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-overlay-skip-all",
+    why: "偵測人手改動永遠略過講員／翻譯／獻花——儲存及寄出偵測唔到",
+    file: "src/FineTune.gs",
+    find: "    if (isManualPost && !manualPostsTracked) {",
+    replace: "    if (isManualPost) {",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-overlay-track-all",
+    why: "未通知過嘅版本都偵測講員／翻譯／獻花嘅 grid 改動（改變現有行為）",
+    file: "src/FineTune.gs",
+    find: "    if (isManualPost && !manualPostsTracked) {",
+    replace: "    if (false) {",
+    tests: ["tests/grid_placeholder_roundtrip.test.js", "tests/preacher_free_text_save_confirm.test.js"]
+  },
+  {
+    id: "bc-ctx-flag-off",
+    why: "context 永遠報「未通知過人」",
+    file: "src/FineTune.gs",
+    find: "    noticeSent: isVersionNoticeSent_(quarterId, versionNo),",
+    replace: "    noticeSent: false,",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-free-unresolved",
+    why: "外請自由文字當「認不出的名」而擋住儲存",
+    file: "src/FineTune.gs",
+    find: "    if (normalizedGrid !== '' && !resolvedId && !isManualPost) {",
+    replace: "    if (normalizedGrid !== '' && !resolvedId) {",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-free-text-lost",
+    why: "新一版把自由文字名字蒸發成空字串",
+    file: "src/StateSource.gs",
+    find: "(s.isManual ? manualFreeText : (originalRow.personName || ''))",
+    replace: "(s.isManual ? '' : (originalRow.personName || ''))",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-free-text-source",
+    why: "自由文字嗰格新一版來源變 SKIPPED",
+    file: "src/StateSource.gs",
+    find: "((s.personId || manualFreeText) ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)",
+    replace: "(s.personId ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-ui-notice-off",
+    why: "彈窗唔出「已正式發出……要撳第 2 步」提示句",
+    file: "src/ui/ScriptZone2.html",
+    find: "    if (data.writesToSheetOnly) {",
+    replace: "    if (false) {",
+    tests: ["tests/fill_after_official.test.js"]
+  },
+  {
+    id: "bc-ui-status-saved",
+    why: "只寫工作表嘅格仍然顯示「已儲存 ✓」",
+    file: "src/ui/ScriptZone2.html",
+    find: "              ? '已寫在職事表，未儲存成新版本' : '已儲存 ✓';",
+    replace: "              ? '已儲存 ✓' : '已儲存 ✓';",
+    tests: ["tests/fill_after_official.test.js"]
   },
 ];
 

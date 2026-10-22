@@ -53,6 +53,9 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     timezone: timezone,
     original: original,
     gridValues: skipGrid ? {} : readGridPersonIds_(quarterId, versionNo, timezone),
+    // 第七十四輪批次 BC 組：呢一版有冇已經通知過人（正式發出／改動後重發）。已通知過人嘅版本，
+    // 講員／翻譯／獻花嘅 grid 改動先要偵測（見 `buildGridOverlayState_()`）。
+    noticeSent: isVersionNoticeSent_(quarterId, versionNo),
     // 第二十輪批次階段 A2：算「呢一格本來應該渲染成咩」要用嘅三樣嘢
     // （顯示標籤、逐崗位 EmptyDisplay、逐日期 ExternalOwner）。
     gridRender: buildGridRenderContext_(quarterId, timezone, posts),
@@ -207,6 +210,8 @@ function buildGridOverlayState_(context) {
 
   const changes = [];
   const unresolved = [];
+  // 由 `buildFineTuneContext_()` 讀 SendLog 算好放喺 context（呢個函式要保持純運算，唔可以自己讀工作表）
+  const manualPostsTracked = context.noticeSent === true;
 
   const manualState = context.original.map(function (a) {
     const key = a.serviceDate + '|' + a.postId + '|' + a.slotIndex;
@@ -245,7 +250,19 @@ function buildGridOverlayState_(context) {
     //
     // ⚠️ 判斷由 `Posts` 嘅 `AutoGenerate` 讀出嚟，**唔用崗位 ID 白名單**
     // ——崗位會增減，寫死 ID 會喺下一次加崗位嗰陣再爆一次。
-    if (context.gridRender.autoGenerateByPostId[a.postId] === false) {
+    //
+    // ⚠️ 第七十四輪批次 BC 組：**呢個「整格略過」收窄咗**——只略過「grid 同版本紀錄一致」嗰啲格，
+    // 而唔係永遠略過。原因：已通知過人嘅版本（正式發出／改動後重發）用〔填講員／翻譯／獻花〕填格，
+    // 現在只寫 grid 工作表、**唔改 `RosterAssignments`**（見 `PreacherTranslationFill.gs`），
+    // 要撳〔儲存及寄出〕先成為新一版。如果呢類崗位仍然永遠略過，grid 上嗰一格改動就偵測唔到——
+    // 第七十三輪 K1 嘅「沒有偵測到任何改動」。
+    // 一致（未通知過人嘅版本：填格工具同時寫長表同 grid）⇒ 下面「渲染再比對」自然相等，
+    // 照舊唔算改動、唔做名字解析；有差異先當人手改動。人名認唔到（外請講員等自由文字）**唔算**
+    // 「認不出」（`unresolved`），因為呢類崗位本來就容許自由文字。
+    const isManualPost = context.gridRender.autoGenerateByPostId[a.postId] === false;
+    // ⚠️ 只有「已通知過人嘅版本」先偵測呢類崗位嘅 grid 改動；未通知過嘅版本照舊整格略過
+    //（填格工具直接寫長表同 grid，唯一寫入途徑唔係 grid，不改變現有行為）。
+    if (isManualPost && !manualPostsTracked) {
       return Object.assign({}, base, { personId: a.personId, isManual: false });
     }
 
@@ -293,7 +310,7 @@ function buildGridOverlayState_(context) {
       return Object.assign({}, base, { personId: '', isManual: false });
     }
 
-    if (normalizedGrid !== '' && !resolvedId) {
+    if (normalizedGrid !== '' && !resolvedId && !isManualPost) {
       unresolved.push(Object.assign({}, base, {
         text: normalizedGrid,
         // 階段 C1：訊息要講得出「本來應該係咩」，幹事先知道自己改壞咗乜

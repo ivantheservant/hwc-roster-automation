@@ -419,3 +419,35 @@ function buildSpecialSundayByDate_(specialRows, timezone) {
     });
   return byDate;
 }
+
+/**
+ * 第七十四輪批次 BC 組：這一個版本有冇**已經通知過人**（正式發出或改動後重發）。
+ *
+ * 現場（第七十三輪 K1）：2028T3 已正式發出，〔填講員／翻譯／獻花〕仍然直接改寫已寄出那一版嘅
+ * `RosterAssignments`，結果寄出紀錄同內容對唔上，而且「只寄給安排有改動的人」拿最新版同「上次寄出的版本」
+ * 比較——兩者係同一版 ⇒ 填獻花嗰位會友永遠收唔到通知。
+ *
+ * 判斷：`SendLog` 有呢一版（`VersionNo`）嘅 `OFFICIAL` 或 `RESEND` 紀錄，而且 Status 屬「已收到」
+ * （`isNoticeReceivedRecord_()`＝SENT／DRY_RUN／SKIPPED_UNCHANGED／EXTERNAL，補寄工具同一個共用判斷，
+ * 唔另寫一套）。**按版本判斷**：已正式發出之後存成新一版（未寄）就恢復照舊直接填。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object[]=} sendLogRows 選填；唔傳就自己讀 SendLog
+ * @returns {boolean}
+ */
+function isVersionNoticeSent_(quarterId, versionNo, sendLogRows) {
+  if (!quarterId || versionNo === undefined || versionNo === null) return false;
+  const C = COLUMNS.SEND_LOG;
+  if (!sendLogRows) {
+    // 連 SendLog 工作表都未建立 ⇒ 從來冇寄過任何嘢；其他讀取失敗唔吞，照樣拋出（唔可以靜靜當成「未寄」）
+    if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SEND_LOG)) return false;
+  }
+  return (sendLogRows || readSheet(SHEETS.SEND_LOG)).some(function (row) {
+    if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return false;
+    if (Number(row[C.VERSION_NO]) !== Number(versionNo)) return false;
+    const stage = String(row[C.STAGE] || '').trim();
+    if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND) return false;
+    return isNoticeReceivedRecord_({ status: String(row[C.STATUS] || '').trim() });
+  });
+}

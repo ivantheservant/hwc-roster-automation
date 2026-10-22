@@ -293,7 +293,7 @@ console.log('\n=== A4【核心】儲存後：RosterAssignments 更新、grid 工
   checkEqual('★ 儲存前有 3 格待填', before.pending.length, 3);
 
   const result = gas.apiSavePreacherTranslationEntry('2026T4', '2026-10-04', 'PREACH', 1, '王美美');
-  checkEqual('★★ 回傳結果（自由文字，未連結 NameMapping）', result, { personId: '', linkedToNameMapping: false });
+  checkEqual('★★ 回傳結果（自由文字，未連結 NameMapping）', result, { personId: '', linkedToNameMapping: false, sheetOnly: false });
 
   const after = gas.apiListPreacherTranslationPending('2026T4');
   checkEqual('★★★ 儲存之後只剩 2 格待填（講員嗰格已經填咗）', after.pending.length, 2);

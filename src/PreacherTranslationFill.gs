@@ -67,6 +67,52 @@ function findPreacherTranslationPostIds_() {
   return { preacherPostId: preacherPostId, translationPostId: translationPostId, flowerPostId: flowerPostId };
 }
 
+/**
+ * 第七十四輪批次 BC 組：grid 文字係咪「幹事填咗人」（唔係空白、唔係佔位文字）。
+ * 佔位文字用 `GRID_PLACEHOLDER_TEXTS`、`GRID_LABELS.PENDING`、`GRID_LABELS.GAP`——同寫 grid 嗰邊同一份。
+ * @param {*} value 儲存格值
+ * @returns {boolean}
+ */
+function isGridCellFilledByPerson_(value) {
+  const text = String(value === null || value === undefined ? '' : value).trim();
+  if (!text) return false;
+  if (GRID_PLACEHOLDER_TEXTS.indexOf(text) !== -1) return false;
+  if (text === GRID_LABELS.PENDING || text === GRID_LABELS.GAP) return false;
+  return true;
+}
+
+/**
+ * 第七十四輪批次 BC 組：讀最新版本 grid 工作表上，講員／翻譯／獻花**已經有人名**嘅格子。
+ * 只喺「已通知過人嘅版本」用（呢啲格只寫咗工作表，未寫入 `RosterAssignments`，要撳
+ * 〔儲存及寄出〕先成為新一版）。純讀取；工作表唔存在 ⇒ 空物件。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string[]} postIds 要讀嘅崗位 ID
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>} `yyyy-MM-dd|postId|slotIndex` → 工作表上嘅文字
+ */
+function readGridFilledManualCells_(quarterId, versionNo, postIds, timezone) {
+  const out = {};
+  const gridSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(buildRosterSheetName_(quarterId, versionNo));
+  if (!gridSheet) return out;
+  const lastRow = gridSheet.getLastRow();
+  const lastCol = gridSheet.getLastColumn();
+  if (lastRow < 3 || lastCol < 1) return out;
+  const keys = gridSheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  const body = gridSheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  body.forEach(function (row) {
+    const date = toDateString(row[0], timezone);
+    if (!date) return;
+    keys.forEach(function (key, ci) {
+      const m = /^(.+)#(\d+)$/.exec(String(key || ''));
+      if (!m || postIds.indexOf(m[1]) === -1) return;
+      if (!isGridCellFilledByPerson_(row[ci])) return;
+      out[date + '|' + m[1] + '|' + Number(m[2])] = String(row[ci]).trim();
+    });
+  });
+  return out;
+}
+
 
 /**
  * 列出指定季度最新版本目前還空著的講員／翻譯／獻花格子。純讀取。
@@ -119,6 +165,11 @@ function apiListPreacherTranslationPending(quarterId) {
   });
 
   const targetPostIds = [ids.preacherPostId, ids.translationPostId, ids.flowerPostId].filter(Boolean);
+  // 第七十四輪批次 BC 組：已通知過人嘅版本，填咗嘅格只寫咗工作表——讀工作表上嘅值，
+  // 幹事改完再開彈窗先唔會見到舊值（空格）。
+  const writesToSheetOnly = isVersionNoticeSent_(quarterId, versionNo);
+  const sheetFilled = writesToSheetOnly
+    ? readGridFilledManualCells_(quarterId, versionNo, targetPostIds, timezone) : {};
   const pending = [];
   readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] !== quarterId) return;
@@ -132,12 +183,16 @@ function apiListPreacherTranslationPending(quarterId) {
       .indexOf(RULE_IDS.SPECIAL_SUNDAY_SKIP) !== -1) return;
 
     const serviceDate = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const sheetOnlyName = sheetFilled[serviceDate + '|' + postId + '|' + Number(row[COLUMNS.ROSTER_ASSIGNMENTS.SLOT_INDEX])] || '';
     pending.push({
       serviceDate: serviceDate,
       weekIndex: weekIndexByDate[serviceDate] || 0,
       postId: postId,
       postName: postNameById[postId] || postId,
       slotIndex: Number(row[COLUMNS.ROSTER_ASSIGNMENTS.SLOT_INDEX]),
+      // 已通知過人嘅版本：工作表上已經有人名（未儲存成新版本）——彈窗預填，狀態寫「已寫在職事表」
+      currentName: sheetOnlyName,
+      sheetOnly: !!sheetOnlyName,
       // 獻花由會友認獻、不是每週都有人——留空是正常情況，UI 據此顯示唔同嘅
       // 提示文字，唔會令幹事誤以為每一格都一定要填先算完成。
       optional: postId === ids.flowerPostId
@@ -154,6 +209,8 @@ function apiListPreacherTranslationPending(quarterId) {
     versionNo: versionNo,
     stage: getQuarterStage_(quarterId),
     officialSentHint: getQuarterStage_(quarterId) === QUARTER_STAGE.OFFICIAL_SENT,
+    // 第七十四輪批次 BC 組：最新一版已通知過人 ⇒ 填嘅格只寫工作表，要撳第 2 步〔儲存及寄出〕先成為新一版
+    writesToSheetOnly: writesToSheetOnly,
     pending: pending
   };
 }
@@ -199,41 +256,50 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
   const personId = resolvePersonId(trimmedName) || '';
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
-  // ---- 1. 更新 RosterAssignments 長表 ----
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_ASSIGNMENTS);
-  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_ASSIGNMENTS);
-  const lastRow = sheet.getLastRow();
-  const lastCol = sheet.getLastColumn();
-  const headers = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-  const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const colIndex = {};
-  headers.forEach(function (h, i) { colIndex[h] = i + 1; });
+  // ⚠️ 第七十四輪批次 BC 組：最新一版**已經通知過人**（正式發出／改動後重發）⇒ 唔可以改寫佢嘅
+  // `RosterAssignments`（寄出紀錄同內容會對唔上，而且「只寄給安排有改動的人」比較嘅兩版變成同一版，
+  // 填嗰位會友永遠收唔到通知）。改為**只寫 grid 工作表嗰一格**，等同幹事喺表上親手改；
+  // 之後撳第 2 步〔儲存及寄出〕偵測到呢一格改動，成為新一版，再用「改動後重發」通知。
+  // 未通知過嘅版本（初稿、只寄過審閱本）照舊直接改。
+  const sheetOnly = isVersionNoticeSent_(quarterId, versionNo);
 
-  const values = lastRow >= 3 ? sheet.getRange(3, 1, lastRow - 2, lastCol).getValues() : [];
-  let targetSheetRow = -1;
-  for (let i = 0; i < values.length; i++) {
-    const row = values[i];
-    if (row[colIndex[C.QUARTER_ID] - 1] !== quarterId) continue;
-    if (Number(row[colIndex[C.VERSION_NO] - 1]) !== versionNo) continue;
-    if (toDateString(row[colIndex[C.SERVICE_DATE] - 1], timezone) !== serviceDate) continue;
-    if (row[colIndex[C.POST_ID] - 1] !== postId) continue;
-    if (Number(row[colIndex[C.SLOT_INDEX] - 1]) !== Number(slotIndex)) continue;
-    targetSheetRow = i + 3;
-    break;
-  }
-  if (targetSheetRow === -1) {
-    throw new Error('在 RosterAssignments 找不到對應的格子（' + serviceDate + ' ' + postId + '#' + slotIndex + '），'
-      + '可能版本已經改變，請重新整理側邊欄。');
-  }
+  // ---- 1. 更新 RosterAssignments 長表（已通知過人嘅版本唔做）----
+  if (!sheetOnly) {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_ASSIGNMENTS);
+    if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_ASSIGNMENTS);
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+    const C = COLUMNS.ROSTER_ASSIGNMENTS;
+    const colIndex = {};
+    headers.forEach(function (h, i) { colIndex[h] = i + 1; });
 
-  if (colIndex[C.PERSON_ID]) sheet.getRange(targetSheetRow, colIndex[C.PERSON_ID]).setValue(personId);
-  if (colIndex[C.PERSON_NAME_SNAPSHOT]) sheet.getRange(targetSheetRow, colIndex[C.PERSON_NAME_SNAPSHOT]).setValue(trimmedName);
-  if (colIndex[C.ASSIGN_SOURCE]) sheet.getRange(targetSheetRow, colIndex[C.ASSIGN_SOURCE]).setValue(ASSIGN_SOURCE.MANUAL);
-  if (colIndex[C.UPDATED_AT]) {
-    sheet.getRange(targetSheetRow, colIndex[C.UPDATED_AT]).setValue(nowTimestamp_());
-    applyTimestampFormat_(sheet, headers, [C.UPDATED_AT], targetSheetRow, 1);
+    const values = lastRow >= 3 ? sheet.getRange(3, 1, lastRow - 2, lastCol).getValues() : [];
+    let targetSheetRow = -1;
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      if (row[colIndex[C.QUARTER_ID] - 1] !== quarterId) continue;
+      if (Number(row[colIndex[C.VERSION_NO] - 1]) !== versionNo) continue;
+      if (toDateString(row[colIndex[C.SERVICE_DATE] - 1], timezone) !== serviceDate) continue;
+      if (row[colIndex[C.POST_ID] - 1] !== postId) continue;
+      if (Number(row[colIndex[C.SLOT_INDEX] - 1]) !== Number(slotIndex)) continue;
+      targetSheetRow = i + 3;
+      break;
+    }
+    if (targetSheetRow === -1) {
+      throw new Error('在 RosterAssignments 找不到對應的格子（' + serviceDate + ' ' + postId + '#' + slotIndex + '），'
+        + '可能版本已經改變，請重新整理側邊欄。');
+    }
+
+    if (colIndex[C.PERSON_ID]) sheet.getRange(targetSheetRow, colIndex[C.PERSON_ID]).setValue(personId);
+    if (colIndex[C.PERSON_NAME_SNAPSHOT]) sheet.getRange(targetSheetRow, colIndex[C.PERSON_NAME_SNAPSHOT]).setValue(trimmedName);
+    if (colIndex[C.ASSIGN_SOURCE]) sheet.getRange(targetSheetRow, colIndex[C.ASSIGN_SOURCE]).setValue(ASSIGN_SOURCE.MANUAL);
+    if (colIndex[C.UPDATED_AT]) {
+      sheet.getRange(targetSheetRow, colIndex[C.UPDATED_AT]).setValue(nowTimestamp_());
+      applyTimestampFormat_(sheet, headers, [C.UPDATED_AT], targetSheetRow, 1);
+    }
+    if (colIndex[C.UPDATED_BY]) sheet.getRange(targetSheetRow, colIndex[C.UPDATED_BY]).setValue(Session.getActiveUser().getEmail());
   }
-  if (colIndex[C.UPDATED_BY]) sheet.getRange(targetSheetRow, colIndex[C.UPDATED_BY]).setValue(Session.getActiveUser().getEmail());
 
   // ---- 2. 更新 grid 工作表對應儲存格：填入姓名、清掉「待人手填寫」的底色與備註 ----
   // ⚠️ 第十五輪批次階段 A3：講員／翻譯／獻花一定係喺 v0 剛生成之後就要填，
@@ -246,6 +312,7 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
   const gridSheetName = buildRosterSheetName_(quarterId, versionNo);
   const gridSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(gridSheetName);
   let wasProtected = false;
+  let gridCellWritten = false;
   if (gridSheet) {
     wasProtected = writeToPossiblyProtectedGridSheet_(gridSheet, function () {
       const gridLastRow = gridSheet.getLastRow();
@@ -262,8 +329,14 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
         range.setValue(trimmedName);
         range.setBackground(null);
         range.setNote('');
+        gridCellWritten = true;
       }
     });
+  }
+  // 已通知過人嘅版本：工作表嗰一格係**唯一**寫入嘅地方，寫唔到就要講，唔可以靜靜當成功
+  if (sheetOnly && !gridCellWritten) {
+    throw new Error('在職事表工作表（' + gridSheetName + '）找不到這一格（' + serviceDate + ' ' + postId + '#' + slotIndex + '），'
+      + '沒有寫入任何東西。請重新整理再試一次。');
   }
 
   // ---- 3. AuditLog ----
@@ -275,10 +348,11 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
     newValue: trimmedName,
     source: 'runOpenPreacherTranslationFill_',
     notes: (personId ? '已連結 NameMapping PersonID=' + personId : '文字快照，未連結 NameMapping')
+      + (sheetOnly ? '（這一版已通知過人：只寫了職事表工作表，沒有寫入 RosterAssignments；要撳〔儲存及寄出〕才成為新一版）' : '')
       + (wasProtected ? '（grid 工作表受保護，已暫時解除並用原設定重新保護）' : '')
   });
 
-  return { personId: personId, linkedToNameMapping: !!personId };
+  return { personId: personId, linkedToNameMapping: !!personId, sheetOnly: sheetOnly };
 }
 
 /**
