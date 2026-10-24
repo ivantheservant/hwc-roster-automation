@@ -6002,6 +6002,22 @@ const MUTATIONS = [
     replace: "              ? '已儲存 ✓' : '已儲存 ✓';",
     tests: ["tests/fill_after_official.test.js"]
   },
+  {
+    id: "cn-import-back",
+    why: "第 1 步還原〔用「匯入」〕掣",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    // 匯入功能只留喺「進階與診斷 ▸ 匯入人手編好的職事表」。\n    return card;",
+    replace: "    card.querySelector('.step-body').appendChild(make('div', { className: 'row' }, [\n      make('span', { text: '已經用舊方法排好？', className: 'muted' }),\n      button('用「匯入」', () => openImportRoster(), 'secondary')\n    ]));\n    return card;",
+    tests: ["tests/round75_cn_no_import_step1.test.js"]
+  },
+  {
+    id: "cn-zone4-import-gone",
+    why: "連進階與診斷嘅「檢查並匯入」都拿走（功能唔見咗）",
+    file: "src/ui/ScriptZone4.html",
+    find: "      zone4Row('檢查並匯入',",
+    replace: "      zone4Row('檢查匯入（停用）',",
+    tests: ["tests/round75_cn_no_import_step1.test.js"]
+  }
 ];
 
 /**

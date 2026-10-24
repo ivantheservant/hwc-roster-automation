@@ -204,13 +204,9 @@
       acts: acts,
       extra: renderPermanentLink(flow)
     });
-    // 第六十七輪批次 AF 組：仲未有版本 ⇒ 提一句「已經用舊方法排好？」，直接帶去匯入
-    if (!t.alreadyGenerated) {
-      card.querySelector('.step-body').appendChild(make('div', { className: 'row' }, [
-        make('span', { text: '已經用舊方法排好？', className: 'muted' }),
-        button('用「匯入」', () => openImportRoster(), 'secondary')
-      ]));
-    }
+    // 第七十五輪批次 CN 組：第六十七輪 AF 組加嘅「已經用舊方法排好？〔用「匯入」〕」拿走。
+    // Ivan 實測：生成前後撳落去都只係開「檢查匯入表：填了 0 格」，以為係匯入 Excel／PDF。
+    // 匯入功能只留喺「進階與診斷 ▸ 匯入人手編好的職事表」。
     return card;
   }
 
