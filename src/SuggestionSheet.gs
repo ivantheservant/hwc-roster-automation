@@ -1070,7 +1070,8 @@ function apiAcceptSuggestion_locked_(quarterId) {
   // 傳漏一個就會把說明寫落「有冇保護」嗰一欄，而畫面睇落完全正常。
   registerVersion(
     quarterId, created.versionNo, created.sheetName,
-    VERSION_VALUES.BASIS_FINE_TUNE, versionNo, 0, false,
+    // 第七十五輪批次 CH 組：版本下拉要分得出「系統調整」同「人手調整後」
+    VERSION_VALUES.BASIS_SUGGESTION, versionNo, 0, false,
     '接受系統建議版本：' + resolved.changes.length + ' 格');
 
   // ⚠️ 建議表一定要清走。留著的話會積落一堆 `_建議`，

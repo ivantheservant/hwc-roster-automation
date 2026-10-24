@@ -1603,6 +1603,8 @@ const VERSION_VALUES = {
   // 第六十七輪批次 AF 組：由人手編好嘅職事表匯入（`RosterImport.gs`）。
   // 版本說明文字見 `VERSION_BASIS_LABELS`（WebAppDashboard.gs）。
   BASIS_IMPORT: 'IMPORT',
+  // 第七十五輪批次 CH 組：接受〔請系統幫我調整〕嘅建議表（之前寫 FINE_TUNE，版本下拉分唔出）
+  BASIS_SUGGESTION: 'SUGGESTION',
   STATUS_DRAFT: 'DRAFT'
 };
 

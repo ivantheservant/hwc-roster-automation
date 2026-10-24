@@ -416,6 +416,7 @@
     const sheetUrl = d.latestVersion && d.latestVersion.sheetUrl;
     const suggestion = (flow && flow.suggestion) || {};
 
+    let openNode;
     if (sheetUrl) {
       const open = make('a', { text: '查看／修改職事表', className: 'bigLink' });
       open.href = sheetUrl;
@@ -423,13 +424,15 @@
       open.rel = 'noopener';
       open.style.fontSize = 'var(--fs-lg)';
       open.style.padding = '12px 22px';
-      acts.push(open);
+      openNode = open;
     } else {
-      acts.push(stepButton('查看／修改職事表', () => {}, {
+      openNode = stepButton('查看／修改職事表', () => {}, {
         disabled: true,
         title: d.latestVersion ? '開不到那一張工作表。' : '要先在第 1 步生成職事表。'
-      }));
+      });
     }
+    // 第七十五輪批次 CH 組：版本下拉（預設＝最新一版）。揀最新 ⇒ 照舊；揀舊版本 ⇒〔查看這一版〕〔用這一版作起點〕
+    acts.push((d.versionChoices || []).length > 0 ? buildVersionPicker(d.versionChoices, openNode) : openNode);
 
     // ── 第四十一輪批次 B 組：兩粒新掣 ───────────────────────────
     //
@@ -467,19 +470,7 @@
       title: save.enabled ? '' : (save.disabledReason || '')
     }));
 
-    // ⚠️ 第四十三輪批次 H 組：第五粒——〔回到上一個儲存版本〕。
-    //
-    // Ivan：「幹事最常做嘅就係『我改壞咗，還原』。」
-    // 「進階與診斷」嗰粒要佢揀版本；呢一粒直接回上一版。
-    // 走嘅係**同一條路**（同一個預覽同確認），只係目標由系統揀。
-    const hasPrevious = !!(d.latestVersion && Number(d.latestVersion.versionNo) > 0);
-    acts.push(stepButton('回到上一個儲存版本', openRollbackToPrevious, {
-      disabled: !hasPrevious,
-      className: 'secondary',
-      title: hasPrevious
-        ? ''
-        : '這一季只有一個版本，沒有「上一個」可以回去。'
-    }));
+    // 第七十五輪批次 CH 組：〔回到上一個儲存版本〕拿走——上面嘅版本下拉〔用這一版作起點〕取代佢。
 
     // 第七十五輪批次 CA／CI 組：〔排表偏好〕由「名單維護」搬到第 2 步（Ivan：改完偏好想即刻用）。
     acts.push(stepButton('排表偏好', () => openWeights(), { className: 'secondary' }));
@@ -539,6 +530,107 @@
     }
 
     return card;
+  }
+
+  /* ── 第七十五輪批次 CH 組：版本下拉 ────────────────────────────
+   *
+   * 揀咗邊一版要記住（主畫面每次重新整理都會重畫），換季度就返去最新一版。
+   * 〔用這一版作起點〕唔會即刻建立新版本：只係把嗰一版寫入最新嗰張可以改嘅工作表，
+   * 撳〔儲存〕先成為新一版（來源「以第 M 版作起點」）。舊版本一律唔改唔刪。
+   */
+  let pickedVersionNo_ = null;
+  let pickedVersionQuarter_ = '';
+
+  function buildVersionPicker(choices, openNode) {
+    if (pickedVersionQuarter_ !== currentQuarterId) {
+      pickedVersionNo_ = null;
+      pickedVersionQuarter_ = currentQuarterId;
+    }
+    const wrap = make('span', { className: 'version-picker' });
+    const slot = make('span', { className: 'version-picker-acts' });
+    const select = document.createElement('select');
+    select.title = '版本';
+    choices.forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = String(v.versionNo);
+      opt.textContent = v.label + (v.isLatest ? '（最新）' : '');
+      select.appendChild(opt);
+    });
+    const latest = choices.filter((v) => v.isLatest)[0] || choices[0];
+    const keep = choices.filter((v) => v.versionNo === pickedVersionNo_ && !v.isLatest)[0];
+    select.value = String((keep || latest).versionNo);
+    const paint = () => {
+      clear(slot);
+      const no = Number(select.value);
+      const chosen = choices.filter((v) => v.versionNo === no)[0];
+      if (!chosen || chosen.isLatest) {
+        pickedVersionNo_ = null;
+        slot.appendChild(openNode);
+        return;
+      }
+      pickedVersionNo_ = no;
+      slot.appendChild(buildViewVersionLink(chosen));
+      slot.appendChild(stepButton('用這一版作起點', () => openUseVersionAsStartPoint(chosen), {
+        className: 'secondary',
+        title: '把第 ' + no + ' 版的內容寫入最新那一張職事表，之後撳〔儲存〕成為新一版。'
+      }));
+    };
+    select.addEventListener('change', paint);
+    wrap.appendChild(select);
+    wrap.appendChild(slot);
+    paint();
+    return wrap;
+  }
+
+  /** 〔查看這一版〕：新分頁開嗰一版工作表；同時叫後端確保佢係唯讀（未有保護就加）。 */
+  function buildViewVersionLink(v) {
+    if (!v.sheetUrl) {
+      return stepButton('查看這一版', () => {}, {
+        disabled: true, title: '找不到第 ' + v.versionNo + ' 版的工作表。'
+      });
+    }
+    const a = make('a', { text: '查看這一版', className: 'bigLink' });
+    a.href = v.sheetUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.addEventListener('click', () => {
+      // ⚠️ 會加保護（寫入）⇒ 用 callServerMutating
+      callServerMutating('apiOpenVersionForViewing', currentQuarterId, v.versionNo)
+        .catch((err) => setStatus('第 ' + v.versionNo + ' 版未能設成唯讀：' + ((err && err.message) || err), true));
+    });
+    return a;
+  }
+
+  function openUseVersionAsStartPoint(v) {
+    openConfirm({
+      title: '用第 ' + v.versionNo + ' 版作起點',
+      bodyNodes: [
+        para('現在的職事表上未儲存的改動會被這一版的內容蓋過，舊版本不會改變。'),
+        para('寫入之後你可以再改；撳〔儲存〕才會成為新一版（來源寫「以第 ' + v.versionNo + ' 版作起點」）。', 'muted')
+      ],
+      confirmLabel: '確定',
+      cancelLabel: '取消',
+      onConfirm: () => {
+        closeModal();
+        runAction('寫入第 ' + v.versionNo + ' 版的內容', async () => {
+          const r = await callServerMutating('apiUseVersionAsStartPoint', currentQuarterId, v.versionNo);
+          pickedVersionNo_ = null;
+          const link = make('a', { text: '開啟職事表', className: 'sheetlink' });
+          link.href = r.sheetUrl || '';
+          link.target = '_blank';
+          link.rel = 'noopener';
+          openModal('已用第 ' + r.targetVersionNo + ' 版作起點', [
+            make('div', {
+              text: '已把第 ' + r.targetVersionNo + ' 版寫入最新那一張職事表：' + r.cellCount + ' 格'
+                + (r.titleCount > 0 ? '、每週標題 ' + r.titleCount + ' 週' : '') + '。',
+              className: 'ok-line'
+            }),
+            para('還未儲存。看過或再改之後，撳〔儲存〕成為新一版。舊版本沒有改變。', 'muted'),
+            r.sheetUrl ? link : para('')
+          ], [button('知道了', () => closeModalAndRefresh(), '')]);
+        });
+      }
+    });
   }
 
   /* ── 名單下拉選單：第四十一輪批次 A 組起全自動 ────────────────

@@ -14,7 +14,7 @@
   function renderZone4(d) {
     const body = clear(el('zone4Body'));
 
-    body.appendChild(renderRollbackEntry());
+    // 第七十五輪批次 CH 組：〔回到上一個版本〕拿走——第 2 步嘅版本下拉〔用這一版作起點〕取代佢。
     // 第二十六輪批次階段 A2-4：掣 2 嘅錯誤訊息會指去呢度，所以一定要有。
     body.appendChild(renderRepublishEntry(d));
 
@@ -490,7 +490,7 @@
         make('div', { className: 'sec' }, [
           sectionTitle('會做的事：'),
           make('div', { text: '・重新排整季，建立一個新版本', className: 'vio-row' }),
-          make('div', { text: '・舊版本原封不動保留，可以用「回到上一個版本」', className: 'vio-row' }),
+          make('div', { text: '・舊版本原封不動保留，可以在第 2 步的版本下拉選回來作起點', className: 'vio-row' }),
           sectionTitle('不會做的事：'),
           make('div', { text: '・不會寄出任何電郵', className: 'vio-row' }),
           make('div', { text: '・不會刪走任何舊版本', className: 'vio-row' })

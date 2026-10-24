@@ -112,7 +112,9 @@ const VERSION_BASIS_LABELS = {
   RESEND: '改動後重發時建立',
   VERSION_ROLLBACK: '回到舊版本',
   // 第六十七輪批次 AF 組
-  IMPORT: '由人手職事表匯入'
+  IMPORT: '由人手職事表匯入',
+  // 第七十五輪批次 CH 組（「以第 M 版作起點」本身係中文，照用，見下面）
+  SUGGESTION: '系統調整'
 };
 
 /**
@@ -528,6 +530,15 @@ function buildDashboardState_(quarterId) {
       sheetUrl: row ? buildGridSheetUrl_(row[V.SHEET_NAME]) : ''
     };
   }
+  // 第七十五輪批次 CH 組：第 2 步嘅版本下拉（讀唔到唔可以令主畫面出唔到）
+  let versionChoices = [];
+  if (versionExists) {
+    try {
+      versionChoices = listQuarterVersionChoices_(quarterId, timezone);
+    } catch (err) {
+      log_('WARN', 'buildDashboardState_ 讀不到版本清單：' + err.message);
+    }
+  }
 
   // ── 未儲存改動（三者任一，規格 2.2）─────────────────────────
   const unsaved = readDashboardUnsavedState_(quarterId, versionNo);
@@ -605,6 +616,7 @@ function buildDashboardState_(quarterId) {
     statusText: buildDashboardStatusText_(stage, versionExists, generateOnText,
       readDashboardStatusExtras_(quarterId, versionNo, stage, versionExists)),
     latestVersion: latestVersion,
+    versionChoices: versionChoices,
     isDryRun: isDryRun,
     // 第四十一輪批次 H 組：轉寄測試地址有值嗰陣，介面頂部要有一個標籤。
     // **唔可以靜靜生效**——佢最壞嘅失敗方式係「唔記得閂」，

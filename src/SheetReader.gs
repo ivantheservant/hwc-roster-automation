@@ -954,3 +954,46 @@ function publicDecisionItem_(item) {
   Object.keys(item).forEach(function (k) { if (k !== 'violation') out[k] = item[k]; });
   return out;
 }
+
+/* 第七十五輪批次 CH 組：〔用這一版作起點〕嘅 AuditLog 標記（寫：`WebAppRollback.gs`；讀：儲存）。 */
+/** AuditLog「以舊版本作起點」標記嘅 action。TargetKey＝季度、OldValue＝寫入時最新版本號、NewValue＝起點版本號。 */
+const VERSION_START_POINT_ACTION = 'VERSION_START_POINT';
+
+/**
+ * 儲存嗰陣：最新一版（`baseVersionNo`）之上有冇「以第 M 版作起點」。
+ * 只認**最後一個**而且係喺 `baseVersionNo` 之上寫嘅標記——之後有任何新版本，
+ * 基準版本號就唔同，舊標記自然唔再算。
+ * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {string} quarterId 季度 ID
+ * @param {number} baseVersionNo 儲存時嘅基準版本
+ * @returns {?number} 起點版本號；冇就 null
+ */
+function findStartPointForSave_(auditRows, quarterId, baseVersionNo) {
+  const C = COLUMNS.AUDIT_LOG;
+  let found = null;
+  (auditRows || []).forEach(function (r) {
+    if (String(r[C.ACTION] || '') !== VERSION_START_POINT_ACTION) return;
+    if (String(r[C.TARGET_KEY] || '').trim() !== quarterId) return;
+    if (Number(r[C.OLD_VALUE]) !== Number(baseVersionNo)) return;
+    const m = Number(r[C.NEW_VALUE]);
+    if (!isNaN(m)) found = m;
+  });
+  return found;
+}
+
+/**
+ * 儲存用嘅來源文字：有起點 ⇒「以第 M 版作起點」；冇 ⇒ null（照用 `BASIS_FINE_TUNE`）。
+ * 讀唔到 AuditLog 唔可以令儲存失敗 ⇒ WARN、當冇。
+ * @param {string} quarterId 季度 ID
+ * @param {number} baseVersionNo 基準版本
+ * @returns {?string}
+ */
+function readStartPointBasisForSave_(quarterId, baseVersionNo) {
+  try {
+    const m = findStartPointForSave_(readSheet(SHEETS.AUDIT_LOG), quarterId, baseVersionNo);
+    return m === null ? null : '以第 ' + m + ' 版作起點';
+  } catch (err) {
+    log_('WARN', 'readStartPointBasisForSave_ 讀不到 AuditLog：' + err.message);
+    return null;
+  }
+}

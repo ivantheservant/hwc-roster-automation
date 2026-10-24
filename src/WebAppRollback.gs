@@ -366,3 +366,352 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
       : ''
   };
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十五輪批次 CH 組：第 2 步嘅版本下拉（Ivan 已決定做法）
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 取代〔回到上一個儲存版本〕同「進階與診斷 ▸ 回到上一個版本」：
+ *   ・揀最新一版 ⇒ 照舊（〔查看／修改職事表〕開可以改嘅工作表）
+ *   ・揀舊版本 ⇒〔查看這一版〕（新分頁、唯讀）／〔用這一版作起點〕
+ *
+ * 〔用這一版作起點〕**唔會即刻建立新版本**：只係把嗰一版嘅格子同每週標題
+ * 按機器鍵寫入最新嗰張可以改嘅工作表，之後幹事可以再改，撳〔儲存〕先成為新一版。
+ * 所以「人手改動偵測」（`buildGridOverlayState_()`）自然會見到嗰啲格，
+ * 唔使另一條儲存路。新一版嘅來源寫「以第 M 版作起點」——靠下面嗰個 AuditLog 標記。
+ * 標記同儲存嗰陣讀標記嘅函式喺 `SheetReader.gs`（儲存嗰邊一定載入）。
+ * 舊版本一律唔改唔刪。上面嘅 `apiRollbackPlan()`／`apiRollbackExecute()` 留低（自我測試、亂行機仲用）。
+ */
+
+/**
+ * 一個版本嘅來源（人話）。
+ * @param {Object} row `RosterVersions` 一行
+ * @returns {string}
+ */
+function describeVersionSource_(row) {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  const basis = String(row[V.BASIS] === null || row[V.BASIS] === undefined ? '' : row[V.BASIS]).trim();
+  const parent = String(row[V.PARENT_VERSION_NO] === null || row[V.PARENT_VERSION_NO] === undefined
+    ? '' : row[V.PARENT_VERSION_NO]).trim();
+  // 生成時已經有舊版本 ⇒ 重新生成（`MultiRun.gs` 寫 ParentVersionNo＝上一版）
+  if (basis === VERSION_VALUES.BASIS_AUTO_GENERATE && parent !== '') return '重新生成';
+  return buildVersionBasisText_(basis);
+}
+
+/**
+ * 「由誰」：`EmailRecipients.DisplayName` → `NameMapping.NameTC` → 電郵 @ 前面部分。
+ * 兩張表各讀一次。讀唔到就淨係用電郵 @ 前面。
+ * @returns {function(string): string}
+ */
+function buildVersionAuthorResolver_() {
+  const byEmail = {};
+  const add = function (email, name) {
+    const e = String(email || '').trim().toLowerCase();
+    const n = String(name || '').trim();
+    if (e && n && !byEmail[e]) byEmail[e] = n;
+  };
+  try {
+    const R = COLUMNS.EMAIL_RECIPIENTS;
+    readSheet(SHEETS.EMAIL_RECIPIENTS).forEach(function (r) { add(r[R.EMAIL], r[R.DISPLAY_NAME]); });
+  } catch (err) {
+    log_('WARN', 'buildVersionAuthorResolver_ 讀不到 EmailRecipients：' + err.message);
+  }
+  try {
+    const N = COLUMNS.NAME_MAPPING;
+    readSheet(SHEETS.NAME_MAPPING).forEach(function (r) { add(r[N.EMAIL], r[N.NAME_TC]); });
+  } catch (err) {
+    log_('WARN', 'buildVersionAuthorResolver_ 讀不到 NameMapping：' + err.message);
+  }
+  return function (email) {
+    const e = String(email || '').trim();
+    if (!e) return '';
+    if (byEmail[e.toLowerCase()]) return byEmail[e.toLowerCase()];
+    const at = e.indexOf('@');
+    return at > 0 ? e.slice(0, at) : e;
+  };
+}
+
+/**
+ * 呢一季全部版本（新到舊），畀第 2 步嘅版本下拉用。
+ * 每項 `label`＝「第 N 版　yyyy-MM-dd HH:mm　來源　由誰」。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object[]}
+ */
+function listQuarterVersionChoices_(quarterId, timezone) {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  const latestVersionNo = findLatestVersionNo(quarterId);
+  const authorOf = buildVersionAuthorResolver_();
+  return readSheet(SHEETS.ROSTER_VERSIONS)
+    .filter(function (row) { return String(row[V.QUARTER_ID] || '').trim() === quarterId; })
+    .map(function (row) {
+      const versionNo = Number(row[V.VERSION_NO]);
+      const at = normalizeSentAt_(row[V.CREATED_AT], timezone);
+      const createdAtText = at ? at.text : '';
+      const sourceText = describeVersionSource_(row);
+      const byText = authorOf(row[V.CREATED_BY]);
+      return {
+        versionNo: versionNo,
+        createdAtText: createdAtText,
+        sourceText: sourceText,
+        byText: byText,
+        isLatest: versionNo === latestVersionNo,
+        sheetUrl: buildGridSheetUrl_(String(row[V.SHEET_NAME] || '').trim()),
+        label: ['第 ' + versionNo + ' 版', createdAtText, sourceText, byText]
+          .filter(function (s) { return s !== ''; }).join('　')
+      };
+    })
+    .filter(function (v) { return !isNaN(v.versionNo); })
+    .sort(function (a, b) { return b.versionNo - a.versionNo; });
+}
+
+/**
+ * 搵一個版本嘅 `RosterVersions` 行同工作表。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {{row: Object, sheetName: string}}
+ */
+function findVersionRowForPicker_(quarterId, versionNo) {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  const row = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+    return String(r[V.QUARTER_ID] || '').trim() === quarterId && Number(r[V.VERSION_NO]) === versionNo;
+  })[0];
+  if (!row) {
+    throw new Error(buildThreePartMessage_(
+      '找不到這一季的第 ' + versionNo + ' 版。',
+      '職事表沒有任何改動。',
+      ['撳頁頂〔重新整理〕再選一次']));
+  }
+  const sheetName = String(row[V.SHEET_NAME] || '').trim() || buildRosterSheetName_(quarterId, versionNo);
+  return { row: row, sheetName: sheetName };
+}
+
+/**
+ * 一個版本**儲存嗰陣**嘅每週標題（「類型」欄應該顯示乜）。
+ *
+ * ⚠️ 唔可以讀嗰一版嘅工作表：幹事係喺嗰張表上改完先儲存成下一版，
+ * 所以舊版本工作表上面嘅字其實係**下一版**嘅內容。標題唔係逐版存，
+ * 於是由 AuditLog 推返出嚟（AuditLog 只會加、唔會改，行嘅次序就係時間次序）：
+ *   第 M 版「建立新版本」嗰行之後，每個日期**第一筆** `WEEK_TITLE_CHANGED` 嘅 OldValue
+ *   ＝ 嗰陣（亦即第 M 版）顯示緊嘅字；之後冇改過 ⇒ 同而家一樣。
+ * 搵唔到第 M 版「建立新版本」嗰行（例如好舊嘅資料）⇒ 用而家嘅標題，記 WARN。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object} renderContext `buildGridRenderContext_()`（要有 `typeTextByDate`）
+ * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @returns {Object.<string, string>} 日期 → 標題文字
+ */
+function readVersionWeekTitles_(quarterId, versionNo, renderContext, auditRows) {
+  const C = COLUMNS.AUDIT_LOG;
+  const out = {};
+  const current = renderContext.typeTextByDate || {};
+  Object.keys(current).forEach(function (d) { out[d] = current[d]; });
+  const rows = auditRows || [];
+  let createdAt = -1;
+  rows.forEach(function (r, i) {
+    if (String(r[C.ACTION] || '') === '建立新版本'
+      && String(r[C.TARGET_KEY] || '').trim() === quarterId + '-v' + versionNo) createdAt = i;
+  });
+  if (createdAt === -1) {
+    log_('WARN', 'readVersionWeekTitles_ 找不到第 ' + versionNo + ' 版的建立紀錄，每週標題用現在的');
+    return out;
+  }
+  const seen = {};
+  for (let i = createdAt + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (String(r[C.ACTION] || '') !== 'WEEK_TITLE_CHANGED') continue;
+    const key = String(r[C.TARGET_KEY] || '').trim();
+    if (key.indexOf(quarterId + '|') !== 0) continue;
+    const d = key.slice(quarterId.length + 1);
+    if (seen[d] || !Object.prototype.hasOwnProperty.call(out, d)) continue;
+    seen[d] = true;
+    out[d] = String(r[C.OLD_VALUE] === null || r[C.OLD_VALUE] === undefined ? '' : r[C.OLD_VALUE]).trim();
+  }
+  return out;
+}
+
+/**
+ * 把第 `sourceVersionNo` 版**儲存咗嘅內容**（`RosterAssignments`＋每週標題）按機器鍵寫入一張工作表。
+ * 只寫內容唔同嘅格；只寫有改嘅行（資料行冇公式，見 `createRosterSheet()`）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} sourceVersionNo 內容來源版本
+ * @param {Object} sheet 要寫入嘅工作表
+ * @param {string} timezone 時區
+ * @returns {{cellCount: number, titleCount: number}}
+ */
+function writeVersionContentIntoSheet_(quarterId, sourceVersionNo, sheet, timezone) {
+  const sourceRows = readVersionAssignmentsForGrid_(quarterId, sourceVersionNo);
+  if (sourceRows.length === 0) {
+    throw new Error(buildThreePartMessage_(
+      '第 ' + sourceVersionNo + ' 版在系統內部沒有任何派工紀錄。',
+      '職事表沒有任何改動。',
+      ['選另一個版本']));
+  }
+  const renderContext = buildGridRenderContext_(quarterId, timezone);
+  let auditRows = [];
+  try {
+    auditRows = readSheet(SHEETS.AUDIT_LOG);
+  } catch (err) {
+    log_('WARN', 'writeVersionContentIntoSheet_ 讀不到 AuditLog（每週標題用現在的）：' + err.message);
+  }
+  const titles = readVersionWeekTitles_(quarterId, sourceVersionNo, renderContext, auditRows);
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 3) throw new Error('工作表沒有內容：' + sheet.getName());
+  const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(function (k) { return String(k || '').trim(); });
+  const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  const colByKey = {};
+  keys.forEach(function (k, i) { if (k.indexOf('#') !== -1) colByKey[k] = i; });
+  // ⚠️ 用第 2 行機器鍵認欄，唔靠位置估
+  const typeCol = keys[WEEK_TITLE_GRID_COLUMN - 1] === GRID_KEYS.TYPE ? WEEK_TITLE_GRID_COLUMN - 1 : -1;
+  const rowByDate = {};
+  values.forEach(function (r, i) {
+    const d = toDateString(r[0], timezone);
+    if (d && rowByDate[d] === undefined) rowByDate[d] = i;
+  });
+
+  const changedRows = {};
+  let cellCount = 0;
+  let titleCount = 0;
+  const setCell = function (ri, ci, text) {
+    const now = String(values[ri][ci] === null || values[ri][ci] === undefined ? '' : values[ri][ci]).trim();
+    if (now === String(text).trim()) return false;
+    values[ri][ci] = text;
+    changedRows[ri] = true;
+    return true;
+  };
+  sourceRows.forEach(function (a) {
+    const ri = rowByDate[a.serviceDate];
+    const ci = colByKey[a.postId + '#' + a.slotIndex];
+    if (ri === undefined || ci === undefined) return;
+    if (setCell(ri, ci, renderExpectedGridText_(a, a.postId, a.serviceDate, renderContext))) cellCount++;
+  });
+  if (typeCol !== -1) {
+    Object.keys(titles).forEach(function (d) {
+      const ri = rowByDate[d];
+      if (ri === undefined) return;
+      if (setCell(ri, typeCol, titles[d])) titleCount++;
+    });
+  }
+  Object.keys(changedRows).forEach(function (ri) {
+    const i = Number(ri);
+    sheet.getRange(3 + i, 1, 1, lastCol).setValues([values[i]]);
+  });
+  return { cellCount: cellCount, titleCount: titleCount };
+}
+
+/**
+ * 〔查看這一版〕：舊版本嘅工作表網址（新分頁開）。
+ *
+ * ⚠️ 舊版本工作表上面可能仲有「改完先儲存成下一版」嘅字（見 `readVersionWeekTitles_()`），
+ * 所以開之前先把嗰張表**還原成嗰一版儲存咗嘅內容**——版本紀錄（`RosterAssignments`／
+ * `RosterVersions`）一格都唔改，只係令張表同嗰一版一致。
+ * 唯讀：未有保護 ⇒ 加一個「只會提示」嘅保護；已經有保護（例如 v0 鎖定）⇒ 照用。
+ * 最新一版唔郁（佢係要改嗰張）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 舊版本號
+ * @returns {{url: string, sheetName: string, protectedNow: boolean, restoredCells: number, restoreFailed: string}}
+ */
+function apiOpenVersionForViewing(quarterId, versionNo) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('查看舊版本', function () {
+    return openVersionForViewing_locked_(quarterId, Number(versionNo));
+  });
+}
+
+function openVersionForViewing_locked_(quarterId, target) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const found = findVersionRowForPicker_(quarterId, target);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(found.sheetName);
+  if (!sheet) {
+    throw new Error(buildThreePartMessage_(
+      '第 ' + target + ' 版的工作表「' + found.sheetName + '」不見了。',
+      '職事表沒有任何改動。系統內部仍然有這一版的資料。',
+      ['選這一版再撳〔用這一版作起點〕，內容會寫入最新那一張']));
+  }
+  let protectedNow = false;
+  let restoredCells = 0;
+  let restoreFailed = '';
+  if (target !== findLatestVersionNo(quarterId)) {
+    try {
+      const r = writeVersionContentIntoSheet_(quarterId, target, sheet, timezone);
+      restoredCells = r.cellCount + r.titleCount;
+    } catch (err) {
+      restoreFailed = err.message;
+      log_('WARN', 'apiOpenVersionForViewing 還原舊版本工作表失敗：' + err.message);
+    }
+    try {
+      const existing = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET) || [];
+      if (existing.length === 0) {
+        sheet.protect().setDescription('第 ' + target + ' 版（舊版本），只供查看').setWarningOnly(true);
+        protectedNow = true;
+      }
+    } catch (err) {
+      log_('WARN', 'apiOpenVersionForViewing 加保護失敗：' + err.message);
+    }
+  }
+  return {
+    url: buildGridSheetUrl_(found.sheetName), sheetName: found.sheetName,
+    protectedNow: protectedNow, restoredCells: restoredCells, restoreFailed: restoreFailed
+  };
+}
+
+/**
+ * 〔用這一版作起點〕。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 起點（舊版本號）
+ * @returns {Object}
+ */
+function apiUseVersionAsStartPoint(quarterId, versionNo) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('用舊版本作起點', function () {
+    return useVersionAsStartPoint_locked_(quarterId, Number(versionNo));
+  });
+}
+
+function useVersionAsStartPoint_locked_(quarterId, target) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const latest = findLatestVersionNo(quarterId);
+  if (latest < 0) {
+    throw new Error(buildThreePartMessage_('這一季還沒有任何版本。', '職事表沒有任何改動。',
+      ['先在第 1 步生成職事表']));
+  }
+  if (isNaN(target) || target < 0 || target === latest) {
+    throw new Error(buildThreePartMessage_(
+      (isNaN(target) || target < 0) ? '沒有選要用哪一版作起點。' : '你選的第 ' + target + ' 版就是最新一版。',
+      '職事表沒有任何改動。',
+      ['在版本下拉選一個舊版本再撳一次']));
+  }
+  findVersionRowForPicker_(quarterId, target);   // 冇呢一版 ⇒ 拋錯
+  const latestFound = findVersionRowForPicker_(quarterId, latest);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(latestFound.sheetName);
+  if (!sheet) {
+    throw new Error(buildThreePartMessage_(
+      '找不到最新一版的工作表「' + latestFound.sheetName + '」。',
+      '職事表沒有任何改動。',
+      ['如果那張表只是被改了名，把名字改回原本的就可以']));
+  }
+
+  const written = writeVersionContentIntoSheet_(quarterId, target, sheet, timezone);
+
+  writeAuditLog_({
+    action: VERSION_START_POINT_ACTION,
+    targetSheet: latestFound.sheetName,
+    targetKey: quarterId,
+    oldValue: String(latest),
+    newValue: String(target),
+    source: 'apiUseVersionAsStartPoint',
+    notes: '以第 ' + target + ' 版作起點：寫入 ' + written.cellCount + ' 格、每週標題 ' + written.titleCount
+      + ' 週（未儲存；第 ' + target + ' 版與第 ' + latest + ' 版都沒有改動）'
+  });
+
+  return {
+    ok: true,
+    targetVersionNo: target,
+    latestVersionNo: latest,
+    cellCount: written.cellCount,
+    titleCount: written.titleCount,
+    sheetUrl: buildGridSheetUrl_(latestFound.sheetName)
+  };
+}

@@ -474,7 +474,10 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     || plan.requests.confirm.length > 0
     || plan.requests.needsInput.length > 0;
   const titleChanges = resolved.titleChanges || [];
-  const versionNote = '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
+  // 第七十五輪批次 CH 組：喺呢一版之上用過〔用這一版作起點〕⇒ 新一版來源寫「以第 M 版作起點」
+  const startPointBasis = readStartPointBasisForSave_(quarterId, plan.baseVersionNo);
+  const versionNote = (startPointBasis ? startPointBasis + '；' : '')
+    + '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
     + (titleChanges.length > 0 ? '、每週標題 ' + titleChanges.length + ' 週' : '')
     + (plan.requests.apply.length > 0 ? '、申報 ' + plan.requests.apply.length + ' 筆' : '');
 
@@ -493,7 +496,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
       requestResult = applyRequests_(
         requestPlan,
         (input.confirmedRequestRows || []),
-        VERSION_VALUES.BASIS_FINE_TUNE,
+        startPointBasis || VERSION_VALUES.BASIS_FINE_TUNE,
         versionNote,
         // 規格 1.4：同一格幹事已經親手改咗嗰啲申報，唔套用。
         // 列號由 plan 嗰邊算好（`overlaps`）——**上游決定，下游執行**。
@@ -509,7 +512,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         { titleChangeCount: titleChanges.length });
       registerVersion(
         quarterId, created.versionNo, created.sheetName,
-        VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
+        startPointBasis || VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
         plan.violations.kept.length + plan.violations.semiHard.length + plan.violations.semiKept.length,
         false, versionNote);
     }

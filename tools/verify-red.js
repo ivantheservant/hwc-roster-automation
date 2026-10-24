@@ -6289,6 +6289,126 @@ const MUTATIONS = [
     find: "    acts.push(stepButton('儲存', () => openSaveAndConfirm(), {",
     replace: "    acts.push(stepButton('儲存及寄出', () => openSaveAndConfirm(), {",
     tests: ["tests/send_recipients_pool.test.js"]
+  },
+  {
+    id: "ch-no-picker",
+    why: "第 2 步冇版本下拉",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    acts.push((d.versionChoices || []).length > 0 ? buildVersionPicker(d.versionChoices, openNode) : openNode);",
+    replace: "    acts.push(openNode);",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-old-shows-edit",
+    why: "揀舊版本仍然只顯示〔查看／修改職事表〕",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      if (!chosen || chosen.isLatest) {\n        pickedVersionNo_ = null;",
+    replace: "      if (true) {\n        pickedVersionNo_ = null;",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-start-no-ask",
+    why: "〔用這一版作起點〕唔先問就寫入",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      slot.appendChild(stepButton('用這一版作起點', () => openUseVersionAsStartPoint(chosen), {",
+    replace: "      slot.appendChild(stepButton('用這一版作起點', () => callServerMutating('apiUseVersionAsStartPoint', currentQuarterId, chosen.versionNo), {",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-titles-from-sheet",
+    why: "每週標題照抄工作表（其實係下一版嘅字）",
+    file: "src/WebAppRollback.gs",
+    find: "  const titles = readVersionWeekTitles_(quarterId, sourceVersionNo, renderContext, auditRows);",
+    replace: "  const titles = readGridTypeColumn_(sheet.getName(), timezone);",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-title-no-replay",
+    why: "唔睇 AuditLog 標題改動，一律用現在嘅標題",
+    file: "src/WebAppRollback.gs",
+    find: "    if (String(r[C.ACTION] || '') !== 'WEEK_TITLE_CHANGED') continue;",
+    replace: "    continue;",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-no-titles",
+    why: "作起點唔寫每週標題",
+    file: "src/WebAppRollback.gs",
+    find: "  if (typeCol !== -1) {\n    Object.keys(titles).forEach(function (d) {",
+    replace: "  if (false) {\n    Object.keys(titles).forEach(function (d) {",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-basis-not-marked",
+    why: "儲存後來源冇寫「以第 M 版作起點」",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "        startPointBasis || VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,",
+    replace: "        VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-marker-sticky",
+    why: "起點標記之後每次儲存都沿用",
+    file: "src/SheetReader.gs",
+    find: "    if (Number(r[C.OLD_VALUE]) !== Number(baseVersionNo)) return;\n",
+    replace: "",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-view-no-protect",
+    why: "〔查看這一版〕唔設唯讀",
+    file: "src/WebAppRollback.gs",
+    find: "      if (existing.length === 0) {\n        sheet.protect().setDescription('第 ' + target + ' 版（舊版本），只供查看')",
+    replace: "      if (false) {\n        sheet.protect().setDescription('第 ' + target + ' 版（舊版本），只供查看')",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-view-no-restore",
+    why: "〔查看這一版〕顯示嘅係下一版改過嘅字",
+    file: "src/WebAppRollback.gs",
+    find: "      const r = writeVersionContentIntoSheet_(quarterId, target, sheet, timezone);\n      restoredCells",
+    replace: "      const r = { cellCount: 0, titleCount: 0 };\n      restoredCells",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-view-latest-locked",
+    why: "查看最新一版都加保護",
+    file: "src/WebAppRollback.gs",
+    find: "  if (target !== findLatestVersionNo(quarterId)) {\n    try {\n      const r = writeVersionContentIntoSheet_",
+    replace: "  if (true) {\n    try {\n      const r = writeVersionContentIntoSheet_",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-author-full-email",
+    why: "「由誰」顯示成條電郵",
+    file: "src/WebAppRollback.gs",
+    find: "    return at > 0 ? e.slice(0, at) : e;",
+    replace: "    return e;",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-no-regen-label",
+    why: "重新生成都寫成「系統生成」",
+    file: "src/WebAppRollback.gs",
+    find: "  if (basis === VERSION_VALUES.BASIS_AUTO_GENERATE && parent !== '') return '重新生成';\n",
+    replace: "",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-suggest-as-manual",
+    why: "接受建議表嘅版本寫成人手調整",
+    file: "src/SuggestionSheet.gs",
+    find: "    VERSION_VALUES.BASIS_SUGGESTION, versionNo, 0, false,",
+    replace: "    VERSION_VALUES.BASIS_FINE_TUNE, versionNo, 0, false,",
+    tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ch-zone4-rollback-back",
+    why: "進階與診斷〔回到上一個版本〕還原",
+    file: "src/ui/ScriptZone4.html",
+    find: "    // 第七十五輪批次 CH 組：〔回到上一個版本〕拿走——第 2 步嘅版本下拉〔用這一版作起點〕取代佢。\n",
+    replace: "    body.appendChild(renderRollbackEntry());\n",
+    tests: ["tests/round75_ch_version_picker.test.js"]
   }
 ];
 

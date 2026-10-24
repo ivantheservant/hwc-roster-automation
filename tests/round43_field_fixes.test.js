@@ -705,9 +705,9 @@ console.log('\n=== H：版面 ===');
   check('★★★★ 生成之前會問「使唔使先改名單」，而且〔先去改名單〕真係帶佢去'
     + '（⚠️ 只證明有呢個名；真正嘅保證喺 generate_asks_eligibility.test.js）',
     /askEligibilityFirst/.test(flow) && /openEligibilitySheet\(\);/.test(flow), '');
-  check('★★★★★ 第 2 步有〔回到上一個儲存版本〕，而且走返同一條回退路',
-    /openRollbackToPrevious/.test(flow)
-      && /apiRollbackPlan/.test(bare(read('src/ui/ScriptRollback.html'))), '');
+  // 第七十五輪批次 CH 組（Ivan 決定）：〔回到上一個儲存版本〕由第 2 步嘅版本下拉〔用這一版作起點〕取代
+  check('★★★★★ 第 2 步唔再有〔回到上一個儲存版本〕，改由版本下拉〔用這一版作起點〕',
+    !/openRollbackToPrevious/.test(bare(flow)) && /apiUseVersionAsStartPoint/.test(flow), '');
   check('★★★★★ 撳之前要講明「未儲存嘅改動會唔見咗」'
     + '——回退會重寫 grid 工作表，佢改咗而未儲存嗰幾格會被蓋走',
     /還未儲存的東西，會不見了/.test(read('src/ui/ScriptRollback.html')), '');
