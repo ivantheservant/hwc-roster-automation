@@ -430,7 +430,11 @@ function planApplyRequests_(quarterId) {
         ? ASSIGN_SOURCE.MANUAL
         : (originalRow.assignSource || ASSIGN_SOURCE.AUTO),
       isManual: !!s.isManual,
-      ruleFlags: ruleFlagsByKey[key] || []
+      // 第七十六輪批次 DA 組：人手清空「不由系統排」崗位（Posts.AutoGenerate=FALSE）嘅格 ⇒ 補返原因，
+      // 同 `materialiseManualEdits_()` 一致（否則顯示成「⚠ 未能安排」）
+      ruleFlags: (s.isManual && !s.personId && !String(s.freeText || '').trim()
+        && context.gridRender && context.gridRender.autoGenerateByPostId[s.postId] === false)
+        ? [RULE_IDS.NO_AUTO_GENERATE] : (ruleFlagsByKey[key] || [])
     };
   });
 

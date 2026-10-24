@@ -6617,6 +6617,38 @@ const MUTATIONS = [
     find: "        if (to && to < quarterStart) return;\n",
     replace: "",
     tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "da-blank-id-only",
+    why: "清空只有名字嘅格當成冇改動（淨睇 PersonID）",
+    file: "src/FineTune.gs",
+    find: "    if (normalizedGrid === '' && !a.personId && !originalFreeText_(a)) {",
+    replace: "    if (normalizedGrid === '' && !a.personId) {",
+    tests: ["tests/round76_da_clear_name_cells.test.js"]
+  },
+  {
+    id: "da-label-as-name",
+    why: "顯示標籤（待填）被當成人名存入新版本",
+    file: "src/FineTune.gs",
+    find: "  return [labels.pending, labels.na, labels.specialSkip, labels.gap].indexOf(t) !== -1 ? '' : t;",
+    replace: "  return t;",
+    tests: ["tests/round76_da_clear_name_cells.test.js"]
+  },
+  {
+    id: "da-clear-shows-gap",
+    why: "清空講員格變成「⚠ 未能安排」",
+    file: "src/StateSource.gs",
+    find: "          && context.gridRender.autoGenerateByPostId[s.postId] === false) ? [RULE_IDS.NO_AUTO_GENERATE] : [])",
+    replace: "          && false) ? [RULE_IDS.NO_AUTO_GENERATE] : [])",
+    tests: ["tests/round76_da_clear_name_cells.test.js"]
+  },
+  {
+    id: "da-req-clear-gap",
+    why: "有申報嗰條儲存路清空講員格冇補原因",
+    file: "src/RequestsApply.gs",
+    find: "        ? [RULE_IDS.NO_AUTO_GENERATE] : (ruleFlagsByKey[key] || [])",
+    replace: "        ? (ruleFlagsByKey[key] || []) : (ruleFlagsByKey[key] || [])",
+    tests: ["tests/round76_da_clear_name_cells.test.js"]
   }
 ];
 

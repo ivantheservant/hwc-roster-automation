@@ -281,7 +281,12 @@ function materialiseManualEdits_(context, changes, state, source, opts) {
       // 有人嗰啲帶住嘅係規則警告，一樣要跟住新版本行）。
       // **被人手改動嘅格：清空**——舊原因描述嘅係舊嗰個佔用者，
       // 幹事已經親手覆寫咗，留住就會變成一個講緊另一件事嘅標籤。
-      ruleFlags: s.isManual ? [] : ((originalRow.ruleFlags || []).slice())
+      // ⚠️ 第七十六輪批次 DA 組：人手**清空**一格「本來就唔由系統排」嘅崗位（`Posts.AutoGenerate = FALSE`，
+      // 例如講員）⇒ 補返「不自動排」原因，否則冇原因嘅空格會被分類成「⚠ 未能安排」。
+      ruleFlags: s.isManual
+        ? ((!s.personId && !manualFreeText && context.gridRender
+          && context.gridRender.autoGenerateByPostId[s.postId] === false) ? [RULE_IDS.NO_AUTO_GENERATE] : [])
+        : ((originalRow.ruleFlags || []).slice())
     };
   });
 

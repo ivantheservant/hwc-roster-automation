@@ -137,6 +137,19 @@ function normalizeCellText_(text) {
 }
 
 /**
+ * 第七十六輪批次 DA 組：人手改動偵測用嘅正規化——除咗 `normalizeCellText_()` 嘅佔位文字，
+ * 連 Config 可改嘅顯示標籤（`readGridCellLabels_()`：待填／不設／特殊主日／未能安排）都當空白。
+ * @param {*} text 格內文字
+ * @param {?Object} labels `context.gridRender.labels`
+ * @returns {string}
+ */
+function normalizeOverlayCellText_(text, labels) {
+  const t = normalizeCellText_(text);
+  if (!t || !labels) return t;
+  return [labels.pending, labels.na, labels.specialSkip, labels.gap].indexOf(t) !== -1 ? '' : t;
+}
+
+/**
  * 比對原始版本與 grid 現況，找出人手改動，並檢查改動後的狀態違反了哪些規則。
  * @param {Object} context fine-tune 的資料集
  * @returns {{changes: Object[], violations: Object[], manualState: Object[]}} 分析結果
@@ -276,10 +289,12 @@ function buildGridOverlayState_(context) {
     // （`renderExpectedGridText_()`，重用寫 grid 嗰段程式碼），
     // 同 grid 實際內容比對。相等就唔係人手改動。
     // 「特殊主日」對「特殊主日」自然相等，唔需要任何白名單。
-    const normalizedGrid = normalizeCellText_(gridText);
+    // ⚠️ 第七十六輪批次 DA 組：Config 嘅四個顯示標籤（待填／不設／特殊主日／未能安排）都當空白，
+    // 兩邊一齊咁比。否則〔用這一版作起點〕寫返一格「（待填）」落去，就會被當成一個叫「（待填）」嘅名。
+    const normalizedGrid = normalizeOverlayCellText_(gridText, context.gridRender.labels);
     const expectedText = renderExpectedGridText_(
       a, a.postId, a.serviceDate, context.gridRender);
-    if (normalizedGrid === normalizeCellText_(expectedText)) {
+    if (normalizedGrid === normalizeOverlayCellText_(expectedText, context.gridRender.labels)) {
       return Object.assign({}, base, { personId: a.personId, isManual: false, freeText: originalFreeText_(a) });
     }
 
@@ -302,7 +317,10 @@ function buildGridOverlayState_(context) {
       return Object.assign({}, base, { personId: a.personId, isManual: false, freeText: originalFreeText_(a) });
     }
     // 空白對空白亦都唔係改動（例如佔位文字被刪走，最終一樣係冇人）
-    if (normalizedGrid === '' && !a.personId) {
+    // ⚠️ 第七十六輪批次 DA 組：「原本係空」要睇 PersonID **同埋名字**。外請講員、名單以外嘅名、
+    // 臨時幫手都只有名字冇 PersonID——淨睇 `personId` 嘅話，幹事清空嗰格會被當成「冇改動」，
+    // 儲存之後個名「回魂」（第七十五輪回歸 R8：以第 0 版作起點，第 2 版仍有外請講員）。
+    if (normalizedGrid === '' && !a.personId && !originalFreeText_(a)) {
       return Object.assign({}, base, { personId: '', isManual: false });
     }
 

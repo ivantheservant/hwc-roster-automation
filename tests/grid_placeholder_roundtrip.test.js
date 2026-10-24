@@ -327,7 +327,9 @@ console.log('\n=== B3【核心】round-trip：渲染出嚟再解析返，必須�
   // 呢度用一個「假裝渲染器改咗字」嘅情境模擬分岔。
   const drifted = Object.assign({}, context, {
     gridValues: Object.assign({}, context.gridValues, {
-      '2026-10-04|WORSHIP|1': '特殊主日'   // 渲染器改成通用字，解析器唔知
+      // 第七十六輪批次 DA 組：Config 顯示標籤（例如「特殊主日」）而家刻意當空白（冇人），
+      // 所以用一個唔係標籤嘅字模擬分岔——一樣證明比對真係有做。
+      '2026-10-04|WORSHIP|1': '英語堂（舊寫法）'   // 渲染器改咗字，解析器唔知
     })
   });
   const driftedOverlay = gas.buildGridOverlayState_(drifted);
