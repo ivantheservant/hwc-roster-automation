@@ -43,6 +43,33 @@ const PUBLIC_LINK_EXPECTED_ACCESS = 'ANYONE_WITH_LINK';
 const PUBLIC_LINK_EXPECTED_PERMISSION = 'VIEW';
 
 /**
+ * 第七十五輪批次 CL 組：公開職事表嘅**唯讀顯示網址**格式。
+ *
+ * Ivan 手動測試 A：狀態卡〔開啟看看〕開出嚟係 `/edit`——佢自己（檔案擁有人）可以直接改公開版。
+ * 「任何人都不應該可以直接改公開版。」
+ *
+ * 揀 `/preview`：唔出編輯工具列、唔出選單，連擁有人開都係純睇；
+ * 寄出嘅電郵、個人頁、狀態卡、補寄全部用同一個（經 `findPublicLinkRow_()`）。
+ * 舊信入面嘅 `/edit` 連結照樣有效（同一個檔案；其他人本來就只有檢視權）。
+ */
+const PUBLIC_LINK_VIEW_SUFFIX = '/preview';
+
+/**
+ * 由檔案 ID 砌唯讀顯示網址；冇 ID 就嘗試由舊網址（`/edit…`）轉換。
+ * 兩樣都冇 ⇒ 空字串（唔會砌一條唔知去邊嘅連結）。
+ * @param {string} fileId 公開檔案 ID
+ * @param {string=} storedUrl `PublicLinks` 記低嘅網址（舊紀錄可能係 `/edit`）
+ * @returns {string}
+ */
+function buildPublicViewUrl_(fileId, storedUrl) {
+  const id = String(fileId || '').trim();
+  if (id) return 'https://docs.google.com/spreadsheets/d/' + id + PUBLIC_LINK_VIEW_SUFFIX;
+  const url = String(storedUrl || '').trim();
+  const m = url.match(/^(https:\/\/docs\.google\.com\/spreadsheets\/d\/[^\/?#]+)/);
+  return m ? m[1] + PUBLIC_LINK_VIEW_SUFFIX : url;
+}
+
+/**
  * 取得（必要時建立）`PublicLinks` 工作表，確保第 1、2 行標題正確。
  * 沿用全專案慣例：第 1 行中文標題、第 2 行機器鍵、資料由第 3 行開始。
  * @returns {Sheet} `PublicLinks` 工作表
@@ -94,7 +121,8 @@ function findPublicLinkRow_(quarterId) {
       return {
         quarterId: quarterId,
         fileId: String(rows[i][C.FILE_ID] || '').trim(),
-        fileUrl: String(rows[i][C.FILE_URL] || '').trim(),
+        // 第七十五輪批次 CL 組：一律回唯讀顯示網址（舊紀錄嘅 `/edit` 喺呢度轉換）
+        fileUrl: buildPublicViewUrl_(rows[i][C.FILE_ID], rows[i][C.FILE_URL]),
         lastPublishedAt: String(rows[i][C.LAST_PUBLISHED_AT] || '').trim(),
         // 第六十三輪批次 A 組：判斷「過期」要比時間，唔可以用 String() 之後嘅值
         //（Date 轉字串係英文長句）。見 `normalizeSheetTimestamp_()`。
@@ -484,9 +512,12 @@ function publishPublicRoster_(quarterId) {
   const existing = findPublicLinkRow_(quarterId);
   const resolved = resolveOrCreatePublicSpreadsheet_(quarterId, existing ? existing.fileId : '');
   writePublicRosterContent_(resolved.spreadsheet, content);
+  // 第七十五輪批次 CL 組：每次發佈都確保「知道連結的人可以檢視」＋所有工作表受保護。
+  enforcePublicRosterReadOnly_(resolved.spreadsheet);
 
   const fileId = resolved.spreadsheet.getId();
-  const fileUrl = resolved.spreadsheet.getUrl();
+  // 第七十五輪批次 CL 組：記低嘅係唯讀顯示網址，唔係 `getUrl()`（`/edit`）
+  const fileUrl = buildPublicViewUrl_(fileId, resolved.spreadsheet.getUrl());
   let sharing = { access: '', permission: '' };
   try {
     sharing = readPublicFileSharing_(fileId);
@@ -588,7 +619,7 @@ function checkPublicLinksSharing_() {
     const result = {
       quarterId: quarterId,
       fileId: fileId,
-      fileUrl: String(row[C.FILE_URL] || '').trim(),
+      fileUrl: buildPublicViewUrl_(fileId, row[C.FILE_URL]),
       lastPublishedAt: String(row[C.LAST_PUBLISHED_AT] || '').trim(),
       lastPublishedVersion: row[C.LAST_PUBLISHED_VERSION],
       access: '', permission: '', ok: false, message: ''
@@ -712,4 +743,42 @@ function runCheckPublicLinks_() {
   lines.push('', '本工具完全唯讀：不會改動任何連結或分享設定。');
 
   ui.alert(title, lines.join('\n'), ui.ButtonSet.OK);
+}
+
+/**
+ * 第七十五輪批次 CL 組：公開版**一律唯讀**。
+ *
+ * 1. 分享設定：「知道連結的人可以檢視」（`ANYONE_WITH_LINK`＋`VIEW`）。
+ *    ⚠️ 以前只喺建立新檔時設一次（怕改返幹事手動放寬過嘅設定）；Ivan 已決定
+ *    「任何人都不應該可以直接改公開版」，所以每次發佈都收返窄。
+ * 2. 每一張工作表加保護，只留 `SCRIPT_ACCOUNT_EMAIL`（同埋檔案擁有人——Google 規定移唔走）。
+ *
+ * 做唔到唔可以令發佈失敗（內容已經寫好）——記 WARN，`檢查公開連結` 會報分享設定唔啱。
+ * @param {Spreadsheet} spreadsheet 公開試算表
+ * @returns {{sharingSet: boolean, protectedSheets: number}}
+ */
+function enforcePublicRosterReadOnly_(spreadsheet) {
+  const out = { sharingSet: false, protectedSheets: 0 };
+  try {
+    DriveApp.getFileById(spreadsheet.getId())
+      .setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    out.sharingSet = true;
+  } catch (err) {
+    log_('WARN', '公開職事表設定分享（只可檢視）失敗：' + err.message);
+  }
+  const scriptAccount = String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
+  spreadsheet.getSheets().forEach(function (sheet) {
+    try {
+      const existing = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+      const protection = (existing && existing.length > 0) ? existing[0] : sheet.protect();
+      protection.setDescription('公開版唯讀（只有系統可以改）');
+      protection.removeEditors(protection.getEditors());
+      if (scriptAccount) protection.addEditor(scriptAccount);
+      if (protection.canDomainEdit()) protection.setDomainEdit(false);
+      out.protectedSheets++;
+    } catch (err) {
+      log_('WARN', '公開職事表工作表「' + sheet.getName() + '」加保護失敗：' + err.message);
+    }
+  });
+  return out;
 }

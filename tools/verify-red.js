@@ -6105,6 +6105,38 @@ const MUTATIONS = [
     find: "    return (t >= s && t <= e) ? t : s;",
     replace: "    return t;",
     tests: ["tests/round75_cm_unavailable_quarter.test.js"]
+  },
+  {
+    id: "cl-edit-url",
+    why: "公開連結還原成 /edit（可以直接改公開版）",
+    file: "src/PublicRoster.gs",
+    find: "const PUBLIC_LINK_VIEW_SUFFIX = '/preview';",
+    replace: "const PUBLIC_LINK_VIEW_SUFFIX = '/edit';",
+    tests: ["tests/round75_cl_public_readonly.test.js"]
+  },
+  {
+    id: "cl-old-row-raw",
+    why: "舊紀錄嘅 /edit 原樣回傳，唔轉唯讀網址",
+    file: "src/PublicRoster.gs",
+    find: "        fileUrl: buildPublicViewUrl_(rows[i][C.FILE_ID], rows[i][C.FILE_URL]),",
+    replace: "        fileUrl: String(rows[i][C.FILE_URL] || '').trim(),",
+    tests: ["tests/round75_cl_public_readonly.test.js"]
+  },
+  {
+    id: "cl-no-enforce",
+    why: "發佈時唔再收窄分享、唔加保護",
+    file: "src/PublicRoster.gs",
+    find: "  enforcePublicRosterReadOnly_(resolved.spreadsheet);\n",
+    replace: "",
+    tests: ["tests/round75_cl_public_readonly.test.js"]
+  },
+  {
+    id: "cl-keep-editors",
+    why: "保護唔移走其他編輯者",
+    file: "src/PublicRoster.gs",
+    find: "      protection.removeEditors(protection.getEditors());\n      if (scriptAccount) protection.addEditor(scriptAccount);\n      if (protection.canDomainEdit()) protection.setDomainEdit(false);\n      out.protectedSheets++;",
+    replace: "      if (scriptAccount) protection.addEditor(scriptAccount);\n      if (protection.canDomainEdit()) protection.setDomainEdit(false);\n      out.protectedSheets++;",
+    tests: ["tests/round75_cl_public_readonly.test.js"]
   }
 ];
 
