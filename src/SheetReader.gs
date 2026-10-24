@@ -1038,3 +1038,15 @@ function lastQuarterResetAuditIndex_(auditRows, quarterId) {
   });
   return at;
 }
+
+/**
+ * 第七十六輪批次 DB 組：一格「有冇人」嘅**唯一**定義——有 PersonID，或者有名字
+ * （外請講員、名單以外嘅名、這一季臨時幫手都只有名字）。所有「N 格沒有人」都經呢度。
+ * @param {*} personId PersonID
+ * @param {*} name 名字（PersonNameSnapshot／狀態嘅 freeText）
+ * @returns {boolean}
+ */
+function isCellFilled_(personId, name) {
+  if (String(personId === null || personId === undefined ? '' : personId).trim()) return true;
+  return String(name === null || name === undefined ? '' : name).trim() !== '';
+}

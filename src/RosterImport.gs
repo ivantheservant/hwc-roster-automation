@@ -314,7 +314,7 @@ function buildImportPlan_(quarterId) {
           // 客席講員唔喺名單係正常嘅（同填講員工具嘅規則）。
           // flag 照帶 `NO_AUTO_GENERATE`——同生成器寫嘅一樣，令「有冇人」嘅定義（AH 組）唔會把呢格當空格。
           freeText.push(Object.assign({}, base, { text: typed }));
-          state.push(Object.assign({}, base, { personId: '', isManual: true, assignSource: ASSIGN_SOURCE.MANUAL, ruleFlags: [RULE_IDS.NO_AUTO_GENERATE] }));
+          state.push(Object.assign({}, base, { personId: '', freeText: typed, isManual: true, assignSource: ASSIGN_SOURCE.MANUAL, ruleFlags: [RULE_IDS.NO_AUTO_GENERATE] }));
           assignments.push(Object.assign({}, base, { personId: '', personName: typed, assignSource: ASSIGN_SOURCE.MANUAL, ruleFlags: [RULE_IDS.NO_AUTO_GENERATE] }));
           return;
         }

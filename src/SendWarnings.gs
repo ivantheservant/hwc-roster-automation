@@ -37,6 +37,9 @@ function versionStateFromOriginal_(context) {
       postId: a.postId,
       slotIndex: a.slotIndex,
       personId: a.personId || '',
+      // 第七十六輪批次 DB 組：冇 PersonID 但有名（外請講員、名單以外嘅名、臨時幫手）要帶住，
+      // 否則 `listGenuineBlankCells_()` 會把佢哋當成「沒有人」（第七十五輪回歸 R10）
+      freeText: originalFreeText_(a),
       isManual: false
     };
   });

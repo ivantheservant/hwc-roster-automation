@@ -6190,8 +6190,8 @@ const MUTATIONS = [
     id: "ce-free-text-blank",
     why: "有名冇 PersonID 嘅格當成空格",
     file: "src/FineTune.gs",
-    find: "    if (String(s.freeText || '').trim()) return false;\n",
-    replace: "",
+    find: "    if (isCellFilled_(s.personId, s.freeText)) return false;\n",
+    replace: "    if (s.personId) return false;\n",
     tests: ["tests/round75_cefg_decisions_save.test.js"]
   },
   {
@@ -6649,6 +6649,38 @@ const MUTATIONS = [
     find: "        ? [RULE_IDS.NO_AUTO_GENERATE] : (ruleFlagsByKey[key] || [])",
     replace: "        ? (ruleFlagsByKey[key] || []) : (ruleFlagsByKey[key] || [])",
     tests: ["tests/round76_da_clear_name_cells.test.js"]
+  },
+  {
+    id: "db-send-no-name",
+    why: "寄出確認窗把有名字嘅格當成沒有人",
+    file: "src/SendWarnings.gs",
+    find: "      freeText: originalFreeText_(a),\n",
+    replace: "",
+    tests: ["tests/round76_db_named_cells_not_blank.test.js"]
+  },
+  {
+    id: "db-filled-id-only",
+    why: "「有冇人」淨睇 PersonID",
+    file: "src/SheetReader.gs",
+    find: "  return String(name === null || name === undefined ? '' : name).trim() !== '';",
+    replace: "  return false;",
+    tests: ["tests/round76_db_named_cells_not_blank.test.js"]
+  },
+  {
+    id: "db-pending-id-only",
+    why: "待補格子淨睇 PersonID",
+    file: "src/RequestsApply.gs",
+    find: "    if (isCellFilled_(row[C.PERSON_ID], row[C.PERSON_NAME_SNAPSHOT]) || row[C.ASSIGN_SOURCE] !== ASSIGN_SOURCE.SKIPPED) return;",
+    replace: "    if (row[C.PERSON_ID] || row[C.ASSIGN_SOURCE] !== ASSIGN_SOURCE.SKIPPED) return;",
+    tests: ["tests/round76_db_named_cells_not_blank.test.js"]
+  },
+  {
+    id: "db-import-no-name",
+    why: "匯入預覽嘅外請講員冇帶名",
+    file: "src/RosterImport.gs",
+    find: "personId: '', freeText: typed, isManual: true",
+    replace: "personId: '', isManual: true",
+    tests: ["tests/round76_db_named_cells_not_blank.test.js"]
   }
 ];
 

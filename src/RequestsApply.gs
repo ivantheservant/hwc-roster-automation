@@ -1203,7 +1203,8 @@ function listPendingBackfillCells_(quarterId, versionNo) {
   const pendingKeys = {};
   readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId || Number(row[C.VERSION_NO]) !== versionNo) return;
-    if (row[C.PERSON_ID] || row[C.ASSIGN_SOURCE] !== ASSIGN_SOURCE.SKIPPED) return;
+    // 第七十六輪批次 DB 組：「有冇人」同一個定義（有 PersonID 或者有名都算有人）
+    if (isCellFilled_(row[C.PERSON_ID], row[C.PERSON_NAME_SNAPSHOT]) || row[C.ASSIGN_SOURCE] !== ASSIGN_SOURCE.SKIPPED) return;
     if (splitList_(row[C.RULE_FLAGS]).indexOf(RULE_IDS.ELIGIBILITY) === -1) return;
     const key = cellKey_(toDateString(row[C.SERVICE_DATE], timezone), row[C.POST_ID], row[C.SLOT_INDEX]);
     pendingKeys[key] = true;

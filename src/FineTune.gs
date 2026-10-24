@@ -1369,9 +1369,9 @@ function listGenuineBlankCells_(state, context) {
     flagsByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a.ruleFlags || [];
   });
   return (state || []).filter(function (s) {
-    if (s.personId) return false;
-    // 第七十五輪批次 CE 組：有名而冇 PersonID（臨時幫手、外請講員、未決定嘅名）唔係空格。
-    if (String(s.freeText || '').trim()) return false;
+    // 第七十五輪批次 CE 組／第七十六輪批次 DB 組：有名而冇 PersonID（臨時幫手、外請講員、未決定嘅名）唔係空格。
+    // 「有冇人」只有一個定義：`isCellFilled_()`（SheetReader.gs）。
+    if (isCellFilled_(s.personId, s.freeText)) return false;
     return !isIntentionallyBlankCell_(
       flagsByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)]);
   }).map(function (s) {
