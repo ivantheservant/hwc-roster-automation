@@ -129,30 +129,15 @@ function apiCheckMyChanges(quarterId) {
         isTitle: true, fromName: t.fromName, toName: t.toName };
     }));
 
-    // ── 哪幾格的名字認不出 ─────────────────────────────────────
-    const unresolved = analysis.unresolved.map(function (u) {
-      return {
-        serviceDate: u.serviceDate,
-        postId: u.postId,
-        postNameTC: postNames[u.postId] || u.postId,
-        slotIndex: u.slotIndex,
-        text: u.text,
-        expectedText: u.expectedText || ''
-      };
-    });
-
-    // ── 哪幾格違反規則 ─────────────────────────────────────────
-    const violations = (analysis.violations || []).map(function (v) {
-      return {
-        serviceDate: v.serviceDate,
-        postNameTC: postNames[v.postId] || v.postId,
-        slotIndex: v.slotIndex,
-        personName: v.personName || '',
-        ruleId: v.ruleId,
-        severity: v.severity,
-        reason: v.reason || ''
-      };
-    });
+    // ── 第七十五輪批次 CE／CF 組：逐格決定 ─────────────────────────
+    //
+    // 「名單上找不到的名字」每一個有〔加入名單〕同 ☐「這一季臨時幫手，不加入名單」；
+    // 「違反規則的格」每一格一個 ☐「保留我的安排，系統不要調整」。全部預設唔勾，
+    // 勾咗嘅即時記住（`apiSetCellDecisions()`），換咗人就失效。
+    // ⚠️ 同儲存、請系統幫我調整用同一支 `buildDecisionItems_()`。
+    const decisions = buildCheckDecisionItems_(quarterId, versionNo, context, analysis);
+    const unresolved = decisions.names.map(publicDecisionItem_);
+    const violations = decisions.rules.map(publicDecisionItem_);
 
     // ── 哪幾格空了 ─────────────────────────────────────────────
     //
@@ -182,12 +167,37 @@ function apiCheckMyChanges(quarterId) {
       blanks: blanks,
       // 一句總結。全部乾淨的時候要講得出「可以儲存」——
       // 一個空清單不會告訴幹事下一步做甚麼。
-      allClear: unresolved.length === 0 && violations.length === 0 && blanks.length === 0
+      // 第七十五輪批次 CF 組：勾咗「保留」／「臨時幫手」或者已放行嘅格當處理好。
+      allClear: unresolved.every(function (u) { return u.checked; })
+        && violations.every(function (v) { return v.checked || v.released; })
+        && blanks.length === 0
     };
   } finally {
     endSheetReadMemo_();
   }
 }
+
+/**
+ * 第七十五輪批次 CE／CF 組：檢查、調整共用——逐格決定項目（放行紀錄、決定都讀埋）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {Object} context fine-tune context
+ * @param {{unresolved: Object[], violations: Object[]}} analysis
+ * @returns {{names: Object[], rules: Object[]}}
+ */
+function buildCheckDecisionItems_(quarterId, versionNo, context, analysis) {
+  let releaseContext = null;
+  try {
+    releaseContext = buildHardViolationClassContext_(quarterId, versionNo, context.unavailable);
+  } catch (err) {
+    log_('WARN', 'buildCheckDecisionItems_：讀不到放行紀錄，已放行的格會當未決定：' + err.message);
+  }
+  const decorated = (typeof decorateViolations_ === 'function')
+    ? decorateViolations_(analysis.violations || [], context) : (analysis.violations || []);
+  return buildDecisionItems_(context, analysis.unresolved || [], decorated,
+    readCellDecisionIndex_(quarterId, context.timezone), releaseContext);
+}
+
 
 /**
  * 讀一張任意工作表的 grid 文字（同 `readGridPersonIds_()` 一模一樣的形狀）。
@@ -294,18 +304,11 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     violations: findStateViolations_(resolved.state, context)
   };
 
-  // ⚠️ 認不出的名字**一定要擋**。理由同儲存那條路一模一樣
-  //（見 UnresolvedNameFix.gs）：一個沒有 PersonID 的名字，
-  // 那一格對那個人完全沒有作用。在這裡放行，就等於讓它經由
-  // 建議表那條路溜進正式版本。
-  if (analysis.unresolved.length > 0) {
-    return {
-      blocked: true,
-      versionNo: versionNo,
-      unresolved: analysis.unresolved,
-      message: '有 ' + analysis.unresolved.length + ' 格的名字系統認不出。'
-    };
-  }
+  // ⚠️ 第七十五輪批次 CE 組（Ivan 決定）：**唔可以因為有未決定嘅名而整個拒絕**（現場 image8）。
+  // 照樣調整其他格；名字嗰格（臨時幫手或者未決定）系統唔郁，並喺結果列出未決定嗰幾個。
+  // 佢哋喺狀態入面冇 PersonID 但有名（`freeText`），所以唔會被當成空格去填。
+  const decisionItems = buildCheckDecisionItems_(quarterId, versionNo, context, analysis);
+  const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });
 
   const manualKeys = {};
   analysis.changes.forEach(function (c) {
@@ -326,7 +329,11 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   } catch (err) {
     log_('WARN', 'buildSuggestionState_：讀不到放行紀錄，已放行的格會被當成普通違反：' + err.message);
   }
-  const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext);
+  // 第七十五輪批次 CF 組：勾咗「保留我的安排，系統不要調整」嘅格一律唔郁；其餘違反規則嘅格
+  //（包括幹事自己改過而冇勾嘅）照調整。舊嘅「准系統調整我勾了的」（allowedKeys）唔再用。
+  const keptKeys = {};
+  decisionItems.rules.forEach(function (r) { if (r.checked) keptKeys[r.key] = true; });
+  const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext, keptKeys);
   const releasedCellKeys = {};
   (fix.untouchedManual || []).forEach(function (u) {
     if (u.released) releasedCellKeys[u.key] = true;
@@ -351,9 +358,9 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
       ? ('這一格違反了規則（' + u.reason + '），但你已經放行'
         + (u.releasedVersionNo === null || u.releasedVersionNo === undefined ? '' : '（第 ' + u.releasedVersionNo + ' 版）')
         + '——系統不會改動這一格。')
-      : ('你改的這一格違反了規則（' + u.reason + '）。'
-        + '系統沒有動它——你改的東西系統不會自己改走。'
-        + '如果要系統一併調整，回介面在那張清單勾選這一格，再撳一次「請系統幫我調整」。');
+      : (u.kept
+        ? ('這一格違反了規則（' + u.reason + '），但你已經勾了「保留我的安排，系統不要調整」——系統不會改動這一格。')
+        : ('你改的這一格違反了規則（' + u.reason + '）。系統沒有動它。'));
   });
 
   fix.proposals.forEach(function (p) {
@@ -414,8 +421,11 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     // 仲有一格未處理。「已放行」用 `proposeMinimalFixFromState_()` 判好嘅 `untouchedManual[].released`
     // （第六十七輪 AG 組同一支判斷），唔另寫一份。
     remainingViolations: findStateViolations_(analysis.manualState, context).filter(function (v) {
-      return !releasedCellKeys[cellKey_(v.serviceDate, v.postId, v.slotIndex)];
-    })
+      const k = cellKey_(v.serviceDate, v.postId, v.slotIndex);
+      return !releasedCellKeys[k] && !keptKeys[k];
+    }),
+    // 第七十五輪批次 CE 組：未決定嘅名（唔係擋住，係列出嚟）
+    undecidedNames: undecidedNames.map(publicDecisionItem_)
   };
 }
 
@@ -432,7 +442,7 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
  * @param {Object} analysis `analyseManualState_(context)` 的結果
  * @returns {Object} {proposals, unfixable}
  */
-function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext) {
+function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext, keptKeys) {
   const proposals = [];
   const unfixable = [];
   // ⚠️ 第六十七輪批次 AG 組：**已放行嘅格一律唔動**（就算幹事勾咗「准系統調整」）。
@@ -498,10 +508,11 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
       continue;
     }
 
-    // ⚠️ 幹事親手改過而佢又冇明確准許 ⇒ **唔改，改為提示**。
-    // 唔可以靜靜略過——靜靜略過等於「系統睇唔到嗰個問題」，
-    // 而佢正正需要知道嗰一格有問題。
-    if (manual[key] && !allowed[key]) {
+    // ⚠️ 第七十五輪批次 CF 組（Ivan 決定）：有傳 `keptKeys` ⇒ **只有勾咗「保留我的安排」嘅格唔郁**，
+    // 幹事改過而冇勾嘅照調整（原則由「親手改過一律唔動」改為「勾咗先唔動」，預設唔勾）。
+    // 冇傳（舊呼叫端）⇒ 照舊：親手改過而冇明確准許 ⇒ 唔改，改為提示。
+    const untouchable = keptKeys ? !!keptKeys[key] : (manual[key] && !allowed[key]);
+    if (untouchable) {
       const post = findPostById_(context.posts, violation.postId);
       untouchedManual.push({
         key: key,
@@ -513,7 +524,8 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
         personName: nameOfPersonId_(context, violation.personId),
         ruleId: violation.ruleId,
         severity: violation.severity,
-        reason: violation.reason || violation.ruleId
+        reason: violation.reason || violation.ruleId,
+        kept: !!keptKeys
       });
       continue;
     }
@@ -767,9 +779,13 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
         reason: u.reason,
         // 第六十七輪批次 AG 組：已放行嘅格——畫面標「已放行（第 X 版）」、冇勾選框
         released: u.released === true,
-        releasedVersionNo: u.releasedVersionNo === undefined ? null : u.releasedVersionNo
+        releasedVersionNo: u.releasedVersionNo === undefined ? null : u.releasedVersionNo,
+        // 第七十五輪批次 CF 組：勾咗「保留我的安排」嘅格
+        kept: u.kept === true
       };
     }),
+    // 第七十五輪批次 CE 組：未決定嘅名——嗰幾格冇郁，要幹事決定（加入名單或臨時幫手）
+    undecidedNames: built.undecidedNames || [],
     // ⚠️ 系統改完之後仍然違反規則的格**一定要講出來**。
     // 不講的話，幹事會以為「系統調整過 ＝ 一定沒問題」，
     // 然後直接接受——而那幾格其實仍然是壞的。
@@ -833,7 +849,8 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
       postId: s.postId,
       slotIndex: s.slotIndex,
       personId: s.personId || '',
-      personName: person ? person.nameTC : (orig.personName || ''),
+      // 第七十五輪批次 CE 組：冇 PersonID 而有名（臨時幫手、未決定、外請講員）⇒ 照寫個名
+      personName: person ? person.nameTC : (String(s.freeText || '').trim() || (s.isManual ? '' : (orig.personName || ''))),
       assignSource: orig.assignSource || ASSIGN_SOURCE.AUTO,
       ruleFlags: (orig.ruleFlags || []).slice()
     };
@@ -1016,11 +1033,17 @@ function apiAcceptSuggestion_locked_(quarterId) {
 
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiAcceptSuggestion');
-  if (resolved.unresolved.length > 0) {
+  // 第七十五輪批次 CE 組：勾咗「這一季臨時幫手」嘅名唔擋；未決定嘅先擋。
+  const acceptIndex = readCellDecisionIndex_(quarterId, timezone);
+  const undecided = resolved.unresolved.filter(function (u) {
+    return !acceptIndex.isTempHelper(u.serviceDate + '|' + u.postId + '|' + u.slotIndex, u.text);
+  });
+  if (undecided.length > 0) {
     throw new Error(buildThreePartMessage_(
-      '建議表上有 ' + resolved.unresolved.length + ' 格的名字系統認不出。',
+      '建議表上有 ' + undecided.length + ' 格的名字在名單上找不到，而且你還沒有決定。',
       '什麼都沒有儲存，建議表也留著沒有動。',
-      ['回去建議表把那幾格改成正確的寫法，再撳一次接受']));
+      ['撳〔檢查我的改動〕，在「名單上找不到的名字」選〔加入名單〕或者勾「這一季臨時幫手，不加入名單」',
+        '或者回去建議表把那幾格改成正確的寫法，再撳一次接受']));
   }
 
   // ⚠️ 第四十三輪批次 B 組：零改動要**在這裡擋住並且講人話**。

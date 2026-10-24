@@ -305,22 +305,20 @@ console.log('\n=== A 對照組：AutoGenerate=TRUE 嘅崗位打錯名，仍然�
   check('（前置）主席一格打一個唔存在嘅名',
     setGridCell(0, DATES[0], 'CHAIR', '完全唔存在嘅人'));
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  checkEqual('★★★★★ **仍然**被擋（豁免唔可以擴大到全部崗位）',
-    plan.blockReason, 'UNRESOLVED_NAMES');
+  // ⚠️ 第七十五輪批次 CE 組（Ivan 決定）：唔再即時擋，改為要逐個決定（加入名單／這一季臨時幫手）——
+  // 豁免（自由文字照收）仍然**只限人手崗位**：自動排嘅崗位一定要決定先可以儲存。
+  check('★★★★★ **仍然**要決定（豁免唔可以擴大到全部崗位）',
+    plan.blocked === false && plan.needsDecision === true, JSON.stringify(plan).slice(0, 300));
   checkEqual('★★★★ 剛好一格', (plan.unresolved || []).length, 1);
 
   // ── B 組：兩個值都要印，而且唔可以講反 ──
   const u = plan.unresolved[0];
-  checkEqual('★★★★★ **`gridText` ＝ 幹事真正打嗰個**'
-    + '（修正之前呢個欄位名寫錯咗，永遠 fallback 到空字串，'
-    + '結果對話框話你打咗空白，但 grid 上明明有字）',
-    u.gridText, '完全唔存在嘅人');
-  check('★★★★★ `expectedText` ＝ 本來應該渲染成咩，而且**同 gridText 唔同**'
+  checkEqual('★★★★★ **`text` ＝ 幹事真正打嗰個**', u.text, '完全唔存在嘅人');
+  check('★★★★★ `expectedText` ＝ 本來應該渲染成咩，而且**同 text 唔同**'
     + '——兩個值調轉咗嘅話呢一條會紅',
-    u.expectedText !== undefined && u.expectedText !== u.gridText,
+    u.expectedText !== undefined && u.expectedText !== u.text,
     JSON.stringify(u));
-  check('★★★★ 舊欄位名 rawText 保留，但帶住正確嘅值',
-    u.rawText === u.gridText, JSON.stringify(u));
+  check('★★★★ 決定比對用嘅 cellText 同 text 一樣', u.cellText === u.text, JSON.stringify(u));
   checkEqual('★★★★ 講得出係邊一日', u.serviceDate, DATES[0]);
   // ⚠️ 順帶：`context.postNames` 喺 `buildFineTuneContext_()` **根本唔存在**
   //（只有寄信嗰個 context 先有），所以本檔案三處嘅三元運算永遠 fallback

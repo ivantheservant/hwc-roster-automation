@@ -44,6 +44,9 @@ const SHEETS = {
   // 回傳空陣列，全部相關規則自動失效，舊環境完全不受影響。見 Roles.gs 檔頭。
   ROLES: 'Roles',
   PERSON_POST_EXCLUSIONS: 'PersonPostExclusions',
+  // 第七十五輪批次 CE／CF 組：幹事喺〔檢查我的改動〕／〔儲存〕逐格做嘅決定
+  //（「保留我的安排，系統不要調整」／「這一季臨時幫手，不加入名單」）。第一次勾選時自動建立。
+  CELL_DECISIONS: 'CellDecisions',
   // 第二十六輪批次階段 C：排表偏好（某人 × 某崗位 → 比平均多／少 N 次）。
   PERSON_POST_WEIGHT: 'PersonPostWeight'
 };
@@ -286,6 +289,26 @@ const COLUMNS = {
   // 第十六輪批次階段 B：個人崗位排除（規則 3）。表達「某人暫時唔做某崗位，
   // 日後解除」——解除時**填 EffectiveTo，唔好刪除成行**，噉樣舊季度嘅職事表
   // 唔會因為今日解除咗而被追溯判定為違規（同 Roles 一樣嘅道理）。
+  /**
+   * 第七十五輪批次 CE／CF 組：逐格決定。
+   *
+   * 一格一種決定一行（同一格可以同時有 KEEP 同 TEMP_HELPER 兩行）。**決定只對嗰一格嗰個名有效**：
+   * `CellText` 同職事表而家嗰格（正規化後）唔同 ⇒ 失效（換咗人就要重新決定）。
+   * 取消勾選 ⇒ `Status=CANCELLED`（唔刪行，留低痕跡）；重設季度測試資料 ⇒ 成季刪走。
+   */
+  CELL_DECISIONS: {
+    DECISION_ID: 'DecisionID',
+    QUARTER_ID: 'QuarterID',
+    SERVICE_DATE: 'ServiceDate',
+    POST_ID: 'PostID',
+    SLOT_INDEX: 'SlotIndex',
+    KIND: 'Kind',
+    CELL_TEXT: 'CellText',
+    RULE_ID: 'RuleID',
+    STATUS: 'Status',
+    UPDATED_AT: 'UpdatedAt',
+    UPDATED_BY: 'UpdatedBy'
+  },
   PERSON_POST_EXCLUSIONS: {
     EXCLUSION_ID: 'ExclusionID',
     PERSON_ID: 'PersonID',
@@ -1485,6 +1508,24 @@ const CONFIG_TYPES = {
   STR: 'STR',
   ENUM: 'ENUM',
   EMAIL: 'EMAIL'
+};
+
+/**
+ * 第七十五輪批次 CE／CF 組：逐格決定嘅種類。
+ *   KEEP　　　　「保留我的安排，系統不要調整」（違反規則嘅格）。一定要遵守嘅規則勾咗 ＝ 放行；
+ *   　　　　　　儲存時轉成現有嘅放行紀錄（`logHardViolationRelease_()`），之後整季記住。
+ *   TEMP_HELPER「這一季臨時幫手，不加入名單」（系統排嘅崗位填咗名單上搵唔到嘅名）。
+ *   　　　　　　嗰格只存名字（冇 PersonID、冇電郵）；系統唔會調整、唔計服侍次數。
+ */
+const CELL_DECISION_KIND = {
+  KEEP: 'KEEP',
+  TEMP_HELPER: 'TEMP_HELPER'
+};
+
+/** 逐格決定嘅狀態。 */
+const CELL_DECISION_STATUS = {
+  ACTIVE: 'ACTIVE',
+  CANCELLED: 'CANCELLED'
 };
 
 /** Posts 的 Frequency 欄可能出現的值。 */

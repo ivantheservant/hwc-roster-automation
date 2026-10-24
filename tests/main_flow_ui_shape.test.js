@@ -418,8 +418,10 @@ console.log('\n=== 儲存：一切正常就唔好彈窗 ===');
     /v\.real \|\| \[\]\)\.length === 0[\s\S]{0,600}plan\.overlaps \|\| \[\]\)\.length === 0/.test(zone1), '');
   check('★★★★★ 而且快路行嘅仍然係同一個 api，冇第二套儲存邏輯',
     /function executeCleanSave[\s\S]{0,600}callServerMutating\('apiSaveAndConfirmExecute'/.test(zone1), '');
-  check('★★★★★ 有嘢要佢決定嗰陣，兩粒掣係「照樣儲存」同「返回修改」',
-    /confirmLabel: '照樣儲存'/.test(zone1) && /cancelLabel: '返回修改'/.test(zone1));
+  // 第七十五輪批次 CG 組：確認畫面掣改為〔儲存〕（全部決定咗先撳得）＋〔返回修改〕
+  check('★★★★★ 有嘢要佢決定嗰陣，掣係〔儲存〕同〔返回修改〕',
+    /const saveBtn = button\('儲存', \(\) => executeSaveAndConfirm\(\), ''\);/.test(zone1)
+    && /button\('返回修改', \(\) => closeModal\(\), 'secondary'\)/.test(zone1));
 }
 
 console.log('\n=== 確認清單要講人話 ===');

@@ -564,7 +564,7 @@ function selfTestBuildCandidatePool_(quarterId, versionNo) {
  * ⚠️ 接受條件**只有一條**
  * ═══════════════════════════════════════════════════════════════════
  *
- *     `needsRelease === false` 而且 `violations.real` 係空陣列
+ *     `needsDecision !== true` 而且 `violations.real` 係空陣列（第七十五輪起放行改為逐格決定）
  *
  * 唔好自己再解讀任何規則、唔好睇 `semiHard`／`structural`
  *（嗰兩樣唔攔儲存）。呢一句就係攔住 S05 嗰道閘自己用嘅判斷。
@@ -658,10 +658,11 @@ function selfTestPickAcceptedCells_(quarterId, versionNo, howMany, scenarioId) {
         return c.serviceDate + ' ' + c.postId + '#' + c.slotIndex
           + ' ← ' + c.replacement.name + '（' + v.ruleId + '）';
       }),
-      needsRelease: plan.needsRelease === true
+      // 第七十五輪批次 CG 組：打字放行換成逐格決定（needsDecision）
+      needsDecision: plan.needsDecision === true
     });
 
-    if (bad.length === 0 && plan.needsRelease === false) {
+    if (bad.length === 0 && plan.needsDecision !== true) {
       // ⚠️ `confirmed` ＝「呢一份 plan 講嘅就係最終格局」。
       // 呼叫嗰邊唔使再叫多一次，慳返一次好貴嘅呼叫。
       return { cells: written, attempts: attempts, planCalls: planCalls,
@@ -1077,7 +1078,7 @@ function selfTestCall_(scenarioId, apiName, fn) {
  *
  * 而家換成 `selfTestPickAcceptedCells_()`：寫入之後問
  * `apiSaveAndConfirmPlan()`，接受條件只有一條——
- * `needsRelease === false` 而且 `violations.real` 係空陣列。
+ * `needsDecision !== true` 而且 `violations.real` 係空陣列（第七十五輪起放行改為逐格決定）。
  *
  * ⚠️ 留低嗰兩支就係留低第二個算法。所以拆走，唔係「留住以防萬一」。
  */
@@ -1170,7 +1171,7 @@ function selfTestS03_(quarterId) {
   t.expect('（過程）' + describeAcceptedPickAttempts_(picked),
     true, '（過程紀錄，不是斷言）',
     'plan ' + picked.planCalls + ' 次',
-    '接受條件只有一條：needsRelease === false 而且 violations.real 是空的。');
+    '接受條件只有一條：needsDecision 不是 true 而且 violations.real 是空的。');
 
   // ── plan 拋錯／被擋住 ⇒ **拋出去，令它報 ERROR 帶住原文** ────
   //
@@ -1219,9 +1220,9 @@ function selfTestS03_(quarterId) {
     : selfTestCall_('S03', 'apiSaveAndConfirmPlan（最終確認）',
       function () { return apiSaveAndConfirmPlan(quarterId); });
   const real = ((plan.violations || {}).real || []);
-  t.equal('不需要打字放行（needsRelease = false）'
-    + '——要放行的話，S05 會拋錯，而 S06 之後全部被擋住',
-    plan.needsRelease, false, 'apiSaveAndConfirmPlan().needsRelease');
+  t.equal('不需要逐格決定（needsDecision 不是 true）'
+    + '——有未決定的話，S05 會拋錯，而 S06 之後全部被擋住',
+    plan.needsDecision === true, false, 'apiSaveAndConfirmPlan().needsDecision');
   t.equal('而且一格硬規則違反都沒有（violations.real 是空的）',
     real.length, 0,
     real.map(function (v) {
@@ -1709,7 +1710,7 @@ function selfTestS10_(quarterId) {
   t.expect('（過程）' + describeAcceptedPickAttempts_(picked),
     true, '（過程紀錄，不是斷言）',
     'plan ' + picked.planCalls + ' 次',
-    '接受條件只有一條：needsRelease === false 而且 violations.real 是空的。');
+    '接受條件只有一條：needsDecision 不是 true 而且 violations.real 是空的。');
 
   if (picked.planError) throw new Error('S10 選格時：' + picked.planError);
   if ((picked.preExisting || []).length > 0) {
@@ -1743,9 +1744,9 @@ function selfTestS10_(quarterId) {
     : selfTestCall_('S10', 'apiSaveAndConfirmPlan（最終確認）',
       function () { return apiSaveAndConfirmPlan(quarterId); });
   const midReal = ((midPlan.violations || {}).real || []);
-  t.equal('不需要打字放行（needsRelease = false）'
-    + '——要放行的話，下面那一句「儲存並確認」會拋錯',
-    midPlan.needsRelease, false, 'apiSaveAndConfirmPlan().needsRelease');
+  t.equal('不需要逐格決定（needsDecision 不是 true）'
+    + '——有未決定的話，下面那一句「儲存」會拋錯',
+    midPlan.needsDecision === true, false, 'apiSaveAndConfirmPlan().needsDecision');
   t.equal('而且一格硬規則違反都沒有（violations.real 是空的）',
     midReal.length, 0,
     midReal.map(function (v) {
@@ -2440,20 +2441,21 @@ function selfTestS17_(quarterId) {
 
   const plan = selfTestCall_('S17', 'apiSaveAndConfirmPlan',
     function () { return apiSaveAndConfirmPlan(quarterId); });
-  t.expect('系統認得出這是一條硬規則違反，而且要求打字放行',
-    plan.needsRelease === true, 'needsRelease=true', String(plan.needsRelease),
+  // 第七十五輪批次 CF／CG 組：打字放行換成逐格勾「保留我的安排，系統不要調整」
+  t.expect('系統認得出這是一條硬規則違反，而且要求逐格決定',
+    plan.needsDecision === true, 'needsDecision=true', String(plan.needsDecision),
     'apiSaveAndConfirmPlan().violations.real＝'
       + JSON.stringify((plan.violations || {}).real || []).slice(0, 500));
 
   // ── 2　直接儲存 ⇒ 要被拒絕，而且講得出是哪一格、哪一條規則 ──
   let refused = '';
   try {
-    selfTestCall_('S17', 'apiSaveAndConfirmExecute（不帶放行字眼）',
+    selfTestCall_('S17', 'apiSaveAndConfirmExecute（未勾保留）',
       function () { return apiSaveAndConfirmExecute(quarterId, { decisions: [] }); });
   } catch (err) {
     refused = err.message;
   }
-  t.expect('不帶放行字眼就儲存 ⇒ 被拒絕', refused !== '',
+  t.expect('未勾「保留我的安排」就儲存 ⇒ 被拒絕', refused !== '',
     '被拒絕', refused || '（居然存到了）',
     'apiSaveAndConfirmExecute(quarterId, {decisions: []})');
   t.expect('而且訊息講得出有幾多格違反',
@@ -2463,32 +2465,33 @@ function selfTestS17_(quarterId) {
     + '不講的話，幹事不知道現在到底存了沒有',
     /職事表沒有任何改動/.test(refused), '有這一句',
     refused.slice(0, 300), '拒絕訊息原文');
-  t.expect('而且講得出要輸入什麼才放行得到',
-    refused.indexOf(SAVE_CONFIRM_RELEASE_TEXT) >= 0,
-    '訊息裡面有「' + SAVE_CONFIRM_RELEASE_TEXT + '」',
+  t.expect('而且講得出要怎樣做（勾「保留我的安排」）',
+    refused.indexOf('保留我的安排') >= 0, '訊息裡面有「保留我的安排」',
     refused.slice(0, 300), '拒絕訊息原文');
 
   const stillAt = findLatestVersionNo(quarterId);
   t.equal('被拒絕之後，版本號沒有變——說「沒有任何改動」就真的不可以有',
     stillAt, versionNo, 'findLatestVersionNo()');
 
-  // ── 3　帶住放行字眼再叫一次 ⇒ 存得到 ────────────────────────
+  // ── 3　勾「保留我的安排」再儲存 ⇒ 存得到 ────────────────────
   let released = null;
   let releaseThrew = '';
   try {
-    released = selfTestCall_('S17', 'apiSaveAndConfirmExecute（帶放行字眼）',
-      function () {
-        return apiSaveAndConfirmExecute(quarterId,
-          { decisions: [], releaseText: SAVE_CONFIRM_RELEASE_TEXT });
-      });
+    const items = ((plan.decisionItems || {}).rules || []).map(function (r) {
+      return { serviceDate: r.serviceDate, postId: r.postId, slotIndex: r.slotIndex, kind: r.kind,
+        cellText: r.cellText, ruleId: r.ruleId, checked: true };
+    });
+    selfTestCall_('S17', 'apiSetCellDecisions（勾保留）',
+      function () { return apiSetCellDecisions(quarterId, items); });
+    released = selfTestCall_('S17', 'apiSaveAndConfirmExecute（勾了保留）',
+      function () { return apiSaveAndConfirmExecute(quarterId, { decisions: [] }); });
   } catch (err) {
     releaseThrew = err.message;
   }
-  t.expect('帶住放行字眼再叫一次 ⇒ 存得到',
+  t.expect('勾了「保留我的安排」再儲存 ⇒ 存得到',
     releaseThrew === '' && !!released, '存得到',
     releaseThrew || JSON.stringify(released).slice(0, 400),
-    'apiSaveAndConfirmExecute(quarterId, {decisions: [], releaseText: "'
-      + SAVE_CONFIRM_RELEASE_TEXT + '"})');
+    'apiSetCellDecisions(...) → apiSaveAndConfirmExecute(quarterId, {decisions: []})');
   const afterRelease = findLatestVersionNo(quarterId);
   t.expect('而且真的多了一版', afterRelease > versionNo,
     '> ' + versionNo, String(afterRelease), 'findLatestVersionNo()');

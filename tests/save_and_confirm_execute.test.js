@@ -73,7 +73,7 @@ console.log('\n=== D-2 步 2【核心】預覽過期偵測 ===');
       gas.assertSaveConfirmPlanStillFresh_(plan, [
         { serviceDate: '2099-01-01', postId: 'X', slotIndex: 1 }
       ]);
-    }, '重新撳一次「儲存及寄出」');
+    }, '重新撳一次「儲存」');
 
   let noDecisions = true;
   try { gas.assertSaveConfirmPlanStillFresh_(plan, []); } catch (e) { noDecisions = false; }
@@ -89,18 +89,18 @@ console.log('\n=== D-2 步 2【核心】預覽過期偵測 ===');
     }, '已經過期');
 }
 
-console.log('\n=== D-2 步 3：放行文字檢查（靜態）===');
+console.log('\n=== D-2 步 3：逐格決定檢查（靜態；第七十五輪 CG 組取代打字放行）===');
 {
-  check('★★★★★ 有真違反而放行文字唔啱 ⇒ 拋錯',
-    /if \(plan\.needsRelease && String\(input\.releaseText \|\| ''\)\.trim\(\) !== SAVE_CONFIRM_RELEASE_TEXT\)/.test(SRC));
+  check('★★★★★ 仲有未決定嘅一定要遵守違反或者名 ⇒ 拋錯', /if \(plan\.needsDecision\) \{/.test(SRC));
   check('★★★★★ 拒絕時明確講「職事表沒有任何改動」'
     + '——幹事最想知嘅係「而家個表究竟點」',
     /職事表沒有任何改動，第 ' \+ plan\.baseVersionNo/.test(SRC));
-  check('★★★★ 用三段式訊息', /needsRelease[\s\S]{0,300}?buildThreePartMessage_\(/.test(SRC));
+  check('★★★★ 用三段式訊息', /needsDecision[\s\S]{0,300}?buildThreePartMessage_\(/.test(SRC));
   check('★★★★★ 檢查排喺「重新跑 plan」之後'
-    + '——次序反轉嘅話，會用一份過時嘅 needsRelease 去判斷要唔要放行',
+    + '——次序反轉嘅話，會用一份過時嘅決定狀態去判斷',
     SRC.indexOf('assertSaveConfirmPlanStillFresh_(plan, input.decisions)')
-      < SRC.indexOf('plan.needsRelease && String(input.releaseText'));
+      < SRC.indexOf('if (plan.needsDecision) {'));
+  check('★★★★★ 唔再要打字放行', SRC.indexOf("plan.needsRelease && String(input.releaseText") === -1);
 }
 
 console.log('\n=== D-2 步 1／2【核心】唔信前端傳嚟嘅狀態 ===');

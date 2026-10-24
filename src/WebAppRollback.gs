@@ -126,7 +126,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
     return rollbackBlocked_('UNSAVED_CHANGES', buildThreePartMessage_(
       bits.join('，') + '，未儲存。回到上一個版本會令這些改動消失。',
       '職事表沒有任何改動，第 ' + currentVersionNo + ' 版仍然是最新一版。',
-      ['先撳「儲存及寄出」，把改動儲存成新一版',
+      ['先撳「儲存」，把改動儲存成新一版',
         '或者把那幾格改回原樣，這一粒就會重新亮起']));
   }
 

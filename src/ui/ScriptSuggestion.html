@@ -74,47 +74,20 @@
       nodes.push(para('去〔查看／修改職事表〕在表上改，改完回來再撳這一粒。', 'muted'));
     }
 
-    // ── 名字認不出 ──────────────────────────────────────────
-    if (r.unresolved.length > 0) {
-      const box = make('div', { className: 'sec sec-warn' }, [
-        sectionTitle('這 ' + r.unresolved.length + ' 格的名字系統認不出'),
-        make('div', {
-          text: '這幾格在儲存的時候會被擋住。到時那個畫面有〔立即加入這個人〕。',
-          className: 'muted'
-        })
-      ]);
-      r.unresolved.forEach((u) => {
-        box.appendChild(make('div', {
-          text: humanDate(u.serviceDate) + '　' + u.postNameTC
-            + '　你打了「' + u.text + '」'
-            + (u.expectedText ? ('，本來應該是「' + u.expectedText + '」') : ''),
-          className: 'vio-row'
-        }));
-      });
-      nodes.push(box);
-    }
-
-    // ── 違反規則 ────────────────────────────────────────────
-    if (r.violations.length > 0) {
-      const box = make('div', { className: 'sec sec-warn' }, [
-        sectionTitle('這 ' + r.violations.length + ' 格違反了規則')
-      ]);
-      r.violations.forEach((v) => {
-        // 用返共通嗰個人話轉換——規則代號對幹事嚟講同一串亂碼冇分別。
-        box.appendChild(make('div', {
-          text: humanViolationLine({
-            serviceDate: v.serviceDate, postNameTC: v.postNameTC,
-            slotIndex: v.slotIndex, personName: v.personName,
-            ruleId: v.ruleId, reason: v.reason
-          }),
-          className: 'vio-row'
-        }));
-      });
-      box.appendChild(make('div', {
-        text: '撳〔請系統幫我調整〕，系統會嘗試用最少的改動修好這幾格。',
+    // ── 第七十五輪批次 CE／CF 組：逐格確認 ─────────────────────
+    //
+    // 名單上找不到的名字：〔加入名單〕或 ☐「這一季臨時幫手，不加入名單」；
+    // 違反規則的格：☐「保留我的安排，系統不要調整」（預設唔勾，即時記住）。
+    // 同〔儲存〕確認畫面用同一個元件（`buildDecisionSections()`，Script.html）。
+    const decisions = buildDecisionSections(
+      { names: r.unresolved || [], rules: r.violations || [] },
+      { onAddPerson: (u) => openAddUnresolvedPerson(u, openCheckMyChanges) });
+    decisions.nodes.forEach((n) => nodes.push(n));
+    if ((r.violations || []).length > 0) {
+      nodes.push(make('div', {
+        text: '撳〔請系統幫我調整〕：系統只會調整沒有勾的違反規則格和空格，勾了的不會動。',
         className: 'muted'
       }));
-      nodes.push(box);
     }
 
     // ── 空格 ────────────────────────────────────────────────
@@ -171,9 +144,10 @@
     // 因為呢一個 bug 上一輪令我查錯咗成個後端。
     const from = (typeof startFrom === 'string') ? startFrom : '';
     runAction('系統調整中，請稍候', async () => {
+      // 第七十五輪批次 CF 組：「准系統調整我勾了的」拿走——系統只會調整**冇勾**「保留我的安排」嘅格，
+      // 後端自己讀逐格決定。第 3 個參數照送空陣列（後端已經唔用）。
       const r = await callServerMutating(
-        'apiBuildSuggestion', currentQuarterId, from,
-        Array.isArray(allowKeys) ? allowKeys : []);
+        'apiBuildSuggestion', currentQuarterId, from, []);
       // ⚠️ 第四十二輪批次 A 組：兩張表都改過 ⇒ **問返幹事**，
       // 唔可以靜靜揀一張。揀錯嗰張就等於靜靜丟咗佢一批改動，
       // 而佢完全唔會知。
@@ -267,53 +241,49 @@
       className: 'muted'
     }));
 
-    // ── 第四十六輪批次 C3 組：你改的、違反規則、系統沒有動 ──────
+    // ── 第七十五輪批次 CF 組：系統冇動嘅格 ───────────────────────
     //
-    // ⚠️ Ivan 嘅原則：**系統改壞幹事親手做嘅決定，比排錯更差。**
-    // 佢改一格，係因為佢知道一啲系統唔知道嘅事。所以系統唔會自己改走，
-    // 改為列出嚟問佢——而且**預設全部唔勾**。
-    //
-    // 預設勾好就等於系統仍然喺度替佢決定，只係多咗一個佢唔會細睇嘅畫面。
+    // 只會係「你勾咗保留我的安排」或者「已放行」嘅格（其餘違反規則嘅格系統會試住調整）。
+    // 舊嘅「准系統調整我勾了的」勾選框拿走——意思同新嘅勾選框相反，兩樣並存會令人撈亂。
     const untouched = r.untouchedManual || [];
-    const allowSelected = {};
     let blockedBox = null;
     if (untouched.length > 0) {
-      // ⚠️ 第六十七輪批次 AG 組：已放行嘅格**冇勾選框**，標「已放行（第 X 版）——系統不會改動這一格」；
-      // 未放行嘅照舊勾選。
-      const releasedCount = untouched.filter((u) => u.released).length;
-      blockedBox = make('div', { className: 'sec sec-warn' }, [
-        sectionTitle('你改過、而違反規則的格（' + untouched.length + ' 格）'),
+      blockedBox = make('div', { className: 'sec' }, [
+        sectionTitle('系統沒有動這幾格（' + untouched.length + ' 格）'),
         make('div', {
-          text: '系統不會自己改走你親手做的決定。'
-            + (releasedCount < untouched.length
-              ? '要它一併調整的，在下面勾選，然後撳〔准系統調整我勾了的〕。' : '')
-            + (releasedCount > 0 ? '已放行的格系統不會改動。' : ''),
+          text: '你勾了「保留我的安排，系統不要調整」或者已經放行。要系統調整的話，'
+            + '回〔檢查我的改動〕取消那一格的勾，再撳一次〔請系統幫我調整〕。',
           className: 'muted'
         })
       ]);
       untouched.forEach((u) => {
-        const label = humanDate(u.serviceDate) + '　' + u.postNameTC
-          + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '')
-          + '　' + u.personName + '——' + u.reason;
-        if (u.released) {
-          blockedBox.appendChild(make('div', { className: 'vio-row' }, [
-            make('span', { text: label }),
-            make('span', {
-              text: '已放行' + (u.releasedVersionNo === null || u.releasedVersionNo === undefined
-                ? '' : '（第 ' + u.releasedVersionNo + ' 版）') + '——系統不會改動這一格',
-              className: 'tag'
-            })
-          ]));
-          return;
-        }
-        const line = make('label', { className: 'check-row' });
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = false;   // ⚠️ 預設不勾
-        cb.addEventListener('change', () => { allowSelected[u.key] = cb.checked; });
-        line.appendChild(cb);
-        line.appendChild(make('span', { text: label }));
-        blockedBox.appendChild(line);
+        blockedBox.appendChild(make('div', {
+          text: humanDate(u.serviceDate) + '　' + u.postNameTC
+            + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '')
+            + '　' + u.personName + '——' + u.reason
+            + (u.released ? ('（已放行' + (u.releasedVersionNo === null || u.releasedVersionNo === undefined
+              ? '' : '，第 ' + u.releasedVersionNo + ' 版') + '）') : '（你勾了保留）'),
+          className: 'vio-row'
+        }));
+      });
+    }
+
+    // 第七十五輪批次 CE 組：未決定嘅名——系統冇郁嗰幾格，唔再因為佢哋而整個拒絕
+    const undecided = r.undecidedNames || [];
+    let undecidedBox = null;
+    if (undecided.length > 0) {
+      undecidedBox = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('名單上找不到、你還沒有決定的名字（' + undecided.length + ' 個）'),
+        make('div', {
+          text: '這幾格系統沒有動。去〔檢查我的改動〕選〔加入名單〕或者勾「這一季臨時幫手」。',
+          className: 'muted'
+        })
+      ]);
+      undecided.forEach((u) => {
+        undecidedBox.appendChild(make('div', {
+          text: humanDate(u.serviceDate) + '　' + u.postNameTC + '　「' + u.text + '」',
+          className: 'vio-row'
+        }));
       });
     }
 
@@ -393,8 +363,7 @@
       nodes.push(box);
     }
 
-    // ⚠️ C3 組嗰段擺喺最後——佢係一個**要佢答**嘅問題，
-    // 唔應該混喺上面幾段報告中間。
+    if (undecidedBox) nodes.push(undecidedBox);
     if (blockedBox) nodes.push(blockedBox);
 
     const acts = [
@@ -402,22 +371,6 @@
       button('放棄，回到我自己那一版', () => openDiscardSuggestion(), 'secondary'),
       button('稍後再決定', () => closeModal(), 'secondary')
     ];
-    if (untouched.length > 0) {
-      // 〔准系統調整我勾了的〕＝ 用同一個起點再算一次，
-      // 但今次帶住「呢幾格准動」。**唔勾就一格都唔會動。**
-      acts.unshift(button('准系統調整我勾了的', () => {
-        const allow = Object.keys(allowSelected).filter((k) => allowSelected[k] === true);
-        if (allow.length === 0) {
-          setStatus('你一格都沒有勾。系統不會動你改過的任何一格。', true);
-          return;
-        }
-        closeModal();
-        // 起點用返呢一次嗰個，唔可以由頭再問一次——
-        // 佢啱啱先答過，再問一次只會令佢以為系統唔記得咗。
-        openBuildSuggestion(r.startSource, allow);
-      }, ''));
-      acts.push(button('保持原狀', () => closeModal(), 'secondary'));
-    }
     openModal('系統建議版本', nodes, acts);
   }
 

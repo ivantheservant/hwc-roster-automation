@@ -268,12 +268,11 @@ console.log('\n=== B1：認唔出嘅名字要列出嚟 ===');
   check('（收尾）清返嗰格', setGrid(GRID0, DATES[3], 'READ', ''));
 }
 
-console.log('\n=== B2【核心】建議表都要擋認唔出嘅名字 ===');
+console.log('\n=== B2（第七十五輪 CE 組）認唔出嘅名唔再整個拒絕，嗰格唔郁並列出 ===');
 {
-  // ⚠️ 理由同儲存嗰條路一模一樣（見 UnresolvedNameFix.gs）：
-  // 一個冇 PersonID 嘅名，嗰一格對嗰個人完全冇作用。
-  // 喺呢度放行，就等於俾佢經由建議表嗰條路溜入正式版本——
-  // 而幹事會以為「系統調整過 ⇒ 一定冇問題」。
+  // ⚠️ 第七十五輪批次 CE 組（Ivan 決定）：現場 image8 ——「有 1 格的名字系統認不出。什麼都沒有改動，
+  // 也沒有建立建議表」。改為：照樣調整其他格；名字嗰格（臨時幫手／未決定）唔郁，列做「未決定」。
+  // 佢仍然唔會溜入正式版本：接受建議表、儲存都要先決定（加入名單或勾「這一季臨時幫手」）。
   const latest = gas.findLatestVersionNo(Q);
   const gridNow = gas.buildRosterSheetName_(Q, latest);
   check('（前置）喺正式表打一個唔喺名單上嘅名',
@@ -281,16 +280,15 @@ console.log('\n=== B2【核心】建議表都要擋認唔出嘅名字 ===');
 
   const before = snapshotAssignments();
   const r = gas.apiBuildSuggestion(Q);
-  checkEqual('★★★★★ 拒絕產生建議表', r.ok, false);
-  check('★★★★★ 而且逐個列出認唔出嗰幾個',
-    (r.unresolved || []).length === 1, JSON.stringify(r.unresolved));
-  check('★★★★ 訊息明確講「乜都冇改動，亦都冇建立建議表」',
-    String(r.message || '').indexOf('沒有建立建議表') !== -1, r.message);
-  checkEqual('★★★★★ `RosterAssignments` 一個字都冇變',
-    snapshotAssignments(), before);
-  check('★★★★★ 而且真係冇整咗一張建議表出嚟',
-    gas.apiGetSuggestionState(Q).hasSuggestion === false, '');
-
+  checkEqual('★★★★★ 唔再拒絕產生建議表', r.ok, true);
+  check('★★★★★ 未決定嘅名逐個列出',
+    (r.undecidedNames || []).length === 1 && r.undecidedNames[0].text === '又一個唔存在嘅人', JSON.stringify(r.undecidedNames));
+  checkEqual('★★★★★ `RosterAssignments` 一個字都冇變', snapshotAssignments(), before);
+  let threw = null;
+  try { gas.apiAcceptSuggestion(Q); } catch (e) { threw = e; }
+  check('★★★★★★ 未決定就接受 ⇒ 拒絕（唔會溜入正式版本）',
+    threw && /還沒有決定/.test(threw.message), threw && threw.message);
+  gas.apiDiscardSuggestion(Q);
   check('（收尾）清返嗰格', setGrid(gridNow, DATES[5], 'CHAIR', ''));
 }
 // =====================================================================

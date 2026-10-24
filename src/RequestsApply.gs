@@ -422,7 +422,9 @@ function planApplyRequests_(quarterId) {
       postId: s.postId,
       slotIndex: s.slotIndex,
       personId: s.personId,
-      personName: person ? person.nameTC : (s.isManual ? '' : originalRow.personName),
+      // 第七十五輪批次 CD／CE 組：冇 PersonID 而有名（外請講員、這一季臨時幫手）⇒ 帶住個名，唔可以蒸發
+      personName: person ? person.nameTC
+        : (String(s.freeText || '').trim() || (s.isManual ? '' : originalRow.personName)),
       // 人手改過嘅格記成 MANUAL，令新版本嘅來源欄講得出真相
       assignSource: s.isManual
         ? ASSIGN_SOURCE.MANUAL

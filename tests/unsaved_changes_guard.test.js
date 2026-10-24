@@ -60,8 +60,8 @@ console.log('\n=== E2：assertNoUnsavedChanges_ 嘅三種觸發條件（靜態�
     /gridChangeCount > 0/.test(src) && /unresolvedCount > 0/.test(src)
     && /pendingRequestCount > 0/.test(src));
   check('★★★★★ 用三段式訊息', /buildThreePartMessage_\(/.test(src));
-  check('★★★★★ 出路第一條就係「先撳儲存及寄出」',
-    /先撳「儲存及寄出」/.test(src));
+  check('★★★★★ 出路第一條就係「先撳儲存」',
+    /先撳「儲存」/.test(src));
   check('★★★★★ 讀唔到狀態（-1）時唔可以講「零改動」，要誠實講「查不到」'
     + '——把「讀唔到」當成「冇事」正正就係本專案燒過幾次嗰個 bug class',
     /系統查不到目前有沒有未儲存的改動/.test(src));

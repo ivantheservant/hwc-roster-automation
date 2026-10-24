@@ -2,7 +2,7 @@
 // 執行方式：node tests/review_sent_hint.test.js
 //
 // 現場（截圖 s_stage_note）：寄了審閱本之後（進度「已寄給堂委，等他們的意見」），第 3 步〔寄出〕開出的
-// 仍然是「寄給堂委審閱」。要先在第 2 步撳〔儲存及寄出〕（沒有改動也可以）把進度推到「意見已收齊」，
+// 仍然是「寄給堂委審閱」。要先在第 2 步撳〔儲存〕（沒有改動也可以）把進度推到「意見已收齊」，
 // 〔寄出〕才會變成正式發出。只改顯示，不改流程。
 
 const fs = require('fs');
@@ -21,7 +21,7 @@ function check(label, condition, extra) {
 
 const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
-const EXPECTED = '堂委的意見收齊、要正式發出給全體？請先在第 2 步撳〔儲存及寄出〕（沒有改動也可以撳），之後再撳〔寄出〕，這裡就會變成「正式發出給全體」。';
+const EXPECTED = '堂委的意見收齊、要正式發出給全體？請先在第 2 步撳〔儲存〕（沒有改動也可以撳），之後再撳〔寄出〕，這裡就會變成「正式發出給全體」。';
 
 const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SendOptions.gs', 'SendRecipients.gs', 'WebAppSendPlan.gs']);
 

@@ -201,12 +201,13 @@ console.log('\n=== B1 S17 驗嘅五件事 ===');
   check('★★★★★★ 二、唔帶放行字眼儲存 ⇒ 要被拒絕'
     + '——⚠️ 佢係**拋錯**，唔係回 `{ok:false}`，所以要 catch',
     /catch \(err\) \{\s*\n\s*refused = err\.message;/.test(s17)
-      && /t\.expect\('不帶放行字眼就儲存 ⇒ 被拒絕'/.test(s17), s17.slice(0, 2200));
+      // 第七十五輪批次 CG 組：「唔帶放行字眼」變成「未勾保留我的安排」
+      && /t\.expect\('未勾「保留我的安排」就儲存 ⇒ 被拒絕'/.test(s17), s17.slice(0, 2200));
   check('★★★★★★ 而且被拒絕之後版本號唔准變'
     + '——訊息話「職事表沒有任何改動」，就真係唔可以有',
     /t\.equal\('被拒絕之後，版本號沒有變/.test(s17), '');
-  check('★★★★★★ 三、帶住放行字眼再叫一次 ⇒ 存得到，而且真係多咗一版',
-    /releaseText: SAVE_CONFIRM_RELEASE_TEXT/.test(s17)
+  check('★★★★★★ 三、勾咗「保留我的安排」（apiSetCellDecisions）再儲存 ⇒ 存得到，而且真係多咗一版',
+    /apiSetCellDecisions\(quarterId, items\)/.test(s17)
       && /t\.expect\('而且真的多了一版', afterRelease > versionNo,/.test(s17),
     s17.slice(0, 3600));
   check('★★★★★★ 四、`AuditLog` 記低咗放行咗幾多格',
@@ -247,23 +248,25 @@ console.log('\n=== B2【核心】放行要留低痕跡 ===');
   gas.readSheet = function () { return []; };
   gas.getQuarterStage_ = function () { return gas.QUARTER_STAGE.DRAFT; };
   gas.buildSaveAndConfirmPlan_ = function () {
+    // 第七十五輪批次 CF／CG 組：打字放行換成逐格勾「保留我的安排」——勾咗嘅一定要遵守違反喺 `violations.kept`
     return {
-      blocked: false, needsRelease: true, baseVersionNo: 1, stage: gas.QUARTER_STAGE.DRAFT,
+      blocked: false, needsRelease: false, needsDecision: false, baseVersionNo: 1, stage: gas.QUARTER_STAGE.DRAFT,
       zeroChange: false, decisions: [],
       requests: { apply: [], confirm: [], needsInput: [] },
-      gridChanges: [{ x: 1 }], overlaps: [], proposals: [],
+      gridChanges: [{ x: 1 }], titleChanges: [], overlaps: [], proposals: [],
+      decisionItems: { names: [], rules: [] },
       violations: {
-        real: [{ serviceDate: '2028-07-02', postId: 'CHAIR', slotIndex: 1,
+        real: [],
+        kept: [{ serviceDate: '2028-07-02', postId: 'CHAIR', slotIndex: 1,
           ruleId: 'HARD_ELIGIBILITY', severity: 'HARD' }],
-        released: [], structural: [], semiHard: []
+        released: [], structural: [], semiHard: [], semiKept: []
       }
     };
   };
 
   let threw = '';
   try {
-    gas.apiSaveAndConfirmExecute('2028T3',
-      { decisions: [], releaseText: gas.SAVE_CONFIRM_RELEASE_TEXT });
+    gas.apiSaveAndConfirmExecute('2028T3', { decisions: [] });
   } catch (err) { threw = err.message; }
 
   const release = audits.filter(function (a) { return a.action === '放行硬規則違反'; });
@@ -314,8 +317,9 @@ console.log('\n=== B2 冇放行嘅乾淨儲存 ⇒ 一筆都唔好寫 ===');
       blocked: false, needsRelease: false, baseVersionNo: 1, stage: gas.QUARTER_STAGE.DRAFT,
       zeroChange: false, decisions: [],
       requests: { apply: [], confirm: [], needsInput: [] },
-      gridChanges: [{ x: 1 }], overlaps: [], proposals: [],
-      violations: { real: [], released: [], structural: [], semiHard: [] }
+      gridChanges: [{ x: 1 }], titleChanges: [], overlaps: [], proposals: [],
+      decisionItems: { names: [], rules: [] },
+      violations: { real: [], kept: [], released: [], structural: [], semiHard: [], semiKept: [] }
     };
   };
   try { gas.apiSaveAndConfirmExecute('2028T3', { decisions: [] }); } catch (err) { /* 唔理 */ }

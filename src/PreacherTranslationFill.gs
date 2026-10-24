@@ -304,7 +304,7 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
     newValue: trimmedName,
     source: 'runOpenPreacherTranslationFill_',
     notes: (personId ? '已連結 NameMapping PersonID=' + personId : '文字快照，未連結 NameMapping')
-      + (sheetOnly ? '（這一版已通知過人：只寫了職事表工作表，沒有寫入 RosterAssignments；要撳〔儲存及寄出〕才成為新一版）' : '')
+      + (sheetOnly ? '（這一版已通知過人：只寫了職事表工作表，沒有寫入 RosterAssignments；要撳〔儲存〕才成為新一版）' : '')
       + (wasProtected ? '（grid 工作表受保護，已暫時解除並用原設定重新保護）' : '')
   });
 

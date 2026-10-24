@@ -40,7 +40,9 @@ const gas = loadGasSource([
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Trigger.gs', 'WebAppGuards.gs', 'WebAppDashboard.gs', 'WebAppRollback.gs',
   'WebAppGenerate.gs', 'GridNameDropdown.gs', 'MailRedirect.gs',
-  'SendRecipients.gs', 'Mailer.gs', 'SendOptions.gs', 'SuggestionSheet.gs'
+  'SendRecipients.gs', 'Mailer.gs', 'SendOptions.gs', 'SuggestionSheet.gs',
+  // 第七十五輪批次 CF 組：逐格決定（apiSetCellDecisions）
+  'CellDecisions.gs'
 ]);
 
 let fail = 0;
@@ -219,6 +221,16 @@ function setGrid(sheetName, dateStr, postKey, text) {
   sh.getRange(r, c).setValue(text);
   return true;
 }
+/** 第七十五輪批次 CF 組：把〔檢查我的改動〕列出嘅違反格全部勾「保留我的安排」。 */
+function keepAllViolations() {
+  const chk = gas.apiCheckMyChanges(Q);
+  const items = (chk.violations || []).filter(function (v) { return !v.released && !v.checked; })
+    .map(function (v) {
+      return { serviceDate: v.serviceDate, postId: v.postId, slotIndex: v.slotIndex, kind: v.kind,
+        cellText: v.cellText, ruleId: v.ruleId, checked: true };
+    });
+  if (items.length > 0) gas.apiSetCellDecisions(Q, items);
+}
 function readGrid(sheetName, dateStr, postKey) {
   const sh = ss.getSheetByName(sheetName);
   return String(sh.getRange(rowOf(sh, dateStr), colOf(sh, postKey)).getValue() || '').trim();
@@ -233,24 +245,15 @@ const GRID = gas.buildRosterSheetName_(Q, V0);
 // =====================================================================
 console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都要有對應嘅嘢 ===');
 {
-  // ⚠️ 第四十六輪批次 C 組：**呢一節嘅預期行為反轉咗。**
+  // ⚠️ 第七十五輪批次 CF 組（Ivan 決定）：**呢一節嘅預期行為再反轉一次。**
   //
-  // 本來造嘅係「一格既俾幹事改過、又俾系統再改一次」（紫色）。
-  // 而由第四十六輪開始，Ivan 定咗一條原則：
-  //
-  //   > 系統改壞幹事親手做嘅決定，比排錯更差。
-  //
-  // 所以同一個 case 而家嘅正確結果係：**系統唔會動嗰一格**，
-  // 改為上第四種色（橙）＋ 一個講清楚嘅備註 ＋ 喺對話框問返佢。
-  //
-  // 「紫色」呢一種**仍然存在**，但佢而家只會喺幹事**明確勾咗准動**
-  // 之後先出現——下面第二段就係造嗰一種。
+  // 第四十六輪 C 組定嘅係「幹事親手改過嘅格一律唔動，要佢勾『准系統調整』先動」。
+  // Ivan 手動測試 A 之後改為：每一格違反規則嘅格有 ☐「保留我的安排，系統不要調整」
+  //（預設唔勾，喺〔檢查我的改動〕勾，即時記住）；〔請系統幫我調整〕**只調整冇勾嘅格**。
+  // 所以：冇勾 ⇒ 系統會改（紫色＝你改過而系統又改咗）；勾咗 ⇒ 唔郁（橙色＋格註）。
   const prev = readGrid(GRID, DATES[2], 'CHAIR#1');
   check('（前置）上一週有人', prev !== '' && prev.indexOf('待填') === -1, prev);
   check('（前置）改成連續兩週同一人', setGrid(GRID, DATES[3], 'CHAIR#1', prev));
-
-  const r = gas.apiBuildSuggestion(Q, 'GRID');
-  check('★★★★ 產生到建議表', r.ok === true, JSON.stringify(r).slice(0, 300));
 
   const norm = function (x) { return String(x || '').toLowerCase(); };
   const countColours = function (sheetName) {
@@ -268,28 +271,32 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
     }
     return seen2;
   };
-  const sh = ss.getSheetByName(r.sheetName);
-  const kr = keyRowOf(sh);
-  const seen = countColours(r.sheetName);
+  const notesOf = function (sheetName) {
+    const out = [];
+    const sh3 = ss.getSheetByName(sheetName);
+    const kr3 = keyRowOf(sh3);
+    for (let row = kr3 + 1; row <= sh3.getLastRow(); row++) {
+      for (let c = 1; c <= sh3.getLastColumn(); c++) {
+        const n = String(sh3.getRange(row, c).getNote() || '').trim();
+        if (n) out.push(n);
+      }
+    }
+    return out;
+  };
 
+  // ── 一、冇勾：系統調整（紫色）──────────────────────────────
+  const r2 = gas.apiBuildSuggestion(Q, 'GRID');
+  check('★★★★ 產生到建議表', r2.ok === true, JSON.stringify(r2).slice(0, 300));
+  const seen2 = countColours(r2.sheetName);
   checkEqual('★★★★★★ **對話框報嘅每一個數字，同張表上實際上咗色嘅格數一模一樣**'
     + '——現場就係報「黃色 1 格」而張表上一格黃色都冇',
-    r.colourCounts, seen);
-  check('★★★★★★ **系統冇動幹事改嗰一格**，改為上橙色'
-    + '——呢個係第四十六輪 C 組嗰條原則：'
-    + '系統改壞幹事親手做嘅決定，比排錯更差',
-    seen.manualViolation >= 1, JSON.stringify(seen));
-  check('★★★★★★ 而且嗰一格**完全冇被改走**（`systemKeys` 唔會包住佢）'
-    + '——上色啱咗而個值被改咗，等於顏色講大話',
-    readGrid(r.sheetName, DATES[3], 'CHAIR#1') === prev,
-    readGrid(r.sheetName, DATES[3], 'CHAIR#1') + ' / ' + prev);
-  check('★★★★★ 對話框逐格列出嚟俾佢自己決定',
-    (r.untouchedManual || []).length >= 1, JSON.stringify(r.untouchedManual));
-  check('★★★★★ 而且講得出邊一格、邊個、點解',
-    (r.untouchedManual || []).some(function (u) {
-      return u.serviceDate === DATES[3] && u.postNameTC === '主席'
-        && u.personName === prev && u.reason.indexOf('上一週同崗位已是此人') !== -1;
-    }), JSON.stringify(r.untouchedManual));
+    r2.colourCounts, seen2);
+  check('★★★★★★ 冇勾「保留我的安排」⇒ 系統真係動咗嗰一格（第七十五輪 CF 組）',
+    readGrid(r2.sheetName, DATES[3], 'CHAIR#1') !== prev,
+    readGrid(r2.sheetName, DATES[3], 'CHAIR#1') + ' / ' + prev);
+  check('★★★★★★ 而且嗰一格係**紫色**（你改過，而系統又再改咗一次）',
+    seen2.both >= 1 && seen2.manualViolation === 0, JSON.stringify(seen2));
+  const sh = ss.getSheetByName(r2.sheetName);
   check('★★★★★ 四種顏色各有各嘅色碼，冇兩種撞埋',
     gas.SUGGESTION_COLOR_MANUAL !== gas.SUGGESTION_COLOR_SYSTEM
       && gas.SUGGESTION_COLOR_SYSTEM !== gas.SUGGESTION_COLOR_BOTH
@@ -301,57 +308,7 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
     sh.getRange(2, 3).getValue().indexOf('紫色格') !== -1
       && sh.getRange(2, 4).getValue().indexOf('橙色格') !== -1,
     String(sh.getRange(2, 3).getValue()) + ' | ' + String(sh.getRange(2, 4).getValue()));
-
-  // ── 格註：橙色格要講清楚「系統冇動佢」同埋點樣叫佢動 ──────────
-  const notes = [];
-  for (let row = kr + 1; row <= sh.getLastRow(); row++) {
-    for (let c = 1; c <= sh.getLastColumn(); c++) {
-      const n = String(sh.getRange(row, c).getNote() || '').trim();
-      if (n) notes.push(n);
-    }
-  }
-  check('★★★★★ **橙色格真係有格註**'
-    + '——一格橙色而冇備註，幹事唔知點解佢係橙色',
-    notes.length >= 1, 'notes=' + notes.length);
-  const blockNote = notes.filter(function (n) {
-    return n.indexOf('你改的這一格違反了規則') !== -1;
-  })[0];
-  check('★★★★★★ 格註明講**系統冇動佢**'
-    + '——唔講嘅話，佢會以為系統已經修好咗',
-    !!blockNote && blockNote.indexOf('系統沒有動它') !== -1, String(blockNote));
-  check('★★★★★ 而且講得出真正嘅原因（呢個 case 係連續兩週同一人）',
-    !!blockNote && blockNote.indexOf('上一週同崗位已是此人') !== -1, String(blockNote));
-  check('★★★★★ 亦都講埋「想系統一併調整可以點做」'
-    + '——一句「系統冇動」而唔講點樣叫佢動，等於得一半',
-    !!blockNote && blockNote.indexOf('勾選這一格') !== -1, String(blockNote));
-
-  // ── 勾咗之後：系統先至動 ───────────────────────────────────
-  //
-  // ⚠️ 呢一段係整節嘅反證。冇佢嘅話，上面全部斷言用一句
-  // 「系統乜都唔做」都會綠——而嗰個唔係我哋要嘅行為。
-  const allowKey = (r.untouchedManual || [])[0] && (r.untouchedManual || [])[0].key;
-  check('（前置）攞到嗰一格嘅 key', !!allowKey, String(allowKey));
-  const r2 = gas.apiBuildSuggestion(Q, 'GRID', [allowKey]);
-  check('★★★★ 再產生一次', r2.ok === true, JSON.stringify(r2).slice(0, 200));
-  check('★★★★★★ **勾咗之後系統真係動咗嗰一格**'
-    + '——唔動嘅話，個勾選框就係一個冇作用嘅裝飾',
-    readGrid(r2.sheetName, DATES[3], 'CHAIR#1') !== prev,
-    readGrid(r2.sheetName, DATES[3], 'CHAIR#1') + ' / ' + prev);
-  const seen2 = countColours(r2.sheetName);
-  check('★★★★★★ 而且嗰一格變成**紫色**（你改過，而系統又再改咗一次）',
-    seen2.both >= 1 && seen2.manualViolation === 0, JSON.stringify(seen2));
-  checkEqual('★★★★★ 第二次嘅數字一樣對得住表上實際上色',
-    r2.colourCounts, seen2);
-
-  const notes2 = [];
-  const sh2 = ss.getSheetByName(r2.sheetName);
-  const kr2b = keyRowOf(sh2);
-  for (let row = kr2b + 1; row <= sh2.getLastRow(); row++) {
-    for (let c = 1; c <= sh2.getLastColumn(); c++) {
-      const n = String(sh2.getRange(row, c).getNote() || '').trim();
-      if (n) notes2.push(n);
-    }
-  }
+  const notes2 = notesOf(r2.sheetName);
   const fixNote = notes2.filter(function (n) { return n.indexOf('系統改了這一格') !== -1; })[0];
   check('★★★★★ 系統改嗰格嘅格註講得出**真正嘅原因**'
     + '——呢個 case 係連續兩週同一人，所以要見到「上一週同崗位已是此人」；'
@@ -359,9 +316,34 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
     !!fixNote && fixNote.indexOf('上一週同崗位已是此人') !== -1,
     JSON.stringify(notes2.slice(0, 3)));
   check('★★★★ 而且照樣講埋改成邊個（兩樣都要，唔係二選一）',
-    // 第六十五輪批次 Z 組：替補唔再係「PersonID 最細嗰個」，所以唔寫死係邊個——
-    // 要驗嘅係「建議改派 X」同「改成「X」」講緊同一個人
     !!fixNote && /建議改派 (\S+?)。[\s\S]*改成「\1」/.test(fixNote), String(fixNote));
+
+  // ── 二、勾咗「保留我的安排」：唔郁（橙色＋格註）────────────────
+  const chk = gas.apiCheckMyChanges(Q);
+  const item = (chk.violations || []).filter(function (v) {
+    return v.serviceDate === DATES[3] && v.postId === 'CHAIR';
+  })[0];
+  check('（前置）〔檢查我的改動〕有嗰一格嘅勾選項目，預設唔勾', item && item.checked === false, JSON.stringify(chk.violations));
+  gas.apiSetCellDecisions(Q, [{ serviceDate: item.serviceDate, postId: item.postId, slotIndex: item.slotIndex,
+    kind: item.kind, cellText: item.cellText, ruleId: item.ruleId, checked: true }]);
+  const r = gas.apiBuildSuggestion(Q, 'GRID');
+  check('★★★★ 再產生一次', r.ok === true, JSON.stringify(r).slice(0, 200));
+  const seen = countColours(r.sheetName);
+  checkEqual('★★★★★ 第二次嘅數字一樣對得住表上實際上色', r.colourCounts, seen);
+  check('★★★★★★ 勾咗之後嗰一格**完全冇被改走**，而且係橙色',
+    readGrid(r.sheetName, DATES[3], 'CHAIR#1') === prev && seen.manualViolation >= 1,
+    readGrid(r.sheetName, DATES[3], 'CHAIR#1') + ' / ' + prev + ' ' + JSON.stringify(seen));
+  check('★★★★★ 對話框講得出邊一格、邊個、點解，而且標明係你勾咗保留',
+    (r.untouchedManual || []).some(function (u) {
+      return u.serviceDate === DATES[3] && u.postNameTC === '主席'
+        && u.personName === prev && u.reason.indexOf('上一週同崗位已是此人') !== -1 && u.kept === true;
+    }), JSON.stringify(r.untouchedManual));
+  const keepNote = notesOf(r.sheetName).filter(function (n) { return n.indexOf('保留我的安排') !== -1; })[0];
+  check('★★★★★★ 格註講明系統冇動佢、因為你勾咗保留',
+    !!keepNote && keepNote.indexOf('系統不會改動這一格') !== -1, String(keepNote));
+  // 還原：取消勾選、放棄建議表、改返 grid
+  gas.apiSetCellDecisions(Q, [{ serviceDate: item.serviceDate, postId: item.postId, slotIndex: item.slotIndex,
+    kind: item.kind, cellText: item.cellText, ruleId: item.ruleId, checked: false }]);
 }
 
 console.log('\n=== C2：建議表都要有下拉選單 ===');
@@ -429,6 +411,9 @@ console.log('\n=== B：舊版本嘅建議表要清走 ===');
 {
   // 造一張 v0 嘅建議表，然後建立一個新版本 ⇒ 舊嗰張要冇咗。
   setGrid(GRID, DATES[5], 'CHAIR#1', PEOPLE.P9805);
+  // 第七十五輪批次 CF 組：〔請系統幫我調整〕而家會調整冇勾「保留我的安排」嘅違反格——
+  // 呢一節要嘅係「有一張有內容嘅建議表」，所以先勾保留（唔係呢一節要驗嘅嘢）。
+  keepAllViolations();
   const built = gas.apiBuildSuggestion(Q, 'GRID');
   check('（前置）有一張 v' + V0 + ' 嘅建議表', built.ok === true, JSON.stringify(built).slice(0, 200));
 
@@ -447,6 +432,7 @@ console.log('\n=== B：舊版本嘅建議表要清走 ===');
   check('（前置）而家係 v' + v1, v1 >= 1, String(v1));
   check('（前置）喺 v1 改一格',
     setGrid(gas.buildRosterSheetName_(Q, v1), DATES[4], 'CHAIR#1', PEOPLE.P9804));
+  keepAllViolations();
   const built2 = gas.apiBuildSuggestion(Q, 'GRID');
   check('（前置）v1 有一張建議表', built2.ok === true,
     JSON.stringify(built2).slice(0, 200));
@@ -687,7 +673,8 @@ console.log('\n=== G：儲存之前要提醒「仲有 N 格冇人」===');
   check('★★★★★ 冇空格嘅時候**唔會出呢一段**（每次都出就等於冇出過）',
     /if \(plan\.blankCells && plan\.blankCells\.length > 0\) \{/.test(zone1), '');
   check('★★★★★ 而且加咗一粒直接接落〔請系統幫我調整〕',
-    /extraActions: buildFixItActions\(plan\)/.test(zone1)
+    // 第七十五輪批次 CG 組：確認窗改用 openModal，掣列入面接住 buildFixItActions(plan)
+    /\.concat\(buildFixItActions\(plan\)\)/.test(zone1)
       && /openBuildSuggestion\(\);/.test(zone1), '');
   check('★★★★★ 但**冇嘢可以調整嗰陣唔會出嗰粒掣**'
     + '——一粒撳咗只會話「冇嘢要調整」嘅掣，就係一粒冇用嘅掣',

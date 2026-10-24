@@ -461,7 +461,7 @@
     const save = (d.buttons && d.buttons.save) || {};
     // ⚠️ 第四十六輪批次 D2 組：改名叫「儲存及寄出」。
     // 儲存之後直唔直接去寄出，係確認窗入面一個**預設唔勾**嘅選項。
-    acts.push(stepButton('儲存及寄出', () => openSaveAndConfirm(), {
+    acts.push(stepButton('儲存', () => openSaveAndConfirm(), {
       disabled: !save.enabled,
       className: 'secondary',
       title: save.enabled ? '' : (save.disabledReason || '')

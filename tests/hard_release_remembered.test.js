@@ -38,7 +38,7 @@ const gas = loadGasSource([
   'Trigger.gs', 'WebAppGuards.gs', 'WebAppDashboard.gs',
   'WebAppGenerate.gs', 'GridNameDropdown.gs', 'MailRedirect.gs',
   'SendRecipients.gs', 'Mailer.gs', 'ResendFlow.gs', 'SendOptions.gs', 'PersonalLinkInMail.gs',
-  'SuggestionSheet.gs',
+  'SuggestionSheet.gs', 'CellDecisions.gs',
   'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppSaveConfirm.gs'
 ]);
 
@@ -308,16 +308,21 @@ let V1 = -1;
 console.log('\n=== AG1【核心】第一次儲存要打字放行，而且寫落機器可讀紀錄 ===');
 {
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  check('★★★★★ 計劃：有 1 格真違反、要打字', plan.needsRelease === true
-    && plan.violations.real.length === 1 && plan.violations.real[0].ruleId === 'HARD_ELIGIBILITY',
+  // ⚠️ 第七十五輪批次 CF／CG 組（Ivan 決定）：打字放行換成逐格勾「保留我的安排，系統不要調整」。
+  // 勾咗 ＝ 放行；儲存時轉成**同一套**機器可讀放行紀錄（下面全部斷言照舊）。
+  check('★★★★★ 計劃：有 1 格真違反、要決定（勾選）', plan.needsDecision === true && plan.needsRelease === false
+    && plan.violations.real.length === 1 && plan.violations.real[0].ruleId === 'HARD_ELIGIBILITY'
+    && plan.decisionItems.rules.length === 1,
     JSON.stringify(plan.violations).slice(0, 400));
   let threw = null;
   try { gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] }); } catch (e) { threw = e; }
-  check('★★★★★ 唔打字 ⇒ 拒絕', threw !== null && /打字放行/.test(threw.message), threw && threw.message);
+  check('★★★★★ 未勾 ⇒ 拒絕', threw !== null && /你還沒有決定/.test(threw.message), threw && threw.message);
 
-  const result = gas.apiSaveAndConfirmExecute(Q, {
-    decisions: [], confirmedRequestRows: [], releaseText: gas.SAVE_CONFIRM_RELEASE_TEXT });
-  check('★★★★★ 打字「' + gas.SAVE_CONFIRM_RELEASE_TEXT + '」⇒ 建立新版本',
+  const it = plan.decisionItems.rules[0];
+  gas.apiSetCellDecisions(Q, [{ serviceDate: it.serviceDate, postId: it.postId, slotIndex: it.slotIndex,
+    kind: it.kind, cellText: it.cellText, ruleId: it.ruleId, checked: true }]);
+  const result = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
+  check('★★★★★ 勾咗「保留我的安排」⇒ 建立新版本',
     result.ok === true && result.versionCreated === true, JSON.stringify(result).slice(0, 300));
   V1 = gas.findLatestVersionNo(Q);
   checkEqual('★★★★ 新版本嗰格就係假丁', whoIsOn(V1, DATES[CELL_DATE], 'CHAIR'), 'P9604');
@@ -337,7 +342,7 @@ console.log('\n=== AG1【核心】第一次儲存要打字放行，而且寫落�
 console.log('\n=== AG1【核心】再儲存同一狀態 ⇒ 唔使打字，清單喺「已放行」 ===');
 {
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  check('★★★★★★ needsRelease = false', plan.needsRelease === false, JSON.stringify(plan.violations.real).slice(0, 300));
+  check('★★★★★★ needsDecision = false', plan.needsDecision === false, JSON.stringify(plan.violations.real).slice(0, 300));
   check('★★★★★★ 喺 `violations.released`', plan.violations.released.length === 1
     && plan.violations.released[0].personId === 'P9604', JSON.stringify(plan.violations.released).slice(0, 300));
   checkEqual('★★★★★ 講得出係第幾版放行', plan.violations.released[0].releasedVersionNo, V1);
@@ -389,11 +394,13 @@ console.log('\n=== AG3【核心】「請系統幫我調整」唔動已放行嘅�
   const rq = gas.apiBuildSuggestion(Q);
   check('★★★★ 建議表建立成功', rq.ok === true, JSON.stringify(rq).slice(0, 300));
   const remainingDates = (rq.remaining || []).map(function (x) { return x.serviceDate + '|' + x.postNameTC; });
-  checkEqual('★★★★★★ 「仍然違反」剛好 1 格＝未放行嗰格；已放行嗰格唔計',
-    remainingDates, [otherDate + '|主席']);
-  check('★★★★★ 已放行嗰格仍然喺「你改過、而違反規則的格」標 released',
+  // ⚠️ 第七十五輪批次 CF 組（Ivan 決定）：冇勾「保留我的安排」嘅違反格，系統會試住調整
+  //（唔再係「親手改過一律唔動」）。所以未放行嗰格唔再列喺「系統沒有動」，而係俾系統改。
+  check('★★★★★★ 「仍然違反」唔計已放行嗰格',
+    remainingDates.indexOf(DATES[CELL_DATE] + '|主席') === -1, JSON.stringify(remainingDates));
+  check('★★★★★ 已放行嗰格仍然喺「系統沒有動」標 released；未放行而冇勾嗰格唔喺度（系統會調整）',
     (rq.untouchedManual || []).some(function (x) { return x.serviceDate === DATES[CELL_DATE] && x.released === true; })
-    && (rq.untouchedManual || []).some(function (x) { return x.serviceDate === otherDate && x.released === false; }),
+    && !(rq.untouchedManual || []).some(function (x) { return x.serviceDate === otherDate; }),
     JSON.stringify(rq.untouchedManual));
   check('（收尾）另一個主日主席格改返', setGrid(gridOf(V1), otherDate, 'CHAIR', otherChairBefore ? PEOPLE[otherChairBefore] : ''));
   check('（收尾）改返嗰格讀經', setGrid(gridOf(V1), DATES[3], 'READ', PEOPLE[readNow]));
@@ -403,7 +410,7 @@ console.log('\n=== AG2【核心】換人 ⇒ 要重新放行 ===');
 {
   check('（前置）同一格換成另一個唔合資格嘅人（假丙）', setGrid(gridOf(V1), DATES[CELL_DATE], 'CHAIR', PEOPLE.P9603));
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  check('★★★★★★ needsRelease = true（放行只記住「同一個人」）', plan.needsRelease === true
+  check('★★★★★★ needsDecision = true（放行只記住「同一個人」）', plan.needsDecision === true
     && plan.violations.real.length === 1 && plan.violations.real[0].personId === 'P9603',
     JSON.stringify(plan.violations).slice(0, 300));
   check('（收尾）改返假丁', setGrid(gridOf(V1), DATES[CELL_DATE], 'CHAIR', PEOPLE.P9604));
@@ -412,18 +419,22 @@ console.log('\n=== AG2【核心】換人 ⇒ 要重新放行 ===');
 
 console.log('\n=== AG4【核心】舊格式紀錄（主流程第五十三至六十六輪）：核對得到個人先認 ===');
 {
+  // 第七十五輪批次 CF 組：AG1 嘅「保留我的安排」勾選仲生效（CellDecisions），會令呢度永遠當已決定。
+  // 呢一節驗嘅係 AuditLog 放行紀錄本身，所以先取消嗰個勾。
+  gas.apiSetCellDecisions(Q, [{ serviceDate: DATES[CELL_DATE], postId: 'CHAIR', slotIndex: 1, kind: 'KEEP',
+    cellText: PEOPLE.P9604, ruleId: 'HARD_ELIGIBILITY', checked: false }]);
   // 主流程嘅儲存同時寫咗一行舊格式（人類可讀）稽核行——兩行都刪走先係「冇紀錄」
   deleteAuditRowsWhere(function (r) {
     return r[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_ACTION
       || r[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION;
   });
-  check('（對照）刪走兩種紀錄 ⇒ 又要打字', gas.apiSaveAndConfirmPlan(Q).needsRelease === true);
+  check('（對照）刪走兩種紀錄 ⇒ 又要打字', gas.apiSaveAndConfirmPlan(Q).needsDecision === true);
 
   // 舊格式：action『放行硬規則違反』、targetKey『<季度> v<版本>』、notes『日期　PostID#slot　RuleID』
   appendAudit(gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION, Q + ' v' + V1,
     DATES[CELL_DATE] + '　CHAIR#1　HARD_ELIGIBILITY');
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  check('★★★★★★ 該版本嗰格嘅人正係假丁 ⇒ 認做已放行', plan.needsRelease === false
+  check('★★★★★★ 該版本嗰格嘅人正係假丁 ⇒ 認做已放行', plan.needsDecision === false
     && plan.violations.released.length === 1, JSON.stringify(plan.violations).slice(0, 300));
   checkEqual('★★★★★ 放行版本由 targetKey 讀出', plan.violations.released[0].releasedVersionNo, V1);
 
@@ -431,13 +442,13 @@ console.log('\n=== AG4【核心】舊格式紀錄（主流程第五十三至六�
   deleteAuditRowsWhere(function (r) { return r[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION; });
   appendAudit(gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION, Q + ' v' + V0,
     DATES[CELL_DATE] + '　CHAIR#1　HARD_ELIGIBILITY');
-  check('★★★★★★ 指向嗰一版嗰格係另一個人 ⇒ **唔認**', gas.apiSaveAndConfirmPlan(Q).needsRelease === true);
+  check('★★★★★★ 指向嗰一版嗰格係另一個人 ⇒ **唔認**', gas.apiSaveAndConfirmPlan(Q).needsDecision === true);
 
   // 另一季度嘅紀錄唔算
   deleteAuditRowsWhere(function (r) { return r[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION; });
   appendAudit(gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION, '2098T4 v' + V1,
     DATES[CELL_DATE] + '　CHAIR#1　HARD_ELIGIBILITY');
-  check('★★★★ 另一季度嘅舊紀錄唔算', gas.apiSaveAndConfirmPlan(Q).needsRelease === true);
+  check('★★★★ 另一季度嘅舊紀錄唔算', gas.apiSaveAndConfirmPlan(Q).needsDecision === true);
 
   // 留低一行認得到嘅，落面 AH 要用
   deleteAuditRowsWhere(function (r) { return r[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_MAINFLOW_LEGACY_ACTION; });
@@ -519,15 +530,16 @@ console.log('\n=== AH2【核心】畫面：三個確認框同狀態卡由同一�
   });
   const body = sg.document.getElementById('modalBody');
   const bodyText = body.textContent;
-  check('★★★★★★ 段題「你改過、而違反規則的格（2 格）」', /你改過、而違反規則的格（2 格）/.test(bodyText), bodyText);
-  check('★★★★★★ 已放行嗰格標「已放行（第 ' + V1 + ' 版）——系統不會改動這一格」',
-    new RegExp('已放行（第 ' + V1 + ' 版）——系統不會改動這一格').test(bodyText), bodyText);
+  // 第七十五輪批次 CF 組：段題改為「系統沒有動這幾格（N 格）」，冇勾選框（勾選喺〔檢查我的改動〕）
+  check('★★★★★★ 段題「系統沒有動這幾格（2 格）」', /系統沒有動這幾格（2 格）/.test(bodyText), bodyText);
+  check('★★★★★★ 已放行嗰格標「已放行，第 ' + V1 + ' 版」',
+    new RegExp('已放行，第 ' + V1 + ' 版').test(bodyText), bodyText);
   const countInputs = function (node) {
     let n = node.tagName === 'INPUT' ? 1 : 0;
     (node.children || []).forEach(function (c) { n += countInputs(c); });
     return n;
   };
-  checkEqual('★★★★★ 只有未放行嗰格有勾選框（1 個）', countInputs(body), 1);
+  checkEqual('★★★★★ 建議窗冇勾選框（「准系統調整我勾了的」已拿走）', countInputs(body), 0);
 
   // 三個確認框真係叫呢支——用原始碼守住（唔係靠文字比對結果）
   const fs = require('fs');

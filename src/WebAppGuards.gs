@@ -85,7 +85,7 @@ function canSendWithUnsavedChanges_(state) {
       reason: '表上有 ' + s.unresolvedCount + ' 格的文字系統認不出來。'
         + '那不是「你改了還沒儲存」，那是系統讀不懂那幾格——'
         + '寄出去之後那幾格會變成什麼，系統自己都講不出，'
-        + '所以這一次不能用「寄出但不儲存」。先去「儲存及寄出」把那幾格處理好。'
+        + '所以這一次不能用「寄出但不儲存」。先去「儲存」把那幾格處理好。'
     };
   }
   if (s.pendingRequestCount > 0) {
@@ -93,7 +93,7 @@ function canSendWithUnsavedChanges_(state) {
       allowed: false,
       reason: '有 ' + s.pendingRequestCount + ' 筆修改申報還沒有處理。'
         + '那些東西還沒有進到表上，所以這一次不能用「寄出但不儲存」。'
-        + '先去「儲存及寄出」處理它們。'
+        + '先去「儲存」處理它們。'
     };
   }
   if (!(s.gridChangeCount > 0)) {
@@ -167,7 +167,7 @@ function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
       verdict.reason,
       '「' + actionName + '」沒有執行，沒有寄出任何電郵。'
         + '你在表上的東西一格都沒有動。',
-      ['先撳「儲存及寄出」，把表上的東西處理好，之後再撳「' + actionName + '」',
+      ['先撳「儲存」，把表上的東西處理好，之後再撳「' + actionName + '」',
         '如果那些東西是打錯的，把那幾格改回原樣']));
   }
 
@@ -183,7 +183,7 @@ function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
     '職事表沒有任何改動，第 ' + (versionNo < 0 ? '—' : versionNo)
       + ' 版仍然是最新一版。「' + actionName + '」沒有執行，沒有寄出任何電郵。',
     [
-      '先撳「儲存及寄出」，把改動儲存成新一版，之後再撳「' + actionName + '」',
+      '先撳「儲存」，把改動儲存成新一版，之後再撳「' + actionName + '」',
       '如果那些改動是打錯的，把那幾格改回原樣，這一粒掣就會重新亮起'
     ]
   ));

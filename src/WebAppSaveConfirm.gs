@@ -56,9 +56,10 @@ function buildSaveAndConfirmPlan_(quarterId) {
       blocked: true, blockReason: reason, unresolved: [],
       requests: { apply: [], confirm: [], needsInput: [] },
       gridChanges: [], overlaps: [],
-      violations: { real: [], released: [], structural: [], semiHard: [] },
+      violations: { real: [], kept: [], released: [], structural: [], semiHard: [], semiKept: [] },
       needsRelease: false, proposals: [], targetVersionNo: null,
-      zeroChange: false, zeroChangeAction: null
+      zeroChange: false, zeroChangeAction: null,
+      tempHelpers: [], decisionItems: { names: [], rules: [] }, needsDecision: false, keptCount: 0
     }, extra || {});
   };
 
@@ -106,46 +107,11 @@ function buildSaveAndConfirmPlan_(quarterId) {
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiSaveAndConfirmPlan');
 
-  if (resolved.unresolved.length > 0) {
-    // **立即中止，唔做之後任何一步**，亦唔提供「略過這幾格繼續」嘅出口。
-    // 認唔出就係認唔出——猜係第十九／二十輪嗰一類 bug 嘅溫床。
-    return blocked('UNRESOLVED_NAMES', {
-      // ─────────────────────────────────────────────────────────────
-      // ⚠️ 第三十五輪批次 B 組：**兩個值都要送，而且唔可以送錯欄位名。**
-      // ─────────────────────────────────────────────────────────────
-      //
-      // 原本寫 `rawText: u.manualText || u.rawText || ''`，但
-      // `buildGridOverlayState_()`（FineTune.gs）推入 `unresolved` 嗰陣
-      // 用嘅欄位名係 **`text`**——`manualText` 同 `rawText` 兩個都唔存在。
-      // 所以永遠 fallback 到 `''`，而畫面就印成「你打了：「(空白)」」。
-      //
-      // 現場後果：grid 上明明有一位客席講員嘅名，對話框話你打咗空白。
-      // 幹事會照住去改一格本來冇問題嘅嘢。
-      //
-      // ⚠️ 而家**兩個值都送**（格內現在／本來應該係）。只送一個
-      // 就永遠分唔出係邊一邊出事——而呢個 bug 正正就係噉樣藏咗好耐。
-      // ⚠️ 第三十五輪批次 B 組（順帶）：`context.postNames` **根本唔存在**。
-      // `buildFineTuneContext_()` 冇呢個欄位（只有寄信嗰個 context 先有），
-      // 所以個三元運算永遠 fallback 到 `u.postId` ⇒ 幹事見到嘅係
-      // `PREACHER#1` 呢種機器鍵，唔係「講員」。
-      // 現場對話框嗰句 `2027-07-04　PREACHER#1　……` 就係噉嚟。
-      // 而家由 `context.posts` 真正譯返中文名。
-      unresolved: resolved.unresolved.map(function (u) {
-        return {
-          serviceDate: u.serviceDate,
-          postNameTC: postNameById[u.postId] || u.postId,
-          slotIndex: u.slotIndex,
-          // 格內而家真正有咩（幹事打嗰個）
-          gridText: u.text || '',
-          // 呢一格本來應該渲染成咩（版本記錄嗰邊）
-          expectedText: u.expectedText || '',
-          // 舊欄位名保留，等未更新嘅前端唔會即刻爆——但佢而家帶住**正確**嘅值。
-          rawText: u.text || ''
-        };
-      }),
-      message: buildUnresolvedGuidanceText_(resolved.unresolved)
-    });
-  }
+  // ⚠️ 第七十五輪批次 CE／CG 組（Ivan 決定）：認唔出嘅名**唔再即時擋**。
+  // 每一個有兩個選擇：〔加入名單〕（`apiAddPersonForUnresolvedName()`）或者
+  // ☐「這一季臨時幫手，不加入名單」（`CellDecisions`，整季記住、換咗名就失效）。
+  // 未決定嘅喺確認畫面即場列出，**全部決定咗先可以儲存**（execute 會再驗一次）。
+  // 臨時幫手嗰格：冇 PersonID、冇電郵，只存名字；唔計服侍次數；系統唔會調整。
 
   // ── 步 1.3　讀待處理申報 ─────────────────────────────────────
   const requestPlan = planApplyRequests_(quarterId);
@@ -203,7 +169,39 @@ function buildSaveAndConfirmPlan_(quarterId) {
   // 用現成嘅 `decorateViolations_()`（RequestsApply.gs），唔另寫一份。
   const rawViolations = findStateViolations_(resolved.state, context);
   const allViolations = decorateViolations_(rawViolations, context);
-  const violations = classifySaveConfirmViolations_(quarterId, versionNo, allViolations);
+  const classified = classifySaveConfirmViolations_(quarterId, versionNo, allViolations);
+
+  // ── 第七十五輪批次 CF／CG 組：逐格決定 ─────────────────────────
+  //
+  // 一定要遵守嘅規則：勾咗「保留我的安排，系統不要調整」＝ 放行（取代打字放行框）；
+  // 儲存時轉成現有放行紀錄（`logHardViolationRelease_()`）。「盡量避免」嘅：勾咗就唔再提，
+  // 唔勾只係一句提示、唔擋。⚠️ 同〔檢查我的改動〕用同一支 `buildDecisionItems_()`。
+  let saveReleaseContext = null;
+  try {
+    saveReleaseContext = buildHardViolationClassContext_(quarterId, versionNo, context.unavailable);
+  } catch (err) {
+    log_('WARN', 'buildSaveAndConfirmPlan_：讀不到放行紀錄：' + err.message);
+  }
+  const decisionItems = buildDecisionItems_(context, resolved.unresolved, allViolations,
+    readCellDecisionIndex_(quarterId, context.timezone), saveReleaseContext);
+  const keptRuleKeys = {};
+  decisionItems.rules.forEach(function (r) { if (r.checked) keptRuleKeys[r.key + '§' + r.ruleId] = true; });
+  const isKeptViolation = function (v) {
+    return !!keptRuleKeys[v.serviceDate + '|' + v.postId + '|' + v.slotIndex + '§' + v.ruleId];
+  };
+  const violations = {
+    real: classified.real.filter(function (v) { return !isKeptViolation(v); }),
+    kept: classified.real.filter(isKeptViolation),
+    released: classified.released,
+    structural: classified.structural,
+    semiHard: classified.semiHard.filter(function (v) { return !isKeptViolation(v); }),
+    semiKept: classified.semiHard.filter(isKeptViolation)
+  };
+  const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });
+  const tempHelpers = decisionItems.names.filter(function (n) { return n.checked; });
+  const undecidedRuleItems = decisionItems.rules.filter(function (r) {
+    return r.mustFollow && !r.checked && !r.released;
+  });
 
   // ── 步 1.6　三欄對照 ─────────────────────────────────────────
   const proposals = buildSaveConfirmProposals_(context, resolved, allViolations);
@@ -230,14 +228,26 @@ function buildSaveAndConfirmPlan_(quarterId) {
   return {
     blocked: false,
     blockReason: null,
-    unresolved: [],
+    // 第七十五輪批次 CE 組：未決定嘅名（決定項目形狀）；已決定嘅臨時幫手喺 `tempHelpers`
+    unresolved: undecidedNames.map(publicDecisionItem_),
+    tempHelpers: tempHelpers.map(publicDecisionItem_),
+    // 第七十五輪批次 CG 組：確認畫面即場顯示嘅決定元件（同〔檢查我的改動〕同一個形狀）
+    decisionItems: {
+      names: undecidedNames.map(publicDecisionItem_),
+      rules: undecidedRuleItems.map(publicDecisionItem_)
+    },
+    // 仲有未決定嘅「一定要遵守」違反或者名 ⇒ 未可以儲存
+    needsDecision: undecidedNames.length > 0 || undecidedRuleItems.length > 0,
+    // 你已確認保留嘅格數（唔再逐格重複提示）
+    keptCount: violations.kept.length + violations.semiKept.length + tempHelpers.length,
     requests: requests,
     gridChanges: gridChanges,
     titleChanges: titleChanges,
     overlaps: overlaps,
     blankCells: blankCells,
     violations: violations,
-    needsRelease: violations.real.length > 0,
+    // ⚠️ 第七十五輪批次 CG 組：打字放行框拿走——放行由勾選決定（`needsDecision`）。
+    needsRelease: false,
     proposals: proposals,
     targetVersionNo: versionNo + 1,
     stage: stage,
@@ -406,14 +416,16 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   }
   assertSaveConfirmPlanStillFresh_(plan, input.decisions);
 
-  // ── 3　放行文字檢查 ─────────────────────────────────────────
-  if (plan.needsRelease && String(input.releaseText || '').trim() !== SAVE_CONFIRM_RELEASE_TEXT) {
+  // ── 3　第七十五輪批次 CG 組：逐格決定檢查（取代打字放行）──────────
+  //
+  // 後端唔信前端：重新 plan 一次，仲有未決定嘅「一定要遵守」違反或者名 ⇒ 一格都唔寫。
+  if (plan.needsDecision) {
     throw new Error(buildThreePartMessage_(
-      '有 ' + plan.violations.real.length + ' 格違反了一定要遵守的規則，需要你打字放行才能儲存。',
+      '還有 ' + plan.decisionItems.rules.length + ' 格違反了一定要遵守的規則、'
+        + plan.decisionItems.names.length + ' 個名字在名單上找不到，你還沒有決定。',
       '職事表沒有任何改動，第 ' + plan.baseVersionNo + ' 版仍然是最新一版。',
-      ['如果這些安排是正確的（例如名單還未更新），在放行格輸入「'
-        + SAVE_CONFIRM_RELEASE_TEXT + '」再撳一次',
-        '如果是改錯了，回到職事表把那幾格改回去，再撳「儲存及寄出」']));
+      ['在確認畫面逐格勾「保留我的安排，系統不要調整」／「這一季臨時幫手，不加入名單」，或者〔加入名單〕',
+        '如果是改錯了，撳〔返回修改〕，回到職事表把那幾格改回去，再撳「儲存」']));
   }
 
   // ── 零改動路徑（D4）────────────────────────────────────────
@@ -498,7 +510,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
       registerVersion(
         quarterId, created.versionNo, created.sheetName,
         VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
-        plan.violations.real.length + plan.violations.semiHard.length,
+        plan.violations.kept.length + plan.violations.semiHard.length + plan.violations.semiKept.length,
         false, versionNote);
     }
   } catch (err) {
@@ -527,14 +539,15 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   //
   // ⚠️ 排喺版本真係建立咗之後先寫。建立失敗嗰條路喺上面就 return 咗，
   // 唔會行到呢度——唔可以記低一次冇發生過嘅放行。
-  if (plan.needsRelease) {
+  // 第七十五輪批次 CF 組：勾咗「保留我的安排」嘅一定要遵守違反 ＝ 放行 ⇒ 轉成現有放行紀錄（整季記住）
+  if (plan.violations.kept.length > 0) {
     // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**（`logHardViolationRelease_()`，
     // 同步驟 3／5、選單版本同一個格式：action=「硬規則放行」、targetKey=季度、
     // notes 有 `RELEASED_KEYS:` 6 欄 key）。之前只寫下面嗰行人類可讀嘅紀錄，
     // `readReleasedHardViolationKeys_()` 認唔出 ⇒ 同樣 3 格每一次儲存都要重新打字放行。
     try {
-      logHardViolationRelease_(quarterId, 'apiSaveAndConfirmExecute（儲存及寄出）',
-        plan.violations.real, created.versionNo);
+      logHardViolationRelease_(quarterId, 'apiSaveAndConfirmExecute（儲存：勾選保留）',
+        plan.violations.kept, created.versionNo);
     } catch (err) {
       log_('WARN', '機器可讀放行紀錄寫不進 AuditLog：' + err.message);
     }
@@ -544,11 +557,11 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         targetSheet: SHEETS.ROSTER_VERSIONS,
         targetKey: quarterId + ' v' + created.versionNo,
         oldValue: '第 ' + plan.baseVersionNo + ' 版',
-        newValue: '放行了 ' + plan.violations.real.length + ' 格規則違反',
+        newValue: '放行了 ' + plan.violations.kept.length + ' 格規則違反（勾選「保留我的安排」）',
         source: 'apiSaveAndConfirmExecute',
         // ⚠️ 用 `postId`。岗位中文名嘸個 map 係
         // `buildSaveAndConfirmPlan_()` 嘅本地變數，嘸呢度拿唔到。
-        notes: plan.violations.real.map(function (v) {
+        notes: plan.violations.kept.map(function (v) {
           return v.serviceDate + '　' + v.postId + '#' + v.slotIndex
             + '　' + v.ruleId;
         }).join('；')
@@ -602,7 +615,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     appliedRequestCount: requestResult ? requestResult.appliedCount : 0,
     rejectedRequestCount: requestResult ? requestResult.rejectedCount : 0,
     needsInputCount: requestResult ? requestResult.needsInputCount : 0,
-    releasedViolationCount: plan.violations.real.length,
+    releasedViolationCount: plan.violations.kept.length,
     stageAdvanced: stageAdvanced,
     publishFailed: publish.failed,
     publishError: publish.message,
@@ -667,7 +680,7 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
         '沒有任何東西被寫入——第 ' + targetVersionNo + ' 版沒有建立，'
           + '職事表、修改申報、Stage 全部維持原樣，第 ' + baseVersionNo + ' 版仍然是最新一版。'
           + '沒有寄出任何電郵。',
-        ['直接再撳一次「儲存及寄出」就可以，不需要做任何清理',
+        ['直接再撳一次「儲存」就可以，不需要做任何清理',
           '如果再試仍然一樣，把上面整段文字交給開發者'])
     };
   }
@@ -744,7 +757,7 @@ function assertSaveConfirmPlanStillFresh_(plan, decisions) {
 
   throw new Error(
     '職事表在你確認的期間被改動過，剛才的預覽已經過期。'
-    + '請關掉這個畫面重新撳一次「儲存及寄出」。');
+    + '請關掉這個畫面重新撳一次「儲存」。');
 }
 
 /**

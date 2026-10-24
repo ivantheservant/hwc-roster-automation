@@ -45,38 +45,19 @@ console.log('\n=== 決定 D4【核心】零改動路徑：邊個 Stage 做咩 ==
       .length === 1);
 }
 
-console.log('\n=== 步 1.2【核心】認唔出姓名 ⇒ 立即阻擋，冇「略過繼續」出口 ===');
+console.log('\n=== 步 1.2（第七十五輪 CE／CG 組）認唔出姓名唔再即時擋，改為逐個決定 ===');
 {
-  check('★★★★★ unresolved.length > 0 就即刻 return blocked，'
-    + '**唔做之後任何一步**（唔會走到申報、規則檢查）',
-    /if \(resolved\.unresolved\.length > 0\) \{[\s\S]{0,400}?return blocked\('UNRESOLVED_NAMES'/.test(SRC));
-
-  check('★★★★★ 完全冇提供「略過這幾格繼續」嘅選項'
-    + '——認唔出就係認唔出，猜係第十九／二十輪嗰一類 bug 嘅溫床',
-    SRC.indexOf('略過') === -1 || !/skipUnresolved|ignoreUnresolved|forceContinue/.test(SRC));
-
-  // ⚠️ 第三十五輪批次 B 組：而家要送**兩個值**。
-  // 原本只送一個（而且欄位名寫錯咗，永遠 fallback 到空字串），
-  // 令對話框話幹事打咗空白，但 grid 上明明有字。
-  check('★★★★ 阻擋時會列出日期／崗位（規格步 1.2）',
-    /serviceDate: u\.serviceDate[\s\S]{0,400}?postNameTC:/.test(SRC));
-  check('★★★★★ 而且**兩個值都送**：格內現在有咩 ＋ 本來應該係咩'
-    + '——只送一個就永遠分唔出係邊一邊出事',
-    /gridText: u\.text/.test(SRC) && /expectedText: u\.expectedText/.test(SRC));
-  // ⚠️ 只查 unresolved 嗰段——`manualText` 喺 `changes` 嗰邊係**真實存在**
-  // 而且要用嘅欄位（`gridChanges`／`overlaps` 都靠佢），唔可以一竹篙打一船人。
-  {
-    const start = SRC.indexOf('unresolved: resolved.unresolved.map');
-    const block = start === -1 ? '' : SRC.slice(start, start + 700);
-    check('★★★★★ unresolved 嗰段唔可以再讀 `u.manualText`／`u.rawText`'
-      + '（`buildGridOverlayState_()` 推入 unresolved 嗰陣用嘅欄位名係 `text`，'
-      + '嗰兩個根本唔存在，所以永遠 fallback 到空字串）',
-      block !== '' && !/u\.manualText/.test(block), block.slice(0, 300));
-  }
-
-  check('★★★★ 用返第二十輪已有嘅 buildUnresolvedGuidanceText_()，'
-    + '唔喺呢度另寫一套指引',
-    /buildUnresolvedGuidanceText_\(resolved\.unresolved\)/.test(SRC));
+  // ⚠️ 第七十五輪批次 CE 組（Ivan 決定）：名單上搵唔到嘅名每一個有〔加入名單〕或
+  // ☐「這一季臨時幫手，不加入名單」。未決定嘅喺確認畫面即場列出，全部決定咗先可以儲存
+  //（execute 會再驗一次——`needsDecision`）。
+  check('★★★★★ plan 唔再因 unresolved 而 return blocked',
+    !/return blocked\('UNRESOLVED_NAMES'/.test(SRC));
+  check('★★★★★ 未決定嘅名、未決定嘅一定要遵守違反 ⇒ needsDecision',
+    /needsDecision: undecidedNames\.length > 0 \|\| undecidedRuleItems\.length > 0/.test(SRC));
+  check('★★★★★ 決定項目同〔檢查我的改動〕用同一支 buildDecisionItems_()',
+    /buildDecisionItems_\(context, resolved\.unresolved, allViolations,/.test(SRC));
+  check('★★★★ 仍然冇「略過這幾格繼續」嘅出口（要逐個決定，唔係一鍵略過）',
+    !/skipUnresolved|ignoreUnresolved|forceContinue/.test(SRC));
 }
 
 console.log('\n=== 步 1.4【核心】同一格既有 grid 改動又有申報 ⇒ grid 贏 ===');
@@ -154,8 +135,9 @@ console.log('\n=== 結構性要求 ===');
     /resolveAuthoritativeState_\(\s*\n?\s*context, STATE_SOURCE\.GRID_OVERLAY, 'apiSaveAndConfirmPlan'\)/.test(SRC));
   check('★★★★★ plan 完全冇寫入（冇 write／setValue／advanceQuarterStage_ 之類）',
     !/function buildSaveAndConfirmPlan_[\s\S]*?\n\}/.exec(SRC)[0].match(/writeAssignments|createRosterSheet|registerVersion|setValue|advanceQuarterStage_|publishPublicRoster_/));
-  check('★★★★ 三種 blockReason 都有（規格 2.4）',
-    /'UNRESOLVED_NAMES'/.test(SRC) && /'NO_VERSION'/.test(SRC) && /'GRID_SHEET_MISSING'/.test(SRC));
+  // 第七十五輪批次 CE 組：UNRESOLVED_NAMES 唔再係 blockReason（改為逐個決定）
+  check('★★★★ 兩種 blockReason（NO_VERSION／GRID_SHEET_MISSING）都有',
+    /'NO_VERSION'/.test(SRC) && /'GRID_SHEET_MISSING'/.test(SRC));
   check('★★★★★ 三種阻擋都用三段式訊息（規格 1.5）',
     (SRC.match(/buildThreePartMessage_\(/g) || []).length >= 3);
   checkEqual('★★★★★ 打字確認字串係「確認」兩個字（規格 1.4.4），'

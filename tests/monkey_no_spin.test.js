@@ -329,9 +329,10 @@ console.log('\n=== A2【核心】「寫一格認不出的名字」自己收拾 =
   gas.selfTestWriteGridCell_ = function (q, v, d, p, s, text) {
     writes.push(text); return true;
   };
+  // 第七十五輪批次 CE 組：認唔出嘅名唔再擋（blockReason），改為要逐個決定（needsDecision＋names）
   gas.apiSaveAndConfirmPlan = function () {
-    return { blocked: true, blockReason: 'UNRESOLVED_NAMES',
-      message: '有 1 格的名字系統認不出來。' };
+    return { blocked: false, needsDecision: true,
+      decisionItems: { names: [{ text: '一個系統認不出的名字' }], rules: [] }, message: '' };
   };
 
   const action = gas.monkeyActions_().filter(function (a) {
@@ -344,8 +345,8 @@ console.log('\n=== A2【核心】「寫一格認不出的名字」自己收拾 =
     + '——唔收拾嘅話就等於種一個坑：'
     + '下一步開始系統乜都唔准做，而亂行機會困喺入面',
     writes.join(' → '), '一個系統認不出的名字 → 假甲乙');
-  checkEqual('★★★★★★ 而且驗到儲存被 `UNRESOLVED_NAMES` 擋住',
-    result.blockReason, 'UNRESOLVED_NAMES');
+  checkEqual('★★★★★★ 而且驗到儲存要求逐個決定（NEEDS_NAME_DECISION）',
+    result.blockReason, 'NEEDS_NAME_DECISION');
   checkEqual('★★★★★ `expect` 收貨',
     action.expect(result,
       { stage: 'DRAFT', latestVersionNo: 3, gridChangeCount: 0, unresolvedCount: 0 },
@@ -364,13 +365,13 @@ console.log('\n=== A2 冇擋住 ⇒ 要報（嗰個係系統最嚴厲嗰道閘�
     { wrote: true, reverted: true, blockReason: '', cell: 'x', originalName: '假甲乙' },
     { stage: 'DRAFT', latestVersionNo: 3, gridChangeCount: 0, unresolvedCount: 0 },
     { stage: 'DRAFT', latestVersionNo: 3, gridChangeCount: 0, unresolvedCount: 0 });
-  check('★★★★★★ 冇因為 `UNRESOLVED_NAMES` 擋住 ⇒ 報'
+  check('★★★★★★ 冇要求逐個決定 ⇒ 報'
     + '——一個認唔出嘅名靜靜噉入咗版本，'
     + '就係系統最嚴厲嗰道閘失效咗',
-    /竟然沒有.*擋住/.test(complaint), complaint);
+    /竟然沒有要求逐個決定/.test(complaint), complaint);
 
   const noRevert = action.expect(
-    { wrote: true, reverted: false, blockReason: 'UNRESOLVED_NAMES' },
+    { wrote: true, reverted: false, blockReason: 'NEEDS_NAME_DECISION' },
     { stage: 'DRAFT', latestVersionNo: 3, gridChangeCount: 0, unresolvedCount: 0 },
     { stage: 'DRAFT', latestVersionNo: 3, gridChangeCount: 0, unresolvedCount: 0 });
   check('★★★★★★ 改唔返原值 ⇒ 報',

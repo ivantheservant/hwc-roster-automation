@@ -234,7 +234,7 @@
       a.className = 'bigLink';
       nodes.push(a);
     }
-    nodes.push(para('在試算表直接改格子，改完回來撳「儲存及寄出」。'));
+    nodes.push(para('在試算表直接改格子，改完回來撳「儲存」。'));
 
     // 「還有 N 項未做」——真數字，唔係寫死。
     const pq = res.preQuarter || {};
@@ -276,9 +276,8 @@
     '建立新一版並寫入紀錄',
     '重新發佈公開連結'
   ];
-  /** 掣 1 嘅暫存狀態：由 plan 攞返嚟，逐格決定存喺呢度。 */
+  /** 掣 1 嘅暫存狀態：由 plan 攞返嚟。（第七十五輪 CG 組：逐格決定改為即時記住喺後端，唔再存喺度。） */
   let savePlan = null;
-  let saveDecisions = {};
 
   /**
    * 第三十九輪批次 A 組第 3 步：**完全沒有問題就不要彈窗。**
@@ -305,6 +304,10 @@
       && (plan.overlaps || []).length === 0
       && (plan.unresolved || []).length === 0
       && !plan.needsRelease
+      // 第七十五輪批次 CG 組：有未決定嘅嘢、或者有已確認保留嘅格（要講一句）⇒ 一定要彈窗
+      && !plan.needsDecision
+      && !(Number(plan.keptCount) > 0)
+      && (v.kept || []).length === 0
       // 有申報要套用就一定要彈——那不是他改的東西，他有權先看一眼。
       && (r.apply || []).length === 0
       // 真的有東西要儲存，才走這條快路。
@@ -330,11 +333,11 @@
    * @param {{thenSend: boolean}=} opts 由〔立即儲存並繼續〕嗰條路傳落嚟
    */
   function openSaveAndConfirm(opts) {
-    // ⚠️ 只有明確傳咗先會預設勾住。其餘全部入口一律唔勾。
-    saveThenSendDefault_ = !!(opts && opts.thenSend);
+    // ⚠️ 第七十五輪批次 CG 組：「儲存之後直接去寄出」勾選框拿走。只有由寄出窗〔立即儲存並繼續〕
+    // 入嚟（`thenSend`）先會喺儲存完成窗出〔繼續去寄出〕——佢本來就係喺第 3 步寄出緊。
+    saveThenSend_ = !!(opts && opts.thenSend);
     runAction('讀取改動', async () => {
       savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
-      saveDecisions = {};
 
       if (savePlan.blocked) return renderSaveBlocked(savePlan);
       if (savePlan.zeroChange) return renderSaveZeroChange(savePlan);
@@ -412,14 +415,14 @@
         })
       ]));
 
-      openModal('儲存及寄出：有名字認不出', nodes, [
+      openModal('儲存：有名字認不出', nodes, [
         button('知道了，我去改', () => closeModal(), '')
       ]);
       return;
     }
 
     // NO_VERSION／GRID_SHEET_MISSING：後端已經俾咗三段式訊息。
-    showErrorModal('儲存及寄出', new Error(plan.message || plan.blockReason));
+    showErrorModal('儲存', new Error(plan.message || plan.blockReason));
   }
 
   /* ── D4／零改動兩種路徑 ─────────────────────────────────── */
@@ -427,7 +430,7 @@
   function renderSaveZeroChange(plan) {
     if (plan.zeroChangeAction === 'ADVANCE_STAGE_ONLY') {
       openConfirm({
-        title: '儲存及寄出：堂委沒有提出改動',
+        title: '儲存：堂委沒有提出改動',
         bodyNodes: [
           para('堂委沒有提出改動。撳下去就當作意見已收齊，'
             + '「正式發出給全體」會亮起。職事表內容不會改變。'),
@@ -442,12 +445,12 @@
           ])
         ],
         confirmLabel: '確定，意見已收齊',
-        onConfirm: () => executeSaveAndConfirm('')
+        onConfirm: () => executeSaveAndConfirm()
       });
       return;
     }
 
-    openModal('儲存及寄出', [
+    openModal('儲存', [
       para('沒有偵測到任何改動，不需要儲存。'
         + (plan.stage === 'REQUESTS_APPLIED' ? '可以撳「正式發出給全體」了。' : '')
         + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : ''))
@@ -557,7 +560,16 @@
   function renderSaveMain(plan) {
     const nodes = [];
 
-    // 1　待處理申報
+    // ── 第七十五輪批次 CG 組：確認畫面簡化 ───────────────────────
+    //
+    // Ivan：已經喺〔檢查我的改動〕決定咗嘅嘢，儲存嗰陣唔使再逐格問一次；
+    // 逐格「用我改的／改回原本」拿走；打字放行框拿走（改為勾選）；
+    // 「儲存之後直接去寄出」拿走（寄出一律喺第 3 步）。
+
+    // 1　你改了這 N 格（可以摺疊）
+    nodes.push(buildChangedCellsSection(plan.gridChanges || []));
+
+    // 2　待處理申報（照舊）
     if (plan.requests.apply.length > 0) {
       nodes.push(listSection('會自動套用的修改申報（' + plan.requests.apply.length + ' 筆）',
         plan.requests.apply, requestRow));
@@ -596,8 +608,6 @@
       plan.requests.needsInput.forEach((r) => box.appendChild(requestRow(r)));
       nodes.push(box);
     }
-
-    // 2　重疊格（grid 贏）
     if (plan.overlaps && plan.overlaps.length > 0) {
       const box = make('div', { className: 'sec sec-warn' }, [
         sectionTitle('以下 ' + plan.overlaps.length + ' 格你在表上改過，同時亦有修改申報'),
@@ -614,24 +624,43 @@
       nodes.push(box);
     }
 
-    // 3　規則檢查
-    nodes.push(make('div', { className: 'sec' }, [
-      sectionTitle('規則檢查'),
-      renderViolations(plan.violations)
-    ]));
-
-    // 4　三欄對照
-    if (plan.proposals && plan.proposals.length > 0) {
-      nodes.push(renderProposalTable(plan.proposals));
+    // 3　你已確認保留的格數——唔再逐格重複提示
+    if (Number(plan.keptCount) > 0) {
+      nodes.push(make('div', {
+        text: '你已確認保留 ' + plan.keptCount + ' 格（勾了「保留我的安排」或「這一季臨時幫手」），'
+          + '這一次照樣儲存，不再逐格列出。',
+        className: 'ok-line'
+      }));
     }
 
-    // 4b　第四十三輪批次 G 組：仲有幾多格冇人
-    //
-    // Ivan：「我編輯之後，職事表未完成（我移走咗一啲名）。
-    //   建議喺真正儲存之前彈窗提醒我：而家未完成，最好唔好寄出。
-    //   加一粒〔請系統幫我調整〕，然後先至係確認儲存嘅掣。」
-    //
-    // ⚠️ 冇空格嗰陣**唔可以出呢一段**——每次都出就等於冇出過。
+    // 4　未決定的「一定要遵守」違反、未決定的名：同〔檢查我的改動〕同一個元件，全部勾了先可以儲存
+    const saveBtn = button('儲存', () => executeSaveAndConfirm(), '');
+    const pending = (plan.decisionItems && (plan.decisionItems.names.length + plan.decisionItems.rules.length)) || 0;
+    let decisions = null;
+    if (pending > 0) {
+      nodes.push(make('div', {
+        text: '下面幾項要先決定，全部勾了才可以儲存；改錯了就撳〔返回修改〕。',
+        className: 'warn-head'
+      }));
+      decisions = buildDecisionSections(plan.decisionItems, {
+        onChanged: () => { saveBtn.disabled = !decisions.allDecided(); },
+        onAddPerson: (u) => openAddUnresolvedPerson(u)
+      });
+      decisions.nodes.forEach((n) => nodes.push(n));
+    }
+    saveBtn.disabled = !!decisions && !decisions.allDecided();
+
+    // 5　未決定的「盡量避免」：一句提示，唔擋
+    const semi = ((plan.violations || {}).semiHard || []).length;
+    if (semi > 0) {
+      nodes.push(make('div', {
+        text: '另有 ' + semi + ' 格違反「盡量避免」的規則，你沒有勾保留——不會擋住儲存；'
+          + '想系統調整的話，撳〔請系統幫我調整〕。',
+        className: 'muted'
+      }));
+    }
+
+    // 6　仲有格冇人（照舊）
     if (plan.blankCells && plan.blankCells.length > 0) {
       const box = make('div', { className: 'warnbox' }, [
         make('div', {
@@ -660,58 +689,39 @@
       nodes.push(box);
     }
 
-    // 5　確認畫面（規格步 1.7）
+    // 7　會做／唔會做
     nodes.push(buildSaveSummary(plan));
 
-    // ⚠️ 第四十六輪批次 D2 組：**儲存之後直接去寄出**（預設唔勾）。
-    //
-    // Ivan 嘅流程係「改 → 儲存 → 寄出」，而每次都要退出、再喺主流程
-    // 撳多一粒掣。呢個勾選框把兩步駁埋。
-    //
-    // ⚠️ **預設唔勾**。寄出係一個對外嘅動作，預設幫佢揀咗就等於
-    // 一個唔為意嘅人撳「照樣儲存」之後直接開咗寄出彈窗——
-    // 而佢以為自己淨係喺度儲存。
-    // ⚠️ 第四十七輪批次 A5 組：預設值由 `saveThenSendDefault_` 決定。
-    // 平時係 `false`；只有由〔立即儲存並繼續〕入嚟先會係 `true`。
-    saveThenSend_ = saveThenSendDefault_;
-    const thenSendRow = make('label', { className: 'check-row' });
-    const thenSendCb = document.createElement('input');
-    thenSendCb.type = 'checkbox';
-    thenSendCb.checked = saveThenSendDefault_;
-    thenSendCb.addEventListener('change', () => { saveThenSend_ = thenSendCb.checked; });
-    thenSendRow.appendChild(thenSendCb);
-    thenSendRow.appendChild(make('span', { text: '儲存之後直接去寄出' }));
-    nodes.push(make('div', { className: 'sec' }, [thenSendRow]));
+    openModal('會儲存成第 ' + plan.targetVersionNo + ' 版', nodes, [saveBtn]
+      .concat(buildFixItActions(plan))
+      .concat([button('返回修改', () => closeModal(), 'secondary')]));
+  }
 
-    const bodyNodes = nodes;
-    if (plan.needsRelease) {
-      openConfirm({
-        title: '儲存成第 ' + plan.targetVersionNo + ' 版',
-        bodyNodes: bodyNodes,
-        requireTyping: true,
-        typingHint: '上面有 ' + plan.violations.real.length
-          + ' 格違反了一定要遵守的規則。如果這是正確的（例如名單還未更新），'
-          + '請在下面輸入「' + CONFIRM_PHRASE + '」放行。'
-          + '放行之後這幾格會照樣儲存，並記入紀錄。',
-        confirmLabel: '照樣儲存',
-        // 第三十九輪批次 A 組第 3 步：「取消」喺呢度唔啱講法——
-        // 佢唔係放棄，係返去表上面改返嗰幾格。
-        cancelLabel: '返回修改',
-        danger: true,
-        onConfirm: (typed) => executeSaveAndConfirm(typed)
-      });
-    } else {
-      openConfirm({
-        title: '儲存成第 ' + plan.targetVersionNo + ' 版',
-        bodyNodes: bodyNodes,
-        confirmLabel: '照樣儲存',
-        cancelLabel: '返回修改',
-        // ⚠️ 第四十三輪批次 G 組：仲有格冇人嗰陣，加一粒直接接落
-        // 〔請系統幫我調整〕——唔使佢退出再自己撳一次。
-        extraActions: buildFixItActions(plan),
-        onConfirm: () => executeSaveAndConfirm('')
-      });
-    }
+  /**
+   * 第七十五輪批次 CG 組：「你改了這 N 格」——預設收起，撳一下展開。
+   * @param {Object[]} changes plan.gridChanges
+   * @returns {Node}
+   */
+  function buildChangedCellsSection(changes) {
+    const box = make('div', { className: 'sec' }, [sectionTitle('你改了這 ' + changes.length + ' 格')]);
+    if (changes.length === 0) return box;
+    const list = make('div', {});
+    changes.forEach((c) => {
+      list.appendChild(make('div', {
+        text: humanDate(c.serviceDate) + '　' + c.postNameTC
+          + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '')
+          + '　' + (c.originalName || '（空白）') + ' → ' + (c.manualName || '（空白）'),
+        className: 'ok-line'
+      }));
+    });
+    list.hidden = changes.length > 6;
+    const toggle = button(list.hidden ? '顯示全部' : '收起', () => {
+      list.hidden = !list.hidden;
+      toggle.textContent = list.hidden ? '顯示全部' : '收起';
+    }, 'link');
+    box.appendChild(row([toggle], 'row-right'));
+    box.appendChild(list);
+    return box;
   }
 
   /**
@@ -744,74 +754,8 @@
     });
   }
 
-  /**
-   * 規格步 1.6：三欄對照。**預設一定係「用我改的」**——
-   * 幹事嘅決定係最新真相，系統唔應該替佢揀。
-   */
-  function renderProposalTable(proposals) {
-    const box = make('div', { className: 'sec' }, [
-      sectionTitle('這幾格要怎樣處理（' + proposals.length + ' 格）')
-    ]);
-
-    box.appendChild(row([
-      button('全部用我改的', () => {
-        proposals.forEach((p) => {
-          const key = proposalKey(p);
-          saveDecisions[key] = 'MANUAL';
-          const radio = document.querySelector('input[name="' + cssEscape(key) + '"][value="MANUAL"]');
-          if (radio) radio.checked = true;
-        });
-      }, 'link')
-    ], 'row-right'));
-
-    proposals.forEach((p) => {
-      const key = proposalKey(p);
-      saveDecisions[key] = 'MANUAL';   // 預設
-
-      const line = make('div', { className: 'prop' });
-      line.appendChild(make('div', {
-        text: p.serviceDate + '　' + p.postNameTC + '#' + p.slotIndex
-          + (p.reason ? '　（' + p.reason + '）' : ''),
-        className: 'prop-head'
-      }));
-
-      const opts = make('div', { className: 'prop-opts' });
-      opts.appendChild(radioOption(key, 'MANUAL', '用我改的：' + (p.manual || '（空白）'), true, false));
-      if (p.suggested) {
-        opts.appendChild(radioOption(key, 'SUGGESTED', '用系統建議：' + p.suggested, false, false));
-      }
-      // 原本係空白就唔可以「改回原本」——applyDecisions() 本身有呢道保護，
-      // 前端要同步變灰並寫明原因，唔好俾人撳完先發現唔得。
-      opts.appendChild(radioOption(
-        key, 'ORIGINAL',
-        p.canRevertToOriginal
-          ? ('改回原本：' + p.original)
-          : '改回原本（原本這一格是空白，不能改回）',
-        false, !p.canRevertToOriginal));
-      line.appendChild(opts);
-      box.appendChild(line);
-    });
-    return box;
-  }
-
-  function proposalKey(p) { return p.serviceDate + '|' + p.postId + '|' + p.slotIndex; }
-
-  /** name 屬性會入 CSS selector，簡單轉義一下。 */
-  function cssEscape(s) { return s.replace(/[|]/g, '\\|'); }
-
-  function radioOption(name, value, labelText, checked, disabled) {
-    const label = make('label', { className: 'radio-row' + (disabled ? ' is-off' : '') });
-    const input = document.createElement('input');
-    input.type = 'radio';
-    input.name = name;
-    input.value = value;
-    input.checked = !!checked;
-    input.disabled = !!disabled;
-    input.addEventListener('change', () => { if (input.checked) saveDecisions[name] = value; });
-    label.appendChild(input);
-    label.appendChild(make('span', { text: labelText }));
-    return label;
-  }
+  // 第七十五輪批次 CG 組：三欄對照（逐格「用我改的／改回原本」）拿走——Ivan：
+  // 已經喺〔檢查我的改動〕決定咗嘅嘢唔使再問；改錯咗就〔返回修改〕喺表上改返。
 
   /** 規格步 1.7：「會做的事」同「不會做的事」兩節都要有。 */
   function buildSaveSummary(plan) {
@@ -823,7 +767,9 @@
     if (plan.requests.needsInput.length > 0) {
       willDo.push(plan.requests.needsInput.length + ' 筆申報系統看不懂，會留在申報表不動');
     }
-    if (plan.needsRelease) willDo.push('放行 ' + plan.violations.real.length + ' 項規則違反（你需要打字確認）');
+    // 第七十五輪批次 CF／CG 組：勾咗「保留我的安排」嘅一定要遵守違反 ＝ 放行，記入紀錄
+    const keptHard = ((plan.violations || {}).kept || []).length;
+    if (keptHard > 0) willDo.push('記錄你勾了保留的 ' + keptHard + ' 格（等於放行，之後整季記住）');
     willDo.push('儲存成第 ' + plan.targetVersionNo + ' 版。第 ' + plan.baseVersionNo
       + ' 版原封不動保留，可以對照');
     if (plan.stage === 'REVIEW_SENT') willDo.push('把這一季的進度推前到「意見已收齊」');
@@ -851,7 +797,7 @@
   function executeCleanSave(plan) {
     runAction('儲存中，請稍候', async () => {
       const result = await callServerMutating('apiSaveAndConfirmExecute', currentQuarterId, {
-        decisions: [], confirmedRequestRows: [], releaseText: ''
+        decisions: [], confirmedRequestRows: []
       });
       resetMainFlowState();
       // ⚠️ 第四十一輪批次 C 組：快路同正常路要用**同一個**結果畫面。
@@ -862,39 +808,25 @@
   }
 
   /**
-   * 第四十六輪批次 D2 組：這一次儲存完之後要不要直接開寄出彈窗。
-   * ⚠️ 每次畫確認窗都重設做 `false`——留住上一次嘅選擇，
-   * 幹事下次撳「照樣儲存」就會突然彈個寄出窗出嚟，而佢冇揀過。
+   * 第四十六輪批次 D2 組（第七十五輪 CG 組收窄）：儲存完之後要唔要直接開寄出彈窗。
+   * 只由寄出窗〔立即儲存並繼續〕入嚟先係 true（`openSaveAndConfirm({ thenSend: true })`）。
    */
   let saveThenSend_ = false;
 
   /**
-   * 第四十七輪批次 A5 組：**這一次進來的時候，那個勾應不應該預設勾住。**
-   *
-   * ⚠️ 每次 `openSaveAndConfirm()` 都會重設它——留住上一次的值，
-   * 幹事下一次由主流程進來就會突然見到一個他沒有勾過的勾。
+   * 第七十五輪批次 CG 組：執行儲存。逐格決定已經即時記住（後端會再驗一次），
+   * 唔再送「用我改的／改回原本」，亦唔再要打字放行。
    */
-  let saveThenSendDefault_ = false;
-
-  function executeSaveAndConfirm(releaseText) {
+  function executeSaveAndConfirm() {
     const confirmedRequestRows = Array.prototype.slice
       .call(document.querySelectorAll('input.req-confirm'))
       .filter((cb) => cb.checked)
       .map((cb) => Number(cb.dataset.sheetRow));
 
-    const decisions = Object.keys(saveDecisions).map((key) => {
-      const parts = key.split('|');
-      return {
-        serviceDate: parts[0], postId: parts[1], slotIndex: Number(parts[2]),
-        choice: saveDecisions[key]
-      };
-    });
-
     runAction('儲存中，請稍候', async () => {
       const result = await callServerMutating('apiSaveAndConfirmExecute', currentQuarterId, {
-        decisions: decisions,
-        confirmedRequestRows: confirmedRequestRows,
-        releaseText: releaseText
+        decisions: [],
+        confirmedRequestRows: confirmedRequestRows
       });
       renderSaveResult(result);
     }, SAVE_BUSY_STEPS);
@@ -903,13 +835,13 @@
   function renderSaveResult(result) {
     // ── 完全失敗（後端回 ok:false，唔係拋錯）────────────────
     if (!result.ok) {
-      showErrorModal('儲存及寄出', new Error(result.message || '儲存失敗。'));
+      showErrorModal('儲存', new Error(result.message || '儲存失敗。'));
       return;
     }
 
     // ── 零改動路徑 ─────────────────────────────────────────
     if (result.zeroChange) {
-      openModal('儲存及寄出', [
+      openModal('儲存', [
         make('div', { text: result.message, className: 'ok-line' })
       ], [button('完成', () => closeModalAndRefresh(), '')]);
       return;
@@ -985,7 +917,7 @@
     }
     if (result.releasedViolationCount > 0) {
       nodes.push(make('div', {
-        text: '你放行了 ' + result.releasedViolationCount + ' 格違反規則的安排，已經記入紀錄。',
+        text: '你勾了保留的 ' + result.releasedViolationCount + ' 格（違反一定要遵守的規則）已經記入放行紀錄，之後整季記住。',
         className: 'ok-line'
       }));
     }
@@ -1001,6 +933,8 @@
     // ⚠️ **唔可以跳過呢個結果畫面。** 佢係「系統改咗你嗰幾格」嘅唯一證據，
     // 跳過就變成「撳一粒掣，寄出彈窗彈咗出嚟」，而佢完全唔知儲存咗乜。
     // 所以做法係：照樣顯示，只係把主掣由〔知道了〕換成〔繼續去寄出〕。
+    // 第七十五輪批次 CG 組：完成窗加〔請系統幫我調整〕（Ivan：儲存之後想即刻再調整）
+    const adjustBtn = button('請系統幫我調整', () => { closeModal(); openBuildSuggestion(); }, 'secondary');
     const doneActs = saveThenSend_
       ? [
         button('繼續去寄出', () => {
@@ -1013,10 +947,10 @@
         }, ''),
         button('留在這裡', () => closeModalAndRefresh(), 'secondary')
       ]
-      : [button('知道了', () => closeModalAndRefresh(), '')];
+      : [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];
     if (saveThenSend_) {
       nodes.push(make('div', {
-        text: '你剛才勾了「儲存之後直接去寄出」。撳〔繼續去寄出〕就會開寄出畫面。',
+        text: '你剛才由「寄出」那裡先儲存。撳〔繼續去寄出〕就會回到寄出畫面。',
         className: 'ok-line strong'
       }));
     }

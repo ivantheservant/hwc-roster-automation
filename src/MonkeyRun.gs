@@ -302,7 +302,10 @@ function monkeyActions_() {
         let blockMessage = '';
         try {
           const plan = apiSaveAndConfirmPlan(quarterId);
-          blockReason = plan.blocked ? String(plan.blockReason || '') : '';
+          // 第七十五輪批次 CE 組：認唔出嘅名唔再擋（blockReason），改為要逐個決定（needsDecision）
+          blockReason = plan.blocked ? String(plan.blockReason || '')
+            : ((plan.needsDecision === true && ((plan.decisionItems || {}).names || []).length > 0)
+              ? 'NEEDS_NAME_DECISION' : '');
           blockMessage = String(plan.message || '').slice(0, 200);
         } catch (err) {
           blockReason = '（拋錯）' + err.message;
@@ -322,10 +325,10 @@ function monkeyActions_() {
         if (!result.wrote) return '那一格寫不進去，這一步什麼都沒有驗到。';
         // ⚠️ **儲存必定被拒絕。** 唔拒絕嘅話，一個認唔出嘅名
         // 就會靜靜噉入咗版本——而嗰個係系統最嚴厲嗰一道閘。
-        if (result.blockReason !== 'UNRESOLVED_NAMES') {
-          return '寫了一個系統認不出的名字，而「儲存及寄出」竟然沒有'
-            + '因為 UNRESOLVED_NAMES 而擋住（blockReason='
-            + (result.blockReason || '（沒有擋）') + '）。';
+        if (result.blockReason !== 'NEEDS_NAME_DECISION') {
+          return '寫了一個名單上找不到的名字，而「儲存」竟然沒有'
+            + '要求逐個決定（加入名單／這一季臨時幫手）（結果＝'
+            + (result.blockReason || '（沒有要求）') + '）。';
         }
         if (!result.reverted) return '驗完之後改不回原值，留下了一格認不出的名字。';
         // 收拾乾淨 ⇒ 狀態要同做之前一模一樣。

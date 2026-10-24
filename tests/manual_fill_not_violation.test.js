@@ -7,7 +7,7 @@
 //
 // 經幹事介面「填講員／翻譯／獻花」填咗 3 格獻花。人名喺 `NameMapping`，
 // 所以 `apiSavePreacherTranslationEntry()` 連結咗 PersonID。之後撳
-// 「儲存及寄出」，確認畫面列出：
+// 「儲存」，確認畫面列出：
 //
 //   ⚠ 違反了一定要遵守的規則：3 格
 //   4 月 2 日　FLOWER——這個崗位不由系統排，要你自己填
@@ -264,7 +264,8 @@ console.log('\n=== K 對照組：系統自己排咗 ⇒ 照樣報 ===');
   check('★★★★★★ 生成器錯誤地 AUTO 排咗獻花 ⇒ **照樣報**',
     noAutoOf(gas.findStateViolations_(rec2, ctx2)).length === 1);
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  check('★★★★★ 而且儲存確認要放行', plan.needsRelease === true
+  // 第七十五輪批次 CF／CG 組：打字放行換成逐格勾選（needsDecision）
+  check('★★★★★ 而且儲存確認要決定（勾「保留我的安排」＝放行）', plan.needsDecision === true
     && noAutoOf(plan.violations.real).length === 1, JSON.stringify(plan.violations.real).slice(0, 300));
   const verify = gas.checkHardRuleViolations_(gas.buildVerifyContext_(Q, 0));
   const g = verify.groups.filter(function (x) { return /AutoGenerate=FALSE/.test(x.label); })[0];

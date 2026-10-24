@@ -64,6 +64,11 @@ function makePlan(opts) {
     blocked: false,
     blockReason: null,
     unresolved: [],
+    // 第七十五輪批次 CE／CG 組：逐格決定
+    tempHelpers: [],
+    decisionItems: { names: [], rules: [] },
+    needsDecision: real.length > 0,
+    keptCount: 0,
     requests: { apply: [], confirm: [], needsInput: [] },
     gridChanges: (opts && opts.gridChanges) || [],
     titleChanges: [],
@@ -552,9 +557,9 @@ console.log('\n=== C【核心】S03 真正跑一次：第一批有一格犯規 �
   check('★★★★★★ 而且過程寫入咗報告：plan 叫咗幾多次、邊幾格犯規',
     /plan 叫了 2 次/.test(labels) && /2028-07-02 WORSHIP#1/.test(labels),
     labels.slice(0, 900));
-  check('★★★★★★ 而且真係驗咗 `needsRelease === false`'
+  check('★★★★★★ 而且真係驗咗 `needsDecision` 唔係 true（第七十五輪起放行改為逐格決定）'
     + '——呢一句就係攔住 S05 嗰道閘自己用嘅判斷',
-    /不需要打字放行（needsRelease = false）/.test(labels), labels.slice(0, 900));
+    /不需要逐格決定（needsDecision 不是 true）/.test(labels), labels.slice(0, 900));
   check('★★★★★ 同埋 `violations.real` 係空嘅',
     /violations.real 是空的/.test(labels), labels.slice(0, 900));
 }

@@ -320,7 +320,7 @@ function computeDashboardButtons_(s) {
     disabledReason: s.hasOfficialRecord
       ? '已經正式發出過。之後有改動請用「改動後重發」。'
       : (!officialStageOk
-        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存及寄出」，這一粒才會著。'
+        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存」，這一粒才會著。'
         : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : '')),
     dynamicText: buildOfficialButtonText_(s),
     targetPersonCount: s.officialTargetCount,
@@ -379,7 +379,9 @@ function buildGenerateButtonText_(s) {
 function buildSaveButtonText_(s) {
   const u = s.unsaved;
   if (u.unresolvedCount > 0) {
-    return '有 ' + u.unresolvedCount + ' 格的文字系統認不出，撳下去會告訴你是哪幾格。';
+    // 第七十五輪批次 CE 組：認唔出嘅名唔再擋，撳落去可以逐個決定
+    return '有 ' + u.unresolvedCount + ' 個名字在名單上找不到。撳〔儲存〕或者〔檢查我的改動〕，'
+      + '可以逐個選〔加入名單〕或者「這一季臨時幫手，不加入名單」。';
   }
   // 第三十四輪批次甲3：`NEEDS_INPUT` 唔再擋住流程，但**一定要講出嚟**，
   // 否則就變成靜靜消失。一律當成句尾嘅補充。
@@ -470,7 +472,7 @@ function buildUnsavedBlockHint_(unsaved) {
   if (unsaved.gridChangeCount > 0) bits.push('你在表上改了 ' + unsaved.gridChangeCount + ' 格');
   if (unsaved.unresolvedCount > 0) bits.push('有 ' + unsaved.unresolvedCount + ' 格的文字系統認不出');
   if (unsaved.pendingRequestCount > 0) bits.push('有 ' + unsaved.pendingRequestCount + ' 筆修改申報未處理');
-  return bits.join('、') + '。先撳「儲存及寄出」，這一粒才會著。';
+  return bits.join('、') + '。先撳「儲存」，這一粒才會著。';
 }
 
 /**
@@ -758,7 +760,11 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
         context, STATE_SOURCE.GRID_OVERLAY, 'readDashboardUnsavedState_');
       // 第七十五輪批次 CC 組：改咗每週標題（「類型」欄）都係一項未儲存改動
       gridChangeCount = resolved.changes.length + (resolved.titleChanges || []).length;
-      unresolvedCount = resolved.unresolved.length;
+      // 第七十五輪批次 CE 組：已勾「這一季臨時幫手」嘅名唔再算「未處理」
+      const dIndex = readCellDecisionIndex_(quarterId, context.timezone);
+      unresolvedCount = resolved.unresolved.filter(function (u) {
+        return !dIndex.isTempHelper(u.serviceDate + '|' + u.postId + '|' + u.slotIndex, u.text);
+      }).length;
     } catch (err) {
       // grid 工作表被刪／改名嗰類。**唔可以當成「零改動」**——
       // 零改動會令掣 2／3／4 全部亮起，等於話「冇嘢未處理」，

@@ -115,9 +115,10 @@ console.log('\n=== A2【核心】S03 要同時驗兩個數 ===');
     + '唔再自己實作一次「儲存會唔會被攔」',
     /const picked = selfTestPickAcceptedCells_\(quarterId, versionNo, 3, 'S03'\);/
       .test(s03), s03.slice(0, 900));
-  check('★★★★★★ 而且真係驗 `needsRelease === false`'
+  // 第七十五輪批次 CG 組：打字放行換成逐格決定（needsDecision）
+  check('★★★★★★ 而且真係驗 `needsDecision` 唔係 true'
     + '——呢一句就係攔住 S05 嗰道閘自己用嘅判斷',
-    /^  t\.equal\('不需要打字放行（needsRelease = false）'/m.test(s03),
+    /^  t\.equal\('不需要逐格決定（needsDecision 不是 true）'/m.test(s03),
     s03.slice(-900));
   check('★★★★★★ 而且冇喺 S03 度直接叫 `selfTestWriteGridCell_()`'
     + '——直接叫就係繞過咗揀真名嗰一步',

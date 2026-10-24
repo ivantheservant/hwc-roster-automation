@@ -279,13 +279,12 @@ console.log('\n=== A5 由〔立即儲存並繼續〕入去 ⇒ 「儲存後直�
   const zone1 = read('src/ui/ScriptZone1.html');
   check('★★★★★ `openSaveAndConfirm()` 收得到 `{ thenSend: true }`',
     /function openSaveAndConfirm\(opts\)/.test(zone1), '');
-  check('★★★★★★ 而且**只有明確傳咗先會預設勾住**'
-    + '——第四十六輪 D 組定咗預設唔勾；'
-    + '呢度係一個例外（佢本來就係想寄出，只係被未儲存擋住）',
-    /saveThenSendDefault_ = !!\(opts && opts\.thenSend\);/.test(zone1), '');
-  check('★★★★★ 平時（冇傳）仍然預設唔勾',
-    /thenSendCb\.checked = saveThenSendDefault_;/.test(zone1)
-    && /openSaveAndConfirm\(\)/.test(read('src/ui/ScriptMainFlow.html')), '');
+  // ⚠️ 第七十五輪批次 CG 組：「儲存之後直接去寄出」勾選框拿走；只剩呢一條路
+  //（寄出窗〔立即儲存並繼續〕）會喺完成窗出〔繼續去寄出〕。
+  check('★★★★★★ 而且**只有明確傳咗先會接去寄出**',
+    /saveThenSend_ = !!\(opts && opts\.thenSend\);/.test(zone1), '');
+  check('★★★★★ 平時（主流程第 2 步）冇傳 ⇒ 唔會接去寄出',
+    /openSaveAndConfirm\(\)/.test(read('src/ui/ScriptMainFlow.html')) && !/thenSendCb/.test(zone1), '');
   check('★★★★★★ 勾住**唔等於**跳過儲存結果畫面'
     + '——嗰個係「系統改咗你嗰幾格」嘅唯一證據',
     /button\('繼續去寄出'/.test(zone1), '');

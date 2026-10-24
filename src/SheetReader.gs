@@ -777,3 +777,180 @@ function readGridFilledManualCells_(quarterId, versionNo, postIds, timezone) {
   });
   return out;
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十五輪批次 CE／CF 組：逐格決定（讀）
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 寫入喺 `CellDecisions.gs`（`apiSetCellDecisions()`）。讀放喺呢度：檢查、調整、儲存、
+ * 寄出都要用，而全部入口都會載入 SheetReader.gs。
+ */
+
+/**
+ * 正規化格內文字（決定有冇失效就係比呢個）。同人手改動偵測同一個規則（`normalizeCellText_()`）。
+ * @param {*} text 格內文字
+ * @returns {string}
+ */
+function normalizeDecisionText_(text) {
+  const t = String(text === null || text === undefined ? '' : text).trim();
+  return GRID_PLACEHOLDER_TEXTS.indexOf(t) === -1 ? t : '';
+}
+
+/**
+ * 讀一季**生效中**嘅逐格決定。冇 `CellDecisions` 工作表 ⇒ 空（未有人勾過）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object[]} 每項 `{key, serviceDate, postId, slotIndex, kind, cellText, ruleId}`
+ */
+function readActiveCellDecisions_(quarterId, timezone) {
+  let exists = false;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    exists = !!(ss && ss.getSheetByName && ss.getSheetByName(SHEETS.CELL_DECISIONS));
+  } catch (err) {
+    exists = false;
+  }
+  if (!exists) return [];
+  const D = COLUMNS.CELL_DECISIONS;
+  return readSheet(SHEETS.CELL_DECISIONS).filter(function (row) {
+    return String(row[D.QUARTER_ID] || '').trim() === quarterId
+      && String(row[D.STATUS] || '').trim() === CELL_DECISION_STATUS.ACTIVE;
+  }).map(function (row) {
+    const serviceDate = toDateString(row[D.SERVICE_DATE], timezone);
+    const postId = String(row[D.POST_ID] || '').trim();
+    const slotIndex = Number(row[D.SLOT_INDEX]) || 1;
+    return {
+      key: serviceDate + '|' + postId + '|' + slotIndex,
+      serviceDate: serviceDate, postId: postId, slotIndex: slotIndex,
+      kind: String(row[D.KIND] || '').trim(),
+      cellText: normalizeDecisionText_(row[D.CELL_TEXT]),
+      ruleId: String(row[D.RULE_ID] || '').trim()
+    };
+  });
+}
+
+/**
+ * 逐格決定索引。`isKept(key, text)`／`isTempHelper(key, text)`：**格內而家嘅文字要同決定嗰陣一樣**先算數。
+ * @param {Object[]} decisions `readActiveCellDecisions_()` 嘅結果
+ * @returns {{isKept: function(string, string): boolean, isTempHelper: function(string, string): boolean, list: Object[]}}
+ */
+function buildCellDecisionIndex_(decisions) {
+  const byKind = {};
+  (decisions || []).forEach(function (d) {
+    byKind[d.kind + '§' + d.key] = d.cellText;
+  });
+  const match = function (kind, key, text) {
+    const k = kind + '§' + key;
+    return Object.prototype.hasOwnProperty.call(byKind, k)
+      && byKind[k] === normalizeDecisionText_(text);
+  };
+  return {
+    list: decisions || [],
+    isKept: function (key, text) { return match(CELL_DECISION_KIND.KEEP, key, text); },
+    isTempHelper: function (key, text) { return match(CELL_DECISION_KIND.TEMP_HELPER, key, text); }
+  };
+}
+
+/**
+ * 讀一季嘅決定索引（讀唔到 ⇒ 空索引＋WARN；**唔可以當成「全部已決定」**）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object} `buildCellDecisionIndex_()` 嘅結果
+ */
+function readCellDecisionIndex_(quarterId, timezone) {
+  try {
+    return buildCellDecisionIndex_(readActiveCellDecisions_(quarterId, timezone));
+  } catch (err) {
+    log_('WARN', 'readCellDecisionIndex_ 讀不到逐格決定，全部當未決定：' + err.message);
+    return buildCellDecisionIndex_([]);
+  }
+}
+
+/**
+ * 某一格職事表上而家嘅文字（決定比對用）。`context.gridValues` 冇嗰格 ⇒ 用版本紀錄嘅名。
+ * @param {Object} context fine-tune context
+ * @param {string} key `date|post|slot`
+ * @returns {string}
+ */
+function currentCellTextForDecision_(context, key) {
+  if (context && context.gridValues && Object.prototype.hasOwnProperty.call(context.gridValues, key)) {
+    return normalizeDecisionText_(context.gridValues[key]);
+  }
+  const a = ((context && context.original) || []).filter(function (o) {
+    return o.serviceDate + '|' + o.postId + '|' + o.slotIndex === key;
+  })[0];
+  return a ? normalizeDecisionText_(a.personName) : '';
+}
+
+/**
+ * 第七十五輪批次 CE／CF 組：把「認唔出嘅名」同「違反規則嘅格」砌成逐格決定項目。
+ *
+ * ⚠️ 三個畫面（檢查我的改動、儲存、請系統幫我調整）一定要用同一份——
+ * 否則一個畫面話「已確認」，另一個話「未決定」。
+ *
+ * @param {Object} context fine-tune context
+ * @param {Object[]} unresolved overlay 嘅 unresolved
+ * @param {Object[]} violations 違反（HARD＋SEMI_HARD；結構性不適用會略過）
+ * @param {Object} decisionIndex `buildCellDecisionIndex_()`
+ * @param {?Object} releaseContext `buildHardViolationClassContext_()`（讀唔到 ⇒ null，當冇放行）
+ * @returns {{names: Object[], rules: Object[]}}
+ */
+function buildDecisionItems_(context, unresolved, violations, decisionIndex, releaseContext) {
+  const postNameById = {};
+  (context.posts || []).forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
+  const names = (unresolved || []).map(function (u) {
+    const key = u.serviceDate + '|' + u.postId + '|' + u.slotIndex;
+    const text = normalizeDecisionText_(u.text);
+    return {
+      kind: CELL_DECISION_KIND.TEMP_HELPER, key: key,
+      serviceDate: u.serviceDate, postId: u.postId, postNameTC: postNameById[u.postId] || u.postId,
+      slotIndex: u.slotIndex, cellText: text, text: text, expectedText: u.expectedText || '',
+      checked: decisionIndex.isTempHelper(key, text)
+    };
+  });
+  const rules = [];
+  const seen = {};
+  (violations || []).forEach(function (v) {
+    if (v.severity !== RULE_LEVELS.HARD && v.severity !== RULE_LEVELS.SEMI_HARD) return;
+    if (STRUCTURAL_NA_RULE_IDS.indexOf(v.ruleId) !== -1) return;
+    const key = v.serviceDate + '|' + v.postId + '|' + v.slotIndex;
+    const dedupe = key + '§' + v.ruleId;
+    if (seen[dedupe]) return;
+    seen[dedupe] = true;
+    const cellText = currentCellTextForDecision_(context, key);
+    let released = null;
+    if (v.severity === RULE_LEVELS.HARD && releaseContext) {
+      try {
+        const c = classifyHardViolations_([v], releaseContext);
+        released = c.released.length > 0 ? c.released[0]
+          : (c.lateUnavailable.length > 0 ? c.lateUnavailable[0] : null);
+      } catch (err) {
+        released = null;
+      }
+    }
+    rules.push({
+      kind: CELL_DECISION_KIND.KEEP, key: key,
+      serviceDate: v.serviceDate, postId: v.postId,
+      postNameTC: v.postNameTC || postNameById[v.postId] || v.postId,
+      slotIndex: v.slotIndex, personId: v.personId || '', personName: v.personName || cellText,
+      cellText: cellText, ruleId: v.ruleId, severity: v.severity,
+      mustFollow: v.severity === RULE_LEVELS.HARD, reason: v.reason || '',
+      released: !!released,
+      releasedVersionNo: (released && released.releasedVersionNo !== undefined) ? released.releasedVersionNo : null,
+      checked: !released && decisionIndex.isKept(key, cellText),
+      violation: v
+    });
+  });
+  return { names: names, rules: rules };
+}
+
+/**
+ * 逐格決定項目送去前端嘅形狀（唔帶內部嘅 `violation` 物件）。
+ * @param {Object} item `buildDecisionItems_()` 嘅一項
+ * @returns {Object}
+ */
+function publicDecisionItem_(item) {
+  const out = {};
+  Object.keys(item).forEach(function (k) { if (k !== 'violation') out[k] = item[k]; });
+  return out;
+}

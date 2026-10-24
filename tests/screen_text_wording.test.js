@@ -2,7 +2,7 @@
 // 執行方式：node tests/screen_text_wording.test.js
 //
 //   AY1　「不在 Eligibility 名單內」→「不在這個崗位的名單上」（FineTune／Verify／其他畫面文字）
-//   AY2　沒有改動時撳〔儲存及寄出〕，彈窗標題「儲存並確認」→「儲存及寄出」（與主流程按鈕一致）
+//   AY2　沒有改動時撳〔儲存〕，彈窗標題「儲存並確認」→「儲存」（與主流程按鈕一致）
 //   AY3　修改申報認不到名字：「名單上找不到「X」。如果是新人，請先用「新增人員」加入；如果是舊人，請留意同音字或異體字。」
 //   AY4　「指定服侍」和「不能服侍」認名字共用同一支 `resolvePersonId()`（包括 NameAlias）
 
@@ -43,7 +43,7 @@ console.log('\n=== AY1 「不在這個崗位的名單上」 ===');
   check('★★★★ src/ui 沒有「不在 Eligibility」', uiHits.length === 0, uiHits.join(','));
 }
 
-console.log('\n=== AY2 彈窗標題「儲存及寄出」 ===');
+console.log('\n=== AY2 彈窗標題「儲存」 ===');
 {
   const zone = stripComments(read('src/ui/ScriptZone1.html'));
   const stale = zone.split('\n').filter((l) => /(openModal|showErrorModal)\('儲存並確認|title: '儲存並確認/.test(l));
@@ -55,11 +55,11 @@ console.log('\n=== AY2 彈窗標題「儲存及寄出」 ===');
     return walk(vm.runInContext('document.getElementById("modalTitle")', ui));
   };
   vm.runInContext('renderSaveZeroChange({ zeroChangeAction: "NONE", stage: "DRAFT" })', ui);
-  check('★★★★★★ 沒有改動時撳〔儲存及寄出〕：彈窗標題是「儲存及寄出」', title() === '儲存及寄出', title());
+  check('★★★★★★ 沒有改動時撳〔儲存〕：彈窗標題是「儲存」', title() === '儲存', title());
   vm.runInContext('renderSaveResult({ ok: true, zeroChange: true, message: "完成" })', ui);
-  check('★★★★★ 零改動完成窗標題同樣', title() === '儲存及寄出', title());
+  check('★★★★★ 零改動完成窗標題同樣', title() === '儲存', title());
   vm.runInContext('renderSaveZeroChange({ zeroChangeAction: "ADVANCE_STAGE_ONLY", stage: "REVIEW_SENT" })', ui);
-  check('★★★★★ 「堂委沒有提出改動」窗標題開頭是「儲存及寄出」', /儲存及寄出：堂委沒有提出改動/.test(title()) || title() === '', title());
+  check('★★★★★ 「堂委沒有提出改動」窗標題開頭是「儲存」', /儲存：堂委沒有提出改動/.test(title()) || title() === '', title());
 }
 
 console.log('\n=== AY3／AY4 申報認不到名字的句子；兩條路認名一致 ===');
@@ -106,7 +106,7 @@ console.log('\n=== AY3／AY4 申報認不到名字的句子；兩條路認名一
     !/readSheet\(SHEETS\.NAME_MAPPING\)/.test(src) && (src.match(/resolvePersonId\(/g) || []).length >= 3, '');
 }
 
-console.log('\n=== 第七十三輪文字組：畫面上叫幹事去撳「儲存並確認」（舊名）一律改為「儲存及寄出」 ===');
+console.log('\n=== 第七十三輪文字組：畫面上叫幹事去撳「儲存並確認」（舊名）一律改為「儲存」 ===');
 {
   // 例外（幹事看不到、或只是內部識別／紀錄）：
   //   ScriptZone1.html 的 ZONE1_BUTTONS（區一已收起，`hidden`）、MonkeyRun／SelfTestRunner／SeasonRehearsal 的
@@ -130,7 +130,7 @@ console.log('\n=== 第七十三輪文字組：畫面上叫幹事去撳「儲存�
   });
   check('★★★★★★ src 內所有畫面文字都不再叫幹事撳「儲存並確認」', hits.length === 0, hits.join('\n'));
   const guards = stripComments(read('src/WebAppGuards.gs'));
-  check('★★★★★ 擋住寄出的訊息（WebAppGuards）指向「儲存及寄出」', guards.indexOf('先撳「儲存及寄出」') !== -1);
+  check('★★★★★ 擋住寄出的訊息（WebAppGuards）指向「儲存」', guards.indexOf('先撳「儲存」') !== -1);
 }
 
 console.log(fail === 0 ? '\nOK' : `\n${fail} FAILURE(S)`);

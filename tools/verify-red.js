@@ -54,15 +54,6 @@ const MUTATIONS = [
     tests: ['tests/suggestion_sheet.test.js']
   },
   {
-    id: 'suggest-blocks-unres',
-    why: '把「建議表遇到認唔出嘅名字」還原成照樣行落去'
-      + '——一個冇 PersonID 嘅名會經由建議表嗰條路溜入正式版本',
-    file: 'src/SuggestionSheet.gs',
-    find: '  if (analysis.unresolved.length > 0) {',
-    replace: '  if (false) {',
-    tests: ['tests/suggestion_sheet.test.js']
-  },
-  {
     id: 'dropdown-auto-on-create',
     why: '把 `createRosterSheet()` 收尾嗰個自動套用拆走'
       + '——每一張新 grid 都冇咗名單選單，而幹事以為有（介面已經冇咗嗰一步）',
@@ -1091,26 +1082,6 @@ const MUTATIONS = [
     tests: ['tests/send_recipients_pool.test.js']
   },
   {
-    id: 'suggest-touches-manual',
-    why: '令〔請系統幫我調整〕照舊改走幹事親手改過嘅格'
-      + '——第四十六輪 C 組嗰條原則：'
-      + '系統改壞幹事親手做嘅決定，比排錯更差',
-    file: 'src/SuggestionSheet.gs',
-    find: '    if (manual[key] && !allowed[key]) {',
-    replace: '    if (false) {',
-    tests: ['tests/round43_field_fixes.test.js', 'tests/suggestion_start_point.test.js']
-  },
-  {
-    id: 'suggest-allow-default-on',
-    why: '把「邊幾格准系統動」嘅預設值由「一格都唔准」改成「全部准」'
-      + '——噉樣就等於行返舊行為，而多咗嗰個清單只會變成'
-      + '一個幹事唔會細睇嘅畫面',
-    file: 'src/ui/ScriptSuggestion.html',
-    find: '        cb.checked = false;   // ⚠️ 預設不勾',
-    replace: '        cb.checked = true;',
-    tests: ['tests/send_recipients_pool.test.js']
-  },
-  {
     id: 'suggest-no-orange',
     why: '拆走第四種顏色（幹事改過、違反規則、系統冇動）'
       + '——用返黃色嘅話，佢喺表上完全分唔出邊幾格有問題，'
@@ -1119,18 +1090,6 @@ const MUTATIONS = [
     find: '      if (isBlocked) {',
     replace: '      if (false) {',
     tests: ['tests/round43_field_fixes.test.js']
-  },
-  {
-    id: 'save-then-send-default',
-    why: '把「儲存之後直接去寄出」嘅預設值改成勾好'
-      + '——寄出係一個對外嘅動作；預設幫佢揀咗，'
-      + '就等於一個唔為意嘅人撳「照樣儲存」之後直接開咗寄出彈窗',
-    file: 'src/ui/ScriptZone1.html',
-    // ⚠️ 第四十七輪批次 A5 組：預設值由 `saveThenSendDefault_` 出。
-    // 呢一條守嘅嘢冇變：**平時預設唔勾。**
-    find: '  let saveThenSendDefault_ = false;',
-    replace: '  let saveThenSendDefault_ = true;',
-    tests: ['tests/send_recipients_pool.test.js']
   },
   {
     id: 'unsaved-dialog-dead',
@@ -1172,8 +1131,8 @@ const MUTATIONS = [
       + '——佢本來就係想寄出，只係被未儲存擋住；'
       + '唔勾嘅話佢儲存完又要自己再搵一次〔寄出〕',
     file: 'src/ui/ScriptZone1.html',
-    find: '    saveThenSendDefault_ = !!(opts && opts.thenSend);',
-    replace: '    saveThenSendDefault_ = false;',
+    find: "    saveThenSend_ = !!(opts && opts.thenSend);",
+    replace: "    saveThenSend_ = false;",
     tests: ['tests/send_unsaved_gate.test.js']
   },
   {
@@ -2573,8 +2532,8 @@ const MUTATIONS = [
       + '——一個違反咗硬規則、由人手放行嘅版本，'
       + '事後冇任何方法分得出佢同一個乾淨版本嘅分別',
     file: 'src/WebAppSaveConfirm.gs',
-    find: '  if (plan.needsRelease) {',
-    replace: '  if (false) {',
+    find: "  if (plan.violations.kept.length > 0) {\n    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**",
+    replace: "  if (false) {\n    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**",
     tests: ['tests/selftest_release_scenario.test.js']
   },
   {
@@ -2585,10 +2544,8 @@ const MUTATIONS = [
     file: 'src/WebAppSaveConfirm.gs',
     // 第六十七輪批次 AG 組：`if (plan.needsRelease) {` 之後而家先有一段註解＋機器可讀紀錄，
     // 所以錨點改用 `if` 嗰一行本身（檔內只有一處）。
-    find: '  if (plan.needsRelease) {' + '\n'
-      + '    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**',
-    replace: '  if (true) {' + '\n'
-      + '    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**',
+    find: "  if (plan.violations.kept.length > 0) {\n    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**",
+    replace: "  if (true) {\n    // ⚠️ 第六十七輪批次 AG 組：**機器可讀嘅放行紀錄一定要寫**",
     tests: ['tests/selftest_release_scenario.test.js']
   },
   {
@@ -2607,7 +2564,7 @@ const MUTATIONS = [
       + '——`needsRelease === false` 而且 `violations.real` 係空陣列'
       + '先係接受條件，而嗰一句就係攔住 S05 嗰道閘自己用嘅判斷',
     file: 'src/SelfTestRunner.gs',
-    find: '    if (bad.length === 0 && plan.needsRelease === false) {',
+    find: "    if (bad.length === 0 && plan.needsDecision !== true) {",
     replace: '    if (true) {',
     tests: ['tests/selftest_batch_pick.test.js']
   },
@@ -2718,12 +2675,7 @@ const MUTATIONS = [
       + '——一句「找到 2 格」冇人知佢試過乜、換過邊格、撞過邊條規則，'
       + '而嗰啲正正係下一輪要靠嘅資料',
     file: 'src/SelfTestRunner.gs',
-    find: "  t.expect('（過程）' + describeAcceptedPickAttempts_(picked)," + '\n'
-      + "    true, '（過程紀錄，不是斷言）'," + '\n'
-      + "    'plan ' + picked.planCalls + ' 次'," + '\n'
-      + "    '接受條件只有一條：needsRelease === false 而且 violations.real 是空的。');" + '\n'
-      + '\n'
-      + '  // ── plan 拋錯／被擋住 ⇒ **拋出去，令它報 ERROR 帶住原文** ────',
+    find: "  t.expect('（過程）' + describeAcceptedPickAttempts_(picked),\n    true, '（過程紀錄，不是斷言）',\n    'plan ' + picked.planCalls + ' 次',\n    '接受條件只有一條：needsDecision 不是 true 而且 violations.real 是空的。');\n\n  // ── plan 拋錯／被擋住 ⇒ **拋出去，令它報 ERROR 帶住原文** ────",
     replace: '  // ── plan 拋錯／被擋住 ⇒ **拋出去，令它報 ERROR 帶住原文** ────',
     tests: ['tests/selftest_batch_pick.test.js']
   },
@@ -3409,7 +3361,7 @@ const MUTATIONS = [
       + '——嗰個係系統最嚴厲嗰一道閘，佢失效嘅話'
       + '一個認唔出嘅名會靜靜噉入咗版本',
     file: 'src/MonkeyRun.gs',
-    find: "        if (result.blockReason !== 'UNRESOLVED_NAMES') {",
+    find: "        if (result.blockReason !== 'NEEDS_NAME_DECISION') {",
     replace: '        if (false) {',
     tests: ['tests/monkey_no_spin.test.js']
   },
@@ -4833,7 +4785,7 @@ const MUTATIONS = [
     id: 'ag-mainflow-no-log',
     why: '主流程放行唔寫機器可讀紀錄（拆走第 1 點）——每次儲存都要重新打字',
     file: 'src/WebAppSaveConfirm.gs',
-    find: "      logHardViolationRelease_(quarterId, 'apiSaveAndConfirmExecute（儲存及寄出）',\n        plan.violations.real, created.versionNo);",
+    find: "      logHardViolationRelease_(quarterId, 'apiSaveAndConfirmExecute（儲存：勾選保留）',\n        plan.violations.kept, created.versionNo);",
     replace: '      void 0;',
     tests: ['tests/hard_release_remembered.test.js']
   },
@@ -4881,8 +4833,8 @@ const MUTATIONS = [
     id: 'ag-ui-released-cb',
     why: '結果窗已放行嘅格照畫勾選框、冇「已放行」標籤',
     file: 'src/ui/ScriptSuggestion.html',
-    find: '        if (u.released) {',
-    replace: '        if (false) {',
+    find: "            + (u.released ? ('（已放行'",
+    replace: "            + (false ? ('（已放行'",
     tests: ['tests/hard_release_remembered.test.js']
   },
   // ── 第六十七輪批次 AH 組：寄出前講空格 ──────────────────────────
@@ -5270,8 +5222,8 @@ const MUTATIONS = [
     id: 'aq-remain-has-released',
     why: '「系統改完之後仍然違反」又把已放行嘅格計入——同「已放行」段重複列出',
     file: 'src/SuggestionSheet.gs',
-    find: '      return !releasedCellKeys[cellKey_(v.serviceDate, v.postId, v.slotIndex)];',
-    replace: '      return true;',
+    find: "      return !releasedCellKeys[k] && !keptKeys[k];",
+    replace: "      return !keptKeys[k];",
     tests: ['tests/hard_release_remembered.test.js']
   },
   {
@@ -5614,8 +5566,8 @@ const MUTATIONS = [
     id: 'ax-hint-wrong-step',
     why: '提示寫錯步驟（叫人撳〔儲存〕而唔係〔儲存及寄出〕）',
     file: 'src/WebAppSendPlan.gs',
-    find: '  + \'請先在第 2 步撳〔儲存及寄出〕（沒有改動也可以撳），\'',
-    replace: '  + \'請先在第 2 步撳〔儲存〕，\'',
+    find: "  + '請先在第 2 步撳〔儲存〕（沒有改動也可以撳），'",
+    replace: "  + '請先在第 2 步撳〔儲存〕，'",
     tests: ['tests/review_sent_hint.test.js']
   },
   {
@@ -5654,16 +5606,16 @@ const MUTATIONS = [
     id: 'ay-title-old-nochange',
     why: '沒有改動窗標題又係「儲存並確認」',
     file: 'src/ui/ScriptZone1.html',
-    find: '    openModal(\'儲存及寄出\', [\n      para(\'沒有偵測到任何改動，不需要儲存。\'',
-    replace: '    openModal(\'儲存並確認\', [\n      para(\'沒有偵測到任何改動，不需要儲存。\'',
+    find: "    openModal('儲存', [\n      para('沒有偵測到任何改動，不需要儲存。'",
+    replace: "    openModal('儲存並確認', [\n      para('沒有偵測到任何改動，不需要儲存。'",
     tests: ['tests/screen_text_wording.test.js']
   },
   {
     id: 'ay-title-old-zero-done',
     why: '零改動完成窗標題又係「儲存並確認」',
     file: 'src/ui/ScriptZone1.html',
-    find: '      openModal(\'儲存及寄出\', [\n        make(\'div\', { text: result.message, className: \'ok-line\' })',
-    replace: '      openModal(\'儲存並確認\', [\n        make(\'div\', { text: result.message, className: \'ok-line\' })',
+    find: "      openModal('儲存', [\n        make('div', { text: result.message, className: 'ok-line' })",
+    replace: "      openModal('儲存並確認', [\n        make('div', { text: result.message, className: 'ok-line' })",
     tests: ['tests/screen_text_wording.test.js']
   },
   {
@@ -5838,7 +5790,7 @@ const MUTATIONS = [
     id: "txt-guards-oldname",
     why: "擋住寄出嘅訊息還原成舊名「儲存並確認」",
     file: "src/WebAppGuards.gs",
-    find: "      ['先撳「儲存及寄出」，把表上的東西處理好，之後再撳「' + actionName + '」',",
+    find: "      ['先撳「儲存」，把表上的東西處理好，之後再撳「' + actionName + '」',",
     replace: "      ['先撳「儲存並確認」，把表上的東西處理好，之後再撳「' + actionName + '」',",
     tests: ["tests/screen_text_wording.test.js"]
   },
@@ -5846,7 +5798,7 @@ const MUTATIONS = [
     id: "txt-dash-oldname",
     why: "狀態卡掣提示還原成舊名「儲存並確認」",
     file: "src/WebAppDashboard.gs",
-    find: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存及寄出」，這一粒才會著。'",
+    find: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存」，這一粒才會著。'",
     replace: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存並確認」，這一粒才會著。'",
     tests: ["tests/screen_text_wording.test.js", "tests/webapp_dashboard_state.test.js"]
   },
@@ -6217,6 +6169,126 @@ const MUTATIONS = [
     find: "      button('不能服侍的日期', () => openUnavailable(), '')\n    ]));",
     replace: "      button('不能服侍的日期', () => openUnavailable(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
     tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
+  },
+  {
+    id: "ce-unresolved-blocks",
+    why: "請系統幫我調整又因為未決定嘅名而整個拒絕",
+    file: "src/SuggestionSheet.gs",
+    find: "  const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });\n",
+    replace: "  const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });\n  if (undecidedNames.length > 0) return { blocked: true, versionNo: versionNo, unresolved: analysis.unresolved, message: 'x' };\n",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "ce-temp-name-lost",
+    why: "建議表上臨時幫手／未決定嘅名蒸發",
+    file: "src/SuggestionSheet.gs",
+    find: "      personName: person ? person.nameTC : (String(s.freeText || '').trim() || (s.isManual ? '' : (orig.personName || ''))),",
+    replace: "      personName: person ? person.nameTC : (s.isManual ? '' : (orig.personName || '')),",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "ce-free-text-blank",
+    why: "有名冇 PersonID 嘅格當成空格",
+    file: "src/FineTune.gs",
+    find: "    if (String(s.freeText || '').trim()) return false;\n",
+    replace: "",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "ce-temp-any-text",
+    why: "臨時幫手決定換咗名都照算（唔失效）",
+    file: "src/SheetReader.gs",
+    find: "      && byKind[k] === normalizeDecisionText_(text);",
+    replace: "      && true;",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "cf-kept-ignored",
+    why: "勾咗「保留我的安排」嘅格系統照樣調整",
+    file: "src/SuggestionSheet.gs",
+    find: "  decisionItems.rules.forEach(function (r) { if (r.checked) keptKeys[r.key] = true; });",
+    replace: "  decisionItems.rules.forEach(function (r) { if (false) keptKeys[r.key] = true; });",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "cf-old-manual-rule",
+    why: "還原「親手改過一律唔動」（冇勾都唔調整）",
+    file: "src/SuggestionSheet.gs",
+    find: "    const untouchable = keptKeys ? !!keptKeys[key] : (manual[key] && !allowed[key]);",
+    replace: "    const untouchable = !!(keptKeys && keptKeys[key]) || (manual[key] && !allowed[key]);",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "cf-no-persist",
+    why: "勾選唔即時記住（冇叫 apiSetCellDecisions）",
+    file: "src/ui/Script.html",
+    find: "      await callServerMutating('apiSetCellDecisions', currentQuarterId, payloads);",
+    replace: "      await Promise.resolve(payloads);",
+    tests: ["tests/round75_cfg_ui.test.js"]
+  },
+  {
+    id: "cf-check-all-no-ask",
+    why: "〔全部勾選〕唔先問一句",
+    file: "src/ui/Script.html",
+    find: "      nodes.push(row([button('全部勾選', () => { confirmBox.hidden = false; }, 'secondary')]));",
+    replace: "      nodes.push(row([button('全部勾選', () => { boxes.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; }); changed(); }, 'secondary')]));",
+    tests: ["tests/round75_cfg_ui.test.js"]
+  },
+  {
+    id: "cf-no-revert-on-fail",
+    why: "記唔到都唔還原勾選框",
+    file: "src/ui/Script.html",
+    find: "        if (!ok) { cb.checked = !want; state[sk(it)] = !want; changed(); }",
+    replace: "        if (!ok) { changed(); }",
+    tests: ["tests/round75_cfg_ui.test.js"]
+  },
+  {
+    id: "cg-no-decision-gate",
+    why: "未決定都照樣儲存（後端唔驗）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  if (plan.needsDecision) {\n    throw new Error(buildThreePartMessage_(",
+    replace: "  if (false) {\n    throw new Error(buildThreePartMessage_(",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "cg-kept-no-release-log",
+    why: "勾咗保留嘅一定要遵守違反唔寫放行紀錄",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  if (plan.violations.kept.length > 0) {\n",
+    replace: "  if (false) {\n",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "cg-unresolved-blocks",
+    why: "儲存計劃又因認唔出嘅名即時擋",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });\n",
+    replace: "  const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });\n  if (undecidedNames.length > 0) return blocked('UNRESOLVED_NAMES', { message: 'x' });\n",
+    tests: ["tests/round75_cefg_decisions_save.test.js"]
+  },
+  {
+    id: "cg-save-btn-always-on",
+    why: "未決定都畀撳〔儲存〕",
+    file: "src/ui/ScriptZone1.html",
+    find: "    saveBtn.disabled = !!decisions && !decisions.allDecided();",
+    replace: "    saveBtn.disabled = false;",
+    tests: ["tests/round75_cfg_ui.test.js"]
+  },
+  {
+    id: "cg-done-no-adjust",
+    why: "儲存完成窗冇〔請系統幫我調整〕",
+    file: "src/ui/ScriptZone1.html",
+    find: "      : [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];",
+    replace: "      : [button('知道了', () => closeModalAndRefresh(), '')];",
+    tests: ["tests/round75_cfg_ui.test.js"]
+  },
+  {
+    id: "cg-name-renamed-back",
+    why: "第 2 步掣還原叫「儲存及寄出」",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    acts.push(stepButton('儲存', () => openSaveAndConfirm(), {",
+    replace: "    acts.push(stepButton('儲存及寄出', () => openSaveAndConfirm(), {",
+    tests: ["tests/send_recipients_pool.test.js"]
   }
 ];
 

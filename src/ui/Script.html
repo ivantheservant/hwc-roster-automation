@@ -1624,6 +1624,169 @@
       + (why ? ('——' + why) : '');
   }
 
+  /* ============================================================
+   * 第七十五輪批次 CE／CF 組：逐格決定元件
+   * ============================================================
+   *
+   * 〔檢查我的改動〕同〔儲存〕確認畫面**共用呢一份**（寫兩份嘅話兩邊會慢慢唔一樣）。
+   *
+   *   名單上找不到的名字：〔加入名單〕＋ ☐「這一季臨時幫手，不加入名單」
+   *   違反規則的格：☐「保留我的安排，系統不要調整」；一定要遵守嘅標紅「一定要遵守」
+   *   〔全部勾選〕：先彈一句「確定全部保留你的安排？系統不會調整這些格。」〔確定〕〔取消〕
+   *
+   * ⚠️ 全部**預設唔勾**（由後端講返目前狀態）。每勾一格即時記住（`apiSetCellDecisions`）；
+   * 記唔到 ⇒ 勾選框還原＋講一句，**唔可以畫面顯示勾咗而實際冇記住**。
+   */
+
+  /** 一項決定 → 送去後端嘅形狀。 */
+  function decisionPayload(item, checked) {
+    return {
+      serviceDate: item.serviceDate, postId: item.postId, slotIndex: item.slotIndex,
+      kind: item.kind, cellText: item.cellText, ruleId: item.ruleId || '', checked: !!checked
+    };
+  }
+
+  /**
+   * 即時記住一批決定。
+   * @param {Object[]} payloads `decisionPayload()` 嘅結果
+   * @returns {Promise<boolean>} 記唔記得到
+   */
+  async function persistDecisions(payloads) {
+    try {
+      await callServerMutating('apiSetCellDecisions', currentQuarterId, payloads);
+      return true;
+    } catch (err) {
+      setStatus('記不住你的選擇：' + (err && err.message ? err.message : String(err))
+        + '　請再試一次，或者撳「重新整理」。', true);
+      return false;
+    }
+  }
+
+  /**
+   * 畫逐格決定嘅幾段。
+   * @param {{names: Object[], rules: Object[]}} items 後端 `buildDecisionItems_()` 嘅結果
+   * @param {{onChanged: function(), onAddPerson: function(Object), title: string=}} opts
+   * @returns {{nodes: Node[], allDecided: function(): boolean}}
+   */
+  function buildDecisionSections(items, opts) {
+    opts = opts || {};
+    const names = (items && items.names) || [];
+    const rules = (items && items.rules) || [];
+    const state = {};   // key§kind → checked
+    const boxes = [];   // {item, cb}
+    const sk = (it) => it.key + '§' + it.kind + '§' + (it.ruleId || '');
+    const changed = () => { if (opts.onChanged) opts.onChanged(); };
+
+    const checkLine = (it, labelText) => {
+      const line = make('label', { className: 'check-row' });
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!it.checked;
+      state[sk(it)] = !!it.checked;
+      cb.addEventListener('change', async () => {
+        const want = cb.checked;
+        state[sk(it)] = want;
+        changed();
+        const ok = await persistDecisions([decisionPayload(it, want)]);
+        if (!ok) { cb.checked = !want; state[sk(it)] = !want; changed(); }
+      });
+      line.appendChild(cb);
+      line.appendChild(make('span', { text: labelText }));
+      boxes.push({ item: it, cb: cb });
+      return line;
+    };
+
+    const nodes = [];
+    if (names.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('名單上找不到的名字（' + names.length + ' 個）'),
+        make('div', {
+          text: '每一個選一樣：加入事奉人員名單；或者勾「這一季臨時幫手」——'
+            + '那一格只記名字，系統不會調整它，他沒有電郵、收不到信，也不計入服侍次數。',
+          className: 'muted'
+        })
+      ]);
+      names.forEach((u) => {
+        const item = make('div', { className: 'prop' });
+        item.appendChild(make('div', {
+          text: humanDate(u.serviceDate) + '　' + u.postNameTC
+            + (Number(u.slotIndex) > 1 ? (' ' + u.slotIndex) : '') + '　你填了「' + u.text + '」',
+          className: 'prop-head'
+        }));
+        item.appendChild(row([
+          button('加入名單', () => { if (opts.onAddPerson) opts.onAddPerson(u); }, 'secondary')
+        ]));
+        item.appendChild(checkLine(u, '這一季臨時幫手，不加入名單'));
+        box.appendChild(item);
+      });
+      nodes.push(box);
+    }
+
+    if (rules.length > 0) {
+      const box = make('div', { className: 'sec sec-warn' }, [
+        sectionTitle('違反規則的格（' + rules.length + ' 格）'),
+        make('div', {
+          text: '勾了「保留我的安排」的格，系統不會調整；一定要遵守的規則勾了就等於放行，'
+            + '儲存時記入紀錄，之後整季記住（換了那一格的人就要重新決定）。',
+          className: 'muted'
+        })
+      ]);
+      rules.forEach((v) => {
+        const item = make('div', { className: 'prop' });
+        const head = make('div', { className: 'prop-head' }, [
+          make('span', { text: humanViolationLine(v) + '　' }),
+          make('span', {
+            text: v.mustFollow ? '一定要遵守' : '盡量避免',
+            className: v.mustFollow ? 'tag tag-bad' : 'tag'
+          })
+        ]);
+        item.appendChild(head);
+        if (v.released) {
+          item.appendChild(make('div', {
+            text: '已放行' + (v.releasedVersionNo === null || v.releasedVersionNo === undefined
+              ? '' : '（第 ' + v.releasedVersionNo + ' 版）') + '——系統不會改動這一格',
+            className: 'muted'
+          }));
+        } else {
+          item.appendChild(checkLine(v, '保留我的安排，系統不要調整'));
+        }
+        box.appendChild(item);
+      });
+      nodes.push(box);
+    }
+
+    // 〔全部勾選〕：先彈一句確認（喺彈窗入面，唔會蓋走呢個畫面）
+    if (boxes.length > 0) {
+      const confirmBox = make('div', { className: 'warnbox' });
+      confirmBox.hidden = true;
+      confirmBox.appendChild(make('div', {
+        text: '確定全部保留你的安排？系統不會調整這些格。', className: 'warn-head'
+      }));
+      confirmBox.appendChild(row([
+        button('確定', async () => {
+          confirmBox.hidden = true;
+          const todo = boxes.filter((b) => !b.cb.checked);
+          todo.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; });
+          changed();
+          const ok = await persistDecisions(todo.map((b) => decisionPayload(b.item, true)));
+          if (!ok) {
+            todo.forEach((b) => { b.cb.checked = false; state[sk(b.item)] = false; });
+            changed();
+          }
+        }, ''),
+        button('取消', () => { confirmBox.hidden = true; }, 'secondary')
+      ]));
+      nodes.push(row([button('全部勾選', () => { confirmBox.hidden = false; }, 'secondary')]));
+      nodes.push(confirmBox);
+    }
+
+    return {
+      nodes: nodes,
+      allDecided: () => names.every((u) => state[sk(u)] === true)
+        && rules.every((v) => !v.mustFollow || v.released || state[sk(v)] === true)
+    };
+  }
+
   function renderViolations(v) {
     const nodes = [];
     const describe = humanViolationLine;

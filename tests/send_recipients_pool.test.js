@@ -422,18 +422,13 @@ console.log('\n=== D【核心】兩處改名 ＋ 儲存後接去寄出 ===');
     /下載一份自己留底/.test(flow), '');
   check('★★★★ 「要印紙本的有 N 位」嗰個動態數字保留',
     /要印紙本的有 ' \+ n \+ ' 位/.test(flow), '');
-  check('★★★★★ 儲存嗰粒叫「儲存及寄出」',
-    /stepButton\('儲存及寄出', \(\) => openSaveAndConfirm\(\)/.test(flow), '');
-  check('★★★★★★ 確認窗有「儲存之後直接去寄出」，而且**預設唔勾**'
-    + '——預設幫佢揀咗，就等於一個唔為意嘅人撳「照樣儲存」之後'
-    + '直接開咗寄出彈窗，而佢以為自己淨係喺度儲存',
-    // ⚠️ 第四十七輪批次 A5 組：預設值改咗由 `saveThenSendDefault_` 出，
-    // 而佢平時係 `false`，只有由〔立即儲存並繼續〕入嚟先會係 `true`。
-    // 守嘅嘢冇變：**平時預設唔勾。**
-    /text: '儲存之後直接去寄出'/.test(zone1)
-    && /thenSendCb\.checked = saveThenSendDefault_;/.test(zone1)
-    && /saveThenSendDefault_ = !!\(opts && opts\.thenSend\);/.test(zone1)
-    && /let saveThenSendDefault_ = false;/.test(zone1), '');
+  check('★★★★★ 儲存嗰粒叫「儲存」',
+    /stepButton\('儲存', \(\) => openSaveAndConfirm\(\)/.test(flow), '');
+  // ⚠️ 第七十五輪批次 CG 組（Ivan 決定）：「儲存之後直接去寄出」勾選框拿走（寄出一律喺第 3 步）。
+  // 只有由寄出窗〔立即儲存並繼續〕入嚟（`thenSend`）先會喺完成窗出〔繼續去寄出〕。
+  check('★★★★★★ 確認窗冇「儲存之後直接去寄出」勾選框（第七十五輪 CG 組）',
+    !/text: '儲存之後直接去寄出'/.test(zone1)
+    && /saveThenSend_ = !!\(opts && opts\.thenSend\);/.test(zone1), '');
   check('★★★★★★ 勾咗都**唔會跳過儲存結果畫面**'
     + '——嗰個係「系統改咗你嗰幾格」嘅唯一證據；'
     + '跳過就變成「撳一粒掣，寄出彈窗彈咗出嚟」',
@@ -447,35 +442,23 @@ console.log('\n=== C【核心】系統唔可以改動幹事親手改過嘅格（
   const sug = read('src/ui/ScriptSuggestion.html');
   const sheet = read('src/SuggestionSheet.gs');
 
-  check('★★★★★★ 幹事改過而違反規則嗰幾格**逐格列出嚟俾佢自己決定**'
-    + '——Ivan 嘅原則：系統改壞幹事親手做嘅決定，比排錯更差',
-    // 第六十七輪批次 AG 組：段標題改為「你改過、而違反規則的格（N 格）」（已放行嘅標出嚟）——仍然逐格列
-    /你改過、而違反規則的格（' \+ untouched\.length \+ ' 格）/.test(sug), '');
-  check('★★★★★★ 而且**預設全部唔勾**'
-    + '——預設勾好就等於系統仍然喺度替佢決定，'
-    + '只係多咗一個佢唔會細睇嘅畫面',
-    /cb\.checked = false;   \/\/ ⚠️ 預設不勾/.test(sug), '');
-  check('★★★★★ 兩粒掣：〔准系統調整我勾了的〕〔保持原狀〕',
-    /button\('准系統調整我勾了的'/.test(sug)
-    && /button\('保持原狀'/.test(sug), '');
-  check('★★★★★ 一格都冇勾就撳落去 ⇒ **講一句**，唔會靜靜乜都唔做',
-    /你一格都沒有勾。系統不會動你改過的任何一格。/.test(sug), '');
-  check('★★★★★ 而且再算嗰陣用返同一個起點（唔會由頭再問一次）',
-    /openBuildSuggestion\(r\.startSource, allow\)/.test(sug), '');
-
-  check('★★★★★★ 後端預設**一格都唔准動**'
-    + '——`allowKeys` 冇傳 ⇒ 空物件；'
-    + '預設「全部准」就等於行返舊行為',
-    /const allowedKeys = \{\};/.test(sheet)
-    && /\(Array\.isArray\(allowKeys\) \? allowKeys : \[\]\)\.forEach/.test(sheet), '');
+  // ⚠️ 第七十五輪批次 CF 組（Ivan 決定）：原則由「幹事親手改過一律唔動、要佢勾『准系統調整』」
+  // 改為「逐格勾『保留我的安排，系統不要調整』（預設唔勾），勾咗先唔動」。勾選喺〔檢查我的改動〕
+  // 同〔儲存〕（共用 `buildDecisionSections()`），「准系統調整我勾了的」拿走（意思相反，會撈亂）。
+  const common = read('src/ui/Script.html');
+  check('★★★★★★ 建議窗冇「准系統調整我勾了的」（第七十五輪 CF 組）',
+    !/button\('准系統調整我勾了的'/.test(sug) && !/allowSelected/.test(sug), '');
+  check('★★★★★★ 逐格決定元件預設唔勾、講「保留我的安排，系統不要調整」',
+    /保留我的安排，系統不要調整/.test(common) && /cb\.checked = !!it\.checked;/.test(common), '');
+  check('★★★★★ 後端：只有勾咗保留嘅格先唔郁（keptKeys）',
+    /const untouchable = keptKeys \? !!keptKeys\[key\]/.test(sheet), '');
   check('★★★★★ 第四種顏色有自己嘅色碼，同黃色分開',
     /const SUGGESTION_COLOR_MANUAL_VIOLATION = /.test(sheet), '');
   check('★★★★★ 圖例印埋第四種（唔印就要人自己估）',
     /橙色格 ＝ 你改過、違反了規則，而系統沒有動它/.test(sheet), '');
-  check('★★★★★★ 格註明講「系統沒有動它」同埋點樣叫佢動'
+  check('★★★★★★ 格註明講「系統不會改動這一格」同點解（勾咗保留）'
     + '——唔講嘅話，佢會以為系統已經修好咗',
-    /系統沒有動它——你改的東西系統不會自己改走/.test(sheet)
-    && /勾選這一格/.test(sheet), '');
+    /你已經勾了「保留我的安排，系統不要調整」——系統不會改動這一格/.test(sheet), '');
 }
 
 // =====================================================================

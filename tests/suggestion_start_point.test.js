@@ -53,7 +53,7 @@ const gas = loadGasSource([
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',
   'Trigger.gs', 'WebAppGuards.gs', 'WebAppDashboard.gs',
   'WebAppGenerate.gs', 'GridNameDropdown.gs', 'MailRedirect.gs',
-  'SendRecipients.gs', 'Mailer.gs', 'SuggestionSheet.gs'
+  'SendRecipients.gs', 'Mailer.gs', 'SuggestionSheet.gs', 'CellDecisions.gs'
 ]);
 
 let fail = 0;
@@ -404,38 +404,29 @@ console.log('\n=== B【核心】造一個肯定違反嘅改動 ⇒ 藍色格一�
       return v.ruleId === gas.RULE_IDS.NO_CONSECUTIVE;
     }), JSON.stringify(chk.violations));
 
+  // ⚠️ 第七十五輪批次 CF 組（Ivan 決定）：冇勾「保留我的安排，系統不要調整」嘅違反格，
+  // 系統**會**調整（唔再係第四十六輪「親手改過一律唔動」）。勾咗先唔動。
+  // 守嘅嘢冇變：**系統一定要偵測到，而且一定要話畀佢知**（Ivan 現場「0 格」分唔出原因）。
   const r = gas.apiBuildSuggestion(Q, 'GRID');
   check('★★★★ 產生到建議表', r.ok === true, JSON.stringify(r).slice(0, 300));
-  // ⚠️ 第四十六輪批次 C 組：呢一條**改咗形狀**。
-  //
-  // 呢個 case 造嘅係「**幹事親手改**咗一格，而嗰一格違反規則」。
-  // 由第四十六輪開始，系統對呢一種**唔會自己改走**——
-  // 佢改一格係因為佢知道一啲系統唔知道嘅事。
-  //
-  // 但守嘅嘢一個字都冇變：**系統一定要偵測到，而且一定要話畀佢知。**
-  // Ivan 現場嗰個問題係「0 格，分唔出係冇違反定係偵測唔到」，
-  // 而家答案係一個橙色格 ＋ 一行清單 ＋ 一個要佢答嘅問題。
-  check('★★★★★★ **系統偵測到，而且逐格列咗出嚟**'
+  check('★★★★★★ **冇勾保留 ⇒ 藍／紫色格 ≥ 1**（系統真係調整咗嗰一格）'
     + '——Ivan 現場見到 0 格，要分得出「真係冇違反」定係「偵測唔到」',
-    (r.untouchedManual || []).length >= 1,
-    'untouchedManual=' + JSON.stringify(r.untouchedManual)
-      + ' remaining=' + JSON.stringify(r.remaining));
-  check('★★★★★★ 而且**冇動幹事改嗰一格**'
-    + '——呢個係第四十六輪 C 組嗰條原則：'
-    + '系統改壞幹事親手做嘅決定，比排錯更差',
-    r.systemCount === 0, 'systemCount=' + r.systemCount);
-  check('★★★★★ 表上真係有橙色格（唔係得個講字）',
-    (r.colourCounts || {}).manualViolation >= 1,
-    JSON.stringify(r.colourCounts));
+    r.systemCount >= 1 && ((r.colourCounts || {}).system + (r.colourCounts || {}).both) >= 1,
+    'systemCount=' + r.systemCount + ' colours=' + JSON.stringify(r.colourCounts));
 
-  // ⚠️ 反證：勾咗之後系統一定要真係動。冇呢一段嘅話，
-  // 上面全部斷言用一句「系統乜都唔做」都會綠。
-  const allowKey = (r.untouchedManual || [])[0] && (r.untouchedManual || [])[0].key;
-  const rAllowed = gas.apiBuildSuggestion(Q, 'GRID', [allowKey]);
-  check('★★★★★★ **勾咗之後藍色格 ≥ 1**'
-    + '——唔動嘅話，個勾選框就係一個冇作用嘅裝飾',
-    rAllowed.systemCount >= 1,
-    'systemCount=' + rAllowed.systemCount);
+  // ⚠️ 反證：勾咗「保留我的安排」之後系統一定唔可以動。
+  const item = (chk.violations || []).filter(function (v) { return v.ruleId === gas.RULE_IDS.NO_CONSECUTIVE; })[0];
+  gas.apiSetCellDecisions(Q, [{ serviceDate: item.serviceDate, postId: item.postId, slotIndex: item.slotIndex,
+    kind: item.kind, cellText: item.cellText, ruleId: item.ruleId, checked: true }]);
+  const rKept = gas.apiBuildSuggestion(Q, 'GRID');
+  check('★★★★★★ 勾咗保留 ⇒ 嗰一格列喺「系統沒有動」，而且係橙色',
+    (rKept.untouchedManual || []).some(function (u) { return u.kept === true; })
+      && (rKept.colourCounts || {}).manualViolation >= 1,
+    JSON.stringify(rKept.untouchedManual) + ' ' + JSON.stringify(rKept.colourCounts));
+  // 收尾：取消勾選，再用冇勾嘅狀態整返一張（下面一節要睇藍色格嘅備註）
+  gas.apiSetCellDecisions(Q, [{ serviceDate: item.serviceDate, postId: item.postId, slotIndex: item.slotIndex,
+    kind: item.kind, cellText: item.cellText, ruleId: item.ruleId, checked: false }]);
+  gas.apiBuildSuggestion(Q, 'GRID');
 }
 
 console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
@@ -460,14 +451,11 @@ console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
   // 兩句都要有測試守住，而下面守嘅係「系統真係動嗰陣講唔講得出原因」。
   const startForNotes = gas.resolveSuggestionStartPoint_(
     Q, gas.findLatestVersionNo(Q), 'GRID');
-  const blockedFirst = gas.buildSuggestionState_(Q, startForNotes);
-  const allowAll = Object.keys(blockedFirst.blockedKeys || {});
-  const allowMap = {};
-  allowAll.forEach(function (k) { allowMap[k] = true; });
-  const built = gas.buildSuggestionState_(Q, startForNotes, allowMap);
+  // ⚠️ 第七十五輪批次 CF 組：冇勾「保留我的安排」⇒ 系統直接調整（唔使再准），所以直接睇系統改過嘅格。
+  const built = gas.buildSuggestionState_(Q, startForNotes);
   const noteTexts = Object.keys(built.notes).map(function (k) { return built.notes[k]; });
-  check('★★★★★ （前置）呢個 case 真係有幹事改過而違反嘅格',
-    allowAll.length >= 1, JSON.stringify(allowAll));
+  check('★★★★★ （前置）呢個 case 系統真係改咗幹事改過而違反嘅格',
+    Object.keys(built.systemKeys || {}).length >= 1, JSON.stringify(built.systemKeys));
   // （下面兩條斷言要用到 `noteTexts`，所以要喺呢一行之後。）
   check('★★★★★ 系統改過嘅格有備註，而且講得出原因',
     noteTexts.some(function (t) { return t.indexOf('系統改了這一格。原因：') !== -1; }),

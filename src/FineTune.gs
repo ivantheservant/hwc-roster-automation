@@ -223,7 +223,7 @@ function buildGridOverlayState_(context) {
 
     // grid 沒有這一格（例如崗位是後來加的）：照抄原值
     if (gridText === undefined) {
-      return Object.assign({}, base, { personId: a.personId, isManual: false });
+      return Object.assign({}, base, { personId: a.personId, isManual: false, freeText: originalFreeText_(a) });
     }
 
     // ─────────────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ function buildGridOverlayState_(context) {
     const expectedText = renderExpectedGridText_(
       a, a.postId, a.serviceDate, context.gridRender);
     if (normalizedGrid === normalizeCellText_(expectedText)) {
-      return Object.assign({}, base, { personId: a.personId, isManual: false });
+      return Object.assign({}, base, { personId: a.personId, isManual: false, freeText: originalFreeText_(a) });
     }
 
     // 到這裡才是真正的人手改動
@@ -299,7 +299,7 @@ function buildGridOverlayState_(context) {
     // 呢個正正就係第十八輪嗰個 bug class（缺失被當成有意義嘅值），
     // 唔可以喺修另一個 bug 嘅時候順手種返一個。
     if (resolvedId && resolvedId === a.personId) {
-      return Object.assign({}, base, { personId: a.personId, isManual: false });
+      return Object.assign({}, base, { personId: a.personId, isManual: false, freeText: originalFreeText_(a) });
     }
     // 空白對空白亦都唔係改動（例如佔位文字被刪走，最終一樣係冇人）
     if (normalizedGrid === '' && !a.personId) {
@@ -322,10 +322,21 @@ function buildGridOverlayState_(context) {
       manualText: normalizedGrid
     }));
 
-    return Object.assign({}, base, { personId: resolvedId, isManual: true });
+    return Object.assign({}, base, { personId: resolvedId, isManual: true, freeText: resolvedId ? '' : normalizedGrid });
   });
 
   return { changes: changes, unresolved: unresolved, manualState: manualState };
+}
+
+/**
+ * 第七十五輪批次 CE 組：版本紀錄嗰格冇 PersonID 但有名（外請講員、臨時幫手）⇒ 嗰個名。
+ * 狀態入面帶住佢（`freeText`），「空格」先唔會把一格有名嘅格當成冇人。
+ * @param {Object} a `context.original` 一項
+ * @returns {string}
+ */
+function originalFreeText_(a) {
+  if (!a || a.personId) return '';
+  return String(a.personName || '').trim();
 }
 
 /**
@@ -1341,6 +1352,8 @@ function listGenuineBlankCells_(state, context) {
   });
   return (state || []).filter(function (s) {
     if (s.personId) return false;
+    // 第七十五輪批次 CE 組：有名而冇 PersonID（臨時幫手、外請講員、未決定嘅名）唔係空格。
+    if (String(s.freeText || '').trim()) return false;
     return !isIntentionallyBlankCell_(
       flagsByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)]);
   }).map(function (s) {
