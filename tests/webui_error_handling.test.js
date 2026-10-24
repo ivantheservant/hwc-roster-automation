@@ -121,7 +121,8 @@ console.log('\n=== 核心不變量二：唔可以有裸露嘅 callServer()（會
 
 console.log('\n=== 核心不變量三：冇季度時要講嘢，唔可以靜靜白畫面 ===');
 {
-  const fn = common.slice(common.indexOf('async function loadQuarters'));
+  // ⚠️ 第七十五輪批次 CB 組：讀季度清單、填選單搬咗去 fillQuarterSelect_()（loadQuarters() 先確保未來季度已建立）
+  const fn = common.slice(common.indexOf('async function fillQuarterSelect_'));
   const body = fn.slice(0, fn.indexOf('\n  }\n') + 5);
   check('★★★★★ loadQuarters() 有處理「一個季度都冇」嘅情況',
     /if \(!quarters \|\| quarters\.length === 0\)/.test(body));

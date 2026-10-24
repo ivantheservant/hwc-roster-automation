@@ -6137,6 +6137,46 @@ const MUTATIONS = [
     find: "      protection.removeEditors(protection.getEditors());\n      if (scriptAccount) protection.addEditor(scriptAccount);\n      if (protection.canDomainEdit()) protection.setDomainEdit(false);\n      out.protectedSheets++;",
     replace: "      if (scriptAccount) protection.addEditor(scriptAccount);\n      if (protection.canDomainEdit()) protection.setDomainEdit(false);\n      out.protectedSheets++;",
     tests: ["tests/round75_cl_public_readonly.test.js"]
+  },
+  {
+    id: "cb-include-started",
+    why: "連已經開始咗嘅季度都建（範圍下限冇咗）",
+    file: "src/AnnualQuarters.gs",
+    find: "      if (p.startDate > today && p.startDate <= horizon) plans.push(p);",
+    replace: "      if (p.startDate <= horizon) plans.push(p);",
+    tests: ["tests/round75_cb_quarter_lookahead.test.js"]
+  },
+  {
+    id: "cb-whole-batch",
+    why: "一次過寫晒（唔再逐季、唔逐季記 AuditLog）",
+    file: "src/AnnualQuarters.gs",
+    find: "  picked.plans.forEach(function (plan) {\n    const result = executeAnnualQuarters_([plan]);",
+    replace: "  [picked.plans[0]].filter(Boolean).forEach(function (plan) {\n    const result = executeAnnualQuarters_(picked.plans);",
+    tests: ["tests/round75_cb_quarter_lookahead.test.js"]
+  },
+  {
+    id: "cb-bad-config-zero",
+    why: "Config 唔啱當成 0（靜靜熄咗）",
+    file: "src/AnnualQuarters.gs",
+    find: "    return DEFAULTS.QUARTER_LOOKAHEAD_MONTHS;\n  }\n  return n;",
+    replace: "    return 0;\n  }\n  return n;",
+    tests: ["tests/round75_cb_quarter_lookahead.test.js"]
+  },
+  {
+    id: "cb-no-load-ensure",
+    why: "載入幹事介面時唔再自動建立",
+    file: "src/ui/Script.html",
+    find: "      await callServerMutating('apiEnsureFutureQuarters');\n    } catch (err) { /* 見上：唔阻住載入 */ }",
+    replace: "    } catch (err) { /* 見上：唔阻住載入 */ }",
+    tests: ["tests/round75_cb_quarter_lookahead.test.js"]
+  },
+  {
+    id: "cb-no-daily-ensure",
+    why: "每日排程唔再自動建立",
+    file: "src/Trigger.gs",
+    find: "      const ahead = ensureLookaheadQuarters_('dailyAutomationCheck_');",
+    replace: "      const ahead = { created: [] };",
+    tests: ["tests/round75_cb_quarter_lookahead.test.js"]
   }
 ];
 

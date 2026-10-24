@@ -90,6 +90,7 @@ function getConfigBaselineSnapshot_() {
       PUBLIC_ROSTER_DATE_FORMAT: { launchTargetValue: '{M}月{d}日', source: '程式碼預設值（試算表現時實際值未核實）' },
       PUBLIC_ROSTER_FILE_NAME_PATTERN: { launchTargetValue: '{QuarterID} 粵語堂職事表（公開版）', source: '程式碼預設值（試算表現時實際值未核實）' },
       QUARTER_TERM_START_MONTHS: { launchTargetValue: '1,4,7,10', source: '已核實的實際值' },
+      QUARTER_LOOKAHEAD_MONTHS: { launchTargetValue: '6', source: '程式碼預設值（試算表現時實際值未核實）' },
       RANDOM_SEED: { launchTargetValue: '20260811', source: '已核實的實際值' },
       REMIND_DEADLINE_DAYS: { launchTargetValue: '7', source: '已核實的實際值' },
       REMIND_STUCK_DAYS: { launchTargetValue: '3', source: '已核實的實際值' },

@@ -38,6 +38,11 @@
       zone4Row('草稿覆核報告（給堂委看）',
         '產生一份給堂委看的文字報告：這一版排了誰、有什麼要留意。',
         () => openDraftReviewReport(), false),
+      // 第七十五輪批次 CB 組：手動觸發「季度提前自動建立」（同載入時同一支）
+      zone4Row('建立未來季度',
+        '確保今日起幾個月內（Config 的 QUARTER_LOOKAHEAD_MONTHS，預設 6）開始的季度都已經建立。'
+          + '平時打開這一頁就會自動做；這裡是手動再做一次。',
+        () => openEnsureFutureQuarters(), false),
       // 第七十五輪批次 CA 組：由「開季前準備」搬落嚟（唔係常用功能）
       zone4Row('名單檢查',
         '只看：列出名單上可能有問題的人（例如沒有電郵、沒有任何崗位）。',
@@ -95,6 +100,22 @@
       text: '其餘工具（體檢、上線前檢查、匯出關鍵狀態等）請用試算表上方的選單。',
       className: 'muted'
     }));
+  }
+
+  /**
+   * 第七十五輪批次 CB 組：〔建立未來季度〕。走 `apiEnsureFutureQuarters()`——同載入時同一支。
+   * 建咗新季度就重填季度選單（保留而家揀緊嗰季，唔會跳走）。
+   */
+  function openEnsureFutureQuarters() {
+    runAction('建立未來季度', async () => {
+      const r = await callServerMutating('apiEnsureFutureQuarters');
+      if (r.created && r.created.length > 0) await fillQuarterSelect_(currentQuarterId);
+      openModal('建立未來季度', [
+        make('div', { text: r.created && r.created.length > 0 ? '已完成' : '不需要再建',
+          className: 'ok-head' }),
+        para(r.message || '')
+      ], [button('知道了', () => closeModal(), '')]);
+    });
   }
 
   /* ── 第六十七輪批次 AF 組：匯入人手編好嘅職事表 ──────────────── */

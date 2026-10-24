@@ -330,6 +330,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "SCHEDULE"
     },
+    "QUARTER_LOOKAHEAD_MONTHS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "6",
+      "launchTargetValue": "6",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SCHEDULE"
+    },
     "RANDOM_SEED": {
       "source": "已核實的實際值",
       "currentValue": "20260811",

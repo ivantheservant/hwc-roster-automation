@@ -369,3 +369,126 @@ function runAnnualQuartersWizard_() {
     ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十五輪批次 CB 組：季度提前自動建立
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * Ivan 手動測試 A：「季度選單入面未來嘅季度，會唔會到時自動出現？可唔可以提前大約半年建立？」
+ *
+ * 做法：確保「開始日期喺今日之後 N 個月內」（N＝Config `QUARTER_LOOKAHEAD_MONTHS`，預設 6）
+ * 嘅季度都已經有 `Quarters` 同 `ServiceDates`；冇就**逐季**建立（唔會一次過開一整年）。
+ * 計日期全部重用「產生下一年度四個季度」嗰套（`planAnnualQuarters_()`／`executeAnnualQuarters_()`），
+ * 只係揀出範圍入面、未存在嘅嗰幾季。
+ *
+ * 三個入口：幹事介面載入時（`apiEnsureFutureQuarters()`）、每日自動排程（如已安裝）、
+ * 進階與診斷〔建立未來季度〕（同一支函式）。每建一季寫一行 AuditLog。
+ */
+
+/**
+ * 「今日起 N 個月」嘅最後一日（yyyy-MM-dd）。純函式。
+ *
+ * 月份加減用日曆月：`2026-10-24` ＋ 6 ⇒ `2027-04-24`；冇嗰日（例如 8 月 31 日＋6 ⇒ 2 月）就用嗰個月最後一日。
+ * @param {string} today yyyy-MM-dd
+ * @param {number} months 月數
+ * @returns {string}
+ */
+function addMonthsToYmd_(today, months) {
+  const p = String(today).split('-').map(Number);
+  const total = p[0] * 12 + (p[1] - 1) + Number(months);
+  const y = Math.floor(total / 12);
+  const m = total % 12 + 1;
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const d = Math.min(p[2], lastDay);
+  return y + '-' + (m < 10 ? '0' + m : m) + '-' + (d < 10 ? '0' + d : d);
+}
+
+/**
+ * 揀出要建立嘅季度。純函式（方便測試）。
+ * @param {string} today yyyy-MM-dd
+ * @param {number} months 提前幾多個月
+ * @param {function(number): Object[]} planYear 一年四季嘅規劃（`planAnnualQuarters_` 包一層）
+ * @returns {{horizon: string, plans: Object[]}} 只含**未存在**而且開始日期喺 (today, horizon] 嘅季度
+ */
+function selectLookaheadQuarterPlans_(today, months, planYear) {
+  const horizon = addMonthsToYmd_(today, months);
+  const firstYear = Number(String(today).slice(0, 4));
+  const lastYear = Number(String(horizon).slice(0, 4));
+  const plans = [];
+  for (let y = firstYear; y <= lastYear; y++) {
+    planYear(y).forEach(function (p) {
+      if (p.alreadyExists) return;
+      if (p.startDate > today && p.startDate <= horizon) plans.push(p);
+    });
+  }
+  return { horizon: horizon, plans: plans };
+}
+
+/**
+ * 讀 `QUARTER_LOOKAHEAD_MONTHS`。唔係正整數 ⇒ 用預設（6），並記 WARN——
+ * **唔可以當成 0**（0 ＝ 永遠唔建，等於靜靜熄咗呢個功能）。
+ * @returns {number}
+ */
+function readQuarterLookaheadMonths_() {
+  const raw = getConfig(CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS, DEFAULTS.QUARTER_LOOKAHEAD_MONTHS);
+  const n = Number(raw);
+  if (!isFinite(n) || n < 1 || Math.floor(n) !== n) {
+    log_('WARN', 'Config ' + CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS + '＝「' + raw + '」不是正整數，改用預設 '
+      + DEFAULTS.QUARTER_LOOKAHEAD_MONTHS + ' 個月。');
+    return DEFAULTS.QUARTER_LOOKAHEAD_MONTHS;
+  }
+  return n;
+}
+
+/**
+ * 確保未來 N 個月內開始嘅季度都已建立。**會寫入**（`Quarters`／`ServiceDates`／AuditLog）。
+ * @param {string} source 邊個入口叫（寫入 AuditLog）
+ * @returns {{months: number, horizon: string, created: string[], serviceDatesWritten: number}}
+ */
+function ensureLookaheadQuarters_(source) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const months = readQuarterLookaheadMonths_();
+  const startMonths = readQuarterTermStartMonths_();
+  const dateSettings = readQuarterDateSettings_();
+  const existing = readExistingQuarterAndServiceDateIds_();
+  const picked = selectLookaheadQuarterPlans_(today, months, function (year) {
+    return planAnnualQuarters_(year, startMonths, existing.quarterIds, existing.serviceDateIds, dateSettings);
+  });
+
+  const created = [];
+  let serviceDatesWritten = 0;
+  // ⚠️ 逐季寫、逐季記 AuditLog：中途出事都清楚知道邊幾季已經建立。
+  picked.plans.forEach(function (plan) {
+    const result = executeAnnualQuarters_([plan]);
+    if (result.quartersWritten > 0) {
+      created.push(plan.quarterId);
+      serviceDatesWritten += result.serviceDatesWritten;
+      writeAuditLog_({
+        action: '自動建立未來季度',
+        targetSheet: SHEETS.QUARTERS,
+        targetKey: plan.quarterId,
+        newValue: plan.startDate + ' 至 ' + plan.endDate + '，' + result.serviceDatesWritten + ' 個主日',
+        source: source || 'ensureLookaheadQuarters_',
+        notes: '開始日期在今日（' + today + '）之後 ' + months + ' 個月內（至 ' + picked.horizon + '）'
+      });
+    }
+  });
+  return { months: months, horizon: picked.horizon, created: created, serviceDatesWritten: serviceDatesWritten };
+}
+
+/**
+ * 幹事介面：載入時（靜靜做）以及進階與診斷〔建立未來季度〕（顯示結果）。
+ * @returns {{months: number, horizon: string, created: string[], serviceDatesWritten: number, message: string}}
+ */
+function apiEnsureFutureQuarters() {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('建立未來季度', function () {
+    const r = ensureLookaheadQuarters_('apiEnsureFutureQuarters');
+    r.message = r.created.length > 0
+      ? ('已建立 ' + r.created.length + ' 個季度：' + r.created.map(buildQuarterLabel_).join('、')
+        + '。季度選單已經可以揀。')
+      : ('今日起 ' + r.months + ' 個月內（至 ' + r.horizon + '）開始的季度都已經建立好，不需要再建。');
+    return r;
+  });
+}

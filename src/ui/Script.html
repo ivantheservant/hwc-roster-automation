@@ -1680,6 +1680,20 @@
   // ── 頂部：季度、狀態卡 ───────────────────────────────────────
 
   async function loadQuarters() {
+    // ⚠️ 第七十五輪批次 CB 組：載入時先確保「今日起 N 個月內開始」嘅季度都已建立，
+    // 季度選單先會一直有下一季。**做唔到唔可以令成頁載入失敗**——靜靜略過，
+    // 進階與診斷〔建立未來季度〕仲可以手動做一次（會講原因）。
+    try {
+      await callServerMutating('apiEnsureFutureQuarters');
+    } catch (err) { /* 見上：唔阻住載入 */ }
+    await fillQuarterSelect_(null);
+  }
+
+  /**
+   * 第七十五輪批次 CB 組：讀季度清單、填季度選單。
+   * @param {?string} keepQuarterId 想保留嘅季度（建立未來季度之後重填用）；null ＝ 照舊揀第一個
+   */
+  async function fillQuarterSelect_(keepQuarterId) {
     const quarters = await callServer('apiListQuarters');
     const select = clear(el('quarter'));
 
@@ -1699,6 +1713,9 @@
       select.appendChild(option);
     });
 
+    if (keepQuarterId && quarters.some((q) => q.quarterId === keepQuarterId)) {
+      select.value = keepQuarterId;
+    }
     currentQuarterId = select.value;
     await loadDashboard();
   }

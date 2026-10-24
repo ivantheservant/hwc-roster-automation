@@ -187,7 +187,7 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
       '「' + buildQuarterLabel_(target.quarterId) + '」已經生成過了。',
       '什麼都沒有改動。',
       ['要生成另一季，先在最上面的季度選單選那一季',
-        '要重新生成這一季（會覆蓋現有安排），請去「進階與診斷 ▸ 重新生成職事表」']);
+        '要重新生成這一季（會覆蓋現有安排），請去「常用設定 ▸ 重新生成初稿（覆蓋式）」']);
   } else if (allGenerated) {
     // ⚠️ 什麼日期警告都不算。掣是灰的，他做不到任何事——
     // 這時候唯一有用的資訊是「下一步去哪裡」。
@@ -195,9 +195,9 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     warnMessage = buildThreePartMessage_(
       '所有已建立的季度都生成過了。',
       '什麼都沒有改動。',
-      ['要建立更下一年的季度，請去「開季前準備 ▸ 產生下一年度四個季度」',
+      ['未來幾個月開始的季度系統會自動建立；要手動再做一次，請去「進階與診斷 ▸ 建立未來季度」',
         '要重新生成一個已經生成過的季度（會覆蓋現有安排），'
-          + '請去「進階與診斷 ▸ 重新生成職事表」']);
+          + '請去「常用設定 ▸ 重新生成初稿（覆蓋式）」']);
   } else if (target.endDate && target.endDate < today) {
     warn = GENERATE_TARGET_WARN_PAST;
     warnMessage = buildThreePartMessage_(

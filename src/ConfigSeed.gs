@@ -464,6 +464,15 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS, type: CONFIG_TYPES.INT, group: 'SCHEDULE',
+      defaultValue: String(DEFAULTS.QUARTER_LOOKAHEAD_MONTHS),
+      description: '第七十五輪批次新增：提前幾多個月自動建立未來季度。幹事介面每次載入（以及每日自動排程，'
+        + '如果已安裝）都會檢查：開始日期在今日之後這麼多個月內的季度，如果還沒有 Quarters 與 ServiceDates '
+        + '就逐季建立（日期計法同「產生下一年度四個季度」一樣）。進階與診斷有〔建立未來季度〕可以手動做一次。'
+        + '預設 6；不是正整數時用 6 並記一句 WARN。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.REMIND_UNCONFIRMED_SPECIAL_DAYS, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: String(DEFAULTS.REMIND_UNCONFIRMED_SPECIAL_DAYS),
       description: '第十六輪批次新增（教會規則 5）：距離自動生成日期少於幾天，就開始提醒'

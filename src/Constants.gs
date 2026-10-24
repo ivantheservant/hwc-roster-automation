@@ -1220,6 +1220,9 @@ const CONFIG_KEYS = {
   // 完全應該由幹事自己喺試算表決定。預設值 `1,4,7,10` 就係原本寫死嗰套
   // （T1=1-3月、T2=4-6月、T3=7-9月、T4=10-12月），所以唔設定嘅話行為不變。
   QUARTER_TERM_START_MONTHS: 'QUARTER_TERM_START_MONTHS',
+  // 第七十五輪批次 CB 組：提前幾多個月自動建立未來季度（Quarters＋ServiceDates）。
+  // 幹事介面載入時、每日自動排程、進階與診斷〔建立未來季度〕都用（見 AnnualQuarters.gs）。
+  QUARTER_LOOKAHEAD_MONTHS: 'QUARTER_LOOKAHEAD_MONTHS',
   // 第十六輪批次階段 D：提醒幹事「呢一季仲有未確認日期嘅特殊主日」嘅提前日數。
   // 距離自動生成日期（computeAutomationSchedule_() 算出嘅 generateDate）
   // 仲有唔夠呢個日數、而該季 SpecialSundays 有 Confirmed=FALSE 嘅列，
@@ -1724,6 +1727,8 @@ const DEFAULTS = {
   REMIND_UNCONFIRMED_SPECIAL_DAYS: 7,
   // 第十七輪批次階段 C：T1～T4 各自嘅起始月份（日曆季度）。
   QUARTER_TERM_START_MONTHS: '1,4,7,10',
+  // 第七十五輪批次 CB 組：Ivan 要求「提前大約半年」
+  QUARTER_LOOKAHEAD_MONTHS: 6,
   PDF_MIN_SIZE_BYTES: 10240,
   /**
    * 第十九輪批次階段 C1：步驟 4 容許嘅個人 PDF 缺件比例（0–1）。

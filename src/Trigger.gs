@@ -116,6 +116,19 @@ function dailyAutomationCheck_() {
     const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
     const report = [];
 
+    // 第七十五輪批次 CB 組：先確保未來 N 個月內開始嘅季度已建立（逐季、寫 AuditLog）。
+    // 出事唔可以令其他季度嘅檢查唔做——包 try/catch，同下面每季判斷同一種防禦。
+    try {
+      const ahead = ensureLookaheadQuarters_('dailyAutomationCheck_');
+      if (ahead.created.length > 0) {
+        report.push({ quarterId: ahead.created.join(','), action: 'LOOKAHEAD', outcome: 'CREATED',
+          detail: '自動建立未來季度：' + ahead.created.join('、') });
+      }
+    } catch (err) {
+      log_('WARN', 'dailyAutomationCheck_: 自動建立未來季度失敗，其餘照做：' + err.message);
+      report.push({ quarterId: '', action: 'LOOKAHEAD', outcome: 'ERROR', detail: err.message });
+    }
+
     readSheet(SHEETS.QUARTERS).forEach(function (row) {
       const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
       if (!quarterId) return;

@@ -318,7 +318,8 @@ console.log('\n=== A1【核心】全部季度都生成過 ⇒ 灰掣，而且講
     + '幹事讀出嚟只會覺得系統壞咗',
     t.warn, 'ALL_GENERATED');
   check('★★★★★ 訊息要講清楚下一步去邊（唔係淨係話「唔得」）',
-    t.warnMessage.indexOf('產生下一年度四個季度') !== -1, t.warnMessage);
+    // ⚠️ 第七十五輪批次 CB 組：未來季度改為自動建立，手動入口係「進階與診斷 ▸ 建立未來季度」
+    t.warnMessage.indexOf('建立未來季度') !== -1, t.warnMessage);
   check('★★★★ 而且講埋「想重新生成就去進階與診斷」',
     t.warnMessage.indexOf('重新生成') !== -1, t.warnMessage);
   check('★★★★ 掣旁邊講得出而家有幾多個版本', t.versionCount >= 1, 'v=' + t.versionCount);
