@@ -970,12 +970,9 @@
       ['PLAIN', '每人一份，不標示名字',
         '每一份內容都一模一樣，所以系統只做一個檔，你印幾份就可以。'
           + '下面仍然要選人——選了多少位，就是要印多少份。'],
-      ['FULL_ONE', '一份整季表，印一張大家看',
-        '同上面那一種是同一個檔，只是印一張。不需要選人。'],
-      // 第六十七輪批次 AJ 組：系統出問題時可以自己手動繼續嘅一份
-      ['EDITABLE_COPY', '可編輯的試算表副本（最新版本）',
-        '把最新版本的職事表（連格式和本季服侍次數統計）複製成一份獨立的 Google 試算表，'
-          + '放在 Drive 的「' + currentQuarterId + '／可編輯副本」資料夾。只是快照，之後系統再改動不會更新它。不需要選人。']
+      // ⚠️ 第七十五輪批次 CK 組：只剩上面兩種。
+      // 「一份整季表，印一張大家看」同「每人一份，不標示名字」係同一個檔（Ivan：重複）；
+      // 「可編輯的試算表副本」搬咗去「進階與診斷 ▸ 系統出問題時怎樣做」入面嘅〔建立可編輯副本〕。
     ].forEach((opt) => {
       const line = make('label', { className: 'radio-row' });
       const input = document.createElement('input');
@@ -996,24 +993,6 @@
       kindBox.appendChild(make('div', { text: '　　' + opt[2], className: 'muted' }));
     });
     nodes.push(kindBox);
-
-    // ⚠️ 「一份整季表」根本唔使揀人。仲畫住個名單只會令人以為要揀——
-    // 一個撳落去冇作用嘅控制項，就係呢個專案一直喺度殺嗰樣嘢。
-    if (paperKind_ === 'FULL_ONE') {
-      openModal('要印紙本的人', nodes, [
-        button('產生這一份', () => runPlainPaper(1), ''),
-        button('取消', () => closeModal(), 'secondary')
-      ]);
-      return;
-    }
-    // 第六十七輪批次 AJ 組：可編輯副本都唔使揀人
-    if (paperKind_ === 'EDITABLE_COPY') {
-      openModal('下載及匯出', nodes, [
-        button('建立副本', () => runEditableCopy(), ''),
-        button('取消', () => closeModal(), 'secondary')
-      ]);
-      return;
-    }
 
     // ── 名單（共用元件）────────────────────────────────────
     //

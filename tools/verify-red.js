@@ -6017,6 +6017,22 @@ const MUTATIONS = [
     find: "      zone4Row('檢查並匯入',",
     replace: "      zone4Row('檢查匯入（停用）',",
     tests: ["tests/round75_cn_no_import_step1.test.js"]
+  },
+  {
+    id: "ck-full-one-back",
+    why: "下載及匯出還原「一份整季表」選項",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      // ⚠️ 第七十五輪批次 CK 組：只剩上面兩種。\n",
+    replace: "      ['FULL_ONE', '一份整季表，印一張大家看', '同上面那一種是同一個檔。'],\n",
+    tests: ["tests/round75_ck_paper_two_kinds.test.js"]
+  },
+  {
+    id: "ck-copy-btn-gone",
+    why: "系統出問題時怎樣做冇〔建立可編輯副本〕",
+    file: "src/ui/ScriptZone4.html",
+    find: "        button('建立可編輯副本', () => runEditableCopy(), 'secondary'),\n",
+    replace: "",
+    tests: ["tests/round75_ck_paper_two_kinds.test.js"]
   }
 ];
 

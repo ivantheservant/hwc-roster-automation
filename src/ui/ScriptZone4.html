@@ -332,7 +332,21 @@
         // 有 USER_GUIDE_URL ⇒ 連結；冇 ⇒ 指南章名。
         guideLine
       ]));
-      openModal('系統出問題時怎樣做', nodes, [button('知道了', () => closeModal(), '')]);
+      // 第七十五輪批次 CK 組：〔建立可編輯副本〕由第 4 步〔下載及匯出〕搬到呢度。
+      // 走嘅仍然係 `runEditableCopy()`（ScriptSendPaper.html）→ `apiCreateEditableRosterCopy()`，
+      // 同正式發出之後自動建立嗰份係同一支。
+      nodes.push(make('div', { className: 'sec' }, [
+        sectionTitle('建立一份新的可編輯副本'),
+        make('div', {
+          text: '把最新版本的職事表（連格式和本季服侍次數統計）複製成一份獨立的 Google 試算表，'
+            + '放在 Drive 的「' + currentQuarterId + '／可編輯副本」資料夾。只是快照，之後系統再改動不會更新它。',
+          className: 'muted'
+        })
+      ]));
+      openModal('系統出問題時怎樣做', nodes, [
+        button('建立可編輯副本', () => runEditableCopy(), 'secondary'),
+        button('知道了', () => closeModal(), '')
+      ]);
     });
   }
 

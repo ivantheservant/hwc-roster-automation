@@ -51,10 +51,13 @@ const packBare = paperPack.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$
 // =====================================================================
 console.log('\n=== G【核心】三揀一真係有三個 ===');
 {
-  ['PERSONAL', 'PLAIN', 'FULL_ONE'].forEach(function (kind) {
+  // ⚠️ 第七十五輪批次 CK 組（Ivan 決定）：三揀一變**二揀一**。
+  // 「一份整季表，印一張大家看」同「不標示名字」係同一個檔，拿走。
+  ['PERSONAL', 'PLAIN'].forEach(function (kind) {
     check('★★★★★ 有 `' + kind + '` 呢一種',
       new RegExp("'" + kind + "'").test(uiBare), '');
   });
+  check('★★★★★ 而 `FULL_ONE` 已經拿走（第七十五輪 CK 組）', !/'FULL_ONE'/.test(uiBare), '');
   check('★★★★★ 預設係「標示自己個名」（現狀）'
     + '——預設變咗嘅話，幹事乜都唔撳就會印出一疊冇名嘅表',
     /let paperKind_ = 'PERSONAL'/.test(uiBare), '');
@@ -78,8 +81,6 @@ console.log('\n=== G【核心】「每一份都一樣」呢件事要講出嚟 ==
   check('★★★★★ 而且明講「選了多少位 ＝ 要印多少份」'
     + '（唔講嘅話，個名單喺嗰一種入面睇落好似冇作用）',
     /選了多少位，就是要印多少份/.test(ui), '');
-  check('★★★★★ 「一份大家看」嗰個選項明講同上面嗰種係同一個檔',
-    /同上面那一種是同一個檔/.test(ui), '');
   check('★★★★★ 後端回傳嘅訊息都講一次'
     + '（幹事撳完之後見到嘅係嗰句，唔係彈窗嗰句）',
     /每一個人拿到的都一樣，所以只做一個檔/.test(packBare), '');
@@ -96,13 +97,10 @@ console.log('\n=== G【核心】「揀幾多位」喺唔標示嗰種要有意義
   //（佢排喺前面），噉個斷言就會永遠綠燈而乜都冇驗到。
   const dlgAt = uiBare.indexOf('function renderPaperDialog');
   const dlg = uiBare.slice(dlgAt, uiBare.indexOf('\n  function selectedPaperIds', dlgAt));
-  check('★★★★★ 而 `FULL_ONE` **唔畫**名單，並且喺畫名單之前就 return'
-    + '——一個撳落去冇作用嘅控制項，就係呢個專案一直喺度殺嗰樣嘢',
-    dlgAt !== -1 && dlg.indexOf("if (paperKind_ === 'FULL_ONE')") !== -1
-      && dlg.indexOf("if (paperKind_ === 'FULL_ONE')") < dlg.indexOf('pickListNodes('),
+  // 第七十五輪批次 CK 組：`FULL_ONE` 拿走之後，兩種都會畫名單。
+  check('★★★★★ renderPaperDialog() 每一種都畫名單（冇「唔使揀人」嘅分支）',
+    dlgAt !== -1 && dlg.indexOf('pickListNodes(') !== -1 && dlg.indexOf("'FULL_ONE'") === -1,
     dlg.slice(0, 200));
-  check('★★★★ `FULL_ONE` 傳 1 份，唔係傳揀咗幾多位',
-    /runPlainPaper\(1\)/.test(uiBare), '');
   check('★★★★★ 而 `PLAIN` 傳嘅係揀咗幾多位',
     /runPlainPaper\(selectedPaperIds\(\)\.length\)/.test(uiBare), '');
   check('★★★★ 份數超過一份嗰陣，結果畫面直接講「份數選 N」'

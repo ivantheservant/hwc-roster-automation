@@ -6,7 +6,7 @@
 //   　　　放入 `<季度>/可編輯副本/`、原表一格都唔動、新檔只剩一張表、完成訊息講明「快照」
 //   AJ2　正式發出成功之後自動做一份；**做唔到唔會令寄出失敗**，Stage 照前進，完成窗有一句
 //   AJ3　`apiGetRecoveryLinks()`：三個位置嘅連結由程式讀出；冇就講冇、唔建資料夾
-//   AJ4　畫面：第 4 步多一項、區四多一個入口、唯讀白名單有 `apiGetRecoveryLinks`；
+//   AJ4　畫面：（第七十五輪 CK 組起）副本入口喺「系統出問題時怎樣做」、區四多一個入口、唯讀白名單有 `apiGetRecoveryLinks`；
 //   　　　公開文件存在而且冇網址／電郵／ID
 //
 // Drive／試算表全部用替身——呢組要驗嘅係「系統叫 Drive 做咩」，唔係 Drive 本身。
@@ -264,10 +264,12 @@ console.log('\n=== AJ4【核心】畫面同文件 ===');
 {
   const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
   const paper = read('src/ui/ScriptSendPaper.html');
-  check('★★★★★★ 第 4 步多一項「可編輯的試算表副本（最新版本）」', /'EDITABLE_COPY', '可編輯的試算表副本（最新版本）'/.test(paper));
-  check('★★★★★ 嗰項叫 apiCreateEditableRosterCopy', /callServerMutating\('apiCreateEditableRosterCopy', currentQuarterId\)/.test(paper));
-  check('★★★★ 說明講明係快照', /只是快照，之後系統再改動不會更新它/.test(paper));
+  // ⚠️ 第七十五輪批次 CK 組（Ivan 決定）：入口由第 4 步搬去「系統出問題時怎樣做」彈窗嘅〔建立可編輯副本〕。
+  check('★★★★★★ 第 4 步已經冇「可編輯的試算表副本（最新版本）」（第七十五輪 CK 組）', !/'EDITABLE_COPY'/.test(paper));
+  check('★★★★★ 建立副本仍然叫 apiCreateEditableRosterCopy', /callServerMutating\('apiCreateEditableRosterCopy', currentQuarterId\)/.test(paper));
   const zone4 = read('src/ui/ScriptZone4.html');
+  check('★★★★ 說明講明係快照（搬咗去區四）', /只是快照，之後系統再改動不會更新它/.test(zone4));
+  check('★★★★★ 「系統出問題時怎樣做」有〔建立可編輯副本〕', /button\('建立可編輯副本', \(\) => runEditableCopy\(\)/.test(zone4));
   check('★★★★★★ 區四有「系統出問題時怎樣做」', /zone4Row\('系統出問題時怎樣做'/.test(zone4));
   check('★★★★★ 連結由 apiGetRecoveryLinks 讀出，唔寫死', /callServer\('apiGetRecoveryLinks', currentQuarterId\)/.test(zone4)
     && !/https?:\/\//.test(zone4.slice(zone4.indexOf('function openRecoveryHelp'), zone4.indexOf('function openRecoveryHelp') + 4000)));
