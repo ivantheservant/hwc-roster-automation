@@ -6441,6 +6441,86 @@ const MUTATIONS = [
     find: "    if (!hasVersion) {\n      openModal('排表偏好已儲存'",
     replace: "    if (false) {\n      openModal('排表偏好已儲存'",
     tests: ["tests/round75_ci_weights_regenerate.test.js"]
+  },
+  {
+    id: "cj-temp-not-listed",
+    why: "臨時幫手冇列入收不到電郵",
+    file: "src/WebAppFlow.gs",
+    find: "        out.people.push({ name: name, reason: '臨時幫手' });",
+    replace: "        void 0;",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-noemail-not-listed",
+    why: "名單上冇電郵嘅人冇列出",
+    file: "src/WebAppFlow.gs",
+    find: "        out.people.push({ name: (p && p.name) || name || id, reason: '沒有電郵' });",
+    replace: "        void 0;",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-external-listed",
+    why: "外請講員都逐個列名",
+    file: "src/WebAppFlow.gs",
+    find: "      if (autoByPost[a.postId] === true) {\n        if (seen['NAME:' + name]) return;",
+    replace: "      if (true) {\n        if (seen['NAME:' + name]) return;",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-dup-names",
+    why: "同一個人列多次",
+    file: "src/WebAppFlow.gs",
+    find: "        if (seen['ID:' + id]) return;\n",
+    replace: "",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-error-as-clear",
+    why: "查唔到當成全部收到",
+    file: "src/ui/Script.html",
+    find: "    if (u.error) {\n      return [make('div', { text: '查不到哪幾位收不到電郵（'",
+    replace: "    if (false) {\n      return [make('div', { text: '查不到哪幾位收不到電郵（'",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-no-external-line",
+    why: "冇講另有幾個名字不在名單上",
+    file: "src/ui/Script.html",
+    find: "    if (u.externalNameCount > 0) {\n      nodes.push(make('div', {\n        text: '另有 '",
+    replace: "    if (false) {\n      nodes.push(make('div', {\n        text: '另有 '",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-review-confirm-off",
+    why: "寄給堂委審閱確認窗冇列",
+    file: "src/ui/ScriptZone1.html",
+    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'",
+    replace: "\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-review-done-off",
+    why: "寄給堂委審閱完成窗冇列",
+    file: "src/ui/ScriptZone1.html",
+    find: "    // 第七十五輪批次 CJ 組：完成窗同樣列出\n    buildUnreachableNodes(r.unreachable).forEach((n) => nodes.push(n));\n\n    // 規格 2.5 最後一段",
+    replace: "\n    // 規格 2.5 最後一段",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-official-off",
+    why: "正式發出確認窗冇列",
+    file: "src/ui/ScriptZone1.html",
+    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
+    replace: "\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
+    tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cj-preview-no-data",
+    why: "寄給堂委審閱預覽冇帶收不到電郵資料",
+    file: "src/WebAppFlow.gs",
+    find: "  plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);",
+    replace: "",
+    tests: ["tests/round75_cj_unreachable.test.js"]
   }
 ];
 

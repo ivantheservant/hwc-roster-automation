@@ -189,7 +189,10 @@ function apiStep2Preview(quarterId, sendOptions) {
   // ⚠️ 第四十七輪批次 B1 組：一定要把 `sendOptions` 傳落去。
   // 唔傳嘅話，事前講嘅收件人數同真正寄嘅唔同——
   // 而現場就係「會寄給這 3 位」對住「模擬 9 封」。
-  return planStep2_(quarterId, sendOptions);
+  const plan = planStep2_(quarterId, sendOptions);
+  // 第七十五輪批次 CJ 組
+  plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);
+  return plan;
 }
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -279,7 +282,9 @@ function apiStep2Confirm_locked_(quarterId, sendOptions) {
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf,
-    publicLinkRepublished: !!result.publicLinkRepublished
+    publicLinkRepublished: !!result.publicLinkRepublished,
+    // 第七十五輪批次 CJ 組：完成窗同樣列出
+    unreachable: buildUnreachablePeople_(quarterId, null)
   };
 }
 
@@ -452,7 +457,10 @@ function apiStep4GetMissingPdfWarnings(quarterId, versionNo) {
  */
 function apiStep4GetSendPreview(quarterId, versionNo, sendOptions) {
   assertWebAppRequestAllowed_();
-  return planStep4SendPreview_(quarterId, versionNo, sendOptions);
+  const preview = planStep4SendPreview_(quarterId, versionNo, sendOptions);
+  // 第七十五輪批次 CJ 組
+  preview.unreachable = buildUnreachablePeople_(quarterId, versionNo);
+  return preview;
 }
 
 /**
@@ -495,7 +503,9 @@ function apiStep4Confirm_locked_(quarterId, sendOptions) {
     unhandledCount: result.outcome ? result.outcome.unhandledCount : 0,
     publicLinkRepublished: !!result.publicLinkRepublished,
     // 第六十七輪批次 AJ 組：自動副本結果（冇前進 Stage 就係 null）
-    editableCopy: result.editableCopy || null
+    editableCopy: result.editableCopy || null,
+    // 第七十五輪批次 CJ 組：完成窗同樣列出
+    unreachable: buildUnreachablePeople_(quarterId, null)
   };
 }
 
@@ -773,4 +783,66 @@ function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
     zeroAssignmentPeople: zeroAssignmentPeople,
     publicLinkRepublished: !!sendResult.publicLinkRepublished
   };
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十五輪批次 CJ 組：寄出時列出收不到電郵的人
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * Ivan：「主席填了臨時幫手『ivan』，寄出時會不會提示沒有他的電郵？」
+ *
+ * 由版本紀錄（`RosterAssignments`）數，唔睇工作表：
+ *   ・有 PersonID 但 `NameMapping` 冇電郵 ⇒ 列名（沒有電郵）
+ *   ・冇 PersonID 嘅名，喺**系統排**嘅崗位（`Posts.AutoGenerate = TRUE`）⇒ 臨時幫手（CE 組），列名
+ *   ・冇 PersonID 嘅名，喺**人手填**嘅崗位（例如外請講員）⇒ 唔列名，只數有幾個
+ * 崗位由 `Posts` 欄判斷，唔寫死崗位。讀唔到 ⇒ `error`，畫面講「查不到」，唔可以當「全部收到」。
+ */
+
+/**
+ * @param {string} quarterId 季度 ID
+ * @param {?number} versionNo 版本號；冇就用最新一版
+ * @returns {{people: Object[], externalNameCount: number, error: string}}
+ */
+function buildUnreachablePeople_(quarterId, versionNo) {
+  const out = { people: [], externalNameCount: 0, error: '' };
+  try {
+    const v = (versionNo === null || versionNo === undefined || versionNo === '')
+      ? findLatestVersionNo(quarterId) : Number(versionNo);
+    if (isNaN(v) || v < 0) return out;
+    const autoByPost = {};
+    readPostsNormalized().forEach(function (p) { autoByPost[p.postId] = p.autoGenerate === true; });
+    const N = COLUMNS.NAME_MAPPING;
+    const people = {};
+    readSheet(SHEETS.NAME_MAPPING).forEach(function (r) {
+      const id = String(r[N.PERSON_ID] || '').trim();
+      if (id) people[id] = { name: String(r[N.NAME_TC] || '').trim(), email: String(r[N.EMAIL] || '').trim() };
+    });
+    const seen = {};
+    const external = {};
+    readVersionAssignmentsForGrid_(quarterId, v).forEach(function (a) {
+      const id = String(a.personId || '').trim();
+      const name = String(a.personName || '').trim();
+      if (id) {
+        const p = people[id];
+        if (p && p.email) return;
+        if (seen['ID:' + id]) return;
+        seen['ID:' + id] = true;
+        out.people.push({ name: (p && p.name) || name || id, reason: '沒有電郵' });
+        return;
+      }
+      if (!name || GRID_PLACEHOLDER_TEXTS.indexOf(name) !== -1) return;
+      if (autoByPost[a.postId] === true) {
+        if (seen['NAME:' + name]) return;
+        seen['NAME:' + name] = true;
+        out.people.push({ name: name, reason: '臨時幫手' });
+      } else {
+        external[name] = true;
+      }
+    });
+    out.externalNameCount = Object.keys(external).length;
+  } catch (err) {
+    log_('WARN', 'buildUnreachablePeople_ 失敗：' + err.message);
+    out.error = err.message;
+  }
+  return out;
 }

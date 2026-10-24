@@ -1090,6 +1090,8 @@
       if (preview.contents) nodes.push(sendContentsBox(preview.contents));
       // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
       buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
+      // 第七十五輪批次 CJ 組
+      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1142,6 +1144,8 @@
     // 第六十三輪批次 A 組：寄之前補發咗公開連結 ⇒ 講一句
     if (r.publicLinkRepublished) lines.push('寄出之前，系統已經自動把公開連結更新到最新內容。');
     const nodes = lines.map((t) => make('div', { text: t, className: 'ok-line' }));
+    // 第七十五輪批次 CJ 組：完成窗同樣列出
+    buildUnreachableNodes(r.unreachable).forEach((n) => nodes.push(n));
 
     // 規格 2.5 最後一段：區二未做完 >0 就提一提。
     const undone = d.preQuarter && d.preQuarter.undoneItemCount;
@@ -1470,6 +1474,8 @@
       }
       // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
       buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
+      // 第七十五輪批次 CJ 組
+      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1571,6 +1577,8 @@
     if (r.outcomeSentence) {
       nodes.push(make('div', { text: r.outcomeSentence, className: 'ok-line strong' }));
     }
+    // 第七十五輪批次 CJ 組：完成窗同樣列出
+    buildUnreachableNodes(r.unreachable).forEach((n) => nodes.push(n));
     // 第六十三輪批次 A 組
     if (r.publicLinkRepublished) {
       nodes.push(make('div', { text: '寄出之前，系統已經自動把公開連結更新到最新內容。', className: 'ok-line' }));

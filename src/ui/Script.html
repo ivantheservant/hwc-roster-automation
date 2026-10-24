@@ -828,6 +828,40 @@
    * @param {{compact: boolean}=} opts `compact` ⇒ 狀態卡用（兩行字，清單收埋）
    * @returns {Element[]} 冇嘢要講就係空陣列
    */
+  /**
+   * 第七十五輪批次 CJ 組：寄出確認窗／完成窗嘅「這幾位收不到電郵」（後端 `buildUnreachablePeople_()`）。
+   * 系統排嘅崗位上冇電郵嘅人＋臨時幫手逐個列名；人手填崗位上唔喺名單嘅名（例如外請講員）只講數目。
+   * 查唔到 ⇒ 講「查不到」，唔可以當「全部收到」。
+   * @param {?Object} u `{people, externalNameCount, error}`
+   * @returns {Element[]}
+   */
+  function buildUnreachableNodes(u) {
+    if (!u) return [];
+    if (u.error) {
+      return [make('div', { text: '查不到哪幾位收不到電郵（' + u.error + '）。不是「全部收到」，是「查不到」。', className: 'muted' })];
+    }
+    const nodes = [];
+    if ((u.people || []).length > 0) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', { text: '這幾位收不到電郵', className: 'warn-head' })
+      ]);
+      u.people.forEach((p) => box.appendChild(make('div', {
+        text: '・' + p.name + '（' + p.reason + '）', className: 'vio-row'
+      })));
+      box.appendChild(make('div', {
+        text: '他們不會收到信。請用第 4 步〔下載及匯出〕印紙本給他們。', className: 'lines'
+      }));
+      nodes.push(box);
+    }
+    if (u.externalNameCount > 0) {
+      nodes.push(make('div', {
+        text: '另有 ' + u.externalNameCount + ' 個名字不在名單上（例如外請講員），不會通知。',
+        className: 'muted'
+      }));
+    }
+    return nodes;
+  }
+
   function buildSendWarningNodes(w, opts) {
     const nodes = [];
     if (!w) return nodes;
