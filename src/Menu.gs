@@ -2149,6 +2149,13 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     '　可編輯副本：' + (plan.editableCopyFiles || []).length + ' 個檔案（移到垃圾桶）',
     '　清理後變空的版本 PDF 資料夾：' + (plan.pdfFolders || []).length + ' 個（移到垃圾桶）',
     '　Quarters.Stage：重設為 ' + QUARTER_STAGE.DRAFT,
+    // 第七十五輪批次 CP 組
+    '　Unavailable（日期完全在這一季之內，任何來源、任何狀態）：'
+      + (plan.unavailableInQuarterDetails || []).length + ' 行（見下面）',
+    '　逐格決定（CellDecisions：臨時幫手、保留我的安排）：' + (plan.cellDecisionRows || 0) + ' 行',
+    '　已放行的規則違反：' + (plan.releasedKeyCount || 0) + ' 項（重設之後不再生效；AuditLog 紀錄保留）',
+    '　其他工作表：' + ((plan.extraSheetNames || []).join('、') || '無'),
+    '　每週標題（ServiceDates.Title，只清這一季）：' + (plan.weekTitleDates || []).length + ' 週',
     '',
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
     '　EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays，',
@@ -2185,11 +2192,30 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     plan.pdfFolders.slice(0, 20).forEach(function (f) { lines.push('　' + f.name); });
   }
 
+  // 第七十五輪批次 CP 組：完全落喺呢一季、會清走嘅 Unavailable（逐行列出）
+  if ((plan.unavailableInQuarterDetails || []).length > 0) {
+    lines.push('', '會清走的不能服侍日期（完全在這一季之內）：');
+    plan.unavailableInQuarterDetails.slice(0, 20).forEach(function (u) {
+      lines.push('　' + (u.name ? u.name + '（' + u.personId + '）' : u.personId)
+        + '　' + u.dateFrom + (u.dateTo && u.dateTo !== u.dateFrom ? ' → ' + u.dateTo : '')
+        + '　Source=' + u.source + (u.status ? '　Status=' + u.status : ''));
+    });
+    if (plan.unavailableInQuarterDetails.length > 20) {
+      lines.push('　……另有 ' + (plan.unavailableInQuarterDetails.length - 20) + ' 行');
+    }
+  }
+  // 第七十五輪批次 CP 組：會影響呢一季嘅人員設定（唔碰，只講）
+  if ((plan.personSettingNotes || []).length > 0) {
+    lines.push('', '會影響這一季的人員設定（不會改，只是讓你知道）：');
+    plan.personSettingNotes.slice(0, 20).forEach(function (n) { lines.push('　' + n); });
+    if (plan.personSettingNotes.length > 20) lines.push('　……另有 ' + (plan.personSettingNotes.length - 20) + ' 項');
+  }
+
   // 第十輪批次階段 B1：逐行列出「落喺呢季但唔係申報自動加入」嘅 Unavailable。
   // 以前淨係喺 manualAttention 報一個數字，幹事要自己去成張表慢慢對——
   // 實測時就係咁漏咗一行測試資料。列出嚟，但一樣唔會自動刪。
   if (plan.unavailableManualDetails && plan.unavailableManualDetails.length > 0) {
-    lines.push('', '⚠ 落在這一季、但不是由申報自動加入的 Unavailable（不會清，請自己看一次）：');
+    lines.push('', '⚠ 由這一季開始但延伸到季度以外、而且不是由申報自動加入的 Unavailable（不會清，請自己看一次）：');
     plan.unavailableManualDetails.slice(0, 20).forEach(function (u) {
       lines.push('　' + u.personId + '　' + u.dateFrom + ' → ' + u.dateTo
         + '　Source=' + u.source

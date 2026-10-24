@@ -138,8 +138,11 @@ function readReleasedHardViolationKeys_(auditRows, quarterId) {
 function readReleasedHardViolationInfo_(auditRows, quarterId) {
   const C = COLUMNS.AUDIT_LOG;
   const released = {};
+  // 第七十五輪批次 CP 組：重設咗呢一季 ⇒ 之前嘅放行全部失效
+  const after = lastQuarterResetAuditIndex_(auditRows, quarterId);
 
-  (auditRows || []).forEach(function (row) {
+  (auditRows || []).forEach(function (row, i) {
+    if (i <= after) return;
     if (String(row[C.ACTION] || '') !== HARD_RELEASE_ACTION) return;
     if (String(row[C.TARGET_KEY] || '') !== quarterId) return;
 
@@ -259,8 +262,10 @@ function readMainFlowLegacyReleasedInfo_(auditRows, quarterId) {
 function readLegacyReleasedHardViolations_(auditRows, quarterId) {
   const C = COLUMNS.AUDIT_LOG;
   const released = {};
+  const after = lastQuarterResetAuditIndex_(auditRows, quarterId);   // 第七十五輪批次 CP 組
 
-  (auditRows || []).forEach(function (row) {
+  (auditRows || []).forEach(function (row, i) {
+    if (i <= after) return;
     if (String(row[C.ACTION] || '') !== HARD_RELEASE_ACTION) return;
     if (String(row[C.TARGET_KEY] || '') !== quarterId) return;
 
@@ -279,6 +284,8 @@ function readLegacyReleasedHardViolations_(auditRows, quarterId) {
 
 /** AuditLog 入面「硬規則放行」嘅 Action 值，寫入同讀取共用一個常數。 */
 const HARD_RELEASE_ACTION = '硬規則放行';
+
+// 第七十五輪批次 CP 組：`QUARTER_RESET_AUDIT_ACTION`／`lastQuarterResetAuditIndex_()` 喺 SheetReader.gs（重設嗰邊都要用）。
 
 /**
  * 把硬規則違反分成三類。**純函式**，離線測得到。

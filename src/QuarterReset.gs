@@ -5,14 +5,16 @@
  * - **先算後做**：`planQuarterReset_()` 只讀取、只統計，完全不刪任何東西；
  *   實際刪除的 `executeQuarterReset_()` 只按這份計畫執行，不會自己再去找東西刪
  * - **範圍嚴格限定在一個季度**：所有掃描都以 QuarterID 篩選，其他季度完全不碰
- * - **不確定的一律不刪**：辨識不到的檔案、來源不是 REQUEST 的 Unavailable、
+ * - **不確定的一律不刪**：辨識不到的檔案、跨季而且來源不是 REQUEST 的 Unavailable、
  *   受保護的版本，一律留下並列入「需要人手處理」清單，由幹事自己判斷
+ *   （第七十五輪批次 CP 組起：日期**完全**落在這一季之內的 Unavailable，任何來源都清，並逐行列出）
  * - **PDF 只移到垃圾桶**（`setTrashed(true)`），不永久刪除，30 日內可自行復原
  * - **刪除前先寫 AuditLog**：先記錄將被刪除的內容摘要，才開始刪
  *
  * 絕對不碰的工作表（無論任何情況）：Eligibility、NameMapping、NameAlias、Config、
  * EmailTemplates、EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays。
  * 這些是系統的基礎設定與人員資料，跟「某一季的測試痕跡」無關。
+ * 唯一例外（第七十五輪批次 CP 組）：`ServiceDates.Title`（每週標題，幹事在職事表改的）只清這一季那幾格。
  */
 
 /** 執行重設前必須逐字輸入的確認字串。 */
@@ -48,6 +50,20 @@ function planQuarterReset_(quarterId, includeV0) {
     // 「絕對不碰」名單入面，所以唔會清——但佢會**永久影響之後每一次生成**
     // （嗰個人由此對嗰個崗位變成合資格），所以一定要列出嚟俾幹事知。
     eligibilityRequestRows: [],
+    // 第七十五輪批次 CP 組（Ivan 決定）：要清得徹底——
+    //   ・日期**完全落喺呢一季**嘅 Unavailable（任何 Source、任何狀態）⇒ 清（逐行列出）
+    //   ・呢一季嘅逐格決定（`CellDecisions`，CE／CF 組）⇒ 清
+    //   ・呢一季嘅放行 ⇒ 失效（AuditLog 唔刪：重設嗰行就係標記，讀放行時忽略佢之前嘅，見 HardViolationClass.gs）
+    //   ・`匯入_<季度>`、`Verify_<季度>_v*`、`Roster_<季度>_v*_建議` 工作表 ⇒ 刪
+    //   ・呢一季嘅每週標題（`ServiceDates.Title`，CC 組）⇒ 清空（只清呢一欄、只清呢一季）
+    //   ・會影響呢一季嘅人員設定（`PersonPostExclusions`）⇒ **唔碰**，但列出嚟
+    unavailableInQuarterRows: 0,
+    unavailableInQuarterDetails: [],
+    cellDecisionRows: 0,
+    extraSheetNames: [],
+    weekTitleDates: [],
+    releasedKeyCount: 0,
+    personSettingNotes: [],
     pdfFiles: [],          // {id, name, sizeBytes}
     // 第七十輪批次 AW 組：該季「可編輯副本」資料夾內要清嘅檔案、
     // 及清走 PDF 之後會變空嘅版本 PDF 資料夾（一併移到垃圾桶）。
@@ -150,13 +166,28 @@ function planQuarterReset_(quarterId, includeV0) {
     plan.manualAttention.push('Quarters 找不到 ' + quarterId + ' 的起訖日期，'
       + '無法判斷 Unavailable 哪些行屬於這一季，因此 Unavailable 完全不清，請自行檢查。');
   } else {
+    const nameById = readPersonNameIndex_();
     readSheet(SHEETS.UNAVAILABLE).forEach(function (row) {
       const dateFrom = toDateString(row[U.DATE_FROM], timezone);
       if (!dateFrom || dateFrom < quarterStart || dateFrom > quarterEnd) return;
       const source = String(row[U.SOURCE] || '').trim().toUpperCase();
+      const dateTo = toDateString(row[U.DATE_TO], timezone) || dateFrom;
       if (source === 'REQUEST') {
         plan.unavailableRequestRows++;
-      } else {
+      }
+      if (isUnavailableFullyInQuarter_(dateFrom, dateTo, quarterStart, quarterEnd)) {
+        // 第七十五輪批次 CP 組：完全落喺呢一季 ⇒ 清（任何 Source、任何狀態），逐行列出
+        if (source !== 'REQUEST') plan.unavailableInQuarterRows++;
+        const personId = String(row[U.PERSON_ID] || '').trim();
+        plan.unavailableInQuarterDetails.push({
+          personId: personId,
+          name: nameById[personId] || '',
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+          source: String(row[U.SOURCE] || '').trim() || '（空白）',
+          status: String(row[U.STATUS] || '').trim()
+        });
+      } else if (source !== 'REQUEST') {
         plan.unavailableManualRows++;
         plan.unavailableManualDetails.push({
           personId: String(row[U.PERSON_ID] || '').trim(),
@@ -171,12 +202,14 @@ function planQuarterReset_(quarterId, includeV0) {
     });
     if (plan.unavailableManualRows > 0) {
       plan.manualAttention.push('Unavailable 有 ' + plan.unavailableManualRows
-        + ' 行落在這一季、但 Source 不是 REQUEST（即幹事人手輸入的不可服侍日），'
-        + '一律保留不清——程式無法分辨哪一行是真實請假、哪一行是測試時打的。'
+        + ' 行由這一季開始、但延伸到這一季以外，而且 Source 不是 REQUEST（即幹事人手輸入的不可服侍日），'
+        + '保留不清——跨季的紀錄有一部分屬於其他季度。'
         + '下面已逐行列出，請自己看一次，測試資料請自行到 Unavailable 刪除，'
         + '否則重新生成時系統會繼續避開這些人。');
     }
   }
+
+  planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, timezone);
 
   // ---- Eligibility：由「指定服侍」申報自動加入的行（不清，但一定要講）----
   // 這一項是階段 B2 逐項確認「清乾淨之後重新生成會不會有殘留影響」時發現的：
@@ -336,12 +369,15 @@ function executeQuarterReset_(plan) {
     sendLogRowsDeleted: 0, requestRowsDeleted: 0, unavailableRowsDeleted: 0,
     fineTuneProposalRowsDeleted: 0, fineTuneProposalArchiveRowsDeleted: 0,
     pdfTrashed: 0, editableCopiesTrashed: 0, pdfFoldersTrashed: 0, pdfFoldersKept: 0,
+    cellDecisionRowsDeleted: 0, extraSheetsDeleted: 0, weekTitlesCleared: 0,
     stageReset: false, publicRosterCleared: false, errors: []
   };
 
   // 先留底：刪之前把打算刪什麼寫入 AuditLog
+  // ⚠️ 第七十五輪批次 CP 組：呢一行亦係「放行失效」嘅標記——讀放行時忽略呢一季最後一次重設之前嘅
+  // （`readReleasedHardViolationInfo_()`）。AuditLog 唔可以刪，所以唔係刪放行紀錄。
   writeAuditLog_({
-    action: '重設季度測試資料',
+    action: QUARTER_RESET_AUDIT_ACTION,
     targetSheet: '（多張）',
     targetKey: plan.quarterId,
     oldValue: 'Stage=' + plan.quarterStage
@@ -354,7 +390,12 @@ function executeQuarterReset_(plan) {
       + '　FineTuneProposals_Archive=' + plan.fineTuneProposalArchiveRows + ' 行'
       + '　PDF=' + plan.pdfFiles.length + ' 個'
       + '　可編輯副本=' + (plan.editableCopyFiles || []).length + ' 個'
-      + '　版本PDF資料夾=' + (plan.pdfFolders || []).length + ' 個',
+      + '　版本PDF資料夾=' + (plan.pdfFolders || []).length + ' 個'
+      + '　Unavailable(完全在這一季)=' + (plan.unavailableInQuarterDetails || []).length + ' 行'
+      + '　CellDecisions=' + (plan.cellDecisionRows || 0) + ' 行'
+      + '　其他工作表=' + (plan.extraSheetNames || []).join(',')
+      + '　每週標題=' + (plan.weekTitleDates || []).length + ' 週'
+      + '　放行失效=' + (plan.releasedKeyCount || 0) + ' 項',
     newValue: '（全部清除，Stage 重設為 ' + QUARTER_STAGE.DRAFT + '）',
     source: 'MENU',
     notes: '連 v0 一齊清：' + (plan.includeV0 ? 'YES' : 'NO')
@@ -381,8 +422,9 @@ function executeQuarterReset_(plan) {
     return String(record[COLUMNS.REQUESTS.QUARTER_ID] || '').trim() === plan.quarterId;
   }, result.errors);
 
-  // ---- Unavailable：只刪 Source=REQUEST 且落在這一季的行 ----
-  if (plan.unavailableRequestRows > 0) {
+  // ---- Unavailable：Source=REQUEST 且由這一季開始的行；以及（第七十五輪批次 CP 組）
+  //      日期完全落在這一季之內的行（任何 Source、任何狀態）。跨季的人手紀錄照舊不刪。
+  if (plan.unavailableRequestRows > 0 || (plan.unavailableInQuarterDetails || []).length > 0) {
     const U = COLUMNS.UNAVAILABLE;
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const quarter = findQuarter_(plan.quarterId);
@@ -390,13 +432,16 @@ function executeQuarterReset_(plan) {
     const quarterEnd = quarter ? toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
     if (quarterStart && quarterEnd) {
       result.unavailableRowsDeleted = deleteRowsMatching_(SHEETS.UNAVAILABLE, function (record) {
-        const source = String(record[U.SOURCE] || '').trim().toUpperCase();
-        if (source !== 'REQUEST') return false;   // 人手輸入的絕對不刪
         const dateFrom = toDateString(record[U.DATE_FROM], timezone);
-        return !!dateFrom && dateFrom >= quarterStart && dateFrom <= quarterEnd;
+        if (!dateFrom || dateFrom < quarterStart || dateFrom > quarterEnd) return false;
+        const dateTo = toDateString(record[U.DATE_TO], timezone) || dateFrom;
+        if (isUnavailableFullyInQuarter_(dateFrom, dateTo, quarterStart, quarterEnd)) return true;
+        return String(record[U.SOURCE] || '').trim().toUpperCase() === 'REQUEST';
       }, result.errors);
     }
   }
+
+  executeQuarterResetExtras_(plan, result);
 
   // ---- FineTuneProposals（主表）／FineTuneProposals_Archive（第十四輪批次階段 E 新增）----
   result.fineTuneProposalRowsDeleted = deleteRowsMatching_(SHEETS.FINE_TUNE_PROPOSALS, function (record) {
@@ -676,7 +721,9 @@ function summariseQuarterResetBatch_(entries) {
     quarters: 0, versions: 0, assignmentRows: 0, sendLogRows: 0,
     requestRows: 0, unavailableRequestRows: 0,
     fineTuneProposalRows: 0, fineTuneProposalArchiveRows: 0,
-    pdfFiles: 0, editableCopies: 0, pdfFolders: 0, manualAttention: 0
+    pdfFiles: 0, editableCopies: 0, pdfFolders: 0, manualAttention: 0,
+    // 第七十五輪批次 CP 組
+    unavailableInQuarterRows: 0, cellDecisionRows: 0, extraSheets: 0, weekTitles: 0, releasedKeys: 0
   };
 
   (entries || []).forEach(function (entry) {
@@ -711,13 +758,20 @@ function summariseQuarterResetBatch_(entries) {
     totals.editableCopies += item.editableCopies;
     totals.pdfFolders += item.pdfFolders;
     totals.manualAttention += item.manualAttention.length;
+    totals.unavailableInQuarterRows += plan.unavailableInQuarterRows || 0;
+    totals.cellDecisionRows += plan.cellDecisionRows || 0;
+    totals.extraSheets += (plan.extraSheetNames || []).length;
+    totals.weekTitles += (plan.weekTitleDates || []).length;
+    totals.releasedKeys += plan.releasedKeyCount || 0;
   });
 
   const nothingToDo = totals.versions === 0 && totals.assignmentRows === 0
     && totals.sendLogRows === 0 && totals.requestRows === 0
     && totals.unavailableRequestRows === 0 && totals.fineTuneProposalRows === 0
     && totals.fineTuneProposalArchiveRows === 0 && totals.pdfFiles === 0
-    && totals.editableCopies === 0 && totals.pdfFolders === 0;
+    && totals.editableCopies === 0 && totals.pdfFolders === 0
+    && totals.unavailableInQuarterRows === 0 && totals.cellDecisionRows === 0
+    && totals.extraSheets === 0 && totals.weekTitles === 0 && totals.releasedKeys === 0;
 
   return { perQuarter: perQuarter, totals: totals, nothingToDo: nothingToDo };
 }
@@ -817,4 +871,150 @@ function executeQuarterResetBatch_(entries) {
   });
 
   return { results: results, failedQuarters: failedQuarters };
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十五輪批次 CP 組：重設季度要清得徹底
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 不能服侍嘅日期**完全**落喺呢一季之內（開始同結束都喺季度入面）。
+ * @param {string} dateFrom yyyy-MM-dd
+ * @param {string} dateTo yyyy-MM-dd（空就當同 dateFrom）
+ * @param {string} quarterStart yyyy-MM-dd
+ * @param {string} quarterEnd yyyy-MM-dd
+ * @returns {boolean}
+ */
+function isUnavailableFullyInQuarter_(dateFrom, dateTo, quarterStart, quarterEnd) {
+  const to = dateTo || dateFrom;
+  return !!dateFrom && dateFrom >= quarterStart && to <= quarterEnd && to >= dateFrom;
+}
+
+/**
+ * 呢一季嘅「其他工作表」：`匯入_<季度>`、`Verify_<季度>_v<數字>`、`Roster_<季度>_v<數字>_建議`。
+ * ⚠️ 名字比對要嚴格（同 `discardStaleSuggestionSheets_()` 一樣），幹事自己開嘅表唔可以誤刪。
+ * @param {string} quarterId 季度 ID
+ * @param {Object[]} sheets `ss.getSheets()`
+ * @returns {string[]}
+ */
+function listQuarterResetExtraSheetNames_(quarterId, sheets) {
+  const verifyPrefix = SHEET_PREFIXES.VERIFY + quarterId + '_v';
+  const rosterPrefix = SHEET_PREFIXES.ROSTER + quarterId + '_v';
+  const out = [];
+  (sheets || []).forEach(function (sheet) {
+    const name = sheet.getName();
+    if (name === IMPORT_SHEET_PREFIX + quarterId) { out.push(name); return; }
+    if (name.indexOf(verifyPrefix) === 0 && /^\d+$/.test(name.slice(verifyPrefix.length))) { out.push(name); return; }
+    if (name.indexOf(rosterPrefix) === 0 && /^\d+_建議$/.test(name.slice(rosterPrefix.length))) out.push(name);
+  });
+  return out.sort();
+}
+
+/**
+ * 計畫（只讀）：決定紀錄、其他工作表、每週標題、放行、會影響呢一季嘅人員設定。
+ * @param {Object} plan `planQuarterReset_()` 嘅計畫（就地加欄位）
+ * @param {string} quarterId 季度 ID
+ * @param {string} quarterStart yyyy-MM-dd（可空）
+ * @param {string} quarterEnd yyyy-MM-dd（可空）
+ * @param {string} timezone 時區
+ */
+function planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, timezone) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    if (ss.getSheetByName(SHEETS.CELL_DECISIONS)) {
+      plan.cellDecisionRows = readSheet(SHEETS.CELL_DECISIONS).filter(function (r) {
+        return String(r[COLUMNS.CELL_DECISIONS.QUARTER_ID] || '').trim() === quarterId;
+      }).length;
+    }
+  } catch (err) {
+    plan.manualAttention.push('檢查 CellDecisions（逐格決定）失敗，這一項不清：' + err.message);
+  }
+  try {
+    plan.extraSheetNames = listQuarterResetExtraSheetNames_(quarterId, ss.getSheets());
+  } catch (err) {
+    plan.manualAttention.push('檢查匯入／核對／建議工作表失敗，這一項不清：' + err.message);
+  }
+  try {
+    const D = COLUMNS.SERVICE_DATES;
+    readSheet(SHEETS.SERVICE_DATES).forEach(function (r) {
+      if (String(r[D.QUARTER_ID] || '').trim() !== quarterId) return;
+      if (String(r[D.TITLE] === null || r[D.TITLE] === undefined ? '' : r[D.TITLE]).trim() === '') return;
+      plan.weekTitleDates.push(toDateString(r[D.SERVICE_DATE], timezone));
+    });
+  } catch (err) {
+    plan.manualAttention.push('檢查每週標題（ServiceDates.Title）失敗，這一項不清：' + err.message);
+  }
+  try {
+    plan.releasedKeyCount = Object.keys(
+      readReleasedHardViolationKeys_(readSheet(SHEETS.AUDIT_LOG), quarterId)).length;
+  } catch (err) {
+    plan.manualAttention.push('檢查放行紀錄失敗：' + err.message);
+  }
+  // 會影響呢一季嘅人員設定：唔碰，只列出（例如暫不擔任某崗位嘅人）
+  try {
+    if (quarterStart && quarterEnd && ss.getSheetByName(SHEETS.PERSON_POST_EXCLUSIONS)) {
+      const X = COLUMNS.PERSON_POST_EXCLUSIONS;
+      const names = readPersonNameIndex_();
+      const postNames = {};
+      readPostsNormalized().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+      readSheet(SHEETS.PERSON_POST_EXCLUSIONS).forEach(function (r) {
+        if (r[X.ACTIVE] !== undefined && r[X.ACTIVE] !== '' && !isTrueValue_(r[X.ACTIVE])) return;
+        const from = toDateString(r[X.EFFECTIVE_FROM], timezone);
+        const to = toDateString(r[X.EFFECTIVE_TO], timezone);
+        if (from && from > quarterEnd) return;
+        if (to && to < quarterStart) return;
+        const id = String(r[X.PERSON_ID] || '').trim();
+        const postId = String(r[X.POST_ID] || '').trim();
+        plan.personSettingNotes.push((names[id] || id) + '　暫不擔任 ' + (postNames[postId] || postId)
+          + (from || to ? '（' + (from || '…') + ' → ' + (to || '…') + '）' : ''));
+      });
+    }
+  } catch (err) {
+    plan.manualAttention.push('檢查會影響這一季的人員設定失敗：' + err.message);
+  }
+}
+
+/**
+ * 執行：清決定紀錄、刪其他工作表、清每週標題。放行失效靠 `executeQuarterReset_()` 頂頭嗰行 AuditLog。
+ * @param {Object} plan 計畫
+ * @param {Object} result 結果（就地加數）
+ */
+function executeQuarterResetExtras_(plan, result) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if ((plan.cellDecisionRows || 0) > 0) {
+    result.cellDecisionRowsDeleted = deleteRowsMatching_(SHEETS.CELL_DECISIONS, function (record) {
+      return String(record[COLUMNS.CELL_DECISIONS.QUARTER_ID] || '').trim() === plan.quarterId;
+    }, result.errors);
+  }
+  (plan.extraSheetNames || []).forEach(function (name) {
+    try {
+      const sheet = ss.getSheetByName(name);
+      if (sheet) {
+        ss.deleteSheet(sheet);
+        result.extraSheetsDeleted++;
+      }
+    } catch (err) {
+      result.errors.push('刪除工作表 ' + name + ' 失敗：' + err.message);
+    }
+  });
+  if ((plan.weekTitleDates || []).length > 0) {
+    try {
+      const sheet = ss.getSheetByName(SHEETS.SERVICE_DATES);
+      const keys = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const D = COLUMNS.SERVICE_DATES;
+      const qCol = keys.indexOf(D.QUARTER_ID);
+      const tCol = keys.indexOf(D.TITLE);
+      if (qCol !== -1 && tCol !== -1 && sheet.getLastRow() >= 3) {
+        const values = sheet.getRange(3, 1, sheet.getLastRow() - 2, keys.length).getValues();
+        values.forEach(function (row, i) {
+          if (String(row[qCol] || '').trim() !== plan.quarterId) return;
+          if (String(row[tCol] === null || row[tCol] === undefined ? '' : row[tCol]).trim() === '') return;
+          sheet.getRange(i + 3, tCol + 1).setValue('');
+          result.weekTitlesCleared++;
+        });
+      }
+    } catch (err) {
+      result.errors.push('清空每週標題失敗：' + err.message);
+    }
+  }
 }

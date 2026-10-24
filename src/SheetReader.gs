@@ -997,3 +997,44 @@ function readStartPointBasisForSave_(quarterId, baseVersionNo) {
     return null;
   }
 }
+
+/**
+ * 第七十五輪批次 CP 組：PersonID → 中文名（唯讀；確認清單用）。讀唔到就回空物件、記 WARN。
+ * @returns {Object.<string, string>}
+ */
+function readPersonNameIndex_() {
+  const out = {};
+  try {
+    const N = COLUMNS.NAME_MAPPING;
+    readSheet(SHEETS.NAME_MAPPING).forEach(function (r) {
+      const id = String(r[N.PERSON_ID] || '').trim();
+      if (id) out[id] = String(r[N.NAME_TC] || '').trim();
+    });
+  } catch (err) {
+    log_('WARN', 'readPersonNameIndex_ 讀不到人員名單：' + err.message);
+  }
+  return out;
+}
+
+/**
+ * 第七十五輪批次 CP 組：AuditLog 入面「重設季度測試資料」嘅 Action（`executeQuarterReset_()` 寫）。
+ * 呢一行就係「放行失效」嘅標記。
+ */
+const QUARTER_RESET_AUDIT_ACTION = '重設季度測試資料';
+
+/**
+ * 呢一季**最後一次**重設喺 AuditLog 第幾行（陣列索引）；冇重設過 ⇒ -1。
+ * AuditLog 只會加、唔會改，行嘅次序就係時間次序。
+ * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {string} quarterId 季度 ID
+ * @returns {number}
+ */
+function lastQuarterResetAuditIndex_(auditRows, quarterId) {
+  const C = COLUMNS.AUDIT_LOG;
+  let at = -1;
+  (auditRows || []).forEach(function (row, i) {
+    if (String(row[C.ACTION] || '') === QUARTER_RESET_AUDIT_ACTION
+      && String(row[C.TARGET_KEY] || '').trim() === quarterId) at = i;
+  });
+  return at;
+}

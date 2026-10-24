@@ -5534,8 +5534,8 @@ const MUTATIONS = [
     id: 'aw-nothing-ignore-copy',
     why: '只有副本要清都當成冇嘢做',
     file: 'src/QuarterReset.gs',
-    find: '\n    && totals.editableCopies === 0 && totals.pdfFolders === 0;',
-    replace: ';',
+    find: "\n    && totals.editableCopies === 0 && totals.pdfFolders === 0\n    && totals.unavailableInQuarterRows === 0",
+    replace: "\n    && totals.unavailableInQuarterRows === 0",
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
   {
@@ -6521,6 +6521,102 @@ const MUTATIONS = [
     find: "  plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);",
     replace: "",
     tests: ["tests/round75_cj_unreachable.test.js"]
+  },
+  {
+    id: "cp-unavail-only-request",
+    why: "完全喺季內嘅人手 Unavailable 唔清",
+    file: "src/QuarterReset.gs",
+    find: "        if (isUnavailableFullyInQuarter_(dateFrom, dateTo, quarterStart, quarterEnd)) return true;\n",
+    replace: "",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-unavail-cross-gone",
+    why: "跨季嘅人手 Unavailable 都清走",
+    file: "src/QuarterReset.gs",
+    find: "  return !!dateFrom && dateFrom >= quarterStart && to <= quarterEnd && to >= dateFrom;",
+    replace: "  return !!dateFrom && dateFrom >= quarterStart;",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-unavail-not-listed",
+    why: "確認清單冇列會清走嘅 Unavailable",
+    file: "src/Menu.gs",
+    find: "  if ((plan.unavailableInQuarterDetails || []).length > 0) {\n    lines.push('', '會清走的不能服侍日期（完全在這一季之內）：');",
+    replace: "  if (false) {\n    lines.push('', '會清走的不能服侍日期（完全在這一季之內）：');",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-decisions-kept",
+    why: "重設唔清逐格決定",
+    file: "src/QuarterReset.gs",
+    find: "  if ((plan.cellDecisionRows || 0) > 0) {\n    result.cellDecisionRowsDeleted",
+    replace: "  if (false) {\n    result.cellDecisionRowsDeleted",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-decisions-all-q",
+    why: "清決定連其他季度都清",
+    file: "src/QuarterReset.gs",
+    find: "    result.cellDecisionRowsDeleted = deleteRowsMatching_(SHEETS.CELL_DECISIONS, function (record) {\n      return String(record[COLUMNS.CELL_DECISIONS.QUARTER_ID] || '').trim() === plan.quarterId;",
+    replace: "    result.cellDecisionRowsDeleted = deleteRowsMatching_(SHEETS.CELL_DECISIONS, function (record) {\n      return true;",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-release-survives",
+    why: "重設之後舊放行仍然生效",
+    file: "src/HardViolationClass.gs",
+    find: "  (auditRows || []).forEach(function (row, i) {\n    if (i <= after) return;\n    if (String(row[C.ACTION] || '') !== HARD_RELEASE_ACTION) return;\n    if (String(row[C.TARGET_KEY] || '') !== quarterId) return;\n\n    const notes = String(row[C.NOTES] || '');\n    const at = notes.indexOf(HARD_RELEASE_KEY_PREFIX);",
+    replace: "  (auditRows || []).forEach(function (row, i) {\n    if (String(row[C.ACTION] || '') !== HARD_RELEASE_ACTION) return;\n    if (String(row[C.TARGET_KEY] || '') !== quarterId) return;\n\n    const notes = String(row[C.NOTES] || '');\n    const at = notes.indexOf(HARD_RELEASE_KEY_PREFIX);",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-reset-any-quarter",
+    why: "重設標記唔分季度",
+    file: "src/SheetReader.gs",
+    find: "    if (String(row[C.ACTION] || '') === QUARTER_RESET_AUDIT_ACTION\n      && String(row[C.TARGET_KEY] || '').trim() === quarterId) at = i;",
+    replace: "    if (String(row[C.ACTION] || '') === QUARTER_RESET_AUDIT_ACTION) at = i;",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-extra-sheets-kept",
+    why: "匯入／核對／建議表唔刪",
+    file: "src/QuarterReset.gs",
+    find: "    plan.extraSheetNames = listQuarterResetExtraSheetNames_(quarterId, ss.getSheets());",
+    replace: "    plan.extraSheetNames = [];",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-extra-loose-match",
+    why: "名字相似嘅建議表都刪",
+    file: "src/QuarterReset.gs",
+    find: "    if (name.indexOf(rosterPrefix) === 0 && /^\\d+_建議$/.test(name.slice(rosterPrefix.length))) out.push(name);",
+    replace: "    if (name.indexOf(rosterPrefix) === 0 && /_建議/.test(name)) out.push(name);",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-titles-kept",
+    why: "每週標題唔清",
+    file: "src/QuarterReset.gs",
+    find: "          sheet.getRange(i + 3, tCol + 1).setValue('');",
+    replace: "          void 0;",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-no-person-notes",
+    why: "確認清單冇列會影響這一季的人員設定",
+    file: "src/QuarterReset.gs",
+    find: "        plan.personSettingNotes.push((names[id] || id) + '　暫不擔任 '",
+    replace: "        void (names[id] || id) + ('　暫不擔任 '",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
+  },
+  {
+    id: "cp-person-notes-expired",
+    why: "已過期嘅人員設定都列出",
+    file: "src/QuarterReset.gs",
+    find: "        if (to && to < quarterStart) return;\n",
+    replace: "",
+    tests: ["tests/round75_cp_reset_thorough.test.js"]
   }
 ];
 
