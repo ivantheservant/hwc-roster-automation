@@ -241,7 +241,8 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
   const assignments = readVersionAssignmentsForGrid_(quarterId, versionNo);
   const layout = buildGridLayout_(quarterId, assignments);
   const posts = readPostsNormalized();
-  const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
+  // 第七十五輪批次 CC 組：日期下面嗰行標題＝特別主日名稱（如開住）再由每週標題蓋過
+  const specialTitleByDate = buildDisplayTitleIndex_(quarterId, timezone);
   // 第十三輪批次階段 A4：日期格式同 PublicRoster.gs 嘅
   // buildPublicRosterContent_() 共用同一套 Config Key，義工喺公開連結／
   // 個人連結見到嘅係同一套顯示邏輯。

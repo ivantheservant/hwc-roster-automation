@@ -105,7 +105,9 @@ function buildGas(opts) {
       ['REMIND_STUCK_MAX_COUNT', '3', 'INT', 'AUTOMATION', '', 'TRUE'],
       ['REMIND_DEADLINE_DAYS', '7', 'INT', 'AUTOMATION', '', 'TRUE'],
       ['REMIND_UNCONFIRMED_SPECIAL_DAYS', '7', 'INT', 'AUTOMATION', '', 'TRUE'],
-      ['SEND_WEEKDAY_GUARD', 'NONE', 'STRING', 'AUTOMATION', '', 'TRUE']
+      ['SEND_WEEKDAY_GUARD', 'NONE', 'STRING', 'AUTOMATION', '', 'TRUE'],
+      // 第七十五輪批次 CC 組：特別主日預設關閉；呢份測試守嘅係「開住」嗰陣嘅提醒
+      ['SPECIAL_SUNDAYS_ENABLED', 'TRUE', 'BOOL', 'GENERATOR', '', 'TRUE']
     ]);
 
   ss.addSheet('Quarters',

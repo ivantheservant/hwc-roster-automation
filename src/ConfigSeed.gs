@@ -484,6 +484,16 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      key: CONFIG_KEYS.SPECIAL_SUNDAYS_ENABLED, type: CONFIG_TYPES.BOOL, group: 'GENERATOR',
+      defaultValue: 'FALSE',
+      description: '第七十五輪批次新增：要不要使用 SpecialSundays（特別主日）。FALSE（預設）＝完全不讀：'
+        + '生成、請系統幫我調整、核對、匯入、開季前準備清單、PDF／公開職事表／個人頁的圖例都不理它，'
+        + '每一週照常排所有崗位。合堂等要清空崗位的週，由幹事在職事表自己清空或改名；'
+        + '每週標題（例如浸禮崇拜、堂慶）在職事表的「類型」欄直接改，儲存時會記住。'
+        + 'SpecialSundays 工作表和資料不會被刪；改回 TRUE 就恢復舊行為。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.SEND_HOUR_LOCAL, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: '9',
       description: '每日自動排程檢查大約在幾點執行（0-23，只保證在該小時內觸發）。'

@@ -166,7 +166,12 @@ function buildSaveAndConfirmPlan_(quarterId) {
       originalName: c.originalName || '（空白）',
       manualName: c.manualText || '（空白）'
     };
-  });
+  }).concat(buildWeekTitleChangeRows_(resolved.titleChanges).map(function (t) {
+    // 第七十五輪批次 CC 組：改每週標題算一項改動，列喺「你改了這 N 格」
+    return { serviceDate: t.serviceDate, postId: t.postId, postNameTC: t.postNameTC,
+      slotIndex: t.slotIndex, isTitle: true, originalName: t.originalName, manualName: t.manualName };
+  }));
+  const titleChanges = resolved.titleChanges || [];
 
   // 同一格既有 grid 改動、又有申報 ⇒ **grid 贏**（規格 1.4）。
   // 幹事親手改嗰個係最新真相；申報係之前提交嘅。
@@ -220,13 +225,15 @@ function buildSaveAndConfirmPlan_(quarterId) {
   });
 
   // ── 零改動路徑（D4）────────────────────────────────────────
-  const zeroChange = resolved.changes.length === 0 && requestPlan.results.length === 0;
+  const zeroChange = resolved.changes.length === 0 && requestPlan.results.length === 0
+    && titleChanges.length === 0;
   return {
     blocked: false,
     blockReason: null,
     unresolved: [],
     requests: requests,
     gridChanges: gridChanges,
+    titleChanges: titleChanges,
     overlaps: overlaps,
     blankCells: blankCells,
     violations: violations,
@@ -454,12 +461,18 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const hasRequests = plan.requests.apply.length > 0
     || plan.requests.confirm.length > 0
     || plan.requests.needsInput.length > 0;
+  const titleChanges = resolved.titleChanges || [];
   const versionNote = '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
+    + (titleChanges.length > 0 ? '、每週標題 ' + titleChanges.length + ' 週' : '')
     + (plan.requests.apply.length > 0 ? '、申報 ' + plan.requests.apply.length + ' 筆' : '');
 
   let created;
   let requestResult = null;
   try {
+    // 第七十五輪批次 CC 組：每週標題先寫入 ServiceDates.Title，下面建立新一版嗰陣就會用到。
+    if (titleChanges.length > 0) {
+      writeWeekTitles_(quarterId, titleChanges, context.timezone, 'apiSaveAndConfirmExecute');
+    }
     if (hasRequests) {
       // ⚠️ 重新 plan 一次，唔用上面個 `plan`——`buildSaveAndConfirmPlan_()`
       // 出嚟嘅係俾前端睇嘅精簡版（`mapRequestForClient_()`），
@@ -480,7 +493,8 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         cellCount: resolved.changes.length
       };
     } else {
-      created = materialiseManualEdits_(context, resolved.changes, resolved.state, 'apiSaveAndConfirmExecute');
+      created = materialiseManualEdits_(context, resolved.changes, resolved.state, 'apiSaveAndConfirmExecute',
+        { titleChangeCount: titleChanges.length });
       registerVersion(
         quarterId, created.versionNo, created.sheetName,
         VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
@@ -581,7 +595,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     // 由「比對兩個版本」讀出來，不改 `applyRequests_()` 的寫入邏輯。
     savedChanges: buildSavedChangeRowsForSave_(
       quarterId, plan.baseVersionNo, created.versionNo,
-      resolved.changes, savedPostNames, hasRequests),
+      resolved.changes, savedPostNames, hasRequests).concat(buildWeekTitleChangeRows_(titleChanges)),
     // ⚠️ 第三十四輪批次甲2：呢兩個數而家由**真正套用嘅結果**出，
     // 唔再由 plan 嗰個「打算套用幾多筆」出。修正之前兩者永遠一樣，
     // 因為根本冇套用過——一個永遠自我印證嘅數字。

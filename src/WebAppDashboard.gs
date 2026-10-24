@@ -756,7 +756,8 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
       const context = buildFineTuneContext_(quarterId, versionNo);
       const resolved = resolveAuthoritativeState_(
         context, STATE_SOURCE.GRID_OVERLAY, 'readDashboardUnsavedState_');
-      gridChangeCount = resolved.changes.length;
+      // 第七十五輪批次 CC 組：改咗每週標題（「類型」欄）都係一項未儲存改動
+      gridChangeCount = resolved.changes.length + (resolved.titleChanges || []).length;
       unresolvedCount = resolved.unresolved.length;
     } catch (err) {
       // grid 工作表被刪／改名嗰類。**唔可以當成「零改動」**——

@@ -258,15 +258,15 @@ console.log('\n=== G 畫面：預覽度睇得到兩個日期 ===');
 {
   const ui = read('src/ui/ScriptZone2.html')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  check('★★★★★ 逐季畫住生成日期同正式發出日期',
-    /text: '　　生成日期 ' \+ \(r\.generateOn \|\| '（算不出）'\)/.test(ui), '');
+  // ⚠️ 第七十五輪批次 CC 組：區二嘅年度工具畫面拿走咗（未來季度改為自動建立，CB 組）。
+  check('★★★★★ 區二已經冇年度工具畫面（第七十五輪 CC 組）', !/function renderAnnualQuartersPlan/.test(ui), '');
   check('★★★★★ 後端有回呢兩個欄位（前端有得畫先有意義）',
     /generateOn: p\.generateOn \|\| '',/.test(read('src/WebAppRuleReview.gs')), '');
   check('★★★★★ 唔再叫幹事「寫入之後還要用選單的計算季度日期補上」'
     + '——嗰句就係 Ivan 冇做、然後四季全部冇日期嗰一步',
     ui.indexOf('那兩格這裡不會填') === -1, '');
-  check('★★★★★ 算唔到嗰陣講返**原因**（Config 邊個 Key 未填）',
-    /LEAD_DAYS_GENERATE 或 LEAD_DAYS_OFFICIAL 還沒有填/.test(ui), '');
+  check('★★★★★ 算唔到嗰陣講返**原因**（Config 邊個 Key 未填）——選單版預覽',
+    /CONFIG_KEYS\.LEAD_DAYS_GENERATE \+ ' 或 '/.test(read('src/AnnualQuarters.gs')), '');
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

@@ -227,7 +227,8 @@ function buildPublicRosterContent_(quarterId, versionNo) {
   const layout = buildGridLayout_(quarterId, assignments);
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const posts = readPostsNormalized();
-  const specialTitleByDate = buildSpecialSundayTitleIndex_(quarterId, timezone);
+  // 第七十五輪批次 CC 組：日期下面嗰行標題＝特別主日名稱（如開住）再由每週標題蓋過
+  const specialTitleByDate = buildDisplayTitleIndex_(quarterId, timezone);
   // 第十三輪批次階段 A4：日期格式可以喺 Config 調，見
   // transposeRosterForPublicView_() 的 displayOptions 說明。
   const displayOptions = {

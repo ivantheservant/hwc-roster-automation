@@ -123,7 +123,11 @@ function apiCheckMyChanges(quarterId) {
         fromName: c.originalName || '（空白）',
         toName: c.manualText || '（空白）'
       };
-    });
+    }).concat(buildWeekTitleChangeRows_(resolved.titleChanges).map(function (t) {
+      // 第七十五輪批次 CC 組：改咗每週標題都要列喺「你改了這 N 格」
+      return { serviceDate: t.serviceDate, postNameTC: t.postNameTC, slotIndex: t.slotIndex,
+        isTitle: true, fromName: t.fromName, toName: t.toName };
+    }));
 
     // ── 哪幾格的名字認不出 ─────────────────────────────────────
     const unresolved = analysis.unresolved.map(function (u) {

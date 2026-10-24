@@ -6177,6 +6177,70 @@ const MUTATIONS = [
     find: "      const ahead = ensureLookaheadQuarters_('dailyAutomationCheck_');",
     replace: "      const ahead = { created: [] };",
     tests: ["tests/round75_cb_quarter_lookahead.test.js"]
+  },
+  {
+    id: "cc-read-special-always",
+    why: "特別主日關咗都照讀（生成會跳過崗位）",
+    file: "src/SheetReader.gs",
+    find: "  if (!isSpecialSundaysEnabled_()) return [];\n  return readSheet(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {",
+    replace: "  return readSheet(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-checklist-special",
+    why: "開季前準備清單照列特別主日兩項",
+    file: "src/WebAppPreQuarter.gs",
+    find: "  const specialItems = input.specialEnabled === false ? [] : [",
+    replace: "  const specialItems = false ? [] : [",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-legend-special",
+    why: "圖例照列「特殊主日」",
+    file: "src/RosterWriter.gs",
+    find: "  ].filter(function (r) { return showSpecialRow || r[0] !== labels.specialSkip; });",
+    replace: "  ];",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-title-not-detected",
+    why: "「類型」欄改動偵測唔到",
+    file: "src/SheetReader.gs",
+    find: "    if (now !== want) out.push({ serviceDate: d, fromTitle: want, toTitle: now });",
+    replace: "    if (false) out.push({ serviceDate: d, fromTitle: want, toTitle: now });",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-title-not-written",
+    why: "儲存時唔寫 ServiceDates.Title",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "      writeWeekTitles_(quarterId, titleChanges, context.timezone, 'apiSaveAndConfirmExecute');",
+    replace: "      // 冇寫",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-grid-ignores-title",
+    why: "新一版「類型」欄唔用每週標題",
+    file: "src/RosterWriter.gs",
+    find: "      resolveWeekTypeText_(d.serviceType, specialTitleByDate[d.serviceDate], d.weekTitle)];",
+    replace: "      resolveWeekTypeText_(d.serviceType, specialTitleByDate[d.serviceDate], '')];",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-title-only-no-ver",
+    why: "只改標題唔建立新一版",
+    file: "src/StateSource.gs",
+    find: "  if ((!changes || changes.length === 0) && titleChangeCount === 0) {",
+    replace: "  if (!changes || changes.length === 0) {",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cc-title-no-clear",
+    why: "改返預設唔清空 Title",
+    file: "src/SheetReader.gs",
+    find: "    const newTitle = (change.toTitle === '' || change.toTitle === defaultText) ? '' : change.toTitle;",
+    replace: "    const newTitle = change.toTitle;",
+    tests: ["tests/round75_cc_special_off_week_title.test.js"]
   }
 ];
 

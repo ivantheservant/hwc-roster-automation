@@ -82,7 +82,8 @@ function buildImportLayout_(quarterId) {
     serviceDates: serviceDates,
     rows: rows,
     naByKey: naByKey,
-    specialTitleByDate: buildSpecialSundayTitleIndex_(quarterId, timezone)
+    // 第七十五輪批次 CC 組：表頭日期下面嗰行標題連每週標題
+    specialTitleByDate: buildDisplayTitleIndex_(quarterId, timezone)
   };
 }
 

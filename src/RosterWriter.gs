@@ -168,7 +168,9 @@ function buildGridLayout_(quarterId, assignments) {
       return {
         serviceDate: toDateString(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone),
         weekIndex: Number(row[COLUMNS.SERVICE_DATES.WEEK_INDEX]),
-        serviceType: row[COLUMNS.SERVICE_DATES.SERVICE_TYPE]
+        serviceType: row[COLUMNS.SERVICE_DATES.SERVICE_TYPE],
+        // 第七十五輪批次 CC 組：幹事喺「類型」欄改過嘅每週標題（空白 ＝ 預設）
+        weekTitle: row[COLUMNS.SERVICE_DATES.TITLE]
       };
     })
     .sort(function (a, b) { return a.weekIndex - b.weekIndex; });
@@ -182,7 +184,9 @@ function buildGridLayout_(quarterId, assignments) {
   Object.keys(GRID_CELL_CLASS).forEach(function (k) { classCounts[GRID_CELL_CLASS[k]] = 0; });
 
   const rows = dates.map(function (d, rowOffset) {
-    const row = [d.serviceDate, d.weekIndex, describeServiceType_(d.serviceType, specialTitleByDate[d.serviceDate])];
+    // 第七十五輪批次 CC 組：每週標題（ServiceDates.Title）有值就用佢，否則照舊
+    const row = [d.serviceDate, d.weekIndex,
+      resolveWeekTypeText_(d.serviceType, specialTitleByDate[d.serviceDate], d.weekTitle)];
     for (let c = 3; c < keys.length; c++) {
       const parts = keys[c].split('#');
       const key = d.serviceDate + '|' + parts[0] + '|' + parts[1];
@@ -200,7 +204,9 @@ function buildGridLayout_(quarterId, assignments) {
 
   return {
     headers: headers, keys: keys, rows: rows, dates: dates,
-    cellIndex: cellIndex, classCounts: classCounts, labels: labels
+    cellIndex: cellIndex, classCounts: classCounts, labels: labels,
+    // 第七十五輪批次 CC 組：圖例要唔要列「特殊主日」（見 buildLegendRows_()）
+    specialSundaysEnabled: isSpecialSundaysEnabled_()
   };
 }
 
@@ -514,6 +520,11 @@ function buildLegendRows_(layout) {
   const counts = layout.classCounts || {};
   const labels = layout.labels || readGridCellLabels_();
   const countText = function (cls) { return (counts[cls] || 0) + ' 格'; };
+  // 第七十五輪批次 CC 組：特別主日關咗而呢一版又冇「特殊主日」格 ⇒ 圖例唔列嗰一行。
+  // （舊版本真係有特殊主日格嘅話照列，否則表上嗰啲格冇解釋。）`layout.specialSundaysEnabled`
+  // 由 `buildGridLayout_()` 放；冇（純函式測試自己砌嘅 layout）⇒ 照舊列。
+  const showSpecialRow = layout.specialSundaysEnabled !== false
+    || (counts[GRID_CELL_CLASS.SPECIAL_SKIP] || 0) > 0;
 
   return [
     // 第六十八輪批次 AO 組：匯入人手編好的版本（Basis=IMPORT，全部 MANUAL）都用呢個圖例，
@@ -527,7 +538,7 @@ function buildLegendRows_(layout) {
       countText(GRID_CELL_CLASS.SPECIAL_SKIP)],
     [labels.gap, '系統找不到合資格而當日又有空的人，需要人手處理',
       countText(GRID_CELL_CLASS.GENUINE_GAP)]
-  ];
+  ].filter(function (r) { return showSpecialRow || r[0] !== labels.specialSkip; });
 }
 
 /**
@@ -1136,7 +1147,9 @@ function buildGridRenderContext_(quarterId, timezone, posts) {
     labels: readGridCellLabels_(),
     emptyDisplayByPostId: emptyDisplayByPostId,
     autoGenerateByPostId: autoGenerateByPostId,
-    externalOwnerByDate: buildSpecialSundayExternalOwnerIndex_(quarterId, timezone)
+    externalOwnerByDate: buildSpecialSundayExternalOwnerIndex_(quarterId, timezone),
+    // 第七十五輪批次 CC 組：每週「類型」欄本來應該顯示乜（偵測幹事有冇改每週標題）
+    typeTextByDate: buildTypeTextByDate_(quarterId, timezone)
   };
 }
 

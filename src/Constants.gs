@@ -327,7 +327,10 @@ const COLUMNS = {
     SERVICE_TYPE: 'ServiceType',
     SPECIAL_ID: 'SpecialID',
     AUTO_GENERATE: 'AutoGenerate',
-    NOTES: 'Notes'
+    NOTES: 'Notes',
+    // 第七十五輪批次 CC 組：每週標題（幹事喺職事表「類型」欄改，〔儲存〕時寫入）。
+    // 空白 ＝ 預設（ServiceType）。舊試算表冇呢一欄 ⇒ 第一次寫入時自動加（見 WeekTitles）。
+    TITLE: 'Title'
   },
   SPECIAL_SUNDAYS: {
     SPECIAL_ID: 'SpecialID',
@@ -1229,6 +1232,10 @@ const CONFIG_KEYS = {
   // 就會觸發提醒。預設 7 日（生成前一星期），符合教會新規則第 5 條
   // 「5 月嗰次合堂要出表時先確認」——出表前一星期問，仲有時間去問。
   REMIND_UNCONFIRMED_SPECIAL_DAYS: 'REMIND_UNCONFIRMED_SPECIAL_DAYS',
+  // 第七十五輪批次 CC 組（Ivan 決定）：特別主日完全拿走。FALSE（預設）⇒ 生成、調整、核對、匯入、
+  // 開季前準備清單、圖例全部**唔讀** `SpecialSundays`，每一週照常排所有崗位。工作表同資料照留。
+  // 每週標題（浸禮崇拜、堂慶……）改為由幹事喺職事表「類型」欄直接改（存 `ServiceDates.Title`）。
+  SPECIAL_SUNDAYS_ENABLED: 'SPECIAL_SUNDAYS_ENABLED',
   SEND_HOUR_LOCAL: 'SEND_HOUR_LOCAL',
   SEND_WEEKDAY_GUARD: 'SEND_WEEKDAY_GUARD',
   SYS_TIMEZONE: 'SYS_TIMEZONE',
@@ -1725,6 +1732,8 @@ const DEFAULTS = {
   WEBAPP_VOLUNTEER_URL: '',
   // 第十六輪批次階段 D：生成前幾多日開始提醒「仲有未確認日期嘅特殊主日」。
   REMIND_UNCONFIRMED_SPECIAL_DAYS: 7,
+  // 第七十五輪批次 CC 組：預設唔用特別主日
+  SPECIAL_SUNDAYS_ENABLED: false,
   // 第十七輪批次階段 C：T1～T4 各自嘅起始月份（日曆季度）。
   QUARTER_TERM_START_MONTHS: '1,4,7,10',
   // 第七十五輪批次 CB 組：Ivan 要求「提前大約半年」

@@ -129,10 +129,10 @@ console.log('\n=== F1：前端唔可以自己另做一次轉換 ===');
   const front = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'ui', 'ScriptZone2.html'), 'utf8');
 
-  check('★★★★★ 前端只傳 checkbox 狀態（confirmedChecked），'
-    + '**唔喺前端自己轉成 TRUE／FALSE／空白**'
-    + '——兩邊各有一套轉換，遲早有一邊搞反',
-    /confirmedChecked: confirmedCb\.checked/.test(front));
+  // ⚠️ 第七十五輪批次 CC 組（Ivan 決定）：〔確認特別主日〕彈窗拿走咗。前端已經冇編輯器，
+  // 所以「前端唔可以自己另做一次轉換」自然成立；後端轉換照舊（下面幾條守住）。
+  check('★★★★★ 前端已經冇特別主日編輯器（第七十五輪 CC 組）',
+    !/confirmedCb/.test(front) && !/function openSpecialSundays/.test(front));
   check('★★★★★ 前端完全冇出現 Confirmed 欄嘅字面值轉換',
     !/Confirmed['"]?\s*[:=]\s*['"](TRUE|FALSE)['"]/.test(front));
 

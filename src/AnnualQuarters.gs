@@ -487,7 +487,7 @@ function apiEnsureFutureQuarters() {
     const r = ensureLookaheadQuarters_('apiEnsureFutureQuarters');
     r.message = r.created.length > 0
       ? ('已建立 ' + r.created.length + ' 個季度：' + r.created.map(buildQuarterLabel_).join('、')
-        + '。季度選單已經可以揀。')
+        + '。季度選單已經可以選。')
       : ('今日起 ' + r.months + ' 個月內（至 ' + r.horizon + '）開始的季度都已經建立好，不需要再建。');
     return r;
   });

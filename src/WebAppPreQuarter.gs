@@ -85,9 +85,13 @@ function planPreQuarterChecklist_(input) {
     }).length;
   };
 
-  const items = [
+  // 第七十五輪批次 CC 組：特別主日關咗（`specialEnabled === false`）⇒ 唔再列「特別主日日期未確認」
+  //「合堂未指定跳過崗位」兩項。冇傳（舊呼叫端／純函式測試）⇒ 照舊列。
+  const specialItems = input.specialEnabled === false ? [] : [
     { id: 'specialUnconfirmed', label: '特別主日日期未確認', count: specialUnconfirmed },
-    { id: 'combinedNoSkip', label: '合堂未指定跳過崗位', count: combinedNoSkip },
+    { id: 'combinedNoSkip', label: '合堂未指定跳過崗位', count: combinedNoSkip }
+  ];
+  const items = specialItems.concat([
     { id: 'preacherEmpty', label: '講員未填', count: countEmptyWeeks(input.preacherPostId) },
     {
       id: 'translationEmpty',
@@ -95,7 +99,7 @@ function planPreQuarterChecklist_(input) {
       count: countEmptyWeeks(input.translationPostId, function (d) { return d.translationRequired === true; })
     },
     { id: 'flowerEmpty', label: '獻花未填', count: countEmptyWeeks(input.flowerPostId) }
-  ];
+  ]);
 
   return {
     // N ＝ count > 0 嘅**項數**，唔係全部 count 加埋。
@@ -200,7 +204,9 @@ function buildPreQuarterChecklistInputs_(quarterId) {
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const S = COLUMNS.SPECIAL_SUNDAYS;
 
-  const specialRows = readOptionalSheetRows_(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {
+  // 第七十五輪批次 CC 組：特別主日關咗 ⇒ 當冇（清單唔列兩項、唔會因 SkipPostIDs 而少計）
+  const specialEnabled = isSpecialSundaysEnabled_();
+  const specialRows = !specialEnabled ? [] : readOptionalSheetRows_(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {
     return String(row[S.QUARTER_ID] || '').trim() === quarterId;
   });
 
@@ -251,6 +257,7 @@ function buildPreQuarterChecklistInputs_(quarterId) {
   }
 
   return {
+    specialEnabled: specialEnabled,
     specialRows: specialRows,
     serviceDates: serviceDates,
     filledByDatePost: filledByDatePost,

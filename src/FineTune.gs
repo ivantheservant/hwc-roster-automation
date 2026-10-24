@@ -53,6 +53,8 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     timezone: timezone,
     original: original,
     gridValues: skipGrid ? {} : readGridPersonIds_(quarterId, versionNo, timezone),
+    // 第七十五輪批次 CC 組：「類型」欄（每週標題）現況，偵測幹事有冇改（見 WeekTitles.gs）
+    gridTypeValues: skipGrid ? {} : readGridTypeColumn_(buildRosterSheetName_(quarterId, versionNo), timezone),
     // 第七十四輪批次 BC 組：呢一版有冇已經通知過人（正式發出／改動後重發）。已通知過人嘅版本，
     // 講員／翻譯／獻花嘅 grid 改動先要偵測（見 `buildGridOverlayState_()`）。
     noticeSent: isVersionNoticeSent_(quarterId, versionNo),

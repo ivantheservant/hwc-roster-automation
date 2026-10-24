@@ -66,6 +66,7 @@ function makePlan(opts) {
     unresolved: [],
     requests: { apply: [], confirm: [], needsInput: [] },
     gridChanges: (opts && opts.gridChanges) || [],
+    titleChanges: [],
     overlaps: [],
     blankCells: [],
     violations: { real: real, released: [], structural: [], semiHard: [] },

@@ -290,25 +290,12 @@ console.log('\n=== G2 前端：同掣 1 一樣嘅三欄對照，預設全部唔�
 
 console.log('\n=== G1 年度工具搬入區二 ===');
 {
-  check('★★★★ 「確認特別主日」畫面底部有兩粒掣',
-    /button\('產生下一年度四個季度', \(\) => openAnnualTool\('quarters'\), 'secondary'\)/.test(zone2)
-    && /button\('產生年度合堂建議', \(\) => openAnnualTool\('combined'\), 'secondary'\)/.test(zone2));
-  check('★★★★★ 而且「暫時請用選單」嗰段已經拆走',
-    !/這個工具本輪還沒有搬上網頁/.test(zone2));
-  check('★★★★★ 兩個都係先預覽（列出全部會新增嘅行）',
-    /callServer\(api, yearInput\.value\.trim\(\)\)/.test(zone2)
-    && /plan\.rows\.forEach/.test(zone2));
-  check('★★★★★ 兩個都要打字確認（都係寫入動作）',
-    (zone2.match(/requireTyping: true,\s*\n\s*confirmLabel: '確定寫入'/g) || []).length === 2);
-  check('★★★★★ 確認畫面有「不會做的事」，而且明講唔會覆寫既有資料',
-    zone2.indexOf('・不會覆寫任何一格既有資料') !== -1
-    && zone2.indexOf('・不會覆寫已經存在的那幾日') !== -1);
-  check('★★★★★ 冇 QuarterID 嘅合堂建議會喺**預覽**就標明會略過'
-    + '——冇 QuarterID 嘅行寫落去等於垃圾行（全系統都讀唔到），'
-    + '唔可以寫完先發現',
-    /willWrite: !p\.alreadyExists && !!p\.quarterId/.test(backend)
-    && zone2.indexOf('找不到對應的季度（那一季還沒有建立），略過') !== -1);
-  check('★★★★ 略過嘅一定要報出嚟', /res\.skipped\.length > 0/.test(zone2));
+  // ⚠️ 第七十五輪批次 CC 組（Ivan 決定）：〔確認特別主日〕彈窗連入面兩個年度工具一齊拿走。
+  // 未來季度改為自動建立（CB 組）；年度合堂只留選單版。後端 API 冇刪。
+  check('★★★★ 區二已經冇年度工具入口（第七十五輪 CC 組）',
+    !/openAnnualTool\(/.test(zone2) && !/button\('產生下一年度四個季度'/.test(zone2));
+  check('★★★★★ 後端：冇 QuarterID 嘅合堂建議喺預覽就標明會略過',
+    /willWrite: !p\.alreadyExists && !!p\.quarterId/.test(backend));
   check('★★★★★ 後端自己重新算一次，唔信前端傳返嚟嗰份',
     /const plan = apiAnnualQuartersPlan\(year\);/.test(backend)
     && /const preview = apiAnnualCombinedPlan\(year\);/.test(backend));
@@ -332,9 +319,10 @@ console.log('\n=== G 呼叫層：讀寫分流 ===');
   });
   ['apiAnnualQuartersExecute', 'apiAnnualCombinedExecute',
     'apiExportRuleReviewSheet', 'apiRuleReviewImportExecute'].forEach(function (n) {
-    const src = n.indexOf('Annual') !== -1 ? zone2 : zone4;
-    check('★★★★★ ' + n + ' 唔喺白名單，而且用 callServerMutating()',
-      readOnly.indexOf(n) === -1 && src.indexOf("callServerMutating('" + n + "'") !== -1);
+    // 第七十五輪批次 CC 組：年度工具嘅網頁入口拿走咗，只驗「唔喺唯讀白名單」
+    const isAnnual = n.indexOf('Annual') !== -1;
+    check('★★★★★ ' + n + ' 唔喺白名單' + (isAnnual ? '' : '，而且用 callServerMutating()'),
+      readOnly.indexOf(n) === -1 && (isAnnual || zone4.indexOf("callServerMutating('" + n + "'") !== -1));
   });
 }
 

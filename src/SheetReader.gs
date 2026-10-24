@@ -324,11 +324,29 @@ function readServiceDates(quarterId) {
 }
 
 /**
+ * 第七十五輪批次 CC 組：特別主日用唔用（Config `SPECIAL_SUNDAYS_ENABLED`，預設 FALSE）。
+ *
+ * ⚠️ 讀唔到 Config 都當 FALSE（Ivan 已決定拿走特別主日；靜靜開返舊行為反而會令
+ * 幹事見到佢以為已經冇咗嘅「特殊主日」）。
+ * @returns {boolean}
+ */
+function isSpecialSundaysEnabled_() {
+  try {
+    return getConfig(CONFIG_KEYS.SPECIAL_SUNDAYS_ENABLED, DEFAULTS.SPECIAL_SUNDAYS_ENABLED) === true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
  * 讀取指定季度的 SpecialSundays（特別主日安排）。
  * @param {string} quarterId 季度 ID，例如 "2026T4"
  * @returns {Object[]} 該季度的特別主日物件陣列
  */
 function readSpecialSundays(quarterId) {
+  // 第七十五輪批次 CC 組：關咗（預設）⇒ 一律當冇特別主日。呢度係生成、調整、核對、匯入、
+  // 角色影響、軟規則量度、grid 標題／外部單位索引嘅共同入口，所以只喺呢度關一次。
+  if (!isSpecialSundaysEnabled_()) return [];
   return readSheet(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {
     return row[COLUMNS.SPECIAL_SUNDAYS.QUARTER_ID] === quarterId;
   });
@@ -449,5 +467,261 @@ function isVersionNoticeSent_(quarterId, versionNo, sendLogRows) {
     const stage = String(row[C.STAGE] || '').trim();
     if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND) return false;
     return isNoticeReceivedRecord_({ status: String(row[C.STATUS] || '').trim() });
+  });
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十五輪批次 CC 組：每週標題（放喺 SheetReader.gs：全部測試同入口都會載入呢個檔）
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 第七十五輪批次 CC 組：**每週標題可以喺職事表直接改。**
+ *
+ * ═════════════════════════════════════════════════════════════════════
+ * Ivan 嘅決定
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 「確認特別主日」可唔可以拿走？崗位跟職事表，未有就由幹事喺介面填；
+ * 喺介面都可以改嗰一週嘅標題（浸禮崇拜、堂慶……），少一個功能，易用易學。
+ *
+ * 所以：特別主日預設關閉（`SPECIAL_SUNDAYS_ENABLED`），而職事表工作表嘅「類型」欄
+ *（現時寫「主日崇拜」）由幹事直接改。〔儲存〕時：
+ *
+ *   ・「類型」欄同預期唔同 ⇒ 算一項改動（出現喺「你改了這 N 格」）
+ *   ・寫入 `ServiceDates.Title`（空白 ＝ 預設；改返預設 ⇒ 清空）
+ *   ・之後每一版職事表、公開職事表、個人 PDF、個人頁都用呢個標題
+ *
+ * ⚠️ 「預期」＝ 呢一週而家應該顯示乜（`Title` 有值就係佢，否則 `ServiceType`
+ *（＋特別主日名稱，如果仲開住））。比對嘅係**顯示文字**，同人手改動偵測
+ *「渲染再比對」係同一個做法（第二十輪 A2）。
+ *
+ * ⚠️ 舊版本嘅工作表唔會改——佢哋嘅「類型」欄保留當時顯示嘅標題。
+ *「用某一版作起點」（CH 組）會連「類型」欄一齊抄，所以儲存時標題會跟返嗰一版。
+ */
+
+/** 職事表工作表「類型」欄嘅位置（第 3 欄；第 1 欄日期、第 2 欄週次）。 */
+const WEEK_TITLE_GRID_COLUMN = 3;
+
+/**
+ * 呢一季每週嘅自訂標題 `{yyyy-MM-dd: Title}`（只含有值嘅週）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>}
+ */
+function buildWeekTitleIndex_(quarterId, timezone) {
+  const S = COLUMNS.SERVICE_DATES;
+  const index = {};
+  readServiceDates(quarterId).forEach(function (row) {
+    const title = String(row[S.TITLE] === undefined || row[S.TITLE] === null ? '' : row[S.TITLE]).trim();
+    if (!title) return;
+    const d = toDateString(row[S.SERVICE_DATE], timezone);
+    if (d) index[d] = title;
+  });
+  return index;
+}
+
+/**
+ * 「類型」欄應該顯示嘅文字。純函式。
+ * @param {*} serviceType `ServiceDates.ServiceType`
+ * @param {string=} specialTitle 特別主日名稱（關咗就係空）
+ * @param {string=} weekTitle `ServiceDates.Title`
+ * @returns {string}
+ */
+function resolveWeekTypeText_(serviceType, specialTitle, weekTitle) {
+  const t = String(weekTitle || '').trim();
+  return t || describeServiceType_(serviceType, specialTitle);
+}
+
+/**
+ * 每一週「類型」欄應該顯示嘅文字 `{yyyy-MM-dd: 文字}`。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>}
+ */
+function buildTypeTextByDate_(quarterId, timezone) {
+  const S = COLUMNS.SERVICE_DATES;
+  const specialTitles = buildSpecialSundayTitleIndex_(quarterId, timezone);
+  const out = {};
+  readServiceDates(quarterId).forEach(function (row) {
+    const d = toDateString(row[S.SERVICE_DATE], timezone);
+    if (!d) return;
+    out[d] = resolveWeekTypeText_(row[S.SERVICE_TYPE], specialTitles[d], row[S.TITLE]);
+  });
+  return out;
+}
+
+/**
+ * 公開職事表／個人頁／匯入表嗰種「日期下面寫一行標題」用嘅索引：
+ * 特別主日名稱（開住先有）再由每週自訂標題蓋過。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>}
+ */
+function buildDisplayTitleIndex_(quarterId, timezone) {
+  const merged = Object.assign({}, buildSpecialSundayTitleIndex_(quarterId, timezone));
+  const weekTitles = buildWeekTitleIndex_(quarterId, timezone);
+  Object.keys(weekTitles).forEach(function (d) { merged[d] = weekTitles[d]; });
+  return merged;
+}
+
+/**
+ * 讀職事表工作表嘅「類型」欄 `{yyyy-MM-dd: 文字}`。
+ * @param {string} sheetName 工作表名
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>}
+ */
+function readGridTypeColumn_(sheetName, timezone) {
+  // ⚠️ 讀唔到「類型」欄唔可以令整個 context 建唔到（人手改動偵測仲要照做）——
+  // 工作表本身唔見咗嘅話，`readGridPersonIds_()` 已經會大聲拋錯。呢度只係少咗標題偵測，記 WARN。
+  try {
+    return readGridTypeColumnUnsafe_(sheetName, timezone);
+  } catch (err) {
+    log_('WARN', 'readGridTypeColumn_ 讀不到「類型」欄（每週標題改動這次偵測不到）：' + err.message);
+    return {};
+  }
+}
+
+/**
+ * `readGridTypeColumn_()` 嘅本體（會拋錯）。
+ * @param {string} sheetName 工作表名
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>}
+ */
+function readGridTypeColumnUnsafe_(sheetName, timezone) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error('找不到工作表: ' + sheetName);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return {};
+  const keys = sheet.getRange(2, 1, 1, WEEK_TITLE_GRID_COLUMN).getValues()[0];
+  // ⚠️ 用第 2 行機器鍵確認第 3 欄真係「類型」，唔係靠位置估。
+  if (String(keys[WEEK_TITLE_GRID_COLUMN - 1] || '').trim() !== GRID_KEYS.TYPE) return {};
+  const values = sheet.getRange(3, 1, lastRow - 2, WEEK_TITLE_GRID_COLUMN).getValues();
+  const out = {};
+  values.forEach(function (row) {
+    const d = toDateString(row[0], timezone);
+    if (d) out[d] = String(row[WEEK_TITLE_GRID_COLUMN - 1] === null || row[WEEK_TITLE_GRID_COLUMN - 1] === undefined
+      ? '' : row[WEEK_TITLE_GRID_COLUMN - 1]).trim();
+  });
+  return out;
+}
+
+/**
+ * 「類型」欄有冇被改過。**純運算**（資料由 `buildFineTuneContext_()` 放好）。
+ *
+ * `context.gridTypeValues` 冇 ⇒ 呢個 context 冇讀 grid（例如 `skipGrid`）⇒ 冇改動。
+ * 有 grid 但冇 `context.gridRender.typeTextByDate` ⇒ **拋錯**：唔知預期係乜就唔可以靜靜當冇改。
+ * @param {Object} context fine-tune context
+ * @returns {Object[]} 每項 `{serviceDate, fromTitle, toTitle}`
+ */
+function detectWeekTitleChanges_(context) {
+  const grid = context && context.gridTypeValues;
+  if (!grid || Object.keys(grid).length === 0) return [];
+  const expected = context.gridRender && context.gridRender.typeTextByDate;
+  if (!expected) {
+    throw new Error('偵測每週標題改動需要 `context.gridRender.typeTextByDate`（每週「類型」欄本來應該顯示乜）。'
+      + '用 `buildGridRenderContext_()` 產生，不要自己拼。');
+  }
+  const out = [];
+  Object.keys(grid).sort().forEach(function (d) {
+    if (!Object.prototype.hasOwnProperty.call(expected, d)) return;   // 唔係呢一季嘅日期
+    const now = String(grid[d] || '').trim();
+    const want = String(expected[d] || '').trim();
+    if (now !== want) out.push({ serviceDate: d, fromTitle: want, toTitle: now });
+  });
+  return out;
+}
+
+/**
+ * 確保 `ServiceDates` 有「Title」一欄（第 1 行中文標題、第 2 行機器鍵）。冇就加喺最尾。
+ * @param {Sheet} sheet ServiceDates 工作表
+ * @returns {number} 「Title」欄嘅欄號（1-based）
+ */
+function ensureServiceDatesTitleColumn_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(function (k) { return String(k || '').trim(); });
+  const at = keys.indexOf(COLUMNS.SERVICE_DATES.TITLE);
+  if (at !== -1) return at + 1;
+  const col = lastCol + 1;
+  sheet.getRange(1, col).setValue('每週標題（空白＝預設）');
+  sheet.getRange(2, col).setValue(COLUMNS.SERVICE_DATES.TITLE);
+  return col;
+}
+
+/**
+ * 把「類型」欄嘅改動寫入 `ServiceDates.Title`。**會寫入**（逐週寫 AuditLog）。
+ *
+ * 改成同預設（`ServiceType`＋特別主日名稱）一樣 ⇒ 清空 Title（即係「改返預設」）。
+ * 改成空白 ⇒ 都係清空（「類型」欄唔可以冇字——下一版會顯示預設）。
+ * @param {string} quarterId 季度 ID
+ * @param {Object[]} titleChanges `detectWeekTitleChanges_()` 嘅結果
+ * @param {string} timezone 時區
+ * @param {string} source 呼叫者（AuditLog）
+ * @returns {number} 寫咗幾多週
+ */
+function writeWeekTitles_(quarterId, titleChanges, timezone, source) {
+  if (!titleChanges || titleChanges.length === 0) return 0;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SERVICE_DATES);
+  if (!sheet) throw new Error('找不到工作表: ' + SHEETS.SERVICE_DATES);
+  const titleCol = ensureServiceDatesTitleColumn_(sheet);
+  const lastCol = sheet.getLastColumn();
+  const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(function (k) { return String(k || '').trim(); });
+  const S = COLUMNS.SERVICE_DATES;
+  const qCol = keys.indexOf(S.QUARTER_ID);
+  const dCol = keys.indexOf(S.SERVICE_DATE);
+  const tCol = keys.indexOf(S.SERVICE_TYPE);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return 0;
+  const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  const specialTitles = buildSpecialSundayTitleIndex_(quarterId, timezone);
+  const byDate = {};
+  titleChanges.forEach(function (c) { byDate[c.serviceDate] = c; });
+
+  let written = 0;
+  values.forEach(function (row, i) {
+    if (String(row[qCol] || '').trim() !== quarterId) return;
+    const d = toDateString(row[dCol], timezone);
+    const change = byDate[d];
+    if (!change) return;
+    const defaultText = describeServiceType_(row[tCol], specialTitles[d]);
+    const newTitle = (change.toTitle === '' || change.toTitle === defaultText) ? '' : change.toTitle;
+    sheet.getRange(i + 3, titleCol).setValue(newTitle);
+    written++;
+    writeAuditLog_({
+      action: 'WEEK_TITLE_CHANGED',
+      targetSheet: SHEETS.SERVICE_DATES,
+      targetKey: quarterId + '|' + d,
+      oldValue: change.fromTitle,
+      newValue: newTitle || ('（預設）' + defaultText),
+      source: source || 'writeWeekTitles_',
+      notes: '幹事在職事表「類型」欄改了每週標題'
+    });
+  });
+  return written;
+}
+
+/** 「類型」欄改動喺逐格清單入面用嘅假崗位鍵（唔會撞到任何真崗位 ID）。 */
+const WEEK_TITLE_POST_KEY = '__TITLE__';
+/** 「類型」欄改動喺清單入面顯示嘅名。 */
+const WEEK_TITLE_LABEL_TC = '類型（每週標題）';
+
+/**
+ * 把標題改動砌成「你改了這 N 格」清單嘅行（三個畫面三種欄名都填齊）。
+ * @param {Object[]} titleChanges `detectWeekTitleChanges_()` 嘅結果
+ * @returns {Object[]}
+ */
+function buildWeekTitleChangeRows_(titleChanges) {
+  return (titleChanges || []).map(function (c) {
+    return {
+      serviceDate: c.serviceDate,
+      postId: WEEK_TITLE_POST_KEY,
+      postNameTC: WEEK_TITLE_LABEL_TC,
+      slotIndex: 1,
+      isTitle: true,
+      originalName: c.fromTitle || '（空白）',
+      manualName: c.toTitle || '（空白，改回預設）',
+      fromName: c.fromTitle || '（空白）',
+      toName: c.toTitle || '（空白，改回預設）',
+      source: 'MANUAL'
+    };
   });
 }

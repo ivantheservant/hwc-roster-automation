@@ -96,6 +96,7 @@ function getConfigBaselineSnapshot_() {
       REMIND_STUCK_DAYS: { launchTargetValue: '3', source: '已核實的實際值' },
       REMIND_STUCK_MAX_COUNT: { launchTargetValue: '3', source: '已核實的實際值' },
       REMIND_UNCONFIRMED_SPECIAL_DAYS: { launchTargetValue: '7', source: '已核實的實際值' },
+      SPECIAL_SUNDAYS_ENABLED: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第二十五輪批次新增。上線目標值＝FALSE（初稿由幹事人手撳掣生成）。
       // 試算表現時未有這一列——Config 的自動補建會在下次執行時加入。
       TRIGGER_AUTO_GENERATE: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },

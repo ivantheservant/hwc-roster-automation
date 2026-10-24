@@ -231,6 +231,8 @@ function isUnconfirmedSpecialSunday_(row) {
  * @returns {Object[]} 每項 {specialId, serviceDate, type, title}
  */
 function listUnconfirmedSpecialSundays_(quarterId, timezone) {
+  // 第七十五輪批次 CC 組：特別主日關咗 ⇒ 冇嘢要確認（唔提醒、唔擋生成）
+  if (!isSpecialSundaysEnabled_()) return [];
   const C = COLUMNS.SPECIAL_SUNDAYS;
   return readOptionalSheet_(SHEETS.SPECIAL_SUNDAYS)
     .filter(function (row) { return row[C.QUARTER_ID] === quarterId; })

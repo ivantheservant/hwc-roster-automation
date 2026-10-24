@@ -130,7 +130,8 @@ function resolveAuthoritativeState_(context, mode, callerName) {
         };
       }),
       changes: [],
-      unresolved: []
+      unresolved: [],
+      titleChanges: []
     };
   }
 
@@ -141,7 +142,10 @@ function resolveAuthoritativeState_(context, mode, callerName) {
   return {
     state: overlay.manualState,
     changes: overlay.changes,
-    unresolved: overlay.unresolved
+    unresolved: overlay.unresolved,
+    // 第七十五輪批次 CC 組：「類型」欄（每週標題）嘅改動。**唔混入 `changes`**——
+    // `changes` 每一項都係一格派工（下游會當格用），標題唔係。
+    titleChanges: detectWeekTitleChanges_(context)
   };
 }
 
@@ -171,7 +175,7 @@ function resolveAuthoritativeState_(context, mode, callerName) {
  * @param {string} source 呼叫來源（寫入 AuditLog）
  * @returns {{versionNo: number, sheetName: string, cellCount: number}}
  */
-function materialiseManualEdits_(context, changes, state, source) {
+function materialiseManualEdits_(context, changes, state, source, opts) {
   // ⚠️ 第三十輪批次階段 A2：呢個函式**同時收 context 同 state，而且
   // context 行先**——同 `findStateViolations_()` 啱啱相反。
   // 兩個次序相反嘅函式喺同一條路徑上面（`apiSaveAndConfirmExecute()`
@@ -179,9 +183,13 @@ function materialiseManualEdits_(context, changes, state, source) {
   requireContextArg_('materialiseManualEdits_', 1, context, ['posts', 'serviceDates']);
   requireStateArg_('materialiseManualEdits_', 3, state, 'source');
 
-  if (!changes || changes.length === 0) {
+  // 第七十五輪批次 CC 組：只改咗每週標題（「類型」欄）都要建立新一版——標題已經由呼叫端寫入
+  // `ServiceDates.Title`，新一版嘅工作表會顯示佢。`opts.titleChangeCount` 由呼叫端明確講。
+  const titleChangeCount = (opts && Number(opts.titleChangeCount)) || 0;
+  if ((!changes || changes.length === 0) && titleChangeCount === 0) {
     throw new Error('materialiseManualEdits_() 沒有收到任何人手改動，不應該建立新版本');
   }
+  changes = changes || [];
 
   const originalByKey = {};
   context.original.forEach(function (a) {
@@ -296,7 +304,7 @@ function materialiseManualEdits_(context, changes, state, source) {
   const sheetName = createRosterSheet(context.quarterId, newVersionNo, assignments, []);
   writeAssignments(context.quarterId, newVersionNo, assignments);
 
-  return { versionNo: newVersionNo, sheetName: sheetName, cellCount: changes.length };
+  return { versionNo: newVersionNo, sheetName: sheetName, cellCount: changes.length + titleChangeCount };
 }
 
 /**
