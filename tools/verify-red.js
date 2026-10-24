@@ -6409,6 +6409,38 @@ const MUTATIONS = [
     find: "    // 第七十五輪批次 CH 組：〔回到上一個版本〕拿走——第 2 步嘅版本下拉〔用這一版作起點〕取代佢。\n",
     replace: "    body.appendChild(renderRollbackEntry());\n",
     tests: ["tests/round75_ch_version_picker.test.js"]
+  },
+  {
+    id: "ci-no-ask-after-save",
+    why: "儲存偏好之後冇問要唔要重新生成",
+    file: "src/ui/ScriptZone3.html",
+    find: "          askRegenerateAfterWeights(res, !!(dash && dash.latestVersion));",
+    replace: "          renderWeights();",
+    tests: ["tests/round75_ci_weights_regenerate.test.js"]
+  },
+  {
+    id: "ci-regen-no-typing",
+    why: "〔重新生成〕唔經打字確認即刻生成",
+    file: "src/ui/ScriptZone3.html",
+    find: "      button('重新生成', () => { closeModal(); openRegenerate(); }, ''),",
+    replace: "      button('重新生成', () => { closeModal(); callServerMutating('apiGenerateRoster', currentQuarterId); }, ''),",
+    tests: ["tests/round75_ci_weights_regenerate.test.js"]
+  },
+  {
+    id: "ci-later-regenerates",
+    why: "〔之後再說〕都照樣重新生成",
+    file: "src/ui/ScriptZone3.html",
+    find: "      button('之後再說', () => closeModalAndRefresh(), 'secondary')",
+    replace: "      button('之後再說', () => { callServerMutating('apiGenerateRoster', currentQuarterId); closeModalAndRefresh(); }, 'secondary')",
+    tests: ["tests/round75_ci_weights_regenerate.test.js"]
+  },
+  {
+    id: "ci-ask-without-version",
+    why: "未生成過都問重新生成",
+    file: "src/ui/ScriptZone3.html",
+    find: "    if (!hasVersion) {\n      openModal('排表偏好已儲存'",
+    replace: "    if (false) {\n      openModal('排表偏好已儲存'",
+    tests: ["tests/round75_ci_weights_regenerate.test.js"]
   }
 ];
 

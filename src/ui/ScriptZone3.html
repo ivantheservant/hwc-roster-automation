@@ -1253,12 +1253,36 @@
           setStatus('已新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。');
           weightData = await callServer('apiGetPersonPostWeightMatrix', currentQuarterId);
           weightChanges = {};
-          renderWeights();
+          // 第七十五輪批次 CI 組（Ivan 決定）：儲存之後即刻問要唔要用新偏好重新生成這一季。
+          // 〔重新生成〕走現有「重新生成初稿（覆蓋式）」同一個確認畫面（仍然要打「確認」）。
+          const dash = await getDashboard();
+          askRegenerateAfterWeights(res, !!(dash && dash.latestVersion));
         });
       }
     });
   }
 
+  /** 第七十五輪批次 CI 組：儲存排表偏好之後嘅一問。未生成過 ⇒ 唔問（生成時自然用新偏好）。 */
+  function askRegenerateAfterWeights(res, hasVersion) {
+    const done = make('div', {
+      text: '已儲存排表偏好：新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。',
+      className: 'ok-line'
+    });
+    if (!hasVersion) {
+      openModal('排表偏好已儲存', [done, para('生成這一季的職事表時會用新的偏好。', 'muted')], [
+        button('知道了', () => closeModalAndRefresh(), '')
+      ]);
+      return;
+    }
+    openModal('排表偏好已儲存', [
+      done,
+      para('新的偏好會用在之後生成的職事表。要現在用新偏好重新生成這一季嗎？'
+        + '會建立新一版，舊版本全部保留；職事表上未儲存的改動會不見。')
+    ], [
+      button('重新生成', () => { closeModal(); openRegenerate(); }, ''),
+      button('之後再說', () => closeModalAndRefresh(), 'secondary')
+    ]);
+  }
 
   /* ============================================================
    * 畫面五：身分（堂委／執事）（規格 4.3，第二十七輪批次階段 C）
