@@ -307,7 +307,10 @@ function locatePersonCells_(sheet, quarterId, versionNo, personId, versionAssign
   const sourceRows = versionAssignments || readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
     return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
   });
+  // 第七十六輪批次 DC 組：臨時幫手按**名字**搵佢嗰幾格（冇 PersonID）
+  const tempName = tempHelperNameFromPaperKey_(personId);
   const mine = sourceRows.filter(function (row) {
+    if (tempName) return !String(row[C.PERSON_ID] || '').trim() && String(row[C.PERSON_NAME_SNAPSHOT] || '').trim() === tempName;
     return row[C.PERSON_ID] === personId;
   });
 
@@ -881,6 +884,9 @@ function buildAttachmentName_(quarterId, versionNo, personName) {
  * @returns {string} 中文姓名；找不到時回傳 PersonID 本身
  */
 function lookupPersonName_(personId) {
+  // 第七十六輪批次 DC 組：臨時幫手（`NAME:名字`）冇 PersonID，個名就喺鍵入面
+  const tempName = tempHelperNameFromPaperKey_(personId);
+  if (tempName) return tempName;
   const people = readSheet(SHEETS.NAME_MAPPING);
   for (let i = 0; i < people.length; i++) {
     if (people[i][COLUMNS.NAME_MAPPING.PERSON_ID] === personId) {

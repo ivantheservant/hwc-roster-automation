@@ -943,6 +943,8 @@
       paperExtra_ = { extraEmails: [], extraEmailsRaw: '' };
       paperSelection_ = {};
       s.noEmail.forEach((p) => { paperSelection_[p.personId] = true; });
+      // 第七十六輪批次 DC 組：臨時幫手同樣收唔到信 ⇒ 一樣預設勾選
+      (s.tempHelpers || []).forEach((p) => { paperSelection_[p.personId] = true; });
       renderPaperDialog(s, '');
     });
   }
@@ -998,12 +1000,19 @@
     //
     // 冇電郵嗰批排喺前面並且預設勾好；有電郵嗰批排喺後面，
     // 有啲長者兩樣都要，可以額外揀。
+    const temps = s.tempHelpers || [];
     const items = s.noEmail.map((p) => ({
       key: p.personId,
       label: p.nameTC,
       note: '（這一季 ' + p.cellCount + ' 格）',
       warn: '⚠ 查不到電郵'
-    })).concat(s.withEmail.map((p) => ({
+    })).concat(temps.map((p) => ({
+      // 第七十六輪批次 DC 組：這一季臨時幫手（冇 PersonID、冇電郵），按名字標示佢嗰幾格
+      key: p.personId,
+      label: p.nameTC,
+      note: '（這一季 ' + p.cellCount + ' 格）',
+      warn: '⚠ 臨時幫手，收不到電郵'
+    }))).concat(s.withEmail.map((p) => ({
       key: p.personId,
       label: p.nameTC,
       note: '（這一季 ' + p.cellCount + ' 格，有電郵）',
@@ -1013,7 +1022,8 @@
     const redraw = (kw) => renderPaperDialog(s, kw === undefined ? keyword : kw);
 
     nodes.push(make('div', { className: 'sec' }, [
-      sectionTitle('查不到電郵的有 ' + s.noEmail.length + ' 位——預設全部已經選好'),
+      sectionTitle('查不到電郵的有 ' + (s.noEmail.length + temps.length) + ' 位'
+        + (temps.length > 0 ? '（包括 ' + temps.length + ' 位臨時幫手）' : '') + '——預設全部已經選好'),
       make('div', {
         text: '有電郵的人也在下面，有些長者兩樣都要，可以額外選。',
         className: 'muted'

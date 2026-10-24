@@ -360,44 +360,9 @@ function countPeopleWithoutEmail_(quarterId) {
  * @returns {{noEmail: Object[], withEmail: Object[]}} 每筆 {personId, nameTC, cellCount}
  */
 function splitAssignedPeopleByEmail_(quarterId, versionNo) {
-  const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const N = COLUMNS.NAME_MAPPING;
-
-  const emailById = {};
-  const nameById = {};
-  readPeople().forEach(function (row) {
-    const id = String(row[N.PERSON_ID] || '').trim();
-    if (!id) return;
-    emailById[id] = String(row[N.EMAIL] || '').trim();
-    nameById[id] = String(row[N.NAME_TC] || '').trim();
-  });
-
-  const countById = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
-    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
-    if (Number(row[A.VERSION_NO]) !== versionNo) return;
-    const id = String(row[A.PERSON_ID] || '').trim();
-    if (!id) return;
-    countById[id] = (countById[id] || 0) + 1;
-  });
-
-  const noEmail = [];
-  const withEmail = [];
-  Object.keys(countById).forEach(function (id) {
-    const entry = {
-      personId: id,
-      // ⚠️ 查不到名字**不可以**當成空白略過——那樣幹事會少印一份，
-      // 而且完全不知道少了誰。照樣列出來，用一句講明查不到。
-      nameTC: nameById[id] || ('（NameMapping 查不到這個編號：' + id + '）'),
-      cellCount: countById[id]
-    };
-    if (emailById[id]) withEmail.push(entry); else noEmail.push(entry);
-  });
-
-  const byName = function (a, b) {
-    return a.nameTC < b.nameTC ? -1 : (a.nameTC > b.nameTC ? 1 : 0);
-  };
-  return { noEmail: noEmail.sort(byName), withEmail: withEmail.sort(byName) };
+  // 第七十六輪批次 DC 組：搬咗去 `splitVersionPeopleForNotice_()`（SheetReader.gs），
+  // 寄出窗「收不到電郵」同第 4 步名單同一份；呢度多咗 `tempHelpers`／`externalNameCount`。
+  return splitVersionPeopleForNotice_(quarterId, versionNo);
 }
 
 /**
@@ -424,13 +389,15 @@ function apiGetPaperListState(quarterId) {
   try {
     const versionNo = findLatestVersionNo(quarterId);
     if (versionNo < 0) {
-      return { versionNo: -1, noEmail: [], withEmail: [], message: '這一季還沒有生成過任何版本。' };
+      return { versionNo: -1, noEmail: [], withEmail: [], tempHelpers: [], message: '這一季還沒有生成過任何版本。' };
     }
     const split = splitAssignedPeopleByEmail_(quarterId, versionNo);
     return {
       versionNo: versionNo,
       noEmail: split.noEmail,
       withEmail: split.withEmail,
+      // 第七十六輪批次 DC 組：這一季臨時幫手（冇 PersonID、冇電郵），同「查不到電郵」一樣預設勾選
+      tempHelpers: split.tempHelpers,
       message: ''
     };
   } finally {

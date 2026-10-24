@@ -73,10 +73,11 @@ console.log('\n=== CJ2：確認窗／完成窗都帶住 ===');
   const confirm4 = src.slice(src.indexOf('function apiStep4Confirm_locked_('), src.indexOf('function apiStep5Plan('));
   check('★★★★★ 正式發出：完成窗資料帶住', /unreachable: buildUnreachablePeople_\(quarterId, null\)/.test(confirm4));
 
-  const realRead = gas.readVersionAssignmentsForGrid_;
-  gas.readVersionAssignmentsForGrid_ = function () { throw new Error('讀不到'); };
+  // 第七十六輪批次 DC 組：名單改由 splitVersionPeopleForNotice_()（同第 4 步同一份）出
+  const realSplit = gas.splitVersionPeopleForNotice_;
+  gas.splitVersionPeopleForNotice_ = function () { throw new Error('讀不到'); };
   const bad = gas.buildUnreachablePeople_(sc.Q, null);
-  gas.readVersionAssignmentsForGrid_ = realRead;
+  gas.splitVersionPeopleForNotice_ = realSplit;
   check('★★★★★ 讀唔到 ⇒ error（唔可以當全部收到）', bad.error === '讀不到' && bad.people.length === 0, JSON.stringify(bad));
 }
 

@@ -1050,3 +1050,87 @@ function isCellFilled_(personId, name) {
   if (String(personId === null || personId === undefined ? '' : personId).trim()) return true;
   return String(name === null || name === undefined ? '' : name).trim() !== '';
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十六輪批次 DC 組：通知不到嘅人——寄出窗「收不到電郵」同第 4 步紙本名單**同一份**
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/** 臨時幫手冇 PersonID：紙本名單／個人 PDF 用「NAME:名字」做佢嘅鍵。 */
+const TEMP_HELPER_PAPER_KEY_PREFIX = 'NAME:';
+
+/**
+ * 紙本鍵 → 臨時幫手名字；唔係臨時幫手嘅鍵 ⇒ 空字串。
+ * @param {*} key 紙本名單嘅鍵（PersonID 或 `NAME:名字`）
+ * @returns {string}
+ */
+function tempHelperNameFromPaperKey_(key) {
+  const k = String(key === null || key === undefined ? '' : key);
+  return k.indexOf(TEMP_HELPER_PAPER_KEY_PREFIX) === 0 ? k.slice(TEMP_HELPER_PAPER_KEY_PREFIX.length).trim() : '';
+}
+
+/**
+ * 呢一版有份服侍嘅人，分成：冇電郵（名單上）、有電郵、臨時幫手、外請（只數）。**純讀取。**
+ *
+ * ⚠️ 寄出窗「這幾位收不到電郵」（`buildUnreachablePeople_()`）同第 4 步紙本名單
+ * （`apiGetPaperListState()`）都經呢度——兩邊人數一定一樣。
+ *   ・有 PersonID ⇒ 睇 `NameMapping`（`readPeople()`）有冇電郵
+ *   ・冇 PersonID 有名，喺系統排嘅崗位（`Posts.AutoGenerate = TRUE`）⇒ 臨時幫手（CE 組）
+ *   ・冇 PersonID 有名，喺人手崗位（例如外請講員）⇒ 唔列名，只數
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {{noEmail: Object[], withEmail: Object[], tempHelpers: Object[], externalNameCount: number}}
+ *   前三份每筆 `{personId, nameTC, cellCount}`；臨時幫手嘅 `personId` 係 `NAME:名字`，另有 `tempHelper: true`
+ */
+function splitVersionPeopleForNotice_(quarterId, versionNo) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const N = COLUMNS.NAME_MAPPING;
+  const emailById = {};
+  const nameById = {};
+  readPeople().forEach(function (row) {
+    const id = String(row[N.PERSON_ID] || '').trim();
+    if (!id) return;
+    emailById[id] = String(row[N.EMAIL] || '').trim();
+    nameById[id] = String(row[N.NAME_TC] || '').trim();
+  });
+  const autoByPost = {};
+  readPostsNormalized().forEach(function (p) { autoByPost[p.postId] = p.autoGenerate === true; });
+
+  const countById = {};
+  const tempCount = {};
+  const external = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== versionNo) return;
+    const id = String(row[A.PERSON_ID] || '').trim();
+    if (id) {
+      countById[id] = (countById[id] || 0) + 1;
+      return;
+    }
+    const name = String(row[A.PERSON_NAME_SNAPSHOT] || '').trim();
+    if (!name || GRID_PLACEHOLDER_TEXTS.indexOf(name) !== -1) return;
+    if (autoByPost[String(row[A.POST_ID] || '').trim()] === true) tempCount[name] = (tempCount[name] || 0) + 1;
+    else external[name] = true;
+  });
+
+  const noEmail = [];
+  const withEmail = [];
+  Object.keys(countById).forEach(function (id) {
+    const entry = {
+      personId: id,
+      // ⚠️ 查不到名字**不可以**當成空白略過——那樣幹事會少印一份，而且完全不知道少了誰。
+      nameTC: nameById[id] || ('（NameMapping 查不到這個編號：' + id + '）'),
+      cellCount: countById[id]
+    };
+    if (emailById[id]) withEmail.push(entry); else noEmail.push(entry);
+  });
+  const tempHelpers = Object.keys(tempCount).map(function (name) {
+    return { personId: TEMP_HELPER_PAPER_KEY_PREFIX + name, nameTC: name, cellCount: tempCount[name], tempHelper: true };
+  });
+  const byName = function (a, b) {
+    return a.nameTC < b.nameTC ? -1 : (a.nameTC > b.nameTC ? 1 : 0);
+  };
+  return {
+    noEmail: noEmail.sort(byName), withEmail: withEmail.sort(byName),
+    tempHelpers: tempHelpers.sort(byName), externalNameCount: Object.keys(external).length
+  };
+}

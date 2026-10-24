@@ -809,37 +809,11 @@ function buildUnreachablePeople_(quarterId, versionNo) {
     const v = (versionNo === null || versionNo === undefined || versionNo === '')
       ? findLatestVersionNo(quarterId) : Number(versionNo);
     if (isNaN(v) || v < 0) return out;
-    const autoByPost = {};
-    readPostsNormalized().forEach(function (p) { autoByPost[p.postId] = p.autoGenerate === true; });
-    const N = COLUMNS.NAME_MAPPING;
-    const people = {};
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (r) {
-      const id = String(r[N.PERSON_ID] || '').trim();
-      if (id) people[id] = { name: String(r[N.NAME_TC] || '').trim(), email: String(r[N.EMAIL] || '').trim() };
-    });
-    const seen = {};
-    const external = {};
-    readVersionAssignmentsForGrid_(quarterId, v).forEach(function (a) {
-      const id = String(a.personId || '').trim();
-      const name = String(a.personName || '').trim();
-      if (id) {
-        const p = people[id];
-        if (p && p.email) return;
-        if (seen['ID:' + id]) return;
-        seen['ID:' + id] = true;
-        out.people.push({ name: (p && p.name) || name || id, reason: '沒有電郵' });
-        return;
-      }
-      if (!name || GRID_PLACEHOLDER_TEXTS.indexOf(name) !== -1) return;
-      if (autoByPost[a.postId] === true) {
-        if (seen['NAME:' + name]) return;
-        seen['NAME:' + name] = true;
-        out.people.push({ name: name, reason: '臨時幫手' });
-      } else {
-        external[name] = true;
-      }
-    });
-    out.externalNameCount = Object.keys(external).length;
+    // 第七十六輪批次 DC 組：同第 4 步紙本名單同一份（`splitVersionPeopleForNotice_()`），人數一定一樣
+    const split = splitVersionPeopleForNotice_(quarterId, v);
+    out.people = split.noEmail.map(function (p) { return { name: p.nameTC, reason: '沒有電郵' }; })
+      .concat(split.tempHelpers.map(function (t) { return { name: t.nameTC, reason: '臨時幫手' }; }));
+    out.externalNameCount = split.externalNameCount;
   } catch (err) {
     log_('WARN', 'buildUnreachablePeople_ 失敗：' + err.message);
     out.error = err.message;

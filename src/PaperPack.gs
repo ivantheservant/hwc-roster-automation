@@ -151,7 +151,8 @@ function listPaperPackFiles_(quarterId, versionNo, personIds) {
   const files = [];
   const missing = [];
   personIds.forEach(function (id) {
-    const nameTC = nameById[id] || '';
+    // 第七十六輪批次 DC 組：臨時幫手（`NAME:名字`）唔喺 NameMapping，個名就喺鍵入面
+    const nameTC = nameById[id] || tempHelperNameFromPaperKey_(id);
     if (!nameTC) {
       missing.push({ personId: id, nameTC: '', reason: 'NameMapping 查不到這個編號。' });
       return;

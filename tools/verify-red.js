@@ -182,7 +182,7 @@ const MUTATIONS = [
     id: 'paper-list-keeps-unknown',
     why: '把紙本名單還原成「NameMapping 查不到就略過」'
       + '——幹事會少印一份，而且完全不知道少了誰',
-    file: 'src/WebAppMainFlow.gs',
+    file: 'src/SheetReader.gs',
     find: "      nameTC: nameById[id] || ('（NameMapping 查不到這個編號：' + id + '）'),",
     replace: '      nameTC: nameById[id],',
     tests: ['tests/main_flow_six_steps.test.js']
@@ -6446,32 +6446,24 @@ const MUTATIONS = [
     id: "cj-temp-not-listed",
     why: "臨時幫手冇列入收不到電郵",
     file: "src/WebAppFlow.gs",
-    find: "        out.people.push({ name: name, reason: '臨時幫手' });",
-    replace: "        void 0;",
+    find: "\n      .concat(split.tempHelpers.map(function (t) { return { name: t.nameTC, reason: '臨時幫手' }; }));",
+    replace: ";",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
   {
     id: "cj-noemail-not-listed",
     why: "名單上冇電郵嘅人冇列出",
     file: "src/WebAppFlow.gs",
-    find: "        out.people.push({ name: (p && p.name) || name || id, reason: '沒有電郵' });",
-    replace: "        void 0;",
+    find: "    out.people = split.noEmail.map(function (p) { return { name: p.nameTC, reason: '沒有電郵' }; })",
+    replace: "    out.people = [].map(function (p) { return { name: p.nameTC, reason: '沒有電郵' }; })",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
   {
     id: "cj-external-listed",
     why: "外請講員都逐個列名",
-    file: "src/WebAppFlow.gs",
-    find: "      if (autoByPost[a.postId] === true) {\n        if (seen['NAME:' + name]) return;",
-    replace: "      if (true) {\n        if (seen['NAME:' + name]) return;",
-    tests: ["tests/round75_cj_unreachable.test.js"]
-  },
-  {
-    id: "cj-dup-names",
-    why: "同一個人列多次",
-    file: "src/WebAppFlow.gs",
-    find: "        if (seen['ID:' + id]) return;\n",
-    replace: "",
+    file: "src/SheetReader.gs",
+    find: "    if (autoByPost[String(row[A.POST_ID] || '').trim()] === true) tempCount[name] = (tempCount[name] || 0) + 1;",
+    replace: "    if (true) tempCount[name] = (tempCount[name] || 0) + 1;",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
   {
@@ -6681,6 +6673,62 @@ const MUTATIONS = [
     find: "personId: '', freeText: typed, isManual: true",
     replace: "personId: '', isManual: true",
     tests: ["tests/round76_db_named_cells_not_blank.test.js"]
+  },
+  {
+    id: "dc-temp-not-in-paper",
+    why: "第 4 步名單冇臨時幫手",
+    file: "src/WebAppMainFlow.gs",
+    find: "      tempHelpers: split.tempHelpers,",
+    replace: "      tempHelpers: [],",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "dc-temp-not-preselect",
+    why: "臨時幫手冇預設勾選",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      (s.tempHelpers || []).forEach((p) => { paperSelection_[p.personId] = true; });\n",
+    replace: "",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "dc-ui-no-temp-label",
+    why: "名單冇標明臨時幫手",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      warn: '⚠ 臨時幫手，收不到電郵'",
+    replace: "      warn: '⚠ 查不到電郵'",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "dc-locate-by-id-only",
+    why: "個人 PDF 搵唔到臨時幫手嗰幾格（淨睇 PersonID）",
+    file: "src/PdfExport.gs",
+    find: "    if (tempName) return !String(row[C.PERSON_ID] || '').trim() && String(row[C.PERSON_NAME_SNAPSHOT] || '').trim() === tempName;\n",
+    replace: "",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "dc-lookup-key-as-name",
+    why: "臨時幫手檔名用咗「NAME:」鍵",
+    file: "src/PdfExport.gs",
+    find: "  if (tempName) return tempName;\n  const people",
+    replace: "  const people",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "dc-files-unfixable",
+    why: "臨時幫手 PDF 被當成「NameMapping 查不到」",
+    file: "src/PaperPack.gs",
+    find: "    const nameTC = nameById[id] || tempHelperNameFromPaperKey_(id);",
+    replace: "    const nameTC = nameById[id] || '';",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "dc-count-mismatch",
+    why: "寄出窗同第 4 步唔係同一份名單（收不到電郵漏咗臨時幫手）",
+    file: "src/SheetReader.gs",
+    find: "    if (autoByPost[String(row[A.POST_ID] || '').trim()] === true) tempCount[name] = (tempCount[name] || 0) + 1;\n    else external[name] = true;",
+    replace: "    if (autoByPost[String(row[A.POST_ID] || '').trim()] === true) return;\n    else external[name] = true;",
+    tests: ["tests/round76_dc_temp_helper_paper.test.js"]
   }
 ];
 
