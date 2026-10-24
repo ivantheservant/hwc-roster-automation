@@ -2453,7 +2453,7 @@ const MUTATIONS = [
     file: 'src/SelfTestRunner.gs',
     find: "  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex].join('|');",
     replace: "  return [v.ruleId, v.serviceDate, v.postId, v.slotIndex, v.personId].join('|');",
-    tests: ['tests/selftest_safe_cell_pick.test.js']
+    tests: ['tests/selftest_violating_pick_key.test.js']
   },
 
   // ── 第五十三輪批次 C 組：唔好再撳 ─────────────────────────────

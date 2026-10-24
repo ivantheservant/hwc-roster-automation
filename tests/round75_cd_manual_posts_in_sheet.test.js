@@ -61,10 +61,10 @@ sc.setCell(0, sc.DATES[0], 'PREACH#1', 'Rev Wong');            // 外請講員�
 
 console.log('\n=== CD1：之後再改（任何階段）都偵測到 ===');
 {
-  sc.setCell(1, sc.DATES[1], 'FLOWER#1', 'Helena');
+  sc.setCell(1, sc.DATES[1], 'FLOWER#1', 'Guest Flower');
   const plan = gas.apiSaveAndConfirmPlan(sc.Q);
   check('★★★★★ 再改一格獻花（名單以外）⇒ 偵測到、唔擋',
-    plan.blocked === false && plan.gridChanges.length === 1 && plan.gridChanges[0].manualName === 'Helena', JSON.stringify(plan.gridChanges));
+    plan.blocked === false && plan.gridChanges.length === 1 && plan.gridChanges[0].manualName === 'Guest Flower', JSON.stringify(plan.gridChanges));
   sc.setCell(1, sc.DATES[1], 'FLOWER#1', '');
 }
 
