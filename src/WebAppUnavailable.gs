@@ -38,6 +38,8 @@ function apiListUnavailable(quarterId, keyword) {
     const M = COLUMNS.NAME_MAPPING;
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    // 第七十五輪批次 CM 組：每一筆標明「同揀咗嘅季度重唔重疊」，前端預設只顯示重疊而生效中嘅。
+    const range = readQuarterDateRangeForUnavailable_(quarterId, timezone);
 
     const peopleById = {};
     const people = [];
@@ -80,6 +82,7 @@ function apiListUnavailable(quarterId, keyword) {
         source: String(row[U.SOURCE] || '').trim(),
         status: String(row[U.STATUS] || '').trim()
       };
+      item.inQuarter = unavailableOverlapsRange_(item.dateFrom, item.dateTo, range);
       // ─────────────────────────────────────────────────────────────
       // ⚠️ 第三十四輪批次乙3：**先睇 `Status`，再睇日期。**
       // ─────────────────────────────────────────────────────────────
@@ -110,6 +113,9 @@ function apiListUnavailable(quarterId, keyword) {
     return {
       quarterId: quarterId,
       today: today,
+      // 第七十五輪批次 CM 組：前端用嚟過濾同埋做新增時嘅預設日期
+      quarterStart: range ? range.start : '',
+      quarterEnd: range ? range.end : '',
       people: people.filter(function (p) { return p.active; })
         .sort(function (a, b) { return a.nameTC < b.nameTC ? -1 : 1; }),
       posts: readPosts().map(function (row) {
@@ -127,6 +133,46 @@ function apiListUnavailable(quarterId, keyword) {
   } finally {
     endSheetReadMemo_();
   }
+}
+
+/**
+ * 第七十五輪批次 CM 組：季度嘅起訖日（`Quarters.StartDate`／`EndDate`）。
+ *
+ * Ivan 手動測試 A：重設之後以為仲有測試資料，其實係其他季度嘅紀錄
+ *（`Unavailable` 冇季度欄，舊畫面全部列出）。
+ * 讀唔到 ⇒ `null`，前端就唔過濾（寧可多列，唔可以靜靜收埋）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {?{start: string, end: string}}
+ */
+function readQuarterDateRangeForUnavailable_(quarterId, timezone) {
+  try {
+    const q = findQuarter_(String(quarterId || '').trim());
+    if (!q) return null;
+    const start = toDateString(q[COLUMNS.QUARTERS.START_DATE], timezone);
+    const end = toDateString(q[COLUMNS.QUARTERS.END_DATE], timezone);
+    return (start && end) ? { start: start, end: end } : null;
+  } catch (err) {
+    log_('WARN', 'readQuarterDateRangeForUnavailable_ 讀不到季度日期：' + err.message);
+    return null;
+  }
+}
+
+/**
+ * 一筆不能服侍紀錄同季度日期範圍有冇重疊。純函式。
+ *
+ * 冇 `DateTo` ⇒ 當成只係 `DateFrom` 嗰一日。冇範圍（讀唔到季度）⇒ 一律當重疊。
+ * @param {string} dateFrom yyyy-MM-dd
+ * @param {string} dateTo yyyy-MM-dd（可空）
+ * @param {?{start: string, end: string}} range
+ * @returns {boolean}
+ */
+function unavailableOverlapsRange_(dateFrom, dateTo, range) {
+  if (!range) return true;
+  const from = String(dateFrom || '').trim();
+  const to = String(dateTo || '').trim() || from;
+  if (!from) return true;
+  return from <= range.end && to >= range.start;
 }
 
 /**

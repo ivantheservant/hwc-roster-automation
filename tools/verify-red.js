@@ -6081,6 +6081,30 @@ const MUTATIONS = [
     find: "    people: buildGridSheetUrl_(SHEETS.NAME_MAPPING),",
     replace: "    people: buildGridSheetUrl_(SHEETS.ROLES),",
     tests: ["tests/round75_ca_layout.test.js"]
+  },
+  {
+    id: "cm-no-overlap-check",
+    why: "後端唔再判斷同季度重疊（全部當本季）",
+    file: "src/WebAppUnavailable.gs",
+    find: "  return from <= range.end && to >= range.start;",
+    replace: "  return true;",
+    tests: ["tests/round75_cm_unavailable_quarter.test.js"]
+  },
+  {
+    id: "cm-ui-no-filter",
+    why: "前端預設照舊列出全部季度",
+    file: "src/ui/ScriptZone3.html",
+    find: "    const current = showAll ? unavailableData.current : unavailableData.current.filter(inQ);",
+    replace: "    const current = unavailableData.current;",
+    tests: ["tests/round75_cm_unavailable_quarter.test.js"]
+  },
+  {
+    id: "cm-default-today",
+    why: "新增預設日期唔理季度",
+    file: "src/ui/ScriptZone3.html",
+    find: "    return (t >= s && t <= e) ? t : s;",
+    replace: "    return t;",
+    tests: ["tests/round75_cm_unavailable_quarter.test.js"]
   }
 ];
 

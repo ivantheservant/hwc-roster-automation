@@ -72,12 +72,33 @@
    * ============================================================ */
 
   let unavailableData = null;
+  /**
+   * 第七十五輪批次 CM 組：「顯示其他季度和已取消的」。**預設唔勾**——
+   * 只顯示同揀咗嘅季度重疊、而且生效中嘅紀錄。
+   * Ivan：重設之後見到一堆紀錄，以為係測試資料冇清，其實係其他季度嘅。
+   */
+  let unavailableShowAll_ = false;
 
-  function openUnavailable(keyword) {
+  function openUnavailable(keyword, keepShowAll) {
+    if (!keepShowAll) unavailableShowAll_ = false;
     runAction('讀取不能服侍的日期', async () => {
       unavailableData = await callServer('apiListUnavailable', currentQuarterId, keyword || '');
       renderUnavailable(keyword || '');
     });
+  }
+
+  /**
+   * 第七十五輪批次 CM 組：新增時嘅預設日期一定落喺呢一季之內。
+   * 今日喺季度入面 ⇒ 今日；否則 ⇒ 季度第一日。讀唔到季度 ⇒ 空白（照舊）。
+   * @param {Object} data `apiListUnavailable` 嘅結果
+   * @returns {string} yyyy-MM-dd 或空字串
+   */
+  function defaultUnavailableDate(data) {
+    const s = data && data.quarterStart;
+    const e = data && data.quarterEnd;
+    if (!s || !e) return '';
+    const t = data.today || '';
+    return (t >= s && t <= e) ? t : s;
   }
 
   function renderUnavailable(keyword) {
@@ -89,17 +110,55 @@
           className: 'warn-head'
         })
       ]),
-      peopleSearchBox(keyword, (k) => openUnavailable(k))
+      peopleSearchBox(keyword, (k) => openUnavailable(k, true))
     ];
 
     nodes.push(row([button('＋ 新增一筆', () => openUnavailableEditor(null), '')], 'row-right'));
 
-    if (unavailableData.current.length === 0) {
-      nodes.push(make('div', { text: '目前沒有生效中的紀錄。', className: 'muted' }));
+    // ── 第七十五輪批次 CM 組：預設只顯示呢一季 ───────────────────
+    const showAll = unavailableShowAll_;
+    const qs = unavailableData.quarterStart || '';
+    const qe = unavailableData.quarterEnd || '';
+    const inQ = (r) => r.inQuarter !== false;
+    const current = showAll ? unavailableData.current : unavailableData.current.filter(inQ);
+    const hiddenCount = showAll ? 0
+      : (unavailableData.current.length - current.length)
+        + (unavailableData.cancelled || []).length + unavailableData.past.length;
+
+    const toggleLine = make('label', { className: 'check-row' });
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.checked = showAll;
+    toggle.addEventListener('change', () => {
+      unavailableShowAll_ = !!toggle.checked;
+      renderUnavailable(keyword);
+    });
+    toggleLine.appendChild(toggle);
+    toggleLine.appendChild(make('span', { text: '顯示其他季度和已取消的' }));
+    nodes.push(toggleLine);
+
+    const scope = (qs && qe) ? ('這一季（' + qs + ' 至 ' + qe + '）') : '這一季';
+    if (current.length === 0) {
+      nodes.push(make('div', {
+        text: showAll ? '目前沒有生效中的紀錄。' : (scope + '沒有生效中的紀錄。'),
+        className: 'muted'
+      }));
     } else {
-      const box = make('div', { className: 'sec' }, [sectionTitle('生效中')]);
-      unavailableData.current.forEach((r) => box.appendChild(unavailableRow(r)));
+      const box = make('div', { className: 'sec' }, [
+        sectionTitle(showAll ? '生效中（全部季度）' : ('生效中：' + scope))
+      ]);
+      current.forEach((r) => box.appendChild(unavailableRow(r)));
       nodes.push(box);
+    }
+    if (hiddenCount > 0) {
+      nodes.push(make('div', {
+        text: '另有 ' + hiddenCount + ' 筆是其他季度、已過去或已取消的紀錄，沒有顯示（勾上面那一格就會列出）。',
+        className: 'muted'
+      }));
+    }
+    if (!showAll) {
+      openModal('不能服侍的日期', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+      return;
     }
 
     // 第三十四輪批次乙3：已取消嘅獨立一組。
@@ -204,10 +263,10 @@
           if (!res.ok) { showErrorModal('不能服侍的日期', new Error(res.message)); return; }
           // 列表要即時反映——重新讀，唔係喺前端自己刪走一行。
           unavailableData = await callServer('apiListUnavailable', currentQuarterId, '');
-          openUnavailable('');
+          openUnavailable('', true);
         });
       }, 'danger'),
-      button('不要取消', () => openUnavailable(''), 'secondary')
+      button('不要取消', () => openUnavailable('', true), 'secondary')
     ]);
   }
 
@@ -224,8 +283,9 @@
       personSel.appendChild(o);
     });
 
-    const fromInput = dateInput(e.dateFrom || '');
-    const toInput = dateInput(e.dateTo || '');
+    // 第七十五輪批次 CM 組：新增時預設日期落喺呢一季之內
+    const fromInput = dateInput(e.dateFrom || (existing ? '' : defaultUnavailableDate(unavailableData)));
+    const toInput = dateInput(e.dateTo || (existing ? '' : defaultUnavailableDate(unavailableData)));
 
     const appliesSel = document.createElement('select');
     [['ALL', '全部崗位'], ['POSTS', '指定崗位']].forEach(([v, t]) => {
