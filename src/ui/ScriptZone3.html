@@ -12,18 +12,59 @@
    * 所以每一個寫入動作前面都有一個確認畫面，列明「會改動幾多行」。
    */
 
-  function renderZone3() {
+  /**
+   * 第七十五輪批次 CA 組：呢一區由「名單維護」改成**「常用設定」**。
+   *
+   * Ivan 手動測試 A：
+   *   ・〔人員與電郵〕〔身分（堂委／執事）〕⇒ 直接開試算表嗰張工作表改（新分頁）
+   *   ・加〔固定收件人／管理員電郵〕（EmailRecipients）
+   *   ・〔匯出規則審閱表〕〔重新生成初稿（覆蓋式）〕由進階與診斷搬上嚟
+   *   ・〔崗位資格〕〔暫時不做某崗位〕拿走入口（`PersonPostExclusions` 資料照留、排表照守）
+   *   ・〔不能服侍的日期〕搬去「開季前準備」；〔排表偏好〕搬去主流程第 2 步
+   *
+   * ⚠️ 三條工作表網址由後端 `buildDashboardState_().settingsLinks` 實時砌（試算表 ID 同 gid
+   * 都唔寫死）。搵唔到嗰張表 ⇒ 灰掣＋原因，**唔會畫一條去錯地方嘅連結**。
+   * ⚠️ 一律 `target=_blank`：唔可以取代幹事介面嗰個分頁。
+   * @param {Object=} d dashboard 狀態
+   */
+  function renderZone3(d) {
     const body = clear(el('zone3Body'));
-    body.appendChild(para('這裡改的是真實的會友資料。每一個改動都會記錄下來，'
-      + '而且系統不會刪走任何一行——不再服侍的人是「停用」，不是刪除。'));
+    const links = (d && d.settingsLinks) || {};
+    body.appendChild(para('人員資料、身分和固定收件人都直接在試算表那一張工作表改（會在新分頁打開）。'
+      + '不再服侍的人請把「Active」改成 FALSE，不要刪除那一行。'));
     body.appendChild(row([
-      button('不能服侍的日期', () => openUnavailable(), ''),
-      button('人員與電郵', () => openPeople(), ''),
-      button('崗位資格', () => openEligibility(), ''),
-      button('排表偏好', () => openWeights(), ''),
-      button('身分（堂委／執事）', () => openRoles(), ''),
-      button('暫時不做某崗位', () => openExclusions(), '')
+      settingsSheetLink('人員與電郵', links.people, 'NameMapping'),
+      settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),
+      settingsSheetLink('固定收件人／管理員電郵', links.recipients, 'EmailRecipients')
     ]));
+    body.appendChild(make('div', { className: 'sec' }, [
+      zone4Row('匯出規則審閱表', '把系統現時的規則設定變成一份人看得懂的試算表，給堂委逐條決定。',
+        () => openRuleExport(), false),
+      zone4Row('重新生成初稿（覆蓋式）',
+        '重新排一次，會建立一個新版本。現有的人手改動不會保留。',
+        () => openRegenerate(), true)
+    ]));
+  }
+
+  /**
+   * 常用設定入面「在新分頁開某一張工作表」嘅掣。
+   * @param {string} label 掣上嘅字
+   * @param {string} url 後端砌好嘅網址；空 ⇒ 灰掣
+   * @param {string} sheetName 工作表名（只用嚟寫原因）
+   * @returns {Node}
+   */
+  function settingsSheetLink(label, url, sheetName) {
+    if (!url) {
+      const b = button(label, () => {}, 'secondary');
+      b.disabled = true;
+      b.title = '找不到「' + sheetName + '」這一張工作表，或者暫時讀不到它的位置。撳「重新整理」再試。';
+      return b;
+    }
+    const a = make('a', { text: label, className: 'bigLink' });
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    return a;
   }
 
   /* ============================================================

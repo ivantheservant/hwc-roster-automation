@@ -435,8 +435,9 @@ console.log('\n=== AF5【核心】畫面 ===');
   check('★★★★★ 認唔出嘅名有〔立即加入這個人〕（同儲存確認同一個對話框）', /openAddUnresolvedPerson\(u, openImportRoster\)/.test(zone4));
   check('★★★★★ 有「已經在系統外寄給全體」選項、預設未寄過', /已經在系統外寄給全體/.test(zone4) && /let sentExternally = false;/.test(zone4));
   check('★★★★ 空格用 AH 組同一支 buildSendWarningNodes', /buildSendWarningNodes\(\{\s*blank:/.test(zone4));
-  check('★★★★★ 第 1 步未有版本時有「已經用舊方法排好？」連去匯入',
-    /已經用舊方法排好？/.test(read('ScriptMainFlow.html')) && /openImportRoster\(\)/.test(read('ScriptMainFlow.html')));
+  // ⚠️ 第七十五輪批次 CN 組（Ivan 決定）：第 1 步嘅〔用「匯入」〕拿走，匯入只留喺進階與診斷。
+  check('★★★★★ 第 1 步已經冇「已經用舊方法排好？」（第七十五輪 CN 組）',
+    !/已經用舊方法排好？/.test(read('ScriptMainFlow.html')) && !/openImportRoster\(\)/.test(read('ScriptMainFlow.html')));
   check('★★★★ 唯讀白名單有 apiCheckImportSheet', /'apiCheckImportSheet',/.test(read('Script.html')));
 }
 

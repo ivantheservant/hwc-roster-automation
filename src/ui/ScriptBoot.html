@@ -46,7 +46,8 @@
   // ⚠️ 階段 A：區二身係由狀態快取畫出嚟嘅，所以要經 `getDashboard()` 攞
   // ——直接讀個變數就係「快取可能過期」嗰個 bug class 嘅入口。
   wireZoneToggle('zone2Head', 'zone2Body', async () => renderZone2Body(await getDashboard()));
-  wireZoneToggle('zone3Head', 'zone3Body', renderZone3);
+  // 第七十五輪批次 CA 組：區三改做「常用設定」，要 dashboard 嘅工作表網址
+  wireZoneToggle('zone3Head', 'zone3Body', async () => renderZone3(await getDashboard()));
   wireZoneToggle('zone4Head', 'zone4Body', null);
 
   // 撳背景關彈窗（但唔可以撳彈窗本身就關——會誤觸）

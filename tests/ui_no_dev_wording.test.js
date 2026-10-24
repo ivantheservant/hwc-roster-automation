@@ -38,11 +38,12 @@ console.log('\n=== N：錯字提示指去真係存在嘅位置 ===');
 {
   const zone1 = visible(read('ScriptZone1.html'));
   const zone3 = read('ScriptZone3.html');
-  check('★★★★★ 提示指去「名單維護 ▸ 人員與電郵 ▸ 別名」掣',
-    /撳「人員與電郵」，再撳「別名」加一個別名/.test(zone1));
-  check('★★★★★ 而嗰兩粒掣真係存在（唔係指去一個唔存在嘅位置）',
-    /button\('人員與電郵', \(\) => openPeople\(\)/.test(zone3) && /button\('別名', \(\) => openAliases\(\)/.test(zone3));
-  check('★★★★ 唔再叫幹事去改試算表嘅 NameAlias 工作表', zone1.indexOf('暫時請用試算表的 NameAlias') === -1);
+  // ⚠️ 第七十五輪批次 CA 組（Ivan 決定）：「名單維護」整區拿走，人員資料改為直接喺試算表改，
+  // 所以別名嘅提示改為直接指去 NameAlias 工作表（呢個位置真係存在）。
+  check('★★★★★ 提示指去試算表「NameAlias」工作表',
+    /在試算表的「NameAlias」工作表加一行/.test(zone1));
+  check('★★★★★ 提示唔再指去已經拿走嘅「名單維護」', zone1.indexOf('名單維護') === -1);
+  check('★★★★ 唔再有「下一輪」之類開發者用語', zone1.indexOf('暫時請用試算表的 NameAlias') === -1);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

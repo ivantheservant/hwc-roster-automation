@@ -404,7 +404,7 @@ function buildSaveButtonText_(s) {
 /** 規格 2.3 掣 2 嘅動態文字。 */
 function buildReviewButtonText_(s) {
   if (s.reviewerCount === 0) {
-    return '現時沒有登記任何堂委電郵，寄出去不會有人收到。先去「名單維護」補。';
+    return '現時沒有登記任何堂委電郵，寄出去不會有人收到。先去「常用設定 ▸ 身分（堂委／執事）」補。';
   }
   const last = s.lastSentAt[MAIL_STAGES.REVIEW];
   // 第七十輪批次 AU 組：呢粒掣寄嘅係**預設審閱名單**（`Role=REVIEWER`），
@@ -617,7 +617,24 @@ function buildDashboardState_(quarterId) {
       : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' },
     // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
     eligibilityImpact: versionExists ? summariseEligibilityImpact_(quarterId)
-      : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' }
+      : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' },
+    // 第七十五輪批次 CA 組：「常用設定」三粒掣喺新分頁直接開嗰張工作表。
+    settingsLinks: buildSettingsSheetLinks_()
+  };
+}
+
+/**
+ * 第七十五輪批次 CA 組：「常用設定」三張工作表嘅網址。
+ *
+ * Ivan：「人員與電郵、身分（堂委執事）可唔可以直接去試算表嗰張工作表改？」
+ * ⚠️ 用 `buildGridSheetUrl_()`（試算表 ID 同 gid 實時問）；搵唔到 ⇒ 空字串，前端畫灰掣。
+ * @returns {{people: string, roles: string, recipients: string}}
+ */
+function buildSettingsSheetLinks_() {
+  return {
+    people: buildGridSheetUrl_(SHEETS.NAME_MAPPING),
+    roles: buildGridSheetUrl_(SHEETS.ROLES),
+    recipients: buildGridSheetUrl_(SHEETS.EMAIL_RECIPIENTS)
   };
 }
 

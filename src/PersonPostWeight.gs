@@ -604,7 +604,7 @@ function runEnsurePersonPostWeightSheet_() {
     ui.alert(title,
       '已建立 ' + SHEETS.PERSON_POST_WEIGHT + ' 工作表（第 1 行是說明標題，'
       + '第 2 行是系統用的欄位鍵，已隱藏）。\n\n'
-      + '之後請用幹事介面「名單維護 ▸ 排表偏好」加內容，不要直接在這張表打字'
+      + '之後請用幹事介面「主流程第 2 步 ▸ 排表偏好」加內容，不要直接在這張表打字'
       + '——那個畫面會自動填 WeightID／建立時間，並且寫入稽核紀錄。\n\n'
       + '⚠️ 解除一筆偏好是填「解除日」，不是刪掉那一行。',
       ui.ButtonSet.OK);

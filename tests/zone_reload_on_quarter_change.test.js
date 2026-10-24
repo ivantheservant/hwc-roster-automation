@@ -127,7 +127,8 @@ console.log('\n=== 全部收摺區都要接上同一套機制 ===');
     JSON.stringify(wired));
   check('★★★★★ 區三而家有真內容（renderZone3），唔再係 null'
     + '——本輪加咗內容，正正就係嗰個「將來會中招」嘅情況',
-    /wireZoneToggle\('zone3Head', 'zone3Body', renderZone3\)/.test(boot));
+    // 第七十五輪批次 CA 組：區三（常用設定）要 dashboard 嘅工作表網址
+    /wireZoneToggle\('zone3Head', 'zone3Body', async \(\) => renderZone3\(await getDashboard\(\)\)\)/.test(boot));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

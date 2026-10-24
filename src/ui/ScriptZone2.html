@@ -59,17 +59,6 @@
     const body = clear(el('zone2Body'));
     const pq = (d && d.preQuarter) || { items: [] };
 
-    // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
-    const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
-    (pq.items || []).forEach((i) => {
-      summary.appendChild(make('div', {
-        text: (i.count > 0 ? '⬜ ' : '✅ ') + i.label + '：' + i.count
-          + (i.count > 0 ? ' 項' : ' 項（做好了）'),
-        className: i.count > 0 ? 'vio-row' : 'vio-row muted'
-      }));
-    });
-    body.appendChild(summary);
-
     // ⚠️ 第四十三輪批次 H 組：「更改各崗位的事奉人員名單」搬咗入嚟做**第 0 步**。
     //
     // Ivan 嘅講法：改名單係**生成之前**做嘅事。擺喺主流程第 3 步
@@ -81,11 +70,24 @@
       body.appendChild(renderStepEligibility());
     }
 
+    // ⚠️ 第七十五輪批次 CA 組：〔不能服侍的日期〕由「名單維護」搬到呢度（Ivan：生成之前就要處理）；
+    // 〔名單檢查〕搬去「進階與診斷」（唔係常用功能）。
     body.appendChild(row([
+      button('不能服侍的日期', () => openUnavailable(), ''),
       button('確認特別主日', openSpecialSundays, ''),
-      button('填講員／翻譯／獻花', openPreacherFill, ''),
-      button('名單檢查', openPeopleHints, 'secondary')
+      button('填講員／翻譯／獻花', openPreacherFill, '')
     ]));
+
+    // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
+    const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
+    (pq.items || []).forEach((i) => {
+      summary.appendChild(make('div', {
+        text: (i.count > 0 ? '⬜ ' : '✅ ') + i.label + '：' + i.count
+          + (i.count > 0 ? ' 項' : ' 項（做好了）'),
+        className: i.count > 0 ? 'vio-row' : 'vio-row muted'
+      }));
+    });
+    body.appendChild(summary);
   }
 
   /* ============================================================
@@ -649,7 +651,7 @@
       const hints = data.peopleHints || [];
 
       const nodes = [
-        para('這幾項跟人不跟季，所以不算入上面的「還有 N 項未做」。')
+        para('這幾項跟人不跟季，所以不算入「開季前準備」的「還有 N 項未做」。')
       ];
 
       // 第二十五輪批次階段 E4：頭兩項同最後一項已經有區三畫面，
@@ -660,7 +662,8 @@
       const openIn = {
         noEmail: function () { openPeople(); },
         notInNameList: function () { openPeople(); },
-        thinEligibility: function () { openEligibility(); }
+        // 第七十五輪批次 CA 組：〔崗位資格〕入口拿走（同名單工作表重複）⇒ 改開名單工作表
+        thinEligibility: function () { openEligibilitySheet(); }
       };
       const where = {
         expiredRole: 'Roles 工作表，檢查 EffectiveTo 欄；換屆不要刪行，只填卸任日期'
@@ -682,13 +685,8 @@
         // 呢度特登唔喺註解舉完整例子——寫出嚟一樣會被自己個掃描器捉到。
         const hintId = h['id'];
         if (h.count > 0 && openIn[hintId]) {
-          box.appendChild(row([button('去處理', () => {
-            // 開區三之前先展開嗰一區，否則關咗彈窗之後幹事會搵唔返。
-            setZoneOpen('zone3Head', 'zone3Body', true);
-            markZoneLoaded('zone3Body');
-            renderZone3();
-            openIn[hintId]();
-          }, 'link')], 'row-right'));
+          // 第七十五輪批次 CA 組：區三已經唔係「名單維護」，直接開嗰個畫面就得。
+          box.appendChild(row([button('去處理', () => openIn[hintId](), 'link')], 'row-right'));
         } else if (h.count > 0 && where[hintId]) {
           box.appendChild(make('div', {
             text: '去處理：試算表的 ' + where[hintId] + '。改完回來重新整理這一頁。',

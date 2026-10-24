@@ -197,8 +197,10 @@ console.log('\n=== C 呼叫層：讀寫分流（階段 A 嗰條白名單）===')
 
 console.log('\n=== C 區三入口 ===');
 {
-  check('★★★★ 區三有「身分（堂委／執事）」呢粒掣',
-    /button\('身分（堂委／執事）', \(\) => openRoles\(\), ''\)/.test(zone3));
+  // ⚠️ 第七十五輪批次 CA 組（Ivan 決定）：區三變「常用設定」，〔身分（堂委／執事）〕
+  // 改為喺新分頁直接開 Roles 工作表；openRoles() 畫面本身冇刪。
+  check('★★★★ 常用設定有「身分（堂委／執事）」（開 Roles 工作表）',
+    /settingsSheetLink\('身分（堂委／執事）', links\.roles, 'Roles'\)/.test(zone3));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

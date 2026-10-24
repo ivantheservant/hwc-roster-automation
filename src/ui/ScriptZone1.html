@@ -394,10 +394,10 @@
       const how = make('div', { className: 'sec' }, [sectionTitle('或者這樣處理：')]);
       const ul = make('ul', { className: 'err-list' });
       ul.appendChild(make('li', { text: '如果打錯字，回到職事表把那一格改回正確的名字' }));
-      // 第六十三輪批次 N 組：指去介面上真係存在嘅位置——「人員與電郵」入面有一粒「別名」。
-      // 舊字句仲寫住「下一輪才搬上來，暫時請用試算表的 NameAlias 工作表」：
-      // 位置早已搬咗上嚟，而「下一輪」係開發者用語，幹事唔知係幾時。
-      ul.appendChild(make('li', { text: '如果是同一個人的另一種寫法，去下面「名單維護」撳「人員與電郵」，再撳「別名」加一個別名' }));
+      // 第六十三輪批次 N 組：指去真係存在嘅位置。
+      // ⚠️ 第七十五輪批次 CA 組：「名單維護」整區拿走，人員資料改為直接喺試算表改（Ivan 決定），
+      // 所以別名都係直接去 NameAlias 工作表加。
+      ul.appendChild(make('li', { text: '如果是同一個人的另一種寫法，在試算表的「NameAlias」工作表加一行（原本的名字＋這個寫法），回來再撳一次' }));
       how.appendChild(ul);
       nodes.push(how);
 

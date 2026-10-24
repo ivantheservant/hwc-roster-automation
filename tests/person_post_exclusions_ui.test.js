@@ -158,8 +158,10 @@ console.log('\n=== D 呼叫層：讀寫分流 ===');
 
 console.log('\n=== D 區三頁尾嗰句「下一輪會搬上來」要拆走 ===');
 {
-  check('★★★★ 區三有「暫時不做某崗位」呢粒掣',
-    /button\('暫時不做某崗位', \(\) => openExclusions\(\), ''\)/.test(zone3));
+  // ⚠️ 第七十五輪批次 CA 組（Ivan 決定）：〔暫時不做某崗位〕入口拿走；
+  // `PersonPostExclusions` 資料照留、排表照守，畫面本身（openExclusions）冇刪。
+  check('★★★★ 區三已經冇「暫時不做某崗位」呢粒掣（第七十五輪 CA 組）',
+    !/button\('暫時不做某崗位'/.test(zone3) && /function openExclusions\(/.test(zone3));
   check('★★★★★ 而且冇咗「下一輪／下一個階段會搬上來」嗰句'
     + '——兩個畫面都做完咗，留住嗰句會令幹事去選單搵一個已經喺呢度嘅功能',
     !/下一輪會搬上來/.test(zone3) && !/下一個階段會搬上來/.test(zone3));

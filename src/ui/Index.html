@@ -105,11 +105,19 @@
     <div class="zone-body" id="zone1Body"></div>
   </section>
 
-  <!-- 名單維護（改人、改資格、改偏好）-->
+  <!--
+    常用設定（第七十五輪批次 CA 組）。
+
+    ⚠️ 原本嘅「名單維護」整區拿走（Ivan 手動測試 A）：
+      〔崗位資格〕同「開啟名單工作表」重複、〔暫時不做某崗位〕唔要 UI（資料照留、排表照守）；
+      〔不能服侍的日期〕搬去開季前準備；〔排表偏好〕搬去第 2 步；
+      〔人員與電郵〕〔身分〕改為喺新分頁直接開試算表嗰張工作表。
+    沿用 `zone3` 呢個容器 id（收摺邏輯、換季度重設都已經接好），內容由 renderZone3() 畫。
+  -->
   <section class="zone" id="zone3">
     <button class="zone-head" id="zone3Head" type="button" aria-expanded="false">
-      <span class="zone-title">名單維護</span>
-      <span class="zone-count">改人、改資格、改偏好</span>
+      <span class="zone-title">常用設定</span>
+      <span class="zone-count">人員、身分、收件人</span>
       <span class="zone-caret">▾</span>
     </button>
     <div class="zone-body" id="zone3Body" hidden></div>

@@ -204,7 +204,7 @@
       acts: acts,
       extra: renderPermanentLink(flow)
     });
-    // 第七十五輪批次 CN 組：第六十七輪 AF 組加嘅「已經用舊方法排好？〔用「匯入」〕」拿走。
+    // 第七十五輪批次 CN 組：第六十七輪 AF 組加喺呢度嘅〔用「匯入」〕掣拿走。
     // Ivan 實測：生成前後撳落去都只係開「檢查匯入表：填了 0 格」，以為係匯入 Excel／PDF。
     // 匯入功能只留喺「進階與診斷 ▸ 匯入人手編好的職事表」。
     return card;
@@ -480,6 +480,9 @@
         ? ''
         : '這一季只有一個版本，沒有「上一個」可以回去。'
     }));
+
+    // 第七十五輪批次 CA／CI 組：〔排表偏好〕由「名單維護」搬到第 2 步（Ivan：改完偏好想即刻用）。
+    acts.push(stepButton('排表偏好', () => openWeights(), { className: 'secondary' }));
 
     const card = stepCard({
       num: 2,

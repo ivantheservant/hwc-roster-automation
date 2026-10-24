@@ -6033,6 +6033,54 @@ const MUTATIONS = [
     find: "        button('建立可編輯副本', () => runEditableCopy(), 'secondary'),\n",
     replace: "",
     tests: ["tests/round75_ck_paper_two_kinds.test.js"]
+  },
+  {
+    id: "ca-zone3-old-title",
+    why: "區三標題還原成「名單維護」",
+    file: "src/ui/Index.html",
+    find: "      <span class=\"zone-title\">常用設定</span>",
+    replace: "      <span class=\"zone-title\">名單維護</span>",
+    tests: ["tests/round75_ca_layout.test.js"]
+  },
+  {
+    id: "ca-settings-same-tab",
+    why: "常用設定嘅工作表連結唔喺新分頁開（取代咗幹事介面）",
+    file: "src/ui/ScriptZone3.html",
+    find: "    const a = make('a', { text: label, className: 'bigLink' });\n    a.href = url;\n    a.target = '_blank';",
+    replace: "    const a = make('a', { text: label, className: 'bigLink' });\n    a.href = url;\n    a.target = '_self';",
+    tests: ["tests/round75_ca_layout.test.js"]
+  },
+  {
+    id: "ca-unavail-not-zone2",
+    why: "開季前準備冇〔不能服侍的日期〕",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('不能服侍的日期', () => openUnavailable(), ''),\n",
+    replace: "",
+    tests: ["tests/round75_ca_layout.test.js"]
+  },
+  {
+    id: "ca-weights-not-step2",
+    why: "第 2 步冇〔排表偏好〕",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    acts.push(stepButton('排表偏好', () => openWeights(), { className: 'secondary' }));\n",
+    replace: "",
+    tests: ["tests/round75_ca_layout.test.js"]
+  },
+  {
+    id: "ca-hints-not-zone4",
+    why: "進階與診斷冇〔名單檢查〕",
+    file: "src/ui/ScriptZone4.html",
+    find: "      zone4Row('名單檢查',",
+    replace: "      zone4Row('人員提示',",
+    tests: ["tests/round75_ca_layout.test.js"]
+  },
+  {
+    id: "ca-links-hardcoded",
+    why: "常用設定網址唔再由工作表實時問（gid 錯）",
+    file: "src/WebAppDashboard.gs",
+    find: "    people: buildGridSheetUrl_(SHEETS.NAME_MAPPING),",
+    replace: "    people: buildGridSheetUrl_(SHEETS.ROLES),",
+    tests: ["tests/round75_ca_layout.test.js"]
   }
 ];
 

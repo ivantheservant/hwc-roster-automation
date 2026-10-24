@@ -20,9 +20,7 @@
 
     body.appendChild(make('div', { className: 'sec' }, [
       sectionTitle('職事表工具'),
-      zone4Row('重新生成初稿（覆蓋式）',
-        '重新排一次，會建立一個新版本。現有的人手改動不會保留。',
-        () => openRegenerate(), true),
+      // 第七十五輪批次 CA 組：〔重新生成初稿（覆蓋式）〕〔匯出規則審閱表〕搬咗去「常用設定」。
       // 第四十一輪批次 A 組：名單下拉選單而家全自動——每一張新 grid
       // 都會有，改完事奉人員名單亦都會自動再跑一次。
       // 呢粒掣係**手動補救**：萬一自動嗰次設唔到（最常見係工作表被保護），
@@ -39,7 +37,11 @@
         () => openPendingCells(), false),
       zone4Row('草稿覆核報告（給堂委看）',
         '產生一份給堂委看的文字報告：這一版排了誰、有什麼要留意。',
-        () => openDraftReviewReport(), false)
+        () => openDraftReviewReport(), false),
+      // 第七十五輪批次 CA 組：由「開季前準備」搬落嚟（唔係常用功能）
+      zone4Row('名單檢查',
+        '只看：列出名單上可能有問題的人（例如沒有電郵、沒有任何崗位）。',
+        () => openPeopleHints(), false)
     ]));
 
     body.appendChild(make('div', { className: 'sec' }, [
@@ -58,12 +60,9 @@
     body.appendChild(make('div', { className: 'sec' }, [
       sectionTitle('規則審閱'),
       make('div', {
-        text: '把系統現時的規則設定變成一份人看得懂的試算表，'
-          + '給堂委逐條決定；他們填好之後再匯入。',
+        text: '堂委填好規則審閱表之後（匯出在「常用設定」），在這裡讀回系統。',
         className: 'muted'
       }),
-      zone4Row('匯出規則審閱表', '產生一份新的試算表，放在 Drive 的 RuleReview 資料夾。',
-        () => openRuleExport(), false),
       zone4Row('匯入規則審閱表', '讀回堂委填好的那一份，逐條給你接受或拒絕。',
         () => openRuleImport(), false)
     ]));
