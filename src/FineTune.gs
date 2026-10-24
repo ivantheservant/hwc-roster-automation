@@ -55,9 +55,7 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     gridValues: skipGrid ? {} : readGridPersonIds_(quarterId, versionNo, timezone),
     // 第七十五輪批次 CC 組：「類型」欄（每週標題）現況，偵測幹事有冇改（見 WeekTitles.gs）
     gridTypeValues: skipGrid ? {} : readGridTypeColumn_(buildRosterSheetName_(quarterId, versionNo), timezone),
-    // 第七十四輪批次 BC 組：呢一版有冇已經通知過人（正式發出／改動後重發）。已通知過人嘅版本，
-    // 講員／翻譯／獻花嘅 grid 改動先要偵測（見 `buildGridOverlayState_()`）。
-    noticeSent: isVersionNoticeSent_(quarterId, versionNo),
+    // （第七十四輪批次 BC 組嘅 `noticeSent` 已經拿走：第七十五輪 CD 組起人手崗位一律偵測。）
     // 第二十輪批次階段 A2：算「呢一格本來應該渲染成咩」要用嘅三樣嘢
     // （顯示標籤、逐崗位 EmptyDisplay、逐日期 ExternalOwner）。
     gridRender: buildGridRenderContext_(quarterId, timezone, posts),
@@ -212,8 +210,6 @@ function buildGridOverlayState_(context) {
 
   const changes = [];
   const unresolved = [];
-  // 由 `buildFineTuneContext_()` 讀 SendLog 算好放喺 context（呢個函式要保持純運算，唔可以自己讀工作表）
-  const manualPostsTracked = context.noticeSent === true;
 
   const manualState = context.original.map(function (a) {
     const key = a.serviceDate + '|' + a.postId + '|' + a.slotIndex;
@@ -262,11 +258,9 @@ function buildGridOverlayState_(context) {
     // 照舊唔算改動、唔做名字解析；有差異先當人手改動。人名認唔到（外請講員等自由文字）**唔算**
     // 「認不出」（`unresolved`），因為呢類崗位本來就容許自由文字。
     const isManualPost = context.gridRender.autoGenerateByPostId[a.postId] === false;
-    // ⚠️ 只有「已通知過人嘅版本」先偵測呢類崗位嘅 grid 改動；未通知過嘅版本照舊整格略過
-    //（填格工具直接寫長表同 grid，唯一寫入途徑唔係 grid，不改變現有行為）。
-    if (isManualPost && !manualPostsTracked) {
-      return Object.assign({}, base, { personId: a.personId, isManual: false });
-    }
+    // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：〔填講員／翻譯／獻花〕拿走，呢類崗位**一律喺職事表直接填**，
+    // 所以**任何階段**嘅改動都要偵測到（第七十四輪 BC 組「只有已通知過人嘅版本先偵測」嘅限制拿走）。
+    // 名字喺 NameMapping ⇒ 連 PersonID；唔喺（外請講員等）⇒ 照收自由文字，唔算「認不出」（見下面）。
 
     // ── 第二十輪批次階段 A2：比對方向由「反推」改成「渲染再比對」 ──
     //

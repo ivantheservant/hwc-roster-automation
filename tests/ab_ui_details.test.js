@@ -50,21 +50,13 @@ console.log('\n=== AB①：按日期認出季度嗰筆，儲存確認畫面講�
   check('★★★★ 一般嗰筆唔加括號', !/（/.test(plain.textContent), plain.textContent);
 }
 
-console.log('\n=== AB②：講員、翻譯對唔上名單 ⇒ 中性灰色 ===');
+console.log('\n=== AB②：（第七十五輪 CD 組起）〔填講員／翻譯／獻花〕彈窗已拿走 ===');
 {
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：彈窗連「對唔對得上名單」嘅回饋一齊拿走。
+  // 而家人手崗位喺職事表直接填，選單提示講明「名單以外的名字系統照收」（GridNameDropdown.gs）。
   const ui = loadUiScripts(['Script.html', 'ScriptZone2.html']);
-  const n1 = new ui.__StubNode('div');
-  ui.renderLinkFeedback(n1, { linkedToNameMapping: false }, '外請', true);
-  check('★★★★★ 講員／翻譯：灰色（muted），唔係橙色警告', n1.className === 'muted', n1.className);
-  check('★★★★ 句子照舊（外請講員屬正常）', /外請講員屬正常/.test(n1.textContent));
-  const n2 = new ui.__StubNode('div');
-  ui.renderLinkFeedback(n2, { linkedToNameMapping: false }, '打錯', false);
-  check('★★★★★ 獻花（optional）維持橙色', n2.className === 'link-warn', n2.className);
-  const n3 = new ui.__StubNode('div');
-  ui.renderLinkFeedback(n3, { linkedToNameMapping: true }, '假一', true);
-  check('★★★★ 對得上照舊綠色', n3.className === 'link-ok', n3.className);
-  check('★★★★★ 呼叫點按 c.optional 分：必填（講員、翻譯）⇒ 中性',
-    /renderLinkFeedback\(linkNote, res, name, !c\.optional\);/.test(read('src/ui/ScriptZone2.html')));
+  check('★★★★★ renderLinkFeedback() 已經冇咗（第七十五輪 CD 組）', typeof ui.renderLinkFeedback === 'undefined');
+  check('★★★★ 選單提示講明名單以外照收', /系統照收/.test(read('src/GridNameDropdown.gs')));
 }
 
 console.log('\n=== AB③：第 1 步「現時有 N 個版本」跟住 dashboard ===');

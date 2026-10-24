@@ -333,10 +333,11 @@ console.log('\n=== A3【核心】第 3 步：下拉選單唔可以變成限制 =
   r.columns.forEach(function (c) { byPost[c.postId] = c; });
 
   check('★★★★ 自動排嘅崗位有加選單', !!byPost.CHAIR && !!byPost.READ, JSON.stringify(r.columns));
-  checkEqual('★★★★★ 講員嗰欄**刻意冇選單**——佢係自由文字，'
-    + '俾個選單只會令幹事以為「唔喺選單上就係唔可以」',
-    r.skipped.filter(function (s) { return s.postId === 'PREACH'; })
-      .map(function (s) { return s.reason; }), ['NOT_AUTO']);
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：人手崗位都有選單（allowInvalid，名單以外照收）。
+  // 呢個 fixture 嘅講員冇任何人喺名單 ⇒ 冇得列（NO_ELIGIBLE），但唔再係「NOT_AUTO 刻意唔設」。
+  check('★★★★★ 講員嗰欄唔再因為「唔係自動排」而唔設選單（第七十五輪 CD 組）',
+    r.skipped.filter(function (s) { return s.postId === 'PREACH' && s.reason === 'NOT_AUTO'; }).length === 0,
+    JSON.stringify(r.skipped));
 
   // ★★★ 呢一條係整個功能嘅關鍵。
   const sheet = ss.getSheetByName(gas.buildRosterSheetName_(Q_NOW, gas.findLatestVersionNo(Q_NOW)));

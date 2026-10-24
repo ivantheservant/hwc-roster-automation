@@ -313,15 +313,6 @@ const MUTATIONS = [
     tests: ['tests/paper_print_kinds.test.js']
   },
   {
-    id: 'paper-full-draws-list',
-    why: '拆走「一份大家睇」嗰一種嘅提早 return'
-      + '——會畫返個名單出嚟，而嗰個名單喺嗰一種入面撳極都冇作用',
-    file: 'src/ui/ScriptSendPaper.html',
-    find: "    if (paperKind_ === 'FULL_ONE') {",
-    replace: "    if (paperKind_ === 'FULL_ONE' && false) {",
-    tests: ['tests/paper_print_kinds.test.js']
-  },
-  {
     id: 'paper-kind-sticky',
     why: '拆走「每次開彈窗重設返做預設」'
       + '——幹事上次揀咗「不標示」，下次開會以為自己揀緊預設，然後印出一疊冇名嘅表',
@@ -4298,7 +4289,8 @@ const MUTATIONS = [
     id: 'n-alias-dev-wording',
     why: '錯字提示寫返「下一輪才搬上來」——開發者用語，而且位置早已搬咗上嚟',
     file: 'src/ui/ScriptZone1.html',
-    find: "去下面「名單維護」撳「人員與電郵」，再撳「別名」加一個別名' }));",
+    // 第七十五輪批次 CA 組：提示改為直接指去 NameAlias 工作表（「名單維護」整區拿走）
+    find: "在試算表的「NameAlias」工作表加一行（原本的名字＋這個寫法），回來再撳一次' }));",
     replace: "去「名單維護 ▸ 人員與電郵 ▸ 別名」加別名（下一輪才搬上來，暫時請用試算表的 NameAlias 工作表）' }));",
     tests: ['tests/ui_no_dev_wording.test.js']
   },
@@ -4678,14 +4670,6 @@ const MUTATIONS = [
     file: 'src/ui/ScriptZone1.html',
     find: "        + (r.quarterNote ? '（' + r.quarterNote + '）' : ''),",
     replace: "        + '',",
-    tests: ['tests/ab_ui_details.test.js']
-  },
-  {
-    id: 'ab-speaker-orange',
-    why: '講員、翻譯對唔上名單又變返橙色警告——外請講員係常態',
-    file: 'src/ui/ScriptZone2.html',
-    find: '            renderLinkFeedback(linkNote, res, name, !c.optional);',
-    replace: '            renderLinkFeedback(linkNote, res, name);',
     tests: ['tests/ab_ui_details.test.js']
   },
   {
@@ -5931,38 +5915,6 @@ const MUTATIONS = [
     tests: ["tests/fill_after_official.test.js"]
   },
   {
-    id: "bc-preq-no-overlay",
-    why: "「開季前準備」未填計數唔計工作表上已填嘅格",
-    file: "src/WebAppPreQuarter.gs",
-    find: "    if (isVersionNoticeSent_(quarterId, versionNo)) {",
-    replace: "    if (false) {",
-    tests: ["tests/fill_after_official.test.js"]
-  },
-  {
-    id: "bc-overlay-skip-all",
-    why: "偵測人手改動永遠略過講員／翻譯／獻花——儲存及寄出偵測唔到",
-    file: "src/FineTune.gs",
-    find: "    if (isManualPost && !manualPostsTracked) {",
-    replace: "    if (isManualPost) {",
-    tests: ["tests/fill_after_official.test.js"]
-  },
-  {
-    id: "bc-overlay-track-all",
-    why: "未通知過嘅版本都偵測講員／翻譯／獻花嘅 grid 改動（改變現有行為）",
-    file: "src/FineTune.gs",
-    find: "    if (isManualPost && !manualPostsTracked) {",
-    replace: "    if (false) {",
-    tests: ["tests/grid_placeholder_roundtrip.test.js", "tests/preacher_free_text_save_confirm.test.js"]
-  },
-  {
-    id: "bc-ctx-flag-off",
-    why: "context 永遠報「未通知過人」",
-    file: "src/FineTune.gs",
-    find: "    noticeSent: isVersionNoticeSent_(quarterId, versionNo),",
-    replace: "    noticeSent: false,",
-    tests: ["tests/fill_after_official.test.js"]
-  },
-  {
     id: "bc-free-unresolved",
     why: "外請自由文字當「認不出的名」而擋住儲存",
     file: "src/FineTune.gs",
@@ -5984,22 +5936,6 @@ const MUTATIONS = [
     file: "src/StateSource.gs",
     find: "((s.personId || manualFreeText) ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)",
     replace: "(s.personId ? ASSIGN_SOURCE.MANUAL : ASSIGN_SOURCE.SKIPPED)",
-    tests: ["tests/fill_after_official.test.js"]
-  },
-  {
-    id: "bc-ui-notice-off",
-    why: "彈窗唔出「已正式發出……要撳第 2 步」提示句",
-    file: "src/ui/ScriptZone2.html",
-    find: "    if (data.writesToSheetOnly) {",
-    replace: "    if (false) {",
-    tests: ["tests/fill_after_official.test.js"]
-  },
-  {
-    id: "bc-ui-status-saved",
-    why: "只寫工作表嘅格仍然顯示「已儲存 ✓」",
-    file: "src/ui/ScriptZone2.html",
-    find: "              ? '已寫在職事表，未儲存成新版本' : '已儲存 ✓';",
-    replace: "              ? '已儲存 ✓' : '已儲存 ✓';",
     tests: ["tests/fill_after_official.test.js"]
   },
   {
@@ -6054,7 +5990,7 @@ const MUTATIONS = [
     id: "ca-unavail-not-zone2",
     why: "開季前準備冇〔不能服侍的日期〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('不能服侍的日期', () => openUnavailable(), ''),\n",
+    find: "      button('不能服侍的日期', () => openUnavailable(), '')\n",
     replace: "",
     tests: ["tests/round75_ca_layout.test.js"]
   },
@@ -6241,6 +6177,46 @@ const MUTATIONS = [
     find: "    const newTitle = (change.toTitle === '' || change.toTitle === defaultText) ? '' : change.toTitle;",
     replace: "    const newTitle = change.toTitle;",
     tests: ["tests/round75_cc_special_off_week_title.test.js"]
+  },
+  {
+    id: "cd-manual-skip-again",
+    why: "人手崗位嘅 grid 改動又整格略過（偵測唔到）",
+    file: "src/FineTune.gs",
+    find: "    const isManualPost = context.gridRender.autoGenerateByPostId[a.postId] === false;\n",
+    replace: "    const isManualPost = context.gridRender.autoGenerateByPostId[a.postId] === false;\n    if (isManualPost) return Object.assign({}, base, { personId: a.personId, isManual: false });\n",
+    tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
+  },
+  {
+    id: "cd-outside-unresolved",
+    why: "外請講員當成「認不出」",
+    file: "src/FineTune.gs",
+    find: "    if (normalizedGrid !== '' && !resolvedId && !isManualPost) {",
+    replace: "    if (normalizedGrid !== '' && !resolvedId) {",
+    tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
+  },
+  {
+    id: "cd-no-manual-dropdown",
+    why: "人手崗位冇名單選單",
+    file: "src/GridNameDropdown.gs",
+    find: "      const isManualPost = post.autoGenerate === false;\n",
+    replace: "      const isManualPost = post.autoGenerate === false;\n      if (isManualPost) { skipped.push({ postId: postId, postNameTC: post.postNameTC, reason: 'NOT_AUTO' }); return; }\n",
+    tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
+  },
+  {
+    id: "cd-checklist-from-ra",
+    why: "未填計數唔睇職事表工作表（照舊只睇長表）",
+    file: "src/WebAppPreQuarter.gs",
+    find: "  if (gridExists) {\n    const onSheet = readGridFilledManualCells_(",
+    replace: "  if (false) {\n    const onSheet = readGridFilledManualCells_(",
+    tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
+  },
+  {
+    id: "cd-fill-btn-back",
+    why: "開季前準備還原〔填講員／翻譯／獻花〕",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('不能服侍的日期', () => openUnavailable(), '')\n    ]));",
+    replace: "      button('不能服侍的日期', () => openUnavailable(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
+    tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
   }
 ];
 

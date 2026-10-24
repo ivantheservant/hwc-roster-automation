@@ -22,12 +22,13 @@
  * 那才是把關的位置，不是這裡。
  *
  * ─────────────────────────────────────────────────────────────────────
- * ⚠️ 「不由系統排」的崗位不設選單
+ * ⚠️ 「不由系統排」的崗位（第七十五輪批次 CD 組起都有選單）
  * ─────────────────────────────────────────────────────────────────────
  *
- * 講員／翻譯／獻花（`AutoGenerate=FALSE`）的值本來就是自由文字，
- * 而且外請講員不在 `NameMapping`。給這幾欄一個選單只會誤導——
- * 幹事會以為「不在選單上就是不可以」。這幾欄刻意留白。
+ * 講員／翻譯／獻花（`AutoGenerate=FALSE`）的值本來就是自由文字，而且外請講員
+ * 不在 `NameMapping`。以前這幾欄刻意留白（怕幹事以為「不在選單上就是不可以」）。
+ * 第七十五輪〔填講員／翻譯／獻花〕拿走之後，這幾欄要在職事表直接填，所以都加選單
+ * （列名單上的人），提示文字講明「可以直接打名單以外的名字，系統照收」。
  */
 
 /**
@@ -111,11 +112,10 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
       const post = postById[postId];
       if (!post) return;                      // 日期／週次／類型三欄
 
-      // 不由系統排的崗位刻意留白，理由見檔頭。
-      if (post.autoGenerate === false) {
-        skipped.push({ postId: postId, postNameTC: post.postNameTC, reason: 'NOT_AUTO' });
-        return;
-      }
+      // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：人手填嘅崗位（講員／翻譯／獻花）**而家都有選單**——
+      //〔填講員／翻譯／獻花〕拿走咗，幹事一律喺職事表直接填。選單照舊列名單上嘅人，
+      // 但 `setAllowInvalid(true)` ⇒ 打名單以外嘅名（外請講員）只出警告、唔拒絕，系統照收。
+      const isManualPost = post.autoGenerate === false;
 
       const names = (eligibility.byPost[postId] || [])
         .map(function (pid) { return nameById[pid]; })
@@ -136,8 +136,11 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
       const rule = SpreadsheetApp.newDataValidation()
         .requireValueInList(names, true)
         .setAllowInvalid(true)
-        .setHelpText('可以在選單裡面選，也可以直接打一個不在名單上的名'
-          + '（外請講員、新人、借調都是這樣填）。')
+        .setHelpText(isManualPost
+          ? ('這個崗位由你人手填：可以在選單裡面選，也可以直接打名單以外的名字（例如外請講員），'
+            + '系統照收，不用另外確認。名字在人員名單上的，正式發出時會收到通知。')
+          : ('可以在選單裡面選，也可以直接打一個不在名單上的名'
+            + '（外請講員、新人、借調都是這樣填）。'))
         .build();
       // ⚠️ 第四十一輪批次 A 組：設不到要老實講，不可以靜靜失敗。
       //

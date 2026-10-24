@@ -290,21 +290,18 @@ console.log('\n=== BC6　「開季前準備」嘅獻花未填計數 ===');
   check('★★★★ 獻花未填 = 4 週 − 已填 3 格（2 格寫入長表、1 格只寫工作表）= 1', flower.count === 1, JSON.stringify(flower));
   clearSendLog();
   const inputs2 = gas.buildPreQuarterChecklistInputs_(Q);
-  check('★★★★ 未通知過人：照舊只看資料層（工作表上嗰格唔計）',
-    !inputs2.filledByDatePost[DATES[2] + '|FLOWER'], JSON.stringify(inputs2.filledByDatePost));
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：「未填」一律照最新職事表工作表計，唔再分通知過人與否。
+  check('★★★★ 未通知過人：（第七十五輪 CD 組起）一樣照工作表計',
+    inputs2.filledByDatePost[DATES[2] + '|FLOWER'] === true, JSON.stringify(inputs2.filledByDatePost));
 }
 
-console.log('\n=== BC7　畫面：專屬提示句、狀態文字 ===');
+console.log('\n=== BC7　畫面：（第七十五輪 CD 組起）彈窗連提示句一齊拿走 ===');
 {
-  const zone2 = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone2.html'), 'utf8').split(String.fromCharCode(13)).join('');
-  check('★★★★★ 提示句全文（Ivan 指定）',
-    zone2.indexOf('這一季已經正式發出。你在這裡改的格會先寫在職事表上；要撳第 2 步〔儲存及寄出〕才會成為新一版，') !== -1
-    && zone2.indexOf('之後用「改動後重發」通知受影響的人。') !== -1);
-  check('★★★★★ 儲存之後狀態：sheetOnly ⇒「已寫在職事表，未儲存成新版本」，否則「已儲存 ✓」',
-    zone2.indexOf("(res && res.sheetOnly)") !== -1 && zone2.indexOf("'已寫在職事表，未儲存成新版本' : '已儲存 ✓'") !== -1);
-  check('★★★★ 開彈窗時已寫工作表嘅格預填狀態文字', zone2.indexOf("c.sheetOnly ? '已寫在職事表，未儲存成新版本' : ''") !== -1);
-  check('★★★★ 只有 writesToSheetOnly 先出新提示（否則照舊句）',
-    zone2.indexOf('if (data.writesToSheetOnly) {') !== -1 && zone2.indexOf('} else if (data.officialSentHint) {') !== -1);
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：〔填講員／翻譯／獻花〕掣同彈窗拿走，BC 組嘅提示句、
+  // 「已寫在職事表，未儲存成新版本」狀態字隨彈窗一齊拿走。伺服器端（試算表側邊欄仲用）照舊。
+  const zone2 = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone2.html'), 'utf8');
+  check('★★★★★ 提示句、狀態字都冇咗', zone2.indexOf('writesToSheetOnly') === -1
+    && zone2.indexOf('已寫在職事表，未儲存成新版本') === -1);
 }
 
 console.log('\n=== BC8　〔儲存及寄出〕之後：工作表上嗰格成為新一版，自由文字名唔會蒸發 ===');

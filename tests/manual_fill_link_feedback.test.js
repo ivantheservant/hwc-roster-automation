@@ -87,31 +87,21 @@ console.log('\n=== B2【核心】輸入格要關掉瀏覽器自動填充 ===');
 {
   // Ivan 實測：Chrome 當咗個姓名格係聯絡人欄位，彈出佢自己嘅通訊錄。
   // 幹事會以為嗰啲係系統畀嘅建議，撳落去就填咗一個完全唔相干嘅人。
-  check('★★★★★ 幹事介面嘅姓名格有 autocomplete = off',
-    /input\.autocomplete = 'off';/.test(zone2));
-  check('★★★★★ 而且有一個 Chrome 認唔出嘅 name'
-    + '——單靠 autocomplete=off，Chrome 有時會照樣無視',
-    /input\.name = 'hwc-person-free-text';/.test(zone2));
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：幹事介面嘅〔填講員／翻譯／獻花〕彈窗拿走咗
+  //（人手崗位改為喺職事表直接填），淨係側邊欄仲有輸入格。
+  check('★★★★★ 幹事介面已經冇填講員彈窗（第七十五輪 CD 組）', !/function renderPreacherFill\(/.test(zone2));
   check('★★★★ 側邊欄嗰個輸入格一樣',
     /autocomplete="off"/.test(sidebar) && /hwc-person-free-text/.test(sidebar));
 }
 
 console.log('\n=== B3【核心】儲存之後要講「有冇對上名單」 ===');
 {
-  check('★★★★★ 前端有 renderLinkFeedback()', /function renderLinkFeedback\(/.test(zone2));
-  check('★★★★★ 儲存之後真係攞返個結果嚟用'
-    + '（原本嗰句 await 冇收回傳值，即係後端講咗都冇人聽）',
-    // 第二十七輪批次階段 A：呢個呼叫會寫入，所以改咗行 callServerMutating()
-    // ——寫完之後狀態快取要標記過期，否則區二嘅「還有 N 項未做」會停喺舊數。
-    /const res = await callServerMutating\('apiWebSavePreacherEntry'/.test(zone2));
-  check('★★★★★ 對得上：講明佢會收到通知',
-    zone2.indexOf('已對上名單上的「') !== -1 && zone2.indexOf('正式發出時他會收到通知。') !== -1);
-  check('★★★★★ 對唔上：講明佢唔會收到，**而且講明外請講員屬正常**'
-    + '——寫成錯誤嘅話，幹事會去「修正」一件根本冇問題嘅事',
-    zone2.indexOf('名單上沒有這個名字，正式發出時不會寄給他。外請講員屬正常。') !== -1);
-  check('★★★★ 兩種都唔用紅色（對唔上唔係錯誤）',
-    // 第六十五輪批次 AB 組第 2 點：講員、翻譯對唔上改用中性灰色（muted），獻花仍然橙色
-    /className = neutralWhenUnlinked \? 'muted' : 'link-warn'/.test(zone2) && !/link-err/.test(zone2));
+  // ⚠️ 第七十五輪批次 CD 組：幹事介面嘅回饋隨彈窗拿走。職事表選單提示講明：
+  // 名單上嘅人正式發出時會收到通知，名單以外嘅名字（外請講員）系統照收。
+  check('★★★★★ 幹事介面已經冇 renderLinkFeedback()（第七十五輪 CD 組）', !/function renderLinkFeedback\(/.test(zone2));
+  const dropdown = fs.readFileSync(path.join(__dirname, '..', 'src', 'GridNameDropdown.gs'), 'utf8');
+  check('★★★★★ 職事表選單提示：名單上嘅人會收到通知、名單以外照收',
+    /正式發出時會收到通知/.test(dropdown) && /系統照收/.test(dropdown));
 }
 
 console.log('\n=== B3 後端一直都有回 linkedToNameMapping ===');

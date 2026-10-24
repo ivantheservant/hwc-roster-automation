@@ -291,8 +291,9 @@ console.log('\n=== A：改成另一個自由文字，一樣唔算人手改動 ==
 {
   check('（前置）grid 改成另一個名', setGridCell(0, DATES[0], 'PREACH', '另一位客席講員'));
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  checkEqual('★★★★★ 仍然 0 格人手改動（嗰個唔係 grid 嘅職責）',
-    (plan.gridChanges || []).length, 0);
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：人手崗位一律喺職事表直接填，改動要偵測到。
+  checkEqual('★★★★★ 算 1 格人手改動（第七十五輪 CD 組）',
+    (plan.gridChanges || []).length, 1);
   check('★★★★★ 仍然唔會判「認唔出」', plan.blockReason !== 'UNRESOLVED_NAMES',
     String(plan.blockReason));
   // 還原

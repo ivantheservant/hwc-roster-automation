@@ -67,52 +67,8 @@ function findPreacherTranslationPostIds_() {
   return { preacherPostId: preacherPostId, translationPostId: translationPostId, flowerPostId: flowerPostId };
 }
 
-/**
- * 第七十四輪批次 BC 組：grid 文字係咪「幹事填咗人」（唔係空白、唔係佔位文字）。
- * 佔位文字用 `GRID_PLACEHOLDER_TEXTS`、`GRID_LABELS.PENDING`、`GRID_LABELS.GAP`——同寫 grid 嗰邊同一份。
- * @param {*} value 儲存格值
- * @returns {boolean}
- */
-function isGridCellFilledByPerson_(value) {
-  const text = String(value === null || value === undefined ? '' : value).trim();
-  if (!text) return false;
-  if (GRID_PLACEHOLDER_TEXTS.indexOf(text) !== -1) return false;
-  if (text === GRID_LABELS.PENDING || text === GRID_LABELS.GAP) return false;
-  return true;
-}
-
-/**
- * 第七十四輪批次 BC 組：讀最新版本 grid 工作表上，講員／翻譯／獻花**已經有人名**嘅格子。
- * 只喺「已通知過人嘅版本」用（呢啲格只寫咗工作表，未寫入 `RosterAssignments`，要撳
- * 〔儲存及寄出〕先成為新一版）。純讀取；工作表唔存在 ⇒ 空物件。
- * @param {string} quarterId 季度 ID
- * @param {number} versionNo 版本號
- * @param {string[]} postIds 要讀嘅崗位 ID
- * @param {string} timezone 時區
- * @returns {Object.<string, string>} `yyyy-MM-dd|postId|slotIndex` → 工作表上嘅文字
- */
-function readGridFilledManualCells_(quarterId, versionNo, postIds, timezone) {
-  const out = {};
-  const gridSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(buildRosterSheetName_(quarterId, versionNo));
-  if (!gridSheet) return out;
-  const lastRow = gridSheet.getLastRow();
-  const lastCol = gridSheet.getLastColumn();
-  if (lastRow < 3 || lastCol < 1) return out;
-  const keys = gridSheet.getRange(2, 1, 1, lastCol).getValues()[0];
-  const body = gridSheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
-  body.forEach(function (row) {
-    const date = toDateString(row[0], timezone);
-    if (!date) return;
-    keys.forEach(function (key, ci) {
-      const m = /^(.+)#(\d+)$/.exec(String(key || ''));
-      if (!m || postIds.indexOf(m[1]) === -1) return;
-      if (!isGridCellFilledByPerson_(row[ci])) return;
-      out[date + '|' + m[1] + '|' + Number(m[2])] = String(row[ci]).trim();
-    });
-  });
-  return out;
-}
-
+// 第七十五輪批次 CD 組：`isGridCellFilledByPerson_()`／`readGridFilledManualCells_()` 搬咗去 SheetReader.gs
+//（開季前準備清單一律照職事表工作表計，全部入口都要用得到）。
 
 /**
  * 列出指定季度最新版本目前還空著的講員／翻譯／獻花格子。純讀取。

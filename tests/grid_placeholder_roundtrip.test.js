@@ -269,15 +269,16 @@ console.log('\n=== 第三十五輪 A：AutoGenerate=FALSE 嘅崗位完全唔參�
 
   checkEqual('★★★★★ **唔會被判成「認唔出」**（呢一條就係上線 blocker）',
     overlay.unresolved.length, 0);
-  checkEqual('★★★★★ 亦都唔算人手改動——嗰啲格嘅唯一寫入途徑係'
-    + '「填講員／翻譯／獻花」，唔係 grid',
-    overlay.changes.length, 0);
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：〔填講員／翻譯／獻花〕拿走，呢類格一律喺 grid 填 ⇒ 算改動，
+  // 但仍然唔判「認唔出」（上面嗰條）。
+  checkEqual('★★★★★ 算 1 格人手改動（第七十五輪 CD 組），而且帶住自由文字',
+    overlay.changes.length === 1 && overlay.changes[0].manualText === '某某某牧師', true);
 
   // 再改一次成另一個自由文字，一樣唔應該有反應。
   context.gridValues['2026-11-15|PREACHER|1'] = '另一位客席講員';
   const again = gas.buildGridOverlayState_(context);
-  checkEqual('★★★★★ 改成另一個自由文字都一樣（唔係 grid 嘅職責）',
-    again.unresolved.length + again.changes.length, 0);
+  checkEqual('★★★★★ 改成另一個自由文字：一樣唔判「認唔出」，算 1 格改動（第七十五輪 CD 組）',
+    again.unresolved.length === 0 && again.changes.length === 1, true);
 
   // ⚠️ 對照組：自動排嘅崗位打一個唔存在嘅名，**仍然**要被擋（現有行為不變）。
   const control = buildFixture();

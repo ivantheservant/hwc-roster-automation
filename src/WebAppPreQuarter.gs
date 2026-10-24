@@ -34,6 +34,9 @@ function isCombinedServiceRow_(row) {
   return text.indexOf('合堂') !== -1;
 }
 
+/** 第七十五輪批次 CD 組：講員／翻譯／獻花未填時嘅提示。 */
+const MANUAL_FILL_HINT_TC = '生成之後在職事表直接填';
+
 /**
  * 區二五項各自嘅 count。**純計算，唔碰任何 Google API**，方便離線測試。
  *
@@ -92,13 +95,15 @@ function planPreQuarterChecklist_(input) {
     { id: 'combinedNoSkip', label: '合堂未指定跳過崗位', count: combinedNoSkip }
   ];
   const items = specialItems.concat([
-    { id: 'preacherEmpty', label: '講員未填', count: countEmptyWeeks(input.preacherPostId) },
+    // 第七十五輪批次 CD 組：提示「生成之後在職事表直接填」（〔填講員／翻譯／獻花〕已拿走）
+    { id: 'preacherEmpty', label: '講員未填', count: countEmptyWeeks(input.preacherPostId), hint: MANUAL_FILL_HINT_TC },
     {
       id: 'translationEmpty',
       label: '翻譯未填',
-      count: countEmptyWeeks(input.translationPostId, function (d) { return d.translationRequired === true; })
+      count: countEmptyWeeks(input.translationPostId, function (d) { return d.translationRequired === true; }),
+      hint: MANUAL_FILL_HINT_TC
     },
-    { id: 'flowerEmpty', label: '獻花未填', count: countEmptyWeeks(input.flowerPostId) }
+    { id: 'flowerEmpty', label: '獻花未填', count: countEmptyWeeks(input.flowerPostId), hint: MANUAL_FILL_HINT_TC }
   ]);
 
   return {
@@ -229,12 +234,22 @@ function buildPreQuarterChecklistInputs_(quarterId) {
 
   const postIds = findPreacherTranslationPostIds_();
 
-  // 「有冇填咗人」一律睇最新版本嘅 `RosterAssignments`（資料層），
-  // **唔可以讀 grid 顯示文字反推**——第二十輪就係踩過呢個坑
-  // （合堂嘅「特殊主日」placeholder 被當成人名）。
+  // 「有冇填咗人」：
+  // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：講員／翻譯／獻花一律喺職事表直接填，
+  // 所以**照最新職事表工作表計**（`isGridCellFilledByPerson_()` 認佔位文字，唔會把「待填」當人名）。
+  // 讀唔到工作表（例如被改名）⇒ 退返資料層（`RosterAssignments`），唔可以當全部未填。
   const versionNo = findLatestVersionNo(quarterId);
   const filledByDatePost = {};
-  if (versionNo >= 0) {
+  const manualPostIds = [postIds.preacherPostId, postIds.translationPostId, postIds.flowerPostId].filter(Boolean);
+  const gridExists = versionNo >= 0 && !!SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName(buildRosterSheetName_(quarterId, versionNo));
+  if (gridExists) {
+    const onSheet = readGridFilledManualCells_(quarterId, versionNo, manualPostIds, timezone);
+    Object.keys(onSheet).forEach(function (key) {
+      const parts = key.split('|');
+      filledByDatePost[parts[0] + '|' + parts[1]] = true;
+    });
+  } else if (versionNo >= 0) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
@@ -243,17 +258,6 @@ function buildPreQuarterChecklistInputs_(quarterId) {
         && !String(row[A.PERSON_NAME_SNAPSHOT] || '').trim()) return;
       filledByDatePost[toDateString(row[A.SERVICE_DATE], timezone) + '|' + row[A.POST_ID]] = true;
     });
-    // 第七十四輪批次 BC 組：最新一版已通知過人（正式發出／改動後重發）⇒ 〔填講員／翻譯／獻花〕只寫工作表、
-    // 未寫入 `RosterAssignments`（要撳〔儲存及寄出〕先成為新一版）。「未填」計數要把工作表上已填嘅格
-    // 一併算入，否則填完仍然顯示「未填」。未通知過嘅版本照舊只看資料層。
-    if (isVersionNoticeSent_(quarterId, versionNo)) {
-      const manualPostIds = [postIds.preacherPostId, postIds.translationPostId, postIds.flowerPostId].filter(Boolean);
-      const onSheet = readGridFilledManualCells_(quarterId, versionNo, manualPostIds, timezone);
-      Object.keys(onSheet).forEach(function (key) {
-        const parts = key.split('|');
-        filledByDatePost[parts[0] + '|' + parts[1]] = true;
-      });
-    }
   }
 
   return {
