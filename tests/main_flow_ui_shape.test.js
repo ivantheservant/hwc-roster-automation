@@ -317,10 +317,10 @@ console.log('\n=== C：寄出彈窗 ===');
   // 改成「**〔立即儲存並繼續〕做預設掣**」——因為佢本來就係想寄出，
   // 只係被未儲存擋住。把出路擺喺取消掣度，等於叫佢喺一個
   //「放棄」嘅位置搵一條「繼續」嘅路。
-  check('★★★★★★ 有未儲存改動 ⇒ 一個救得返自己嘅窗，'
-    + '而且〔立即儲存並繼續〕係**預設掣**',
-    /confirmLabel: '立即儲存並繼續'/.test(sendPaper)
-    && /openSaveAndConfirm\(\{ thenSend: true \}\)/.test(sendPaper));
+  // 第七十七輪批次 EE 組：〔立即儲存並繼續〕拿走，改為叫佢先〔取消〕再撳第 2 步〔儲存〕；加〔寄出上一個版本〕
+  check('★★★★★★ 有未儲存改動 ⇒ 叫佢先儲存再寄出，並有〔寄出上一個版本（第 K 版）〕',
+    /請先撳〔取消〕，再撳第 2 步〔儲存〕，然後才寄出/.test(sendPaper)
+    && /button\('寄出上一個版本（' \+ versionText \+ '）'/.test(sendPaper));
   check('★★★★★ 落到最後係叫返原本嗰三條路，冇另起爐灶',
     /openReview\(\)/.test(sendPaper) && /openOfficial\(\)/.test(sendPaper)
     && /openResend\(\)/.test(sendPaper));

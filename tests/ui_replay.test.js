@@ -181,12 +181,11 @@ console.log('\n=== 2D【核心】第四十七輪嗰個死碼，呢一層捉得�
   check('★★★★★★ 而且**冇**畫成「現在沒有可以寄的東西」',
     modal.body.indexOf('現在沒有可以寄的東西') === -1, modal.body.slice(0, 200));
 
-  // 第四十八輪 A 組：三粒掣。
-  check('★★★★★★ 三粒掣，次序係〔立即儲存並繼續〕〔寄出但不儲存〕〔取消〕',
-    modal.actions.length === 3
-      && modal.actions[0].indexOf('立即儲存並繼續') !== -1
-      && modal.actions[1].indexOf('寄出但不儲存') !== -1
-      && modal.actions[2].indexOf('取消') !== -1,
+  // 第七十七輪批次 EE 組：兩粒掣〔寄出上一個版本（第 K 版）〕〔取消〕（〔立即儲存並繼續〕拿走）。
+  check('★★★★★★ 兩粒掣，次序係〔寄出上一個版本（第 K 版）〕〔取消〕',
+    modal.actions.length === 2
+      && modal.actions[0].indexOf('寄出上一個版本') !== -1
+      && modal.actions[1].indexOf('取消') !== -1,
     JSON.stringify(modal.actions));
 }
 

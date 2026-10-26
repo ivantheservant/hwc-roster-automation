@@ -62,6 +62,22 @@ function resolveSendKind_(buttons) {
 }
 
 /**
+ * 第七十七輪批次 EE 組：〔給所有人〕嘅寄出種類。正式發出之後，改動後重發嗰粒掣因為「沒有人的安排改過」
+ * 而唔著 ⇒ 〔給所有人〕照樣行改動後重發嗰條路（每一位都會收到，見 `resolveResendTargetPersonIds_()`）。
+ * 未儲存改動仍然擋（同三粒掣一樣）。
+ * @param {Object} buttons `computeDashboardButtons_()` 的結果
+ * @param {Object} state `buildDashboardState_()` 的結果
+ * @returns {string} SEND_KIND 之一
+ */
+function resolveSendKindForAll_(buttons, state) {
+  const kind = resolveSendKind_(buttons);
+  if (kind !== SEND_KIND.NONE) return kind;
+  const unsaved = state && state.unsaved && state.unsaved.hasAny;
+  if (state && state.stage === QUARTER_STAGE.OFFICIAL_SENT && !unsaved) return SEND_KIND.RESEND;
+  return SEND_KIND.NONE;
+}
+
+/**
  * 那一句「這一次是⋯⋯」。
  * @param {string} kind SEND_KIND 之一
  * @param {Object} facts 給人話用的數字
@@ -232,97 +248,215 @@ function apiGetSendRecipientPool(quarterId, kind) {
   assertWebAppRequestAllowed_();
   beginSheetReadMemo_();
   try {
-    const versionNo = findLatestVersionNo(quarterId);
-    if (versionNo < 0) {
-      return {
-        ok: false,
-        message: buildThreePartMessage_(
-          '這一季還沒有生成過任何版本，所以沒有收件人可以選。',
-          '一封都沒有寄出。',
-          ['先在第 1 步生成職事表'])
-      };
-    }
-
-    let context;
-    try {
-      context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
-    } catch (err) {
-      // ⚠️ 砌不到 context **不可以**回一個空池——空池在畫面上等於
-      // 「這一季一個人都沒有」，而那是假的。
-      throw new Error(buildThreePartMessage_(
-        '讀不到這一季的收件名單（' + err.message + '）。',
-        '一封都沒有寄出。',
-        ['撳一次「重新整理」再試',
-          '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
-    }
-
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-    const pool = buildSendRecipientPool_(context, timezone);
-
-    // ── 第七十輪批次 AT 組：辦公室等固定收件人 ─────────────────
-    const poolStage = sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL;
-    const fixedMembers = tagFixedRecipients_(pool, poolStage, context);
-
-    // ── 「有改動」相對邊一版 ────────────────────────────────
-    const lastSent = findLastSentSnapshot_(quarterId);
-    const changedByPerson = lastSent
-      ? listChangedPersonsBetweenVersions_(quarterId, lastSent.versionNo, versionNo)
-      : {};
-    pool.forEach(function (item) {
-      const notes = changedByPerson[item.personId];
-      if (notes && notes.length > 0) {
-        item.changeNotes = notes;
-        item.sources = item.sources.concat([SEND_SOURCE.CHANGED]);
-      }
-    });
-    // ⚠️ 第六十三輪批次 P 組：有改動、但唔喺池入面嘅人（呢一版 0 格、
-    // 又唔係身分持有人）⇒ 加返入池。唔加嘅話「有 3 位改過」而
-    // 「只寄給安排有改動的人」得 2 位，被整個換走嗰個揀都揀唔到。
-    addChangedPersonsMissingFromPool_(pool, changedByPerson, context.peopleById);
-
-    // ── 六個來源逐個數人（**唔可以寫死**）────────────────────
-    const groups = SEND_SOURCE_LABELS.map(function (g) {
-      const members = pool.filter(function (item) {
-        return item.sources.indexOf(g.key) !== -1;
-      });
-      return {
-        key: g.key,
-        label: g.label,
-        total: members.length,
-        // 冇電郵嘅勾咗都收唔到，所以「勾呢一組會加幾多位」要數勾得到嗰批。
-        selectable: members.filter(function (m) { return m.selectable; }).length,
-        // 第七十輪批次 AT 組：固定收件人那一組列出每一位（電郵照現有方式遮蔽）
-        members: g.key === SEND_SOURCE.FIXED
-          ? members.map(function (m) {
-            return { displayName: m.displayName, emailMasked: maskEmailForPreview_(m.email) };
-          })
-          : []
-      };
-    });
-
+    const snap = buildSendPoolSnapshot_(quarterId, kind);
+    if (!snap.ok) return snap;
     return {
       ok: true,
-      versionNo: versionNo,
-      items: pool,
-      groups: groups,
-      // 第七十輪批次 AT 組：開窗時預設勾上的人（只有正式發出才有）
-      defaultPickedKeys: defaultPickedKeysForStage_(poolStage, fixedMembers),
-      changed: {
-        // ⚠️ **一定要講明相對邊一版。** 只講「有 4 位改過」，
-        // 幹事無從判斷係相對佢啱啱儲存嗰版定係上一次寄嗰版。
-        hasBaseline: !!lastSent,
-        baselineVersionNo: lastSent ? lastSent.versionNo : null,
-        baselineStage: lastSent ? lastSent.stage : '',
-        baselineStageLabel: lastSent ? (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) : '',
-        baselineSentAt: lastSent ? lastSent.sentAt : '',
-        changedCount: Object.keys(changedByPerson).length,
-        sentence: lastSent
-          ? ('同 第 ' + lastSent.versionNo + ' 版（' + lastSent.sentAt + ' '
-            + (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) + '）比較，有 '
-            + Object.keys(changedByPerson).length + ' 位的安排改過。')
-          : '這一季從來沒有寄出過，所以沒有東西可以比較——'
-            + '「只寄給安排有改動的人」現在選不到。'
-      }
+      versionNo: snap.versionNo,
+      items: snap.pool,
+      groups: snap.groups,
+      // 第七十七輪批次 EE 組：〔選擇其他〕開窗時預設勾「只寄給安排有改動的人」嗰一組
+      //（同上一次寄出嘅版本比較）；從來未寄過 ⇒ 一位都唔勾。**唔再預設勾固定收件人**
+      //（嗰個情況改用〔給所有人〕）。
+      defaultPickedKeys: defaultPickedKeysForChanged_(snap.pool, snap.lastSent),
+      changed: snap.changed
+    };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
+ * 第七十七輪批次 EE 組：收件人池＋分組＋「有改動」比較——三粒掣共用（**唔另寫一套**）。
+ * @param {string} quarterId 季度 ID
+ * @param {string=} kind SEND_KIND 之一
+ * @returns {Object} `{ok, versionNo, pool, groups, fixedMembers, lastSent, changed}`；`ok=false` 帶 `message`
+ */
+function buildSendPoolSnapshot_(quarterId, kind) {
+  const versionNo = findLatestVersionNo(quarterId);
+  if (versionNo < 0) {
+    return {
+      ok: false,
+      message: buildThreePartMessage_(
+        '這一季還沒有生成過任何版本，所以沒有收件人可以選。',
+        '一封都沒有寄出。',
+        ['先在第 1 步生成職事表'])
+    };
+  }
+
+  let context;
+  try {
+    context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+  } catch (err) {
+    // ⚠️ 砌不到 context **不可以**回一個空池——空池在畫面上等於
+    // 「這一季一個人都沒有」，而那是假的。
+    throw new Error(buildThreePartMessage_(
+      '讀不到這一季的收件名單（' + err.message + '）。',
+      '一封都沒有寄出。',
+      ['撳一次「重新整理」再試',
+        '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
+  }
+
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const pool = buildSendRecipientPool_(context, timezone);
+
+  // ── 第七十輪批次 AT 組：辦公室等固定收件人 ─────────────────
+  const poolStage = sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL;
+  const fixedMembers = tagFixedRecipients_(pool, poolStage, context);
+
+  // ── 「有改動」相對邊一版 ────────────────────────────────
+  const lastSent = findLastSentSnapshot_(quarterId);
+  const changedByPerson = lastSent
+    ? listChangedPersonsBetweenVersions_(quarterId, lastSent.versionNo, versionNo)
+    : {};
+  pool.forEach(function (item) {
+    const notes = changedByPerson[item.personId];
+    if (notes && notes.length > 0) {
+      item.changeNotes = notes;
+      item.sources = item.sources.concat([SEND_SOURCE.CHANGED]);
+    }
+  });
+  // ⚠️ 第六十三輪批次 P 組：有改動、但唔喺池入面嘅人（呢一版 0 格、
+  // 又唔係身分持有人）⇒ 加返入池。唔加嘅話「有 3 位改過」而
+  // 「只寄給安排有改動的人」得 2 位，被整個換走嗰個揀都揀唔到。
+  addChangedPersonsMissingFromPool_(pool, changedByPerson, context.peopleById);
+
+  // ── 六個來源逐個數人（**唔可以寫死**）────────────────────
+  const groups = SEND_SOURCE_LABELS.map(function (g) {
+    const members = pool.filter(function (item) {
+      return item.sources.indexOf(g.key) !== -1;
+    });
+    return {
+      key: g.key,
+      label: g.label,
+      total: members.length,
+      // 冇電郵嘅勾咗都收唔到，所以「勾呢一組會加幾多位」要數勾得到嗰批。
+      selectable: members.filter(function (m) { return m.selectable; }).length,
+      // 第七十輪批次 AT 組：固定收件人那一組列出每一位（電郵照現有方式遮蔽）
+      members: g.key === SEND_SOURCE.FIXED
+        ? members.map(function (m) {
+          return { displayName: m.displayName, emailMasked: maskEmailForPreview_(m.email) };
+        })
+        : []
+    };
+  });
+
+  return {
+    ok: true,
+    versionNo: versionNo,
+    pool: pool,
+    groups: groups,
+    fixedMembers: fixedMembers,
+    lastSent: lastSent,
+    changed: {
+      // ⚠️ **一定要講明相對邊一版。** 只講「有 4 位改過」，
+      // 幹事無從判斷係相對佢啱啱儲存嗰版定係上一次寄嗰版。
+      hasBaseline: !!lastSent,
+      baselineVersionNo: lastSent ? lastSent.versionNo : null,
+      baselineStage: lastSent ? lastSent.stage : '',
+      baselineStageLabel: lastSent ? (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) : '',
+      baselineSentAt: lastSent ? lastSent.sentAt : '',
+      changedCount: Object.keys(changedByPerson).length,
+      sentence: lastSent
+        ? ('同 第 ' + lastSent.versionNo + ' 版（' + lastSent.sentAt + ' '
+          + (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) + '）比較，有 '
+          + Object.keys(changedByPerson).length + ' 位的安排改過。')
+        : '這一季從來沒有寄出過，所以沒有東西可以比較——'
+          + '「只寄給安排有改動的人」現在選不到。'
+    }
+  };
+}
+
+/**
+ * 第七十七輪批次 EE 組：〔給所有人〕嘅收件人——**由後端算**（重用同一個池同分組）。
+ *
+ * 收件人＝呢一版職事表上全部人 ＋ 堂委 ＋ 執事；`Config.SEND_ALL_INCLUDES_FIXED=TRUE`（預設）
+ * 再加辦公室等固定收件人（`EmailRecipients` 該階段嘅名單）。冇電郵嘅勾唔到——另外列出嚟畀第 4 步印紙本。
+ * @param {string} quarterId 季度 ID
+ * @param {string=} kind SEND_KIND 之一（決定固定收件人係邊個階段嘅名單）
+ * @returns {Object} `{ok, versionNo, pickedKeys, items, groups, noEmailCount, noEmailNames, includesFixed}`
+ */
+function apiGetSendAllRecipients(quarterId, kind) {
+  assertWebAppRequestAllowed_();
+  beginSheetReadMemo_();
+  try {
+    const snap = buildSendPoolSnapshot_(quarterId, kind);
+    if (!snap.ok) return snap;
+    const includesFixed = getConfig(CONFIG_KEYS.SEND_ALL_INCLUDES_FIXED, true) === true;
+    const wanted = [SEND_SOURCE.ROSTER, SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON]
+      .concat(includesFixed ? [SEND_SOURCE.FIXED] : []);
+    const inScope = snap.pool.filter(function (item) {
+      return wanted.some(function (src) { return item.sources.indexOf(src) !== -1; });
+    });
+    const noEmail = inScope.filter(function (item) { return item.type === RECIPIENT_TYPE.PERSON && !item.hasEmail; });
+    return {
+      ok: true,
+      versionNo: snap.versionNo,
+      pickedKeys: inScope.filter(function (item) { return item.selectable !== false; }).map(function (item) { return item.key; }),
+      items: snap.pool,
+      groups: snap.groups,
+      includesFixed: includesFixed,
+      noEmailCount: noEmail.length,
+      noEmailNames: noEmail.map(function (item) { return item.displayName; })
+    };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
+ * 第七十七輪批次 EE 組：〔變動的人〕嘅收件人——同每個人**上一次收到嘅版本**比較、安排有改動嘅人
+ *（包括被整個換走嘅人）。用改動後重發確認窗**同一支**判斷（`planResendChangedPersons_()` →
+ * `computeResendDiff_()`），寄出窗同確認窗人數先會一致。
+ *
+ *   ・上一次冇收到嘅人（冇舊 hash）唔列入，只講一句「另外 K 位上一次沒有收到」
+ *   ・冇電郵嘅列出嚟（寄唔到，要用第 4 步印紙本）
+ *   ・呢一季未正式發出過 ⇒ `ok=false, notOfficialYet=true`
+ * @param {string} quarterId 季度 ID
+ * @returns {Object}
+ */
+function apiGetSendChangedRecipients(quarterId) {
+  assertWebAppRequestAllowed_();
+  beginSheetReadMemo_();
+  try {
+    const sendLog = readSendLogSummaryForDashboard_(quarterId);
+    if (!sendLog.officialSentOnce) {
+      return {
+        ok: false, notOfficialYet: true,
+        message: '這一季還未正式發出給全體，請用〔給所有人〕或〔選擇其他〕。'
+      };
+    }
+    const plan = planResendChangedPersons_(quarterId);
+    const notes = readResendChangeNotes_(quarterId, plan.versionNo);
+    const people = (plan.changed || []).filter(function (c) { return c.arrangementChanged; }).map(function (c) {
+      return {
+        personId: c.personId,
+        nameTC: c.nameTC,
+        hasEmail: !!c.hasEmail,
+        hasAssignments: c.hasAssignments !== false,
+        previousSummary: c.previousSummary || '',
+        currentSummary: c.currentSummary || '',
+        changeNotes: (notes[c.personId] || []).slice()
+      };
+    });
+    const notReceived = (plan.changed || []).filter(function (c) { return !c.arrangementChanged; });
+    const lastSent = findLastSentSnapshot_(quarterId);
+    return {
+      ok: true,
+      versionNo: plan.versionNo,
+      noChanges: people.length === 0,
+      people: people,
+      pickedKeys: people.filter(function (p) { return p.hasEmail; }).map(function (p) { return p.personId; }),
+      noEmailNames: people.filter(function (p) { return !p.hasEmail; }).map(function (p) { return p.nameTC; }),
+      notReceivedCount: notReceived.length,
+      baseline: lastSent ? {
+        versionNo: lastSent.versionNo, sentAt: lastSent.sentAt,
+        stageLabel: SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage
+      } : null
     };
   } catch (err) {
     return { ok: false, message: err.message };
@@ -552,6 +686,8 @@ function apiGetSendPlanSummary(quarterId) {
     const kind = resolveSendKind_(buttons);
     const contents = describeSendContents_(kind);
     const publicLink = readPublicLinkState_(quarterId);
+    // 第七十七輪批次 EE 組：〔給所有人〕喺正式發出之後，就算冇人改過都寄得（行改動後重發嗰條路）
+    const allKind = resolveSendKindForAll_(buttons, state);
 
     // 為什麼寄不到（`kind === NONE` 時）。逐粒掣講它自己的原因——
     // 合成一句「現在不能寄」等於什麼都沒有講。
@@ -581,6 +717,9 @@ function apiGetSendPlanSummary(quarterId) {
 
     return {
       kind: kind,
+      // 第七十七輪批次 EE 組：〔給所有人〕用嘅種類；〔變動的人〕要正式發出過先可以撳
+      allKind: allKind,
+      officialSentOnce: !!state.officialSentOnce,
       // 第七十輪批次 AX 組：已寄給堂委、等意見時，「寄出」窗最上面嘅提示（其他進度係空字串）
       reviewSentHint: buildReviewSentHint_(state.stage),
       // ⚠️ 第四十七輪批次 A1 組：三粒掣唔著嘅**唯一**原因就係未儲存。

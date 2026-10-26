@@ -425,15 +425,13 @@ console.log('\n=== D【核心】兩處改名 ＋ 儲存後接去寄出 ===');
   check('★★★★★ 儲存嗰粒叫「儲存」',
     /stepButton\('儲存', \(\) => openSaveAndConfirm\(\)/.test(flow), '');
   // ⚠️ 第七十五輪批次 CG 組（Ivan 決定）：「儲存之後直接去寄出」勾選框拿走（寄出一律喺第 3 步）。
-  // 只有由寄出窗〔立即儲存並繼續〕入嚟（`thenSend`）先會喺完成窗出〔繼續去寄出〕。
+  // 第七十七輪批次 EE 組：〔立即儲存並繼續〕／〔繼續去寄出〕嗰條路一併清走。
+  const zone1Code = zone1.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★★ 確認窗冇「儲存之後直接去寄出」勾選框（第七十五輪 CG 組）',
-    !/text: '儲存之後直接去寄出'/.test(zone1)
-    && /saveThenSend_ = !!\(opts && opts\.thenSend\);/.test(zone1), '');
-  check('★★★★★★ 勾咗都**唔會跳過儲存結果畫面**'
-    + '——嗰個係「系統改咗你嗰幾格」嘅唯一證據；'
-    + '跳過就變成「撳一粒掣，寄出彈窗彈咗出嚟」',
-    /button\('繼續去寄出'/.test(zone1)
-    && /openSendDialog\(\);/.test(zone1), '');
+    !/text: '儲存之後直接去寄出'/.test(zone1) && !/thenSend/.test(zone1Code), '');
+  check('★★★★★★ 儲存結果畫面一律〔知道了〕〔請系統幫我調整〕，冇〔繼續去寄出〕',
+    !/button\('繼續去寄出'/.test(zone1Code)
+    && /button\('知道了', \(\) => closeModalAndRefresh\(\), ''\), adjustBtn/.test(zone1Code), '');
 }
 
 // =====================================================================

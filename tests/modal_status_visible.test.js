@@ -174,9 +174,10 @@ console.log('\n=== C 撳〔寄出〕嗰幾條「靜靜 return」都行呢個入�
   // ⚠️ 第四十六輪批次 A 組改咗句子（收件範圍唔再有「自己選擇」呢個選項
   // ——收件人一律由幹事勾）。守嘅嘢一個字都冇變：
   // **一條靜靜 `return` 嘅路，一定要先講一句。**
+  // 第七十七輪批次 EE 組：三粒掣——〔選擇其他〕講「還沒有選任何收件人」，〔給所有人〕〔變動的人〕講「一位都沒有電郵」
   check('★★★★★ 「一位都冇揀」有講一句先 return',
-    /setStatus\('還沒有選任何收件人。撳〔選擇收件人〕選好再撳一次。', true\);\s*\n\s*return;/
-      .test(onConfirm), onConfirm.slice(0, 600));
+    /setStatus\(sendMode_ === 'PICK'[\s\S]{0,200}?, true\);\s*\n\s*return;/
+      .test(onConfirm) && /還沒有選任何收件人。撳〔選擇收件人〕選好再撳一次。/.test(onConfirm), onConfirm.slice(0, 600));
   check('★★★★★ 電郵格式唔啱嗰條經 `commitExtraEmails()`'
     + '（佢入面一樣係 `setStatus(…, true)` 然後回 false）',
     /if \(!commitExtraEmails\(sendOptions_\)\) return;/.test(onConfirm), '');

@@ -229,6 +229,21 @@ function defaultPickedKeysForStage_(stage, fixedMembers) {
 }
 
 /**
+ * 第七十七輪批次 EE 組：〔選擇其他〕開窗時預設勾邊啲人——「只寄給安排有改動的人」嗰一組
+ *（同上一次寄出嘅版本比較）。從來未寄過（冇基準）⇒ 一位都唔勾。
+ * 第七十輪 AT 組「正式發出預設勾固定收件人」唔再用（嗰個情況改用〔給所有人〕）。
+ * @param {Object[]} pool 收件人池（已經標好 `CHANGED`）
+ * @param {?Object} lastSent `findLastSentSnapshot_()` 嘅結果
+ * @returns {string[]}
+ */
+function defaultPickedKeysForChanged_(pool, lastSent) {
+  if (!lastSent) return [];
+  return (pool || []).filter(function (m) {
+    return m.selectable !== false && (m.sources || []).indexOf(SEND_SOURCE.CHANGED) !== -1;
+  }).map(function (m) { return m.key; });
+}
+
+/**
  * ⚠️⚠️ 第六十三輪批次 P 組：**被整個換走嘅人一定要喺池入面。**
  *
  * 現場（2026-10-20 瀏覽器實測，`2028T2`）：第 2 版正式發出（模擬）給

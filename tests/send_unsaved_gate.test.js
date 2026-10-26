@@ -200,16 +200,18 @@ console.log('\n=== A2／A3【核心】新嗰個「未儲存」窗 ===');
     && bare.indexOf('s.blockedByUnsavedOnly') < bare.indexOf("s.kind === 'NONE'"), '');
   check('★★★★★★ 標題講得出改咗幾多格',
     /'寄出：你有 ' \+ n \+ ' 格改動還未儲存'/.test(bare), '');
+  // 第七十七輪批次 EE 組（Ivan）：〔立即儲存並繼續〕拿走；內文叫佢先〔取消〕再撳第 2 步〔儲存〕；
+  // 版本號照樣要印出嚟（「寄出上一個儲存的版本（第 K 版）」）。
   check('★★★★★★ **版本號真係印出嚟**'
     + '——唔講版本號，幹事分唔清寄出去嘅係咩內容，'
     + '結果只會照撳〔繼續〕（第四十輪批次 C 組已經記過呢個理由）',
-    /寄出的會是「' \+ versionText \+ '」/.test(bare), '');
+    /或者寄出上一個儲存的版本（' \+ versionText \+ '）/.test(bare), '');
   check('★★★★★ 攞唔到版本號嗰陣有一句保底',
     /上一次儲存確認的版本/.test(bare), '');
-  check('★★★★★★ 〔立即儲存並繼續〕係**預設掣**（第一粒）',
-    /confirmLabel: '立即儲存並繼續'/.test(bare), '');
-  check('★★★★★ 撳落去直接帶去儲存，唔係淨係關窗',
-    /openSaveAndConfirm\(\{ thenSend: true \}\)/.test(bare), '');
+  check('★★★★★★ 內文叫佢先〔取消〕、再撳第 2 步〔儲存〕，然後才寄出（冇〔立即儲存並繼續〕）',
+    /請先撳〔取消〕，再撳第 2 步〔儲存〕，然後才寄出/.test(bare) && !/立即儲存並繼續/.test(bare), '');
+  check('★★★★★ 有〔寄出上一個版本（第 K 版）〕（次要色），直接開寄出窗',
+    /button\('寄出上一個版本（' \+ versionText \+ '）'/.test(bare) && /renderSendMain\(s, \{ allowUnsaved: true \}\)/.test(bare), '');
   check('★★★★★★ **冇畫〔仍然寄出〕嗰粒**'
     + '——後端 `assertNoUnsavedChanges_()` 一定會擋，'
     + '畫一粒撳落去必定失敗嘅掣，比冇嗰粒差',
@@ -274,20 +276,15 @@ console.log('\n=== A4 「儲存之後仲要等咩」嗰句（行真正嗰個函�
 }
 
 // =====================================================================
-console.log('\n=== A5 由〔立即儲存並繼續〕入去 ⇒ 「儲存後直接寄出」預設勾住 ===');
+console.log('\n=== A5 第七十七輪批次 EE 組：〔立即儲存並繼續〕嗰條路已清走 ===');
 {
-  const zone1 = read('src/ui/ScriptZone1.html');
-  check('★★★★★ `openSaveAndConfirm()` 收得到 `{ thenSend: true }`',
-    /function openSaveAndConfirm\(opts\)/.test(zone1), '');
-  // ⚠️ 第七十五輪批次 CG 組：「儲存之後直接去寄出」勾選框拿走；只剩呢一條路
-  //（寄出窗〔立即儲存並繼續〕）會喺完成窗出〔繼續去寄出〕。
-  check('★★★★★★ 而且**只有明確傳咗先會接去寄出**',
-    /saveThenSend_ = !!\(opts && opts\.thenSend\);/.test(zone1), '');
-  check('★★★★★ 平時（主流程第 2 步）冇傳 ⇒ 唔會接去寄出',
-    /openSaveAndConfirm\(\)/.test(read('src/ui/ScriptMainFlow.html')) && !/thenSendCb/.test(zone1), '');
-  check('★★★★★★ 勾住**唔等於**跳過儲存結果畫面'
-    + '——嗰個係「系統改咗你嗰幾格」嘅唯一證據',
-    /button\('繼續去寄出'/.test(zone1), '');
+  const zone1 = read('src/ui/ScriptZone1.html').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  check('★★★★★ `openSaveAndConfirm()` 唔再收 `{ thenSend }`',
+    /function openSaveAndConfirm\(\)/.test(zone1) && !/thenSend/.test(zone1), '');
+  check('★★★★★ 儲存完成窗冇〔繼續去寄出〕（寄出一律由第 3 步三粒掣開始）',
+    !/button\('繼續去寄出'/.test(zone1) && !/saveThenSend_/.test(zone1), '');
+  check('★★★★★ 平時（主流程第 2 步）照舊 `openSaveAndConfirm()`',
+    /openSaveAndConfirm\(\)/.test(read('src/ui/ScriptMainFlow.html')), '');
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

@@ -491,7 +491,7 @@
     // ⚠️ 呢一句係整組最重要嗰一句。
     //
     // AuditLog 同 SendLog 係畀**日後查**嘅；呢一句係畀**而家**嘅佢睇。
-    // 佢撳完〔寄出但不儲存〕、閂咗個窗，五分鐘之後就會唔記得自己揀咗乜
+    // 佢撳完〔寄出上一個版本〕、閂咗個窗，五分鐘之後就會唔記得自己揀咗乜
     // ——而嗰陣佢會以為收信嘅人睇到嘅係佢表上而家嗰個內容。
     //
     // 儲存咗之後自動消失（後端 `buildSentWithUnsavedWarning_()` 見到
@@ -928,18 +928,36 @@
   /* ── 第 4 步：寄出（C 組）────────────────────────────────── */
 
   function renderStepSend(d) {
-    const canSend = !!(d.buttons && (
-      (d.buttons.review && d.buttons.review.enabled)
-      || (d.buttons.official && d.buttons.official.enabled)
-      || (d.buttons.resend && d.buttons.resend.enabled)));
+    // 第七十七輪批次 EE 組（Ivan 手動測試 B）：一粒〔寄出〕改為三粒——
+    //   〔給所有人〕　寄現時已儲存的版本給職事表上所有人、堂委、執事（冇〔選擇收件人〕）
+    //   〔變動的人〕　只寄給同**上一次寄出的版本**比較有改動的人（正式發出之後先可以撳；冇〔選擇收件人〕）
+    //   〔選擇其他〕　現時嘅〔寄出〕：自動打開〔選擇收件人〕，預設勾有改動嘅人
+    // 三粒都先經同一個未儲存檢查（`renderSendDialog()`），再開寄出窗；之後行嘅仍然係原本三條寄出路。
+    const has = !!d.latestVersion;
+    const officialOnce = !!d.officialSentOnce;
+    const notYet = '要先在第 1 步生成職事表。';
     return stepCard({
       num: 3,
       title: '寄出',
-      note: '系統只會寄你已經儲存確認的版本。撳落去會先講清楚這一次寄給誰、寄什麼。',
-      acts: [stepButton('寄出', openSendDialog, {
-        disabled: !canSend && !d.latestVersion,
-        title: d.latestVersion ? '' : '要先在第 1 步生成職事表。'
-      })]
+      note: '系統只會寄已經儲存的版本。',
+      acts: [
+        stepButton('給所有人', () => openSendDialog('ALL'), {
+          disabled: !has,
+          title: has ? '寄現時已儲存的版本給職事表上所有人、堂委和執事。' : notYet
+        }),
+        stepButton('變動的人', () => openSendDialog('CHANGED'), {
+          disabled: !has || !officialOnce,
+          className: 'secondary',
+          title: !has ? notYet
+            : (officialOnce ? '只寄給和上一次寄出的版本比較、安排有改動的人。'
+              : '這一季還未正式發出給全體，請用〔給所有人〕或〔選擇其他〕。')
+        }),
+        stepButton('選擇其他', () => openSendDialog('PICK'), {
+          disabled: !has,
+          className: 'secondary',
+          title: has ? '自己選擇寄給誰（會先打開收件人名單）。' : notYet
+        })
+      ]
     });
   }
 

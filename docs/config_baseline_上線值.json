@@ -400,6 +400,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "MAIL"
     },
+    "SEND_ALL_INCLUDES_FIXED": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
     "ROSTER_DRIVE_FOLDER_ID": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "",

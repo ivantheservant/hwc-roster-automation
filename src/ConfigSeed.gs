@@ -327,6 +327,14 @@ function getConfigKeySeeds_() {
         + 'FALSE＝忽略比對，對每個人都強制重寄。',
       editable: 'TRUE'
     },
+    {
+      // 第七十七輪批次 EE 組
+      key: CONFIG_KEYS.SEND_ALL_INCLUDES_FIXED, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: 'TRUE',
+      description: '幹事介面第 3 步〔給所有人〕的收件人是否包括辦公室等固定收件人（EmailRecipients 該階段的名單）。'
+        + 'TRUE（預設）＝職事表上全部人＋堂委＋執事＋固定收件人；FALSE＝不加固定收件人。',
+      editable: 'TRUE'
+    },
     // ---- SYS ----
     {
       key: CONFIG_KEYS.DRY_RUN, type: CONFIG_TYPES.BOOL, group: 'SYS',

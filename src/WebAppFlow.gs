@@ -539,7 +539,8 @@ function apiStep5Plan(quarterId, sendOptions) {
   let recipientPreview = { total: 0, shown: [], moreCount: 0 };
   // 第六十五輪批次 Y 組：「這一次會寄」同「這一次唔寄」分開（見 buildResendConfirmGroups_()）
   let confirmGroups = { willSend: [], changedNotSent: [], notReceivedNotSentCount: 0, notReceivedNotSentNames: [] };
-  if (changedPlan.changed.length > 0) {
+  // 第七十七輪批次 EE 組：〔給所有人〕（或者勾咗人）⇒ 冇人改過都要算收件人
+  if (changedPlan.changed.length > 0 || resendHasExplicitRecipients_(sendOptions)) {
     const context = buildMailContext_(
       quarterId, changedPlan.versionNo, MAIL_STAGES.RESEND);
     const recipients = resolveActualRecipientsFromContext_(
@@ -552,7 +553,9 @@ function apiStep5Plan(quarterId, sendOptions) {
   }
 
   return {
-    mode: changedPlan.changed.length === 0 ? 'NO_CHANGES' : 'HAS_CHANGES',
+    mode: (changedPlan.changed.length === 0 && recipientCount === 0) ? 'NO_CHANGES' : 'HAS_CHANGES',
+    // 第七十七輪批次 EE 組：〔給所有人〕⇒ 確認窗寫明「全部 N 位都會收到，包括安排沒有改動的人」
+    sendMode: String((sendOptions || {}).sendMode || '').toUpperCase(),
     versionNo: changedPlan.versionNo,
     changed: changedPlan.changed,
     changedPersonCount: changedPlan.changed.length,
@@ -669,7 +672,7 @@ function apiStep5GeneratePdfs_locked_(quarterId, releaseText, sendOptions) {
   // 舊做法要求 `releaseText === '確認放行'`，而畫面永遠傳空字串 ⇒ 一有違反就死胡同（第七十一輪 s47b）。
   // `releaseText` 參數保留（前端仍會傳），但唔再用。
   const changed = planStep5ChangedList_(quarterId);
-  if (changed.changedList.length === 0) {
+  if (changed.changedList.length === 0 && !resendHasExplicitRecipients_(sendOptions)) {
     return { blocked: false, done: true, doneCount: 0, totalPeople: 0, noChanges: true };
   }
   // 第六十四輪批次 V 組：只為「真正會收到信、而且有派工」嘅人產生 PDF
@@ -693,7 +696,7 @@ function apiStep5GeneratePdfs_locked_(quarterId, releaseText, sendOptions) {
 function apiStep5SendPreview(quarterId, sendOptions) {
   assertWebAppRequestAllowed_();
   const changed = planStep5ChangedList_(quarterId);
-  if (changed.changedList.length === 0) return { mode: 'NO_CHANGES', versionNo: changed.versionNo };
+  if (changed.changedList.length === 0 && !resendHasExplicitRecipients_(sendOptions)) return { mode: 'NO_CHANGES', versionNo: changed.versionNo };
 
   const preview = planStep5SendPreview_(
     quarterId, changed.versionNo, changed.context, changed.changedList, sendOptions);
@@ -760,7 +763,7 @@ function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
   } catch (err) {
     log_('WARN', '改動後重發：未放行硬規則違反的提醒紀錄算不到，照常寄出：' + err.message);
   }
-  if (changed.changedList.length === 0) return { blocked: false, noChanges: true };
+  if (changed.changedList.length === 0 && !resendHasExplicitRecipients_(sendOptions)) return { blocked: false, noChanges: true };
 
   // ⚠️ 第六十三輪批次 P 組：「這一版冇任何安排」而又會收到通知嘅人。
   // 用**寄信嗰一刻同一個**收件人解析器（唔寫 `notifyReasonByPerson`），

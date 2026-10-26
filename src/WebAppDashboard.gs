@@ -251,6 +251,9 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   const bestSortKey = {};
   stages.forEach(function (s) { lastSentAt[s] = null; bestSortKey[s] = null; });
   let hasOfficialRecord = false;
+  // 第七十七輪批次 EE 組：呢一季有冇「正式發出過」（OFFICIAL／RESEND 有紀錄，或者匯入時聲明已在系統外寄出）
+  // ——〔變動的人〕只喺之後先可以撳。
+  let officialSentOnce = false;
   // 第四十八輪批次 A4 組第 3 點：最近一筆嘅 `SendOptions`。
   //
   // ⚠️ **摺入呢一次讀，唔另開一次。** `WebAppDashboard.gs` 由第十九輪
@@ -267,6 +270,10 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     const stage = String(row[C.STAGE] || '').trim();
     if (stage === MAIL_STAGES.OFFICIAL) hasOfficialRecord = true;
+    if (stage === MAIL_STAGES.OFFICIAL || stage === MAIL_STAGES.RESEND
+        || String(row[C.STATUS] || '').trim().toUpperCase() === MAIL_STATUS.EXTERNAL) {
+      officialSentOnce = true;
+    }
     if (stage === MAIL_STAGES.REVIEW) reviewRows.push(row);
 
     const sentAt = normalizeSentAt_(row[C.SENT_AT], tz);
@@ -290,6 +297,7 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   return {
     lastSentAt: lastSentAt,
     hasOfficialRecord: hasOfficialRecord,
+    officialSentOnce: officialSentOnce,
     unsavedRelease: parseUnsavedReleaseNote_(latestOptions),
     lastReviewBatch: findLastReviewBatch_(reviewRows, quarterId, tz)
   };
@@ -638,6 +646,8 @@ function buildDashboardState_(quarterId) {
     quarterId: quarterId,
     quarterLabel: buildQuarterLabel_(quarterId),
     stage: stage,
+    // 第七十七輪批次 EE 組：第 3 步〔變動的人〕要正式發出過先可以撳
+    officialSentOnce: !!sendLog.officialSentOnce,
     // ⚠️ 第四十七輪批次 A1 組：「三粒掣唔著嘅**唯一**原因就係未儲存」。
     // 詳細理由見 `computeSendBlockedByUnsavedOnly_()` 檔內說明。
     blockedByUnsavedOnly: computeSendBlockedByUnsavedOnly_(facts),

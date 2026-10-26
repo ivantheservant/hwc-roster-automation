@@ -78,6 +78,28 @@ const SEND_SCOPE_DEFAULT_BY_STAGE = {
  * @param {string} stage 寄送階段
  * @returns {boolean} 今日會不會附
  */
+/**
+ * 第七十七輪批次 EE 組：第 3 步三粒掣。前端放入 `sendOptions.sendMode`，後端只用嚟
+ *   ・寫 `notifyReasonByPerson` 嘅理由文字（〔給所有人〕喺正式發出之後：每一位都要收到）
+ *   ・改動後重發嗰幾個入口判斷「冇人改過都要寄」（`resendHasExplicitRecipients_()`）
+ * 收件人本身一律仍然行 `PICK`＋`pickedKeys`。
+ */
+const SEND_MODE = {
+  /** 〔給所有人〕：職事表上全部人＋堂委＋執事（＋固定收件人，按 Config） */
+  ALL: 'ALL',
+  /** 〔變動的人〕：同上一次寄出嘅版本比較、安排有改動嘅人 */
+  CHANGED: 'CHANGED',
+  /** 〔選擇其他〕：幹事自己勾 */
+  PICK: 'PICK'
+};
+
+/** 第七十七輪批次 EE 組：改動後重發嗰幾個入口——幹事明確指定咗收件人（〔給所有人〕或者勾咗人）就算冇人改過都要寄。 */
+function resendHasExplicitRecipients_(sendOptions) {
+  const o = sendOptions || {};
+  if (String(o.sendMode || '').toUpperCase() === SEND_MODE.ALL) return true;
+  return (o.pickedKeys || []).some(function (k) { return String(k || '').trim() !== ''; });
+}
+
 function icsDefaultForStage_(stage) {
   return stage === MAIL_STAGES.OFFICIAL || stage === MAIL_STAGES.RESEND;
 }
@@ -98,8 +120,6 @@ function resolveSendOptions_(stage, sendOptions, templates) {
   let scope = String(o.recipientScope || '').toUpperCase();
   if (!SEND_RECIPIENT_SCOPE[scope]) scope = defaultScope;
 
-  // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ **拋錯，唔可以靜靜當成寄全部**。
-  // 靜靜寄全部係最壞嘅結果：佢以為淨係寄俾三個人，實際上成班人收到。
   const picked = {};
   let pickedCount = 0;
   (o.pickedKeys || []).forEach(function (k) {
@@ -107,13 +127,6 @@ function resolveSendOptions_(stage, sendOptions, templates) {
     if (!key) return;
     if (!picked[key]) { picked[key] = true; pickedCount++; }
   });
-  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0) {
-    throw new Error(buildThreePartMessage_(
-      '你選了「自己選擇」，但一位都沒有選。',
-      '一封都沒有寄出。',
-      ['回去那個名單勾選要寄給誰，再撳一次',
-        '如果你想寄給全部人，請改選「全部應收的人」']));
-  }
 
   // ── 一之二、幹事自行輸入嘅電郵（第四十三輪批次 F 組）──────────
   //
@@ -137,6 +150,22 @@ function resolveSendOptions_(stage, sendOptions, templates) {
       '一封都沒有寄出。',
       ['回去那一格改正或者刪走，再撳一次']));
   }
+
+  // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ **拋錯，唔可以靜靜當成寄全部**。
+  // 靜靜寄全部係最壞嘅結果：佢以為淨係寄俾三個人，實際上成班人收到。
+  // 第七十七輪批次 EE 組（Ivan 手動測試 B）：只填「另外自行輸入電郵」、一位都冇勾 ⇒ **要寄得出**
+  // ——有自訂地址就唔算「一位都沒有選」。
+  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0 && extraEmails.length === 0) {
+    throw new Error(buildThreePartMessage_(
+      '你選了「自己選擇」，但一位都沒有選，也沒有自行輸入任何電郵。',
+      '一封都沒有寄出。',
+      ['回去那個名單勾選要寄給誰，或者在「另外自行輸入電郵」填一個地址，再撳一次',
+        '如果你想寄給全部人，請用〔給所有人〕']));
+  }
+
+  // 第七十七輪批次 EE 組：第 3 步邊一粒掣（見 `SEND_MODE`）；唔認得就空字串
+  const sendModeRaw = String(o.sendMode || '').toUpperCase();
+  const sendMode = SEND_MODE[sendModeRaw] ? sendModeRaw : '';
 
   // ── 二、附件 ─────────────────────────────────────────────────
   //
@@ -170,6 +199,7 @@ function resolveSendOptions_(stage, sendOptions, templates) {
     pickedKeys: picked,
     pickedCount: pickedCount,
     extraEmails: extraEmails,
+    sendMode: sendMode,
     attachType: attachType,
     listAttachType: listAttachType,
     includeIcs: includeIcs,

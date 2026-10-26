@@ -163,68 +163,39 @@ console.log('\n=== A3【核心】`assertNoUnsavedChanges_()` 嘅缺口 ===');
 }
 
 // =====================================================================
-console.log('\n=== A1／A2【核心】前端：三粒掣 ＋ 一個講到白嘅確認 ===');
+console.log('\n=== A1／A2【核心】前端（第七十七輪批次 EE 組改寫）：〔寄出上一個版本〕直接開寄出窗 ===');
 {
+  // Ivan 手動測試 B：〔寄出但不儲存〕同中間嗰個「我明白」畫面拿走，改為〔寄出上一個版本（第 K 版）〕
+  // 直接開寄出窗，寄出窗頂部黃框講明會寄第 K 版、表上未儲存嘅 N 格唔會寄出。
   const html = read('src/ui/ScriptSendPaper.html');
+  const code = html.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-  check('★★★★★★ 窗裡面有〔寄出但不儲存〕',
-    /寄出但不儲存/.test(html), '');
+  check('★★★★★★ 窗裡面有〔寄出上一個版本（第 K 版）〕，冇〔寄出但不儲存〕〔立即儲存並繼續〕',
+    /button\('寄出上一個版本（' \+ versionText \+ '）'/.test(code) && !/寄出但不儲存/.test(code) && !/立即儲存並繼續/.test(code), '');
   check('★★★★★★ 用次要色，**唔可以**用危險色（紅）'
     + '——佢唔係一個危險動作，佢係一個要睇清楚嘅動作',
-    !/danger[^\n]*寄出但不儲存|寄出但不儲存[^\n]*danger/.test(html), '');
-  check('★★★★★ 〔立即儲存並繼續〕仍然係預設掣',
-    /立即儲存並繼續/.test(html), '');
-
-  check('★★★★★★ 撳落去**唔會直接寄**，中間有一個確認畫面'
-    + '——⚠️ 要驗**粒掣真係叫佢**，唔係得個函式名喺檔案入面。'
-    + '得個名嘅話，粒掣改成直接寄都仍然綠',
-    /button\('寄出但不儲存', \(\) => renderSendWithoutSavingConfirm\(s\)/.test(html), '');
-  check('★★★★★ 而個確認畫面真係存在',
-    /function renderSendWithoutSavingConfirm\(s\) \{/.test(html), '');
-  check('★★★★★★ 確認畫面講得出「會寄出的：第 N 版」',
-    /會寄出的：/.test(html), '');
-  check('★★★★★★ 同埋「不會寄出的：你在表上改了、還未儲存的這 N 格」',
-    /不會寄出的：/.test(html), '');
-  check('★★★★★★ 嗰幾格要**逐格列出嚟**',
-    /renderUnsavedCellList\(cellBox, preview\)/.test(html), '');
+    /button\('寄出上一個版本（' \+ versionText \+ '）', \(\) => \{[\s\S]{0,400}?\}, 'secondary'\)/.test(code), '');
+  check('★★★★★★ 撳落去直接開寄出窗，`allowUnsaved` 係**布林 true**',
+    /renderSendMain\(s, \{ allowUnsaved: true \}\)/.test(code), '');
+  check('★★★★★★ 寄出窗頂部講得出「會寄出第 N 版」同「表上未儲存的 N 格不會寄出，會留在表上」',
+    /會寄出' \+ \(k >= 0 \? \('第 ' \+ k \+ ' 版'\)/.test(code) && /格不會寄出，會留在表上/.test(code), '');
+  check('★★★★★★ 嗰幾格要**逐格列出嚟**（同一支 renderUnsavedCellList）',
+    /renderUnsavedCellList\(det, preview\)/.test(code), '');
   // ⚠️ 料要同「檢查我的改動」嗰個畫面出自**同一支**函式。
-  // 各自格式化嘅話，兩個畫面對住同一格會顯示唔同嘅嘢，
-  // 而冇人分得出邊個啱。
   const planCode = read('src/WebAppSendPlan.gs')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★★ 而且係由共用嘅 `buildSavedChangeRows_()` 出',
     /rows = buildSavedChangeRows_\(resolved\.changes, postNameById, 'MANUAL'\);/
       .test(planCode), '');
-  check('★★★★★★ 有一個明白框',
-    /我明白收信的人看到的是/.test(html), '');
-  check('★★★★★★ 而且**明明白白寫一次 `false`**'
-    + '——靠「唔寫就係 false」嘅話，日後有人加一句'
-    + '`ackBox.checked = something` 就會靜靜變成預設勾住',
-    /ackBox\.checked = false;/.test(html), '');
-  check('★★★★★★ 唔勾嘅時候〔繼續寄出⋯⋯〕係 disabled',
-    /goBtn\.disabled = true;/.test(html) && /繼續寄出/.test(html), '');
-  check('★★★★★ 勾咗先解鎖',
-    /goBtn\.disabled = !ackBox\.checked/.test(html), '');
   check('★★★★★★ 超過 12 格 ⇒ 列頭 12 格 ＋「另外還有 N 格」＋〔全部列出〕',
     /另外還有/.test(html) && /全部列出/.test(html), '');
-  check('★★★★★★ 講明「這 N 格會留在表上，不會不見」'
-    + '——唔講嘅話，幹事會以為撳落去等於放棄咗嗰幾格',
-    /會留在表上，不會不見/.test(html), '');
-
-  // ⚠️ **唔可以用打字閘。**
-  check('★★★★★★ 冇用「請輸入『確認』」嗰種打字閘'
-    + '——嗰個閘留返畀「照樣儲存（違反硬規則）」同「重設季度測試資料」'
-    + '嗰一類**改壞咗救唔返**嘅動作。呢一個救得返（嗰幾格仲喺表上），'
-    + '用打字閘會令打字閘本身貶值',
-    !/請輸入「確認」|逐字輸入/.test(
-      html.slice(html.indexOf('renderSendWithoutSavingConfirm'),
-        html.indexOf('renderSendWithoutSavingConfirm') + 4000)), '');
-
+  check('★★★★★★ 冇用「請輸入『確認』」嗰種打字閘',
+    !/請輸入「確認」|逐字輸入/.test(code.slice(code.indexOf('function renderUnsavedBlocksSend'), code.indexOf('function renderUnsavedBlocksSend') + 3000)), '');
   // A3：唔符合條件嗰陣**唔好畫嗰粒掣**。
   check('★★★★★★ `canSendUnsaved` 係 false 嗰陣唔畫嗰粒掣，'
     + '而且講明點解今次唔可以'
     + '——一粒撳咗冇反應嘅掣，比冇嗰粒掣更差',
-    /s\.canSendUnsaved/.test(html) && /canSendUnsavedReason/.test(html), '');
+    /if \(s\.canSendUnsaved\) \{/.test(code) && /canSendUnsavedReason/.test(code), '');
 }
 
 // =====================================================================

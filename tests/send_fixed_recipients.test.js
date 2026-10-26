@@ -125,19 +125,23 @@ console.log('\n=== AT1 新增一組「辦公室等固定收件人」，成員來
 }
 
 // =====================================================================
-console.log('\n=== AT2 只有正式發出預設勾上 ===');
+console.log('\n=== AT2 第七十七輪批次 EE 組：〔選擇其他〕唔再預設勾固定收件人（嗰個情況改用〔給所有人〕）===');
 {
   setup();
   const official = gas.apiGetSendRecipientPool(Q, 'OFFICIAL');
-  checkEqual('★★★★★★ 正式發出：預設勾上兩位固定收件人',
-    official.defaultPickedKeys.slice().sort(),
-    ['LIST:it@example.invalid', 'LIST:office@example.invalid']);
+  checkEqual('★★★★★★ 正式發出：從來未寄過 ⇒ 一位都唔預設勾（固定收件人都唔勾）',
+    official.defaultPickedKeys, []);
+  check('★★★★★ 固定收件人仍然喺池入面、仍然勾得到',
+    groupOf(official, 'FIXED').selectable === 2, JSON.stringify(groupOf(official, 'FIXED')));
   checkEqual('★★★★★★ 寄給堂委審閱：有這一組但**不預設勾**',
     gas.apiGetSendRecipientPool(Q, 'REVIEW').defaultPickedKeys, []);
   checkEqual('★★★★★★ 改動後重發：有這一組但**不預設勾**',
     gas.apiGetSendRecipientPool(Q, 'RESEND').defaultPickedKeys, []);
   checkEqual('★★★★ 不傳階段（舊呼叫）當正式發出，不爆',
-    gas.apiGetSendRecipientPool(Q).defaultPickedKeys.length, 2);
+    gas.apiGetSendRecipientPool(Q).defaultPickedKeys.length, 0);
+  // 純函式：唯一會預設勾嘅係「有改動」嗰組
+  checkEqual('★★★★★ defaultPickedKeysForChanged_：有基準 ⇒ 勾有改動而有電郵嘅人',
+    gas.defaultPickedKeysForChanged_([{ key: 'P1', selectable: true, sources: ['CHANGED'] }, { key: 'P2', selectable: false, sources: ['CHANGED'] }], { versionNo: 1 }), ['P1']);
 }
 
 // =====================================================================

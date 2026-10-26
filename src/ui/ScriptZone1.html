@@ -319,23 +319,10 @@
   }
 
   /**
-   * ⚠️ 第四十七輪批次 A5 組：多咗一個 `opts`。
-   *
-   * `openSaveAndConfirm({ thenSend: true })` ⇒ 儲存確認窗嗰個
-   *「儲存之後直接去寄出」**預設勾住**。
-   *
-   * 第四十六輪 D 組定咗平時預設唔勾（寄出係對外動作，唔可以幫佢揀）。
-   * 呢度係**一個例外，而且只有一個入口**：佢啱啱撳緊〔寄出〕、
-   * 被「有未儲存改動」擋住、然後撳〔立即儲存並繼續〕。
-   * 佢本來就係想寄出——喺呢一條路上唔預設勾住，反而係要佢再做多一次
-   * 佢啱啱已經做過嘅決定。
-   *
-   * @param {{thenSend: boolean}=} opts 由〔立即儲存並繼續〕嗰條路傳落嚟
+   * 第七十七輪批次 EE 組：寄出窗〔立即儲存並繼續〕拿走（Ivan），所以 `openSaveAndConfirm({ thenSend })`
+   * 嗰條路（儲存完成窗〔繼續去寄出〕）一併清走——儲存完成窗一律〔知道了〕〔請系統幫我調整〕。
    */
-  function openSaveAndConfirm(opts) {
-    // ⚠️ 第七十五輪批次 CG 組：「儲存之後直接去寄出」勾選框拿走。只有由寄出窗〔立即儲存並繼續〕
-    // 入嚟（`thenSend`）先會喺儲存完成窗出〔繼續去寄出〕——佢本來就係喺第 3 步寄出緊。
-    saveThenSend_ = !!(opts && opts.thenSend);
+  function openSaveAndConfirm() {
     runAction('讀取改動', async () => {
       savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
 
@@ -808,12 +795,6 @@
   }
 
   /**
-   * 第四十六輪批次 D2 組（第七十五輪 CG 組收窄）：儲存完之後要唔要直接開寄出彈窗。
-   * 只由寄出窗〔立即儲存並繼續〕入嚟先係 true（`openSaveAndConfirm({ thenSend: true })`）。
-   */
-  let saveThenSend_ = false;
-
-  /**
    * 第七十五輪批次 CG 組：執行儲存。逐格決定已經即時記住（後端會再驗一次），
    * 唔再送「用我改的／改回原本」，亦唔再要打字放行。
    */
@@ -928,32 +909,11 @@
     }
     nodes.push(para('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted'));
 
-    // ⚠️ 第四十六輪批次 D2 組：勾咗「儲存之後直接去寄出」⇒ 直接接落去。
-    //
-    // ⚠️ **唔可以跳過呢個結果畫面。** 佢係「系統改咗你嗰幾格」嘅唯一證據，
-    // 跳過就變成「撳一粒掣，寄出彈窗彈咗出嚟」，而佢完全唔知儲存咗乜。
-    // 所以做法係：照樣顯示，只係把主掣由〔知道了〕換成〔繼續去寄出〕。
+    // ⚠️ **唔可以跳過呢個結果畫面。** 佢係「系統改咗你嗰幾格」嘅唯一證據。
     // 第七十五輪批次 CG 組：完成窗加〔請系統幫我調整〕（Ivan：儲存之後想即刻再調整）
+    // 第七十七輪批次 EE 組：〔繼續去寄出〕嗰條路（`thenSend`）已清走——寄出一律由第 3 步三粒掣開始。
     const adjustBtn = button('請系統幫我調整', () => { closeModal(); openBuildSuggestion(); }, 'secondary');
-    const doneActs = saveThenSend_
-      ? [
-        button('繼續去寄出', () => {
-          closeModal();
-          // 刷新一次先——寄出彈窗要讀新版本號同新嘅寄出紀錄。
-          runAction('重新整理', async () => {
-            await loadDashboard();
-            openSendDialog();
-          });
-        }, ''),
-        button('留在這裡', () => closeModalAndRefresh(), 'secondary')
-      ]
-      : [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];
-    if (saveThenSend_) {
-      nodes.push(make('div', {
-        text: '你剛才由「寄出」那裡先儲存。撳〔繼續去寄出〕就會回到寄出畫面。',
-        className: 'ok-line strong'
-      }));
-    }
+    const doneActs = [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];
     openModal('儲存完成', nodes, doneActs);
   }
 
@@ -1823,6 +1783,12 @@
       // 規格 2.7：**逐個列出**，唔可以淨係寫數字。
       // ⚠️⚠️ 第六十五輪批次 Y 組：最上面係「這一次會寄給的 N 位」，見 buildResendConfirmNodes()
       const nodes = buildResendConfirmNodes(plan);
+      // 第七十七輪批次 EE 組：〔給所有人〕⇒ 名單上每一位都會收到，唔會因為「內容沒變」被略過
+      if (plan.sendMode === 'ALL') {
+        nodes.unshift(make('div', { className: 'warnbox' }, [
+          make('div', { text: '全部 ' + plan.recipientCount + ' 位都會收到，包括安排沒有改動的人。', className: 'lines' })
+        ]));
+      }
 
       if (d.isDryRun) {
         nodes.push(make('div', {

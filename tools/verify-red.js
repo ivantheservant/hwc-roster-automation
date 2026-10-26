@@ -6881,6 +6881,126 @@ const MUTATIONS = [
     find: "    saveBtn.style.fontSize = 'var(--fs-lg)';\n    saveBtn.style.padding = '12px 22px';\n",
     replace: "",
     tests: ["tests/round77_ed_save_button_primary.test.js"]
+  },
+  {
+    id: "ee-pick-empty-extra",
+    why: "只填自行輸入電郵、一位都冇勾 ⇒ 又變返「一位都沒有選」寄唔出",
+    file: "src/SendOptions.gs",
+    find: "  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0 && extraEmails.length === 0) {",
+    replace: "  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0) {",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-all-no-reason",
+    why: "〔給所有人〕喺正式發出之後冇俾每人一個理由（內容冇變嘅會被 SKIPPED_UNCHANGED 擋走）",
+    file: "src/ResendFlow.gs",
+    find: "          context.notifyReasonByPerson[key] = decision.sendMode === SEND_MODE.ALL\n            ? '幹事選擇寄給所有人（包括安排沒有改動的人）'\n            : '幹事指定要寄給這一位';",
+    replace: "          context.notifyReasonByPerson[key] = '幹事指定要寄給這一位';",
+    tests: ["tests/round77_ee_send_buttons.test.js", "tests/send_options.test.js"]
+  },
+  {
+    id: "ee-allkind-none",
+    why: "正式發出之後、冇人改過 ⇒〔給所有人〕變成「現在沒有可以寄的東西」",
+    file: "src/WebAppSendPlan.gs",
+    find: "  if (state && state.stage === QUARTER_STAGE.OFFICIAL_SENT && !unsaved) return SEND_KIND.RESEND;",
+    replace: "  if (false) return SEND_KIND.RESEND;",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-all-drops-noemail",
+    why: "〔給所有人〕唔講有幾多位冇電郵（第 4 步要印紙本嘅人靜靜消失）",
+    file: "src/WebAppSendPlan.gs",
+    find: "      noEmailCount: noEmail.length,",
+    replace: "      noEmailCount: 0,",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-default-fixed-again",
+    why: "〔選擇其他〕又預設勾返固定收件人（唔係有改動嗰組）",
+    file: "src/WebAppSendPlan.gs",
+    find: "      defaultPickedKeys: defaultPickedKeysForChanged_(snap.pool, snap.lastSent),",
+    replace: "      defaultPickedKeys: defaultPickedKeysForStage_(sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL, snap.fixedMembers),",
+    tests: ["tests/send_fixed_recipients.test.js"]
+  },
+  {
+    id: "ee-changed-incl-notrecv",
+    why: "〔變動的人〕把「上一次沒有收到」嘅人都列入（寄出窗同確認窗人數唔一致）",
+    file: "src/WebAppSendPlan.gs",
+    find: "    const people = (plan.changed || []).filter(function (c) { return c.arrangementChanged; }).map(function (c) {",
+    replace: "    const people = (plan.changed || []).filter(function (c) { return true; }).map(function (c) {",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-official-once-narrow",
+    why: "officialSentOnce 只認 OFFICIAL（改動後重發／系統外寄出過都唔算正式發出過）",
+    file: "src/WebAppDashboard.gs",
+    find: "    if (stage === MAIL_STAGES.OFFICIAL || stage === MAIL_STAGES.RESEND\n        || String(row[C.STATUS] || '').trim().toUpperCase() === MAIL_STATUS.EXTERNAL) {\n      officialSentOnce = true;\n    }",
+    replace: "    if (stage === MAIL_STAGES.OFFICIAL) officialSentOnce = true;",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-step5-ignores-all",
+    why: "改動後重發嘅計劃入口唔認〔給所有人〕（冇人改過就當 NO_CHANGES）",
+    file: "src/WebAppFlow.gs",
+    find: "  if (changedPlan.changed.length > 0 || resendHasExplicitRecipients_(sendOptions)) {",
+    replace: "  if (changedPlan.changed.length > 0) {",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-config-default-false",
+    why: "SEND_ALL_INCLUDES_FIXED 種子預設 FALSE（辦公室收唔到正式發出）",
+    file: "src/ConfigSeed.gs",
+    find: "      key: CONFIG_KEYS.SEND_ALL_INCLUDES_FIXED, type: CONFIG_TYPES.BOOL, group: 'MAIL',\n      defaultValue: 'TRUE',",
+    replace: "      key: CONFIG_KEYS.SEND_ALL_INCLUDES_FIXED, type: CONFIG_TYPES.BOOL, group: 'MAIL',\n      defaultValue: 'FALSE',",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-ui-save-continue",
+    why: "未儲存窗又出返〔立即儲存並繼續〕、冇〔寄出上一個版本〕",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      acts.push(button('寄出上一個版本（' + versionText + '）', () => {\n        closeModal();\n        // ⚠️ `allowUnsaved: true` —— **布林 `true`，唔係字串**。後端 `resolveAllowUnsavedFlag_()` 只認布林。\n        renderSendMain(s, { allowUnsaved: true });\n      }, 'secondary'));",
+    replace: "      acts.push(button('立即儲存並繼續', () => { closeModal(); openSaveAndConfirm(); }, ''));",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-ui-all-has-picker",
+    why: "〔給所有人〕主窗仲有〔選擇收件人〕",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "    if (sendMode_ === 'ALL') {\n      const d = sendModeData_ || {};\n      if (d.noEmailCount > 0) {",
+    replace: "    if (sendMode_ === 'ALL' && false) {\n      const d = sendModeData_ || {};\n      if (d.noEmailCount > 0) {",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-ui-no-auto-picker",
+    why: "〔選擇其他〕唔會自動打開〔選擇收件人〕",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "    if (!pickerAutoOpened_) {\n      pickerAutoOpened_ = true;\n      openSendRecipients(s);\n    }\n",
+    replace: "",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-ui-old-list-label",
+    why: "收件人視窗嗰粒掣仲叫〔用這一份名單〕",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "        button('確認', () => {\n          sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);",
+    replace: "        button('用這一份名單', () => {\n          sendOptions_.pickedKeys = Object.keys(selected).filter((k) => selected[k] === true);",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-ui-changed-always",
+    why: "〔變動的人〕未正式發出都可以撳",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "          disabled: !has || !officialOnce,",
+    replace: "          disabled: !has,",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ee-ui-resend-all-text",
+    why: "〔給所有人〕嘅改動後重發確認窗冇寫明「全部 N 位都會收到」",
+    file: "src/ui/ScriptZone1.html",
+    find: "      if (plan.sendMode === 'ALL') {\n        nodes.unshift(",
+    replace: "      if (false) {\n        nodes.unshift(",
+    tests: ["tests/round77_ee_send_buttons.test.js"]
   }
 ];
 

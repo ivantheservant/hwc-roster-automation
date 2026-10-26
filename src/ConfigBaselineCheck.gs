@@ -104,6 +104,8 @@ function getConfigBaselineSnapshot_() {
       // 寫一個具體網址落呢度就等於把一個環境專屬嘅值寫死喺公開 repo。
       WEBAPP_STEWARD_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       RESEND_ONLY_CHANGED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      // 第七十七輪批次 EE 組新增。上線目標值＝TRUE（正式發出時辦公室要收到）。
+      SEND_ALL_INCLUDES_FIXED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROSTER_DRIVE_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第七十輪批次 AW 組新增。上線目標值刻意係空白——網址由管理員貼。
       USER_GUIDE_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },

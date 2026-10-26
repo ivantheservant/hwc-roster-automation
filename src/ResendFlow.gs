@@ -198,7 +198,11 @@ function resolveResendTargetPersonIds_(context, decision, changedPersonIds, prev
       if (targetPersonIds.indexOf(key) === -1) {
         targetPersonIds.push(key);
         if (!previewOnly) {
-          context.notifyReasonByPerson[key] = '幹事指定要寄給這一位';
+          // 第七十七輪批次 EE 組：〔給所有人〕⇒ 名單上每一位都要收到，唔可以因為「內容沒變」被略過
+          //（`deliverOne_()` 見到上游有理由就一定寄）。**唔改 `RESEND_ONLY_CHANGED` 呢個全域設定。**
+          context.notifyReasonByPerson[key] = decision.sendMode === SEND_MODE.ALL
+            ? '幹事選擇寄給所有人（包括安排沒有改動的人）'
+            : '幹事指定要寄給這一位';
         }
       }
     });
