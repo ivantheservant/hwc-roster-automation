@@ -637,10 +637,11 @@ console.log('\n=== E／F：收件人選擇同自行輸入電郵 ===');
     + '——靜靜出一個勾唔到嘅框，幹事只會以為系統壞咗',
     /現時沒有人有這個身分。要用這一組，先去「常用設定 ▸ 身分（堂委／執事）」/.test(paper), '');
 
-  check('★★★★★★ 自行輸入嗰格同六個來源喺**同一版**'
-    + '——收埋去另一個窗嘅話，幹事勾咗「職事表上全部人」就永遠見唔到，'
-    + '而佢想做嘅好可能正正就係「全部人 ＋ 多一個地址」',
-    (paper.match(/buildExtraEmailBox\(sendOptions_/g) || []).length >= 2, '');
+  // 第七十七輪批次 EE 組（Ivan 手動測試 B）：主寄出窗拿走「另外自行輸入電郵」，只留喺〔選擇收件人〕視窗
+  //（同六個來源喺同一版）；「全部人＋多一個地址」＝〔選擇其他〕勾「職事表上全部人」再填地址。
+  check('★★★★★★ 自行輸入嗰格同六個來源喺**同一版**（收件人視窗），主寄出窗冇',
+    (paper.match(/buildExtraEmailBox\(sendOptions_/g) || []).length === 1
+    && /一次過加一整組[\s\S]{0,4000}buildExtraEmailBox\(sendOptions_/.test(paper), '');
   check('★★★★★ 而且主確認掣撳落去之前會驗一次格式',
     /if \(!commitExtraEmails\(sendOptions_\)\) return;/.test(paper), '');
   check('★★★★★ 自行輸入嘅電郵格式唔啱**即刻標紅**，唔係等撳落去先講',

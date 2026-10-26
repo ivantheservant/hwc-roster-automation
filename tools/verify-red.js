@@ -7001,6 +7001,38 @@ const MUTATIONS = [
     find: "      if (plan.sendMode === 'ALL') {\n        nodes.unshift(",
     replace: "      if (false) {\n        nodes.unshift(",
     tests: ["tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "ef-zone3-collapsed",
+    why: "常用設定一開始又係摺埋（Ivan：預設展開）",
+    file: "src/ui/Index.html",
+    find: "    <button class=\"zone-head\" id=\"zone3Head\" type=\"button\" aria-expanded=\"true\">",
+    replace: "    <button class=\"zone-head\" id=\"zone3Head\" type=\"button\" aria-expanded=\"false\">",
+    tests: ["tests/round77_ef_settings_zone.test.js"]
+  },
+  {
+    id: "ef-zone3-not-rerender",
+    why: "重新整理／換季度之後常用設定唔會再展開重畫",
+    file: "src/ui/Script.html",
+    find: "    renderZone3Always(dashboardState_);\n",
+    replace: "",
+    tests: ["tests/round77_ef_settings_zone.test.js"]
+  },
+  {
+    id: "ef-people-link-back",
+    why: "〔人員與電郵〕又出返嚟",
+    file: "src/ui/ScriptZone3.html",
+    find: "    body.appendChild(row([\n      settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),",
+    replace: "    body.appendChild(row([\n      settingsSheetLink('人員與電郵', links.people, 'NameMapping'),\n      settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),",
+    tests: ["tests/round77_ef_settings_zone.test.js"]
+  },
+  {
+    id: "ef-active-sentence",
+    why: "「Active 改成 FALSE」嗰句又出返嚟",
+    file: "src/ui/ScriptZone3.html",
+    find: "      + '身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。'));",
+    replace: "      + '身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。不再服侍的人請把「Active」改成 FALSE。'));",
+    tests: ["tests/round77_ef_settings_zone.test.js"]
   }
 ];
 

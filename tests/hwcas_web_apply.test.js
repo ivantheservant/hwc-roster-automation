@@ -185,8 +185,9 @@ console.log('\n=== E 呼叫層同入口 ===');
   check('★★★★★ apiHwcasApplySelected 唔喺白名單，而且用 callServerMutating()',
     readOnly.indexOf('apiHwcasApplySelected') === -1
     && zone3.indexOf("callServerMutating('apiHwcasApplySelected'") !== -1);
-  check('★★★★ 「人員與電郵」畫面有呢粒掣',
-    /button\('從出席系統補電郵', \(\) => openHwcas\(\), 'secondary'\)/.test(zone3));
+  // 第七十七輪批次 EF 組：「人員與電郵」畫面拿走 ⇒ 入口喺「進階與診斷 ▸ 出席系統連結」
+  check('★★★★ 進階與診斷有「出席系統連結」入口',
+    /zone4Row\('出席系統連結'/.test(read('src/ui/ScriptZone4.html')) && /openHwcas\(\)/.test(read('src/ui/ScriptZone4.html')));
   check('★★★★★ 而且「暫時請用選單」嗰句已經拆走',
     !/「從出席系統補電郵」暫時請用試算表上方的選單/.test(zone3));
 }

@@ -114,13 +114,14 @@
       〔人員與電郵〕〔身分〕改為喺新分頁直接開試算表嗰張工作表。
     沿用 `zone3` 呢個容器 id（收摺邏輯、換季度重設都已經接好），內容由 renderZone3() 畫。
   -->
+  <!-- 第七十七輪批次 EF 組（Ivan）：常用設定**預設展開**（載入、重新整理、換季度之後都係展開，見 renderZone3Always()）。 -->
   <section class="zone" id="zone3">
-    <button class="zone-head" id="zone3Head" type="button" aria-expanded="false">
+    <button class="zone-head" id="zone3Head" type="button" aria-expanded="true">
       <span class="zone-title">常用設定</span>
-      <span class="zone-count">人員、身分、收件人</span>
+      <span class="zone-count">身分、收件人</span>
       <span class="zone-caret">▾</span>
     </button>
-    <div class="zone-body" id="zone3Body" hidden></div>
+    <div class="zone-body" id="zone3Body"></div>
   </section>
 
   <!-- 進階與診斷（出事或者要查數先用）-->

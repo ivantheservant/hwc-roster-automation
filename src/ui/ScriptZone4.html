@@ -46,7 +46,11 @@
       // 第七十五輪批次 CA 組：由「開季前準備」搬落嚟（唔係常用功能）
       zone4Row('名單檢查',
         '只看：列出名單上可能有問題的人（例如沒有電郵、沒有任何崗位）。',
-        () => openPeopleHints(), false)
+        () => openPeopleHints(), false),
+      // 第七十七輪批次 EF 組：人員與電郵畫面拿走 ⇒ 出席系統嘅入口搬到呢度
+      zone4Row('出席系統連結',
+        '哪些人沒有連結出席系統（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵。',
+        () => openHwcas(), false)
     ]));
 
     body.appendChild(make('div', { className: 'sec' }, [

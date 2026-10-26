@@ -30,10 +30,11 @@
   function renderZone3(d) {
     const body = clear(el('zone3Body'));
     const links = (d && d.settingsLinks) || {};
-    body.appendChild(para('人員資料、身分和固定收件人都直接在試算表那一張工作表改（會在新分頁打開）。'
-      + '不再服侍的人請把「Active」改成 FALSE，不要刪除那一行。'));
+    // 第七十七輪批次 EF 組（Ivan）：〔人員與電郵〕拿走——姓名同電郵由出席系統讀取（EG 組），唔應該再有人手輸入；
+    // 「Active 改成 FALSE」嗰句唔再適用。`NameMapping` 嘅 MaxPerQuarter／Active 由管理員直接喺試算表改。
+    body.appendChild(para('人員和電郵由出席系統讀取，這裡不用改。'
+      + '身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。'));
     body.appendChild(row([
-      settingsSheetLink('人員與電郵', links.people, 'NameMapping'),
       settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),
       settingsSheetLink('固定收件人／管理員電郵', links.recipients, 'EmailRecipients')
     ]));
@@ -44,6 +45,17 @@
         '重新排一次，會建立一個新版本。現有的人手改動不會保留。',
         () => openRegenerate(), true)
     ]));
+  }
+
+  /**
+   * 第七十七輪批次 EF 組：常用設定**預設展開**——載入、重新整理、換季度之後都係展開，而且每次重畫
+   *（同開季前準備 `renderZone2Head()` 同一個做法：`setZoneOpen()` 直接開 ⇒ 要自己 `markZoneLoaded()`）。
+   * @param {Object} d dashboard 狀態
+   */
+  function renderZone3Always(d) {
+    setZoneOpen('zone3Head', 'zone3Body', true);
+    markZoneLoaded('zone3Body');
+    renderZone3(d);
   }
 
   /**
@@ -452,290 +464,7 @@
     });
   }
 
-  /* ============================================================
-   * 畫面二：人員與電郵（規格 4.2）
-   * ============================================================ */
-
-  let peopleData = null;
-
-  function openPeople(keyword) {
-    runAction('讀取名單', async () => {
-      peopleData = await callServer('apiListPeople', keyword || '');
-      renderPeople(keyword || '');
-    });
-  }
-
-  function renderPeople(keyword) {
-    const nodes = [
-      peopleSearchBox(keyword, (k) => openPeople(k)),
-      para('停用一個人不會刪走他，也不會影響已經排好的職事表——'
-        + '只是之後不會再被自動排入。'),
-      // 第二十七輪批次階段 E：HWCAS 補電郵搬咗上嚟，做成
-      // 「預覽差異 → 逐行勾選 → 套用」。**絕對唔可以整批自動套用。**
-      make('div', {
-        text: '「從出席系統補電郵」會先給你看差異，逐行勾選之後才寫入。預設全部不勾。',
-        className: 'muted'
-      })
-    ];
-
-    nodes.push(row([
-      button('＋ 新增一位', () => openAddPerson(), ''),
-      button('別名', () => openAliases(), 'secondary'),
-      button('從出席系統補電郵', () => openHwcas(), 'secondary')
-    ], 'row-right'));
-
-    // 「共 N 位」要保留——幹事用嚟核對人數。
-    nodes.push(make('div', {
-      text: '共 ' + peopleData.total + ' 位' + (keyword ? '（符合搜尋）' : ''),
-      className: 'muted'
-    }));
-    // ⚠️ 第二十六輪批次階段 D2：一開畫面**唔再**把 89 位全部展開成編輯卡。
-    //
-    // Ivan 實測：想改一個人嘅電郵，要碌過 89 張卡。
-    // 而且同「不能服侍的日期」風格唔一致——嗰個畫面用精簡清單 ＋
-    // 「修改」連結，撳咗先展開，做得啱。呢度跟返同一個模式。
-    peopleData.people.forEach((p) => nodes.push(personSummaryRow(p)));
-
-    openModal('人員與電郵', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
-  }
-
-  /** 精簡一行：名、編號、英文名、電郵、右邊一條「修改」。 */
-  function personSummaryRow(p) {
-    const box = make('div', { className: 'prop' + (p.active ? '' : ' is-off') });
-    const head = make('div', { className: 'prop-head' });
-    head.appendChild(make('span', { text: p.nameTC || '（沒有中文名）' }));
-    head.appendChild(make('span', { text: p.personId, className: 'idtag' }));
-    if (p.nameEN) head.appendChild(make('span', { text: p.nameEN, className: 'muted' }));
-    if (p.hasEmail) {
-      head.appendChild(make('span', { text: p.email, className: 'muted' }));
-    } else {
-      head.appendChild(make('span', { text: '沒有電郵，正式發出會略過', className: 'tag tag-bad' }));
-    }
-    if (!p.active) head.appendChild(make('span', { text: '已停用', className: 'tag' }));
-    if (p.duplicateNameCount > 1) {
-      head.appendChild(make('span', { text: '名單上有 ' + p.duplicateNameCount + ' 個同名', className: 'tag' }));
-    }
-    box.appendChild(head);
-
-    const slot = make('div', {});
-    box.appendChild(slot);
-    box.appendChild(row([button('修改', () => {
-      if (slot.firstChild) { clear(slot); return; }   // 再撳一次收埋
-      slot.appendChild(personEditor(p));
-    }, 'link')], 'row-right'));
-    return box;
-  }
-
-  /** 撳「修改」之後先展開嘅編輯欄位。 */
-  function personEditor(p) {
-    const box = make('div', { className: 'prop-opts' });
-
-    // ⚠️ 標題（名／PersonID／標籤）已經喺 personSummaryRow() 顯示咗，
-    // 呢度唔重複——重複嘅話幹事會以為展開咗第二個人。
-    // PersonID 由頭到尾都係灰字標籤，唔係輸入格：佢係全系統嘅外鍵，
-    // 改一個就會令嗰個人喺歷史紀錄入面「消失」。
-    const nameInput = textField(p.nameTC, '中文名');
-    const enInput = textField(p.nameEN, '英文名');
-    const memberInput = textField(p.memberNo, '會友編號（5 位數字）');
-    const emailInput = textField(p.email, '電郵');
-    const maxInput = textField(p.maxPerQuarter, '每季上限（可留空）');
-
-    box.appendChild(make('div', { className: 'prop-head' }, [
-      make('span', { text: '中文名' }), nameInput,
-      make('span', { text: '英文名' }), enInput
-    ]));
-    box.appendChild(make('div', { className: 'prop-head' }, [
-      make('span', { text: '會友編號' }), memberInput,
-      make('span', { text: '電郵' }), emailInput,
-      make('span', { text: '每季上限' }), maxInput
-    ]));
-    if (p.emailSource) {
-      box.appendChild(make('div', {
-        text: '電郵來源：' + p.emailSource + (p.emailVerifiedAt ? '（' + p.emailVerifiedAt + '）' : ''),
-        className: 'muted'
-      }));
-    }
-
-    const activeCb = document.createElement('input');
-    activeCb.type = 'checkbox';
-    activeCb.checked = p.active;
-    const activeLabel = make('label', { className: 'check-row' });
-    activeLabel.appendChild(activeCb);
-    activeLabel.appendChild(make('span', { text: '啟用' }));
-    box.appendChild(activeLabel);
-
-    box.appendChild(row([
-      button('儲存這一位', () => {
-        const payload = {
-          personId: p.personId,
-          nameTC: nameInput.value.trim(),
-          nameEN: enInput.value.trim(),
-          memberNo: memberInput.value.trim(),
-          email: emailInput.value.trim(),
-          maxPerQuarter: maxInput.value.trim(),
-          active: activeCb.checked
-        };
-        const warn = [];
-        if (p.active && !activeCb.checked) {
-          warn.push('設為停用之後，這個人不會再被自動排入職事表。'
-            + '已經排好的職事表不受影響。');
-        }
-        if (p.email && payload.email !== p.email) {
-          warn.push('電郵由「' + p.email + '」改成「' + (payload.email || '（空白）') + '」。');
-        }
-        if (!p.email && payload.email) warn.push('補上了電郵，之後正式發出會寄給他。');
-
-        openConfirm({
-          title: '確定要儲存嗎',
-          bodyNodes: [para('會改動 1 行：' + (payload.nameTC || p.personId) + '。')]
-            .concat(warn.map((w) => make('div', { text: w, className: 'vio vio-warn' }))),
-          confirmLabel: '確定儲存',
-          onConfirm: () => { savePersonWithEmailCheck(payload); }
-        });
-      }, ''),
-      button('重新產生連結', () => confirmReissueToken(p), 'secondary')
-    ], 'row-right'));
-
-    return box;
-  }
-
-  function confirmReissueToken(p) {
-    openConfirm({
-      title: '重新產生個人專屬連結',
-      bodyNodes: [
-        para('會改動 1 行：' + p.nameTC + '。'),
-        make('div', { className: 'vio vio-hard' }, [
-          make('div', {
-            text: '他手上那條舊連結會即刻失效，打不開。'
-              + '要等下一次正式發出（或者改動後重發）他才會收到新連結。',
-            className: 'vio-row'
-          })
-        ])
-      ],
-      requireTyping: true,
-      typingHint: '這個動作不可逆，舊連結無法復原。確定的話，請在下面輸入「'
-        + CONFIRM_PHRASE + '」兩個字：',
-      confirmLabel: '確定重新產生',
-      danger: true,
-      onConfirm: () => {
-        runAction('重新產生中', async () => {
-          const res = await callServerMutating('apiReissueToken', p.personId);
-          if (!res.ok) { showErrorModal('重新產生連結', new Error(res.message)); return; }
-          setStatus('已為 ' + (res.nameTC || p.nameTC) + ' 產生新連結。');
-          peopleData = await callServer('apiListPeople', '');
-          renderPeople('');
-        });
-      }
-    });
-  }
-
-  function openAddPerson() {
-    const nameInput = textField('', '中文名（必填）');
-    const enInput = textField('', '英文名');
-    const memberInput = textField('', '會友編號（5 位數字，可留空）');
-    const emailInput = textField('', '電郵（可留空）');
-
-    openModal('新增一位', [
-      para('編號由系統自動編，不用你填。'),
-      make('div', { className: 'prop-head' }, [
-        make('span', { text: '中文名' }), nameInput,
-        make('span', { text: '英文名' }), enInput
-      ]),
-      make('div', { className: 'prop-head' }, [
-        make('span', { text: '會友編號' }), memberInput,
-        make('span', { text: '電郵' }), emailInput
-      ])
-    ], [
-      button('加入', () => {
-        runAction('加入中', async () => {
-          const res = await callServerMutating('apiAddPerson', {
-            nameTC: nameInput.value.trim(),
-            nameEN: enInput.value.trim(),
-            memberNo: memberInput.value.trim(),
-            email: emailInput.value.trim()
-          });
-          if (!res.ok) { showErrorModal('新增人員', new Error(res.message)); return; }
-          setStatus('已加入 ' + res.nameTC + '（' + res.personId + '）。');
-          if (res.duplicateWarning) setStatus(res.duplicateWarning, true);
-          peopleData = await callServer('apiListPeople', '');
-          renderPeople('');
-        });
-      }, ''),
-      button('取消', () => renderPeople(''), 'secondary')
-    ]);
-  }
-
-  /* ── 別名（NameAlias）───────────────────────────────────── */
-
-  function openAliases() {
-    runAction('讀取別名', async () => {
-      const data = await callServer('apiListAliases');
-      renderAliases(data);
-    });
-  }
-
-  function renderAliases(data) {
-    const nodes = [
-      para('同一個人因為異體字或者輸入法寫成兩個名（例如「恒」與「恆」），'
-        + '在這裡告訴系統它們是同一個人。'),
-      make('div', { className: 'warnbox' }, [
-        make('div', {
-          text: '名字相似不代表是同一個人。只有你確定是同一位，才在這裡加。',
-          className: 'warn-head'
-        })
-      ])
-    ];
-
-    (data.aliases || []).forEach((a) => {
-      nodes.push(make('div', { className: 'prop' + (a.active ? '' : ' is-off') }, [
-        make('div', { text: '「' + a.alias + '」＝ ' + a.personName, className: 'prop-head' })
-      ]));
-    });
-    if ((data.aliases || []).length === 0) {
-      nodes.push(make('div', { text: '目前沒有登記任何別名。', className: 'muted' }));
-    }
-
-    const aliasInput = textField('', '別名（另一種寫法）');
-    const personSel = document.createElement('select');
-    (peopleData ? peopleData.people : []).forEach((p) => {
-      const o = document.createElement('option');
-      o.value = p.personId;
-      o.textContent = p.nameTC;
-      personSel.appendChild(o);
-    });
-
-    nodes.push(make('div', { className: 'sec' }, [
-      sectionTitle('新增一個別名'),
-      make('div', { className: 'prop-head' }, [
-        make('span', { text: '別名' }), aliasInput,
-        make('span', { text: '＝' }), personSel
-      ])
-    ]));
-
-    openModal('別名', nodes, [
-      button('加入別名', () => {
-        const alias = aliasInput.value.trim();
-        if (!alias) { setStatus('請先填別名。', true); return; }
-        openConfirm({
-          title: '確定要加入嗎',
-          bodyNodes: [para('會改動 1 行：「' + alias + '」＝ '
-            + personSel.options[personSel.selectedIndex].textContent + '。')],
-          confirmLabel: '確定加入',
-          onConfirm: () => {
-            runAction('加入中', async () => {
-              const res = await callServerMutating('apiSaveAlias', {
-                alias: alias, personId: personSel.value, active: true
-              });
-              if (!res.ok) { showErrorModal('別名', new Error(res.message)); return; }
-              setStatus('已加入。');
-              openAliases();
-            });
-          }
-        });
-      }, ''),
-      button('返回', () => renderPeople(''), 'secondary')
-    ]);
-  }
+  /* 第七十七輪批次 EF 組：畫面二「人員與電郵」整個拿走（Ivan：姓名同電郵由出席系統讀取，唔應該再有人手輸入）。 */
 
   /* ============================================================
    * 畫面三：崗位資格矩陣（規格 4.4）
@@ -947,44 +676,6 @@
           }
         });
       }
-    });
-  }
-
-  /**
-   * 第二十六輪批次階段 D3：儲存人員資料，電郵格式唔啱就再確認一次。
-   *
-   * ⚠️ **唔阻擋**——世上有奇怪但合法嘅地址，擋錯咗幹事就完全入唔到。
-   * 但要有一個位攔一攔：實測撞到一個結尾多咗句號嘅電郵，
-   * 嗰位弟兄姊妹**永遠收唔到通知**，而畫面睇落完全正常。
-   */
-  function savePersonWithEmailCheck(payload) {
-    runAction('儲存中', async () => {
-      const res = await callServerMutating('apiSavePerson', payload);
-      if (res.ok) {
-        setStatus('已儲存。');
-        peopleData = await callServer('apiListPeople', '');
-        renderPeople('');
-        return;
-      }
-      if (!res.needsEmailConfirm) {
-        showErrorModal('人員與電郵', new Error(res.message));
-        return;
-      }
-      openConfirm({
-        title: '電郵格式看起來不對',
-        bodyNodes: [
-          make('div', { className: 'warnbox' }, [
-            make('div', { text: res.message, className: 'warn-head' }),
-            make('div', { text: '你填的是：' + res.email, className: 'lines' })
-          ]),
-          para('常見的打錯：結尾多了一個句號、中間有兩個句號、有多餘的空格。', 'muted')
-        ],
-        confirmLabel: '仍然儲存',
-        onConfirm: () => {
-          // 帶住 confirmedBadEmail 再送一次——後端見到就唔會再攔。
-          savePersonWithEmailCheck(Object.assign({}, payload, { confirmedBadEmail: true }));
-        }
-      });
     });
   }
 
@@ -2299,7 +1990,7 @@
           })));
           nodes.push(box);
         }
-        openModal('套用完成', nodes, [button('完成', () => openPeople(''), '')]);
+        openModal('套用完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
       })
     });
   }

@@ -58,7 +58,9 @@ console.log('\n=== CA①：「名單維護」整區冇咗，換成「常用設�
   const z3 = ui.renderZone3(dash) || ui.document.getElementById('zone3Body');
   const body = ui.document.getElementById('zone3Body');
   const all = clickables(body);
-  ['人員與電郵', '身分（堂委／執事）', '固定收件人／管理員電郵'].forEach((t) => {
+  // 第七十七輪批次 EF 組：〔人員與電郵〕拿走（人員同電郵由出席系統讀取）
+  check('★★★★★★ 常用設定冇〔人員與電郵〕、冇「Active」嗰句', all.indexOf('人員與電郵') === -1 && body.textContent.indexOf('Active') === -1, JSON.stringify(all));
+  ['身分（堂委／執事）', '固定收件人／管理員電郵'].forEach((t) => {
     const a = anchors(body).filter((n) => n.textContent === t)[0];
     check('★★★★★ 常用設定〔' + t + '〕係一條新分頁連結（target=_blank）',
       a && a.target === '_blank' && /^https:\/\/example\.invalid\/s#gid=/.test(a.href), a ? a.href + ' ' + a.target : 'none');
@@ -71,8 +73,8 @@ console.log('\n=== CA①：「名單維護」整區冇咗，換成「常用設�
   // 搵唔到工作表 ⇒ 灰掣＋原因，唔畫一條去錯地方嘅連結
   ui.renderZone3({ settingsLinks: { people: '', roles: 'https://example.invalid/r', recipients: '' } });
   const b2 = ui.document.getElementById('zone3Body');
-  const dead = b2.flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === '人員與電郵')[0];
-  check('★★★★ 網址空 ⇒ 灰掣而且有原因', dead && dead.disabled && /NameMapping/.test(dead.title), dead ? dead.title : 'none');
+  const dead = b2.flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === '固定收件人／管理員電郵')[0];
+  check('★★★★ 網址空 ⇒ 灰掣而且有原因', dead && dead.disabled && /EmailRecipients/.test(dead.title), dead ? dead.title : 'none');
 }
 
 console.log('\n=== CA②：開季前準備：名單 → 不能服侍的日期 → 清單；冇〔名單檢查〕 ===');

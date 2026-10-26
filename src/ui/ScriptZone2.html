@@ -134,8 +134,9 @@
       // 身分（Roles）嗰項仲未有畫面，繼續指返試算表——
       // **唔可以扮到有得撳**，撳完乜都冇發生比指返選單更差。
       const openIn = {
-        noEmail: function () { openPeople(); },
-        notInNameList: function () { openPeople(); },
+        // 第七十七輪批次 EF 組：人員與電郵畫面拿走 ⇒ 改開「出席系統連結」
+        noEmail: function () { openHwcas(); },
+        notInNameList: function () { openHwcas(); },
         // 第七十五輪批次 CA 組：〔崗位資格〕入口拿走（同名單工作表重複）⇒ 改開名單工作表
         thinEligibility: function () { openEligibilitySheet(); }
       };
