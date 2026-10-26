@@ -22,7 +22,9 @@ const BASE_FILES = [
   'WebAppGuards.gs', 'WebAppDashboard.gs', 'MailRedirect.gs', 'WebAppRollback.gs',
   'FiveStageCore.gs', 'WebAppFlow.gs', 'WebAppGenerate.gs', 'WebAppSaveConfirm.gs',
   'PreacherTranslationFill.gs', 'GridNameDropdown.gs', 'MakeupSend.gs', 'WebAppPreQuarter.gs',
-  'AnnualCombined.gs', 'SuggestionSheet.gs', 'UnresolvedNameFix.gs'
+  'AnnualCombined.gs', 'SuggestionSheet.gs', 'UnresolvedNameFix.gs',
+  // 第七十七輪批次 EG 組：主畫面同寄出路都會叫出席系統同步（讀唔到就當冇，唔拋）
+  'HwcasSync.gs'
 ];
 
 /**

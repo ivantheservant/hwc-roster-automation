@@ -320,3 +320,356 @@ function describeHwcasSkip_(r) {
   if (r.noChange) return '電郵跟現在的一樣，不用改';
   return '現在的狀態跟你看到的預覽不同了，請重新整理';
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十七輪批次 EG 組：方法 A 嘅網頁入口
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 幹事介面載入時叫一次（前端畫好主畫面之後先叫，唔拖慢主畫面）。**會寫入 NameMapping。**
+ * 拿唔到鎖（另一個動作在跑）⇒ 略過今次，唔等、唔報錯。讀唔到出席系統 ⇒ `ok=false`＋一句，唔拋。
+ * @param {{force: boolean}=} options `force=true`＝唔理 10 分鐘限制（載入時用）
+ * @returns {Object}
+ */
+function apiSyncPeopleFromHwcas(options) {
+  assertWebAppRequestAllowed_();
+  const o = options || {};
+  let lock = null;
+  try {
+    lock = LockService.getDocumentLock();
+    if (!lock.tryLock(0)) return { ok: true, skipped: 'locked', updated: 0, notice: '' };
+  } catch (err) {
+    return { ok: true, skipped: 'locked', updated: 0, notice: '' };
+  }
+  try {
+    return runHwcasSyncSafely_({ force: o.force === true });
+  } finally {
+    try { lock.releaseLock(); } catch (err) { /* 放鎖失敗唔可以蓋過結果 */ }
+  }
+}
+
+/** 出席系統未設定嗰陣畫面要講嘅一句（同 `apiHwcasPreview()` 同一句）。 */
+function hwcasNotConfiguredResult_() {
+  return {
+    ok: false,
+    notConfigured: true,
+    message: '還沒有設定出席系統的試算表位置。請先在 Config 填 HWCAS_SPREADSHEET_ID。'
+  };
+}
+
+function hwcasReadFailureResult_(err) {
+  return {
+    ok: false,
+    message: buildThreePartMessage_(
+      '讀不到出席系統的資料（' + err.message + '）。',
+      '什麼都沒有改動，名單完全沒有動過。',
+      ['檢查 Config 的 HWCAS_SPREADSHEET_ID 是不是正確',
+        '檢查這個帳號有沒有那個試算表的閱讀權限'])
+  };
+}
+
+/**
+ * 進階與診斷 ▸〔出席系統連結〕嘅四段。**純讀取。**
+ *   一、沒有會眾編號嘅人（附出席系統嘅候選人——重用 `buildHwcasDraft_()` 嘅姓名配對，**預設不勾**）
+ *   二、出席系統找不到編號嘅人　三、重複編號　四、出席系統沒有電郵嘅人
+ * @returns {Object}
+ */
+function apiHwcasLinkPreview() {
+  assertWebAppRequestAllowed_();
+  const config = readConfig();
+  if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
+  let hwcas;
+  try {
+    hwcas = readHwcasByMemberNo_(config);
+  } catch (err) {
+    return hwcasReadFailureResult_(err);
+  }
+  const analysis = analyseHwcasLinks_(hwcas);
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+
+  // 候選人：按姓名（NameTC＋NameAlias）對——同舊「從出席系統補電郵」同一支配對，唔另寫
+  const draft = buildHwcasDraft_(hwcas.records, hwcas.fieldColumns, hwcas.headers);
+  const candidatesByPerson = {};
+  draft.forEach(function (d) {
+    if (!d.personId || d.matchType === HWCAS_MATCH.MISSING_IN_HWCAS) return;
+    const no = memberNoKey_(d.memberNo);
+    if (!no) return;
+    if (!candidatesByPerson[d.personId]) candidatesByPerson[d.personId] = [];
+    candidatesByPerson[d.personId].push({
+      memberNo: no,
+      hwcasName: String(d.hwcasName || ''),
+      emailMasked: maskEmailForPreview_(d.hwcasEmail),
+      hasEmail: !!String(d.hwcasEmail || '').trim(),
+      lastAttendance: toDateString(d.lastAttendance, timezone),
+      matchType: d.matchType,
+      note: String(d.note || '')
+    });
+  });
+  const usedNos = {};
+  analysis.linked.concat(analysis.notFound).forEach(function (p) { usedNos[p.memberNo] = p.nameTC; });
+  analysis.duplicates.forEach(function (d) { usedNos[d.memberNo] = d.people.map(function (p) { return p.nameTC; }).join('、'); });
+
+  return {
+    ok: true,
+    unlinked: analysis.unlinked.map(function (p) {
+      return {
+        personId: p.personId, nameTC: p.nameTC, active: p.active,
+        candidates: (candidatesByPerson[p.personId] || []).map(function (c) {
+          return Object.assign({}, c, { usedBy: usedNos[c.memberNo] || '' });
+        })
+      };
+    }),
+    notFound: analysis.notFound.map(function (p) { return { personId: p.personId, nameTC: p.nameTC, memberNo: p.memberNo }; }),
+    duplicates: analysis.duplicates,
+    noEmailInHwcas: analysis.noEmailInHwcas.map(function (p) { return { personId: p.personId, nameTC: p.nameTC, memberNo: p.memberNo }; }),
+    counts: {
+      linked: analysis.linked.length,
+      unlinked: analysis.unlinked.length,
+      notFound: analysis.notFound.length,
+      duplicates: analysis.duplicates.length,
+      noEmailInHwcas: analysis.noEmailInHwcas.length
+    },
+    sync: describeHwcasSyncForDashboard_()
+  };
+}
+
+/**
+ * 〔連結勾了的人〕：只寫 `MemberNo`（同由編號推出嘅 `Congregation`／`MemberType`），之後即時同步一次電郵。
+ * **會寫入 NameMapping。** 名字一律唔改（保留職事表寫法）。
+ * @param {Object[]} links 每項 {personId, memberNo}
+ * @returns {Object} {ok, linked, skipped, sync}
+ */
+function apiHwcasLinkSelected(links) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('連結出席系統', function () {
+    return hwcasLinkSelected_locked_(links);
+  });
+}
+
+function hwcasLinkSelected_locked_(links) {
+  const list = (links || []).filter(function (l) { return l && String(l.personId || '').trim(); });
+  if (list.length === 0) {
+    return { ok: false, message: buildThreePartMessage_('一位都沒有勾。', '什麼都沒有改動。',
+      ['勾選你確認過的人再撳一次', '這裡刻意預設全部不勾——按姓名配對錯了就會寄錯人']) };
+  }
+  const config = readConfig();
+  if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
+  let hwcas;
+  try {
+    hwcas = readHwcasByMemberNo_(config);
+  } catch (err) {
+    return hwcasReadFailureResult_(err);
+  }
+  const M = COLUMNS.NAME_MAPPING;
+  const prefixMap = readCongregationPrefixMap_();
+  const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
+  const analysis = analyseHwcasLinks_(hwcas);
+  const usedNos = {};
+  analysis.linked.concat(analysis.notFound).forEach(function (p) { usedNos[p.memberNo] = p; });
+  analysis.duplicates.forEach(function (d) { usedNos[d.memberNo] = d; });
+
+  const linked = [];
+  const skipped = [];
+  list.forEach(function (l) {
+    const personId = String(l.personId).trim();
+    const memberNo = normalizeMemberNo_(l.memberNo);
+    if (memberNo.error || !memberNo.value) {
+      skipped.push({ personId: personId, reason: '會眾編號不是 5 位數字' });
+      return;
+    }
+    const key = memberNoKey_(memberNo.value);
+    if (!hwcas.byNo[key]) { skipped.push({ personId: personId, reason: '出席系統找不到編號 ' + key }); return; }
+    if (usedNos[key]) { skipped.push({ personId: personId, reason: '編號 ' + key + ' 已經是名單上另一位的' }); return; }
+    const found = findRowById_(SHEETS.NAME_MAPPING, M.PERSON_ID, personId);
+    if (found.sheetRow === -1) { skipped.push({ personId: personId, reason: '名單上找不到這個編號' }); return; }
+    if (memberNoKey_(found.record[M.MEMBER_NO])) { skipped.push({ personId: personId, reason: '這一位已經有會眾編號' }); return; }
+    const updates = {};
+    updates[M.MEMBER_NO] = memberNo.value;
+    const derived = deriveCongregationAndType_(key, prefixMap);
+    if (derived.congregation) updates[M.CONGREGATION] = derived.congregation;
+    if (derived.memberType) updates[M.MEMBER_TYPE] = derived.memberType;
+    writeRowFields_(opened.sheet, opened.headers, found.sheetRow, updates);
+    usedNos[key] = true;
+    writeZone3Audit_({
+      action: 'HWCAS_LINK',
+      targetSheet: SHEETS.NAME_MAPPING,
+      targetKey: personId,
+      oldValue: M.MEMBER_NO + '=（空白）',
+      newValue: M.MEMBER_NO + '=' + key,
+      notes: String(found.record[M.NAME_TC] || '') + '　幹事確認連結出席系統「' + hwcas.byNo[key].name + '」（名字保留職事表寫法）'
+    });
+    linked.push({ personId: personId, nameTC: String(found.record[M.NAME_TC] || ''), memberNo: key });
+  });
+
+  // 連結完即時按編號更新一次電郵（已經喺鎖入面）
+  const sync = linked.length > 0 ? runHwcasSyncSafely_({ force: true }) : null;
+  return { ok: true, linked: linked, skipped: skipped, sync: sync };
+}
+
+/**
+ * 〔加入名單〕：喺出席系統搜尋（姓名欄 `HWCAS_COL_NAME`＋`NameAlias`，或者會眾編號）。**純讀取。**
+ * @param {string} keyword 職事表上嗰個名（預設填入）或者會眾編號
+ * @returns {Object} {ok, keyword, candidates:[{memberNo, hwcasName, congregation, memberType, emailMasked, hasEmail, lastAttendance, existingPersonId, existingNameTC}]}
+ */
+function apiHwcasSearchPeople(keyword) {
+  assertWebAppRequestAllowed_();
+  const kw = String(keyword || '').trim();
+  const config = readConfig();
+  if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
+  if (!kw) return { ok: true, keyword: '', candidates: [] };
+  let hwcas;
+  try {
+    hwcas = readHwcasByMemberNo_(config);
+  } catch (err) {
+    return hwcasReadFailureResult_(err);
+  }
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const prefixMap = readCongregationPrefixMap_();
+
+  // 名單上已經有呢個編號嘅人
+  const M = COLUMNS.NAME_MAPPING;
+  const existingByNo = {};
+  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    const no = memberNoKey_(row[M.MEMBER_NO]);
+    if (no && !existingByNo[no]) existingByNo[no] = { personId: String(row[M.PERSON_ID] || '').trim(), nameTC: String(row[M.NAME_TC] || '').trim() };
+  });
+
+  // 搜尋字串：本身 ＋ 佢係別名嘅話，正名都一齊搵
+  const terms = [kw];
+  try {
+    const aliasMap = readNameAlias();
+    const nameIndex = buildPersonNameIndex_();
+    if (aliasMap[kw] && nameIndex[aliasMap[kw]] && terms.indexOf(nameIndex[aliasMap[kw]]) === -1) terms.push(nameIndex[aliasMap[kw]]);
+  } catch (err) { /* 別名讀唔到就只用原字 */ }
+
+  const isNo = /^\d+$/.test(kw.replace(/^'/, ''));
+  const candidates = hwcas.all.filter(function (e) {
+    if (isNo) return e.memberNo === memberNoKey_(kw);
+    return e.names.some(function (n) { return terms.some(function (t) { return n.indexOf(t) !== -1; }); });
+  }).slice(0, 20).map(function (e) {
+    const derived = deriveCongregationAndType_(e.memberNo, prefixMap);
+    const ex = existingByNo[e.memberNo] || null;
+    return {
+      memberNo: e.memberNo,
+      hwcasName: e.name,
+      congregation: derived.congregation,
+      memberType: derived.memberType,
+      emailMasked: maskEmailForPreview_(e.email),
+      hasEmail: !!e.email,
+      lastAttendance: toDateString(e.lastAttendance, timezone),
+      existingPersonId: ex ? ex.personId : '',
+      existingNameTC: ex ? ex.nameTC : ''
+    };
+  });
+  return { ok: true, keyword: kw, candidates: candidates };
+}
+
+/**
+ * 〔加入名單〕揀咗一位 ⇒ 新增 `NameMapping`：`NameTC`＝**職事表上嘅寫法**、`MemberNo`、堂會／身分由編號推、
+ * 電郵由出席系統來（`EmailSource=HWCAS`）。**會寫入。** 唔可以人手打電郵。
+ * 嗰個編號已經喺名單上 ⇒ 唔新增，回 `existing`（前端提供〔加一個別名〕）。
+ * @param {Object} payload {nameTC, memberNo, postId, alsoEligible}
+ * @returns {Object}
+ */
+function apiAddPersonFromHwcas(payload) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('由出席系統加入名單', function () {
+    return addPersonFromHwcas_locked_(payload);
+  });
+}
+
+function addPersonFromHwcas_locked_(payload) {
+  const p = payload || {};
+  const M = COLUMNS.NAME_MAPPING;
+  const nameTC = String(p.nameTC || '').trim();
+  if (!nameTC) {
+    return { ok: false, message: buildThreePartMessage_('中文名不可以留空。', '什麼都沒有加入。', ['用職事表上的寫法填中文名']) };
+  }
+  const memberNo = normalizeMemberNo_(p.memberNo);
+  if (memberNo.error || !memberNo.value) {
+    return { ok: false, message: buildThreePartMessage_('沒有收到會眾編號。', '什麼都沒有加入。', ['在出席系統的搜尋結果揀一位再撳']) };
+  }
+  const key = memberNoKey_(memberNo.value);
+  const config = readConfig();
+  if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
+  let hwcas;
+  try {
+    hwcas = readHwcasByMemberNo_(config);
+  } catch (err) {
+    return hwcasReadFailureResult_(err);
+  }
+  const entry = hwcas.byNo[key];
+  if (!entry) {
+    return { ok: false, notInHwcas: true, message: '出席系統找不到編號 ' + key + '。請辦公室先在出席系統加入他，之後再撳〔加入名單〕。' };
+  }
+
+  // 編號已經喺名單上（另一個寫法）⇒ 唔新增人
+  const existingIds = {};
+  let existing = null;
+  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    const id = String(row[M.PERSON_ID] || '').trim();
+    if (id) existingIds[id] = true;
+    if (!existing && memberNoKey_(row[M.MEMBER_NO]) === key) {
+      existing = { personId: id, nameTC: String(row[M.NAME_TC] || '').trim() };
+    }
+  });
+  if (existing) {
+    return {
+      ok: false, existing: existing, canAlias: existing.nameTC !== nameTC,
+      message: '這是名單上的「' + existing.nameTC + '」（' + existing.personId + '）。'
+        + (existing.nameTC !== nameTC ? '可以把「' + nameTC + '」記成他的別名，之後系統就認得。' : '')
+    };
+  }
+
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const derived = deriveCongregationAndType_(key, readCongregationPrefixMap_());
+  const personId = allocatePersonId_(existingIds);
+  const record = {};
+  record[M.PERSON_ID] = personId;
+  record[M.NAME_TC] = nameTC;                    // ⚠️ 職事表上嘅寫法，唔係出席系統嘅
+  record[M.NAME_EN] = '';
+  record[M.MEMBER_NO] = memberNo.value;
+  if (derived.congregation) record[M.CONGREGATION] = derived.congregation;
+  if (derived.memberType) record[M.MEMBER_TYPE] = derived.memberType;
+  record[M.EMAIL] = entry.email;
+  record[M.EMAIL_SOURCE] = EMAIL_SOURCE_HWCAS;
+  if (entry.email) record[M.EMAIL_VERIFIED_AT] = today;
+  const la = toDateString(entry.lastAttendance, timezone);
+  if (la) record[M.LAST_ATTENDANCE] = la;
+  const mp = String(entry.meetingPoint === null || entry.meetingPoint === undefined ? '' : entry.meetingPoint).trim();
+  if (mp) record[M.MEETING_POINT] = mp;
+  record[M.ACTIVE] = BOOLEAN_TEXT.TRUE;
+  record[M.SYNCED_AT] = nowTimestamp_();
+
+  const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
+  appendRowFields_(opened.sheet, opened.headers, record);
+  writeZone3Audit_({
+    action: 'PERSON_ADD_FROM_HWCAS',
+    targetSheet: SHEETS.NAME_MAPPING,
+    targetKey: personId,
+    oldValue: '（新增）',
+    newValue: M.NAME_TC + '=' + nameTC + '　' + M.MEMBER_NO + '=' + key + '　' + M.EMAIL + '=' + (maskEmailForPreview_(entry.email) || '（空白）'),
+    notes: '由出席系統「' + entry.name + '」加入；名字保留職事表寫法'
+  });
+
+  // （可選）讓他可以做那一個崗位——同以前〔加入名單〕一樣，用返同一條路
+  const postId = String(p.postId || '').trim();
+  let eligibilityAdded = 0;
+  if (postId && p.alsoEligible !== false) {
+    const r = apiSaveEligibilityBatch([{ personId: personId, postId: postId, eligible: true }]);
+    eligibilityAdded = (r && r.added) || 0;
+  }
+  const noEmailNote = entry.email ? '' : '出席系統沒有這一位的電郵，所以他收不到信。記得在第 4 步印紙本給他。';
+  return {
+    ok: true,
+    personId: personId,
+    nameTC: nameTC,
+    memberNo: key,
+    hasEmail: !!entry.email,
+    eligibilityAdded: eligibilityAdded,
+    noEmailNote: noEmailNote,
+    message: '已經加入「' + nameTC + '」（' + personId + '）' + (entry.email ? '，電郵已由出席系統讀取' : '') + '。'
+      + (eligibilityAdded > 0 ? '而且他現在可以做那一個崗位。' : '')
+  };
+}

@@ -129,6 +129,8 @@
     'apiRoleOverview',
     'apiListExclusions',
     'apiHwcasPreview',
+    'apiHwcasLinkPreview',
+    'apiHwcasSearchPeople',
     'apiListVersionsForZone4',
     'apiVerifyRosterForZone4',
     'apiListPendingBackfillCellsForZone4',
@@ -1996,6 +1998,26 @@
     } else {
       linkBox.hidden = true;
     }
+
+    // 第七十七輪批次 EG 組：電郵由出席系統讀取——一行細字講幾時更新過；有人收唔到電郵就指去「出席系統連結」
+    const hwcasBox = clear(el('statusHwcas'));
+    const hs = d.hwcasSync || {};
+    const gaps = d.peopleEmailGaps || {};
+    let hwcasLines = 0;
+    if (hs.line) {
+      hwcasBox.appendChild(make('div', { text: hs.line, className: hs.errorText ? 'vio-row' : 'muted' }));
+      hwcasLines++;
+    }
+    if (gaps.noEmail > 0) {
+      const line = make('div', { className: 'muted' });
+      line.appendChild(make('span', {
+        text: gaps.noEmail + ' 位收不到電郵（沒有連結出席系統或者出席系統沒有電郵）▸ 進階與診斷 ▸ '
+      }));
+      line.appendChild(button('出席系統連結', () => openHwcasLink(), 'link'));
+      hwcasBox.appendChild(line);
+      hwcasLines++;
+    }
+    hwcasBox.hidden = hwcasLines === 0;
 
     // ⚠️ 第六十三輪批次 A 組：公開連結未跟上（例如填咗講員而未重發佈）。
     // 寄出前系統會自動補發，但幹事要知——佢可能已經把連結貼咗出去。

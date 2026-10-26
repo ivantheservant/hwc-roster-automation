@@ -458,3 +458,298 @@ function writeHwcasDraftSheet_(draft, source) {
   sheet.autoResizeColumns(1, headers.length);
   return sheetName;
 }
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十七輪批次 EG 組：方法 A——姓名同電郵由出席系統讀取（按會眾編號）
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * Ivan 嘅決定：會眾資料只要出席系統一個來源。職事表直接讀出席系統試算表（唔開 API），
+ * **每次打開幹事介面時讀一次**（換季度、重新整理唔再讀）；每一條寄出路寄信之前都讀一次
+ *（10 分鐘內已更新過就略過）。電郵跟出席系統（按會眾編號）；**名字保留職事表自己嘅寫法**。
+ *
+ * ⚠️ 對出席系統一律唯讀——讀取仍然只經 `readHwcasMembers_()`（只讀 Config `HWCAS_READ_COLUMNS` 列明嘅欄）。
+ * ⚠️ 讀唔到出席系統**唔可以**令主畫面或者寄出失敗：照用上次嘅電郵，畫面講一句。
+ * ⚠️ 只寫有改變嘅格；**唔改** `NameTC`、`NameEN`、`PersonID`、`Active`、`MaxPerQuarter`。
+ */
+
+/** Script Properties 嘅鍵：上次同步時間（epoch ms）、顯示文字、上次錯誤。 */
+const HWCAS_SYNC_LAST_AT_KEY = 'HWCAS_SYNC_LAST_AT';
+const HWCAS_SYNC_LAST_TEXT_KEY = 'HWCAS_SYNC_LAST_TEXT';
+const HWCAS_SYNC_LAST_ERROR_KEY = 'HWCAS_SYNC_LAST_ERROR';
+/** 寄出之前：10 分鐘內已更新過就略過。 */
+const HWCAS_SYNC_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
+/**
+ * 會眾編號嘅比對鍵：去前綴單引號、去空白；全數字就補足 5 位（出席系統有時係數字 1234，名單係 '01234）。
+ * @param {*} raw
+ * @returns {string}
+ */
+function memberNoKey_(raw) {
+  let text = String(raw === null || raw === undefined ? '' : raw).trim().replace(/^'/, '').trim();
+  if (/^\d+$/.test(text) && text.length < 5) text = ('00000' + text).slice(-5);
+  return text;
+}
+
+/**
+ * 讀出席系統一次，以會眾編號為鍵。**唯讀**（經 `readHwcasMembers_()`）。
+ * @param {Object.<string, *>} config `readConfig()` 嘅結果
+ * @returns {{byNo: Object, all: Object[], duplicateNos: string[], records: Object[], fieldColumns: Object, headers: Object}}
+ */
+function readHwcasByMemberNo_(config) {
+  const source = readHwcasMembers_(config);
+  const cols = readHwcasFieldColumns_(config);
+  const byNo = {};
+  const dup = {};
+  source.records.forEach(function (r) {
+    const no = cols.memberNo ? memberNoKey_(r[cols.memberNo]) : '';
+    if (!no) return;
+    const names = (cols.nameColumns && cols.nameColumns.length > 0)
+      ? cols.nameColumns.map(function (c) { return String(r[c] || '').trim(); }).filter(function (n) { return n !== ''; })
+      : [extractHwcasName_(r)].filter(function (n) { return n !== ''; });
+    const entry = {
+      memberNo: no,
+      names: names,
+      name: names.join(' / '),
+      email: cols.email ? String(r[cols.email] || '').trim() : extractHwcasEmail_(r),
+      lastAttendance: cols.lastAttendance ? r[cols.lastAttendance] : '',
+      meetingPoint: cols.meetingPoint ? r[cols.meetingPoint] : '',
+      rowNumber: r._rowNumber
+    };
+    if (byNo[no]) { dup[no] = true; return; }
+    byNo[no] = entry;
+  });
+  return {
+    byNo: byNo,
+    all: Object.keys(byNo).map(function (k) { return byNo[k]; }),
+    duplicateNos: Object.keys(dup),
+    records: source.records,
+    fieldColumns: cols,
+    headers: source.headers
+  };
+}
+
+/**
+ * 名單（`NameMapping` 全部行，唔理 Active）同出席系統按會眾編號對一次。**純讀取。**
+ * @param {Object} hwcas `readHwcasByMemberNo_()` 嘅結果
+ * @returns {{linked: Object[], unlinked: Object[], notFound: Object[], duplicates: Object[], noEmailInHwcas: Object[]}}
+ */
+function analyseHwcasLinks_(hwcas) {
+  const M = COLUMNS.NAME_MAPPING;
+  const linked = [];
+  const unlinked = [];
+  const notFound = [];
+  const byNo = {};
+  readSheet(SHEETS.NAME_MAPPING).forEach(function (row, i) {
+    const personId = String(row[M.PERSON_ID] || '').trim();
+    if (!personId) return;
+    const person = {
+      sheetRow: i + 3,
+      personId: personId,
+      nameTC: String(row[M.NAME_TC] || '').trim() || personId,
+      memberNo: memberNoKey_(row[M.MEMBER_NO]),
+      active: isTrueValue_(row[M.ACTIVE]),
+      row: row
+    };
+    if (!person.memberNo) { unlinked.push(person); return; }
+    if (!byNo[person.memberNo]) byNo[person.memberNo] = [];
+    byNo[person.memberNo].push(person);
+  });
+  const duplicates = [];
+  Object.keys(byNo).sort().forEach(function (no) {
+    const people = byNo[no];
+    if (people.length > 1) {
+      // 兩行用同一個編號 ⇒ 唔知邊一行先係佢，一律唔改，列出嚟
+      duplicates.push({ memberNo: no, people: people.map(function (p) { return { personId: p.personId, nameTC: p.nameTC }; }) });
+      return;
+    }
+    const p = people[0];
+    const h = hwcas.byNo[no];
+    if (!h) { notFound.push(p); return; }
+    p.hwcas = h;
+    linked.push(p);
+  });
+  return {
+    linked: linked,
+    unlinked: unlinked,
+    notFound: notFound,
+    duplicates: duplicates,
+    noEmailInHwcas: linked.filter(function (p) { return !p.hwcas.email; })
+  };
+}
+
+/**
+ * 按會眾編號把出席系統嘅電郵（同最後出席日期、聚會點）更新入 `NameMapping`。**會寫入。**
+ *
+ *   ・只寫有改變嘅格；每個有改動嘅人寫一行 AuditLog（電郵遮蔽）
+ *   ・出席系統冇電郵 ⇒ 名單都清空（跟出席系統）
+ *   ・出席系統搵唔到該編號 ⇒ 唔改，列入「找不到」；兩行同一個編號 ⇒ 列入「重複」
+ *   ・**唔改** `NameTC`、`NameEN`、`PersonID`、`Active`、`MaxPerQuarter`
+ * 讀唔到出席系統會拋錯——由 `runHwcasSyncSafely_()` 接住。
+ * @returns {Object} {updated, emailChanged, notFound, duplicates, unlinkedCount, noEmailInHwcasCount, syncedAtText}
+ */
+function syncPeopleFromHwcasByMemberNo_() {
+  const config = readConfig();
+  const hwcas = readHwcasByMemberNo_(config);
+  const analysis = analyseHwcasLinks_(hwcas);
+  const M = COLUMNS.NAME_MAPPING;
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const now = nowTimestamp_();
+
+  const changes = [];
+  analysis.linked.forEach(function (p) {
+    const h = p.hwcas;
+    const row = p.row;
+    const updates = {};
+    const oldEmail = String(row[M.EMAIL] || '').trim();
+    const emailChanged = oldEmail !== h.email;
+    if (emailChanged) {
+      updates[M.EMAIL] = h.email;
+      updates[M.EMAIL_VERIFIED_AT] = today;
+    }
+    if (String(row[M.EMAIL_SOURCE] || '').trim() !== EMAIL_SOURCE_HWCAS) updates[M.EMAIL_SOURCE] = EMAIL_SOURCE_HWCAS;
+    const la = toDateString(h.lastAttendance, timezone);
+    if (la && la !== toDateString(row[M.LAST_ATTENDANCE], timezone)) updates[M.LAST_ATTENDANCE] = la;
+    const mp = String(h.meetingPoint === null || h.meetingPoint === undefined ? '' : h.meetingPoint).trim();
+    if (mp && mp !== String(row[M.MEETING_POINT] || '').trim()) updates[M.MEETING_POINT] = mp;
+    if (Object.keys(updates).length === 0) return;
+    updates[M.SYNCED_AT] = now;
+    changes.push({ sheetRow: p.sheetRow, personId: p.personId, nameTC: p.nameTC, updates: updates,
+      oldEmail: oldEmail, newEmail: h.email, emailChanged: emailChanged });
+  });
+
+  if (changes.length > 0) {
+    const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
+    changes.forEach(function (c) {
+      writeRowFields_(opened.sheet, opened.headers, c.sheetRow, c.updates);
+      if (!c.emailChanged) return;
+      writeZone3Audit_({
+        action: 'HWCAS_SYNC_EMAIL',
+        targetSheet: SHEETS.NAME_MAPPING,
+        targetKey: c.personId,
+        oldValue: M.EMAIL + '=' + (maskEmailForPreview_(c.oldEmail) || '（空白）'),
+        newValue: M.EMAIL + '=' + (maskEmailForPreview_(c.newEmail) || '（空白）'),
+        notes: c.nameTC + '　按會眾編號由出席系統更新'
+      });
+    });
+  }
+
+  return {
+    updated: changes.length,
+    emailChanged: changes.filter(function (c) { return c.emailChanged; }).length,
+    notFound: analysis.notFound.map(function (p) { return { personId: p.personId, nameTC: p.nameTC, memberNo: p.memberNo }; }),
+    duplicates: analysis.duplicates,
+    unlinkedCount: analysis.unlinked.length,
+    noEmailInHwcasCount: analysis.noEmailInHwcas.length,
+    syncedAtText: now
+  };
+}
+
+/** Script Properties（讀唔到就當冇紀錄——唔可以令主畫面失敗）。 */
+function readHwcasSyncStatus_() {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    return {
+      lastAtMs: Number(p.getProperty(HWCAS_SYNC_LAST_AT_KEY)) || 0,
+      lastText: String(p.getProperty(HWCAS_SYNC_LAST_TEXT_KEY) || ''),
+      lastError: String(p.getProperty(HWCAS_SYNC_LAST_ERROR_KEY) || '')
+    };
+  } catch (err) {
+    return { lastAtMs: 0, lastText: '', lastError: '' };
+  }
+}
+
+function writeHwcasSyncStatus_(fields) {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    Object.keys(fields).forEach(function (k) { p.setProperty(k, String(fields[k])); });
+  } catch (err) {
+    log_('WARN', 'HWCAS 同步狀態寫不入 Script Properties：' + err.message);
+  }
+}
+
+/** 讀唔到出席系統嗰陣畫面同寄出確認窗都講呢一句。 */
+function buildHwcasUnavailableNotice_(lastText) {
+  return '讀不到出席系統，暫時用上次（' + (lastText || '沒有紀錄') + '）的電郵。';
+}
+
+/**
+ * 安全噉同步一次：讀唔到出席系統**唔拋錯**（記低錯誤，畫面講一句）；10 分鐘內已更新過（而且唔係 `force`）就略過。
+ * ⚠️ 呼叫端負責鎖（幹事介面載入：`apiSyncPeopleFromHwcas()` 用 tryLock；寄出路已經喺鎖入面）。
+ * @param {{force: boolean}=} opts
+ * @returns {Object} {ok, skipped, updated, …, notice}
+ */
+function runHwcasSyncSafely_(opts) {
+  const o = opts || {};
+  const status = readHwcasSyncStatus_();
+  if (o.force !== true && status.lastAtMs > 0 && Date.now() - status.lastAtMs < HWCAS_SYNC_MIN_INTERVAL_MS) {
+    return { ok: true, skipped: 'recent', updated: 0, syncedAtText: status.lastText, notice: '' };
+  }
+  try {
+    const r = syncPeopleFromHwcasByMemberNo_();
+    const fields = {};
+    fields[HWCAS_SYNC_LAST_AT_KEY] = Date.now();
+    fields[HWCAS_SYNC_LAST_TEXT_KEY] = r.syncedAtText;
+    fields[HWCAS_SYNC_LAST_ERROR_KEY] = '';
+    writeHwcasSyncStatus_(fields);
+    return Object.assign({ ok: true, skipped: '', notice: '' }, r);
+  } catch (err) {
+    log_('WARN', '出席系統同步失敗（照用上次的電郵）：' + err.message);
+    const fields = {};
+    fields[HWCAS_SYNC_LAST_ERROR_KEY] = err.message;
+    writeHwcasSyncStatus_(fields);
+    return { ok: false, skipped: '', updated: 0, error: err.message, syncedAtText: status.lastText,
+      notice: buildHwcasUnavailableNotice_(status.lastText) };
+  }
+}
+
+/** 寄出路（已經喺鎖入面）：建立收件名單之前同步一次，10 分鐘內已更新過就略過。**唔會令寄出失敗。** */
+function syncPeopleFromHwcasBeforeSend_() {
+  return runHwcasSyncSafely_({ force: false });
+}
+
+/** 寄出確認窗要講嘅一句（上次讀唔到出席系統 ⇒ 講；冇事 ⇒ 空字串）。 */
+function readHwcasNoticeForSend_() {
+  const s = readHwcasSyncStatus_();
+  return s.lastError ? buildHwcasUnavailableNotice_(s.lastText) : '';
+}
+
+/**
+ * 狀態卡嗰兩句。
+ * @returns {{syncedAtText: string, line: string, errorText: string}}
+ */
+function describeHwcasSyncForDashboard_() {
+  const s = readHwcasSyncStatus_();
+  let when = s.lastText;
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    if (when.indexOf(today) === 0) when = '今日 ' + when.slice(11, 16);
+  } catch (err) { /* 照用原文 */ }
+  return {
+    syncedAtText: s.lastText,
+    errorText: s.lastError ? buildHwcasUnavailableNotice_(s.lastText) : '',
+    line: s.lastError
+      ? buildHwcasUnavailableNotice_(s.lastText)
+      : (s.lastText ? '電郵已由出席系統更新（' + when + '）' : '')
+  };
+}
+
+/**
+ * 狀態卡「N 位收不到電郵（沒有連結出席系統或者出席系統沒有電郵）」——只數 Active 嘅人。**純讀取。**
+ * @returns {{noEmail: number, unlinked: number}}
+ */
+function countPeopleEmailGaps_() {
+  const M = COLUMNS.NAME_MAPPING;
+  let noEmail = 0;
+  let unlinked = 0;
+  try {
+    readPeople().forEach(function (row) {
+      if (!String(row[M.EMAIL] || '').trim()) noEmail++;
+      if (!memberNoKey_(row[M.MEMBER_NO])) unlinked++;
+    });
+  } catch (err) {
+    log_('WARN', 'countPeopleEmailGaps_：' + err.message);
+  }
+  return { noEmail: noEmail, unlinked: unlinked };
+}

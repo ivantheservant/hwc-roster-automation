@@ -464,78 +464,116 @@
     const done = onDone || openSaveAndConfirm;
     const typed = String(u.gridText || u.rawText || u.text || '').trim();
     const postName = u.postNameTC || u.postId || '';
+    // 第七十七輪批次 EG 組（Ivan：會眾資料只要出席系統一個來源）：喺出席系統揀人，**唔可以人手打電郵**。
+    // 搜尋格預設填入職事表上嗰個名；同時可以用會眾編號搜尋。名字保留職事表寫法，電郵由出席系統讀取。
+    renderAddFromHwcas(u, typed, postName, typed, done);
+  }
 
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.value = typed;          // 已經填好——佢啱啱先打過一次
-    const enInput = document.createElement('input');
-    enInput.type = 'text';
-    enInput.placeholder = '可以留空';
-    const emailInput = document.createElement('input');
-    emailInput.type = 'text';
-    emailInput.placeholder = '可以留空';
+  function renderAddFromHwcas(u, typed, postName, keyword, done) {
+    runAction('在出席系統搜尋', async () => {
+      const r = await callServer('apiHwcasSearchPeople', keyword);
+      const search = document.createElement('input');
+      search.type = 'text';
+      search.autocomplete = 'off';
+      search.value = keyword;
+      search.placeholder = '姓名（出席系統的寫法）或者會眾編號';
+      search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); renderAddFromHwcas(u, typed, postName, search.value.trim(), done); }
+      });
+      const nodes = [
+        para('在出席系統找這個人。加入之後，名字會保留職事表上的寫法「' + typed + '」，電郵由出席系統讀取。', 'muted'),
+        make('div', { className: 'prop-head' }, [
+          make('span', { text: '搜尋' }), search,
+          button('搜尋', () => renderAddFromHwcas(u, typed, postName, search.value.trim(), done), 'secondary')
+        ])
+      ];
+      if (!r.ok) {
+        nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: r.message || '讀不到出席系統。', className: 'warn-head' })]));
+      } else if (r.candidates.length === 0) {
+        nodes.push(make('div', { className: 'warnbox' }, [
+          make('div', { text: '出席系統找不到這個人。', className: 'warn-head' })
+        ]));
+        nodes.push(make('div', { className: 'sec' }, [
+          sectionTitle('你可以：'),
+          make('div', { text: '・如果他只是這一季幫手，回到「名單上找不到的名字」勾「這一季臨時幫手，不加入名單」', className: 'vio-row' }),
+          make('div', { text: '・請辦公室先在出席系統加入他，之後再撳〔加入名單〕', className: 'vio-row' }),
+          make('div', { text: '・也可以試試用另一個寫法或者會眾編號搜尋', className: 'vio-row' })
+        ]));
+      } else {
+        const list = make('div', { className: 'sec' }, [sectionTitle('出席系統找到這 ' + r.candidates.length + ' 位')]);
+        r.candidates.forEach((c) => {
+          const box = make('div', { className: 'prop' });
+          box.appendChild(make('div', {
+            text: c.hwcasName + '　編號 ' + c.memberNo + (c.congregation ? '　' + c.congregation : '')
+              + (c.memberType ? '／' + c.memberType : '') + '　' + (c.hasEmail ? c.emailMasked : '（出席系統沒有電郵）')
+              + (c.lastAttendance ? '　最後出席 ' + c.lastAttendance : ''),
+            className: 'prop-head'
+          }));
+          if (c.existingPersonId) {
+            box.appendChild(make('div', { text: '這一位已經在名單上：「' + c.existingNameTC + '」（' + c.existingPersonId + '）', className: 'muted' }));
+            box.appendChild(row([button('就是這一位（加一個別名）', () => openAliasForExisting(c, typed, done), '')]));
+          } else {
+            box.appendChild(row([button('就是這一位', () => confirmAddFromHwcas(u, typed, postName, c, done), '')]));
+          }
+          list.appendChild(box);
+        });
+        nodes.push(list);
+      }
+      openModal('加入「' + typed + '」', nodes, [button('關閉', () => closeModal(), 'secondary')]);
+    });
+  }
 
-    // 順帶問一句：同時讓他可以做該崗位。
-    // 預設**勾選**——他既然被排在那一格，多數就是要做那個崗位。
+  function confirmAddFromHwcas(u, typed, postName, c, done) {
+    // 順帶問一句：同時讓他可以做該崗位。預設**勾選**——他既然被排在那一格，多數就是要做那個崗位。
     const eligRow = make('label', { className: 'check-row' });
     const eligCb = document.createElement('input');
     eligCb.type = 'checkbox';
     eligCb.checked = true;
     eligRow.appendChild(eligCb);
-    eligRow.appendChild(make('span', {
-      text: '同時讓他可以做「' + postName + '」'
-    }));
-
-    const field = (label, input) => make('div', { className: 'sec' }, [
-      make('div', { text: label, className: 'sec-title' }), input
-    ]);
-
+    eligRow.appendChild(make('span', { text: '同時讓他可以做「' + postName + '」' }));
     openConfirm({
       title: '加入「' + typed + '」',
       bodyNodes: [
-        para('加入之後會自動重新檢查，這一項應該即刻消失。'),
-        field('中文名', nameInput),
-        field('英文名', enInput),
-        field('電郵', emailInput),
+        para('會把出席系統的「' + c.hwcasName + '」（編號 ' + c.memberNo + '）加入名單，名字用職事表的寫法「' + typed + '」。'),
+        para(c.hasEmail ? '電郵由出席系統讀取：' + c.emailMasked : '出席系統沒有這一位的電郵，所以他收不到信，要用第 4 步印紙本給他。', c.hasEmail ? 'ok-line' : 'vio-row'),
         make('div', { className: 'sec' }, [eligRow]),
-        // ⚠️ 冇電郵係合法嘅（現時就有幾位），但一定要提——
-        // 唔提嘅話幹事會以為加完就萬事俱備，然後嗰個人一直收唔到信。
-        make('div', {
-          text: '沒有電郵的人收不到信，要用第 5 步印紙本給他。',
-          className: 'muted'
-        })
+        para('加入之後會自動重新檢查，這一項應該即刻消失。', 'muted')
       ],
       confirmLabel: '加入',
       onConfirm: () => {
-        const nameTC = nameInput.value.trim();
-        if (!nameTC) { setStatus('中文名不可以留空。', true); return; }
         closeModal();
-        runAction('加入' + nameTC, async () => {
-          const r = await callServerMutating('apiAddPersonForUnresolvedName', {
-            nameTC: nameTC,
-            nameEN: enInput.value.trim(),
-            email: emailInput.value.trim(),
-            postId: u.postId,
-            alsoEligible: eligCb.checked
+        runAction('加入' + typed, async () => {
+          const r = await callServerMutating('apiAddPersonFromHwcas', {
+            nameTC: typed, memberNo: c.memberNo, postId: u.postId, alsoEligible: eligCb.checked
           });
+          if (!r.ok && r.existing) { openAliasForExisting({ existingPersonId: r.existing.personId, existingNameTC: r.existing.nameTC }, typed, done); return; }
           if (!r.ok) { showErrorModal('加入這個人', new Error(r.message)); return; }
-
-          // ⚠️ 撞名只係提示，唔阻擋——真係有兩個同名嘅人係正常事。
-          // 但一定要講出嚟，否則佢會以為加咗落原本嗰一個度。
-          if (r.duplicateWarning) {
-            openModal('加入完成（但要看一眼）', [
-              make('div', { text: r.message, className: 'ok-head' }),
-              make('div', { className: 'warnbox' }, [
-                make('div', { text: r.duplicateWarning, className: 'lines' })
-              ]),
-              para(r.noEmailNote || '', 'muted')
-            ], [button('繼續，重新檢查', () => { closeModal(); done(); }, '')]);
-            return;
-          }
-
+          if (r.noEmailNote) setStatus(r.noEmailNote); else setStatus(r.message);
           // ⚠️ **自動重新檢查**：直接再行一次儲存流程。
-          // 唔自動嘅話佢要自己記得再撳一次，而佢多數會以為加完就搞掂。
-          if (r.noEmailNote) setStatus(r.noEmailNote);
+          done();
+        });
+      }
+    });
+  }
+
+  /** 嗰個會眾編號已經喺名單上（另一個寫法）⇒ 唔新增人，改為加一個別名（重用現有別名函式）。 */
+  function openAliasForExisting(c, typed, done) {
+    openConfirm({
+      title: '這是名單上的「' + c.existingNameTC + '」',
+      bodyNodes: [
+        para('出席系統這一位已經在名單上，寫法是「' + c.existingNameTC + '」。不會再加一個人。'),
+        para(typed !== c.existingNameTC
+          ? '把「' + typed + '」記成他的別名，之後職事表上寫「' + typed + '」系統都認得是他。'
+          : '職事表上的寫法已經一樣，不用加別名。', 'muted')
+      ],
+      confirmLabel: '加一個別名',
+      onConfirm: () => {
+        if (typed === c.existingNameTC) { closeModal(); done(); return; }
+        closeModal();
+        runAction('加入別名', async () => {
+          const r = await callServerMutating('apiSaveAlias', { alias: typed, personId: c.existingPersonId });
+          if (!r.ok) { showErrorModal('加一個別名', new Error(r.message)); return; }
+          setStatus('已把「' + typed + '」記成「' + c.existingNameTC + '」的別名。');
           done();
         });
       }
@@ -1052,6 +1090,8 @@
       buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
       // 第七十五輪批次 CJ 組
       buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));
+      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）
+      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1436,6 +1476,8 @@
       buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
       // 第七十五輪批次 CJ 組
       buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));
+      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）
+      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));
 
       if (preview.alreadySentCount > 0) {
         nodes.push(make('div', { className: 'warnbox' }, [
@@ -1783,6 +1825,8 @@
       // 規格 2.7：**逐個列出**，唔可以淨係寫數字。
       // ⚠️⚠️ 第六十五輪批次 Y 組：最上面係「這一次會寄給的 N 位」，見 buildResendConfirmNodes()
       const nodes = buildResendConfirmNodes(plan);
+      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句
+      if (plan.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: plan.hwcasNotice, className: 'lines' })]));
       // 第七十七輪批次 EE 組：〔給所有人〕⇒ 名單上每一位都會收到，唔會因為「內容沒變」被略過
       if (plan.sendMode === 'ALL') {
         nodes.unshift(make('div', { className: 'warnbox' }, [

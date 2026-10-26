@@ -192,6 +192,8 @@ function apiStep2Preview(quarterId, sendOptions) {
   const plan = planStep2_(quarterId, sendOptions);
   // 第七十五輪批次 CJ 組
   plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);
+  // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 確認窗講一句
+  plan.hwcasNotice = readHwcasNoticeForSend_();
   return plan;
 }
 
@@ -276,6 +278,8 @@ function apiStep2Confirm_locked_(quarterId, sendOptions) {
   const guard = assertNoUnsavedChanges_(quarterId, '寄給堂委審閱',
     resolveAllowUnsavedFlag_(sendOptions));
   logSendWithUnsavedRelease_(quarterId, '寄給堂委審閱', guard);
+  // 第七十七輪批次 EG 組：建立收件名單之前由出席系統更新電郵（10 分鐘內已更新就略過；讀唔到唔會令寄出失敗）
+  syncPeopleFromHwcasBeforeSend_();
   // 第二十六輪批次階段 A2-2：冇公開連結就唔好寄。見 assertPublicLinkReady_()。
   assertPublicLinkReady_(quarterId);
   const result = executeStep2_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
@@ -460,6 +464,8 @@ function apiStep4GetSendPreview(quarterId, versionNo, sendOptions) {
   const preview = planStep4SendPreview_(quarterId, versionNo, sendOptions);
   // 第七十五輪批次 CJ 組
   preview.unreachable = buildUnreachablePeople_(quarterId, versionNo);
+  // 第七十七輪批次 EG 組
+  preview.hwcasNotice = readHwcasNoticeForSend_();
   return preview;
 }
 
@@ -489,6 +495,8 @@ function apiStep4Confirm_locked_(quarterId, sendOptions) {
   const guard = assertNoUnsavedChanges_(quarterId, '正式發出給全體',
     resolveAllowUnsavedFlag_(sendOptions));
   logSendWithUnsavedRelease_(quarterId, '正式發出給全體', guard);
+  // 第七十七輪批次 EG 組：寄之前由出席系統更新電郵
+  syncPeopleFromHwcasBeforeSend_();
   const result = executeStep4Send_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
@@ -569,7 +577,9 @@ function apiStep5Plan(quarterId, sendOptions) {
     contents: describeConfirmContents_(MAIL_STAGES.RESEND, sendOptions),
     isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 第六十七輪批次 AG／AH 組
-    sendWarnings: summariseVersionSendWarnings_(quarterId, changedPlan.versionNo)
+    sendWarnings: summariseVersionSendWarnings_(quarterId, changedPlan.versionNo),
+    // 第七十七輪批次 EG 組
+    hwcasNotice: readHwcasNoticeForSend_()
   };
 }
 
@@ -752,6 +762,8 @@ function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
   const guard = assertNoUnsavedChanges_(quarterId, '改動後重發',
     resolveAllowUnsavedFlag_(sendOptions));
   logSendWithUnsavedRelease_(quarterId, '改動後重發', guard);
+  // 第七十七輪批次 EG 組：寄之前由出席系統更新電郵
+  syncPeopleFromHwcasBeforeSend_();
   const changed = planStep5ChangedList_(quarterId);
   // ⚠️ 第七十三輪批次 BA 組：唔設硬規則關卡（見 `apiStep5GeneratePdfs_locked_()`）。
   // 有未放行嘅違反 ⇒ 只寫一行提醒紀錄（`logUnreleasedHardViolationsAtSend_()`，唔係放行紀錄）。

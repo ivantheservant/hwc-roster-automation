@@ -44,8 +44,8 @@ console.log('\n=== E【核心】對 HWCAS 一律唯讀 ===');
 {
   check('★★★★★ 全檔冇任何 openById 之外嘅 HWCAS 存取，亦冇任何寫入呼叫',
     !/setValue|setValues|appendRow|deleteRow|insertSheet/.test(
-      backend.replace(/writeRowFields_[^\n]*/g, '')),
-    '（writeRowFields_ 寫嘅係本試算表嘅 NameMapping，唔係 HWCAS）');
+      backend.replace(/writeRowFields_[^\n]*/g, '').replace(/appendRowFields_[^\n]*/g, '')),
+    '（writeRowFields_／appendRowFields_ 寫嘅係本試算表嘅 NameMapping，唔係 HWCAS）');
   check('★★★★★ 讀取完全重用 readHwcasMembers_()（佢只讀 Config 列明嘅欄）'
     + '——自己再寫一次讀取就可能讀到唔應該讀嘅欄（例如密碼欄）',
     /readHwcasMembers_\(config\)/.test(backend));
@@ -70,20 +70,21 @@ console.log('\n=== E【核心】預設全部唔勾 ===');
   // 第二十八輪批次階段 D 之後：第三、四類會摺埋，撳「展開看看」會重畫，
   // 所以 checkbox 唔可以再寫死 `false`（寫死就會靜靜清走幹事勾咗嘅行）。
   // 「預設唔勾」呢個保證改成由 `hwcasChecked` 開畫面嗰陣係空嘅嚟撐住。
-  check('★★★★★ 前端 checkbox 預設唔勾（`hwcasChecked` 開畫面嗰陣係空嘅）'
+  // 第七十七輪批次 EG 組：畫面改為「出席系統連結」（按會眾編號連結，電郵之後自動讀）——預設唔勾呢個保證不變
+  check('★★★★★ 前端 checkbox 預設唔勾（`hwcasLinkPicked` 開畫面嗰陣係空嘅）'
     + '——呢一行係整個畫面最重要嘅一行',
-    /cb\.checked = !!hwcasChecked\[r\.personId\];/.test(zone3)
-    && /hwcasChecked = \{\};\s*\n\s*hwcasExpanded = /.test(zone3));
-  check('★★★★★ 而且冇任何地方預先填 `hwcasChecked`'
+    /cb\.checked = hwcasLinkPicked\[p\.personId\] === c\.memberNo;/.test(zone3)
+    && /hwcasLinkPicked = \{\};\s*\n\s*renderHwcasLink\(\)/.test(zone3));
+  check('★★★★★ 而且冇任何地方預先填 `hwcasLinkPicked`'
     + '——填咗就等於幫幹事勾咗',
-    !/hwcasChecked\[[^\]]+\] = true;[\s\S]{0,80}?forEach/.test(zone3));
+    !/hwcasLinkPicked\[[^\]]+\] = [^;]+;[\s\S]{0,80}?forEach/.test(zone3.slice(zone3.indexOf('function renderHwcasLink'), zone3.indexOf('function confirmHwcasLink'))));
   check('★★★★★ 冇「全部勾選」之類嘅捷徑'
     + '——有咗嗰粒掣，「逐個睇過」就會變成「撳一下」',
-    !/全部勾選|全選/.test(zone3));
+    !/全部勾選|全選/.test(zone3.slice(zone3.indexOf('出席系統連結（取代'))));
   check('★★★★ 畫面明講預設唔勾同原因',
-    zone3.indexOf('所以這裡預設全部不勾。請逐個看過再勾。') !== -1);
+    zone3.indexOf('所以預設全部不勾，請逐個看過才勾') !== -1);
   check('★★★★★ 而且講得出配對錯嘅實際後果',
-    zone3.indexOf('對錯了就會把甲的電郵寫進乙的資料') !== -1);
+    zone3.indexOf('對錯了就會寄錯人') !== -1);
 }
 
 console.log('\n=== E【核心】名字相似但唔同人：紅色警告，而且唔可以勾 ===');
@@ -103,9 +104,8 @@ console.log('\n=== E【核心】名字相似但唔同人：紅色警告，而且
     /existingEmail && hwcasEmail && !sameEmail\) \{[\s\S]{0,160}?riskLevel = 'HIGH'/.test(row));
   check('★★★★ 靠別名對上嘅會提一提（兩邊寫法唔同）',
     row.indexOf('是靠「別名」對上的') !== -1);
-  check('★★★★★ 風險分級喺後端做，前端只負責畫紅色'
-    + '——判斷邏輯留喺一處，將來加多一種風險唔使兩邊改',
-    /r\.riskLevel === 'HIGH'/.test(zone3) && !/matchType === 'AMBIGUOUS'/.test(zone3));
+  check('★★★★★ 風險分級喺後端做（riskLevel／warnings 由 buildHwcasPreviewRow_ 出），前端唔自己判斷 AMBIGUOUS',
+    /riskLevel = 'HIGH'/.test(row) && !/matchType === 'AMBIGUOUS'/.test(zone3));
 }
 
 console.log('\n=== E【核心】套用：後端唔信前端傳嚟嘅值 ===');
@@ -153,7 +153,7 @@ console.log('\n=== E Config 未設定時要講人話 ===');
     backend.indexOf('還沒有設定出席系統的試算表位置。請先在 Config 填 HWCAS_SPREADSHEET_ID。') !== -1);
   check('★★★★★ 而且係一個獨立旗標（notConfigured），前端唔使靠字串比對'
     + '——靠字串比對就會喺改文案嗰日靜靜壞咗',
-    /notConfigured: true/.test(preview) && /hwcasData\.notConfigured/.test(zone3));
+    /notConfigured: true/.test(preview) && /d\.notConfigured/.test(zone3));
   check('★★★★ 讀取失敗（權限／ID 錯）用三段式訊息，唔係原始 exception',
     /buildThreePartMessage_\([\s\S]{0,120}?讀不到出席系統的資料/.test(preview));
 }
@@ -170,9 +170,10 @@ console.log('\n=== E 冇嘢可以補嗰啲唔應該佔住畫面 ===');
 
 console.log('\n=== E 確認畫面 ===');
 {
-  check('★★★★★ 套用前有確認畫面，而且逐行列出「舊 → 新」',
-    /openConfirm\(\{[\s\S]{0,900}?callServerMutating\('apiHwcasApplySelected'/.test(zone3)
-    && /\(r\.existingEmail \|\| '（空白）'\) \+ ' → ' \+ r\.hwcasEmail/.test(zone3));
+  // 第七十七輪批次 EG 組：畫面改為「出席系統連結」——連結前有確認畫面，逐行列出「人 → 出席系統候選人」
+  check('★★★★★ 連結前有確認畫面，而且逐行列出',
+    /openConfirm\(\{[\s\S]{0,1200}?callServerMutating\('apiHwcasLinkSelected'/.test(zone3)
+    && /p\.nameTC \+ '　→　' \+/.test(zone3));
   check('★★★★ 有「不會做的事」，而且明講唔會改動出席系統',
     zone3.indexOf('不會改動出席系統（那邊一律唯讀）') !== -1);
 }
@@ -182,12 +183,13 @@ console.log('\n=== E 呼叫層同入口 ===');
   const listMatch = common.match(/const READ_ONLY_APIS = \[([\s\S]*?)\];/);
   const readOnly = (listMatch[1].match(/'([A-Za-z0-9_]+)'/g) || []).map((s) => s.replace(/'/g, ''));
   check('★★★★ apiHwcasPreview 喺唯讀白名單', readOnly.indexOf('apiHwcasPreview') !== -1);
-  check('★★★★★ apiHwcasApplySelected 唔喺白名單，而且用 callServerMutating()',
-    readOnly.indexOf('apiHwcasApplySelected') === -1
-    && zone3.indexOf("callServerMutating('apiHwcasApplySelected'") !== -1);
-  // 第七十七輪批次 EF 組：「人員與電郵」畫面拿走 ⇒ 入口喺「進階與診斷 ▸ 出席系統連結」
+  check('★★★★★ 會寫入嘅（apiHwcasApplySelected／apiHwcasLinkSelected）唔喺白名單；連結用 callServerMutating()',
+    readOnly.indexOf('apiHwcasApplySelected') === -1 && readOnly.indexOf('apiHwcasLinkSelected') === -1
+    && zone3.indexOf("callServerMutating('apiHwcasLinkSelected'") !== -1);
+  check('★★★★ 唯讀嘅 apiHwcasLinkPreview／apiHwcasSearchPeople 喺白名單', readOnly.indexOf('apiHwcasLinkPreview') !== -1 && readOnly.indexOf('apiHwcasSearchPeople') !== -1);
+  // 第七十七輪批次 EF／EG 組：「人員與電郵」畫面拿走 ⇒ 入口喺「進階與診斷 ▸ 出席系統連結」
   check('★★★★ 進階與診斷有「出席系統連結」入口',
-    /zone4Row\('出席系統連結'/.test(read('src/ui/ScriptZone4.html')) && /openHwcas\(\)/.test(read('src/ui/ScriptZone4.html')));
+    /zone4Row\('出席系統連結'/.test(read('src/ui/ScriptZone4.html')) && /openHwcasLink\(\)/.test(read('src/ui/ScriptZone4.html')));
   check('★★★★★ 而且「暫時請用選單」嗰句已經拆走',
     !/「從出席系統補電郵」暫時請用試算表上方的選單/.test(zone3));
 }

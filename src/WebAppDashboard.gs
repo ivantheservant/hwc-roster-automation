@@ -648,6 +648,9 @@ function buildDashboardState_(quarterId) {
     stage: stage,
     // 第七十七輪批次 EE 組：第 3 步〔變動的人〕要正式發出過先可以撳
     officialSentOnce: !!sendLog.officialSentOnce,
+    // 第七十七輪批次 EG 組：狀態卡「電郵已由出席系統更新（…）」／「讀不到出席系統…」；N 位收不到電郵
+    hwcasSync: describeHwcasSyncForDashboard_(),
+    peopleEmailGaps: countPeopleEmailGaps_(),
     // ⚠️ 第四十七輪批次 A1 組：「三粒掣唔著嘅**唯一**原因就係未儲存」。
     // 詳細理由見 `computeSendBlockedByUnsavedOnly_()` 檔內說明。
     blockedByUnsavedOnly: computeSendBlockedByUnsavedOnly_(facts),

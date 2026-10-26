@@ -7033,6 +7033,118 @@ const MUTATIONS = [
     find: "      + '身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。'));",
     replace: "      + '身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。不再服侍的人請把「Active」改成 FALSE。'));",
     tests: ["tests/round77_ef_settings_zone.test.js"]
+  },
+  {
+    id: "eg-sync-overwrites-name",
+    why: "同步嗰陣連 NameTC 都改成出席系統嘅寫法（Ivan：名字保留職事表寫法）",
+    file: "src/HwcasSync.gs",
+    find: "    if (Object.keys(updates).length === 0) return;\n    updates[M.SYNCED_AT] = now;",
+    replace: "    updates[M.NAME_TC] = h.name;\n    updates[M.SYNCED_AT] = now;",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-sync-keeps-old-email",
+    why: "出席系統空白嗰陣唔清空（電郵應該跟出席系統）",
+    file: "src/HwcasSync.gs",
+    find: "    const emailChanged = oldEmail !== h.email;",
+    replace: "    const emailChanged = oldEmail !== h.email && h.email !== '';",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-dup-no-still-syncs",
+    why: "兩行同一個編號都照改（應該列入「重複」、兩位都唔改）",
+    file: "src/HwcasSync.gs",
+    find: "    if (people.length > 1) {\n      // 兩行用同一個編號 ⇒ 唔知邊一行先係佢，一律唔改，列出嚟\n      duplicates.push({ memberNo: no, people: people.map(function (p) { return { personId: p.personId, nameTC: p.nameTC }; }) });\n      return;\n    }",
+    replace: "    if (people.length > 1) {\n      duplicates.push({ memberNo: no, people: people.map(function (p) { return { personId: p.personId, nameTC: p.nameTC }; }) });\n    }",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-no-10min-skip",
+    why: "寄出前每次都重讀出席系統（10 分鐘內應該略過）",
+    file: "src/HwcasSync.gs",
+    find: "  if (o.force !== true && status.lastAtMs > 0 && Date.now() - status.lastAtMs < HWCAS_SYNC_MIN_INTERVAL_MS) {",
+    replace: "  if (false) {",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-read-fail-throws",
+    why: "讀唔到出席系統就拋錯（會令主畫面／寄出失敗）",
+    file: "src/HwcasSync.gs",
+    find: "  } catch (err) {\n    log_('WARN', '出席系統同步失敗（照用上次的電郵）：' + err.message);",
+    replace: "  } catch (err) {\n    throw err;",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-link-changes-name",
+    why: "〔連結勾了的人〕順手把名字改成出席系統嘅寫法",
+    file: "src/WebAppHwcas.gs",
+    find: "    updates[M.MEMBER_NO] = memberNo.value;\n    const derived = deriveCongregationAndType_(key, prefixMap);",
+    replace: "    updates[M.MEMBER_NO] = memberNo.value;\n    updates[M.NAME_TC] = hwcas.byNo[key].name + '（出席系統）';\n    const derived = deriveCongregationAndType_(key, prefixMap);",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-link-no-sync-after",
+    why: "連結完唔即時更新電郵",
+    file: "src/WebAppHwcas.gs",
+    find: "  const sync = linked.length > 0 ? runHwcasSyncSafely_({ force: true }) : null;",
+    replace: "  const sync = null;",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-add-uses-hwcas-name",
+    why: "〔加入名單〕新行用出席系統嘅名（應該用職事表寫法）",
+    file: "src/WebAppHwcas.gs",
+    find: "  record[M.NAME_TC] = nameTC;                    // ⚠️ 職事表上嘅寫法，唔係出席系統嘅",
+    replace: "  record[M.NAME_TC] = entry.name;",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-add-dup-member-no",
+    why: "編號已經喺名單上都照新增多一個人",
+    file: "src/WebAppHwcas.gs",
+    find: "  if (existing) {\n    return {\n      ok: false, existing: existing, canAlias: existing.nameTC !== nameTC,",
+    replace: "  if (false) {\n    return {\n      ok: false, existing: existing, canAlias: existing.nameTC !== nameTC,",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-add-not-in-hwcas",
+    why: "出席系統搵唔到都照新增（應該唔可以）",
+    file: "src/WebAppHwcas.gs",
+    find: "  const entry = hwcas.byNo[key];\n  if (!entry) {",
+    replace: "  const entry = hwcas.byNo[key] || { name: '', email: '', names: [] };\n  if (false) {",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-dash-no-sync-line",
+    why: "主畫面冇「電郵已由出席系統更新（…）」／「讀不到出席系統」嗰句",
+    file: "src/WebAppDashboard.gs",
+    find: "    hwcasSync: describeHwcasSyncForDashboard_(),",
+    replace: "    hwcasSync: { line: '', errorText: '', syncedAtText: '' },",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-send-no-presync",
+    why: "寄出路寄信之前唔同步",
+    file: "src/WebAppFlow.gs",
+    find: "  logSendWithUnsavedRelease_(quarterId, '正式發出給全體', guard);\n  // 第七十七輪批次 EG 組：寄之前由出席系統更新電郵\n  syncPeopleFromHwcasBeforeSend_();",
+    replace: "  logSendWithUnsavedRelease_(quarterId, '正式發出給全體', guard);",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-ui-manual-email",
+    why: "〔加入名單〕畫面又有人手打電郵嘅格",
+    file: "src/ui/ScriptZone1.html",
+    find: "      if (!r.ok) {\n        nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: r.message || '讀不到出席系統。', className: 'warn-head' })]));",
+    replace: "      const emailInput = document.createElement('input'); emailInput.type = 'text'; emailInput.placeholder = '電郵'; nodes.push(emailInput);\n      if (!r.ok) {\n        nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: r.message || '讀不到出席系統。', className: 'warn-head' })]));",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eg-ui-no-load-sync",
+    why: "幹事介面載入時唔叫出席系統同步",
+    file: "src/ui/ScriptBoot.html",
+    find: "  runAction('載入中', async () => { await loadQuarters(); syncHwcasOnLoad(); });",
+    replace: "  runAction('載入中', loadQuarters);",
+    tests: ["tests/round77_eg_hwcas_method_a.test.js"]
   }
 ];
 

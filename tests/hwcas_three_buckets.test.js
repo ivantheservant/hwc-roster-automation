@@ -152,59 +152,24 @@ console.log('\n=== D2 計數：唔可以再有「需要特別小心 434」呢個
     (backend.match(/r\.bucket === HWCAS_BUCKET\./g) || []).length === 4);
   check('★★★★★ 「名單有、出席系統冇」嗰批照舊唔列出，但**要出個數**'
     + '——靜靜掉咗會令幹事以為系統漏咗人',
-    /notInHwcas: draft\.filter/.test(backend)
-    && zone3.indexOf('位在出席系統找不到') !== -1);
+    /notInHwcas: draft\.filter/.test(backend));
   check('★★★★★ 畫面冇咗「需要特別小心」呢個籠統講法',
     zone3Code.indexOf('需要特別小心') === -1);
 }
 
-console.log('\n=== D3 畫面：三段標題＋第三段預設摺埋 ===');
+console.log('\n=== D3／D4 畫面（第七十七輪批次 EG 組：「從出席系統補電郵」已由「出席系統連結」取代）===');
 {
-  check('★★★★★ 前端一律讀後端嘅 `bucket`，**唔自己 filter riskLevel**',
-    /r\.bucket === name/.test(zone3)
-    && !/rows\.filter\(\(r\) => r\.canApply\)/.test(zone3Code)
-    && !/riskLevel === 'HIGH'\)/.test(zone3Code.replace(/r\.riskLevel === 'HIGH'\) \{/g, '')));
-
-  check('★★★★★ 第一段「可以套用」', zone3.indexOf("'一、可以套用（'") !== -1);
-  check('★★★★★ 第二段「要你處理」，而且講明點解（名單上有，只係分唔出邊一位）',
-    zone3.indexOf("'二、要你處理（'") !== -1
-    && zone3.indexOf('名單上有這個人，但系統分不出是哪一位') !== -1);
-  check('★★★★★ 第三段「跟職事表無關」', zone3.indexOf("'三、跟職事表無關'") !== -1);
-
-  check('★★★★★ 第三段摺埋嗰句逐字講清楚有幾多位、去咗邊'
-    + '——淨係唔見咗四百幾行，幹事會以為系統食咗佢哋',
-    /'出席系統另有 ' \+ notRelevant\.length \+ ' 位不在職事表名單，已收起'/.test(zone3));
-  check('★★★★★ 兩段摺埋嘅預設值都係 false（＝預設摺埋）',
-    /hwcasExpanded = \{ notRelevant: false, noChange: false \}/.test(zone3));
-  check('★★★★ 而且重新讀資料嗰陣會 reset'
-    + '——唔 reset 嘅話畫面記住上次展開咗，但入面啲行已經換咗',
-    (zone3.match(/hwcasExpanded = \{ notRelevant: false, noChange: false \}/g) || []).length >= 2);
-  check('★★★★ 摺埋嗰陣唔會起晒四百幾個節點（展開先至叫 buildRows）',
-    /if \(open\) buildRows\(\)\.forEach/.test(zone3));
-}
-
-console.log('\n=== D3 展開／收起唔可以靜靜清走幹事勾咗嘅行 ===');
-{
-  check('★★★★★ checkbox 讀返 `hwcasChecked`，唔係寫死 false'
-    + '——寫死嘅話撳一下「展開看看」就會清走啲勾，而且冇任何提示',
-    /cb\.checked = !!hwcasChecked\[r\.personId\]/.test(zone3)
-    && !/cb\.checked = false;/.test(zone3Code));
-  check('★★★★★ 而 `hwcasChecked` 只喺開畫面嗰陣清空（＝預設唔勾仍然成立）',
-    /hwcasChecked = \{\};[\s\S]{0,120}?renderHwcas\(\)/.test(zone3));
-}
-
-console.log('\n=== D4 逐字保留嗰段警告（寫得啱，唔好郁）===');
-{
-  // ⚠️ 原文喺 `.html` 入面係跨行接駁嘅，所以逐半句對——
-  // 一次過對成句會因為換行而失敗，而唔係因為文字改咗。
-  check('★★★★★ 「出席系統是靠姓名對人的…」原文一字不改',
-    zone3.indexOf('出席系統是靠姓名對人的。對錯了就會把甲的電郵寫進乙的資料，') !== -1
-    && zone3.indexOf('之後乙收到甲的職事表，而甲永遠收不到。') !== -1);
-  check('★★★★★ 「所以這裡預設全部不勾。請逐個看過再勾。」照舊',
-    zone3.indexOf('所以這裡預設全部不勾。請逐個看過再勾。') !== -1);
-  check('★★★★★ 同名多人嗰句「名字相似不代表是同一個人——不要靠猜」照舊'
-    + '——分類之後呢句更加重要，因為第二類而家獨立成段',
+  // 方法 A：電郵按會眾編號自動讀取；呢個畫面只負責「邊個仲未連結」，四段：
+  check('★★★★★ 四段標題', zone3.indexOf("'一、沒有會眾編號的人（'") !== -1 && zone3.indexOf("'二、出席系統找不到編號的人（'") !== -1
+    && zone3.indexOf("'三、重複編號（'") !== -1 && zone3.indexOf("'四、出席系統沒有電郵的人（'") !== -1);
+  check('★★★★★ 候選人嘅 checkbox **預設不勾**（讀返 hwcasLinkPicked，唔係寫死 true）',
+    /cb\.checked = hwcasLinkPicked\[p\.personId\] === c\.memberNo;/.test(zone3) && !/cb\.checked = true;/.test(zone3Code.slice(zone3Code.indexOf('function renderHwcasLink'), zone3Code.indexOf('function confirmHwcasLink'))));
+  check('★★★★★ 「出席系統是靠姓名對人的…預設全部不勾」嗰段警告仍然喺畫面',
+    zone3.indexOf('出席系統是靠姓名對人的，對錯了就會寄錯人') !== -1 && zone3.indexOf('所以預設全部不勾，請逐個看過才勾') !== -1);
+  check('★★★★★ 同名多人嗰句「名字相似不代表是同一個人——不要靠猜」照舊（後端）',
     backend.indexOf('名字相似不代表是同一個人——不要靠猜。') !== -1);
+  check('★★★★ 一個編號已經係名單上另一位嘅 ⇒ 勾唔到而且講明', /cb\.disabled = !!c\.usedBy;/.test(zone3) && zone3.indexOf('這個編號已經是名單上「') !== -1);
+  check('★★★★ 重新讀資料嗰陣清空勾選', /hwcasLinkPicked = \{\};[\s\S]{0,80}?renderHwcasLink\(\)/.test(zone3));
 }
 
 console.log('\n=== D5 套用嘅關卡完全冇放寬 ===');
@@ -215,8 +180,8 @@ console.log('\n=== D5 套用嘅關卡完全冇放寬 ===');
   check('★★★★★ 而 canApply 仍然要求對得上人（EXACT／ALIAS）＋有 PersonID',
     /const canApply = matchedOk && !!d\.personId && hwcasEmail !== '' && !sameEmail;/
       .test(backend));
-  check('★★★★★ 第二、三類根本冇 checkbox（`hwcasRow(r, false)`）',
-    /needsAction\.forEach\(\(r\) => box\.appendChild\(hwcasRow\(r, false\)\)\)/.test(zone3));
+  check('★★★★★ 第二、三、四段根本冇 checkbox（只有第一段嘅候選人先有）',
+    (zone3Code.slice(zone3Code.indexOf('function renderHwcasLink'), zone3Code.indexOf('function confirmHwcasLink')).match(/createElement\('input'\)/g) || []).length === 1);
   check('★★★★ 一行都冇勾嗰陣唔會靜靜咩都唔做，會講返點解',
     backend.indexOf('一行都沒有勾。') !== -1);
 }

@@ -49,8 +49,8 @@
         () => openPeopleHints(), false),
       // 第七十七輪批次 EF 組：人員與電郵畫面拿走 ⇒ 出席系統嘅入口搬到呢度
       zone4Row('出席系統連結',
-        '哪些人沒有連結出席系統（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵。',
-        () => openHwcas(), false)
+        '電郵由出席系統按會眾編號讀取。這裡看哪些人還沒有連結（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵，並把未連結的人連結上。',
+        () => openHwcasLink(), false)
     ]));
 
     body.appendChild(make('div', { className: 'sec' }, [

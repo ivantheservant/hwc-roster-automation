@@ -147,6 +147,7 @@ console.log('\n=== EE6–EE11：畫面 ===');
     'ScriptZone4.html', 'ScriptMainFlow.html', 'ScriptSendPaper.html', 'ScriptSuggestion.html', 'ScriptRollback.html']);
   vm.runInContext("currentQuarterId = '2099T1';", ui);
   vm.runInContext('runAction = async function (l, fn) { await fn(); };', ui);
+  const realOpenResend = ui.openResend;   // EE12 要用真嘅（下面會換成記錄用嘅 stub）
   vm.runInContext('__routed = null; openReview = function (o) { __routed = { kind: "REVIEW", o }; }; openOfficial = function (o) { __routed = { kind: "OFFICIAL", o }; }; openResend = function (o) { __routed = { kind: "RESEND", o }; };', ui);
   const tick = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); };
 
@@ -159,7 +160,7 @@ console.log('\n=== EE6–EE11：畫面 ===');
       confirmGroups: { willSend: [], changedNotSent: [], notReceivedNotSentCount: 0, notReceivedNotSentNames: [] },
       contents: null, sendWarnings: null, isDryRun: true
     } : realCall(name));
-    await ui.openResend({ sendMode: 'ALL', pickedKeys: ['P9701'], recipientScope: 'PICK' });
+    await realOpenResend({ sendMode: 'ALL', pickedKeys: ['P9701'], recipientScope: 'PICK' });
     await tick();
     const t = ui.document.getElementById('modalBody').textContent;
     check('★★★★★★ 正式發出之後〔給所有人〕⇒ 確認窗寫明「全部 5 位都會收到，包括安排沒有改動的人。」', /全部 5 位都會收到，包括安排沒有改動的人。/.test(t), t.slice(0, 300));

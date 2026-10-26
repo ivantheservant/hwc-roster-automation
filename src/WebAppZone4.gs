@@ -544,6 +544,8 @@ function apiMakeupSendExecute(quarterId, stage) {
 function apiMakeupSendExecute_locked_(quarterId, stage) {
   assertWebAppRequestAllowed_();
   try {
+    // 第七十七輪批次 EG 組：寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀唔到唔會令補寄失敗）
+    syncPeopleFromHwcasBeforeSend_();
     const id = String(quarterId || '').trim();
     const versionNo = findLatestVersionNo(id);
     if (versionNo < 0) {

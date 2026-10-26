@@ -59,5 +59,6 @@
   });
 
   initThemeToggle();
-  runAction('載入中', loadQuarters);
+  // 第七十七輪批次 EG 組：主畫面畫好之後先由出席系統更新電郵（同一次開介面只做一次；換季度、重新整理唔再做）
+  runAction('載入中', async () => { await loadQuarters(); syncHwcasOnLoad(); });
 </script>
