@@ -1008,6 +1008,36 @@ function buildGridSheetUrl_(sheetName) {
   }
 }
 
+/**
+ * 第七十七輪批次 EB 組：某張 grid 工作表嘅**唯讀顯示網址**（〔查看這一版〕用）。
+ *
+ * Ivan 手動測試 B：「查看這一版，應該是 read only（現在使用者可以改）。」
+ * 沿用第七十五輪 CL 組公開職事表嘅做法（`/preview`），加 `#gid=` 直接顯示嗰一張工作表。
+ * 第七十七輪回歸時喺瀏覽器核對過：`/preview#gid=<gid>` 同 `/htmlview?gid=<gid>#gid=<gid>`
+ * 都顯示正確工作表、都冇編輯工具列；揀 `/preview`——同公開職事表同一個形式。
+ * 保護（`setWarningOnly`）照舊加，作為第二道防線。
+ * 搵唔到嗰張工作表就回空字串（同 `buildGridSheetUrl_()` 一樣，唔砌一條去錯地方嘅連結）。
+ * @param {*} sheetName grid 工作表名
+ * @returns {string}
+ */
+function buildGridSheetViewUrl_(sheetName) {
+  const name = String(sheetName || '').trim();
+  if (name === '') return '';
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return '';
+    return 'https://docs.google.com/spreadsheets/d/' + ss.getId()
+      + GRID_SHEET_VIEW_SUFFIX + '#gid=' + sheet.getSheetId();
+  } catch (err) {
+    log_('WARN', 'buildGridSheetViewUrl_ 取不到工作表網址：' + err.message);
+    return '';
+  }
+}
+
+/** 第七十七輪批次 EB 組：唯讀顯示網址嘅路徑（同公開職事表 `PUBLIC_LINK_VIEW_SUFFIX` 同一個形式）。 */
+const GRID_SHEET_VIEW_SUFFIX = '/preview';
+
 /** 堂委收件人數；讀唔到時回 0（掣 2 會因此顯示「沒有登記任何堂委電郵」）。 */
 function safeCountReviewers_() {
   try {

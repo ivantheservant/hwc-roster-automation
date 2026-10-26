@@ -6785,6 +6785,30 @@ const MUTATIONS = [
     find: "          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes,\n            { quarterId: currentQuarterId, applyToFuture: weightApplyFuture === true });",
     replace: "          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes);",
     tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "eb-view-url-edit",
+    why: "〔查看這一版〕嘅唯讀顯示網址砌成 /edit（擁有人可以改舊版本）",
+    file: "src/WebAppDashboard.gs",
+    find: "const GRID_SHEET_VIEW_SUFFIX = '/preview';",
+    replace: "const GRID_SHEET_VIEW_SUFFIX = '/edit';",
+    tests: ["tests/round77_eb_view_version_readonly.test.js"]
+  },
+  {
+    id: "eb-choices-old-edit",
+    why: "版本下拉舊版本嘅網址用 /edit",
+    file: "src/WebAppRollback.gs",
+    find: "        sheetUrl: versionNo === latestVersionNo\n          ? buildGridSheetUrl_(String(row[V.SHEET_NAME] || '').trim())\n          : buildGridSheetViewUrl_(String(row[V.SHEET_NAME] || '').trim()),",
+    replace: "        sheetUrl: buildGridSheetUrl_(String(row[V.SHEET_NAME] || '').trim()),",
+    tests: ["tests/round77_eb_view_version_readonly.test.js"]
+  },
+  {
+    id: "eb-open-returns-edit",
+    why: "apiOpenVersionForViewing 回 /edit 網址",
+    file: "src/WebAppRollback.gs",
+    find: "    url: target === findLatestVersionNo(quarterId)\n      ? buildGridSheetUrl_(found.sheetName) : buildGridSheetViewUrl_(found.sheetName),",
+    replace: "    url: buildGridSheetUrl_(found.sheetName),",
+    tests: ["tests/round77_eb_view_version_readonly.test.js"]
   }
 ];
 

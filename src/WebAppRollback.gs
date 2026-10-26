@@ -456,7 +456,10 @@ function listQuarterVersionChoices_(quarterId, timezone) {
         sourceText: sourceText,
         byText: byText,
         isLatest: versionNo === latestVersionNo,
-        sheetUrl: buildGridSheetUrl_(String(row[V.SHEET_NAME] || '').trim()),
+        // 第七十七輪批次 EB 組：最新一版〔查看／修改職事表〕開 `/edit`；舊版本〔查看這一版〕開唯讀顯示網址
+        sheetUrl: versionNo === latestVersionNo
+          ? buildGridSheetUrl_(String(row[V.SHEET_NAME] || '').trim())
+          : buildGridSheetViewUrl_(String(row[V.SHEET_NAME] || '').trim()),
         label: ['第 ' + versionNo + ' 版', createdAtText, sourceText, byText]
           .filter(function (s) { return s !== ''; }).join('　')
       };
@@ -607,7 +610,8 @@ function writeVersionContentIntoSheet_(quarterId, sourceVersionNo, sheet, timezo
  * ⚠️ 舊版本工作表上面可能仲有「改完先儲存成下一版」嘅字（見 `readVersionWeekTitles_()`），
  * 所以開之前先把嗰張表**還原成嗰一版儲存咗嘅內容**——版本紀錄（`RosterAssignments`／
  * `RosterVersions`）一格都唔改，只係令張表同嗰一版一致。
- * 唯讀：未有保護 ⇒ 加一個「只會提示」嘅保護；已經有保護（例如 v0 鎖定）⇒ 照用。
+ * 唯讀：第七十七輪批次 EB 組起開嘅係**唯讀顯示網址**（`/preview#gid=`，冇編輯工具列、改唔到格）；
+ * 保護作為第二道防線——未有保護 ⇒ 加一個「只會提示」嘅保護；已經有保護（例如 v0 鎖定）⇒ 照用。
  * 最新一版唔郁（佢係要改嗰張）。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 舊版本號
@@ -652,7 +656,10 @@ function openVersionForViewing_locked_(quarterId, target) {
     }
   }
   return {
-    url: buildGridSheetUrl_(found.sheetName), sheetName: found.sheetName,
+    // 第七十七輪批次 EB 組：舊版本開**唯讀顯示網址**（`/preview#gid=`）；最新一版照舊開 `/edit`（佢係要改嗰張）
+    url: target === findLatestVersionNo(quarterId)
+      ? buildGridSheetUrl_(found.sheetName) : buildGridSheetViewUrl_(found.sheetName),
+    sheetName: found.sheetName,
     protectedNow: protectedNow, restoredCells: restoredCells, restoreFailed: restoreFailed
   };
 }
