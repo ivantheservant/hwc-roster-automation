@@ -213,22 +213,6 @@ function tagFixedRecipients_(pool, stage, context) {
 }
 
 /**
- * 第七十輪批次 AT 組：開「選擇收件人」時預設勾哪些人（由後端定，前端不寫死）。
- *
- * 只有**正式發出**預設勾「固定收件人」那一組（幹事可以取消）；
- * 寄給堂委審閱、改動後重發都有這一組但不預設勾。
- *
- * @param {string} stage MAIL_STAGES 之一
- * @param {Object[]} fixedMembers `tagFixedRecipients_()` 的結果
- * @returns {string[]} 預設勾上的池鍵
- */
-function defaultPickedKeysForStage_(stage, fixedMembers) {
-  if (stage !== MAIL_STAGES.OFFICIAL) return [];
-  return (fixedMembers || []).filter(function (m) { return m.selectable !== false; })
-    .map(function (m) { return m.key; });
-}
-
-/**
  * 第七十七輪批次 EE 組：〔選擇其他〕開窗時預設勾邊啲人——「只寄給安排有改動的人」嗰一組
  *（同上一次寄出嘅版本比較）。從來未寄過（冇基準）⇒ 一位都唔勾。
  * 第七十輪 AT 組「正式發出預設勾固定收件人」唔再用（嗰個情況改用〔給所有人〕）。

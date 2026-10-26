@@ -119,7 +119,7 @@ const MUTATIONS = [
     why: '把「揀咗自己揀但一個都冇揀」還原成靜靜當成寄全部'
       + '——佢以為淨係寄俾三個人，實際上成班人收到',
     file: 'src/SendOptions.gs',
-    find: '  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0) {',
+    find: "  if (scope === SEND_RECIPIENT_SCOPE.PICK && pickedCount === 0 && extraEmails.length === 0) {",
     replace: '  if (false) {',
     tests: ['tests/send_options.test.js']
   },
@@ -686,7 +686,7 @@ const MUTATIONS = [
     file: 'src/FineTune.gs',
     find: '  if (f.indexOf(RULE_IDS.NO_AUTO_GENERATE) !== -1) return true;',
     replace: '  if (false) return true;',
-    tests: ['tests/round43_field_fixes.test.js']
+    tests: ["tests/round77_eh_round76_gaps.test.js"]
   },
   {
     id: 'mutation-lock-off',
@@ -1126,16 +1126,6 @@ const MUTATIONS = [
     tests: ['tests/send_unsaved_gate.test.js']
   },
   {
-    id: 'save-send-not-optin',
-    why: '把〔立即儲存並繼續〕嗰條路嘅「儲存後直接寄出」改成唔預設勾'
-      + '——佢本來就係想寄出，只係被未儲存擋住；'
-      + '唔勾嘅話佢儲存完又要自己再搵一次〔寄出〕',
-    file: 'src/ui/ScriptZone1.html',
-    find: "    saveThenSend_ = !!(opts && opts.thenSend);",
-    replace: "    saveThenSend_ = false;",
-    tests: ['tests/send_unsaved_gate.test.js']
-  },
-  {
     id: 'preview-counts-reviewers',
     why: '把步驟 2 嘅事前收件人數改返做 `countReviewerRecipients_()`'
       + '——即係現場嗰個 bug：確認窗講「會寄給這 3 位」，'
@@ -1477,24 +1467,12 @@ const MUTATIONS = [
     tests: ['tests/send_without_saving.test.js']
   },
   {
-    id: 'unsaved-ack-prechecked',
-    why: '把「我明白」嗰個框改成預設勾住'
-      + '——整個確認畫面唯一嘅作用就係逼佢睇一眼，'
-      + '預設勾住等於冇咗嗰一眼',
-    file: 'src/ui/ScriptSendPaper.html',
-    find: '    ackBox.checked = false;',
-    replace: '    ackBox.checked = true;',
-    tests: ['tests/send_without_saving.test.js']
-  },
-  {
     id: 'unsaved-no-confirm',
-    why: '撳〔寄出但不儲存〕直接去寄，唔出中間嗰個確認畫面'
-      + '——真正嘅風險係「幹事以為寄出去嘅係佢啱啱改嗰一版」，'
-      + '而嗰個畫面就係唯一講清楚呢件事嘅地方',
+    why: "有未儲存改動撳寄出，唔出「寄出：你有 N 格改動還未儲存」嗰個窗、直接開寄出窗——幹事會以為寄出去嘅係佢啱啱改嗰一版（第七十七輪 EE 組改成兩粒掣嘅窗）",
     file: 'src/ui/ScriptSendPaper.html',
-    find: "        ? [button('寄出但不儲存', () => renderSendWithoutSavingConfirm(s), 'secondary')]",
-    replace: "        ? [button('寄出但不儲存', () => renderSendMain(s, { allowUnsaved: true }), 'secondary')]",
-    tests: ['tests/send_without_saving.test.js']
+    find: "      renderUnsavedBlocksSend(s);\n      return;",
+    replace: "      renderSendMain(s, { allowUnsaved: true });\n      return;",
+    tests: ["tests/send_unsaved_gate.test.js", "tests/round77_ee_send_buttons.test.js"]
   },
   {
     id: 'unsaved-no-banner',
@@ -3746,7 +3724,7 @@ const MUTATIONS = [
       + '——現場：「有 3 位的安排改過」但「只寄給安排有改動的人」得 2 位，'
       + '被換走嗰位揀都揀唔到，永遠收唔到「你嗰兩格已經改由別人負責」',
     file: 'src/WebAppSendPlan.gs',
-    find: '    addChangedPersonsMissingFromPool_(pool, changedByPerson, context.peopleById);\n',
+    find: "  addChangedPersonsMissingFromPool_(pool, changedByPerson, context.peopleById);\n",
     replace: '',
     tests: ['tests/resend_dropped_person.test.js']
   },
@@ -5251,14 +5229,6 @@ const MUTATIONS = [
     tests: ['tests/send_fixed_recipients.test.js']
   },
   {
-    id: 'at-default-all-stages',
-    why: '所有階段都預設勾固定收件人（審閱／重發唔應該預設勾）',
-    file: 'src/SendRecipients.gs',
-    find: '  if (stage !== MAIL_STAGES.OFFICIAL) return [];\n  return (fixedMembers',
-    replace: '  return (fixedMembers',
-    tests: ['tests/send_fixed_recipients.test.js']
-  },
-  {
     id: 'at-fixed-wrong-stage',
     why: '固定收件人唔跟階段，永遠用正式發出嗰份名單',
     file: 'src/SendRecipients.gs',
@@ -5270,8 +5240,8 @@ const MUTATIONS = [
     id: 'at-api-ignores-kind',
     why: '後端唔理前端傳嚟嘅階段',
     file: 'src/WebAppSendPlan.gs',
-    find: '    const poolStage = sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL;',
-    replace: '    const poolStage = MAIL_STAGES.OFFICIAL;',
+    find: "  const poolStage = sendKindToStage_(kind) || MAIL_STAGES.OFFICIAL;",
+    replace: "  const poolStage = MAIL_STAGES.OFFICIAL;",
     tests: ['tests/send_fixed_recipients.test.js']
   },
   {
@@ -5942,17 +5912,17 @@ const MUTATIONS = [
     id: "ca-unavail-not-zone2",
     why: "開季前準備冇〔不能服侍的日期〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('不能服侍的日期', () => openUnavailable(), '')\n",
+    find: "      button('不能服侍的日期', () => openUnavailable(), ''),\n",
     replace: "",
     tests: ["tests/round75_ca_layout.test.js"]
   },
   {
     id: "ca-weights-not-step2",
-    why: "第 2 步冇〔排表偏好〕",
-    file: "src/ui/ScriptMainFlow.html",
-    find: "    acts.push(stepButton('排表偏好', () => openWeights(), { className: 'secondary' }));\n",
+    why: "開季前準備冇〔排表偏好〕（第七十七輪 EA 組由第 2 步搬過嚟）",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('排表偏好', () => openWeights(), '')\n",
     replace: "",
-    tests: ["tests/round75_ca_layout.test.js"]
+    tests: ["tests/round75_ca_layout.test.js", "tests/round77_ea_weight_scope.test.js"]
   },
   {
     id: "ca-hints-not-zone4",
@@ -6166,8 +6136,8 @@ const MUTATIONS = [
     id: "cd-fill-btn-back",
     why: "開季前準備還原〔填講員／翻譯／獻花〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('不能服侍的日期', () => openUnavailable(), '')\n    ]));",
-    replace: "      button('不能服侍的日期', () => openUnavailable(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
+    find: "      button('排表偏好', () => openWeights(), '')\n    ]));",
+    replace: "      button('排表偏好', () => openWeights(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
     tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
   },
   {
@@ -6278,16 +6248,16 @@ const MUTATIONS = [
     id: "cg-done-no-adjust",
     why: "儲存完成窗冇〔請系統幫我調整〕",
     file: "src/ui/ScriptZone1.html",
-    find: "      : [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];",
-    replace: "      : [button('知道了', () => closeModalAndRefresh(), '')];",
+    find: "    const doneActs = [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];",
+    replace: "    const doneActs = [button('知道了', () => closeModalAndRefresh(), '')];",
     tests: ["tests/round75_cfg_ui.test.js"]
   },
   {
     id: "cg-name-renamed-back",
     why: "第 2 步掣還原叫「儲存及寄出」",
     file: "src/ui/ScriptMainFlow.html",
-    find: "    acts.push(stepButton('儲存', () => openSaveAndConfirm(), {",
-    replace: "    acts.push(stepButton('儲存及寄出', () => openSaveAndConfirm(), {",
+    find: "    const saveBtn = stepButton('儲存', () => openSaveAndConfirm(), {",
+    replace: "    const saveBtn = stepButton('儲存及寄出', () => openSaveAndConfirm(), {",
     tests: ["tests/send_recipients_pool.test.js"]
   },
   {
@@ -6389,7 +6359,7 @@ const MUTATIONS = [
   {
     id: "ch-no-regen-label",
     why: "重新生成都寫成「系統生成」",
-    file: "src/WebAppRollback.gs",
+    file: "src/WebAppDashboard.gs",
     find: "  if (basis === VERSION_VALUES.BASIS_AUTO_GENERATE && parent !== '') return '重新生成';\n",
     replace: "",
     tests: ["tests/round75_ch_version_picker.test.js"]
@@ -6486,8 +6456,8 @@ const MUTATIONS = [
     id: "cj-review-confirm-off",
     why: "寄給堂委審閱確認窗冇列",
     file: "src/ui/ScriptZone1.html",
-    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'",
-    replace: "\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'",
+    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'",
+    replace: "      // 第七十五輪批次 CJ 組\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 位收件人收過信，'",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
   {
@@ -6502,8 +6472,8 @@ const MUTATIONS = [
     id: "cj-official-off",
     why: "正式發出確認窗冇列",
     file: "src/ui/ScriptZone1.html",
-    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
-    replace: "\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
+    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
+    replace: "      // 第七十五輪批次 CJ 組\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
   {
@@ -7061,7 +7031,7 @@ const MUTATIONS = [
   {
     id: "eg-no-10min-skip",
     why: "寄出前每次都重讀出席系統（10 分鐘內應該略過）",
-    file: "src/HwcasSync.gs",
+    file: "src/SheetReader.gs",
     find: "  if (o.force !== true && status.lastAtMs > 0 && Date.now() - status.lastAtMs < HWCAS_SYNC_MIN_INTERVAL_MS) {",
     replace: "  if (false) {",
     tests: ["tests/round77_eg_hwcas_method_a.test.js"]
@@ -7069,7 +7039,7 @@ const MUTATIONS = [
   {
     id: "eg-read-fail-throws",
     why: "讀唔到出席系統就拋錯（會令主畫面／寄出失敗）",
-    file: "src/HwcasSync.gs",
+    file: "src/SheetReader.gs",
     find: "  } catch (err) {\n    log_('WARN', '出席系統同步失敗（照用上次的電郵）：' + err.message);",
     replace: "  } catch (err) {\n    throw err;",
     tests: ["tests/round77_eg_hwcas_method_a.test.js"]

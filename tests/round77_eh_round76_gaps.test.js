@@ -135,5 +135,15 @@ console.log('\n=== EH4：字眼 ===');
   gas.findLatestVersionNo = realLatest;
 }
 
+console.log('\n=== EH2 補充：上一版原因旗標嗰條防線仍然要守 ===');
+{
+  // 「Posts.AutoGenerate=FALSE」同「上一版嗰格有 NO_AUTO_GENERATE 旗標」係兩條獨立嘅防線：
+  // 新嗰條（EH2）睇 Posts；舊嗰條（第四十三輪）睇旗標。任何一條拆走都唔可以靜靜過關。
+  check('★★★★★ 有 NO_AUTO_GENERATE 旗標嘅格 ⇒ 本來就應該留白',
+    gas.isIntentionallyBlankCell_([gas.RULE_IDS.NO_AUTO_GENERATE]) === true);
+  check('★★★★ 冇旗標嘅格 ⇒ 唔係「本來就應該留白」',
+    gas.isIntentionallyBlankCell_([]) === false);
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);
