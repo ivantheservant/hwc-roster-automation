@@ -6818,7 +6818,8 @@ const MUTATIONS = [
     id: "ec-accept-no-counts",
     why: "接受建議嗰陣冇把人手／系統格數寫入版本",
     file: "src/SuggestionSheet.gs",
-    find: "  const changeCounts = fp && fp.counts\n    ? { manual: fp.counts.manual, system: fp.counts.system, startPoint: null } : null;",
+    // 第七十八輪批次 FC 組：人手格數加咗類型改動
+    find: "  const changeCounts = fp && fp.counts\n    ? { manual: fp.counts.manual + titleChanges.length, system: fp.counts.system, startPoint: null } : null;",
     replace: "  const changeCounts = null;",
     tests: ["tests/round77_ec_version_source_counts.test.js"]
   },
