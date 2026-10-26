@@ -6865,6 +6865,22 @@ const MUTATIONS = [
     find: "      basisText: row ? buildVersionSourceText_(row) : '（沒有說明）',",
     replace: "      basisText: row ? buildVersionBasisText_(row[V.BASIS]) : '（沒有說明）',",
     tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ed-save-secondary",
+    why: "〔儲存〕又變返灰色次要按鈕（Ivan：要同〔查看／修改職事表〕一樣顯眼）",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      className: 'primary-big',\n      title: save.enabled ? '' : (save.disabledReason || '')",
+    replace: "      className: 'secondary',\n      title: save.enabled ? '' : (save.disabledReason || '')",
+    tests: ["tests/round77_ed_save_button_primary.test.js"]
+  },
+  {
+    id: "ed-save-small",
+    why: "〔儲存〕字體內距同〔查看／修改職事表〕唔一樣",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    saveBtn.style.fontSize = 'var(--fs-lg)';\n    saveBtn.style.padding = '12px 22px';\n",
+    replace: "",
+    tests: ["tests/round77_ed_save_button_primary.test.js"]
   }
 ];
 

@@ -464,11 +464,16 @@
     const save = (d.buttons && d.buttons.save) || {};
     // ⚠️ 第四十六輪批次 D2 組：改名叫「儲存及寄出」。
     // 儲存之後直唔直接去寄出，係確認窗入面一個**預設唔勾**嘅選項。
-    acts.push(stepButton('儲存', () => openSaveAndConfirm(), {
+    // 第七十七輪批次 ED 組（Ivan：〔儲存〕要和〔查看／修改職事表〕一樣顯眼）：
+    // 用主要按鈕樣式（藍色），字體大小同內距同上面嗰條 `bigLink` 一樣；撳唔到就照舊變灰、有原因。
+    const saveBtn = stepButton('儲存', () => openSaveAndConfirm(), {
       disabled: !save.enabled,
-      className: 'secondary',
+      className: 'primary-big',
       title: save.enabled ? '' : (save.disabledReason || '')
-    }));
+    });
+    saveBtn.style.fontSize = 'var(--fs-lg)';
+    saveBtn.style.padding = '12px 22px';
+    acts.push(saveBtn);
 
     // 第七十五輪批次 CH 組：〔回到上一個儲存版本〕拿走——上面嘅版本下拉〔用這一版作起點〕取代佢。
     // 第七十七輪批次 EA 組：〔排表偏好〕搬咗去「開季前準備」（〔不能服侍的日期〕旁邊）。
