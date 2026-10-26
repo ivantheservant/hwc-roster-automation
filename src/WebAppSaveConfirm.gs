@@ -479,9 +479,11 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   // 第七十七輪批次 EC 組：每個新版本記低人手改動格數（存入 `RosterVersions.ChangeCounts`）。
   // 用舊版本作起點：起點那一版寫在來源，**之後再改的格**先算人手（同起點版本比，唔係同最新一版比）。
   const startPointNo = parseStartPointVersionNo_(startPointBasis);
+  // 第七十八輪批次 FC 組：人手格數包括「類型」改動（同〔檢查我的改動〕「你改了這 N 格」一致）。
+  // 用舊版本作起點嗰陣，類型差異大部分係起點寫入嘅，唔計（只計之後再改嘅格）。
   const changeCounts = {
     manual: startPointNo === null
-      ? resolved.changes.length
+      ? resolved.changes.length + titleChanges.length
       : countManualChangesBeyondStartPoint_(quarterId, startPointNo, resolved.changes, context),
     system: 0,
     startPoint: startPointNo

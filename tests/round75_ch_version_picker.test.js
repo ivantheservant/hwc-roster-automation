@@ -43,8 +43,9 @@ console.log('\n=== CH1／CH2：版本清單 ===');
   check('★★★★★ 全部版本、新到舊', list.length === 2 && list[0].versionNo === 1 && list[1].versionNo === 0,
     JSON.stringify(list));
   check('★★★★★ 最新一版標明 isLatest', list[0].isLatest === true && list[1].isLatest === false);
+  // 第七十八輪批次 FC 組：人手格數包括「類型」改動（主席 1 格＋第 2 週標題 1 格）
   check('★★★★★★ 每項：第 N 版　日期時間　來源　由誰',
-    list[0].label === '第 1 版　2099-01-01 09:00　人手改動 1 格　k'
+    list[0].label === '第 1 版　2099-01-01 09:00　人手改動 2 格　k'
       && list[1].label === '第 0 版　2099-01-01 09:00　系統生成　k', JSON.stringify(list.map((v) => v.label)));
   check('★★★★ 每版帶工作表網址（〔查看這一版〕用）', list.every((v) => /^https:\/\//.test(v.sheetUrl || '')),
     JSON.stringify(list.map((v) => v.sheetUrl)));

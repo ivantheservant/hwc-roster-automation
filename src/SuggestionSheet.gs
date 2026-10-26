@@ -227,12 +227,7 @@ function readGridTextFromSheet_(sheetName, timezone) {
   // 系統會當他甚麼都沒有改過。
   //
   // 改成掃描：機器鍵那一行的特徵是「有格子含 #」（`POSTID#slot`）。
-  let keyRow = -1;
-  for (let r = 1; r <= Math.min(lastRow, 12); r++) {
-    const row = sheet.getRange(r, 1, 1, lastCol).getValues()[0];
-    const hasKey = row.some(function (v) { return String(v || '').indexOf('#') !== -1; });
-    if (hasKey) { keyRow = r; break; }
-  }
+  const keyRow = findGridKeyRowByScan_(sheet, lastRow, lastCol);
   if (keyRow === -1) {
     throw new Error(buildThreePartMessage_(
       '在「' + sheetName + '」找不到機器鍵那一行（格子裡面帶 # 的那一行）。',
@@ -263,6 +258,62 @@ function readGridTextFromSheet_(sheetName, timezone) {
     }
   });
   return result;
+}
+
+/**
+ * 機器鍵嗰一行（有格子含 `#`）喺第幾行。建議表頂有圖例，所以要掃，唔可以寫死第 2 行。
+ * @param {Object} sheet 工作表
+ * @param {number} lastRow 最後一行
+ * @param {number} lastCol 最後一欄
+ * @returns {number} 行號（1-based）；搵唔到 ⇒ -1
+ */
+function findGridKeyRowByScan_(sheet, lastRow, lastCol) {
+  for (let r = 1; r <= Math.min(lastRow, 12); r++) {
+    const row = sheet.getRange(r, 1, 1, lastCol).getValues()[0];
+    if (row.some(function (v) { return String(v || '').indexOf('#') !== -1; })) return r;
+  }
+  return -1;
+}
+
+/**
+ * 第七十八輪批次 FC 組：建議表「類型」欄（每週標題）嘅現況，形狀同 `readGridTypeColumn_()` 一樣。
+ * 用機器鍵嗰行（建議表喺圖例之後）認「類型」欄，唔靠位置估；認唔到 ⇒ `{}`（當冇改）。
+ * @param {string} sheetName 建議表名稱
+ * @param {string} timezone 時區
+ * @returns {Object.<string, string>} 日期 → 「類型」欄文字
+ */
+function readSuggestionTypeColumn_(sheetName, timezone) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return {};
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  const keyRow = findGridKeyRowByScan_(sheet, lastRow, lastCol);
+  if (keyRow === -1 || lastRow <= keyRow) return {};
+  const keys = sheet.getRange(keyRow, 1, 1, WEEK_TITLE_GRID_COLUMN).getValues()[0];
+  if (String(keys[WEEK_TITLE_GRID_COLUMN - 1] || '').trim() !== GRID_KEYS.TYPE) return {};
+  const values = sheet.getRange(keyRow + 1, 1, lastRow - keyRow, WEEK_TITLE_GRID_COLUMN).getValues();
+  const out = {};
+  values.forEach(function (row) {
+    const d = toDateString(row[0], timezone);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const v = row[WEEK_TITLE_GRID_COLUMN - 1];
+    out[d] = String(v === null || v === undefined ? '' : v).trim();
+  });
+  return out;
+}
+
+/**
+ * 第七十八輪批次 FC 組：接受建議嗰陣嘅「類型」改動——正式表上改嘅，加建議表上另外改嘅
+ *（同一週兩邊都改 ⇒ 以建議表為準）。兩份都係 `detectWeekTitleChanges_()` 嘅結果。
+ * @param {Object[]} fromGrid 正式表（`resolved.titleChanges`）
+ * @param {Object[]} fromSuggestion 建議表
+ * @returns {Object[]} 按日期排
+ */
+function mergeWeekTitleChanges_(fromGrid, fromSuggestion) {
+  const byDate = {};
+  (fromGrid || []).forEach(function (c) { byDate[c.serviceDate] = c; });
+  (fromSuggestion || []).forEach(function (c) { byDate[c.serviceDate] = c; });
+  return Object.keys(byDate).sort().map(function (d) { return byDate[d]; });
 }
 
 /**
@@ -1035,11 +1086,21 @@ function apiAcceptSuggestion_locked_(quarterId) {
   // 第七十七輪批次 EC 組：人手／系統各改咗幾多格——用建立建議表嗰陣記低嘅數字（唔另寫一套比對）。
   // ⚠️ 要喺建立新版本**之前**讀：建立新版本嗰陣建議表會被清走。舊建議表冇數字 ⇒ null，來源照寫「系統調整」。
   const fp = readSuggestionFingerprints_(sheetName);
-  const changeCounts = fp && fp.counts
-    ? { manual: fp.counts.manual, system: fp.counts.system, startPoint: null } : null;
-
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiAcceptSuggestion');
+  // ⚠️ 第七十八輪批次 FC 組：**「類型」欄（每週標題）嘅改動都要帶入新版本。**
+  //
+  // 現場（第七十七輪回歸 G9／G10）：〔檢查我的改動〕話「你改了這 5 格」（包括類型），
+  // 接受建議之後只存咗 4 格，新一版類型返返原本——類型嗰格靜靜丟咗。
+  // 用同〔檢查我的改動〕同一份 `detectWeekTitleChanges_()`：正式表上改嘅（`resolved.titleChanges`），
+  // 加建議表上另外改嘅（同一週以建議表為準）。
+  const titleChanges = mergeWeekTitleChanges_(resolved.titleChanges, detectWeekTitleChanges_({
+    gridTypeValues: readSuggestionTypeColumn_(sheetName, timezone),
+    gridRender: context.gridRender
+  }));
+  // 人手格數包括類型改動（同〔檢查我的改動〕「你改了這 N 格」一致）
+  const changeCounts = fp && fp.counts
+    ? { manual: fp.counts.manual + titleChanges.length, system: fp.counts.system, startPoint: null } : null;
   // 第七十五輪批次 CE 組：勾咗「這一季臨時幫手」嘅名唔擋；未決定嘅先擋。
   const acceptIndex = readCellDecisionIndex_(quarterId, timezone);
   const undecided = resolved.unresolved.filter(function (u) {
@@ -1057,7 +1118,7 @@ function apiAcceptSuggestion_locked_(quarterId) {
   // 不擋的話，下游 `materialiseManualEdits_()` 會拋一句寫給開發者看的
   // 「沒有收到任何人手改動，不應該建立新版本」——幹事看見那一句
   // 只會以為系統壞了，而其實是他沒有東西可以儲存。
-  if (resolved.changes.length === 0) {
+  if (resolved.changes.length === 0 && titleChanges.length === 0) {
     discardSuggestionSheet_(quarterId, versionNo);
     return {
       ok: false,
@@ -1071,8 +1132,13 @@ function apiAcceptSuggestion_locked_(quarterId) {
     };
   }
 
+  // 第七十八輪批次 FC 組：同〔儲存〕一樣，每週標題先寫入 ServiceDates.Title，下面建立新一版嗰陣就會用到
+  if (titleChanges.length > 0) {
+    writeWeekTitles_(quarterId, titleChanges, timezone, 'apiAcceptSuggestion');
+  }
   const created = materialiseManualEdits_(
-    context, resolved.changes, resolved.state, 'apiAcceptSuggestion');
+    context, resolved.changes, resolved.state, 'apiAcceptSuggestion',
+    { titleChangeCount: titleChanges.length });
   // ⚠️ 參數次序：第 7 個係 ，第 8 個先係 。
   // 傳漏一個就會把說明寫落「有冇保護」嗰一欄，而畫面睇落完全正常。
   registerVersion(
@@ -1080,6 +1146,7 @@ function apiAcceptSuggestion_locked_(quarterId) {
     // 第七十五輪批次 CH 組：版本下拉要分得出「系統調整」同「人手改動」
     VERSION_VALUES.BASIS_SUGGESTION, versionNo, 0, false,
     '接受系統建議版本：' + resolved.changes.length + ' 格'
+      + (titleChanges.length > 0 ? '、每週標題 ' + titleChanges.length + ' 週' : '')
       + (changeCounts ? '（人手 ' + changeCounts.manual + '、系統 ' + changeCounts.system + '）' : ''),
     changeCounts);
 
@@ -1097,7 +1164,7 @@ function apiAcceptSuggestion_locked_(quarterId) {
     targetSheet: created.sheetName,
     targetCell: '',
     oldValue: 'v' + versionNo,
-    newValue: 'v' + created.versionNo + '（' + resolved.changes.length + ' 格）'
+    newValue: 'v' + created.versionNo + '（' + created.cellCount + ' 格）'
   });
 
   // ⚠️ 第四十二輪批次 D 組：**逐格列出來**，不是只給一個數字。
@@ -1111,18 +1178,18 @@ function apiAcceptSuggestion_locked_(quarterId) {
     versionNo: created.versionNo,
     baseVersionNo: versionNo,
     baseSheetRestoreFailed: baseSheetRestore.failed,
-    cellCount: resolved.changes.length,
+    cellCount: created.cellCount,
     savedChanges: buildSavedChangeRows_(
       (resolved.changes || []).map(function (c) {
         return {
           serviceDate: c.serviceDate, postId: c.postId, slotIndex: c.slotIndex,
           fromName: c.originalName, toName: c.manualText
         };
-      }), acceptPostNames, 'MANUAL'),
+      }), acceptPostNames, 'MANUAL').concat(buildWeekTitleChangeRows_(titleChanges)),
     publishFailed: publish.failed,
     publishError: publish.message,
     message: '已經接受建議，儲存成第 ' + created.versionNo + ' 版（'
-      + resolved.changes.length + ' 格改動）。'
+      + created.cellCount + ' 格改動）。'
   };
 }
 

@@ -49,8 +49,9 @@ const MUTATIONS = [
       + '——建議表頂有一段圖例，寫死就會讀到一片空白，'
       + '而幹事喺建議表上改嘅嘢會靜靜消失',
     file: 'src/SuggestionSheet.gs',
-    find: '    if (hasKey) { keyRow = r; break; }',
-    replace: '    if (hasKey) { keyRow = 2; break; }',
+    // 第七十八輪批次 FC 組：掃描抽成 findGridKeyRowByScan_()（建議表「類型」欄都用）
+    find: "    if (row.some(function (v) { return String(v || '').indexOf('#') !== -1; })) return r;",
+    replace: "    if (row.some(function (v) { return String(v || '').indexOf('#') !== -1; })) return 2;",
     tests: ['tests/suggestion_sheet.test.js']
   },
   {
@@ -7254,6 +7255,47 @@ const MUTATIONS = [
     find: "    if (!result || !result.baseSheetRestoreFailed) return null;",
     replace: "    return null;",
     tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  // ── 第七十八輪批次 FC 組：接受建議時帶入「類型」改動；人手格數包括類型 ──
+  {
+    id: "fc-accept-drop-title",
+    why: "接受建議時類型改動靜靜丟咗（新一版返返原本嘅類型）",
+    file: "src/SuggestionSheet.gs",
+    find: "  if (titleChanges.length > 0) {\n    writeWeekTitles_(quarterId, titleChanges, timezone, 'apiAcceptSuggestion');\n  }\n",
+    replace: "",
+    tests: ["tests/round78_fc_title_on_accept.test.js"]
+  },
+  {
+    id: "fc-accept-manual-no-ttl",
+    why: "接受建議嘅人手格數唔計類型（同〔檢查我的改動〕對唔上）",
+    file: "src/SuggestionSheet.gs",
+    find: "    ? { manual: fp.counts.manual + titleChanges.length, system: fp.counts.system, startPoint: null } : null;",
+    replace: "    ? { manual: fp.counts.manual, system: fp.counts.system, startPoint: null } : null;",
+    tests: ["tests/round78_fc_title_on_accept.test.js"]
+  },
+  {
+    id: "fc-save-manual-no-ttl",
+    why: "〔儲存〕嘅人手格數唔計類型",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "      ? resolved.changes.length + titleChanges.length\n",
+    replace: "      ? resolved.changes.length\n",
+    tests: ["tests/round78_fc_title_on_accept.test.js"]
+  },
+  {
+    id: "fc-sug-title-ignored",
+    why: "建議表上改嘅類型冇帶入（唔係以建議表為準）",
+    file: "src/SuggestionSheet.gs",
+    find: "  (fromSuggestion || []).forEach(function (c) { byDate[c.serviceDate] = c; });\n",
+    replace: "",
+    tests: ["tests/round78_fc_title_on_accept.test.js"]
+  },
+  {
+    id: "fc-done-no-title-row",
+    why: "接受建議完成窗冇列類型嗰一行",
+    file: "src/SuggestionSheet.gs",
+    find: "      }), acceptPostNames, 'MANUAL').concat(buildWeekTitleChangeRows_(titleChanges)),",
+    replace: "      }), acceptPostNames, 'MANUAL'),",
+    tests: ["tests/round78_fc_title_on_accept.test.js"]
   }
 ];
 
