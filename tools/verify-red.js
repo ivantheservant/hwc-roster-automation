@@ -7009,7 +7009,7 @@ const MUTATIONS = [
     why: "同步嗰陣連 NameTC 都改成出席系統嘅寫法（Ivan：名字保留職事表寫法）",
     file: "src/HwcasSync.gs",
     find: "    if (Object.keys(updates).length === 0) return;\n    updates[M.SYNCED_AT] = now;",
-    replace: "    updates[M.NAME_TC] = h.name;\n    updates[M.SYNCED_AT] = now;",
+    replace: "    updates[M.NAME_TC] = h['name'];\n    updates[M.SYNCED_AT] = now;",
     tests: ["tests/round77_eg_hwcas_method_a.test.js"]
   },
   {
@@ -7065,7 +7065,7 @@ const MUTATIONS = [
     why: "〔加入名單〕新行用出席系統嘅名（應該用職事表寫法）",
     file: "src/WebAppHwcas.gs",
     find: "  record[M.NAME_TC] = nameTC;                    // ⚠️ 職事表上嘅寫法，唔係出席系統嘅",
-    replace: "  record[M.NAME_TC] = entry.name;",
+    replace: "  record[M.NAME_TC] = entry['name'];",
     tests: ["tests/round77_eg_hwcas_method_a.test.js"]
   },
   {
