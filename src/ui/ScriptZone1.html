@@ -297,7 +297,9 @@
     const v = plan.violations || {};
     const r = plan.requests || {};
     return (v.real || []).length === 0
-      && (v.semiHard || []).length === 0
+      // 第七十八輪批次 FE 組：「盡量避免」只計今次儲存帶出嚟嘅（上一版已存嘅唔再令每次儲存都彈窗）。
+      // 舊後端冇 `semiHardNew` ⇒ 照舊用全部。
+      && (Array.isArray(v.semiHardNew) ? v.semiHardNew : (v.semiHard || [])).length === 0
       && (v.released || []).length === 0
       && (r.confirm || []).length === 0
       && (r.needsInput || []).length === 0

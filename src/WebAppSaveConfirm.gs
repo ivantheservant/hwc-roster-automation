@@ -56,7 +56,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
       blocked: true, blockReason: reason, unresolved: [],
       requests: { apply: [], confirm: [], needsInput: [] },
       gridChanges: [], overlaps: [],
-      violations: { real: [], kept: [], released: [], structural: [], semiHard: [], semiKept: [] },
+      violations: { real: [], kept: [], released: [], structural: [], semiHard: [], semiKept: [], semiHardNew: [] },
       needsRelease: false, proposals: [], targetVersionNo: null,
       zeroChange: false, zeroChangeAction: null,
       tempHelpers: [], decisionItems: { names: [], rules: [] }, needsDecision: false, keptCount: 0
@@ -197,6 +197,9 @@ function buildSaveAndConfirmPlan_(quarterId) {
     semiHard: classified.semiHard.filter(function (v) { return !isKeptViolation(v); }),
     semiKept: classified.semiHard.filter(isKeptViolation)
   };
+  // 第七十八輪批次 FE 組：「盡量避免」違反之中，邊啲係**今次儲存帶出嚟**（上一版冇）。
+  // 快路（一切正常直接儲存）只睇呢一批；上一版已經存咗嘅照樣喺確認畫面提示，但唔會令每次儲存都彈窗。
+  violations.semiHardNew = filterNewSemiHardViolations_(violations.semiHard, context);
   const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });
   const tempHelpers = decisionItems.names.filter(function (n) { return n.checked; });
   const undecidedRuleItems = decisionItems.rules.filter(function (r) {
@@ -256,6 +259,42 @@ function buildSaveAndConfirmPlan_(quarterId) {
     zeroChange: zeroChange,
     zeroChangeAction: zeroChange ? resolveZeroChangeAction_(stage) : null
   };
+}
+
+/**
+ * ⚠️ 第七十八輪批次 FE 組：**「盡量避免」違反只計今次儲存帶出嚟嘅。**
+ *
+ * 現場（第七十八輪回歸 H5）：第 2 版存咗一格「連續兩週」（盡量避免，幹事知道、冇勾保留），
+ * 之後喺第 2 版只換一個司事（冇違規）撳〔儲存〕，照樣出「會儲存成第 3 版」確認窗——
+ * 因為快路要求 `violations.semiHard` 係空，而嗰一格舊違反仍然喺表上。
+ * 結果係：表上只要有一格已存嘅「盡量避免」，之後每一次儲存都彈窗。
+ *
+ * 同一格、同一條規則、同一個人喺上一版（`context.original`）已經違反 ⇒ 唔算新。
+ * 上一版算唔到（讀表失敗等）⇒ **全部當新**（多彈一次窗只係麻煩，少彈就係靜靜改咗嘢）。
+ * @param {Object[]} semiHard 今次狀態嘅「盡量避免」違反（未勾保留）
+ * @param {Object} context `buildFineTuneContext_()` 嘅結果（要 `original`）
+ * @returns {Object[]} 上一版冇嘅嗰批
+ */
+function filterNewSemiHardViolations_(semiHard, context) {
+  const list = semiHard || [];
+  if (list.length === 0) return [];
+  try {
+    const keyOf = function (v) { return violationKey_(v) + '|' + (v.personId || ''); };
+    const baseState = (context.original || []).map(function (a) {
+      return {
+        serviceDateId: a.serviceDateId, serviceDate: a.serviceDate, postId: a.postId,
+        slotIndex: a.slotIndex, personId: a.personId || '', isManual: false
+      };
+    });
+    const before = {};
+    findStateViolations_(baseState, context).forEach(function (v) {
+      if (v.severity === RULE_LEVELS.SEMI_HARD) before[keyOf(v)] = true;
+    });
+    return list.filter(function (v) { return !before[keyOf(v)]; });
+  } catch (err) {
+    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);
+    return list.slice();
+  }
 }
 
 /**

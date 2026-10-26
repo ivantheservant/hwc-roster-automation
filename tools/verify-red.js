@@ -7314,6 +7314,39 @@ const MUTATIONS = [
     find: "  /儲存前的確認窗/,\n",
     replace: "",
     tests: ["tests/round78_fd_save_wording.test.js"]
+  },
+  // ── 第七十八輪批次 FE 組：快路只睇今次帶出嘅「盡量避免」──
+  {
+    id: "fe-ui-all-semi-hard",
+    why: "上一版已存嘅「盡量避免」又令每次儲存都彈確認窗",
+    file: "src/ui/ScriptZone1.html",
+    find: "      && (Array.isArray(v.semiHardNew) ? v.semiHardNew : (v.semiHard || [])).length === 0",
+    replace: "      && (v.semiHard || []).length === 0",
+    tests: ["tests/round78_fe_semi_hard_new.test.js"]
+  },
+  {
+    id: "fe-new-ignores-base",
+    why: "唔同上一版比，全部「盡量避免」都當新",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    return list.filter(function (v) { return !before[keyOf(v)]; });",
+    replace: "    return list.slice();",
+    tests: ["tests/round78_fe_semi_hard_new.test.js"]
+  },
+  {
+    id: "fe-new-drops-all",
+    why: "今次帶出嘅「盡量避免」都當舊（快路靜靜儲存）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    return list.filter(function (v) { return !before[keyOf(v)]; });",
+    replace: "    return [];",
+    tests: ["tests/round78_fe_semi_hard_new.test.js"]
+  },
+  {
+    id: "fe-fail-not-safe",
+    why: "上一版算唔到就當冇新違反",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);\n    return list.slice();",
+    replace: "    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);\n    return [];",
+    tests: ["tests/round78_fe_semi_hard_new.test.js"]
   }
 ];
 
