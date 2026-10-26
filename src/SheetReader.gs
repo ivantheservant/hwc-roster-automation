@@ -1051,7 +1051,7 @@ function parseStartPointVersionNo_(basisText) {
  */
 function formatVersionChangeCounts_(counts) {
   if (!counts) return '';
-  const n = function (v) { const x = Math.round(Number(v)); return isNaN(x) || x < 0 ? 0 : x; };
+  const n = function (v) { const rounded = Math.round(Number(v)); return isNaN(rounded) || rounded < 0 ? 0 : rounded; };
   const start = counts.startPoint === null || counts.startPoint === undefined || counts.startPoint === ''
     ? '' : String(Math.round(Number(counts.startPoint)));
   return 'manual=' + n(counts.manual) + ';system=' + n(counts.system) + ';start=' + start;
