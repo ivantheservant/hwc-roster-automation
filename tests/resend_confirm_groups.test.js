@@ -122,7 +122,8 @@ console.log('\n=== Y：後端接駁 ===');
   const flow = read('src/WebAppFlow.gs');
   const fn = flow.slice(flow.indexOf('function apiStep5Plan('), flow.indexOf('function apiStep5Decline('));
   check('★★★★★ apiStep5Plan() 用同一份收件人解析結果分組，帶 changeNotes',
-    /confirmGroups = buildResendConfirmGroups_\(changedPlan\.changed, recipients,\s*\n\s*readResendChangeNotes_\(quarterId, changedPlan\.versionNo\)\)/.test(fn)
+    // 第七十八輪批次 FA 組：多咗第 4 個參數（每一位嘅現時安排）
+    /confirmGroups = buildResendConfirmGroups_\(changedPlan\.changed, recipients,\s*\n\s*readResendChangeNotes_\(quarterId, changedPlan\.versionNo\), changedPlan\.currentByPerson\)/.test(fn)
       && /confirmGroups: confirmGroups/.test(fn), fn.slice(0, 400));
   const z1 = read('src/ui/ScriptZone1.html');
   check('★★★★ openResend() 用 buildResendConfirmNodes()', /const nodes = buildResendConfirmNodes\(plan\);/.test(z1));

@@ -557,7 +557,7 @@ function apiStep5Plan(quarterId, sendOptions) {
     recipientCount = recipients.length;
     recipientPreview = summariseRecipientsForPreview_(recipients);
     confirmGroups = buildResendConfirmGroups_(changedPlan.changed, recipients,
-      readResendChangeNotes_(quarterId, changedPlan.versionNo));
+      readResendChangeNotes_(quarterId, changedPlan.versionNo), changedPlan.currentByPerson);
   }
 
   return {

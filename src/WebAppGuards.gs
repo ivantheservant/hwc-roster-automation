@@ -401,8 +401,37 @@ function planResendChangedPersons_(quarterId) {
     context: context,
     // 第六十三輪批次 R 組
     arrangementChangedCount: arrangementChangedCount,
-    notReceivedCount: changed.length - arrangementChangedCount
+    notReceivedCount: changed.length - arrangementChangedCount,
+    // 第七十八輪批次 FA 組：唔喺改動名單入面嘅收件人（〔給所有人〕）都要有「現在」
+    currentByPerson: buildCurrentArrangementByPerson_(context)
   };
+}
+
+/**
+ * ⚠️ 第七十八輪批次 FA 組：**這一版每一位嘅現時安排**（唔淨係改動名單入面嗰幾位）。
+ *
+ * 現場（第七十七輪回歸 G23）：正式發出之後〔給所有人〕確認窗「這一次會寄給的 54 位」，
+ * 每一位（包括明明有崗位嘅）都寫「現在：（這一季沒有安排）」——因為只有
+ * `planResendChangedPersons_()` 嘅改動名單有 `currentSummary`，其餘收件人落空。
+ *
+ * 用**同一個** `buildAssignmentSummary_()`（第三十四輪丙3：兩邊日期格式要一致）。
+ * 唔喺回傳入面嘅人＝這一版真係冇崗位。
+ *
+ * @param {Object} context `buildMailContext_()` 的結果（要 `assignmentsByPerson`）
+ * @returns {Object.<string, {hasAssignments: boolean, currentSummary: string}>}
+ */
+function buildCurrentArrangementByPerson_(context) {
+  const out = {};
+  const byPerson = (context && context.assignmentsByPerson) || {};
+  Object.keys(byPerson).forEach(function (personId) {
+    const assignments = byPerson[personId] || [];
+    if (assignments.length === 0) return;
+    out[personId] = {
+      hasAssignments: true,
+      currentSummary: buildAssignmentSummary_(assignments, context.postNames, context.timezone)
+    };
+  });
+  return out;
 }
 
 /**
@@ -425,25 +454,35 @@ function planResendChangedPersons_(quarterId) {
  * @param {Object[]} recipients `resolveActualRecipientsFromContext_()` 嘅結果
  * @param {Object.<string, string[]>} changeNotesByPerson
  *   `listChangedPersonsBetweenVersions_()` 嘅結果（攞唔到就傳 `{}`）
+ * @param {Object=} currentByPerson 第七十八輪批次 FA 組：`buildCurrentArrangementByPerson_()`
+ *   嘅結果。唔喺改動名單入面嘅收件人用佢嘅「現在」；冇傳 ⇒ `hasAssignments: null`
+ *  （攞唔到資料，畫面寫「現在的安排沒有記錄」，唔可以扮冇安排）
  * @returns {{willSend: Object[], changedNotSent: Object[],
  *   notReceivedNotSentCount: number, notReceivedNotSentNames: string[]}}
  */
-function buildResendConfirmGroups_(changed, recipients, changeNotesByPerson) {
+function buildResendConfirmGroups_(changed, recipients, changeNotesByPerson, currentByPerson) {
   const notes = changeNotesByPerson || {};
   const changedById = {};
   (changed || []).forEach(function (c) { changedById[c.personId] = c; });
   const describe = function (c, extra) {
+    let hasAssignments = c.hasAssignments !== false;
+    let currentSummary = c.currentSummary || '';
+    if (!extra.inChangedList && !extra.isListRecipient) {
+      const now = currentByPerson ? currentByPerson[c.personId] : undefined;
+      hasAssignments = currentByPerson ? !!now : null;
+      currentSummary = now ? now.currentSummary : '';
+    }
     return {
       personId: c.personId || '',
       nameTC: extra.nameTC || c.nameTC || c.personId || '',
       isListRecipient: !!extra.isListRecipient,
       inChangedList: !!extra.inChangedList,
       arrangementChanged: !!extra.inChangedList && c.arrangementChanged !== false,
-      hasAssignments: c.hasAssignments !== false,
+      hasAssignments: hasAssignments,
       hasEmail: extra.hasEmail,
       firstNotifyDueToEmail: !!c.firstNotifyDueToEmail,
       previousSummary: c.previousSummary || '',
-      currentSummary: c.currentSummary || '',
+      currentSummary: currentSummary,
       changeNotes: (c.personId && notes[c.personId]) ? notes[c.personId].slice() : []
     };
   };

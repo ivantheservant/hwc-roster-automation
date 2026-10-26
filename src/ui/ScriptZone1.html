@@ -1652,12 +1652,14 @@
    * 第六十五輪批次 Y 組：改動後重發確認框「現在」嗰一行。
    * 第六十三輪批次 P 組：被整個換走嘅人明寫「這一季沒有安排」，
    * 唔靠 currentSummary 剛好係空字串。
+   * ⚠️ 第七十八輪批次 FA 組：攞唔到資料（`currentSummary` 空、又唔係明確冇崗位）
+   * ⇒ 寫「現在的安排沒有記錄」，同「上次的安排沒有記錄」同一個原則——唔可以扮冇安排。
    * @param {Object} c 一個人
    * @returns {string}
    */
   function resendCurrentText(c) {
     return '現在：' + (c.hasAssignments === false
-      ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'));
+      ? '這一季沒有安排' : (c.currentSummary || '（現在的安排沒有記錄）'));
   }
 
   /**
@@ -1723,6 +1725,10 @@
       // 冇舊 hash（上次冇收到）⇒ 用收件人頁同一份版本比較，例如「5 月 14 日　領詩（新增，本來是 …）」
       item.appendChild(make('div', { text: '改動：' + c.changeNotes.join('、'), className: 'vio-row' }));
       item.appendChild(make('div', { text: resendCurrentText(c), className: 'vio-row muted' }));
+    } else if (!c.inChangedList) {
+      // 第七十八輪批次 FA 組：〔給所有人〕入面安排冇改過嘅人——唔寫「原本／現在」
+      item.appendChild(make('div', { text: '安排沒有改動', className: 'vio-row muted' }));
+      item.appendChild(make('div', { text: resendCurrentText(c), className: 'vio-row' }));
     } else {
       item.appendChild(make('div', { text: resendCurrentText(c), className: 'vio-row' }));
     }

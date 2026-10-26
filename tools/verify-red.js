@@ -3765,8 +3765,8 @@ const MUTATIONS = [
     file: 'src/ui/ScriptZone1.html',
     // 第六十五輪批次 Y 組：抽成 resendCurrentText()
     find: "    return '現在：' + (c.hasAssignments === false\n"
-      + "      ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'));",
-    replace: "    return '現在：' + (c.currentSummary || '（這一季沒有安排）');",
+      + "      ? '這一季沒有安排' : (c.currentSummary || '（現在的安排沒有記錄）'));",
+    replace: "    return '現在：' + (c.currentSummary || '（現在的安排沒有記錄）');",
     tests: ['tests/resend_dropped_person.test.js']
   },
   // ── 第六十三輪批次 Q 組：補寄用最新版本查寄出紀錄 ──────────────
@@ -7155,6 +7155,47 @@ const MUTATIONS = [
     find: "    const ranges = formatVersionNoRanges_(tail);",
     replace: "    const ranges = tail.map(String);",
     tests: ["tests/round77_eh_round76_gaps.test.js"]
+  },
+  // ── 第七十八輪批次 FA 組：〔給所有人〕確認窗每一位都有現時安排 ──
+  {
+    id: "fa-no-current-summary",
+    why: "唔喺改動名單入面嘅收件人冇「現在」摘要（又變成「這一季沒有安排」）",
+    file: "src/WebAppGuards.gs",
+    find: "      currentSummary = now ? now.currentSummary : '';",
+    replace: "      currentSummary = '';",
+    tests: ["tests/round78_fa_sendall_current.test.js"]
+  },
+  {
+    id: "fa-has-assign-false",
+    why: "唔喺改動名單入面嘅收件人一律當冇崗位",
+    file: "src/WebAppGuards.gs",
+    find: "      hasAssignments = currentByPerson ? !!now : null;",
+    replace: "      hasAssignments = false;",
+    tests: ["tests/round78_fa_sendall_current.test.js"]
+  },
+  {
+    id: "fa-flow-no-current",
+    why: "apiStep5Plan() 冇把每一位嘅現時安排傳入確認窗",
+    file: "src/WebAppFlow.gs",
+    find: "readResendChangeNotes_(quarterId, changedPlan.versionNo), changedPlan.currentByPerson);",
+    replace: "readResendChangeNotes_(quarterId, changedPlan.versionNo));",
+    tests: ["tests/round78_fa_sendall_current.test.js"]
+  },
+  {
+    id: "fa-unknown-as-none",
+    why: "攞唔到「現在」資料嗰陣扮冇安排",
+    file: "src/ui/ScriptZone1.html",
+    find: "      ? '這一季沒有安排' : (c.currentSummary || '（現在的安排沒有記錄）'));",
+    replace: "      ? '這一季沒有安排' : (c.currentSummary || '（這一季沒有安排）'));",
+    tests: ["tests/round78_fa_sendall_current.test.js"]
+  },
+  {
+    id: "fa-ui-no-unchanged",
+    why: "冇改動嘅人冇寫「安排沒有改動」",
+    file: "src/ui/ScriptZone1.html",
+    find: "      item.appendChild(make('div', { text: '安排沒有改動', className: 'vio-row muted' }));\n",
+    replace: "",
+    tests: ["tests/round78_fa_sendall_current.test.js"]
   }
 ];
 
