@@ -968,17 +968,62 @@ const VERSION_START_POINT_ACTION = 'VERSION_START_POINT';
  * @param {number} baseVersionNo 儲存時嘅基準版本
  * @returns {?number} 起點版本號；冇就 null
  */
-function findStartPointForSave_(auditRows, quarterId, baseVersionNo) {
+function findStartPointForSave_(auditRows, quarterId, baseVersionNo, guards) {
   const C = COLUMNS.AUDIT_LOG;
+  const g = guards || {};
   let found = null;
   (auditRows || []).forEach(function (r) {
     if (String(r[C.ACTION] || '') !== VERSION_START_POINT_ACTION) return;
     if (String(r[C.TARGET_KEY] || '').trim() !== quarterId) return;
     if (Number(r[C.OLD_VALUE]) !== Number(baseVersionNo)) return;
+    // 第七十七輪批次 EH 組（第七十六輪 F1）：標記要**唔早過**基準版本嘅建立時間、亦唔早過該季最後一次重設
+    // ——否則重設之前留低嘅舊標記，重新生成到同一個版本號嗰陣會被當成今次嘅起點。
+    const ts = normalizeSheetTimestamp_(r[C.TIMESTAMP], g.timezone);
+    if (ts) {
+      if (g.versionCreatedAt && ts < g.versionCreatedAt) return;
+      if (g.lastResetAt && ts < g.lastResetAt) return;
+    }
     const m = Number(r[C.NEW_VALUE]);
     if (!isNaN(m)) found = m;
   });
   return found;
+}
+
+/** 第七十七輪批次 EH 組：重設季度測試資料完成嗰陣寫嘅 AuditLog action（`QuarterReset.gs`）。 */
+const QUARTER_RESET_AFTER_ACTION = 'QUARTER_RESET_BATCH_AFTER';
+
+/**
+ * 該季最後一次重設嘅時間（`yyyy-MM-dd HH:mm:ss`）；冇就 null。
+ * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {?string}
+ */
+function findLastQuarterResetAt_(auditRows, quarterId, timezone) {
+  const C = COLUMNS.AUDIT_LOG;
+  let last = null;
+  (auditRows || []).forEach(function (r) {
+    if (String(r[C.ACTION] || '') !== QUARTER_RESET_AFTER_ACTION) return;
+    if (String(r[C.TARGET_KEY] || '').trim() !== quarterId) return;
+    const ts = normalizeSheetTimestamp_(r[C.TIMESTAMP], timezone);
+    if (ts && (last === null || ts > last)) last = ts;
+  });
+  return last;
+}
+
+/**
+ * 某一版嘅建立時間（`RosterVersions.CreatedAt`，`yyyy-MM-dd HH:mm:ss`）；搵唔到就 null。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} timezone 時區
+ * @returns {?string}
+ */
+function readVersionCreatedAtForStartPoint_(quarterId, versionNo, timezone) {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  const row = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+    return String(r[V.QUARTER_ID] || '').trim() === quarterId && Number(r[V.VERSION_NO]) === Number(versionNo);
+  })[0];
+  return row ? normalizeSheetTimestamp_(row[V.CREATED_AT], timezone) : null;
 }
 
 /**
@@ -1040,7 +1085,14 @@ function parseVersionChangeCounts_(value) {
 
 function readStartPointBasisForSave_(quarterId, baseVersionNo) {
   try {
-    const m = findStartPointForSave_(readSheet(SHEETS.AUDIT_LOG), quarterId, baseVersionNo);
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const auditRows = readSheet(SHEETS.AUDIT_LOG);
+    // 第七十七輪批次 EH 組（F1）：標記要唔早過基準版本建立時間、亦唔早過該季最後一次重設
+    const m = findStartPointForSave_(auditRows, quarterId, baseVersionNo, {
+      timezone: timezone,
+      versionCreatedAt: readVersionCreatedAtForStartPoint_(quarterId, baseVersionNo, timezone),
+      lastResetAt: findLastQuarterResetAt_(auditRows, quarterId, timezone)
+    });
     return m === null ? null : '以第 ' + m + ' 版作起點';
   } catch (err) {
     log_('WARN', 'readStartPointBasisForSave_ 讀不到 AuditLog：' + err.message);

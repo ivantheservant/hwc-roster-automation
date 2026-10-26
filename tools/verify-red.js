@@ -7145,6 +7145,46 @@ const MUTATIONS = [
     find: "  runAction('載入中', async () => { await loadQuarters(); syncHwcasOnLoad(); });",
     replace: "  runAction('載入中', loadQuarters);",
     tests: ["tests/round77_eg_hwcas_method_a.test.js"]
+  },
+  {
+    id: "eh-f1-no-ts-guard",
+    why: "起點標記唔睇時間（重設前留低嘅舊標記又會變成今次嘅起點）",
+    file: "src/SheetReader.gs",
+    find: "    if (ts) {\n      if (g.versionCreatedAt && ts < g.versionCreatedAt) return;\n      if (g.lastResetAt && ts < g.lastResetAt) return;\n    }\n",
+    replace: "",
+    tests: ["tests/round77_eh_round76_gaps.test.js"]
+  },
+  {
+    id: "eh-f1-no-reset-guard",
+    why: "起點標記唔理該季最後一次重設",
+    file: "src/SheetReader.gs",
+    find: "      if (g.lastResetAt && ts < g.lastResetAt) return;\n",
+    replace: "",
+    tests: ["tests/round77_eh_round76_gaps.test.js"]
+  },
+  {
+    id: "eh-f2-flags-only",
+    why: "「沒有人」又靠上一版旗標判斷（清空嘅講員／獻花被當成空格）",
+    file: "src/FineTune.gs",
+    find: "    if (autoByPost && autoByPost[s.postId] === false) return false;\n",
+    replace: "",
+    tests: ["tests/round77_eh_round76_gaps.test.js"]
+  },
+  {
+    id: "eh-f3-no-temp-helper",
+    why: "第 4 步卡片標題又漏計臨時幫手",
+    file: "src/WebAppMainFlow.gs",
+    find: "  return split.noEmail.concat(split.tempHelpers || []);",
+    replace: "  return split.noEmail;",
+    tests: ["tests/round77_eh_round76_gaps.test.js"]
+  },
+  {
+    id: "eh-wording-no-ranges",
+    why: "版本號唔合併（又係「第 1 及第 2 及第 3…」）",
+    file: "src/WebAppSendPlan.gs",
+    find: "    const ranges = formatVersionNoRanges_(tail);",
+    replace: "    const ranges = tail.map(String);",
+    tests: ["tests/round77_eh_round76_gaps.test.js"]
   }
 ];
 

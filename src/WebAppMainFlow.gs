@@ -372,7 +372,9 @@ function splitAssignedPeopleByEmail_(quarterId, versionNo) {
  * @returns {Object[]} 每筆 {personId, nameTC, cellCount}
  */
 function listPeopleNeedingPaper_(quarterId, versionNo) {
-  return splitAssignedPeopleByEmail_(quarterId, versionNo).noEmail;
+  // 第七十七輪批次 EH 組（第七十六輪 F3）：臨時幫手都要印紙本——卡片標題、寄出窗「收不到電郵」、第 4 步名單三個數字一致
+  const split = splitAssignedPeopleByEmail_(quarterId, versionNo);
+  return split.noEmail.concat(split.tempHelpers || []);
 }
 
 /**

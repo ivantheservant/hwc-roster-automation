@@ -535,6 +535,26 @@ function apiGetLastReviewSendOptions(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} {batches, currentVersionNo, unsentVersions, warnSentence}
  */
+/**
+ * 第七十七輪批次 EH 組：版本號清單 ⇒ 人話片段（連續三個或以上寫「A 至 B」；兩個寫「A、B」）。**純函式。**
+ * @param {number[]} list 版本號
+ * @returns {string[]} 例如 [1,2,3,4,5] ⇒ ['1 至 5']；[2,4,5,6] ⇒ ['2', '4 至 6']
+ */
+function formatVersionNoRanges_(list) {
+  const nums = (list || []).map(Number).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });
+  const parts = [];
+  let i = 0;
+  while (i < nums.length) {
+    let j = i;
+    while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
+    if (j > i + 1) parts.push(nums[i] + ' 至 ' + nums[j]);
+    else if (j === i + 1) parts.push(nums[i] + '、' + nums[j]);
+    else parts.push(String(nums[i]));
+    i = j + 1;
+  }
+  return parts;
+}
+
 function buildSendHistoryView_(quarterId) {
   const batches = listSendHistory_(quarterId);
   const currentVersionNo = findLatestVersionNo(quarterId);
@@ -555,9 +575,11 @@ function buildSendHistoryView_(quarterId) {
     warnSentence = '';
   } else if (!sentVersions[currentVersionNo]) {
     const tail = unsent.filter(function (v) { return v > 0; });
+    // 第七十七輪批次 EH 組：連續嘅版本號合併——「第 1 至 5 版都未寄過」「第 2、4 至 6 版未寄過」
+    const ranges = formatVersionNoRanges_(tail);
     warnSentence = tail.length > 1
-      ? ('⚠️ 目前是第 ' + currentVersionNo + ' 版，第 '
-        + tail.join(' 及第 ') + ' 版未寄過給任何人。')
+      ? ('⚠️ 目前是第 ' + currentVersionNo + ' 版，第 ' + ranges.join('、') + ' 版'
+        + (ranges.length === 1 ? '都' : '') + '未寄過給任何人。')
       : ('⚠️ 目前是第 ' + currentVersionNo + ' 版，這一版未寄過給任何人。');
   }
 

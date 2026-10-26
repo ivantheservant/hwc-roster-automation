@@ -1368,10 +1368,15 @@ function listGenuineBlankCells_(state, context) {
   (context.original || []).forEach(function (a) {
     flagsByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a.ruleFlags || [];
   });
+  const autoByPost = (context.gridRender && context.gridRender.autoGenerateByPostId) || null;
   return (state || []).filter(function (s) {
     // 第七十五輪批次 CE 組／第七十六輪批次 DB 組：有名而冇 PersonID（臨時幫手、外請講員、未決定嘅名）唔係空格。
     // 「有冇人」只有一個定義：`isCellFilled_()`（SheetReader.gs）。
     if (isCellFilled_(s.personId, s.freeText)) return false;
+    // 第七十七輪批次 EH 組（第七十六輪 F2）：人手崗位（`Posts.AutoGenerate=FALSE`：講員／翻譯／獻花）
+    // 本來就留畀幹事填，清空咗唔算「沒有人」——按 `Posts` 判斷，唔靠上一版嘅原因旗標
+    //（上一版嗰格有名就冇旗標，先會被當成真空格）。
+    if (autoByPost && autoByPost[s.postId] === false) return false;
     return !isIntentionallyBlankCell_(
       flagsByKey[cellKey_(s.serviceDate, s.postId, s.slotIndex)]);
   }).map(function (s) {
