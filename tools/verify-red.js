@@ -7296,6 +7296,23 @@ const MUTATIONS = [
     find: "      }), acceptPostNames, 'MANUAL').concat(buildWeekTitleChangeRows_(titleChanges)),",
     replace: "      }), acceptPostNames, 'MANUAL'),",
     tests: ["tests/round78_fc_title_on_accept.test.js"]
+  },
+  // ── 第七十八輪批次 FD 組：〔儲存〕確認窗嘅字眼 ──
+  {
+    id: "fd-spec-old-wording",
+    why: "介面規格又寫返「儲存前的確認窗」（一切正常其實唔出）",
+    file: "docs/幹事介面規格.md",
+    find: "  （當時：確認畫面多了一個 ☐ 儲存之後直接去寄出，**預設不勾**；",
+    replace: "  儲存前的確認窗多了一個 ☐ 儲存之後直接去寄出，**預設不勾**；",
+    tests: ["tests/round78_fd_save_wording.test.js"]
+  },
+  {
+    id: "fd-scan-misses-old",
+    why: "靜態檢查捉唔到「儲存前的確認窗」",
+    file: "tools/scan-static-risks.js",
+    find: "  /儲存前的確認窗/,\n",
+    replace: "",
+    tests: ["tests/round78_fd_save_wording.test.js"]
   }
 ];
 

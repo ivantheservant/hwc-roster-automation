@@ -32,6 +32,7 @@
  * 4. 手砌 context 傳入規則函式 —— 第十八輪嗰個 bug class 嘅殘餘
  * 5. 同時攞到兩個真相來源但只用其中一個 —— 第十九輪階段 B
  * 6. 由渲染輸出反推資料 —— 第二十輪階段 A（合堂令新功能完全用唔到）
+ * 7. 「儲存一定先出確認」嘅字眼 —— 第七十八輪批次 FD 組（第七十七輪回歸 G11）
  */
 
 'use strict';
@@ -434,6 +435,47 @@ function scanDisplayToDataReversal() {
 }
 
 // =====================================================================
+// 7. 「儲存一定先出確認」嘅字眼 —— 第七十八輪批次 FD 組
+// =====================================================================
+
+/**
+ * 〔儲存〕一切正常（冇違規、冇申報、冇空格、冇未決定嘅名）會**直接儲存**，唔出
+ * 「會儲存成第 N 版」確認畫面（第三十九輪批次 A 組 `saveIsCompletelyClean()`）。
+ * 第七十七輪回歸 G11：腳本同指南都假設一定有確認窗，`g18_save_confirm` 因此拍唔到。
+ * 畀幹事睇嘅字眼（`src/` 非註解、使用說明）唔可以再寫「儲存前一定有確認窗」。
+ */
+const SAVE_ALWAYS_CONFIRM_PATTERNS = [
+  /儲存前的確認窗/,
+  /儲存[^。\n]{0,12}(一定|每次|總會|都會)[^。\n]{0,8}(確認畫面|確認窗)/,
+  /撳〔儲存〕[^。\n]{0,10}(會先出|先會出|一定出)[^。\n]{0,6}確認/
+];
+const SAVE_WORDING_DOCS = ['docs/幹事操作說明.md', 'docs/幹事介面規格.md'];
+
+function checkSaveWordingLine(line) {
+  return SAVE_ALWAYS_CONFIRM_PATTERNS.some(function (re) { return re.test(line); });
+}
+
+function scanSaveAlwaysConfirmWording() {
+  const note = '〔儲存〕一切正常會直接儲存，不出確認畫面；請改成準確的講法，例如'
+    + '「有需要你決定的事才會出確認畫面；一切正常會直接儲存」。';
+  const files = listFiles(SRC_DIR, '.gs').concat(listFiles(UI_DIR, '.html'));
+  files.forEach(function (file) {
+    const rel = path.relative(ROOT, file.full).split(path.sep).join('/');
+    fs.readFileSync(file.full, 'utf8').split('\n').forEach(function (line, i) {
+      if (looksLikeComment(line)) return;
+      if (checkSaveWordingLine(line)) report('儲存確認字眼', rel, i + 1, line, note);
+    });
+  });
+  SAVE_WORDING_DOCS.forEach(function (rel) {
+    const full = path.join(ROOT, rel);
+    if (!fs.existsSync(full)) return;
+    fs.readFileSync(full, 'utf8').split('\n').forEach(function (line, i) {
+      if (checkSaveWordingLine(line)) report('儲存確認字眼', rel, i + 1, line, note);
+    });
+  });
+}
+
+// =====================================================================
 // 輸出
 // =====================================================================
 
@@ -485,6 +527,7 @@ function main() {
   scanHandBuiltContext();
   scanDualSourceAmbiguity();
   scanDisplayToDataReversal();
+  scanSaveAlwaysConfirmWording();
 
   const byKind = {};
   findings.forEach(function (f) {
@@ -523,6 +566,7 @@ if (require.main === module) {
   module.exports = {
     scanTemplateEscaping, scanFirstRunAsymmetry, scanUncheckedColumnAccess,
     scanHandBuiltContext, scanDualSourceAmbiguity, scanDisplayToDataReversal, shouldFlagReversal,
+    scanSaveAlwaysConfirmWording, checkSaveWordingLine,
     checkTemplateLine, buildReportMarkdown,
     _findings: findings, _report: report
   };
