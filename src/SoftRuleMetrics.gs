@@ -805,7 +805,7 @@ function buildPersonPostWeightMetricRows_(quarterId, versionNo) {
 
     if (weights.rows.length === 0 && weights.invalid.length === 0) {
       return [diagRow_(section, '（本季沒有設定任何排表偏好）', '0 項',
-        '系統按一般規則排。要設定的話：幹事介面「主流程第 2 步 ▸ 排表偏好」。')];
+        '系統按一般規則排。要設定的話：幹事介面「開季前準備 ▸ 排表偏好」。')];
     }
 
     const postNames = {};

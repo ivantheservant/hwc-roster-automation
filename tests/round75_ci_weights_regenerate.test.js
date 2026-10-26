@@ -1,7 +1,7 @@
 // 第七十五輪批次 CI 組：〔排表偏好〕喺第 2 步；儲存偏好之後問要唔要重新生成（Ivan 已決定）。
 // 執行方式：node tests/round75_ci_weights_regenerate.test.js
 //
-//   CI1　第 2 步有〔排表偏好〕
+//   CI1　〔排表偏好〕喺開季前準備（第七十七輪批次 EA 組由第 2 步搬過去）
 //   CI2　儲存偏好之後彈窗：「新的偏好會用在之後生成的職事表。要現在用新偏好重新生成這一季嗎？
 //        會建立新一版，舊版本全部保留；職事表上未儲存的改動會不見。」〔重新生成〕〔之後再說〕
 //   CI3　〔重新生成〕走現有「重新生成初稿（覆蓋式）」同一個確認畫面（仍然要打「確認」）；
@@ -46,12 +46,14 @@ const tick = async () => { for (let i = 0; i < 8; i++) await new Promise((r) => 
 const btnIn = (node, text) => node.flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === text)[0];
 
 (async () => {
-  console.log('\n=== CI1：第 2 步有〔排表偏好〕===');
+  console.log('\n=== CI1：〔排表偏好〕喺開季前準備（第七十七輪批次 EA 組由第 2 步搬過去）===');
   {
     const { ui } = setup(true);
     const card = ui.renderStep2({ latestVersion: { versionNo: 2, sheetUrl: 'https://example.invalid/v2' },
       buttons: { save: { enabled: true } }, versionChoices: [] }, {});
-    check('★★★★★ 第 2 步有〔排表偏好〕', !!btnIn(card, '排表偏好'));
+    check('★★★★★ 第 2 步冇〔排表偏好〕', !btnIn(card, '排表偏好'));
+    ui.renderZone2Body({ preQuarter: { items: [] } });
+    check('★★★★★ 開季前準備有〔排表偏好〕', !!btnIn(ui.document.getElementById('zone2Body'), '排表偏好'));
   }
 
   console.log('\n=== CI2／CI3：儲存偏好之後問一句 ===');

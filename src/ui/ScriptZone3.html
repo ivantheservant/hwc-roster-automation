@@ -995,14 +995,22 @@
   let weightData = null;
   let weightChanges = {};
   let weightPostFilter = '';
+  // 第七十七輪批次 EA 組：「也用於之後的季度（直到再改）」，**預設不勾**＝只用於這一季。
+  let weightApplyFuture = false;
 
   function openWeights() {
     runAction('讀取排表偏好', async () => {
       weightData = await callServer('apiGetPersonPostWeightMatrix', currentQuarterId);
       weightChanges = {};
       weightPostFilter = '';
+      weightApplyFuture = false;
       renderWeights();
     });
+  }
+
+  /** 第七十七輪批次 EA 組：畫面同確認窗都用呢個季度名（後端砌，冇就退回季度 ID）。 */
+  function weightQuarterLabel() {
+    return (weightData && weightData.quarterLabel) || currentQuarterId || '';
   }
 
   function renderWeights() {
@@ -1017,7 +1025,9 @@
         })
       ]),
       para('「多一次」的意思是「這一季比系統原本會派的多大約一次」，'
-        + '不是「一定多一次」——系統仍然要先滿足所有規則。', 'muted')
+        + '不是「一定多一次」——系統仍然要先滿足所有規則。', 'muted'),
+      // 第七十七輪批次 EA 組：一律按所揀季度顯示（參考日期＝季度開始日）
+      para('這裡顯示的是 ' + weightQuarterLabel() + ' 生效的偏好。每一項旁邊寫明是「只限這一季」還是「之後各季都用」。', 'muted')
     ];
 
     // 查不到用人量就講出嚟。唔講嘅話，畫面上「冇黃字」會被理解成
@@ -1082,8 +1092,22 @@
       nodes.push(list);
     }
 
+    // 第七十七輪批次 EA 組：範圍勾選框（預設不勾＝只用於這一季）
+    const futureBox = document.createElement('input');
+    futureBox.type = 'checkbox';
+    futureBox.id = 'weightApplyFuture';
+    futureBox.checked = weightApplyFuture;
+    futureBox.addEventListener('change', () => { weightApplyFuture = futureBox.checked; });
+    const futureLabel = make('label', { className: 'check-row' }, [
+      futureBox, make('span', { text: ' 也用於之後的季度（直到再改）' })
+    ]);
+    nodes.push(make('div', { className: 'sec' }, [
+      futureLabel,
+      para('不勾＝這次的改動只用於 ' + weightQuarterLabel() + '，之後的季度不受影響。', 'muted')
+    ]));
+
     nodes.push(make('div', { id: 'weightFooter', className: 'sec' }));
-    openModal('排表偏好', nodes, [
+    openModal('排表偏好：' + weightQuarterLabel(), nodes, [
       button('儲存改動', () => confirmWeightBatch(), ''),
       button('關閉', () => closeModalAndRefresh(), 'secondary')
     ]);
@@ -1151,8 +1175,10 @@
       make('span', { text: '原因' }), reasonInput
     ]));
     if (person.adjust !== 0) {
+      // 第七十七輪批次 EA 組：寫明範圍
       box.appendChild(make('div', {
-        text: '目前生效中。選「一般（預設）」就會解除（記錄會保留，不會刪走）。',
+        text: '目前生效中（' + (person.scopeText || '之後各季都用') + '）。'
+          + '選「一般（預設）」就會改為照一般排（記錄會保留，不會刪走）。',
         className: 'muted'
       }));
     }
@@ -1228,15 +1254,22 @@
       }));
     });
 
+    // 第七十七輪批次 EA 組：儲存之前先講明範圍（Ivan：提醒使用者是只限這一季，還是之後的季度也用）
+    const label = weightQuarterLabel();
+    const scopeLine = weightApplyFuture
+      ? '這 ' + summary.total + ' 項偏好由 ' + label + ' 開始，之後每一季都會用，直到你再改。'
+      : '這 ' + summary.total + ' 項偏好只用於 ' + label + '。之後的季度不受影響。';
     openConfirm({
       title: '確定要儲存嗎',
       bodyNodes: [
-        para('會新增 ' + summary.added + ' 項偏好、解除 ' + summary.released + ' 項偏好。'),
+        make('div', { className: 'warnbox' }, [make('div', { text: scopeLine, className: 'warn-head' })]),
         list,
-        para('解除不會刪走那一行——系統只是記下「由今天起不再生效」，'
-          + '之後仍然查得到當時是怎樣決定的。', 'muted')
+        para(weightApplyFuture
+          ? '之前「只限某一季」或者長期的設定會由 ' + label + ' 起停止生效；紀錄會保留，不會刪走。'
+          : '選「一般（預設）」也會記一項「這一季照一般排」，用來蓋過長期的偏好；紀錄會保留，不會刪走。', 'muted')
       ],
       confirmLabel: '確定儲存',
+      cancelLabel: '返回',
       onConfirm: () => {
         runAction('儲存中', async () => {
           const changes = Object.keys(weightChanges).map((k) => {
@@ -1248,9 +1281,10 @@
               reason: weightChanges[k].reason || '解除偏好'
             };
           });
-          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes);
+          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes,
+            { quarterId: currentQuarterId, applyToFuture: weightApplyFuture === true });
           if (!res.ok) { showErrorModal('排表偏好', new Error(res.message || '儲存失敗')); return; }
-          setStatus('已新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。');
+          setStatus('已儲存 ' + res.added + ' 項、解除 ' + res.released + ' 項（' + (res.scopeText || '') + '）。');
           weightData = await callServer('apiGetPersonPostWeightMatrix', currentQuarterId);
           weightChanges = {};
           // 第七十五輪批次 CI 組（Ivan 決定）：儲存之後即刻問要唔要用新偏好重新生成這一季。
@@ -1265,7 +1299,8 @@
   /** 第七十五輪批次 CI 組：儲存排表偏好之後嘅一問。未生成過 ⇒ 唔問（生成時自然用新偏好）。 */
   function askRegenerateAfterWeights(res, hasVersion) {
     const done = make('div', {
-      text: '已儲存排表偏好：新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。',
+      text: '已儲存排表偏好：新增 ' + res.added + ' 項、解除 ' + res.released + ' 項'
+        + (res.scopeText ? '（' + res.scopeText + '）' : '') + '。',
       className: 'ok-line'
     });
     if (!hasVersion) {

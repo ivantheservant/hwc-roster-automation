@@ -79,8 +79,11 @@ function apiGetPersonPostWeightMatrix(quarterId) {
       eligibleByPost[postId].push(personId);
     });
 
-    // 現正生效嘅偏好（今日做參考日期）
-    const active = readActivePersonPostWeights_(today, timezone);
+    // 第七十七輪批次 EA 組：一律按**所揀季度**睇（參考日期＝季度開始日，同生成一樣）。
+    // 冇季度資料先退回今日。
+    const scope = resolveWeightQuarterScope_(quarterId, timezone);
+    const referenceDate = scope ? scope.startDate : today;
+    const active = readActivePersonPostWeights_(referenceDate, timezone);
 
     // 全部偏好行（含已解除嘅），供畫面顯示「以前改過乜」
     let allRows = [];
@@ -132,6 +135,9 @@ function apiGetPersonPostWeightMatrix(quarterId) {
             adjust: adjust,
             reason: hit ? hit.reason : '',
             weightId: hit ? hit.weightId : '',
+            // 第七十七輪批次 EA 組：呢一項係「只限這一季」定「之後各季都用」
+            scope: hit ? hit.scope : '',
+            scopeText: hit ? describeWeightScope_(hit.scope) : '',
             baseline: base.baseline,
             baselineSource: base.source,
             target: target,
@@ -161,11 +167,15 @@ function apiGetPersonPostWeightMatrix(quarterId) {
       posts: byPost,
       activeCount: active.rows.length,
       invalid: active.invalid,
+      // 第七十七輪批次 EA 組：畫面標題寫明季度；儲存嗰陣要傳返 quarterId
+      quarterId: scope ? scope.quarterId : String(quarterId || '').trim(),
+      quarterLabel: scope ? scope.label : '',
+      referenceDate: referenceDate,
       // 前端要靠呢兩個字段分辨「查不到」同「查到但冇人接近上限」。
       // 兩者睇落一樣（都係冇黃字），但意思完全相反。
       loadAvailable: load.available,
       loadUnavailableReason: load.reason,
-      history: allRows.filter(function (r) { return r.effectiveTo !== ''; })
+      history: allRows.filter(function (r) { return r.effectiveTo !== '' && r.effectiveTo < referenceDate; })
     };
   } finally {
     endSheetReadMemo_();
@@ -386,30 +396,170 @@ function readQuarterLoadForWeights_(quarterId) {
 }
 
 /**
- * 批次儲存偏好改動。**會寫入。**
+ * 第七十七輪批次 EA 組：排表偏好一律按季度睇。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {?{quarterId: string, label: string, startDate: string, endDate: string}} 冇呢一季（或者冇日期）就 null
+ */
+function resolveWeightQuarterScope_(quarterId, timezone) {
+  const id = String(quarterId || '').trim();
+  if (!id) return null;
+  const info = findQuarterRowInfo_(id);
+  if (!info) return null;
+  const Q = COLUMNS.QUARTERS;
+  const startDate = toDateString(info.values[Q.START_DATE], timezone);
+  const endDate = toDateString(info.values[Q.END_DATE], timezone);
+  if (!startDate || !endDate) return null;
+  return { quarterId: id, label: buildQuarterLabel_(id), startDate: startDate, endDate: endDate };
+}
+
+/** 第七十七輪批次 EA 組：範圍嘅人話（畫面每一項旁邊、AuditLog 都用呢一句）。 */
+function describeWeightScope_(scope) {
+  return scope === WEIGHT_SCOPE.QUARTER ? '只限這一季' : '之後各季都用';
+}
+
+/**
+ * 第七十七輪批次 EA 組：由改動清單算出要寫邊幾行。**純函式**（唔讀表、唔寫表、唔睇今日）。
  *
- * 三種動作：
- *   新增（本來冇偏好，而家揀咗多／少 N 次）⇒ 加一行
- *   改動（本來有偏好，而家換咗另一個數字）⇒ 解除舊行 ＋ 加新行
- *   解除（本來有偏好，而家揀返「一般」）⇒ **填 EffectiveTo，唔刪行**
- *
- * ⚠️ 「改動」特登做成「解除舊行 ＋ 加新行」而唔係就地改個數字：
- * 就地改嘅話，「上一次係幾多、幾時改嘅、點解改」就冇咗。
- * 堂委下次開會問「舊年我哋decide咗幾多」就答唔到。
+ * 只限這一季（`applyToFuture=false`）：
+ *   加一行 `EffectiveFrom=季初、EffectiveTo=季尾、Adjust=新值`。**`Adjust=0` 都要寫一行**——
+ *   意思係「這一季照一般排」，用嚟蓋過長期偏好。唔解除任何行（讀取規則：只限行優先於長期行；
+ *   同一季多行 ⇒ `CreatedAt` 最新嗰行，見 `weightRowOutranks_()`）。
+ * 之後各季都用（`applyToFuture=true`）：
+ *   該 (人, 崗位) 所有「季初當日或之後仲生效」嘅行——長期行、呢一季或之後嘅只限行——
+ *   填 `EffectiveTo=季初前一日`（過去季度嘅紀錄一行都唔郁，之前嗰季照樣讀到舊值）；
+ *   `Adjust≠0` 先加一行長期行（`EffectiveFrom=季初、EffectiveTo` 空白）。
+ * 照舊**唔刪行**。
  *
  * @param {Object[]} changes 每項 {personId, postId, adjust, reason}
- * @returns {Object} {ok, added, released, skipped}
+ * @param {Object[]} existingRows 每項 {sheetRow, weightId, personId, postId, adjust, effectiveFrom, effectiveTo, active, createdAt, index}
+ * @param {{startDate: string, endDate: string}} quarter 季度範圍
+ * @param {boolean} applyToFuture TRUE＝之後各季都用
+ * @returns {{releases: Object[], adds: Object[], skipped: number}}
  */
-function apiSavePersonPostWeightBatch(changes) {
+function planPersonPostWeightWrites_(changes, existingRows, quarter, applyToFuture) {
+  const dayBefore = shiftDateString_(quarter.startDate, -1);
+  const releases = [];
+  const adds = [];
+  let skipped = 0;
+
+  const rowsByKey = {};
+  (existingRows || []).forEach(function (r) {
+    if (!r.personId || !r.postId || r.active === false) return;
+    const key = r.personId + '|' + r.postId;
+    if (!rowsByKey[key]) rowsByKey[key] = [];
+    rowsByKey[key].push(r);
+  });
+
+  (changes || []).forEach(function (change) {
+    const personId = String(change.personId || '').trim();
+    const postId = String(change.postId || '').trim();
+    if (!personId || !postId) { skipped++; return; }
+    const adjust = Math.round(Number(change.adjust));
+    const reason = String(change.reason || '').trim();
+    const rows = rowsByKey[personId + '|' + postId] || [];
+
+    if (!applyToFuture) {
+      // 季初嗰日生效嘅係邊一行——同 `readActivePersonPostWeights_()` 同一個揀法
+      const effectiveNow = pickEffectiveWeightRow_(rows, quarter.startDate);
+      const wasAdjust = effectiveNow ? effectiveNow.adjust : 0;
+      if (wasAdjust === adjust) { skipped++; return; }
+      adds.push({
+        personId: personId, postId: postId, adjust: adjust, reason: reason,
+        effectiveFrom: quarter.startDate, effectiveTo: quarter.endDate,
+        scope: WEIGHT_SCOPE.QUARTER, wasAdjust: wasAdjust
+      });
+      return;
+    }
+
+    const stillRelevant = rows.filter(function (r) {
+      return r.effectiveTo === '' || r.effectiveTo >= quarter.startDate;
+    });
+    const ongoingNow = pickLatestWeightRow_(stillRelevant.filter(function (r) {
+      return r.effectiveTo === '' && (!r.effectiveFrom || r.effectiveFrom <= quarter.startDate);
+    }));
+    const wasAdjust = ongoingNow ? ongoingNow.adjust : 0;
+    const hasQuarterOverride = stillRelevant.some(function (r) { return r.effectiveTo !== ''; });
+    if (wasAdjust === adjust && !hasQuarterOverride) { skipped++; return; }
+    stillRelevant.forEach(function (r) {
+      releases.push({
+        sheetRow: r.sheetRow, weightId: r.weightId, personId: personId, postId: postId,
+        wasAdjust: r.adjust, effectiveTo: dayBefore,
+        scope: r.effectiveTo === '' ? WEIGHT_SCOPE.ONGOING : WEIGHT_SCOPE.QUARTER
+      });
+    });
+    if (adjust !== 0) {
+      adds.push({
+        personId: personId, postId: postId, adjust: adjust, reason: reason,
+        effectiveFrom: quarter.startDate, effectiveTo: '',
+        scope: WEIGHT_SCOPE.ONGOING, wasAdjust: wasAdjust
+      });
+    }
+  });
+
+  return { releases: releases, adds: adds, skipped: skipped };
+}
+
+/** 參考日期嗰日生效嘅行（只限行 > 長期行 > CreatedAt）。冇就 null。 */
+function pickEffectiveWeightRow_(rows, referenceDate) {
+  return pickLatestWeightRow_((rows || []).filter(function (r) {
+    if (r.effectiveFrom && r.effectiveFrom > referenceDate) return false;
+    if (r.effectiveTo && r.effectiveTo < referenceDate) return false;
+    return true;
+  }));
+}
+
+/** 用 `weightRowOutranks_()` 揀出最高優先嗰行。冇就 null。 */
+function pickLatestWeightRow_(rows) {
+  let best = null;
+  (rows || []).forEach(function (r) {
+    const shaped = {
+      scope: r.effectiveTo ? WEIGHT_SCOPE.QUARTER : WEIGHT_SCOPE.ONGOING,
+      createdAt: r.createdAt || '', index: r.index || 0
+    };
+    if (!best || weightRowOutranks_(shaped, best.shaped)) best = { row: r, shaped: shaped };
+  });
+  return best ? best.row : null;
+}
+
+/**
+ * 批次儲存偏好改動。**會寫入。**
+ *
+ * 第七十七輪批次 EA 組：兩種範圍（Ivan 決定）——
+ *   只限這一季（預設）：加一行只限呢一季嘅行（`Adjust=0` 都寫，意思係「這一季照一般排」）
+ *   之後各季都用：解除由季初起仍然生效嘅行（填 `EffectiveTo=季初前一日`），`Adjust≠0` 再加長期行
+ * 寫邊幾行由 `planPersonPostWeightWrites_()`（純函式）決定；呢度只係照寫同寫 AuditLog。
+ *
+ * ⚠️ 照舊**唔刪行**：要睇得返「嗰陣時堂委係點決定嘅」。
+ *
+ * @param {Object[]} changes 每項 {personId, postId, adjust, reason}
+ * @param {{quarterId: string, applyToFuture: boolean}=} options 季度同範圍
+ * @returns {Object} {ok, added, released, skipped, scopeText}
+ */
+function apiSavePersonPostWeightBatch(changes, options) {
   assertWebAppRequestAllowed_();
   const list = changes || [];
+  const opts = options || {};
   if (list.length === 0) {
     return { ok: true, added: 0, released: 0, skipped: 0, notes: '沒有任何改動。' };
   }
 
   const W = COLUMNS.PERSON_POST_WEIGHT;
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const scope = resolveWeightQuarterScope_(opts.quarterId, timezone);
+  if (!scope) {
+    return {
+      ok: false,
+      message: buildThreePartMessage_(
+        '找不到季度「' + String(opts.quarterId || '') + '」的開始和結束日期。',
+        '什麼都沒有儲存。',
+        ['先在頁頂選一個季度', 'Quarters 工作表那一季要有 StartDate 和 EndDate'])
+    };
+  }
+  const applyToFuture = opts.applyToFuture === true;
+  const scopeText = applyToFuture
+    ? '由 ' + scope.label + ' 開始，之後各季都用'
+    : '只限 ' + scope.label;
 
   // 每一筆改動都要有原因——冇原因嘅偏好，三個月後冇人記得點解。
   const missingReason = list.filter(function (c) {
@@ -450,61 +600,51 @@ function apiSavePersonPostWeightBatch(changes) {
       String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim();
   });
 
-  // 現正生效嘅行，逐個 (人|崗位) 索引到列號
-  const existing = {};
-  readOptionalSheet_(SHEETS.PERSON_POST_WEIGHT).forEach(function (row, i) {
-    const personId = String(row[W.PERSON_ID] || '').trim();
-    const postId = String(row[W.POST_ID] || '').trim();
-    if (!personId || !postId) return;
-    if (!isTrueValue_(row[W.ACTIVE])) return;
-    const to = toDateString(row[W.EFFECTIVE_TO], timezone);
-    if (to && to < today) return;   // 已經解除
-    existing[personId + '|' + postId] = { record: row, sheetRow: i + 3 };
+  const existingRows = readOptionalSheet_(SHEETS.PERSON_POST_WEIGHT).map(function (row, i) {
+    return {
+      sheetRow: i + 3,
+      index: i,
+      weightId: String(row[W.WEIGHT_ID] || '').trim(),
+      personId: String(row[W.PERSON_ID] || '').trim(),
+      postId: String(row[W.POST_ID] || '').trim(),
+      adjust: Math.round(Number(row[W.ADJUST])) || 0,
+      effectiveFrom: toDateString(row[W.EFFECTIVE_FROM], timezone),
+      effectiveTo: toDateString(row[W.EFFECTIVE_TO], timezone),
+      active: isTrueValue_(row[W.ACTIVE]),
+      createdAt: normalizeSheetTimestamp_(row[W.CREATED_AT], timezone) || ''
+    };
   });
+  const plan = planPersonPostWeightWrites_(list, existingRows, scope, applyToFuture);
 
   const actor = Session.getActiveUser().getEmail();
-  let added = 0;
-  let released = 0;
-  let skipped = 0;
+  const labelOf = function (personId, postId) {
+    return (nameIndex[personId] || personId) + '　' + (postNames[postId] || postId);
+  };
 
-  list.forEach(function (change) {
-    const personId = String(change.personId || '').trim();
-    const postId = String(change.postId || '').trim();
-    if (!personId || !postId) { skipped++; return; }
-    const adjust = Math.round(Number(change.adjust));
-    const reason = String(change.reason || '').trim();
-    const label = (nameIndex[personId] || personId) + '　' + (postNames[postId] || postId);
-    const hit = existing[personId + '|' + postId];
-    const wasAdjust = hit ? (Number(hit.record[W.ADJUST]) || 0) : 0;
-    if (wasAdjust === adjust) { skipped++; return; }
+  // 解除（**填 EffectiveTo，唔刪行**）
+  plan.releases.forEach(function (r) {
+    const releaseUpdates = {};
+    releaseUpdates[W.EFFECTIVE_TO] = r.effectiveTo;
+    writeRowFields_(opened.sheet, opened.headers, r.sheetRow, releaseUpdates);
+    writeZone3Audit_({
+      action: 'WEIGHT_RELEASE',
+      targetSheet: SHEETS.PERSON_POST_WEIGHT,
+      targetKey: r.weightId || (r.personId + '|' + r.postId),
+      oldValue: 'Adjust=' + r.wasAdjust + '（' + describeWeightScope_(r.scope) + '）',
+      newValue: 'EffectiveTo=' + r.effectiveTo + '（解除，沒有刪行）',
+      notes: labelOf(r.personId, r.postId) + '　範圍：' + scopeText
+    });
+  });
 
-    // 解除舊嗰行（**填 EffectiveTo，唔刪行**）
-    if (hit) {
-      const releaseUpdates = {};
-      releaseUpdates[W.EFFECTIVE_TO] = today;
-      writeRowFields_(opened.sheet, opened.headers, hit.sheetRow, releaseUpdates);
-      writeZone3Audit_({
-        action: 'WEIGHT_RELEASE',
-        targetSheet: SHEETS.PERSON_POST_WEIGHT,
-        targetKey: String(hit.record[W.WEIGHT_ID] || personId + '|' + postId),
-        oldValue: 'Adjust=' + wasAdjust,
-        newValue: 'EffectiveTo=' + today + '（解除，沒有刪行）',
-        notes: label
-      });
-      released++;
-    }
-
-    // 揀返「一般」＝ 淨係解除，唔加新行
-    if (adjust === 0) return;
-
+  plan.adds.forEach(function (a, i) {
     const record = {};
-    record[W.WEIGHT_ID] = 'WGT-' + compactTimestamp_() + '-' + (added + 1);
-    record[W.PERSON_ID] = personId;
-    record[W.POST_ID] = postId;
-    record[W.ADJUST] = adjust;
-    record[W.REASON] = reason;
-    record[W.EFFECTIVE_FROM] = today;
-    record[W.EFFECTIVE_TO] = '';
+    record[W.WEIGHT_ID] = 'WGT-' + compactTimestamp_() + '-' + (i + 1);
+    record[W.PERSON_ID] = a.personId;
+    record[W.POST_ID] = a.postId;
+    record[W.ADJUST] = a.adjust;
+    record[W.REASON] = a.reason;
+    record[W.EFFECTIVE_FROM] = a.effectiveFrom;
+    record[W.EFFECTIVE_TO] = a.effectiveTo;
     record[W.ACTIVE] = BOOLEAN_TEXT.TRUE;
     // ⚠️ CreatedAt 一定要**格式化**先寫入（第二十二輪喺 QuarterReset.gs
     // 撞過同一件事：未格式化嘅 Date 顯示出嚟係一串 GMT 文字）。
@@ -515,12 +655,19 @@ function apiSavePersonPostWeightBatch(changes) {
       action: 'WEIGHT_ADD',
       targetSheet: SHEETS.PERSON_POST_WEIGHT,
       targetKey: record[W.WEIGHT_ID],
-      oldValue: hit ? 'Adjust=' + wasAdjust : '（沒有偏好）',
-      newValue: 'Adjust=' + adjust,
-      notes: label + '　原因：' + reason
+      oldValue: a.wasAdjust === 0 ? '（沒有偏好）' : 'Adjust=' + a.wasAdjust,
+      newValue: 'Adjust=' + a.adjust + (a.adjust === 0 ? '（這一季照一般排）' : '')
+        + '（' + describeWeightScope_(a.scope) + '）',
+      notes: labelOf(a.personId, a.postId) + '　原因：' + a.reason + '　範圍：' + scopeText
     });
-    added++;
   });
 
-  return { ok: true, added: added, released: released, skipped: skipped };
+  return {
+    ok: true,
+    added: plan.adds.length,
+    released: plan.releases.length,
+    skipped: plan.skipped,
+    scopeText: scopeText,
+    applyToFuture: applyToFuture
+  };
 }

@@ -6729,6 +6729,62 @@ const MUTATIONS = [
     find: "    if (autoByPost[String(row[A.POST_ID] || '').trim()] === true) tempCount[name] = (tempCount[name] || 0) + 1;\n    else external[name] = true;",
     replace: "    if (autoByPost[String(row[A.POST_ID] || '').trim()] === true) return;\n    else external[name] = true;",
     tests: ["tests/round76_dc_temp_helper_paper.test.js"]
+  },
+  {
+    id: "ea-ongoing-beats-qtr",
+    why: "長期行蓋過只限某一季嘅行（只限行應該優先）",
+    file: "src/PersonPostWeight.gs",
+    find: "  if (a.scope !== b.scope) return a.scope === WEIGHT_SCOPE.QUARTER;",
+    replace: "  if (a.scope !== b.scope) return a.scope === WEIGHT_SCOPE.ONGOING;",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "ea-zero-row-skipped",
+    why: "只限某一季嘅 Adjust=0 行被略過，蓋唔到長期偏好",
+    file: "src/PersonPostWeight.gs",
+    find: "    const key = personId + '|' + postId;\n    if (!candidates[key] || weightRowOutranks_(candidate, candidates[key])) candidates[key] = candidate;",
+    replace: "    const key = personId + '|' + postId;\n    if (adjust === 0) return;\n    if (!candidates[key] || weightRowOutranks_(candidate, candidates[key])) candidates[key] = candidate;",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "ea-qtr-row-no-end",
+    why: "只限這一季寫成長期行（冇 EffectiveTo）",
+    file: "src/WebAppWeightEdit.gs",
+    find: "        effectiveFrom: quarter.startDate, effectiveTo: quarter.endDate,",
+    replace: "        effectiveFrom: quarter.startDate, effectiveTo: '',",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "ea-release-on-start",
+    why: "之後各季都用：解除舊行填季初（唔係季初前一日），上一季會受影響",
+    file: "src/WebAppWeightEdit.gs",
+    find: "        wasAdjust: r.adjust, effectiveTo: dayBefore,",
+    replace: "        wasAdjust: r.adjust, effectiveTo: quarter.startDate,",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "ea-matrix-ref-today",
+    why: "偏好畫面用今日做參考日期（應該係所揀季度嘅開始日）",
+    file: "src/WebAppWeightEdit.gs",
+    find: "    const referenceDate = scope ? scope.startDate : today;",
+    replace: "    const referenceDate = today;",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "ea-ui-default-future",
+    why: "「也用於之後的季度」預設勾咗（Ivan：預設不勾）",
+    file: "src/ui/ScriptZone3.html",
+    find: "    futureBox.checked = weightApplyFuture;",
+    replace: "    futureBox.checked = true;",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
+  },
+  {
+    id: "ea-ui-no-scope-opts",
+    why: "儲存時冇傳季度同範圍（後端會當冇季度）",
+    file: "src/ui/ScriptZone3.html",
+    find: "          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes,\n            { quarterId: currentQuarterId, applyToFuture: weightApplyFuture === true });",
+    replace: "          const res = await callServerMutating('apiSavePersonPostWeightBatch', changes);",
+    tests: ["tests/round77_ea_weight_scope.test.js"]
   }
 ];
 

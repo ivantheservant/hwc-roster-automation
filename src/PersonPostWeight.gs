@@ -83,6 +83,12 @@ function readActivePersonPostWeights_(referenceDate, timezone, baselineData) {
   const byKey = {};
   const rows = [];
   const invalid = [];
+  // 第七十七輪批次 EA 組：同一個 (人, 崗位) 喺參考日期可以有多於一行生效——
+  //   有 `EffectiveTo` 嘅（只限某一季）**優先於**長期行（`EffectiveTo` 空白）；
+  //   同類多行 ⇒ `CreatedAt` 最新嗰行（同一秒就後面嗰行）。見 `weightRowOutranks_()`。
+  //   揀中嘅行 `Adjust=0` ⇒ 呢一季「照一般排」——結果係冇偏好，但**蓋過**長期偏好，
+  //   所以唔可以好似以前噉直接略過 0 嘅行。
+  const candidates = {};
 
   let raw = [];
   try {
@@ -94,7 +100,7 @@ function readActivePersonPostWeights_(referenceDate, timezone, baselineData) {
     return { byKey: {}, rows: [], invalid: [] };
   }
 
-  raw.forEach(function (row) {
+  raw.forEach(function (row, index) {
     const personId = String(row[W.PERSON_ID] || '').trim();
     const postId = String(row[W.POST_ID] || '').trim();
     if (!personId || !postId) return;
@@ -119,30 +125,73 @@ function readActivePersonPostWeights_(referenceDate, timezone, baselineData) {
       });
       return;
     }
-    if (adjust === 0) return;   // 0 ＝ 冇偏好，同冇呢一行一樣
-
-    // 第二十八輪批次階段 A：目標次數喺呢度就算好。
-    // ⚠️ 冇傳 `baselineData` 嗰陣 `target` 係 `null`——**唔可以當成 0**。
-    // 排表路徑見到 null 會拋錯（見 `computePersonPostWeightBonus_()`）；
-    // 編輯畫面唔需要目標值，所以佢唔傳都冇問題。
-    const base = resolveWeightBaseline_(personId, postId, baselineData);
-    const entry = {
+    const candidate = {
       weightId: String(row[W.WEIGHT_ID] || '').trim(),
       personId: personId,
       postId: postId,
       adjust: adjust,
       reason: String(row[W.REASON] || '').trim(),
+      effectiveFrom: from,
+      effectiveTo: to,
+      scope: to ? WEIGHT_SCOPE.QUARTER : WEIGHT_SCOPE.ONGOING,
+      createdAt: normalizeSheetTimestamp_(row[W.CREATED_AT], timezone) || '',
+      index: index
+    };
+    const key = personId + '|' + postId;
+    if (!candidates[key] || weightRowOutranks_(candidate, candidates[key])) candidates[key] = candidate;
+  });
+
+  Object.keys(candidates).forEach(function (key) {
+    const picked = candidates[key];
+    if (picked.adjust === 0) return;   // 揀中嘅係「照一般排」⇒ 冇偏好（但已經蓋過長期行）
+
+    // 第二十八輪批次階段 A：目標次數喺呢度就算好。
+    // ⚠️ 冇傳 `baselineData` 嗰陣 `target` 係 `null`——**唔可以當成 0**。
+    // 排表路徑見到 null 會拋錯（見 `computePersonPostWeightBonus_()`）；
+    // 編輯畫面唔需要目標值，所以佢唔傳都冇問題。
+    const base = resolveWeightBaseline_(picked.personId, picked.postId, baselineData);
+    const entry = {
+      weightId: picked.weightId,
+      personId: picked.personId,
+      postId: picked.postId,
+      adjust: picked.adjust,
+      reason: picked.reason,
+      effectiveFrom: picked.effectiveFrom,
+      effectiveTo: picked.effectiveTo,
+      scope: picked.scope,
       baseline: base.baseline,
       baselineSource: base.source,
       baselineLabel: base.label,
       target: base.source === WEIGHT_BASELINE_SOURCE.NOT_COMPUTED
-        ? null : computeWeightTarget_(base.baseline, adjust)
+        ? null : computeWeightTarget_(base.baseline, picked.adjust)
     };
-    byKey[personId + '|' + postId] = entry;
+    byKey[key] = entry;
     rows.push(entry);
   });
 
   return { byKey: byKey, rows: rows, invalid: invalid };
+}
+
+/** 第七十七輪批次 EA 組：一筆偏好嘅範圍。 */
+const WEIGHT_SCOPE = {
+  /** 只限某一季（`EffectiveTo` 有值） */
+  QUARTER: 'QUARTER',
+  /** 之後各季都用（`EffectiveTo` 空白） */
+  ONGOING: 'ONGOING'
+};
+
+/**
+ * 第七十七輪批次 EA 組：同一個 (人, 崗位) 兩行都生效嗰陣，`a` 係咪應該蓋過 `b`。**純函式。**
+ *   只限某一季 > 長期；同類 ⇒ `CreatedAt` 較新；再同 ⇒ 表上較後嗰行（後加嘅）。
+ * 生成、〔請系統幫我調整〕、排表品質統計、偏好畫面全部經 `readActivePersonPostWeights_()` 用同一個揀法。
+ * @param {{scope: string, createdAt: string, index: number}} a
+ * @param {{scope: string, createdAt: string, index: number}} b
+ * @returns {boolean}
+ */
+function weightRowOutranks_(a, b) {
+  if (a.scope !== b.scope) return a.scope === WEIGHT_SCOPE.QUARTER;
+  if ((a.createdAt || '') !== (b.createdAt || '')) return (a.createdAt || '') > (b.createdAt || '');
+  return (a.index || 0) > (b.index || 0);
 }
 
 /**

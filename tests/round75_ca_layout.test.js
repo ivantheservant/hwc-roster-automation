@@ -3,7 +3,7 @@
 //
 // 新主畫面（摘要）：
 //   開季前準備：〔開啟名單工作表〕〔儲存並套用名單〕→〔不能服侍的日期〕→「這一季還要做的」
-//   主流程第 2 步：多咗〔排表偏好〕
+//   主流程第 2 步：多咗〔排表偏好〕（第七十七輪批次 EA 組：再搬去開季前準備）
 //   常用設定（取代「名單維護」）：〔人員與電郵〕〔身分（堂委／執事）〕〔固定收件人／管理員電郵〕
 //     （新分頁開工作表）＋〔匯出規則審閱表〕〔重新生成初稿（覆蓋式）〕
 //   進階與診斷：加〔名單檢查〕；〔重新生成〕〔匯出規則審閱表〕搬走
@@ -88,10 +88,14 @@ console.log('\n=== CA②：開季前準備：名單 → 不能服侍的日期 �
     t.indexOf('開啟名單工作表') < t.indexOf('不能服侍的日期') && t.indexOf('不能服侍的日期') < t.indexOf('這一季還要做的'), t.slice(0, 300));
 }
 
-console.log('\n=== CA③：第 2 步有〔排表偏好〕 ===');
+console.log('\n=== CA③：〔排表偏好〕喺開季前準備（第七十七輪批次 EA 組：由第 2 步搬過去）===');
 {
   const card = ui.renderStep2(dash, { suggestion: {} });
-  check('★★★★★★ 第 2 步有〔排表偏好〕', buttonTexts(card).indexOf('排表偏好') !== -1, JSON.stringify(buttonTexts(card)));
+  check('★★★★★★ 第 2 步冇〔排表偏好〕', buttonTexts(card).indexOf('排表偏好') === -1, JSON.stringify(buttonTexts(card)));
+  ui.renderZone2Body(dash);
+  const btns = buttonTexts(ui.document.getElementById('zone2Body'));
+  check('★★★★★★ 開季前準備有〔排表偏好〕，喺〔不能服侍的日期〕旁邊',
+    btns.indexOf('排表偏好') !== -1 && btns.indexOf('排表偏好') === btns.indexOf('不能服侍的日期') + 1, JSON.stringify(btns));
 }
 
 console.log('\n=== CA④：進階與診斷：加〔名單檢查〕；〔重新生成〕〔匯出規則審閱表〕搬走 ===');

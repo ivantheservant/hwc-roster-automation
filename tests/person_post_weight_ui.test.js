@@ -59,7 +59,23 @@ function weightRow(o) {
   return r;
 }
 
-console.log('\n=== C4【核心】揀返「一般」＝填 EffectiveTo，唔刪行 ===');
+// 第七十七輪批次 EA 組：儲存一律按季度（只限這一季／之後各季都用）。
+// 舊嘅「解除＝填 EffectiveTo 今日」改為由 `planPersonPostWeightWrites_()` 決定；
+// 「唔刪行」呢個原則不變。
+gas.findQuarterRowInfo_ = function (id) {
+  if (id !== '2099T1') return null;
+  const Q = gas.COLUMNS.QUARTERS;
+  const v = {}; v[Q.QUARTER_ID] = id; v[Q.START_DATE] = '2099-01-01'; v[Q.END_DATE] = '2099-03-31';
+  return { sheetRow: 3, headers: [], values: v };
+};
+gas.buildQuarterLabel_ = function (id) { return id === '2099T1' ? '2099年1-3月' : id; };
+gas.Utilities = { formatDate: function (d, tz) {
+  if (tz === 'UTC') return d.toISOString().slice(0, 10);
+  return '2026-08-18';
+} };
+const OPTS = { quarterId: '2099T1', applyToFuture: false };
+
+console.log('\n=== C4【核心】揀返「一般」（只限這一季）＝加一行 Adjust=0，唔刪行 ===');
 {
   const writes = [];
   const appends = [];
@@ -73,20 +89,18 @@ console.log('\n=== C4【核心】揀返「一般」＝填 EffectiveTo，唔刪�
 
   const res = gas.apiSavePersonPostWeightBatch([
     { personId: 'P9001', postId: 'CHAIR', adjust: 0, reason: '改回一般' }
-  ]);
-  checkEqual('★★★★ 算做「解除 1 項」', { added: res.added, released: res.released },
-    { added: 0, released: 1 });
-  checkEqual('★★★★★ 寫嘅係 EffectiveTo（今日），**唔係刪行、唔係 Active=FALSE**',
-    writes[0].updates[W.EFFECTIVE_TO], '2026-08-18');
-  check('★★★★★ 而且冇動 Active（Active=FALSE 係另一個意思）',
-    !Object.prototype.hasOwnProperty.call(writes[0].updates, W.ACTIVE));
-  checkEqual('★★★★★ 揀「一般」**唔會**再加一行新嘅', appends.length, 0);
+  ], OPTS);
+  checkEqual('★★★★ 只限這一季：算做「新增 1 項」（一行「這一季照一般排」）、解除 0',
+    { added: res.added, released: res.released }, { added: 1, released: 0 });
+  checkEqual('★★★★★ 新行 Adjust=0、EffectiveFrom=季初、EffectiveTo=季尾',
+    [appends[0][W.ADJUST], appends[0][W.EFFECTIVE_FROM], appends[0][W.EFFECTIVE_TO]], [0, '2099-01-01', '2099-03-31']);
+  checkEqual('★★★★★ 長期行一行都冇郁（只限這一季唔解除任何行）', writes.length, 0);
 
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppWeightEdit.gs'), 'utf8');
   check('★★★★★ 整個檔案冇任何刪行呼叫', !/deleteRow|deleteRows|removeRow/.test(src));
 }
 
-console.log('\n=== C4【核心】改動＝解除舊行 ＋ 加新行（唔就地改個數字）===');
+console.log('\n=== C4【核心】之後各季都用＝解除舊行（填 EffectiveTo＝季初前一日）＋ 加新行 ===');
 {
   const writes = [];
   const appends = [];
@@ -98,13 +112,16 @@ console.log('\n=== C4【核心】改動＝解除舊行 ＋ 加新行（唔就地
 
   const res = gas.apiSavePersonPostWeightBatch([
     { personId: 'P9001', postId: 'CHAIR', adjust: 1, reason: '堂委 2026-08 覆議' }
-  ]);
+  ], { quarterId: '2099T1', applyToFuture: true });
   checkEqual('★★★★ 同時算「解除 1、新增 1」',
     { added: res.added, released: res.released }, { added: 1, released: 1 });
-  checkEqual('★★★★★ 舊行填 EffectiveTo', writes[0][W.EFFECTIVE_TO], '2026-08-18');
+  checkEqual('★★★★★ 舊行填 EffectiveTo＝季初前一日（唔係今日；過去季度嘅紀錄唔受影響）',
+    writes[0][W.EFFECTIVE_TO], '2098-12-31');
+  check('★★★★★ 而且冇動 Active（Active=FALSE 係另一個意思）',
+    !Object.prototype.hasOwnProperty.call(writes[0], W.ACTIVE));
   checkEqual('★★★★★ 新行係一行**全新**紀錄，唔係就地改'
     + '——就地改嘅話，「上一次係幾多、幾時改、點解改」就冇咗',
-    appends[0][W.ADJUST], 1);
+    [appends[0][W.ADJUST], appends[0][W.EFFECTIVE_FROM], appends[0][W.EFFECTIVE_TO]], [1, '2099-01-01', '']);
   checkEqual('★★★★ 新行有記低原因', appends[0][W.REASON], '堂委 2026-08 覆議');
   checkEqual('★★★★★ CreatedAt 已經格式化（唔係未格式化嘅 Date 物件）'
     + '——第二十二輪喺 QuarterReset.gs 撞過同一件事',
@@ -119,10 +136,20 @@ console.log('\n=== C4 冇改到嘅唔算改動 ===');
   gas.appendRowFields_ = function () { return 9; };
   const res = gas.apiSavePersonPostWeightBatch([
     { personId: 'P9001', postId: 'CHAIR', adjust: 2, reason: '一樣' }
-  ]);
+  ], OPTS);
   checkEqual('★★★★★ 同原本一樣 ⇒ skipped，唔會白白加多一行',
     { added: res.added, released: res.released, skipped: res.skipped },
     { added: 0, released: 0, skipped: 1 });
+}
+
+console.log('\n=== C4 冇季度 ⇒ 整批唔寫 ===');
+{
+  gas.readOptionalSheet_ = function () { return []; };
+  const res = gas.apiSavePersonPostWeightBatch([
+    { personId: 'P9001', postId: 'CHAIR', adjust: 1, reason: '測試' }
+  ], { quarterId: '2098T9' });
+  check('★★★★★ 搵唔到季度日期 ⇒ ok=false 而且講明「什麼都沒有儲存」',
+    res.ok === false && /什麼都沒有儲存/.test(res.message) && /2098T9/.test(res.message), res.message);
 }
 
 console.log('\n=== C4【核心】每一項都要填原因 ===');
@@ -130,7 +157,7 @@ console.log('\n=== C4【核心】每一項都要填原因 ===');
   gas.readOptionalSheet_ = function () { return []; };
   const res = gas.apiSavePersonPostWeightBatch([
     { personId: 'P9001', postId: 'CHAIR', adjust: 1, reason: '' }
-  ]);
+  ], OPTS);
   check('★★★★★ 冇填原因 ⇒ 整批都唔寫'
     + '——三個月之後，冇原因嘅偏好冇人記得點解要噉改',
     res.ok === false && /沒有填原因/.test(res.message));
@@ -143,7 +170,7 @@ console.log('\n=== C4 超出範圍要擋 ===');
   gas.readOptionalSheet_ = function () { return []; };
   const res = gas.apiSavePersonPostWeightBatch([
     { personId: 'P9001', postId: 'CHAIR', adjust: 9, reason: '測試' }
-  ]);
+  ], OPTS);
   check('★★★★★ 超出 ±3 ⇒ 整批都唔寫，唔會靜靜夾到範圍內',
     res.ok === false && /超出範圍/.test(res.message));
 }
@@ -168,7 +195,7 @@ console.log('\n=== C4 矩陣：只列有資格嘅人 ===');
     return [];
   };
 
-  const m = gas.apiGetPersonPostWeightMatrix();
+  const m = gas.apiGetPersonPostWeightMatrix('2099T1');
   checkEqual('★★★★★ 只列有該崗位資格嘅人（P9002 冇資格，唔會出現）'
     + '——90 × 16 個空下拉係一幅噪音，幹事會搵唔到想改嗰個',
     m.posts[0].people.map(function (p) { return p.personId; }), ['P9001']);
@@ -190,10 +217,11 @@ console.log('\n=== C4 畫面文案 ===');
     + '然後去取消佢嘅資格，而嗰個係完全唔同、而且好難復原嘅一件事',
     zone3.indexOf('這裡只影響「誰做多少次」。不會影響誰有資格做，') !== -1
     && zone3.indexOf('也不會令系統違反任何規則。') !== -1);
-  check('★★★★★ 確認畫面有「會新增 N 項偏好、解除 N 項偏好」',
-    /會新增 ' \+ summary\.added \+ ' 項偏好、解除 ' \+ summary\.released \+ ' 項偏好/.test(zone3));
-  check('★★★★★ 而且講明解除唔會刪行',
-    zone3.indexOf('解除不會刪走那一行') !== -1);
+  // 第七十七輪批次 EA 組：確認畫面改為先講範圍（只限這一季／之後各季都用）
+  check('★★★★★ 確認畫面講明「這 N 項偏好只用於（季度）。之後的季度不受影響。」',
+    zone3.indexOf("項偏好只用於 ' + label + '。之後的季度不受影響。'") !== -1);
+  check('★★★★★ 而且講明紀錄會保留、唔會刪走',
+    zone3.indexOf('紀錄會保留，不會刪走') !== -1);
   check('★★★★ 有講明「多一次」係「大約一次」，唔係「一定」',
     zone3.indexOf('不是「一定多一次」') !== -1);
   check('★★★★ 前端亦會擋住冇填原因',
