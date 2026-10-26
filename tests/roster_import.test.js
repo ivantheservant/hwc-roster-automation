@@ -412,11 +412,12 @@ console.log('\n=== AF4【核心】「已經在系統外寄給全體」⇒ OFFICI
   check('（前置）改咗一格', done);
   const saved = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('（前置）儲存成第 3 版', saved.ok === true && gas.findLatestVersionNo(Q) === 3, JSON.stringify(saved).slice(0, 200));
-  // 第六十九輪批次 AS 組：匯入（IMPORT）之後再儲存一次（FINE_TUNE）⇒ 狀態卡版本來源是「人手調整後」，
+  // 第六十九輪批次 AS 組：匯入（IMPORT）之後再儲存一次（FINE_TUNE）⇒ 狀態卡版本來源是人手改動，
   // 唔可以停喺「由人手職事表匯入」。（查過：呢條係綠 ⇒ 唔係 bug；補驗時見到舊字多數係畫面未刷新。）
+  // 第七十七輪批次 EC 組：來源帶格數 ⇒「人手改動 1 格」。
   const dashAs = gas.apiGetDashboardState(Q).latestVersion;
-  checkEqual('★★★★★★ 匯入後儲存一次：最新版本 basisText＝人手調整後', { v: dashAs.versionNo, t: dashAs.basisText },
-    { v: 3, t: '人手調整後' });
+  checkEqual('★★★★★★ 匯入後儲存一次：最新版本 basisText＝人手改動 1 格', { v: dashAs.versionNo, t: dashAs.basisText },
+    { v: 3, t: '人手改動 1 格' });
   const basisOfV3 = gas.readSheet(S.ROSTER_VERSIONS).filter(function (r) {
     return r[C.ROSTER_VERSIONS.QUARTER_ID] === Q && Number(r[C.ROSTER_VERSIONS.VERSION_NO]) === 3;
   })[0];

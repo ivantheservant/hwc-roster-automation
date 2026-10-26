@@ -54,7 +54,7 @@ function apiListVersionsForZone4(quarterId) {
         const createdAt = normalizeSentAt_(v[V.CREATED_AT], timezone);
         // 內部代號（DRAFT／REQUESTS_APPLIED…）唔可以出現喺畫面上。
         // 翻譯表同狀態卡共用，唔會兩邊各有一套。
-        const basisText = buildVersionBasisText_(v[V.BASIS]);
+        const basisText = buildVersionSourceText_(v);
         return {
           versionNo: no,
           label: '第 ' + no + ' 版　' + (createdAt.text || '（沒有時間紀錄）')

@@ -536,7 +536,7 @@ function findRequestGridOverlaps_(plan, postNames) {
  *   不傳時維持原本行為（步驟 3／5 嘅既有呼叫端不用改）。
  * @returns {Object} 套用結果摘要
  */
-function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverriddenSheetRows) {
+function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverriddenSheetRows, changeCounts) {
   const confirmedSet = {};
   (confirmedSheetRows || []).forEach(function (r) { confirmedSet[r] = true; });
   // ─────────────────────────────────────────────────────────────────
@@ -763,7 +763,9 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
   let newEligibilityCount = 0;
   let newUnavailableCount = 0;
   try {
-    registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false, versionNote || '');
+    registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false, versionNote || '',
+      // 第七十七輪批次 EC 組：有人手改動就記低格數（來源會寫「套用修改申報後＋人手改動 N 格」）
+      changeCounts || null);
     markPendingBackfillCells_(sheetName, pendingBackfillCells);
     newEligibilityCount = writeNewEligibilityRows_(newEligibilityRows);
     newUnavailableCount = writeNewUnavailableRows_(newUnavailableRows);

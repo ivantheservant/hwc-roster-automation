@@ -89,7 +89,7 @@ function runTail(opts) {
     + 'const pendingBackfillCells = opts.pendingBackfillCells || [];'
     + 'const newEligibilityRows = opts.newEligibilityRows || [];'
     + 'const newUnavailableRows = opts.newUnavailableRows || [];'
-    + 'const basis = null; const versionNote = "";'
+    + 'const basis = null; const versionNote = ""; const changeCounts = null;'
     + tail + '}');
   return { result: fn(gas, opts), calls: calls, gas: gas };
 }

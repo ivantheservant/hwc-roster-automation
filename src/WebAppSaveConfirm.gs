@@ -476,6 +476,16 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const titleChanges = resolved.titleChanges || [];
   // 第七十五輪批次 CH 組：喺呢一版之上用過〔用這一版作起點〕⇒ 新一版來源寫「以第 M 版作起點」
   const startPointBasis = readStartPointBasisForSave_(quarterId, plan.baseVersionNo);
+  // 第七十七輪批次 EC 組：每個新版本記低人手改動格數（存入 `RosterVersions.ChangeCounts`）。
+  // 用舊版本作起點：起點那一版寫在來源，**之後再改的格**先算人手（同起點版本比，唔係同最新一版比）。
+  const startPointNo = parseStartPointVersionNo_(startPointBasis);
+  const changeCounts = {
+    manual: startPointNo === null
+      ? resolved.changes.length
+      : countManualChangesBeyondStartPoint_(quarterId, startPointNo, resolved.changes, context),
+    system: 0,
+    startPoint: startPointNo
+  };
   const versionNote = (startPointBasis ? startPointBasis + '；' : '')
     + '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
     + (titleChanges.length > 0 ? '、每週標題 ' + titleChanges.length + ' 週' : '')
@@ -501,7 +511,8 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         // 規格 1.4：同一格幹事已經親手改咗嗰啲申報，唔套用。
         // 列號由 plan 嗰邊算好（`overlaps`）——**上游決定，下游執行**。
         plan.overlaps.map(function (o) { return o.sheetRow; })
-          .filter(function (row) { return row !== undefined && row !== null; }));
+          .filter(function (row) { return row !== undefined && row !== null; }),
+        changeCounts);
       created = {
         versionNo: requestResult.versionNo,
         sheetName: requestResult.sheetName,
@@ -514,7 +525,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         quarterId, created.versionNo, created.sheetName,
         startPointBasis || VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
         plan.violations.kept.length + plan.violations.semiHard.length + plan.violations.semiKept.length,
-        false, versionNote);
+        false, versionNote, changeCounts);
     }
   } catch (err) {
     // ─────────────────────────────────────────────────────────────
@@ -659,6 +670,37 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
  * @param {Error} err 原本嘅錯誤
  * @returns {Object} 失敗結果（`ok: false`）
  */
+/**
+ * 第七十七輪批次 EC 組：用舊版本作起點之後，幹事**再改**咗幾多格——同起點版本（第 K 版）比，
+ * 唔係同最新一版比（同最新一版比嘅話，起點寫入嗰啲格全部會被當成人手改動）。
+ * 比較用同一把尺：`normalizeOverlayCellText_()`（Config 顯示標籤當空白）；PersonID 一樣就當一樣。
+ * @param {string} quarterId 季度 ID
+ * @param {number} startPointNo 起點版本號
+ * @param {Object[]} changes `resolveAuthoritativeState_()` 嘅 `changes`
+ * @param {Object} context fine-tune context（要 `timezone`、`gridRender.labels`）
+ * @returns {number}
+ */
+function countManualChangesBeyondStartPoint_(quarterId, startPointNo, changes, context) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const labels = context && context.gridRender ? context.gridRender.labels : null;
+  const byKey = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== Number(startPointNo)) return;
+    const key = cellKey_(toDateString(row[A.SERVICE_DATE], context.timezone),
+      String(row[A.POST_ID] || '').trim(), Number(row[A.SLOT_INDEX]));
+    byKey[key] = {
+      personId: String(row[A.PERSON_ID] || '').trim(),
+      name: String(row[A.PERSON_NAME_SNAPSHOT] || '').trim()
+    };
+  });
+  return (changes || []).filter(function (c) {
+    const was = byKey[cellKey_(c.serviceDate, c.postId, c.slotIndex)] || { personId: '', name: '' };
+    if (c.manualPersonId && c.manualPersonId === was.personId) return false;
+    return normalizeOverlayCellText_(c.manualText, labels) !== normalizeOverlayCellText_(was.name, labels);
+  }).length;
+}
+
 function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
   const targetVersionNo = baseVersionNo + 1;
 

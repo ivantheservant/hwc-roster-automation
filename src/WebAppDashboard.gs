@@ -107,7 +107,8 @@ function buildDashboardStatusBase_(stage, versionExists, generateOnText, extras)
  */
 const VERSION_BASIS_LABELS = {
   AUTO_GENERATE: '系統生成',
-  FINE_TUNE: '人手調整後',
+  // 第七十七輪批次 EC 組：舊字眼改為「人手改動」（有格數嗰陣會寫「人手改動 N 格」）
+  FINE_TUNE: '人手改動',
   REQUESTS_APPLIED: '套用修改申報後',
   RESEND: '改動後重發時建立',
   VERSION_ROLLBACK: '回到舊版本',
@@ -152,6 +153,40 @@ function translateVersionBasis_(basis) {
 function buildVersionBasisText_(basis) {
   const text = translateVersionBasis_(basis);
   return text === '' ? '（沒有說明）' : text;
+}
+
+/**
+ * 第七十七輪批次 EC 組：一個版本嘅來源（人話）——版本下拉、狀態卡、進階與診斷嘅版本清單**同一支**。
+ *
+ * Ivan（手動測試 B）：「有些修改是人手改完＋系統調整，可不可以在每一個版本反映是人手、系統還是兩者都有？」
+ * 數字由 `RosterVersions.ChangeCounts` 嚟（`registerVersion()` 嗰陣寫入）：
+ *   只有人手：「人手改動 N 格」　只有系統：「系統調整 M 格」　兩者：「人手改動 N 格＋系統調整 M 格」
+ *   以舊版本作起點：「以第 K 版作起點」，再有人手改動就加「＋人手改動 N 格」
+ *   系統生成、重新生成、匯入、套用修改申報後：照現有文字（套用申報時有人手改動 ⇒ 加「＋人手改動 N 格」）
+ *   舊版本冇數字：照現有文字，**唔猜**。
+ * @param {Object} row `RosterVersions` 一行
+ * @returns {string}
+ */
+function buildVersionSourceText_(row) {
+  const V = COLUMNS.ROSTER_VERSIONS;
+  const basis = String(row[V.BASIS] === null || row[V.BASIS] === undefined ? '' : row[V.BASIS]).trim();
+  const parent = String(row[V.PARENT_VERSION_NO] === null || row[V.PARENT_VERSION_NO] === undefined
+    ? '' : row[V.PARENT_VERSION_NO]).trim();
+  // 生成時已經有舊版本 ⇒ 重新生成（`MultiRun.gs` 寫 ParentVersionNo＝上一版）
+  if (basis === VERSION_VALUES.BASIS_AUTO_GENERATE && parent !== '') return '重新生成';
+  const base = buildVersionBasisText_(basis);
+  const counts = parseVersionChangeCounts_(row[V.CHANGE_COUNTS]);
+  if (!counts) return base;
+  const manual = counts.manual > 0 ? '人手改動 ' + counts.manual + ' 格' : '';
+  const system = counts.system > 0 ? '系統調整 ' + counts.system + ' 格' : '';
+  if (counts.startPoint !== null) {
+    return '以第 ' + counts.startPoint + ' 版作起點' + (manual ? '＋' + manual : '');
+  }
+  if (basis === VERSION_VALUES.BASIS_FINE_TUNE || basis === VERSION_VALUES.BASIS_SUGGESTION) {
+    const parts = [manual, system].filter(function (s) { return s !== ''; });
+    return parts.length > 0 ? parts.join('＋') : base;
+  }
+  return base + (manual ? '＋' + manual : '');
 }
 
 /**
@@ -524,7 +559,8 @@ function buildDashboardState_(quarterId) {
       versionNo: versionNo,
       // ⚠️ 唔可以 String(Date)——第二十二輪已經喺 Diagnostics 修過同一個位。
       createdAt: row ? toDateString(row[V.CREATED_AT], timezone) : '',
-      basisText: row ? buildVersionBasisText_(row[V.BASIS]) : '（沒有說明）',
+      // 第七十七輪批次 EC 組：同版本下拉同一支（有格數就寫「人手改動 N 格＋系統調整 M 格」）
+      basisText: row ? buildVersionSourceText_(row) : '（沒有說明）',
       // A6：常駐「開啟職事表」連結。搵唔到嗰張工作表就係空字串——
       // 前端見到空字串就唔會畫個連結出嚟。
       sheetUrl: row ? buildGridSheetUrl_(row[V.SHEET_NAME]) : ''

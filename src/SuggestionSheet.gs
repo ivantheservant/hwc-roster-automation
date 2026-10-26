@@ -731,7 +731,9 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
     const suggestionFp = fingerprintGridText_(
       readGridTextFromSheet_(sheetName, timezone));
     writeSuggestionFingerprints_(
-      SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName), gridFp, suggestionFp);
+      SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName), gridFp, suggestionFp,
+      // 第七十七輪批次 EC 組：順手記低「幹事改咗幾多格、系統動咗幾多格」，接受嗰陣寫入版本來源
+      { manual: manualCount, system: systemCount });
   });
 
   writeAuditLog_({
@@ -1030,6 +1032,11 @@ function apiAcceptSuggestion_locked_(quarterId) {
   // ⚠️ 建議表**就是**這一次要儲存的 grid。把它當成 gridValues 餵落去，
   // 下游那一條路就完全不用知道有「建議表」這一回事。
   context.gridValues = readGridTextFromSheet_(sheetName, timezone);
+  // 第七十七輪批次 EC 組：人手／系統各改咗幾多格——用建立建議表嗰陣記低嘅數字（唔另寫一套比對）。
+  // ⚠️ 要喺建立新版本**之前**讀：建立新版本嗰陣建議表會被清走。舊建議表冇數字 ⇒ null，來源照寫「系統調整」。
+  const fp = readSuggestionFingerprints_(sheetName);
+  const changeCounts = fp && fp.counts
+    ? { manual: fp.counts.manual, system: fp.counts.system, startPoint: null } : null;
 
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiAcceptSuggestion');
@@ -1070,9 +1077,11 @@ function apiAcceptSuggestion_locked_(quarterId) {
   // 傳漏一個就會把說明寫落「有冇保護」嗰一欄，而畫面睇落完全正常。
   registerVersion(
     quarterId, created.versionNo, created.sheetName,
-    // 第七十五輪批次 CH 組：版本下拉要分得出「系統調整」同「人手調整後」
+    // 第七十五輪批次 CH 組：版本下拉要分得出「系統調整」同「人手改動」
     VERSION_VALUES.BASIS_SUGGESTION, versionNo, 0, false,
-    '接受系統建議版本：' + resolved.changes.length + ' 格');
+    '接受系統建議版本：' + resolved.changes.length + ' 格'
+      + (changeCounts ? '（人手 ' + changeCounts.manual + '、系統 ' + changeCounts.system + '）' : ''),
+    changeCounts);
 
   // ⚠️ 建議表一定要清走。留著的話會積落一堆 `_建議`，
   // 而下一次幹事分不清哪一張是最新的。
@@ -1267,9 +1276,12 @@ const SUGGESTION_FINGERPRINT_MARK = '[起點指紋]';
  * @param {string} gridFp 產生這一次建議的時候，正式表的指紋
  * @param {string} suggestionFp 剛剛寫好的建議表本身的指紋
  */
-function writeSuggestionFingerprints_(sheet, gridFp, suggestionFp) {
+function writeSuggestionFingerprints_(sheet, gridFp, suggestionFp, counts) {
   const row = sheet.getLastRow() + 2;
-  sheet.getRange(row, 1, 1, 3).setValues([[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp]]);
+  // 第七十七輪批次 EC 組：第 4、5 格＝幹事改咗幾多格、系統動咗幾多格（接受建議嗰陣寫入版本來源）
+  const manual = counts ? Math.round(Number(counts.manual)) || 0 : '';
+  const system = counts ? Math.round(Number(counts.system)) || 0 : '';
+  sheet.getRange(row, 1, 1, 5).setValues([[SUGGESTION_FINGERPRINT_MARK, gridFp, suggestionFp, manual, system]]);
   sheet.hideRows(row);
 }
 
@@ -1277,19 +1289,24 @@ function writeSuggestionFingerprints_(sheet, gridFp, suggestionFp) {
  * 讀返那兩個指紋。**讀不到就回 `null`，不猜。**
  *
  * @param {string} sheetName 建議表名稱
- * @returns {{gridFp: string, suggestionFp: string}|null}
+ * @returns {{gridFp: string, suggestionFp: string, counts: ?{manual: number, system: number}}|null}
+ *   `counts`＝建立建議表嗰陣幹事改咗幾多格、系統動咗幾多格（第七十七輪批次 EC 組）；舊建議表冇 ⇒ null
  */
 function readSuggestionFingerprints_(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return null;
   const lastRow = sheet.getLastRow();
   for (let r = lastRow; r >= 1 && r > lastRow - 6; r--) {
-    const row = sheet.getRange(r, 1, 1, 3).getValues()[0];
+    const row = sheet.getRange(r, 1, 1, 5).getValues()[0];
     if (String(row[0] || '').trim() !== SUGGESTION_FINGERPRINT_MARK) continue;
     const gridFp = String(row[1] || '').trim();
     const suggestionFp = String(row[2] || '').trim();
     if (!gridFp || !suggestionFp) return null;
-    return { gridFp: gridFp, suggestionFp: suggestionFp };
+    const manual = String(row[3] === null || row[3] === undefined ? '' : row[3]).trim();
+    const system = String(row[4] === null || row[4] === undefined ? '' : row[4]).trim();
+    const counts = manual === '' || system === '' || isNaN(Number(manual)) || isNaN(Number(system))
+      ? null : { manual: Number(manual), system: Number(system) };
+    return { gridFp: gridFp, suggestionFp: suggestionFp, counts: counts };
   }
   return null;
 }

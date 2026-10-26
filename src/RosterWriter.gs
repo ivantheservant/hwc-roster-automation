@@ -893,12 +893,19 @@ function writeAssignments(quarterId, versionNo, assignments) {
  * @param {string=} notes 備註，例如採用的 seed，供日後重現該版本
  * @returns {void}
  */
-function registerVersion(quarterId, versionNo, sheetName, basis, parentVersionNo, warningCount, isProtected, notes) {
+function registerVersion(quarterId, versionNo, sheetName, basis, parentVersionNo, warningCount, isProtected, notes, changeCounts) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_VERSIONS);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_VERSIONS);
 
-  const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
   const C = COLUMNS.ROSTER_VERSIONS;
+  let headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+  // 第七十七輪批次 EC 組：舊試算表冇 `ChangeCounts` 呢一欄 ⇒ 喺最尾補一欄
+  //（第 1 行中文標題、第 2 行機器鍵），之後一律經表頭名稱讀寫，唔用固定欄號。
+  if (headers.indexOf(C.CHANGE_COUNTS) === -1) {
+    const col = headers.length + 1;
+    sheet.getRange(1, col, 2, 1).setValues([['改動格數'], [C.CHANGE_COUNTS]]);
+    headers = headers.concat([C.CHANGE_COUNTS]);
+  }
   const record = {};
   record[C.VERSION_ID] = quarterId + '-v' + versionNo;
   record[C.QUARTER_ID] = quarterId;
@@ -912,6 +919,8 @@ function registerVersion(quarterId, versionNo, sheetName, basis, parentVersionNo
   record[C.CREATED_AT] = nowTimestamp_();
   record[C.CREATED_BY] = Session.getActiveUser().getEmail();
   record[C.NOTES] = notes || '';
+  // 第七十七輪批次 EC 組：人手／系統改動格數、起點版本（冇就空白，來源文字照舊）
+  record[C.CHANGE_COUNTS] = formatVersionChangeCounts_(changeCounts || null);
 
   const row = headers.map(function (h) {
     return record[h] === undefined ? '' : record[h];

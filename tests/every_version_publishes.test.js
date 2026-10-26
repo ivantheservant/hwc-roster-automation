@@ -134,7 +134,7 @@ console.log('\n=== A2【核心】套用修改申報：加完行一定跟住發�
   const runTail = new Function('ctx', 'with (ctx) {'
     + 'const plan = { quarterId: "2028T3", baseVersionNo: 2 };'
     + 'const newVersionNo = 3; const sheetName = "Roster_2028T3_v3";'
-    + 'const basis = null; const versionNote = ""; const warnings = [];'
+    + 'const basis = null; const versionNote = ""; const warnings = []; const changeCounts = null;'
     + 'const outcomes = []; const pendingBackfillCells = [];'
     + 'const newEligibilityRows = []; const newUnavailableRows = [];'
     + 'let newEligibilityCount = 0; let newUnavailableCount = 0;'

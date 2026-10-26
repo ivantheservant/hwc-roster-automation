@@ -2,7 +2,7 @@
 // 執行方式：node tests/round75_ch_version_picker.test.js
 //
 //   CH1　版本清單：全部版本、新到舊；每項「第 N 版　yyyy-MM-dd HH:mm　來源　由誰」；預設＝最新一版
-//   CH2　來源人話：系統生成／重新生成／人手調整後／系統調整／由人手職事表匯入／以第 M 版作起點
+//   CH2　來源人話：系統生成／重新生成／人手改動（第七十七輪批次 EC 組：帶格數）／系統調整／由人手職事表匯入／以第 M 版作起點
 //   CH3　〔用這一版作起點〕：把那一版的格子＋每週標題按機器鍵寫入最新那張工作表；唔建立新版本、舊版本唔改
 //   CH4　之後〔儲存〕⇒ 新一版來源「以第 M 版作起點」；再之後嘅儲存唔再沿用
 //   CH5　〔查看這一版〕：舊版本未有保護就加（只提示）；最新一版唔加
@@ -44,7 +44,7 @@ console.log('\n=== CH1／CH2：版本清單 ===');
     JSON.stringify(list));
   check('★★★★★ 最新一版標明 isLatest', list[0].isLatest === true && list[1].isLatest === false);
   check('★★★★★★ 每項：第 N 版　日期時間　來源　由誰',
-    list[0].label === '第 1 版　2099-01-01 09:00　人手調整後　k'
+    list[0].label === '第 1 版　2099-01-01 09:00　人手改動 1 格　k'
       && list[1].label === '第 0 版　2099-01-01 09:00　系統生成　k', JSON.stringify(list.map((v) => v.label)));
   check('★★★★ 每版帶工作表網址（〔查看這一版〕用）', list.every((v) => /^https:\/\//.test(v.sheetUrl || '')),
     JSON.stringify(list.map((v) => v.sheetUrl)));
@@ -56,8 +56,8 @@ console.log('\n=== CH1／CH2：版本清單 ===');
   const src = (basis, parent) => gas.describeVersionSource_({ [V.BASIS]: basis, [V.PARENT_VERSION_NO]: parent });
   check('★★★★★ 來源：系統生成（第一版）／重新生成（之前有版本）',
     src('AUTO_GENERATE', '') === '系統生成' && src('AUTO_GENERATE', 0) === '重新生成');
-  check('★★★★★ 來源：人手調整後／系統調整／由人手職事表匯入',
-    src('FINE_TUNE', 0) === '人手調整後' && src('SUGGESTION', 1) === '系統調整'
+  check('★★★★★ 來源：人手改動／系統調整／由人手職事表匯入（冇格數嘅舊版本照舊）',
+    src('FINE_TUNE', 0) === '人手改動' && src('SUGGESTION', 1) === '系統調整'
       && src('IMPORT', '') === '由人手職事表匯入');
   check('★★★★ 接受建議表嘅版本寫 SUGGESTION（唔再同人手調整混埋）',
     /VERSION_VALUES\.BASIS_SUGGESTION, versionNo, 0, false,/.test(require('fs').readFileSync(
@@ -180,7 +180,7 @@ console.log('\n=== CH6：畫面 ===');
     latestVersion: { versionNo: 2, sheetUrl: 'https://example.invalid/v2' },
     buttons: { save: { enabled: true } },
     versionChoices: [
-      { versionNo: 2, label: '第 2 版　2099-01-02 10:00　人手調整後　k', isLatest: true, sheetUrl: 'https://example.invalid/v2' },
+      { versionNo: 2, label: '第 2 版　2099-01-02 10:00　人手改動 1 格　k', isLatest: true, sheetUrl: 'https://example.invalid/v2' },
       { versionNo: 1, label: '第 1 版　2099-01-01 10:00　系統調整　k', isLatest: false, sheetUrl: 'https://example.invalid/v1' },
       { versionNo: 0, label: '第 0 版　2099-01-01 09:00　系統生成　k', isLatest: false, sheetUrl: 'https://example.invalid/v0' }
     ]
@@ -194,7 +194,7 @@ console.log('\n=== CH6：畫面 ===');
 
   check('★★★★★★ 第 2 步有版本下拉，列出全部版本', sel && sel.children.length === 3, sel && sel.children.length);
   check('★★★★★ 每項顯示「第 N 版　日期時間　來源　由誰」，最新一版標明',
-    sel && sel.children[0].textContent === '第 2 版　2099-01-02 10:00　人手調整後　k（最新）'
+    sel && sel.children[0].textContent === '第 2 版　2099-01-02 10:00　人手改動 1 格　k（最新）'
       && sel.children[1].textContent === '第 1 版　2099-01-01 10:00　系統調整　k', sel && sel.children.map((o) => o.textContent).join(' / '));
   check('★★★★★★ 預設＝最新一版 ⇒〔查看／修改職事表〕照舊', sel && sel.value === '2' && !!linkTo('查看／修改職事表')
     && !linkTo('查看這一版'));

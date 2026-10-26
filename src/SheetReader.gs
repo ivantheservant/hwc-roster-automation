@@ -988,6 +988,56 @@ function findStartPointForSave_(auditRows, quarterId, baseVersionNo) {
  * @param {number} baseVersionNo 基準版本
  * @returns {?string}
  */
+/**
+ * 第七十七輪批次 EC 組：由「以第 M 版作起點」呢句攞返 M。唔係呢句（或者 null）⇒ null。
+ * @param {?string} basisText `readStartPointBasisForSave_()` 嘅結果
+ * @returns {?number}
+ */
+function parseStartPointVersionNo_(basisText) {
+  const m = /^以第 (\d+) 版作起點$/.exec(String(basisText || '').trim());
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * 第七十七輪批次 EC 組：`RosterVersions.ChangeCounts` 嘅寫法——`manual=N;system=M;start=K`（K 可以空白）。
+ * 冇數字（舊路徑、重新生成、匯入……）⇒ 空字串。
+ * @param {?{manual: number, system: number, startPoint: ?number}} counts
+ * @returns {string}
+ */
+function formatVersionChangeCounts_(counts) {
+  if (!counts) return '';
+  const n = function (v) { const x = Math.round(Number(v)); return isNaN(x) || x < 0 ? 0 : x; };
+  const start = counts.startPoint === null || counts.startPoint === undefined || counts.startPoint === ''
+    ? '' : String(Math.round(Number(counts.startPoint)));
+  return 'manual=' + n(counts.manual) + ';system=' + n(counts.system) + ';start=' + start;
+}
+
+/**
+ * 第七十七輪批次 EC 組：讀返 `ChangeCounts`。認唔出（舊版本空白）⇒ null——**唔猜**，來源文字照舊。
+ * @param {*} value 試算表嗰格
+ * @returns {?{manual: number, system: number, startPoint: ?number}}
+ */
+function parseVersionChangeCounts_(value) {
+  const text = String(value === null || value === undefined ? '' : value).trim();
+  if (text === '') return null;
+  const out = { manual: 0, system: 0, startPoint: null };
+  let seen = false;
+  text.split(';').forEach(function (part) {
+    const kv = part.split('=');
+    if (kv.length !== 2) return;
+    const key = kv[0].trim();
+    const val = kv[1].trim();
+    if (key === 'manual' || key === 'system') {
+      const num = Number(val);
+      if (!isNaN(num)) { out[key] = num; seen = true; }
+    } else if (key === 'start') {
+      const num = Number(val);
+      out.startPoint = val === '' || isNaN(num) ? null : num;
+    }
+  });
+  return seen ? out : null;
+}
+
 function readStartPointBasisForSave_(quarterId, baseVersionNo) {
   try {
     const m = findStartPointForSave_(readSheet(SHEETS.AUDIT_LOG), quarterId, baseVersionNo);

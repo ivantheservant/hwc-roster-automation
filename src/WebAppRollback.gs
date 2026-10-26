@@ -389,13 +389,8 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
  * @returns {string}
  */
 function describeVersionSource_(row) {
-  const V = COLUMNS.ROSTER_VERSIONS;
-  const basis = String(row[V.BASIS] === null || row[V.BASIS] === undefined ? '' : row[V.BASIS]).trim();
-  const parent = String(row[V.PARENT_VERSION_NO] === null || row[V.PARENT_VERSION_NO] === undefined
-    ? '' : row[V.PARENT_VERSION_NO]).trim();
-  // 生成時已經有舊版本 ⇒ 重新生成（`MultiRun.gs` 寫 ParentVersionNo＝上一版）
-  if (basis === VERSION_VALUES.BASIS_AUTO_GENERATE && parent !== '') return '重新生成';
-  return buildVersionBasisText_(basis);
+  // 第七十七輪批次 EC 組：同狀態卡、進階與診斷同一支（`WebAppDashboard.gs`），帶人手／系統格數
+  return buildVersionSourceText_(row);
 }
 
 /**

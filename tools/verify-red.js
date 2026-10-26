@@ -6809,6 +6809,62 @@ const MUTATIONS = [
     find: "    url: target === findLatestVersionNo(quarterId)\n      ? buildGridSheetUrl_(found.sheetName) : buildGridSheetViewUrl_(found.sheetName),",
     replace: "    url: buildGridSheetUrl_(found.sheetName),",
     tests: ["tests/round77_eb_view_version_readonly.test.js"]
+  },
+  {
+    id: "ec-counts-not-saved",
+    why: "registerVersion 冇寫 ChangeCounts（版本來源永遠冇格數）",
+    file: "src/RosterWriter.gs",
+    find: "  record[C.CHANGE_COUNTS] = formatVersionChangeCounts_(changeCounts || null);",
+    replace: "  record[C.CHANGE_COUNTS] = '';",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ec-no-header-ensure",
+    why: "舊試算表冇 ChangeCounts 欄嗰陣唔補欄（數字靜靜被丟）",
+    file: "src/RosterWriter.gs",
+    find: "  if (headers.indexOf(C.CHANGE_COUNTS) === -1) {",
+    replace: "  if (false) {",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ec-text-drops-system",
+    why: "來源文字漏咗「系統調整 M 格」",
+    file: "src/WebAppDashboard.gs",
+    find: "  const system = counts.system > 0 ? '系統調整 ' + counts.system + ' 格' : '';",
+    replace: "  const system = '';",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ec-start-counts-all",
+    why: "用舊版本作起點嗰陣，起點寫入嘅格全部當成人手改動",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "      : countManualChangesBeyondStartPoint_(quarterId, startPointNo, resolved.changes, context),",
+    replace: "      : resolved.changes.length,",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ec-accept-no-counts",
+    why: "接受建議嗰陣冇把人手／系統格數寫入版本",
+    file: "src/SuggestionSheet.gs",
+    find: "  const changeCounts = fp && fp.counts\n    ? { manual: fp.counts.manual, system: fp.counts.system, startPoint: null } : null;",
+    replace: "  const changeCounts = null;",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ec-fp-no-counts",
+    why: "建立建議表嗰陣冇記低幹事改咗幾多格",
+    file: "src/SuggestionSheet.gs",
+    find: "  const manual = counts ? Math.round(Number(counts.manual)) || 0 : '';",
+    replace: "  const manual = '';",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
+  },
+  {
+    id: "ec-dash-old-text",
+    why: "狀態卡仍然用舊嘅來源文字（同版本下拉唔一致）",
+    file: "src/WebAppDashboard.gs",
+    find: "      basisText: row ? buildVersionSourceText_(row) : '（沒有說明）',",
+    replace: "      basisText: row ? buildVersionBasisText_(row[V.BASIS]) : '（沒有說明）',",
+    tests: ["tests/round77_ec_version_source_counts.test.js"]
   }
 ];
 

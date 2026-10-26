@@ -65,7 +65,7 @@ console.log('\n=== B1【核心】全部 registerVersion() 用過嘅 Basis 值都
   checkEqual('★★★★★ REQUESTS_APPLIED（實測撞到嗰個）',
     gas.buildVersionBasisText_('REQUESTS_APPLIED'), '套用修改申報後');
   checkEqual('★★★★ AUTO_GENERATE', gas.buildVersionBasisText_('AUTO_GENERATE'), '系統生成');
-  checkEqual('★★★★ FINE_TUNE', gas.buildVersionBasisText_('FINE_TUNE'), '人手調整後');
+  checkEqual('★★★★ FINE_TUNE（第七十七輪批次 EC 組改字眼）', gas.buildVersionBasisText_('FINE_TUNE'), '人手改動');
   checkEqual('★★★★ RESEND', gas.buildVersionBasisText_('RESEND'), '改動後重發時建立');
 }
 

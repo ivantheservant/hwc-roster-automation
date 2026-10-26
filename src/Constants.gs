@@ -460,7 +460,11 @@ const COLUMNS = {
     WARNING_COUNT: 'WarningCount',
     CREATED_AT: 'CreatedAt',
     CREATED_BY: 'CreatedBy',
-    NOTES: 'Notes'
+    NOTES: 'Notes',
+    // 第七十七輪批次 EC 組：呢一版「人手改動幾多格、系統調整幾多格、以邊一版作起點」
+    // （`manual=N;system=M;start=K`，見 `formatVersionChangeCounts_()`／`parseVersionChangeCounts_()`）。
+    // 舊試算表冇呢一欄 ⇒ `registerVersion()` 會喺最尾補一欄；舊版本冇數字 ⇒ 來源文字照舊。
+    CHANGE_COUNTS: 'ChangeCounts'
   },
   EMAIL_RECIPIENTS: {
     RECIPIENT_ID: 'RecipientID',
