@@ -342,12 +342,15 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
     };
   }
 
+  // 第七十八輪批次 FB 組：回退之前嗰張（最新）表還原成佢自己嗰一版
+  const baseSheetRestore = restoreBaseSheetAfterNewVersion_(quarterId, plan.currentVersionNo, 'apiRollbackExecute');
   const publish = tryPublishPublicRoster_(quarterId);
 
   return {
     ok: true,
     versionCreated: true,
     newVersionNo: newVersionNo,
+    baseSheetRestoreFailed: baseSheetRestore.failed,
     sheetName: sheetName,
     targetVersionNo: target,
     previousVersionNo: plan.currentVersionNo,

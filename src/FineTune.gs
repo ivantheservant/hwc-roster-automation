@@ -1193,6 +1193,8 @@ function applyDecisions(batchId) {
   const sheetName = createRosterSheet(quarterId, newVersionNo, assignments, warnings);
   writeAssignments(quarterId, newVersionNo, assignments);
   registerVersion(quarterId, newVersionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE, baseVersionNo, warnings.length, false);
+  // 第七十八輪批次 FB 組：起點嗰張舊表還原成佢自己嗰一版
+  restoreBaseSheetAfterNewVersion_(quarterId, baseVersionNo, 'applyDecisions');
   markProposalsApplied_(batchId, newVersionNo);
   const archived = archiveOldProposals_(batchId);
 

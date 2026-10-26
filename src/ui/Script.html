@@ -1102,6 +1102,23 @@
   }
 
   /**
+   * ⚠️ 第七十八輪批次 FB 組：儲存新版本之後，作為起點嗰張舊表還原唔到 ⇒ 完成窗黃框講一句。
+   * 〔儲存〕同〔接受這個建議版本〕兩個完成窗共用。
+   * @param {Object} result 後端結果（`baseSheetRestoreFailed`、`baseVersionNo`）
+   * @returns {?Element} 冇失敗 ⇒ null
+   */
+  function baseSheetRestoreWarning(result) {
+    if (!result || !result.baseSheetRestoreFailed) return null;
+    return make('div', { className: 'warnbox' }, [
+      make('div', {
+        text: '第 ' + result.baseVersionNo + ' 版的工作表未能還原，查看時系統會再試'
+          + '（' + result.baseSheetRestoreFailed + '）。',
+        className: 'lines'
+      })
+    ]);
+  }
+
+  /**
    * 第四十二輪批次 D 組：**「這一次儲存了哪幾格」呢一段，三個出口共用。**
    *
    * ⚠️ 三個儲存出口（〔儲存我的修改〕、〔接受這個建議版本〕、

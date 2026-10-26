@@ -1087,6 +1087,9 @@ function apiAcceptSuggestion_locked_(quarterId) {
   // 而下一次幹事分不清哪一張是最新的。
   discardSuggestionSheet_(quarterId, versionNo);
 
+  // 第七十八輪批次 FB 組：幹事喺正式表（第 versionNo 版嗰張）改過嘅格，還原成第 versionNo 版
+  const baseSheetRestore = restoreBaseSheetAfterNewVersion_(quarterId, versionNo, 'apiAcceptSuggestion');
+
   const publish = tryPublishPublicRoster_(quarterId);
 
   writeAuditLog_({
@@ -1107,6 +1110,7 @@ function apiAcceptSuggestion_locked_(quarterId) {
     ok: true,
     versionNo: created.versionNo,
     baseVersionNo: versionNo,
+    baseSheetRestoreFailed: baseSheetRestore.failed,
     cellCount: resolved.changes.length,
     savedChanges: buildSavedChangeRows_(
       (resolved.changes || []).map(function (c) {

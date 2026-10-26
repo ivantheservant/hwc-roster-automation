@@ -443,6 +443,8 @@ function apiImportRosterExecute_locked_(quarterId, input) {
   registerVersion(q, versionNo, sheetName, VERSION_VALUES.BASIS_IMPORT,
     plan.hasVersion ? plan.latestVersionNo : null, 0, shouldProtect,
     IMPORT_VERSION_NOTE + '（' + plan.sheetName + '，' + plan.filledCount + ' 格）');
+  // 第七十八輪批次 FB 組：之前最新嗰張表還原成佢自己嗰一版（冇版本 ⇒ 乜都唔做）
+  restoreBaseSheetAfterNewVersion_(q, plan.hasVersion ? plan.latestVersionNo : null, 'apiImportRosterExecute');
 
   if (plan.needsRelease) {
     // AG 組格式：6 欄 key ＋ 放行版本，之後儲存同一狀態唔使再打字

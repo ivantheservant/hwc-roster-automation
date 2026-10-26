@@ -585,23 +585,51 @@
     return wrap;
   }
 
-  /** 〔查看這一版〕：新分頁開嗰一版工作表；同時叫後端確保佢係唯讀（未有保護就加）。 */
+  /**
+   * 〔查看這一版〕。
+   *
+   * ⚠️ 第七十八輪批次 FB 組：**先準備、後開啟。** 以前係一條 `<a target=_blank>`，撳落去即刻開網址，
+   * 同時「射後不理」叫 `apiOpenVersionForViewing()`（還原＋保護）。內置瀏覽器喺同一分頁開，頁面一走
+   * 個呼叫就斷咗，還原從來冇跑；就算新分頁開，`/preview` 都早過還原載入（第七十七輪回歸 G12）。
+   * 而家係一粒掣：等後端還原完，先出小窗〔開啟第 N 版〕（`target=_blank`，避開彈出視窗攔截）。
+   */
   function buildViewVersionLink(v) {
     if (!v.sheetUrl) {
       return stepButton('查看這一版', () => {}, {
         disabled: true, title: '找不到第 ' + v.versionNo + ' 版的工作表。'
       });
     }
-    const a = make('a', { text: '查看這一版', className: 'bigLink' });
-    a.href = v.sheetUrl;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.addEventListener('click', () => {
-      // ⚠️ 會加保護（寫入）⇒ 用 callServerMutating
-      callServerMutating('apiOpenVersionForViewing', currentQuarterId, v.versionNo)
-        .catch((err) => setStatus('第 ' + v.versionNo + ' 版未能設成唯讀：' + ((err && err.message) || err), true));
+    return stepButton('查看這一版', () => openViewVersion(v), {
+      className: 'secondary',
+      title: '先把第 ' + v.versionNo + ' 版那一張表準備好（只可以看），再開啟。'
     });
-    return a;
+  }
+
+  /**
+   * 第七十八輪批次 FB 組：〔查看這一版〕嘅小窗。還原唔到（`restoreFailed`）⇒ 黃框講明，唔可以沉默。
+   * @param {Object} v 版本下拉嘅一項
+   */
+  function openViewVersion(v) {
+    runAction('準備第 ' + v.versionNo + ' 版（只可以看）', async () => {
+      // ⚠️ 會還原舊表、加保護（寫入）⇒ 用 callServerMutating，**等佢完成**先出連結
+      const r = await callServerMutating('apiOpenVersionForViewing', currentQuarterId, v.versionNo);
+      const link = make('a', { text: '開啟第 ' + v.versionNo + ' 版', className: 'sheetlink' });
+      link.href = (r && r.url) || v.sheetUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      const nodes = [make('div', { text: '第 ' + v.versionNo + ' 版已經準備好（只可以看）', className: 'ok-head' })];
+      if (r && r.restoreFailed) {
+        nodes.push(make('div', { className: 'warnbox' }, [
+          make('div', {
+            text: '這一張表未能還原成第 ' + v.versionNo + ' 版的內容（' + r.restoreFailed + '），'
+              + '畫面上看到的可能不是第 ' + v.versionNo + ' 版。',
+            className: 'lines'
+          })
+        ]));
+      }
+      nodes.push(make('div', {}, [link]));
+      openModal('查看第 ' + v.versionNo + ' 版', nodes, [button('關閉', () => closeModal(), 'secondary')]);
+    });
   }
 
   function openUseVersionAsStartPoint(v) {

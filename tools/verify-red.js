@@ -6338,7 +6338,8 @@ const MUTATIONS = [
     file: "src/WebAppRollback.gs",
     find: "      const r = writeVersionContentIntoSheet_(quarterId, target, sheet, timezone);\n      restoredCells",
     replace: "      const r = { cellCount: 0, titleCount: 0 };\n      restoredCells",
-    tests: ["tests/round75_ch_version_picker.test.js"]
+    // 第七十八輪批次 FB 組：儲存嗰陣已經還原，呢條改由「儲存時還原唔到、查看時再試」守
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
   },
   {
     id: "ch-view-latest-locked",
@@ -7196,6 +7197,63 @@ const MUTATIONS = [
     find: "      item.appendChild(make('div', { text: '安排沒有改動', className: 'vio-row muted' }));\n",
     replace: "",
     tests: ["tests/round78_fa_sendall_current.test.js"]
+  },
+  // ── 第七十八輪批次 FB 組：儲存新版本時還原舊表；〔查看這一版〕先準備、後開啟 ──
+  {
+    id: "fb-save-no-restore",
+    why: "〔儲存〕之後舊表留住人手改動（查看舊版本見到嘅唔係嗰一版）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    : restoreBaseSheetAfterNewVersion_(quarterId, plan.baseVersionNo, 'apiSaveAndConfirmExecute').failed;",
+    replace: "    : '';",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  {
+    id: "fb-accept-no-restore",
+    why: "接受建議之後舊表留住人手改動",
+    file: "src/SuggestionSheet.gs",
+    find: "  const baseSheetRestore = restoreBaseSheetAfterNewVersion_(quarterId, versionNo, 'apiAcceptSuggestion');",
+    replace: "  const baseSheetRestore = { restoredCells: 0, failed: '' };",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  {
+    id: "fb-requests-no-restore",
+    why: "套用修改申報（步驟 3、5、〔儲存〕有申報）之後舊表冇還原",
+    file: "src/RequestsApply.gs",
+    find: "  const baseSheetRestore = restoreBaseSheetAfterNewVersion_(plan.quarterId, plan.baseVersionNo, 'applyRequests_');",
+    replace: "  const baseSheetRestore = { restoredCells: 0, failed: '' };",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  {
+    id: "fb-restore-fail-throws",
+    why: "舊表還原唔到就令成個儲存失敗（新版本其實已經建立咗）",
+    file: "src/SheetReader.gs",
+    find: "    out.failed = String((err && err.message) || err);\n",
+    replace: "    throw err;\n",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  {
+    id: "fb-view-fire-forget",
+    why: "〔查看這一版〕又變返射後不理（未還原完就開網址）",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      const r = await callServerMutating('apiOpenVersionForViewing', currentQuarterId, v.versionNo);",
+    replace: "      const r = {}; callServerMutating('apiOpenVersionForViewing', currentQuarterId, v.versionNo);",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  {
+    id: "fb-view-no-warnbox",
+    why: "〔查看這一版〕還原失敗時沉默（冇黃框）",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      if (r && r.restoreFailed) {",
+    replace: "      if (false) {",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
+  },
+  {
+    id: "fb-done-no-warnbox",
+    why: "儲存完成窗唔講舊表還原唔到",
+    file: "src/ui/Script.html",
+    find: "    if (!result || !result.baseSheetRestoreFailed) return null;",
+    replace: "    return null;",
+    tests: ["tests/round78_fb_base_sheet_restore.test.js"]
   }
 ];
 

@@ -699,6 +699,59 @@ function writeWeekTitles_(quarterId, titleChanges, timezone, source) {
   return written;
 }
 
+/** 第七十八輪批次 FB 組：儲存新版本之後舊表還原唔到嘅 AuditLog 動作名。 */
+const BASE_SHEET_RESTORE_FAILED_ACTION = 'BASE_SHEET_RESTORE_FAILED';
+
+/**
+ * ⚠️ 第七十八輪批次 FB 組：**新版本建立之後，把作為起點嗰張舊表還原成佢自己嗰一版。**
+ *
+ * 現場（第七十七輪回歸 G12）：幹事喺 `Roster_2028T3_v0` 上直接改咗 5 格 → 儲存成第 1 版
+ *（新表 `_v1`）。`_v0` 上面嗰 5 格人手改動一直留住，〔查看這一版〕揀第 0 版見到嘅係人手改過嘅
+ * 內容；而儲存完成窗寫「第 0 版原封不動保留」。幹事改嘅係最新嗰張表，新版本寫入新表，
+ * 所以舊表要喺呢度還原（`writeVersionContentIntoSheet_()`，連「類型」欄）。
+ *
+ * 所有建立新版本、而又以一張舊表作起點嘅路都要叫：〔儲存〕、接受建議、套用修改申報
+ *（`applyRequests_()`）、回退、匯入、選單「套用決定」。生成（`MultiRun.gs`）唔用舊表，唔叫。
+ *
+ * ⚠️ 還原失敗**唔可以**令儲存失敗——新版本已經建立咗。記 AuditLog，回傳原因俾完成窗
+ * 講一句「第 K 版的工作表未能還原，查看時系統會再試」（〔查看這一版〕嗰陣會再還原一次）。
+ * @param {string} quarterId 季度 ID
+ * @param {?number} baseVersionNo 作為起點嘅舊版本號（冇 ⇒ 乜都唔做）
+ * @param {string} source 呼叫者（AuditLog）
+ * @returns {{restoredCells: number, failed: string}}
+ */
+function restoreBaseSheetAfterNewVersion_(quarterId, baseVersionNo, source) {
+  const out = { restoredCells: 0, failed: '' };
+  if (baseVersionNo === null || baseVersionNo === undefined || baseVersionNo === '') return out;
+  const base = Number(baseVersionNo);
+  if (isNaN(base) || base < 0) return out;
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const sheetName = findVersionRowForPicker_(quarterId, base).sheetName;
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+    if (!sheet) throw new Error('找不到工作表「' + sheetName + '」');
+    const r = writeVersionContentIntoSheet_(quarterId, base, sheet, timezone);
+    out.restoredCells = r.cellCount + r.titleCount;
+  } catch (err) {
+    out.failed = String((err && err.message) || err);
+    log_('WARN', 'restoreBaseSheetAfterNewVersion_ 第 ' + base + ' 版的工作表未能還原：' + out.failed);
+    try {
+      writeAuditLog_({
+        action: BASE_SHEET_RESTORE_FAILED_ACTION,
+        targetSheet: buildRosterSheetName_(quarterId, base),
+        targetKey: quarterId + '-v' + base,
+        oldValue: '',
+        newValue: '',
+        source: source || 'restoreBaseSheetAfterNewVersion_',
+        notes: '新版本已經建立；第 ' + base + ' 版的工作表未能還原（' + out.failed + '），查看時系統會再試'
+      });
+    } catch (logErr) {
+      log_('WARN', '還原失敗紀錄寫不進 AuditLog：' + logErr.message);
+    }
+  }
+  return out;
+}
+
 /** 「類型」欄改動喺逐格清單入面用嘅假崗位鍵（唔會撞到任何真崗位 ID）。 */
 const WEEK_TITLE_POST_KEY = '__TITLE__';
 /** 「類型」欄改動喺清單入面顯示嘅名。 */

@@ -818,10 +818,13 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
     // 版本已經真係建立咗，所以唔當成套用失敗——但要帶出去畀呼叫端講。
     log_('WARN', '套用申報之後發佈公開連結失敗：' + publish.message);
   }
+  // 第七十八輪批次 FB 組：作為起點嗰張舊表還原成佢自己嗰一版（步驟 3、5、〔儲存〕有申報都經呢度）
+  const baseSheetRestore = restoreBaseSheetAfterNewVersion_(plan.quarterId, plan.baseVersionNo, 'applyRequests_');
   return {
     sheetName: sheetName,
     versionNo: newVersionNo,
     baseVersionNo: plan.baseVersionNo,
+    baseSheetRestoreFailed: baseSheetRestore.failed,
     // ⚠️ 兩條路（有造版本／冇造版本）嘅欄位要一樣，
     // 否則呼叫端要寫 `result.versionCreated === undefined` 呢種判斷。
     versionCreated: true,

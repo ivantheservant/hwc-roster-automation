@@ -540,6 +540,12 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     return buildSaveConfirmFailureResult_(quarterId, plan.baseVersionNo, err);
   }
 
+  // ── 第七十八輪批次 FB 組：作為起點嗰張舊表還原成佢自己嗰一版 ──
+  // 有申報嗰條路 `applyRequests_()` 已經做咗（同一支），唔做兩次。
+  const baseSheetRestoreFailed = requestResult
+    ? (requestResult.baseSheetRestoreFailed || '')
+    : restoreBaseSheetAfterNewVersion_(quarterId, plan.baseVersionNo, 'apiSaveAndConfirmExecute').failed;
+
   // ── 第五十三輪批次 B 組：**放行咗就要留低痕跡。** ────────────
   //
   // ⚠️ 修正之前，一次「打字放行硬規則違反」喺 `AuditLog` 度**冇任何紀錄**。
@@ -607,6 +613,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     versionNo: created.versionNo,
     sheetName: created.sheetName,
     baseVersionNo: plan.baseVersionNo,
+    baseSheetRestoreFailed: baseSheetRestoreFailed,
     cellCount: created.cellCount,
     // ⚠️ 第四十一輪批次 C 組：**逐格列出來**，不是只給一個數字。
     //

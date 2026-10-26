@@ -946,6 +946,8 @@
       nodes.push(make('div', { text: '「寄出」現在可以撳了。', className: 'ok-line strong' }));
     }
     nodes.push(para('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted'));
+    const restoreWarn = baseSheetRestoreWarning(result);
+    if (restoreWarn) nodes.push(restoreWarn);
 
     // ⚠️ **唔可以跳過呢個結果畫面。** 佢係「系統改咗你嗰幾格」嘅唯一證據。
     // 第七十五輪批次 CG 組：完成窗加〔請系統幫我調整〕（Ivan：儲存之後想即刻再調整）

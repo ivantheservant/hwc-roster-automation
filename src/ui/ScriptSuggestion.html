@@ -399,6 +399,9 @@
           ].concat(savedChangeNodes(r.savedChanges, r.cellCount)).concat([
             para('第 ' + r.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted')
           ]);
+          // 第七十八輪批次 FB 組：舊表還原唔到要講（同〔儲存〕完成窗同一支）
+          const restoreWarn = baseSheetRestoreWarning(r);
+          if (restoreWarn) nodes.push(restoreWarn);
           if (r.publishFailed) {
             nodes.push(make('div', { className: 'warnbox' }, [
               make('div', {

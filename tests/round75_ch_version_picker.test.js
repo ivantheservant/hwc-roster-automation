@@ -150,8 +150,9 @@ console.log('\n=== CH5：查看這一版（唯讀）===');
   wrap(sc.gridSheet(3));
   const r = gas.apiOpenVersionForViewing(sc.Q, 0);
   check('★★★★★ 回嗰一版工作表網址', /^https:\/\//.test(r.url) && r.sheetName === 'Roster_' + sc.Q + '_v0', JSON.stringify(r));
-  check('★★★★★★ 舊版本工作表先還原成嗰一版儲存咗嘅內容（幹事喺嗰張表改完先儲存成第 1 版）',
-    sc.getCell(0, D[0], 'CHAIR#1') === v0Chair && sc.getCell(0, D[1], '_TYPE') === v0Title1 && r.restoredCells === 2,
+  // 第七十八輪批次 FB 組：儲存成第 1 版嗰陣已經還原咗 ⇒ 查看嗰陣冇格要再還原（restoredCells＝0）
+  check('★★★★★★ 舊版本工作表係嗰一版儲存咗嘅內容（幹事喺嗰張表改完先儲存成第 1 版；儲存嗰陣已還原）',
+    sc.getCell(0, D[0], 'CHAIR#1') === v0Chair && sc.getCell(0, D[1], '_TYPE') === v0Title1 && r.restoredCells === 0,
     JSON.stringify([sc.getCell(0, D[0], 'CHAIR#1'), sc.getCell(0, D[1], '_TYPE'), r]));
   check('★★★★★★ 版本紀錄一格都唔改', JSON.stringify(sc.rows(0)) === v0RowsAtStart);
   check('★★★★★★ 舊版本未有保護 ⇒ 加保護（只提示）', protectedSheets.length === 1
@@ -202,14 +203,17 @@ console.log('\n=== CH6：畫面 ===');
 
   sel.value = '0';
   sel.fire('change');
-  const view = linkTo('查看這一版');
-  check('★★★★★★ 揀舊版本 ⇒〔查看這一版〕喺新分頁開嗰一版', view && view.href === 'https://example.invalid/v0'
-    && view.target === '_blank', view && view.href);
+  // 第七十八輪批次 FB 組：〔查看這一版〕改為一粒掣——先等後端還原，再出小窗〔開啟第 0 版〕（新分頁）
+  const view = btnOf(card, '查看這一版');
+  check('★★★★★★ 揀舊版本 ⇒〔查看這一版〕（掣）', !!view && !linkTo('查看這一版'));
   check('★★★★★ 〔查看／修改職事表〕收起（避免以為改緊舊版本）', !linkTo('查看／修改職事表'));
   view.fire('click');
   await tick();
-  check('★★★★★ 撳〔查看這一版〕順手叫後端設唯讀', calls.some((c) => c.name === 'apiOpenVersionForViewing' && c.no === 0),
+  check('★★★★★ 撳〔查看這一版〕叫後端準備（還原＋唯讀）', calls.some((c) => c.name === 'apiOpenVersionForViewing' && c.no === 0),
     JSON.stringify(calls));
+  const openLink = ui.document.getElementById('modalBody').flatten()
+    .filter((n) => n.tagName === 'A' && n.textContent === '開啟第 0 版')[0];
+  check('★★★★★★ 準備好之後小窗〔開啟第 0 版〕喺新分頁開', openLink && openLink.target === '_blank', openLink && openLink.href);
 
   const startBtn = btnOf(card, '用這一版作起點');
   check('★★★★★★ 揀舊版本 ⇒〔用這一版作起點〕', !!startBtn);
