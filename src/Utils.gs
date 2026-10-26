@@ -1029,3 +1029,10 @@ function deleteSheetRowsInRuns_(sheet, rowNumbers) {
   }
   return rows.length;
 }
+
+/** 第七十七輪批次 EE 組：改動後重發嗰幾個入口——幹事明確指定咗收件人（〔給所有人〕或者勾咗人）就算冇人改過都要寄。 */
+function resendHasExplicitRecipients_(sendOptions) {
+  const o = sendOptions || {};
+  if (String(o.sendMode || '').toUpperCase() === SEND_MODE.ALL) return true;
+  return (o.pickedKeys || []).some(function (k) { return String(k || '').trim() !== ''; });
+}

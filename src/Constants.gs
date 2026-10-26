@@ -1892,3 +1892,18 @@ const IMPORT_CONFIRM_TEXT = '確認匯入';
 const IMPORT_RELEASE_CONFIRM_TEXT = '確認放行';
 /** 版本紀錄上嘅說明文字。 */
 const IMPORT_VERSION_NOTE = '由人手職事表匯入';
+
+/**
+ * 第七十七輪批次 EE 組：第 3 步三粒掣。前端放入 `sendOptions.sendMode`，後端只用嚟
+ *   ・寫 `notifyReasonByPerson` 嘅理由文字（〔給所有人〕喺正式發出之後：每一位都要收到）
+ *   ・改動後重發嗰幾個入口判斷「冇人改過都要寄」（`resendHasExplicitRecipients_()`）
+ * 收件人本身一律仍然行 `PICK`＋`pickedKeys`。
+ */
+const SEND_MODE = {
+  /** 〔給所有人〕：職事表上全部人＋堂委＋執事（＋固定收件人，按 Config） */
+  ALL: 'ALL',
+  /** 〔變動的人〕：同上一次寄出嘅版本比較、安排有改動嘅人 */
+  CHANGED: 'CHANGED',
+  /** 〔選擇其他〕：幹事自己勾 */
+  PICK: 'PICK'
+};
