@@ -43,7 +43,7 @@ console.log('\n=== EF1：預設展開 ===');
     /id="zone3Head" type="button" aria-expanded="true"/.test(zone3) && /<div class="zone-body" id="zone3Body"><\/div>/.test(zone3), zone3);
   const allUi = fs.readdirSync(path.join(ROOT, 'src', 'ui')).map((f) => code(read('src/ui/' + f))).join('\n');
   check('★★★★★★ 每次重畫主畫面都 renderZone3Always(d)（跟住 renderZone2Head(d)；重新整理、換季度之後都係展開）',
-    /renderZone2Head\(dashboardState_\);\s*\n\s*renderZone3Always\(dashboardState_\);/.test(allUi));
+    /renderZone2Head\(dashboardState_\);\s*\n\s*if \(typeof renderZone3Always === 'function'\) renderZone3Always\(dashboardState_\);/.test(allUi));
   // 真係行一次（測試用嘅假 DOM 冇 setAttribute ⇒ 記低 setZoneOpen／markZoneLoaded 收到乜）
   vm.runInContext('__zo = null; setZoneOpen = (h, b, o) => { __zo = [h, b, o]; }; __ml = null; markZoneLoaded = (b) => { __ml = b; return false; };', ui);
   ui.renderZone3Always(dash);
@@ -96,7 +96,7 @@ console.log('\n=== EF4：字眼 ===');
   });
   walk(srcDir);
   check('★★★★★ 全 src 冇再叫幹事去「人員與電郵」／「名單維護」', hits.length === 0, JSON.stringify(hits));
-  check('★★★★ 名單上找不到的名字 ⇒ 叫佢撳〔加入名單〕（在出席系統揀人）', /撳〔加入名單〕（在出席系統揀人）/.test(read('src/EligibilitySheetEditor.gs')));
+  check('★★★★ 名單上找不到的名字 ⇒ 叫佢撳〔加入名單〕（在出席系統選人）', /撳〔加入名單〕（在出席系統選人）/.test(read('src/EligibilitySheetEditor.gs')));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

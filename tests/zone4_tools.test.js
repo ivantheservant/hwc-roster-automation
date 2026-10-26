@@ -119,9 +119,10 @@ console.log('\n=== F 版本下拉一律寫人話 ===');
   check('★★★★★ label 係「第 N 版　時間　原因」，唔係工作表名'
     + '——`Roster_2026T4_v2` 係內部代號，唔係幹事嘅語言',
     /'第 ' \+ no \+ ' 版　'/.test(list));
-  check('★★★★★ 原因用共用嘅 buildVersionBasisText_()（同狀態卡同一份翻譯表）'
+  // 第七十七輪批次 EC 組：改為同一支 buildVersionSourceText_()（入面仍然經 buildVersionBasisText_() 同一份翻譯表，再帶格數）
+  check('★★★★★ 原因用共用嘅 buildVersionSourceText_()（同版本下拉、狀態卡同一份）'
     + '——兩邊各有一套就會有一日對唔上',
-    /buildVersionBasisText_\(v\[V\.BASIS\]\)/.test(list));
+    /buildVersionSourceText_\(v\)/.test(list));
   check('★★★★ 時間用共用嘅 normalizeSentAt_()（唔會直接 String(Date)）',
     /normalizeSentAt_\(v\[V\.CREATED_AT\], timezone\)/.test(list));
   check('★★★★ 冇時間紀錄要講「（沒有時間紀錄）」，唔可以留空白',

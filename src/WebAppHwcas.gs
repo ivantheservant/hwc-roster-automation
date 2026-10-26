@@ -587,7 +587,7 @@ function addPersonFromHwcas_locked_(payload) {
   }
   const memberNo = normalizeMemberNo_(p.memberNo);
   if (memberNo.error || !memberNo.value) {
-    return { ok: false, message: buildThreePartMessage_('沒有收到會眾編號。', '什麼都沒有加入。', ['在出席系統的搜尋結果揀一位再撳']) };
+    return { ok: false, message: buildThreePartMessage_('沒有收到會眾編號。', '什麼都沒有加入。', ['在出席系統的搜尋結果選一位再撳']) };
   }
   const key = memberNoKey_(memberNo.value);
   const config = readConfig();

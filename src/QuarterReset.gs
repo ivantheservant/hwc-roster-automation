@@ -828,8 +828,9 @@ function executeQuarterResetBatch_(entries) {
 
       try {
         writeAuditLog_({
-          // 第七十七輪批次 EH 組：儲存嗰陣用呢個 action 判斷「以第 M 版作起點」標記係咪重設之前留低嘅
-          action: QUARTER_RESET_AFTER_ACTION,
+          // 第七十七輪批次 EH 組：儲存嗰陣用同一個字（`QUARTER_RESET_AFTER_ACTION`，SheetReader.gs）
+          // 判斷「以第 M 版作起點」標記係咪重設之前留低嘅
+          action: 'QUARTER_RESET_BATCH_AFTER',
           targetSheet: '（多張）',
           targetKey: quarterId,
           oldValue: '（見同一季的 QUARTER_RESET_BATCH_BEFORE）',

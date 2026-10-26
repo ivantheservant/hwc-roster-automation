@@ -83,9 +83,9 @@ console.log('\n=== D3【核心】格式唔啱唔可以阻擋儲存，只可以�
 
   const zone3 = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'ui', 'ScriptZone3.html'), 'utf8');
-  check('★★★★★ 前端有處理 needsEmailConfirm，而且再送一次時帶住 confirmedBadEmail',
-    /res\.needsEmailConfirm/.test(zone3)
-    && /confirmedBadEmail: true/.test(zone3));
+  // 第七十七輪批次 EF／EG 組：前端唔再有人手輸入電郵嘅畫面（電郵由出席系統讀取）；後端照舊處理 needsEmailConfirm
+  check('★★★★★ 後端仍然識 confirmedBadEmail（選單／其他呼叫端用）',
+    /p\.confirmedBadEmail !== true/.test(src));
   check('★★★★ 用規格指定嗰句文案',
     src.indexOf('這個電郵格式看起來不對，寄出時可能會失敗。確定要儲存嗎？') !== -1);
 }

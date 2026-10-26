@@ -7014,7 +7014,7 @@ const MUTATIONS = [
     id: "ef-zone3-not-rerender",
     why: "重新整理／換季度之後常用設定唔會再展開重畫",
     file: "src/ui/Script.html",
-    find: "    renderZone3Always(dashboardState_);\n",
+    find: "    if (typeof renderZone3Always === 'function') renderZone3Always(dashboardState_);\n",
     replace: "",
     tests: ["tests/round77_ef_settings_zone.test.js"]
   },

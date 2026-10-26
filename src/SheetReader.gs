@@ -1051,7 +1051,10 @@ function parseStartPointVersionNo_(basisText) {
  */
 function formatVersionChangeCounts_(counts) {
   if (!counts) return '';
-  const n = function (v) { const rounded = Math.round(Number(v)); return isNaN(rounded) || rounded < 0 ? 0 : rounded; };
+  const n = function (v) {
+    const rounded = Math.round(Number(v));
+    return isNaN(rounded) || rounded < 0 ? 0 : rounded;
+  };
   const start = counts.startPoint === null || counts.startPoint === undefined || counts.startPoint === ''
     ? '' : String(Math.round(Number(counts.startPoint)));
   return 'manual=' + n(counts.manual) + ';system=' + n(counts.system) + ';start=' + start;
@@ -1235,4 +1238,160 @@ function splitVersionPeopleForNotice_(quarterId, versionNo) {
     noEmail: noEmail.sort(byName), withEmail: withEmail.sort(byName),
     tempHelpers: tempHelpers.sort(byName), externalNameCount: Object.keys(external).length
   };
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第七十七輪批次 EG 組：出席系統同步嘅狀態同「安全同步」——放喺呢度係因為主畫面（`WebAppDashboard.gs`）
+ * 同每一條寄出路（`WebAppFlow.gs`／`WebAppZone4.gs`）都會叫，而佢哋唔一定載入 `HwcasSync.gs`。
+ * 真正讀出席系統、寫 NameMapping 嘅 `syncPeopleFromHwcasByMemberNo_()` 仍然喺 `HwcasSync.gs`；
+ * 佢唔存在（例如測試只載入部分檔案）⇒ `runHwcasSyncSafely_()` 當成「讀不到出席系統」，唔拋。
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/** Script Properties 嘅鍵：上次同步時間（epoch ms）、顯示文字、上次錯誤。 */
+const HWCAS_SYNC_LAST_AT_KEY = 'HWCAS_SYNC_LAST_AT';
+const HWCAS_SYNC_LAST_TEXT_KEY = 'HWCAS_SYNC_LAST_TEXT';
+const HWCAS_SYNC_LAST_ERROR_KEY = 'HWCAS_SYNC_LAST_ERROR';
+/** 寄出之前：10 分鐘內已更新過就略過。 */
+const HWCAS_SYNC_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
+/**
+ * 會眾編號嘅比對鍵：去前綴單引號、去空白；全數字就補足 5 位（出席系統有時係數字 1234，名單係 '01234）。
+ * @param {*} raw
+ * @returns {string}
+ */
+function memberNoKey_(raw) {
+  let text = String(raw === null || raw === undefined ? '' : raw).trim().replace(/^'/, '').trim();
+  if (/^\d+$/.test(text) && text.length < 5) text = ('00000' + text).slice(-5);
+  return text;
+}
+
+/** Script Properties（讀唔到就當冇紀錄——唔可以令主畫面失敗）。 */
+function readHwcasSyncStatus_() {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    return {
+      lastAtMs: Number(p.getProperty(HWCAS_SYNC_LAST_AT_KEY)) || 0,
+      lastText: String(p.getProperty(HWCAS_SYNC_LAST_TEXT_KEY) || ''),
+      lastError: String(p.getProperty(HWCAS_SYNC_LAST_ERROR_KEY) || '')
+    };
+  } catch (err) {
+    return { lastAtMs: 0, lastText: '', lastError: '' };
+  }
+}
+
+function writeHwcasSyncStatus_(fields) {
+  try {
+    const p = PropertiesService.getScriptProperties();
+    Object.keys(fields).forEach(function (k) { p.setProperty(k, String(fields[k])); });
+  } catch (err) {
+    log_('WARN', 'HWCAS 同步狀態寫不入 Script Properties：' + err.message);
+  }
+}
+
+/** 讀唔到出席系統嗰陣畫面同寄出確認窗都講呢一句。 */
+function buildHwcasUnavailableNotice_(lastText) {
+  return '讀不到出席系統，暫時用上次（' + (lastText || '沒有紀錄') + '）的電郵。';
+}
+
+/**
+ * 安全噉同步一次：讀唔到出席系統**唔拋錯**（記低錯誤，畫面講一句）；10 分鐘內已更新過（而且唔係 `force`）就略過。
+ * ⚠️ 呼叫端負責鎖（幹事介面載入：`apiSyncPeopleFromHwcas()` 用 tryLock；寄出路已經喺鎖入面）。
+ * @param {{force: boolean}=} opts
+ * @returns {Object} {ok, skipped, updated, …, notice}
+ */
+function runHwcasSyncSafely_(opts) {
+  const o = opts || {};
+  const status = readHwcasSyncStatus_();
+  if (o.force !== true && status.lastAtMs > 0 && Date.now() - status.lastAtMs < HWCAS_SYNC_MIN_INTERVAL_MS) {
+    return { ok: true, skipped: 'recent', updated: 0, syncedAtText: status.lastText, notice: '' };
+  }
+  try {
+    const r = syncPeopleFromHwcasByMemberNo_();
+    const fields = {};
+    fields[HWCAS_SYNC_LAST_AT_KEY] = Date.now();
+    fields[HWCAS_SYNC_LAST_TEXT_KEY] = r.syncedAtText;
+    fields[HWCAS_SYNC_LAST_ERROR_KEY] = '';
+    writeHwcasSyncStatus_(fields);
+    return Object.assign({ ok: true, skipped: '', notice: '' }, r);
+  } catch (err) {
+    log_('WARN', '出席系統同步失敗（照用上次的電郵）：' + err.message);
+    const fields = {};
+    fields[HWCAS_SYNC_LAST_ERROR_KEY] = err.message;
+    writeHwcasSyncStatus_(fields);
+    return { ok: false, skipped: '', updated: 0, error: err.message, syncedAtText: status.lastText,
+      notice: buildHwcasUnavailableNotice_(status.lastText) };
+  }
+}
+
+/** 寄出路（已經喺鎖入面）：建立收件名單之前同步一次，10 分鐘內已更新過就略過。**唔會令寄出失敗。** */
+function syncPeopleFromHwcasBeforeSend_() {
+  return runHwcasSyncSafely_({ force: false });
+}
+
+/** 寄出確認窗要講嘅一句（上次讀唔到出席系統 ⇒ 講；冇事 ⇒ 空字串）。 */
+function readHwcasNoticeForSend_() {
+  const s = readHwcasSyncStatus_();
+  return s.lastError ? buildHwcasUnavailableNotice_(s.lastText) : '';
+}
+
+/**
+ * 狀態卡嗰兩句。
+ * @returns {{syncedAtText: string, line: string, errorText: string}}
+ */
+function describeHwcasSyncForDashboard_() {
+  const s = readHwcasSyncStatus_();
+  let when = s.lastText;
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    if (when.indexOf(today) === 0) when = '今日 ' + when.slice(11, 16);
+  } catch (err) { /* 照用原文 */ }
+  return {
+    syncedAtText: s.lastText,
+    errorText: s.lastError ? buildHwcasUnavailableNotice_(s.lastText) : '',
+    line: s.lastError
+      ? buildHwcasUnavailableNotice_(s.lastText)
+      : (s.lastText ? '電郵已由出席系統更新（' + when + '）' : '')
+  };
+}
+
+/**
+ * 狀態卡「N 位收不到電郵（沒有連結出席系統或者出席系統沒有電郵）」——只數 Active 嘅人。**純讀取。**
+ * @returns {{noEmail: number, unlinked: number}}
+ */
+function countPeopleEmailGaps_() {
+  const M = COLUMNS.NAME_MAPPING;
+  let noEmail = 0;
+  let unlinked = 0;
+  try {
+    readPeople().forEach(function (row) {
+      if (!String(row[M.EMAIL] || '').trim()) noEmail++;
+      if (!memberNoKey_(row[M.MEMBER_NO])) unlinked++;
+    });
+  } catch (err) {
+    log_('WARN', 'countPeopleEmailGaps_：' + err.message);
+  }
+  return { noEmail: noEmail, unlinked: unlinked };
+}
+
+/**
+ * 第七十七輪批次 EE 組：第 3 步三粒掣。前端放入 `sendOptions.sendMode`，後端只用嚟
+ *   ・寫 `notifyReasonByPerson` 嘅理由文字（〔給所有人〕喺正式發出之後：每一位都要收到）
+ *   ・改動後重發嗰幾個入口判斷「冇人改過都要寄」（`resendHasExplicitRecipients_()`）
+ * 收件人本身一律仍然行 `PICK`＋`pickedKeys`。
+ */
+const SEND_MODE = {
+  /** 〔給所有人〕：職事表上全部人＋堂委＋執事（＋固定收件人，按 Config） */
+  ALL: 'ALL',
+  /** 〔變動的人〕：同上一次寄出嘅版本比較、安排有改動嘅人 */
+  CHANGED: 'CHANGED',
+  /** 〔選擇其他〕：幹事自己勾 */
+  PICK: 'PICK'
+};
+
+/** 第七十七輪批次 EE 組：改動後重發嗰幾個入口——幹事明確指定咗收件人（〔給所有人〕或者勾咗人）就算冇人改過都要寄。 */
+function resendHasExplicitRecipients_(sendOptions) {
+  const o = sendOptions || {};
+  if (String(o.sendMode || '').toUpperCase() === SEND_MODE.ALL) return true;
+  return (o.pickedKeys || []).some(function (k) { return String(k || '').trim() !== ''; });
 }

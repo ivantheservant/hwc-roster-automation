@@ -37,7 +37,8 @@ console.log('\n=== EH1（F1）：純函式 ===');
   check('★★★★★ findLastQuarterResetAt_：讀到該季最後一次重設時間；Date 物件都認得',
     gas.findLastQuarterResetAt_([resetRow, Object.assign({}, resetRow, { [A.TIMESTAMP]: new Date('2099-01-07T09:00:00Z') })], sc.Q, 'UTC') === '2099-01-07 09:00:00'
     && gas.findLastQuarterResetAt_([], sc.Q, sc.TZ) === null);
-  check('★★★★ 重設完成嗰行用同一個 action 常數', /action: QUARTER_RESET_AFTER_ACTION,/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'QuarterReset.gs'), 'utf8')));
+  check('★★★★ 重設完成嗰行寫嘅 action 同儲存嗰邊用嘅常數係同一個字', /action: 'QUARTER_RESET_BATCH_AFTER'/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'QuarterReset.gs'), 'utf8'))
+    && gas.QUARTER_RESET_AFTER_ACTION === 'QUARTER_RESET_BATCH_AFTER');
 }
 
 console.log('\n=== EH1（F1）：真入口——重設前嘅標記唔會變成今次嘅起點 ===');

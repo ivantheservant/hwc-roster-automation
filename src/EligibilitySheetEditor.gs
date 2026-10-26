@@ -394,7 +394,7 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
       '名單裡面有 ' + plan.unresolved.length + ' 個名字系統認不出。',
       '名單沒有任何改動——一個都沒有寫入。',
       ['回去「' + ELIGIBILITY_SHEET_NAME + '」那張表，把那幾個名字改成正確的寫法',
-        '如果那是一位新人，在第 2 步〔檢查我的改動〕撳〔加入名單〕（在出席系統揀人）',
+        '如果那是一位新人，在第 2 步〔檢查我的改動〕撳〔加入名單〕（在出席系統選人）',
         '改好之後再撳一次「儲存並套用名單」']));
   }
   if (plan.added.length === 0 && plan.removed.length === 0) {

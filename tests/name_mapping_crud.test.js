@@ -203,21 +203,20 @@ console.log('\n=== E2 畫面文案 ===');
 {
   const zone3 = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'ui', 'ScriptZone3.html'), 'utf8');
-  check('★★★★★ 停用時有講「已經排好的職事表不受影響」',
-    zone3.indexOf('已經排好的職事表不受影響。') !== -1);
-  check('★★★★ 冇電郵嗰行有標示「正式發出會略過」',
-    zone3.indexOf('沒有電郵，正式發出會略過') !== -1);
+  // 第七十七輪批次 EF／EG 組：「人員與電郵」畫面整個拿走（人員同電郵由出席系統讀取），
+  // 停用／MaxPerQuarter 由管理員直接喺試算表改；下面改為驗新畫面。
+  check('★★★★★ 前端冇殘留人員與電郵畫面', !/function renderPeople\(|function openAddPerson\(/.test(zone3));
   check('★★★★★ 重發 token 要打字確認（不可逆）',
     /requireTyping: true/.test(zone3));
   // 第二十七輪批次階段 E：HWCAS 補電郵搬咗上嚟，做成
   // 「預覽差異 → 逐行勾選 → 套用」。原本嗰句「暫時請用選單」已經拆走。
   // 完整嘅斷言喺 tests/hwcas_web_apply.test.js；呢度只確認入口存在，
   // 同埋「預設全部不勾」呢句一定要留喺畫面上。
-  check('★★★★ HWCAS 補電郵有入口，而且畫面講明預設不勾',
-    /button\('從出席系統補電郵', \(\) => openHwcas\(\), 'secondary'\)/.test(zone3)
+  check('★★★★ 出席系統連結有入口（進階與診斷），而且畫面講明預設不勾',
+    /zone4Row\('出席系統連結'/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone4.html'), 'utf8'))
     && zone3.indexOf('預設全部不勾') !== -1);
-  check('★★★★★ 別名畫面有講「名字相似不代表是同一個人」',
-    zone3.indexOf('名字相似不代表是同一個人。') !== -1);
+  check('★★★★★ 同名多人：後端講明「名字相似不代表是同一個人」',
+    fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppHwcas.gs'), 'utf8').indexOf('名字相似不代表是同一個人') !== -1);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
