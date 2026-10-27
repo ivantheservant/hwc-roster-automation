@@ -416,8 +416,12 @@
         return;
       }
       if (r.noChanges) {
-        openModal('變動的人', [para('和上一次寄出的版本比較，沒有人的安排改過。')],
-          [button('知道了', () => closeModal(), '')]);
+        // 第八十四輪批次 KE 組：有電郵嘅人冇改動，但冇電郵嘅人有改動 ⇒ 都要講
+        const noEmail = r.noEmailChanged || [];
+        openModal('變動的人', [para(noEmail.length > 0
+          ? '和上一次寄出的版本比較，有電郵的人的安排都沒有改過。' : '和上一次寄出的版本比較，沒有人的安排改過。')]
+          .concat(noEmail.length > 0 ? [noEmailChangedSection(noEmail)] : []),
+        [button('知道了', () => closeModal(), '')]);
         return;
       }
       sendPool_ = (r.people || []).map((p) => ({
@@ -431,6 +435,29 @@
       sendOptions_.recipientScope = 'PICK';
       drawSendMain(s);
     });
+  }
+
+  /**
+   * 第八十四輪批次 KE 組：「這幾位的安排有改動，但沒有電郵，請另外通知」——〔變動的人〕寄出窗同完成窗共用。
+   * 逐個寫名字同改動（原本／現在）。唔改變寄給誰同人數。
+   * @param {Object[]} list 後端 `listChangedPeopleWithoutEmail_()` 嘅結果
+   * @returns {Node}
+   */
+  function noEmailChangedSection(list) {
+    const box = make('div', { className: 'sec sec-warn' }, [
+      sectionTitle('這幾位的安排有改動，但沒有電郵，請另外通知（' + list.length + ' 位）')
+    ]);
+    list.forEach((p) => {
+      const row = make('div', { className: 'vio-row' });
+      row.appendChild(make('div', { text: p.nameTC, className: 'strong' }));
+      row.appendChild(make('div', {
+        text: '　原本：' + (p.previousSummary || '（上次的安排沒有記錄）') + '／現在：' + (p.currentSummary || '這一季沒有安排'),
+        className: 'muted'
+      }));
+      box.appendChild(row);
+    });
+    box.appendChild(make('div', { text: '可以用第 4 步「要印紙本的人」印給他們。', className: 'muted' }));
+    return box;
   }
 
   /** 第七十七輪批次 EE 組：〔變動的人〕逐個列出會收到嘅人同改動（「原本／現在」）。 */
@@ -538,7 +565,10 @@
           className: 'muted'
         }));
       }
-      (d.people || []).forEach((p) => whoBox.appendChild(changedPersonLine(p)));
+      // 第八十四輪批次 KE 組：冇電郵嘅人改喺下面「請另外通知」一段列（唔重覆）
+      (d.people || []).filter((p) => p.hasEmail || (d.noEmailChanged || []).length === 0)
+        .forEach((p) => whoBox.appendChild(changedPersonLine(p)));
+      if ((d.noEmailChanged || []).length > 0) whoBox.appendChild(noEmailChangedSection(d.noEmailChanged));
       if (d.notReceivedCount > 0) {
         whoBox.appendChild(make('div', {
           text: '另外 ' + d.notReceivedCount + ' 位上一次沒有收到，這裡不會寄給他們——要用〔選擇其他〕或「補寄未收到的人」。',

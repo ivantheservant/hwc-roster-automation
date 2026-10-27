@@ -564,10 +564,13 @@ function apiGetSendChangedRecipients(quarterId) {
     });
     const notReceived = (plan.changed || []).filter(function (c) { return !c.arrangementChanged; });
     const lastSent = findLastSentSnapshot_(quarterId);
+    // 第八十四輪批次 KE 組：安排有改動但冇電郵嘅人（例如被換走嗰位）——唔改變寄給誰同人數，只係提醒另外通知
+    const noEmailChanged = listChangedPeopleWithoutEmail_(quarterId, plan, people);
     return {
       ok: true,
       versionNo: plan.versionNo,
       noChanges: people.length === 0,
+      noEmailChanged: noEmailChanged,
       people: people,
       pickedKeys: people.filter(function (p) { return p.hasEmail; }).map(function (p) { return p.personId; }),
       noEmailNames: people.filter(function (p) { return !p.hasEmail; }).map(function (p) { return p.nameTC; }),
@@ -582,6 +585,59 @@ function apiGetSendChangedRecipients(quarterId) {
   } finally {
     endSheetReadMemo_();
   }
+}
+
+/**
+ * 第八十四輪批次 KE 組：**安排有改動、但冇電郵**嘅人——〔變動的人〕寄出窗同完成窗嘅「請另外通知」一段。
+ *
+ * 現場（第八十三輪 G21）：第 12 週讀經原本嗰位被換走，但佢冇電郵——上一次正式發出時佢唔喺收件名單
+ *（冇電郵勾唔到），`SendLog` 冇佢嘅 hash，於是 `computeResendDiff_()` 當佢「上一次沒有收到」，
+ * 〔變動的人〕完全冇提佢。
+ *
+ * 比較基準＝上一次正式發出／改動後重發嗰一版（`readResendBaseline_()`，同〔變動的人〕同一個基準）：
+ * 嗰一版同而家呢一版，佢嘅安排（日期＋崗位＋位置）唔同 ⇒ 列入。改動名單入面本身冇電郵嘅人都一併列入。
+ * 臨時幫手冇 PersonID，唔會出現。**唔改變寄給誰同人數**。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {Object} plan `planResendChangedPersons_()` 嘅結果（要 `context`）
+ * @param {Object[]} people 〔變動的人〕名單（`apiGetSendChangedRecipients` 嘅 `people`）
+ * @returns {Object[]} 每項 {personId, nameTC, previousSummary, currentSummary}，按 PersonID 排
+ */
+function listChangedPeopleWithoutEmail_(quarterId, plan, people) {
+  const context = plan.context || {};
+  const peopleById = context.peopleById || {};
+  const hasEmail = function (id) { return !!(peopleById[id] && peopleById[id].email); };
+  const nameOf = function (id) { return peopleById[id] ? peopleById[id].nameTC : id; };
+  const summaryOf = function (list) {
+    return list.length > 0 ? buildAssignmentSummary_(list, context.postNames, context.timezone) : '這一季沒有安排';
+  };
+  const out = {};
+  const baseline = context.resendBaseline || null;
+  if (baseline) {
+    const A = COLUMNS.ROSTER_ASSIGNMENTS;
+    const before = groupAssignmentsByPerson_(readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+      return row[A.QUARTER_ID] === quarterId && Number(row[A.VERSION_NO]) === baseline.versionNo;
+    }).map(function (row) {
+      return { serviceDate: toDateString(row[A.SERVICE_DATE], context.timezone), postId: row[A.POST_ID],
+        slotIndex: Number(row[A.SLOT_INDEX]), personId: row[A.PERSON_ID] };
+    }));
+    const now = context.assignmentsByPerson || {};
+    const ids = {};
+    Object.keys(before).concat(Object.keys(now)).forEach(function (id) { ids[id] = true; });
+    Object.keys(ids).forEach(function (id) {
+      if (hasEmail(id)) return;
+      const prev = before[id] || [];
+      const cur = now[id] || [];
+      if (computeAssignmentHash_(prev) === computeAssignmentHash_(cur)) return;
+      out[id] = { personId: id, nameTC: nameOf(id), previousSummary: summaryOf(prev), currentSummary: summaryOf(cur) };
+    });
+  }
+  (people || []).forEach(function (p) {
+    if (p.hasEmail || out[p.personId]) return;
+    out[p.personId] = { personId: p.personId, nameTC: p.nameTC, previousSummary: p.previousSummary || '',
+      currentSummary: p.hasAssignments ? (p.currentSummary || '') : '這一季沒有安排' };
+  });
+  return Object.keys(out).sort().map(function (id) { return out[id]; });
 }
 
 /**

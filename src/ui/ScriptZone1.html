@@ -2002,6 +2002,11 @@
       });
       doneNodes.push(box);
     }
+    // 第八十四輪批次 KE 組：〔變動的人〕完成窗同寄出窗一樣列出「有改動但沒有電郵」嘅人
+    if (typeof sendMode_ !== 'undefined' && sendMode_ === 'CHANGED' && sendModeData_
+        && (sendModeData_.noEmailChanged || []).length > 0) {
+      doneNodes.push(noEmailChangedSection(sendModeData_.noEmailChanged));
+    }
     // 第六十三輪批次 A 組
     if (result.publicLinkRepublished) {
       doneNodes.push(make('div', { text: '寄出之前，系統已經自動把公開連結更新到最新內容。', className: 'ok-line' }));

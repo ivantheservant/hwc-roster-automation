@@ -8423,6 +8423,46 @@ const MUTATIONS = [
     find: "    if (extra > 0) bits.push((bits.length > 0 ? '另外 ' : '') + extra + ' 個電郵地址');",
     replace: "    if (extra > 0) bits.push((bits.length > 0 ? '另外' : '') + '自訂 ' + extra + ' 個地址');",
     tests: ["tests/round84_kd_pick_other_wording.test.js"]
+  },
+  {
+    id: "ke-api-no-list",
+    why: "冇電郵嘅改動冇回傳",
+    file: "src/WebAppSendPlan.gs",
+    find: "      noEmailChanged: noEmailChanged,",
+    replace: "      noEmailChanged: [],",
+    tests: ["tests/round84_ke_changed_no_email.test.js"]
+  },
+  {
+    id: "ke-skip-baseline",
+    why: "唔同基準版本比較",
+    file: "src/WebAppSendPlan.gs",
+    find: "  const baseline = context.resendBaseline || null;\n  if (baseline) {\n    const A = COLUMNS.ROSTER_ASSIGNMENTS;",
+    replace: "  const baseline = context.resendBaseline || null;\n  if (false) {\n    const A = COLUMNS.ROSTER_ASSIGNMENTS;",
+    tests: ["tests/round84_ke_changed_no_email.test.js"]
+  },
+  {
+    id: "ke-includes-email",
+    why: "有電郵嘅人都列入",
+    file: "src/WebAppSendPlan.gs",
+    find: "      if (hasEmail(id)) return;\n      const prev = before[id] || [];",
+    replace: "      const prev = before[id] || [];",
+    tests: ["tests/round84_ke_changed_no_email.test.js"]
+  },
+  {
+    id: "ke-ui-send-none",
+    why: "寄出窗冇請另外通知",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      if ((d.noEmailChanged || []).length > 0) whoBox.appendChild(noEmailChangedSection(d.noEmailChanged));\n",
+    replace: "",
+    tests: ["tests/round84_ke_changed_no_email.test.js"]
+  },
+  {
+    id: "ke-ui-done-none",
+    why: "完成窗冇請另外通知",
+    file: "src/ui/ScriptZone1.html",
+    find: "    if (typeof sendMode_ !== 'undefined' && sendMode_ === 'CHANGED' && sendModeData_",
+    replace: "    if (typeof sendMode_ !== 'undefined' && sendMode_ === 'NEVER' && sendModeData_",
+    tests: ["tests/round84_ke_changed_no_email.test.js"]
   }
 ];
 
