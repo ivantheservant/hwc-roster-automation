@@ -379,17 +379,24 @@
     });
   }
 
-  /** 第八十二輪批次 IG 組：〔寄給堂委／執事〕嘅收件人摘要（每組幾多位、包唔包你自己）。 */
-  function committeeSummaryLines(d) {
+  /**
+   * 第八十三輪批次 JD 組：〔寄給堂委／執事〕嘅摘要句——**只按組別寫**。
+   * 之前用通用嘅 `describeSendSelection()`，寫出「職事表上全部人 7 位、另外堂委 1 位……」，
+   * 但審閱本根本唔係寄畀職事表上全部人。
+   * @param {Object} d `apiGetSendCommitteeRecipients` 嘅結果
+   * @param {number} total 這一次會寄給幾多位（勾咗嘅＋自訂地址）
+   * @returns {string}
+   */
+  function committeeSummarySentence(d, total) {
     const c = d.counts || {};
-    const lines = [
-      '堂委 ' + (c.COMMITTEE || 0) + ' 位、執事 ' + (c.DEACON || 0) + ' 位、IT ' + (c.IT || 0) + ' 位、幹事 '
-        + (c.CLERK || 0) + ' 位、固定收件人 ' + (c.FIXED || 0) + ' 個（同一個人只寄一次）'
-    ];
-    if (d.selfEmail) {
-      lines.push(d.selfInPool ? '你自己（' + d.selfEmail + '）已經在上面的名單內。'
-        : '另外寄一份給你自己（' + d.selfEmail + '）。');
-    }
+    return '這一次會寄給 ' + total + ' 位：堂委 ' + (c.COMMITTEE || 0) + ' 位、執事 ' + (c.DEACON || 0)
+      + ' 位、IT ' + (c.IT || 0) + ' 位、幹事 ' + (c.CLERK || 0) + ' 位、固定收件人 ' + (c.FIXED || 0) + ' 個'
+      + (d.selfEmail ? '、你自己' : '') + '（同一個人只寄一次）。';
+  }
+
+  /** 第八十二輪批次 IG 組：〔寄給堂委／執事〕摘要句之下嘅補充（沒有電郵的人）。 */
+  function committeeSummaryLines(d) {
+    const lines = [];
     if ((d.noEmailNames || []).length > 0) {
       lines.push('另外 ' + d.noEmailNames.length + ' 位沒有電郵，收不到：' + d.noEmailNames.join('、'));
     }
@@ -504,7 +511,10 @@
     // 第七十七輪批次 EE 組：〔給所有人〕〔變動的人〕只顯示後端算好嘅名單，**冇**〔選擇收件人〕、**冇**自行輸入電郵。
     const whoBox = make('div', { className: 'sec' }, [sectionTitle('寄給誰')]);
     whoBox.appendChild(make('div', {
-      text: describeSendSelection(),
+      text: sendMode_ === 'COMMITTEE'
+        ? committeeSummarySentence(sendModeData_ || {},
+          (sendOptions_.pickedKeys || []).length + (sendOptions_.extraEmails || []).length)
+        : describeSendSelection(),
       className: (sendOptions_.pickedKeys || []).length === 0
         && (sendOptions_.extraEmails || []).length === 0
         ? 'vio-row' : 'ok-line strong'
@@ -618,7 +628,8 @@
     // ── 喺 REQUESTS_APPLIED 嗰一步，「再寄一次審閱本」仍然做得到 ──
     const actions = [];
     // 第八十二輪批次 IG 組：寄審閱本有自己一粒〔寄給堂委／執事〕，〔給所有人〕嗰個窗唔再夾「改為再寄一次審閱本」
-    if (s.alsoReview && sendMode_ !== 'ALL') {
+    // 第八十三輪批次 JD 組：只留喺〔選擇其他〕；後端 `alsoReview` 只喺呢一季真係寄過審閱本先係 true
+    if (s.alsoReview && sendMode_ === 'PICK') {
       actions.push(button('改為再寄一次審閱本', () => { closeModal(); openReviewSameBatch(); }, 'secondary'));
     }
 

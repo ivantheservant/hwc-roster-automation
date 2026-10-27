@@ -190,8 +190,8 @@ function apiStep2Preview(quarterId, sendOptions) {
   // 唔傳嘅話，事前講嘅收件人數同真正寄嘅唔同——
   // 而現場就係「會寄給這 3 位」對住「模擬 9 封」。
   const plan = planStep2_(quarterId, sendOptions);
-  // 第七十五輪批次 CJ 組
-  plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);
+  // 第七十五輪批次 CJ 組；第八十三輪批次 JD 組：審閱本只由審閱名單計
+  plan.unreachable = buildReviewUnreachablePeople_(quarterId);
   // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 確認窗講一句
   plan.hwcasNotice = readHwcasNoticeForSend_();
   return plan;
@@ -287,8 +287,8 @@ function apiStep2Confirm_locked_(quarterId, sendOptions) {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf,
     publicLinkRepublished: !!result.publicLinkRepublished,
-    // 第七十五輪批次 CJ 組：完成窗同樣列出
-    unreachable: buildUnreachablePeople_(quarterId, null)
+    // 第七十五輪批次 CJ 組：完成窗同樣列出；第八十三輪批次 JD 組：審閱本只由審閱名單計
+    unreachable: buildReviewUnreachablePeople_(quarterId)
   };
 }
 
@@ -813,6 +813,28 @@ function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
  *   ・冇 PersonID 嘅名，喺**人手填**嘅崗位（例如外請講員）⇒ 唔列名，只數有幾個
  * 崗位由 `Posts` 欄判斷，唔寫死崗位。讀唔到 ⇒ `error`，畫面講「查不到」，唔可以當「全部收到」。
  */
+
+/**
+ * 第八十三輪批次 JD 組：審閱本嘅「這幾位收不到電郵」——**只由審閱名單計**（堂委、執事、IT、幹事、
+ * 固定收件人入面冇電郵嘅人）。之前用咗職事表嗰一份（`buildUnreachablePeople_()`），列出一班根本唔喺
+ * 審閱名單上嘅人（同臨時幫手）。形狀同 `buildUnreachablePeople_()` 一樣，前端共用一支畫法。
+ * @param {string} quarterId 季度 ID
+ * @returns {{people: Object[], externalNameCount: number, error: string}}
+ */
+function buildReviewUnreachablePeople_(quarterId) {
+  const out = { people: [], externalNameCount: 0, error: '' };
+  try {
+    const snap = buildSendPoolSnapshot_(quarterId, SEND_KIND.REVIEW);
+    if (!snap.ok) throw new Error(snap.message || '讀不到審閱名單');
+    out.people = filterReviewScope_(snap.pool).filter(function (item) {
+      return item.type === RECIPIENT_TYPE.PERSON && !item.hasEmail;
+    }).map(function (item) { return { name: item.displayName, reason: '沒有電郵' }; });
+  } catch (err) {
+    log_('WARN', 'buildReviewUnreachablePeople_ 失敗：' + err.message);
+    out.error = err.message;
+  }
+  return out;
+}
 
 /**
  * @param {string} quarterId 季度 ID

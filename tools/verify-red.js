@@ -6434,7 +6434,7 @@ const MUTATIONS = [
     id: "cj-preview-no-data",
     why: "寄給堂委審閱預覽冇帶收不到電郵資料",
     file: "src/WebAppFlow.gs",
-    find: "  plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);",
+    find: "  plan.unreachable = buildReviewUnreachablePeople_(quarterId);",
     replace: "",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
@@ -7786,8 +7786,8 @@ const MUTATIONS = [
     id: "ig-no-deacon",
     why: "寄給堂委／執事漏咗執事",
     file: "src/WebAppSendPlan.gs",
-    find: "    const wanted = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];",
-    replace: "    const wanted = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];",
+    find: "const REVIEW_SCOPE_SOURCES_ = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];",
+    replace: "const REVIEW_SCOPE_SOURCES_ = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];",
     tests: ["tests/round82_ig_send_buttons.test.js"]
   },
   {
@@ -8119,6 +8119,62 @@ const MUTATIONS = [
     find: "    if (typeof setSaveButtonRunning === 'function') setSaveButtonRunning(true);",
     replace: "",
     tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jd-preview-roster",
+    why: "審閱預覽用職事表名單",
+    file: "src/WebAppFlow.gs",
+    find: "  plan.unreachable = buildReviewUnreachablePeople_(quarterId);",
+    replace: "  plan.unreachable = buildUnreachablePeople_(quarterId, plan.versionNo);",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jd-done-roster",
+    why: "審閱完成窗用職事表名單",
+    file: "src/WebAppFlow.gs",
+    find: "    unreachable: buildReviewUnreachablePeople_(quarterId)\n",
+    replace: "    unreachable: buildUnreachablePeople_(quarterId, null)\n",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jd-scope-no-filter",
+    why: "審閱收不到電郵唔篩範圍",
+    file: "src/WebAppFlow.gs",
+    find: "    out.people = filterReviewScope_(snap.pool).filter(function (item) {",
+    replace: "    out.people = snap.pool.filter(function (item) {",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jd-also-review-any",
+    why: "未寄過都出再寄審閱本",
+    file: "src/WebAppSendPlan.gs",
+    find: "      && !!(buttons.review && buttons.review.enabled) && reviewSentBefore;",
+    replace: "      && !!(buttons.review && buttons.review.enabled);",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jd-btn-any-mode",
+    why: "堂委窗都出再寄審閱本",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "    if (s.alsoReview && sendMode_ === 'PICK') {",
+    replace: "    if (s.alsoReview && sendMode_ !== 'ALL') {",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jd-sentence-generic",
+    why: "堂委窗用通用摘要句",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      text: sendMode_ === 'COMMITTEE'\n        ? committeeSummarySentence(",
+    replace: "      text: false\n        ? committeeSummarySentence(",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jd-sentence-roster",
+    why: "摘要句寫職事表上全部人",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "    return '這一次會寄給 ' + total + ' 位：堂委 '",
+    replace: "    return '這一次會寄給 ' + total + ' 位：職事表上全部人 0 位、堂委 '",
+    tests: ["tests/round83_jd_review_dialog.test.js"]
   }
 ];
 

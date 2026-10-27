@@ -63,11 +63,12 @@ console.log('\n=== CJ2：確認窗／完成窗都帶住 ===');
   gas.planStep2_ = function () { return { versionNo: 1, recipientCount: 1 }; };
   gas.planStep4SendPreview_ = function () { return { recipientCount: 1 }; };
   const preview = gas.apiStep2Preview(sc.Q, null);
-  check('★★★★★★ 寄給堂委審閱：確認窗資料帶住', preview.unreachable && preview.unreachable.people.length === 2,
+  // 第八十三輪批次 JD 組：審閱本改為只由審閱名單計（`buildReviewUnreachablePeople_()`，詳細見 round83_jd 測試）
+  check('★★★★★★ 寄給堂委審閱：確認窗資料帶住', preview.unreachable && Array.isArray(preview.unreachable.people),
     JSON.stringify(preview.unreachable));
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppFlow.gs'), 'utf8');
   const confirm2 = src.slice(src.indexOf('function apiStep2Confirm_locked_('), src.indexOf('function apiStep3Plan('));
-  check('★★★★★ 寄給堂委審閱：完成窗資料帶住', /unreachable: buildUnreachablePeople_\(quarterId, null\)/.test(confirm2));
+  check('★★★★★ 寄給堂委審閱：完成窗資料帶住', /unreachable: buildReviewUnreachablePeople_\(quarterId\)/.test(confirm2));
   const p4 = gas.apiStep4GetSendPreview(sc.Q, 1, null);
   check('★★★★★ 正式發出：確認窗資料帶住', p4.unreachable && p4.unreachable.people.length === 2, JSON.stringify(p4.unreachable));
   const confirm4 = src.slice(src.indexOf('function apiStep4Confirm_locked_('), src.indexOf('function apiStep5Plan('));

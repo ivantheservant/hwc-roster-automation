@@ -461,16 +461,28 @@ function apiGetSendAllRecipients(quarterId, kind) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} `{ok, versionNo, pickedKeys, extraEmails, items, groups, counts, selfEmail, selfInPool, noEmailNames}`
  */
+/** 第八十二輪批次 IG 組：〔寄給堂委／執事〕（審閱本）嘅收件範圍。 */
+const REVIEW_SCOPE_SOURCES_ = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];
+
+/**
+ * 收件池入面屬於審閱本範圍嘅項目。
+ * @param {Object[]} pool `buildSendPoolSnapshot_()` 嘅 `pool`
+ * @returns {Object[]}
+ */
+function filterReviewScope_(pool) {
+  return (pool || []).filter(function (item) {
+    return REVIEW_SCOPE_SOURCES_.some(function (src) { return (item.sources || []).indexOf(src) !== -1; });
+  });
+}
+
 function apiGetSendCommitteeRecipients(quarterId) {
   assertWebAppRequestAllowed_();
   beginSheetReadMemo_();
   try {
     const snap = buildSendPoolSnapshot_(quarterId, SEND_KIND.REVIEW);
     if (!snap.ok) return snap;
-    const wanted = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];
-    const inScope = snap.pool.filter(function (item) {
-      return wanted.some(function (src) { return item.sources.indexOf(src) !== -1; });
-    });
+    const wanted = REVIEW_SCOPE_SOURCES_;
+    const inScope = filterReviewScope_(snap.pool);
     const counts = {};
     wanted.forEach(function (src) {
       counts[src] = inScope.filter(function (item) { return item.sources.indexOf(src) !== -1 && item.selectable !== false; }).length;
@@ -830,8 +842,12 @@ function apiGetSendPlanSummary(quarterId) {
     }
 
     // 在 REQUESTS_APPLIED 那一步，「再寄一次審閱本」仍然做得到。
+    // 第八十三輪批次 JD 組：只喺呢一季**真係寄過**審閱本先有「再寄一次」（前端只喺〔選擇其他〕顯示）
+    const reviewSentBefore = listSendHistory_(quarterId).some(function (b) {
+      return b.stage === MAIL_STAGES.REVIEW && b.sent > 0;
+    });
     const alsoReview = kind === SEND_KIND.OFFICIAL
-      && !!(buttons.review && buttons.review.enabled);
+      && !!(buttons.review && buttons.review.enabled) && reviewSentBefore;
 
     // 第四十輪批次 A 組：三個選項嘅**預設值**。
     //
