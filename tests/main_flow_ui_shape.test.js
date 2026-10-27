@@ -223,7 +223,8 @@ console.log('\n=== 載入次序：新檔案一定要喺 ScriptZone1 之後、Scr
 console.log('\n=== B【核心】字要夠大 ===');
 {
   check('★★★★★ 內文基準至少 16px（Ivan 明講過讀唔到）',
-    /font-size: 16px;/.test(style), '');
+    // 第八十二輪 IE 組起內文用 var(--fs-body)，三級最細（標準）都是 16px
+    /font-size: var\(--fs-body\);/.test(style) && /--fs-body: 16px;/.test(style) && /--fs-body: 18px;/.test(style), '');
   check('★★★★★ 有一個一致嘅字級尺度（唔係逐個位寫死一個數字）',
     /--fs-md:/.test(style) && /--fs-xl:/.test(style) && /--fs-2xl:/.test(style));
   check('★★★★★ **唔用 `zoom`**'

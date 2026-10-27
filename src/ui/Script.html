@@ -2272,4 +2272,35 @@
       callServerMutating('apiSetThemePreference', next).catch(() => {});
     });
   }
+
+  // ── 第八十二輪批次 IE 組：字體三級（標準／大／特大）──────────────
+  // 只記在這部電腦的瀏覽器（localStorage）。讀不到、寫不到都不可以令介面出錯：
+  // 讀不到就用預設「大」，寫不到就只限這一次打開有效。字號本身全在 Style.html 的 CSS 變數。
+  const FONT_SIZE_STORAGE_KEY = 'hwcRosterFontSize';
+  const FONT_SIZE_LEVELS = ['standard', 'large', 'xlarge'];
+  const FONT_SIZE_DEFAULT = 'large';
+
+  function normaliseFontSizeLevel(level) {
+    return FONT_SIZE_LEVELS.indexOf(level) >= 0 ? level : FONT_SIZE_DEFAULT;
+  }
+  function readStoredFontSize() {
+    try { return normaliseFontSizeLevel(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY)); }
+    catch (e) { return FONT_SIZE_DEFAULT; }
+  }
+  function applyFontSize(level) {
+    const lv = normaliseFontSizeLevel(level);
+    document.documentElement.setAttribute('data-font', lv);
+    const sel = el('fontSizeSelect');
+    if (sel) sel.value = lv;
+    return lv;
+  }
+  function initFontSizePicker() {
+    applyFontSize(readStoredFontSize());
+    const sel = el('fontSizeSelect');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+      const lv = applyFontSize(sel.value);
+      try { window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, lv); } catch (e) { /* 記不住：只限這一次打開 */ }
+    });
+  }
 </script>

@@ -34,10 +34,12 @@
     color: var(--fg);
     background: var(--bg);
     line-height: 1.75;
-    font-size: 16px;
+    font-size: var(--fs-body);
+    /* 第八十二輪批次 IE 組：字大到一行放不下時，長字（網址、電郵）也要斷行，不可以撐出橫向捲動 */
+    overflow-wrap: anywhere;
   }
 
-  h1 { font-size: 24px; margin: 0; }
+  h1 { font-size: var(--fs-h1); margin: 0; }
 
   /* ── 頂部 ─────────────────────────────────────────────── */
   .topbar {
@@ -47,8 +49,8 @@
     border-bottom: 1px solid var(--border);
   }
   .quarter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
-  .quarter-row label { font-size: 13px; color: var(--muted); }
-  .topbar-actions { display: flex; gap: 8px; }
+  .quarter-row label { font-size: var(--fs-hint); color: var(--muted); }
+  .topbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
   select, input[type=text] {
     font: inherit; padding: 6px 10px;
@@ -56,6 +58,7 @@
     background: var(--card); color: var(--fg);
   }
   input[type=text] { min-width: 140px; }
+  select, input[type=text], textarea { max-width: 100%; }
 
   button {
     font: inherit; padding: 7px 14px; border-radius: 6px;
@@ -73,7 +76,7 @@
   }
   button.chip {
     background: var(--card-off); color: var(--fg); border: 1px solid var(--border);
-    font-size: 12px; padding: 2px 8px; border-radius: 999px; margin: 0 4px 4px 0;
+    font-size: var(--fs-note); padding: 2px 8px; border-radius: 999px; margin: 0 4px 4px 0;
   }
   /* 第二十五輪批次階段 B5：禁用掣唔可以只靠透明度。
      藍底掣半透明之後仍然係藍色，喺非技術使用者眼中「淺藍」同「藍」
@@ -90,7 +93,7 @@
   }
 
   .badge {
-    font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    font-size: var(--fs-note); padding: 3px 10px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--card);
   }
   .badge-dryrun {
@@ -98,7 +101,7 @@
   }
   .badge.inline { display: inline-block; margin-top: 8px; }
 
-  .status { min-height: 20px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .status { min-height: 20px; font-size: var(--fs-hint); color: var(--muted); margin-bottom: 10px; }
   .status.error { color: var(--danger); }
 
   /* ────────────────────────────────────────────────────────
@@ -125,38 +128,38 @@
     border: 1px solid var(--border); border-left: 4px solid var(--accent);
     border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; background: var(--card);
   }
-  .statuscard-title { font-size: 16px; font-weight: 600; }
-  .statuscard-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .statuscard-title { font-size: var(--fs-body); font-weight: 600; }
+  .statuscard-sub { font-size: var(--fs-note); color: var(--muted); margin-top: 4px; }
 
   /* ── 四區 ─────────────────────────────────────────────── */
   .zone { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
   .zone-primary { border-color: var(--accent); }
   .zone-head {
-    width: 100%; display: flex; align-items: center; gap: 10px;
+    width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
     padding: 10px 14px; background: var(--card-off); border: none;
     color: var(--fg); cursor: pointer; text-align: left; border-radius: 0;
   }
   .zone-head.static { cursor: default; }
-  .zone-title { font-weight: 600; font-size: 14px; flex: 1; }
-  .zone-count { font-size: 12px; }
+  .zone-title { font-weight: 600; font-size: var(--fs-body2); flex: 1; }
+  .zone-count { font-size: var(--fs-note); }
   .zone-count.warn { color: #a15c00; font-weight: 600; }
   .zone-count.ok { color: var(--ok); }
-  .zone-caret { color: var(--muted); font-size: 12px; }
+  .zone-caret { color: var(--muted); font-size: var(--fs-note); }
   .zone-body { padding: 12px 14px; }
   .zone-body[hidden] { display: none; }
 
   /* ── 區一：一粒掣一張卡 ───────────────────────────────── */
   .act {
-    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;
     padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
     margin-bottom: 10px; background: var(--card);
   }
   .act-off { background: var(--card-off); }
   .act-on { border-color: var(--accent); }
-  .act-main { flex: 1; min-width: 0; }
-  .act-name { font-weight: 600; font-size: 15px; }
-  .act-desc { font-size: 13px; color: var(--muted); margin-top: 3px; }
-  .act-why { font-size: 12px; color: #a15c00; margin-top: 5px; }
+  .act-main { flex: 1 1 16em; min-width: 0; }
+  .act-name { font-weight: 600; font-size: var(--fs-name); }
+  .act-desc { font-size: var(--fs-hint); color: var(--muted); margin-top: 3px; }
+  .act-why { font-size: var(--fs-note); color: #a15c00; margin-top: 5px; }
 
   /* ── 彈窗 ─────────────────────────────────────────────── */
   .modal-backdrop {
@@ -171,7 +174,7 @@
     max-height: calc(100vh - 60px);
   }
   .modal-title {
-    font-size: 17px; font-weight: 600; padding: 16px 20px 10px;
+    font-size: var(--fs-title); font-weight: 600; padding: 16px 20px 10px;
     border-bottom: 1px solid var(--border);
   }
   .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
@@ -179,7 +182,7 @@
      佢出現嘅時候，幹事啱啱撳完一粒掣而件事冇發生，要一眼睇得到。 */
   .modal-status {
     margin: 0 20px 12px; padding: 10px 12px; border-radius: 6px;
-    font-size: 14px; line-height: 1.5; font-weight: 600;
+    font-size: var(--fs-body2); line-height: 1.5; font-weight: 600;
     /* 錯誤用紅（`--danger`），唔用琥珀——琥珀喺呢個專案係
        「對唔上名單但唔一定係錯」嗰種，而呢度係「你撳咗，件事冇發生」。 */
     background: var(--warn-bg); color: var(--danger);
@@ -193,7 +196,7 @@
      ⚠️ **唔可以**用 `.ok-head` 嗰隻綠——幹事見到綠色就會走去印，
      而封信根本未寄出。 */
   .warn-head {
-    font-size: 16px; font-weight: 600; color: var(--danger); margin-bottom: 6px;
+    font-size: var(--fs-body); font-weight: 600; color: var(--danger); margin-bottom: 6px;
   }
   .modal-actions {
     padding: 12px 20px; border-top: 1px solid var(--border);
@@ -201,22 +204,22 @@
   }
 
   /* ── 內容元件 ─────────────────────────────────────────── */
-  .lines { font-size: 14px; margin: 0 0 12px; white-space: pre-wrap; }
-  .muted { font-size: 13px; color: var(--muted); }
+  .lines { font-size: var(--fs-body2); margin: 0 0 12px; white-space: pre-wrap; }
+  .muted { font-size: var(--fs-hint); color: var(--muted); }
   .sec { margin: 14px 0; }
-  .sec-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .sec-title { font-weight: 600; font-size: var(--fs-body2); margin-bottom: 6px; }
   .sec-warn { border-left: 3px solid var(--warn-border); padding-left: 10px; }
   .sec-summary { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
   .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
   .row-right { justify-content: flex-end; }
 
-  .vio { border-left: 3px solid var(--border); padding: 8px 12px; margin: 10px 0; font-size: 13px; }
+  .vio { border-left: 3px solid var(--border); padding: 8px 12px; margin: 10px 0; font-size: var(--fs-hint); }
   .vio-hard { border-color: var(--danger); background: #fce8e611; }
   .vio-warn { border-color: var(--warn-border); background: #fff8e111; }
   .vio-info { border-color: var(--accent); background: #e8f0fe11; }
   .vio-head { font-weight: 600; margin-bottom: 4px; }
-  .vio-row { padding: 2px 0; font-size: 13px; }
-  .ok-line { font-size: 14px; padding: 3px 0; }
+  .vio-row { padding: 2px 0; font-size: var(--fs-hint); }
+  .ok-line { font-size: var(--fs-body2); padding: 3px 0; }
   .ok-line.strong { font-weight: 600; }
 
   .warnbox {
@@ -226,32 +229,32 @@
   :root[data-theme="dark"] .warnbox { background: #3a2f10; }
 
   .err-part { margin-bottom: 12px; }
-  .err-label { font-weight: 600; font-size: 13px; color: var(--muted); }
-  .err-text { font-size: 14px; white-space: pre-wrap; }
-  .err-list { margin: 4px 0 0; padding-left: 22px; font-size: 14px; }
+  .err-label { font-weight: 600; font-size: var(--fs-hint); color: var(--muted); }
+  .err-text { font-size: var(--fs-body2); white-space: pre-wrap; }
+  .err-list { margin: 4px 0 0; padding-left: 22px; font-size: var(--fs-body2); }
   .err-list li { margin: 3px 0; }
 
   .tech { margin-top: 14px; }
   .tech-pre {
     background: var(--card-off); border: 1px solid var(--border); border-radius: 6px;
-    padding: 8px; font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    padding: 8px; font-size: var(--fs-note); white-space: pre-wrap; word-break: break-word;
     max-height: 200px; overflow-y: auto;
   }
 
   .prop { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
   .prop.is-off { background: var(--card-off); opacity: .75; }
   .prop.is-optional { border-style: dashed; }
-  .prop-head { font-weight: 600; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .prop-head { font-weight: 600; font-size: var(--fs-hint); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .prop-opts { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
 
   .radio-row, .check-row {
-    display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; padding: 2px 0;
+    display: flex; align-items: center; gap: 7px; font-size: var(--fs-hint); cursor: pointer; padding: 2px 0;
   }
   .check-row.inline { display: inline-flex; margin-right: 12px; }
   .radio-row.is-off { color: var(--muted); cursor: not-allowed; }
 
   .tag {
-    font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    font-size: var(--fs-tiny); padding: 1px 8px; border-radius: 999px;
     border: 1px solid var(--border); background: var(--card-off); font-weight: normal;
   }
   .tag-bad { background: #fce8e6; border-color: #f5c2bd; }
@@ -262,29 +265,29 @@
   }
 
   /* 第二十五輪批次階段 A5／A6：生成流程同常駐職事表連結 */
-  .statuscard-link { margin-top: 6px; font-size: 13px; }
+  .statuscard-link { margin-top: 6px; font-size: var(--fs-hint); }
   .sheetlink { color: var(--accent); font-weight: 600; margin-right: 6px; }
   .bigLink {
     display: inline-block; margin: 10px 0; padding: 10px 16px;
     background: var(--accent); color: #fff; border-radius: 6px;
     text-decoration: none; font-weight: 600;
   }
-  .ok-head { font-size: 16px; font-weight: 600; color: var(--ok); margin-bottom: 6px; }
+  .ok-head { font-size: var(--fs-body); font-weight: 600; color: var(--ok); margin-bottom: 6px; }
 
   /* 第二十五輪批次階段 B3：「有冇對上名單」嘅回饋。
      兩種都唔係錯誤（外請講員對唔上係正常），所以用綠／琥珀，唔用紅。 */
-  .link-ok { font-size: 13px; color: var(--ok); margin-top: 4px; }
-  .link-warn { font-size: 13px; color: var(--warn-fg); margin-top: 4px; }
+  .link-ok { font-size: var(--fs-hint); color: var(--ok); margin-top: 4px; }
+  .link-warn { font-size: var(--fs-hint); color: var(--warn-fg); margin-top: 4px; }
 
   /* 第二十五輪批次階段 E：區三名單維護 */
   .idtag {
-    font-size: 11px; color: var(--muted); background: var(--card-off);
+    font-size: var(--fs-tiny); color: var(--muted); background: var(--card-off);
     border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
   }
   .tag-bad { background: #fce8e6; border-color: #f5c2bd; color: #a1160a; }
   .check-row.inline { display: inline-flex; margin-right: 12px; }
   .prop.is-off { opacity: .6; }
-  .inp-date { max-width: 130px; }
+  .inp-date { max-width: 10em; }
 
 
   /* ══════════════════════════════════════════════════════════════
@@ -302,20 +305,48 @@
      帶 `!important` 就會同佢打架，重現第三十四輪嗰個
     「睇得見、撳得到、但會被靜靜忽略」嘅 bug。
      ────────────────────────────────────────────────────────────── */
+  /* 第八十二輪批次 IE 組：字體分三級（頁頂〔字體〕選單，記在瀏覽器；見 Script.html initFontSizePicker）。
+     Ivan：重要的提示文字要大至少一倍。所以 `:root` 本身＝「大」（預設；腳本未行到也是大），
+     `data-font="standard"`＝第八十一輪之前的字號，`data-font="xlarge"`＝特大。
+     ⚠️ 全檔一律用這些變數，不准再寫死 px 字號（tests/round82_ie_font_size.test.js 守住）。
+     ⚠️ 「大」「特大」兩級：提示、說明、按鈕下的描述（--fs-tiny 至 --fs-md）一律不可以小於內文 --fs-body。
+     代價：字大了，彈窗會變長要捲動、按鈕會換行——所以做成可以選的三級，而不是一律大一倍。 */
   :root {
-    --fs-xs: 13px;   /* 附註、機器代號 */
-    --fs-sm: 15px;   /* 次要說明 */
-    --fs-md: 16px;   /* 內文基準 */
-    --fs-lg: 18px;   /* 區塊標題、彈窗標題 */
-    --fs-xl: 21px;   /* 主流程每一步嘅標題 */
-    --fs-2xl: 26px;  /* 載入回饋、頁首 */
+    --fs-tiny: 18px;   /* 小標籤（.tag、.idtag）；標準級 11px */
+    --fs-note: 18px;   /* 附註（.statuscard-sub、.zone-count、.act-why、.badge）；標準級 12px */
+    --fs-hint: 18px;   /* 提示、說明（.muted、.act-desc、.vio-row、勾選列）；標準級 13px */
+    --fs-body2: 18px;  /* 彈窗內文、小標題；標準級 14px */
+    --fs-name: 19px;   /* 按鈕卡名稱；標準級 15px */
+    --fs-body: 18px;   /* 內文基準；標準級 16px */
+    --fs-title: 20px;  /* 彈窗標題；標準級 17px */
+    --fs-h1: 27px;     /* 頁首；標準級 24px */
+    --fs-xs: 18px;   /* 附註、機器代號；標準級 13px */
+    --fs-sm: 18px;   /* 次要說明；標準級 15px */
+    --fs-md: 18px;   /* 內文基準；標準級 16px */
+    --fs-lg: 20px;   /* 區塊標題、彈窗標題；標準級 18px */
+    --fs-xl: 23px;   /* 主流程每一步嘅標題；標準級 21px */
+    --fs-2xl: 28px;  /* 載入回饋、頁首；標準級 26px */
   }
+  :root[data-font="standard"] {
+    --fs-tiny: 11px; --fs-note: 12px; --fs-hint: 13px; --fs-body2: 14px;
+    --fs-name: 15px; --fs-body: 16px; --fs-title: 17px; --fs-h1: 24px;
+    --fs-xs: 13px; --fs-sm: 15px; --fs-md: 16px; --fs-lg: 18px; --fs-xl: 21px; --fs-2xl: 26px;
+  }
+  :root[data-font="xlarge"] {
+    --fs-tiny: 22px; --fs-note: 22px; --fs-hint: 22px; --fs-body2: 22px;
+    --fs-name: 23px; --fs-body: 22px; --fs-title: 24px; --fs-h1: 30px;
+    --fs-xs: 22px; --fs-sm: 22px; --fs-md: 22px; --fs-lg: 24px; --fs-xl: 27px; --fs-2xl: 32px;
+  }
+  /* 字大之後按鈕文字可以換行，不可以撐出畫面或者被截斷。 */
+  button { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+  .check-row input[type="checkbox"], .radio-row input[type="radio"] { width: 1em; height: 1em; flex: 0 0 auto; }
+  .font-pick { display: inline-flex; align-items: center; gap: 6px; }
 
   /* ── 主流程六步（規格 1.0，第三十九輪 A 組）────────────────
      呢一段要**明顯大過**其餘部分——幹事九成時間只會用呢六粒掣。 */
   .flow { margin-bottom: 22px; }
   .flow-head {
-    display: flex; align-items: baseline; gap: 10px;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
     margin: 0 0 12px; padding-bottom: 8px;
     border-bottom: 2px solid var(--accent);
   }
@@ -328,7 +359,7 @@
     border: 1px solid var(--border); border-radius: 10px; background: var(--card);
   }
   .step-num {
-    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+    flex: 0 0 auto; width: 1.9em; height: 1.9em; border-radius: 50%;
     background: var(--accent); color: #fff;
     font-size: var(--fs-lg); font-weight: 700;
     display: flex; align-items: center; justify-content: center;

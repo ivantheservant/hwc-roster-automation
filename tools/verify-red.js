@@ -7911,6 +7911,70 @@ const MUTATIONS = [
     find: "    if ((wt.moves || []).length > 0 || (wt.unmet || []).length > 0 || wt.error) {",
     replace: "    if (false) {",
     tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ie-hardcode-muted",
+    why: "提示字寫死 13px",
+    file: "src/ui/Style.html",
+    find: ".muted { font-size: var(--fs-hint);",
+    replace: ".muted { font-size: 13px;",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-large-hint-small",
+    why: "大級提示細過內文",
+    file: "src/ui/Style.html",
+    find: "    --fs-hint: 18px;",
+    replace: "    --fs-hint: 13px;",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-default-standard",
+    why: "預設變返標準",
+    file: "src/ui/Script.html",
+    find: "  const FONT_SIZE_DEFAULT = 'large';",
+    replace: "  const FONT_SIZE_DEFAULT = 'standard';",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-no-try-read",
+    why: "讀 localStorage 冇包 try",
+    file: "src/ui/Script.html",
+    find: "    try { return normaliseFontSizeLevel(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY)); }\n    catch (e) { return FONT_SIZE_DEFAULT; }",
+    replace: "    return normaliseFontSizeLevel(window.localStorage.getItem(FONT_SIZE_STORAGE_KEY));",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-no-save",
+    why: "轉級冇記住",
+    file: "src/ui/Script.html",
+    find: "      try { window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, lv); } catch (e) { /* 記不住：只限這一次打開 */ }",
+    replace: "",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-btn-nowrap",
+    why: "按鈕唔換行",
+    file: "src/ui/Style.html",
+    find: "  button { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }",
+    replace: "  button { white-space: nowrap; max-width: 100%; }",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-act-nowrap",
+    why: "按鈕卡唔換行",
+    file: "src/ui/Style.html",
+    find: "    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;",
+    replace: "    display: flex; align-items: center; justify-content: space-between; gap: 14px;",
+    tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ie-no-boot",
+    why: "開介面冇套用字體",
+    file: "src/ui/ScriptBoot.html",
+    find: "  initFontSizePicker();\n",
+    replace: "",
+    tests: ["tests/round82_ie_font_size.test.js"]
   }
 ];
 
