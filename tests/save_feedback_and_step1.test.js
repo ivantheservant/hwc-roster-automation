@@ -224,7 +224,9 @@ console.log('\n=== D【核心】同一格兩邊都有 ⇒ 幹事嗰批贏 ===');
 console.log('\n=== D：三個出口都真係接咗上去 ===');
 {
   check('★★★★★ 〔儲存我的修改〕（連套用申報嗰條）',
-    /savedChanges: buildSavedChangeRowsForSave_\(/.test(bare(saveGs)), '');
+    // 第八十三輪批次 JG 組：先計好（量時間）再放入回傳
+    /const savedChanges = buildSavedChangeRowsForSave_\(/.test(bare(saveGs))
+      && /savedChanges: savedChanges,/.test(bare(saveGs)), '');
   check('★★★★★ 而且申報帶嚟嗰幾格真係由比對兩個版本讀出嚟'
     + '——`resolved.changes` 只有幹事親手改嗰批，'
     + '而申報動嘅格數往往比佢自己改嘅多',

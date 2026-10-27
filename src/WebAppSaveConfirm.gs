@@ -602,10 +602,13 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
 
 function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const input = payload || {};
+  // 第八十三輪批次 JG 組：各階段計時（log ＋ 回傳 `timings`，前端寫入 console）
+  const timer = startPhaseTimer_();
 
   // ── 1　後端重新讀 Stage 同最新版本號，唔信前端 ────────────────
   // ── 2　重新跑一次 plan，比對前端送嚟嘅決定係咪仲對應同一批格 ──
   const plan = buildSaveAndConfirmPlan_(quarterId);
+  timer.mark('重新檢查（讀表、分類規則、申報）');
   if (plan.blocked) {
     throw new Error(plan.message || ('無法儲存：' + plan.blockReason));
   }
@@ -664,6 +667,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const context = buildFineTuneContext_(quarterId, plan.baseVersionNo);
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiSaveAndConfirmExecute');
+  timer.mark('讀取最新表上狀態');
 
   const hasRequests = plan.requests.apply.length > 0
     || plan.requests.confirm.length > 0
@@ -737,12 +741,14 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     // 而回退本身係一個會建立新版本嘅動作。
     return buildSaveConfirmFailureResult_(quarterId, plan.baseVersionNo, err);
   }
+  timer.mark(hasRequests ? '套用申報、建立新版本、寫派工' : '建立新版本、寫派工');
 
   // ── 第七十八輪批次 FB 組：作為起點嗰張舊表還原成佢自己嗰一版 ──
   // 有申報嗰條路 `applyRequests_()` 已經做咗（同一支），唔做兩次。
   const baseSheetRestoreFailed = requestResult
     ? (requestResult.baseSheetRestoreFailed || '')
     : restoreBaseSheetAfterNewVersion_(quarterId, plan.baseVersionNo, 'apiSaveAndConfirmExecute').failed;
+  timer.mark('還原舊版本工作表');
 
   // ── 第五十三輪批次 B 組：**放行咗就要留低痕跡。** ────────────
   //
@@ -802,10 +808,19 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const savedPostNames = {};
   readPostsNormalized().forEach(function (po) { savedPostNames[po.postId] = po.postNameTC; });
 
+  timer.mark('放行紀錄、進度');
+
   // ── 7　重新發佈公開連結 ─────────────────────────────────────
   const publish = tryPublishPublicRoster_(quarterId);
+  timer.mark('重新發佈公開連結');
+  const savedChanges = buildSavedChangeRowsForSave_(
+    quarterId, plan.baseVersionNo, created.versionNo,
+    resolved.changes, savedPostNames, hasRequests).concat(buildWeekTitleChangeRows_(titleChanges));
+  timer.mark('完成窗明細（比對兩版）');
+  log_('INFO', '儲存分段時間（' + quarterId + ' 第 ' + created.versionNo + ' 版）：' + timer.summary());
 
   return {
+    timings: timer.list(),
     ok: true,
     versionCreated: true,
     versionNo: created.versionNo,
@@ -828,9 +843,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     // `resolved.changes` 只有幹事親手改的那批；套用申報那條路動了哪幾格，
     // 這裡本來一句都沒有講——而那條路動的格數往往比他自己改的多。
     // 由「比對兩個版本」讀出來，不改 `applyRequests_()` 的寫入邏輯。
-    savedChanges: buildSavedChangeRowsForSave_(
-      quarterId, plan.baseVersionNo, created.versionNo,
-      resolved.changes, savedPostNames, hasRequests).concat(buildWeekTitleChangeRows_(titleChanges)),
+    savedChanges: savedChanges,
     // ⚠️ 第三十四輪批次甲2：呢兩個數而家由**真正套用嘅結果**出，
     // 唔再由 plan 嗰個「打算套用幾多筆」出。修正之前兩者永遠一樣，
     // 因為根本冇套用過——一個永遠自我印證嘅數字。

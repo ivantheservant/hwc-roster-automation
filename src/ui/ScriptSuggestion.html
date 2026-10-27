@@ -146,11 +146,12 @@
     // 第八十二輪批次 IB 組（Ivan 手動測試 C）：唔使先撳〔檢查我的改動〕——有未決定嘅項目
     //（未勾嘅違反規則格、名單上找不到嘅名）就先出「調整之前」視窗，用**同一個**勾選元件；冇就直接開始。
     // 由「用邊一張做起點」小窗返嚟（`from` 有值）⇒ 已經決定過，直接開始。
-    if (from) { runBuildSuggestion(from, false); return; }
-    runAction('讀取你的改動', async () => {
+    if (from) return runBuildSuggestion(from, false);
+    return runAction('讀取你的改動', async () => {
       const pre = await callServer('apiCheckMyChanges', currentQuarterId);
       if (pre && pre.ok && Number(pre.undecidedCount) > 0) { renderBeforeAdjust(pre); return; }
-      runBuildSuggestion('', true);
+      // ⚠️ 第八十三輪批次 JG 組：一定要 `return`（等埋調整先算完成），見 `runActionDepth_`
+      return runBuildSuggestion('', true);
     });
   }
 
@@ -212,7 +213,7 @@
   }
 
   function runBuildSuggestion(from, showWillHandle) {
-    runAction('系統調整中，請稍候', async () => {
+    return runAction('系統調整中，請稍候', async () => {
       // 第七十五輪批次 CF 組：「准系統調整我勾了的」拿走——系統只會調整**冇勾**「保留我的安排」嘅格，
       // 後端自己讀逐格決定。第 3 個參數照送空陣列（後端已經唔用）。
       const r = await callServerMutating(

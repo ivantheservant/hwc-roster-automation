@@ -764,7 +764,18 @@
   // 結果窗本身就係「完成」嘅回饋，處理中牌要**即刻**收。唔收嘅話佢會疊喺
   // 結果窗上面，等 finally 嘅刷新（可以成分鐘）完先消失——現場見到「寄送中，
   // 請稍候　已經 168 秒」蓋住完成窗。冇結果窗嘅動作照舊：刷新完先收（見 finally）。
+  // ⚠️ 第八十三輪批次 JG 組：仲有幾多個 `runAction()` 未完（巢狀用）。
+  //
+  // 現場（第八十二輪 Q7）：撳〔儲存〕之後 80 秒畫面冇任何變化，完成窗冇出現，其實已經存咗。
+  // 原因：〔儲存〕（`openSaveAndConfirm()` 嘅「讀取改動」）入面叫 `executeCleanSave()`，
+  // 而嗰個函式開咗**第二個** `runAction()` 但冇 `return` ⇒ 外層即刻完成：閃一下「已完成」、
+  // 收牌、解鎖——後台仲儲存緊，畫面已經可以撳；等內層完成先開完成窗，期間幹事再撳就會蓋過佢。
+  // 修法：一、呼叫端 `return`；二、呢度數住——**最後一個完成嘅動作先收牌、先解鎖、先刷新**，
+  // 將來有人再漏 `return` 都唔會再出事。
+  let runActionDepth_ = 0;
+
   async function runAction(label, action, steps) {
+    runActionDepth_++;
     setBusy(true);
     // 第三十九輪 B 組：細灰字留住（俾睇慣咗嘅人），但真正嘅回饋係中央嗰塊牌。
     setStatus(label + '…');
@@ -782,6 +793,9 @@
       showErrorModal(actionErrorTitle_(label), err);
       setStatus('');
     } finally {
+      runActionDepth_--;
+      // 第八十三輪批次 JG 組：仲有另一個動作做緊（巢狀）⇒ 唔收牌、唔解鎖、唔刷新，留畀最後嗰個
+      if (runActionDepth_ > 0) return;
       // 階段 A：呢個動作期間有冇寫過嘢？有嘅話畫面（狀態卡、區一四粒掣、
       // 區二「還有 N 項未做」）一定要跟住變。
       //

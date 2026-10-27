@@ -5659,7 +5659,7 @@ const MUTATIONS = [
     id: "ba-unreleased-all",
     why: "「未放行」清單唔剔走已放行嘅格——全部已放行嘅重發都會寫提醒",
     file: "src/HardViolationClass.gs",
-    find: "    return classified.real;\n  } catch (err) {\n    log_('WARN', 'listUnreleasedHardViolations_",
+    find: "    return classified.real.concat(classified.lateUnavailable);\n  } catch (err) {\n    log_('WARN', 'listUnreleasedHardViolations_",
     replace: "    return judgeable;\n  } catch (err) {\n    log_('WARN', 'listUnreleasedHardViolations_",
     tests: ["tests/resend_no_hard_gate.test.js"]
   },
@@ -8055,6 +8055,70 @@ const MUTATIONS = [
     find: "        reason: late ? HARD_VIOLATION_CLASS_LABEL.LATE_UNAVAILABLE : (v.reason || v.ruleId),",
     replace: "        reason: v.reason || v.ruleId,",
     tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "jg-depth-ignored",
+    why: "巢狀動作提早收牌解鎖",
+    file: "src/ui/Script.html",
+    find: "      if (runActionDepth_ > 0) return;",
+    replace: "      if (false) return;",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-clean-no-return",
+    why: "快路儲存冇 return",
+    file: "src/ui/ScriptZone1.html",
+    find: "  function executeCleanSave(plan) {\n    return runAction(",
+    replace: "  function executeCleanSave(plan) {\n    runAction(",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-suggest-no-return",
+    why: "調整冇 return",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "      return runBuildSuggestion('', true);",
+    replace: "      runBuildSuggestion('', true);",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-btn-not-grey",
+    why: "儲存掣唔即時變灰",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      refs.wasDisabled = !!refs.btn.disabled;\n      refs.btn.disabled = true;",
+    replace: "      refs.wasDisabled = !!refs.btn.disabled;",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-no-running-text",
+    why: "冇儲存中字句",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      if (refs.running) { refs.running.textContent = SAVE_RUNNING_TEXT; refs.running.hidden = false; }",
+    replace: "",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-recheck-saving",
+    why: "儲存緊著返掣",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    if (saveRunning_) return false;",
+    replace: "",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-no-timings",
+    why: "冇分段時間",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    timings: timer.list(),",
+    replace: "    timings: [],",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
+  },
+  {
+    id: "jg-no-save-start",
+    why: "撳儲存冇即時反應",
+    file: "src/ui/ScriptZone1.html",
+    find: "    if (typeof setSaveButtonRunning === 'function') setSaveButtonRunning(true);",
+    replace: "",
+    tests: ["tests/round83_jg_save_feedback.test.js"]
   }
 ];
 

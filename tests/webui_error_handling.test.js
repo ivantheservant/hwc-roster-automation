@@ -69,7 +69,8 @@ console.log('\n=== 核心不變量一：runAction() 係唯一嘅錯誤出口 ===
     // 第二十七輪批次階段 A：`finally` 入面而家仲有「有寫入就刷新狀態快取」
     // 一段，所以由 `finally {` 去到 `setBusy(false)` 之間長咗。
     // 關鍵斷言冇變：**解除忙碌一定要喺 finally 入面**。
-    /async function runAction[\s\S]{0,500}?finally \{[\s\S]{0,600}?setBusy\(false\);/.test(common));
+    // 第八十三輪批次 JG 組：前面多咗巢狀計數（runActionDepth_），範圍放寬
+    /async function runAction[\s\S]{0,800}?finally \{[\s\S]{0,900}?setBusy\(false\);/.test(common));
   check('★★★★ callServer() 有 withFailureHandler，唔會靜靜 hang 住',
     /withFailureHandler\(/.test(common));
 }

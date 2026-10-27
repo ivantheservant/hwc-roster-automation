@@ -435,6 +435,29 @@
   let step2SaveRefs_ = null;
   let saveRecheckAt_ = 0;
 
+  /* 第八十三輪批次 JG 組：撳〔儲存〕即時有反應——掣變灰、旁邊寫「儲存中……」，做完先還原。 */
+  const SAVE_RUNNING_TEXT = '儲存中……（可能要一至兩分鐘，請不要再撳）';
+  let saveRunning_ = false;
+
+  /**
+   * @param {boolean} on 開始（true）／結束（false）
+   */
+  function setSaveButtonRunning(on) {
+    saveRunning_ = !!on;
+    const refs = step2SaveRefs_;
+    if (!refs || !refs.btn) return;
+    if (on) {
+      refs.wasDisabled = !!refs.btn.disabled;
+      refs.btn.disabled = true;
+      refs.btn.classList.add('is-running');
+      if (refs.running) { refs.running.textContent = SAVE_RUNNING_TEXT; refs.running.hidden = false; }
+    } else {
+      refs.btn.disabled = !!refs.wasDisabled;
+      refs.btn.classList.remove('is-running');
+      if (refs.running) { refs.running.textContent = ''; refs.running.hidden = true; }
+    }
+  }
+
   /** 搵一個節點入面第一個 className 完全等於 cls 嘅子孫。 */
   function findChildByClass(node, cls) {
     if (!node) return null;
@@ -471,6 +494,7 @@
   async function maybeRecheckSaveButton(nowMs) {
     const now = nowMs === undefined ? Date.now() : nowMs;
     if (!step2SaveRefs_ || !currentQuarterId || modalOpen) return false;
+    if (saveRunning_) return false;   // 第八十三輪批次 JG 組：儲存緊唔好著返粒掣
     if (now - saveRecheckAt_ < SAVE_RECHECK_MIN_MS) return false;
     saveRecheckAt_ = now;
     try {
@@ -554,6 +578,10 @@
     saveBtn.style.fontSize = 'var(--fs-lg)';
     saveBtn.style.padding = '12px 22px';
     acts.push(saveBtn);
+    // 第八十三輪批次 JG 組：「儲存中……」（撳下先出）
+    const saveRunningNote = make('span', { text: '', className: 'save-running' });
+    saveRunningNote.hidden = true;
+    acts.push(saveRunningNote);
 
     // 第七十五輪批次 CH 組：〔回到上一個儲存版本〕拿走——上面嘅版本下拉〔用這一版作起點〕取代佢。
     // 第七十七輪批次 EA 組：〔排表偏好〕搬咗去「開季前準備」（〔不能服侍的日期〕旁邊）。
@@ -569,6 +597,7 @@
     // 第八十二輪批次 IH 組：記住〔儲存〕同第 2 步嗰兩句，切返幹事介面時輕量更新（唔重載成個主畫面）
     step2SaveRefs_ = {
       btn: saveBtn,
+      running: saveRunningNote,
       note: findChildByClass(card, 'step-note'),
       why: findChildByClass(card, 'step-why')
     };

@@ -328,14 +328,19 @@
    * 嗰條路（儲存完成窗〔繼續去寄出〕）一併清走——儲存完成窗一律〔知道了〕〔請系統幫我調整〕。
    */
   function openSaveAndConfirm() {
-    runAction('讀取改動', async () => {
+    // 第八十三輪批次 JG 組：撳下即刻變灰＋「儲存中……」（伺服器第一個回覆可能要幾十秒）
+    if (typeof setSaveButtonRunning === 'function') setSaveButtonRunning(true);
+    return runAction('讀取改動', async () => {
       savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
 
       if (savePlan.blocked) return renderSaveBlocked(savePlan);
       if (savePlan.zeroChange) return renderSaveZeroChange(savePlan);
       // 第三十九輪批次 A 組第 3 步：一切正常就直接儲存，唔彈窗。
+      // ⚠️ 第八十三輪批次 JG 組：一定要 `return`（等埋儲存先算完成），見 `runActionDepth_`
       if (saveIsCompletelyClean(savePlan)) return executeCleanSave(savePlan);
       renderSaveMain(savePlan);
+    }).finally(() => {
+      if (typeof setSaveButtonRunning === 'function') setSaveButtonRunning(false);
     });
   }
 
@@ -851,10 +856,11 @@
    * 而這條路的前提是一格違反都沒有，所以沒有任何東西要他決定。
    */
   function executeCleanSave(plan) {
-    runAction('儲存中，請稍候', async () => {
+    return runAction('儲存中，請稍候', async () => {
       const result = await callServerMutating('apiSaveAndConfirmExecute', currentQuarterId, {
         decisions: [], confirmedRequestRows: []
       });
+      logSaveTimings(result);
       resetMainFlowState();
       // ⚠️ 第四十一輪批次 C 組：快路同正常路要用**同一個**結果畫面。
       // 兩套「儲存成功」嘅講法 ＝ 兩個真相來源，改一個另一個唔會跟，
@@ -873,13 +879,24 @@
       .filter((cb) => cb.checked)
       .map((cb) => Number(cb.dataset.sheetRow));
 
-    runAction('儲存中，請稍候', async () => {
+    return runAction('儲存中，請稍候', async () => {
       const result = await callServerMutating('apiSaveAndConfirmExecute', currentQuarterId, {
         decisions: [],
         confirmedRequestRows: confirmedRequestRows
       });
+      logSaveTimings(result);
       renderSaveResult(result);
     }, SAVE_BUSY_STEPS);
+  }
+
+  /**
+   * 第八十三輪批次 JG 組：伺服器回嘅儲存分段時間寫入瀏覽器 console（畀維護者睇，幹事睇唔到）。
+   * @param {Object} result `apiSaveAndConfirmExecute` 嘅結果
+   */
+  function logSaveTimings(result) {
+    const t = result && result.timings;
+    if (!Array.isArray(t) || typeof console === 'undefined') return;
+    console.info('[儲存分段時間] ' + t.map((x) => x.label + ' ' + Math.round(x.ms / 100) / 10 + 's').join('；'));
   }
 
   function renderSaveResult(result) {

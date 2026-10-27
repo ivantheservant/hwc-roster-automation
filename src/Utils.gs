@@ -687,6 +687,28 @@ function log_(level, message) {
 }
 
 /**
+ * 第八十三輪批次 JG 組：分段計時（例如儲存嘅各個階段）。只量度，唔改行為。
+ * @returns {{mark: function(string): void, list: function(): Object[], summary: function(): string}}
+ */
+function startPhaseTimer_() {
+  const t0 = Date.now();
+  let last = t0;
+  const phases = [];
+  const list = function () { return phases.concat([{ label: '合計', ms: Date.now() - t0 }]); };
+  return {
+    mark: function (label) {
+      const now = Date.now();
+      phases.push({ label: label, ms: now - last });
+      last = now;
+    },
+    list: list,
+    summary: function () {
+      return list().map(function (p) { return p.label + ' ' + (Math.round(p.ms / 100) / 10) + 's'; }).join('；');
+    }
+  };
+}
+
+/**
  * 把一個值轉成有限數字；**轉唔到就回 `null`，唔會回 0。**
  *
  * ─────────────────────────────────────────────────────────────────────
