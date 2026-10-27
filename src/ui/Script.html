@@ -904,6 +904,20 @@
       nodes.push(box);
     }
 
+    // 第八十三輪批次 JA 組：狀態卡——「之後才申報不能服侍」嘅格（**唔係**已放行，冇「放行」二字）
+    const late = w.lateUnavailable || { count: 0, items: [], moreCount: 0 };
+    if (late.count > 0 && compact) {
+      const names = (late.items || []).map((r) => cellLabel(r) + '　' + (r.personName || r.personId)).join('、')
+        + (late.moreCount > 0 ? '……另有 ' + late.moreCount + ' 格' : '');
+      nodes.push(make('div', { className: 'warnbox' }, [
+        make('div', {
+          text: '這一季有 ' + late.count + ' 格的人之後才申報不能服侍：' + names + '。'
+            + '撳第 2 步〔請系統幫我調整〕換人，或者在〔檢查我的改動〕勾「保留我的安排」。',
+          className: 'warn-head'
+        })
+      ]));
+    }
+
     // 第七十三輪批次 BA 組：未放行嘅硬規則違反——黃框提醒，**不阻擋**（改動後重發、正式發出同一支）。
     // 狀態卡（compact）唔顯示，免得同「儲存及寄出」嗰邊嘅提示重複。
     const unreleased = w.unreleased || { count: 0, items: [], moreCount: 0 };
@@ -1858,7 +1872,14 @@
             className: v.mustFollow ? 'tag tag-bad' : 'tag'
           })
         ]);
+        // 第八十三輪批次 JA 組：之後才申報不能服侍——加標籤同一句說明（照樣有勾選框）
+        if (v.lateUnavailable && !v.released) {
+          head.appendChild(make('span', { text: v.lateLabel || '之後才申報不能服侍', className: 'tag' }));
+        }
         item.appendChild(head);
+        if (v.lateUnavailable && !v.released && v.lateNote) {
+          item.appendChild(make('div', { text: v.lateNote, className: 'muted' }));
+        }
         if (v.released) {
           item.appendChild(make('div', {
             text: '已放行' + (v.releasedVersionNo === null || v.releasedVersionNo === undefined

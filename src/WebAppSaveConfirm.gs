@@ -216,6 +216,11 @@ function buildSaveAndConfirmPlan_(quarterId) {
   const undecidedRuleItems = decisionItems.rules.filter(function (r) {
     return r.mustFollow && !r.checked && !r.released;
   });
+  // 第八十三輪批次 JA 組：其中幾多格係「之後才申報不能服侍」（理由分開講）
+  const lateUndecidedCount = undecidedRuleItems.filter(function (r) { return r.lateUnavailable; }).length;
+  const lateRealCount = violations.real.filter(function (v) {
+    return v.violationClass === HARD_VIOLATION_CLASS.LATE_UNAVAILABLE;
+  }).length;
 
   // ── 步 1.6　三欄對照 ─────────────────────────────────────────
   const proposals = buildSaveConfirmProposals_(context, resolved, allViolations);
@@ -245,8 +250,9 @@ function buildSaveAndConfirmPlan_(quarterId) {
   // 前端見到 `confirmReasons` 係空就直接儲存，唔自己再判斷一次。
   const keptNewCount = violations.keptNew.length + violations.semiKeptNew.length + tempHelpersNew.length;
   const confirmReasons = buildSaveConfirmReasons_({
-    realCount: violations.real.length,
-    undecidedRuleCount: undecidedRuleItems.length,
+    realCount: violations.real.length - lateRealCount,
+    undecidedRuleCount: undecidedRuleItems.length - lateUndecidedCount,
+    lateUndecidedCount: Math.max(lateUndecidedCount, lateRealCount),
     undecidedNameCount: undecidedNames.length,
     semiHardNewCount: violations.semiHardNew.length,
     keptNewCount: violations.keptNew.length + violations.semiKeptNew.length,
@@ -406,6 +412,9 @@ function buildSaveConfirmReasons_(n) {
   const add = function (code, count, text) { if (count > 0) out.push({ code: code, count: count, text: text }); };
   const rule = Math.max(n.realCount || 0, n.undecidedRuleCount || 0);
   add('RULE_UNDECIDED', rule, '有 ' + rule + ' 格違反「一定要遵守」的規則，你還沒有決定');
+  // 第八十三輪批次 JA 組：之後才申報不能服侍——同未決定嘅真違反一樣要決定，唔會被「上一版已經係噉」濾走
+  add('LATE_UNAVAILABLE_UNDECIDED', n.lateUndecidedCount || 0,
+    '有 ' + (n.lateUndecidedCount || 0) + ' 格的人之後才申報不能服侍，你還沒有決定');
   add('NAME_UNDECIDED', n.undecidedNameCount || 0,
     '有 ' + (n.undecidedNameCount || 0) + ' 個名字在名單上找不到，你還沒有決定');
   add('SEMI_HARD_NEW', n.semiHardNewCount || 0,
@@ -457,7 +466,11 @@ function resolveZeroChangeAction_(stage) {
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
  * @param {Object[]} allViolations `findStateViolations_()` 嘅結果
- * @returns {{real: Object[], released: Object[], structural: Object[], semiHard: Object[]}}
+ * ⚠️ 第八十三輪批次 JA 組：**「之後才申報不能服侍」（`LATE_UNAVAILABLE`）唔係已放行**——從來冇人放行過。
+ * 佢歸入 `real`（未放行，要逐格決定；寄出時提醒），另外喺 `lateUnavailable` 列出方便標示。
+ * 只有真正嘅放行紀錄（`releasedKeys`／`legacyReleasedKeys`）先入 `released`。
+ *
+ * @returns {{real: Object[], released: Object[], lateUnavailable: Object[], structural: Object[], semiHard: Object[]}}
  */
 function classifySaveConfirmViolations_(quarterId, versionNo, allViolations) {
   const hard = (allViolations || []).filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
@@ -471,20 +484,23 @@ function classifySaveConfirmViolations_(quarterId, versionNo, allViolations) {
 
   let real = judgeable;
   let released = [];
+  let lateUnavailable = [];
   try {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const classified = classifyHardViolations_(
       judgeable,
       buildHardViolationClassContext_(quarterId, versionNo, readUnavailableNormalized(timezone)));
-    real = classified.real;
-    released = classified.released.concat(classified.lateUnavailable);
+    lateUnavailable = classified.lateUnavailable;
+    real = classified.real.concat(lateUnavailable);
+    released = classified.released;
   } catch (err) {
     // 分類唔到 ⇒ **一律當成真違反**，唔可以靜靜當成「已放行」。
     // 寧可多要一次打字確認，都好過把一個真違反歸類成「唔使理」。
     log_('WARN', 'classifySaveConfirmViolations_ 分類失敗，全部當真違反：' + err.message);
   }
 
-  return { real: real, released: released, structural: structural, semiHard: semiHard };
+  return { real: real, released: released, lateUnavailable: lateUnavailable,
+    structural: structural, semiHard: semiHard };
 }
 
 /**

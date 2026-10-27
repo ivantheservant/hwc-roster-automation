@@ -183,7 +183,8 @@ console.log('\n=== A6：三類混合 ===');
   checkEqual('★★★★★ needsAction 只由真違反決定', r.needsAction, true);
   checkEqual('★★★★★ 摘要三類都列出',
     r.summary.split('\n')[0],
-    '硬規則違反：3 項（真違反 1、已放行 1、版本生成後才新增的申報 1）');
+    // 第八十三輪批次 JA 組：第 3 類改名「之後才申報不能服侍」
+    '硬規則違反：3 項（真違反 1、已放行 1、之後才申報不能服侍 1）');
   check('★★★★ 每項都有中文分類標籤（報告要逐項標示）',
     r.items.every(function (i) { return !!i.classLabel; }));
 }

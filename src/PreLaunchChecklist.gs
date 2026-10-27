@@ -483,7 +483,7 @@ function buildPreLaunchChecklist_(quarterId) {
         : (hardClassified.real.length === 0
           ? '最新版本（v' + versionNo + '）沒有需要處理的硬規則違反。'
             + (hardClassified.items.length > 0
-              ? '下面列出的各項都是已知情況（已放行／版本生成後才新增的申報），保留只為對照。'
+              ? '下面列出的各項都是已知情況（已放行／之後才申報不能服侍），保留只為對照。'
               : '')
           : '最新版本（v' + versionNo + '）仍有真違反，正式發出前必須處理或明確放行：')),
     (hardClassified ? hardClassified.items : []).slice(0, 20).map(function (v) {

@@ -66,7 +66,8 @@ const HARD_VIOLATION_CLASS = {
 const HARD_VIOLATION_CLASS_LABEL = {
   REAL: '真違反',
   RELEASED: '已放行',
-  LATE_UNAVAILABLE: '版本生成後才新增的申報'
+  // 第八十三輪批次 JA 組：全部畫面同一句（之前叫「版本生成後才新增的申報」）
+  LATE_UNAVAILABLE: '之後才申報不能服侍'
 };
 
 /**
@@ -387,7 +388,8 @@ function listUnreleasedHardViolations_(quarterId, versionNo, violations) {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const classified = classifyHardViolations_(
       judgeable, buildHardViolationClassContext_(quarterId, vNo, readUnavailableNormalized(timezone)));
-    return classified.real;
+    // 第八十三輪批次 JA 組：之後才申報不能服侍＝冇人放行過 ⇒ 一樣係未放行
+    return classified.real.concat(classified.lateUnavailable);
   } catch (err) {
     log_('WARN', 'listUnreleasedHardViolations_ 分類失敗，全部當未放行：' + err.message);
     return judgeable;

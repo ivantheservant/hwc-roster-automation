@@ -326,7 +326,7 @@ function testHardRuleViolations_() {
     classified.summary.split('\n')[0]
   ];
   if (classified.released.length > 0 || classified.lateUnavailable.length > 0) {
-    detailParts.push('（已放行與版本生成後才新增的申報只列出、不判為失敗）');
+    detailParts.push('（已放行與之後才申報不能服侍只列出、不判為失敗）');
   }
 
   return {

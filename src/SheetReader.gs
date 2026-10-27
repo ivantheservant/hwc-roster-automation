@@ -972,11 +972,14 @@ function buildDecisionItems_(context, unresolved, violations, decisionIndex, rel
     seen[dedupe] = true;
     const cellText = currentCellTextForDecision_(context, key);
     let released = null;
+    let late = false;
     if (v.severity === RULE_LEVELS.HARD && releaseContext) {
       try {
         const c = classifyHardViolations_([v], releaseContext);
-        released = c.released.length > 0 ? c.released[0]
-          : (c.lateUnavailable.length > 0 ? c.lateUnavailable[0] : null);
+        // ⚠️ 第八十三輪批次 JA 組：「之後才申報不能服侍」**唔係已放行**（冇人放行過）——
+        // 佢係一格未決定嘅「一定要遵守」違反，有勾選框；勾咗＝放行（儲存時寫放行紀錄）。
+        released = c.released.length > 0 ? c.released[0] : null;
+        late = c.lateUnavailable.length > 0;
       } catch (err) {
         released = null;
       }
@@ -990,11 +993,25 @@ function buildDecisionItems_(context, unresolved, violations, decisionIndex, rel
       mustFollow: v.severity === RULE_LEVELS.HARD, reason: v.reason || '',
       released: !!released,
       releasedVersionNo: (released && released.releasedVersionNo !== undefined) ? released.releasedVersionNo : null,
+      lateUnavailable: late,
+      lateLabel: late ? HARD_VIOLATION_CLASS_LABEL.LATE_UNAVAILABLE : '',
+      lateNote: late ? lateUnavailableNote_(v.serviceDate) : '',
       checked: !released && decisionIndex.isKept(key, cellText),
       violation: v
     });
   });
   return { names: names, rules: rules };
+}
+
+/**
+ * 第八十三輪批次 JA 組：「之後才申報不能服侍」嗰一格嘅說明句（逐格決定項目用）。
+ * @param {string} serviceDate `yyyy-MM-dd`
+ * @returns {string}
+ */
+function lateUnavailableNote_(serviceDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(serviceDate || ''));
+  const day = m ? (Number(m[2]) + '月' + Number(m[3]) + '日') : String(serviceDate || '');
+  return '這個人在這一版儲存之後才申報 ' + day + ' 不能服侍。不勾的話，〔請系統幫我調整〕會換人。';
 }
 
 /**

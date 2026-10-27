@@ -62,7 +62,8 @@ function versionStateFromOriginal_(context) {
  */
 function summariseVersionSendWarnings_(quarterId, versionNo) {
   const empty = { count: 0, items: [], moreCount: 0 };
-  const out = { versionNo: versionNo, blank: empty, released: empty, unreleased: empty, error: '' };
+  const out = { versionNo: versionNo, blank: empty, released: empty, unreleased: empty,
+    lateUnavailable: empty, error: '' };
   if (!(versionNo >= 0)) return out;
   try {
     // 唔讀 grid（`skipGrid`）：呢度要嘅係已儲存版本，而且 grid 嗰次讀取係整個 context 最貴嘅一步。
@@ -89,17 +90,23 @@ function summariseVersionSendWarnings_(quarterId, versionNo) {
       };
     });
     // 第七十三輪批次 BA 組：未放行嘅（`classified.real`）——寄出時只提醒，不阻擋
+    // ⚠️ 第八十三輪批次 JA 組：`real` 包括「之後才申報不能服侍」（冇人放行過），理由寫明
     const unreleased = classified.real.map(function (v) {
+      const late = v.violationClass === HARD_VIOLATION_CLASS.LATE_UNAVAILABLE;
       return {
         serviceDate: v.serviceDate, postId: v.postId,
         postNameTC: postNames[v.postId] || v.postId, slotIndex: v.slotIndex,
         personId: v.personId || '', personName: nameOfPersonId_(context, v.personId),
-        ruleId: v.ruleId, reason: v.reason || v.ruleId
+        ruleId: v.ruleId,
+        reason: late ? HARD_VIOLATION_CLASS_LABEL.LATE_UNAVAILABLE : (v.reason || v.ruleId),
+        lateUnavailable: late
       };
     });
     out.blank = limitSendWarningList_(blanks);
     out.released = limitSendWarningList_(released);
     out.unreleased = limitSendWarningList_(unreleased);
+    // 狀態卡用：「這一季有 N 格的人之後才申報不能服侍」
+    out.lateUnavailable = limitSendWarningList_(unreleased.filter(function (u) { return u.lateUnavailable; }));
   } catch (err) {
     if (typeof log_ === 'function') {
       log_('WARN', 'summariseVersionSendWarnings_（' + quarterId + ' v' + versionNo + '）算不到：' + err.message);

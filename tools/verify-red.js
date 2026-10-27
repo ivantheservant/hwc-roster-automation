@@ -7975,6 +7975,86 @@ const MUTATIONS = [
     find: "  initFontSizePicker();\n",
     replace: "",
     tests: ["tests/round82_ie_font_size.test.js"]
+  },
+  {
+    id: "ja-save-merge-released",
+    why: "之後才申報併入已放行",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    released = classified.released;\n  } catch (err) {",
+    replace: "    released = classified.released.concat(lateUnavailable);\n  } catch (err) {",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-save-real-no-late",
+    why: "之後才申報唔算未放行",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    real = classified.real.concat(lateUnavailable);",
+    replace: "    real = classified.real;",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-decision-released",
+    why: "決定項目當已放行",
+    file: "src/SheetReader.gs",
+    find: "        released = c.released.length > 0 ? c.released[0] : null;",
+    replace: "        released = c.released.length > 0 ? c.released[0] : (c.lateUnavailable[0] || null);",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-list-unrel-no-late",
+    why: "寄出紀錄漏之後才申報",
+    file: "src/HardViolationClass.gs",
+    find: "    return classified.real.concat(classified.lateUnavailable);",
+    replace: "    return classified.real;",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-label-old",
+    why: "字眼變返舊",
+    file: "src/HardViolationClass.gs",
+    find: "  LATE_UNAVAILABLE: '之後才申報不能服侍'",
+    replace: "  LATE_UNAVAILABLE: '版本生成後才新增的申報'",
+    tests: ["tests/round83_ja_late_unavailable.test.js","tests/hard_violation_class.test.js"]
+  },
+  {
+    id: "ja-reason-missing",
+    why: "確認窗冇之後才申報理由",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  add('LATE_UNAVAILABLE_UNDECIDED', n.lateUndecidedCount || 0,",
+    replace: "  add('LATE_UNAVAILABLE_UNDECIDED', 0,",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-note-missing",
+    why: "決定項目冇說明句",
+    file: "src/SheetReader.gs",
+    find: "      lateNote: late ? lateUnavailableNote_(v.serviceDate) : '',",
+    replace: "      lateNote: '',",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-card-hidden",
+    why: "狀態卡冇之後才申報",
+    file: "src/ui/Script.html",
+    find: "    if (late.count > 0 && compact) {",
+    replace: "    if (false) {",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-ui-no-checkbox",
+    why: "之後才申報冇勾選框",
+    file: "src/ui/Script.html",
+    find: "        if (v.released) {\n          item.appendChild(make('div', {\n            text: '已放行'",
+    replace: "        if (v.released || v.lateUnavailable) {\n          item.appendChild(make('div', {\n            text: '已放行'",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
+  },
+  {
+    id: "ja-send-reason",
+    why: "寄出警告理由唔講",
+    file: "src/SendWarnings.gs",
+    find: "        reason: late ? HARD_VIOLATION_CLASS_LABEL.LATE_UNAVAILABLE : (v.reason || v.ruleId),",
+    replace: "        reason: v.reason || v.ruleId,",
+    tests: ["tests/round83_ja_late_unavailable.test.js"]
   }
 ];
 
