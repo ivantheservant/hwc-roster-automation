@@ -280,7 +280,20 @@ function buildRuleReviewContext_() {
     log_('WARN', '規則審閱表讀不到 Posts，互斥組／身分要求會顯示為「沒有設」：' + err.message);
   }
 
+  // 第八十四輪批次 KF 組：「暫時不做某崗位」今日生效中有幾多項（讀唔到 ⇒ null，只寫「有生效」，唔作數字）
+  let exclusionCurrentCount = null;
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    exclusionCurrentCount = readPersonPostExclusionsSafe_(timezone).filter(function (e) {
+      return isEffectiveOn_(e.effectiveFrom, e.effectiveTo, today);
+    }).length;
+  } catch (err) {
+    log_('WARN', '規則審閱表讀不到「暫時不做某崗位」：' + err.message);
+  }
+
   return {
+    exclusionCurrentCount: exclusionCurrentCount,
     // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然
     // 回一個純字串陣列（停用嘅標返「（已停用）」），令舊呼叫端唔使改。
     mutexGroups: Object.keys(mutexByGroup).sort().map(function (g) {

@@ -8463,6 +8463,62 @@ const MUTATIONS = [
     find: "    if (typeof sendMode_ !== 'undefined' && sendMode_ === 'CHANGED' && sendModeData_",
     replace: "    if (typeof sendMode_ !== 'undefined' && sendMode_ === 'NEVER' && sendModeData_",
     tests: ["tests/round84_ke_changed_no_email.test.js"]
+  },
+  {
+    id: "kf-no-append",
+    why: "預設開啟嘅硬規則冇列",
+    file: "src/RuleReview.gs",
+    find: "    }).concat(group.level === RULE_LEVELS.HARD ? appendedRows : []);",
+    replace: "    }).concat([]);",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "kf-no-dedupe",
+    why: "有行嘅時候列兩次",
+    file: "src/RuleReview.gs",
+    find: "      return level === group.level && !isAppended(r);",
+    replace: "      return level === group.level;",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "kf-default-off",
+    why: "冇行就當關掉",
+    file: "src/RuleReview.gs",
+    find: "    synthetic[R.ENABLED] = existing ? existing[R.ENABLED] : (RULE_DEFAULT_ENABLED[id] === true);",
+    replace: "    synthetic[R.ENABLED] = existing ? existing[R.ENABLED] : false;",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "kf-keep-level",
+    why: "Level寫錯唔當硬規則",
+    file: "src/RuleReview.gs",
+    find: "    synthetic[R.LEVEL] = RULE_LEVELS.HARD;",
+    replace: "    synthetic[R.LEVEL] = existing ? existing[R.LEVEL] : RULE_LEVELS.HARD;",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "kf-role-no-posts",
+    why: "身分要求冇逐個崗位寫",
+    file: "src/RuleReview.gs",
+    find: "      return gated.map(function (p) { return p.postNameTC + '：只限' + p.requiredText; }).join('／');",
+    replace: "      return '有生效';",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "kf-excl-no-count",
+    why: "排除冇寫項數",
+    file: "src/RuleReview.gs",
+    find: "      return '有生效' + (n === null || n === undefined ? '' : '（現時 ' + n + ' 項）');",
+    replace: "      return '有生效';",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "kf-doc-old-col",
+    why: "週報說明欄名錯",
+    file: "docs/週報系統讀取職事表資料說明.md",
+    find: "中文名 `Posts.PostName_TC`）",
+    replace: "中文名 `Posts.PostNameTC`）",
+    tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
   }
 ];
 

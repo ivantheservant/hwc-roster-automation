@@ -146,7 +146,8 @@ console.log('\n=== B3【核心】互斥組同身分要求：讀實際資料，�
   const gated = gas.describeRuleForReview_(
     ruleRow(ID.ROLE_REQUIRED, 'HARD', ''), gas.RULE_LEVELS.HARD, 13, CTX);
   check('★★★★★ 身分要求同樣讀實際資料（邊個崗位、要邊個身分）',
-    gated.what.indexOf('報告（「堂委」）') !== -1, gated.what);
+    // 第八十四輪批次 KF 組：逐個崗位寫喺「現時設定」（「報告：只限「堂委」」）
+    gated.currentText.indexOf('報告：只限「堂委」') !== -1, gated.currentText);
 
   const backend = read('src/WebAppRuleReview.gs');
   check('★★★★★ 而且真係由 Posts 讀出嚟（唔係另一份寫死清單）',
@@ -205,7 +206,9 @@ console.log('\n=== B4【核心】五條軟規則各有具體選項 ===');
   const built = gas.buildRuleReviewSheetRows_(
     [ruleRow(ID.PERSONAL_QUOTA, 'SOFT', 1)], 13, CTX);
   check('★★★★ 而且備註真係出現喺表上（第三欄）',
-    built.rows[2][2].indexOf('改成人人平均會令核心義工大幅減少') !== -1, built.rows[2][2]);
+    // 第八十四輪批次 KF 組：前面多咗「一定要遵守」兩條，用規則名搵返嗰一行
+    (built.rows.filter((r) => r[1] === gas.ruleReviewPlainEntry_(ID.PERSONAL_QUOTA).text)[0] || [])[2].indexOf('改成人人平均會令核心義工大幅減少') !== -1,
+    JSON.stringify(built.rows));
 }
 
 console.log('\n=== B4【核心】匯入用選項自己嘅值，唔可以由文字反推 ===');

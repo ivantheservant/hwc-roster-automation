@@ -451,21 +451,27 @@ function ruleReviewPlainEntry_(ruleId) {
       return describeMutexGroupsForReview_((ctx && ctx.mutexGroups) || []);
     }
   };
+  // 第八十四輪批次 KF 組：呢兩條預設開啟（`RULE_DEFAULT_ENABLED`），`RuleSettings` 冇呢兩行都要列
+  //（見 `buildRuleReviewSheetRows_()`，排喺「一定要遵守」最後）。
   table[RULE_IDS.ROLE_REQUIRED] = {
-    text: '某些崗位只由具備相應身分的人擔任',
-    what: function (rule, ctx) {
+    text: '某些崗位只由指定身分的人擔任',
+    what: '崗位設定了身分要求的話，系統只會排有那個身分的人；身分以那一個主日當日為準。',
+    // 按 `Posts.RequiredRoles` 逐個寫（讀實際資料，唔寫死）
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
       const gated = (ctx && ctx.gatedPosts) || [];
-      if (gated.length === 0) {
-        return '哪些崗位有身分要求由設定決定。現時一個都沒有設，所以這一條實際上不會擋住任何安排。';
-      }
-      return '現時有 ' + gated.length + ' 個崗位有身分要求：'
-        + gated.map(function (p) { return p.postNameTC + '（' + p.requiredText + '）'; }).join('；')
-        + '。';
+      if (gated.length === 0) return '有生效，但現時沒有崗位設定身分要求，所以不會擋住任何安排';
+      return gated.map(function (p) { return p.postNameTC + '：只限' + p.requiredText; }).join('／');
     }
   };
   table[RULE_IDS.PERSON_POST_EXCLUDED] = {
-    text: '個別同工按教會安排暫時不擔任某些崗位',
-    what: '在「暫時不做某崗位」登記了的人，在登記那段時間之內不會被排到那個崗位。解除是填一個解除日期，不是刪掉紀錄。'
+    text: '堂委會決定暫時不做某崗位的人，不會被排到那個崗位',
+    what: '在「暫時不做某崗位」登記了的人，在登記那段時間之內不會被排到那個崗位。解除是填一個解除日期，不是刪掉紀錄。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      const n = ctx ? ctx.exclusionCurrentCount : null;
+      return '有生效' + (n === null || n === undefined ? '' : '（現時 ' + n + ' 項）');
+    }
   };
 
   // ── 盡量遵守（準硬規則）────────────────────────────────────
@@ -734,12 +740,27 @@ function buildRuleReviewSheetRows_(ruleRows, weeks, ctx) {
   const meta = [null];
   const fallbackRuleIds = [];
 
+  // 第八十四輪批次 KF 組：`RULE_DEFAULT_ENABLED` 嗰兩條硬規則**一定要列**（排喺「一定要遵守」最後）——
+  // `RuleSettings` 冇嗰一行都照樣生效（`isRuleEnabled_()`），唔列就等於堂委睇唔到。
+  // 有嗰一行（例如 `Enabled=FALSE`）⇒ 用嗰一行照實寫（「已關掉」）。一律當硬規則（匯入只記 AuditLog）。
+  const appendedIds = Object.keys(RULE_DEFAULT_ENABLED).sort();
+  const isAppended = function (r) { return appendedIds.indexOf(String(r[R.RULE_ID] || '').trim()) !== -1; };
+  const appendedRows = appendedIds.map(function (id) {
+    const existing = (ruleRows || []).filter(function (r) { return String(r[R.RULE_ID] || '').trim() === id; })[0];
+    const synthetic = {};
+    synthetic[R.RULE_ID] = id;
+    synthetic[R.ENABLED] = existing ? existing[R.ENABLED] : (RULE_DEFAULT_ENABLED[id] === true);
+    synthetic[R.LEVEL] = RULE_LEVELS.HARD;
+    synthetic[R.TARGET_VALUE] = existing ? existing[R.TARGET_VALUE] : '';
+    return synthetic;
+  });
+
   let seq = 0;
   RULE_REVIEW_GROUPS.forEach(function (group) {
     const inGroup = (ruleRows || []).filter(function (r) {
       const level = String(r[R.LEVEL] || RULE_LEVELS.SOFT).trim().toUpperCase();
-      return level === group.level;
-    });
+      return level === group.level && !isAppended(r);
+    }).concat(group.level === RULE_LEVELS.HARD ? appendedRows : []);
     if (inGroup.length === 0) return;
 
     rows.push([group.title, '', '', '', '', '', '']);

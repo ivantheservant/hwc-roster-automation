@@ -143,7 +143,8 @@ console.log('\n=== G2 表格結構：三組、七欄 ===');
   check('★★★★ meta 逐行對應（組標題行係 null）',
     built.meta.length === built.rows.length
     && built.meta[0] === null
-    && built.meta.filter((m) => !!m).length === 3);
+    // 第八十四輪批次 KF 組：「一定要遵守」最後一定加 RULE_DEFAULT_ENABLED 嗰兩條（RuleSettings 冇都列）⇒ 3＋2
+    && built.meta.filter((m) => !!m).length === 5);
   check('★★★★★ 「堂委決定」同「備註」兩欄一律留空俾人填',
     built.rows.filter((r, i) => built.meta[i]).every((r) => r[5] === '' && r[6] === ''));
 }
