@@ -6382,38 +6382,9 @@ const MUTATIONS = [
     replace: "    body.appendChild(renderRollbackEntry());\n",
     tests: ["tests/round75_ch_version_picker.test.js"]
   },
-  {
-    id: "ci-no-ask-after-save",
-    why: "儲存偏好之後冇問要唔要重新生成",
-    file: "src/ui/ScriptZone3.html",
-    find: "          askRegenerateAfterWeights(res, !!(dash && dash.latestVersion));",
-    replace: "          renderWeights();",
-    tests: ["tests/round75_ci_weights_regenerate.test.js"]
-  },
-  {
-    id: "ci-regen-no-typing",
-    why: "〔重新生成〕唔經打字確認即刻生成",
-    file: "src/ui/ScriptZone3.html",
-    find: "      button('重新生成', () => { closeModal(); openRegenerate(); }, ''),",
-    replace: "      button('重新生成', () => { closeModal(); callServerMutating('apiGenerateRoster', currentQuarterId); }, ''),",
-    tests: ["tests/round75_ci_weights_regenerate.test.js"]
-  },
-  {
-    id: "ci-later-regenerates",
-    why: "〔之後再說〕都照樣重新生成",
-    file: "src/ui/ScriptZone3.html",
-    find: "      button('之後再說', () => closeModalAndRefresh(), 'secondary')",
-    replace: "      button('之後再說', () => { callServerMutating('apiGenerateRoster', currentQuarterId); closeModalAndRefresh(); }, 'secondary')",
-    tests: ["tests/round75_ci_weights_regenerate.test.js"]
-  },
-  {
-    id: "ci-ask-without-version",
-    why: "未生成過都問重新生成",
-    file: "src/ui/ScriptZone3.html",
-    find: "    if (!hasVersion) {\n      openModal('排表偏好已儲存'",
-    replace: "    if (false) {\n      openModal('排表偏好已儲存'",
-    tests: ["tests/round75_ci_weights_regenerate.test.js"]
-  },
+  // 第八十二輪批次 ID 組：CI 組「儲存偏好之後問要唔要重新生成」整段拿走（Ivan），
+  // 原本 4 條突變（ci-no-ask-after-save／ci-regen-no-typing／ci-later-regenerates／ci-ask-without-version）
+  // 冇咗目標，由下面 id- 突變取代。
   {
     id: "cj-temp-not-listed",
     why: "臨時幫手冇列入收不到電郵",
@@ -7673,6 +7644,31 @@ const MUTATIONS = [
     find: "    if (!step2SaveRefs_ || !currentQuarterId || modalOpen) return false;",
     replace: "    if (!step2SaveRefs_ || !currentQuarterId) return false;",
     tests: ["tests/round82_ih_save_grey_recheck.test.js"]
+  },
+  // ── 第八十二輪批次 ID 組：儲存排表偏好之後唔再問要唔要重新生成 ──
+  {
+    id: "id-ask-regenerate",
+    why: "儲存偏好之後又問重新生成",
+    file: "src/ui/ScriptZone3.html",
+    find: "    ], [button('知道了', () => closeModalAndRefresh(), '')]);\n  }",
+    replace: "    ], [button('重新生成', () => { closeModal(); openRegenerate(); }, ''),\n      button('之後再說', () => closeModalAndRefresh(), 'secondary')]);\n  }",
+    tests: ["tests/round82_id_weights_saved_notice.test.js"]
+  },
+  {
+    id: "id-no-notice",
+    why: "儲存偏好之後冇完成訊息",
+    file: "src/ui/ScriptZone3.html",
+    find: "          showWeightsSavedNotice(res);",
+    replace: "          closeModal();",
+    tests: ["tests/round82_id_weights_saved_notice.test.js"]
+  },
+  {
+    id: "id-no-adjust-hint",
+    why: "完成訊息冇指去請系統幫我調整",
+    file: "src/ui/ScriptZone3.html",
+    find: "          + '要用新偏好調整現有的職事表，撳第 2 步〔請系統幫我調整〕；還未生成的話，生成時會自動用。',",
+    replace: "          + '',",
+    tests: ["tests/round82_id_weights_saved_notice.test.js"]
   }
 ];
 

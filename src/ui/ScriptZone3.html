@@ -978,36 +978,27 @@
           setStatus('已儲存 ' + res.added + ' 項、解除 ' + res.released + ' 項（' + (res.scopeText || '') + '）。');
           weightData = await callServer('apiGetPersonPostWeightMatrix', currentQuarterId);
           weightChanges = {};
-          // 第七十五輪批次 CI 組（Ivan 決定）：儲存之後即刻問要唔要用新偏好重新生成這一季。
-          // 〔重新生成〕走現有「重新生成初稿（覆蓋式）」同一個確認畫面（仍然要打「確認」）。
-          const dash = await getDashboard();
-          askRegenerateAfterWeights(res, !!(dash && dash.latestVersion));
+          // 第八十二輪批次 ID 組（Ivan：不用這個功能）：第七十五輪 CI 組「要不要重新生成」嗰一問拿走
+          //（重新生成會蓋過人手改動）——只出完成訊息，指去〔請系統幫我調整〕。
+          showWeightsSavedNotice(res);
         });
       }
     });
   }
 
-  /** 第七十五輪批次 CI 組：儲存排表偏好之後嘅一問。未生成過 ⇒ 唔問（生成時自然用新偏好）。 */
-  function askRegenerateAfterWeights(res, hasVersion) {
-    const done = make('div', {
-      text: '已儲存排表偏好：新增 ' + res.added + ' 項、解除 ' + res.released + ' 項'
-        + (res.scopeText ? '（' + res.scopeText + '）' : '') + '。',
-      className: 'ok-line'
-    });
-    if (!hasVersion) {
-      openModal('排表偏好已儲存', [done, para('生成這一季的職事表時會用新的偏好。', 'muted')], [
-        button('知道了', () => closeModalAndRefresh(), '')
-      ]);
-      return;
-    }
+  /**
+   * 第八十二輪批次 ID 組：儲存排表偏好之後嘅完成訊息（唔再問要唔要重新生成）。
+   * @param {{added: number, released: number, scopeText: string}} res `apiSavePersonPostWeightBatch` 嘅結果
+   */
+  function showWeightsSavedNotice(res) {
     openModal('排表偏好已儲存', [
-      done,
-      para('新的偏好會用在之後生成的職事表。要現在用新偏好重新生成這一季嗎？'
-        + '會建立新一版，舊版本全部保留；職事表上未儲存的改動會不見。')
-    ], [
-      button('重新生成', () => { closeModal(); openRegenerate(); }, ''),
-      button('之後再說', () => closeModalAndRefresh(), 'secondary')
-    ]);
+      make('div', {
+        text: '已儲存排表偏好' + (res.scopeText ? '（' + res.scopeText + '）' : '') + '。'
+          + '要用新偏好調整現有的職事表，撳第 2 步〔請系統幫我調整〕；還未生成的話，生成時會自動用。',
+        className: 'ok-line'
+      }),
+      para('新增 ' + res.added + ' 項、解除 ' + res.released + ' 項。', 'muted')
+    ], [button('知道了', () => closeModalAndRefresh(), '')]);
   }
 
   /* ============================================================
