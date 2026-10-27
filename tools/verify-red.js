@@ -7591,6 +7591,47 @@ const MUTATIONS = [
     find: "    startPointVersionNo: startPointNo,\n    startPointCells:",
     replace: "    startPointVersionNo: null,\n    startPointCells:",
     tests: ["tests/round82_if_start_point_save.test.js"]
+  },
+  // ── 第八十二輪批次 IA 組：勾選撞鎖自動再試、排隊、寫唔到就還原 ──
+  {
+    id: "ia-no-retry",
+    why: "撞鎖唔再試",
+    file: "src/ui/Script.html",
+    find: "        if (!isMutationLockBusyError(err) || attempt >= DECISION_RETRY_MAX_ATTEMPTS) return { ok: false, err: err };",
+    replace: "        return { ok: false, err: err };",
+    tests: ["tests/round82_ia_decision_retry.test.js"]
+  },
+  {
+    id: "ia-retry-forever",
+    why: "冇上限，一直等",
+    file: "src/ui/Script.html",
+    find: "  const DECISION_RETRY_MAX_ATTEMPTS = 11;",
+    replace: "  const DECISION_RETRY_MAX_ATTEMPTS = 40;",
+    tests: ["tests/round82_ia_decision_retry.test.js"]
+  },
+  {
+    id: "ia-no-queue",
+    why: "唔排隊，連續勾會互相撞",
+    file: "src/ui/Script.html",
+    find: "    const run = decisionQueue_.then(() => writeDecisionsWithRetry(payloads, onWaiting));",
+    replace: "    const run = writeDecisionsWithRetry(payloads, onWaiting);",
+    tests: ["tests/round82_ia_decision_retry.test.js"]
+  },
+  {
+    id: "ia-no-revert",
+    why: "寫唔到都保持已勾",
+    file: "src/ui/Script.html",
+    find: "          cb.checked = !want; state[sk(it)] = !want; changed();\n          note.textContent = '　這一格未記住，請再勾一次';",
+    replace: "          note.textContent = '　這一格未記住，請再勾一次';",
+    tests: ["tests/round82_ia_decision_retry.test.js"]
+  },
+  {
+    id: "ia-no-note",
+    why: "嗰一行唔講未記住",
+    file: "src/ui/Script.html",
+    find: "          note.textContent = '　這一格未記住，請再勾一次';\n          note.className",
+    replace: "          note.textContent = '';\n          note.className",
+    tests: ["tests/round82_ia_decision_retry.test.js"]
   }
 ];
 

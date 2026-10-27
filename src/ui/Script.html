@@ -1702,19 +1702,61 @@
   }
 
   /**
-   * 即時記住一批決定。
+   * 第八十二輪批次 IA 組（手動測試 C）：勾選嗰陣撞到「另一個動作還在做緊」（全域鎖）⇒ 決定冇記住。
+   * 而家：撞鎖就**等一陣再試**（每 3 秒一次、最多大約 30 秒）；連續勾幾格**排隊逐個寫**，唔會互相撞。
+   */
+  const DECISION_RETRY_MS = 3000;
+  const DECISION_RETRY_MAX_ATTEMPTS = 11;   // 第一次 + 10 次重試 ≈ 30 秒
+  let decisionQueue_ = Promise.resolve();
+
+  /** 錯誤係咪「鎖被佔用」（`withMutationLock_()` 嗰兩句）——只有呢種先值得等。 */
+  function isMutationLockBusyError(err) {
+    const msg = err && err.message ? err.message : String(err || '');
+    return /另一個動作還在做緊|拿不到「同一時間只做一件事」那一把鎖/.test(msg);
+  }
+
+  /** 等一陣（測試可以換走）。 */
+  function waitMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 寫一批決定；撞鎖就等再試。
+   * @param {Object[]} payloads
+   * @param {function()=} onWaiting 撞鎖、準備再試嗰陣叫（畫面寫「記住中……」）
+   * @returns {Promise<{ok: boolean, err: *}>}
+   */
+  async function writeDecisionsWithRetry(payloads, onWaiting) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await callServerMutating('apiSetCellDecisions', currentQuarterId, payloads);
+        return { ok: true, err: null };
+      } catch (err) {
+        if (!isMutationLockBusyError(err) || attempt >= DECISION_RETRY_MAX_ATTEMPTS) return { ok: false, err: err };
+        if (onWaiting) onWaiting();
+        await waitMs(DECISION_RETRY_MS);
+      }
+    }
+  }
+
+  /**
+   * 即時記住一批決定（排隊：上一批寫完先寫下一批）。
    * @param {Object[]} payloads `decisionPayload()` 嘅結果
+   * @param {function()=} onWaiting 撞鎖等候中
    * @returns {Promise<boolean>} 記唔記得到
    */
-  async function persistDecisions(payloads) {
-    try {
-      await callServerMutating('apiSetCellDecisions', currentQuarterId, payloads);
-      return true;
-    } catch (err) {
-      setStatus('記不住你的選擇：' + (err && err.message ? err.message : String(err))
-        + '　請再試一次，或者撳「重新整理」。', true);
+  function persistDecisions(payloads, onWaiting) {
+    const run = decisionQueue_.then(() => writeDecisionsWithRetry(payloads, onWaiting));
+    decisionQueue_ = run.then(() => null, () => null);
+    return run.then((r) => {
+      if (r.ok) return true;
+      setStatus('記不住你的選擇：' + (r.err && r.err.message ? r.err.message : String(r.err))
+        + '　勾選已經還原，請再勾一次，或者撳「重新整理」。', true);
       return false;
-    }
+    }, (err) => {
+      setStatus('記不住你的選擇：' + (err && err.message ? err.message : String(err)), true);
+      return false;
+    });
   }
 
   /**
@@ -1738,16 +1780,28 @@
       cb.type = 'checkbox';
       cb.checked = !!it.checked;
       state[sk(it)] = !!it.checked;
+      // 第八十二輪批次 IA 組：勾選框旁邊講狀態——「記住中……」；最後都寫唔到 ⇒ 還原＋「這一格未記住」
+      const note = make('span', { text: '', className: 'decision-note' });
       cb.addEventListener('change', async () => {
         const want = cb.checked;
         state[sk(it)] = want;
         changed();
-        const ok = await persistDecisions([decisionPayload(it, want)]);
-        if (!ok) { cb.checked = !want; state[sk(it)] = !want; changed(); }
+        note.textContent = '　記住中……';
+        note.className = 'decision-note';
+        const ok = await persistDecisions([decisionPayload(it, want)],
+          () => { note.textContent = '　記住中……（另一個動作做緊，系統會自動再試）'; });
+        if (ok) {
+          note.textContent = '';
+        } else {
+          cb.checked = !want; state[sk(it)] = !want; changed();
+          note.textContent = '　這一格未記住，請再勾一次';
+          note.className = 'decision-note err-text';
+        }
       });
       line.appendChild(cb);
       line.appendChild(make('span', { text: labelText }));
-      boxes.push({ item: it, cb: cb });
+      line.appendChild(note);
+      boxes.push({ item: it, cb: cb, note: note });
       return line;
     };
 
@@ -1821,9 +1875,10 @@
         button('確定', async () => {
           confirmBox.hidden = true;
           const todo = boxes.filter((b) => !b.cb.checked);
-          todo.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; });
+          todo.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; b.note.textContent = '　記住中……'; });
           changed();
           const ok = await persistDecisions(todo.map((b) => decisionPayload(b.item, true)));
+          todo.forEach((b) => { b.note.textContent = ok ? '' : '　這一格未記住，請再勾一次'; });
           if (!ok) {
             todo.forEach((b) => { b.cb.checked = false; state[sk(b.item)] = false; });
             changed();
