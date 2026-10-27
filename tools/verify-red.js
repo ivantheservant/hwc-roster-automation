@@ -8295,6 +8295,22 @@ const MUTATIONS = [
     find: "（第八十三輪批次 JF 組起由上面全域規則負責）。 */",
     replace: "（第八十三輪批次 JF 組起由上面全域規則負責）。 */\n  .dlg-lg .check-row input[type=\"checkbox\"] { width: 17px; height: 17px; }",
     tests: ["tests/round83_je_jf_reset_refresh_inputs.test.js"]
+  },
+  {
+    id: "ka-later-close-only",
+    why: "稍後再決定只關窗唔重畫",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "      button('稍後再決定', () => refreshLikeButton(), 'secondary')",
+    replace: "      button('稍後再決定', () => closeModal(), 'secondary')",
+    tests: ["tests/round84_ka_later_refresh.test.js"]
+  },
+  {
+    id: "ka-later-no-reset",
+    why: "稍後再決定唔清主流程快取",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "      button('稍後再決定', () => refreshLikeButton(), 'secondary')",
+    replace: "      button('稍後再決定', () => closeModalAndRefresh(), 'secondary')",
+    tests: ["tests/round84_ka_later_refresh.test.js"]
   }
 ];
 

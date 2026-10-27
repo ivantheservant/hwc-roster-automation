@@ -479,7 +479,8 @@
     const acts = [
       button('接受這個建議版本', () => openAcceptSuggestion(), ''),
       button('放棄，回到我自己那一版', () => openDiscardSuggestion(), 'secondary'),
-      button('稍後再決定', () => closeModal(), 'secondary')
+      // 第八十四輪批次 KA 組：同〔重新整理〕同一條路重畫主流程，第 2 步即時出「現在有一張建議表未處理」
+      button('稍後再決定', () => refreshLikeButton(), 'secondary')
     ];
     openModal('系統建議版本', nodes, acts);
   }
