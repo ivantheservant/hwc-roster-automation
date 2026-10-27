@@ -294,6 +294,9 @@
    * @returns {boolean} 可不可以直接儲存
    */
   function saveIsCompletelyClean(plan) {
+    // ⚠️ 第八十一輪批次 HA 組：後端已經用同一份判斷列出「為甚麼要你看一看」——空 ⇒ 直接儲存。
+    // 舊後端冇 `confirmReasons` ⇒ 照舊用下面嘅判斷。
+    if (Array.isArray(plan.confirmReasons)) return plan.confirmReasons.length === 0;
     const v = plan.violations || {};
     const r = plan.requests || {};
     return (v.real || []).length === 0
@@ -582,6 +585,21 @@
     });
   }
 
+  /**
+   * 第八十一輪批次 HA 組：確認窗最上面「為甚麼要你看一看」——逐項列出令今次唔可以直接儲存嘅原因。
+   * 原因由後端出（`confirmReasons`），前端唔自己判斷。舊後端冇呢個欄位 ⇒ 唔顯示。
+   * @param {Object[]=} reasons `plan.confirmReasons`
+   * @returns {?Element}
+   */
+  function buildSaveWhySection(reasons) {
+    if (!Array.isArray(reasons) || reasons.length === 0) return null;
+    const box = make('div', { className: 'warnbox' }, [
+      make('div', { text: '為甚麼要你看一看', className: 'warn-head' })
+    ]);
+    reasons.forEach((r) => box.appendChild(make('div', { text: '・' + r.text, className: 'vio-row' })));
+    return box;
+  }
+
   /* ── C2：正常流程（一個彈窗，由上而下五節）────────────────── */
 
   function renderSaveMain(plan) {
@@ -592,6 +610,10 @@
     // Ivan：已經喺〔檢查我的改動〕決定咗嘅嘢，儲存嗰陣唔使再逐格問一次；
     // 逐格「用我改的／改回原本」拿走；打字放行框拿走（改為勾選）；
     // 「儲存之後直接去寄出」拿走（寄出一律喺第 3 步）。
+
+    // 0　第八十一輪批次 HA 組：為甚麼要你看一看（後端 `buildSaveConfirmReasons_()`，同快路同一份判斷）
+    const why = buildSaveWhySection(plan.confirmReasons);
+    if (why) nodes.push(why);
 
     // 1　你改了這 N 格（可以摺疊）
     nodes.push(buildChangedCellsSection(plan.gridChanges || []));

@@ -7328,24 +7328,25 @@ const MUTATIONS = [
     id: "fe-new-ignores-base",
     why: "唔同上一版比，全部「盡量避免」都當新",
     file: "src/WebAppSaveConfirm.gs",
-    find: "    return list.filter(function (v) { return !before[keyOf(v)]; });",
-    replace: "    return list.slice();",
+    // 第八十一輪批次 HA 組：比較抽咗做 `filterNewSinceBase_()`（保留格共用）
+    find: "  return filterNewSinceBase_(list, index);\n}",
+    replace: "  return list.slice();\n}",
     tests: ["tests/round78_fe_semi_hard_new.test.js"]
   },
   {
     id: "fe-new-drops-all",
     why: "今次帶出嘅「盡量避免」都當舊（快路靜靜儲存）",
     file: "src/WebAppSaveConfirm.gs",
-    find: "    return list.filter(function (v) { return !before[keyOf(v)]; });",
-    replace: "    return [];",
+    find: "  return filterNewSinceBase_(list, index);\n}",
+    replace: "  return [];\n}",
     tests: ["tests/round78_fe_semi_hard_new.test.js"]
   },
   {
     id: "fe-fail-not-safe",
     why: "上一版算唔到就當冇新違反",
     file: "src/WebAppSaveConfirm.gs",
-    find: "    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);\n    return list.slice();",
-    replace: "    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);\n    return [];",
+    find: "  if (!baseIndex) return l.slice();",
+    replace: "  if (!baseIndex) return [];",
     tests: ["tests/round78_fe_semi_hard_new.test.js"]
   },
   // ── 第七十九輪批次 GA 組：個人 PDF 缺件檢查跟這一次揀嘅附件 ──
@@ -7412,6 +7413,87 @@ const MUTATIONS = [
     find: "  return !!template && String(template.attachType || '').toUpperCase() === ATTACH_TYPE.PERSONAL_PDF;",
     replace: "  return false;",
     tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  // ── 第八十一輪批次 HA 組 ──
+  {
+    id: "ha-ui-ignores-reasons",
+    why: "前端唔睇後端嘅「為甚麼」，照舊自己判斷（舊放行格又令每次儲存彈窗）",
+    file: "src/ui/ScriptZone1.html",
+    find: "    if (Array.isArray(plan.confirmReasons)) return plan.confirmReasons.length === 0;\n",
+    replace: "",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-released-all-new",
+    why: "上一版已放行嘅格都當新",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  violations.releasedNew = filterNewSinceBase_(violations.released, baseIndex);",
+    replace: "  violations.releasedNew = violations.released.slice();",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-kept-never-new",
+    why: "今次新保留嘅格都當舊（靜靜直接儲存）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  violations.keptNew = filterNewSinceBase_(violations.kept, baseIndex);",
+    replace: "  violations.keptNew = [];",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-temp-never-new",
+    why: "今次新標記嘅臨時幫手都當舊",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  return list.filter(function (t) { return oldNameByKey[t.key] !== t.text; });",
+    replace: "  return [];",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-base-fail-empty",
+    why: "上一版算唔到就當冇違反（全部當舊）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    log_('WARN', (who || 'buildBaseViolationIndex_') + ' 算不到上一版的違反，全部當新：' + err.message);\n    return null;",
+    replace: "    log_('WARN', (who || 'buildBaseViolationIndex_') + ' 算不到上一版的違反，全部當新：' + err.message);\n    return {};",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-key-no-person",
+    why: "保留格換咗另一個人都當舊",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  return violationKey_(v) + '|' + (v.personId || '');",
+    replace: "  return violationKey_(v);",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-reason-no-semi",
+    why: "「為甚麼」漏咗今次帶來嘅盡量避免",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  add('SEMI_HARD_NEW', n.semiHardNewCount || 0,",
+    replace: "  add('SEMI_HARD_NEW', 0,",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-reason-no-kept",
+    why: "「為甚麼」漏咗新保留嘅格",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  add('KEPT_NEW', n.keptNewCount || 0,",
+    replace: "  add('KEPT_NEW', 0,",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-why-not-shown",
+    why: "確認窗冇顯示「為甚麼要你看一看」",
+    file: "src/ui/ScriptZone1.html",
+    find: "    const why = buildSaveWhySection(plan.confirmReasons);",
+    replace: "    const why = null;",
+    tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "ha-reasons-not-in-plan",
+    why: "儲存計劃冇帶「為甚麼」出去",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    confirmReasons: confirmReasons,\n    requests: requests,",
+    replace: "    requests: requests,",
+    tests: ["tests/round81_ha_kept_new.test.js"]
   }
 ];
 

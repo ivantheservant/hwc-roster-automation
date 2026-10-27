@@ -69,6 +69,9 @@ function makePlan(opts) {
     decisionItems: { names: [], rules: [] },
     needsDecision: real.length > 0,
     keptCount: 0,
+    // 第八十一輪批次 HA 組：今次新保留嘅格數、「為甚麼要你看一看」
+    keptNewCount: 0,
+    confirmReasons: real.length > 0 ? [{ code: 'RULE_UNDECIDED', count: real.length, text: '' }] : [],
     requests: { apply: [], confirm: [], needsInput: [] },
     gridChanges: (opts && opts.gridChanges) || [],
     titleChanges: [],

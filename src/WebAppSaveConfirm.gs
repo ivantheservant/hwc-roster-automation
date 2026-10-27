@@ -56,10 +56,12 @@ function buildSaveAndConfirmPlan_(quarterId) {
       blocked: true, blockReason: reason, unresolved: [],
       requests: { apply: [], confirm: [], needsInput: [] },
       gridChanges: [], overlaps: [],
-      violations: { real: [], kept: [], released: [], structural: [], semiHard: [], semiKept: [], semiHardNew: [] },
+      violations: { real: [], kept: [], released: [], structural: [], semiHard: [], semiKept: [], semiHardNew: [],
+        keptNew: [], semiKeptNew: [], releasedNew: [] },
       needsRelease: false, proposals: [], targetVersionNo: null,
       zeroChange: false, zeroChangeAction: null,
-      tempHelpers: [], decisionItems: { names: [], rules: [] }, needsDecision: false, keptCount: 0
+      tempHelpers: [], decisionItems: { names: [], rules: [] }, needsDecision: false, keptCount: 0,
+      keptNewCount: 0, confirmReasons: []
     }, extra || {});
   };
 
@@ -199,9 +201,18 @@ function buildSaveAndConfirmPlan_(quarterId) {
   };
   // 第七十八輪批次 FE 組：「盡量避免」違反之中，邊啲係**今次儲存帶出嚟**（上一版冇）。
   // 快路（一切正常直接儲存）只睇呢一批；上一版已經存咗嘅照樣喺確認畫面提示，但唔會令每次儲存都彈窗。
-  violations.semiHardNew = filterNewSemiHardViolations_(violations.semiHard, context);
+  // ⚠️ 第八十一輪批次 HA 組：已保留／已放行嘅違反同一個道理——上一版已經係噉 ⇒ 唔算新。
+  // 上一版嘅違反只計一次（`buildBaseViolationIndex_()`），四批共用。
+  const needBase = violations.semiHard.length + violations.kept.length
+    + violations.semiKept.length + violations.released.length > 0;
+  const baseIndex = needBase ? buildBaseViolationIndex_(context, 'buildSaveAndConfirmPlan_') : null;
+  violations.semiHardNew = filterNewSemiHardViolations_(violations.semiHard, context, baseIndex);
+  violations.keptNew = filterNewSinceBase_(violations.kept, baseIndex);
+  violations.semiKeptNew = filterNewSinceBase_(violations.semiKept, baseIndex);
+  violations.releasedNew = filterNewSinceBase_(violations.released, baseIndex);
   const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });
   const tempHelpers = decisionItems.names.filter(function (n) { return n.checked; });
+  const tempHelpersNew = filterNewTempHelpers_(tempHelpers, context);
   const undecidedRuleItems = decisionItems.rules.filter(function (r) {
     return r.mustFollow && !r.checked && !r.released;
   });
@@ -225,6 +236,25 @@ function buildSaveAndConfirmPlan_(quarterId) {
     };
   });
 
+  // ── 第八十一輪批次 HA 組：「為甚麼要你看一看」＝快路唔成立嘅原因，**同一份**判斷 ───
+  // 前端見到 `confirmReasons` 係空就直接儲存，唔自己再判斷一次。
+  const keptNewCount = violations.keptNew.length + violations.semiKeptNew.length + tempHelpersNew.length;
+  const confirmReasons = buildSaveConfirmReasons_({
+    realCount: violations.real.length,
+    undecidedRuleCount: undecidedRuleItems.length,
+    undecidedNameCount: undecidedNames.length,
+    semiHardNewCount: violations.semiHardNew.length,
+    keptNewCount: violations.keptNew.length + violations.semiKeptNew.length,
+    tempHelpersNewCount: tempHelpersNew.length,
+    releasedNewCount: violations.releasedNew.length,
+    requestApplyCount: requests.apply.length,
+    requestConfirmCount: requests.confirm.length,
+    requestNeedsInputCount: requests.needsInput.length,
+    overlapCount: overlaps.length,
+    blankCellCount: blankCells.length,
+    gridChangeCount: gridChanges.length
+  });
+
   // ── 零改動路徑（D4）────────────────────────────────────────
   const zeroChange = resolved.changes.length === 0 && requestPlan.results.length === 0
     && titleChanges.length === 0;
@@ -243,6 +273,9 @@ function buildSaveAndConfirmPlan_(quarterId) {
     needsDecision: undecidedNames.length > 0 || undecidedRuleItems.length > 0,
     // 你已確認保留嘅格數（唔再逐格重複提示）
     keptCount: violations.kept.length + violations.semiKept.length + tempHelpers.length,
+    // 第八十一輪批次 HA 組：其中**今次新保留**嘅（上一版冇）——只有呢啲先令快路唔成立
+    keptNewCount: keptNewCount,
+    confirmReasons: confirmReasons,
     requests: requests,
     gridChanges: gridChanges,
     titleChanges: titleChanges,
@@ -273,13 +306,35 @@ function buildSaveAndConfirmPlan_(quarterId) {
  * 上一版算唔到（讀表失敗等）⇒ **全部當新**（多彈一次窗只係麻煩，少彈就係靜靜改咗嘢）。
  * @param {Object[]} semiHard 今次狀態嘅「盡量避免」違反（未勾保留）
  * @param {Object} context `buildFineTuneContext_()` 嘅結果（要 `original`）
+ * @param {?Object=} baseIndex `buildBaseViolationIndex_()` 已經算好嘅（冇傳 ⇒ 即場算；`null` ⇒ 算唔到）
  * @returns {Object[]} 上一版冇嘅嗰批
  */
-function filterNewSemiHardViolations_(semiHard, context) {
+function filterNewSemiHardViolations_(semiHard, context, baseIndex) {
   const list = semiHard || [];
   if (list.length === 0) return [];
+  const index = baseIndex !== undefined
+    ? baseIndex : buildBaseViolationIndex_(context, 'filterNewSemiHardViolations_');
+  return filterNewSinceBase_(list, index);
+}
+
+/**
+ * 同一格、同一條規則、同一個人嘅違反鍵（新／舊比較用）。
+ * @param {Object} v 違反
+ * @returns {string}
+ */
+function baseViolationKey_(v) {
+  return violationKey_(v) + '|' + (v.personId || '');
+}
+
+/**
+ * 第七十八輪 FE 組／第八十一輪 HA 組：**上一版（`context.original`）已經有嘅違反**。
+ * 算唔到（讀表失敗等）⇒ 回 `null`，呼叫端要**全部當新**（寧願多彈一次窗）。
+ * @param {Object} context `buildFineTuneContext_()` 嘅結果
+ * @param {string=} who log 用嘅呼叫者名
+ * @returns {?Object<string, boolean>} `baseViolationKey_()` ⇒ true
+ */
+function buildBaseViolationIndex_(context, who) {
   try {
-    const keyOf = function (v) { return violationKey_(v) + '|' + (v.personId || ''); };
     const baseState = (context.original || []).map(function (a) {
       return {
         serviceDateId: a.serviceDateId, serviceDate: a.serviceDate, postId: a.postId,
@@ -287,14 +342,82 @@ function filterNewSemiHardViolations_(semiHard, context) {
       };
     });
     const before = {};
-    findStateViolations_(baseState, context).forEach(function (v) {
-      if (v.severity === RULE_LEVELS.SEMI_HARD) before[keyOf(v)] = true;
-    });
-    return list.filter(function (v) { return !before[keyOf(v)]; });
+    findStateViolations_(baseState, context).forEach(function (v) { before[baseViolationKey_(v)] = true; });
+    return before;
   } catch (err) {
-    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);
-    return list.slice();
+    log_('WARN', (who || 'buildBaseViolationIndex_') + ' 算不到上一版的違反，全部當新：' + err.message);
+    return null;
   }
+}
+
+/**
+ * 只留低上一版冇嘅違反。`baseIndex` 係 `null`（算唔到）⇒ **全部當新**。
+ * @param {Object[]} list 違反
+ * @param {?Object} baseIndex `buildBaseViolationIndex_()` 嘅結果
+ * @returns {Object[]}
+ */
+function filterNewSinceBase_(list, baseIndex) {
+  const l = list || [];
+  if (!baseIndex) return l.slice();
+  return l.filter(function (v) { return !baseIndex[baseViolationKey_(v)]; });
+}
+
+/**
+ * ⚠️ 第八十一輪批次 HA 組：**今次新標記嘅臨時幫手**。上一版同一格已經係同一個名（冇 PersonID）⇒ 唔算新。
+ * @param {Object[]} tempHelpers 已勾「這一季臨時幫手」嘅決定項目（`key`、`text`）
+ * @param {Object} context `buildFineTuneContext_()` 嘅結果
+ * @returns {Object[]}
+ */
+function filterNewTempHelpers_(tempHelpers, context) {
+  const list = tempHelpers || [];
+  if (list.length === 0) return [];
+  const oldNameByKey = {};
+  ((context && context.original) || []).forEach(function (o) {
+    if (String(o.personId || '').trim()) return;
+    const name = normalizeDecisionText_(o.personName);
+    if (name) oldNameByKey[o.serviceDate + '|' + o.postId + '|' + o.slotIndex] = name;
+  });
+  return list.filter(function (t) { return oldNameByKey[t.key] !== t.text; });
+}
+
+/**
+ * ⚠️ 第八十一輪批次 HA 組：**點解今次唔可以直接儲存**（確認窗最上面「為甚麼要你看一看」）。
+ *
+ * 呢一份就係快路嘅判斷：空陣列 ⇒ 前端直接儲存。之前快路喺前端（`saveIsCompletelyClean()`）
+ * 自己判斷、確認窗又冇講原因——幹事見到一個窗但唔知點解要睇。
+ * 只列**今次**帶來嘅（舊嘅盡量避免、舊嘅保留格照舊喺下面提示，唔放入嚟）。
+ *
+ * @param {Object} n 各項數目
+ * @returns {Object[]} 每項 `{code, count, text}`
+ */
+function buildSaveConfirmReasons_(n) {
+  const out = [];
+  const add = function (code, count, text) { if (count > 0) out.push({ code: code, count: count, text: text }); };
+  const rule = Math.max(n.realCount || 0, n.undecidedRuleCount || 0);
+  add('RULE_UNDECIDED', rule, '有 ' + rule + ' 格違反「一定要遵守」的規則，你還沒有決定');
+  add('NAME_UNDECIDED', n.undecidedNameCount || 0,
+    '有 ' + (n.undecidedNameCount || 0) + ' 個名字在名單上找不到，你還沒有決定');
+  add('SEMI_HARD_NEW', n.semiHardNewCount || 0,
+    '今次的改動帶來 ' + (n.semiHardNewCount || 0) + ' 格「盡量避免」的違反');
+  add('KEPT_NEW', n.keptNewCount || 0,
+    '你新保留了 ' + (n.keptNewCount || 0) + ' 格違反規則的安排');
+  add('TEMP_HELPER_NEW', n.tempHelpersNewCount || 0,
+    '你新標記了 ' + (n.tempHelpersNewCount || 0) + ' 位「這一季臨時幫手」');
+  add('RELEASED_NEW', n.releasedNewCount || 0,
+    '今次的改動令 ' + (n.releasedNewCount || 0) + ' 格之前放行過的違反規則安排再出現');
+  add('REQUEST_APPLY', n.requestApplyCount || 0,
+    '有 ' + (n.requestApplyCount || 0) + ' 筆修改申報要套用');
+  add('REQUEST_CONFIRM', n.requestConfirmCount || 0,
+    '有 ' + (n.requestConfirmCount || 0) + ' 筆修改申報要你逐筆確認');
+  add('REQUEST_NEEDS_INPUT', n.requestNeedsInputCount || 0,
+    '有 ' + (n.requestNeedsInputCount || 0) + ' 筆修改申報系統看不懂');
+  add('OVERLAP', n.overlapCount || 0,
+    '有 ' + (n.overlapCount || 0) + ' 格你在表上改過，同時亦有修改申報');
+  add('BLANK_CELLS', n.blankCellCount || 0, '還有 ' + (n.blankCellCount || 0) + ' 格沒有人');
+  if (out.length === 0 && !(n.gridChangeCount > 0)) {
+    out.push({ code: 'NO_GRID_CHANGE', count: 0, text: '這一次沒有你在表上改過的格' });
+  }
+  return out;
 }
 
 /**
