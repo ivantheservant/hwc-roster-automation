@@ -398,15 +398,26 @@
       nodes.push(box);
     }
     // 第八十二輪批次 IC 組：按排表偏好微調了 M 格；做不到的寫明
+    // 第八十四輪批次 KC 組：**每一項**生效中的偏好一句（微調了 N 格／已達到目標，不用微調／做不到）；
+    // 這一季沒有生效中的偏好（也沒有讀不到）就不出這一段
     const wt = r.weightTune || {};
-    if ((wt.moves || []).length > 0 || (wt.unmet || []).length > 0 || wt.error) {
-      const box = make('div', { className: 'sec' }, [sectionTitle('按排表偏好微調了 ' + (wt.moves || []).length + ' 格')]);
-      (wt.moves || []).forEach((m) => box.appendChild(make('div', {
-        text: humanDate(m.serviceDate) + '　' + m.postNameTC + (Number(m.slotIndex) > 1 ? (' ' + m.slotIndex) : '')
+    const weightItems = wt.outcomes || [];
+    if (weightItems.length > 0 || wt.error) {
+      const box = make('div', { className: 'sec' }, [sectionTitle('排表偏好'
+        + (weightItems.length > 0 ? '（' + weightItems.length + ' 項'
+          + ((wt.moves || []).length > 0 ? '，按排表偏好微調了 ' + wt.moves.length + ' 格' : '') + '）' : ''))]);
+      const moveLine = (m) => make('div', {
+        text: '　　' + humanDate(m.serviceDate) + '　' + m.postNameTC + (Number(m.slotIndex) > 1 ? (' ' + m.slotIndex) : '')
           + '　' + m.fromName + ' → ' + m.toName + '（' + m.label + '）',
         className: 'ok-line'
-      })));
-      (wt.unmet || []).forEach((t) => box.appendChild(make('div', { text: '做不到：' + t, className: 'vio-row' })));
+      });
+      weightItems.forEach((oc) => {
+        box.appendChild(make('div', {
+          text: (oc.kind === 'UNMET' ? '做不到：' : '・') + oc.text,
+          className: oc.kind === 'UNMET' ? 'vio-row' : 'ok-line'
+        }));
+        (wt.moves || []).filter((m) => m.weightKey === oc.weightKey).forEach((m) => box.appendChild(moveLine(m)));
+      });
       if (wt.error) box.appendChild(make('div', { text: '排表偏好這一次讀不到（' + wt.error + '），沒有按偏好微調。', className: 'vio-row' }));
       nodes.push(box);
     }

@@ -177,8 +177,12 @@ console.log('\n=== IB2／IC5：前端 ===');
       weights: { count: 1, items: [{ personName: '假戊', postNameTC: '報告', adjust: 1, target: 3 }] }, blankCount: 2 } };
   const result = { ok: true, sheetName: 'S', url: 'u', startNote: '', colourCounts: { manual: 1, system: 1, both: 0, manualViolation: 0, weight: 1 },
     manualOutcomes: [{ serviceDate: '2099-01-11', postNameTC: '讀經', slotIndex: 1, fromName: '假乙', toName: '假甲', outcome: 'SYSTEM_CHANGED', text: '系統再改成「假丁」（連續兩週）' }],
-    weightTune: { moves: [{ serviceDate: '2099-01-18', postNameTC: '報告', slotIndex: 1, fromName: '假丙', toName: '假戊', label: '假戊的報告（排表偏好多1次，目標 3 次）' }],
-      unmet: ['假己的主席：目標 2 次，現時 1 次，找不到可以換而不違反規則的格。'], error: '' },
+    weightTune: { moves: [{ serviceDate: '2099-01-18', postNameTC: '報告', slotIndex: 1, fromName: '假丙', toName: '假戊', label: '假戊的報告（排表偏好多1次，目標 3 次）', weightKey: 'P9805|REPORT' }],
+      unmet: ['假己的主席：目標 2 次，現時 1 次，找不到可以換而不違反規則的格。'],
+      // 第八十四輪批次 KC 組：每一項偏好一句（結果窗由 outcomes 畫）
+      outcomes: [{ kind: 'TUNED', text: '假戊的報告：微調了 1 格（目標 3 次，現時 3 次）', moveCount: 1, weightKey: 'P9805|REPORT' },
+        { kind: 'UNMET', text: '假己的主席：目標 2 次，現時 1 次，找不到可以換而不違反規則的格。', moveCount: 0, weightKey: 'P9806|CHAIR' }],
+      error: '' },
     willHandle: pre.willHandle, untouchedManual: [], undecidedNames: [], remaining: [], unfillable: [] };
   ui.callServer = async (name) => { calls.push(name); return pre; };
   ui.callServerMutating = async (name) => { calls.push(name); return result; };

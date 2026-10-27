@@ -454,13 +454,13 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
 
   // ── 第八十二輪批次 IC 組：按排表偏好微調（修好違規、填好空格之後另做一步）──
   const weightKeys = {};
-  let weightTune = { moves: [], unmet: [], error: '' };
+  let weightTune = { moves: [], unmet: [], outcomes: [], error: '' };
   try {
     const protectedKeys = Object.assign({}, manualKeys, keptKeys, releasedCellKeys, blockedKeys, systemKeys);
     const tuned = proposeWeightFineTune_(context, analysis.manualState, {
       weights: readWeightsForQuarterTune_(quarterId, timezone), protectedKeys: protectedKeys
     });
-    weightTune = { moves: tuned.moves, unmet: tuned.unmet, error: '' };
+    weightTune = { moves: tuned.moves, unmet: tuned.unmet, outcomes: tuned.outcomes || [], error: '' };
     tuned.moves.forEach(function (m) {
       if (stateByKey[m.key]) stateByKey[m.key].personId = m.toPersonId;
       systemKeys[m.key] = true;
@@ -966,9 +966,14 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
     weightTune: {
       moves: ((built.weightTune || {}).moves || []).map(function (m) {
         return { serviceDate: m.serviceDate, postNameTC: m.postNameTC, slotIndex: m.slotIndex,
-          fromName: m.fromName, toName: m.toName, label: m.label };
+          fromName: m.fromName, toName: m.toName, label: m.label,
+          weightKey: m.weightPersonId + '|' + m.weightPostId };
       }),
       unmet: ((built.weightTune || {}).unmet || []).map(function (u) { return u.text; }),
+      // 第八十四輪批次 KC 組：每一項偏好一句（三選一）；`weightKey` 對返上面嘅 moves
+      outcomes: ((built.weightTune || {}).outcomes || []).map(function (oc) {
+        return { kind: oc.kind, text: oc.text, moveCount: oc.moveCount, weightKey: oc.personId + '|' + oc.postId };
+      }),
       error: (built.weightTune || {}).error || ''
     }
   };
@@ -1808,22 +1813,33 @@ function readWeightsForQuarterTune_(quarterId, timezone) {
  * @param {Object} context fine-tune context
  * @param {Object[]} state 修好違規、填好空格之後嘅狀態
  * @param {{weights: {rows: Object[]}, protectedKeys: Object.<string, boolean>}} opts
- * @returns {{moves: Object[], unmet: Object[]}}
+ * @returns {{moves: Object[], unmet: Object[], outcomes: Object[]}} `outcomes`（第八十四輪批次 KC 組）：
+ *   每一項生效中嘅偏好一句——`TUNED` 微調了 N 格／`MET` 已達到目標，不用微調／`UNMET` 做不到（原因）
  */
 function proposeWeightFineTune_(context, state, opts) {
   const o = opts || {};
   const protectedKeys = o.protectedKeys || {};
-  const rows = ((o.weights && o.weights.rows) || [])
-    .filter(function (w) { return w.target !== null && w.target !== undefined && !isNaN(Number(w.target)); })
-    .slice()
-    .sort(function (a, b) {
-      const ka = a.personId + '|' + a.postId;
-      const kb = b.personId + '|' + b.postId;
-      return ka < kb ? -1 : (ka > kb ? 1 : 0);
-    });
+  const byWeightKey = function (a, b) {
+    const ka = a.personId + '|' + a.postId;
+    const kb = b.personId + '|' + b.postId;
+    return ka < kb ? -1 : (ka > kb ? 1 : 0);
+  };
+  const hasTarget = function (w) { return w.target !== null && w.target !== undefined && !isNaN(Number(w.target)); };
+  const allRows = ((o.weights && o.weights.rows) || []).slice().sort(byWeightKey);
+  const rows = allRows.filter(hasTarget);
   const moves = [];
   const unmet = [];
-  if (rows.length === 0) return { moves: moves, unmet: unmet };
+  const outcomes = [];
+  const postName = function (postId) {
+    const p = findPostById_(context.posts, postId);
+    return p ? p.postNameTC : postId;
+  };
+  // 第八十四輪批次 KC 組：算唔到目標嘅偏好都要有一句（唔可以靜靜冇咗）
+  allRows.filter(function (w) { return !hasTarget(w); }).forEach(function (w) {
+    outcomes.push({ personId: w.personId, postId: w.postId, kind: 'UNMET', moveCount: 0,
+      text: nameOfPersonId_(context, w.personId) + '的' + postName(w.postId) + '：算不到這一季的目標次數，系統沒有按它微調。' });
+  });
+  if (rows.length === 0) return { moves: moves, unmet: unmet, outcomes: outcomes };
 
   const weightByKey = {};
   rows.forEach(function (w) { weightByKey[w.personId + '|' + w.postId] = w; });
@@ -1832,10 +1848,6 @@ function proposeWeightFineTune_(context, state, opts) {
     originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
   });
   const autoByPost = (context.gridRender && context.gridRender.autoGenerateByPostId) || {};
-  const postName = function (postId) {
-    const p = findPostById_(context.posts, postId);
-    return p ? p.postNameTC : postId;
-  };
   const keyOf = function (s) { return cellKey_(s.serviceDate, s.postId, s.slotIndex); };
   const movedKeys = {};
   let work = state.map(function (s) { return Object.assign({}, s); });
@@ -1895,7 +1907,35 @@ function proposeWeightFineTune_(context, state, opts) {
     });
   };
 
+  // 第八十四輪批次 KC 組：每一項偏好一句（微調了 N 格／已達到目標，不用微調／做不到）
+  const recordOutcome = function (w, movesBefore, unmetBefore, count) {
+    const n = moves.length - movesBefore;
+    const label = nameOfPersonId_(context, w.personId) + '的' + postName(w.postId);
+    if (unmet.length > unmetBefore) {
+      outcomes.push({ personId: w.personId, postId: w.postId, kind: 'UNMET', moveCount: n, text: unmet[unmet.length - 1].text });
+    } else if (count !== Number(w.target)) {
+      // 撞到 `WEIGHT_TUNE_MAX_MOVES` 未做完
+      describeUnmet(w, count, '這一次可以換的格數已到上限（' + WEIGHT_TUNE_MAX_MOVES + ' 格），未做完。');
+      outcomes.push({ personId: w.personId, postId: w.postId, kind: 'UNMET', moveCount: n, text: unmet[unmet.length - 1].text });
+    } else if (n > 0) {
+      outcomes.push({ personId: w.personId, postId: w.postId, kind: 'TUNED', moveCount: n,
+        text: label + '：微調了 ' + n + ' 格（目標 ' + w.target + ' 次，現時 ' + count + ' 次）' });
+    } else {
+      outcomes.push({ personId: w.personId, postId: w.postId, kind: 'MET', moveCount: 0,
+        text: label + '：目標 ' + w.target + ' 次，現時 ' + count + ' 次，已達到目標，不用微調' });
+    }
+  };
+
   rows.forEach(function (w) {
+    const movesBefore = moves.length;
+    const unmetBefore = unmet.length;
+    tuneOne(w);
+    recordOutcome(w, movesBefore, unmetBefore, countOf(w.personId, w.postId));
+  });
+  outcomes.sort(byWeightKey);
+  return { moves: moves, unmet: unmet, outcomes: outcomes };
+
+  function tuneOne(w) {
     const target = Number(w.target);
     let count = countOf(w.personId, w.postId);
     const eligible = ((context.eligibility.byPost || {})[w.postId] || []).indexOf(w.personId) !== -1;
@@ -1940,8 +1980,7 @@ function proposeWeightFineTune_(context, state, opts) {
       if (!done) { describeUnmet(w, count, '找不到可以換給別人而不違反規則的格。'); return; }
       count = countOf(w.personId, w.postId);
     }
-  });
-  return { moves: moves, unmet: unmet };
+  }
 }
 
 const GAP_FILL_MAX_CELLS = 40;

@@ -7860,8 +7860,8 @@ const MUTATIONS = [
     id: "ic-no-tune",
     why: "冇按偏好微調",
     file: "src/SuggestionSheet.gs",
-    find: "    weightTune = { moves: tuned.moves, unmet: tuned.unmet, error: '' };",
-    replace: "    weightTune = { moves: [], unmet: [], error: '' }; tuned.moves = [];",
+    find: "    weightTune = { moves: tuned.moves, unmet: tuned.unmet, outcomes: tuned.outcomes || [], error: '' };",
+    replace: "    weightTune = { moves: [], unmet: [], outcomes: [], error: '' }; tuned.moves = [];",
     tests: ["tests/round82_ib_ic_adjust_all.test.js"]
   },
   {
@@ -7908,7 +7908,7 @@ const MUTATIONS = [
     id: "ic-no-result-section",
     why: "結果窗冇按偏好微調一段",
     file: "src/ui/ScriptSuggestion.html",
-    find: "    if ((wt.moves || []).length > 0 || (wt.unmet || []).length > 0 || wt.error) {",
+    find: "    if (weightItems.length > 0 || wt.error) {",
     replace: "    if (false) {",
     tests: ["tests/round82_ib_ic_adjust_all.test.js"]
   },
@@ -8343,6 +8343,46 @@ const MUTATIONS = [
     find: "    if (titles.length > 0) {\n      box.appendChild(make('div', { text: '・每週標題改了 '",
     replace: "    if (false) {\n      box.appendChild(make('div', { text: '・每週標題改了 '",
     tests: ["tests/round84_kb_will_handle_titles.test.js"]
+  },
+  {
+    id: "kc-no-met-line",
+    why: "已達目標冇一句",
+    file: "src/SuggestionSheet.gs",
+    find: "    } else {\n      outcomes.push({ personId: w.personId, postId: w.postId, kind: 'MET', moveCount: 0,",
+    replace: "    } else if (false) {\n      outcomes.push({ personId: w.personId, postId: w.postId, kind: 'MET', moveCount: 0,",
+    tests: ["tests/round84_kc_weight_outcome_each.test.js"]
+  },
+  {
+    id: "kc-outcomes-dropped",
+    why: "結果冇逐項偏好",
+    file: "src/SuggestionSheet.gs",
+    find: "      outcomes: ((built.weightTune || {}).outcomes || []).map(",
+    replace: "      outcomes: ([]).map(",
+    tests: ["tests/round84_kc_weight_outcome_each.test.js"]
+  },
+  {
+    id: "kc-no-target-silent",
+    why: "算唔到目標靜靜冇句",
+    file: "src/SuggestionSheet.gs",
+    find: "  allRows.filter(function (w) { return !hasTarget(w); }).forEach(",
+    replace: "  [].forEach(",
+    tests: ["tests/round84_kc_weight_outcome_each.test.js"]
+  },
+  {
+    id: "kc-ui-old-gate",
+    why: "冇微調就冇偏好一段",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "    if (weightItems.length > 0 || wt.error) {",
+    replace: "    if ((wt.moves || []).length > 0 || (wt.unmet || []).length > 0 || wt.error) {",
+    tests: ["tests/round84_kc_weight_outcome_each.test.js"]
+  },
+  {
+    id: "kc-ui-no-moves",
+    why: "微調冇逐格列出",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "        (wt.moves || []).filter((m) => m.weightKey === oc.weightKey).forEach((m) => box.appendChild(moveLine(m)));\n",
+    replace: "",
+    tests: ["tests/round84_kc_weight_outcome_each.test.js"]
   }
 ];
 
