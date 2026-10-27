@@ -192,8 +192,9 @@
     if (un.length > 0) {
       box.appendChild(make('div', {
         text: '・「不能服侍的日期」令這一版 ' + un.length + ' 格的人那一日不能服侍（系統會換人）', className: 'ok-line' }));
+      // 第八十三輪批次 JB 組：同結果窗同一套原因字眼（「某某 該日不能服侍」）
       un.forEach((c) => box.appendChild(make('div', {
-        text: '　　' + cellText(c) + '　' + (c.personName || ''), className: 'vio-row' })));
+        text: '　　' + cellText(c) + '　' + (c.reason || c.personName || ''), className: 'vio-row' })));
     }
     const wt = d.weights || {};
     if (wt.error) {
@@ -375,6 +376,17 @@
         text: humanDate(o.serviceDate) + '　' + o.postNameTC + (Number(o.slotIndex) > 1 ? (' ' + o.slotIndex) : '')
           + '　' + o.fromName + ' → ' + o.toName + '：' + o.text,
         className: o.outcome === 'SYSTEM_CHANGED' || o.outcome === 'UNFIXABLE' ? 'vio-row strong' : 'vio-row'
+      })));
+      nodes.push(box);
+    }
+    // 第八十三輪批次 JB 組：系統修好的格（唔係你人手改過的；人手改過而被再改的已喺上面，唔重覆）
+    const fixes = r.systemFixes || [];
+    if (fixes.length > 0) {
+      const box = make('div', { className: 'sec' }, [sectionTitle('系統修好的格（' + fixes.length + ' 格）')]);
+      fixes.forEach((f) => box.appendChild(make('div', {
+        text: humanDate(f.serviceDate) + '　' + f.postNameTC + (Number(f.slotIndex) > 1 ? (' ' + f.slotIndex) : '')
+          + '：' + f.fromName + ' → ' + f.toName + '（' + f.reason + '）',
+        className: 'ok-line'
       })));
       nodes.push(box);
     }

@@ -425,6 +425,9 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
         : ('你改的這一格違反了規則（' + u.reason + '）。系統沒有動它。'));
   });
 
+  // 第八十三輪批次 JB 組：系統修好嘅格（**唔係**你人手改過嗰啲——嗰啲喺 `manualOutcomes`；
+  // 按偏好微調嘅喺 `weightTune`）——結果窗用文字逐格列出，唔使開建議表先見到。
+  const systemFixes = [];
   fix.proposals.forEach(function (p) {
     const key = cellKey_(p.serviceDate, p.postId, p.slotIndex);
     if (!p.suggestedPersonId) {
@@ -436,6 +439,15 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     }
     const before = stateByKey[key] ? (stateByKey[key].personId || '') : '';
     if (before === p.suggestedPersonId) return;   // 冇實際改動
+    if (!manualKeys[key]) {
+      const fromName = before ? nameOfPersonId_(context, before) : '';
+      const postObj = findPostById_(context.posts, p.postId);
+      systemFixes.push({
+        serviceDate: p.serviceDate, postNameTC: postObj ? postObj.postNameTC : p.postId, slotIndex: p.slotIndex,
+        fromName: fromName || '（空白）', toName: p.suggestedName || nameOfPersonId_(context, p.suggestedPersonId),
+        reason: systemFixReasonText_(p.brokenRuleId, p.kind, fromName, p.reason)
+      });
+    }
     systemKeys[key] = true;
     if (stateByKey[key]) stateByKey[key].personId = p.suggestedPersonId;
     // ⚠️ 第四十三輪批次 D 組：填空格同修違反嘅備註要寫得唔同。
@@ -473,7 +485,9 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   // ── 第八十二輪批次 IB 組：你人手改過嘅每一格，系統點樣處理 ──
   const reasonByKey = {};
   fix.proposals.forEach(function (p) {
-    reasonByKey[cellKey_(p.serviceDate, p.postId, p.slotIndex)] = p.reason || p.brokenRuleId || '';
+    // 第八十三輪批次 JB 組：同「系統修好的格」同一套原因字眼
+    reasonByKey[cellKey_(p.serviceDate, p.postId, p.slotIndex)] =
+      systemFixReasonText_(p.brokenRuleId, p.kind, p.manualName || '', p.reason || p.brokenRuleId || '');
   });
   const untouchedByKey = {};
   (fix.untouchedManual || []).forEach(function (u) { untouchedByKey[u.key] = u; });
@@ -544,6 +558,8 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     // 第八十二輪批次 IB 組：人手改過每一格嘅處理結果、「這一次會處理」
     manualOutcomes: manualOutcomes,
     willHandle: willHandle,
+    // 第八十三輪批次 JB 組：系統修好嘅格（唔係你人手改過嘅）
+    systemFixes: systemFixes,
     // 第四十六輪批次 C4 組：幹事改過、違反規則、系統冇動嗰幾格（第三種顏色）。
     blockedKeys: blockedKeys,
     untouchedManual: fix.untouchedManual || [],
@@ -953,6 +969,8 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
     // 第八十二輪批次 IB 組：「這一次會處理」＋你人手改過嘅每一格點樣處理
     willHandle: built.willHandle,
     manualOutcomes: built.manualOutcomes || [],
+    // 第八十三輪批次 JB 組：系統修好的格（逐格：日期 崗位：原本 → 改成（原因））
+    systemFixes: built.systemFixes || [],
     // 第八十二輪批次 IC 組：按排表偏好微調咗邊幾格；做唔到嘅原因
     weightTune: {
       moves: ((built.weightTune || {}).moves || []).map(function (m) {
@@ -1703,8 +1721,11 @@ function buildAdjustWillHandle_(quarterId, context, analysis, timezone) {
   const unavailableCells = (analysis.violations || []).filter(function (v) {
     return v.ruleId === RULE_IDS.UNAVAILABLE;
   }).map(function (v) {
+    const personName = nameOfPersonId_(context, v.personId);
     return { serviceDate: v.serviceDate, postNameTC: postNameOf(v.postId), slotIndex: v.slotIndex,
-      personName: nameOfPersonId_(context, v.personId) };
+      personName: personName,
+      // 第八十三輪批次 JB 組：同結果窗「系統修好的格」同一套原因字眼
+      reason: systemFixReasonText_(v.ruleId, '', personName, v.reason) };
   });
   let weights = { count: 0, items: [], error: '' };
   try {
@@ -1728,6 +1749,22 @@ function buildAdjustWillHandle_(quarterId, context, analysis, timezone) {
     log_('WARN', 'buildAdjustWillHandle_ 數不到空格：' + err.message);
   }
   return { gridChanges: gridChanges, unavailableCells: unavailableCells, weights: weights, blankCount: blankCount };
+}
+
+/**
+ * 第八十三輪批次 JB 組：系統改一格嘅原因（人話）——「調整之前」同結果窗共用，唔各自寫。
+ * @param {string} ruleId 違反咗嘅規則（填空格時可以空）
+ * @param {string} kind 建議種類（`FILL_GAP`＝空格，系統填上）
+ * @param {string} personName 原本嗰個人
+ * @param {string=} fallback 其他規則嘅原因句（`reason`）
+ * @returns {string}
+ */
+function systemFixReasonText_(ruleId, kind, personName, fallback) {
+  if (kind === 'FILL_GAP') return '空格，系統填上';
+  if (ruleId === RULE_IDS.UNAVAILABLE) return (personName ? personName + ' ' : '') + '該日不能服侍';
+  if (ruleId === RULE_IDS.NO_CONSECUTIVE) return '連續兩週';
+  if (ruleId === RULE_IDS.ELIGIBILITY) return '不在這個崗位的名單上';
+  return fallback || ruleId || '';
 }
 
 /** 一次調整最多按偏好換幾多格（安全上限；正常一季遠低過呢個數）。 */

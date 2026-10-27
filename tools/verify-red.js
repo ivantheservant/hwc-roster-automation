@@ -8175,6 +8175,54 @@ const MUTATIONS = [
     find: "    return '這一次會寄給 ' + total + ' 位：堂委 '",
     replace: "    return '這一次會寄給 ' + total + ' 位：職事表上全部人 0 位、堂委 '",
     tests: ["tests/round83_jd_review_dialog.test.js"]
+  },
+  {
+    id: "jb-include-manual",
+    why: "人手改過的格重覆列入",
+    file: "src/SuggestionSheet.gs",
+    find: "    if (!manualKeys[key]) {\n      const fromName = before ? nameOfPersonId_(context, before) : '';",
+    replace: "    if (true) {\n      const fromName = before ? nameOfPersonId_(context, before) : '';",
+    tests: ["tests/round83_jb_system_fixes.test.js"]
+  },
+  {
+    id: "jb-no-fixes-returned",
+    why: "結果冇系統修好的格",
+    file: "src/SuggestionSheet.gs",
+    find: "    systemFixes: built.systemFixes || [],",
+    replace: "    systemFixes: [],",
+    tests: ["tests/round83_jb_system_fixes.test.js"]
+  },
+  {
+    id: "jb-reason-raw",
+    why: "原因用機器句",
+    file: "src/SuggestionSheet.gs",
+    find: "  if (ruleId === RULE_IDS.UNAVAILABLE) return (personName ? personName + ' ' : '') + '該日不能服侍';",
+    replace: "",
+    tests: ["tests/round83_jb_system_fixes.test.js"]
+  },
+  {
+    id: "jb-willhandle-reason",
+    why: "調整之前冇同一句原因",
+    file: "src/SuggestionSheet.gs",
+    find: "      reason: systemFixReasonText_(v.ruleId, '', personName, v.reason) };",
+    replace: "      reason: v.reason || '' };",
+    tests: ["tests/round83_jb_system_fixes.test.js"]
+  },
+  {
+    id: "jb-ui-no-section",
+    why: "結果窗冇系統修好的格",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "    if (fixes.length > 0) {\n      const box = make('div', { className: 'sec' }, [sectionTitle('系統修好的格（'",
+    replace: "    if (false) {\n      const box = make('div', { className: 'sec' }, [sectionTitle('系統修好的格（'",
+    tests: ["tests/round83_jb_system_fixes.test.js"]
+  },
+  {
+    id: "jb-manual-reason-raw",
+    why: "人手再改原因字眼唔同",
+    file: "src/SuggestionSheet.gs",
+    find: "      systemFixReasonText_(p.brokenRuleId, p.kind, p.manualName || '', p.reason || p.brokenRuleId || '');",
+    replace: "      p.reason || p.brokenRuleId || '';",
+    tests: ["tests/round83_jb_system_fixes.test.js"]
   }
 ];
 
