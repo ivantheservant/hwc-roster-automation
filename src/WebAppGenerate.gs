@@ -134,7 +134,8 @@ function apiGenerateDraftExecute_locked_(quarterId) {
           + '（可能是你在另一個分頁已經生成過，或者剛剛撳了兩次。）',
         [
           '重新整理這一頁，就會看到已經生成好的初稿',
-          '如果想重新生成，請去「進階功能」'
+          // 第八十二輪批次 II 組：幹事介面冇「重新生成初稿」
+          REDO_QUARTER_HINT_TEXT
         ])
     };
   }

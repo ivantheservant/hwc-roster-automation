@@ -65,8 +65,10 @@ console.log('\n=== CA①：「名單維護」整區冇咗，換成「常用設�
     check('★★★★★ 常用設定〔' + t + '〕係一條新分頁連結（target=_blank）',
       a && a.target === '_blank' && /^https:\/\/example\.invalid\/s#gid=/.test(a.href), a ? a.href + ' ' + a.target : 'none');
   });
-  check('★★★★★ 常用設定有〔匯出規則審閱表〕〔重新生成初稿（覆蓋式）〕兩項',
-    /匯出規則審閱表/.test(body.textContent) && /重新生成初稿（覆蓋式）/.test(body.textContent), body.textContent.slice(0, 300));
+  // 第八十二輪批次 II／IJ 組（刻意改動）：〔重新生成初稿（覆蓋式）〕拿走，換成〔整季清走重來〕
+  check('★★★★★ 常用設定有〔匯出規則審閱表〕〔整季清走重來〕兩項、冇〔重新生成初稿（覆蓋式）〕',
+    /匯出規則審閱表/.test(body.textContent) && /整季清走重來/.test(body.textContent)
+      && !/重新生成初稿（覆蓋式）/.test(body.textContent), body.textContent.slice(0, 300));
   ['崗位資格', '暫時不做某崗位', '不能服侍的日期', '排表偏好'].forEach((t) => {
     check('★★★★★ 常用設定冇〔' + t + '〕', all.indexOf(t) === -1 && body.textContent.indexOf('〔' + t) === -1, JSON.stringify(all));
   });

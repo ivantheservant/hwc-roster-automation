@@ -326,7 +326,7 @@ function computeDashboardButtons_(s) {
   buttons.generate = {
     enabled: !s.versionExists,
     disabledReason: s.versionExists
-      ? '這一季已經有初稿了。如果要重新生成，請去「進階功能」。' : '',
+      ? '這一季已經有初稿了。' + REDO_QUARTER_HINT_TEXT + '。' : '',
     dynamicText: buildGenerateButtonText_(s)
   };
 
@@ -414,6 +414,21 @@ function buildGenerateButtonText_(s) {
   }
   return '原定 ' + s.generateOnText + ' 生成，已經過了 '
     + Math.abs(s.daysUntilGenerateOn) + ' 天。';
+}
+
+/**
+ * 第八十二輪批次 IJ 組：〔整季清走重來〕可唔可以撳。讀唔到（任何錯誤）⇒ 一律當封鎖——
+ * 呢個係全系統最危險嘅動作之一，「唔知」唔可以變成「可以」。
+ * @param {string} quarterId 季度 ID
+ * @returns {{blocked: boolean, reason: string}}
+ */
+function readQuarterResetAvailabilitySafe_(quarterId) {
+  try {
+    return describeQuarterResetAvailability_(quarterId);
+  } catch (err) {
+    log_('WARN', 'readQuarterResetAvailabilitySafe_ 讀不到：' + err.message);
+    return { blocked: true, reason: '暫時讀不到這一季可不可以清走。撳「重新整理」再試。' };
+  }
 }
 
 /** 第八十二輪批次 IH 組：〔儲存〕灰色時嘅原因（表上冇未儲存改動）。 */
@@ -726,7 +741,9 @@ function buildDashboardState_(quarterId) {
     eligibilityImpact: versionExists ? summariseEligibilityImpact_(quarterId)
       : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' },
     // 第七十五輪批次 CA 組：「常用設定」三粒掣喺新分頁直接開嗰張工作表。
-    settingsLinks: buildSettingsSheetLinks_()
+    settingsLinks: buildSettingsSheetLinks_(),
+    // 第八十二輪批次 IJ 組：常用設定〔整季清走重來〕可唔可以撳（封鎖季度 ⇒ 灰掣＋原因）
+    quarterReset: readQuarterResetAvailabilitySafe_(quarterId)
   };
 }
 

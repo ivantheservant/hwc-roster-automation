@@ -101,7 +101,8 @@ console.log('\n=== F【核心】選單版一行都唔可以改 ===');
 
 console.log('\n=== F【核心】只搬七個 ===');
 {
-  const names = ['重新生成初稿（覆蓋式）', '匯出職事表 PDF', '產生個人 PDF',
+  // 第八十二輪批次 II 組：〔重新生成初稿（覆蓋式）〕拿走
+  const names = ['匯出職事表 PDF', '產生個人 PDF',
     '補寄未收到的人', '核對職事表', '列出待補格子', '草稿覆核報告（給堂委看）'];
   names.forEach(function (n) {
     check('★★★★ 區四有「' + n + '」', zone4.indexOf("'" + n + "'") !== -1);
@@ -132,18 +133,12 @@ console.log('\n=== F 版本下拉一律寫人話 ===');
     zone4.indexOf('這一季還沒有任何版本，所以沒有東西可以處理。') !== -1);
 }
 
-console.log('\n=== F【核心】重新生成（覆蓋式）要打字確認 ===');
+// 第八十二輪批次 II 組（刻意改動）：幹事介面嘅〔重新生成初稿（覆蓋式）〕整個拿走（Ivan 決定），
+// 原本「要打字確認」嗰四條跟住一齊冇咗；改為守住佢真係唔再存在。
+console.log('\n=== F【核心】重新生成（覆蓋式）已經拿走（第八十二輪 II 組）===');
 {
-  check('★★★★★ 有打字確認（會建立新版本，而且會蓋走未儲存嘅人手改動）',
-    /openConfirm\(\{[\s\S]{0,1600}?requireTyping: true,[\s\S]{0,200}?confirmLabel: '確定重新生成'/.test(zone4));
-  check('★★★★★ 而且明確警告會蓋走未儲存嘅人手改動',
-    zone4.indexOf('你在表上做過的人手改動，如果還沒有撳「儲存」，就會不見了。') !== -1);
-  check('★★★★★ 而且指出「如果只係想套用幾格，應該用掣 1」'
-    + '——唔講嘅話，幹事會用一個核彈去做一件小事',
-    zone4.indexOf('如果只是想套用你剛才在表上改的幾格，請用區一的「儲存」') !== -1);
-  check('★★★★ 有「不會做的事」，講明唔會寄信、唔會刪舊版本',
-    zone4.indexOf('・不會寄出任何電郵') !== -1
-    && zone4.indexOf('・不會刪走任何舊版本') !== -1);
+  check('★★★★★ 區四冇 openRegenerate／「確定重新生成」', !/function openRegenerate\(/.test(zone4)
+    && zone4.indexOf("confirmLabel: '確定重新生成'") === -1);
 }
 
 console.log('\n=== F 待補格子唔收版本號 ===');
@@ -238,7 +233,9 @@ console.log('\n=== F 呼叫層：讀寫分流 ===');
     'apiMakeupSendStages', 'apiMakeupSendPlan'].forEach(function (n) {
     check('★★★★ ' + n + ' 喺唯讀白名單', readOnly.indexOf(n) !== -1);
   });
-  ['apiGenerateRoster', 'apiExportRosterPdf', 'apiGeneratePersonalPdfBatch',
+  // 第八十二輪批次 II 組：apiGenerateRoster 嘅幹事介面入口（〔重新生成初稿〕）已拿走——只驗佢唔喺唯讀白名單
+  check('★★★★★ apiGenerateRoster 唔喺白名單（幹事介面已冇入口）', readOnly.indexOf('apiGenerateRoster') === -1);
+  ['apiExportRosterPdf', 'apiGeneratePersonalPdfBatch',
     'apiMakeupSendExecute', 'apiRepublishPublicLink'].forEach(function (n) {
     check('★★★★★ ' + n + ' 唔喺白名單，而且用 callServerMutating()',
       readOnly.indexOf(n) === -1

@@ -6089,8 +6089,9 @@ const MUTATIONS = [
     id: "cc-title-only-no-ver",
     why: "只改標題唔建立新一版",
     file: "src/StateSource.gs",
-    find: "  if ((!changes || changes.length === 0) && titleChangeCount === 0) {",
-    replace: "  if (!changes || changes.length === 0) {",
+    // 第八十二輪批次 IF 組：條件多咗「起點」（`&& !hasStartPoint`），突變照舊拿走「只改標題」嗰半
+    find: "  if ((!changes || changes.length === 0) && titleChangeCount === 0 && !hasStartPoint) {",
+    replace: "  if ((!changes || changes.length === 0) && !hasStartPoint) {",
     tests: ["tests/round75_cc_special_off_week_title.test.js"]
   },
   {
@@ -6209,8 +6210,9 @@ const MUTATIONS = [
     id: "cf-no-revert-on-fail",
     why: "記唔到都唔還原勾選框",
     file: "src/ui/Script.html",
-    find: "        if (!ok) { cb.checked = !want; state[sk(it)] = !want; changed(); }",
-    replace: "        if (!ok) { changed(); }",
+    // 第八十二輪批次 IA 組：還原嗰句搬入 else 分支（同時寫「這一格未記住」）
+    find: "          cb.checked = !want; state[sk(it)] = !want; changed();\n          note.textContent = '　這一格未記住，請再勾一次';",
+    replace: "          changed();\n          note.textContent = '　這一格未記住，請再勾一次';",
     tests: ["tests/round75_cfg_ui.test.js"]
   },
   {
@@ -7669,6 +7671,88 @@ const MUTATIONS = [
     find: "          + '要用新偏好調整現有的職事表，撳第 2 步〔請系統幫我調整〕；還未生成的話，生成時會自動用。',",
     replace: "          + '',",
     tests: ["tests/round82_id_weights_saved_notice.test.js"]
+  },
+  // ── 第八十二輪批次 II 組：幹事介面拿走〔重新生成初稿（覆蓋式）〕──
+  {
+    id: "ii-regen-row-back",
+    why: "常用設定又有重新生成初稿",
+    file: "src/ui/ScriptZone3.html",
+    find: "        () => openRuleExport(), false),\n      resetRow\n    ]));",
+    replace: "        () => openRuleExport(), false),\n      resetRow,\n      zone4Row('重新生成初稿（覆蓋式）', '重新排一次。', () => {}, true)\n    ]));",
+    tests: ["tests/round82_ii_no_regenerate_entry.test.js"]
+  },
+  {
+    id: "ii-step1-says-regen",
+    why: "第 1 步仍叫人重新生成",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "          : '這一季已經生成過了。' + REDO_QUARTER_HINT",
+    replace: "          : '這一季已經生成過了。要重新生成這一季請去「常用設定 ▸ 重新生成初稿（覆蓋式）」。'",
+    tests: ["tests/round82_ii_no_regenerate_entry.test.js"]
+  },
+  {
+    id: "ii-hint-no-reset",
+    why: "提示冇指去整季清走重來",
+    file: "src/Constants.gs",
+    find: "const REDO_QUARTER_HINT_TEXT = '要整季重來，用「常用設定 ▸ 整季清走重來」之後再生成；'",
+    replace: "const REDO_QUARTER_HINT_TEXT = '要重來請聯絡管理員；'",
+    tests: ["tests/round82_ii_no_regenerate_entry.test.js", "tests/main_flow_six_steps.test.js"]
+  },
+  {
+    id: "ii-server-says-regen",
+    why: "後端訊息仍叫人重新生成初稿",
+    file: "src/WebAppGenerate.gs",
+    find: "          // 第八十二輪批次 II 組：幹事介面冇「重新生成初稿」\n          REDO_QUARTER_HINT_TEXT",
+    replace: "          '如果想重新生成，請去「進階功能」'",
+    tests: ["tests/round82_ii_no_regenerate_entry.test.js"]
+  },
+  // ── 第八十二輪批次 IJ 組：幹事介面〔整季清走重來〕──
+  {
+    id: "ij-no-typing-check",
+    why: "打錯字都照清",
+    file: "src/WebAppQuarterReset.gs",
+    find: "  if (String(typed || '').trim() !== QUARTER_RESET_CONFIRM_TEXT) {",
+    replace: "  if (false) {",
+    tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
+  },
+  {
+    id: "ij-no-block-recheck",
+    why: "後端唔再驗封鎖季度",
+    file: "src/WebAppQuarterReset.gs",
+    find: "  if (avail.blocked) {\n    throw new Error(",
+    replace: "  if (false) {\n    throw new Error(",
+    tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
+  },
+  {
+    id: "ij-ignore-blocked-list",
+    why: "封鎖清單唔生效",
+    file: "src/WebAppQuarterReset.gs",
+    find: "  const split = splitQuarterResetTargets_([id], blockedList);",
+    replace: "  const split = splitQuarterResetTargets_([id], []);",
+    tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
+  },
+  {
+    id: "ij-keep-v0",
+    why: "唔連第 0 版一齊清",
+    file: "src/WebAppQuarterReset.gs",
+    find: "  const plan = planQuarterReset_(id, true);\n  const batch",
+    replace: "  const plan = planQuarterReset_(id, false);\n  const batch",
+    tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
+  },
+  {
+    id: "ij-no-official-warn",
+    why: "已正式發出冇紅框",
+    file: "src/WebAppQuarterReset.gs",
+    find: "  if (plan && plan.quarterStage === QUARTER_STAGE.OFFICIAL_SENT) return true;",
+    replace: "  if (false) return true;",
+    tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
+  },
+  {
+    id: "ij-front-not-grey",
+    why: "封鎖季度掣照亮",
+    file: "src/ui/ScriptZone3.html",
+    find: "      if (b) { b.disabled = true; b.title = reset.reason || ''; }",
+    replace: "      if (b) { b.title = reset.reason || ''; }",
+    tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
   }
 ];
 

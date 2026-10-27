@@ -478,68 +478,12 @@
     openModal(title, nodes, [button('關閉', () => closeModal(), '')]);
   }
 
-  /* ── 重新生成初稿（覆蓋式）───────────────────────────────── */
-
-  function openRegenerate() {
-    openConfirm({
-      title: '重新生成初稿（覆蓋式）',
-      bodyNodes: [
-        make('div', { className: 'vio vio-hard' }, [
-          make('div', {
-            text: '這會重新排一次整季，並建立一個新版本。'
-              + '你在表上做過的人手改動，如果還沒有撳「儲存」，就會不見了。',
-            className: 'vio-row'
-          })
-        ]),
-        make('div', { className: 'sec' }, [
-          sectionTitle('會做的事：'),
-          make('div', { text: '・重新排整季，建立一個新版本', className: 'vio-row' }),
-          make('div', { text: '・舊版本原封不動保留，可以在第 2 步的版本下拉選回來作起點', className: 'vio-row' }),
-          sectionTitle('不會做的事：'),
-          make('div', { text: '・不會寄出任何電郵', className: 'vio-row' }),
-          make('div', { text: '・不會刪走任何舊版本', className: 'vio-row' })
-        ]),
-        // ⚠️ 第四十四輪批次 F 組：呢度**唔再彈多一個窗**問「使唔使先改名單」。
-        //
-        // 主流程嗰粒「生成」會問（見 `ScriptZone1.html` 嘅
-        // `openGenerateDraft()`），但呢一粒係區四嘅覆蓋式重做，本身
-        // 已經要打字確認。喺一個打字確認之上再疊一個彈窗，只會令人
-        // 撳完再撳，而唔會令人真係去改名單。改為喺同一版講一句。
-        para('會用「現在」那一份名單來排。要先改名單的話，'
-          + '請先去第 2 步「更改各崗位的事奉人員」，改完再回來撳這一粒。', 'muted'),
-        para('如果只是想套用你剛才在表上改的幾格，請用區一的「儲存」，'
-          + '不要用這一個。', 'muted')
-      ],
-      requireTyping: true,
-      confirmLabel: '確定重新生成',
-      danger: true,
-      onConfirm: () => runAction('重新生成中，請稍候', async () => {
-        const res = await callServerMutating('apiGenerateRoster', currentQuarterId);
-        // ⚠️ 第二十八輪批次階段 C4：本來寫 `res.violationCount`，
-        // 而 `apiGenerateRoster()` 根本冇呢個欄位——畫面永遠印
-        // 「規則違反（未提供）項」。
-        // 冇假造一個 0 係啱嘅，但個數字其實攞得到（`warnings`），
-        // 所以應該攞返，唔係留一句幹事睇唔明嘅話。
-        const nodes = [
-          make('div', { text: '已建立第 ' + res.versionNo + ' 版。', className: 'ok-line' })
-        ];
-        nodes.push(make('div', {
-          text: typeof res.warnings === 'number'
-            ? ('規則提示 ' + res.warnings + ' 項。')
-            : '規則違反：稍後可用「核對職事表」查看。',
-          className: 'ok-line'
-        }));
-        if (res.blank !== undefined) {
-          nodes.push(make('div', {
-            text: '已排 ' + res.assigned + ' 格，留空 ' + res.blank + ' 格'
-              + '（留空包括講員／翻譯／獻花這些要你人手填的）。',
-            className: 'muted'
-          }));
-        }
-        openModal('重新生成完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
-      })
-    });
-  }
+  /* ── 第八十二輪批次 II 組：〔重新生成初稿（覆蓋式）〕拿走（Ivan 決定）──────────
+   *
+   * 現場：Stage 係 REQUESTS_APPLIED 嗰陣撳佢 ⇒「『生成職事表（Web UI）』需要 Stage 為『DRAFT』」。
+   * Ivan：幹事介面唔需要任何「重新生成初稿」——要整季重來用「常用設定 ▸ 整季清走重來」（IJ 組）之後再生成；
+   * 要回到之前嘅內容用第 2 步版本下拉〔用這一版作起點〕。伺服器函式（試算表選單、自測仍用）保留。
+   */
 
   /* ── 核對職事表 ─────────────────────────────────────────── */
 

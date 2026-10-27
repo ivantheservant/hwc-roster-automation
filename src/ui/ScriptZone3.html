@@ -38,13 +38,84 @@
       settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),
       settingsSheetLink('固定收件人／管理員電郵', links.recipients, 'EmailRecipients')
     ]));
+    // 第八十二輪批次 II 組（Ivan 決定）：〔重新生成初稿（覆蓋式）〕拿走——整季重來用〔整季清走重來〕（IJ 組）
+    // 第八十二輪批次 IJ 組：〔整季清走重來〕（紅色危險掣）；受保護季度 ⇒ 灰掣＋原因
+    const reset = (d && d.quarterReset) || { blocked: true, reason: '暫時讀不到這一季可不可以清走。撳「重新整理」再試。' };
+    const resetRow = zone4Row('整季清走重來',
+      '把這一季清走到「還未生成初稿」（連第 0 版、派工紀錄、寄出紀錄、逐格決定、這一季的不能服侍日期等），'
+        + '之後可以重新生成。人員資料、名單、規則、Config 一律不碰。',
+      () => openQuarterResetFromDashboard(), true);
+    if (reset.blocked) {
+      const b = findChildByTag(resetRow, 'BUTTON');
+      if (b) { b.disabled = true; b.title = reset.reason || ''; }
+      resetRow.appendChild(make('div', { text: reset.reason || '', className: 'step-why' }));
+    }
     body.appendChild(make('div', { className: 'sec' }, [
       zone4Row('匯出規則審閱表', '把系統現時的規則設定變成一份人看得懂的試算表，給堂委逐條決定。',
         () => openRuleExport(), false),
-      zone4Row('重新生成初稿（覆蓋式）',
-        '重新排一次，會建立一個新版本。現有的人手改動不會保留。',
-        () => openRegenerate(), true)
+      resetRow
     ]));
+  }
+
+  /** 搵第一個 tagName 符合嘅子孫。 */
+  function findChildByTag(node, tag) {
+    if (!node) return null;
+    if (node.tagName === tag) return node;
+    const kids = node.children || [];
+    for (let i = 0; i < kids.length; i++) {
+      const hit = findChildByTag(kids[i], tag);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  /**
+   * 第八十二輪批次 IJ 組：〔整季清走重來〕——同試算表選單「重設季度測試資料」同一支後端。
+   * 先列確認清單（`apiQuarterResetPlan`，只讀），已正式發出就最上面紅框；要打「確認重設」先清。
+   */
+  function openQuarterResetFromDashboard() {
+    runAction('讀取確認清單', async () => {
+      const p = await callServer('apiQuarterResetPlan', currentQuarterId);
+      if (p.blocked) {
+        openModal('整季清走重來', [make('div', { text: p.blockedReason || '這一季不可以清走。', className: 'err-text' })],
+          [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      const nodes = [];
+      if (p.officialSent) {
+        nodes.push(make('div', { className: 'vio vio-hard' }, [
+          make('div', { text: p.officialSentWarning, className: 'vio-head' })
+        ]));
+      }
+      nodes.push(para('會把「' + p.quarterLabel + '」清走到「還未生成初稿」（連第 0 版一齊清）。'
+        + '除了 PDF（移到垃圾桶）之外，全部無法復原。', 'strong'));
+      const list = make('div', { className: 'sec' });
+      (p.lines || []).forEach((l) => list.appendChild(make('div', { text: l || '　', className: 'vio-row' })));
+      nodes.push(list);
+      if (p.nothingToDo) {
+        nodes.push(para('這一季沒有找到任何可以清理的東西，不需要執行。', 'muted'));
+        openModal('整季清走重來：' + p.quarterLabel, nodes, [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      openConfirm({
+        title: '整季清走重來：' + p.quarterLabel,
+        bodyNodes: nodes,
+        requireTyping: true,
+        typingPhrase: p.confirmText || '確認重設',
+        confirmLabel: '確定清走',
+        danger: true,
+        onConfirm: (typed) => runAction('清走中，請稍候', async () => {
+          const r = await callServerMutating('apiQuarterResetExecute', currentQuarterId, typed);
+          openModal('整季清走重來', [
+            make('div', {
+              text: r.ok ? ('已清走「' + p.quarterLabel + '」。現在是「還未生成初稿」，可以在第 1 步重新生成。')
+                : ('中途失敗：' + (r.error || '') + '　部分內容可能已經被清走，請看 AuditLog。'),
+              className: r.ok ? 'ok-line' : 'err-text'
+            })
+          ], [button('完成', () => closeModalAndRefresh(), '')]);
+        })
+      });
+    });
   }
 
   /**

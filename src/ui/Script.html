@@ -108,6 +108,8 @@
     'apiSaveAndConfirmPlan',
     // 第八十二輪批次 IH 組：切返幹事介面時重新檢查〔儲存〕——只讀
     'apiGetSaveButtonState',
+    // 第八十二輪批次 IJ 組：〔整季清走重來〕確認清單——只讀（planQuarterReset_ 只掃描）
+    'apiQuarterResetPlan',
     'apiStep2Preview',
     'apiStep4GetPendingWarnings',
     'apiStep4GetMissingPdfWarnings',
@@ -1407,15 +1409,18 @@
     const body = (opts.bodyNodes || []).slice();
     let input = null;
 
+    // 第八十二輪批次 IJ 組：`typingPhrase` 可以換（〔整季清走重來〕要打「確認重設」）；預設照舊「確認」
+    const phrase = opts.typingPhrase || CONFIRM_PHRASE;
+    const phraseCount = ['', '一', '兩', '三', '四', '五', '六'][phrase.length] || String(phrase.length);
     if (opts.requireTyping) {
       const box = make('div', { className: 'confirm-typing' });
       box.appendChild(make('p', {
-        text: opts.typingHint || '這個動作不可逆。確定的話，請在下面輸入「' + CONFIRM_PHRASE + '」兩個字：',
+        text: opts.typingHint || '這個動作不可逆。確定的話，請在下面輸入「' + phrase + '」' + phraseCount + '個字：',
         className: 'lines'
       }));
       input = document.createElement('input');
       input.type = 'text';
-      input.placeholder = CONFIRM_PHRASE;
+      input.placeholder = phrase;
       input.autocomplete = 'off';
       box.appendChild(input);
       body.push(box);
@@ -1423,9 +1428,9 @@
 
     const confirmBtn = button(opts.confirmLabel || '確定', () => {
       const typed = input ? input.value.trim() : '';
-      if (opts.requireTyping && typed !== CONFIRM_PHRASE) {
+      if (opts.requireTyping && typed !== phrase) {
         // 前端呢層只係提早俾回饋；後端一樣會再驗一次，唔靠畫面做關卡。
-        setStatus('請輸入「' + CONFIRM_PHRASE + '」兩個字才可以繼續。', true);
+        setStatus('請輸入「' + phrase + '」' + phraseCount + '個字才可以繼續。', true);
         if (input) input.focus();
         return;
       }

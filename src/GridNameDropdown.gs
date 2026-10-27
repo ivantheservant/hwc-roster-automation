@@ -55,7 +55,8 @@ function applyGridNameDropdowns_(quarterId, versionNo) {
       '找不到「' + sheetName + '」這一張工作表。',
       '職事表沒有任何改動。',
       ['如果那張表只是被改了名，把名字改回原本的就可以',
-        '否則去「常用設定 ▸ 重新生成初稿（覆蓋式）」重新建立一張（舊版本全部保留）']));
+        // 第八十二輪批次 II 組：幹事介面冇「重新生成初稿」——用舊版本作起點，儲存之後會建立新一張
+        '否則在第 2 步版本下拉選上一版〔用這一版作起點〕再〔儲存〕，會建立新一張（舊版本全部保留）']));
   }
   // 正式那一張的機器鍵一定在第 2 行（見 `buildGridLayout_()`）。
   return applyNameDropdownsToSheet_(sheet, sheetName, 2);

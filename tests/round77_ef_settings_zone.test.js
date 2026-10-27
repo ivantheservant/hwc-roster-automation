@@ -59,9 +59,10 @@ console.log('\n=== EF2：內容 ===');
   const body = ui.document.getElementById('zone3Body');
   const texts = buttonTexts(body);
   check('★★★★★★ 冇〔人員與電郵〕', texts.indexOf('人員與電郵') === -1, JSON.stringify(texts));
-  check('★★★★★ 有〔身分（堂委／執事）〕〔固定收件人／管理員電郵〕〔匯出規則審閱表〕〔重新生成初稿（覆蓋式）〕',
+  // 第八十二輪批次 II／IJ 組（刻意改動）：〔重新生成初稿（覆蓋式）〕換成〔整季清走重來〕
+  check('★★★★★ 有〔身分（堂委／執事）〕〔固定收件人／管理員電郵〕〔匯出規則審閱表〕〔整季清走重來〕',
     ['身分（堂委／執事）', '固定收件人／管理員電郵'].every((t) => texts.indexOf(t) !== -1)
-    && /匯出規則審閱表/.test(body.textContent) && /重新生成初稿（覆蓋式）/.test(body.textContent), JSON.stringify(texts));
+    && /匯出規則審閱表/.test(body.textContent) && /整季清走重來/.test(body.textContent), JSON.stringify(texts));
   check('★★★★★★ 新一句：「人員和電郵由出席系統讀取，這裡不用改。身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。」',
     body.textContent.indexOf('人員和電郵由出席系統讀取，這裡不用改。身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。') !== -1, body.textContent.slice(0, 200));
   check('★★★★★★ 冇「Active」改成 FALSE 嗰句', body.textContent.indexOf('Active') === -1);

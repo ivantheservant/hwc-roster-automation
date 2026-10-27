@@ -91,14 +91,9 @@ console.log('\n=== C4【核心】重新生成完成：唔可以寫「（未提�
     !/res\.violationCount/.test(zone4Code));
   check('★★★★★ 亦冇咗「（未提供）」呢四個字',
     zone4Code.indexOf('（未提供）') === -1);
-  check('★★★★★ 改成讀 `res.warnings`（`apiGenerateRoster()` 真係有回）',
-    /typeof res\.warnings === 'number'/.test(zone4));
-  check('★★★★★ 攞唔到嗰陣寫「稍後可用『核對職事表』查看」，而唔係一個假 0'
-    + '——假 0 會令幹事以為已經檢查過而且冇問題',
-    zone4.indexOf('規則違反：稍後可用「核對職事表」查看。') !== -1);
-  check('★★★★ 順帶把「已排／留空」都寫出嚟，而且講明留空包括人手填嗰啲'
-    + '（同階段 C1 同一個道理）',
-    zone4.indexOf('留空包括講員／翻譯／獻花這些要你人手填的') !== -1);
+  // 第八十二輪批次 II 組（刻意改動）：幹事介面嘅「重新生成完成」窗（`openRegenerate()`）已經拿走，
+  // 嗰三句一齊冇咗。上面兩條「唔可以再出現」照舊守住。
+  check('★★★★★ 幹事介面冇「重新生成完成」窗（第八十二輪 II 組）', !/function openRegenerate\(/.test(zone4));
 
   // 反面：後端真係回嗰個欄位。
   check('★★★★★ 後端 apiGenerateRoster() 確實有回 warnings／assigned／blank',
