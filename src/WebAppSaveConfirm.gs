@@ -61,7 +61,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
       needsRelease: false, proposals: [], targetVersionNo: null,
       zeroChange: false, zeroChangeAction: null,
       tempHelpers: [], decisionItems: { names: [], rules: [] }, needsDecision: false, keptCount: 0,
-      keptNewCount: 0, confirmReasons: []
+      keptNewCount: 0, confirmReasons: [], startPoint: null
     }, extra || {});
   };
 
@@ -236,6 +236,11 @@ function buildSaveAndConfirmPlan_(quarterId) {
     };
   });
 
+  // ── 第八十二輪批次 IF 組：最新一版之上用過〔用這一版作起點〕──────────────
+  // 起點本身就係一項要儲存嘅改動：就算 grid 偵測唔到差異（例如兩版只係顯示字唔同），
+  // 都唔可以當成零改動——否則幹事撳〔儲存〕只見「沒有改動」／「意見已收齊」，冇新一版。
+  const startPoint = readPendingStartPointForSave_(quarterId, versionNo, context, postNameById);
+
   // ── 第八十一輪批次 HA 組：「為甚麼要你看一看」＝快路唔成立嘅原因，**同一份**判斷 ───
   // 前端見到 `confirmReasons` 係空就直接儲存，唔自己再判斷一次。
   const keptNewCount = violations.keptNew.length + violations.semiKeptNew.length + tempHelpersNew.length;
@@ -252,12 +257,16 @@ function buildSaveAndConfirmPlan_(quarterId) {
     requestNeedsInputCount: requests.needsInput.length,
     overlapCount: overlaps.length,
     blankCellCount: blankCells.length,
-    gridChangeCount: gridChanges.length
+    gridChangeCount: gridChanges.length,
+    startPointVersionNo: startPoint ? startPoint.versionNo : null,
+    startPointCellCount: startPoint ? startPoint.cells.length : 0,
+    baseVersionNo: versionNo
   });
 
   // ── 零改動路徑（D4）────────────────────────────────────────
+  // 第八十二輪批次 IF 組：有起點未儲存 ⇒ 唔係零改動
   const zeroChange = resolved.changes.length === 0 && requestPlan.results.length === 0
-    && titleChanges.length === 0;
+    && titleChanges.length === 0 && !startPoint;
   return {
     blocked: false,
     blockReason: null,
@@ -285,6 +294,8 @@ function buildSaveAndConfirmPlan_(quarterId) {
     // ⚠️ 第七十五輪批次 CG 組：打字放行框拿走——放行由勾選決定（`needsDecision`）。
     needsRelease: false,
     proposals: proposals,
+    // 第八十二輪批次 IF 組：{versionNo, basisText, cells}；冇起點 ⇒ null
+    startPoint: startPoint,
     targetVersionNo: versionNo + 1,
     stage: stage,
     baseVersionNo: versionNo,
@@ -414,6 +425,12 @@ function buildSaveConfirmReasons_(n) {
   add('OVERLAP', n.overlapCount || 0,
     '有 ' + (n.overlapCount || 0) + ' 格你在表上改過，同時亦有修改申報');
   add('BLANK_CELLS', n.blankCellCount || 0, '還有 ' + (n.blankCellCount || 0) + ' 格沒有人');
+  // 第八十二輪批次 IF 組：用舊版本作起點 ⇒ 一定出窗，寫明起點同嗰幾格
+  if (n.startPointVersionNo !== null && n.startPointVersionNo !== undefined) {
+    out.push({ code: 'START_POINT', count: n.startPointCellCount || 0,
+      text: '你用了第 ' + n.startPointVersionNo + ' 版作起點（與第 ' + n.baseVersionNo + ' 版不同的有 '
+        + (n.startPointCellCount || 0) + ' 格）' });
+  }
   if (out.length === 0 && !(n.gridChangeCount > 0)) {
     out.push({ code: 'NO_GRID_CHANGE', count: 0, text: '這一次沒有你在表上改過的格' });
   }
@@ -683,8 +700,9 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         cellCount: resolved.changes.length
       };
     } else {
+      // 第八十二輪批次 IF 組：用舊版本作起點、grid 冇偵測到差異 ⇒ 照樣建立新一版（起點本身就係改動）
       created = materialiseManualEdits_(context, resolved.changes, resolved.state, 'apiSaveAndConfirmExecute',
-        { titleChangeCount: titleChanges.length });
+        { titleChangeCount: titleChanges.length, startPointVersionNo: startPointNo });
       registerVersion(
         quarterId, created.versionNo, created.sheetName,
         startPointBasis || VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
@@ -779,6 +797,9 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     baseVersionNo: plan.baseVersionNo,
     baseSheetRestoreFailed: baseSheetRestoreFailed,
     cellCount: created.cellCount,
+    // 第八十二輪批次 IF 組：完成窗寫明「以第 M 版作起點」同嗰幾格
+    startPointVersionNo: startPointNo,
+    startPointCells: plan.startPoint ? plan.startPoint.cells : [],
     // ⚠️ 第四十一輪批次 C 組：**逐格列出來**，不是只給一個數字。
     //
     // Ivan 實測之後講：「沒有任何成功儲存的提示。需要提示幹事儲存了
@@ -870,6 +891,75 @@ function countManualChangesBeyondStartPoint_(quarterId, startPointNo, changes, c
     if (c.manualPersonId && c.manualPersonId === was.personId) return false;
     return normalizeOverlayCellText_(c.manualText, labels) !== normalizeOverlayCellText_(was.name, labels);
   }).length;
+}
+
+/**
+ * 第八十二輪批次 IF 組：最新一版之上未儲存嘅「以第 M 版作起點」，連同起點同最新一版**真正唔同**嘅格。
+ *
+ * 格嘅比較直接用 `RosterAssignments`（起點版本 vs 最新一版），唔靠 grid 偵測——
+ * 儲存窗／完成窗要講得出「以第 M 版作起點」帶咗邊幾格返嚟。
+ * 讀唔到 ⇒ 照舊當冇起點（`readStartPointBasisForSave_()` 已經 WARN）；比較失敗 ⇒ 格清單空、起點照計。
+ * @param {string} quarterId 季度 ID
+ * @param {number} baseVersionNo 最新一版
+ * @param {Object} context fine-tune context（要 `timezone`、`gridRender.labels`）
+ * @param {Object.<string,string>} postNameById 崗位中文名
+ * @returns {?{versionNo: number, basisText: string, cells: Object[]}}
+ */
+function readPendingStartPointForSave_(quarterId, baseVersionNo, context, postNameById) {
+  const basisText = readStartPointBasisForSave_(quarterId, baseVersionNo);
+  const no = parseStartPointVersionNo_(basisText);
+  if (no === null) return null;
+  let cells = [];
+  try {
+    cells = listStartPointCellDiffs_(quarterId, no, baseVersionNo, context, postNameById);
+  } catch (err) {
+    log_('WARN', 'readPendingStartPointForSave_ 比較第 ' + no + ' 版與第 ' + baseVersionNo + ' 版失敗：' + err.message);
+  }
+  return { versionNo: no, basisText: basisText, cells: cells };
+}
+
+/**
+ * 第八十二輪批次 IF 組：兩個版本之間唔同嘅格（PersonID 一樣 ⇒ 一樣；冇 PersonID 就比名字，顯示標籤當空白）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} startNo 起點版本
+ * @param {number} baseNo 最新一版
+ * @param {Object} context fine-tune context
+ * @param {Object.<string,string>} postNameById 崗位中文名
+ * @returns {Object[]} `{serviceDate, postId, postNameTC, slotIndex, baseName, startName}`
+ */
+function listStartPointCellDiffs_(quarterId, startNo, baseNo, context, postNameById) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const labels = context && context.gridRender ? context.gridRender.labels : null;
+  const byVersion = {};
+  byVersion[startNo] = {};
+  byVersion[baseNo] = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    const v = Number(row[A.VERSION_NO]);
+    if (!byVersion[v]) return;
+    const serviceDate = toDateString(row[A.SERVICE_DATE], context.timezone);
+    const postId = String(row[A.POST_ID] || '').trim();
+    const slotIndex = Number(row[A.SLOT_INDEX]);
+    byVersion[v][cellKey_(serviceDate, postId, slotIndex)] = {
+      serviceDate: serviceDate, postId: postId, slotIndex: slotIndex,
+      personId: String(row[A.PERSON_ID] || '').trim(),
+      name: normalizeOverlayCellText_(String(row[A.PERSON_NAME_SNAPSHOT] || '').trim(), labels)
+    };
+  });
+  const out = [];
+  Object.keys(byVersion[baseNo]).forEach(function (key) {
+    const b = byVersion[baseNo][key];
+    const s = byVersion[startNo][key] || { personId: '', name: '' };
+    if (b.personId && b.personId === s.personId) return;
+    if (!b.personId && !s.personId && b.name === s.name) return;
+    out.push({ serviceDate: b.serviceDate, postId: b.postId, postNameTC: (postNameById || {})[b.postId] || b.postId,
+      slotIndex: b.slotIndex, baseName: b.name, startName: s.name });
+  });
+  out.sort(function (x, y) {
+    return x.serviceDate < y.serviceDate ? -1 : x.serviceDate > y.serviceDate ? 1
+      : (x.postId < y.postId ? -1 : x.postId > y.postId ? 1 : x.slotIndex - y.slotIndex);
+  });
+  return out;
 }
 
 function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {

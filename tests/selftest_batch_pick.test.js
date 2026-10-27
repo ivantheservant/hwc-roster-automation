@@ -72,6 +72,8 @@ function makePlan(opts) {
     // 第八十一輪批次 HA 組：今次新保留嘅格數、「為甚麼要你看一看」
     keptNewCount: 0,
     confirmReasons: real.length > 0 ? [{ code: 'RULE_UNDECIDED', count: real.length, text: '' }] : [],
+    // 第八十二輪批次 IF 組：用舊版本作起點（冇 ⇒ null）
+    startPoint: null,
     requests: { apply: [], confirm: [], needsInput: [] },
     gridChanges: (opts && opts.gridChanges) || [],
     titleChanges: [],

@@ -615,6 +615,11 @@
     const why = buildSaveWhySection(plan.confirmReasons);
     if (why) nodes.push(why);
 
+    // 0.5　第八十二輪批次 IF 組：以第 M 版作起點（同最新一版唔同嘅格）
+    const sp = buildStartPointSection(plan.startPoint && plan.startPoint.versionNo,
+      plan.startPoint && plan.startPoint.cells, plan.baseVersionNo);
+    if (sp) nodes.push(sp);
+
     // 1　你改了這 N 格（可以摺疊）
     nodes.push(buildChangedCellsSection(plan.gridChanges || []));
 
@@ -744,6 +749,31 @@
     openModal('會儲存成第 ' + plan.targetVersionNo + ' 版', nodes, [saveBtn]
       .concat(buildFixItActions(plan))
       .concat([button('返回修改', () => closeModal(), 'secondary')]));
+  }
+
+  /**
+   * 第八十二輪批次 IF 組：「以第 M 版作起點」一段——儲存窗同完成窗共用。
+   * @param {?number} startNo 起點版本號（冇 ⇒ 唔顯示）
+   * @param {Object[]=} cells 起點同最新一版唔同嘅格（`listStartPointCellDiffs_()`）
+   * @param {number} baseNo 起點之前最新嗰一版
+   * @returns {?Node}
+   */
+  function buildStartPointSection(startNo, cells, baseNo) {
+    if (startNo === null || startNo === undefined) return null;
+    const list = cells || [];
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle('以第 ' + startNo + ' 版作起點：與第 ' + baseNo + ' 版不同的有 ' + list.length + ' 格')
+    ]);
+    if (list.length === 0) {
+      box.appendChild(make('div', { text: '兩版每一格的人都一樣；照樣儲存成新一版，來源寫「以第 ' + startNo + ' 版作起點」。',
+        className: 'muted' }));
+    }
+    list.forEach((c) => box.appendChild(make('div', {
+      text: humanDate(c.serviceDate) + '　' + c.postNameTC + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '')
+        + '　' + (c.baseName || '（空白）') + ' → ' + (c.startName || '（空白）'),
+      className: 'ok-line'
+    })));
+    return box;
   }
 
   /**
@@ -933,6 +963,9 @@
     const nodes = [
       make('div', { text: '已儲存成第 ' + result.versionNo + ' 版', className: 'ok-head' })
     ];
+    // 第八十二輪批次 IF 組：用舊版本作起點 ⇒ 寫明起點同嗰幾格
+    const spDone = buildStartPointSection(result.startPointVersionNo, result.startPointCells, result.baseVersionNo);
+    if (spDone) nodes.push(spDone);
 
     // ⚠️ 第四十二輪批次 D 組：呢一段抽咗做共用元件 `savedChangeNodes()`。
     // 三個儲存出口（呢度、接受建議、套用申報）用同一份碼——

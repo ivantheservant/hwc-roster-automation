@@ -186,7 +186,9 @@ function materialiseManualEdits_(context, changes, state, source, opts) {
   // 第七十五輪批次 CC 組：只改咗每週標題（「類型」欄）都要建立新一版——標題已經由呼叫端寫入
   // `ServiceDates.Title`，新一版嘅工作表會顯示佢。`opts.titleChangeCount` 由呼叫端明確講。
   const titleChangeCount = (opts && Number(opts.titleChangeCount)) || 0;
-  if ((!changes || changes.length === 0) && titleChangeCount === 0) {
+  // 第八十二輪批次 IF 組：用舊版本作起點（呼叫端明確傳起點版本號）⇒ 冇偵測到格嘅差異都建立新一版
+  const hasStartPoint = !!opts && opts.startPointVersionNo !== null && opts.startPointVersionNo !== undefined;
+  if ((!changes || changes.length === 0) && titleChangeCount === 0 && !hasStartPoint) {
     throw new Error('materialiseManualEdits_() 沒有收到任何人手改動，不應該建立新版本');
   }
   changes = changes || [];

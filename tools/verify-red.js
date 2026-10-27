@@ -7550,6 +7550,47 @@ const MUTATIONS = [
     find: "      notifyReason: newJoiner\n        ? RESEND_NOTIFY_REASON.NEW_ASSIGNMENT",
     replace: "      notifyReason: false\n        ? RESEND_NOTIFY_REASON.NEW_ASSIGNMENT",
     tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  // ── 第八十二輪批次 IF 組：用舊版本作起點再儲存一定建立新一版 ──
+  {
+    id: "if-start-zero-change",
+    why: "起點唔計改動 ⇒ grid 冇差異就行零改動路",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    && titleChanges.length === 0 && !startPoint;",
+    replace: "    && titleChanges.length === 0;",
+    tests: ["tests/round82_if_start_point_save.test.js"]
+  },
+  {
+    id: "if-materialise-guard",
+    why: "起點冇偵測到差異 ⇒ 建立版本拋錯",
+    file: "src/StateSource.gs",
+    find: "titleChangeCount === 0 && !hasStartPoint) {",
+    replace: "titleChangeCount === 0) {",
+    tests: ["tests/round82_if_start_point_save.test.js"]
+  },
+  {
+    id: "if-no-start-reason",
+    why: "儲存窗唔講起點",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  if (n.startPointVersionNo !== null && n.startPointVersionNo !== undefined) {",
+    replace: "  if (false) {",
+    tests: ["tests/round82_if_start_point_save.test.js"]
+  },
+  {
+    id: "if-cells-empty",
+    why: "起點嗰幾格冇列出",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    cells = listStartPointCellDiffs_(quarterId, no, baseVersionNo, context, postNameById);",
+    replace: "    cells = [];",
+    tests: ["tests/round82_if_start_point_save.test.js"]
+  },
+  {
+    id: "if-result-no-start",
+    why: "完成窗唔講起點",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    startPointVersionNo: startPointNo,\n    startPointCells:",
+    replace: "    startPointVersionNo: null,\n    startPointCells:",
+    tests: ["tests/round82_if_start_point_save.test.js"]
   }
 ];
 

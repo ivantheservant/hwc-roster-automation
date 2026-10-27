@@ -211,7 +211,8 @@ console.log('\n=== D-2 步 4／5：重用既有寫入路徑，唔重新抄一次
   check('★★★★★ 用 materialiseManualEdits_()（內含逐格 AuditLog → '
     + 'createRosterSheet() → writeAssignments()），冇喺呢度抄多次',
     // 第七十五輪批次 CC 組：多咗第 5 個參數（只改每週標題都要建立新一版）
-    /materialiseManualEdits_\(context, resolved\.changes, resolved\.state, 'apiSaveAndConfirmExecute',\s*\{ titleChangeCount: titleChanges\.length \}\)/.test(SRC));
+    // 第八十二輪批次 IF 組：多傳起點版本號（用舊版本作起點、冇偵測到差異都建立新一版）
+    /materialiseManualEdits_\(context, resolved\.changes, resolved\.state, 'apiSaveAndConfirmExecute',\s*\{ titleChangeCount: titleChanges\.length, startPointVersionNo: startPointNo \}\)/.test(SRC));
   check('★★★★ 之後補 registerVersion()，Basis 用既有常數',
     /registerVersion\([\s\S]{0,200}?VERSION_VALUES\.BASIS_FINE_TUNE/.test(SRC));
   check('★★★★★ 只喺 REVIEW_SENT 一種情況先前進 Stage（決定 D3）',
