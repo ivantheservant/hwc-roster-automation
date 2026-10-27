@@ -107,6 +107,7 @@ function apiCheckMyChanges(quarterId) {
       context, STATE_SOURCE.GRID_OVERLAY, 'apiCheckMyChanges');
     const analysis = {
       changes: resolved.changes,
+      titleChanges: resolved.titleChanges,
       unresolved: resolved.unresolved,
       manualState: resolved.state,
       violations: findStateViolations_(resolved.state, context)
@@ -116,21 +117,10 @@ function apiCheckMyChanges(quarterId) {
     context.posts.forEach(function (p) { postNames[p.postId] = p.postNameTC; });
 
     // ── 改了哪幾格 ─────────────────────────────────────────────
-    const changes = analysis.changes.map(function (c) {
-      return {
-        serviceDate: c.serviceDate,
-        postNameTC: postNames[c.postId] || c.postId,
-        slotIndex: c.slotIndex,
-        // ⚠️ 空白要講得出是空白。寫一個空字串落畫面，
-        // 幹事會以為系統壞了或者自己看漏。
-        fromName: c.originalName || '（空白）',
-        toName: c.manualText || '（空白）'
-      };
-    }).concat(buildWeekTitleChangeRows_(resolved.titleChanges).map(function (t) {
-      // 第七十五輪批次 CC 組：改咗每週標題都要列喺「你改了這 N 格」
-      return { serviceDate: t.serviceDate, postNameTC: t.postNameTC, slotIndex: t.slotIndex,
-        isTitle: true, fromName: t.fromName, toName: t.toName };
-    }));
+    // 第七十五輪批次 CC 組：改咗每週標題都要列喺「你改了這 N 格」
+    // 第八十四輪批次 KB 組：同「這一次會處理」同一支（`buildMyChangeRows_()`），兩邊數字加起來一致
+    const myRows = buildMyChangeRows_(context, analysis.changes, analysis.titleChanges);
+    const changes = myRows.cells.concat(myRows.titles);
 
     // ── 第七十五輪批次 CE／CF 組：逐格決定 ─────────────────────────
     //
@@ -359,6 +349,7 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     context, STATE_SOURCE.GRID_OVERLAY, 'buildSuggestionState_');
   const analysis = {
     changes: resolved.changes,
+    titleChanges: resolved.titleChanges,
     unresolved: resolved.unresolved,
     manualState: resolved.state,
     violations: findStateViolations_(resolved.state, context)
@@ -1714,10 +1705,9 @@ function buildAdjustWillHandle_(quarterId, context, analysis, timezone) {
     const p = findPostById_(context.posts, postId);
     return p ? p.postNameTC : postId;
   };
-  const gridChanges = (analysis.changes || []).map(function (c) {
-    return { serviceDate: c.serviceDate, postNameTC: postNameOf(c.postId), slotIndex: c.slotIndex,
-      fromName: c.originalName || '（空白）', toName: c.manualText || '（空白）' };
-  });
+  // 第八十四輪批次 KB 組：同〔檢查我的改動〕同一支；每週標題另列（系統不會調整）
+  const myRows = buildMyChangeRows_(context, analysis.changes, analysis.titleChanges);
+  const gridChanges = myRows.cells;
   const unavailableCells = (analysis.violations || []).filter(function (v) {
     return v.ruleId === RULE_IDS.UNAVAILABLE;
   }).map(function (v) {
@@ -1748,7 +1738,38 @@ function buildAdjustWillHandle_(quarterId, context, analysis, timezone) {
   } catch (err) {
     log_('WARN', 'buildAdjustWillHandle_ 數不到空格：' + err.message);
   }
-  return { gridChanges: gridChanges, unavailableCells: unavailableCells, weights: weights, blankCount: blankCount };
+  return { gridChanges: gridChanges, titleChanges: myRows.titles, unavailableCells: unavailableCells,
+    weights: weights, blankCount: blankCount };
+}
+
+/**
+ * 第八十四輪批次 KB 組：幹事喺表上改咗嘅格——〔檢查我的改動〕（兩段相加）同「這一次會處理」
+ *（格、每週標題分開兩行）**同一個計算來源**，唔各自 map。
+ * @param {Object} context fine-tune context（要 `posts`）
+ * @param {Object[]} changes `resolveAuthoritativeState_()` 嘅 `changes`
+ * @param {Object[]=} titleChanges `resolveAuthoritativeState_()` 嘅 `titleChanges`
+ * @returns {{cells: Object[], titles: Object[]}}
+ */
+function buildMyChangeRows_(context, changes, titleChanges) {
+  const postNames = {};
+  (context.posts || []).forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+  return {
+    cells: (changes || []).map(function (c) {
+      return {
+        serviceDate: c.serviceDate,
+        postNameTC: postNames[c.postId] || c.postId,
+        slotIndex: c.slotIndex,
+        // ⚠️ 空白要講得出是空白。寫一個空字串落畫面，
+        // 幹事會以為系統壞了或者自己看漏。
+        fromName: c.originalName || '（空白）',
+        toName: c.manualText || '（空白）'
+      };
+    }),
+    titles: buildWeekTitleChangeRows_(titleChanges).map(function (t) {
+      return { serviceDate: t.serviceDate, postNameTC: t.postNameTC, slotIndex: t.slotIndex,
+        isTitle: true, fromName: t.fromName, toName: t.toName };
+    })
+  };
 }
 
 /**

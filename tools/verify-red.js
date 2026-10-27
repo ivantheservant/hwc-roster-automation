@@ -8311,6 +8311,38 @@ const MUTATIONS = [
     find: "      button('稍後再決定', () => refreshLikeButton(), 'secondary')",
     replace: "      button('稍後再決定', () => closeModalAndRefresh(), 'secondary')",
     tests: ["tests/round84_ka_later_refresh.test.js"]
+  },
+  {
+    id: "kb-check-no-titles",
+    why: "這一次會處理冇每週標題",
+    file: "src/SuggestionSheet.gs",
+    find: "      changes: resolved.changes,\n      titleChanges: resolved.titleChanges,\n",
+    replace: "      changes: resolved.changes,\n",
+    tests: ["tests/round84_kb_will_handle_titles.test.js"]
+  },
+  {
+    id: "kb-suggest-no-titles",
+    why: "結果窗冇每週標題",
+    file: "src/SuggestionSheet.gs",
+    find: "\n  const analysis = {\n    changes: resolved.changes,\n    titleChanges: resolved.titleChanges,\n",
+    replace: "\n  const analysis = {\n    changes: resolved.changes,\n",
+    tests: ["tests/round84_kb_will_handle_titles.test.js"]
+  },
+  {
+    id: "kb-grid-mixes-titles",
+    why: "格數混埋每週標題",
+    file: "src/SuggestionSheet.gs",
+    find: "  const gridChanges = myRows.cells;",
+    replace: "  const gridChanges = myRows.cells.concat(myRows.titles);",
+    tests: ["tests/round84_kb_will_handle_titles.test.js"]
+  },
+  {
+    id: "kb-ui-no-title-line",
+    why: "前端冇每週標題一行",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "    if (titles.length > 0) {\n      box.appendChild(make('div', { text: '・每週標題改了 '",
+    replace: "    if (false) {\n      box.appendChild(make('div', { text: '・每週標題改了 '",
+    tests: ["tests/round84_kb_will_handle_titles.test.js"]
   }
 ];
 

@@ -188,6 +188,13 @@
     box.appendChild(make('div', { text: '・你在表上改了 ' + changes.length + ' 格', className: 'ok-line' }));
     changes.forEach((c) => box.appendChild(make('div', {
       text: '　　' + cellText(c) + '　' + c.fromName + ' → ' + c.toName, className: 'vio-row' })));
+    // 第八十四輪批次 KB 組：每週標題另列一行（同〔檢查我的改動〕加起來一致）
+    const titles = d.titleChanges || [];
+    if (titles.length > 0) {
+      box.appendChild(make('div', { text: '・每週標題改了 ' + titles.length + ' 週（系統不會調整）', className: 'ok-line' }));
+      titles.forEach((t) => box.appendChild(make('div', {
+        text: '　　' + humanDate(t.serviceDate) + '　' + t.fromName + ' → ' + t.toName, className: 'vio-row' })));
+    }
     const un = d.unavailableCells || [];
     if (un.length > 0) {
       box.appendChild(make('div', {
