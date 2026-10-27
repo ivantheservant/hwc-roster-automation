@@ -154,7 +154,8 @@ console.log('\n=== A1【核心】`blockedByUnsavedOnly`：一定要重算，唔�
     + '——儲存完一樣寄唔到，俾佢〔立即儲存並繼續〕就係呃佢',
     alsoNoVersion === false, String(alsoNoVersion));
 
-  // 已經正式發出過而又冇人改動 ⇒ 三粒都唔會著。
+  // 已經正式發出過而又冇人改動：第八十二輪批次 IG 組起〔寄給堂委／執事〕任何階段都寄得，
+  // 所以儲存之後審閱本嗰粒會著 ⇒ 「只係未儲存擋住」＝ `true`（刻意改動）。
   const alsoStageDone = gas.computeSendBlockedByUnsavedOnly_(
     facts({
       unsaved: UNSAVED_ONE_CELL,
@@ -162,8 +163,8 @@ console.log('\n=== A1【核心】`blockedByUnsavedOnly`：一定要重算，唔�
       hasOfficialRecord: true,
       changedPersonCount: 0
     }));
-  check('★★★★★★ 未儲存 ＋ Stage 已經行完 ⇒ `false`',
-    alsoStageDone === false, String(alsoStageDone));
+  check('★★★★★★ 未儲存 ＋ 已正式發出、冇人改動 ⇒ `true`（儲存之後〔寄給堂委／執事〕可以寄；第八十二輪 IG 組）',
+    alsoStageDone === true, String(alsoStageDone));
 
   check('★★★★★ 冇未儲存改動 ⇒ `false`（根本唔關佢事）',
     gas.computeSendBlockedByUnsavedOnly_(facts()) === false);

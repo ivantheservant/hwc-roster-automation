@@ -1920,5 +1920,10 @@ const SEND_MODE = {
   /** 〔變動的人〕：同上一次寄出嘅版本比較、安排有改動嘅人 */
   CHANGED: 'CHANGED',
   /** 〔選擇其他〕：幹事自己勾 */
-  PICK: 'PICK'
+  PICK: 'PICK',
+  /** 第八十二輪批次 IG 組：〔寄給堂委／執事〕：審閱本，收件人由後端算（堂委＋執事＋IT＋幹事＋審閱固定名單＋登入者本人） */
+  COMMITTEE: 'COMMITTEE'
 };
+
+/** 第八十二輪批次 IG 組：〔變動的人〕灰色時嘅原因（前端同一句）。 */
+const RESEND_NEEDS_OFFICIAL_TEXT = '要先用〔給所有人〕正式發出一次';

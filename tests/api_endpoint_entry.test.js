@@ -168,8 +168,9 @@ console.log('\n=== A3【核心】掣 1「儲存並確認」由端點入口行一
     JSON.stringify(result && result.violations));
   check('★★★★ 零改動路徑判斷到（冇 grid 改動、冇申報）',
     result !== null && result.zeroChange === true);
-  check('★★★★ `REVIEW_SENT` 零改動 ⇒ 只前進 Stage',
-    result !== null && result.zeroChangeAction === 'ADVANCE_STAGE_ONLY');
+  // 第八十二輪批次 IG 組（刻意改動）：零改動唔再推進度（「意見已收齊」唔再擋任何嘢）
+  check('★★★★ `REVIEW_SENT` 零改動 ⇒ 乜都唔做（第八十二輪 IG 組）',
+    result !== null && result.zeroChangeAction === 'NOTHING');
 }
 
 console.log('\n=== A3 反面：把參數次序改返轉頭，呢一份要即刻着 ===');
@@ -327,12 +328,9 @@ console.log('\n=== D4 步驟 2 嘅 Stage 閘門由入口叫都要生效 ===');
   });
   let thrown = null;
   try { gas.apiStep2Preview('2027T4'); } catch (err) { thrown = err; }
-  check('★★★★★ `OFFICIAL_SENT` ⇒ 由入口叫都會被擋'
-    + '——閘門唔可以只喺內部函式生效',
-    thrown !== null, '完全冇拋錯');
-  check('★★★★ 而且訊息講得出係邊一步同而家係咩 Stage',
-    thrown !== null && thrown.message.indexOf('步驟 2') !== -1
-    && thrown.message.indexOf('OFFICIAL_SENT') !== -1, thrown && thrown.message);
+  // 第八十二輪批次 IG 組（刻意改動）：〔寄給堂委／執事〕正式發出之後都寄得 ⇒ 步驟 2 喺 OFFICIAL_SENT 唔再擋
+  check('★★★★★ `OFFICIAL_SENT` ⇒ 步驟 2（審閱本）唔會因為 Stage 被擋（第八十二輪 IG 組）',
+    thrown === null || !/Stage/.test(thrown.message), thrown && thrown.message);
 }
 
 console.log('\n=== D4 步驟 2 冇版本 ⇒ 要講「請先生成初稿」，唔可以靜靜過 ===');

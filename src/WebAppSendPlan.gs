@@ -70,11 +70,55 @@ function resolveSendKind_(buttons) {
  * @returns {string} SEND_KIND 之一
  */
 function resolveSendKindForAll_(buttons, state) {
-  const kind = resolveSendKind_(buttons);
-  if (kind !== SEND_KIND.NONE) return kind;
+  // 第八十二輪批次 IG 組：〔給所有人〕一律係正式發出——未正式發出 ⇒ OFFICIAL（唔再會變成寄審閱本）；
+  // 正式發出之後 ⇒ 改動後重發（全部人都收到）。
+  const b = buttons || {};
+  if (b.official && b.official.enabled) return SEND_KIND.OFFICIAL;
   const unsaved = state && state.unsaved && state.unsaved.hasAny;
   if (state && state.stage === QUARTER_STAGE.OFFICIAL_SENT && !unsaved) return SEND_KIND.RESEND;
   return SEND_KIND.NONE;
+}
+
+/**
+ * 第八十二輪批次 IG 組：REVIEW／OFFICIAL／RESEND 三種寄出各自嘅預設附件／日曆檔（由該階段範本決定）。
+ * 讀唔到某一種嘅範本 ⇒ 嗰一種冇預設（前端退回 `sendOptionDefaults`）。
+ * @returns {Object.<string, {recipientScope: string, attachType: string, includeIcs: boolean}>}
+ */
+function buildSendOptionDefaultsByKind_() {
+  const out = {};
+  [SEND_KIND.REVIEW, SEND_KIND.OFFICIAL, SEND_KIND.RESEND].forEach(function (k) {
+    try {
+      const stage = sendKindToStage_(k);
+      const d = resolveSendOptions_(stage, null, resolveStageTemplates_(stage));
+      out[k] = { recipientScope: d.recipientScope, attachType: d.attachType, includeIcs: d.includeIcs };
+    } catch (err) {
+      log_('WARN', 'buildSendOptionDefaultsByKind_ 讀不到 ' + k + ' 的預設：' + err.message);
+    }
+  });
+  return out;
+}
+
+/**
+ * 第八十二輪批次 IG 組：第 3 步四粒掣各自係邊一種寄出（前端照呢份揀，唔自己判斷）。
+ *   〔寄給堂委／執事〕＝審閱本（任何階段）
+ *   〔給所有人〕　　　＝正式發出（第一次）／改動後重發（之後，全部人）
+ *   〔變動的人〕　　　＝改動後重發（正式發出之後）
+ *   〔選擇其他〕　　　＝正式發出之前寄審閱本；之後係改動通知
+ * @param {Object} buttons `computeDashboardButtons_()` 的結果
+ * @param {Object} state `buildDashboardState_()` 的結果
+ * @returns {{COMMITTEE: string, ALL: string, CHANGED: string, PICK: string}}
+ */
+function resolveSendKindByMode_(buttons, state) {
+  const b = buttons || {};
+  const official = !!(state && state.stage === QUARTER_STAGE.OFFICIAL_SENT);
+  const unsaved = !!(state && state.unsaved && state.unsaved.hasAny);
+  const review = (b.review && b.review.enabled) ? SEND_KIND.REVIEW : SEND_KIND.NONE;
+  return {
+    COMMITTEE: review,
+    ALL: resolveSendKindForAll_(buttons, state),
+    CHANGED: (b.resend && b.resend.enabled) ? SEND_KIND.RESEND : SEND_KIND.NONE,
+    PICK: official ? (unsaved ? SEND_KIND.NONE : SEND_KIND.RESEND) : review
+  };
 }
 
 /**
@@ -409,6 +453,68 @@ function apiGetSendAllRecipients(quarterId, kind) {
 }
 
 /**
+ * 第八十二輪批次 IG 組：〔寄給堂委／執事〕嘅收件人——**由後端算**（重用同一個池同分組）。
+ *
+ * 收件人＝堂委＋執事＋IT＋幹事身分嘅人＋`EmailRecipients` 審閱階段嘅固定名單＋現時登入嘅幹事帳戶本人
+ *（`Session.getActiveUser()`）。同一個地址只寄一次：登入者本人已經喺池入面（例如佢係堂委）就唔另外加；
+ * 唔喺池 ⇒ 放入 `extraEmails`。冇電郵嘅身分持有人勾唔到，另外列出。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object} `{ok, versionNo, pickedKeys, extraEmails, items, groups, counts, selfEmail, selfInPool, noEmailNames}`
+ */
+function apiGetSendCommitteeRecipients(quarterId) {
+  assertWebAppRequestAllowed_();
+  beginSheetReadMemo_();
+  try {
+    const snap = buildSendPoolSnapshot_(quarterId, SEND_KIND.REVIEW);
+    if (!snap.ok) return snap;
+    const wanted = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];
+    const inScope = snap.pool.filter(function (item) {
+      return wanted.some(function (src) { return item.sources.indexOf(src) !== -1; });
+    });
+    const counts = {};
+    wanted.forEach(function (src) {
+      counts[src] = inScope.filter(function (item) { return item.sources.indexOf(src) !== -1 && item.selectable !== false; }).length;
+    });
+    const picked = inScope.filter(function (item) { return item.selectable !== false; });
+    const pickedKeys = picked.map(function (item) { return item.key; });
+    let selfEmail = '';
+    try {
+      selfEmail = String(Session.getActiveUser().getEmail() || '').trim();
+    } catch (err) {
+      log_('WARN', 'apiGetSendCommitteeRecipients 讀不到登入帳戶：' + err.message);
+    }
+    const lower = selfEmail.toLowerCase();
+    // 同一個地址只寄一次：池入面任何一項（人或者 EmailRecipients）已經係呢個地址 ⇒ 用嗰一項
+    const selfItem = lower ? snap.pool.filter(function (item) {
+      return String(item.email || '').trim().toLowerCase() === lower && item.selectable !== false;
+    })[0] : null;
+    const extraEmails = [];
+    if (selfItem) {
+      if (pickedKeys.indexOf(selfItem.key) === -1) pickedKeys.push(selfItem.key);
+    } else if (lower) {
+      extraEmails.push(selfEmail);
+    }
+    const noEmail = inScope.filter(function (item) { return item.type === RECIPIENT_TYPE.PERSON && !item.hasEmail; });
+    return {
+      ok: true,
+      versionNo: snap.versionNo,
+      pickedKeys: pickedKeys,
+      extraEmails: extraEmails,
+      items: snap.pool,
+      groups: snap.groups,
+      counts: counts,
+      selfEmail: selfEmail,
+      selfInPool: !!selfItem,
+      noEmailNames: noEmail.map(function (item) { return item.displayName; })
+    };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
  * 第七十七輪批次 EE 組：〔變動的人〕嘅收件人——同每個人**上一次收到嘅版本**比較、安排有改動嘅人
  *（包括被整個換走嘅人）。用改動後重發確認窗**同一支**判斷（`planResendChangedPersons_()` →
  * `computeResendDiff_()`），寄出窗同確認窗人數先會一致。
@@ -427,7 +533,8 @@ function apiGetSendChangedRecipients(quarterId) {
     if (!sendLog.officialSentOnce) {
       return {
         ok: false, notOfficialYet: true,
-        message: '這一季還未正式發出給全體，請用〔給所有人〕或〔選擇其他〕。'
+        // 第八十二輪批次 IG 組
+        message: '這一季還未正式發出給全體。' + RESEND_NEEDS_OFFICIAL_TEXT + '。'
       };
     }
     const plan = planResendChangedPersons_(quarterId);
@@ -679,10 +786,8 @@ function buildUnsavedSendPreview_(quarterId, state) {
  * 幹事唔知，截圖時連測試工具都走錯過一次。
  *
  * ⚠️ 只改顯示，**唔改流程**。文字由後端出（前端唔另寫一套）。
+ * 第八十二輪批次 IG 組：〔給所有人〕唔再要求「意見已收齊」⇒ 提示文字（SEND_REVIEW_SENT_HINT）拿走。
  */
-const SEND_REVIEW_SENT_HINT = '堂委的意見收齊、要正式發出給全體？'
-  + '請先在第 2 步撳〔儲存〕（沒有改動也可以撳），'
-  + '之後再撳〔寄出〕，這裡就會變成「正式發出給全體」。';
 
 /**
  * 這個進度要不要顯示上面那個提示。純函式。
@@ -690,7 +795,8 @@ const SEND_REVIEW_SENT_HINT = '堂委的意見收齊、要正式發出給全體�
  * @returns {string} 提示文字；其他進度回空字串
  */
 function buildReviewSentHint_(stage) {
-  return stage === QUARTER_STAGE.REVIEW_SENT ? SEND_REVIEW_SENT_HINT : '';
+  // 第八十二輪批次 IG 組：〔給所有人〕任何時候都係正式發出，唔使先「儲存」推進度 ⇒ 呢個提示唔再需要
+  return '';
 }
 
 /**
@@ -741,6 +847,9 @@ function apiGetSendPlanSummary(quarterId) {
       kind: kind,
       // 第七十七輪批次 EE 組：〔給所有人〕用嘅種類；〔變動的人〕要正式發出過先可以撳
       allKind: allKind,
+      // 第八十二輪批次 IG 組：四粒掣各自嘅寄出種類（前端照用）
+      kindByMode: resolveSendKindByMode_(buttons, state),
+      stage: state.stage,
       officialSentOnce: !!state.officialSentOnce,
       // 第七十輪批次 AX 組：已寄給堂委、等意見時，「寄出」窗最上面嘅提示（其他進度係空字串）
       reviewSentHint: buildReviewSentHint_(state.stage),
@@ -766,6 +875,9 @@ function apiGetSendPlanSummary(quarterId) {
         PERSONAL_PDF: describeAttachOption_(ATTACH_TYPE.PERSONAL_PDF),
         FULL_PDF: describeAttachOption_(ATTACH_TYPE.FULL_PDF)
       },
+      // 第八十二輪批次 IG 組：四粒掣嘅種類唔一定同 `kind` 一樣（例如初稿階段〔寄給堂委／執事〕＝審閱本），
+      // 所以三種嘅預設值都畀，前端照該粒掣嘅種類揀
+      sendOptionDefaultsByKind: buildSendOptionDefaultsByKind_(),
       sendOptionDefaults: defaultDecision ? {
         recipientScope: defaultDecision.recipientScope,
         attachType: defaultDecision.attachType,

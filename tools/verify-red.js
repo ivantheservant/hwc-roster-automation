@@ -5509,14 +5509,7 @@ const MUTATIONS = [
     replace: "\n    && totals.unavailableInQuarterRows === 0",
     tests: ['tests/recovery_and_reset_copies.test.js']
   },
-  {
-    id: 'ax-hint-all-stages',
-    why: '所有進度都出「意見收齊」提示',
-    file: 'src/WebAppSendPlan.gs',
-    find: '  return stage === QUARTER_STAGE.REVIEW_SENT ? SEND_REVIEW_SENT_HINT : \'\';',
-    replace: '  return SEND_REVIEW_SENT_HINT;',
-    tests: ['tests/review_sent_hint.test.js']
-  },
+  // 第八十二輪批次 IG 組（審閱提示、掣 3 舊原因拿走）：ax-hint-all-stages 已退役（目標程式已拿走）
   {
     id: 'ax-hint-not-in-data',
     why: '寄出窗資料冇帶提示',
@@ -5533,14 +5526,7 @@ const MUTATIONS = [
     replace: '    if (false) {',
     tests: ['tests/review_sent_hint.test.js']
   },
-  {
-    id: 'ax-hint-wrong-step',
-    why: '提示寫錯步驟（叫人撳〔儲存〕而唔係〔儲存及寄出〕）',
-    file: 'src/WebAppSendPlan.gs',
-    find: "  + '請先在第 2 步撳〔儲存〕（沒有改動也可以撳），'",
-    replace: "  + '請先在第 2 步撳〔儲存〕，'",
-    tests: ['tests/review_sent_hint.test.js']
-  },
+  // 第八十二輪批次 IG 組（審閱提示、掣 3 舊原因拿走）：ax-hint-wrong-step 已退役（目標程式已拿走）
   {
     id: 'ay-finetune-old-text',
     why: '微調違反原因又寫返內部表名',
@@ -5765,14 +5751,7 @@ const MUTATIONS = [
     replace: "      ['先撳「儲存並確認」，把表上的東西處理好，之後再撳「' + actionName + '」',",
     tests: ["tests/screen_text_wording.test.js"]
   },
-  {
-    id: "txt-dash-oldname",
-    why: "狀態卡掣提示還原成舊名「儲存並確認」",
-    file: "src/WebAppDashboard.gs",
-    find: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存」，這一粒才會著。'",
-    replace: "        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存並確認」，這一粒才會著。'",
-    tests: ["tests/screen_text_wording.test.js", "tests/webapp_dashboard_state.test.js"]
-  },
+  // 第八十二輪批次 IG 組（審閱提示、掣 3 舊原因拿走）：txt-dash-oldname 已退役（目標程式已拿走）
   {
     id: "bc-save-rewrites",
     why: "已通知過人嘅版本仍然改寫 RosterAssignments",
@@ -7753,6 +7732,87 @@ const MUTATIONS = [
     find: "      if (b) { b.disabled = true; b.title = reset.reason || ''; }",
     replace: "      if (b) { b.title = reset.reason || ''; }",
     tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
+  },
+  // ── 第八十二輪批次 IG 組：〔寄給堂委／執事〕；〔給所有人〕一律係正式發出 ──
+  {
+    id: "ig-all-is-review",
+    why: "初稿階段給所有人變返審閱本",
+    file: "src/WebAppDashboard.gs",
+    find: "  const officialStageOk = s.versionExists && s.stage !== QUARTER_STAGE.OFFICIAL_SENT;",
+    replace: "  const officialStageOk = s.stage === QUARTER_STAGE.REQUESTS_APPLIED;",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-step4-old-stages",
+    why: "正式發出仍要意見已收齊",
+    file: "src/FiveStageCore.gs",
+    find: "const STEP4_ALLOWED_STAGES_ = [QUARTER_STAGE.DRAFT, QUARTER_STAGE.REVIEW_SENT, QUARTER_STAGE.REQUESTS_APPLIED];",
+    replace: "const STEP4_ALLOWED_STAGES_ = [QUARTER_STAGE.REQUESTS_APPLIED];",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-review-reverts",
+    why: "正式發出後寄審閱本令進度退回",
+    file: "src/FiveStageCore.gs",
+    find: "  if (getQuarterStage_(quarterId) !== QUARTER_STAGE.OFFICIAL_SENT) {\n    setQuarterStage_(quarterId, QUARTER_STAGE.REVIEW_SENT,",
+    replace: "  if (true) {\n    setQuarterStage_(quarterId, QUARTER_STAGE.REVIEW_SENT,",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-review-hides-chg",
+    why: "正式發出後嘅審閱本蓋過舊安排",
+    file: "src/Mailer.gs",
+    find: "    if (stage === MAIL_STAGES.REVIEW && officialSeen[personId]) return;",
+    replace: "",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-no-self",
+    why: "寄給堂委／執事漏咗登入者本人",
+    file: "src/WebAppSendPlan.gs",
+    find: "    } else if (lower) {\n      extraEmails.push(selfEmail);\n    }",
+    replace: "    }",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-self-dup",
+    why: "登入者本人喺名單都再加一次",
+    file: "src/WebAppSendPlan.gs",
+    find: "    if (selfItem) {\n      if (pickedKeys.indexOf(selfItem.key) === -1) pickedKeys.push(selfItem.key);\n    } else if (lower) {",
+    replace: "    if (false) {\n    } else if (lower) {",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-no-deacon",
+    why: "寄給堂委／執事漏咗執事",
+    file: "src/WebAppSendPlan.gs",
+    find: "    const wanted = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];",
+    replace: "    const wanted = [SEND_SOURCE.COMMITTEE, SEND_SOURCE.IT, SEND_SOURCE.CLERK, SEND_SOURCE.FIXED];",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-zero-advances",
+    why: "零改動儲存又推進度",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  return 'NOTHING';\n}",
+    replace: "  return stage === QUARTER_STAGE.REVIEW_SENT ? 'ADVANCE_STAGE_ONLY' : 'NOTHING';\n}",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-button-order",
+    why: "第 3 步冇寄給堂委執事掣",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "        stepButton('寄給堂委／執事', () => openSendDialog('COMMITTEE'), {",
+    replace: "        stepButton('寄給堂委審閱', () => openSendDialog('COMMITTEE'), {",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  {
+    id: "ig-pick-official",
+    why: "選擇其他喺初稿變正式發出",
+    file: "src/WebAppSendPlan.gs",
+    find: "    PICK: official ? (unsaved ? SEND_KIND.NONE : SEND_KIND.RESEND) : review",
+    replace: "    PICK: official ? (unsaved ? SEND_KIND.NONE : SEND_KIND.RESEND) : resolveSendKindForAll_(buttons, state)",
+    tests: ["tests/round82_ig_send_buttons.test.js"]
   }
 ];
 

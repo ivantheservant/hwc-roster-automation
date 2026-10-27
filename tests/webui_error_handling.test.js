@@ -174,7 +174,8 @@ console.log('\n=== 第二十四輪新增：確認畫面永遠有「取消」（�
       .test(fn.slice(0, 2500)));
   check('★★★★ 打字確認唔啱時唔會執行，只會提示（前端只係提早回饋，'
     + '後端一樣會再驗一次）',
-    /typed !== CONFIRM_PHRASE/.test(fn) && /return;/.test(fn));
+    // 第八十二輪批次 IJ 組：要打嘅字可以換（`phrase`，預設 CONFIRM_PHRASE）
+    /typed !== phrase/.test(fn) && /const phrase = opts\.typingPhrase \|\| CONFIRM_PHRASE;/.test(fn) && /return;/.test(fn));
 }
 
 console.log('\n=== 第二十四輪新增：setBusy 唔可以把本身應該變灰嘅掣着返 ===');

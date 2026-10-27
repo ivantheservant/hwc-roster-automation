@@ -559,8 +559,9 @@ console.log('\n=== 開始狀態 ===');
 
 console.log('\n=== 各步驟在錯誤 Stage 執行都要被真正嘅 requireQuarterStage_() 拒絕 ===');
 {
-  expectThrow('★★★★★ 步驟 4 在 DRAFT 執行 → 拒絕（由入口 apiStep4Confirm 叫落去）',
-    function () { gas.apiStep4Confirm(Q); }, '步驟 4');
+  // 第八十二輪批次 IG 組（刻意改動）：正式發出唔再要求先寄審閱本——DRAFT 都可以；未有版本就照擋
+  expectThrow('★★★★★ 步驟 4 未有版本 → 拒絕（由入口 apiStep4Confirm 叫落去）',
+    function () { gas.apiStep4Confirm(Q); }, '版本');
   expectThrow('★★★★ 步驟 5 在 DRAFT 執行 → 拒絕（由入口 apiStep5Plan 叫落去）',
     function () { gas.apiStep5Plan(Q); }, '步驟 5');
 }
@@ -593,8 +594,9 @@ let v0 = -1;
 
 console.log('\n=== 步驟 2：寄給堂委審閱（apiStep2Preview → apiStep2Confirm，DRAFT → REVIEW_SENT）===');
 {
-  expectThrow('★★★★ 步驟 4 仲未到步驟 2，繼續拒絕',
-    function () { gas.apiStep4Confirm(Q); }, '步驟 4');
+  // 第八十二輪批次 IG 組（刻意改動）：DRAFT 都准正式發出（〔給所有人〕）；呢個敘事照舊行審閱本先，所以唔真係寄
+  check('★★★★ 步驟 4 嘅 Stage 閘門包括 DRAFT（第八十二輪 IG 組）',
+    gas.STEP4_ALLOWED_STAGES_.indexOf(gas.QUARTER_STAGE.DRAFT) !== -1);
 
   const preview = gas.apiStep2Preview(Q);
   checkEqual('★★★★★ preview 對應到最新版本 v0', preview.versionNo, 0);

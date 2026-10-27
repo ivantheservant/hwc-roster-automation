@@ -1072,7 +1072,14 @@ function readLastSendRecordByPerson_(quarterId) {
   });
 
   const result = {};
+  // 第八十二輪批次 IG 組：〔寄給堂委／執事〕正式發出之後都寄得（審閱本）。正式發出／重發之後再收到嘅
+  // 審閱本**唔可以**蓋過嗰個人上一次正式收到嘅安排——否則佢之後嘅改動喺〔變動的人〕會消失。
+  const officialSeen = {};
   rows.forEach(function (row) {
+    const personId = row[C.PERSON_ID];
+    const stage = String(row[C.STAGE] || '').toUpperCase();
+    if (stage === MAIL_STAGES.REVIEW && officialSeen[personId]) return;
+    if (stage !== MAIL_STAGES.REVIEW) officialSeen[personId] = true;
     result[row[C.PERSON_ID]] = {
       hash: String(row[C.ASSIGNMENT_HASH] || ''),
       status: String(row[C.STATUS] || '').toUpperCase(),

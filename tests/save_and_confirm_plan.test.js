@@ -32,17 +32,16 @@ const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppSaveConfirm
 console.log('\n=== 決定 D4【核心】零改動路徑：邊個 Stage 做咩 ===');
 {
   checkEqual('★★★★★ DRAFT ⇒ 乜都唔做', gas.resolveZeroChangeAction_(S.DRAFT), 'NOTHING');
-  checkEqual('★★★★★ REVIEW_SENT ⇒ 只前進 Stage（＝堂委冇意見，'
-    + '唔建版本但要令掣 3 亮起）', gas.resolveZeroChangeAction_(S.REVIEW_SENT), 'ADVANCE_STAGE_ONLY');
+  // 第八十二輪批次 IG 組（刻意改動）：正式發出唔再要求「意見已收齊」⇒ 審閱階段零改動都乜都唔做
+  checkEqual('★★★★★ REVIEW_SENT ⇒ 乜都唔做（第八十二輪 IG 組）', gas.resolveZeroChangeAction_(S.REVIEW_SENT), 'NOTHING');
   checkEqual('★★★★ REQUESTS_APPLIED ⇒ 乜都唔做',
     gas.resolveZeroChangeAction_(S.REQUESTS_APPLIED), 'NOTHING');
   checkEqual('★★★★ OFFICIAL_SENT ⇒ 乜都唔做',
     gas.resolveZeroChangeAction_(S.OFFICIAL_SENT), 'NOTHING');
-  check('★★★★★ **只有一個 Stage 會前進**——如果多過一個，'
-    + '就會出現「零改動但 Stage 走咗兩格」呢種講唔出理由嘅行為',
+  check('★★★★★ **冇任何 Stage 會因為零改動而前進**（第八十二輪 IG 組）',
     [S.DRAFT, S.REVIEW_SENT, S.REQUESTS_APPLIED, S.OFFICIAL_SENT]
       .filter(function (st) { return gas.resolveZeroChangeAction_(st) === 'ADVANCE_STAGE_ONLY'; })
-      .length === 1);
+      .length === 0);
 }
 
 console.log('\n=== 步 1.2（第七十五輪 CE／CG 組）認唔出姓名唔再即時擋，改為逐個決定 ===');

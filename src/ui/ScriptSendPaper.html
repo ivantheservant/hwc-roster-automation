@@ -29,8 +29,9 @@
   let sendModeData_ = null;
 
   function openSendDialog(mode) {
-    // ⚠️ 由 `button()` 直接綁嗰陣收到嘅係 MouseEvent——只認三個字串，其餘當〔選擇其他〕。
-    sendMode_ = (mode === 'ALL' || mode === 'CHANGED') ? mode : 'PICK';
+    // ⚠️ 由 `button()` 直接綁嗰陣收到嘅係 MouseEvent——只認四個字串，其餘當〔選擇其他〕。
+    // 第八十二輪批次 IG 組：加〔寄給堂委／執事〕（COMMITTEE）
+    sendMode_ = (mode === 'ALL' || mode === 'CHANGED' || mode === 'COMMITTEE') ? mode : 'PICK';
     pickerAutoOpened_ = false;
     sendModeData_ = null;
     runAction('讀取寄送資料', async () => {
@@ -43,6 +44,8 @@
     // 第七十七輪批次 EE 組：〔給所有人〕喺正式發出之後，就算「沒有人的安排改過」都寄得
     //（後端 `allKind`＝改動後重發嗰條路，每一位都會收到）。
     if (sendMode_ === 'ALL' && s.allKind && s.allKind !== 'NONE') s.kind = s.allKind;
+    // 第八十二輪批次 IG 組：四粒掣各自嘅寄出種類由後端講（〔給所有人〕＝正式發出、〔寄給堂委／執事〕＝審閱本……）
+    if (s.kindByMode && s.kindByMode[sendMode_]) s.kind = s.kindByMode[sendMode_];
 
     // ══════════════════════════════════════════════════════════
     // ⚠️ 第四十七輪批次 A2 組：**次序調轉咗，而且唔可以再調返轉。**
@@ -295,6 +298,11 @@
   /** 呢一次彈窗入面幹事揀咗咩。開窗嗰陣由後端嘅預設值填好。 */
   let sendOptions_ = null;
 
+  /** 第八十二輪批次 IG 組：呢粒掣種類嘅預設值（後端 `sendOptionDefaultsByKind`；冇就退回舊嗰份）。 */
+  function sendDefaultsFor(s) {
+    return ((s.sendOptionDefaultsByKind || {})[s.kind]) || s.sendOptionDefaults || {};
+  }
+
   /**
    * @param {Object} s `apiGetSendPlanSummary()` 嘅結果
    * @param {Object=} opts 第四十八輪批次 A2 組：`{allowUnsaved: true}` ⇒
@@ -315,8 +323,9 @@
       recipientScope: 'PICK',
       // 第七十七輪批次 EE 組：第 3 步邊一粒掣（後端用嚟寫理由、同「冇人改過都要寄」嘅判斷）
       sendMode: sendMode_,
-      attachType: (s.sendOptionDefaults || {}).attachType || 'NONE',
-      includeIcs: !!(s.sendOptionDefaults || {}).includeIcs,
+      // 第八十二輪批次 IG 組：預設值跟呢粒掣嘅種類（審閱本／正式發出／改動後重發）
+      attachType: sendDefaultsFor(s).attachType || 'NONE',
+      includeIcs: !!sendDefaultsFor(s).includeIcs,
       pickedKeys: [],
       extraEmails: [],
       extraEmailsRaw: ''
@@ -329,6 +338,7 @@
     // 第七十七輪批次 EE 組：〔給所有人〕〔變動的人〕嘅名單由**後端**算；〔選擇其他〕自動開收件人視窗。
     if (sendMode_ === 'ALL') { loadSendAllRecipients(s); return; }
     if (sendMode_ === 'CHANGED') { loadSendChangedRecipients(s); return; }
+    if (sendMode_ === 'COMMITTEE') { loadSendCommitteeRecipients(s); return; }
     drawSendMain(s);
     if (!pickerAutoOpened_) {
       pickerAutoOpened_ = true;
@@ -348,6 +358,42 @@
       sendOptions_.recipientScope = 'PICK';
       drawSendMain(s);
     });
+  }
+
+  /**
+   * 第八十二輪批次 IG 組：〔寄給堂委／執事〕——堂委＋執事＋IT＋幹事＋固定收件人＋你自己，後端算；
+   * 寄出窗只顯示摘要，冇〔選擇收件人〕。
+   */
+  function loadSendCommitteeRecipients(s) {
+    runAction('讀取收件名單', async () => {
+      const r = await callServer('apiGetSendCommitteeRecipients', currentQuarterId);
+      if (!r.ok) { showErrorModal('寄給堂委／執事', new Error(r.message)); return; }
+      sendPool_ = r.items || [];
+      sendPoolGroups_ = r.groups || [];
+      sendModeData_ = r;
+      sendOptions_.pickedKeys = (r.pickedKeys || []).slice();
+      sendOptions_.extraEmails = (r.extraEmails || []).slice();
+      sendOptions_.extraEmailsRaw = (r.extraEmails || []).join(', ');
+      sendOptions_.recipientScope = 'PICK';
+      drawSendMain(s);
+    });
+  }
+
+  /** 第八十二輪批次 IG 組：〔寄給堂委／執事〕嘅收件人摘要（每組幾多位、包唔包你自己）。 */
+  function committeeSummaryLines(d) {
+    const c = d.counts || {};
+    const lines = [
+      '堂委 ' + (c.COMMITTEE || 0) + ' 位、執事 ' + (c.DEACON || 0) + ' 位、IT ' + (c.IT || 0) + ' 位、幹事 '
+        + (c.CLERK || 0) + ' 位、固定收件人 ' + (c.FIXED || 0) + ' 個（同一個人只寄一次）'
+    ];
+    if (d.selfEmail) {
+      lines.push(d.selfInPool ? '你自己（' + d.selfEmail + '）已經在上面的名單內。'
+        : '另外寄一份給你自己（' + d.selfEmail + '）。');
+    }
+    if ((d.noEmailNames || []).length > 0) {
+      lines.push('另外 ' + d.noEmailNames.length + ' 位沒有電郵，收不到：' + d.noEmailNames.join('、'));
+    }
+    return lines;
   }
 
   /** 第七十七輪批次 EE 組：〔變動的人〕——同上一次寄出嘅版本比較、安排有改動嘅人（同改動後重發確認窗同一支判斷）。 */
@@ -471,6 +517,9 @@
           className: 'vio-row'
         }));
       }
+    } else if (sendMode_ === 'COMMITTEE') {
+      // 第八十二輪批次 IG 組：只顯示摘要，冇〔選擇收件人〕
+      committeeSummaryLines(sendModeData_ || {}).forEach((t) => whoBox.appendChild(make('div', { text: t, className: 'vio-row' })));
     } else if (sendMode_ === 'CHANGED') {
       const d = sendModeData_ || {};
       if (d.baseline) {
@@ -568,12 +617,14 @@
 
     // ── 喺 REQUESTS_APPLIED 嗰一步，「再寄一次審閱本」仍然做得到 ──
     const actions = [];
-    if (s.alsoReview) {
+    // 第八十二輪批次 IG 組：寄審閱本有自己一粒〔寄給堂委／執事〕，〔給所有人〕嗰個窗唔再夾「改為再寄一次審閱本」
+    if (s.alsoReview && sendMode_ !== 'ALL') {
       actions.push(button('改為再寄一次審閱本', () => { closeModal(); openReviewSameBatch(); }, 'secondary'));
     }
 
     openConfirm({
-      title: '寄出',
+      // 第八十二輪批次 IG 組：標題寫明係邊一種（審閱本／正式發出／改動後重發）
+      title: '寄出：' + (SEND_KIND_NAMES_TC[String(s.kind || '').toLowerCase()] || '寄出'),
       bodyNodes: nodes,
       // ⚠️ 第四十三輪批次 E2：粒掣一律叫「寄出」。
       // Ivan：「click 寄給堂委審閱，不能 click。呢粒掣應該叫『寄出』。」

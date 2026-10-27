@@ -66,11 +66,12 @@ console.log('\n=== 規格 1.2【核心】狀態卡文字，逐個 Stage ===');
       gas.buildDashboardStatusText_(S.DRAFT, true, '11月27日')]
       .every(function (s) { return s.indexOf('自動') === -1; }));
   checkEqual('★★★★★ DRAFT 有版本', gas.buildDashboardStatusText_(S.DRAFT, true, ''),
-    '初稿已生成，未寄給堂委。');
+    // 第八十二輪批次 IG 組（刻意改動）：寄審閱本變成可選，進度文字跟住改
+    '初稿已生成，未正式發出給全體。');
   checkEqual('★★★★★ REVIEW_SENT', gas.buildDashboardStatusText_(S.REVIEW_SENT, true, ''),
-    '已寄給堂委，等他們的意見。');
+    '已寄審閱本給堂委／執事，未正式發出給全體。');
   checkEqual('★★★★★ REQUESTS_APPLIED', gas.buildDashboardStatusText_(S.REQUESTS_APPLIED, true, ''),
-    '堂委意見已處理，未正式發出給全體。');
+    '已儲存修改，未正式發出給全體。');
   checkEqual('★★★★★ OFFICIAL_SENT', gas.buildDashboardStatusText_(S.OFFICIAL_SENT, true, ''),
     '已正式發出給全體。');
 
@@ -99,10 +100,10 @@ console.log('\n=== 規格 2.3 掣 1 動態文字，六種情況 ===');
     t({ unsaved: { gridChangeCount: 4, unresolvedCount: 2, pendingRequestCount: 3, hasAny: true } }),
     // 第七十五輪批次 CE 組：認唔出嘅名唔再擋，撳落去可以逐個決定
     '有 2 個名字在名單上找不到。撳〔儲存〕或者〔檢查我的改動〕，可以逐個選〔加入名單〕或者「這一季臨時幫手，不加入名單」。');
-  checkEqual('★★★★★ REVIEW_SENT 且零改動 ⇒ 講清楚撳落去等於「意見已收齊」'
-    + '（唔係「乜都唔會做」——呢個係 D4 零改動路徑最易誤解嘅一種）',
+  // 第八十二輪批次 IG 組（刻意改動）：零改動唔再推進度 ⇒ 審閱階段都只係「未偵測到」
+  checkEqual('★★★★★ REVIEW_SENT 且零改動 ⇒「未偵測到你在表上改過任何格。」（第八十二輪 IG 組）',
     t({ stage: S.REVIEW_SENT }),
-    '堂委沒有提出改動。撳下去就當作意見已收齊，可以進入正式發出。');
+    '未偵測到你在表上改過任何格。');
 }
 
 console.log('\n=== 規格 2.3 掣 2 動態文字 ===');
@@ -167,14 +168,17 @@ console.log('\n=== 規格 2.2【核心】四粒掣嘅 enabled 狀態機 ===');
     b({ stage: S.REVIEW_SENT }).review.enabled === true);
   check('★★★★★ 掣 2 喺 REQUESTS_APPLIED 撳得到（D2 嘅重點：舊版只准 DRAFT）',
     b({ stage: S.REQUESTS_APPLIED }).review.enabled === true);
-  check('★★★★★ 掣 2 喺 OFFICIAL_SENT 撳唔到',
-    b({ stage: S.OFFICIAL_SENT }).review.enabled === false);
+  // 第八十二輪批次 IG 組（刻意改動）：〔寄給堂委／執事〕正式發出之後都寄得
+  check('★★★★★ 掣 2 喺 OFFICIAL_SENT 都撳得到（第八十二輪 IG 組）',
+    b({ stage: S.OFFICIAL_SENT }).review.enabled === true);
 
   // 掣 3：三層防重複
-  check('★★★★★ 掣 3 只喺 REQUESTS_APPLIED 撳得到',
+  // 第八十二輪批次 IG 組（刻意改動）：〔給所有人〕＝正式發出，未正式發出之前任何階段都得
+  check('★★★★★ 掣 3 喺 DRAFT／REVIEW_SENT／REQUESTS_APPLIED 都撳得到，OFFICIAL_SENT 撳唔到',
     b({ stage: S.REQUESTS_APPLIED }).official.enabled === true
-    && b({ stage: S.REVIEW_SENT }).official.enabled === false
-    && b({ stage: S.DRAFT }).official.enabled === false);
+    && b({ stage: S.REVIEW_SENT }).official.enabled === true
+    && b({ stage: S.DRAFT }).official.enabled === true
+    && b({ stage: S.OFFICIAL_SENT }).official.enabled === false);
   check('★★★★★ 掣 3：SendLog 有 OFFICIAL 紀錄 ⇒ 即使 Stage 啱都撳唔到'
     + '（規格 2.6 第 2 層，不論版本、不論 DRY_RUN）',
     b({ hasOfficialRecord: true }).official.enabled === false);
@@ -226,12 +230,15 @@ console.log('\n=== 規格 1.6【核心】disabledReason 一律寫「怎樣才撳
 
   check('★★★★★ 每一句都講到「點樣先撳得到」或者「應該改用邊粒掣」',
     samples.every(function (s) {
-      return s.indexOf('才會著') !== -1 || s.indexOf('請用') !== -1 || s.indexOf('不需要') !== -1;
+      // 第八十二輪批次 IG 組：〔變動的人〕嘅原因「要先用〔給所有人〕正式發出一次」都係講點樣先撳得到
+      return s.indexOf('才會著') !== -1 || s.indexOf('請用') !== -1 || s.indexOf('不需要') !== -1
+        || s.indexOf('要先用') !== -1;
     }), JSON.stringify(samples, null, 1));
 
-  checkEqual('★★★★ 掣 3 喺 DRAFT 嘅提示係規格 1.6 嗰句正例',
-    gas.computeDashboardButtons_(facts({ stage: S.DRAFT })).official.disabledReason,
-    '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存」，這一粒才會著。');
+  // 第八十二輪批次 IG 組（刻意改動）：DRAFT 都可以正式發出 ⇒ 冇灰色原因；冇版本先有
+  checkEqual('★★★★ 掣 3 喺 DRAFT 撳得到（冇原因）', gas.computeDashboardButtons_(facts({ stage: S.DRAFT })).official.disabledReason, '');
+  checkEqual('★★★★ 掣 3 冇版本嘅提示', gas.computeDashboardButtons_(facts({ versionExists: false })).official.disabledReason,
+    '要先生成初稿，這一粒才會著。');
 }
 
 console.log('\n=== 規格 1.1／5.1：季度與版本一律寫人話 ===');

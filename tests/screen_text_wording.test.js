@@ -59,7 +59,8 @@ console.log('\n=== AY2 彈窗標題「儲存」 ===');
   vm.runInContext('renderSaveResult({ ok: true, zeroChange: true, message: "完成" })', ui);
   check('★★★★★ 零改動完成窗標題同樣', title() === '儲存', title());
   vm.runInContext('renderSaveZeroChange({ zeroChangeAction: "ADVANCE_STAGE_ONLY", stage: "REVIEW_SENT" })', ui);
-  check('★★★★★ 「堂委沒有提出改動」窗標題開頭是「儲存」', /儲存：堂委沒有提出改動/.test(title()) || title() === '', title());
+  // 第八十二輪批次 IG 組：「堂委沒有提出改動」嗰個窗拿走——任何零改動都係「儲存」
+  check('★★★★★ 零改動（審閱階段）窗標題都係「儲存」（第八十二輪 IG 組）', title() === '儲存', title());
 }
 
 console.log('\n=== AY3／AY4 申報認不到名字的句子；兩條路認名一致 ===');

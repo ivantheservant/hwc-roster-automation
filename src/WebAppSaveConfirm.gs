@@ -443,9 +443,9 @@ function buildSaveConfirmReasons_(n) {
  * @returns {string} `'NOTHING'` 或 `'ADVANCE_STAGE_ONLY'`
  */
 function resolveZeroChangeAction_(stage) {
-  // 只有 REVIEW_SENT 一種情況有嘢做：堂委冇提意見，撳掣 1 就當作
-  // 「意見已收齊」，Stage 前進令掣 3 亮起。其餘全部乜都唔做。
-  return stage === QUARTER_STAGE.REVIEW_SENT ? 'ADVANCE_STAGE_ONLY' : 'NOTHING';
+  // 第八十二輪批次 IG 組：〔給所有人〕唔再要求「意見已收齊」⇒ 零改動〔儲存〕任何階段都只係「沒有改動」，
+  // 唔再推進度（第二十三輪 D4 嗰個「堂委冇提意見，撳一下當作收齊」拿走）。
+  return 'NOTHING';
 }
 
 /**
@@ -1015,25 +1015,13 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
  * @returns {Object}
  */
 function executeSaveConfirmZeroChange_(quarterId, plan) {
-  if (plan.zeroChangeAction !== 'ADVANCE_STAGE_ONLY') {
-    return {
-      ok: true, versionCreated: false, publishFailed: false, stageAdvanced: false,
-      zeroChange: true,
-      message: '沒有偵測到任何改動，不需要儲存。'
-        + (plan.stage === QUARTER_STAGE.REQUESTS_APPLIED ? '可以撳「正式發出給全體」了。' : '')
-        + (plan.stage === QUARTER_STAGE.OFFICIAL_SENT ? '這一季已經正式發出過了。' : '')
-    };
-  }
-
-  // REVIEW_SENT 零改動 ＝ 堂委冇提意見。唔建版本，但 Stage 前進 + 重發連結。
-  advanceQuarterStage_(quarterId, QUARTER_STAGE.REQUESTS_APPLIED);
-  const publish = tryPublishPublicRoster_(quarterId);
+  // 第八十二輪批次 IG 組：零改動一律乜都唔做（第二十三輪 D4 嗰條推進度嘅路拿走）
   return {
-    ok: true, versionCreated: false, stageAdvanced: true, zeroChange: true,
-    publishFailed: publish.failed, publishError: publish.message,
-    message: '堂委沒有提出改動，已當作意見已收齊。職事表內容沒有改變，'
-      + '沒有建立新版本。「正式發出給全體」現在可以撳了。'
-      + (publish.failed ? '\n\n⚠️ 不過公開連結未能更新（' + publish.message + '）。' : '')
+    ok: true, versionCreated: false, publishFailed: false, stageAdvanced: false,
+    zeroChange: true,
+    message: '沒有偵測到任何改動，不需要儲存，沒有建立新版本。'
+      + (plan.stage === QUARTER_STAGE.OFFICIAL_SENT
+        ? '這一季已經正式發出過了。' : '要正式發出，撳第 3 步〔給所有人〕。')
   };
 }
 

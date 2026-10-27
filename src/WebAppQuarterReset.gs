@@ -85,7 +85,7 @@ function quarterResetExecute_locked_(quarterId, typed) {
   // 後端再驗一次封鎖（唔信前端）
   const avail = describeQuarterResetAvailability_(id);
   if (avail.blocked) {
-    throw new Error(buildThreePartMessage_(avail.reason, '沒有清走任何東西。', ['揀另一個季度']));
+    throw new Error(buildThreePartMessage_(avail.reason, '沒有清走任何東西。', ['選另一個季度']));
   }
   const plan = planQuarterReset_(id, true);
   const batch = executeQuarterResetBatch_([{ quarterId: id, plan: plan }]);

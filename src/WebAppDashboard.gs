@@ -86,9 +86,10 @@ function buildDashboardStatusBase_(stage, versionExists, generateOnText, extras)
       ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，撳下面的「生成初稿」。'
       : '還未生成初稿。撳下面的「生成初稿」。';
   }
-  if (stage === QUARTER_STAGE.DRAFT) return '初稿已生成，未寄給堂委。';
-  if (stage === QUARTER_STAGE.REVIEW_SENT) return '已寄給堂委，等他們的意見。';
-  if (stage === QUARTER_STAGE.REQUESTS_APPLIED) return '堂委意見已處理，未正式發出給全體。';
+  // 第八十二輪批次 IG 組：寄審閱本變成可選（〔寄給堂委／執事〕），唔再係正式發出之前一定要行嘅一步
+  if (stage === QUARTER_STAGE.DRAFT) return '初稿已生成，未正式發出給全體。';
+  if (stage === QUARTER_STAGE.REVIEW_SENT) return '已寄審閱本給堂委／執事，未正式發出給全體。';
+  if (stage === QUARTER_STAGE.REQUESTS_APPLIED) return '已儲存修改，未正式發出給全體。';
   if (stage === QUARTER_STAGE.OFFICIAL_SENT) return '已正式發出給全體。';
   return '這一季的情況：' + stage;
 }
@@ -338,30 +339,30 @@ function computeDashboardButtons_(s) {
   // 二來原本嗰句係口語（「咗」），畫面文案一律書面語。
   buttons.save = computeSaveButton_(s);
 
-  // ── 掣 2：寄給堂委審閱 ────────────────────────────────────────
-  // D2：開放於 DRAFT／REVIEW_SENT／REQUESTS_APPLIED（＝未正式發出之前）。
-  const reviewStageOk = s.versionExists && s.stage !== QUARTER_STAGE.OFFICIAL_SENT;
+  // ── 掣 2：寄給堂委審閱（第 3 步〔寄給堂委／執事〕）──────────────
+  // 第八十二輪批次 IG 組：任何階段都可以寄（正式發出之後都得；照用審閱本範本、進度唔變）。
+  const reviewStageOk = s.versionExists;
   buttons.review = {
     enabled: reviewStageOk && !unsaved.hasAny,
     disabledReason: !s.versionExists
       ? '要先生成初稿，這一粒才會著。'
-      : (s.stage === QUARTER_STAGE.OFFICIAL_SENT
-        ? '這一季已經正式發出給全體，不會再寄審閱本。之後有改動請用「改動後重發」。'
-        : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : '')),
+      : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : ''),
     dynamicText: buildReviewButtonText_(s),
     recipientCount: s.reviewerCount,
     lastSentAt: s.lastSentAt[MAIL_STAGES.REVIEW]
   };
 
-  // ── 掣 3：正式發出給全體 ──────────────────────────────────────
+  // ── 掣 3：正式發出給全體（第 3 步〔給所有人〕）────────────────
   // 三層防重複（規格 2.6）：Stage、SendLog 有冇 OFFICIAL 紀錄、未儲存改動。
-  const officialStageOk = s.stage === QUARTER_STAGE.REQUESTS_APPLIED;
+  // 第八十二輪批次 IG 組：唔再要求先寄審閱本、先「意見已收齊」——未正式發出之前任何階段都得。
+  //（＝`STEP4_ALLOWED_STAGES_`：OFFICIAL_SENT 以外嘅三個階段；呢個係純函式，唔依賴 FiveStageCore.gs 載入次序）
+  const officialStageOk = s.versionExists && s.stage !== QUARTER_STAGE.OFFICIAL_SENT;
   buttons.official = {
     enabled: officialStageOk && !s.hasOfficialRecord && !unsaved.hasAny,
-    disabledReason: s.hasOfficialRecord
-      ? '已經正式發出過。之後有改動請用「改動後重發」。'
-      : (!officialStageOk
-        ? '要先撳「寄給堂委審閱」，收齊意見之後再撳「儲存」，這一粒才會著。'
+    disabledReason: !s.versionExists
+      ? '要先生成初稿，這一粒才會著。'
+      : (s.hasOfficialRecord || s.stage === QUARTER_STAGE.OFFICIAL_SENT
+        ? '已經正式發出過。之後有改動請用〔變動的人〕或者〔給所有人〕重發。'
         : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : '')),
     dynamicText: buildOfficialButtonText_(s),
     targetPersonCount: s.officialTargetCount,
@@ -375,7 +376,8 @@ function computeDashboardButtons_(s) {
   buttons.resend = {
     enabled: resendStageOk && !unsaved.hasAny && s.changedPersonCount > 0,
     disabledReason: !resendStageOk
-      ? '要先撳「正式發出給全體」，這一粒才會著。'
+      // 第八十二輪批次 IG 組
+      ? RESEND_NEEDS_OFFICIAL_TEXT
       : (unsaved.hasAny
         ? buildUnsavedBlockHint_(unsaved)
         : (s.changedPersonCount === 0 ? '沒有人的安排改過，不需要重發。' : '')),
@@ -493,9 +495,7 @@ function buildSaveButtonText_(s) {
   const noChange = u.gridChangeCount === 0 && u.pendingRequestCount === 0;
   // 第八十二輪批次 IH／IF 組：用舊版本作起點而表上冇偵測到差異
   if (noChange && s.startPointPending) return '你用了舊版本作起點，還未儲存。撳〔儲存〕成為新一版。' + needsInput;
-  if (noChange && s.stage === QUARTER_STAGE.REVIEW_SENT) {
-    return '堂委沒有提出改動。撳下去就當作意見已收齊，可以進入正式發出。' + needsInput;
-  }
+  // 第八十二輪批次 IG 組：「意見已收齊」唔再擋任何嘢 ⇒ 審閱階段冇改動都只係「未偵測到」
   if (noChange) return '未偵測到你在表上改過任何格。' + needsInput;
   if (u.gridChangeCount > 0 && u.pendingRequestCount > 0) {
     return '偵測到你在表上改了 ' + u.gridChangeCount + ' 格，另有 '

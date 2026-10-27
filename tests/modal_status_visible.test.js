@@ -185,7 +185,8 @@ console.log('\n=== C 撳〔寄出〕嗰幾條「靜靜 return」都行呢個入�
     /setStatus\('這 ' \+ r\.invalid\.length \+ ' 個看起來不是電郵地址：/
       .test(scriptHtml), '');
   check('★★★★★ 打字確認唔啱嗰條一樣（`openConfirm` 入面）',
-    /setStatus\('請輸入「' \+ CONFIRM_PHRASE \+ '」兩個字才可以繼續。', true\);/
+    // 第八十二輪批次 IJ 組：要打嘅字可以換（〔整季清走重來〕＝「確認重設」），句子跟住變
+    /setStatus\('請輸入「' \+ phrase \+ '」' \+ phraseCount \+ '個字才可以繼續。', true\);/
       .test(scriptHtml), '');
 }
 

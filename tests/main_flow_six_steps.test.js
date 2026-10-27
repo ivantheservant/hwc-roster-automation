@@ -441,10 +441,13 @@ console.log('\n=== A4：改好之後，新增同移走都要逐項列出 ===');
 console.log('\n=== C【核心】第 5 步：階段由系統判斷 ===');
 {
   const s = gas.apiGetSendPlanSummary(Q_NOW);
-  checkEqual('★★★★★ DRAFT 階段 ⇒ 寄給堂委審閱', s.kind, 'REVIEW');
+  // 第八十二輪批次 IG 組（刻意改動）：寄出種類由第 3 步邊一粒掣決定（kindByMode）——
+  // DRAFT 階段〔寄給堂委／執事〕＝審閱本，〔給所有人〕＝正式發出
+  checkEqual('★★★★★ DRAFT 階段〔寄給堂委／執事〕⇒ 寄給堂委審閱', s.kindByMode.COMMITTEE, 'REVIEW');
+  checkEqual('★★★★★ DRAFT 階段〔給所有人〕⇒ 正式發出', s.kindByMode.ALL, 'OFFICIAL');
   check('★★★★★ 而且用一句人話講出嚟，唔係機器代號',
-    s.kindSentence.indexOf('堂委審閱') !== -1
-    && s.kindSentence.indexOf('REVIEW') === -1, s.kindSentence);
+    gas.buildSendKindSentence_('REVIEW', {}).indexOf('堂委審閱') !== -1
+    && gas.buildSendKindSentence_('REVIEW', {}).indexOf('REVIEW') === -1);
   check('★★★★ 講得出寄俾邊幾個', s.recipientSentence.indexOf('堂委') !== -1, s.recipientSentence);
 
   // ★★★ 那條永久連結一律要喺信入面。

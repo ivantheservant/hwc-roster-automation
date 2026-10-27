@@ -420,32 +420,10 @@
   /* ── D4／零改動兩種路徑 ─────────────────────────────────── */
 
   function renderSaveZeroChange(plan) {
-    if (plan.zeroChangeAction === 'ADVANCE_STAGE_ONLY') {
-      openConfirm({
-        title: '儲存：堂委沒有提出改動',
-        bodyNodes: [
-          para('堂委沒有提出改動。撳下去就當作意見已收齊，'
-            + '「正式發出給全體」會亮起。職事表內容不會改變。'),
-          make('div', { className: 'sec' }, [
-            sectionTitle('會做的事：'),
-            make('div', { text: '・把這一季的進度推前到「意見已收齊」', className: 'vio-row' }),
-            make('div', { text: '・重新發佈公開連結（連結地址不變）', className: 'vio-row' }),
-            sectionTitle('不會做的事：'),
-            make('div', { text: '・不會建立新版本', className: 'vio-row' }),
-            make('div', { text: '・不會改動職事表任何一格', className: 'vio-row' }),
-            make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
-          ])
-        ],
-        confirmLabel: '確定，意見已收齊',
-        onConfirm: () => executeSaveAndConfirm()
-      });
-      return;
-    }
-
+    // 第八十二輪批次 IG 組：「堂委沒有提出改動，撳下去就當作意見已收齊」嗰個窗拿走——零改動只講「沒有改動」
     openModal('儲存', [
       para('沒有偵測到任何改動，不需要儲存。'
-        + (plan.stage === 'REQUESTS_APPLIED' ? '可以撳「正式發出給全體」了。' : '')
-        + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : ''))
+        + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : '要正式發出，撳第 3 步〔給所有人〕。'))
     ], [button('知道了', () => closeModal(), '')]);
   }
 
@@ -851,7 +829,6 @@
     if (keptHard > 0) willDo.push('記錄你勾了保留的 ' + keptHard + ' 格（等於放行，之後整季記住）');
     willDo.push('儲存成第 ' + plan.targetVersionNo + ' 版。第 ' + plan.baseVersionNo
       + ' 版原封不動保留，可以對照');
-    if (plan.stage === 'REVIEW_SENT') willDo.push('把這一季的進度推前到「意見已收齊」');
     willDo.push('重新發佈公開連結（連結地址不變）');
     willDo.forEach((t) => box.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
 
@@ -1198,7 +1175,10 @@
     const lines = [
       r.isDryRun ? '測試模式：沒有真的寄出任何電郵，只記錄了一次。' : '已經寄出。',
       '寄出 ' + r.sent + ' 封　模擬 ' + r.dryRun + ' 封　查無電郵略過 ' + r.skipped + ' 位',
-      '這一季的進度現在是「已寄給堂委，等他們的意見」。'
+      // 第八十二輪批次 IG 組：審閱本唔再係正式發出之前一定要行嘅一步
+      d && d.stage === 'OFFICIAL_SENT'
+        ? '這一季已經正式發出過，審閱本不會改變進度。'
+        : '這一季還未正式發出給全體；要正式發出，撳第 3 步〔給所有人〕。'
     ];
     // 第六十三輪批次 A 組：寄之前補發咗公開連結 ⇒ 講一句
     if (r.publicLinkRepublished) lines.push('寄出之前，系統已經自動把公開連結更新到最新內容。');

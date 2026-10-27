@@ -72,11 +72,11 @@ console.log('\n=== B2【核心】步驟 2 嘅三個 Stage 全部照認 ===');
       pre.met === true, JSON.stringify(pre));
   });
 
+  // 第八十二輪批次 IG 組（刻意改動）：〔寄給堂委／執事〕正式發出之後都寄得 ⇒ OFFICIAL_SENT 都符合
   const gas = loadWithStage('OFFICIAL_SENT');
   const pre = gas.describeFlowStepPrecondition_(gas.FLOW_STEP_KEYS.REVIEW_SEND, '2027T4');
-  check('★★★★★ 而 `OFFICIAL_SENT` 真係唔符合——'
-    + '放寬唔等於乜都當啱，否則呢個欄位就變咗一句廢話',
-    pre.met === false, JSON.stringify(pre));
+  check('★★★★★ `OFFICIAL_SENT` 都符合（第八十二輪 IG 組：審閱本任何階段都寄得）',
+    pre.met === true, JSON.stringify(pre));
   check('★★★★ 而且講得出實際係咩 Stage',
     pre.text.indexOf('OFFICIAL_SENT') !== -1, pre.text);
 }
@@ -85,7 +85,8 @@ console.log('\n=== B2 步驟 3／4／5 嘅單一 Stage 照樣講得準 ===');
 {
   const cases = [
     ['SAVE_CONFIRM', 'REVIEW_SENT', 'DRAFT'],
-    ['OFFICIAL_SEND', 'REQUESTS_APPLIED', 'REVIEW_SENT'],
+    // 第八十二輪批次 IG 組：正式發出唔再要求先「意見已收齊」⇒ 唯一唔符合嘅係已經正式發出
+    ['OFFICIAL_SEND', 'REVIEW_SENT', 'OFFICIAL_SENT'],
     ['RESEND', 'OFFICIAL_SENT', 'REQUESTS_APPLIED']
   ];
   cases.forEach(function (c) {

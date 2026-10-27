@@ -348,8 +348,9 @@ console.log('\n=== C：寄出彈窗 ===');
     && /sectionTitle\('日曆檔'\)/.test(sendPaper), '');
   // 附件同日曆檔嘅預設值仍然由後端嚟（兩個真相來源嘅問題冇變）。
   check('★★★★★ 附件同日曆檔嘅預設值由後端嚟，前端冇自己寫死一套',
-    /s\.sendOptionDefaults \|\| \{\}\)\.attachType/.test(sendPaper)
-    && /s\.sendOptionDefaults \|\| \{\}\)\.includeIcs/.test(sendPaper), '');
+    // 第八十二輪批次 IG 組：預設值跟該粒掣嘅種類（`sendDefaultsFor(s)`：sendOptionDefaultsByKind，冇就退回 sendOptionDefaults）
+    /sendDefaultsFor\(s\)\.attachType/.test(sendPaper) && /sendDefaultsFor\(s\)\.includeIcs/.test(sendPaper)
+    && /\(\(s\.sendOptionDefaultsByKind \|\| \{\}\)\[s\.kind\]\) \|\| s\.sendOptionDefaults \|\| \{\}/.test(sendPaper), '');
   // ⚠️ 第四十六輪批次 A 組：收件範圍**唔再有三揀一**。
   // 收件人一律行 `PICK`（照 `pickedKeys` 寄），而 `pickedKeys` 由
   // 六個來源勾選框 ＋ 逐個加減砌出嚟。

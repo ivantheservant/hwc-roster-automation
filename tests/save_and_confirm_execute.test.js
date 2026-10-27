@@ -191,13 +191,12 @@ console.log('\n=== D-3【核心】零改動路徑 ===');
   const zeroFn = SRC.slice(SRC.indexOf('function executeSaveConfirmZeroChange_'));
   check('★★★★★ NOTHING 分支：唔建版本、唔前進 Stage、唔發佈',
     /versionCreated: false, publishFailed: false, stageAdvanced: false/.test(zeroFn));
-  check('★★★★★ ADVANCE_STAGE_ONLY 分支：唔建版本，但前進 Stage 兼重發連結（D4）',
-    /advanceQuarterStage_\(quarterId, QUARTER_STAGE\.REQUESTS_APPLIED\)[\s\S]{0,200}?tryPublishPublicRoster_/.test(zeroFn));
-  check('★★★★★ REVIEW_SENT 零改動嘅訊息要講清楚「當作意見已收齊」'
-    + '（唔係「乜都冇做」——呢個係最易誤解嘅一種）',
-    /已當作意見已收齊/.test(zeroFn));
-  check('★★★★ REQUESTS_APPLIED 零改動時加一句「可以撳正式發出」',
-    /可以撳「正式發出給全體」了/.test(zeroFn));
+  // 第八十二輪批次 IG 組（刻意改動）：ADVANCE_STAGE_ONLY（「當作意見已收齊」）整條拿走——零改動一律乜都唔做
+  const zeroBody = zeroFn.slice(0, zeroFn.indexOf('\n}\n') + 2);
+  check('★★★★★ 冇 ADVANCE_STAGE_ONLY 分支（零改動唔再推進度）',
+    !/advanceQuarterStage_/.test(zeroBody) && !/意見已收齊/.test(zeroBody), zeroBody.slice(0, 300));
+  check('★★★★ 未正式發出嘅零改動加一句「要正式發出，撳第 3 步〔給所有人〕」',
+    /要正式發出，撳第 3 步〔給所有人〕。/.test(zeroFn));
   check('★★★★ OFFICIAL_SENT 零改動時加一句「已經正式發出過」',
     /這一季已經正式發出過了/.test(zeroFn));
   check('★★★★★ 零改動路徑排喺放行檢查之後'

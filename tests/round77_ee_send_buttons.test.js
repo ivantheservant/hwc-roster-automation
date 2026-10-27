@@ -124,7 +124,10 @@ console.log('\n=== EE5：正式發出之後〔給所有人〕 ===');
     gas.resolveSendKindForAll_(btnsOff, { stage: 'OFFICIAL_SENT', unsaved: { hasAny: false } }) === 'RESEND');
   check('★★★★★ 有未儲存 ⇒ NONE（照舊擋）', gas.resolveSendKindForAll_(btnsOff, { stage: 'OFFICIAL_SENT', unsaved: { hasAny: true } }) === 'NONE');
   check('★★★★ 未正式發出 ⇒ NONE', gas.resolveSendKindForAll_(btnsOff, { stage: 'DRAFT', unsaved: { hasAny: false } }) === 'NONE');
-  check('★★★★ 本來就著 ⇒ 照舊', gas.resolveSendKindForAll_({ review: { enabled: true } }, { stage: 'DRAFT', unsaved: {} }) === 'REVIEW');
+  // 第八十二輪批次 IG 組（刻意改動）：〔給所有人〕一律係正式發出——只有審閱掣著唔會變成寄審閱本
+  check('★★★★ 只有審閱掣著 ⇒ 唔會變成審閱本（NONE）；正式發出著 ⇒ OFFICIAL',
+    gas.resolveSendKindForAll_({ review: { enabled: true } }, { stage: 'DRAFT', unsaved: {} }) === 'NONE'
+    && gas.resolveSendKindForAll_({ official: { enabled: true } }, { stage: 'DRAFT', unsaved: {} }) === 'OFFICIAL');
 
   const context = { assignmentsByPerson: { P9701: [1], P9702: [1] }, lastHashByPerson: { P9701: 'h', P9702: 'h' }, notifyReasonByPerson: {} };
   const decision = gas.resolveSendOptions_('RESEND', { recipientScope: 'PICK', pickedKeys: ['P9701', 'P9702'], sendMode: 'ALL' }, null);
@@ -208,9 +211,11 @@ console.log('\n=== EE6–EE11：畫面 ===');
   {
     const card = ui.renderStepSend({ latestVersion: { versionNo: 2 }, officialSentOnce: false, buttons: {} });
     const texts = card.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
-    check('★★★★★★ 第 3 步三粒掣：給所有人／變動的人／選擇其他', JSON.stringify(texts) === JSON.stringify(['給所有人', '變動的人', '選擇其他']), JSON.stringify(texts));
+    // 第八十二輪批次 IG 組（刻意改動）：加〔寄給堂委／執事〕排第一；〔變動的人〕原因改為「要先用〔給所有人〕正式發出一次」
+    check('★★★★★★ 第 3 步四粒掣：寄給堂委／執事／給所有人／變動的人／選擇其他',
+      JSON.stringify(texts) === JSON.stringify(['寄給堂委／執事', '給所有人', '變動的人', '選擇其他']), JSON.stringify(texts));
     const changedBtn = btnIn(card, '變動的人');
-    check('★★★★★★ 未正式發出 ⇒〔變動的人〕變灰、原因講明用〔給所有人〕或〔選擇其他〕', changedBtn.disabled === true && /這一季還未正式發出給全體，請用〔給所有人〕或〔選擇其他〕/.test(changedBtn.title), changedBtn.title);
+    check('★★★★★★ 未正式發出 ⇒〔變動的人〕變灰、原因「要先用〔給所有人〕正式發出一次」', changedBtn.disabled === true && /要先用〔給所有人〕正式發出一次/.test(changedBtn.title), changedBtn.title);
     check('★★★★ 〔給所有人〕係主要按鈕、可以撳', !btnIn(card, '給所有人').disabled && !/secondary/.test(btnIn(card, '給所有人').className));
     check('★★★★ 卡片說明：「系統只會寄已經儲存的版本。」', /系統只會寄已經儲存的版本。/.test(card.textContent));
     const card2 = ui.renderStepSend({ latestVersion: { versionNo: 2 }, officialSentOnce: true, buttons: {} });
@@ -229,7 +234,8 @@ console.log('\n=== EE6–EE11：畫面 ===');
     btnIn(acts(), '寄出上一個版本（第 2 版）').fire('click');
     await tick();
     check('★★★★★★ 撳落去直接開寄出窗（冇「我明白」中間畫面），頂部黃框寫明會寄第 2 版、1 格唔會寄出',
-      title() === '寄出' && /會寄出第 2 版（2099-01-01 09:00 儲存）；表上未儲存的 1 格不會寄出，會留在表上/.test(body().textContent), title() + ' ' + body().textContent.slice(0, 300));
+      // 第八十二輪批次 IG 組：寄出窗標題寫明種類（「寄出：正式發出給全體」等）
+      /^寄出(：.+)?$/.test(title()) && /會寄出第 2 版（2099-01-01 09:00 儲存）；表上未儲存的 1 格不會寄出，會留在表上/.test(body().textContent), title() + ' ' + body().textContent.slice(0, 300));
     check('★★★★★ allowUnsaved 係布林 true', vm.runInContext('sendOptions_.allowUnsaved === true', ui));
     // 後端唔准
     summary = baseSummary({ blockedByUnsavedOnly: true, canSendUnsaved: false, canSendUnsavedReason: '這一季還未寄過，不可以用舊版本。', unsaved: { hasAny: true, gridChangeCount: 2 } });
@@ -300,7 +306,7 @@ console.log('\n=== EE6–EE11：畫面 ===');
     await tick();
     btnIn(acts(), '確認').fire('click');
     await tick();
-    check('★★★★★★ 只填自訂地址 ⇒ 回到主窗，寄給誰寫「自訂 1 個地址」', title() === '寄出' && /自訂 1 個地址/.test(body().textContent), title() + ' ' + body().textContent.slice(0, 300));
+    check('★★★★★★ 只填自訂地址 ⇒ 回到主窗，寄給誰寫「自訂 1 個地址」', /^寄出(：.+)?$/.test(title()) && /自訂 1 個地址/.test(body().textContent), title() + ' ' + body().textContent.slice(0, 300));
     check('★★★★★ 主窗冇「另外自行輸入電郵」一段（只留喺收件人視窗）', body().textContent.indexOf('另外自行輸入電郵') === -1);
     btnIn(acts(), '寄出').fire('click');
     await tick();

@@ -27,8 +27,10 @@ const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SendOptions.gs', 'SendRe
 
 console.log('\n=== AX1 後端：只有「已寄給堂委」這個進度才出提示 ===');
 {
-  check('★★★★★★ REVIEW_SENT ⇒ 有提示，而且字句同規格一致', gas.buildReviewSentHint_(gas.QUARTER_STAGE.REVIEW_SENT) === EXPECTED,
+  // 第八十二輪批次 IG 組（刻意改動）：〔給所有人〕任何時候都係正式發出、唔使先「儲存」推進度 ⇒ 呢個提示拿走
+  check('★★★★★★ REVIEW_SENT ⇒ 唔再出提示（第八十二輪 IG 組）', gas.buildReviewSentHint_(gas.QUARTER_STAGE.REVIEW_SENT) === '',
     gas.buildReviewSentHint_(gas.QUARTER_STAGE.REVIEW_SENT));
+  check('★★★★ 舊提示字句已經清走', read('src/WebAppSendPlan.gs').indexOf(EXPECTED) === -1);
   [gas.QUARTER_STAGE.DRAFT, gas.QUARTER_STAGE.REQUESTS_APPLIED, gas.QUARTER_STAGE.OFFICIAL_SENT, '', undefined].forEach((st) => {
     check('★★★★★ 進度 ' + String(st) + ' ⇒ 不出提示', gas.buildReviewSentHint_(st) === '', gas.buildReviewSentHint_(st));
   });
@@ -52,6 +54,7 @@ console.log('\n=== AX2 畫面：有提示就畫在最上面；沒有就不畫 ==
     const walk = (n) => String(n._text || '') + '\n' + (n.children || []).map(walk).join('\n');
     return walk(vm.runInContext('document.getElementById("modalBody")', ui));
   };
+  // 前端仍然照後端畀嘅 reviewSentHint 畫（後端而家一律畀空字串）——用一句測試字串驗畫法
   const withHint = bodyText(Object.assign({}, baseS, { reviewSentHint: EXPECTED }));
   check('★★★★★★ 有提示 ⇒ 寄出窗有那一句', withHint.indexOf(EXPECTED) !== -1, withHint.slice(0, 400));
   check('★★★★★★ 提示在最上面（排在「系統只會寄你已經儲存確認的版本」之前）',

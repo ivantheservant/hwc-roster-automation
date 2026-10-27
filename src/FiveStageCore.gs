@@ -83,7 +83,9 @@ function computeFiveStepAvailability_(stage, step1VersionExists) {
 const STEP2_ALLOWED_STAGES_ = [
   QUARTER_STAGE.DRAFT,
   QUARTER_STAGE.REVIEW_SENT,
-  QUARTER_STAGE.REQUESTS_APPLIED
+  QUARTER_STAGE.REQUESTS_APPLIED,
+  // 第八十二輪批次 IG 組：〔寄給堂委／執事〕任何階段都可以寄（正式發出之後都得；照用審閱本範本、進度唔變）
+  QUARTER_STAGE.OFFICIAL_SENT
 ];
 
 /**
@@ -104,7 +106,8 @@ const STEP3_APPLY_ALLOWED_STAGES_ = [
  * 讀同一份清單——兩邊各寫一次就會漂移，而漂移嘅後果係報告講一套、
  * 系統做另一套。
  */
-const STEP4_ALLOWED_STAGES_ = [QUARTER_STAGE.REQUESTS_APPLIED];
+// 第八十二輪批次 IG 組：〔給所有人〕＝正式發出，**唔再要求先寄審閱本、先「意見已收齊」**
+const STEP4_ALLOWED_STAGES_ = [QUARTER_STAGE.DRAFT, QUARTER_STAGE.REVIEW_SENT, QUARTER_STAGE.REQUESTS_APPLIED];
 
 /** 步驟 5 容許嘅 Stage。同上。 */
 const STEP5_ALLOWED_STAGES_ = [QUARTER_STAGE.OFFICIAL_SENT];
@@ -254,7 +257,10 @@ function executeStep2_(quarterId, sendOptions) {
   // ——因為而家真係「已寄給堂委、等緊佢哋意見」。
   // 用 `setQuarterStage_()` 而唔係 `advanceQuarterStage_()`：後者寫入
   // AuditLog 嘅 action 寫死係「Stage 前進」，退返轉頭嗰陣紀錄會講大話。
-  setQuarterStage_(quarterId, QUARTER_STAGE.REVIEW_SENT, '步驟 2：寄給堂委審閱（第二輪審閱會令 Stage 退回）');
+  // 第八十二輪批次 IG 組：已正式發出 ⇒ 審閱本照寄，進度**唔退回**（正式發出嗰個事實唔會因為寄審閱本而消失）
+  if (getQuarterStage_(quarterId) !== QUARTER_STAGE.OFFICIAL_SENT) {
+    setQuarterStage_(quarterId, QUARTER_STAGE.REVIEW_SENT, '步驟 2：寄給堂委審閱（第二輪審閱會令 Stage 退回）');
+  }
   return result;
 }
 

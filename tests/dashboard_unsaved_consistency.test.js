@@ -217,8 +217,9 @@ setStage('REVIEW_SENT');
 console.log('\n=== S1（現場第一次）：已寄堂委，申報表加咗申報 ⇒ 第 2 步要講有申報 ===');
 {
   const r0 = readBoth(v0);
-  check('（前提）未加申報 ⇒「堂委沒有提出改動」',
-    /^堂委沒有提出改動/.test(r0.dash.buttons.save.dynamicText), r0.dash.buttons.save.dynamicText);
+  // 第八十二輪批次 IG 組（刻意改動）：審閱階段冇改動都只係「未偵測到」（唔再講「堂委沒有提出改動」）
+  check('（前提）未加申報 ⇒「未偵測到你在表上改過任何格」',
+    /^未偵測到你在表上改過任何格/.test(r0.dash.buttons.save.dynamicText), r0.dash.buttons.save.dynamicText);
   addReq(DATES[1], 'P9702');
   addReq(DATES[2], 'P9703');
   const r = readBoth(v0);
