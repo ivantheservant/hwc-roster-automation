@@ -336,11 +336,7 @@ function computeDashboardButtons_(s) {
   // 第二十五輪批次階段 B4：措辭由「要等系統生成咗初稿」改成
   // 「要先生成初稿」——一來自動生成關咗，「等」係錯嘅；
   // 二來原本嗰句係口語（「咗」），畫面文案一律書面語。
-  buttons.save = {
-    enabled: s.versionExists,
-    disabledReason: s.versionExists ? '' : '要先生成初稿，這一粒才會著。',
-    dynamicText: buildSaveButtonText_(s)
-  };
+  buttons.save = computeSaveButton_(s);
 
   // ── 掣 2：寄給堂委審閱 ────────────────────────────────────────
   // D2：開放於 DRAFT／REVIEW_SENT／REQUESTS_APPLIED（＝未正式發出之前）。
@@ -420,6 +416,50 @@ function buildGenerateButtonText_(s) {
     + Math.abs(s.daysUntilGenerateOn) + ' 天。';
 }
 
+/** 第八十二輪批次 IH 組：〔儲存〕灰色時嘅原因（表上冇未儲存改動）。 */
+const SAVE_NOTHING_TO_SAVE_TEXT = '表上沒有未儲存的改動';
+
+/**
+ * 掣 1〔儲存〕嘅狀態——主畫面同「切回幹事介面時嘅輕量檢查」（`apiGetSaveButtonState()`）**同一支**。
+ *
+ * 第八十二輪批次 IH 組（Ivan：沒有改動的話〔儲存〕可不可以變灰？）：
+ * 有版本、而且有嘢要儲存（表上改動、認唔出嘅名、未處理嘅修改申報、用舊版本作起點未儲存）先亮。
+ * 讀唔到未儲存狀態（`hasAny` 會係 true、數字係 -1）⇒ 照舊亮——唔可以把「讀唔到」當成「冇嘢」。
+ * @param {Object} s `{versionExists, stage, unsaved, startPointPending}`
+ * @returns {{enabled: boolean, disabledReason: string, dynamicText: string, hasWork: boolean}}
+ */
+function computeSaveButton_(s) {
+  const u = s.unsaved || {};
+  const hasWork = !!u.hasAny || Number(u.unresolvedCount) > 0 || !!s.startPointPending;
+  const enabled = !!s.versionExists && hasWork;
+  return {
+    enabled: enabled,
+    hasWork: hasWork,
+    disabledReason: !s.versionExists ? '要先生成初稿，這一粒才會著。' : (hasWork ? '' : SAVE_NOTHING_TO_SAVE_TEXT),
+    dynamicText: buildSaveButtonText_(s)
+  };
+}
+
+/**
+ * 第八十二輪批次 IH 組：幹事由試算表分頁切返幹事介面 ⇒ 前端用呢個**輕量**呼叫重新檢查有冇未儲存改動，
+ * 只更新〔儲存〕同第 2 步嗰句，唔重載成個主畫面。
+ * @param {string} quarterId 季度 ID
+ * @returns {{versionNo: number, save: Object}}
+ */
+function apiGetSaveButtonState(quarterId) {
+  assertWebAppRequestAllowed_();
+  const versionNo = findLatestVersionNo(quarterId);
+  const versionExists = versionNo >= 0;
+  const s = {
+    versionExists: versionExists,
+    stage: getQuarterStage_(quarterId),
+    unsaved: versionExists ? readDashboardUnsavedState_(quarterId, versionNo)
+      : { gridChangeCount: 0, unresolvedCount: 0, pendingRequestCount: 0, needsInputCount: 0, hasAny: false },
+    startPointPending: versionExists && readStartPointBasisForSave_(quarterId, versionNo) !== null
+  };
+  return { versionNo: versionNo, save: computeSaveButton_(s) };
+}
+
 /** 規格 2.3 掣 1 嘅動態文字。 */
 function buildSaveButtonText_(s) {
   const u = s.unsaved;
@@ -436,6 +476,8 @@ function buildSaveButtonText_(s) {
     : '';
 
   const noChange = u.gridChangeCount === 0 && u.pendingRequestCount === 0;
+  // 第八十二輪批次 IH／IF 組：用舊版本作起點而表上冇偵測到差異
+  if (noChange && s.startPointPending) return '你用了舊版本作起點，還未儲存。撳〔儲存〕成為新一版。' + needsInput;
   if (noChange && s.stage === QUARTER_STAGE.REVIEW_SENT) {
     return '堂委沒有提出改動。撳下去就當作意見已收齊，可以進入正式發出。' + needsInput;
   }
@@ -619,6 +661,8 @@ function buildDashboardState_(quarterId) {
     generateOnText: generateOnText,
     daysUntilGenerateOn: daysUntilGenerateOn,
     unsaved: unsaved,
+    // 第八十二輪批次 IH 組：用舊版本作起點而未儲存，都係一項要儲存嘅改動（IF 組）
+    startPointPending: versionExists && readStartPointBasisForSave_(quarterId, versionNo) !== null,
     reviewerCount: safeCountReviewers_(),
     officialTargetCount: officialCounts.total,
     officialNoEmailCount: officialCounts.noEmail,

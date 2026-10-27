@@ -56,7 +56,12 @@
       make('div', { text: o.title, className: 'step-title' })
     ]);
     if (o.note) body.appendChild(make('div', { text: o.note, className: 'step-note' }));
-    if (o.why) body.appendChild(make('div', { text: o.why, className: 'step-why' }));
+    // 第八十二輪批次 IH 組：`whyAlways` ⇒ 冇原因都留一個（隱藏）位，之後輕量更新嗰陣先有地方寫
+    if (o.why || o.whyAlways) {
+      const why = make('div', { text: o.why || '', className: 'step-why' });
+      why.hidden = !o.why;
+      body.appendChild(why);
+    }
     if (o.acts && o.acts.length > 0) {
       body.appendChild(make('div', { className: 'step-acts' }, o.acts));
     }
@@ -411,6 +416,72 @@
 
   /* ── 第 2 步：查看／修改職事表 ─────────────────────────────── */
 
+  /* ── 第八十二輪批次 IH 組：切返幹事介面就自動重新檢查〔儲存〕────────────
+   *
+   * 幹事喺試算表分頁改完格、切返嚟（`visibilitychange`／`focus`）⇒ 用一個**輕量**呼叫
+   * （`apiGetSaveButtonState`，同主畫面同一支 `computeSaveButton_()`）更新〔儲存〕同第 2 步嗰句；
+   * 10 秒內唔重覆；彈窗開住就唔做（唔好喺幹事睇緊嘢嗰陣郁畫面）。
+   */
+  const SAVE_RECHECK_MIN_MS = 10000;
+  let step2SaveRefs_ = null;
+  let saveRecheckAt_ = 0;
+
+  /** 搵一個節點入面第一個 className 完全等於 cls 嘅子孫。 */
+  function findChildByClass(node, cls) {
+    if (!node) return null;
+    if (node.className === cls) return node;
+    const kids = node.children || [];
+    for (let i = 0; i < kids.length; i++) {
+      const hit = findChildByClass(kids[i], cls);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  /**
+   * 把後端〔儲存〕狀態套落畫面。
+   * @param {{btn: Node, note: ?Node, why: ?Node}} refs
+   * @param {{enabled: boolean, disabledReason: string, dynamicText: string}} save
+   */
+  function applySaveButtonState(refs, save) {
+    if (!refs || !refs.btn || !save) return;
+    refs.btn.disabled = !save.enabled;
+    refs.btn.title = save.enabled ? '' : (save.disabledReason || '');
+    if (refs.note) refs.note.textContent = save.dynamicText || '';
+    if (refs.why) {
+      refs.why.textContent = save.enabled ? '' : (save.disabledReason || '');
+      refs.why.hidden = !!save.enabled;
+    }
+  }
+
+  /**
+   * 切返嚟嗰陣檢查一次（10 秒內唔重覆）。
+   * @param {number=} nowMs 測試用
+   * @returns {Promise<boolean>} 有冇真係叫後端
+   */
+  async function maybeRecheckSaveButton(nowMs) {
+    const now = nowMs === undefined ? Date.now() : nowMs;
+    if (!step2SaveRefs_ || !currentQuarterId || modalOpen) return false;
+    if (now - saveRecheckAt_ < SAVE_RECHECK_MIN_MS) return false;
+    saveRecheckAt_ = now;
+    try {
+      const r = await callServer('apiGetSaveButtonState', currentQuarterId);
+      applySaveButtonState(step2SaveRefs_, r && r.save);
+      return true;
+    } catch (err) {
+      return false;   // 檢查唔到就維持原狀；撳〔儲存〕嗰陣後端會再判斷一次
+    }
+  }
+
+  function onReturnToDashboard() {
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+    maybeRecheckSaveButton();
+  }
+  document.addEventListener('visibilitychange', onReturnToDashboard);
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('focus', onReturnToDashboard);
+  }
+
   function renderStep2(d, flow) {
     const acts = [];
     const sheetUrl = d.latestVersion && d.latestVersion.sheetUrl;
@@ -483,8 +554,15 @@
       title: '查看／修改職事表',
       note: save.dynamicText || '',
       why: (!save.enabled && save.disabledReason) ? save.disabledReason : '',
+      whyAlways: true,
       acts: acts
     });
+    // 第八十二輪批次 IH 組：記住〔儲存〕同第 2 步嗰兩句，切返幹事介面時輕量更新（唔重載成個主畫面）
+    step2SaveRefs_ = {
+      btn: saveBtn,
+      note: findChildByClass(card, 'step-note'),
+      why: findChildByClass(card, 'step-why')
+    };
 
     // ── 第四十八輪批次 A4 組第 3 點 ──────────────────────────────
     //

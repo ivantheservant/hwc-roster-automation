@@ -150,10 +150,14 @@ console.log('\n=== 規格 2.2【核心】四粒掣嘅 enabled 狀態機 ===');
 {
   const b = function (o) { return gas.computeDashboardButtons_(facts(o)); };
 
-  // 掣 1：有版本就任何 Stage 都撳得到
+  // 掣 1：有版本、而且有嘢要儲存 ⇒ 任何 Stage 都撳得到
+  // 第八十二輪批次 IH 組（刻意改動）：冇未儲存改動 ⇒ 灰（「表上沒有未儲存的改動」）
+  const withWork = { gridChangeCount: 1, unresolvedCount: 0, pendingRequestCount: 0, hasAny: true };
   [S.DRAFT, S.REVIEW_SENT, S.REQUESTS_APPLIED, S.OFFICIAL_SENT].forEach(function (st) {
-    check('★★★★ 掣 1 喺 ' + st + ' 都撳得到（佢係唯一會改內容嘅掣）',
-      b({ stage: st }).save.enabled === true);
+    check('★★★★ 掣 1 喺 ' + st + ' 有改動都撳得到（佢係唯一會改內容嘅掣）',
+      b({ stage: st, unsaved: withWork }).save.enabled === true);
+    check('★★★★ 掣 1 喺 ' + st + ' 冇改動 ⇒ 灰（第八十二輪 IH 組）',
+      b({ stage: st }).save.enabled === false && b({ stage: st }).save.disabledReason === '表上沒有未儲存的改動');
   });
   check('★★★★★ 冇版本 ⇒ 掣 1 撳唔到', b({ versionExists: false }).save.enabled === false);
 

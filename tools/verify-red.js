@@ -7632,6 +7632,47 @@ const MUTATIONS = [
     find: "          note.textContent = '　這一格未記住，請再勾一次';\n          note.className",
     replace: "          note.textContent = '';\n          note.className",
     tests: ["tests/round82_ia_decision_retry.test.js"]
+  },
+  // ── 第八十二輪批次 IH 組：冇改動〔儲存〕變灰；切返嚟自動檢查 ──
+  {
+    id: "ih-save-always-on",
+    why: "冇改動都亮",
+    file: "src/WebAppDashboard.gs",
+    find: "  const enabled = !!s.versionExists && hasWork;",
+    replace: "  const enabled = !!s.versionExists;",
+    tests: ["tests/round82_ih_save_grey_recheck.test.js"]
+  },
+  {
+    id: "ih-no-start-point",
+    why: "起點未儲存唔算有嘢要存",
+    file: "src/WebAppDashboard.gs",
+    find: "  const hasWork = !!u.hasAny || Number(u.unresolvedCount) > 0 || !!s.startPointPending;",
+    replace: "  const hasWork = !!u.hasAny || Number(u.unresolvedCount) > 0;",
+    tests: ["tests/round82_ih_save_grey_recheck.test.js"]
+  },
+  {
+    id: "ih-no-throttle",
+    why: "10 秒內重覆檢查",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    if (now - saveRecheckAt_ < SAVE_RECHECK_MIN_MS) return false;",
+    replace: "",
+    tests: ["tests/round82_ih_save_grey_recheck.test.js"]
+  },
+  {
+    id: "ih-no-apply",
+    why: "檢查完唔更新畫面",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      applySaveButtonState(step2SaveRefs_, r && r.save);",
+    replace: "",
+    tests: ["tests/round82_ih_save_grey_recheck.test.js"]
+  },
+  {
+    id: "ih-modal-recheck",
+    why: "彈窗開住都郁畫面",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    if (!step2SaveRefs_ || !currentQuarterId || modalOpen) return false;",
+    replace: "    if (!step2SaveRefs_ || !currentQuarterId) return false;",
+    tests: ["tests/round82_ih_save_grey_recheck.test.js"]
   }
 ];
 
