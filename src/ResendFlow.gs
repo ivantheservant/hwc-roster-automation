@@ -55,6 +55,13 @@ function computeResendDiff_(context) {
 
     if (!hashChanged && !firstNotifyDueToEmail) return;
 
+    // ⚠️ 第八十一輪批次 HB 組：冇舊 hash 嘅人分兩類（基準版本見 `readResendBaseline_()`）。
+    //   新加入＝基準版本冇任何安排、而且從來未喺 OFFICIAL／RESEND 收件名單出現過，而家有安排
+    //   ⇒ 安排有改動（〔變動的人〕要列、要寄、要 PDF）；其餘冇舊 hash 嘅＝漏收，照舊交俾補寄。
+    const baseline = context.resendBaseline || null;
+    const newJoiner = !oldHash && assignments.length > 0 && !!baseline
+      && !baseline.assignedById[personId] && !baseline.everSentById[personId];
+
     changed.push({
       personId: personId,
       nameTC: person ? person.nameTC : personId,
@@ -63,12 +70,15 @@ function computeResendDiff_(context) {
       oldHash: oldHash,
       newHash: newHash,
       firstNotifyDueToEmail: firstNotifyDueToEmail,
+      newJoiner: newJoiner,
       // 第三十三輪批次階段 A：把「為什麼要寄」明明白白帶出去，讓下游
       // deliverOne_() 直接執行這個決定，不要再自己用 hash 判斷一次。
       // hashChanged 優先——兩者同時成立時，派工真的改了才是主要原因。
-      notifyReason: hashChanged
-        ? RESEND_NOTIFY_REASON.ASSIGNMENT_CHANGED
-        : RESEND_NOTIFY_REASON.FIRST_NOTIFY_AFTER_EMAIL_ADDED
+      notifyReason: newJoiner
+        ? RESEND_NOTIFY_REASON.NEW_ASSIGNMENT
+        : (hashChanged
+          ? RESEND_NOTIFY_REASON.ASSIGNMENT_CHANGED
+          : RESEND_NOTIFY_REASON.FIRST_NOTIFY_AFTER_EMAIL_ADDED)
     });
   });
   return changed;
@@ -85,7 +95,8 @@ function computeResendDiff_(context) {
  * 確認是不是真的想改這麼多人」，每人一行「上次的安排沒有記錄」。
  *
  *   有舊 hash 而且唔同　　　　　⇒ true（安排有改動）
- *   冇舊 hash　　　　　　　　　⇒ false（上次冇收到）
+ *   冇舊 hash、新加入（第八十一輪 HB 組）⇒ true（上一次冇安排，今次有）
+ *   冇舊 hash（其餘）　　　　　⇒ false（上次冇收到）
  *   hash 一樣（首次通知，之前冇電郵）⇒ false（佢上次一樣冇收到）
  *
  * ⚠️ **只影響點樣講，唔影響寄畀邊個**——寄畀邊個仍然由
@@ -95,6 +106,7 @@ function computeResendDiff_(context) {
  * @returns {boolean}
  */
 function isArrangementChangedSinceLastSend_(c) {
+  if (c && c.newJoiner === true) return true;
   return !!(c && c.oldHash) && c.oldHash !== c.newHash;
 }
 

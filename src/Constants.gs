@@ -1016,8 +1016,16 @@ const RESEND_NOTIFY_REASON = {
    * （`SKIPPED_NO_EMAIL`），而現在電郵已經補上。
    * 對這個人來說這其實是**第一次**真正收到通知，不可以因為內容沒變而略過。
    */
-  FIRST_NOTIFY_AFTER_EMAIL_ADDED: 'FIRST_NOTIFY_AFTER_EMAIL_ADDED'
+  FIRST_NOTIFY_AFTER_EMAIL_ADDED: 'FIRST_NOTIFY_AFTER_EMAIL_ADDED',
+  /**
+   * 第八十一輪批次 HB 組：上一次正式發出／改動後重發嗰一版**冇任何安排**（所以當時冇收信），
+   * 今次新加入咗崗位。冇舊 hash 都一定要寄——佢就係〔變動的人〕最需要通知嘅人。
+   */
+  NEW_ASSIGNMENT: 'NEW_ASSIGNMENT'
 };
+
+/** 第八十一輪批次 HB 組：新加入嘅人喺〔變動的人〕／改動後重發確認窗「原本：」嗰一行。 */
+const RESEND_NEW_JOINER_PREVIOUS_TEXT = '（上一次沒有安排）';
 
 /**
  * 第三十三輪批次階段 A2：`readLastSendRecordByPerson_()`（Mailer.gs）認定

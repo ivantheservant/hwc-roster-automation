@@ -258,6 +258,8 @@ function buildMailContext_(quarterId, versionNo, stage) {
     // 追加階段 AO：只有步驟 5 的 computeResendDiff_() 會用到，OFFICIAL／其他階段
     // 多讀這一份小資料的成本可忽略，不特地依 stage 條件略過，維持 context 建構邏輯單純。
     lastStatusByPerson: readLastStatusByPerson_(quarterId),
+    // 第八十一輪批次 HB 組：改動後重發先要（分「新加入」同「漏收」）；讀唔到 ⇒ null（同以前一樣，冇舊 hash 一律當漏收）
+    resendBaseline: stage === MAIL_STAGES.RESEND ? readResendBaselineSafe_(quarterId) : null,
     placeholders: {
       QuarterID: quarterId,
       VersionNo: 'v' + versionNo,
@@ -1117,6 +1119,65 @@ function readLastHashByPerson_(quarterId) {
   const result = {};
   Object.keys(records).forEach(function (id) { result[id] = records[id].hash; });
   return result;
+}
+
+/**
+ * ⚠️ 第八十一輪批次 HB 組：改動後重發嘅**基準版本**——上一次正式發出／改動後重發（或者匯入時
+ * 聲明「已在系統外寄給全體」嘅 `EXTERNAL`）嗰一版，以及嗰一版每位有冇安排。
+ *
+ * 用嚟分開兩種「冇舊 hash」嘅人（見 `computeResendDiff_()`）：
+ *   ・新加入：基準版本**冇任何安排**、而且從來未喺 OFFICIAL／RESEND 收件名單出現過 ⇒ 安排有改動，要寄
+ *   ・漏收　：基準版本有安排但冇收到（冇電郵以外嘅失敗、只寄咗部分人等）⇒ 照舊交俾補寄
+ *
+ * 基準版本點樣取：`SendLog` 呢一季、Stage 係 OFFICIAL 或 RESEND（或 Status 係 EXTERNAL）、
+ * Status 喺 `RESEND_BASELINE_STATUSES` 入面嘅行之中，`SentAt` 最遲嗰一行嘅版本號。
+ *
+ * @param {string} quarterId 季度 ID
+ * @returns {?{versionNo: number, assignedById: Object<string, boolean>, everSentById: Object<string, boolean>}}
+ *   從來未正式發出過 ⇒ `null`
+ */
+function readResendBaseline_(quarterId) {
+  const C = COLUMNS.SEND_LOG;
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  let latest = null;
+  const everSentById = {};
+  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+    if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
+    const stage = String(row[C.STAGE] || '').trim();
+    const status = String(row[C.STATUS] || '').trim().toUpperCase();
+    if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND && status !== MAIL_STATUS.EXTERNAL) return;
+    const personId = String(row[C.PERSON_ID] || '').trim();
+    if (personId) everSentById[personId] = true;
+    if (RESEND_BASELINE_STATUSES.indexOf(status) === -1) return;
+    const versionNo = Number(row[C.VERSION_NO]);
+    if (isNaN(versionNo)) return;
+    const at = row[C.SENT_AT] ? new Date(row[C.SENT_AT]).getTime() : 0;
+    if (!latest || at >= latest.at) latest = { versionNo: versionNo, at: at };
+  });
+  if (!latest) return null;
+  const assignedById = {};
+  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== latest.versionNo) return;
+    const personId = String(row[A.PERSON_ID] || '').trim();
+    if (personId) assignedById[personId] = true;
+  });
+  return { versionNo: latest.versionNo, assignedById: assignedById, everSentById: everSentById };
+}
+
+/**
+ * `readResendBaseline_()` 嘅安全版：讀唔到 ⇒ `null`＋WARN（即係冇舊 hash 嘅人照舊當「上一次沒有收到」，
+ * 唔會因為讀唔到而多寄）。
+ * @param {string} quarterId 季度 ID
+ * @returns {?Object}
+ */
+function readResendBaselineSafe_(quarterId) {
+  try {
+    return readResendBaseline_(quarterId);
+  } catch (err) {
+    log_('WARN', 'readResendBaseline_ 讀不到改動後重發的基準版本：' + err.message);
+    return null;
+  }
 }
 
 /**

@@ -7414,7 +7414,7 @@ const MUTATIONS = [
     replace: "  return false;",
     tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
   },
-  // ── 第八十一輪批次 HA 組 ──
+  // ── 第八十一輪批次 HA／HB 組 ──
   {
     id: "ha-ui-ignores-reasons",
     why: "前端唔睇後端嘅「為甚麼」，照舊自己判斷（舊放行格又令每次儲存彈窗）",
@@ -7494,6 +7494,62 @@ const MUTATIONS = [
     find: "    confirmReasons: confirmReasons,\n    requests: requests,",
     replace: "    requests: requests,",
     tests: ["tests/round81_ha_kept_new.test.js"]
+  },
+  {
+    id: "hb-no-new-joiner",
+    why: "冇舊 hash 嘅人一律當漏收（新加入嘅人收唔到通知）",
+    file: "src/ResendFlow.gs",
+    find: "      && !baseline.assignedById[personId] && !baseline.everSentById[personId];",
+    replace: "      && false;",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  {
+    id: "hb-classify-ignores",
+    why: "新加入唔算「安排有改動」",
+    file: "src/ResendFlow.gs",
+    find: "  if (c && c.newJoiner === true) return true;\n",
+    replace: "",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  {
+    id: "hb-pdf-drop-new",
+    why: "改動後重發唔為新加入嘅人產生 PDF",
+    file: "src/ResendFlow.gs",
+    find: "      return ((context.assignmentsByPerson || {})[id] || []).length > 0;",
+    replace: "      return ((context.assignmentsByPerson || {})[id] || []).length > 0 && !!(context.lastHashByPerson || {})[id];",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  {
+    id: "hb-baseline-any-stage",
+    why: "基準版本連審閱本都計",
+    file: "src/Mailer.gs",
+    find: "    if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND && status !== MAIL_STATUS.EXTERNAL) return;",
+    replace: "    if (false) return;",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  {
+    id: "hb-prev-summary-blank",
+    why: "新加入嘅人「原本」寫成「沒有記錄」",
+    file: "src/WebAppGuards.gs",
+    find: "    if (c.newJoiner) c.previousSummary = RESEND_NEW_JOINER_PREVIOUS_TEXT;",
+    replace: "    if (c.newJoiner) c.previousSummary = '';",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  {
+    id: "hb-context-no-baseline",
+    why: "改動後重發嘅 context 冇讀基準版本",
+    file: "src/Mailer.gs",
+    find: "    resendBaseline: stage === MAIL_STAGES.RESEND ? readResendBaselineSafe_(quarterId) : null,",
+    replace: "    resendBaseline: null,",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
+  },
+  {
+    id: "hb-reason-not-new",
+    why: "新加入嘅人冇自己嘅上游理由",
+    file: "src/ResendFlow.gs",
+    find: "      notifyReason: newJoiner\n        ? RESEND_NOTIFY_REASON.NEW_ASSIGNMENT",
+    replace: "      notifyReason: false\n        ? RESEND_NOTIFY_REASON.NEW_ASSIGNMENT",
+    tests: ["tests/round81_hb_new_joiner_resend.test.js"]
   }
 ];
 

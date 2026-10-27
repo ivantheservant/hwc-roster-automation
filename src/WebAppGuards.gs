@@ -372,6 +372,7 @@ function planResendChangedPersons_(quarterId) {
       // 或者寫「無」）。前端見到空字串會顯示「（上次的安排沒有記錄）」
       // ——講「冇記錄」係誠實嘅，扮到有得比較就會令幹事以為自己核對過。
       previousSummary: (context.lastSummaryByPerson || {})[c.personId] || '',
+      newJoiner: c.newJoiner === true,
       // ─────────────────────────────────────────────────────────────
       // ⚠️ 第三十四輪批次丙3：**兩邊要用同一個日期 formatter。**
       // ─────────────────────────────────────────────────────────────
@@ -394,6 +395,10 @@ function planResendChangedPersons_(quarterId) {
     };
   });
 
+  // ⚠️ 第八十一輪批次 HB 組：新加入（基準版本冇安排）⇒「原本」明寫「上一次沒有安排」，唔係「沒有記錄」
+  changed.forEach(function (c) {
+    if (c.newJoiner) c.previousSummary = RESEND_NEW_JOINER_PREVIOUS_TEXT;
+  });
   const arrangementChangedCount = changed.filter(function (c) { return c.arrangementChanged; }).length;
   return {
     versionNo: versionNo,
