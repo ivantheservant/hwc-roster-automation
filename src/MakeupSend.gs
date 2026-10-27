@@ -414,7 +414,10 @@ function findMakeupPdfGaps_(plan) {
     return { applicable: true, people: [], absentCount: 0, staleCount: 0 };
   }
 
-  const check = checkMissingPersonalPdfs_(plan.quarterId, plan.versionNo, plan.stage);
+  // 第七十九輪批次 GA 組：上面已經確認這一次實際附件＝個人版 PDF；
+  // 把它傳落去，缺件檢查就唔會因為範本寫另一種而判做「唔需要」。
+  const check = checkMissingPersonalPdfs_(plan.quarterId, plan.versionNo, plan.stage,
+    { attachType: ATTACH_TYPE.PERSONAL_PDF });
   if (!check.applicable) return none;
   const pick = function (p) { return !!wanted[p.personId]; };
   const absent = (check.absent || check.missing || []).filter(pick);

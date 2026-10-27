@@ -570,6 +570,25 @@ function listPeopleNeedingPersonalPdf_(quarterId, versionNo) {
 }
 
 /**
+ * 第七十九輪批次 GA 組：這一次寄出實際附的是不是個人版 PDF。
+ *
+ * 有 `sendOptions` ⇒ `resolveSendOptions_()`（寄信同一支）的 `attachType`；
+ * 沒有（`null`／`undefined`／非物件）⇒ 範本嗰一欄（今日行為）。
+ *
+ * @param {string} stage 寄送階段
+ * @param {?Object=} sendOptions 幹事在寄出窗的決定
+ * @returns {boolean}
+ */
+function personalPdfNeededForSend_(stage, sendOptions) {
+  if (sendOptions && typeof sendOptions === 'object') {
+    const decision = resolveSendOptions_(stage, sendOptions, resolveStageTemplates_(stage));
+    return decision.attachType === ATTACH_TYPE.PERSONAL_PDF;
+  }
+  const template = findEmailTemplate_(stage);
+  return !!template && String(template.attachType || '').toUpperCase() === ATTACH_TYPE.PERSONAL_PDF;
+}
+
+/**
  * 寄送 OFFICIAL／RESEND 之前的缺件檢查：該階段的範本若要求個人版 PDF，
  * 就核對本季每個有被派工的人是否已有對應的檔案存在 Shared Drive。
  *
@@ -578,16 +597,24 @@ function listPeopleNeedingPersonalPdf_(quarterId, versionNo) {
  *
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
+ * ⚠️ 第七十九輪批次 GA 組：**「這一次實際附甚麼」跟幹事在寄出窗揀的**，
+ * 不是只看範本。揀了「不附」或「整季 PDF」，根本不需要個人 PDF，不應該叫幹事
+ * 等 8 分鐘產生 58 份。有傳 `sendOptions` 就用寄信嗰條路同一支
+ * `resolveSendOptions_()` 解析；沒傳（試算表選單版本，沒有揀附件的畫面）
+ * 照範本，行為同以前一樣。
+ *
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
  * @param {string} stage 寄送階段
+ * @param {?Object=} sendOptions 幹事在寄出窗的決定（可以不傳）
  * @returns {{applicable: boolean, missing: Object[], total: number}}
- *   applicable=false 代表這個階段／範本不需要個人 PDF，missing 一律為空陣列
+ *   applicable=false 代表這個階段／附件不需要個人 PDF，missing 一律為空陣列
  */
-function checkMissingPersonalPdfs_(quarterId, versionNo, stage) {
+function checkMissingPersonalPdfs_(quarterId, versionNo, stage, sendOptions) {
   if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND) {
     return { applicable: false, missing: [], total: 0 };
   }
-  const template = findEmailTemplate_(stage);
-  if (!template || String(template.attachType || '').toUpperCase() !== ATTACH_TYPE.PERSONAL_PDF) {
+  if (!personalPdfNeededForSend_(stage, sendOptions)) {
     return { applicable: false, missing: [], total: 0 };
   }
 

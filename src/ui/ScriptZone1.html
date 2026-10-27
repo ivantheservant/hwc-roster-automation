@@ -1427,7 +1427,8 @@
       const d = await getDashboard();
       const warnings = await callServer('apiStep4GetPendingWarnings', currentQuarterId);
       const versionNo = warnings.versionNo;
-      const missing = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);
+      // 第七十九輪批次 GA 組：附件跟這一次揀的（「不附」／「整季 PDF」不需要個人 PDF）
+      const missing = await callServer('apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo, sendOpts);
 
       // ── 個人 PDF 缺件超過上限 ⇒ 保留現有阻擋（第十九輪嘅關卡）──────
       //

@@ -7347,6 +7347,71 @@ const MUTATIONS = [
     find: "    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);\n    return list.slice();",
     replace: "    log_('WARN', 'filterNewSemiHardViolations_ 算不到上一版的違反，全部當新：' + err.message);\n    return [];",
     tests: ["tests/round78_fe_semi_hard_new.test.js"]
+  },
+  // ── 第七十九輪批次 GA 組：個人 PDF 缺件檢查跟這一次揀嘅附件 ──
+  {
+    id: "ga-ui-no-sendopts",
+    why: "前端問缺件檢查冇帶寄出窗揀嘅附件（揀「不附」都要等產生 PDF）",
+    file: "src/ui/ScriptZone1.html",
+    find: "'apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo, sendOpts);",
+    replace: "'apiStep4GetMissingPdfWarnings', currentQuarterId, versionNo);",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-attach-from-template",
+    why: "缺件檢查淨係睇範本，唔睇幹事今次揀嘅附件",
+    file: "src/PdfBatch.gs",
+    find: "  if (sendOptions && typeof sendOptions === 'object') {\n    const decision",
+    replace: "  if (false && sendOptions && typeof sendOptions === 'object') {\n    const decision",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-gate-loosened",
+    why: "揀咗個人版 PDF 都唔查缺件（放寬）",
+    file: "src/PdfBatch.gs",
+    find: "    return decision.attachType === ATTACH_TYPE.PERSONAL_PDF;",
+    replace: "    return false;",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-send-gate-no-opts",
+    why: "後端寄出閘門唔跟幹事揀嘅附件",
+    file: "src/FiveStageCore.gs",
+    find: "    checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions));",
+    replace: "    checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL));",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-plan-no-opts",
+    why: "前端問嘅缺件計劃冇傳附件落去檢查",
+    file: "src/FiveStageCore.gs",
+    find: "  const result = checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);",
+    replace: "  const result = checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-api-drops-opts",
+    why: "網頁入口收咗 sendOptions 但冇交俾缺件計劃",
+    file: "src/WebAppFlow.gs",
+    find: "  const missingCheck = planStep4MissingPdf_(quarterId, versionNo, sendOptions);",
+    replace: "  const missingCheck = planStep4MissingPdf_(quarterId, versionNo);",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-makeup-no-attach",
+    why: "補寄缺件檢查唔用這一次實際附件（範本寫另一種就當唔需要）",
+    file: "src/MakeupSend.gs",
+    find: "  const check = checkMissingPersonalPdfs_(plan.quarterId, plan.versionNo, plan.stage,\n    { attachType: ATTACH_TYPE.PERSONAL_PDF });",
+    replace: "  const check = checkMissingPersonalPdfs_(plan.quarterId, plan.versionNo, plan.stage);",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
+  },
+  {
+    id: "ga-menu-ignores-template",
+    why: "冇傳 sendOptions（選單版）都唔再照範本",
+    file: "src/PdfBatch.gs",
+    find: "  return !!template && String(template.attachType || '').toUpperCase() === ATTACH_TYPE.PERSONAL_PDF;",
+    replace: "  return false;",
+    tests: ["tests/round79_ga_pdf_gate_by_attach.test.js"]
   }
 ];
 

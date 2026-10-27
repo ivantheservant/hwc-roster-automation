@@ -431,11 +431,12 @@ function apiStep4GetPendingWarnings(quarterId) {
  * 供前端呼叫：步驟 4 第二畫面——個人 PDF 缺件檢查。純讀取。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
+ * @param {?Object=} sendOptions 寄出窗揀的（第七十九輪批次 GA 組：揀「不附」／「整季 PDF」就不查個人 PDF）
  * @returns {Object} 缺件檢查結果
  */
-function apiStep4GetMissingPdfWarnings(quarterId, versionNo) {
+function apiStep4GetMissingPdfWarnings(quarterId, versionNo, sendOptions) {
   assertWebAppRequestAllowed_();
-  const missingCheck = planStep4MissingPdf_(quarterId, versionNo);
+  const missingCheck = planStep4MissingPdf_(quarterId, versionNo, sendOptions);
   return {
     applicable: missingCheck.applicable,
     total: missingCheck.total,

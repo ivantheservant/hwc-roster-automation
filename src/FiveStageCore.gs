@@ -397,11 +397,12 @@ function planStep4Warnings_(quarterId) {
  * 步驟 4 第二組警告：個人 PDF 缺件檢查。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
+ * @param {?Object=} sendOptions 幹事在寄出窗揀的（第七十九輪批次 GA 組：附件跟這一次揀的）
  * @returns {Object} `checkMissingPersonalPdfs_()` 的結果
  */
-function planStep4MissingPdf_(quarterId, versionNo) {
+function planStep4MissingPdf_(quarterId, versionNo, sendOptions) {
   requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
-  const result = checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
+  const result = checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
   // 第十九輪批次階段 C1：缺件比例過高時 `gate.blocked = true`，
   // 呼叫端唔應該再畀「現在繼續」呢個選擇。
   result.gate = evaluateStep4MissingPdfGate_(result);
@@ -553,7 +554,7 @@ function executeStep4Send_(quarterId, sendOptions) {
   // 唔可以淨係靠對話框——Web UI 每次請求都係獨立嘅，畫面順序攔唔到
   // 直接呼叫；而且幹事由睇警告到撳確認之間，狀態有可能已經變咗。
   const gate = evaluateStep4MissingPdfGate_(
-    checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL));
+    checkMissingPersonalPdfs_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions));
   if (gate.blocked) {
     throw new Error('步驟 4：正式發出——因為個人 PDF 缺件太多而中止。\n\n' + gate.message);
   }
