@@ -635,7 +635,9 @@
 
     openConfirm({
       // 第八十二輪批次 IG 組：標題寫明係邊一種（審閱本／正式發出／改動後重發）
-      title: '寄出：' + (SEND_KIND_NAMES_TC[String(s.kind || '').toLowerCase()] || '寄出'),
+      // 第八十四輪批次 KD 組：〔選擇其他〕寫「選擇其他（審閱本）」／正式發出之後「選擇其他（改動通知）」
+      title: sendMode_ === 'PICK' ? pickOtherSendTitle(s.kind)
+        : '寄出：' + (SEND_KIND_NAMES_TC[String(s.kind || '').toLowerCase()] || '寄出'),
       bodyNodes: nodes,
       // ⚠️ 第四十三輪批次 E2：粒掣一律叫「寄出」。
       // Ivan：「click 寄給堂委審閱，不能 click。呢粒掣應該叫『寄出』。」
@@ -661,6 +663,16 @@
         routeSend(s.kind, sendOptions_);
       }
     });
+  }
+
+  /**
+   * 第八十四輪批次 KD 組：〔選擇其他〕寄出窗標題。正式發出之後（後端 `kindByMode.PICK`＝RESEND）寄嘅係改動通知；
+   * 之前寄嘅係審閱本。
+   * @param {string} kind SEND_KIND 之一
+   * @returns {string}
+   */
+  function pickOtherSendTitle(kind) {
+    return '寄出：選擇其他（' + (String(kind || '').toUpperCase() === 'RESEND' ? '改動通知' : '審閱本') + '）';
   }
 
   /** 一粒 radio。 */
@@ -745,9 +757,16 @@
     // 執事 → IT → 幹事 → 只寄有改動的人）歸入**第一個**佢屬於嘅組，
     // 後面嘅組用「另外」字眼，只數「前面各組都冇數過」嘅人。
     // 自訂地址最尾，亦係「另外」。
+    // ⚠️ 第八十四輪批次 KD 組：**只計真係勾咗嘅組**（嗰一組勾得到嘅人全部勾咗＝組別勾選框係勾住，
+    // 同 `sendSourceAllPicked()` 同一個定義）。現場 G15：只勾「堂委」，摘要寫「職事表上全部人 6 位」——
+    // 因為堂委全部都喺職事表上，而舊寫法逐組數「揀咗嘅人屬唔屬於呢一組」。
+    // 逐個勾嘅寫「另外自選 N 位」；自行輸入嘅寫「另外 N 個電郵地址」。
+    const pickedMap = {};
+    keys.forEach((k) => { pickedMap[k] = true; });
     const counted = {};
     const bits = [];
     (sendPoolGroups_ || []).forEach((g) => {
+      if (!sendSourceAllPicked(g.key, pickedMap)) return;
       const n = keys.filter((k) => !counted[k] && byKey[k]
         && (byKey[k].sources || []).indexOf(g.key) !== -1).length;
       if (n === 0) return;
@@ -756,10 +775,10 @@
       });
       bits.push((bits.length > 0 ? '另外' : '') + g.label + ' ' + n + ' 位');
     });
-    // 揀咗、但唔屬於任何一組嘅（不應該發生；發生嘅話都要計入，總數先對得上）
+    // 逐個勾嘅（唔屬於任何一個勾咗嘅組）
     const ungrouped = keys.filter((k) => !counted[k]).length;
-    if (ungrouped > 0) bits.push((bits.length > 0 ? '另外' : '') + '其他 ' + ungrouped + ' 位');
-    if (extra > 0) bits.push((bits.length > 0 ? '另外' : '') + '自訂 ' + extra + ' 個地址');
+    if (ungrouped > 0) bits.push((bits.length > 0 ? '另外' : '') + '自選 ' + ungrouped + ' 位');
+    if (extra > 0) bits.push((bits.length > 0 ? '另外 ' : '') + extra + ' 個電郵地址');
 
     const total = keys.length + extra;
     return '這一次會寄給 ' + total + ' 位'

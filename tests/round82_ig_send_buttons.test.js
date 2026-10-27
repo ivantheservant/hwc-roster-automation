@@ -179,7 +179,8 @@ console.log('\n=== IG6：畫面 ===');
   const card2 = ui.renderStepSend({ latestVersion: { versionNo: 1 }, officialSentOnce: true });
   check('★★★★ 正式發出之後〔變動的人〕亮', card2.flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === '變動的人')[0].disabled === false);
   const sp = fs.readFileSync(path.join(SRC, 'ui', 'ScriptSendPaper.html'), 'utf8');
-  check('★★★★★ 寄出窗標題寫明種類', /title: '寄出：' \+ \(SEND_KIND_NAMES_TC\[/.test(sp));
+  // 第八十四輪批次 KD 組：〔選擇其他〕另有自己嘅標題（pickOtherSendTitle）
+  check('★★★★★ 寄出窗標題寫明種類', /: '寄出：' \+ \(SEND_KIND_NAMES_TC\[/.test(sp) && /sendMode_ === 'PICK' \? pickOtherSendTitle\(s\.kind\)/.test(sp));
   check('★★★★★ 〔寄給堂委／執事〕冇〔選擇收件人〕（只顯示摘要）', /sendMode_ === 'COMMITTEE'\) \{\n\s+\/\/ 第八十二輪批次 IG 組：只顯示摘要/.test(sp));
   check('★★★★ 只讀 API 名單有 apiGetSendCommitteeRecipients', /'apiGetSendCommitteeRecipients'/.test(fs.readFileSync(path.join(SRC, 'ui', 'Script.html'), 'utf8')));
 }

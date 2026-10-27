@@ -8383,6 +8383,46 @@ const MUTATIONS = [
     find: "        (wt.moves || []).filter((m) => m.weightKey === oc.weightKey).forEach((m) => box.appendChild(moveLine(m)));\n",
     replace: "",
     tests: ["tests/round84_kc_weight_outcome_each.test.js"]
+  },
+  {
+    id: "kd-title-generic",
+    why: "選擇其他標題照舊寫審閱",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      title: sendMode_ === 'PICK' ? pickOtherSendTitle(s.kind)",
+    replace: "      title: false ? pickOtherSendTitle(s.kind)",
+    tests: ["tests/round84_kd_pick_other_wording.test.js"]
+  },
+  {
+    id: "kd-title-no-resend",
+    why: "正式發出後仍寫審閱本",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "=== 'RESEND' ? '改動通知' : '審閱本'",
+    replace: "=== 'NEVER' ? '改動通知' : '審閱本'",
+    tests: ["tests/round84_kd_pick_other_wording.test.js"]
+  },
+  {
+    id: "kd-any-member-group",
+    why: "未勾嘅組都寫入摘要",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "      if (!sendSourceAllPicked(g.key, pickedMap)) return;\n",
+    replace: "",
+    tests: ["tests/round84_kd_pick_other_wording.test.js"]
+  },
+  {
+    id: "kd-ungrouped-other",
+    why: "逐個勾唔寫自選",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "+ '自選 ' + ungrouped + ' 位');",
+    replace: "+ '其他 ' + ungrouped + ' 位');",
+    tests: ["tests/round84_kd_pick_other_wording.test.js"]
+  },
+  {
+    id: "kd-extra-old-word",
+    why: "自行輸入唔寫電郵地址",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "    if (extra > 0) bits.push((bits.length > 0 ? '另外 ' : '') + extra + ' 個電郵地址');",
+    replace: "    if (extra > 0) bits.push((bits.length > 0 ? '另外' : '') + '自訂 ' + extra + ' 個地址');",
+    tests: ["tests/round84_kd_pick_other_wording.test.js"]
   }
 ];
 

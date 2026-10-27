@@ -37,7 +37,7 @@ function sentence(pool, picked, extraEmails) {
 /** 由句子抽出所有「N 位／N 個地址」，加埋。 */
 function sumOfParts(text) {
   const body = text.split('：')[1] || '';
-  return (body.match(/(\d+) (?:位|個地址)/g) || [])
+  return (body.match(/(\d+) (?:位|個電郵地址)/g) || [])
     .reduce((a, m) => a + Number(/\d+/.exec(m)[0]), 0);
 }
 
@@ -70,8 +70,9 @@ console.log('\n=== U：其他情況 ===');
   ];
   const t = sentence(pool, ['a', 'b', 'c', 'z'], ['x@example.invalid']);
   check('★★★★★ 歸組、其他、自訂地址都計入，總數 5', sumOfParts(t) === 5 && /會寄給 5 位/.test(t), t);
-  check('★★★★ 第一項冇「另外」，後面每項有', /^這一次會寄給 5 位：堂委 1 位、另外執事 1 位、另外只寄給安排有改動的人 1 位、另外其他 1 位、另外自訂 1 個地址。$/.test(t), t);
-  check('★★★★ 淨係自訂地址', sentence(pool, [], ['x@example.invalid']) === '這一次會寄給 1 位：自訂 1 個地址。');
+  // 第八十四輪批次 KD 組：逐個勾嘅寫「自選」；自行輸入嘅寫「N 個電郵地址」
+  check('★★★★ 第一項冇「另外」，後面每項有', /^這一次會寄給 5 位：堂委 1 位、另外執事 1 位、另外只寄給安排有改動的人 1 位、另外自選 1 位、另外 1 個電郵地址。$/.test(t), t);
+  check('★★★★ 淨係自訂地址', sentence(pool, [], ['x@example.invalid']) === '這一次會寄給 1 位：1 個電郵地址。');
   check('★★★ 冇揀 ⇒ 照舊', sentence(pool, [], []) === '還沒有選任何收件人。');
 }
 

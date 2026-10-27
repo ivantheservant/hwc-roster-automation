@@ -306,7 +306,8 @@ console.log('\n=== EE6–EE11：畫面 ===');
     await tick();
     btnIn(acts(), '確認').fire('click');
     await tick();
-    check('★★★★★★ 只填自訂地址 ⇒ 回到主窗，寄給誰寫「自訂 1 個地址」', /^寄出(：.+)?$/.test(title()) && /自訂 1 個地址/.test(body().textContent), title() + ' ' + body().textContent.slice(0, 300));
+    // 第八十四輪批次 KD 組：字眼改「N 個電郵地址」
+    check('★★★★★★ 只填自訂地址 ⇒ 回到主窗，寄給誰寫「1 個電郵地址」', /^寄出(：.+)?$/.test(title()) && /會寄給 1 位：1 個電郵地址/.test(body().textContent), title() + ' ' + body().textContent.slice(0, 300));
     check('★★★★★ 主窗冇「另外自行輸入電郵」一段（只留喺收件人視窗）', body().textContent.indexOf('另外自行輸入電郵') === -1);
     btnIn(acts(), '寄出').fire('click');
     await tick();
