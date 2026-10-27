@@ -36,11 +36,8 @@
     });
   });
 
-  el('btnRefresh').addEventListener('click', () => {
-    closeModal();
-    resetMainFlowState();
-    runAction('重新整理', loadDashboard);
-  });
+  // 第八十三輪批次 JE 組：〔整季清走重來〕完成後都行呢一條（`refreshLikeButton()`）
+  el('btnRefresh').addEventListener('click', () => refreshLikeButton());
 
   // 收摺區
   // ⚠️ 階段 A：區二身係由狀態快取畫出嚟嘅，所以要經 `getDashboard()` 攞

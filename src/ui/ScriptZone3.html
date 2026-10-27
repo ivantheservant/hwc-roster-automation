@@ -112,7 +112,8 @@
                 : ('中途失敗：' + (r.error || '') + '　部分內容可能已經被清走，請看 AuditLog。'),
               className: r.ok ? 'ok-line' : 'err-text'
             })
-          ], [button('完成', () => closeModalAndRefresh(), '')]);
+          // 第八十三輪批次 JE 組：同〔重新整理〕同一條路整頁重畫（唔使幹事自己撳）
+          ], [button('完成', () => refreshLikeButton(), '')]);
         })
       });
     });

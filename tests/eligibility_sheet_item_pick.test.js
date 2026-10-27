@@ -245,7 +245,8 @@ console.log('\n=== D：字太細 ===');
   check('★★★★ 第 3 步嗰個彈窗有用到佢',
     /className: 'dlg-lg'/.test(uiBare), '');
   check('★★★★ 勾選框本身都大咗（手指撳得中先算得上「勾得到」）',
-    /\.dlg-lg \.check-row input\[type="checkbox"\]/.test(style), '');
+    // 第八十三輪批次 JF 組：改為全域規則（全部 checkbox／radio 跟字體放大，唔再寫死 17px）
+    /input\[type="checkbox"\], input\[type="radio"\] \{\s*width: calc\(var\(--fs-/.test(style), '');
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

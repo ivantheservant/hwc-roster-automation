@@ -339,7 +339,13 @@
   }
   /* 字大之後按鈕文字可以換行，不可以撐出畫面或者被截斷。 */
   button { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
-  .check-row input[type="checkbox"], .radio-row input[type="radio"] { width: 1em; height: 1em; flex: 0 0 auto; }
+  /* 第八十三輪批次 JF 組：**全部** radio／checkbox 跟字體級別放大。
+     ⚠️ 唔可以用 `1em`：輸入框唔繼承字號，`1em` 永遠係瀏覽器預設（約 13px），特大級都係咁細。
+     所以直接用字號變數（同內文一樣大）；唔逐處寫死、唔排除任何一種。 */
+  input[type="checkbox"], input[type="radio"] {
+    width: calc(var(--fs-body) * 1.1); height: calc(var(--fs-body) * 1.1);
+    flex: 0 0 auto; vertical-align: middle; margin: 0 0.35em 0 0; cursor: pointer;
+  }
   .font-pick { display: inline-flex; align-items: center; gap: 6px; }
 
   /* ── 主流程六步（規格 1.0，第三十九輪 A 組）────────────────
@@ -471,8 +477,7 @@
   .dlg-lg .muted { font-size: var(--fs-sm); }
   .dlg-lg .sec-title { font-size: var(--fs-lg); }
   .dlg-lg .prop-head { font-size: var(--fs-md); }
-  /* 勾選框本身都要大——手指撳得中先算得上「勾得到」。 */
-  .dlg-lg .check-row input[type="checkbox"] { width: 17px; height: 17px; }
+  /* 勾選框本身都要大——手指撳得中先算得上「勾得到」（第八十三輪批次 JF 組起由上面全域規則負責）。 */
 
   /* ── 手機／平板 ───────────────────────────────────────────
      幹事有機會用平板或手機開。呢度只放大同換行，唔改任何行為。 */

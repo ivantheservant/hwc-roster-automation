@@ -405,7 +405,9 @@ console.log('\n=== 換季度／重新整理要清走主流程嘅快取 ===');
   check('★★★★★ 換季度時會 resetMainFlowState()',
     /resetAllZoneLoadState\(\);[\s\S]{0,400}resetMainFlowState\(\)/.test(boot));
   check('★★★★★ 撳「重新整理」時都會',
-    /btnRefresh[\s\S]{0,200}resetMainFlowState\(\)/.test(boot));
+    // 第八十三輪批次 JE 組：〔重新整理〕改為叫 refreshLikeButton()（入面先 resetMainFlowState()）
+    /btnRefresh[\s\S]{0,200}refreshLikeButton\(\)/.test(boot)
+      && /function refreshLikeButton\(\) \{[\s\S]{0,200}resetMainFlowState\(\)/.test(fs.readFileSync(path.join(UI, 'Script.html'), 'utf8')));
   check('★★★★★ 而且主流程畫唔出唔可以令成版嘢載入失敗'
     + '（幹事會見到一版接近空白嘅畫面而完全唔知發生咩事）',
     /try \{\s*\n\s*await renderMainFlow\(dashboardState_\);\s*\n\s*\} catch/.test(common), '');

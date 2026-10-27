@@ -8255,6 +8255,46 @@ const MUTATIONS = [
     find: "        text: weightPersonPostLabel(b.personId, b.postId) + '　' + b.reason, className: 'vio-row'",
     replace: "        text: b.personId + '　' + b.postId + '　' + b.reason, className: 'vio-row'",
     tests: ["tests/round83_jc_weight_gap_names.test.js"]
+  },
+  {
+    id: "je-reset-old-refresh",
+    why: "清走後冇整頁重畫",
+    file: "src/ui/ScriptZone3.html",
+    find: "          ], [button('完成', () => refreshLikeButton(), '')]);",
+    replace: "          ], [button('完成', () => closeModalAndRefresh(), '')]);",
+    tests: ["tests/round83_je_jf_reset_refresh_inputs.test.js"]
+  },
+  {
+    id: "je-no-reset-state",
+    why: "重新整理唔清主流程快取",
+    file: "src/ui/Script.html",
+    find: "    if (typeof resetMainFlowState === 'function') resetMainFlowState();\n    return runAction('重新整理', loadDashboard);",
+    replace: "    return runAction('重新整理', loadDashboard);",
+    tests: ["tests/round83_je_jf_reset_refresh_inputs.test.js"]
+  },
+  {
+    id: "jf-1em",
+    why: "勾選框用1em唔放大",
+    file: "src/ui/Style.html",
+    find: "    width: calc(var(--fs-body) * 1.1); height: calc(var(--fs-body) * 1.1);",
+    replace: "    width: 1em; height: 1em;",
+    tests: ["tests/round83_je_jf_reset_refresh_inputs.test.js"]
+  },
+  {
+    id: "jf-scoped",
+    why: "部分選項唔放大",
+    file: "src/ui/Style.html",
+    find: "  input[type=\"checkbox\"], input[type=\"radio\"] {\n    width: calc(",
+    replace: "  .check-row input[type=\"checkbox\"], .radio-row input[type=\"radio\"] {\n    width: calc(",
+    tests: ["tests/round83_je_jf_reset_refresh_inputs.test.js"]
+  },
+  {
+    id: "jf-hard-px",
+    why: "勾選框寫死px",
+    file: "src/ui/Style.html",
+    find: "（第八十三輪批次 JF 組起由上面全域規則負責）。 */",
+    replace: "（第八十三輪批次 JF 組起由上面全域規則負責）。 */\n  .dlg-lg .check-row input[type=\"checkbox\"] { width: 17px; height: 17px; }",
+    tests: ["tests/round83_je_jf_reset_refresh_inputs.test.js"]
   }
 ];
 

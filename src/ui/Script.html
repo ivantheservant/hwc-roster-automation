@@ -1427,6 +1427,18 @@
   }
 
   /**
+   * 第八十三輪批次 JE 組：同頁頂〔重新整理〕**同一條路**整頁重畫（狀態卡、第 1–4 步、版本下拉）。
+   * `closeModalAndRefresh()` 唔清主流程嘅快取（`resetMainFlowState()`），所以〔整季清走重來〕之後
+   * 第 1 步仲寫「現時有 4 個版本」。
+   * @returns {Promise<void>}
+   */
+  function refreshLikeButton() {
+    closeModal();
+    if (typeof resetMainFlowState === 'function') resetMainFlowState();
+    return runAction('重新整理', loadDashboard);
+  }
+
+  /**
    * 規格 1.4：確認畫面。
    *
    * @param {Object} opts
