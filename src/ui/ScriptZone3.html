@@ -809,7 +809,7 @@
         className: 'vio-head'
       }));
       weightData.invalid.forEach((b) => box.appendChild(make('div', {
-        text: b.personId + '　' + b.postId + '　' + b.reason, className: 'vio-row'
+        text: weightPersonPostLabel(b.personId, b.postId) + '　' + b.reason, className: 'vio-row'
       })));
       nodes.push(box);
     }
@@ -991,6 +991,24 @@
     return { added: added, released: released, total: added + released };
   }
 
+  /**
+   * 第八十三輪批次 JC 組：偏好相關畫面一律寫「人名　崗位名」，唔可以出 PersonID／PostID。
+   * 名由 `weightData.posts`（後端已經譯好）查；查唔到都唔印代號。
+   * @param {string} personId
+   * @param {string} postId
+   * @returns {string}
+   */
+  function weightPersonPostLabel(personId, postId) {
+    const post = ((weightData && weightData.posts) || []).filter((p) => p.postId === postId)[0];
+    let person = post ? (post.people || []).filter((x) => x.personId === personId)[0] : null;
+    if (!person) {
+      ((weightData && weightData.posts) || []).forEach((p) => {
+        if (!person) person = (p.people || []).filter((x) => x.personId === personId)[0] || null;
+      });
+    }
+    return (person ? person.nameTC : '（名單上找不到這個人）') + '　' + (post ? post.postNameTC : '（找不到這個崗位）');
+  }
+
   function confirmWeightBatch() {
     const summary = summariseWeightChanges();
     if (summary.total === 0) { setStatus('未有任何改動。'); return; }
@@ -1009,8 +1027,9 @@
       const parts = k.split('|');
       const c = weightChanges[k];
       const choice = weightData.choices.filter((x) => x.adjust === c.adjust)[0];
+      // 第八十三輪批次 JC 組：寫人名同崗位名，唔寫 PersonID／PostID
       list.appendChild(make('div', {
-        text: parts[0] + '　' + parts[1] + '　→ ' + (choice ? choice.label : c.adjust)
+        text: weightPersonPostLabel(parts[0], parts[1]) + '　→ ' + (choice ? choice.label : c.adjust)
           + (c.reason ? '（' + c.reason + '）' : ''),
         className: 'vio-row'
       }));

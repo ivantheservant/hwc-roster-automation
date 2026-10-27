@@ -8223,6 +8223,38 @@ const MUTATIONS = [
     find: "      systemFixReasonText_(p.brokenRuleId, p.kind, p.manualName || '', p.reason || p.brokenRuleId || '');",
     replace: "      p.reason || p.brokenRuleId || '';",
     tests: ["tests/round83_jb_system_fixes.test.js"]
+  },
+  {
+    id: "jc-gap-no-target",
+    why: "警告句用另一個目標",
+    file: "src/WebAppWeightEdit.gs",
+    find: "      assignments, withTarget, peopleById, postNames,",
+    replace: "      assignments, active, peopleById, postNames,",
+    tests: ["tests/round83_jc_weight_gap_names.test.js"]
+  },
+  {
+    id: "jc-no-baseline-pass",
+    why: "偏好窗冇傳基準",
+    file: "src/WebAppWeightEdit.gs",
+    find: "    const gapByKey = readWeightGapTextByKey_(quarterId, active, nameById, posts, baselineData);",
+    replace: "    const gapByKey = readWeightGapTextByKey_(quarterId, active, nameById, posts);",
+    tests: ["tests/round83_jc_weight_gap_names.test.js"]
+  },
+  {
+    id: "jc-confirm-ids",
+    why: "確認窗印代號",
+    file: "src/ui/ScriptZone3.html",
+    find: "        text: weightPersonPostLabel(parts[0], parts[1]) + '　→ ' + (choice ? choice.label : c.adjust)",
+    replace: "        text: parts[0] + '　' + parts[1] + '　→ ' + (choice ? choice.label : c.adjust)",
+    tests: ["tests/round83_jc_weight_gap_names.test.js"]
+  },
+  {
+    id: "jc-invalid-ids",
+    why: "無效行印代號",
+    file: "src/ui/ScriptZone3.html",
+    find: "        text: weightPersonPostLabel(b.personId, b.postId) + '　' + b.reason, className: 'vio-row'",
+    replace: "        text: b.personId + '　' + b.postId + '　' + b.reason, className: 'vio-row'",
+    tests: ["tests/round83_jc_weight_gap_names.test.js"]
   }
 ];
 

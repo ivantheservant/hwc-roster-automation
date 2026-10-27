@@ -115,7 +115,8 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     // 本季已經排咗幾多次（逐個崗位）——同「上一季幾多次」擺埋一齊睇先有意思。
     const thisQuarterByKey = readThisQuarterPostCounts_(quarterId);
     // 第二十九輪批次階段 C：實際次數同目標對唔上嗰陣，喺呢一頁講返點解。
-    const gapByKey = readWeightGapTextByKey_(quarterId, active, nameById, posts);
+    // 第八十三輪批次 JC 組：帶埋基準落去——警告句同畫面同一行嘅「今季目標」要係同一個數
+    const gapByKey = readWeightGapTextByKey_(quarterId, active, nameById, posts, baselineData);
 
     const byPost = posts.map(function (p) {
       const ids = (eligibleByPost[p.postId] || []).slice().sort(function (a, b) {
@@ -235,7 +236,7 @@ function buildWeightBaselineDataSafely_(quarterId) {
  * @returns {?Object.<string, string>} null ＝ **查不到**（未有版本／讀取失敗），
  *   唔係「查到而且個個都啱啱好」
  */
-function readWeightGapTextByKey_(quarterId, active, nameById, posts) {
+function readWeightGapTextByKey_(quarterId, active, nameById, posts, baselineData) {
   const id = String(quarterId || '').trim();
   if (!id) return null;
   if (!active || !active.rows || active.rows.length === 0) {
@@ -243,6 +244,16 @@ function readWeightGapTextByKey_(quarterId, active, nameById, posts) {
     return {};
   }
   try {
+    // ⚠️ 第八十三輪批次 JC 組（第八十二輪 Q2 收尾「目標 6、已排 6，卻寫比目標多 5 次」）：
+    // `active.rows` 冇 `baseline`／`target` ⇒ 報告用 `computeWeightTarget_(0, adjust)`＝1 做目標，
+    // 而畫面同一行嘅「今季目標」係 `基準 5 ＋ 1＝6`。兩個數唔同。而家用**同一份**基準砌目標。
+    const withTarget = Object.assign({}, active, {
+      rows: active.rows.map(function (w) {
+        if (w.target !== null && w.target !== undefined) return w;
+        const base = resolveWeightBaseline_(w.personId, w.postId, baselineData || null);
+        return Object.assign({}, w, { baseline: base.baseline, target: computeWeightTarget_(base.baseline, w.adjust) });
+      })
+    });
     const versionNo = findLatestVersionNo(id);
     if (versionNo < 0) return null;
 
@@ -266,7 +277,7 @@ function readWeightGapTextByKey_(quarterId, active, nameById, posts) {
     });
 
     const report = buildPersonPostWeightReport_(
-      assignments, active, peopleById, postNames,
+      assignments, withTarget, peopleById, postNames,
       // 每季上限：傳 null ＝ 查不到，報告會照樣講明「上限查不到」，
       // 唔會扮到已經檢查過。呢一頁本來就冇讀 RuleSettings。
       buildWeightLimitContextSafely_());

@@ -170,7 +170,8 @@ console.log('\n=== C【核心】畫面同後端：一個欄位、一份計算 ==
     zone3Code.indexOf('未達標') === -1 && zone3Code.indexOf('比目標多') === -1);
 
   check('★★★★★ 後端行 `buildPersonPostWeightReport_()`，唔係另寫一套',
-    /buildPersonPostWeightReport_\(\s*\n?\s*assignments, active, peopleById, postNames/
+    // 第八十三輪批次 JC 組：傳入帶咗目標嘅偏好行（withTarget）
+    /buildPersonPostWeightReport_\(\s*\n?\s*assignments, withTarget, peopleById, postNames/
       .test(backend));
   check('★★★★★ 而且只搬 `gapText` 出去（唔會前端再拆 reasons 自己砌）',
     /if \(r\.gapText\) byKey\[r\.personId \+ '\|' \+ r\.postId\] = r\.gapText;/.test(backend));
