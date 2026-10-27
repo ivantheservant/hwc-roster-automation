@@ -64,6 +64,9 @@ const SUGGESTION_COLOR_BOTH = '#e2d3f5';
  */
 const SUGGESTION_COLOR_MANUAL_VIOLATION = '#ffd0b5';
 
+/** 第八十二輪批次 IC 組：第五種顏色——系統按排表偏好微調嘅格（綠色）。 */
+const SUGGESTION_COLOR_WEIGHT = '#d4f4dd';
+
 /**
  * 建議表的名稱。
  * @param {string} quarterId 季度 ID
@@ -158,6 +161,9 @@ function apiCheckMyChanges(quarterId) {
         };
       });
 
+    // 第八十二輪批次 IB 組：〔請系統幫我調整〕之前要決定嘅項目（未勾嘅違反規則格、未決定嘅名）
+    const undecidedCount = unresolved.filter(function (u) { return !u.checked; }).length
+      + violations.filter(function (v) { return !v.checked && !v.released; }).length;
     return {
       ok: true,
       versionNo: versionNo,
@@ -165,6 +171,9 @@ function apiCheckMyChanges(quarterId) {
       unresolved: unresolved,
       violations: violations,
       blanks: blanks,
+      undecidedCount: undecidedCount,
+      // 第八十二輪批次 IB 組：「這一次會處理」（同結果窗同一支）
+      willHandle: buildAdjustWillHandle_(quarterId, context, analysis, context.timezone),
       // 一句總結。全部乾淨的時候要講得出「可以儲存」——
       // 一個空清單不會告訴幹事下一步做甚麼。
       // 第七十五輪批次 CF 組：勾咗「保留」／「臨時幫手」或者已放行嘅格當處理好。
@@ -360,6 +369,8 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   // 佢哋喺狀態入面冇 PersonID 但有名（`freeText`），所以唔會被當成空格去填。
   const decisionItems = buildCheckDecisionItems_(quarterId, versionNo, context, analysis);
   const undecidedNames = decisionItems.names.filter(function (n) { return !n.checked; });
+  // 第八十二輪批次 IB 組：「這一次會處理」——**調整之前**嘅狀態（改動、不能服侍、偏好、空格）
+  const willHandle = buildAdjustWillHandle_(quarterId, context, analysis, timezone);
 
   const manualKeys = {};
   analysis.changes.forEach(function (c) {
@@ -438,6 +449,74 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
         + (p.suggestedName || '（空白）') + '」。');
   });
 
+  // ── 第八十二輪批次 IC 組：按排表偏好微調（修好違規、填好空格之後另做一步）──
+  const weightKeys = {};
+  let weightTune = { moves: [], unmet: [], error: '' };
+  try {
+    const protectedKeys = Object.assign({}, manualKeys, keptKeys, releasedCellKeys, blockedKeys, systemKeys);
+    const tuned = proposeWeightFineTune_(context, analysis.manualState, {
+      weights: readWeightsForQuarterTune_(quarterId, timezone), protectedKeys: protectedKeys
+    });
+    weightTune = { moves: tuned.moves, unmet: tuned.unmet, error: '' };
+    tuned.moves.forEach(function (m) {
+      if (stateByKey[m.key]) stateByKey[m.key].personId = m.toPersonId;
+      systemKeys[m.key] = true;
+      weightKeys[m.key] = true;
+      notes[m.key] = '系統按排表偏好微調了這一格：' + m.label + '。原本是「' + m.fromName + '」，改成「' + m.toName + '」。';
+    });
+  } catch (err) {
+    // 讀唔到偏好唔可以令整個調整失敗——照樣出建議表，結果窗寫明「排表偏好這一次沒有處理到」
+    log_('WARN', 'buildSuggestionState_：排表偏好微調做不到：' + err.message);
+    weightTune.error = err.message;
+  }
+
+  // ── 第八十二輪批次 IB 組：你人手改過嘅每一格，系統點樣處理 ──
+  const reasonByKey = {};
+  fix.proposals.forEach(function (p) {
+    reasonByKey[cellKey_(p.serviceDate, p.postId, p.slotIndex)] = p.reason || p.brokenRuleId || '';
+  });
+  const untouchedByKey = {};
+  (fix.untouchedManual || []).forEach(function (u) { untouchedByKey[u.key] = u; });
+  const tempHelperKeys = {};
+  const undecidedNameKeys = {};
+  decisionItems.names.forEach(function (n) {
+    if (n.checked) tempHelperKeys[n.key] = true; else undecidedNameKeys[n.key] = true;
+  });
+  const remainingKeys = {};
+  findStateViolations_(analysis.manualState, context).forEach(function (v) {
+    remainingKeys[cellKey_(v.serviceDate, v.postId, v.slotIndex)] = v.reason || v.ruleId;
+  });
+  const postNameOf = function (postId) {
+    const p = findPostById_(context.posts, postId);
+    return p ? p.postNameTC : postId;
+  };
+  const manualOutcomes = analysis.changes.map(function (c) {
+    const key = cellKey_(c.serviceDate, c.postId, c.slotIndex);
+    const base = { serviceDate: c.serviceDate, postNameTC: postNameOf(c.postId), slotIndex: c.slotIndex,
+      fromName: c.originalName || '（空白）', toName: c.manualText || '（空白）' };
+    const u = untouchedByKey[key];
+    let outcome;
+    let text;
+    if (systemKeys[key]) {
+      const now = stateByKey[key] ? nameOfPersonId_(context, stateByKey[key].personId) : '';
+      outcome = 'SYSTEM_CHANGED';
+      text = '系統再改成「' + now + '」（' + (reasonByKey[key] || '按排表偏好微調') + '）';
+    } else if (u && u.released) {
+      outcome = 'RELEASED'; text = '系統沒有動（已放行）';
+    } else if (u) {
+      outcome = 'KEPT'; text = '系統沒有動（你勾了保留）';
+    } else if (tempHelperKeys[key]) {
+      outcome = 'TEMP_HELPER'; text = '系統沒有動（臨時幫手）';
+    } else if (undecidedNameKeys[key]) {
+      outcome = 'NAME_UNDECIDED'; text = '系統沒有動（名單上找不到這個名字，你還沒有決定）';
+    } else if (remainingKeys[key]) {
+      outcome = 'UNFIXABLE'; text = '系統找不到可以換的人（' + remainingKeys[key] + '）';
+    } else {
+      outcome = 'NO_VIOLATION'; text = '系統沒有動（沒有違反規則）';
+    }
+    return Object.assign(base, { outcome: outcome, text: text });
+  });
+
   // ⚠️ 上一版逐格的中繼資料（`ruleFlags`／`assignSource`／原本的名字）。
   //
   // 在這裡算好，是為了令 `writeSuggestionSheet_()` 完全不用碰
@@ -459,6 +538,12 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     state: analysis.manualState,
     manualKeys: manualKeys,
     systemKeys: systemKeys,
+    // 第八十二輪批次 IC 組：按排表偏好微調嘅格（綠色）同結果
+    weightKeys: weightKeys,
+    weightTune: weightTune,
+    // 第八十二輪批次 IB 組：人手改過每一格嘅處理結果、「這一次會處理」
+    manualOutcomes: manualOutcomes,
+    willHandle: willHandle,
     // 第四十六輪批次 C4 組：幹事改過、違反規則、系統冇動嗰幾格（第三種顏色）。
     blockedKeys: blockedKeys,
     untouchedManual: fix.untouchedManual || [],
@@ -864,7 +949,19 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
       };
     }),
     gapCapped: !!built.gapCapped,
-    gapCount: built.gapCount || 0
+    gapCount: built.gapCount || 0,
+    // 第八十二輪批次 IB 組：「這一次會處理」＋你人手改過嘅每一格點樣處理
+    willHandle: built.willHandle,
+    manualOutcomes: built.manualOutcomes || [],
+    // 第八十二輪批次 IC 組：按排表偏好微調咗邊幾格；做唔到嘅原因
+    weightTune: {
+      moves: ((built.weightTune || {}).moves || []).map(function (m) {
+        return { serviceDate: m.serviceDate, postNameTC: m.postNameTC, slotIndex: m.slotIndex,
+          fromName: m.fromName, toName: m.toName, label: m.label };
+      }),
+      unmet: ((built.weightTune || {}).unmet || []).map(function (u) { return u.text; }),
+      error: (built.weightTune || {}).error || ''
+    }
   };
 }
 
@@ -932,7 +1029,9 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
     // 而那幾格正正就是他要親自決定的。
     ['黃色格 ＝ 你自己改過的', '藍色格 ＝ 系統建議改的',
       '紫色格 ＝ 你改過，而系統又再改了一次',
-      '橙色格 ＝ 你改過、違反了規則，而系統沒有動它'],
+      '橙色格 ＝ 你改過、違反了規則，而系統沒有動它',
+      // 第八十二輪批次 IC 組
+      '綠色格 ＝ 系統按排表偏好微調的'],
     ['系統改過的格，把滑鼠停在上面會見到它為甚麼改。'],
     // ⚠️ 第四十二輪批次 A 組：這一句以前是**假的**——系統當時只會用
     // 第一次那個快照。現在真的做得到（見 `resolveSuggestionStartPoint_()`），
@@ -952,6 +1051,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   sheet.getRange(2, 3).setBackground(SUGGESTION_COLOR_BOTH);
   // 第四十六輪批次 C4 組：第四格 ＝ 你改的、違反規則、系統沒有動。
   sheet.getRange(2, 4).setBackground(SUGGESTION_COLOR_MANUAL_VIOLATION);
+  sheet.getRange(2, 5).setBackground(SUGGESTION_COLOR_WEIGHT);
   sheet.getRange(1, 1, legend.length, 1).setFontWeight('bold');
 
   const headerRow = legend.length + 1;
@@ -971,7 +1071,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   // 對話框那三個數字一定要由「實際上了色的格」數出來，
   // 不可以由 `manualKeys`／`systemKeys` 各自 `Object.keys().length` 算——
   // 那樣就是兩個真相來源，而現場那個 bug 正正是兩邊對不上。
-  const colourCounts = { manual: 0, system: 0, both: 0, manualViolation: 0 };
+  const colourCounts = { manual: 0, system: 0, both: 0, manualViolation: 0, weight: 0 };
   layout.rows.forEach(function (row, r) {
     const dateStr = String(row[0]);
     for (let c = 3; c < layout.keys.length; c++) {
@@ -993,9 +1093,14 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
       // 佢一定同時係 `isManual`，所以放後面就會永遠被黃色蓋走，
       // 而對話框報嘅「橙色 N 格」喺表上一格都搵唔到——
       // 呢個正正就係第四十三輪 C1 嗰個 bug 嘅形狀。
+      // 第八十二輪批次 IC 組：按排表偏好微調嘅格（只會係系統排嘅格，唔會同人手改過重疊）
+      const isWeight = (built.weightKeys || {})[cellKey] === true;
       if (isBlocked) {
         cell.setBackground(SUGGESTION_COLOR_MANUAL_VIOLATION);
         colourCounts.manualViolation++;
+      } else if (isWeight) {
+        cell.setBackground(SUGGESTION_COLOR_WEIGHT);
+        colourCounts.weight++;
       } else if (isManual && isSystem) {
         cell.setBackground(SUGGESTION_COLOR_BOTH);
         colourCounts.both++;
@@ -1558,6 +1663,229 @@ function discardStaleSuggestionSheets_(quarterId, keepVersionNo) {
  */
 
 /** 一次最多為幾多格空格找人。理由見下面。 */
+/* ═════════════════════════════════════════════════════════════════════
+ * 第八十二輪批次 IC 組：〔請系統幫我調整〕按排表偏好微調
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 修好違規、填好空格之後**另做一步**：每一項生效中嘅偏好（`readActivePersonPostWeights_()`，
+ * 參考日期＝季度開始日，同生成一樣嘅優先次序）比較目標次數（`computeWeightTarget_()`）同實際次數：
+ *   少過目標 ⇒ 喺嗰個崗位搵一格**系統排嘅格**換成呢個人
+ *   多過目標 ⇒ 把佢喺嗰個崗位一格系統排嘅格，換畀另一位合資格、負荷較低嘅人
+ *
+ * 只郁「系統排嘅格」：幹事改過、已保留、已放行、臨時幫手、人手填崗位（AutoGenerate=FALSE）、
+ * 人手來源（`HUMAN_ASSIGN_SOURCES`）、今次調整已經改過嘅格一律唔郁。
+ * 每一次換人都要通過全部規則（`findStateViolations_()` 唔可以多一個新違規——包括其他人）
+ * 同次數上限（`exceedsAssignmentLimit_()`）；換人揀選用 `rankReplacementCandidates_()`（第六十五輪 Z 組嗰套）。
+ * 每項偏好換到目標為止；唔會令另一位有偏好嘅人偏離佢嘅目標；全部次序固定 ⇒ 同一個輸入同一個結果。
+ */
+
+/**
+ * 第八十二輪批次 IB 組：〔請系統幫我調整〕「這一次會處理」——〔檢查我的改動〕、「調整之前」視窗、
+ * 結果窗**同一支**。用調整之前嘅狀態算：
+ *   你在表上改了 N 格（逐格）；「不能服侍的日期」令這一版 K 格的人那一日不能服侍（逐格，系統會換人）；
+ *   這一季生效中的排表偏好 P 項；空格 B 格（系統會試填）
+ * 讀唔到偏好 ⇒ `weights.error`（唔拋）。
+ * @param {string} quarterId 季度 ID
+ * @param {Object} context fine-tune context
+ * @param {{changes: Object[], violations: Object[], manualState: Object[]}} analysis 調整之前
+ * @param {string} timezone 時區
+ * @returns {Object}
+ */
+function buildAdjustWillHandle_(quarterId, context, analysis, timezone) {
+  const postNameOf = function (postId) {
+    const p = findPostById_(context.posts, postId);
+    return p ? p.postNameTC : postId;
+  };
+  const gridChanges = (analysis.changes || []).map(function (c) {
+    return { serviceDate: c.serviceDate, postNameTC: postNameOf(c.postId), slotIndex: c.slotIndex,
+      fromName: c.originalName || '（空白）', toName: c.manualText || '（空白）' };
+  });
+  const unavailableCells = (analysis.violations || []).filter(function (v) {
+    return v.ruleId === RULE_IDS.UNAVAILABLE;
+  }).map(function (v) {
+    return { serviceDate: v.serviceDate, postNameTC: postNameOf(v.postId), slotIndex: v.slotIndex,
+      personName: nameOfPersonId_(context, v.personId) };
+  });
+  let weights = { count: 0, items: [], error: '' };
+  try {
+    const w = readWeightsForQuarterTune_(quarterId, timezone);
+    weights = {
+      count: w.rows.length,
+      items: w.rows.map(function (r) {
+        return { personName: nameOfPersonId_(context, r.personId), postNameTC: postNameOf(r.postId),
+          adjust: r.adjust, target: r.target };
+      }),
+      error: ''
+    };
+  } catch (err) {
+    log_('WARN', 'buildAdjustWillHandle_ 讀不到排表偏好：' + err.message);
+    weights.error = err.message;
+  }
+  let blankCount = 0;
+  try {
+    blankCount = listGenuineBlankCells_(analysis.manualState || [], context).length;
+  } catch (err) {
+    log_('WARN', 'buildAdjustWillHandle_ 數不到空格：' + err.message);
+  }
+  return { gridChanges: gridChanges, unavailableCells: unavailableCells, weights: weights, blankCount: blankCount };
+}
+
+/** 一次調整最多按偏好換幾多格（安全上限；正常一季遠低過呢個數）。 */
+const WEIGHT_TUNE_MAX_MOVES = 30;
+
+/**
+ * 呢一季生效中嘅排表偏好（參考日期＝季度開始日；有基準先有目標次數）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {{rows: Object[]}}
+ */
+function readWeightsForQuarterTune_(quarterId, timezone) {
+  const quarterRow = findQuarter_(quarterId);
+  const refDate = quarterRow ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+  return readActivePersonPostWeights_(refDate, timezone, buildWeightBaselineData_(quarterId, timezone));
+}
+
+/**
+ * 按偏好微調。**唔改傳入嘅 state**——回一串換人（呼叫端自己套落去）。
+ * @param {Object} context fine-tune context
+ * @param {Object[]} state 修好違規、填好空格之後嘅狀態
+ * @param {{weights: {rows: Object[]}, protectedKeys: Object.<string, boolean>}} opts
+ * @returns {{moves: Object[], unmet: Object[]}}
+ */
+function proposeWeightFineTune_(context, state, opts) {
+  const o = opts || {};
+  const protectedKeys = o.protectedKeys || {};
+  const rows = ((o.weights && o.weights.rows) || [])
+    .filter(function (w) { return w.target !== null && w.target !== undefined && !isNaN(Number(w.target)); })
+    .slice()
+    .sort(function (a, b) {
+      const ka = a.personId + '|' + a.postId;
+      const kb = b.personId + '|' + b.postId;
+      return ka < kb ? -1 : (ka > kb ? 1 : 0);
+    });
+  const moves = [];
+  const unmet = [];
+  if (rows.length === 0) return { moves: moves, unmet: unmet };
+
+  const weightByKey = {};
+  rows.forEach(function (w) { weightByKey[w.personId + '|' + w.postId] = w; });
+  const originalByKey = {};
+  (context.original || []).forEach(function (a) {
+    originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
+  });
+  const autoByPost = (context.gridRender && context.gridRender.autoGenerateByPostId) || {};
+  const postName = function (postId) {
+    const p = findPostById_(context.posts, postId);
+    return p ? p.postNameTC : postId;
+  };
+  const keyOf = function (s) { return cellKey_(s.serviceDate, s.postId, s.slotIndex); };
+  const movedKeys = {};
+  let work = state.map(function (s) { return Object.assign({}, s); });
+
+  const isSystemCell = function (s) {
+    const k = keyOf(s);
+    if (protectedKeys[k] || movedKeys[k] || s.isManual) return false;
+    if (autoByPost[s.postId] === false) return false;
+    const orig = originalByKey[k];
+    if (orig && HUMAN_ASSIGN_SOURCES.indexOf(String(orig.assignSource || '')) !== -1) return false;
+    return true;
+  };
+  const countOf = function (personId, postId) {
+    return work.filter(function (s) { return s.personId === personId && s.postId === postId; }).length;
+  };
+  const loadOf = function (personId) {
+    return work.filter(function (s) { return s.personId === personId; }).length;
+  };
+  // 同一格、同一條規則、**同一個人** ⇒ 同一個違反（換咗人之後嗰格嘅違反係另一個人嘅，算新）
+  const vKey = function (v) { return violationKey_(v) + '|' + String(v.personId || ''); };
+  const existing = {};
+  findStateViolations_(work, context).forEach(function (v) { existing[vKey(v)] = true; });
+  // 另一位有偏好嘅人會唔會因為呢一換而偏離佢嘅目標
+  const breaksOther = function (personId, postId, delta) {
+    const w = weightByKey[personId + '|' + postId];
+    if (!w) return false;
+    const c = countOf(personId, postId);
+    return delta < 0 ? (c - 1 < Number(w.target)) : (c + 1 > Number(w.target));
+  };
+  const tryMove = function (key, newPersonId) {
+    const trial = substituteCell_(work, key, newPersonId);
+    if (exceedsAssignmentLimit_(newPersonId, trial, context)) return null;
+    const introduced = findStateViolations_(trial, context).filter(function (v) { return !existing[vKey(v)]; });
+    return introduced.length > 0 ? null : trial;
+  };
+  const apply = function (cell, toPersonId, w, direction) {
+    const key = keyOf(cell);
+    const trial = tryMove(key, toPersonId);
+    if (!trial) return false;
+    moves.push({
+      key: key, serviceDate: cell.serviceDate, postId: cell.postId, postNameTC: postName(cell.postId),
+      slotIndex: cell.slotIndex, fromPersonId: cell.personId, toPersonId: toPersonId,
+      fromName: nameOfPersonId_(context, cell.personId), toName: nameOfPersonId_(context, toPersonId),
+      weightPersonId: w.personId, weightPostId: w.postId, direction: direction,
+      label: nameOfPersonId_(context, w.personId) + '的' + postName(w.postId)
+        + '（排表偏好' + (Number(w.adjust) > 0 ? '多' : '少') + Math.abs(Number(w.adjust)) + '次，目標 ' + w.target + ' 次）'
+    });
+    movedKeys[key] = true;
+    work = trial;
+    return true;
+  };
+  const describeUnmet = function (w, count, why) {
+    unmet.push({
+      personId: w.personId, postId: w.postId, target: Number(w.target), actual: count,
+      text: nameOfPersonId_(context, w.personId) + '的' + postName(w.postId) + '：目標 ' + w.target + ' 次，現時 '
+        + count + ' 次，' + why
+    });
+  };
+
+  rows.forEach(function (w) {
+    const target = Number(w.target);
+    let count = countOf(w.personId, w.postId);
+    const eligible = ((context.eligibility.byPost || {})[w.postId] || []).indexOf(w.personId) !== -1;
+    // ── 少過目標：換一格系統排嘅格畀佢 ──
+    while (count < target && moves.length < WEIGHT_TUNE_MAX_MOVES) {
+      if (!eligible || !context.peopleById[w.personId]) {
+        describeUnmet(w, count, '他不在這個崗位的事奉人員名單上，系統不可以排他。');
+        return;
+      }
+      const cells = work.filter(function (s) {
+        return s.postId === w.postId && s.personId && s.personId !== w.personId && isSystemCell(s)
+          && !breaksOther(s.personId, s.postId, -1);
+      }).sort(function (a, b) {
+        // 負荷較高嘅人嗰格先換（令次數更平均）；同負荷 ⇒ 日期、位置
+        const dl = loadOf(b.personId) - loadOf(a.personId);
+        if (dl !== 0) return dl;
+        return keyOf(a) < keyOf(b) ? -1 : (keyOf(a) > keyOf(b) ? 1 : 0);
+      });
+      let done = false;
+      for (let i = 0; i < cells.length && !done; i++) done = apply(cells[i], w.personId, w, 'UP');
+      if (!done) { describeUnmet(w, count, '找不到可以換而不違反規則的格。'); return; }
+      count = countOf(w.personId, w.postId);
+    }
+    // ── 多過目標：把佢一格系統排嘅格換畀別人 ──
+    while (count > target && moves.length < WEIGHT_TUNE_MAX_MOVES) {
+      const cells = work.filter(function (s) {
+        return s.postId === w.postId && s.personId === w.personId && isSystemCell(s);
+      }).sort(function (a, b) { return keyOf(a) < keyOf(b) ? -1 : (keyOf(a) > keyOf(b) ? 1 : 0); });
+      let done = false;
+      for (let i = 0; i < cells.length && !done; i++) {
+        const cell = cells[i];
+        const pool = (context.eligibility.byPost || {})[w.postId] || [];
+        const ranking = rankReplacementCandidates_(pool,
+          { serviceDate: cell.serviceDate, postId: cell.postId, slotIndex: cell.slotIndex, personId: w.personId }, work, context);
+        for (let j = 0; j < ranking.order.length && !done; j++) {
+          const candidate = ranking.order[j];
+          if (candidate === w.personId || !context.peopleById[candidate]) continue;
+          if (breaksOther(candidate, w.postId, +1)) continue;
+          done = apply(cell, candidate, w, 'DOWN');
+        }
+      }
+      if (!done) { describeUnmet(w, count, '找不到可以換給別人而不違反規則的格。'); return; }
+      count = countOf(w.personId, w.postId);
+    }
+  });
+  return { moves: moves, unmet: unmet };
+}
+
 const GAP_FILL_MAX_CELLS = 40;
 
 

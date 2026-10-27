@@ -143,6 +143,75 @@
     // 喺送出之前擋住，而 lint 會喺 commit 之前擋住。三層都要有，
     // 因為呢一個 bug 上一輪令我查錯咗成個後端。
     const from = (typeof startFrom === 'string') ? startFrom : '';
+    // 第八十二輪批次 IB 組（Ivan 手動測試 C）：唔使先撳〔檢查我的改動〕——有未決定嘅項目
+    //（未勾嘅違反規則格、名單上找不到嘅名）就先出「調整之前」視窗，用**同一個**勾選元件；冇就直接開始。
+    // 由「用邊一張做起點」小窗返嚟（`from` 有值）⇒ 已經決定過，直接開始。
+    if (from) { runBuildSuggestion(from, false); return; }
+    runAction('讀取你的改動', async () => {
+      const pre = await callServer('apiCheckMyChanges', currentQuarterId);
+      if (pre && pre.ok && Number(pre.undecidedCount) > 0) { renderBeforeAdjust(pre); return; }
+      runBuildSuggestion('', true);
+    });
+  }
+
+  /**
+   * 第八十二輪批次 IB 組：「調整之前」——同〔檢查我的改動〕同一個勾選元件（`buildDecisionSections()`）。
+   * @param {Object} pre `apiCheckMyChanges` 嘅結果
+   */
+  function renderBeforeAdjust(pre) {
+    const nodes = [buildWillHandleSection(pre.willHandle)];
+    nodes.push(make('div', {
+      text: '下面幾項你還沒有決定。勾了「保留我的安排」或「這一季臨時幫手」的格，系統不會調整；沒有勾的，系統會試著調整。',
+      className: 'warn-head'
+    }));
+    const decisions = buildDecisionSections(
+      { names: pre.unresolved || [], rules: pre.violations || [] },
+      { onAddPerson: (u) => openAddUnresolvedPerson(u, () => openBuildSuggestion()) });
+    decisions.nodes.forEach((n) => nodes.push(n));
+    openModal('調整之前', nodes, [
+      button('開始調整', () => { closeModal(); runBuildSuggestion('', false); }, ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  /**
+   * 第八十二輪批次 IB 組：「這一次會處理」——調整之前視窗同結果窗共用。
+   * @param {Object=} w 後端 `buildAdjustWillHandle_()` 嘅結果
+   * @returns {Node}
+   */
+  function buildWillHandleSection(w) {
+    const d = w || {};
+    const box = make('div', { className: 'sec' }, [sectionTitle('這一次會處理')]);
+    const cellText = (c) => humanDate(c.serviceDate) + '　' + c.postNameTC + (Number(c.slotIndex) > 1 ? (' ' + c.slotIndex) : '');
+    const changes = d.gridChanges || [];
+    box.appendChild(make('div', { text: '・你在表上改了 ' + changes.length + ' 格', className: 'ok-line' }));
+    changes.forEach((c) => box.appendChild(make('div', {
+      text: '　　' + cellText(c) + '　' + c.fromName + ' → ' + c.toName, className: 'vio-row' })));
+    const un = d.unavailableCells || [];
+    if (un.length > 0) {
+      box.appendChild(make('div', {
+        text: '・「不能服侍的日期」令這一版 ' + un.length + ' 格的人那一日不能服侍（系統會換人）', className: 'ok-line' }));
+      un.forEach((c) => box.appendChild(make('div', {
+        text: '　　' + cellText(c) + '　' + (c.personName || ''), className: 'vio-row' })));
+    }
+    const wt = d.weights || {};
+    if (wt.error) {
+      box.appendChild(make('div', { text: '・排表偏好：這一次讀不到（' + wt.error + '），系統不會按偏好微調。', className: 'vio-row' }));
+    } else if (Number(wt.count) > 0) {
+      box.appendChild(make('div', {
+        text: '・排表偏好：這一季有 ' + wt.count + ' 項生效中的偏好（系統會按它微調；做不到的會寫明）', className: 'ok-line' }));
+      (wt.items || []).forEach((i) => box.appendChild(make('div', {
+        text: '　　' + i.personName + '的' + i.postNameTC + '：' + (Number(i.adjust) > 0 ? '多' : '少') + Math.abs(Number(i.adjust)) + ' 次'
+          + (i.target === null || i.target === undefined ? '' : '（目標 ' + i.target + ' 次）'),
+        className: 'vio-row' })));
+    }
+    if (Number(d.blankCount) > 0) {
+      box.appendChild(make('div', { text: '・空格 ' + d.blankCount + ' 格（系統會試填）', className: 'ok-line' }));
+    }
+    return box;
+  }
+
+  function runBuildSuggestion(from, showWillHandle) {
     runAction('系統調整中，請稍候', async () => {
       // 第七十五輪批次 CF 組：「准系統調整我勾了的」拿走——系統只會調整**冇勾**「保留我的安排」嘅格，
       // 後端自己讀逐格決定。第 3 個參數照送空陣列（後端已經唔用）。
@@ -157,7 +226,7 @@
         showErrorModal('請系統幫我調整', new Error(r.message));
         return;
       }
-      renderSuggestionResult(r);
+      renderSuggestionResult(r, showWillHandle);
     });
   }
 
@@ -190,7 +259,7 @@
     ]);
   }
 
-  function renderSuggestionResult(r) {
+  function renderSuggestionResult(r, showWillHandle) {
     const link = make('a', { text: '開啟建議版本（' + r.sheetName + '）', className: 'bigLink' });
     link.href = r.url;
     link.target = '_blank';
@@ -224,8 +293,10 @@
     colourLine('紫色格 ＝ 你改過，而系統又再改了一次', cc.both);
     // 第四十六輪批次 C4 組：第四種顏色。
     colourLine('橙色格 ＝ 你改過、違反了規則，而系統沒有動它', cc.manualViolation);
+    // 第八十二輪批次 IC 組：第五種顏色。
+    colourLine('綠色格 ＝ 系統按排表偏好微調的', cc.weight || 0);
 
-    if (cc.system === 0 && cc.both === 0) {
+    if (cc.system === 0 && cc.both === 0 && !(cc.weight > 0)) {
       colourBox.appendChild(make('div', {
         text: '你改的都沒有違反規則，系統不需要調整任何東西——所以沒有藍色格。',
         className: 'ok-line strong'
@@ -287,13 +358,40 @@
       });
     }
 
-    const nodes = [
-      make('div', { text: '建議版本已經做好', className: 'ok-head' }),
+    const nodes = [make('div', { text: '建議版本已經做好', className: 'ok-head' })];
+    // 第八十二輪批次 IB 組：冇「調整之前」視窗嗰陣，結果窗最上面講「這一次會處理」
+    if (showWillHandle && r.willHandle) nodes.push(buildWillHandleSection(r.willHandle));
+    nodes.push(
       // ⚠️ 第四十二輪批次 A 組：起點要寫出嚟，俾佢一眼核對得到。
       // 唔講嘅話，「系統有冇計我啱啱改嗰幾格」呢條問題佢答唔到。
       make('div', { text: r.startNote || '', className: 'ok-line strong' }),
-      link,
-      colourBox,
+      link);
+    // 第八十二輪批次 IB 組：你人手改過的格——逐格寫結果（包括冇違規、系統冇動嘅）
+    const outcomes = r.manualOutcomes || [];
+    if (outcomes.length > 0) {
+      const box = make('div', { className: 'sec' }, [sectionTitle('你人手改過的格（' + outcomes.length + ' 格）')]);
+      outcomes.forEach((o) => box.appendChild(make('div', {
+        text: humanDate(o.serviceDate) + '　' + o.postNameTC + (Number(o.slotIndex) > 1 ? (' ' + o.slotIndex) : '')
+          + '　' + o.fromName + ' → ' + o.toName + '：' + o.text,
+        className: o.outcome === 'SYSTEM_CHANGED' || o.outcome === 'UNFIXABLE' ? 'vio-row strong' : 'vio-row'
+      })));
+      nodes.push(box);
+    }
+    // 第八十二輪批次 IC 組：按排表偏好微調了 M 格；做不到的寫明
+    const wt = r.weightTune || {};
+    if ((wt.moves || []).length > 0 || (wt.unmet || []).length > 0 || wt.error) {
+      const box = make('div', { className: 'sec' }, [sectionTitle('按排表偏好微調了 ' + (wt.moves || []).length + ' 格')]);
+      (wt.moves || []).forEach((m) => box.appendChild(make('div', {
+        text: humanDate(m.serviceDate) + '　' + m.postNameTC + (Number(m.slotIndex) > 1 ? (' ' + m.slotIndex) : '')
+          + '　' + m.fromName + ' → ' + m.toName + '（' + m.label + '）',
+        className: 'ok-line'
+      })));
+      (wt.unmet || []).forEach((t) => box.appendChild(make('div', { text: '做不到：' + t, className: 'vio-row' })));
+      if (wt.error) box.appendChild(make('div', { text: '排表偏好這一次讀不到（' + wt.error + '），沒有按偏好微調。', className: 'vio-row' }));
+      nodes.push(box);
+    }
+    nodes.push(colourBox);
+    nodes.push(
       // ⚠️ 第四十二輪批次 A 組：呢一段以前係**假嘅**。
       // 系統當時只會用第一次嗰個快照，幹事之後改嘅嘢完全冇計。
       // 而佢照住呢句去做，即係介面呃咗佢。
@@ -301,8 +399,7 @@
       para('你可以直接在那張表上再改，改完回來再撳一次〔請系統幫我調整〕，'
         + '系統會重新讀那一張表做起點再算一次。可以重複到你滿意為止。'),
       para('如果你改的是正式那一張職事表（不是建議表），系統就會用正式那一張做起點。'
-        + '兩張都改過的話，它會先問你要用哪一張。', 'muted')
-    ];
+        + '兩張都改過的話，它會先問你要用哪一張。', 'muted'));
 
     // ── 第四十三輪批次 D 組：填唔到嗰啲空格 ─────────────────
     //

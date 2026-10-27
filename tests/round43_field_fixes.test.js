@@ -259,11 +259,13 @@ console.log('\n=== C1【核心】對話框報嘅每一個數字，張表上都�
   const countColours = function (sheetName) {
     const sh2 = ss.getSheetByName(sheetName);
     const kr2 = keyRowOf(sh2);
-    const seen2 = { manual: 0, system: 0, both: 0, manualViolation: 0 };
+    // 第八十二輪批次 IC 組：第五種顏色（按排表偏好微調，綠色）
+    const seen2 = { manual: 0, system: 0, both: 0, manualViolation: 0, weight: 0 };
     for (let row = kr2 + 1; row <= sh2.getLastRow(); row++) {
       for (let c = 1; c <= sh2.getLastColumn(); c++) {
         const bg = norm(sh2.getRange(row, c).getBackground());
-        if (bg === norm(gas.SUGGESTION_COLOR_MANUAL_VIOLATION)) seen2.manualViolation++;
+        if (bg === norm(gas.SUGGESTION_COLOR_WEIGHT)) seen2.weight++;
+        else if (bg === norm(gas.SUGGESTION_COLOR_MANUAL_VIOLATION)) seen2.manualViolation++;
         else if (bg === norm(gas.SUGGESTION_COLOR_MANUAL)) seen2.manual++;
         else if (bg === norm(gas.SUGGESTION_COLOR_SYSTEM)) seen2.system++;
         else if (bg === norm(gas.SUGGESTION_COLOR_BOTH)) seen2.both++;

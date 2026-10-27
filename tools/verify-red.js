@@ -7813,6 +7813,104 @@ const MUTATIONS = [
     find: "    PICK: official ? (unsaved ? SEND_KIND.NONE : SEND_KIND.RESEND) : review",
     replace: "    PICK: official ? (unsaved ? SEND_KIND.NONE : SEND_KIND.RESEND) : resolveSendKindForAll_(buttons, state)",
     tests: ["tests/round82_ig_send_buttons.test.js"]
+  },
+  // ── 第八十二輪批次 IB 組：〔請系統幫我調整〕一個掣處理全部 ──
+  {
+    id: "ib-no-before-window",
+    why: "有未決定都唔出調整之前",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "      if (pre && pre.ok && Number(pre.undecidedCount) > 0) { renderBeforeAdjust(pre); return; }",
+    replace: "",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ib-undecided-zero",
+    why: "未決定項目數永遠係 0",
+    file: "src/SuggestionSheet.gs",
+    find: "    const undecidedCount = unresolved.filter(function (u) { return !u.checked; }).length\n      + violations.filter(function (v) { return !v.checked && !v.released; }).length;",
+    replace: "    const undecidedCount = 0;",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ib-outcome-only-viol",
+    why: "結果窗漏咗冇違規嘅人手格",
+    file: "src/SuggestionSheet.gs",
+    find: "      outcome = 'NO_VIOLATION'; text = '系統沒有動（沒有違反規則）';\n    }\n    return Object.assign(base, { outcome: outcome, text: text });\n  });",
+    replace: "      outcome = 'NO_VIOLATION'; text = '系統沒有動（沒有違反規則）';\n    }\n    return Object.assign(base, { outcome: outcome, text: text });\n  }).filter(function (o) { return o.outcome !== 'NO_VIOLATION'; });",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ib-temp-as-noviol",
+    why: "臨時幫手寫成冇違規",
+    file: "src/SuggestionSheet.gs",
+    find: "    } else if (tempHelperKeys[key]) {\n      outcome = 'TEMP_HELPER';",
+    replace: "    } else if (false) {\n      outcome = 'TEMP_HELPER';",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ib-no-unavailable",
+    why: "這一次會處理漏咗不能服侍",
+    file: "src/SuggestionSheet.gs",
+    find: "    return v.ruleId === RULE_IDS.UNAVAILABLE;\n  }).map(function (v) {",
+    replace: "    return false;\n  }).map(function (v) {",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  // ── 第八十二輪批次 IC 組：按排表偏好微調 ──
+  {
+    id: "ic-no-tune",
+    why: "冇按偏好微調",
+    file: "src/SuggestionSheet.gs",
+    find: "    weightTune = { moves: tuned.moves, unmet: tuned.unmet, error: '' };",
+    replace: "    weightTune = { moves: [], unmet: [], error: '' }; tuned.moves = [];",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ic-touch-manual",
+    why: "偏好微調郁埋人手改過嘅格",
+    file: "src/SuggestionSheet.gs",
+    find: "    if (protectedKeys[k] || movedKeys[k] || s.isManual) return false;",
+    replace: "    if (movedKeys[k]) return false;",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ic-allow-new-viol",
+    why: "偏好微調唔理新違規",
+    file: "src/SuggestionSheet.gs",
+    find: "    return introduced.length > 0 ? null : trial;",
+    replace: "    return trial;",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ic-no-down",
+    why: "偏好 −1 冇少一格",
+    file: "src/SuggestionSheet.gs",
+    find: "    while (count > target && moves.length < WEIGHT_TUNE_MAX_MOVES) {",
+    replace: "    while (false) {",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ic-ineligible-ok",
+    why: "唔喺名單嘅人都排",
+    file: "src/SuggestionSheet.gs",
+    find: "      if (!eligible || !context.peopleById[w.personId]) {",
+    replace: "      if (!context.peopleById[w.personId]) {",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ic-no-green",
+    why: "偏好微調嘅格冇綠色",
+    file: "src/SuggestionSheet.gs",
+    find: "      } else if (isWeight) {\n        cell.setBackground(SUGGESTION_COLOR_WEIGHT);\n        colourCounts.weight++;",
+    replace: "      } else if (false) {\n        cell.setBackground(SUGGESTION_COLOR_WEIGHT);\n        colourCounts.weight++;",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
+  },
+  {
+    id: "ic-no-result-section",
+    why: "結果窗冇按偏好微調一段",
+    file: "src/ui/ScriptSuggestion.html",
+    find: "    if ((wt.moves || []).length > 0 || (wt.unmet || []).length > 0 || wt.error) {",
+    replace: "    if (false) {",
+    tests: ["tests/round82_ib_ic_adjust_all.test.js"]
   }
 ];
 

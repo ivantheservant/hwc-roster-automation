@@ -267,9 +267,13 @@ console.log('\n=== C 保底：`openBuildSuggestion()` 自己都唔會轉發一�
     + '——三層都要有：lint 喺 commit 前擋、'
     + '`sanitizeServerArgs_()` 喺送出前擋、呢一句喺源頭擋',
     /const from = \(typeof startFrom === 'string'\) \? startFrom : '';/.test(fn), fn);
+  // 第八十二輪批次 IB 組：送出嗰行搬咗去 `runBuildSuggestion(from, …)`（先出「調整之前」視窗）——
+  // `openBuildSuggestion` 只會把清完嗰個 `from` 傳落去
+  const runFn = grabFn(suggestion, '  function runBuildSuggestion(from, showWillHandle) {');
   check('★★★★★ 而且送出嗰行用嘅係清完嗰個 `from`，唔係 `startFrom || \'\'`',
-    /'apiBuildSuggestion', currentQuarterId, from,/.test(fn)
-    && fn.indexOf("startFrom || ''") === -1, fn);
+    /'apiBuildSuggestion', currentQuarterId, from,/.test(runFn)
+    && /runBuildSuggestion\(from, false\)/.test(fn)
+    && fn.indexOf("startFrom || ''") === -1 && runFn.indexOf("startFrom || ''") === -1, runFn);
 }
 
 // =====================================================================
