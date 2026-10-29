@@ -262,8 +262,13 @@ function buildRuleReviewContext_() {
     log_('WARN', '規則審閱表讀不到 Posts 原始行，互斥組會顯示為「沒有設」：' + err.message);
   }
 
+  // 第八十五輪批次 LD 組：每人每季崗位上限（Posts.MaxPerPersonPerQuarter）逐個崗位列出
+  const postMaxPosts = [];
   try {
     readPostsNormalized().forEach(function (p) {
+      if (p.maxPerPersonPerQuarter !== null && p.maxPerPersonPerQuarter !== undefined) {
+        postMaxPosts.push({ postId: p.postId, postNameTC: p.postNameTC || p.postId, limit: p.maxPerPersonPerQuarter });
+      }
       postNameById[p.postId] = p.postNameTC || p.postId;
       const required = p.requiredRoles || [];
       if (required.length > 0) {
@@ -316,6 +321,7 @@ function buildRuleReviewContext_() {
   return {
     exclusionCurrentCount: exclusionCurrentCount,
     eligibilityRolePosts: eligibilityRolePosts,
+    postMaxPosts: postMaxPosts,
     // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然
     // 回一個純字串陣列（停用嘅標返「（已停用）」），令舊呼叫端唔使改。
     mutexGroups: Object.keys(mutexByGroup).sort().map(function (g) {

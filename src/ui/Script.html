@@ -122,6 +122,9 @@
     'apiListSpecialSundays',
     'apiWebListPreacherPending',
     'apiGetPreQuarterChecklist',
+    // 第八十五輪批次 LD 組：〔人手檢查〕——只讀；改動之後的一句提醒（只更新快取）
+    'apiGetStaffingCheck',
+    'apiGetStaffingChangeNote',
     'apiListUnavailable',
     'apiPreviewUnavailableImpact',
     'apiListPeople',
@@ -447,8 +450,24 @@
   async function callServerMutating(fnName, ...args) {
     const result = await callServerRaw_(fnName, ...args);
     dashboardStale_ = true;
+    // 第八十五輪批次 LD 組：改了會影響人手的資料 ⇒ 重新做人手檢查，下一個完成窗寫一句（不足才寫）
+    if (STAFFING_AFFECTING_CALLS.indexOf(fnName) !== -1 && currentQuarterId) {
+      try {
+        const r = await callServerRaw_('apiGetStaffingChangeNote', currentQuarterId);
+        pendingStaffingNote_ = (r && r.note) || '';
+      } catch (err) {
+        pendingStaffingNote_ = '';
+      }
+    }
     return result;
   }
+
+  /** 第八十五輪批次 LD 組：會影響人手檢查的儲存動作（名單、不能服侍、偏好、身分、暫時不做、規則、合堂）。 */
+  const STAFFING_AFFECTING_CALLS = ['apiApplyEligibilitySheet', 'apiSaveEligibilityBatch', 'apiSaveUnavailable',
+    'apiSavePersonPostWeightBatch', 'apiAddRole', 'apiSaveRole', 'apiRolesTermChangeExecute', 'apiAddExclusion',
+    'apiSaveExclusion', 'apiLiftExclusion', 'apiRuleReviewImportExecute', 'apiSaveCombinedServices'];
+  /** 下一個彈窗最上面要寫的人手提醒（寫一次就清空）。 */
+  let pendingStaffingNote_ = '';
 
   /**
    * 讀狀態快取嘅**唯一**入口。過期就先刷新再回。
@@ -1393,6 +1412,11 @@
   function openModal(title, bodyNodes, actionNodes) {
     el('modalTitle').textContent = title;
     const body = clear(el('modalBody'));
+    // 第八十五輪批次 LD 組：剛才的儲存令人手不足 ⇒ 完成窗最上面寫一句
+    if (typeof pendingStaffingNote_ !== 'undefined' && pendingStaffingNote_) {
+      body.appendChild(make('div', { text: pendingStaffingNote_, className: 'warnbox' }));
+      pendingStaffingNote_ = '';
+    }
     (bodyNodes || []).forEach((n) => { if (n) body.appendChild(n); });
     const actions = clear(el('modalActions'));
     (actionNodes || []).forEach((n) => { if (n) actions.appendChild(n); });
@@ -1704,6 +1728,7 @@
     HARD_MUTEX_GROUP: '他同一日已經做了另一個不可以兼任的崗位',
     HARD_ROLE_REQUIRED: '這個崗位要求某個身分，他那一日沒有',
     HARD_PERSON_POST_EXCLUDED: '名單上寫明他暫時不做這個崗位',
+    HARD_POST_MAX_PER_PERSON: '他這一季做這個崗位的次數已到上限',
     SEMI_NO_CONSECUTIVE: '他連續兩週都做這個崗位'
   };
 

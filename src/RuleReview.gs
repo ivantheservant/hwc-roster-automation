@@ -473,6 +473,18 @@ function ruleReviewPlainEntry_(ruleId) {
       return gated.map(function (p) { return p.postNameTC + '：只限' + p.requiredText; }).join('／');
     }
   };
+  // 第八十五輪批次 LD 組：預設開啟（`RULE_DEFAULT_ENABLED`），現時設定逐個崗位列出
+  table[RULE_IDS.POST_MAX_PER_PERSON] = {
+    text: '某些崗位每人每季最多做幾次',
+    what: '崗位設定了「每人每季最多幾次」的話，某人這一季做這個崗位到了上限，系統就不會再排他。'
+      + '沒有設定的崗位不限次數。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      const list = (ctx && ctx.postMaxPosts) || [];
+      if (list.length === 0) return '有生效，但現時沒有設定（沒有崗位設了上限）';
+      return list.map(function (p) { return p.postNameTC + '：每人每季最多 ' + p.limit + ' 次'; }).join('／');
+    }
+  };
   table[RULE_IDS.PERSON_POST_EXCLUDED] = {
     text: '堂委會決定暫時不做某崗位的人，不會被排到那個崗位',
     what: '在「暫時不做某崗位」登記了的人，在登記那段時間之內不會被排到那個崗位。解除是填一個解除日期，不是刪掉紀錄。',

@@ -82,12 +82,22 @@ function apiGenerateDraftPlan(quarterId) {
     };
   }
 
+  // 第八十五輪批次 LD 組：生成確認窗列出人手不足的崗位（同一個 context，數字和生成一致）
+  let staffing = null;
+  try {
+    staffing = computeStaffingCheck_(context);
+  } catch (err) {
+    log_('WARN', 'apiGenerateDraftPlan：人手檢查失敗：' + err.message);
+    staffing = { error: err.message, totalBlanks: 0, posts: [], notes: [] };
+  }
+
   return {
     blocked: false,
     quarterId: quarterId,
     quarterLabel: buildQuarterLabel_(quarterId),
     serviceDateCount: context.serviceDates.length,
     postCount: context.posts.length,
+    staffing: staffing,
     attemptsPlanned: readMultiRunAttempts_(),
     timeBudgetMinutes: Math.round(MULTIRUN_TIME_BUDGET_MS / 60000)
   };

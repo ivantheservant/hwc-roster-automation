@@ -160,7 +160,8 @@ function buildGasStubs_() {
 // 包喺 try/catch（依賴嘅 FineTune 函式冇載入就回 `error`、數字 0），所以一律載入——
 // 否則每一份載 FiveStageCore／WebAppDashboard 嘅測試都要自己記得加。
 // 第八十五輪批次 LC 組：`EligibilityRoles.gs`（崗位名單上的「堂委」「執事」）——readEligibility()／buildRoleContext_() 都會叫。
-const ALWAYS_LOADED = ['ArgShape.gs', 'SendWarnings.gs', 'EditableCopy.gs', 'EligibilityRoles.gs'];
+// 第八十五輪批次 LD 組：`StaffingCheck.gs`（人手檢查＋生成後補空格）——buildRoster_() 會叫。
+const ALWAYS_LOADED = ['ArgShape.gs', 'SendWarnings.gs', 'EditableCopy.gs', 'EligibilityRoles.gs', 'StaffingCheck.gs'];
 
 function loadGasSource(files, overrides) {
   const requested = files || FILES_FOR_GENERATOR;

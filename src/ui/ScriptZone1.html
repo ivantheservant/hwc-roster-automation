@@ -137,12 +137,23 @@
     // 生成係**可逆**嘅：唔會寄信、唔會覆蓋任何嘢（冇版本先撳得到）。
     // 所以唔需要打字確認——打字確認留返俾真正不可逆嘅動作（掣 3／掣 4）。
     // 每個動作都要打字，打字就會變成一個機械動作，到真正危險嗰次就冇咗作用。
+    // 第八十五輪批次 LD 組：人手不足的崗位（生成後會留空）
+    const staffingNodes = [];
+    const st = plan.staffing;
+    if (st && st.totalBlanks > 0) {
+      const box = make('div', { className: 'warnbox' }, [
+        make('div', { text: '以下崗位人手不足，生成後會留空（最少 ' + st.totalBlanks + ' 格）：', className: 'warn-head' })
+      ]);
+      (st.posts || []).forEach((p) => box.appendChild(make('div', { text: '・' + p.text, className: 'vio-row' })));
+      staffingNodes.push(box);
+    }
     openConfirm({
       title: '生成 ' + (plan.quarterLabel || plan.quarterId) + ' 的初稿',
       bodyNodes: [
-        facts,
+        facts
+      ].concat(staffingNodes).concat([
         para('可能需要一至數分鐘，過程中不要關掉這個視窗。')
-      ],
+      ]),
       confirmLabel: '開始生成',
       onConfirm: () => executeGenerateDraft()
     });

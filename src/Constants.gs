@@ -229,7 +229,9 @@ const COLUMNS = {
     // 放喺 Posts 而唔係 RuleSettings，理由同 EarlyArrivalMinutes 一樣——
     // 「呢個崗位要咩身分」係崗位本身嘅屬性，逐崗位設定，Posts 本來就係
     // 「一個崗位一列」嘅資料結構。見 Roles.gs 檔頭。
-    REQUIRED_ROLES: 'RequiredRoles'
+    REQUIRED_ROLES: 'RequiredRoles',
+    // 第八十五輪批次 LD 組：每人每季在這個崗位最多幾次（留空＝不限）。HARD_POST_MAX_PER_PERSON 用。
+    MAX_PER_PERSON_PER_QUARTER: 'MaxPerPersonPerQuarter'
   },
   NAME_MAPPING: {
     PERSON_ID: 'PersonID',
@@ -663,6 +665,8 @@ const RULE_IDS = {
   // 第十六輪批次階段 B（教會新規則 3）：PersonPostExclusions 明確排除咗
   // 呢個人做呢個崗位，而且喺嗰個主日當日仍然生效。
   PERSON_POST_EXCLUDED: 'HARD_PERSON_POST_EXCLUDED',
+  // 第八十五輪批次 LD 組：Posts.MaxPerPersonPerQuarter——某人在這一季這個崗位已達上限 ⇒ 不再排他。
+  POST_MAX_PER_PERSON: 'HARD_POST_MAX_PER_PERSON',
   NO_CONSECUTIVE: 'SEMI_NO_CONSECUTIVE',
   // 第十六輪批次階段 C（教會新規則 4）：堂委盡量集中喺指定嘅幾個崗位，
   // 其餘崗位盡量唔排。軟規則——排唔到人嗰陣仍然可以派，只係扣分。
@@ -783,7 +787,8 @@ const RULE_LEVEL_PENALTY = {
  */
 const RULE_DEFAULT_LEVELS = {
   [RULE_IDS.ROLE_REQUIRED]: RULE_LEVELS.HARD,
-  [RULE_IDS.PERSON_POST_EXCLUDED]: RULE_LEVELS.HARD
+  [RULE_IDS.PERSON_POST_EXCLUDED]: RULE_LEVELS.HARD,
+  [RULE_IDS.POST_MAX_PER_PERSON]: RULE_LEVELS.HARD
 };
 
 /**
@@ -794,7 +799,9 @@ const RULE_DEFAULT_LEVELS = {
  */
 const RULE_DEFAULT_ENABLED = {
   [RULE_IDS.ROLE_REQUIRED]: true,
-  [RULE_IDS.PERSON_POST_EXCLUDED]: true
+  [RULE_IDS.PERSON_POST_EXCLUDED]: true,
+  // 第八十五輪批次 LD 組：和 HARD_ROLE_REQUIRED 一樣預設開啟；RuleSettings 有行就照該行
+  [RULE_IDS.POST_MAX_PER_PERSON]: true
 };
 
 /**

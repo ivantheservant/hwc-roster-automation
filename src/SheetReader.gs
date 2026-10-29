@@ -240,9 +240,23 @@ function readPostsNormalized() {
       // 第十六輪批次階段 B：擔任這個崗位所需的身分（逗號分隔＝任一符合即可）。
       // 欄不存在時 row[...] 是 undefined，`splitList_()` 會得出空陣列＝沒有要求，
       // 所以未補建這一欄的舊環境完全不受影響。
-      requiredRoles: String(row[COLUMNS.POSTS.REQUIRED_ROLES] || '').trim()
+      requiredRoles: String(row[COLUMNS.POSTS.REQUIRED_ROLES] || '').trim(),
+      // 第八十五輪批次 LD 組：每人每季最多幾次；留空（或欄不存在）＝不限（null）
+      maxPerPersonPerQuarter: parsePostMaxPerPerson_(row[COLUMNS.POSTS.MAX_PER_PERSON_PER_QUARTER])
     };
   });
+}
+
+/**
+ * 第八十五輪批次 LD 組：`Posts.MaxPerPersonPerQuarter` 的值。留空／不是數字／負數 ⇒ null（不限）。
+ * @param {*} raw 原值
+ * @returns {?number}
+ */
+function parsePostMaxPerPerson_(raw) {
+  if (raw === '' || raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  if (isNaN(n) || n < 0) return null;
+  return Math.floor(n);
 }
 
 /**

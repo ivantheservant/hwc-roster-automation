@@ -41,6 +41,7 @@ function describeRuleForCommittee_(ruleId) {
   // 而呢兩條正正就係最需要解釋清楚嘅（堂委會問「點解呢個人唔見咗」）。
   map[RULE_IDS.ROLE_REQUIRED] = '某些崗位只由具備相應身分的人擔任（教會規定）';
   map[RULE_IDS.PERSON_POST_EXCLUDED] = '個別同工按教會安排暫時不擔任某些崗位';
+  map[RULE_IDS.POST_MAX_PER_PERSON] = '某些崗位每人每季最多做幾次';
   map[RULE_IDS.ROLE_POST_FOCUS] = '堂委盡量集中在指定的幾個崗位，避免負擔過重';
   return map[ruleId] || '規則檢查';
 }

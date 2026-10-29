@@ -1787,6 +1787,8 @@ function buildMyChangeRows_(context, changes, titleChanges) {
  */
 function systemFixReasonText_(ruleId, kind, personName, fallback) {
   if (kind === 'FILL_GAP') return '空格，系統填上';
+  // 第八十五輪批次 LD 組：為了填空格把這一格的人調開
+  if (kind === 'MAKE_ROOM') return '騰出人手填空格';
   if (ruleId === RULE_IDS.UNAVAILABLE) return (personName ? personName + ' ' : '') + '該日不能服侍';
   if (ruleId === RULE_IDS.NO_CONSECUTIVE) return '連續兩週';
   if (ruleId === RULE_IDS.ELIGIBILITY) return '不在這個崗位的名單上';
@@ -2003,7 +2005,7 @@ function proposeGapFills_(context, workingState) {
   const gaps = listGenuineBlankCells_(workingState, context);
 
   const proposals = [];
-  const unfillable = [];
+  let unfillable = [];
   // ⚠️ 有上限，而且**一定要講出來**。`findReplacementPerson_()` 每個候選人
   // 都會重跑一次整張表的規則檢查，幾十格 × 幾十個人就會撞爆
   // Apps Script 的六分鐘上限——而撞爆的樣子是「撳完之後什麼都沒有發生」。
@@ -2052,6 +2054,38 @@ function proposeGapFills_(context, workingState) {
       s.personId = found.personId;
     });
   });
+
+  // 第八十五輪批次 LD 組：逐格找不到人的空格，再用人手檢查的網絡補（可能要把別格的人調開）——
+  // 留空數不可以多過人手檢查算出的最少留空數。人手填的格不改。
+  if (unfillable.length > 0) {
+    let flow = { changes: [] };
+    try {
+      flow = augmentGapFillsWithStaffingFlow_(context, workingState);
+    } catch (err) {
+      log_('WARN', 'augmentGapFillsWithStaffingFlow_ 失敗，照舊逐格結果：' + err.message);
+    }
+    const filledByFlow = {};
+    flow.changes.forEach(function (ch) {
+      const post = findPostById_(context.posts, ch.postId);
+      const toName = nameOfPersonId_(context, ch.to);
+      if (!ch.from) filledByFlow[cellKey_(ch.serviceDate, ch.postId, ch.slotIndex)] = true;
+      proposals.push({
+        serviceDate: ch.serviceDate,
+        postId: ch.postId,
+        postNameTC: post ? post.postNameTC : ch.postId,
+        slotIndex: ch.slotIndex,
+        manualName: ch.from ? nameOfPersonId_(context, ch.from) : '',
+        suggestedPersonId: ch.to,
+        suggestedName: toName,
+        brokenRuleId: '',
+        kind: ch.from ? 'MAKE_ROOM' : 'FILL_GAP',
+        reason: ch.from
+          ? '為了令其他排不出的格有人，這一格改由 ' + toName + ' 做（原本的人調去填空格）。'
+          : '這一格本來排不出（⚠ 未能安排），系統把其他格的人調開之後，' + toName + ' 可以做。'
+      });
+    });
+    unfillable = unfillable.filter(function (u) { return !filledByFlow[cellKey_(u.serviceDate, u.postId, u.slotIndex)]; });
+  }
 
   return {
     proposals: proposals,

@@ -453,7 +453,10 @@ function buildRoster_(context) {
     previousWeek = weekByPost;
   }
 
-  return { assignments: assignments, warnings: warnings };
+  // 第八十五輪批次 LD 組：貪心法之後補空格——留空數不可以多過人手檢查的最少留空數
+  const result = { assignments: assignments, warnings: warnings };
+  result.blankRepair = repairRosterBlanksWithStaffingFlow_(context, result);
+  return result;
 }
 
 /**
@@ -1056,6 +1059,16 @@ function evaluateViolations_(personId, state) {
     if (clash.length > 0) {
       violations.push(makeViolation_(rules, RULE_IDS.MUTEX_GROUP,
         '本週已派同組崗位 (' + post.mutexGroup + '): ' + clash.join(',')));
+    }
+  }
+
+  // 第八十五輪批次 LD 組：Posts.MaxPerPersonPerQuarter——這一季這個崗位已達上限 ⇒ 不再排他
+  const postLimit = postMaxPerPersonOf_(rules, post);
+  if (postLimit !== null) {
+    const usedOnPost = (state.postCount || {})[personId + '|' + post.postId] || 0;
+    if (usedOnPost >= postLimit) {
+      violations.push(makeViolation_(rules, RULE_IDS.POST_MAX_PER_PERSON,
+        buildPostMaxPerPersonReason_(post, usedOnPost, postLimit)));
     }
   }
 

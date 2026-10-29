@@ -60,6 +60,8 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     // （顯示標籤、逐崗位 EmptyDisplay、逐日期 ExternalOwner）。
     gridRender: buildGridRenderContext_(quarterId, timezone, posts),
     serviceDates: readServiceDatesNormalized(quarterId, timezone),
+    // 第八十五輪批次 LD 組：特別主日跳過的崗位（人手檢查／補空格的網絡要知道哪些格本來就不設）
+    specialByDate: buildSpecialSundayByDate_(readSpecialSundays(quarterId), timezone),
     posts: posts,
     eligibility: eligibility,
     roles: roleContext.roles,
@@ -492,6 +494,31 @@ function findStateViolations_(state, context) {
       }
     }
   });
+
+  // 第八十五輪批次 LD 組：每人每季在某崗位的上限（Posts.MaxPerPersonPerQuarter）。
+  // 按日期次序數，超出上限的那幾格（第 N+1 次起）逐格報。
+  {
+    const orderOf = {};
+    orderedDates.forEach(function (d, i) { orderOf[d] = i; });
+    const byPersonPost = {};
+    state.forEach(function (cell) {
+      if (!cell.personId) return;
+      const k = cell.personId + '|' + cell.postId;
+      if (!byPersonPost[k]) byPersonPost[k] = [];
+      byPersonPost[k].push(cell);
+    });
+    Object.keys(byPersonPost).forEach(function (k) {
+      const cells = byPersonPost[k];
+      const post = postById[cells[0].postId];
+      const limit = postMaxPerPersonOf_(rules, post);
+      if (limit === null || cells.length <= limit) return;
+      cells.slice().sort(function (a, b) {
+        return ((orderOf[a.serviceDate] || 0) - (orderOf[b.serviceDate] || 0)) || (a.slotIndex - b.slotIndex);
+      }).slice(limit).forEach(function (cell) {
+        add(cell, RULE_IDS.POST_MAX_PER_PERSON, buildPostMaxPerPersonReason_(post, cells.length, limit));
+      });
+    });
+  }
 
   // 次數上限每人只回報一次，掛在該人最後一個主日的格上。
   // 若放在逐格迴圈內，一個做了 9 次的人會產生 9 項違規，把提案清單淹沒。

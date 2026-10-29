@@ -85,6 +85,8 @@ function onOpen() {
         .addItem('補建 Posts 欄位', 'runSeedPostEmptyDisplay_')
         .addItem('補建 Posts 欄位（提早到場分鐘數）', 'runSeedPostEarlyArrivalMinutes_')
         .addItem('補建 Posts 欄位（崗位身分要求）', 'runSeedPostRequiredRoles_')
+        // 第八十五輪批次 LD 組：每人每季崗位上限（HARD_POST_MAX_PER_PERSON）
+        .addItem('補建 Posts 欄位（每人每季最多幾次）', 'runSeedPostMaxPerPerson_')
         .addItem('補建身分名單工作表', 'runEnsureRoleSheets_')
         .addItem('補建排表偏好工作表', 'runEnsurePersonPostWeightSheet_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')

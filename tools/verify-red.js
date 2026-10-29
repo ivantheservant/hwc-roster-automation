@@ -8736,6 +8736,126 @@ const MUTATIONS = [
     find: "    if (roleCode) {\n      if (!ROLE_LABELS_TC[roleCode]) {",
     replace: "    if (false) {\n      if (!ROLE_LABELS_TC[roleCode]) {",
     tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "ld-gen-no-postmax",
+    why: "生成超過崗位上限",
+    file: "src/Generator.gs",
+    find: "    if (usedOnPost >= postLimit) {",
+    replace: "    if (usedOnPost >= postLimit + 99) {",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-ft-no-postmax",
+    why: "檢查改動唔認崗位上限",
+    file: "src/FineTune.gs",
+    find: "      if (limit === null || cells.length <= limit) return;",
+    replace: "      if (true) return;",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-verify-no-postmax",
+    why: "核對唔認崗位上限",
+    file: "src/Verify.gs",
+    find: "          postMaxHits.push(mk(a, RULE_IDS.POST_MAX_PER_PERSON, buildPostMaxPerPersonReason_(post, list.length, limit)));",
+    replace: "          void a;",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-flow-no-postmax",
+    why: "人手檢查唔計崗位上限",
+    file: "src/StaffingCheck.gs",
+    find: "        let from = limit !== null ? getPP(id, post, limit) : getPerson(id);",
+    replace: "        let from = getPerson(id);",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-flow-no-mutex",
+    why: "人手檢查唔計兼任",
+    file: "src/StaffingCheck.gs",
+    find: "      const useMutex = mutexOn && post.mutexGroup && !groupHasPostMax[post.mutexGroup];",
+    replace: "      const useMutex = false;",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-flow-no-qmax",
+    why: "改成HARD嘅每季上限唔計",
+    file: "src/StaffingCheck.gs",
+    find: "    if (quarterMaxHard) cap = Math.max(0, resolveAssignmentLimit_(id, ctx) - (fixedUse.person[id] || 0));",
+    replace: "    void quarterMaxHard;",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-flow-no-role-date",
+    why: "人手檢查唔按日期查身分",
+    file: "src/StaffingCheck.gs",
+    find: "    if (required.length > 0 && isRuleEnabledAllowingDefault_(rules, RULE_IDS.ROLE_REQUIRED)",
+    replace: "    if (false && isRuleEnabledAllowingDefault_(rules, RULE_IDS.ROLE_REQUIRED)",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-no-repair",
+    why: "生成冇補空格",
+    file: "src/Generator.gs",
+    find: "  result.blankRepair = repairRosterBlanksWithStaffingFlow_(context, result);",
+    replace: "  result.blankRepair = { before: 0, after: 0, changed: 0 };",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-tune-moves-manual",
+    why: "調整調開人手改嘅格",
+    file: "src/StaffingCheck.gs",
+    find: "      fixed: !!(s.isManual || s.freeText) };",
+    replace: "      fixed: false };",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-cache-no-sig",
+    why: "快取唔睇簽名",
+    file: "src/StaffingCheck.gs",
+    find: "        if (parsed.signature === sig) {",
+    replace: "        if (true) {",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-reason-unavail",
+    why: "全部不能服侍冇分類",
+    file: "src/StaffingCheck.gs",
+    find: "    if (r.UNAVAILABLE > 0 && r.ROLE === 0 && r.EXCLUDED === 0) return STAFFING_REASON.ALL_UNAVAILABLE;\n",
+    replace: "",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-text-no-advice",
+    why: "人手不足冇講點做",
+    file: "src/StaffingCheck.gs",
+    find: "      + tail + '可以：在' + n + '名單加人，或者把' + n + '的上限改高。';",
+    replace: "      + tail;",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-ui-no-short",
+    why: "開季前準備冇人手不足",
+    file: "src/ui/ScriptZone2.html",
+    find: "    if (st && !st.error && st.totalBlanks > 0) {",
+    replace: "    if (false) {",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-review-no-current",
+    why: "審閱表冇列崗位上限",
+    file: "src/RuleReview.gs",
+    find: "      return list.map(function (p) { return p.postNameTC + '：每人每季最多 ' + p.limit + ' 次'; }).join('／');",
+    replace: "      return '有生效';",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-plan-no-staffing",
+    why: "生成確認窗冇人手檢查",
+    file: "src/WebAppGenerate.gs",
+    find: "    staffing = computeStaffingCheck_(context);",
+    replace: "    staffing = { totalBlanks: 0, posts: [], notes: [] };",
+    tests: ["tests/round85_ld_staffing.test.js"]
   }
 ];
 

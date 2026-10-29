@@ -701,7 +701,17 @@ function buildDashboardState_(quarterId) {
     preQuarter = { undoneItemCount: -1, items: [], error: err.message };
   }
 
+  // 第八十五輪批次 LD 組：人手檢查（以輸入資料簽名快取）。讀不到 ⇒ error，不可以當成「足夠」。
+  let staffing = null;
+  try {
+    staffing = summariseStaffingForDashboard_(readStaffingCheck_(quarterId));
+  } catch (err) {
+    log_('WARN', 'apiGetDashboardState：人手檢查算不到：' + err.message);
+    staffing = { error: err.message, totalBlanks: 0, shortPostCount: 0, posts: [] };
+  }
+
   return {
+    staffing: staffing,
     quarterId: quarterId,
     quarterLabel: buildQuarterLabel_(quarterId),
     stage: stage,
@@ -1156,4 +1166,20 @@ function safeCountReviewers_() {
     log_('WARN', 'safeCountReviewers_ 失敗：' + err.message);
     return 0;
   }
+}
+
+/**
+ * 第八十五輪批次 LD 組：主畫面用的人手檢查摘要。
+ * @param {Object} r readStaffingCheck_() 的結果
+ * @returns {{totalBlanks: number, shortPostCount: number, posts: Object[], ms: number, cached: boolean, error: string}}
+ */
+function summariseStaffingForDashboard_(r) {
+  return {
+    totalBlanks: r.totalBlanks,
+    shortPostCount: r.posts.length,
+    posts: r.posts.map(function (p) { return { postNameTC: p.postNameTC, blanks: p.blanks }; }),
+    ms: r.ms,
+    cached: r.cached === true,
+    error: ''
+  };
 }

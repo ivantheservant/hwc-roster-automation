@@ -559,6 +559,28 @@ function checkHardRuleViolations_(context) {
     });
   });
 
+  // 第八十五輪批次 LD 組：每人每季在某崗位的上限（超出的那幾格，按日期次序）
+  const postMaxHits = [];
+  {
+    const byPersonPost = {};
+    context.assignments.forEach(function (a) {
+      if (!a.personId) return;
+      const k = a.personId + '|' + a.postId;
+      if (!byPersonPost[k]) byPersonPost[k] = [];
+      byPersonPost[k].push(a);
+    });
+    Object.keys(byPersonPost).forEach(function (k) {
+      const list = byPersonPost[k];
+      const post = postById[list[0].postId];
+      const limit = postMaxPerPersonOf_(context.rules || {}, post);
+      if (limit === null || list.length <= limit) return;
+      list.slice().sort(function (a, b) { return a.serviceDate < b.serviceDate ? -1 : (a.serviceDate > b.serviceDate ? 1 : 0); })
+        .slice(limit).forEach(function (a) {
+          postMaxHits.push(mk(a, RULE_IDS.POST_MAX_PER_PERSON, buildPostMaxPerPersonReason_(post, list.length, limit)));
+        });
+    });
+  }
+
   const groups = [
     { label: '不在這個崗位的名單上', items: notEligible },
     { label: '違反 Unavailable', items: unavailableHits },
@@ -566,7 +588,8 @@ function checkHardRuleViolations_(context) {
     { label: '第一主日限定崗位出現在其他週', items: notFirstSunday },
     { label: 'AutoGenerate=FALSE 崗位被派人', items: autoGenerateHits },
     { label: '違反身分限制（規則 1／2：報告限堂委、當值堂委限堂委或執事）', items: roleViolations },
-    { label: '違反個人崗位限制（規則 3）', items: exclusionViolations }
+    { label: '違反個人崗位限制（規則 3）', items: exclusionViolations },
+    { label: '超過每人每季崗位上限', items: postMaxHits }
   ];
   const total = groups.reduce(function (sum, g) { return sum + g.items.length; }, 0);
   // `all` 係全部項目攤平——分類函式要一次過睇晒，唔應該逐 group 各自分類

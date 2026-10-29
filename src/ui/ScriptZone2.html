@@ -78,8 +78,23 @@
       button('排表偏好', () => openWeights(), '')
     ]));
 
+    // 第八十五輪批次 LD 組：人手檢查——有問題才顯示「人手不足：N 個崗位」及〔人手檢查〕
+    const st = d && d.staffing;
+    if (st && !st.error && st.totalBlanks > 0) {
+      body.appendChild(make('div', { className: 'vio vio-hard' }, [
+        make('div', { text: staffingShortText(st), className: 'vio-head' }),
+        row([button('人手檢查', () => openStaffingCheck(), '')])
+      ]));
+    }
+
     // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
     const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
+    // 第八十五輪批次 LD 組：沒有問題就寫「人手檢查：足夠」；讀不到就照實講
+    if (st && st.error) {
+      summary.appendChild(make('div', { text: '⬜ 人手檢查：暫時查不到（' + st.error + '）', className: 'vio-row' }));
+    } else if (st && st.totalBlanks === 0) {
+      summary.appendChild(make('div', { text: '✅ 人手檢查：足夠', className: 'vio-row muted' }));
+    }
     (pq.items || []).forEach((i) => {
       summary.appendChild(make('div', {
         text: (i.count > 0 ? '⬜ ' : '✅ ') + i.label + '：' + i.count
@@ -90,6 +105,40 @@
       }));
     });
     body.appendChild(summary);
+  }
+
+  /** 第八十五輪批次 LD 組：「人手不足：N 個崗位（最少 M 格會留空）」 */
+  function staffingShortText(st) {
+    return '人手不足：' + st.shortPostCount + ' 個崗位（最少 ' + st.totalBlanks + ' 格會留空）'
+      + ((st.posts || []).length ? '——' + st.posts.map((p) => p.postNameTC).join('、') : '');
+  }
+
+  /** 第八十五輪批次 LD 組：〔人手檢查〕——逐個崗位、逐週列出原因。 */
+  function openStaffingCheck() {
+    runAction('人手檢查', async () => {
+      const r = await callServer('apiGetStaffingCheck', currentQuarterId);
+      openModal('人手檢查：' + (r.quarterLabel || currentQuarterId), staffingCheckNodes(r), [button('關閉', () => closeModal(), '')]);
+    });
+  }
+
+  /** 人手檢查的內容（生成確認窗、季前資料預覽也用同一份）。 */
+  function staffingCheckNodes(r) {
+    const nodes = [para('只計一定要遵守的規則（名單、不能服侍、身分要求、暫時不做、同週不可兼任、每人每季上限）。'
+      + '盡量遵守的規則和排表偏好不計——那些可以違反並提醒。', 'muted')];
+    if (!r || r.totalBlanks === 0) {
+      nodes.push(make('div', { text: '人手足夠：每一格都排得到人。', className: 'ok-line' }));
+    } else {
+      nodes.push(make('div', { text: '最少一定會留空 ' + r.totalBlanks + ' 格（共需要 ' + r.totalNeeded + ' 格）。', className: 'strong' }));
+      (r.posts || []).forEach((p) => {
+        const box = make('div', { className: 'sec' }, [make('div', { text: p.text, className: 'vio-head' })]);
+        (p.blankWeeks || []).forEach((w) => box.appendChild(make('div', {
+          text: humanDate(w.serviceDate) + '：' + w.blanks + ' 格（' + w.reasonText + '）', className: 'vio-row'
+        })));
+        nodes.push(box);
+      });
+    }
+    (r && r.notes || []).forEach((n) => nodes.push(para(n, 'muted')));
+    return nodes;
   }
 
   /* ============================================================
