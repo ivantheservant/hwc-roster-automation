@@ -152,7 +152,7 @@ function saveCombinedServices_(quarterId, items) {
       throw new Error(buildThreePartMessage_('「' + kind + '」不是可以選的合堂種類。', '甚麼都沒有儲存。',
         ['重新開啟〔合堂主日〕再選一次', '要加種類，在 Config 的 ' + CONFIG_KEYS.COMBINED_SERVICE_KINDS + ' 加']));
     }
-    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: kind ? String(it.name || '').trim() : '' };
+    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: kind ? String(it['name'] || '').trim() : '' };
   });
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SERVICE_DATES);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.SERVICE_DATES);

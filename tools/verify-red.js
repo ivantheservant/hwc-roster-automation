@@ -8877,8 +8877,8 @@ const MUTATIONS = [
     id: "le-name-without-kind",
     why: "冇種類都寫名稱",
     file: "src/WebAppCombined.gs",
-    find: "    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: kind ? String(it.name || '').trim() : '' };",
-    replace: "    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: String(it.name || '').trim() };",
+    find: "    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: kind ? String(it['name'] || '').trim() : '' };",
+    replace: "    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: String(it['name'] || '').trim() };",
     tests: ["tests/round85_le_combined.test.js"]
   },
   {
