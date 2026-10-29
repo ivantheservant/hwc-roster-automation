@@ -54,7 +54,14 @@ function validateEligibilityOrphans_() {
     const eligibilityId = row[COLUMNS.ELIGIBILITY.ELIGIBILITY_ID];
     const personId = row[COLUMNS.ELIGIBILITY.PERSON_ID];
     const postId = row[COLUMNS.ELIGIBILITY.POST_ID];
-    if (personId && !personIds[personId]) {
+    // 第八十五輪批次 LC 組：「堂委」「執事」（`ROLE:…`）不是人；代號認得就不算孤兒
+    const roleCode = parseEligibilityRoleToken_(personId);
+    if (roleCode) {
+      if (!ROLE_LABELS_TC[roleCode]) {
+        issues.push('Eligibility [' + eligibilityId + ']: 身分代號 "' + personId + '" 不認得（可以用：'
+          + Object.keys(ROLE_LABELS_TC).map(eligibilityRoleTokenOf_).join('、') + '）');
+      }
+    } else if (personId && !personIds[personId]) {
       issues.push('Eligibility [' + eligibilityId + ']: PersonID "' + personId + '" 在 NameMapping 中不存在');
     }
     if (postId && !postIds[postId]) {

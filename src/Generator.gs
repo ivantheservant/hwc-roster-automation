@@ -1008,6 +1008,12 @@ function evaluateViolations_(personId, state) {
     violations.push(makeViolation_(rules, RULE_IDS.UNAVAILABLE, '當事人已表明該日不能服侍'));
   }
 
+  // 第八十五輪批次 LC 組：只經「堂委」「執事」取得資格的人，要那一日仍然是那個身分
+  if (isRuleEnabled_(rules, RULE_IDS.ELIGIBILITY) && isEligibilityCheckedPost_(post)) {
+    const roleFailure = eligibilityRoleTokenFailure_(state.context, post.postId, personId, state.serviceDate.serviceDate);
+    if (roleFailure) violations.push(makeViolation_(rules, RULE_IDS.ELIGIBILITY, roleFailure));
+  }
+
   if (isRuleEnabled_(rules, RULE_IDS.DISTINCT_SLOT) && post.distinctWithinPost) {
     const already = state.weekByPost[post.postId] || [];
     if (already.indexOf(personId) !== -1) {

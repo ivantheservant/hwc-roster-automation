@@ -126,6 +126,18 @@ function apiGetEligibilityMatrix() {
     });
     people.sort(function (a, b) { return a.nameTC < b.nameTC ? -1 : 1; });
 
+    // 第八十五輪批次 LC 組：「堂委」「執事」（ROLE_LABELS_TC）排在最前，勾了就寫一行 PersonID＝`ROLE:…`；
+    // 名稱寫「堂委（現任 6 位：甲、乙……）」（以今日為準）。
+    const display = readRolesForDisplay_(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+    const todayStr = display.today;
+    const roles = display.roles;
+    const nameById = {};
+    people.forEach(function (p) { nameById[p.personId] = p.nameTC; });
+    const rolePeople = Object.keys(ROLE_LABELS_TC).map(function (code) {
+      return { personId: eligibilityRoleTokenOf_(code), nameTC: describeEligibilityRoleToken_(code, roles, nameById, todayStr),
+        nameEN: '', active: true, isRole: true, roleCode: code };
+    });
+
     // 格內容：`PersonID|PostID` → {eligible, historicalCount}
     const cells = {};
     readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
@@ -142,19 +154,26 @@ function apiGetEligibilityMatrix() {
     });
 
     // ⚠️ 統計一律喺**完整資料**上面計，唔理前端點樣分頁過濾。
-    const perPost = {};
-    posts.forEach(function (p) { perPost[p.postId] = 0; });
+    // 第八十五輪批次 LC 組：合資格人數按今日展開（名字＋現任），同一人只計一次。
+    const perPostIds = {};
+    posts.forEach(function (p) { perPostIds[p.postId] = {}; });
     const perPerson = {};
-    people.forEach(function (person) {
+    people.concat(rolePeople).forEach(function (person) {
       perPerson[person.personId] = 0;
       posts.forEach(function (p) {
         const c = cells[person.personId + '|' + p.postId];
         if (c && c.eligible) {
           perPerson[person.personId]++;
-          perPost[p.postId]++;
+          if (person.isRole) {
+            roleHoldersOn_(roles || [], person.roleCode, todayStr).forEach(function (id) { perPostIds[p.postId][id] = true; });
+          } else {
+            perPostIds[p.postId][person.personId] = true;
+          }
         }
       });
     });
+    const perPost = {};
+    posts.forEach(function (p) { perPost[p.postId] = Object.keys(perPostIds[p.postId]).length; });
 
     return {
       posts: posts.map(function (p) {
@@ -167,12 +186,13 @@ function apiGetEligibilityMatrix() {
           thin: p.autoAssigned && perPost[p.postId] < ELIGIBILITY_THIN_THRESHOLD
         };
       }),
-      people: people.map(function (person) {
+      people: rolePeople.concat(people).map(function (person) {
         return {
           personId: person.personId,
           nameTC: person.nameTC,
           nameEN: person.nameEN,
           active: person.active,
+          isRole: person.isRole === true,
           postCount: perPerson[person.personId]
         };
       }),

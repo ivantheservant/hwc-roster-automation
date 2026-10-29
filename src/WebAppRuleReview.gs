@@ -292,8 +292,30 @@ function buildRuleReviewContext_() {
     log_('WARN', '規則審閱表讀不到「暫時不做某崗位」：' + err.message);
   }
 
+  // 第八十五輪批次 LC 組：崗位名單上寫「堂委」「執事」的崗位（以今日的現任展開顯示）
+  const eligibilityRolePosts = [];
+  try {
+    const eligibility = readEligibility();
+    const rolesByPost = eligibility.rolesByPost || {};
+    if (Object.keys(rolesByPost).length > 0) {
+      const display = readRolesForDisplay_(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+      const nameById = readPersonNameIndex_();
+      Object.keys(rolesByPost).sort().forEach(function (postId) {
+        eligibilityRolePosts.push({
+          postNameTC: postNameById[postId] || postId,
+          text: rolesByPost[postId].map(function (code) {
+            return describeEligibilityRoleToken_(code, display.roles, nameById, display.today);
+          }).join('、')
+        });
+      });
+    }
+  } catch (err) {
+    log_('WARN', '規則審閱表讀不到崗位名單上的身分：' + err.message);
+  }
+
   return {
     exclusionCurrentCount: exclusionCurrentCount,
+    eligibilityRolePosts: eligibilityRolePosts,
     // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然
     // 回一個純字串陣列（停用嘅標返「（已停用）」），令舊呼叫端唔使改。
     mutexGroups: Object.keys(mutexByGroup).sort().map(function (g) {

@@ -163,12 +163,32 @@ function readEligibility() {
   const byPerson = {};
   const historicalCount = {};
   const explicitlyExcluded = {};
+  // 第八十五輪批次 LC 組：崗位名單上的「堂委」「執事」（PersonID＝`ROLE:…`）另外存，
+  // 不放入 byPost／byPerson（那兩個只有真人）；展開由 `buildRoleContext_()` 按 Roles 做。
+  const rolesByPost = {};
+  // 第八十五輪批次 LC 組：全部行（包括 Active=FALSE）的歷史次數——名字被「堂委」取代之後，
+  // 那一行停用了，但經身分加入的人要沿用這個數（見 EligibilityRoles.gs）。
+  const historicalCountAll = {};
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
+    const rawPersonId = row[COLUMNS.ELIGIBILITY.PERSON_ID];
+    const rawPostId = row[COLUMNS.ELIGIBILITY.POST_ID];
+    const roleCode = parseEligibilityRoleToken_(rawPersonId);
+    if (rawPersonId && rawPostId && !roleCode) {
+      const n = Number(row[COLUMNS.ELIGIBILITY.HISTORICAL_COUNT]) || 0;
+      if (!historicalCountAll[rawPostId]) historicalCountAll[rawPostId] = {};
+      historicalCountAll[rawPostId][rawPersonId] = Math.max(historicalCountAll[rawPostId][rawPersonId] || 0, n);
+    }
     if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ACTIVE])) continue;
-    const personId = row[COLUMNS.ELIGIBILITY.PERSON_ID];
-    const postId = row[COLUMNS.ELIGIBILITY.POST_ID];
+    const personId = rawPersonId;
+    const postId = rawPostId;
     if (!personId || !postId) continue;
+    if (roleCode) {
+      if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ELIGIBLE])) continue;
+      if (!rolesByPost[postId]) rolesByPost[postId] = [];
+      if (rolesByPost[postId].indexOf(roleCode) === -1) rolesByPost[postId].push(roleCode);
+      continue;
+    }
 
     // 第十六輪批次階段 B 新增：`Active=TRUE` 但 `Eligible=FALSE` 的行，語意是
     // 幹事**明確**寫低「呢個人唔好排呢個崗位」，跟「根本沒有這一行」（從來
@@ -193,7 +213,9 @@ function readEligibility() {
     byPost: byPost,
     byPerson: byPerson,
     historicalCount: historicalCount,
-    explicitlyExcluded: explicitlyExcluded
+    explicitlyExcluded: explicitlyExcluded,
+    rolesByPost: rolesByPost,
+    historicalCountAll: historicalCountAll
   };
 }
 

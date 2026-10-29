@@ -70,11 +70,19 @@ function apiGetPersonPostWeightMatrix(quarterId) {
 
     // 「有資格」＝ Eligibility 有一行而且 Eligible／Active 都 TRUE。
     const eligibleByPost = {};
+    // 第八十五輪批次 LC 組：名單上的「堂委」「執事」（PersonID＝`ROLE:…`）按參考日期展開成現任的人
+    const roleTokensByPost = {};
     readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
       const personId = String(row[E.PERSON_ID] || '').trim();
       const postId = String(row[E.POST_ID] || '').trim();
       if (!personId || !postId) return;
       if (!isTrueValue_(row[E.ELIGIBLE]) || !isTrueValue_(row[E.ACTIVE])) return;
+      const roleCode = parseEligibilityRoleToken_(personId);
+      if (roleCode) {
+        if (!roleTokensByPost[postId]) roleTokensByPost[postId] = [];
+        roleTokensByPost[postId].push(roleCode);
+        return;
+      }
       if (!eligibleByPost[postId]) eligibleByPost[postId] = [];
       eligibleByPost[postId].push(personId);
     });
@@ -83,6 +91,21 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     // 冇季度資料先退回今日。
     const scope = resolveWeightQuarterScope_(quarterId, timezone);
     const referenceDate = scope ? scope.startDate : today;
+    if (Object.keys(roleTokensByPost).length > 0) {
+      const roles = readRolesSafe_(timezone);
+      Object.keys(roleTokensByPost).forEach(function (postId) {
+        const have = {};
+        (eligibleByPost[postId] || []).forEach(function (id) { have[id] = true; });
+        roleTokensByPost[postId].forEach(function (code) {
+          roleHoldersOn_(roles, code, referenceDate).forEach(function (id) {
+            if (have[id]) return;
+            have[id] = true;
+            if (!eligibleByPost[postId]) eligibleByPost[postId] = [];
+            eligibleByPost[postId].push(id);
+          });
+        });
+      });
+    }
     const active = readActivePersonPostWeights_(referenceDate, timezone);
 
     // 全部偏好行（含已解除嘅），供畫面顯示「以前改過乜」

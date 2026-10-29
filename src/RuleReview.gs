@@ -423,6 +423,15 @@ function ruleReviewPlainEntry_(ruleId) {
   table[RULE_IDS.ELIGIBILITY] = {
     text: '只安排做過那個崗位的人',
     what: '系統只會安排「以前做過這個崗位」的人。新人一定要先在「崗位資格」加，系統不會自己擴充。'
+      + '名單上也可以寫「堂委」「執事」：每一個主日當日的現任都可以排。',
+    // 第八十五輪批次 LC 組：名單上寫身分的崗位逐個列出（按今日的現任展開）
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      const list = (ctx && ctx.eligibilityRolePosts) || [];
+      if (list.length === 0) return '有生效';
+      return '有生效；名單上寫身分的崗位：'
+        + list.map(function (p) { return p.postNameTC + '：' + p.text; }).join('／');
+    }
   };
   table[RULE_IDS.DISTINCT_SLOT] = {
     text: '同一天同一個崗位不會排到同一個人兩次',

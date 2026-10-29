@@ -662,8 +662,10 @@
         label.appendChild(make('span', {
           text: person.nameTC + (person.active ? '' : '（已停用）')
         }));
+        // 第八十五輪批次 LC 組：「堂委」「執事」那幾行是身分，不是一個人——按每個主日當日的現任展開
         label.appendChild(make('span', {
-          text: cell.historicalCount > 0 ? '做過 ' + cell.historicalCount + ' 次' : '未做過',
+          text: person.isRole ? '身分：每個主日按當日現任展開'
+            : (cell.historicalCount > 0 ? '做過 ' + cell.historicalCount + ' 次' : '未做過'),
           className: 'muted'
         }));
         label.appendChild(make('span', {

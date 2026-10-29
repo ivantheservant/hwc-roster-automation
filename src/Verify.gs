@@ -493,6 +493,10 @@ function checkHardRuleViolations_(context) {
     // 第七十三輪批次 BB 組：人手填嘅崗位（AutoGenerate=FALSE）唔查名單——見 `isEligibilityCheckedPost_()`
     if (isEligibilityCheckedPost_(post) && pool.indexOf(a.personId) === -1) {
       notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, '不在這個崗位的名單上'));
+    } else if (isEligibilityCheckedPost_(post)) {
+      // 第八十五輪批次 LC 組：只經「堂委」「執事」取得資格 ⇒ 那一日要仍然是那個身分
+      const roleFailure = eligibilityRoleTokenFailure_(context, a.postId, a.personId, a.serviceDate);
+      if (roleFailure) notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, roleFailure));
     }
 
     if (post) {

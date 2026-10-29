@@ -317,10 +317,26 @@ function buildRoleAugmentedEligibleByPost_(eligibility, posts, roles) {
  */
 function buildRoleContext_(eligibility, posts, timezone) {
   const roles = readRolesSafe_(timezone);
+  const eligibleByPost = buildRoleAugmentedEligibleByPost_(eligibility, posts, roles);
+  // 第八十五輪批次 LC 組：崗位名單上的「堂委」「執事」——候選池加入（超集），
+  // 並就地補上 `eligibility.roleOnlyByPost`（逐格逐日檢查用）和沿用的歷史次數。
+  const expansion = buildEligibilityRoleExpansion_(eligibility, roles);
+  Object.keys(expansion.addByPost).forEach(function (postId) {
+    const existing = {};
+    (eligibleByPost[postId] || []).forEach(function (id) { existing[id] = true; });
+    expansion.addByPost[postId].forEach(function (id) {
+      if (existing[id]) return;
+      if (!eligibleByPost[postId]) eligibleByPost[postId] = [];
+      eligibleByPost[postId].push(id);
+    });
+  });
+  eligibility.roleOnlyByPost = expansion.roleOnlyByPost;
+  carryHistoricalCountForRoleExpansion_(eligibility, expansion.roleOnlyByPost);
   return {
     roles: roles,
     exclusions: readPersonPostExclusionsSafe_(timezone),
-    eligibleByPost: buildRoleAugmentedEligibleByPost_(eligibility, posts, roles)
+    eligibleByPost: eligibleByPost,
+    roleOnlyByPost: expansion.roleOnlyByPost
   };
 }
 

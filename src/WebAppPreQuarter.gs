@@ -326,8 +326,11 @@ function buildPreQuarterPeopleHintInputs_(quarterId, baseInputs) {
 
   const eligibility = readEligibility();
   const eligibleCountByPost = {};
-  Object.keys(eligibility.byPost || {}).forEach(function (postId) {
-    eligibleCountByPost[postId] = (eligibility.byPost[postId] || []).length;
+  // 第八十五輪批次 LC 組：名單上的「堂委」「執事」按季度開始日的現任展開
+  const rolesForCount = Object.keys(eligibility.rolesByPost || {}).length > 0
+    ? (readRolesForDisplay_(baseInputs.timezone).roles || []) : [];
+  Object.keys(eligibility.byPost || {}).concat(Object.keys(eligibility.rolesByPost || {})).forEach(function (postId) {
+    eligibleCountByPost[postId] = expandEligibilityOnDate_(eligibility, rolesForCount, postId, quarterStartDate).length;
   });
 
   // 第二十八輪批次階段 C2：電郵格式檢查要看**全部在職嘅人**，唔止本季表上嗰批。

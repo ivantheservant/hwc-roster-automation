@@ -442,6 +442,10 @@ function findStateViolations_(state, context) {
       if (pool.indexOf(cell.personId) === -1) {
         // 第七十輪批次 AY 組：畫面文字唔用內部表名
         add(cell, RULE_IDS.ELIGIBILITY, '不在這個崗位的名單上');
+      } else {
+        // 第八十五輪批次 LC 組：只經「堂委」「執事」取得資格 ⇒ 那一日要仍然是那個身分
+        const roleFailure = eligibilityRoleTokenFailure_(context, cell.postId, cell.personId, cell.serviceDate);
+        if (roleFailure) add(cell, RULE_IDS.ELIGIBILITY, roleFailure);
       }
     }
     if (isRuleEnabled_(rules, RULE_IDS.UNAVAILABLE)

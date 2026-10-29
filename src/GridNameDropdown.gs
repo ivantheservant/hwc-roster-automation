@@ -103,6 +103,12 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
     nameById[id] = String(row[N.NAME_TC] || '').trim();
   });
 
+  // 第八十五輪批次 LC 組：名單上的「堂委」「執事」——選單列出曾經或現任該身分的人（候選池超集；
+  // 某一日已不是那個身分，儲存時由 HARD_ELIGIBILITY 逐日檢查）。
+  const roleTokensByPost = eligibility.rolesByPost || {};
+  const rolesForDropdown = Object.keys(roleTokensByPost).length > 0
+    ? (readRolesForDisplay_(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)).roles || []) : [];
+
   const columns = [];
   const skipped = [];
 
@@ -118,7 +124,7 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
       // 但 `setAllowInvalid(true)` ⇒ 打名單以外嘅名（外請講員）只出警告、唔拒絕，系統照收。
       const isManualPost = post.autoGenerate === false;
 
-      const names = (eligibility.byPost[postId] || [])
+      const names = expandEligibilityOnDate_(eligibility, rolesForDropdown, postId, '')
         .map(function (pid) { return nameById[pid]; })
         .filter(function (n) { return !!n; })
         .sort();

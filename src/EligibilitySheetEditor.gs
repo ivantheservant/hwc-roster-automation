@@ -146,7 +146,10 @@ function buildEligibilitySheet_() {
       .map(function (pid) { return nameById[pid] || ''; })
       .filter(function (n) { return n !== ''; })
       .sort();
-    return { post: post, names: names };
+    // 第八十五輪批次 LC 組：「堂委」「執事」排在名字前面，用中文標籤（輸入時同樣認得）
+    const roleLabels = ((eligibility.rolesByPost || {})[post.postId] || [])
+      .map(function (code) { return ROLE_LABELS_TC[code] || code; }).sort();
+    return { post: post, names: roleLabels.concat(names) };
   });
 
   const maxRows = columns.reduce(function (m, c) { return Math.max(m, c.names.length); }, 0);
@@ -253,6 +256,9 @@ function planEligibilitySheetApply_(quarterId) {
     values.forEach(function (rowValues, r) {
       const text = String(rowValues[c] || '').trim();
       if (!text) return;
+      // 第八十五輪批次 LC 組：「堂委」「執事」（ROLE_LABELS_TC 的標籤）不是「認不出的名字」
+      const roleCode = resolveEligibilityRoleLabel_(text);
+      if (roleCode) { wanted[postId][eligibilityRoleTokenOf_(roleCode)] = true; return; }
       const personId = resolvePersonId(text);
       if (!personId) {
         unresolved.push({
@@ -276,12 +282,15 @@ function planEligibilitySheetApply_(quarterId) {
     const id = String(row[N.PERSON_ID] || '').trim();
     if (id) nameById[id] = String(row[N.NAME_TC] || '').trim();
   });
+  // 第八十五輪批次 LC 組：身分代號顯示成「堂委（現任 6 位：甲、乙……）」（以今日為準）
+  const tz = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  describeEligibilityRoleTokensInto_(nameById, wanted, current, tz);
 
   const added = [];
   const removed = [];
   Object.keys(wanted).forEach(function (postId) {
     const before = {};
-    (current.byPost[postId] || []).forEach(function (pid) { before[pid] = true; });
+    eligibilityEntriesOfPost_(current, postId).forEach(function (pid) { before[pid] = true; });
     Object.keys(wanted[postId]).forEach(function (pid) {
       if (!before[pid]) {
         added.push({ postId: postId, postNameTC: postNameById[postId], personId: pid,
@@ -308,7 +317,6 @@ function planEligibilitySheetApply_(quarterId) {
   const assignedNow = {};
   const assignedDates = {};
   const versionNo = findLatestVersionNo(quarterId);
-  const tz = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   if (versionNo >= 0) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
@@ -527,4 +535,26 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
         ? ('按你的勾選略過了 ' + pick.skipped.length + ' 項，那幾項一格都沒有動。')
         : '')
   };
+}
+
+/**
+ * 第八十五輪批次 LC 組：預覽有身分代號（「堂委」「執事」）時，把它們的顯示名寫入 nameById
+ * （「堂委（現任 6 位：甲、乙……）」，以今日為準）。讀不到身分名單 ⇒ 只寫標籤，不擋預覽。
+ * @param {Object.<string, string>} nameById 會就地加入
+ * @param {Object} wanted 名單工作表上的 {postId: {id: true}}
+ * @param {Object} current `readEligibility()` 的結果
+ * @param {string} tz 時區
+ */
+function describeEligibilityRoleTokensInto_(nameById, wanted, current, tz) {
+  const tokens = {};
+  Object.keys(wanted).forEach(function (postId) {
+    Object.keys(wanted[postId]).forEach(function (id) { if (parseEligibilityRoleToken_(id)) tokens[id] = true; });
+    eligibilityEntriesOfPost_(current, postId).forEach(function (id) { if (parseEligibilityRoleToken_(id)) tokens[id] = true; });
+  });
+  const list = Object.keys(tokens);
+  if (list.length === 0) return;
+  const display = readRolesForDisplay_(tz);
+  list.forEach(function (token) {
+    nameById[token] = describeEligibilityRoleToken_(parseEligibilityRoleToken_(token), display.roles, nameById, display.today);
+  });
 }

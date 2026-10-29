@@ -910,10 +910,11 @@ const MUTATIONS = [
       + '——幹事喺中間留一行空白，下面嗰批人就會被靜靜移走，'
       + '而畫面上完全睇唔出（Ivan 問過兩次嘅正正就係呢件事）',
     file: 'src/EligibilitySheetEditor.gs',
-    find: '      if (!text) return;\n      const personId = resolvePersonId(text);',
+    // 第八十五輪批次 LC 組：中間多了「堂委」「執事」那兩行，find 跟從
+    find: '      if (!text) return;\n      // 第八十五輪批次 LC 組：「堂委」「執事」',
     replace: '      if (!text) { wanted[postId]._stop = true; return; }\n'
       + '      if (wanted[postId]._stop) return;\n'
-      + '      const personId = resolvePersonId(text);',
+      + '      // 第八十五輪批次 LC 組：「堂委」「執事」',
     tests: ['tests/eligibility_sheet_safety.test.js']
   },
   {
@@ -8647,6 +8648,94 @@ const MUTATIONS = [
     find: "      nodes.push(sectionTitle('會保留（人手加入）'));\n",
     replace: "",
     tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lc-token-as-person",
+    why: "身分代號當成真人",
+    file: "src/SheetReader.gs",
+    find: "    if (roleCode) {\n      if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ELIGIBLE])) continue;",
+    replace: "    if (false) {\n      if (!isTrueValue_(row[COLUMNS.ELIGIBILITY.ELIGIBLE])) continue;",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-no-expand",
+    why: "堂委冇展開成現任",
+    file: "src/Roles.gs",
+    find: "  Object.keys(expansion.addByPost).forEach(function (postId) {",
+    replace: "  Object.keys({}).forEach(function (postId) {",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-no-date-check",
+    why: "卸任堂委照排",
+    file: "src/EligibilityRoles.gs",
+    find: "  if (personHasAnyRoleOn_((context && context.roles) || [], personId, only, dateStr)) return '';",
+    replace: "  if (true) return '';",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-gen-no-check",
+    why: "生成冇逐日查身分",
+    file: "src/Generator.gs",
+    find: "    if (roleFailure) violations.push(makeViolation_(rules, RULE_IDS.ELIGIBILITY, roleFailure));",
+    replace: "    void roleFailure;",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-verify-no-check",
+    why: "核對冇認已不是堂委",
+    file: "src/Verify.gs",
+    find: "      if (roleFailure) notEligible.push(mk(a, RULE_IDS.ELIGIBILITY, roleFailure));",
+    replace: "      void roleFailure;",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-explicit-dup",
+    why: "名字同身分重複計",
+    file: "src/EligibilityRoles.gs",
+    find: "        if (explicit[personId] || postExcluded[personId]) return;",
+    replace: "        if (postExcluded[personId]) return;",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-history-zero",
+    why: "名字換成堂委後歷史變零",
+    file: "src/Roles.gs",
+    find: "  carryHistoricalCountForRoleExpansion_(eligibility, expansion.roleOnlyByPost);\n",
+    replace: "",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-sheet-unresolved",
+    why: "名單打堂委當認唔出",
+    file: "src/EligibilitySheetEditor.gs",
+    find: "      if (roleCode) { wanted[postId][eligibilityRoleTokenOf_(roleCode)] = true; return; }",
+    replace: "      void roleCode;",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-weight-no-holders",
+    why: "偏好畫面冇列現任堂委",
+    file: "src/WebAppWeightEdit.gs",
+    find: "    if (Object.keys(roleTokensByPost).length > 0) {\n      const roles = readRolesSafe_(timezone);",
+    replace: "    if (false) {\n      const roles = readRolesSafe_(timezone);",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-matrix-no-role",
+    why: "資格畫面冇身分行",
+    file: "src/WebAppEligibility.gs",
+    find: "      people: rolePeople.concat(people).map(function (person) {",
+    replace: "      people: people.map(function (person) {",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
+  },
+  {
+    id: "lc-validate-orphan",
+    why: "驗證當身分代號孤兒",
+    file: "src/Validate.gs",
+    find: "    if (roleCode) {\n      if (!ROLE_LABELS_TC[roleCode]) {",
+    replace: "    if (false) {\n      if (!ROLE_LABELS_TC[roleCode]) {",
+    tests: ["tests/round85_lc_role_eligibility.test.js"]
   }
 ];
 

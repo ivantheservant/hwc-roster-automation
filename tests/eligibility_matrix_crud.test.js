@@ -104,8 +104,9 @@ console.log('\n=== E3【核心】統計喺完整資料上面計，唔跟前端�
   // （字碼順序對中文名嚟講唔係「筆劃」亦唔係「拼音」，只係一個穩定嘅
   // 確定次序。幹事實際上會用搜尋格搵人，所以本輪冇再花功夫做中文排序，
   // 呢個限制記咗喺 docs/系統範圍稽核.md。）
+  // 第八十五輪批次 LC 組（刻意改動）：people 最前面多了「堂委」「執事」等身分行（isRole），這裏只比真人
   checkEqual('★★★★ 每個人嘅 postCount 亦然',
-    m.people.map(function (p) { return p.personId + '=' + p.postCount; }).sort(),
+    m.people.filter(function (p) { return !p.isRole; }).map(function (p) { return p.personId + '=' + p.postCount; }).sort(),
     ['P9001=1', 'P9002=0']);
 
   const thin = m.posts.filter(function (p) { return p.thin; });
