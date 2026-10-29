@@ -9,7 +9,7 @@
 //   LD6　規則審閱表「一定要遵守」列出（逐個崗位／沒有設定）；生成確認窗資料；主畫面摘要＋快取
 //   LD7　〔請系統幫我調整〕：逐格找不到人時用網絡補（MAKE_ROOM）
 //   LD8　速度：90 人 × 16 崗位 × 13 週
-// 下面用假資料（P0xx），不涉及真實姓名。
+// 下面用假資料（P9xxx），不涉及真實姓名。
 
 const { loadGasSource } = require('./helpers/gas_loader.js');
 const { buildRound75Scene } = require('./helpers/round75_harness.js');
@@ -52,7 +52,7 @@ function ctxOf(o) {
     }, o.rules || {}), maxPerQuarterDefault: 8
   };
 }
-const P = (n) => Array.from({ length: n }, (_, i) => 'P' + String(i + 1).padStart(3, '0'));
+const P = (n) => Array.from({ length: n }, (_, i) => 'P9' + String(i + 1).padStart(3, '0'));
 
 console.log('\n=== LD1：讀經 5 人、上限 1、13 週 ===');
 {
@@ -84,8 +84,8 @@ console.log('\n=== LD2：新硬規則 ===');
   const counts = {};
   filled.forEach((a) => { counts[a.personId] = (counts[a.personId] || 0) + 1; });
   check('★★★★★★ 生成：5 週有人、8 週留空；每人最多 1 次', filled.length === 5 && Object.values(counts).every((n) => n === 1), JSON.stringify(counts));
-  const state = [{ serviceDate: ctx.serviceDates[0].serviceDate, postId: 'READ', slotIndex: 1, personId: 'P001' },
-    { serviceDate: ctx.serviceDates[1].serviceDate, postId: 'READ', slotIndex: 1, personId: 'P001' }];
+  const state = [{ serviceDate: ctx.serviceDates[0].serviceDate, postId: 'READ', slotIndex: 1, personId: 'P9001' },
+    { serviceDate: ctx.serviceDates[1].serviceDate, postId: 'READ', slotIndex: 1, personId: 'P9001' }];
   const v = gas.findStateViolations_(state, ctx).filter((x) => x.ruleId === 'HARD_POST_MAX_PER_PERSON');
   check('★★★★★★ 檢查我的改動／儲存：第 2 次那一格違反（第 1 次不算）',
     v.length === 1 && v[0].serviceDate === ctx.serviceDates[1].serviceDate && /讀經每人每季最多 1 次/.test(v[0].reason), JSON.stringify(v));
