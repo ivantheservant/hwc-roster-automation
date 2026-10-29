@@ -214,7 +214,7 @@ console.log('\n=== A3【核心】原地打轉 ⇒ 停手，唔好跑足 50 步 =
     box.report.ranSteps <= 6, '跑咗 ' + box.report.ranSteps + ' 步');
   check('★★★★★★ 而且報告帶住 `spinning`',
     !!box.report.spinning, JSON.stringify(box.report.spinning));
-  checkEqual('★★★★★★ 講得出係邊個動作',
+  checkEqual('★★★★★★ 說得出係邊個動作',
     box.report.spinning && box.report.spinning.actionId, '改 grid 幾格');
   checkEqual('★★★★★ 連續步數係 5', box.report.spinning
     && box.report.spinning.steps, 5);
@@ -234,7 +234,7 @@ console.log('\n=== A3【核心】原地打轉 ⇒ 停手，唔好跑足 50 步 =
     + '——排喺失敗清單前面：佢係「點解跑到一半就停」嘅答案',
     /⛔ 偵測到原地打轉，已停止。/.test(lines), lines.slice(0, 700));
   check('★★★★★ 而且印埋完整重現路徑同種子',
-    /完整重現路徑：/.test(lines) && /用同一個種子（7）重跑會走同一條路/.test(lines),
+    /完整重現路徑：/.test(lines) && /用同一個種子（7）重新執行會走同一條路/.test(lines),
     lines.slice(0, 900));
 }
 
@@ -259,7 +259,7 @@ console.log('\n=== A3【核心】狀態有郁 ⇒ 唔算打轉，照跑 ===');
       }];
     }
   });
-  checkEqual('★★★★★★ 跑足 12 步'
+  checkEqual('★★★★★★ 執行足 12 步'
     + '——每一步版本號都加一，係真進度，唔可以當打轉',
     box.report.ranSteps, 12);
   checkEqual('★★★★★ 冇 `spinning`', box.report.spinning, null);
@@ -284,7 +284,7 @@ console.log('\n=== A3 同一個動作但狀態有郁 ⇒ 一樣唔算打轉 ==='
         run: function () { return {}; } }];
     }
   });
-  checkEqual('★★★★★★ 跑足 12 步——狀態每幾步就郁一次，唔係打轉',
+  checkEqual('★★★★★★ 執行足 12 步——狀態每幾步就郁一次，唔係打轉',
     box.report.ranSteps, 12);
 }
 
@@ -336,12 +336,12 @@ console.log('\n=== A2【核心】「寫一格認不出的名字」自己收拾 =
   };
 
   const action = gas.monkeyActions_().filter(function (a) {
-    return a.id === '寫一格認不出的名字（即刻改回）';
+    return a.id === '寫一格認不出的名字（立即改回）';
   })[0];
   check('★★★★★★ 呢個動作存在', !!action, '');
   const result = action.run('2028T3', function () { return 0.5; });
 
-  checkEqual('★★★★★★ **寫完即刻改回原值**'
+  checkEqual('★★★★★★ **寫完立即改回原值**'
     + '——唔收拾嘅話就等於種一個坑：'
     + '下一步開始系統乜都唔准做，而亂行機會困喺入面',
     writes.join(' → '), '一個系統認不出的名字 → 假甲乙');
@@ -359,7 +359,7 @@ console.log('\n=== A2 冇擋住 ⇒ 要報（嗰個係系統最嚴厲嗰道閘�
 {
   const gas = loadGasSource(FILES);
   const action = gas.monkeyActions_().filter(function (a) {
-    return a.id === '寫一格認不出的名字（即刻改回）';
+    return a.id === '寫一格認不出的名字（立即改回）';
   })[0];
   const complaint = action.expect(
     { wrote: true, reverted: true, blockReason: '', cell: 'x', originalName: '假甲乙' },
@@ -383,7 +383,7 @@ console.log('\n=== A2 權重要明顯細過一般動作 ===');
 {
   const gas = loadGasSource(FILES);
   const rare = gas.monkeyActions_().filter(function (a) {
-    return a.id === '寫一格認不出的名字（即刻改回）';
+    return a.id === '寫一格認不出的名字（立即改回）';
   })[0];
   check('★★★★★★ 佢有明確權重，而且細過預設'
     + '——呢類「順手探一探」嘅動作經常做會蓋過其餘動作嘅覆蓋率。'
@@ -391,7 +391,7 @@ console.log('\n=== A2 權重要明顯細過一般動作 ===');
     Number(rare.weight) > 0 && Number(rare.weight) < gas.MONKEY_DEFAULT_WEIGHT,
     'weight=' + rare.weight + '　default=' + gas.MONKEY_DEFAULT_WEIGHT);
   const others = gas.monkeyActions_().filter(function (a) {
-    return a.id !== '寫一格認不出的名字（即刻改回）';
+    return a.id !== '寫一格認不出的名字（立即改回）';
   });
   check('★★★★★ 其餘動作冇寫權重（用預設）'
     + '——加新動作嘅人唔使諗權重',

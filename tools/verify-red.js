@@ -456,7 +456,7 @@ const MUTATIONS = [
     file: 'src/ui/ScriptSendPaper.html',
     // ⚠️ 第四十六輪批次 A 組拆走咗「自己選擇」嗰個收件範圍選項
     //（收件人一律由幹事勾）。呢一條守嘅嘢冇變：畫面唔可以有「揀」。
-    find: '撳〔選擇收件人〕選好再撳一次。',
+    find: '按〔選擇收件人〕選好再按一次。',
     replace: '撳〔選擇收件人〕揀好再撳一次。',
     tests: ['tests/operator_wording.test.js']
   },
@@ -475,7 +475,7 @@ const MUTATIONS = [
     why: '把後端嘅機器標記一齊改埋'
       + '——前端拆唔到三段，會退返去顯示原文，而三段式訊息係整套錯誤處理嘅基礎',
     file: 'src/WebAppGuards.gs',
-    find: "  return '發生了什麼：' + whatHappened + '\\n'",
+    find: "  return '發生了甚麼：' + whatHappened + '\\n'",
     replace: "  return '要留意：' + whatHappened + '\\n'",
     tests: ['tests/operator_wording.test.js']
   },
@@ -615,11 +615,11 @@ const MUTATIONS = [
   },
   {
     id: 'flow-marker-leaks',
-    why: '把步卡嗰一句還原成唔剝走「發生了什麼：」'
+    why: '把步卡嗰一句還原成唔剝走「發生了甚麼：」'
       + '——嗰句講嘅係「呢一季仲未到生成日期」，根本冇嘢發生過，'
       + '而幹事見到嗰五個字會即刻以為系統壞咗',
     file: 'src/ui/ScriptMainFlow.html',
-    find: "    return String(text || '').split('\\n')[0].replace(/^發生了什麼：\\s*/, '');",
+    find: "    return String(text || '').split('\\n')[0].replace(/^發生了甚麼：\\s*/, '');",
     replace: "    return String(text || '').split('\\n')[0];",
     tests: ['tests/save_feedback_and_step1.test.js']
   },
@@ -1235,7 +1235,7 @@ const MUTATIONS = [
       + '——工具會報「已經標咗未確認」，而張表上面係空白。'
       + '報告講一件事、資料係另一件事，係最難查嗰種錯',
     file: 'src/AnnualCombined.gs',
-    find: '      if (col <= 0) {\n        throw new Error(buildThreePartMessage_(\n          \'「\' + SHEETS.SPECIAL_SUNDAYS + \'」這一張工作表沒有「\' + key + \'」這一欄，\'\n            + \'所以這一次要寫進去的內容寫不了。\',\n          \'什麼都沒有寫入——這一次的年度合堂建議整批停下來了。\',\n          [\'去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄\',\n            \'補完之後再撳一次這個工具\',\n            \'⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料\']));\n      }\n',
+    find: '      if (col <= 0) {\n        throw new Error(buildThreePartMessage_(\n          \'「\' + SHEETS.SPECIAL_SUNDAYS + \'」這一張工作表沒有「\' + key + \'」這一欄，\'\n            + \'所以這一次要寫進去的內容寫不了。\',\n          \'甚麼都沒有寫入——這一次的年度合堂建議整批停下來了。\',\n          [\'去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄\',\n            \'補完之後再按一次這個工具\',\n            \'⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料\']));\n      }\n',
     replace: '      if (col <= 0) return;\n',
     tests: ['tests/special_sundays_schema.test.js']
   },
@@ -1750,10 +1750,10 @@ const MUTATIONS = [
   },
   {
     id: 'mk-no-path-in-report',
-    why: '報告唔印「走到這裡的完整步驟」'
+    why: '報告唔印「走到這裏的完整步驟」'
       + '——紅咗都重現唔到，而一個重現唔到嘅 bug 報告等於冇',
     file: 'src/MonkeyRun.gs',
-    find: "    lines.push('　 走到這裡的完整步驟：' + (f.path.join(' → ') || '（第一步）'));",
+    find: "    lines.push('　 走到這裏的完整步驟：' + (f.path.join(' → ') || '（第一步）'));",
     replace: '',
     tests: ['tests/monkey_run.test.js']
   },
@@ -1761,7 +1761,7 @@ const MUTATIONS = [
     id: 'mk-no-seed-in-report',
     why: '報告唔印 seed——冇 seed 就重現唔到',
     file: 'src/MonkeyRun.gs',
-    find: "    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）'",
+    find: "    '隨機種子：' + report.seed + '（用同一個種子重新執行，會走同一條路）'",
     replace: "    '（隨機）'",
     tests: ['tests/monkey_run.test.js']
   },
@@ -1947,11 +1947,11 @@ const MUTATIONS = [
   },
   {
     id: 'st-rerun-resets',
-    why: '「只重跑紅色情境」順手重設埋沙盒季度'
+    why: '「只重新執行紅色情境」順手重設埋沙盒季度'
       + '——呢個入口嘅意思就係「保留現場，只重跑嗰幾個」',
     file: 'src/SelfTestRunner.gs',
-    find: "  selfTestMenuEntry_(true, '▶️ 只重跑紅色情境', true);",
-    replace: "  selfTestMenuEntry_(false, '▶️ 只重跑紅色情境', true);",
+    find: "  selfTestMenuEntry_(true, '▶️ 只重新執行紅色情境', true);",
+    replace: "  selfTestMenuEntry_(false, '▶️ 只重新執行紅色情境', true);",
     tests: ['tests/selftest_resume_deadlock.test.js']
   },
   {
@@ -2023,9 +2023,9 @@ const MUTATIONS = [
     why: '把「有版本而其中一條路拋錯」都當成唔適用'
       + '——呢一組就變成「把紅色改成睇唔見」，比修之前更差',
     file: 'src/Invariants.gs',
-    find: "          entry.where, INVARIANT_STATUS.ERROR, '兩條路數出同一個數', '算不出來',",
+    find: "          entry.where, INVARIANT_STATUS.ERROR, '兩條路算出同一個數', '算不出來',",
     replace: "          entry.where, INVARIANT_STATUS.NOT_APPLICABLE, "
-      + "'兩條路數出同一個數', '算不出來',",
+      + "'兩條路算出同一個數', '算不出來',",
     tests: ['tests/sendlog_columns.test.js']
   },
   {
@@ -2163,7 +2163,7 @@ const MUTATIONS = [
       + '——`apiGenerateRoster()` 要 Stage=DRAFT，'
       + '跑到 S09 之後 Stage 係 OFFICIAL_SENT，嗰陣一定被擋',
     file: 'src/SelfTestRunner.gs',
-    find: "    { id: 'S14', title: '特殊主日 SkipPostIDs 生效（要 Stage=DRAFT，所以排在這裡）',",
+    find: "    { id: 'S14', title: '特殊主日 SkipPostIDs 生效（要 Stage=DRAFT，所以排在這裏）',",
     replace: "    { id: 'SZZ', title: '（突變：排錯位）',",
     tests: ['tests/selftest_mainflow.test.js']
   },
@@ -2341,7 +2341,7 @@ const MUTATIONS = [
     why: '報告開頭唔印「開跑就已經存在嘅不變量失敗」'
       + '——嗰幾條係先決條件，唔印嘅話下面每一條嘅綠同紅都冇得打折扣',
     file: 'src/SelfTestRunner.gs',
-    find: "    lines.push('⚠️ 開跑的時候已經存在的不變量失敗（'",
+    find: "    lines.push('⚠️ 開始執行的時候已經存在的不變量失敗（'",
     replace: "    lines.push('（'",
     tests: ['tests/selftest_invariant_attribution.test.js']
   },
@@ -2419,7 +2419,7 @@ const MUTATIONS = [
     why: '查證本身爆咗就靜靜噉當佢過'
       + '——靜靜噉當佢過就係呢一組要修嗰件事',
     file: 'src/MonkeyRun.gs',
-    find: "      complaints.push('查不到這一步做過什麼：' + err.message);",
+    find: "      complaints.push('查不到這一步做過甚麼：' + err.message);",
     replace: '      complaints.length = complaints.length;',
     tests: ['tests/monkey_checks_return_value.test.js']
   },
@@ -2947,12 +2947,12 @@ const MUTATIONS = [
   // ── 第五十六輪批次 B2 組：尾句唔好估 ──────────────────────────
   {
     id: 'nextstep-guess',
-    why: '尾句只印「撳只重跑紅色情境」一句'
+    why: '尾句只印「撳只重新執行紅色情境」一句'
       + '——部機器睇唔到使用者有冇 clasp push 過，'
       + '估唔到就唔好扮估到。指示錯咗兩次，Ivan 照住撳，白撳',
     file: 'src/SelfTestRunner.gs',
     find: "      lines.push('・你改過程式碼（有 clasp push 過）'" + '\n'
-      + "        + ' ⇒ 撳「⚠️ 跑自測」重頭跑');",
+      + "        + ' ⇒ 按「⚠️ 執行自測」從頭執行');",
     replace: '      // （拆走咗）',
     tests: ['tests/selftest_reset_and_clock.test.js']
   },
@@ -3007,7 +3007,7 @@ const MUTATIONS = [
       + '係一條事後會想知嘅資料',
     file: 'src/SelfTestRunner.gs',
     find: '    writeAuditLog_({\n'
-      + "      action: '清走上一次自測的回傳值紀錄',",
+      + "      action: '清除上一次自測的回傳值紀錄',",
     replace: '    const unusedSummary = ({\n'
       + "      action: '',",
     tests: ['tests/selftest_reset_and_clock.test.js']
@@ -3050,8 +3050,8 @@ const MUTATIONS = [
       + '——其餘 mode 之下那三個陣列根本唔會出現嗺回傳入面，'
       + '驗幾多都係嗺度數一個 undefined',
     file: 'src/SelfTestRunner.gs',
-    find: "  t.equal('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'",
-    replace: "  if (false) t.equal('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'",
+    find: "  t.equal('步驟 3 看到有待處理的申報（mode = HAS_PENDING）'",
+    replace: "  if (false) t.equal('步驟 3 看到有待處理的申報（mode = HAS_PENDING）'",
     tests: ['tests/selftest_reads_real_api_fields.test.js']
   },
   {
@@ -3429,8 +3429,8 @@ const MUTATIONS = [
     why: '拆走「正式發出給全體（模擬）」嗰個 `slow` 標記'
       + '——冇標記就冇得跳，開關變成一個乜都唔做嘅開關',
     file: 'src/MonkeyRun.gs',
-    find: "      slow: '要逐個收件人（≈58 位）砌信同查個人 PDF；'",
-    replace: "      slowDisabled: '要逐個收件人（≈58 位）砌信同查個人 PDF；'",
+    find: "      slow: '要逐個收件人（≈58 位）組合電郵和查核個人 PDF；'",
+    replace: "      slowDisabled: '要逐個收件人（≈58 位）組合電郵和查核個人 PDF；'",
     tests: ['tests/monkey_speed.test.js']
   },
   {
@@ -4221,7 +4221,7 @@ const MUTATIONS = [
     why: '錯字提示寫返「下一輪才搬上來」——開發者用語，而且位置早已搬咗上嚟',
     file: 'src/ui/ScriptZone1.html',
     // 第七十五輪批次 CA 組：提示改為直接指去 NameAlias 工作表（「名單維護」整區拿走）
-    find: "在試算表的「NameAlias」工作表加一行（原本的名字＋這個寫法），回來再撳一次' }));",
+    find: "在試算表的「NameAlias」工作表加一行（原本的名字＋這個寫法），回來再按一次' }));",
     replace: "去「名單維護 ▸ 人員與電郵 ▸ 別名」加別名（下一輪才搬上來，暫時請用試算表的 NameAlias 工作表）' }));",
     tests: ['tests/ui_no_dev_wording.test.js']
   },
@@ -4861,7 +4861,7 @@ const MUTATIONS = [
     id: 'ah-ui-no-blank-head',
     why: '畫面唔講「這一版還有 N 格沒有人」',
     file: 'src/ui/Script.html',
-    find: "          text: '⚠ 這一版還有 ' + blank.count + ' 格沒有人，收到的人會見到空格。',",
+    find: "          text: '⚠ 這一版還有 ' + blank.count + ' 格沒有人，收到的人會看到空格。',",
     replace: "          text: '',",
     tests: ['tests/hard_release_remembered.test.js']
   },
@@ -5747,7 +5747,7 @@ const MUTATIONS = [
     id: "txt-guards-oldname",
     why: "擋住寄出嘅訊息還原成舊名「儲存並確認」",
     file: "src/WebAppGuards.gs",
-    find: "      ['先撳「儲存」，把表上的東西處理好，之後再撳「' + actionName + '」',",
+    find: "      ['先按「儲存」，把表上的東西處理好，之後再按「' + actionName + '」',",
     replace: "      ['先撳「儲存並確認」，把表上的東西處理好，之後再撳「' + actionName + '」',",
     tests: ["tests/screen_text_wording.test.js"]
   },
@@ -6190,8 +6190,8 @@ const MUTATIONS = [
     why: "記唔到都唔還原勾選框",
     file: "src/ui/Script.html",
     // 第八十二輪批次 IA 組：還原嗰句搬入 else 分支（同時寫「這一格未記住」）
-    find: "          cb.checked = !want; state[sk(it)] = !want; changed();\n          note.textContent = '　這一格未記住，請再勾一次';",
-    replace: "          changed();\n          note.textContent = '　這一格未記住，請再勾一次';",
+    find: "          cb.checked = !want; state[sk(it)] = !want; changed();\n          note.textContent = '　這一格未能記錄，請再勾一次';",
+    replace: "          changed();\n          note.textContent = '　這一格未能記錄，請再勾一次';",
     tests: ["tests/round75_cfg_ui.test.js"]
   },
   {
@@ -6458,8 +6458,8 @@ const MUTATIONS = [
     id: "cp-unavail-not-listed",
     why: "確認清單冇列會清走嘅 Unavailable",
     file: "src/Menu.gs",
-    find: "  if ((plan.unavailableInQuarterDetails || []).length > 0) {\n    lines.push('', '會清走的不能服侍日期（完全在這一季之內）：');",
-    replace: "  if (false) {\n    lines.push('', '會清走的不能服侍日期（完全在這一季之內）：');",
+    find: "  if ((plan.unavailableInQuarterDetails || []).length > 0) {\n    lines.push('', '會清除的不能服侍日期（完全在這一季之內）：');",
+    replace: "  if (false) {\n    lines.push('', '會清除的不能服侍日期（完全在這一季之內）：');",
     tests: ["tests/round75_cp_reset_thorough.test.js"]
   },
   {
@@ -7573,15 +7573,15 @@ const MUTATIONS = [
     id: "ia-no-revert",
     why: "寫唔到都保持已勾",
     file: "src/ui/Script.html",
-    find: "          cb.checked = !want; state[sk(it)] = !want; changed();\n          note.textContent = '　這一格未記住，請再勾一次';",
-    replace: "          note.textContent = '　這一格未記住，請再勾一次';",
+    find: "          cb.checked = !want; state[sk(it)] = !want; changed();\n          note.textContent = '　這一格未能記錄，請再勾一次';",
+    replace: "          note.textContent = '　這一格未能記錄，請再勾一次';",
     tests: ["tests/round82_ia_decision_retry.test.js"]
   },
   {
     id: "ia-no-note",
     why: "嗰一行唔講未記住",
     file: "src/ui/Script.html",
-    find: "          note.textContent = '　這一格未記住，請再勾一次';\n          note.className",
+    find: "          note.textContent = '　這一格未能記錄，請再勾一次';\n          note.className",
     replace: "          note.textContent = '';\n          note.className",
     tests: ["tests/round82_ia_decision_retry.test.js"]
   },
@@ -7647,7 +7647,7 @@ const MUTATIONS = [
     id: "id-no-adjust-hint",
     why: "完成訊息冇指去請系統幫我調整",
     file: "src/ui/ScriptZone3.html",
-    find: "          + '要用新偏好調整現有的職事表，撳第 2 步〔請系統幫我調整〕；還未生成的話，生成時會自動用。',",
+    find: "          + '要用新偏好調整現有的職事表，按第 2 步〔請系統幫我調整〕；還未生成的話，生成時會自動用。',",
     replace: "          + '',",
     tests: ["tests/round82_id_weights_saved_notice.test.js"]
   },
@@ -7670,9 +7670,9 @@ const MUTATIONS = [
   },
   {
     id: "ii-hint-no-reset",
-    why: "提示冇指去整季清走重來",
+    why: "提示冇指去整季重設",
     file: "src/Constants.gs",
-    find: "const REDO_QUARTER_HINT_TEXT = '要整季重來，用「常用設定 ▸ 整季清走重來」之後再生成；'",
+    find: "const REDO_QUARTER_HINT_TEXT = '要整季重來，用「常用設定 ▸ 整季重設」之後再生成；'",
     replace: "const REDO_QUARTER_HINT_TEXT = '要重來請聯絡管理員；'",
     tests: ["tests/round82_ii_no_regenerate_entry.test.js", "tests/main_flow_six_steps.test.js"]
   },
@@ -8519,6 +8519,70 @@ const MUTATIONS = [
     find: "中文名 `Posts.PostName_TC`）",
     replace: "中文名 `Posts.PostNameTC`）",
     tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
+  },
+  {
+    id: "la-reset-old-name",
+    why: "整季重設改回舊名",
+    file: "src/ui/ScriptZone3.html",
+    find: "    const resetRow = zone4Row('整季重設',",
+    replace: "    const resetRow = zone4Row('整季清走重來',",
+    tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
+    id: "la-send-all-primary",
+    why: "給所有人仍是藍色主按鈕",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "        stepButton('給所有人', () => openSendDialog('ALL'), {\n          disabled: !has,\n          className: 'secondary',\n",
+    replace: "        stepButton('給所有人', () => openSendDialog('ALL'), {\n          disabled: !has,\n",
+    tests: ["tests/round85_la_hk_wording.test.js", "tests/round77_ee_send_buttons.test.js"]
+  },
+  {
+    id: "la-text-no-equal",
+    why: "內容不同也照改",
+    file: "src/SheetTextUpdate.gs",
+    find: "    if (current === item.old) status = SHEET_TEXT_STATUS.WILL_UPDATE;",
+    replace: "    if (current !== item.new) status = SHEET_TEXT_STATUS.WILL_UPDATE;",
+    tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
+    id: "la-text-no-audit",
+    why: "更新說明文字冇寫稽核",
+    file: "src/SheetTextUpdate.gs",
+    find: "      writeAuditLog_({\n        action: 'SHEET_TEXT_UPDATED',",
+    replace: "      ({\n        action: 'SHEET_TEXT_UPDATED',",
+    tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
+    id: "la-text-no-already",
+    why: "第二次不認得已是新內容",
+    file: "src/SheetTextUpdate.gs",
+    find: "    else if (current === item.new) status = SHEET_TEXT_STATUS.ALREADY_NEW;\n",
+    replace: "",
+    tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
+    id: "la-busy-old-text",
+    why: "前端用舊字認忙碌",
+    file: "src/ui/Script.html",
+    find: "    return /另一個動作仍在進行|拿不到「同一時間只做一件事」那一把鎖/.test(msg);",
+    replace: "    return /另一個動作還在做緊|拿不到「同一時間只做一件事」那一把鎖/.test(msg);",
+    tests: ["tests/round82_ia_decision_retry.test.js"]
+  },
+  {
+    id: "la-notes-old-word",
+    why: "版本備註仍寫掣 1",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    + '儲存並確認：人手改動 ' + resolved.changes.length + ' 格'",
+    replace: "    + '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'",
+    tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
+    id: "la-dev-tool-word",
+    why: "開發者工具字串回退",
+    file: "src/SelfTestRunner.gs",
+    find: "按「▶️ 繼續執行自測」繼續（不是「只重新執行紅色情境」）",
+    replace: "撳「▶️ 繼續執行自測」繼續（不是「只重新執行紅色情境」）",
+    tests: ["tests/round85_la_hk_wording.test.js"]
   }
 ];
 

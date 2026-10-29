@@ -115,8 +115,8 @@ console.log('\n=== C【核心】攞唔到鎖嗰陣，真入口真係唔會做嘢
       // 區四嗰兩個會把錯包成 {ok:false, message}
       msg = r && r.message ? r.message : JSON.stringify(r);
     } catch (e) { msg = e.message; }
-    check('★★★★★★ ' + c[0] + '：攞唔到鎖 ⇒ 「另一個動作還在做緊」',
-      msg.indexOf('另一個動作還在做緊') !== -1, msg.slice(0, 200));
+    check('★★★★★★ ' + c[0] + '：攞唔到鎖 ⇒ 「另一個動作仍在進行」',
+      msg.indexOf('另一個動作仍在進行') !== -1, msg.slice(0, 200));
   });
   check('★★★★★★ 而且一行真正嘅內容都冇行過', touched === 0, touched);
 }

@@ -169,7 +169,7 @@ console.log('\n=== B6【最重要】版本號唔符 ⇒ 拒絕接續，狀態清
   const verdict = env.gas.evaluateRehearsalResume_(state, 9);
 
   checkEqual('★★★★★ 拒絕', verdict.ok, false);
-  checkEqual('★★★★★ 而且要清走狀態'
+  checkEqual('★★★★★ 而且要清除狀態'
     + '——留住一個對唔上嘅狀態，下次一撳又會拒絕一次，冇完冇了',
     verdict.clearState, true);
   check('★★★★★ 訊息含**兩個**版本號（現時 v9、演練用嘅 v7）'
@@ -237,9 +237,9 @@ console.log('\n=== B6【核心】PDF 未產生完 ⇒ 更新狀態，唔行步�
     after.pdfRoundsDone > 4, String(after.pdfRoundsDone));
   checkEqual('★★★★★ `PdfDone` 仍然係 false（**唔可以樂觀寫 TRUE**）',
     after.pdfDone, false);
-  checkEqual('★★★★★ 而且狀態**冇被清走**——清走等於逼人由頭再嚟一次',
+  checkEqual('★★★★★ 而且狀態**冇被清除**——清除等於逼人從頭再嚟一次',
     after.quarterId, '2027T4');
-  check('★★★★★ 講返「再撳一次接續」', record.nextAction.indexOf('再撳一次') !== -1,
+  check('★★★★★ 講返「再撳一次接續」', record.nextAction.indexOf('再按一次') !== -1,
     record.nextAction);
 }
 
@@ -297,8 +297,8 @@ console.log('\n=== B4【核心】接續段報告開頭要講返自己係第幾�
   const gas = loadGasSource(FILES);
   const rows = gas.buildRehearsalResumeRows_({
     quarterId: '2027T4', segment: 2, versionNo: 7, completed: false,
-    startedAt: '2027-08-19 09:00:00', nextAction: '請再撳一次接續。',
-    steps: [{ name: '步驟 3.5：產生個人 PDF（續跑）', ok: true, seconds: 200,
+    startedAt: '2027-08-19 09:00:00', nextAction: '請再按一次接續。',
+    steps: [{ name: '步驟 3.5：產生個人 PDF（繼續執行）', ok: true, seconds: 200,
       preconditionText: '（沒有前置條件）', preconditionMet: true,
       detail: { finished: false, rounds: 3 }, error: '' }]
   });
@@ -327,7 +327,7 @@ console.log('\n=== B4【核心】接續段報告開頭要講返自己係第幾�
   check('★★★★★ 最後一段有總結：合共幾段', finalText.indexOf('合共幾段|3 段') !== -1, finalText);
   check('★★★★★ 而且講得出由開始到完成經過幾多分鐘',
     /由開始到完成\|2[45] 分鐘/.test(finalText), finalText);
-  check('★★★★★ 亦講明狀態已清走', finalText.indexOf('已清走') !== -1, finalText);
+  check('★★★★★ 亦講明狀態已清走', finalText.indexOf('已清除') !== -1, finalText);
   check('★★★★★ 算唔到時間就講「算不出來」，**唔可以寫 0 分鐘**'
     + '——0 分鐘會令人以為成件事一秒完成',
     gas.describeRehearsalSpanMinutes_('').indexOf('算不出來') !== -1
@@ -352,7 +352,7 @@ console.log('\n=== B5【核心】第一段收尾要有一句明確嘅下一步 =
   check('★★★★★ 講得出仲差幾多份（58 − 22 ＝ 36）',
     t.indexOf('36 份') !== -1, t);
   check('★★★★★ 而且講明系統會自動接住行步驟 4 同步驟 5',
-    t.indexOf('自動接住') !== -1 && t.indexOf('步驟 5') !== -1, t);
+    t.indexOf('自動繼續執行') !== -1 && t.indexOf('步驟 5') !== -1, t);
 
   const noNum = gas.buildRehearsalNextStepText_({
     resumeNeeded: true, stateError: '',

@@ -190,7 +190,7 @@ function judgeVersionCellCounts_(c, lost, prevVersionNo) {
       level: 'BAD',
       note: '有 ' + lost.length + ' 格在第 ' + prevVersionNo + ' 版還有名字，到這一版變成空白：'
         + sample + (lost.length > 3 ? ' 等' : '') + '。'
-        + '第 ' + prevVersionNo + ' 版還留著那些名字，可以抄回來。'
+        + '第 ' + prevVersionNo + ' 版還留着那些名字，可以抄回來。'
     };
   }
 
@@ -344,7 +344,7 @@ function recordVersionCellAudit_(results, sheetName) {
   const warn = results.filter(function (r) { return r.level === 'WARN'; });
 
   const rows = [
-    diagRow_('清點格子分類', '清點了幾多個版本', results.length,
+    diagRow_('清點格子分類', '清點了多少個版本', results.length,
       '明細在「' + sheetName + '」'),
     diagRow_('清點格子分類', '看來資料壞掉的版本', bad.length,
       bad.length > 0 ? '見下面逐項' : '沒有'),
@@ -428,7 +428,7 @@ function runVersionCellAudit_() {
     lines.splice(1, 0,
       '',
       '⚠ 時間不夠，還有 ' + results.notCheckedCount + ' 個版本沒有看。',
-      '　報告上面那些是真的，只是不齊。再撳一次會由頭再看一遍。');
+      '　報告上面那些是真的，只是不齊。再按一次會從頭再檢查一遍。');
   }
   if (bad.length > 0) {
     lines.push('');

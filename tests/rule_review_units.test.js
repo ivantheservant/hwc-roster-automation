@@ -162,7 +162,7 @@ console.log('\n=== A4 稽核：四條會令堂委做錯決定嘅措辭 ===');
   const dist = gas.ruleReviewPlainEntry_(IDS.QUARTER_DISTRIBUTION);
   check('★★★★★ 「每季次數分佈」要講明佢喺個人配額開住嗰陣完全冇行過'
     + '——唔講嘅話堂委會花時間調一個唔會有任何效果嘅數字',
-    (dist.note || '').indexOf('那一條開着的時候，這裏改什麼都不會有分別') !== -1,
+    (dist.note || '').indexOf('那一條開着的時候，這裏改甚麼都不會有分別') !== -1,
     dist.note);
   check('★★★★★ 反面：引擎的確係 `else if`（二選一）',
     /isRuleEnabled_\(rules, RULE_IDS\.PERSONAL_QUOTA\)\) \{[\s\S]{0,200}?\} else if \(isRuleEnabled_\(rules, RULE_IDS\.QUARTER_DISTRIBUTION\)\)/

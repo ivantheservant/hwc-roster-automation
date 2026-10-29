@@ -238,13 +238,13 @@ function buildDiagnosticsTrimRow_(keptReportNames, droppedReportNames, maxTotal)
   const dropped = (droppedReportNames || []).length;
 
   const note = dropped === 0
-    ? '本次沒有清走任何報告。'
-    : '本次清走了：' + droppedReportNames.join('、')
+    ? '本次沒有清除任何報告。'
+    : '本次清除了：' + droppedReportNames.join('、')
       + '。整份丟走，不會把一份報告斬一半——半截報告看起來跟完整報告一樣，'
-      + '但開頭的摘要已經不見了。要重新看被清走的報告，再執行一次那個工具即可。';
+      + '但開頭的摘要已經不見了。要重新看被清除的報告，再執行一次那個工具即可。';
 
   return diagRow_(DIAGNOSTICS_STATUS_SECTION, '本表保留的報告數',
-    '保留 ' + kept + ' 份，本次清走 ' + dropped + ' 份最舊的',
+    '保留 ' + kept + ' 份，本次清除 ' + dropped + ' 份最舊的',
     note + '（總行數上限 ' + maxTotal + ' 行）');
 }
 
@@ -345,7 +345,7 @@ function writeDiagnosticsReport_(reportName, rows) {
   if (trim.currentReportAlone) {
     combined = [[reportName, now, '（超出上限）', '這份報告本身超過工作表上限',
       combined.length + ' 行 / 上限 ' + DIAGNOSTICS_MAX_ROWS_TOTAL + ' 行',
-      '這份報告本身超過工作表上限，其餘報告已被清走。'
+      '這份報告本身超過工作表上限，其餘報告已被清除。'
       + '整張表現在只有這一份報告，而它仍然超過上限，'
       + '用 connector 讀會被截斷。請把這件事告訴開發者——'
       + '正確的方向是令這份報告更精簡，不是放大上限（放大等於讀不到尾）。']]
@@ -714,7 +714,7 @@ function collectKeyStateRows_() {
       .getSheetByName(SHEETS.PERSON_POST_WEIGHT);
     if (!exists) {
       rows.push(diagRow_('PersonPostWeight', '（工作表尚未建立）', '',
-        '這是可選的表。未建立時排表結果同加入這個機制之前一模一樣。'
+        '這是可選的表。未建立時排表結果與加入這個機制之前一模一樣。'
         + '要用的話：選單「維護 ▸ 補建排表偏好工作表」。'));
       return;
     }

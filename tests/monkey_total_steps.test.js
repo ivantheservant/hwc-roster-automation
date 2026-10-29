@@ -1,4 +1,4 @@
-// 第六十二輪批次 B 組：亂行機嘅步數計錯，Ivan 永遠撳唔到 50/50。
+// 第六十二輪批次 B 組：亂行機嘅步數計錯，Ivan 永遠按唔到 50/50。
 // 執行方式：node tests/monkey_total_steps.test.js
 //
 // ═════════════════════════════════════════════════════════════════════
@@ -14,7 +14,7 @@
 //
 // 成因：`writeMonkeyState_()` 寫落表嗰個係 `report.ranSteps`——
 // **當前呢一批**跑咗幾多步——而 `readMonkeyState_()` 由頭到尾冇讀返佢。
-// 而報告第一句「跑了 N / 50 步」用嘅就係呢個會歸零嘅數。
+// 而報告第一句「執行了 N / 50 步」用嘅就係呢個會歸零嘅數。
 //
 // ⇒ 撳幾多次，分子都只會喺 2–4 之間浮動，永遠去唔到 50。
 //
@@ -189,7 +189,7 @@ console.log('\n=== B2 由頭開始跑 ⇒ 要清走舊 log（新一條路）==='
   gas.writeMonkeyLog_({ seed: 99, quarterId: '2028T3', priorSteps: 0,
     steps: [{ step: 1, action: 'Z', outcome: 'o', invariant: 'OK' }] });
   const log = sheets.MonkeyLog.rows;
-  checkEqual('★★★★★★ 換咗種子由頭跑 ⇒ 只剩新嗰一批（表頭 ＋ 1 行）',
+  checkEqual('★★★★★★ 換咗種子從頭執行 ⇒ 只剩新嗰一批（表頭 ＋ 1 行）',
     log.length, 2);
   checkEqual('★★★★★ 而且係新嗰批', log[1][1], 'Z');
 }
@@ -224,13 +224,13 @@ console.log('\n=== B1 讀舊表：照欄名搵，唔照位置 ===');
   // 一張舊表會被當成「累計已經跑咗 3 步」——而嗰個 3 係批次數。
   // 一個講錯咗嘅數字比冇數字更差，所以搵唔到就當 0。
   const sheets = { MonkeyState: fakeSheet('MonkeyState') };
-  sheets.MonkeyState.appendRow(['種子', '已抽次數', '已跑步數', '季度']);
+  sheets.MonkeyState.appendRow(['種子', '已抽次數', '已執行步數', '季度']);
   sheets.MonkeyState.appendRow([70, 70, 3, '2028T3']);
   const gas = withSheets(sheets);
   const state = gas.readMonkeyState_();
   checkEqual('★★★★★★ 種子同抽數照樣讀得返（舊表都有呢兩欄）',
     state.seed + '/' + state.drawnCount, '70/70');
-  checkEqual('★★★★★★ **累計步數 ＝ 0（唔係當「已跑步數」係累計）**'
+  checkEqual('★★★★★★ **累計步數 ＝ 0（唔係當「已執行步數」係累計）**'
     + '——嗰個 3 係上一批嘅批次數，唔係累計；猜嘅話就係一個講錯咗嘅數字',
     state.totalSteps, 0);
 }
@@ -291,7 +291,7 @@ console.log('\n=== B3【核心】報告要分開講「這一批」同「累計�
     + '於是撳幾多次都係 2、4、3，睇落好似原地踏步',
     /亂行機：累計 10 \/ 50 步/.test(lines), lines.slice(0, 400));
   check('★★★★★★ 而且另外一句講「這一批」，連步號範圍',
-    /這一批：跑了 3 步（第 8 – 10 步）/.test(lines), lines.slice(0, 400));
+    /這一批：執行了 3 步（第 8 – 10 步）/.test(lines), lines.slice(0, 400));
   check('★★★★★★ 時間用「X 分 Y 秒」，唔使自己心算',
     /用了 4 分 12 秒/.test(lines), lines.slice(0, 400));
   check('★★★★★ 平均每步都印',
@@ -358,7 +358,7 @@ console.log('\n=== B1 步號真係跨批續落去（跑一次真迴圈）===');
     second.steps.map(function (s) { return s.step; }).join(','), '4,5,6');
   checkEqual('★★★★★★ **累計 ＝ 6**', second.totalSteps, 6);
   checkEqual('★★★★★ 而「這一批」仍然係 3', second.ranSteps, 3);
-  checkEqual('★★★★★ 步號範圍講得啱',
+  checkEqual('★★★★★ 步號範圍說得啱',
     second.firstStepNo + '–' + second.lastStepNo, '4–6');
 }
 

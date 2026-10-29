@@ -85,7 +85,7 @@ console.log('\n=== 二【核心】續跑要真係接得返 ===');
   const rndB = gas.makeMonkeyRandom_(42, 10);
   for (let i = 0; i < 10; i++) secondHalf.push(rndB());
 
-  checkEqual('★★★★★★ 「跑 10 步再續跑 10 步」＝「一次過跑 20 步」'
+  checkEqual('★★★★★★ 「執行 10 步再繼續執行 10 步」＝「一次過執行 20 步」'
     + '——續跑要接住上一條路，唔係由頭再行一次',
     JSON.stringify(firstHalf.concat(secondHalf)), JSON.stringify(full));
 
@@ -94,7 +94,7 @@ console.log('\n=== 二【核心】續跑要真係接得返 ===');
   check('★★★★★★ 而且續跑入口真係用返上一次嘅抽數',
     /runMonkey_\(steps, state\.seed, state\.drawnCount, /.test(CODE), '');
   // 第六十二輪批次 B1 組：累計步數都要傳落去，否則每批步號由 1 開始，
-  // 而報告嗰句「跑了 N / 50 步」永遠去唔到 50。
+  // 而報告嗰句「執行了 N / 50 步」永遠去唔到 50。
   check('★★★★★★ **而且傳埋累計步數落去**',
     /runMonkey_\(steps, state\.seed, state\.drawnCount, state\.totalSteps\)/
       .test(CODE), '');
@@ -118,7 +118,7 @@ console.log('\n=== 三【核心】五樣絕對唔准做嘅嘢 ===');
   ];
   forbidden.forEach(function (pair) {
     check('★★★★★★ 動作清單入面冇「' + pair[0] + '」',
-      !pair[1].test(actions), '動作清單裡面找到 ' + pair[0]);
+      !pair[1].test(actions), '動作清單裏面找到 ' + pair[0]);
   });
 
   // ⚠️ 成支檔案都唔准有。清單乾淨而別處偷偷做，一樣係壞。
@@ -169,7 +169,7 @@ console.log('\n=== 五【核心】報告要印「走到這裡的完整步驟」 
   check('★★★★★★ 印咗完整重現路徑'
     + '——冇咗佢，紅咗都重現唔到，'
     + '而一個重現唔到嘅 bug 報告對兩個月之後嘅自己嚟講等於冇',
-    /走到這裡的完整步驟：生成初稿 → 改 grid 幾格 → 寄給堂委審閱（模擬）/.test(lines),
+    /走到這裏的完整步驟：生成初稿 → 改 grid 幾格 → 寄給堂委審閱（模擬）/.test(lines),
     lines);
   check('★★★★★★ 而且印咗 seed（唔印嘅話重現唔到）',
     /隨機種子：20260822/.test(lines), lines);
@@ -178,7 +178,7 @@ console.log('\n=== 五【核心】報告要印「走到這裡的完整步驟」 
 
   const blocked = gas.describeMonkeyReport_({
     blocked: true, quarterId: '2026T4',
-    reasons: ['「2026T4」在 QUARTER_RESET_BLOCKED_QUARTERS 裡面。']
+    reasons: ['「2026T4」在 QUARTER_RESET_BLOCKED_QUARTERS 裏面。']
   }).join('\n');
   check('★★★★★★ 被閘擋住要講明「沒有執行」'
     + '——唔講嘅話，一份空白報告睇落同「跑完，冇事」一模一樣',

@@ -67,7 +67,7 @@ console.log('\n=== A2【核心】開關 FALSE ⇒ 一定唔會生成 ===');
     j.outcome, 'SKIPPED_MANUAL_MODE');
   check('★★★★ 而且要講到係「改為提醒幹事自己生成」，唔係得一句「略過」'
     + '——幹事睇檢查報告嗰陣要知道下一步係佢自己撳掣',
-    /提醒/.test(j.detail) && /撳/.test(j.detail));
+    /提醒/.test(j.detail) && /按/.test(j.detail));
 
   reset();
   // 完全冇設定呢個 key（例如舊試算表未補建）也要當成關閉。
@@ -156,7 +156,7 @@ console.log('\n=== A2 提醒信文案：唔可以再講「系統將會自動生�
     + '叫佢去做一件佢做唔到嘅事',
     /notGenerated[\s\S]{0,200}?生成初稿/.test(body));
   check('★★★★★ 而且要明講「系統不會自己生成」',
-    /系統不會自己生成/.test(body));
+    /系統不會自行生成/.test(body));
   check('★★★★ 要提供一條停止收信嘅出路（清空 GenerateOn）'
     + '——一封冇上限嘅提醒信，一定要有得停',
     /GenerateOn/.test(body) && /清空/.test(body));

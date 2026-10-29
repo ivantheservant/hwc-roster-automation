@@ -139,7 +139,7 @@ console.log('\n=== B【核心】開跑就已經紅嘅不變量，唔算落情境
   ], [['I01'], ['I01'], ['I01'], ['I01']]);
   const S = box.gas.SELFTEST_STATUS;
 
-  checkEqual('★★★★★★ X1 係綠——I01 開跑就紅，唔係佢整嘅', box.byId.X1.status, S.PASSED);
+  checkEqual('★★★★★★ X1 係綠——I01 開始執行就紅，唔係佢整嘅', box.byId.X1.status, S.PASSED);
   checkEqual('★★★★★★ **X2 冇被擋住，而且係綠**'
     + '——舊寫法：X1 因為 I01 被判紅 ⇒ X2 `BLOCKED` ⇒ X3 `BLOCKED`。'
     + '一個根因，成串跑唔到',
@@ -157,12 +157,12 @@ console.log('\n=== B【核心】開跑就已經紅嘅不變量，唔算落情境
 
   // ── 報告最頂嗰一節 ─────────────────────────────────────────
   check('★★★★★★ 報告開頭有「開跑的時候已經存在的不變量失敗」一節',
-    /開跑的時候已經存在的不變量失敗（1 條）/.test(box.lines), box.lines.slice(0, 700));
+    /開始執行的時候已經存在的不變量失敗（1 條）/.test(box.lines), box.lines.slice(0, 700));
   check('★★★★★ 而且貼出證據原文',
     /I01 嘅證據/.test(box.lines), box.lines.slice(0, 700));
   check('★★★★★★ 排喺情境前面'
     + '——呢幾條係先決條件，唔清乾淨，下面每一條嘅綠同紅都要打個折扣',
-    box.lines.indexOf('開跑的時候已經存在的不變量失敗')
+    box.lines.indexOf('開始執行的時候已經存在的不變量失敗')
       < box.lines.indexOf('（情境按執行次序排，不按編號。）'), '');
 }
 
@@ -202,7 +202,7 @@ console.log('\n=== B 順手修好咗一條，要講一句 ===');
     { id: 'X1', title: '第一個' },
     { id: 'X2', title: '第二個' }
   ], [['I01'], [], []]);
-  checkEqual('★★★★★ X1 把 I01 整返好咗 ⇒ 講一句',
+  checkEqual('★★★★★ X1 把 I01 整返好咗 ⇒ 說一句',
     /順手修好了：I01/.test(String(box.byId.X1.note || '')), 'true');
   checkEqual('★★★★★ X1 仍然係綠', box.byId.X1.status, box.gas.SELFTEST_STATUS.PASSED);
 }
@@ -233,7 +233,7 @@ console.log('\n=== B 底相影唔到 ⇒ 要講，唔可以當成「乜都冇紅
     + '即係呢一組要修嗰件事',
     report.startupSnapshotError, '不變量表讀唔到');
   check('★★★★★★ 而且要喺報告講明後面嘅歸咎可能唔準',
-    /開跑之前影不到不變量的底相/.test(lines) && /算了在它頭上/.test(lines),
+    /開始執行之前未能取得不變量的基準快照/.test(lines) && /算了在它頭上/.test(lines),
     lines.slice(0, 600));
 }
 
@@ -246,7 +246,7 @@ console.log('\n=== B 底相只影一次，唔可以每個情境影多一次 ==='
   const fast = box.invariantCalls.filter(function (set) {
     return set === box.gas.INVARIANT_SET.PER_SCENARIO;
   }).length;
-  checkEqual('★★★★★★ 3 個情境 ⇒ 快嗰批只跑 4 次（1 張底相 ＋ 每個情境 1 次）'
+  checkEqual('★★★★★★ 3 個情境 ⇒ 快嗰批只執行 4 次（1 張底相 ＋ 每個情境 1 次）'
     + '——上一個情境嘅事後相就係下一個情境嘅事前相，'
     + '所以歸咎一蚊都唔使多畀。第五十輪批次嗰個時間預算問題唔可以走回頭路',
     fast, 4);

@@ -118,7 +118,7 @@ console.log('\n=== F【核心】搵唔到 ⇒ 唔截。寧可多印，不可以�
     gas.findRosterGridLastRow_(fakeSheet(['日期', 'date'])), 0);
 
   const legendAtTop = fakeSheet(['日期', 'date', LEGEND, '（待填）']);
-  checkEqual('★★★★★ 一個主日都冇（圖例緊接住機器鍵行）⇒ 回 0，唔截'
+  checkEqual('★★★★★ 一個主日都冇（圖例緊繼續機器鍵行）⇒ 回 0，唔截'
     + '——截到第 2 行嘅話，出嚟係一份得標題冇內容嘅 PDF',
     gas.findRosterGridLastRow_(legendAtTop), 0);
 }
@@ -229,7 +229,7 @@ console.log('\n=== F：設欄寬嗰個函式本身 ===');
     /try \{\s*\n\s*applyGridColumnWidthsForA4_\(sheet, layout\);\s*\n\s*\} catch/
       .test(writerBare), '');
   check('★★★★ 但唔可以靜靜失敗——要寫 log',
-    /log_\('WARN', 'createRosterSheet：欄寬設定唔到/.test(writer), '');
+    /log_\('WARN', 'createRosterSheet：未能設定欄寬/.test(writer), '');
   check('★★★★★ 排喺 `autoResizeColumns()` **之後**'
     + '——排之前嘅話，autoResize 會即刻把佢設嘅寬度改返',
     writerBare.indexOf('sheet.autoResizeColumns(1, layout.keys.length);')

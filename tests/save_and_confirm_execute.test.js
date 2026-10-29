@@ -73,7 +73,7 @@ console.log('\n=== D-2 步 2【核心】預覽過期偵測 ===');
       gas.assertSaveConfirmPlanStillFresh_(plan, [
         { serviceDate: '2099-01-01', postId: 'X', slotIndex: 1 }
       ]);
-    }, '重新撳一次「儲存」');
+    }, '重新按一次「儲存」');
 
   let noDecisions = true;
   try { gas.assertSaveConfirmPlanStillFresh_(plan, []); } catch (e) { noDecisions = false; }
@@ -152,7 +152,7 @@ console.log('\n=== D-2 步 5 失敗【核心】唔前進 Stage、唔發佈公開
     /沒有任何東西被寫入/.test(failFn));
   check('★★★★★ 乾淨失敗嗰段唔可以叫人回退'
     + '（回退本身會建立新版本——一句嚇人嘅文案會製造一個真正多餘嘅版本）',
-    /直接再撳一次/.test(failFn));
+    /直接再按一次/.test(failFn));
   check('★★★★★ 兩種情況係靠**去睇實際狀態**分（有冇登記版本／grid 工作表在唔在），'
     + '唔係靠估',
     /findLatestVersionNo\(/.test(failFn) && /getSheetByName\(/.test(failFn));
@@ -196,7 +196,7 @@ console.log('\n=== D-3【核心】零改動路徑 ===');
   check('★★★★★ 冇 ADVANCE_STAGE_ONLY 分支（零改動唔再推進度）',
     !/advanceQuarterStage_/.test(zeroBody) && !/意見已收齊/.test(zeroBody), zeroBody.slice(0, 300));
   check('★★★★ 未正式發出嘅零改動加一句「要正式發出，撳第 3 步〔給所有人〕」',
-    /要正式發出，撳第 3 步〔給所有人〕。/.test(zeroFn));
+    /要正式發出，按第 3 步〔給所有人〕。/.test(zeroFn));
   check('★★★★ OFFICIAL_SENT 零改動時加一句「已經正式發出過」',
     /這一季已經正式發出過了/.test(zeroFn));
   check('★★★★★ 零改動路徑排喺放行檢查之後'

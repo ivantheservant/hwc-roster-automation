@@ -1031,7 +1031,7 @@ const RESEND_NEW_JOINER_PREVIOUS_TEXT = '（上一次沒有安排）';
  * 第八十二輪批次 II 組（Ivan 決定）：幹事介面唔再有任何「重新生成初稿」。
  * 一季已經生成過、要重來或者回到之前嘅內容 ⇒ 統一指去呢兩個入口（前端 `REDO_QUARTER_HINT` 同一句）。
  */
-const REDO_QUARTER_HINT_TEXT = '要整季重來，用「常用設定 ▸ 整季清走重來」之後再生成；'
+const REDO_QUARTER_HINT_TEXT = '要整季重來，用「常用設定 ▸ 整季重設」之後再生成；'
   + '要回到之前的內容，用第 2 步版本下拉〔用這一版作起點〕';
 
 /**

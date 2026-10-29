@@ -122,7 +122,7 @@ const okResult = { ok: true, versionNo: 3, baseVersionNo: 2, cellCount: 1,
     const done = ui.openSaveAndConfirm();
     check('★★★★★★ JG4 撳下即刻變灰（未等伺服器）', btn.disabled === true);
     check('★★★★★★ JG4 旁邊即刻寫「儲存中……（可能要一至兩分鐘，請不要再撳）」',
-      running.hidden === false && running.textContent === '儲存中……（可能要一至兩分鐘，請不要再撳）', running.textContent);
+      running.hidden === false && running.textContent === '儲存中……（可能要一至兩分鐘，請不要再按）', running.textContent);
     check('★★★★★ JG4 中央處理中牌即刻出現', busyVisible(ui) && isBusy(ui));
     const rechecked = await ui.maybeRecheckSaveButton(Date.now() + 999999);
     check('★★★★★ JG4 儲存緊切返嚟唔會著返粒掣', rechecked === false && recheckCalls === 0 && btn.disabled === true);

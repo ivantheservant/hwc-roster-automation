@@ -73,7 +73,7 @@ const MONKEY_LOG_MAX_ROWS = 1000;
 const MONKEY_STATE_HEADERS = ['種子', '已抽次數', '累計步數', '季度'];
 
 /** `MonkeyLog` 嘅欄名。 */
-const MONKEY_LOG_HEADERS = ['第幾步', '選了什麼', '結果', '不變量', '種子', '季度'];
+const MONKEY_LOG_HEADERS = ['第幾步', '選了甚麼', '結果', '不變量', '種子', '季度'];
 
 /**
  * 一次執行最多用幾多毫秒。同自測機一樣留 1.5 分鐘收尾。
@@ -254,20 +254,20 @@ function monkeyActions_() {
         // 而亂行機就會困喺「只剩改 grid 合法」嗰個坑入面。
         if (Number(after.unresolvedCount || 0) > 0) {
           return '寫完之後仍然有 ' + after.unresolvedCount + ' 格認不出——'
-            + '系統的規矩是「有認不出的名字就什麼都不准做」，'
+            + '系統的規矩是「有認不出的名字就甚麼都不准做」，'
             + '接下來每一步都會被擋，亂行機會困在原地。';
         }
         if (result.planError) {
           return '選格的時候：' + result.planError;
         }
         if ((result.preExisting || []).length > 0) {
-          return '這一版本身就帶著 ' + result.preExisting.length
+          return '這一版本身就帶着 ' + result.preExisting.length
             + ' 格硬規則違反，不是這一次改動造成的：'
             + result.preExisting.join('；');
         }
         // ⚠️ 一格都寫唔到 ⇒ 呢一步實際上乜都冇做，而下一步會當佢做過。
         return result.changedCells > 0 ? ''
-          : '一格都沒有寫到——這一步實際上什麼都沒有做，'
+          : '一格都沒有寫到——這一步實際上甚麼都沒有做，'
             + '但後面每一步都當它做過了。'
             + (result.noCandidate ? '　' + result.noCandidate : '');
       }
@@ -284,7 +284,7 @@ function monkeyActions_() {
       //
       // ⚠️ 權重低（見 `MONKEY_RARE_WEIGHT`）。S16 已經有一條完整嘅
       // 情境專門驗呢件事，呢度只係一個順手嘅探針。
-      id: '寫一格認不出的名字（即刻改回）',
+      id: '寫一格認不出的名字（立即改回）',
       weight: MONKEY_RARE_WEIGHT,
       legal: function (facts) { return facts.hasVersion; },
       run: function (quarterId, rnd) {
@@ -322,7 +322,7 @@ function monkeyActions_() {
       },
       expect: function (result, before, after) {
         if (result.skipped) return '';
-        if (!result.wrote) return '那一格寫不進去，這一步什麼都沒有驗到。';
+        if (!result.wrote) return '那一格寫不進去，這一步甚麼都沒有驗到。';
         // ⚠️ **儲存必定被拒絕。** 唔拒絕嘅話，一個認唔出嘅名
         // 就會靜靜噉入咗版本——而嗰個係系統最嚴厲嗰一道閘。
         if (result.blockReason !== 'NEEDS_NAME_DECISION') {
@@ -358,7 +358,7 @@ function monkeyActions_() {
       // 掣話得，而系統實際上乜都冇推進。
       expect: function (result, before, after) {
         return after.stage !== before.stage ? ''
-          : '撳了之後 Stage 沒有動過（仍然是 ' + before.stage + '）。';
+          : '按了之後 Stage 沒有動過（仍然是 ' + before.stage + '）。';
       }
     },
     {
@@ -383,7 +383,7 @@ function monkeyActions_() {
       // ⚠️ 但跳過佢有一個**連帶後果**，報告要講明：Stage 上唔到
       // `OFFICIAL_SENT`，所以「改動後重發（只算，不寄）」亦都
       // 永遠合法唔到。呢個唔係 bug，係開關嘅代價。
-      slow: '要逐個收件人（≈58 位）砌信同查個人 PDF；'
+      slow: '要逐個收件人（≈58 位）組合電郵和查核個人 PDF；'
         + '自測機 S08 ＋ S09 已完整驗過同一條路',
       legal: function (facts) {
         return !!(facts.buttons.official && facts.buttons.official.enabled);
@@ -395,8 +395,8 @@ function monkeyActions_() {
       expect: function (result, before, after) {
         if (result && result.advanced === false) return '';
         return after.stage !== before.stage ? ''
-          : '撳了之後 Stage 沒有動過（仍然是 ' + before.stage + '），'
-            + '而回傳值也沒有說明為什麼不前進。';
+          : '按了之後 Stage 沒有動過（仍然是 ' + before.stage + '），'
+            + '而回傳值也沒有說明為甚麼不前進。';
       }
     },
     {
@@ -518,7 +518,7 @@ function monkeyCheckOutcome_(picked, result, before, after) {
       if (complaint) complaints.push(complaint);
     } catch (err) {
       // ⚠️ 查證本身爆咗 ⇒ **要報**。靜靜噉當佢過就係呢一組要修嗰件事。
-      complaints.push('查不到這一步做過什麼：' + err.message);
+      complaints.push('查不到這一步做過甚麼：' + err.message);
     }
   }
   return complaints;
@@ -745,7 +745,7 @@ function runMonkey_(steps, seed, skipDraws, priorSteps) {
         step: absStep, kind: '這個狀態下沒有任何合法動作',
         detail: '停在 ' + monkeyStateFingerprint_(facts)
           + '（Stage｜最新版本號｜認不出的格數）。'
-          + '這一批可以撳的動作有 ' + actions.length + ' 個，'
+          + '這一批可以按的動作有 ' + actions.length + ' 個，'
           + '而沒有一個在這個狀態下合法，所以乾淨停手。',
         path: path.slice()
       });
@@ -775,7 +775,7 @@ function runMonkey_(steps, seed, skipDraws, priorSteps) {
       try {
         after = monkeyReadFacts_(quarterId);
       } catch (err) {
-        failures.push({ step: absStep, kind: '撳完讀不到狀態',
+        failures.push({ step: absStep, kind: '按完讀不到狀態',
           detail: picked.id + '　' + err.message,
           path: path.slice().concat([picked.id]) });
       }
@@ -833,7 +833,7 @@ function runMonkey_(steps, seed, skipDraws, priorSteps) {
         detail: '連續 ' + sameFingerprintRun + ' 步都選中「' + picked.id
           + '」，而且 Stage／最新版本號／認不出的格數完全沒有變過（'
           + monkeyStateFingerprint_(after || facts) + '）。'
-          + '再跑下去只會重複同一步。',
+          + '再執行下去只會重複同一步。',
         path: path.slice()
       });
       stepLog.push({
@@ -986,7 +986,7 @@ function monkeyDescribeSpeed_(report) {
   const range = steps > 0
     ? '（第 ' + report.firstStepNo + ' – ' + report.lastStepNo + ' 步）'
     : '';
-  return '這一批：跑了 ' + steps + ' 步' + range
+  return '這一批：執行了 ' + steps + ' 步' + range
     + '／用了 ' + monkeyFormatDuration_(report.totalMs)
     + '／平均每步 ' + per
     + '（動作 ' + monkeyFormatDuration_(report.actionMs)
@@ -1023,7 +1023,7 @@ function describeMonkeyReport_(report) {
       + report.failures.length + ' 項失敗（這一批）',
     '沙盒季度：' + report.quarterId,
     // ⚠️ seed 一定要印。同一個 seed 重跑一定同一條路。
-    '隨機種子：' + report.seed + '（用同一個種子重跑，會走同一條路）'
+    '隨機種子：' + report.seed + '（用同一個種子重新執行，會走同一條路）'
   ];
 
   // ── 第六十一輪批次 D 組：時間去咗邊 ──────────────────────────
@@ -1037,11 +1037,11 @@ function describeMonkeyReport_(report) {
   // ⚠️ 兩者要分開講。「跑了 50 步」唔等於「驗了 50 次全套」——
   // 混做一句嘅話，一個「全套只跑過 1 次」嘅批次睇落同
   // 「每步都跑全套」一模一樣。
-  lines.push('不變量：逐步跑快的那批（'
+  lines.push('不變量：逐步執行較快的那批（'
     + ((report.fastInvariantIds || []).join('／') || '—') + '）；'
-    + '全套跑了 ' + report.fullSweepCount + ' 次（每 '
+    + '全套執行了 ' + report.fullSweepCount + ' 次（每 '
     + MONKEY_FULL_INVARIANT_EVERY + ' 步一次'
-    + (report.tailSweepStep ? '，另加收尾補跑第 ' + report.tailSweepStep + ' 步'
+    + (report.tailSweepStep ? '，另加收尾補執行第 ' + report.tailSweepStep + ' 步'
       : '') + '）。');
 
   // ── 第六十一輪批次 C 組：跳咗邊幾個慢動作 ────────────────────
@@ -1075,10 +1075,10 @@ function describeMonkeyReport_(report) {
     lines.push('⛔ 這個狀態下沒有任何合法動作，已乾淨停手。');
     lines.push('　 停在第 ' + report.noLegalAction.step + ' 步，狀態 '
       + report.noLegalAction.state + '（Stage｜最新版本號｜認不出的格數）');
-    lines.push('　 這一批可以撳的動作有 ' + report.noLegalAction.actionCount
+    lines.push('　 這一批可以按的動作有 ' + report.noLegalAction.actionCount
       + ' 個，沒有一個在這個狀態下合法。');
     lines.push('　 完整重現路徑：' + (report.path.join(' → ') || '（第一步）'));
-    lines.push('　 用同一個種子（' + report.seed + '）重跑會走同一條路。');
+    lines.push('　 用同一個種子（' + report.seed + '）重新執行會走同一條路。');
     lines.push('');
   }
 
@@ -1094,7 +1094,7 @@ function describeMonkeyReport_(report) {
     lines.push('　 停下來時的狀態：' + report.spinning.state
       + '（Stage｜最新版本號｜認不出的格數）');
     lines.push('　 完整重現路徑：' + (report.path.join(' → ') || '（第一步）'));
-    lines.push('　 用同一個種子（' + report.seed + '）重跑會走同一條路。');
+    lines.push('　 用同一個種子（' + report.seed + '）重新執行會走同一條路。');
     lines.push('');
   }
 
@@ -1108,13 +1108,13 @@ function describeMonkeyReport_(report) {
       + (f.sweep === '全套' ? '（全套那一次驗到；可能是前面幾步之內壞的）'
         : ''));
     lines.push('　 ' + f.detail);
-    lines.push('　 走到這裡的完整步驟：' + (f.path.join(' → ') || '（第一步）'));
+    lines.push('　 走到這裏的完整步驟：' + (f.path.join(' → ') || '（第一步）'));
     lines.push('');
   });
 
   if (report.stoppedForTime) {
-    lines.push('⚠️ 執行時間到，已經乾淨停低（跑了 ' + report.ranSteps + ' 步）。');
-    lines.push('　 撳「測試工具 ▸ ▶️ 繼續亂行」再跑一批。');
+    lines.push('⚠️ 執行時間到，已經乾淨停下（執行了 ' + report.ranSteps + ' 步）。');
+    lines.push('　 按「測試工具 ▸ ▶️ 繼續亂行」再執行一批。');
     lines.push('');
   }
   lines.push('逐步紀錄已經寫進「' + MONKEY_SHEETS.LOG + '」工作表。');
@@ -1242,15 +1242,15 @@ function runMonkeyResumeFromMenu_() {
   if (!state.seed) {
     ui.alert(title,
       '找不到上一次亂行的紀錄（' + MONKEY_SHEETS.STATE + '工作表）。\n\n'
-        + '請先撳「⚠️ 亂行機（沙盒季度，DRY_RUN）」跑第一批。',
+        + '請先按「⚠️ 亂行機（沙盒季度，DRY_RUN）」執行第一批。',
       ui.ButtonSet.OK);
     return;
   }
   const response = ui.prompt(title,
-    '上一次的種子：' + state.seed + '，累計已經跑了 ' + state.totalSteps
+    '上一次的種子：' + state.seed + '，累計已經執行了 ' + state.totalSteps
       + ' 步（用了 ' + state.drawnCount + ' 個亂數）。\n\n'
-      + '這一次會用同一個種子接住上一條路走下去。\n\n'
-      + '要再跑幾多步？（留空 ＝ 50）',
+      + '這一次會用同一個種子沿上一條路繼續走下去。\n\n'
+      + '要再執行多少步？（留空 ＝ 50）',
     ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
   const steps = Number(normalizeIdInput_(response.getResponseText())) || 50;
@@ -1262,7 +1262,7 @@ function runMonkeyResumeFromMenu_() {
     // 而報告嗰句「跑了 N / 50 步」永遠去唔到 50。
     report = runMonkey_(steps, state.seed, state.drawnCount, state.totalSteps);
   } catch (err) {
-    log_('ERROR', 'runMonkey_（續跑）失敗：' + err.message);
+    log_('ERROR', 'runMonkey_（繼續執行）失敗：' + err.message);
     ui.alert(title, '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
     return;
   }
@@ -1287,10 +1287,10 @@ function runMonkeyFromMenu_() {
   const stepsResponse = ui.prompt(title,
     '沙盒季度：' + quarter.value + '\n\n'
       + '這個工具會由沙盒季度的現在狀態出發，看看有哪幾個動作是合法的，'
-      + '隨機選一個執行，然後跑一次全部不變量。重覆 N 次。\n\n'
+      + '隨機選一個執行，然後執行一次全部不變量。重覆 N 次。\n\n'
       + '全程 DRY_RUN，不會寄出任何真實電郵。\n'
       + '不會安裝 trigger、不會碰其他季度、不會改 Config、不會改人員資料。\n\n'
-      + '要跑幾多步？（留空 ＝ 50）',
+      + '要執行多少步？（留空 ＝ 50）',
     ui.ButtonSet.OK_CANCEL);
   if (stepsResponse.getSelectedButton() !== ui.Button.OK) return;
   const steps = Number(normalizeIdInput_(stepsResponse.getResponseText())) || 50;
@@ -1301,7 +1301,7 @@ function runMonkeyFromMenu_() {
   const defaultSeed = Number(Utilities.formatDate(new Date(), timezone, 'yyyyMMdd'));
   const seedResponse = ui.prompt(title,
     '隨機種子？（留空 ＝ ' + defaultSeed + '）\n\n'
-      + '同一個種子重跑，一定走同一條路——所以紅了之後，'
+      + '同一個種子重新執行，一定走同一條路——所以紅了之後，'
       + '用報告開頭那一個種子就可以原原本本重現一次。',
     ui.ButtonSet.OK_CANCEL);
   if (seedResponse.getSelectedButton() !== ui.Button.OK) return;

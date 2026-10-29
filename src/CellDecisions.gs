@@ -68,7 +68,7 @@ function normalizeCellDecisionItem_(item) {
   const kind = String(it.kind || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate) || !postId || !(slotIndex >= 1)
     || (kind !== CELL_DECISION_KIND.KEEP && kind !== CELL_DECISION_KIND.TEMP_HELPER)) {
-    throw new Error('記不住這一項決定：格子資料不完整（' + JSON.stringify(it) + '）。請撳「重新整理」再試。');
+    throw new Error('記不住這一項決定：格子資料不完整（' + JSON.stringify(it) + '）。請按「重新整理」再試。');
   }
   return {
     serviceDate: serviceDate, postId: postId, slotIndex: slotIndex, kind: kind,
@@ -149,7 +149,7 @@ function apiSetCellDecisions(quarterId, items) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('記住你的決定', function () {
     const q = String(quarterId || '').trim();
-    if (!q) throw new Error('記不住這一項決定：沒有季度。請撳「重新整理」再試。');
+    if (!q) throw new Error('無法記錄這一項決定：沒有季度。請按「重新整理」再試。');
     const list = (Array.isArray(items) ? items : []).map(normalizeCellDecisionItem_);
     if (list.length === 0) return { ok: true, written: 0 };
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);

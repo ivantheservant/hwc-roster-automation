@@ -152,7 +152,7 @@ console.log('\n=== BA5　確認窗資料同畫面：unreleased 黃框 ===');
   const text = (n) => String(n.textContent || '') + (n.children || []).map(text).join('\n');
   const shown = ui.buildSendWarningNodes(w).map(text).join('\n');
   check('★★★★★ 黃框文字：還未放行、不阻擋、收到的人會見到、先在第 2 步改好再儲存',
-    /這一版有 2 格違反一定要遵守的規則，而且還未放行（例如儲存之後改了名單）。這不會阻擋寄出，但收到的人會見到這些安排。要改的話，先在第 2 步改好再儲存。/.test(shown),
+    /這一版有 2 格違反一定要遵守的規則，而且還未放行（例如儲存之後改了名單）。這不會阻擋寄出，但收到的人會看到這些安排。要改的話，先在第 2 步改好再儲存。/.test(shown),
     shown);
   check('★★★★ 黃框列出那幾格（主席、讀經）', /主席/.test(shown) && /讀經/.test(shown), shown);
   const compact = ui.buildSendWarningNodes(w, { compact: true }).map(text).join('\n');

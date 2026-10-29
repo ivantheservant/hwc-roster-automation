@@ -329,9 +329,9 @@
         throw new Error(buildClientThreePart_(
           '程式錯誤：呼叫「' + fnName + '」的時候，' + hit.path
             + ' 是' + hit.what + '，這種東西送不到伺服器。',
-          '伺服器一次都沒有被呼叫，所以什麼都沒有改動。',
-          ['請把這一句連同你剛才撳過的掣告訴開發者',
-            '最常見的成因是：一粒掣直接把一個「會收參數」的函式當成點擊處理'
+          '伺服器一次都沒有被呼叫，所以甚麼都沒有改動。',
+          ['請把這一句連同你剛才按過的按鈕名稱告訴開發者',
+            '最常見的成因是：某個按鈕直接把一個「會收參數」的函式當成點擊處理'
               + '（那樣它收到的第一個參數會是滑鼠事件，不是你以為的那個值）']));
       }
       // 乾淨先清——`JSON` 一個來回剝走 prototype／getter 呢類
@@ -349,7 +349,7 @@
    * @returns {string} 三段式訊息
    */
   function buildClientThreePart_(what, state, howto) {
-    return '發生了什麼：' + what
+    return '發生了甚麼：' + what
       + '\n現在的情況：' + state
       + '\n你可以怎樣做：\n' + (howto || []).map(function (h) { return '・' + h; }).join('\n');
   }
@@ -427,7 +427,7 @@
   function callServer(fnName, ...args) {
     if (READ_ONLY_APIS.indexOf(fnName) === -1) {
       return Promise.reject(new Error(
-        '程式錯誤：「' + fnName + '」不在唯讀白名單裡面。'
+        '程式錯誤：「' + fnName + '」不在唯讀白名單裏面。'
         + '會改動資料的呼叫要用 callServerMutating()（它會自動把狀態快取標記為過期）；'
         + '如果它真的一格都不會寫，請把它加入 READ_ONLY_APIS。'));
     }
@@ -638,7 +638,7 @@
     if (outcome !== 'done' && outcome !== 'fail') { busyNode_.hidden = true; return; }
     el('busyCard').className = 'busy-card ' + (outcome === 'done' ? 'is-done' : 'is-fail');
     el('busyTitle').textContent = message || (outcome === 'done' ? '已完成' : '沒有完成');
-    el('busySub').textContent = outcome === 'done' ? '' : '下面會講清楚發生了什麼事。';
+    el('busySub').textContent = outcome === 'done' ? '' : '下面會說明發生了甚麼事。';
     el('busyBar').hidden = true;
     if (busyTickTimer_) { clearInterval(busyTickTimer_); busyTickTimer_ = null; }
     busyHideTimer_ = setTimeout(() => {
@@ -806,7 +806,7 @@
       // 完全無關嘅訊息）。所以只寫一句灰字，唔開第二個彈窗。
       if (dashboardStale_) {
         try { await loadDashboard({ keepModal: true }); }
-        catch (e) { setStatus('畫面上的數字可能不是最新的，請撳「重新整理」。', true); }
+        catch (e) { setStatus('畫面上的數字可能不是最新的，請按「重新整理」。', true); }
       }
       // ⚠️ 收牌一定要喺刷新之後——刷新本身可能要幾秒，
       // 喺嗰之前收牌就會出現「講咗已完成、但畫面仲係舊數字」嘅空窗。
@@ -897,7 +897,7 @@
     if (blank.count > 0) {
       const box = make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '⚠ 這一版還有 ' + blank.count + ' 格沒有人，收到的人會見到空格。',
+          text: '⚠ 這一版還有 ' + blank.count + ' 格沒有人，收到的人會看到空格。',
           className: 'warn-head'
         })
       ]);
@@ -926,7 +926,7 @@
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
           text: '這一季有 ' + late.count + ' 格的人之後才申報不能服侍：' + names + '。'
-            + '撳第 2 步〔請系統幫我調整〕換人，或者在〔檢查我的改動〕勾「保留我的安排」。',
+            + '按第 2 步〔請系統幫我調整〕換人，或者在〔檢查我的改動〕勾「保留我的安排」。',
           className: 'warn-head'
         })
       ]));
@@ -939,7 +939,7 @@
       const box = make('div', { className: 'warnbox' }, [
         make('div', {
           text: '⚠ 這一版有 ' + unreleased.count + ' 格違反一定要遵守的規則，而且還未放行（例如儲存之後改了名單）。'
-            + '這不會阻擋寄出，但收到的人會見到這些安排。要改的話，先在第 2 步改好再儲存。',
+            + '這不會阻擋寄出，但收到的人會看到這些安排。要改的話，先在第 2 步改好再儲存。',
           className: 'warn-head'
         })
       ]);
@@ -1026,7 +1026,7 @@
         box.appendChild(make('div', { text: '另有 ' + impact.moreCount + ' 格。', className: 'muted' }));
       }
       box.appendChild(make('div', {
-        text: '這幾格不會自動改動。要系統幫你重排的話，撳「請系統幫我調整」。',
+        text: '這幾格不會自動改動。要系統幫你重排的話，按「請系統幫我調整」。',
         className: 'muted'
       }));
       if (withButton) {
@@ -1273,7 +1273,7 @@
         msg.textContent = '會另外寄給這 ' + r.valid.length + ' 個地址。' + (note || '');
       } else {
         msg.className = 'muted';
-        msg.textContent = '用逗號或者換行分開，可以入多過一個。' + (note || '');
+        msg.textContent = '用逗號或者換行分開，可以輸入多於一個。' + (note || '');
       }
     };
     input.addEventListener('input', () => {
@@ -1300,7 +1300,7 @@
     const r = parseEmailList(store.extraEmailsRaw || '');
     if (r.invalid.length > 0) {
       setStatus('這 ' + r.invalid.length + ' 個看起來不是電郵地址：'
-        + r.invalid.join('、') + '。改好或者刪走再撳一次。', true);
+        + r.invalid.join('、') + '。改好或者刪除再按一次。', true);
       return false;
     }
     store.extraEmails = r.valid;
@@ -1331,7 +1331,7 @@
       // ⚠️ 零個收件人**一定要講**。一個空白嘅段落等於冇講——
       // 而幹事撳落去之後會見到「寄出 0 封」，然後以為系統壞咗。
       box.appendChild(make('div', {
-        text: '⚠ 一個收件人都沒有。撳落去不會寄出任何東西。',
+        text: '⚠ 一個收件人都沒有。現在按下也不會寄出任何東西。',
         className: 'vio-row'
       }));
       return box;
@@ -1520,12 +1520,12 @@
       nodes.push(errorPart(ERR_LABEL_WHAT,
         'Google 試算表暫時沒有回應（這是 Google 那邊的暫時問題，不是你做錯了）。'));
       nodes.push(errorPart('現在的情況',
-        '如果剛才是在看資料，什麼都沒有改動。如果剛才是在儲存、套用或寄出，'
-        + '可能已經做了一部分——先撳「重新整理」看看狀態卡和版本號，再決定要不要重做。'));
+        '如果剛才是在看資料，甚麼都沒有改動。如果剛才是在儲存、套用或寄出，'
+        + '可能已經做了一部分——先按「重新整理」看看狀態卡和版本號，再決定要不要重做。'));
       const doBox = make('div', { className: 'err-part' });
       doBox.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
       const ul = make('ul', { className: 'err-list' });
-      ul.appendChild(make('li', { text: '等十秒，撳「重新整理」，確認狀態之後再試一次' }));
+      ul.appendChild(make('li', { text: '等十秒，按「重新整理」，確認狀態之後再試一次' }));
       ul.appendChild(make('li', { text: '一直這樣的話，把下面的技術詳情複製給開發者' }));
       doBox.appendChild(ul);
       nodes.push(doBox);
@@ -1607,8 +1607,8 @@
 
   /** 把後端 `buildThreePartMessage_()` 出嚟嘅字串拆返三段。 */
   function parseThreePartMessage(raw) {
-    if (raw.indexOf('發生了什麼：') === -1 || raw.indexOf('現在的情況：') === -1) return null;
-    const whatStart = raw.indexOf('發生了什麼：') + '發生了什麼：'.length;
+    if (raw.indexOf('發生了甚麼：') === -1 || raw.indexOf('現在的情況：') === -1) return null;
+    const whatStart = raw.indexOf('發生了甚麼：') + '發生了甚麼：'.length;
     const stateIdx = raw.indexOf('現在的情況：');
     const doIdx = raw.indexOf('你可以怎樣做：');
     const what = raw.slice(whatStart, stateIdx).trim();
@@ -1761,7 +1761,7 @@
   /** 錯誤係咪「鎖被佔用」（`withMutationLock_()` 嗰兩句）——只有呢種先值得等。 */
   function isMutationLockBusyError(err) {
     const msg = err && err.message ? err.message : String(err || '');
-    return /另一個動作還在做緊|拿不到「同一時間只做一件事」那一把鎖/.test(msg);
+    return /另一個動作仍在進行|拿不到「同一時間只做一件事」那一把鎖/.test(msg);
   }
 
   /** 等一陣（測試可以換走）。 */
@@ -1800,7 +1800,7 @@
     return run.then((r) => {
       if (r.ok) return true;
       setStatus('記不住你的選擇：' + (r.err && r.err.message ? r.err.message : String(r.err))
-        + '　勾選已經還原，請再勾一次，或者撳「重新整理」。', true);
+        + '　勾選已經還原，請再勾一次，或者按「重新整理」。', true);
       return false;
     }, (err) => {
       setStatus('記不住你的選擇：' + (err && err.message ? err.message : String(err)), true);
@@ -1835,15 +1835,15 @@
         const want = cb.checked;
         state[sk(it)] = want;
         changed();
-        note.textContent = '　記住中……';
+        note.textContent = '　記錄中……';
         note.className = 'decision-note';
         const ok = await persistDecisions([decisionPayload(it, want)],
-          () => { note.textContent = '　記住中……（另一個動作做緊，系統會自動再試）'; });
+          () => { note.textContent = '　記錄中……（另一個動作正在進行，系統會自動再試）'; });
         if (ok) {
           note.textContent = '';
         } else {
           cb.checked = !want; state[sk(it)] = !want; changed();
-          note.textContent = '　這一格未記住，請再勾一次';
+          note.textContent = '　這一格未能記錄，請再勾一次';
           note.className = 'decision-note err-text';
         }
       });
@@ -1931,10 +1931,10 @@
         button('確定', async () => {
           confirmBox.hidden = true;
           const todo = boxes.filter((b) => !b.cb.checked);
-          todo.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; b.note.textContent = '　記住中……'; });
+          todo.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; b.note.textContent = '　記錄中……'; });
           changed();
           const ok = await persistDecisions(todo.map((b) => decisionPayload(b.item, true)));
-          todo.forEach((b) => { b.note.textContent = ok ? '' : '　這一格未記住，請再勾一次'; });
+          todo.forEach((b) => { b.note.textContent = ok ? '' : '　這一格未能記錄，請再勾一次'; });
           if (!ok) {
             todo.forEach((b) => { b.cb.checked = false; state[sk(b.item)] = false; });
             changed();

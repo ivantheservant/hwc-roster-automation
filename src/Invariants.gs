@@ -269,14 +269,14 @@ function invariantButtonPreconditions_(quarterId) {
     }
     if (!b.enabled && String(b.disabledReason || '').trim() === '') {
       // ⚠️ 一粒灰咗而唔講點解嘅掣，就係第四十輪 Ivan 撞到嗰件事。
-      bad.push(key + '：enabled=false 而沒有 disabledReason（幹事不知道怎樣才撳得到）');
+      bad.push(key + '：enabled=false 而沒有 disabledReason（幹事不知道怎樣才按得到）');
     }
   });
   return invariantResult_('I02',
-    '每一粒掣的 enabled 同 disabledReason 沒有互相矛盾',
+    '每一個按鈕的 enabled 和 disabledReason 沒有互相矛盾',
     bad.length === 0 ? INVARIANT_STATUS.OK : INVARIANT_STATUS.FAILED,
     '0 項矛盾', bad.length + ' 項矛盾',
-    bad.length === 0 ? '檢查了 ' + Object.keys(buttons).length + ' 粒掣。' : bad.join('；'));
+    bad.length === 0 ? '檢查了 ' + Object.keys(buttons).length + ' 個按鈕。' : bad.join('；'));
 }
 
 /**
@@ -334,7 +334,7 @@ function invariantDialogNumbers_(quarterId) {
         verified = entry.verify(quarterId, c.options);
       } catch (err) {
         results.push(invariantResult_('I08.' + entry.id + c.label,
-          entry.where, INVARIANT_STATUS.ERROR, '兩條路數出同一個數', '算不出來',
+          entry.where, INVARIANT_STATUS.ERROR, '兩條路算出同一個數', '算不出來',
           err.message));
         return;
       }
@@ -547,7 +547,7 @@ function invariantDryRunNoRealSend_(quarterId) {
       ? 'DRY_RUN=TRUE，' + quarterId + ' 的 SendLog 全部是模擬紀錄。'
       : '⚠️ DRY_RUN=TRUE 而這幾筆是 Status=' + MAIL_STATUS.SENT + '：'
         + real.slice(0, 10).join('；')
-        + '（可能是之前在真實模式下寄的；如果是剛剛跑出來的，代表模擬模式沒有生效）');
+        + '（可能是之前在真實模式下寄的；如果是剛剛執行出來的，代表模擬模式沒有生效）');
 }
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -637,7 +637,7 @@ function runAllInvariants_(quarterId, set) {
     run('I06', 'SendLog 每一行的版本找得到', invariantSendLogVersions_);
     run('I07', '受保護季度的 v0 真的有保護', invariantProtectedV0_);
     if (qid) {
-      run('I02', '每一粒掣的前置條件', function () {
+      run('I02', '每一個按鈕的前置條件', function () {
         return invariantButtonPreconditions_(qid);
       });
       run('I08', '畫面上的每一個數字', function () { return invariantDialogNumbers_(qid); });
@@ -647,7 +647,7 @@ function runAllInvariants_(quarterId, set) {
   if (!qid && (wantFast || wantSlow)) {
     results.push(invariantResult_('I02／I08／I09／I10', '需要指定季度才驗得到',
       INVARIANT_STATUS.SKIPPED, '', '',
-      '這四條要對住一個季度才驗得到。跑自測機或亂行機時會自動帶上沙盒季度。'));
+      '這四條要對住一個季度才驗得到。執行自測機或亂行機時會自動帶上沙盒季度。'));
   }
 
   const count = function (status) {
@@ -719,8 +719,8 @@ function classifyInvariantsHealth_(report) {
       ? report.okCount + ' 條全部成立'
       : report.failedCount + ' 條失敗、' + report.errorCount + ' 條算不出',
     broken === 0
-      ? '畫面上的數字同工作表對得上。'
-      : '⚠️ 以下每一條都代表「畫面講的東西同工作表對不上」，或者「系統自己都算不出來」。',
+      ? '畫面上的數字和工作表對得上。'
+      : '⚠️ 以下每一條都代表「畫面說的東西和工作表對不上」，或者「系統自己都算不出來」。',
     report.results.filter(function (r) {
       return r.status !== INVARIANT_STATUS.OK && r.status !== INVARIANT_STATUS.SKIPPED;
     }).map(function (r) {

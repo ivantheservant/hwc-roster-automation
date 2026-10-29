@@ -138,7 +138,7 @@ function apiSaveSpecialSunday(payload) {
   headers.forEach(function (h, i) { if (h) beforeByKey[h] = before[i]; });
   if (String(beforeByKey[S.QUARTER_ID] || '').trim() !== String(p.quarterId || '').trim()) {
     throw new Error(buildThreePartMessage_(
-      '要改的那一行不屬於目前選中的季度（可能在你開著這個畫面的時候，'
+      '要改的那一行不屬於目前選中的季度（可能在你開着這個畫面的時候，'
         + '有人動過特別主日的資料）。',
       '沒有改動任何東西。',
       ['關掉這個畫面，重新整理再試一次']));

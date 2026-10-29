@@ -152,6 +152,8 @@ listSourceFiles().forEach(function (file) {
   // 逐行掃，方便報行號；一行可能有多個路徑。
   scanned.split('\n').forEach(function (line, idx) {
     const lineNo = idx + 1;
+    // 第八十五輪批次 LA 組：一次性更新工具的 `old:` 是試算表現時的舊文字（用來核對），畫面不會顯示。
+    if (/SheetTextUpdate\.gs$/.test(rel) && /^\s*old: '/.test(line)) return;
     // 「A ▸ B」（B 可以再有 ▸ C）。到引號／全形標點／行尾為止。
     const re = /([^\s'"「」，。、＋+]+)\s*▸\s*([^'"「」，。、\n]+)/g;
     let m;
@@ -243,7 +245,7 @@ console.log('\n=== D3 回歸：兩個演練選單標籤唔再撞頭 ===');
       check('★★★★★ 兩項嘅圖示都唔同',
         rehearsal[0].charAt(0) !== rehearsal[1].charAt(0), JSON.stringify(rehearsal));
       check('★★★★ 一項明講「第一段／由頭開始」',
-        rehearsal.some(function (it) { return /第一段|由頭開始/.test(it); }), JSON.stringify(rehearsal));
+        rehearsal.some(function (it) { return /第一段|從頭開始/.test(it); }), JSON.stringify(rehearsal));
       check('★★★★ 一項明講「接續上一段」',
         rehearsal.some(function (it) { return /接續上一段/.test(it); }), JSON.stringify(rehearsal));
     }

@@ -321,7 +321,7 @@ console.log('\n=== C：寄出彈窗 ===');
   //「放棄」嘅位置搵一條「繼續」嘅路。
   // 第七十七輪批次 EE 組：〔立即儲存並繼續〕拿走，改為叫佢先〔取消〕再撳第 2 步〔儲存〕；加〔寄出上一個版本〕
   check('★★★★★★ 有未儲存改動 ⇒ 叫佢先儲存再寄出，並有〔寄出上一個版本（第 K 版）〕',
-    /請先撳〔取消〕，再撳第 2 步〔儲存〕，然後才寄出/.test(sendPaper)
+    /請先按〔取消〕，再按第 2 步〔儲存〕，然後才寄出/.test(sendPaper)
     && /button\('寄出上一個版本（' \+ versionText \+ '）'/.test(sendPaper));
   check('★★★★★ 落到最後係叫返原本嗰三條路，冇另起爐灶',
     /openReview\(\)/.test(sendPaper) && /openOfficial\(\)/.test(sendPaper)

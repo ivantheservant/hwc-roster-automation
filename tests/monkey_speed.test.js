@@ -138,18 +138,18 @@ console.log('\n=== B【核心】逐步跑快嗰批，每 10 步 ＋ 收尾跑全
   const gas = box.gas;
   const sets = box.invCalls;
 
-  checkEqual('★★★★★★ 跑足 12 步', box.report.ranSteps, 12);
+  checkEqual('★★★★★★ 執行足 12 步', box.report.ranSteps, 12);
   checkEqual('★★★★★★ **逐步嗰批係 `PER_SCENARIO`（快嗰四條）**'
     + '——之前每步都跑 `ALL`，入面有 I04（成萬行）同 I08（每條行一次完整 plan）',
     sets.slice(0, 9).filter(function (s) {
       return s === gas.INVARIANT_SET.PER_SCENARIO;
     }).length, 9);
-  checkEqual('★★★★★★ **第 10 步跑全套**——慳時間唔可以變成唔跑全套',
+  checkEqual('★★★★★★ **第 10 步執行全套**——慳時間唔可以變成唔執行全套',
     sets[9], gas.INVARIANT_SET.ALL);
-  checkEqual('★★★★★★ **第 12 步（最後一步）都跑全套**',
+  checkEqual('★★★★★★ **第 12 步（最後一步）都執行全套**',
     sets[11], gas.INVARIANT_SET.ALL);
-  checkEqual('★★★★★ 全套一共跑咗 2 次', box.report.fullSweepCount, 2);
-  checkEqual('★★★★★ 最後一步本身已經係全套 ⇒ 唔使再補跑',
+  checkEqual('★★★★★ 全套一共執行咗 2 次', box.report.fullSweepCount, 2);
+  checkEqual('★★★★★ 最後一步本身已經係全套 ⇒ 唔使再補執行',
     box.report.tailSweepStep, 0);
   checkEqual('★★★★★ 12 步只叫咗 12 次不變量（唔會又快又全咁叫兩次）',
     sets.length, 12);
@@ -184,7 +184,7 @@ console.log('\n=== B【核心】中途 break ⇒ 收尾一定補跑一次全套 
     'tailSweepStep=' + box.report.tailSweepStep
       + '　ranSteps=' + box.report.ranSteps
       + '　最後一次=' + box.invCalls[box.invCalls.length - 1]);
-  checkEqual('★★★★★ 全套一共跑咗 1 次', box.report.fullSweepCount, 1);
+  checkEqual('★★★★★ 全套一共執行咗 1 次', box.report.fullSweepCount, 1);
 }
 
 // =====================================================================
@@ -213,7 +213,7 @@ console.log('\n=== B 只喺全套嗰次先驗到嘅失敗，要講明 ===');
     + '——唔講嘅話，人會淨係盯住第 10 步嗰個動作',
     /可能是前面幾步之內壞的/.test(lines), lines.slice(0, 800));
   check('★★★★★ 而且照樣印完整重現路徑',
-    /走到這裡的完整步驟：/.test(lines), lines.slice(0, 800));
+    /走到這裏的完整步驟：/.test(lines), lines.slice(0, 800));
 }
 
 // =====================================================================
@@ -302,7 +302,7 @@ console.log('\n=== A【核心】冇一個動作合法 ⇒ 乾淨停手，但唔�
   check('★★★★★★ 報告最頂大聲講',
     /⛔ 這個狀態下沒有任何合法動作，已乾淨停手。/.test(lines), lines.slice(0, 800));
   check('★★★★★★ **而且印完整重現路徑同種子**',
-    /完整重現路徑：/.test(lines) && /用同一個種子（7）重跑會走同一條路/.test(lines),
+    /完整重現路徑：/.test(lines) && /用同一個種子（7）重新執行會走同一條路/.test(lines),
     lines.slice(0, 800));
 }
 
@@ -315,7 +315,7 @@ console.log('\n=== A 有得揀嗰陣唔可以誤報「冇合法動作」 ===');
       return [{ id: 'X', legal: function () { return true; },
         run: function () { return {}; } }];
     } });
-  checkEqual('★★★★★★ 跑足 5 步', box.report.ranSteps, 5);
+  checkEqual('★★★★★★ 執行足 5 步', box.report.ranSteps, 5);
   checkEqual('★★★★★ 冇 `noLegalAction`', box.report.noLegalAction, null);
 }
 
@@ -329,11 +329,11 @@ console.log('\n=== D【核心】報告要講得出時間去咗邊 ===');
   });
   // ⚠️ 第六十二輪批次 B3 組：多咗「（第 X – Y 步）」，而且時間
   // 超過一分鐘就寫「M 分 S 秒」——`270.0 秒` 讀落要自己心算。
-  checkEqual('★★★★★★ **一行講齊：幾多步／邊幾步／幾多秒／每步幾多秒／'
+  checkEqual('★★★★★★ **一行說齊：多少步／邊幾步／多少秒／每步多少秒／'
     + '動作同不變量各佔幾多**'
     + '——冇呢一行嘅話，「一批 4.5 分鐘得 2 步」每次都要重新估樽頸喺邊',
     line,
-    '這一批：跑了 2 步（第 8 – 9 步）／用了 4 分 30 秒／平均每步 135 秒'
+    '這一批：執行了 2 步（第 8 – 9 步）／用了 4 分 30 秒／平均每步 135 秒'
       + '（動作 40.0 秒／不變量 3 分 45 秒）');
   check('★★★★★ 零步都唔會爆（除零）',
     /平均每步 —/.test(gas.monkeyDescribeSpeed_(
@@ -353,11 +353,11 @@ console.log('\n=== D【核心】報告要講得出時間去咗邊 ===');
       invariantMs: box.report.invariantMs }));
   const lines = box.gas.describeMonkeyReport_(box.report).join('\n');
   check('★★★★★★ 而且真係印咗出嚟',
-    /這一批：跑了 3 步（第 1 – 3 步）／用了 /.test(lines),
+    /這一批：執行了 3 步（第 1 – 3 步）／用了 /.test(lines),
     lines.slice(0, 500));
   check('★★★★★★ 逐步同全套要分開講'
     + '——「跑了 50 步」唔等於「驗了 50 次全套」',
-    /不變量：逐步跑快的那批（/.test(lines) && /全套跑了 /.test(lines),
+    /不變量：逐步執行較快的那批（/.test(lines) && /全套執行了 /.test(lines),
     lines.slice(0, 700));
   check('★★★★★ 快嗰批嘅 id 由真正跑過嗰次攞返，唔係另寫一份清單',
     /fastInvariantIds = inv\.results\.map/.test(read('src/MonkeyRun.gs')), '');

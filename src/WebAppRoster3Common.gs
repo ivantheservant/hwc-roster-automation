@@ -37,7 +37,7 @@ function openSheetForEdit_(sheetName) {
   if (!sheet) {
     throw new Error(buildThreePartMessage_(
       '找不到「' + sheetName + '」這張工作表。',
-      '什麼都沒有改動。',
+      '甚麼都沒有改動。',
       [
         '檢查試算表下面的分頁有沒有被改名或者刪掉',
         '如果是新環境，先執行選單的「維護 ▸ 全新環境自我檢查」'

@@ -193,7 +193,7 @@ function apiOpenEligibilitySheet() {
     targetSheet: result.sheetName,
     targetCell: '',
     oldValue: '',
-    newValue: '攤開了 ' + result.postCount + ' 個崗位的名單'
+    newValue: '展開了 ' + result.postCount + ' 個崗位的名單'
   });
   return result;
 }
@@ -211,7 +211,7 @@ function planEligibilitySheetApply_(quarterId) {
     throw new Error(buildThreePartMessage_(
       '找不到「' + ELIGIBILITY_SHEET_NAME + '」這一張工作表。',
       '名單沒有任何改動。',
-      ['先撳「開啟名單工作表」，改完再回來撳這一粒']));
+      ['先按「開啟名單工作表」，改完再回來按這個按鈕']));
   }
 
   const lastRow = sheet.getLastRow();
@@ -220,7 +220,7 @@ function planEligibilitySheetApply_(quarterId) {
     throw new Error(buildThreePartMessage_(
       '「' + ELIGIBILITY_SHEET_NAME + '」是空的。',
       '名單沒有任何改動。',
-      ['先撳「開啟名單工作表」重新攤開一次']));
+      ['先按「開啟名單工作表」重新展開一次']));
   }
 
   const postIds = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(function (v) {
@@ -261,7 +261,7 @@ function planEligibilitySheetApply_(quarterId) {
           // 變成一串代號，而幹事根本看不懂自己在答什麼。
           kind: 'UNKNOWN_NAME', postId: postId, postNameTC: postNameById[postId], text: text,
           note: postNameById[postId] + '　第 ' + (r + ELIGIBILITY_SHEET_FIRST_DATA_ROW)
-            + ' 行的「' + text + '」不在人員名單裡面。'
+            + ' 行的「' + text + '」不在人員名單裏面。'
         });
         return;
       }
@@ -391,11 +391,11 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
   const plan = planEligibilitySheetApply_(quarterId);
   if (plan.blocked) {
     throw new Error(buildThreePartMessage_(
-      '名單裡面有 ' + plan.unresolved.length + ' 個名字系統認不出。',
+      '名單裏面有 ' + plan.unresolved.length + ' 個名字系統認不出。',
       '名單沒有任何改動——一個都沒有寫入。',
       ['回去「' + ELIGIBILITY_SHEET_NAME + '」那張表，把那幾個名字改成正確的寫法',
-        '如果那是一位新人，在第 2 步〔檢查我的改動〕撳〔加入名單〕（在出席系統選人）',
-        '改好之後再撳一次「儲存並套用名單」']));
+        '如果那是一位新人，在第 2 步〔檢查我的改動〕按〔加入名單〕（在出席系統選人）',
+        '改好之後再按一次「儲存並套用名單」']));
   }
   if (plan.added.length === 0 && plan.removed.length === 0) {
     return { changed: false, added: 0, removed: 0, message: '名單沒有改動，不需要儲存。' };
@@ -491,7 +491,7 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
     const v = findLatestVersionNo(quarterId);
     if (v >= 0) applyGridNameDropdowns_(quarterId, v);
   } catch (err) {
-    log_('WARN', '名單套用咗，但下拉選單更新唔到：' + err.message);
+    log_('WARN', '名單已套用，但下拉選單未能更新：' + err.message);
     dropdownNote = '名單已經套用好，但職事表上的下拉選單更新不到（'
       + err.message + '）。可以去「進階與診斷 ▸ 更新名單選單」再試一次。';
   }

@@ -168,7 +168,7 @@ console.log('\n=== A3【核心】S16：認唔出嘅名獨立一條，而且自�
   check('★★★★★★ 驗「儲存被拒絕」',
     /儲存被拒絕（整批，不是只跳過那一格）/.test(SRC), '');
   check('★★★★★★ 驗「訊息講得出係邊一格、格內而家係乜」',
-    /訊息講得出是哪一格/.test(SRC) && /訊息講得出那一格現在是什麼字/.test(SRC), '');
+    /訊息說得出是哪一格/.test(SRC) && /訊息說得出那一格現在是甚麼字/.test(SRC), '');
   check('★★★★★★ 驗「職事表冇任何改動（版本數冇增加）」',
     /職事表沒有任何改動（版本數沒有增加）/.test(SRC), '');
   check('★★★★★★ **佢自己收拾**：把嗰一格改返原本嘅文字',
@@ -298,7 +298,7 @@ console.log('\n=== D【核心】連環倒要報成「被擋住」，唔係九條
       && /status: SELFTEST_STATUS\.BLOCKED, checks: \[\], failedChecks: \[\]/.test(CODE),
     '');
   check('★★★★★ 而且註記講明被邊個擋住',
-    /'（被 ' \+ blockedBy\.join\('、'\) \+ ' 擋住，沒有跑。'/.test(CODE), '');
+    /'（被 ' \+ blockedBy\.join\('、'\) \+ ' 擋住，沒有執行。'/.test(CODE), '');
   check('★★★★★★ 續跑嗰陣，上一次嘅結論都算數'
     + '——否則一個「上一次紅、今次跳過」嘅上游就唔會擋到下游',
     /Object\.keys\(state\)\.forEach\(function \(id\) \{ byId\[id\] = state\[id\]; \}\);/
@@ -312,7 +312,7 @@ console.log('\n=== D【核心】連環倒要報成「被擋住」，唔係九條
       { id: 'S05', title: '儲存並確認', status: 'FAILED',
         failedChecks: [{ label: 'x', expected: '1', actual: '0', evidence: '由 y 來' }] },
       { id: 'S06', title: '寄審閱', status: 'BLOCKED', failedChecks: [],
-        note: '（被 S05 擋住，沒有跑。）' },
+        note: '（被 S05 擋住，沒有執行。）' },
       { id: 'S07', title: '套用申報', status: 'BLOCKED', failedChecks: [] }
     ],
     passedCount: 6, failedCount: 1, errorCount: 0, notRunCount: 0,
@@ -331,8 +331,8 @@ console.log('\n=== D【核心】連環倒要報成「被擋住」，唔係九條
   // 第五十六輪批次 B2 組：尾句唔再按狀態揀一句印，兩種情況一齊印。
   check('★★★★★★ 下一步**兩種情況一齊印**'
     + '——部機器根本知唔到使用者有冇 clasp push 過，估唔到就唔好扮估到',
-    /・你改過程式碼（有 clasp push 過） ⇒ 撳「⚠️ 跑自測」重頭跑/.test(lines)
-      && /・你沒有改過程式碼，只是修了工作表的資料 ⇒ 撳「▶️ 只重跑紅色情境」/
+    /・你改過程式碼（有 clasp push 過） ⇒ 按「⚠️ 執行自測」從頭執行/.test(lines)
+      && /・你沒有改過程式碼，只是修了工作表的資料 ⇒ 按「▶️ 只重新執行紅色情境」/
         .test(lines), lines.slice(-500));
 
   // D3：只重跑紅色情境要一併清走 BLOCKED。
@@ -340,7 +340,7 @@ console.log('\n=== D【核心】連環倒要報成「被擋住」，唔係九條
     S01: { status: 'PASSED' }, S05: { status: 'FAILED' },
     S06: { status: 'BLOCKED' }, S15: { status: 'SKIPPED' }
   });
-  checkEqual('★★★★★★ 「只重跑紅色情境」連 `BLOCKED` 都清走'
+  checkEqual('★★★★★★ 「只重新執行紅色情境」連 `BLOCKED` 都清除'
     + '——唔清嘅話，修好上游之後，被擋住嗰幾條仍然唔會跑，'
     + '而嗰幾條先係整件事嘅重點',
     cleared.clearedIds.sort().join(','), 'S05,S06');

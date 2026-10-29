@@ -165,7 +165,7 @@ console.log('\n=== D3／D4 畫面（第七十七輪批次 EG 組：「從出席�
   check('★★★★★ 候選人嘅 checkbox **預設不勾**（讀返 hwcasLinkPicked，唔係寫死 true）',
     /cb\.checked = hwcasLinkPicked\[p\.personId\] === c\.memberNo;/.test(zone3) && !/cb\.checked = true;/.test(zone3Code.slice(zone3Code.indexOf('function renderHwcasLink'), zone3Code.indexOf('function confirmHwcasLink'))));
   check('★★★★★ 「出席系統是靠姓名對人的…預設全部不勾」嗰段警告仍然喺畫面',
-    zone3.indexOf('出席系統是靠姓名對人的，對錯了就會寄錯人') !== -1 && zone3.indexOf('所以預設全部不勾，請逐個看過才勾') !== -1);
+    zone3.indexOf('出席系統是靠姓名配對的，配錯了就會寄錯人') !== -1 && zone3.indexOf('所以預設全部不勾，請逐個看過才勾') !== -1);
   check('★★★★★ 同名多人嗰句「名字相似不代表是同一個人——不要靠猜」照舊（後端）',
     backend.indexOf('名字相似不代表是同一個人——不要靠猜。') !== -1);
   check('★★★★ 一個編號已經係名單上另一位嘅 ⇒ 勾唔到而且講明', /cb\.disabled = !!c\.usedBy;/.test(zone3) && zone3.indexOf('這個編號已經是名單上「') !== -1);

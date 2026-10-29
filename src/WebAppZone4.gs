@@ -68,7 +68,7 @@ function apiListVersionsForZone4(quarterId) {
       ok: false,
       versions: [],
       message: buildThreePartMessage_(
-        '讀不到版本清單（' + err.message + '）。', '什麼都沒有改動。',
+        '讀不到版本清單（' + err.message + '）。', '甚麼都沒有改動。',
         ['重新整理這一頁再試一次'])
     };
   }
@@ -90,7 +90,7 @@ function zone4Failure_(what, err, actions) {
     ok: false,
     message: buildThreePartMessage_(
       what + '失敗（' + err.message + '）。',
-      '什麼都沒有改動，沒有寄出任何電郵。',
+      '甚麼都沒有改動，沒有寄出任何電郵。',
       actions || ['重新整理這一頁再試一次',
         '如果一直失敗，用試算表上方的選單做同一件事——那邊是安全網'])
   };

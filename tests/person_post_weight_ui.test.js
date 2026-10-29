@@ -149,7 +149,7 @@ console.log('\n=== C4 冇季度 ⇒ 整批唔寫 ===');
     { personId: 'P9001', postId: 'CHAIR', adjust: 1, reason: '測試' }
   ], { quarterId: '2098T9' });
   check('★★★★★ 搵唔到季度日期 ⇒ ok=false 而且講明「什麼都沒有儲存」',
-    res.ok === false && /什麼都沒有儲存/.test(res.message) && /2098T9/.test(res.message), res.message);
+    res.ok === false && /甚麼都沒有儲存/.test(res.message) && /2098T9/.test(res.message), res.message);
 }
 
 console.log('\n=== C4【核心】每一項都要填原因 ===');
@@ -162,7 +162,7 @@ console.log('\n=== C4【核心】每一項都要填原因 ===');
     + '——三個月之後，冇原因嘅偏好冇人記得點解要噉改',
     res.ok === false && /沒有填原因/.test(res.message));
   check('★★★★ 而且講明「什麼都沒有儲存」（唔係寫咗一半）',
-    /什麼都沒有儲存/.test(res.message));
+    /甚麼都沒有儲存/.test(res.message));
 }
 
 console.log('\n=== C4 超出範圍要擋 ===');
@@ -215,13 +215,13 @@ console.log('\n=== C4 畫面文案 ===');
   check('★★★★★ 有規格 4.6 指定嗰句（分清楚「做幾多次」同「有冇資格」）'
     + '——冇咗嘅話，幹事會以為「少一次」＝「唔俾佢做」，'
     + '然後去取消佢嘅資格，而嗰個係完全唔同、而且好難復原嘅一件事',
-    zone3.indexOf('這裡只影響「誰做多少次」。不會影響誰有資格做，') !== -1
+    zone3.indexOf('這裏只影響「誰做多少次」。不會影響誰有資格做，') !== -1
     && zone3.indexOf('也不會令系統違反任何規則。') !== -1);
   // 第七十七輪批次 EA 組：確認畫面改為先講範圍（只限這一季／之後各季都用）
   check('★★★★★ 確認畫面講明「這 N 項偏好只用於（季度）。之後的季度不受影響。」',
     zone3.indexOf("項偏好只用於 ' + label + '。之後的季度不受影響。'") !== -1);
   check('★★★★★ 而且講明紀錄會保留、唔會刪走',
-    zone3.indexOf('紀錄會保留，不會刪走') !== -1);
+    zone3.indexOf('紀錄會保留，不會刪除') !== -1);
   check('★★★★ 有講明「多一次」係「大約一次」，唔係「一定」',
     zone3.indexOf('不是「一定多一次」') !== -1);
   check('★★★★ 前端亦會擋住冇填原因',

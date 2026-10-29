@@ -374,9 +374,9 @@ function writeAnnualCombinedSundays_(plan) {
         throw new Error(buildThreePartMessage_(
           '「' + SHEETS.SPECIAL_SUNDAYS + '」這一張工作表沒有「' + key + '」這一欄，'
             + '所以這一次要寫進去的內容寫不了。',
-          '什麼都沒有寫入——這一次的年度合堂建議整批停下來了。',
+          '甚麼都沒有寫入——這一次的年度合堂建議整批停下來了。',
           ['去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄',
-            '補完之後再撳一次這個工具',
+            '補完之後再按一次這個工具',
             '⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料']));
       }
       sheet.getRange(nextRow, col).setValue(value);

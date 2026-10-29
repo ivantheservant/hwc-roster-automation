@@ -353,13 +353,13 @@ function assertPublicRosterUrlAvailableForStage_(quarterId, templates, publicRos
   if (needing.length === 0) return;
 
   throw new Error(buildThreePartMessage_(
-    '這一季（' + quarterId + '）還沒有公開連結，但要寄的信裡面有一個放連結的位置。',
+    '這一季（' + quarterId + '）還沒有公開連結，但要寄的信裏面有一個放連結的位置。',
     '一封都沒有寄出。如果照樣寄，收信的人會看到「公開版連結：」後面一片空白。',
     [
-      '去「進階功能 ▸ 重新發佈公開連結」發佈一次，然後回來再撳',
+      '去「進階功能 ▸ 重新發佈公開連結」發佈一次，然後回來再按',
       '或者在試算表選單「準備工作 ▸ 發佈公開職事表」發佈',
       '如果這一封信本來就不應該有連結，請在 EmailTemplates 把 '
-        + '{PublicRosterUrl} 這一段刪走'
+        + '{PublicRosterUrl} 這一段刪除'
     ]));
 }
 
@@ -1387,7 +1387,7 @@ function assertSendLogRedirectColumnsReady_(headers) {
   if (redirectTargets.length === 0) {
     log_('WARN', 'SendLog 沒有 ' + missing.join('／')
       + ' 這幾欄。轉寄測試地址目前沒有生效，所以每一封的收件人'
-      + '同實際寄去的地址是同一個，查得回。'
+      + '與實際寄去的地址是同一個，可以查回。'
       + '想補齊，去選單「維護 ▸ ⚠️ 補建 SendLog 缺欄」。');
     return;
   }
@@ -1405,7 +1405,7 @@ function assertSendLogRedirectColumnsReady_(headers) {
       + '但 SendLog 沒有「' + C.INTENDED_EMAIL + '」這一欄，'
       + '記不到每一封原本要寄給誰。',
     '一封都沒有寄出。這樣寄出去之後，SendLog 每一行的收件人'
-      + '都會是同一個轉寄地址，查不到誰收到什麼。',
+      + '都會是同一個轉寄地址，查不到誰收到甚麼。',
     ['先去選單「維護 ▸ ⚠️ 補建 SendLog 缺欄」補上這一欄，再回來寄',
       '那一支只會在最後加欄，不會重排、不會改動任何既有資料',
       '如果你其實不想用轉寄，去 Config 把 '
@@ -1430,8 +1430,8 @@ function writeSendLogRows_(outcomes, context) {
   // 同一份紀錄一定會寫入 AuditLog（自由文字），所以查得返。
   if (headers.indexOf(COLUMNS.SEND_LOG.SEND_OPTIONS) === -1) {
     log_('WARN', 'SendLog 沒有 ' + COLUMNS.SEND_LOG.SEND_OPTIONS
-      + ' 這一欄，這一次用了什麼寄送選項只會寫入 AuditLog。'
-      + '想喺 SendLog 都見到，喺表頭（第 2 行）最尾加一欄叫 '
+      + ' 這一欄，這一次用了甚麼寄送選項只會寫入 AuditLog。'
+      + '如想在 SendLog 也看到，在表頭（第 2 行）最後加一欄叫 '
       + COLUMNS.SEND_LOG.SEND_OPTIONS);
   }
 
@@ -1600,7 +1600,7 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   // 而是去撳「生成初稿」。照用 STAGE_NEXT_ACTION 會叫幹事去做一件他做不到的事
   // （沒有版本，那些掣全部是灰的）。
   const nextStepText = notGenerated
-    ? '請開啟幹事介面，撳「生成初稿」。系統不會自己生成——一定要你撳。'
+    ? '請開啟幹事介面，按〔生成初稿〕。系統不會自行生成——一定要由你按。'
     : '下一步請執行' + nextActionText + '。';
 
   const countText = notGenerated
@@ -1652,7 +1652,7 @@ function buildAdminConsoleLinkText_() {
   } else {
     // 冇設定就誠實講「未設定」，唔好扮到有連結。順帶話俾管理員知點補。
     lines.push('幹事介面：請用你自己收藏的那條網址開啟。'
-      + '（管理員把網址填入 Config 的 WEBAPP_STEWARD_URL 之後，這裡就會直接附上連結。）');
+      + '（管理員把網址填入 Config 的 WEBAPP_STEWARD_URL 之後，這裏就會直接附上連結。）');
   }
 
   let sheetUrl = '';

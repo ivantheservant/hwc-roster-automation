@@ -131,7 +131,7 @@ console.log('\n=== 第七十三輪文字組：畫面上叫幹事去撳「儲存�
   });
   check('★★★★★★ src 內所有畫面文字都不再叫幹事撳「儲存並確認」', hits.length === 0, hits.join('\n'));
   const guards = stripComments(read('src/WebAppGuards.gs'));
-  check('★★★★★ 擋住寄出的訊息（WebAppGuards）指向「儲存」', guards.indexOf('先撳「儲存」') !== -1);
+  check('★★★★★ 擋住寄出的訊息（WebAppGuards）指向「儲存」', guards.indexOf('先按「儲存」') !== -1);
 }
 
 console.log(fail === 0 ? '\nOK' : `\n${fail} FAILURE(S)`);

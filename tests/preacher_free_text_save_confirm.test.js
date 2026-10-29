@@ -319,12 +319,12 @@ console.log('\n=== A 對照組：AutoGenerate=TRUE 嘅崗位打錯名，仍然�
     u.expectedText !== undefined && u.expectedText !== u.text,
     JSON.stringify(u));
   check('★★★★ 決定比對用嘅 cellText 同 text 一樣', u.cellText === u.text, JSON.stringify(u));
-  checkEqual('★★★★ 講得出係邊一日', u.serviceDate, DATES[0]);
+  checkEqual('★★★★ 說得出係邊一日', u.serviceDate, DATES[0]);
   // ⚠️ 順帶：`context.postNames` 喺 `buildFineTuneContext_()` **根本唔存在**
   //（只有寄信嗰個 context 先有），所以本檔案三處嘅三元運算永遠 fallback
   // 到 postId ⇒ 幹事見到 `PREACHER#1` 呢種機器鍵。
   // 現場對話框嗰句 `2027-07-04　PREACHER#1　……` 就係噉嚟。
-  checkEqual('★★★★★ 講得出中文崗位名，唔係機器鍵'
+  checkEqual('★★★★★ 說得出中文崗位名，唔係機器鍵'
     + '（`context.postNames` 唔存在，要由 `context.posts` 譯）',
     u.postNameTC, '主席');
 
@@ -347,7 +347,7 @@ console.log('\n=== A：講員已填 ＋ 一筆可套用申報 ⇒ 成功，講�
 
   const plan = gas.apiSaveAndConfirmPlan(Q);
   check('★★★★ 唔會被擋', plan.blocked !== true, JSON.stringify(plan.blockReason));
-  checkEqual('★★★★ 見到 1 筆可套用申報', plan.requests.apply.length, 1);
+  checkEqual('★★★★ 看到 1 筆可套用申報', plan.requests.apply.length, 1);
 
   const result = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('★★★★★ 成功建立新版本', result.ok === true && result.versionCreated === true,
@@ -356,7 +356,7 @@ console.log('\n=== A：講員已填 ＋ 一筆可套用申報 ⇒ 成功，講�
   const v = gas.findLatestVersionNo(Q);
   checkEqual('★★★★★ 申報生效', whoIsOn(v, DATES[2], 'READ',
     gas.COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID), target);
-  checkEqual('★★★★★ **講員嗰格原封不動**（自由文字跟住新版本帶落去，冇被清走）',
+  checkEqual('★★★★★ **講員嗰格原封不動**（自由文字跟住新版本帶落去，冇被清除）',
     whoIsOn(v, DATES[0], 'PREACH', gas.COLUMNS.ROSTER_ASSIGNMENTS.PERSON_NAME_SNAPSHOT),
     GUEST_PREACHER);
 }

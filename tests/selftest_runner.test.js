@@ -82,7 +82,7 @@ console.log('\n=== 一【核心】開跑之前四道閘，一道都唔可以繞�
   // ── 閘 1　DRY_RUN ────────────────────────────────────────────
   withConfig({ DRY_RUN: false });
   let gate = gas.checkSelfTestPreconditions_('2028T3');
-  checkEqual('★★★★★★ `DRY_RUN=FALSE` ⇒ **唔准跑**'
+  checkEqual('★★★★★★ `DRY_RUN=FALSE` ⇒ **唔准執行**'
     + '——自測機會走完整個寄送流程，'
     + 'DRY_RUN=FALSE 嗰陣嗰啲信會真係寄出去', gate.ok, false);
   check('★★★★★ 而且要講得出係因為呢個',
@@ -90,7 +90,7 @@ console.log('\n=== 一【核心】開跑之前四道閘，一道都唔可以繞�
 
   // ⚠️ 讀唔到（`undefined`）**唔算通過**。
   withConfig({ DRY_RUN: undefined });
-  checkEqual('★★★★★★ `DRY_RUN` 讀唔到 ⇒ **一樣唔准跑**'
+  checkEqual('★★★★★★ `DRY_RUN` 讀唔到 ⇒ **一樣唔准執行**'
     + '——「查不到」同「查到係 TRUE」係兩件事，'
     + '而估錯嗰邊嘅代價係真係寄信',
     gas.checkSelfTestPreconditions_('2028T3').ok, false);
@@ -98,10 +98,10 @@ console.log('\n=== 一【核心】開跑之前四道閘，一道都唔可以繞�
   // ── 閘 2　受保護季度 ─────────────────────────────────────────
   withConfig({});
   gate = gas.checkSelfTestPreconditions_('2026T4');
-  checkEqual('★★★★★★ 沙盒季度落喺 `QUARTER_RESET_BLOCKED_QUARTERS` ⇒ 唔准跑'
+  checkEqual('★★★★★★ 沙盒季度落喺 `QUARTER_RESET_BLOCKED_QUARTERS` ⇒ 唔准執行'
     + '——自測機每次開跑都會把佢清乾淨', gate.ok, false);
   gate = gas.checkSelfTestPreconditions_('2027T1');
-  checkEqual('★★★★★★ 落喺 `REHEARSAL_PROTECTED_QUARTERS` ⇒ 一樣唔准跑',
+  checkEqual('★★★★★★ 落喺 `REHEARSAL_PROTECTED_QUARTERS` ⇒ 一樣唔准執行',
     gate.ok, false);
   checkEqual('★★★★★ 大細楷唔理',
     gas.checkSelfTestPreconditions_('2026t4').ok, false);
@@ -109,7 +109,7 @@ console.log('\n=== 一【核心】開跑之前四道閘，一道都唔可以繞�
   // ── 閘 3　Stage ──────────────────────────────────────────────
   gas.getQuarterStage_ = function () { return 'OFFICIAL_SENT'; };
   gate = gas.checkSelfTestPreconditions_('2028T3');
-  checkEqual('★★★★★★ Stage 已經係 `OFFICIAL_SENT` ⇒ 唔准跑'
+  checkEqual('★★★★★★ Stage 已經係 `OFFICIAL_SENT` ⇒ 唔准執行'
     + '——嗰個代表已經正式發出畀全體，唔係一個沙盒季度', gate.ok, false);
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
 
@@ -178,9 +178,9 @@ console.log('\n=== 三【核心】時間到要乾淨停低並講明 ===');
     /results\.push\(\{ id: scenario\.id, title: scenario\.title,\s*\n\s*status: SELFTEST_STATUS\.NOT_RUN,/
       .test(CODE), '');
   check('★★★★★★ 而且嗰一個結果要帶住一句「已停低」畀人睇',
-    /status: SELFTEST_STATUS\.NOT_RUN,[\s\S]{0,160}已停低/.test(SRC), '');
+    /status: SELFTEST_STATUS\.NOT_RUN,[\s\S]{0,160}已停下/.test(SRC), '');
   check('★★★★★★ 而且報告要講「撳繼續跑自測」',
-    /繼續跑自測/.test(SRC), '');
+    /繼續執行自測/.test(SRC), '');
   check('★★★★★ 有續跑入口',
     /function runSelfTestMachineResumeFromMenu_\(/.test(CODE)
       && /runSelfTestMachineResumeFromMenu_/.test(read('src/Menu.gs')), '');
@@ -303,7 +303,7 @@ console.log('\n=== 七 報告要拿得出證據 ===');
 
   const blocked = gas.describeSelfTestReport_({
     blocked: true, quarterId: '2026T4',
-    reasons: ['「2026T4」在 QUARTER_RESET_BLOCKED_QUARTERS 裡面。']
+    reasons: ['「2026T4」在 QUARTER_RESET_BLOCKED_QUARTERS 裏面。']
   }).join('\n');
   check('★★★★★★ 被閘擋住嗰陣要講明「沒有執行」同原因'
     + '——唔講嘅話，一份空白報告睇落同「全部通過」一模一樣',

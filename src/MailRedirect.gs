@@ -113,7 +113,7 @@ function readMailRedirectTargets_() {
         + parsed.bad.length + ' 個看起來不像電郵地址：' + parsed.bad.join('、'),
       '一封都沒有寄出。',
       ['去 Config 工作表把它們改成正確的電郵地址',
-        '要填多過一個地址的話，用逗號、分號、頓號或者換行分開都可以',
+        '要填多於一個地址的話，用逗號、分號、頓號或者換行分開都可以',
         '或者把整格清空——清空就代表正常寄給收件人本人']));
   }
   if (parsed.targets.length === 0) {
@@ -167,7 +167,7 @@ function applyMailRedirect_(plan, redirectTo) {
   const who = String(plan.displayName || '').trim() || String(plan.toEmail || '').trim() || '（不知道是誰）';
   const banner = '⚠️ 這封信本來是寄給「' + who + '」（' + plan.toEmail + '），'
     + '因為系統設定了轉寄測試地址（' + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO
-    + '），所以寄到你這裡。收件人本人沒有收到這封信。';
+    + '），所以寄到你這裏。收件人本人沒有收到這封信。';
 
   return {
     toEmail: target,
@@ -319,7 +319,7 @@ function executeSendLogColumnBackfill_(plan) {
     newValue: plan.missing.join('、'),
     source: 'executeSendLogColumnBackfill_',
     notes: '只在最後加欄；沒有重排、沒有刪除、沒有改動任何既有資料，'
-      + '亦沒有替任何一行填值（舊行寄去了哪裡已經無從得知，'
+      + '亦沒有替任何一行填值（舊行寄去了哪裏已經無從得知，'
       + '猜一個上去就是造假紀錄）'
   });
   return { added: plan.missing.slice() };
@@ -374,7 +374,7 @@ function runSendLogColumnBackfill_() {
     lines.push('');
   }
   lines.push('會做的事：');
-  lines.push('　・在最後（第 ' + plan.nextCol + ' 欄起）加這幾欄，標題同機器鍵各一行');
+  lines.push('　・在最後（第 ' + plan.nextCol + ' 欄起）加這幾欄，標題和機器鍵各一行');
   lines.push('');
   lines.push('不會做的事：');
   lines.push('　・不會重排、不會刪除任何一欄');
@@ -382,7 +382,7 @@ function runSendLogColumnBackfill_() {
   lines.push('　・不會替任何一行填值');
   lines.push('');
   lines.push('補完之後，既有的 ' + plan.rowCount + ' 行這幾欄會是空白——那是正常的，');
-  lines.push('因為那些是補欄之前寄的，寄去了哪裡已經無從得知。');
+  lines.push('因為那些是補欄之前寄的，寄去了哪裏已經無從得知。');
   lines.push('');
   lines.push('要加這幾欄嗎？');
 
@@ -400,6 +400,6 @@ function runSendLogColumnBackfill_() {
   ui.alert(title,
     '已經加好這 ' + result.added.length + ' 欄：\n　' + result.added.join('、') + '\n\n'
       + '既有的 ' + plan.rowCount + ' 行這幾欄是空白的——那是正常的。\n'
-      + '由現在起寄出的每一封，都會記得到「原本要寄給誰」同「實際寄去了哪裡」。',
+      + '由現在起寄出的每一封，都會記錄「原本要寄給誰」和「實際寄去了哪裏」。',
     ui.ButtonSet.OK);
 }

@@ -61,6 +61,8 @@ function collectUserStrings() {
       if (t.indexOf('/*') === 0) { if (t.indexOf('*/') === -1) inBlock = true; return; }
       if (t.indexOf('//') === 0) return;
       if (t.indexOf('log_(') !== -1) return;
+      // 第八十五輪批次 LA 組：一次性更新工具的 `old:` 是試算表現時的舊文字（用來核對），畫面不會顯示。
+      if (rel === 'src/SheetTextUpdate.gs' && /^old: '/.test(t)) return;
       let m; STR_RE.lastIndex = 0;
       while ((m = STR_RE.exec(line))) {
         const s = m[1] !== undefined ? m[1] : m[2];
@@ -105,7 +107,7 @@ console.log('\n=== I【核心】三段式訊息第一段嘅標籤 ===');
 
   check('★★★★★ 顯示標籤唔再係「發生了什麼」'
     + '——好多時嗰一段講嘅係「前置條件未夠」，根本冇嘢發生過',
-    !/errorPart\('發生了什麼'/.test(script) && !/errorPart\('發生了什麼'/.test(zone1), '');
+    !/errorPart\('發生了甚麼'/.test(script) && !/errorPart\('發生了甚麼'/.test(zone1), '');
   check('★★★★★ 而且只有一個地方定義（五個呼叫點各自寫一次嘅話，'
     + '改一次字就一定會漏一兩個）',
     /const ERR_LABEL_WHAT = '要留意';/.test(script), '');
@@ -118,16 +120,16 @@ console.log('\n=== I【核心】三段式訊息第一段嘅標籤 ===');
   check('★★★★★ 全部呼叫點都用返嗰個常數（而家有 ' + useCount + ' 個）',
     useCount >= 5, String(useCount));
   check('★★★★★ 而且冇一個 `errorPart()` 寫死咗第一段嘅標籤',
-    !/errorPart\('(發生了什麼|要留意)'/.test(script)
-      && !/errorPart\('(發生了什麼|要留意)'/.test(zone1), '');
+    !/errorPart\('(發生了甚麼|要留意)'/.test(script)
+      && !/errorPart\('(發生了甚麼|要留意)'/.test(zone1), '');
 
   // ⚠️ 呢一條係整份最重要嘅。後端傳過嚟嗰個分隔標記係**機器格式**，
   // 唔係俾人睇嘅字。改咗佢就要同時改晒所有拋緊三段式訊息嘅地方，
   // 而漏一個就會變成「拆唔到三段」，畫面會退返去顯示原文。
   check('★★★★★ 後端嘅機器標記**冇改**（顯示標籤同機器標記係兩回事）',
-    /return '發生了什麼：' \+ whatHappened/.test(guards), '');
+    /return '發生了甚麼：' \+ whatHappened/.test(guards), '');
   check('★★★★★ 而前端仍然照住嗰個機器標記拆',
-    /raw\.indexOf\('發生了什麼：'\)/.test(script), '');
+    /raw\.indexOf\('發生了甚麼：'\)/.test(script), '');
 }
 
 console.log('\n=== I：口語詞（幹事見到嘅字入面）===');

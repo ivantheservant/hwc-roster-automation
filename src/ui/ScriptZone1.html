@@ -154,7 +154,7 @@
     // 幹事會以為撳咗冇反應，而去撳多次或者重新整理。
     openModal('正在生成初稿', [
       para('正在生成……已經開始，請不要關掉視窗或重新整理。'),
-      para('這一步要跑幾分鐘。完成之後這個視窗會自動變成結果畫面。', 'muted')
+      para('這一步需時幾分鐘。完成之後這個視窗會自動變成結果畫面。', 'muted')
     ], []);
 
     runAction('生成初稿', async () => {
@@ -230,11 +230,11 @@
       a.href = res.sheetUrl;
       a.target = '_blank';
       a.rel = 'noopener';
-      a.textContent = '開啟職事表檢查同修改';
+      a.textContent = '開啟職事表檢查和修改';
       a.className = 'bigLink';
       nodes.push(a);
     }
-    nodes.push(para('在試算表直接改格子，改完回來撳「儲存」。'));
+    nodes.push(para('在試算表直接改格子，改完回來按「儲存」。'));
 
     // 「還有 N 項未做」——真數字，唔係寫死。
     const pq = res.preQuarter || {};
@@ -397,7 +397,7 @@
       // 第六十三輪批次 N 組：指去真係存在嘅位置。
       // ⚠️ 第七十五輪批次 CA 組：「名單維護」整區拿走，人員資料改為直接喺試算表改（Ivan 決定），
       // 所以別名都係直接去 NameAlias 工作表加。
-      ul.appendChild(make('li', { text: '如果是同一個人的另一種寫法，在試算表的「NameAlias」工作表加一行（原本的名字＋這個寫法），回來再撳一次' }));
+      ul.appendChild(make('li', { text: '如果是同一個人的另一種寫法，在試算表的「NameAlias」工作表加一行（原本的名字＋這個寫法），回來再按一次' }));
       how.appendChild(ul);
       nodes.push(how);
 
@@ -405,7 +405,7 @@
       // 系統無理取鬧。理由的全文在 `src/UnresolvedNameFix.gs` 檔頭。
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '這裡沒有「照樣儲存」，是刻意的：系統認不出的名字沒有內部編號，'
+          text: '這裏沒有「照樣儲存」，是刻意的：系統認不出的名字沒有內部編號，'
             + '存了之後那一格對那個人完全沒有作用——他收不到信、沒有個人 PDF、'
             + '不會被計入服侍次數，而且不會有任何錯誤訊息。',
           className: 'lines'
@@ -428,7 +428,7 @@
     // 第八十二輪批次 IG 組：「堂委沒有提出改動，撳下去就當作意見已收齊」嗰個窗拿走——零改動只講「沒有改動」
     openModal('儲存', [
       para('沒有偵測到任何改動，不需要儲存。'
-        + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : '要正式發出，撳第 3 步〔給所有人〕。'))
+        + (plan.stage === 'OFFICIAL_SENT' ? '這一季已經正式發出過了。' : '要正式發出，按第 3 步〔給所有人〕。'))
     ], [button('知道了', () => closeModal(), '')]);
   }
 
@@ -484,7 +484,7 @@
         nodes.push(make('div', { className: 'sec' }, [
           sectionTitle('你可以：'),
           make('div', { text: '・如果他只是這一季幫手，回到「名單上找不到的名字」勾「這一季臨時幫手，不加入名單」', className: 'vio-row' }),
-          make('div', { text: '・請辦公室先在出席系統加入他，之後再撳〔加入名單〕', className: 'vio-row' }),
+          make('div', { text: '・請辦公室先在出席系統加入他，之後再按〔加入名單〕', className: 'vio-row' }),
           make('div', { text: '・也可以試試用另一個寫法或者會眾編號搜尋', className: 'vio-row' })
         ]));
       } else {
@@ -525,7 +525,7 @@
         para('會把出席系統的「' + c.hwcasName + '」（編號 ' + c.memberNo + '）加入名單，名字用職事表的寫法「' + typed + '」。'),
         para(c.hasEmail ? '電郵由出席系統讀取：' + c.emailMasked : '出席系統沒有這一位的電郵，所以他收不到信，要用第 4 步印紙本給他。', c.hasEmail ? 'ok-line' : 'vio-row'),
         make('div', { className: 'sec' }, [eligRow]),
-        para('加入之後會自動重新檢查，這一項應該即刻消失。', 'muted')
+        para('加入之後會自動重新檢查，這一項應該立即消失。', 'muted')
       ],
       confirmLabel: '加入',
       onConfirm: () => {
@@ -676,7 +676,7 @@
     let decisions = null;
     if (pending > 0) {
       nodes.push(make('div', {
-        text: '下面幾項要先決定，全部勾了才可以儲存；改錯了就撳〔返回修改〕。',
+        text: '下面幾項要先決定，全部勾了才可以儲存；改錯了就按〔返回修改〕。',
         className: 'warn-head'
       }));
       decisions = buildDecisionSections(plan.decisionItems, {
@@ -692,7 +692,7 @@
     if (semi > 0) {
       nodes.push(make('div', {
         text: '另有 ' + semi + ' 格違反「盡量避免」的規則，你沒有勾保留——不會擋住儲存；'
-          + '想系統調整的話，撳〔請系統幫我調整〕。',
+          + '想系統調整的話，按〔請系統幫我調整〕。',
         className: 'muted'
       }));
     }
@@ -702,7 +702,7 @@
       const box = make('div', { className: 'warnbox' }, [
         make('div', {
           text: '⚠ 這一版還有 ' + plan.blankCells.length + ' 格沒有人。'
-            + '現在寄出的話，收到的人會見到空格。',
+            + '現在寄出的話，收到的人會看到空格。',
           className: 'warn-head'
         })
       ]);
@@ -933,7 +933,7 @@
           }),
           make('div', {
             text: '請去試算表選單「準備工作 ▸ 發佈公開職事表」再試一次。'
-              + '在成功之前，先不要撳「寄給堂委審閱」，否則他們會看到舊版本。',
+              + '在成功之前，先不要按「寄給堂委審閱」，否則他們會看到舊版本。',
             className: 'err-text'
           })
         ]),
@@ -992,9 +992,9 @@
       }));
     }
     nodes.push(make('div', { text: '公開連結已經更新——連結地址不變，'
-      + '收到的人重新開就見到這一版。', className: 'ok-line' }));
+      + '收到的人重新開就看到這一版。', className: 'ok-line' }));
     if (result.stageAdvanced) {
-      nodes.push(make('div', { text: '「寄出」現在可以撳了。', className: 'ok-line strong' }));
+      nodes.push(make('div', { text: '「寄出」現在可以按了。', className: 'ok-line strong' }));
     }
     nodes.push(para('第 ' + result.baseVersionNo + ' 版原封不動保留，可以隨時對照。', 'muted'));
     const restoreWarn = baseSheetRestoreWarning(result);
@@ -1022,13 +1022,13 @@
    */
   function renderReviewNeedsPublicLink() {
     openModal('寄給堂委審閱：還沒有公開連結', [
-      errorPart(ERR_LABEL_WHAT, '這一季還沒有公開連結。堂委收到的信裡面有一條'
+      errorPart(ERR_LABEL_WHAT, '這一季還沒有公開連結。堂委收到的信裏面有一條'
         + '「唯讀連結」，而那條連結現在是空的。'),
       errorPart('現在的情況', '沒有寄出任何電郵，職事表沒有任何改動。'),
       make('div', { className: 'err-part' }, [
         make('div', { text: '你可以怎樣做', className: 'err-label' }),
         make('div', {
-          text: '撳下面的「立即發佈」。發佈好之後會自動回到寄出的確認畫面。',
+          text: '按下面的「立即發佈」。發佈好之後會自動回到寄出的確認畫面。',
           className: 'err-text'
         })
       ])
@@ -1088,7 +1088,7 @@
     if (meta && meta.sameBatch) {
       return '上次在 ' + last + ' 寄過，會再寄一次給同一批人。'
         + (meta.droppedCount > 0
-          ? ('（上次那批人裡有 ' + meta.droppedCount + ' 位現在已不在收件名單上，這一次不會寄給他們。）')
+          ? ('（上次那批人裏有 ' + meta.droppedCount + ' 位現在已不在收件名單上，這一次不會寄給他們。）')
           : '');
     }
     return '上次在 ' + last + ' 寄過。';
@@ -1156,7 +1156,7 @@
           make('div', {
             text: '如果只想補寄未收到的人，請取消，改用試算表選單'
               + '「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」先看一次，'
-              + '確認名單無誤之後再撳「⚠️ 執行補寄未收到的人」。',
+              + '確認名單無誤之後再按「⚠️ 執行補寄未收到的人」。',
             className: 'err-text'
           })
         ]));
@@ -1195,7 +1195,7 @@
       // 第八十二輪批次 IG 組：審閱本唔再係正式發出之前一定要行嘅一步
       d && d.stage === 'OFFICIAL_SENT'
         ? '這一季已經正式發出過，審閱本不會改變進度。'
-        : '這一季還未正式發出給全體；要正式發出，撳第 3 步〔給所有人〕。'
+        : '這一季還未正式發出給全體；要正式發出，按第 3 步〔給所有人〕。'
     ];
     // 第六十三輪批次 A 組：寄之前補發咗公開連結 ⇒ 講一句
     if (r.publicLinkRepublished) lines.push('寄出之前，系統已經自動把公開連結更新到最新內容。');
@@ -1262,8 +1262,8 @@
       make('div', { className: 'err-part' }, [
         make('div', { text: '你可以怎樣做', className: 'err-label' }),
         make('div', {
-          text: '撳下面那一粒就地產生。人數多的時候要跑幾分鐘，'
-            + '而且可能會分幾次跑完——畫面會自己接住跑，不要關掉視窗。',
+          text: '按下面的按鈕就地產生。人數多的時候需時幾分鐘，'
+            + '而且可能會分幾次完成——畫面會自動繼續，不要關掉視窗。',
           className: 'err-text'
         })
       ]),
@@ -1422,7 +1422,7 @@
               + (failed.length > 0 ? '（其中 ' + failed.length + ' 份失敗，之後會再試。）' : ''),
             className: 'lines'
           }),
-          para('一次執行有時間上限，所以要分幾次。撳「繼續產生」接住做。', 'muted')
+          para('一次執行有時間上限，所以要分幾次。按「繼續產生」繼續處理。', 'muted')
         ]
       };
     }
@@ -1546,7 +1546,7 @@
           make('div', {
             text: '如果只想補寄未收到的人，請取消，改用試算表選單'
               + '「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」先看一次，'
-              + '確認名單無誤之後再撳「⚠️ 執行補寄未收到的人」。',
+              + '確認名單無誤之後再按「⚠️ 執行補寄未收到的人」。',
             className: 'err-text'
           })
         ]));
@@ -1586,7 +1586,7 @@
       // 行同一個 `resolveActualRecipients_()`。
       nodes.push(recipientPreviewBox(preview.recipientPreview,
         '會寄給這 ' + preview.recipientCount + ' 位',
-        '這一份就是撳落去之後真正會收到信的人。'));
+        '這一份就是按下之後真正會收到信的人。'));
 
       nodes.push(make('div', { className: 'sec sec-warn' }, [
         make('div', {
@@ -1660,7 +1660,7 @@
           // 第二十五輪批次階段 B4：清走字面上嘅 `**`。
           // Markdown 粗體語法喺畫面上只會顯示成兩粒星，幹事會問「呢兩粒星係咩」。
           // （第二十一輪已經喺選單版清過一次同類問題。）
-          text: '有人未收到，所以這一季的進度沒有推前。補救之後可以再撳一次這一粒。'
+          text: '有人未收到，所以這一季的進度沒有推進。補救之後可以再按一次這個按鈕。'
             .replace(/\*\*/g, ''),
           className: 'err-text'
         }),
@@ -1818,7 +1818,7 @@
     const top = make('div', { className: 'sec' }, [
       sectionTitle('這一次會寄給的 ' + plan.recipientCount + ' 位'),
       make('div', {
-        text: '這一份就是撳落去之後真正會收到信的人（包括堂委名單）。',
+        text: '這一份就是按下之後真正會收到信的人（包括堂委名單）。',
         className: 'muted'
       })
     ]);

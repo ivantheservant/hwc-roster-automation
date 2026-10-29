@@ -49,7 +49,7 @@
         className: 'statuscard-title'
       }),
       make('div', {
-        text: '這一粒掣只看，不會改動任何東西。',
+        text: '這個按鈕只供查看，不會改動任何東西。',
         className: 'statuscard-sub'
       })
     ]));
@@ -71,7 +71,7 @@
     } else {
       // ⚠️ 上面張狀態卡已經講咗同一句。喺度再講一次，
       // 讀落好似系統講咗兩件唔同嘅事。改成講返「噉點做」。
-      nodes.push(para('去〔查看／修改職事表〕在表上改，改完回來再撳這一粒。', 'muted'));
+      nodes.push(para('去〔查看／修改職事表〕在表上改，改完回來再按這個按鈕。', 'muted'));
     }
 
     // ── 第七十五輪批次 CE／CF 組：逐格確認 ─────────────────────
@@ -85,7 +85,7 @@
     decisions.nodes.forEach((n) => nodes.push(n));
     if ((r.violations || []).length > 0) {
       nodes.push(make('div', {
-        text: '撳〔請系統幫我調整〕：系統只會調整沒有勾的違反規則格和空格，勾了的不會動。',
+        text: '按〔請系統幫我調整〕：系統只會調整沒有勾的違反規則格和空格，勾了的不會動。',
         className: 'muted'
       }));
     }
@@ -162,7 +162,7 @@
   function renderBeforeAdjust(pre) {
     const nodes = [buildWillHandleSection(pre.willHandle)];
     nodes.push(make('div', {
-      text: '下面幾項你還沒有決定。勾了「保留我的安排」或「這一季臨時幫手」的格，系統不會調整；沒有勾的，系統會試著調整。',
+      text: '下面幾項你還沒有決定。勾了「保留我的安排」或「這一季臨時幫手」的格，系統不會調整；沒有勾的，系統會試着調整。',
       className: 'warn-head'
     }));
     const decisions = buildDecisionSections(
@@ -257,7 +257,7 @@
       make('div', { className: 'warnbox' }, [
         make('div', {
           text: '選了其中一張，另一張上面的改動這一次不會計算在內。'
-            + '兩張都不會被刪走，你可以先開來看清楚，再回來撳。',
+            + '兩張都不會被刪除，你可以先開來看清楚，再回來按。',
           className: 'lines'
         })
       ])
@@ -312,12 +312,12 @@
       }));
     } else {
       colourBox.appendChild(make('div', {
-        text: '系統改過的格，把滑鼠停在上面會見到它為甚麼改。',
+        text: '系統改過的格，把滑鼠停在上面會看到它為甚麼改。',
         className: 'muted'
       }));
     }
     colourBox.appendChild(make('div', {
-      text: '那一張表同正式職事表一樣有下拉選單，你可以直接在上面改。',
+      text: '那一張表與正式職事表一樣有下拉選單，你可以直接在上面改。',
       className: 'muted'
     }));
 
@@ -332,7 +332,7 @@
         sectionTitle('系統沒有動這幾格（' + untouched.length + ' 格）'),
         make('div', {
           text: '你勾了「保留我的安排，系統不要調整」或者已經放行。要系統調整的話，'
-            + '回〔檢查我的改動〕取消那一格的勾，再撳一次〔請系統幫我調整〕。',
+            + '回〔檢查我的改動〕取消那一格的勾，再按一次〔請系統幫我調整〕。',
           className: 'muted'
         })
       ]);
@@ -427,7 +427,7 @@
       // 系統當時只會用第一次嗰個快照，幹事之後改嘅嘢完全冇計。
       // 而佢照住呢句去做，即係介面呃咗佢。
       // 而家真係做得到，`tests/suggestion_start_point.test.js` 釘住。
-      para('你可以直接在那張表上再改，改完回來再撳一次〔請系統幫我調整〕，'
+      para('你可以直接在那張表上再改，改完回來再按一次〔請系統幫我調整〕，'
         + '系統會重新讀那一張表做起點再算一次。可以重複到你滿意為止。'),
       para('如果你改的是正式那一張職事表（不是建議表），系統就會用正式那一張做起點。'
         + '兩張都改過的話，它會先問你要用哪一張。', 'muted'));
@@ -462,7 +462,7 @@
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
           text: '這一季有 ' + r.gapCount + ' 格排不出，一次過全部處理會太慢，'
-            + '所以系統這一次只試了前面一批。接受之後再撳一次，它會繼續處理餘下的。',
+            + '所以系統這一次只試了前面一批。接受之後再按一次，它會繼續處理餘下的。',
           className: 'lines'
         })
       ]));
@@ -510,7 +510,7 @@
       title: '接受這個建議版本',
       bodyNodes: [
         para('會把建議表上的內容儲存成新一版。'),
-        para('儲存之後那張建議表會清走——不清走的話會積落一堆，'
+        para('儲存之後那張建議表會清除——不清除的話會累積一大堆，'
           + '下一次你分不清哪一張是最新的。', 'muted')
       ],
       confirmLabel: '接受並儲存',
@@ -555,7 +555,7 @@
     openConfirm({
       title: '放棄建議版本',
       bodyNodes: [
-        para('會刪走那張建議表。'),
+        para('會刪除那張建議表。'),
         para('你自己那一版（職事表上的內容）一格都不會改動。', 'muted')
       ],
       confirmLabel: '放棄建議',

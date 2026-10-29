@@ -119,7 +119,7 @@ console.log('\n=== W【核心】後端唔信前端：缺件就一封都唔寄 ==
   check('★★★★★★ 而且**一封都冇寄**（連有 PDF 嘅 P9301、名單收件人都冇）',
     delivered.length === 0, JSON.stringify(delivered));
   check('★★★★★ 訊息係三段式、講明人數同「沒有寄出任何電郵」',
-    thrown && /發生了什麼：/.test(thrown.message) && /2 位還沒有第 3 版的個人 PDF/.test(thrown.message)
+    thrown && /發生了甚麼：/.test(thrown.message) && /2 位還沒有第 3 版的個人 PDF/.test(thrown.message)
       && /沒有寄出任何電郵/.test(thrown.message), thrown && thrown.message);
 
   delivered = [];

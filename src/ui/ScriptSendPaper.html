@@ -146,11 +146,11 @@
     const nodes = [
       make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '要寄出包括這 ' + n + ' 格的版本，請先撳〔取消〕，再撳第 2 步〔儲存〕，然後才寄出。',
+          text: '要寄出包括這 ' + n + ' 格的版本，請先按〔取消〕，再按第 2 步〔儲存〕，然後才寄出。',
           className: 'lines'
         })
       ]),
-      para('或者寄出上一個儲存的版本（' + versionText + '）：這 ' + n + ' 格不會在裡面，會留在表上。', 'muted')
+      para('或者寄出上一個儲存的版本（' + versionText + '）：這 ' + n + ' 格不會在裏面，會留在表上。', 'muted')
     ];
     const acts = [];
     if (s.canSendUnsaved) {
@@ -186,7 +186,7 @@
       // ⚠️ 讀唔到 ⇒ 唔可以扮成「零格」。
       box.appendChild(make('div', {
         text: '⚠️ 系統讀不到那幾格的內容（' + preview.error + '）。'
-          + '請先關掉這個畫面，撳一次「檢查我的改動」看清楚。',
+          + '請先關掉這個畫面，按一次「檢查我的改動」看清楚。',
         className: 'vio-row'
       }));
       return;
@@ -561,7 +561,7 @@
       const d = sendModeData_ || {};
       if (d.baseline) {
         whoBox.appendChild(make('div', {
-          text: '同第 ' + d.baseline.versionNo + ' 版（' + d.baseline.sentAt + ' ' + d.baseline.stageLabel + '）比較。',
+          text: '與第 ' + d.baseline.versionNo + ' 版（' + d.baseline.sentAt + ' ' + d.baseline.stageLabel + '）比較。',
           className: 'muted'
         }));
       }
@@ -571,7 +571,7 @@
       if ((d.noEmailChanged || []).length > 0) whoBox.appendChild(noEmailChangedSection(d.noEmailChanged));
       if (d.notReceivedCount > 0) {
         whoBox.appendChild(make('div', {
-          text: '另外 ' + d.notReceivedCount + ' 位上一次沒有收到，這裡不會寄給他們——要用〔選擇其他〕或「補寄未收到的人」。',
+          text: '另外 ' + d.notReceivedCount + ' 位上一次沒有收到，這裏不會寄給他們——要用〔選擇其他〕或「補寄未收到的人」。',
           className: 'muted'
         }));
       }
@@ -623,7 +623,7 @@
     });
     icsRow.appendChild(icsCb);
     icsRow.appendChild(make('span', {
-      text: '附 .ics 日曆檔（iPhone 同 Google 日曆都開得到）'
+      text: '附 .ics 日曆檔（iPhone 和 Google 日曆都可以開啟）'
     }));
     icsBox.appendChild(icsRow);
     nodes.push(icsBox);
@@ -682,7 +682,7 @@
         if ((sendOptions_.pickedKeys || []).length === 0
             && (sendOptions_.extraEmailsRaw || '').trim() === '') {
           setStatus(sendMode_ === 'PICK'
-            ? '還沒有選任何收件人。撳〔選擇收件人〕選好再撳一次。'
+            ? '還沒有選任何收件人。按〔選擇收件人〕選好再按一次。'
             : '這一份名單一位都沒有電郵，寄不出。要用第 4 步印紙本。', true);
           return;
         }
@@ -1155,7 +1155,7 @@
       sectionTitle('查不到電郵的有 ' + (s.noEmail.length + temps.length) + ' 位'
         + (temps.length > 0 ? '（包括 ' + temps.length + ' 位臨時幫手）' : '') + '——預設全部已經選好'),
       make('div', {
-        text: '有電郵的人也在下面，有些長者兩樣都要，可以額外選。',
+        text: '有電郵的人也在下面，有些長者兩種方式都需要，可以額外選。',
         className: 'muted'
       })
     ]));
@@ -1190,13 +1190,13 @@
     // ⚠️ 兩個出口都要講清楚會發生咩事——尤其係「寄到自己信箱」
     // 就算喺模擬模式都會真係寄。
     nodes.push(buildExtraEmailBox(paperExtra_,
-      '那幾個地址會收到整份紙本包（同你自己收到那幾封一模一樣），不是個人版。'));
+      '那幾個地址會收到整份紙本包（與你自己收到那幾封一模一樣），不是個人版。'));
 
     nodes.push(make('div', { className: 'sec' }, [
       sectionTitle('兩個出口'),
       make('div', {
         text: '・下載：系統會產生每人一份 PDF，然後給你一條資料夾連結。'
-          + '在 Google 雲端硬碟撳「下載」就會整個資料夾打包成 zip。',
+          + '在 Google 雲端硬碟按「下載」就會整個資料夾打包成 zip。',
         className: 'ok-line'
       }),
       make('div', {
@@ -1292,7 +1292,7 @@
     ];
 
     if (r.folderUrl) {
-      const link = make('a', { text: '開啟資料夾（在裡面撳「下載」就會打包成 zip）', className: 'bigLink' });
+      const link = make('a', { text: '開啟資料夾（在裏面按「下載」就會打包成 zip）', className: 'bigLink' });
       link.href = r.folderUrl;
       link.target = '_blank';
       link.rel = 'noopener';
@@ -1301,7 +1301,7 @@
 
     if (r.files && r.files.length > 0) {
       const box = make('div', { className: 'sec' }, [
-        sectionTitle('逐個檔（只想印其中一兩位就用這裡）')
+        sectionTitle('逐個檔案（只想印其中一兩位就用這裏）')
       ]);
       r.files.forEach((f) => {
         const a = make('a', { text: f.nameTC, className: 'sheetlink' });
@@ -1365,9 +1365,9 @@
         // 先撳『產生並取得連結』」——即係系統明明知道欠邊幾份、
         // 明明有工具補得返，但叫幹事自己去撳多一粒掣。Ivan 就係喺呢度
         // 收到「一份個人 PDF 都找不到。」
-        para('還未產生的，系統會在寄之前自己補產生，不用先撳「產生並取得連結」。'
-          + '份數多的時候一次可能做不完，做不完會停下來講清楚還差多少，'
-          + '再撳一次就會接住做。', 'muted')
+        para('還未產生的，系統會在寄之前自己補產生，不用先按「產生並取得連結」。'
+          + '份數多的時候一次可能做不完，做不完會停下來，並說明還差多少，'
+          + '再按一次就會繼續。', 'muted')
       ],
       confirmLabel: '寄給我自己',
       onConfirm: () => {
@@ -1385,7 +1385,7 @@
 
           if (r.missing && r.missing.length > 0) {
             const box = make('div', { className: 'sec sec-warn' }, [
-              sectionTitle('這 ' + r.missing.length + ' 位補不到 PDF，沒有夾進去')
+              sectionTitle('這 ' + r.missing.length + ' 位未能補產生 PDF，信中沒有附上')
             ]);
             r.missing.forEach((m) => {
               box.appendChild(make('div', {
@@ -1398,7 +1398,7 @@
           // 未做齊 ⇒ 直接俾一粒「接住做」，唔好要佢由頭撳過一次。
           const acts = [];
           if (r.pending) {
-            acts.push(button('接住做餘下的', () => { closeModal(); runPaperEmail(); }, ''));
+            acts.push(button('繼續處理餘下的', () => { closeModal(); runPaperEmail(); }, ''));
           }
           acts.push(button('知道了', () => closeModal(), r.pending ? 'secondary' : ''));
           openModal('寄到自己信箱', nodes, acts);

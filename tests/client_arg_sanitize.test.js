@@ -106,7 +106,7 @@ console.log('\n=== A【核心】重現現場：第 1 個參數係一個事件物
     + '——唔講嘅話，幹事唔知自己啱啱嗰下有冇改到嘢',
     r.msg && r.msg.indexOf('伺服器一次都沒有被呼叫') !== -1, r.msg);
   check('★★★★ 而且係三段式（`showErrorModal()` 拆得開）',
-    r.msg && r.msg.indexOf('發生了什麼：') === 0
+    r.msg && r.msg.indexOf('發生了甚麼：') === 0
     && r.msg.indexOf('現在的情況：') !== -1
     && r.msg.indexOf('你可以怎樣做：') !== -1, r.msg);
   check('★★★★★ 下一步講埋最常見嘅成因（直接綁一個會收參數嘅函式）'

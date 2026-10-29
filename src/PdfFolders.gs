@@ -74,7 +74,7 @@ function getOrCreateRosterSubfolder_(quarterId, versionNo) {
     // 萬一有人手動搬過，我哋要即刻知，唔好靜靜存落 My Drive。
     if (isPersonalMyDriveFolder_(versionFolder)) {
       throw new Error('PDF 版本資料夾「' + quarterName + '/' + versionName
-        + '」不在 Shared Drive 裡面。請檢查有沒有人手動搬過資料夾。');
+        + '」不在 Shared Drive 裏面。請檢查有沒有人手動搬過資料夾。');
     }
     return versionFolder;
   } finally {

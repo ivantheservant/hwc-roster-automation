@@ -39,14 +39,14 @@ console.log('\n=== 規格 1.5【核心】三段式錯誤訊息，缺一不可 ==
     '職事表沒有任何改動，第 2 版仍然是最新一版。',
     ['如果打錯字，把那一格改回原本的名字', '如果是新人，去「名單維護」新增']);
 
-  check('★★★★★ 有「發生了什麼」', msg.indexOf('發生了什麼：') !== -1, msg);
+  check('★★★★★ 有「發生了什麼」', msg.indexOf('發生了甚麼：') !== -1, msg);
   check('★★★★★ 有「現在的情況」——**最重要嗰段**：'
     + '幹事最想知嘅唔係點解錯，係「而家個表究竟點樣」',
     msg.indexOf('現在的情況：') !== -1, msg);
   check('★★★★★ 有「你可以怎樣做」', msg.indexOf('你可以怎樣做：') !== -1, msg);
   check('★★★★ 逐條出路用「・」列出', (msg.match(/・/g) || []).length === 2, msg);
   check('★★★★ 三段次序係「發生咩 → 而家點 → 可以點做」',
-    msg.indexOf('發生了什麼：') < msg.indexOf('現在的情況：')
+    msg.indexOf('發生了甚麼：') < msg.indexOf('現在的情況：')
     && msg.indexOf('現在的情況：') < msg.indexOf('你可以怎樣做：'));
 }
 
@@ -61,7 +61,7 @@ console.log('\n=== E2：assertNoUnsavedChanges_ 嘅三種觸發條件（靜態�
     && /pendingRequestCount > 0/.test(src));
   check('★★★★★ 用三段式訊息', /buildThreePartMessage_\(/.test(src));
   check('★★★★★ 出路第一條就係「先撳儲存」',
-    /先撳「儲存」/.test(src));
+    /先按「儲存」/.test(src));
   check('★★★★★ 讀唔到狀態（-1）時唔可以講「零改動」，要誠實講「查不到」'
     + '——把「讀唔到」當成「冇事」正正就係本專案燒過幾次嗰個 bug class',
     /系統查不到目前有沒有未儲存的改動/.test(src));

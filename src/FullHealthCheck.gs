@@ -413,7 +413,7 @@ function buildFullHealthCheckReport_(quarterId) {
   });
   run(function () {
     const report = buildAutomationCheckReport_();
-    return healthItem_('自動排程條件', HEALTH_SEVERITY.INFO, '若現在執行自動排程檢查會發生什麼',
+    return healthItem_('自動排程條件', HEALTH_SEVERITY.INFO, '若現在執行自動排程檢查會發生甚麼',
       '見備註', report.lines.join('\n'), []);
   });
   run(function () { return classifyRequestsHealth_(scanPendingRequestsAllQuarters_()); });

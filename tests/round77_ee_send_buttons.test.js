@@ -216,7 +216,8 @@ console.log('\n=== EE6–EE11：畫面 ===');
       JSON.stringify(texts) === JSON.stringify(['寄給堂委／執事', '給所有人', '變動的人', '選擇其他']), JSON.stringify(texts));
     const changedBtn = btnIn(card, '變動的人');
     check('★★★★★★ 未正式發出 ⇒〔變動的人〕變灰、原因「要先用〔給所有人〕正式發出一次」', changedBtn.disabled === true && /要先用〔給所有人〕正式發出一次/.test(changedBtn.title), changedBtn.title);
-    check('★★★★ 〔給所有人〕係主要按鈕、可以撳', !btnIn(card, '給所有人').disabled && !/secondary/.test(btnIn(card, '給所有人').className));
+    // 第八十五輪批次 LA 組（刻意改動）：〔給所有人〕和其餘寄出按鈕同一個樣式（secondary），不再是藍色主按鈕。
+    check('★★★★ 〔給所有人〕可以按，和其餘寄出按鈕同一個樣式', !btnIn(card, '給所有人').disabled && /secondary/.test(btnIn(card, '給所有人').className));
     check('★★★★ 卡片說明：「系統只會寄已經儲存的版本。」', /系統只會寄已經儲存的版本。/.test(card.textContent));
     const card2 = ui.renderStepSend({ latestVersion: { versionNo: 2 }, officialSentOnce: true, buttons: {} });
     check('★★★★★ 正式發出之後〔變動的人〕可以撳', btnIn(card2, '變動的人').disabled === false);
@@ -229,7 +230,7 @@ console.log('\n=== EE6–EE11：畫面 ===');
     await ui.openSendDialog('ALL');
     await tick();
     check('★★★★★★ 標題「寄出：你有 1 格改動還未儲存」', title() === '寄出：你有 1 格改動還未儲存', title());
-    check('★★★★★★ 內文叫佢先〔取消〕再撳第 2 步〔儲存〕', /請先撳〔取消〕，再撳第 2 步〔儲存〕，然後才寄出/.test(body().textContent) && /或者寄出上一個儲存的版本（第 2 版）：這 1 格不會在裡面，會留在表上/.test(body().textContent), body().textContent);
+    check('★★★★★★ 內文叫佢先〔取消〕再撳第 2 步〔儲存〕', /請先按〔取消〕，再按第 2 步〔儲存〕，然後才寄出/.test(body().textContent) && /或者寄出上一個儲存的版本（第 2 版）：這 1 格不會在裏面，會留在表上/.test(body().textContent), body().textContent);
     check('★★★★★★ 按鈕只有〔寄出上一個版本（第 2 版）〕〔取消〕', JSON.stringify(actTexts()) === JSON.stringify(['寄出上一個版本（第 2 版）', '取消']), JSON.stringify(actTexts()));
     btnIn(acts(), '寄出上一個版本（第 2 版）').fire('click');
     await tick();

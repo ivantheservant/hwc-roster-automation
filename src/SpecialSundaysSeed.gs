@@ -291,7 +291,7 @@ function runSpecialSundaysColumnBackfill_() {
   after.push('⚠️ 全部都是空白，而「空白」代表「已確認」。');
   after.push('由「產生年度合堂建議」產生、而日期還未向教會確認的那幾行，');
   after.push('要人手把這一欄填 FALSE——只有填了 FALSE 才算未確認，');
-  after.push('系統才會在提醒和體檢裡面算它。');
+  after.push('系統才會在提醒和體檢裏面算它。');
   ui.alert(title, after.join('\n'), ui.ButtonSet.OK);
 }
 

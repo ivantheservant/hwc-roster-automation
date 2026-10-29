@@ -123,11 +123,11 @@ function apiCreateEditableRosterCopy(quarterId) {
     const versionNo = findLatestVersionNo(quarterId);
     if (versionNo < 0) {
       throw new Error(buildThreePartMessage_(
-        '這一季還沒有生成過任何版本。', '什麼都沒有產生。', ['先在第 1 步生成職事表']));
+        '這一季還沒有生成過任何版本。', '甚麼都沒有產生。', ['先在第 1 步生成職事表']));
     }
     const out = createEditableRosterCopy_(quarterId, versionNo, 'apiCreateEditableRosterCopy');
-    out.message = '這一份只是現時第 ' + versionNo + ' 版的快照。之後你在系統裡再改動，'
-      + '這一份不會跟著變；要最新的就再做一份。';
+    out.message = '這一份只是現時第 ' + versionNo + ' 版的快照。之後你在系統裏再改動，'
+      + '這一份不會跟着變；要最新的就再做一份。';
     return out;
   });
 }

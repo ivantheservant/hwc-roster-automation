@@ -123,8 +123,8 @@ console.log('\n=== A6(a)【核心】做唔完 ＋ 時間到 ⇒ `INCOMPLETE`，�
   check('★★★★★★ 摘要講得出「已產生 X / Y 份，還差 Z 份」',
     /已產生 7 \/ 58 份，還差 51 份/.test(box.out.note || ''), box.out.note);
   check('★★★★★★ 而且講得出撳邊粒接住做',
-    /繼續跑自測/.test(box.out.note || '')
-      && !/只重跑紅色情境/.test(box.out.note || ''), box.out.note);
+    /繼續執行自測/.test(box.out.note || '')
+      && !/只重新執行紅色情境/.test(box.out.note || ''), box.out.note);
   check('★★★★★ 順手講明 S09 會被攔住，而嗰個攔截係啱嘅'
     + '——唔講嘅話，Ivan 見到 S09 被擋會去搵一個唔存在嘅 bug',
     /S09/.test(box.out.note || '') && /正確的攔截/.test(box.out.note || ''),
@@ -139,7 +139,7 @@ console.log('\n=== A2【核心】真嘅做完 ⇒ `PASSED` ===');
   });
   checkEqual('★★★★★★ 做完 58 份 ⇒ 綠',
     box.out.status, box.gas.SELFTEST_STATUS.PASSED);
-  checkEqual('★★★★★★ 而且真係跑咗 3 批'
+  checkEqual('★★★★★★ 而且真係執行咗 3 批'
     + '——舊寫法有個 `rounds < 20` 硬上限，58 份分批做唔一定夠',
     box.rounds, 3);
   const labels = box.out.checks.map(function (c) { return c.label; }).join('\n');
@@ -156,7 +156,7 @@ console.log('\n=== A2 冇 `rounds < 20` 硬上限 ===');
   const many = [];
   for (let i = 1; i <= 30; i++) many.push(batch(i * 2, 58, i === 30));
   const box = runS08({ batches: many });
-  checkEqual('★★★★★★ 跑咗 30 批，做完先停',
+  checkEqual('★★★★★★ 執行咗 30 批，做完先停',
     box.rounds, 30);
   checkEqual('★★★★★ 而且係綠', box.out.status, box.gas.SELFTEST_STATUS.PASSED);
   check('★★★★★★ 原始碼冇 `rounds < 20` 呢個上限',
@@ -177,7 +177,7 @@ console.log('\n=== A2【核心】一批都冇前進 ⇒ 紅，唔係 `INCOMPLETE
     box.out.failedChecks.some(function (c) {
       return /不會有分別/.test(c.evidence || '');
     }), JSON.stringify(box.out.failedChecks));
-  checkEqual('★★★★★ 而且唔會無止境跑落去', box.rounds <= 3, true);
+  checkEqual('★★★★★ 而且唔會無止境執行落去', box.rounds <= 3, true);
 }
 
 // =====================================================================
@@ -286,11 +286,11 @@ console.log('\n=== A6(b)【核心】續跑會重跑 `INCOMPLETE` 嗰條 ===');
   };
 
   const first = box.run(false);
-  checkEqual('★★★★★ 第一次跑咗，而且標 `INCOMPLETE`', first.byId.X1.status, S.INCOMPLETE);
-  checkEqual('★★★★★ 跑咗 1 次', ran, 1);
+  checkEqual('★★★★★ 第一次執行咗，而且標 `INCOMPLETE`', first.byId.X1.status, S.INCOMPLETE);
+  checkEqual('★★★★★ 執行咗 1 次', ran, 1);
 
   const second = box.run(true);
-  checkEqual('★★★★★★ **續跑真係再跑咗一次**'
+  checkEqual('★★★★★★ **繼續執行真係再執行咗一次**'
     + '——`settled` 包住 `INCOMPLETE` 嘅話呢度會係 1，'
     + '而 S08 就永遠補唔齊 58 份 PDF',
     ran, 2);
@@ -323,8 +323,8 @@ console.log('\n=== A3【核心】上游 `INCOMPLETE` ⇒ 下游 `BLOCKED`，而�
     /未做完/.test(out.byId.X9.note || '') && /不是失敗/.test(out.byId.X9.note || ''),
     out.byId.X9.note);
   check('★★★★★★ 而且叫佢撳「繼續跑自測」，唔係「只重跑紅色情境」',
-    /繼續跑自測/.test(out.byId.X9.note || '')
-      && !/只重跑紅色情境/.test(out.byId.X9.note || ''), out.byId.X9.note);
+    /繼續執行自測/.test(out.byId.X9.note || '')
+      && !/只重新執行紅色情境/.test(out.byId.X9.note || ''), out.byId.X9.note);
 }
 
 // =====================================================================
@@ -365,7 +365,7 @@ console.log('\n=== A4【核心】摘要要獨立數出「未完成」 ===');
     + '而實際上有一條未做完、一條被佢擋住',
     /1 未完成/.test(out.lines), out.lines.slice(0, 300));
   check('★★★★★★ 而且有一節「⏳ 未做完」',
-    /⏳ 未做完（1 條，撳「▶️ 繼續跑自測」接住做）/.test(out.lines),
+    /⏳ 未做完（1 條，按「▶️ 繼續執行自測」繼續）/.test(out.lines),
     out.lines.slice(0, 900));
   check('★★★★★★ 排喺「被擋住」前面'
     + '——被擋住嗰幾條通常就係佢擋住嘅，先睇到根因就唔使逐條查',
@@ -386,12 +386,12 @@ console.log('\n=== A4【核心】尾句固定叫「繼續跑自測」 ===');
   });
   const lines = box.run(false).lines;
   check('★★★★★★ **「還有 1 條未做完 ⇒ 撳「▶️ 繼續跑自測」接住做」**',
-    /還有 1 條未做完 ⇒ 撳「▶️ 繼續跑自測」接住做（不是「只重跑紅色情境」）/
+    /還有 1 條未做完 ⇒ 按「▶️ 繼續執行自測」繼續（不是「只重新執行紅色情境」）/
       .test(lines), lines.slice(-600));
   check('★★★★★★ 而且明講「不是只重跑紅色情境」'
     + '——「只重跑紅色情境」會把 INCOMPLETE 清走再由頭跑，'
     + '而 S08 要嘅係接住做，唔係由頭再產一次 58 份',
-    /不是「只重跑紅色情境」/.test(lines), lines.slice(-600));
+    /不是「只重新執行紅色情境」/.test(lines), lines.slice(-600));
   check('★★★★★ 而且唔會同時印「你改過程式碼…」嗰兩行'
     + '——兩種指示一齊出，就等於冇指示',
     !/・你改過程式碼（有 clasp push 過）/.test(lines), lines.slice(-600));
@@ -407,7 +407,7 @@ console.log('\n=== A5【核心】「只重跑紅色情境」要一併清走 `INC
     C: { status: S.BLOCKED }, D: { status: S.INCOMPLETE },
     E: { status: S.SKIPPED }
   });
-  checkEqual('★★★★★★ `INCOMPLETE` 被清走'
+  checkEqual('★★★★★★ `INCOMPLETE` 被清除'
     + '——唔清嘅話，修完碼之後佢唔會重跑，'
     + '而佢正正就係要接住做嗰條',
     cleared.clearedIds.sort().join('、'), 'B、C、D');

@@ -187,7 +187,7 @@ console.log('\n=== JA8：前端 ===');
     lateUnavailable: { count: 1, items: [{ serviceDate: '2028-07-16', postNameTC: '讀經', slotIndex: 1, personName: '某某' }], moreCount: 0 } };
   const card = ui.buildSendWarningNodes(w, { compact: true }).map((n) => n.textContent).join('\n');
   check('★★★★★★ JA8 狀態卡句子', card.indexOf('這一季有 1 格的人之後才申報不能服侍：') !== -1
-    && card.indexOf('撳第 2 步〔請系統幫我調整〕換人，或者在〔檢查我的改動〕勾「保留我的安排」。') !== -1, card);
+    && card.indexOf('按第 2 步〔請系統幫我調整〕換人，或者在〔檢查我的改動〕勾「保留我的安排」。') !== -1, card);
   check('★★★★★★ JA8 狀態卡冇「放行」二字', card.indexOf('放行') === -1, card);
   const dlg = ui.buildSendWarningNodes(w, {}).map((n) => n.textContent).join('\n');
   check('★★★★★ JA8 寄出確認窗（非 compact）照樣提醒，理由「之後才申報不能服侍」', dlg.indexOf('之後才申報不能服侍') !== -1, dlg);

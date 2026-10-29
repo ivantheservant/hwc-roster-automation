@@ -104,7 +104,7 @@ function resolveAuthoritativeState_(context, mode, callerName) {
       + '  • `RosterAssignments` 長表（程式讀的）\n'
       + '  • `Roster_XXXXTX_vN` grid 工作表（幹事看和改的）\n\n'
       + '兩者在「幹事剛剛人手改過 grid」的時候並不相同，靜靜挑其中一份\n'
-      + '就是第十九輪批次那個 bug——步驟 3 一直讀長表，所以幹事改幾多次\n'
+      + '就是第十九輪批次那個 bug——步驟 3 一直讀長表，所以幹事改多少次\n'
       + 'grid 都仍然報同一項違反、人名還是改之前那個，硬規則閘變成只有\n'
       + '「放行」一個出口。\n\n'
       + '請明確傳其中一個：\n'
@@ -402,7 +402,7 @@ function runMaterialiseManualEdits_() {
     '已建立 ' + result.sheetName + '（v' + result.versionNo + '），'
       + '帶入 ' + result.cellCount + ' 格人手改動。\n'
       + '原版本 v' + versionNo + ' 保持不變。\n\n'
-      + '如果這一季已經正式發出過，記得跑「步驟 5：改動後重發」'
+      + '如果這一季已經正式發出過，記得執行「步驟 5：改動後重發」'
       + '通知受影響的義工。', ui.ButtonSet.OK);
 }
 
@@ -503,7 +503,7 @@ function buildUnresolvedGuidanceText_(unresolved) {
   lines.push('　3. 如果那一格本來就不該有人（例如你想改回原狀），'
     + '把它改回上面寫的「本來應該是」那個文字。');
   lines.push('');
-  lines.push('為什麼是整批拒絕、不是跳過那幾格：這個工具的用途就是'
+  lines.push('為甚麼是整批拒絕、不是跳過那幾格：這個工具的用途就是'
     + '「讓 grid 跟版本一致」。');
   lines.push('如果跳過認不出的格照樣寫入，你會以為全部改動都入了版本，'
     + '實際上有幾格沒有——');

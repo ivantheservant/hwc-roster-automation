@@ -250,7 +250,7 @@ function runFourStageStep3_locked_() {
     const confirmLines = [
       '以下 ' + confirmList.length + ' 筆「未曾任該崗位」的申報要全部接受嗎？',
       '（選「否」則全部記為 REJECTED。想再提交同一筆的話，'
-      + '把該行的 RequestID 刪走就會重新被當成待處理——'
+      + '把該行的 RequestID 刪除就會重新被當成待處理——'
       + '清 Status 沒有作用，系統判斷的是 RequestID 是否空白。）', ''
     ];
     confirmList.forEach(function (r) {
@@ -481,7 +481,7 @@ function reportCancelledWithNeedsInput_(ui, title, plan) {
   ui.alert(title,
     '已取消，沒有套用任何申報、沒有建立新版本。\n\n'
       + '不過其中 ' + recorded + ' 筆「無法套用」的申報，已經把攔截原因寫回 Requests 工作表的\n'
-      + 'Status 與「處理結果」兩欄，方便你日後直接在表上看到系統為什麼不處理它們。\n\n'
+      + 'Status 與「處理結果」兩欄，方便你日後直接在表上看到系統為甚麼不處理它們。\n\n'
       + '這些行的 RequestID 仍然留空，代表系統從來沒有真正處理過它們——\n'
       + '你修正之後再執行本步驟，它們會照樣被重新驗證，不會被永久丟棄。',
     ui.ButtonSet.OK);
@@ -725,7 +725,7 @@ function runFourStageStep5_locked_() {
       const confirmLines = [
         '以下 ' + confirmList.length + ' 筆「未曾任該崗位」的申報要全部接受嗎？',
         '（選「否」則全部記為 REJECTED。想再提交同一筆的話，'
-      + '把該行的 RequestID 刪走就會重新被當成待處理——'
+      + '把該行的 RequestID 刪除就會重新被當成待處理——'
       + '清 Status 沒有作用，系統判斷的是 RequestID 是否空白。）', ''
       ];
       confirmList.forEach(function (r) {
@@ -809,8 +809,8 @@ function runFourStageStep5_locked_() {
       '步驟 5：改動後重發（產生個人 PDF）',
       '本次改動涉及 ' + pdfCount + ' 人的個人 PDF（版本 v' + versionNo + '），'
         + '預計需時 ' + durationText + '。\n\n'
-        + 'ℹ️ 如果你剛剛才執行過「產生個人 PDF」，這裡仍然可能全部重做一次。\n'
-        + '這不是故障：檔名裡面有版本號'
+        + 'ℹ️ 如果你剛剛才執行過「產生個人 PDF」，這裏仍然可能全部重做一次。\n'
+        + '這不是故障：檔名裏面有版本號'
         + '（{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf），\n'
         + '只要期間建立過新版本，舊版本號那一批就不算數——因為新版本的內容\n'
         + '可能不同，把舊版本的 PDF 當成新版本寄出去才是真正的錯。\n\n'
@@ -939,7 +939,7 @@ function runFourStageStep5_locked_() {
  */
 function buildViolationReportLines_(violations, sheetName) {
   const all = violations || [];
-  if (all.length === 0) return ['重跑規則檢查：沒有發現任何違反 ✓'];
+  if (all.length === 0) return ['重新執行規則檢查：沒有發現任何違反 ✓'];
 
   const hard = all.filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
   const others = all.filter(function (v) { return v.severity !== RULE_LEVELS.HARD; });
@@ -954,7 +954,7 @@ function buildViolationReportLines_(violations, sheetName) {
     return lines;
   };
 
-  const lines = ['重跑規則檢查，共 ' + all.length + ' 項違反：'];
+  const lines = ['重新執行規則檢查，共 ' + all.length + ' 項違反：'];
 
   if (hard.length > 0) {
     lines.push('', '⚠️ 硬規則違反：' + hard.length + ' 項（本系統的原則是硬規則絕不自動違反）');
@@ -1006,7 +1006,7 @@ function remindUnreleasedHardViolations_(ui, quarterId, title, violations) {
   logUnreleasedHardViolationsAtSend_(quarterId, title + '（選單）', findLatestVersionNo(quarterId), unreleased);
   ui.alert(title + '：提醒',
     '這一版有 ' + unreleased.length + ' 格違反一定要遵守的規則，而且還未放行'
-      + '（例如儲存之後改了名單）。這不會阻擋重發，但收到的人會見到這些安排。\n\n'
+      + '（例如儲存之後改了名單）。這不會阻擋重發，但收到的人會看到這些安排。\n\n'
       + '要改的話，先在試算表改好那幾格，再儲存成新版本。',
     ui.ButtonSet.OK);
   return unreleased.length;

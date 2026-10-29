@@ -10,7 +10,7 @@
  */
 
 /** 已正式發出嘅季度，確認清單最上面嗰句紅字。 */
-const QUARTER_RESET_OFFICIAL_SENT_WARNING = '這一季已經正式發出給全體，清走之後寄出紀錄亦會清走。';
+const QUARTER_RESET_OFFICIAL_SENT_WARNING = '這一季已經正式發出給全體，重設之後寄出紀錄亦會清除。';
 
 /**
  * 呢一季可唔可以用〔整季清走重來〕（主畫面按鈕用：封鎖 ⇒ 灰掣＋原因）。
@@ -26,12 +26,12 @@ function describeQuarterResetAvailability_(quarterId) {
   } catch (err) {
     // 讀唔到封鎖清單 ⇒ 一律當封鎖（呢個係全系統最危險嘅動作之一）
     log_('WARN', 'describeQuarterResetAvailability_ 讀不到封鎖清單：' + err.message);
-    return { blocked: true, reason: '讀不到「不可以重設的季度」設定，暫時不可以清走。撳「重新整理」再試。' };
+    return { blocked: true, reason: '讀不到「不可以重設的季度」設定，暫時不可以重設。按「重新整理」再試。' };
   }
   const split = splitQuarterResetTargets_([id], blockedList);
   if (split.blocked.length > 0) {
     return { blocked: true,
-      reason: id + ' 受保護（Config 的 ' + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + '），不可以清走。' };
+      reason: id + ' 受保護（Config 的 ' + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + '），不可以重設。' };
   }
   return { blocked: false, reason: '' };
 }
@@ -69,7 +69,7 @@ function apiQuarterResetPlan(quarterId) {
  */
 function apiQuarterResetExecute(quarterId, typed) {
   assertWebAppRequestAllowed_();
-  return withMutationLock_('整季清走重來', function () {
+  return withMutationLock_('整季重設', function () {
     return quarterResetExecute_locked_(quarterId, typed);
   });
 }
@@ -79,13 +79,13 @@ function quarterResetExecute_locked_(quarterId, typed) {
   if (String(typed || '').trim() !== QUARTER_RESET_CONFIRM_TEXT) {
     throw new Error(buildThreePartMessage_(
       '輸入的文字不是「' + QUARTER_RESET_CONFIRM_TEXT + '」。',
-      '已取消，沒有清走任何東西。',
-      ['要清走的話，逐字輸入「' + QUARTER_RESET_CONFIRM_TEXT + '」再撳一次']));
+      '已取消，沒有清除任何東西。',
+      ['要重設的話，逐字輸入「' + QUARTER_RESET_CONFIRM_TEXT + '」再按一次']));
   }
   // 後端再驗一次封鎖（唔信前端）
   const avail = describeQuarterResetAvailability_(id);
   if (avail.blocked) {
-    throw new Error(buildThreePartMessage_(avail.reason, '沒有清走任何東西。', ['選另一個季度']));
+    throw new Error(buildThreePartMessage_(avail.reason, '沒有清除任何東西。', ['選另一個季度']));
   }
   const plan = planQuarterReset_(id, true);
   const batch = executeQuarterResetBatch_([{ quarterId: id, plan: plan }]);

@@ -202,7 +202,7 @@ function apiPreviewUnavailableImpact(payload) {
       ok: false,
       message: buildThreePartMessage_(
         '開始日期（' + from.dateStr + '）比結束日期（' + to.dateStr + '）遲。',
-        '什麼都沒有加入。',
+        '甚麼都沒有加入。',
         ['把兩個日期調轉', '如果只是一日不能服侍，兩格填同一日'])
     };
   }
@@ -280,7 +280,7 @@ function apiSaveUnavailable(payload) {
   if (!personId) {
     return {
       ok: false,
-      message: buildThreePartMessage_('沒有選人。', '什麼都沒有加入。', ['在上面的下拉選一位'])
+      message: buildThreePartMessage_('沒有選人。', '甚麼都沒有加入。', ['在上面的下拉選一位'])
     };
   }
 
@@ -293,7 +293,7 @@ function apiSaveUnavailable(payload) {
       ok: false,
       message: buildThreePartMessage_(
         '開始日期（' + from.dateStr + '）比結束日期（' + to.dateStr + '）遲。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['把兩個日期調轉', '如果只是一日不能服侍，兩格填同一日'])
     };
   }
@@ -307,7 +307,7 @@ function apiSaveUnavailable(payload) {
       ok: false,
       message: buildThreePartMessage_(
         '選了「指定崗位」，但一個崗位都沒有勾。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['勾選至少一個崗位', '或者改選「全部崗位」'])
     };
   }
@@ -337,7 +337,7 @@ function apiSaveUnavailable(payload) {
         ok: false,
         message: buildThreePartMessage_(
           '找不到要改的那一筆（' + existingId + '）。',
-          '什麼都沒有改動。',
+          '甚麼都沒有改動。',
           ['重新整理這一頁再試一次', '可能有人剛剛在試算表改動過這張表'])
       };
     }
@@ -388,7 +388,7 @@ function parseUnavailableDate_(raw, timezone, label) {
       dateStr: '',
       error: buildThreePartMessage_(
         label + '「' + (parsed.rawText || String(raw || '（空白）')) + '」看不懂。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         [
           '請用 2026-11-08 這種寫法（年-月-日）',
           '「11/8」這種寫法系統不接受——因為分不出是 11 月 8 日還是 8 月 11 日'

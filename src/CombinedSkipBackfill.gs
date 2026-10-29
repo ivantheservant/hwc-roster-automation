@@ -261,9 +261,9 @@ function executeCombinedSkipBackfill_(plan) {
   if (col <= 0) {
     throw new Error(buildThreePartMessage_(
       '「' + SHEETS.SPECIAL_SUNDAYS + '」這一張工作表沒有「' + key + '」這一欄。',
-      '什麼都沒有寫入。',
+      '甚麼都沒有寫入。',
       ['去選單「維護 ▸ 補建 SpecialSundays 工作表」看看這一張表是不是壞了',
-        '如果整張表的欄位都不對，先把它修好再跑這一支']));
+        '如果整張表的欄位都不對，先把它修好再執行這個工具']));
   }
 
   // `readSheet()` 由第 3 行開始，所以 rowIndex 0 ＝ 試算表第 3 行。

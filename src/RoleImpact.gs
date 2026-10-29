@@ -26,7 +26,7 @@
 /** 可行性判斷嘅結論代號。 */
 const ROLE_IMPACT_VERDICT = {
   IMPOSSIBLE: '必定完全排不到人',
-  CLASH: '同週必定撞人',
+  CLASH: '同週必定衝突',
   CONSECUTIVE: '必定違反準硬規則',
   OVERLOAD: '必定有人超額',
   CAPACITY: '必定排不滿',

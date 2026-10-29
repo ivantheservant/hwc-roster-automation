@@ -224,7 +224,7 @@ function convertConfigValue_(rawValue, type, key) {
       // 一項亂七八糟嘅英文長字串，而下游只會當成一個正常成員。
       parts.forEach(function (p) {
         if (looksLikeStringifiedSheetsValue_(p)) {
-          fail('清單裡的「' + p + '」看起來是試算表自動轉成的日期，不是一個清單項目');
+          fail('清單裏的「' + p + '」看起來是試算表自動轉成的日期，不是一個清單項目');
         }
       });
       return parts;
@@ -279,7 +279,7 @@ function buildConfigTypeErrorMessage_(key, type, str, why) {
     '認不出的原因：' + why,
     '',
     '最可能的原因：Google 試算表把那一格自動當成日期／數字了。',
-    '你在格子裡看到的還是原本輸入的東西，但實際存進去的已經不是文字。',
+    '你在格子裏看到的還是原本輸入的東西，但實際存進去的已經不是文字。',
     '',
     '怎樣修：',
     '　1. 開 Config 工作表，選中「' + keyName + '」那一行的 Value 格',
@@ -387,7 +387,7 @@ function describeConfigValueOrigin_(key, source) {
   }
   // MISSING：⚠️ 這一句就是整組要修的那一句。
   return '程式內建預設值——「' + key + '」這個 Key 還沒有加進 Config 工作表，'
-    + '所以你在那裡找不到它。想改這個值，先跑「維護 ▸ 補建 Config 參數」';
+    + '所以你在那裏找不到它。想改這個值，先執行「維護 ▸ 補建 Config 參數」';
 }
 
 /**

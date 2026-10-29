@@ -618,7 +618,7 @@ function detectWeekTitleChanges_(context) {
   if (!grid || Object.keys(grid).length === 0) return [];
   const expected = context.gridRender && context.gridRender.typeTextByDate;
   if (!expected) {
-    throw new Error('偵測每週標題改動需要 `context.gridRender.typeTextByDate`（每週「類型」欄本來應該顯示乜）。'
+    throw new Error('偵測每週標題改動需要 `context.gridRender.typeTextByDate`（每週「類型」欄本來應該顯示甚麼）。'
       + '用 `buildGridRenderContext_()` 產生，不要自己拼。');
   }
   const out = [];

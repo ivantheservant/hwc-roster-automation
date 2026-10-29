@@ -103,7 +103,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
     return rollbackBlocked_('BAD_TARGET', buildThreePartMessage_(
       '沒有選要回到哪一個版本。',
       '職事表沒有任何改動。',
-      ['在上面的版本清單選一個，再撳一次']));
+      ['在上面的版本清單選一個，再按一次']));
   }
   if (target === currentVersionNo) {
     return rollbackBlocked_('TARGET_IS_CURRENT', buildThreePartMessage_(
@@ -126,8 +126,8 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
     return rollbackBlocked_('UNSAVED_CHANGES', buildThreePartMessage_(
       bits.join('，') + '，未儲存。回到上一個版本會令這些改動消失。',
       '職事表沒有任何改動，第 ' + currentVersionNo + ' 版仍然是最新一版。',
-      ['先撳「儲存」，把改動儲存成新一版',
-        '或者把那幾格改回原樣，這一粒就會重新亮起']));
+      ['先按「儲存」，把改動儲存成新一版',
+        '或者把那幾格改回原樣，這個按鈕就會重新亮起']));
   }
 
   // ── 步 3：逐格比對（唯讀）─────────────────────────────────────
@@ -281,7 +281,7 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
     throw new Error(buildThreePartMessage_(
       '「回到上一個版本」需要你打字確認才會執行。',
       '職事表沒有任何改動，第 ' + plan.currentVersionNo + ' 版仍然是最新一版。',
-      ['在確認格輸入「' + ROLLBACK_CONFIRM_TEXT + '」再撳一次',
+      ['在確認格輸入「' + ROLLBACK_CONFIRM_TEXT + '」再按一次',
         '如果不想繼續，直接關掉這個畫面就可以']));
   }
 
@@ -481,7 +481,7 @@ function findVersionRowForPicker_(quarterId, versionNo) {
     throw new Error(buildThreePartMessage_(
       '找不到這一季的第 ' + versionNo + ' 版。',
       '職事表沒有任何改動。',
-      ['撳頁頂〔重新整理〕再選一次']));
+      ['按頁頂〔重新整理〕再選一次']));
   }
   const sheetName = String(row[V.SHEET_NAME] || '').trim() || buildRosterSheetName_(quarterId, versionNo);
   return { row: row, sheetName: sheetName };
@@ -630,7 +630,7 @@ function openVersionForViewing_locked_(quarterId, target) {
     throw new Error(buildThreePartMessage_(
       '第 ' + target + ' 版的工作表「' + found.sheetName + '」不見了。',
       '職事表沒有任何改動。系統內部仍然有這一版的資料。',
-      ['選這一版再撳〔用這一版作起點〕，內容會寫入最新那一張']));
+      ['選這一版再按〔用這一版作起點〕，內容會寫入最新那一張']));
   }
   let protectedNow = false;
   let restoredCells = 0;
@@ -686,7 +686,7 @@ function useVersionAsStartPoint_locked_(quarterId, target) {
     throw new Error(buildThreePartMessage_(
       (isNaN(target) || target < 0) ? '沒有選要用哪一版作起點。' : '你選的第 ' + target + ' 版就是最新一版。',
       '職事表沒有任何改動。',
-      ['在版本下拉選一個舊版本再撳一次']));
+      ['在版本下拉選一個舊版本再按一次']));
   }
   findVersionRowForPicker_(quarterId, target);   // 冇呢一版 ⇒ 拋錯
   const latestFound = findVersionRowForPicker_(quarterId, latest);

@@ -349,7 +349,7 @@ console.log('\n=== E Config 說明要講得出「可以填多過一個」同「�
   const block = seed.slice(at, at + 900);
   check('★★★★★ 說明講明可以填多過一個'
     + '——說明唔講，幹事就會照舊淨係填一個，而呢個功能等於冇做過',
-    /要多過一個地址/.test(block), block.slice(0, 300));
+    /要填多於一個地址/.test(block), block.slice(0, 300));
   check('★★★★★ 而且舉咗一個例（有例先至真係睇得明）',
     /a@example.invalid, b@example.invalid/.test(block), block.slice(0, 300));
   check('★★★★★ 亦都講明「有一個打錯就整批唔寄」'

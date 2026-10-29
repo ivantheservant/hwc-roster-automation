@@ -137,7 +137,7 @@ console.log('\n=== E2【核心】轉寄生效 ＋ 缺欄 ⇒ 直接擋住 ===');
     + '信實際寄咗去轉寄地址，而「原本要寄畀邊個」只喺嗰一欄度',
     /轉寄測試地址生效中/.test(threw), threw || '（沒有拋錯，即是照樣寄了出去）');
   check('★★★★★★ 訊息係三段式（發生了什麼／現在的情況／你可以怎樣做）',
-    /發生了什麼/.test(threw) && /現在的情況/.test(threw) && /你可以怎樣做/.test(threw),
+    /發生了甚麼/.test(threw) && /現在的情況/.test(threw) && /你可以怎樣做/.test(threw),
     threw);
   check('★★★★★★ 而且講得出去邊度補',
     /補建 SendLog 缺欄/.test(threw), threw);

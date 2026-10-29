@@ -61,7 +61,7 @@ console.log('\n=== D【核心】解除 ＝ 填 EffectiveTo，唔係刪行、唔�
     + '——寫落去就會出現一段負長度嘅生效期，等於嗰條限制從來冇存在過',
     /parsed\.dateStr < from/.test(lift));
   check('★★★★ 而且錯誤訊息會指出「真係想當佢冇存在過」應該點做',
-    lift.indexOf('這一行由頭到尾都不算數') !== -1);
+    lift.indexOf('這一行從頭到尾都不算數') !== -1);
 }
 
 console.log('\n=== D【核心】畫面要講清楚同「崗位資格」嘅分別 ===');
@@ -76,7 +76,7 @@ console.log('\n=== D【核心】畫面要講清楚同「崗位資格」嘅分別
     (zone3.match(/崗位資格 = 這個人從來沒做過這個崗位。/g) || []).length >= 2);
   check('★★★★★ 「解除」畫面講明點解係填日期而唔係刪行'
     + '——唔講嘅話，下一個人會覺得「刪咗佢乾淨啲」',
-    zone3.indexOf('系統只會填上「解除日」，不會刪走這一行，也不會把它設成停用。') !== -1);
+    zone3.indexOf('系統只會填上「解除日」，不會刪除這一行，也不會把它設成停用。') !== -1);
 }
 
 console.log('\n=== D 過期嘅摺入「已解除」一節，唔刪 ===');
@@ -86,7 +86,7 @@ console.log('\n=== D 過期嘅摺入「已解除」一節，唔刪 ===');
     /if \(to && to < today\) lifted\.push\(item\);/.test(list));
   check('★★★★ 前端有「已解除」一節，而且寫明保留紀錄',
     zone3.indexOf("sectionTitle('已解除（'") !== -1
-    && zone3.indexOf('保留紀錄，不會刪走') !== -1);
+    && zone3.indexOf('保留紀錄，不會刪除') !== -1);
   check('★★★★★ 已解除嗰啲唔會再有「解除限制」掣'
     + '——撳落去只會令人以為要再解除一次',
     /if \(!isLifted\) buttons\.unshift\(button\('解除限制'/.test(zone3));

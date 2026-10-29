@@ -132,7 +132,7 @@ console.log('\n=== A4(a)【核心】唔係沙盒季度 ＋ OFFICIAL_SENT ⇒ 仍
     box.gate.ok, false);
   check('★★★★★★ 而且講得出佢唔係沙盒季度指住嗰一季',
     box.gate.reasons.some(function (r) {
-      return /不是 SELFTEST_QUARTER_ID 指著的那一季（2028T3）/.test(r);
+      return /不是 SELFTEST_QUARTER_ID 指着的那一季（2028T3）/.test(r);
     }), JSON.stringify(box.gate.reasons));
 }
 
@@ -256,7 +256,7 @@ console.log('\n=== A3【核心】報告開頭要講一句 Stage ===');
 {
   const gas = loadGasSource(FILES);
   const lines = gas.describeSelfTestReport_({
-    quarterId: '2028T3', resetSummary: '（續跑，沒有重設）',
+    quarterId: '2028T3', resetSummary: '（繼續執行，沒有重設）',
     stageAtStart: 'OFFICIAL_SENT',
     results: [], passedCount: 0, failedCount: 0, errorCount: 0,
     notRunCount: 0, incompleteCount: 0, startupFailures: [], finalInvariants: null

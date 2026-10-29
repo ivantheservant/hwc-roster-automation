@@ -192,7 +192,7 @@ console.log('\n=== 乙1：AppliesTo=ALL 一定要寫入空 PostIDs ===');
     String(rows[0][U.POST_IDS] || ''), '');
 }
 
-console.log('\n=== 乙1：前端揀 ALL 嗰陣唔會送 postIds 上嚟，而且個勾撳唔到 ===');
+console.log('\n=== 乙1：前端揀 ALL 嗰陣唔會送 postIds 上嚟，而且個勾按唔到 ===');
 {
   const UI = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone3.html'), 'utf8');
   check('★★★★★ collect() 揀 ALL 時送空陣列'
@@ -226,7 +226,7 @@ console.log('\n=== 乙2：介面可以取消一筆（走 active:false 路徑）=
   check('★★★★★ `active: false` 儲存成功', res.ok === true, JSON.stringify(res));
 
   const row = gas.readSheet(gas.SHEETS.UNAVAILABLE)[0];
-  checkEqual('★★★★★ Status 寫成 CANCELLED（唔係刪走——一律停用不刪除）',
+  checkEqual('★★★★★ Status 寫成 CANCELLED（唔係刪除——一律停用不刪除）',
     String(row[U.STATUS]), gas.UNAVAILABLE_VALUES.STATUS_CANCELLED);
 
   const UI = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone3.html'), 'utf8');
@@ -235,7 +235,7 @@ console.log('\n=== 乙2：介面可以取消一筆（走 active:false 路徑）=
   check('★★★★★ 而且撳之前有確認（會影響排表）',
     /function confirmCancelUnavailable/.test(UI));
   check('★★★★ 確認畫面講明「唔會刪走、之後仍然查得到」',
-    /不會被刪走[\s\S]{0,40}已取消/.test(UI));
+    /不會被刪除[\s\S]{0,40}已取消/.test(UI));
   check('★★★★★ 撳完之後重新讀列表（唔係喺前端自己刪走一行）',
     /apiListUnavailable[\s\S]{0,120}openUnavailable\('''''\)|unavailableData = await callServer\('apiListUnavailable'[\s\S]{0,80}openUnavailable/.test(UI));
 }

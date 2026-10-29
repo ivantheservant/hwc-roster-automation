@@ -101,8 +101,8 @@ function classifyOrphanVersionsHealth_(orphans) {
     orphans.length === 0
       ? '沒有發現問題。'
       : '這些版本寫了一半（派工紀錄或工作表寫了，但沒有登記）。日後這一季再建立新版本時，'
-        + '會因為工作表撞名而失敗。可以用「維護 ▸ ⚠️ 清理未登記的孤兒版本」清走——'
-        + '它只刪這些未登記的資料，已登記的版本一律不碰。',
+        + '會因為工作表名稱重複而失敗。可以用「維護 ▸ ⚠️ 清理未登記的孤兒版本」清除——'
+        + '它只刪這些未登記的資料，已登記的版本一律不會改動。',
     orphans.map(describeOrphanVersion_));
 }
 
@@ -130,7 +130,7 @@ function executeOrphanVersionCleanup_(plan) {
   if (freshKeys !== planKeys) {
     throw new Error(buildThreePartMessage_(
       '預覽之後孤兒版本的清單變了（預覽：' + (planKeys || '無') + '；現在：' + (freshKeys || '無') + '）。',
-      '什麼都沒有刪。',
+      '甚麼都沒有刪。',
       ['重新執行一次這個工具，看清楚新的清單再決定']));
   }
 
@@ -202,19 +202,19 @@ function runCleanupOrphanVersions_locked_() {
     return;
   }
 
-  const lines = ['以下版本在 RosterAssignments 或工作表裡有資料，但 RosterVersions 沒有登記：', '']
+  const lines = ['以下版本在 RosterAssignments 或工作表裏有資料，但 RosterVersions 沒有登記：', '']
     .concat(plan.map(function (o) { return '　・' + describeOrphanVersion_(o); }))
     .concat(['',
       '會做的事：只刪除上面這些未登記版本的派工紀錄和工作表，每一項寫入 AuditLog。',
-      '不會做的事：已登記的版本、SendLog、Requests、PDF 一律不碰。',
+      '不會做的事：已登記的版本、SendLog、Requests、PDF 一律不會改動。',
       '',
-      '（這個工具不受 QUARTER_RESET_BLOCKED_QUARTERS 限制，因為它不碰任何已登記的資料。）',
+      '（這個工具不受 QUARTER_RESET_BLOCKED_QUARTERS 限制，因為它不會改動任何已登記的資料。）',
       '',
       '確定的話，請在下面逐字輸入「' + ORPHAN_VERSION_CONFIRM_TEXT + '」。']);
   const confirm = ui.prompt(title, lines.join('\n'), ui.ButtonSet.OK_CANCEL);
   if (confirm.getSelectedButton() !== ui.Button.OK) return;
   if (confirm.getResponseText().trim() !== ORPHAN_VERSION_CONFIRM_TEXT) {
-    ui.alert(title, '輸入的文字不是「' + ORPHAN_VERSION_CONFIRM_TEXT + '」，已取消，什麼都沒有刪。',
+    ui.alert(title, '輸入的文字不是「' + ORPHAN_VERSION_CONFIRM_TEXT + '」，已取消，甚麼都沒有刪。',
       ui.ButtonSet.OK);
     return;
   }

@@ -44,7 +44,7 @@ console.log('\n=== IJ1／IJ3／IJ4／IJ5 ===');
   const p = gas.apiQuarterResetPlan(sc.Q);
   const menuLines = gas.describeQuarterResetPlanLines_(sc.Q, gas.planQuarterReset_(sc.Q, true));
   check('★★★★★★ IJ1 清單同選單版一致（同一支 describeQuarterResetPlanLines_，連 v0）',
-    JSON.stringify(p.lines) === JSON.stringify(menuLines) && p.lines.some((l) => /連 v0 一齊清：YES/.test(l)),
+    JSON.stringify(p.lines) === JSON.stringify(menuLines) && p.lines.some((l) => /連 v0 一併清除：YES/.test(l)),
     JSON.stringify(p.lines).slice(0, 300));
   check('★★★★ 未發出 ⇒ 冇紅框', p.officialSent === false && p.officialSentWarning === '' && p.blocked === false);
   check('★★★★ 要打嘅字＝確認重設', p.confirmText === '確認重設');
@@ -57,7 +57,7 @@ console.log('\n=== IJ1／IJ3／IJ4／IJ5 ===');
   gas.advanceQuarterStage_(sc.Q, gas.QUARTER_STAGE.OFFICIAL_SENT);
   const p2 = gas.apiQuarterResetPlan(sc.Q);
   check('★★★★★★ IJ4 已正式發出 ⇒ 紅框字', p2.officialSent === true
-    && p2.officialSentWarning === '這一季已經正式發出給全體，清走之後寄出紀錄亦會清走。', JSON.stringify(p2).slice(0, 300));
+    && p2.officialSentWarning === '這一季已經正式發出給全體，重設之後寄出紀錄亦會清除。', JSON.stringify(p2).slice(0, 300));
 
   const r = gas.apiQuarterResetExecute(sc.Q, '確認重設');
   check('★★★★★★ IJ5 清走：ok、0 個版本', r.ok === true && versions(sc) === 0, JSON.stringify(r).slice(0, 300));
@@ -93,14 +93,14 @@ console.log('\n=== IJ6：前端 ===');
     return rows[0] ? rows[0].flatten().filter((n) => n.tagName === 'BUTTON')[0] : null;
   };
   ui.renderZone3({ settingsLinks: {}, quarterReset: { blocked: false, reason: '' } });
-  const b = btnAfter('整季清走重來');
+  const b = btnAfter('整季重設');
   check('★★★★★★ 常用設定有〔整季清走重來〕而且係紅色危險掣', !!b && /danger/.test(b.className) && b.disabled === false,
     b && b.className);
-  ui.renderZone3({ settingsLinks: {}, quarterReset: { blocked: true, reason: '2026T4 受保護（Config 的 QUARTER_RESET_BLOCKED_QUARTERS），不可以清走。' } });
-  const b2 = btnAfter('整季清走重來');
+  ui.renderZone3({ settingsLinks: {}, quarterReset: { blocked: true, reason: '2026T4 受保護（Config 的 QUARTER_RESET_BLOCKED_QUARTERS），不可以清除。' } });
+  const b2 = btnAfter('整季重設');
   check('★★★★★★ 封鎖 ⇒ 灰掣＋原因', !!b2 && b2.disabled === true && /受保護/.test(ui.document.getElementById('zone3Body').textContent));
   ui.renderZone3({ settingsLinks: {} });
-  check('★★★★ 冇狀態（舊後端）⇒ 當封鎖', btnAfter('整季清走重來').disabled === true);
+  check('★★★★ 冇狀態（舊後端）⇒ 當封鎖', btnAfter('整季重設').disabled === true);
 
   // 打字框要「確認重設」
   let confirmedWith = null;

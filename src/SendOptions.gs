@@ -126,7 +126,7 @@ function resolveSendOptions_(stage, sendOptions, templates) {
     throw new Error(buildThreePartMessage_(
       '你自己輸入那 ' + badEmails.length + ' 個地址看起來不是電郵：' + badEmails.join('、'),
       '一封都沒有寄出。',
-      ['回去那一格改正或者刪走，再撳一次']));
+      ['回去那一格改正或者刪除，再按一次']));
   }
 
   // ⚠️ 揀咗「自己揀」但一個都冇揀 ⇒ **拋錯，唔可以靜靜當成寄全部**。
@@ -137,7 +137,7 @@ function resolveSendOptions_(stage, sendOptions, templates) {
     throw new Error(buildThreePartMessage_(
       '你選了「自己選擇」，但一位都沒有選，也沒有自行輸入任何電郵。',
       '一封都沒有寄出。',
-      ['回去那個名單勾選要寄給誰，或者在「另外自行輸入電郵」填一個地址，再撳一次',
+      ['回去那個名單勾選要寄給誰，或者在「另外自行輸入電郵」填一個地址，再按一次',
         '如果你想寄給全部人，請用〔給所有人〕']));
   }
 

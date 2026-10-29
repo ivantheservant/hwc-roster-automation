@@ -142,7 +142,7 @@ function apiListRoles(keyword) {
  */
 function validateRoleInput_(p, timezone) {
   const bad = function (what, actions) {
-    return { ok: false, message: buildThreePartMessage_(what, '什麼都沒有改動。', actions), values: {} };
+    return { ok: false, message: buildThreePartMessage_(what, '甚麼都沒有改動。', actions), values: {} };
   };
 
   const personId = String(p.personId || '').trim();
@@ -151,7 +151,7 @@ function validateRoleInput_(p, timezone) {
   const roleCode = String(p.roleCode || '').trim().toUpperCase();
   if (!ROLE_LABELS_TC[roleCode]) {
     return bad('身分不是「堂委」或者「執事」。',
-      ['在下拉重新選一次', '如果這裡應該有第三種身分，要先在程式碼加入，不能只在表上打字']);
+      ['在下拉重新選一次', '如果這裏應該有第三種身分，要先在程式碼加入，不能只在表上打字']);
   }
 
   // 生效日**可以留空**（＝一直以來都是），同 Roles.gs 嘅讀取邏輯一致。
@@ -274,7 +274,7 @@ function apiSaveRole(payload) {
   if (!roleId) {
     return {
       ok: false,
-      message: buildThreePartMessage_('沒有指定要改哪一行。', '什麼都沒有改動。',
+      message: buildThreePartMessage_('沒有指定要改哪一行。', '甚麼都沒有改動。',
         ['重新整理這一頁再試一次'])
     };
   }
@@ -290,7 +290,7 @@ function apiSaveRole(payload) {
       ok: false,
       message: buildThreePartMessage_(
         '找不到要改的那一行（' + roleId + '）。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['重新整理這一頁再試一次', '可能有人剛剛在試算表改動過這張工作表'])
     };
   }
@@ -342,7 +342,7 @@ function apiRolesTermChangePlan(endDateRaw) {
       ok: false,
       message: buildThreePartMessage_(
         '卸任日期「' + (parsed.rawText || String(endDateRaw || '（空白）')) + '」看不懂。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['請用 2026-11-08 這種寫法（年-月-日）',
           '這一日之後，這一屆的人就不再算是堂委／執事'])
     };
@@ -356,7 +356,7 @@ function apiRolesTermChangePlan(endDateRaw) {
     return {
       ok: false,
       message: buildThreePartMessage_(
-        '找不到身分名單（' + SHEETS.ROLES + '）。', '什麼都沒有改動。',
+        '找不到身分名單（' + SHEETS.ROLES + '）。', '甚麼都沒有改動。',
         ['先執行選單的「維護 ▸ 補建身分名單工作表」'])
     };
   }
@@ -403,7 +403,7 @@ function apiRolesTermChangePlan(endDateRaw) {
     message: invalid.length > 0
       ? buildThreePartMessage_(
         '有 ' + invalid.length + ' 行的生效日比你填的卸任日期還要遲。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['檢查卸任日期有沒有打錯（是不是打了去年）',
           '或者先在下面把那幾行的生效日改正'])
       : ''
@@ -428,8 +428,8 @@ function apiRolesTermChangeExecute(endDateRaw, confirmText) {
       ok: false,
       message: buildThreePartMessage_(
         '沒有輸入「' + ROLES_TERM_CHANGE_CONFIRM_TEXT + '」兩個字。',
-        '什麼都沒有改動。',
-        ['在確認格輸入「' + ROLES_TERM_CHANGE_CONFIRM_TEXT + '」再撳一次'])
+        '甚麼都沒有改動。',
+        ['在確認格輸入「' + ROLES_TERM_CHANGE_CONFIRM_TEXT + '」再按一次'])
     };
   }
 
@@ -442,7 +442,7 @@ function apiRolesTermChangeExecute(endDateRaw, confirmText) {
     return {
       ok: false,
       message: buildThreePartMessage_(
-        '沒有任何現任的身分行需要處理。', '什麼都沒有改動。',
+        '沒有任何現任的身分行需要處理。', '甚麼都沒有改動。',
         ['可能已經換過屆了（每一行都已經有「生效至」）',
           '先看一次上面的清單再決定'])
     };
@@ -514,7 +514,7 @@ function apiRoleOverview() {
       ok: false,
       message: buildThreePartMessage_(
         '讀不到身分總覽（' + err.message + '）。',
-        '什麼都沒有改動。上面的名單仍然可以用。',
+        '甚麼都沒有改動。上面的名單仍然可以用。',
         ['重新整理這一頁再試一次',
           '如果一直失敗，用選單的「查看（唯讀，只寫 Diagnostics）▸ 身分名單概況（唯讀）」看同樣的內容'])
     };

@@ -56,7 +56,7 @@ function apiAddPersonForUnresolvedName(payload) {
   const nameTC = String(p.nameTC || '').trim();
   if (!nameTC) {
     return { ok: false, message: buildThreePartMessage_(
-      '中文名不可以留空。', '什麼都沒有加入。', ['填寫中文名再試一次']) };
+      '中文名不可以留空。', '甚麼都沒有加入。', ['填寫中文名再試一次']) };
   }
 
   // ── 一、加人（用返區三那一條路）──────────────────────────────

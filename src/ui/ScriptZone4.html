@@ -27,7 +27,7 @@
       // 仲有一條路，唔使等下一次建立版本。
       zone4Row('更新名單選單',
         '在最新一版職事表重新設定每個崗位那一欄的下拉選單。'
-          + '正常情況下系統會自動做，這裡是萬一自動那次失敗時的補救。',
+          + '正常情況下系統會自動做，這裏是萬一自動那次失敗時的補救。',
         () => openApplyDropdowns(), false),
       zone4Row('核對職事表',
         '逐格檢查有沒有違反規則，只看不改。',
@@ -36,12 +36,12 @@
         '列出所有還沒有填人的格子，按崗位分類。',
         () => openPendingCells(), false),
       zone4Row('草稿覆核報告（給堂委看）',
-        '產生一份給堂委看的文字報告：這一版排了誰、有什麼要留意。',
+        '產生一份給堂委看的文字報告：這一版排了誰、有甚麼要留意。',
         () => openDraftReviewReport(), false),
       // 第七十五輪批次 CB 組：手動觸發「季度提前自動建立」（同載入時同一支）
       zone4Row('建立未來季度',
         '確保今日起幾個月內（Config 的 QUARTER_LOOKAHEAD_MONTHS，預設 6）開始的季度都已經建立。'
-          + '平時打開這一頁就會自動做；這裡是手動再做一次。',
+          + '平時打開這一頁就會自動做；這裏是手動再做一次。',
         () => openEnsureFutureQuarters(), false),
       // 第七十五輪批次 CA 組：由「開季前準備」搬落嚟（唔係常用功能）
       zone4Row('名單檢查',
@@ -49,7 +49,7 @@
         () => openPeopleHints(), false),
       // 第七十七輪批次 EF 組：人員與電郵畫面拿走 ⇒ 出席系統嘅入口搬到呢度
       zone4Row('出席系統連結',
-        '電郵由出席系統按會眾編號讀取。這裡看哪些人還沒有連結（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵，並把未連結的人連結上。',
+        '電郵由出席系統按會眾編號讀取。這裏看哪些人還沒有連結（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵，並把未連結的人連結上。',
         () => openHwcasLink(), false)
     ]));
 
@@ -69,7 +69,7 @@
     body.appendChild(make('div', { className: 'sec' }, [
       sectionTitle('規則審閱'),
       make('div', {
-        text: '堂委填好規則審閱表之後（匯出在「常用設定」），在這裡讀回系統。',
+        text: '堂委填好規則審閱表之後（匯出在「常用設定」），在這裏讀回系統。',
         className: 'muted'
       }),
       zone4Row('匯入規則審閱表', '讀回堂委填好的那一份，逐條給你接受或拒絕。',
@@ -81,7 +81,7 @@
       sectionTitle('匯入人手編好的職事表'),
       make('div', {
         text: '這一季已經用舊方法（直接在試算表）排好了？先建一張匯入表，把舊表整塊貼進去，'
-          + '再撳「檢查並匯入」。匯入會建立一個新版本（沒有版本就是第 0 版），之後照常用介面。',
+          + '再按「檢查並匯入」。匯入會建立一個新版本（沒有版本就是第 0 版），之後照常用介面。',
         className: 'muted'
       }),
       zone4Row('建立匯入表',
@@ -96,7 +96,7 @@
     body.appendChild(make('div', { className: 'sec' }, [
       sectionTitle('系統出問題時'),
       zone4Row('系統出問題時怎樣做',
-        '去哪裡找最新版（公開連結、完整版 PDF、可編輯副本）、怎樣自己手動繼續、改完怎樣回到系統。',
+        '去哪裏找最新版（公開連結、完整版 PDF、可編輯副本）、怎樣自己手動繼續、改完怎樣回到系統。',
         () => openRecoveryHelp(), false)
     ]));
 
@@ -139,7 +139,7 @@
         link,
         para('每格有名單選單，但直接貼上名單以外的名字也可以——「檢查並匯入」會逐個列出來。'
           + '講員、翻譯、獻花照舊自己填。', 'muted'),
-        para('在你撳「檢查並匯入」並且打字確認之前，系統一格派工都不會變。', 'muted')
+        para('在你按「檢查並匯入」並且打字確認之前，系統一格派工都不會變。', 'muted')
       ], [button('知道了', () => closeModal(), '')]);
     });
   }
@@ -313,7 +313,7 @@
       const r = await callServer('apiGetRecoveryLinks', currentQuarterId);
       const nodes = [
         para('系統壞了、或者一時打不開的時候，這一季的最新版在三個地方都有。'
-          + '先看這三個位置，不用急著改任何東西。'),
+          + '先看這三個位置，不用急着改任何東西。'),
         make('div', { className: 'sec' }, [sectionTitle('三個位置')])
       ];
       const place = (title, link, note) => {
@@ -350,7 +350,7 @@
       nodes.push(make('div', { className: 'sec' }, [
         sectionTitle('怎樣手動繼續'),
         make('div', { text: '1. 開「可編輯副本」最新一份（沒有的話，用公開連結試算表「檔案 ▸ 建立副本」）。', className: 'lines' }),
-        make('div', { text: '2. 在副本上直接改格子，改完自己寄給義工或印出來。系統裡的版本不會跟著變。', className: 'lines' }),
+        make('div', { text: '2. 在副本上直接改格子，改完自己寄給義工或印出來。系統裏的版本不會跟着變。', className: 'lines' }),
         make('div', { text: '3. 系統回復之後，用「進階與診斷 ▸ 匯入人手編好的職事表」把副本讀回系統，之後照常用介面。', className: 'lines' }),
         // 第七十輪批次 AW 組：幹事打唔開 repo，唔再叫佢睇 docs/…。
         // 有 USER_GUIDE_URL ⇒ 連結；冇 ⇒ 指南章名。
@@ -387,7 +387,7 @@
     const desc = link.checkFailed
       ? '現在查不到這一季有沒有公開連結。'
       : (link.hasLink
-        ? '這一季已經有公開連結。內容有改動時，撳這裡可以重新發佈一次。'
+        ? '這一季已經有公開連結。內容有改動時，按這裏可以重新發佈一次。'
         : '這一季還沒有公開連結。寄給堂委之前一定要先發佈。');
 
     box.appendChild(make('div', { className: 'act-main' }, [
@@ -528,7 +528,7 @@
     openVersionTool({
       title: '匯出職事表 PDF',
       actionLabel: '匯出',
-      bodyNodes: [para('會在 Drive 的職事表資料夾裡面建立一個 PDF 檔。')],
+      bodyNodes: [para('會在 Drive 的職事表資料夾裏面建立一個 PDF 檔。')],
       onRun: (versionNo) => runAction('匯出中，請稍候', async () => {
         const res = await callServerMutating('apiExportRosterPdf', currentQuarterId, versionNo);
         if (!res.ok) { showErrorModal('匯出職事表 PDF', new Error(res.message)); return; }
@@ -563,8 +563,8 @@
       actionLabel: '產生',
       bodyNodes: [
         para('為每一位有服侍的人產生一份標示了他名字的 PDF。'),
-        para('人數多的時候要跑幾分鐘，而且可能會分幾次跑完——'
-          + '畫面會自己接住跑，不要關掉視窗。', 'muted')
+        para('人數多的時候需時幾分鐘，而且可能會分幾次完成——'
+          + '畫面會自動繼續，不要關掉視窗。', 'muted')
       ],
       onRun: (versionNo) => runPersonalPdfTool(versionNo)
     });
@@ -677,8 +677,8 @@
       }
       nodes.push(list);
     }
-    nodes.push(para('撳下面那一粒，只為這 ' + gaps.count + ' 位產生。人數多的時候要跑幾分鐘，'
-      + '而且可能會分幾次跑完——畫面會自己接住跑，不要關掉視窗。', 'muted'));
+    nodes.push(para('按下面的按鈕，只為這 ' + gaps.count + ' 位產生。人數多的時候需時幾分鐘，'
+      + '而且可能會分幾次完成——畫面會自動繼續，不要關掉視窗。', 'muted'));
     openModal('補寄：還沒有個人 PDF', nodes, [
       button('現在就產生個人 PDF', () => runMakeupPdfBatch(stage), ''),
       button('取消', () => closeModal(), 'secondary')
@@ -807,7 +807,7 @@
           sectionTitle('不會做的事：'),
           make('div', { text: '・不會再寄給已經收到的人', className: 'vio-row' }),
           make('div', { text: '・不會改動職事表任何一格', className: 'vio-row' }),
-          make('div', { text: '・不會推前這一季的進度', className: 'vio-row' })
+          make('div', { text: '・不會推進這一季的進度', className: 'vio-row' })
         ])
       ]),
       confirmLabel: '確定補寄',
@@ -835,9 +835,9 @@
       bodyNodes: [
         para('會在 Drive 的 RuleReview 資料夾建立一份新的試算表。'),
         make('div', { className: 'sec' }, [
-          sectionTitle('那份表裡面：'),
-          make('div', { text: '・每一條規則一行，用一句人話說明它在做什麼', className: 'vio-row' }),
-          make('div', { text: '・小數一律換算成「13 個主日之中大約幾多次」', className: 'vio-row' }),
+          sectionTitle('那份表裏面：'),
+          make('div', { text: '・每一條規則一行，用一句人話說明它在做甚麼', className: 'vio-row' }),
+          make('div', { text: '・小數一律換算成「13 個主日之中大約多少次」', className: 'vio-row' }),
           make('div', { text: '・堂委只需要填黃色那兩欄：「堂委決定」和「備註」', className: 'vio-row' }),
           sectionTitle('不會做的事：'),
           make('div', { text: '・不會改動系統現時任何一條規則', className: 'vio-row' })
@@ -860,7 +860,7 @@
           a.className = 'bigLink';
           nodes.push(a);
         }
-        nodes.push(para('把這條連結給堂委。他們填好之後，回來撳「匯入規則審閱表」。'));
+        nodes.push(para('把這條連結給堂委。他們填好之後，回來按「匯入規則審閱表」。'));
         openModal('匯出完成', nodes, [button('完成', () => closeModalAndRefresh(), '')]);
       })
     });
@@ -875,7 +875,7 @@
       if (!data.ok) { showErrorModal('匯入規則審閱表', new Error(data.message)); return; }
       if (data.files.length === 0) {
         openModal('匯入規則審閱表', [
-          para('RuleReview 資料夾裡面還沒有任何審閱表。請先撳「匯出規則審閱表」。')
+          para('RuleReview 資料夾裏面還沒有任何審閱表。請先按「匯出規則審閱表」。')
         ], [button('知道了', () => closeModal(), '')]);
         return;
       }

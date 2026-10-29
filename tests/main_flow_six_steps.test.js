@@ -249,9 +249,9 @@ console.log('\n=== A1【核心】第 1 步：掣上面寫住邊一季 ===');
   const none = gas.resolveGenerateTargetQuarter_('');
   checkEqual('★★★★★ 冇揀季度 ⇒ **由今日起計**第一個未生成過嘅季度',
     none.quarterId, Q_NOW);
-  checkEqual('★★★★★ 而且講出佢已經開始咗', none.warn, 'STARTED');
+  checkEqual('★★★★★ 而且說出佢已經開始咗', none.warn, 'STARTED');
   check('★★★★★ 警告係三段式人話，講得出「而家乜都未改動過」',
-    none.warnMessage.indexOf('什麼都沒有改動') !== -1, none.warnMessage);
+    none.warnMessage.indexOf('甚麼都沒有改動') !== -1, none.warnMessage);
   check('★★★★★ 而且撳得到（`alreadyGenerated` 係 false）'
     + '——呢個就係現場嗰個 blocker：粒掣灰咗，幹事永遠測唔到第 1 步',
     none.alreadyGenerated === false, JSON.stringify(none));
@@ -263,7 +263,7 @@ console.log('\n=== A1：只剩下已經過去而又未生成嗰啲 ⇒ 照樣指
   // 只係唔可以再排喺「眼前呢一季」前面。
   const t = gas.resolveGenerateTargetQuarter_(Q_PAST);
   checkEqual('★★★★★ 直接揀住嗰一季 ⇒ 目標就係佢', t.quarterId, Q_PAST);
-  checkEqual('★★★★★ 而且**明確講出佢已經過去**'
+  checkEqual('★★★★★ 而且**明確說出佢已經過去**'
     + '（唔講就等於靜靜幫佢做咗一個決定）', t.warn, 'PAST');
   check('★★★★ 寫住結束日期，令佢自己分得出係咪真係搞錯咗',
     t.warnMessage.indexOf('2098-12-28') !== -1, t.warnMessage);
@@ -274,7 +274,7 @@ console.log('\n=== A1：已經開始咗嘅季度——准許，但要講 ===');
 {
   const t = gas.resolveGenerateTargetQuarter_(Q_NOW);
   checkEqual('★★★★★ 目標 ＝ 佢而家睇緊嗰一季', t.quarterId, Q_NOW);
-  checkEqual('★★★★★ 而且講出佢已經開始咗', t.warn, 'STARTED');
+  checkEqual('★★★★★ 而且說出佢已經開始咗', t.warn, 'STARTED');
   check('★★★★ 警告寫住開始日期', t.warnMessage.indexOf('2099-01-04') !== -1, t.warnMessage);
   check('★★★★★ 但**冇擋住佢**——補一個漏咗嘅季度係真實會發生嘅事',
     t.found === true && t.alreadyGenerated === false, JSON.stringify(t));
@@ -322,7 +322,7 @@ console.log('\n=== A1【核心】全部季度都生成過 ⇒ 灰掣，而且講
     t.warnMessage.indexOf('建立未來季度') !== -1, t.warnMessage);
   // 第八十二輪批次 II 組（刻意改動）：幹事介面冇「重新生成初稿」——改為指去〔整季清走重來〕／〔用這一版作起點〕
   check('★★★★ 而且講埋已生成嘅季度點樣重來（整季清走重來／用這一版作起點）',
-    t.warnMessage.indexOf('整季清走重來') !== -1 && t.warnMessage.indexOf('用這一版作起點') !== -1, t.warnMessage);
+    t.warnMessage.indexOf('整季重設') !== -1 && t.warnMessage.indexOf('用這一版作起點') !== -1, t.warnMessage);
   check('★★★★ 掣旁邊講得出而家有幾多個版本', t.versionCount >= 1, 'v=' + t.versionCount);
 }
 
@@ -472,13 +472,13 @@ console.log('\n=== C：範本冇放連結時要嘈，唔可以靜靜寄一封冇
 
 console.log('\n=== C：階段揀邊一個 ===');
 {
-  checkEqual('★★★★★ 三個都著嗰陣，揀行得最前嗰個（重發）',
+  checkEqual('★★★★★ 三個都着嗰陣，揀行得最前嗰個（重發）',
     gas.resolveSendKind_({
       review: { enabled: true }, official: { enabled: true }, resend: { enabled: true }
     }), 'RESEND');
-  checkEqual('★★★★★ 審閱同正式都著嗰陣，揀正式（流程往前行嗰個方向）',
+  checkEqual('★★★★★ 審閱同正式都着嗰陣，揀正式（流程往前行嗰個方向）',
     gas.resolveSendKind_({ review: { enabled: true }, official: { enabled: true } }), 'OFFICIAL');
-  checkEqual('★★★★ 一個都唔著 ⇒ NONE', gas.resolveSendKind_({}), 'NONE');
+  checkEqual('★★★★ 一個都唔着 ⇒ NONE', gas.resolveSendKind_({}), 'NONE');
 }
 
 // =====================================================================

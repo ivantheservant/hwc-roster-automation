@@ -345,7 +345,7 @@ console.log('\n=== AG1【核心】再儲存同一狀態 ⇒ 唔使打字，清�
   check('★★★★★★ needsDecision = false', plan.needsDecision === false, JSON.stringify(plan.violations.real).slice(0, 300));
   check('★★★★★★ 喺 `violations.released`', plan.violations.released.length === 1
     && plan.violations.released[0].personId === 'P9604', JSON.stringify(plan.violations.released).slice(0, 300));
-  checkEqual('★★★★★ 講得出係第幾版放行', plan.violations.released[0].releasedVersionNo, V1);
+  checkEqual('★★★★★ 說得出係第幾版放行', plan.violations.released[0].releasedVersionNo, V1);
   let threw = null;
   try { gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] }); } catch (e) { threw = e; }
   check('★★★★★ 唔打字都儲存得到（零改動路徑）', threw === null, threw && threw.message);
@@ -501,7 +501,7 @@ console.log('\n=== AH2【核心】畫面：三個確認框同狀態卡由同一�
   const ui = loadUiScripts(['Script.html', 'ScriptZone1.html']);
   const text = function (nodes) { return nodes.map(function (n) { return n.textContent; }).join('\n'); };
   const full = text(ui.buildSendWarningNodes(warnings));
-  check('★★★★★★ 「這一版還有 1 格沒有人，收到的人會見到空格」', /這一版還有 1 格沒有人，收到的人會見到空格/.test(full), full);
+  check('★★★★★★ 「這一版還有 1 格沒有人，收到的人會見到空格」', /這一版還有 1 格沒有人，收到的人會看到空格/.test(full), full);
   check('★★★★★ 列出嗰格（日期＋讀經）', /讀經/.test(full) && /2 月 8 日/.test(full), full);
   check('★★★★★★ 「這一季有 1 格是你放行的違反規則安排」', /這一季有 1 格是你放行的違反規則安排/.test(full), full);
   check('★★★★★ 清單寫人名同「第 ' + V1 + ' 版放行」', new RegExp(PEOPLE.P9604 + '[\\s\\S]*第 ' + V1 + ' 版放行').test(full), full);
@@ -512,7 +512,7 @@ console.log('\n=== AH2【核心】畫面：三個確認框同狀態卡由同一�
 
   const many = { blank: { count: 13, items: warnings.blank.items, moreCount: 12 }, released: { count: 0, items: [], moreCount: 0 }, error: '' };
   check('★★★★ 超過上限寫「另有 12 格」', /另有 12 格/.test(text(ui.buildSendWarningNodes(many))));
-  checkEqual('★★★★ 冇嘢要講 ⇒ 冇節點', ui.buildSendWarningNodes({ blank: { count: 0, items: [] }, released: { count: 0, items: [] }, error: '' }).length, 0);
+  checkEqual('★★★★ 冇嘢要說 ⇒ 冇節點', ui.buildSendWarningNodes({ blank: { count: 0, items: [] }, released: { count: 0, items: [] }, error: '' }).length, 0);
   check('★★★★★ 算唔到 ⇒ 講一句，唔可以當冇問題',
     /算不到/.test(text(ui.buildSendWarningNodes({ blank: { count: 0, items: [] }, released: { count: 0, items: [] }, error: '壞了' }))));
 

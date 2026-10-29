@@ -294,7 +294,7 @@ console.log('\n=== C 純算／純讀嘅動作改咗嘢 ⇒ 要記低 ===');
   check('★★★★★★ 查證本身爆咗 ⇒ **要報**，唔可以靜靜噉當佢過'
     + '——靜靜噉當佢過就係呢一組要修嗰件事',
     gas.monkeyCheckOutcome_(boom, {}, before, before)
-      .some(function (c) { return /查不到這一步做過什麼：查唔到/.test(c); }), '');
+      .some(function (c) { return /查不到這一步做過甚麼：查唔到/.test(c); }), '');
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

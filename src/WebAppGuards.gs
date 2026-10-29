@@ -30,7 +30,7 @@
  * @returns {string}
  */
 function buildThreePartMessage_(whatHappened, currentState, whatYouCanDo) {
-  return '發生了什麼：' + whatHappened + '\n'
+  return '發生了甚麼：' + whatHappened + '\n'
     + '現在的情況：' + currentState + '\n'
     + '你可以怎樣做：\n'
     + (whatYouCanDo || []).map(function (s) { return '　・' + s; }).join('\n');
@@ -84,7 +84,7 @@ function canSendWithUnsavedChanges_(state) {
       allowed: false,
       reason: '表上有 ' + s.unresolvedCount + ' 格的文字系統認不出來。'
         + '那不是「你改了還沒儲存」，那是系統讀不懂那幾格——'
-        + '寄出去之後那幾格會變成什麼，系統自己都講不出，'
+        + '寄出去之後那幾格會變成甚麼，系統自己也說不出，'
         + '所以這一次不能用「寄出但不儲存」。先去「儲存」把那幾格處理好。'
     };
   }
@@ -167,7 +167,7 @@ function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
       verdict.reason,
       '「' + actionName + '」沒有執行，沒有寄出任何電郵。'
         + '你在表上的東西一格都沒有動。',
-      ['先撳「儲存」，把表上的東西處理好，之後再撳「' + actionName + '」',
+      ['先按「儲存」，把表上的東西處理好，之後再按「' + actionName + '」',
         '如果那些東西是打錯的，把那幾格改回原樣']));
   }
 
@@ -183,8 +183,8 @@ function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
     '職事表沒有任何改動，第 ' + (versionNo < 0 ? '—' : versionNo)
       + ' 版仍然是最新一版。「' + actionName + '」沒有執行，沒有寄出任何電郵。',
     [
-      '先撳「儲存」，把改動儲存成新一版，之後再撳「' + actionName + '」',
-      '如果那些改動是打錯的，把那幾格改回原樣，這一粒掣就會重新亮起'
+      '先按「儲存」，把改動儲存成新一版，之後再按「' + actionName + '」',
+      '如果那些改動是打錯的，把那幾格改回原樣，這個按鈕就會重新亮起'
     ]
   ));
 }
@@ -226,8 +226,8 @@ function assertNeverOfficiallySent_(quarterId) {
     '沒有寄出任何電郵，職事表沒有任何改動。',
     [
       '如果之後有改動要通知義工，用「改動後重發」——只會寄給安排真的改過的人',
-      '如果你認為這是誤判（例如之前只是測試模式試跑），'
-        + '要先去「維護 ▸ ⚠️ 清除一批 SendLog 記錄」處理那些紀錄，這一粒才會重新亮起'
+      '如果你認為這是誤判（例如之前只是測試模式試行），'
+        + '要先去「維護 ▸ ⚠️ 清除一批 SendLog 記錄」處理那些紀錄，這個按鈕才會重新亮起'
     ]
   ));
 }
@@ -302,7 +302,7 @@ function assertPublicLinkReady_(quarterId) {
     '一封都沒有寄出。如果照樣寄，堂委會收到一封連結是空白的信，'
       + '而畫面上不會有任何提示。',
     [
-      '撳下面的「立即發佈」，發佈好之後會自動回到這裡',
+      '按下面的「立即發佈」，發佈好之後會自動回到這裏',
       '或者去「進階功能 ▸ 重新發佈公開連結」'
     ]));
 }
@@ -322,8 +322,8 @@ function apiRepublishPublicLink(quarterId) {
       ok: false,
       message: buildThreePartMessage_(
         '這一季還沒有任何版本，沒有東西可以發佈。',
-        '什麼都沒有改動。',
-        ['先撳「生成初稿」'])
+        '甚麼都沒有改動。',
+        ['先按「生成初稿」'])
     };
   }
   try {

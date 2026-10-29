@@ -73,7 +73,7 @@ console.log('\n=== E1【核心】輸入接受逗號分隔嘅季度清單 ===');
   // ⚠️ 重複要**報出嚟**，唔可以靜靜去重。
   const dup = p('2027T1,2027T1,2027T2');
   checkEqual('★★★★★★ 重複嘅只做一次', dup.quarterIds, ['2027T1', '2027T2']);
-  checkEqual('★★★★★★ 而且**講返**邊一個重複咗'
+  checkEqual('★★★★★★ 而且**說返**邊一個重複咗'
     + '——靜靜去重嘅話，幹事以為佢揀咗三季，而畫面顯示兩季，'
     + '佢會以為系統食咗一季',
     dup.duplicates, ['2027T1']);
@@ -109,14 +109,14 @@ console.log('\n=== E4【核心】受保護季度：預設 2026T4，空白唔會�
   check('★★★★★ `ConfigSeed.gs` 有落種，而且係 LIST 型',
     /QUARTER_RESET_BLOCKED_QUARTERS[\s\S]{0,120}CONFIG_TYPES\.LIST/.test(seed), '');
   check('★★★★★ 說明文字講明「填空白唔等於冇保護」',
-    /QUARTER_RESET_BLOCKED_QUARTERS[\s\S]{0,1400}並不會變成「什麼都不保護」/.test(seed), '');
+    /QUARTER_RESET_BLOCKED_QUARTERS[\s\S]{0,1400}並不會變成「甚麼都不保護」/.test(seed), '');
 
   // ── 真係行一次分流 ─────────────────────────────────────────────
   const split = gas.splitQuarterResetTargets_(
     ['2027T1', '2026T4', '2027T2'], ['2026T4']);
   checkEqual('★★★★★★ 受保護嗰季**唔會**入清理名單',
     split.allowed, ['2027T1', '2027T2']);
-  checkEqual('★★★★★★ 而且要**明講**佢被擋咗'
+  checkEqual('★★★★★★ 而且要**明說**佢被擋咗'
     + '——靜靜略過嘅話，幹事以為清咗三季，而實際兩季',
     split.blocked, ['2026T4']);
   checkEqual('★★★★★ 大細楷唔理',
@@ -153,7 +153,7 @@ console.log('\n=== E2【核心】合併確認畫面：逐季細項 ＋ 總數 ==
   checkEqual('★★★★★★ 總數：兩季加埋 3 個版本', summary.totals.versions, 3);
   checkEqual('★★★★★★ 總數：RosterAssignments 39 行', summary.totals.assignmentRows, 39);
   checkEqual('★★★★★ 總數：SendLog 39 行', summary.totals.sendLogRows, 39);
-  checkEqual('★★★★★ 有幾多季', summary.totals.quarters, 2);
+  checkEqual('★★★★★ 有多少季', summary.totals.quarters, 2);
 
   check('★★★★★★ 逐季細項仲喺度'
     + '——淨係一個總數嘅話，幹事睇唔出邊一季會清走乜，'

@@ -113,7 +113,7 @@ console.log('\n=== A1【核心】S07 唔再讀 `results` ===');
   check('★★★★★★ 而且先驗 `mode === HAS_PENDING`'
     + '——唔係呢個 mode 嘅話，三個陣列根本唔會出現喺回傳入面，'
     + '下面驗幾多都係喺度數一個 undefined',
-    /t\.equal\('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'/.test(CODE), '');
+    /t\.equal\('步驟 3 看到有待處理的申報（mode = HAS_PENDING）'/.test(CODE), '');
 }
 
 /**

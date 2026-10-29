@@ -138,9 +138,9 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
         .requireValueInList(names, true)
         .setAllowInvalid(true)
         .setHelpText(isManualPost
-          ? ('這個崗位由你人手填：可以在選單裡面選，也可以直接打名單以外的名字（例如外請講員），'
+          ? ('這個崗位由你人手填：可以在選單裏面選，也可以直接輸入名單以外的名字（例如外請講員），'
             + '系統照收，不用另外確認。名字在人員名單上的，正式發出時會收到通知。')
-          : ('可以在選單裡面選，也可以直接打一個不在名單上的名'
+          : ('可以在選單裏面選，也可以直接輸入一個不在名單上的名字'
             + '（外請講員、新人、借調都是這樣填）。'))
         .build();
       // ⚠️ 第四十一輪批次 A 組：設不到要老實講，不可以靜靜失敗。
@@ -219,7 +219,7 @@ function buildGridDropdownSummary_(result) {
   const notAuto = result.skipped.filter(function (s) { return s.reason === 'NOT_AUTO'; });
   if (notAuto.length > 0) {
     lines.push('這幾欄沒有加：' + notAuto.map(function (s) { return s.postNameTC; }).join('、')
-      + '——它們本來就不由系統排，值是自由文字（外請講員不在人員名單裡面）。');
+      + '——它們本來就不由系統排，值是自由文字（外請講員不在人員名單裏面）。');
   }
 
   const noOne = result.skipped.filter(function (s) { return s.reason === 'NO_ELIGIBLE'; });

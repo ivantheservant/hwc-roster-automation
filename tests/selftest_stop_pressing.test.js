@@ -136,39 +136,39 @@ console.log('\n=== C1【核心】跑過幾次要記低，而且過得到下一�
   gasRef = machine.gas;
 
   const first = machine.run(false);
-  checkEqual('★★★★★★ 第一次：跑過 1 次',
+  checkEqual('★★★★★★ 第一次：執行過 1 次',
     (first.byId.X1.repeat || {}).runCount, 1);
   checkEqual('★★★★★★ 連續相同結果 1 次', (first.byId.X1.repeat || {}).sameStreak, 1);
   check('★★★★★★ 第一次唔可以講「唔好再撳」'
     + '——一次就叫人唔好再撳，就等於冇咗續跑呢個功能',
-    !/不要再撳/.test(first.lines) && !/已經重跑/.test(first.lines),
+    !/不要再按/.test(first.lines) && !/已經重新執行/.test(first.lines),
     first.lines.slice(0, 800));
 
   const second = machine.run(true);
-  checkEqual('★★★★★★ 第二次：跑過 2 次', (second.byId.X1.repeat || {}).runCount, 2);
+  checkEqual('★★★★★★ 第二次：執行過 2 次', (second.byId.X1.repeat || {}).runCount, 2);
   checkEqual('★★★★★★ **連續相同結果 2 次**'
     + '——⚠️ 「只重跑紅色情境」會把紅嗰幾條由狀態表清走，'
     + '而嗰幾條正正就係要數次數嗰幾條。清走咗仲要數得返先算數',
     (second.byId.X1.repeat || {}).sameStreak, 2);
 
   const third = machine.run(true);
-  checkEqual('★★★★★★ 第三次：跑過 3 次', (third.byId.X1.repeat || {}).runCount, 3);
+  checkEqual('★★★★★★ 第三次：執行過 3 次', (third.byId.X1.repeat || {}).runCount, 3);
 
   // ── C2：報告自己講 ────────────────────────────────────────
   check('★★★★★★ **報告自己講「已經重跑 3 次」**'
     + '——之前每一次都要 Ivan 自己察覺「咦，三份一樣」然後停手問。'
     + '而佢十月返嚟嗰陣係一個人，冇人喺旁邊幫佢數',
-    /⛔ 這一條已經重跑 3 次，每次都是同一個結果。/.test(third.lines),
+    /⛔ 這一條已經重新執行 3 次，每次都是同一個結果。/.test(third.lines),
     third.lines.slice(0, 1200));
   check('★★★★★★ 而且講明「再撳唔會有分別」',
-    /再撳「▶️ 只重跑紅色情境」不會有分別——要修碼才會變。/.test(third.lines),
+    /再按「▶️ 只重新執行紅色情境」不會有分別——要修改程式碼才會變。/.test(third.lines),
     third.lines.slice(0, 1200));
 
   // ── C3：最尾嗰句 ──────────────────────────────────────────
   check('★★★★★★ 最尾「下一步」嗰句改成「不要再撳」'
     + '——舊嗰句係「修好之後撳只重跑紅色情境」，'
     + '而 Ivan 就係照住嗰句撳咗三次',
-    /不要再撳——/.test(third.lines) && /把這份報告交給 Claude，要修碼。/.test(third.lines),
+    /不要再按——/.test(third.lines) && /把這份報告交給 Claude，要修碼。/.test(third.lines),
     third.lines.slice(-700));
   // 第五十六輪批次 B2 組：尾句而家係兩行「撳邊粒」嘅指示。
   // 卡住嗰陣兩行都唔應該再出——出咗就係繼續叫佢撳。
@@ -176,8 +176,8 @@ console.log('\n=== C1【核心】跑過幾次要記低，而且過得到下一�
     !/・你改過程式碼（有 clasp push 過）/.test(third.lines)
       && !/・你沒有改過程式碼，只是修了工作表的資料/.test(third.lines),
     third.lines.slice(-700));
-  checkEqual('★★★★★ 綠嗰條唔會被講「唔好再撳」',
-    /X2[\s\S]{0,200}已經重跑/.test(third.lines), 'false');
+  checkEqual('★★★★★ 綠嗰條唔會被說「唔好再按」',
+    /X2[\s\S]{0,200}已經重新執行/.test(third.lines), 'false');
 }
 
 // =====================================================================
@@ -242,10 +242,10 @@ console.log('\n=== B【核心】第五十四輪：被擋住之後，次數唔可
   };
 
   const a = run(false);
-  checkEqual('★★★★★ 第一次：X1 跑咗 1 次', (a.byId.X1.repeat || {}).runCount, 1);
+  checkEqual('★★★★★ 第一次：X1 執行咗 1 次', (a.byId.X1.repeat || {}).runCount, 1);
 
   const b = run(true);
-  checkEqual('★★★★★ 第二次：X1 跑咗 2 次', (b.byId.X1.repeat || {}).runCount, 2);
+  checkEqual('★★★★★ 第二次：X1 執行咗 2 次', (b.byId.X1.repeat || {}).runCount, 2);
   checkEqual('★★★★★ 連續相同結果 2 次', (b.byId.X1.repeat || {}).sameStreak, 2);
 
   // ── 上游爆咗 ⇒ X1 被擋住，冇跑 ─────────────────────────────
@@ -267,12 +267,12 @@ console.log('\n=== B【核心】第五十四輪：被擋住之後，次數唔可
   // ── 上游修好 ⇒ X1 重新跑，次數要接落去 ───────────────────
   upstreamOk = true;
   const d = run(false);
-  checkEqual('★★★★★★ 第四次：X1 跑咗 3 次（唔係由 1 數起）',
+  checkEqual('★★★★★★ 第四次：X1 執行咗 3 次（唔係由 1 數起）',
     (d.byId.X1.repeat || {}).runCount, 3);
   checkEqual('★★★★★★ 而且連續相同結果 3 次', (d.byId.X1.repeat || {}).sameStreak, 3);
   check('★★★★★★ **所以「唔好再撳」終於出得到**'
     + '——之前佢每次被擋住就歸零，於是永遠去唔到嗰一句',
-    /⛔ 這一條已經重跑 3 次，每次都是同一個結果。/.test(d.lines),
+    /⛔ 這一條已經重新執行 3 次，每次都是同一個結果。/.test(d.lines),
     d.lines.slice(0, 1200));
 }
 
@@ -304,9 +304,9 @@ console.log('\n=== C2【核心】結果變咗 ⇒ 連續次數歸零 ===');
     + '一條由「A 斷言紅」變成「B 斷言紅」嘅情境係有進展，'
     + '唔應該被數成「又係同一樣」而叫人停手',
     (third.byId.X1.repeat || {}).sameStreak, 1);
-  checkEqual('★★★★★★ 但係「跑過幾次」照樣累加', (third.byId.X1.repeat || {}).runCount, 3);
+  checkEqual('★★★★★★ 但係「執行過幾次」照樣累加', (third.byId.X1.repeat || {}).runCount, 3);
   check('★★★★★★ 所以唔會叫佢停手',
-    !/不要再撳/.test(third.lines), third.lines.slice(-600));
+    !/不要再按/.test(third.lines), third.lines.slice(-600));
 }
 
 // =====================================================================
@@ -329,10 +329,10 @@ console.log('\n=== C3 有一條紅係新嘅 ⇒ 唔可以叫佢停手 ===');
   }).join('\n');
   check('★★★★★★ 只有一條卡住 ⇒ 仲係印返嗰兩行指示'
     + '——另一條係新嘅，重跑有機會有分別',
-    /・你改過程式碼（有 clasp push 過）/.test(lines) && !/不要再撳/.test(lines),
+    /・你改過程式碼（有 clasp push 過）/.test(lines) && !/不要再按/.test(lines),
     lines.slice(-600));
   check('★★★★★ 但卡住嗰條自己嗰一節仍然要講',
-    /⛔ 這一條已經重跑 3 次/.test(lines), lines.slice(0, 800));
+    /⛔ 這一條已經重新執行 3 次/.test(lines), lines.slice(0, 800));
 }
 
 // =====================================================================

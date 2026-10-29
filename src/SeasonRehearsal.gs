@@ -103,7 +103,7 @@ function evaluateSeasonRehearsalGuards_(input) {
   if (quarterId === '') {
     reasons.push('沒有選季度。這個工具刻意沒有預設值——'
       + '一個會建立版本、產生 PDF、寫 SendLog 的工具，'
-      + '不應該在你沒有講明的情況下自己選擇一季來動。');
+      + '不應該在你沒有說明的情況下自己選擇一季來動。');
   }
 
   // ── 閘 3　受保護季度 ─────────────────────────────────────
@@ -121,7 +121,7 @@ function evaluateSeasonRehearsalGuards_(input) {
   if (opts.typedText !== null && opts.typedText !== undefined) {
     if (String(opts.typedText).trim() !== SEASON_REHEARSAL_CONFIRM_WORD) {
       reasons.push('沒有輸入「' + SEASON_REHEARSAL_CONFIRM_WORD + '」，已取消，'
-        + '什麼都沒有做。');
+        + '甚麼都沒有做。');
     }
   }
 
@@ -305,7 +305,7 @@ function runRehearsalPdfBatches_(quarterId, versionNo, segmentStartedAtMs, round
     nextAction: done ? ''
       : '個人 PDF 未產生完，「步驟 4」一定會被缺件保護擋住，這是預期之內。'
         + '請到選單 ▸ 測試工具 ▸ ▶️ 全季流程演練（接續上一段），'
-        + '系統會續跑餘下的個人 PDF，產生完之後自動接住行步驟 4 同步驟 5。',
+        + '系統會繼續執行餘下的個人 PDF，產生完之後自動繼續執行步驟 4 和步驟 5。',
     totalPeople: pick('totalPeople'),
     doneCount: pick('doneCount'),
     generatedCount: pick('generatedCount'),
@@ -619,7 +619,7 @@ function executeSeasonRehearsal_(quarterId) {
         pdfRoundsDone: Number(pdfDetail.rounds) || 0,
         pdfDone: !!pdfDetail.finished,
         stoppedBy: String(pdfDetail.stoppedBy || ''),
-        notes: '第一段由「全季流程演練（第一段：由頭開始）」建立。'
+        notes: '第一段由「全季流程演練（第一段：從頭開始）」建立。'
           + '接續請用「全季流程演練（接續上一段）」。'
       });
       stateWritten = true;
@@ -851,7 +851,7 @@ function buildSeasonRehearsalRows_(record) {
   } else {
     const inSub = pdf.files.filter(function (f) { return f.inSubfolder; }).length;
     rows.push(row('PDF 資料夾', '檔案總數', pdf.files.length, ''));
-    rows.push(row('PDF 資料夾', '在「季度／版本」子資料夾裡', inSub,
+    rows.push(row('PDF 資料夾', '在「季度／版本」子資料夾裏', inSub,
       inSub === 0
         ? '⚠️ 一個都沒有——分季分版資料夾可能根本沒有建到，這是目前風險最高的未驗證項'
         : ''));
@@ -928,7 +928,7 @@ function buildSeasonRehearsalRows_(record) {
   newPdfs.forEach(function (f) {
     rows.push(row('清理', '新 PDF', f.path, ''));
   });
-  rows.push(row('清理', '要怎樣清走',
+  rows.push(row('清理', '要怎樣清除',
     '選單 ▸ 維護 ▸ ⚠️⚠️ 重設季度測試資料',
     '⚠️ 這個工具刻意不會自動清理——自動清理是不可逆動作，'
     + '不應該由一個測試工具代你決定。'));
@@ -974,8 +974,8 @@ function buildRehearsalNextStepText_(record) {
     + '請到選單 ▸ 測試工具 ▸ ▶️ 全季流程演練（接續上一段），把餘下的 '
     // ⚠️ 數唔到就講「餘下的」，**唔可以寫 0**——0 會令人以為做完咗。
     + (remain === null ? '' : (remain + ' 份'))
-    + '個人 PDF 產生完，系統會自動接住行步驟 4 同步驟 5。\n'
-    + '（那兩步至今從來沒有在演練裡行過一次。）\n';
+    + '個人 PDF 產生完，系統會自動繼續執行步驟 4 和步驟 5。\n'
+    + '（那兩步至今從來沒有在演練裏執行過一次。）\n';
 }
 
 /**
@@ -988,9 +988,9 @@ function runSeasonRehearsal_() {
 
   // ── 先問季度（冇預設值）────────────────────────────────
   const ask = ui.prompt(title,
-    '這個工具會在你指定的季度由頭到尾行足五步：\n'
+    '這個工具會在你指定的季度從頭到尾完整執行五步：\n'
     + '生成初稿 → 儲存並確認 → 寄給堂委 → 正式發出 → 改動後重發。\n\n'
-    + '請輸入季度 ID（例如 2027T4）。這裡刻意沒有預設值。',
+    + '請輸入季度 ID（例如 2027T4）。這裏刻意沒有預設值。',
     ui.ButtonSet.OK_CANCEL);
   if (ask.getSelectedButton() !== ui.Button.OK) return;
   const quarterId = String(ask.getResponseText() || '').trim();
@@ -1030,7 +1030,7 @@ function runSeasonRehearsal_() {
     + '・在 SendLog 寫入兩批紀錄（審閱一批、正式發出一批）\n\n'
     + '⚠️ 不會真的寄出任何電郵——DRY_RUN 是 TRUE，'
     + '整個寄送流程會走完，但信不會離開系統。\n\n'
-    + '⚠️ 演練留下的東西不會自動清走。做完之後報告會列出建立了什麼，'
+    + '⚠️ 演練留下的東西不會自動清除。做完之後報告會列出建立了甚麼，'
     + '由你自己決定要不要用「重設季度測試資料」清理。\n\n'
     + '確定要執行，請輸入「' + SEASON_REHEARSAL_CONFIRM_WORD + '」。',
     ui.ButtonSet.OK_CANCEL);
@@ -1086,13 +1086,13 @@ function runSeasonRehearsal_() {
     + '版本：' + record.baseline.latestVersionNo + ' → ' + record.after.latestVersionNo + '\n\n'
     + '完整報告已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「'
     + reportName + '」，共 ' + rows.length + ' 行。\n'
-    + (wroteOk ? '' : ('\n⚠️ 寫入失敗，Diagnostics 裡面沒有這份報告。\n原因：'
+    + (wroteOk ? '' : ('\n⚠️ 寫入失敗，Diagnostics 裏面沒有這份報告。\n原因：'
       + wrote.error + '\n\n'))
     // ⚠️ 第三十二輪批次階段 B5：**要有一句明確嘅下一步。**
     // 舊版只講「步驟 4 被擋是預期之內」——幹事知道咗係預期，
     // 但完全唔知跟住應該做乜。
     + buildRehearsalNextStepText_(record)
-    + '\n⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走。\n'
+    + '\n⚠️ 演練留下的版本、PDF、SendLog 沒有自動清除。\n'
     + '這次建立了：版本 '
     + (record.created.versions.length === 0 ? '（沒有）'
       : record.created.versions.map(function (v) { return 'v' + v; }).join('、'))

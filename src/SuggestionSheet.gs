@@ -229,9 +229,9 @@ function readGridTextFromSheet_(sheetName, timezone) {
   const keyRow = findGridKeyRowByScan_(sheet, lastRow, lastCol);
   if (keyRow === -1) {
     throw new Error(buildThreePartMessage_(
-      '在「' + sheetName + '」找不到機器鍵那一行（格子裡面帶 # 的那一行）。',
-      '什麼都沒有讀到，也什麼都沒有改動。',
-      ['那一行可能被刪掉了或者被改過。刪掉這一張表，再撳一次「請系統幫我調整」重新產生']));
+      '在「' + sheetName + '」找不到機器鍵那一行（格子裏面帶 # 的那一行）。',
+      '甚麼都沒有讀到，也甚麼都沒有改動。',
+      ['那一行可能被刪掉了或者被改過。刪掉這一張表，再按一次「請系統幫我調整」重新產生']));
   }
 
   const keys = sheet.getRange(keyRow, 1, 1, lastCol).getValues()[0];
@@ -784,7 +784,7 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) {
     throw new Error(buildThreePartMessage_(
-      '這一季還沒有生成過任何版本。', '什麼都沒有改動。', ['先在第 1 步生成職事表']));
+      '這一季還沒有生成過任何版本。', '甚麼都沒有改動。', ['先在第 1 步生成職事表']));
   }
 
   const start = suggestionStep_('判斷這一次的起點是哪一張表', function () {
@@ -816,9 +816,9 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
       unresolved: built.unresolved,
       message: buildThreePartMessage_(
         built.message,
-        '什麼都沒有改動，也沒有建立建議表。',
+        '甚麼都沒有改動，也沒有建立建議表。',
         ['先在職事表把那幾格的名字改成正確的寫法',
-          '或者撳「儲存我的修改」，那裡有〔立即加入這個人〕'])
+          '或者按「儲存我的修改」，那裏有〔立即加入這個人〕'])
     };
   }
 
@@ -850,9 +850,9 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
       nothingToDo: true,
       versionNo: built.versionNo,
       remaining: [],
-      message: '你現在看著的第 ' + built.versionNo + ' 版，同版本紀錄完全一樣'
+      message: '你現在看着的第 ' + built.versionNo + ' 版，與版本紀錄完全一樣'
         + '（沒有未儲存的改動），系統也找不到任何需要調整的地方。'
-        + '所以沒有建立建議表——建立一張同正式表一模一樣的表，'
+        + '所以沒有建立建議表——建立一張與正式表一模一樣的表，'
         + '接受它的時候一定會失敗。'
     };
   }
@@ -1026,7 +1026,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   //
   // ⚠️ 圖例一定要印出來，不可以要人自己猜。兩隻淺色本身分不出意思。
   const legend = [
-    ['這是建議版本，不是正式版本。你在這裡改甚麼都不會影響正式職事表。'],
+    ['這是建議版本，不是正式版本。你在這裏改甚麼都不會影響正式職事表。'],
     // ⚠️ 第四十三輪批次 C1：**三種顏色，不是兩種。**
     //
     // 現場：對話框報「黃色格 1 格／藍色格 1 格」，而張表上一格黃色都沒有。
@@ -1046,11 +1046,11 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
       '橙色格 ＝ 你改過、違反了規則，而系統沒有動它',
       // 第八十二輪批次 IC 組
       '綠色格 ＝ 系統按排表偏好微調的'],
-    ['系統改過的格，把滑鼠停在上面會見到它為甚麼改。'],
+    ['系統改過的格，把滑鼠停在上面會看到它為甚麼改。'],
     // ⚠️ 第四十二輪批次 A 組：這一句以前是**假的**——系統當時只會用
     // 第一次那個快照。現在真的做得到（見 `resolveSuggestionStartPoint_()`），
     // 而且有測試釘住。任何一句「系統會…」都要有一條測試證明它真的會。
-    ['改完可以回介面再撳一次「請系統幫我調整」，'
+    ['改完可以回介面再按一次「請系統幫我調整」，'
       + '系統會重新讀這一張表做起點再算一次。'],
     ['如果你改的是正式那一張職事表（不是這一張），'
       + '系統就會用正式那一張做起點。兩張都改過的話，它會問你要用哪一張。']
@@ -1136,7 +1136,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   try {
     applyGridColumnWidthsForA4_(sheet, layout, dataStart);
   } catch (err) {
-    log_('WARN', 'writeSuggestionSheet_：欄寬設定唔到（建議表本身已經建立好）：' + err.message);
+    log_('WARN', 'writeSuggestionSheet_：未能設定欄寬（建議表本身已經建立好）：' + err.message);
   }
 
   // ⚠️ 第四十三輪批次 C2：**建議表都要有下拉選單。**
@@ -1192,9 +1192,9 @@ function apiAcceptSuggestion_locked_(quarterId) {
   if (!ss.getSheetByName(sheetName)) {
     throw new Error(buildThreePartMessage_(
       '找不到建議表「' + sheetName + '」。',
-      '什麼都沒有改動。',
-      ['可能已經接受過或者放棄過了，撳「重新整理」看看',
-        '或者再撳一次「請系統幫我調整」']));
+      '甚麼都沒有改動。',
+      ['可能已經接受過或者放棄過了，按「重新整理」看看',
+        '或者再按一次「請系統幫我調整」']));
   }
 
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
@@ -1228,9 +1228,9 @@ function apiAcceptSuggestion_locked_(quarterId) {
   if (undecided.length > 0) {
     throw new Error(buildThreePartMessage_(
       '建議表上有 ' + undecided.length + ' 格的名字在名單上找不到，而且你還沒有決定。',
-      '什麼都沒有儲存，建議表也留著沒有動。',
-      ['撳〔檢查我的改動〕，在「名單上找不到的名字」選〔加入名單〕或者勾「這一季臨時幫手，不加入名單」',
-        '或者回去建議表把那幾格改成正確的寫法，再撳一次接受']));
+      '甚麼都沒有儲存，建議表也留着沒有動。',
+      ['按〔檢查我的改動〕，在「名單上找不到的名字」選〔加入名單〕或者勾「這一季臨時幫手，不加入名單」',
+        '或者回去建議表把那幾格改成正確的寫法，再按一次接受']));
   }
 
   // ⚠️ 第四十三輪批次 B 組：零改動要**在這裡擋住並且講人話**。
@@ -1246,8 +1246,8 @@ function apiAcceptSuggestion_locked_(quarterId) {
       baseVersionNo: versionNo,
       cellCount: 0,
       savedChanges: [],
-      message: '建議表的內容同第 ' + versionNo + ' 版一模一樣，沒有東西可以儲存。'
-        + '那一張建議表已經清走，職事表一格都沒有改動。'
+      message: '建議表的內容與第 ' + versionNo + ' 版一模一樣，沒有東西可以儲存。'
+        + '那一張建議表已經清除，職事表一格都沒有改動。'
     };
   }
 
@@ -1326,7 +1326,7 @@ function apiDiscardSuggestion(quarterId) {
     removed: removed,
     message: removed
       ? '已經放棄建議版本。你自己那一版（職事表上的內容）一格都沒有改過。'
-      : '本來就沒有建議表。什麼都沒有改動。'
+      : '本來就沒有建議表。甚麼都沒有改動。'
   };
 }
 
@@ -1637,7 +1637,7 @@ function discardStaleSuggestionSheets_(quarterId, keepVersionNo) {
     removed.push(name);
   });
   if (removed.length > 0) {
-    log_('INFO', '清走過時嘅建議表：' + removed.join('、'));
+    log_('INFO', '清除過時的建議表：' + removed.join('、'));
   }
   return removed;
 }
@@ -2103,11 +2103,11 @@ function suggestionStep_(label, fn) {
     const raw = (err && err.message) ? err.message : String(err);
     // 已經是三段式訊息（我們自己拋的）就原封不動——包多一層只會
     // 令幹事讀到兩段重複的說明。
-    if (raw.indexOf('發生了什麼：') !== -1) throw err;
+    if (raw.indexOf('發生了甚麼：') !== -1) throw err;
     throw new Error(buildThreePartMessage_(
       '在「' + label + '」這一步出錯。\n　系統原本的訊息：' + raw,
       '建議表沒有做好。職事表一格都沒有改動。',
-      ['再撳一次——這一類錯有時是暫時的',
+      ['再按一次——這一類錯誤有時是暫時的',
         '仍然不行的話，把上面整段（包括「' + label + '」那幾個字）複製給開發者',
         '想繼續改職事表的話，直接開職事表改就可以，這一個錯不影響它']));
   }

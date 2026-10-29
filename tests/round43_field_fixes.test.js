@@ -553,7 +553,7 @@ console.log('\n=== A【核心】同一時間只可以有一個會改動資料嘅
     /const MUTATION_LOCK_WAIT_MS = 0;/.test(src), '');
   check('★★★★★ 攞唔到就即刻拋一個講得明白嘅訊息'
     + '——等三十秒然後照做一次，等於佢撳兩次就真係做兩次',
-    /另一個動作還在做緊/.test(read('src/MutationLock.gs')), '');
+    /另一個動作仍在進行/.test(read('src/MutationLock.gs')), '');
   check('★★★★★ 攞鎖本身出錯**唔可以當成攞到**',
     /} catch \(err\) \{[\s\S]{0,400}系統拿不到/.test(read('src/MutationLock.gs')), '');
   check('★★★★★ 放鎖失敗唔可以蓋過原本嘅結果（或者原本嗰個錯）',
@@ -570,7 +570,7 @@ console.log('\n=== A【核心】同一時間只可以有一個會改動資料嘅
   try { gas.apiGenerateDraftExecute(Q); } catch (e) { threw = e.message; }
   gas.LockService = realLock;
   check('★★★★★★ **攞唔到鎖嗰陣，真入口真係唔會做嘢**',
-    threw.indexOf('另一個動作還在做緊') !== -1, threw.slice(0, 200));
+    threw.indexOf('另一個動作仍在進行') !== -1, threw.slice(0, 200));
 }
 
 console.log('\n=== A：全部長時間會寫入嘅入口都包咗 ===');

@@ -52,13 +52,13 @@ console.log('\n=== 規格 1.2【核心】狀態卡文字，逐個 Stage ===');
   // 第二十五輪批次階段 A3 改寫：自動生成關咗，「系統會在 X 自動生成」
   // 會令幹事等一個永遠唔會嚟嘅日子。要保留嘅意圖係
   // 「有日期就講日期、冇日期唔可以砌一個出嚟」，而唔係嗰句具體文案。
-  checkEqual('★★★★★ DRAFT 無版本 ⇒ 講建議幾時生成，而且要叫佢自己撳掣'
+  checkEqual('★★★★★ DRAFT 無版本 ⇒ 說建議幾時生成，而且要叫佢自己按掣'
     + '（唔可以再講「系統會自動生成」——自動生成已經關咗）',
     gas.buildDashboardStatusText_(S.DRAFT, false, '11月27日'),
-    '還未生成初稿。建議在 11月27日 之後生成，撳下面的「生成初稿」。');
+    '還未生成初稿。建議在 11月27日 之後生成，按下面的「生成初稿」。');
   checkEqual('★★★★ DRAFT 無版本、又冇生成日期 ⇒ 唔可以硬砌一個日期出嚟',
     gas.buildDashboardStatusText_(S.DRAFT, false, ''),
-    '還未生成初稿。撳下面的「生成初稿」。');
+    '還未生成初稿。按下面的「生成初稿」。');
   check('★★★★★ 全部狀態卡文案都唔可以再出現「自動生成」'
     + '——系統唔會自己動任何嘢，講咗就係講一件唔會發生嘅事',
     [gas.buildDashboardStatusText_(S.DRAFT, false, '11月27日'),
@@ -99,7 +99,7 @@ console.log('\n=== 規格 2.3 掣 1 動態文字，六種情況 ===');
   checkEqual('★★★★★ 有認不出的文字（**優先於其他情況**，因為佢會阻擋成個動作）',
     t({ unsaved: { gridChangeCount: 4, unresolvedCount: 2, pendingRequestCount: 3, hasAny: true } }),
     // 第七十五輪批次 CE 組：認唔出嘅名唔再擋，撳落去可以逐個決定
-    '有 2 個名字在名單上找不到。撳〔儲存〕或者〔檢查我的改動〕，可以逐個選〔加入名單〕或者「這一季臨時幫手，不加入名單」。');
+    '有 2 個名字在名單上找不到。按〔儲存〕或者〔檢查我的改動〕，可以逐個選〔加入名單〕或者「這一季臨時幫手，不加入名單」。');
   // 第八十二輪批次 IG 組（刻意改動）：零改動唔再推進度 ⇒ 審閱階段都只係「未偵測到」
   checkEqual('★★★★★ REVIEW_SENT 且零改動 ⇒「未偵測到你在表上改過任何格。」（第八十二輪 IG 組）',
     t({ stage: S.REVIEW_SENT }),
@@ -109,26 +109,26 @@ console.log('\n=== 規格 2.3 掣 1 動態文字，六種情況 ===');
 console.log('\n=== 規格 2.3 掣 2 動態文字 ===');
 {
   const t = function (o) { return gas.computeDashboardButtons_(facts(o)).review.dynamicText; };
-  checkEqual('★★★★★ 可撳', t({}), '把唯讀連結寄給 3 位收件人。');
-  checkEqual('★★★★★ 收件人為 0 ⇒ 講明寄出去冇人收到，並指去邊度補',
+  checkEqual('★★★★★ 可按', t({}), '把唯讀連結寄給 3 位收件人。');
+  checkEqual('★★★★★ 收件人為 0 ⇒ 說明寄出去冇人收到，並指去邊度補',
     t({ reviewerCount: 0 }),
     '現時沒有登記任何堂委電郵，寄出去不會有人收到。先去「常用設定 ▸ 身分（堂委／執事）」補。');
   // 第七十輪批次 AU 組：呢粒掣寄嘅係預設審閱名單，唔再寫「同一批人」。
   checkEqual('★★★★ 已寄過（查不到上一批收件人）',
     t({ lastSentAt: { REVIEW: '11月28日 14:30', OFFICIAL: null, RESEND: null } }),
-    '上次在 11月28日 14:30 寄過，但查不到當時的收件人。再撳一次會寄給預設的審閱名單（3 位）。');
+    '上次在 11月28日 14:30 寄過，但查不到當時的收件人。再按一次會寄給預設的審閱名單（3 位）。');
   checkEqual('★★★★ 已寄過（讀得到上一批）',
     t({ lastSentAt: { REVIEW: '11月28日 14:30', OFFICIAL: null, RESEND: null },
       lastReviewBatch: { found: true, count: 6 } }),
-    '上次在 11月28日 14:30 寄過（6 位）。再撳一次會寄給預設的審閱名單（3 位）。');
+    '上次在 11月28日 14:30 寄過（6 位）。再按一次會寄給預設的審閱名單（3 位）。');
 }
 
 console.log('\n=== 規格 2.3 掣 3 動態文字 ===');
 {
   const t = function (o) { return gas.computeDashboardButtons_(facts(o)).official.dynamicText; };
-  checkEqual('★★★★★ 可撳', t({}),
+  checkEqual('★★★★★ 可按', t({}),
     '會寄給表上 57 個人，每人一份標示了自己名字的 PDF 和月曆檔。');
-  checkEqual('★★★★★ 有人沒有電郵 ⇒ 要講出實際會收到嘅人數（57 − 7 = 50）',
+  checkEqual('★★★★★ 有人沒有電郵 ⇒ 要說出實際會收到嘅人數（57 − 7 = 50）',
     t({ officialNoEmailCount: 7 }),
     '會寄給表上 57 個人中的 50 人；另外 7 人沒有電郵，會略過。');
   checkEqual('★★★★★ 已發出過 ⇒ 指去「改動後重發」',
@@ -155,7 +155,7 @@ console.log('\n=== 規格 2.2【核心】四粒掣嘅 enabled 狀態機 ===');
   // 第八十二輪批次 IH 組（刻意改動）：冇未儲存改動 ⇒ 灰（「表上沒有未儲存的改動」）
   const withWork = { gridChangeCount: 1, unresolvedCount: 0, pendingRequestCount: 0, hasAny: true };
   [S.DRAFT, S.REVIEW_SENT, S.REQUESTS_APPLIED, S.OFFICIAL_SENT].forEach(function (st) {
-    check('★★★★ 掣 1 喺 ' + st + ' 有改動都撳得到（佢係唯一會改內容嘅掣）',
+    check('★★★★ 掣 1 喺 ' + st + ' 有改動都按得到（佢係唯一會改內容嘅掣）',
       b({ stage: st, unsaved: withWork }).save.enabled === true);
     check('★★★★ 掣 1 喺 ' + st + ' 冇改動 ⇒ 灰（第八十二輪 IH 組）',
       b({ stage: st }).save.enabled === false && b({ stage: st }).save.disabledReason === '表上沒有未儲存的改動');
@@ -190,7 +190,7 @@ console.log('\n=== 規格 2.2【核心】四粒掣嘅 enabled 狀態機 ===');
     b({ stage: S.OFFICIAL_SENT, changedPersonCount: 0 }).resend.enabled === false);
 }
 
-console.log('\n=== 決定 D5【核心】有未儲存改動 ⇒ 掣 2／3／4 全部撳唔到 ===');
+console.log('\n=== 決定 D5【核心】有未儲存改動 ⇒ 掣 2／3／4 全部按唔到 ===');
 {
   const unsaved = { gridChangeCount: 4, unresolvedCount: 0, pendingRequestCount: 0, hasAny: true };
 
@@ -211,7 +211,7 @@ console.log('\n=== 決定 D5【核心】有未儲存改動 ⇒ 掣 2／3／4 全
     JSON.stringify([atReq.review.disabledReason, atReq.official.disabledReason, atOfficial.resend.disabledReason]));
 }
 
-console.log('\n=== 規格 1.6【核心】disabledReason 一律寫「怎樣才撳得到」，唔寫「為何失敗」 ===');
+console.log('\n=== 規格 1.6【核心】disabledReason 一律寫「怎樣才按得到」，唔寫「為何失敗」 ===');
 {
   const samples = [
     gas.computeDashboardButtons_(facts({ stage: S.DRAFT })).official.disabledReason,
@@ -231,14 +231,14 @@ console.log('\n=== 規格 1.6【核心】disabledReason 一律寫「怎樣才撳
   check('★★★★★ 每一句都講到「點樣先撳得到」或者「應該改用邊粒掣」',
     samples.every(function (s) {
       // 第八十二輪批次 IG 組：〔變動的人〕嘅原因「要先用〔給所有人〕正式發出一次」都係講點樣先撳得到
-      return s.indexOf('才會著') !== -1 || s.indexOf('請用') !== -1 || s.indexOf('不需要') !== -1
+      return s.indexOf('才可以使用') !== -1 || s.indexOf('請用') !== -1 || s.indexOf('不需要') !== -1
         || s.indexOf('要先用') !== -1;
     }), JSON.stringify(samples, null, 1));
 
   // 第八十二輪批次 IG 組（刻意改動）：DRAFT 都可以正式發出 ⇒ 冇灰色原因；冇版本先有
-  checkEqual('★★★★ 掣 3 喺 DRAFT 撳得到（冇原因）', gas.computeDashboardButtons_(facts({ stage: S.DRAFT })).official.disabledReason, '');
+  checkEqual('★★★★ 掣 3 喺 DRAFT 按得到（冇原因）', gas.computeDashboardButtons_(facts({ stage: S.DRAFT })).official.disabledReason, '');
   checkEqual('★★★★ 掣 3 冇版本嘅提示', gas.computeDashboardButtons_(facts({ versionExists: false })).official.disabledReason,
-    '要先生成初稿，這一粒才會著。');
+    '要先生成初稿，這個按鈕才可以使用。');
 }
 
 console.log('\n=== 規格 1.1／5.1：季度與版本一律寫人話 ===');

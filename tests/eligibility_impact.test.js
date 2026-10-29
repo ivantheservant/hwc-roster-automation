@@ -239,7 +239,7 @@ console.log('\n=== AI4【核心】畫面：同一支函式、有〔請系統幫�
     if (node.tagName === 'BUTTON' && node.textContent === '請系統幫我調整') return true;
     return (node.children || []).some(hasButton);
   };
-  check('★★★★ 狀態卡／第 2 步用嘅版本：講明出口、但冇掣', /撳「請系統幫我調整」/.test(plain)
+  check('★★★★ 狀態卡／第 2 步用嘅版本：講明出口、但冇掣', /按「請系統幫我調整」/.test(plain)
     && !ui.buildEligibilityImpactNodes(impact).some(hasButton), plain);
   const withBtn = ui.buildEligibilityImpactNodes(impact, { withButton: true });
   check('★★★★★★ 結果窗版本有一粒〔請系統幫我調整〕', withBtn.some(hasButton));

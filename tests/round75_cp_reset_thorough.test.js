@@ -93,7 +93,7 @@ const lines = gas.describeQuarterResetPlanLines_(sc.Q, plan).join('\n');
   const ids = plan.unavailableInQuarterDetails.map((u) => u.personId + '@' + u.dateFrom).sort();
   check('★★★★★★ CP1 完全喺季內嘅 Unavailable（任何來源、任何狀態）列出', JSON.stringify(ids)
     === JSON.stringify(['P9701@2099-01-11', 'P9704@2099-01-04', 'P9705@2099-01-18']), JSON.stringify(plan.unavailableInQuarterDetails));
-  check('★★★★★ CP1 確認清單逐行列出（連名字）', /會清走的不能服侍日期（完全在這一季之內）/.test(lines)
+  check('★★★★★ CP1 確認清單逐行列出（連名字）', /會清除的不能服侍日期（完全在這一季之內）/.test(lines)
     && lines.indexOf(sc.nameOf('P9701') + '（P9701）　2099-01-11') !== -1, lines);
   check('★★★★ CP1 跨季嘅人手紀錄列為「不會清」', plan.unavailableManualDetails.length === 1
     && plan.unavailableManualDetails[0].personId === 'P9702', JSON.stringify(plan.unavailableManualDetails));

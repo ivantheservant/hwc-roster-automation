@@ -1,7 +1,7 @@
 // 第八十二輪批次 IA 組：〔檢查我的改動〕勾選撞到全域鎖 ⇒ 自動等候再試；排隊逐個寫；最後寫唔到 ⇒ 還原。
 // 執行方式：node tests/round82_ia_decision_retry.test.js
 //
-// 手動測試 C：勾選框下面出紅框「記不住你的選擇：另一個動作還在做緊……」，而勾選框仍然顯示已勾。
+// 手動測試 C：勾選框下面出紅框「記不住你的選擇：另一個動作仍在進行……」，而勾選框仍然顯示已勾。
 //
 //   IA1　撞鎖兩次再成功 ⇒ 自動再試、記住；狀態寫「記住中……」，完成後清走
 //   IA2　一直撞鎖 ⇒ 試到上限（約 30 秒）就停；勾選框還原成未勾；嗰一行寫「這一格未記住，請再勾一次」
@@ -18,7 +18,7 @@ function check(label, condition, extra) {
   if (!ok && extra) console.log('      ' + String(extra).slice(0, 700));
 }
 
-const BUSY = '發生了甚麼：另一個動作還在做緊，所以「記住你的決定」沒有開始。';
+const BUSY = '發生了甚麼：另一個動作仍在進行，所以「記住你的決定」沒有開始。';
 
 function setup(behaviour) {
   const ui = loadUiScripts(['Script.html']);
@@ -74,11 +74,11 @@ function linesOf(sections) {
     cb.checked = true;
     const p = cb.fire('change');
     await Promise.resolve();
-    check('★★★★ 勾咗之後即刻寫「記住中……」', /記住中/.test(textOf(line)), textOf(line));
+    check('★★★★ 勾咗之後即刻寫「記住中……」', /記錄中/.test(textOf(line)), textOf(line));
     await p; await flush();
     check('★★★★★★ 自動再試：一共叫 3 次、等咗 2 次', log.calls.length === 3 && log.waits === 2, JSON.stringify([log.calls.length, log.waits]));
     check('★★★★★★ 勾選框保持已勾', cb.checked === true);
-    check('★★★★ 完成後「記住中」清走、冇「未記住」', !/記住中|未記住/.test(textOf(line)), textOf(line));
+    check('★★★★ 完成後「記住中」清走、冇「未記住」', !/記錄中|未能記錄/.test(textOf(line)), textOf(line));
   }
 
   console.log('\n=== IA2：一直撞鎖 ⇒ 還原 ===');
@@ -91,7 +91,7 @@ function linesOf(sections) {
     await cb.fire('change'); await flush();
     check('★★★★★ 試到上限就停（11 次，約 30 秒）', log.calls.length === 11 && log.waits === 10, JSON.stringify([log.calls.length, log.waits]));
     check('★★★★★★ 勾選框還原成未勾', cb.checked === false);
-    check('★★★★★★ 嗰一行寫「這一格未記住，請再勾一次」', /這一格未記住，請再勾一次/.test(textOf(line)), textOf(line));
+    check('★★★★★★ 嗰一行寫「這一格未記住，請再勾一次」', /這一格未能記錄，請再勾一次/.test(textOf(line)), textOf(line));
     check('★★★★ 頂部／彈窗狀態寫「勾選已經還原」', /勾選已經還原/.test(textOf(ui.document.getElementById('status'))));
   }
 

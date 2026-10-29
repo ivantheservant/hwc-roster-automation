@@ -24,12 +24,12 @@
 <body>
   <h2>填寫講員／翻譯／獻花</h2>
   <div class="hint">
-    講員／翻譯／獻花不受崗位資格限制，可以直接輸入新名字，不用先出現在名單裡。
+    講員／翻譯／獻花不受崗位資格限制，可以直接輸入新名字，不用先出現在名單裏。
     填寫後會同時更新職事表格子、RosterAssignments 與 AuditLog，<b>不會</b>建立新版本、
     不會觸發規則重新檢查、不會影響已經寄出的通知（只有這個人自己的內容才會被記為
     「有更新」）。可以隨時關閉側邊欄，之後重新開啟會繼續顯示還沒填的格子。<br>
     <b>獻花由會友自行認獻，不是每週都有人</b>——虛線邊框、標「可留空」的格子不用
-    勉強填，留空不撳「儲存」就是正常情況，不代表漏做。
+    勉強填，留空不按「儲存」就是正常情況，不代表漏做。
   </div>
   <div class="toolbar">
     <button id="refreshBtn" onclick="load()">重新整理</button>
@@ -91,11 +91,11 @@
       '目前嘗試的季度：' + data.quarterId + '　v' + data.versionNo + '　Stage=' + data.stage;
     var html = '';
     if (data.officialSentHint) {
-      html += '<div class="warn">這一季已經正式發出過。如果這裡填的內容是發出之後才確定的，'
+      html += '<div class="warn">這一季已經正式發出過。如果這裏填的內容是發出之後才確定的，'
         + '記得回選單執行「步驟 5：改動後重發」通知相關人士。</div>';
     }
     if (data.pending.length === 0) {
-      html += '<div class="empty">目前沒有還空著的講員／翻譯／獻花格子。</div>';
+      html += '<div class="empty">目前沒有還空着的講員／翻譯／獻花格子。</div>';
     } else {
       data.pending.forEach(function (p, i) {
         var cellId = 'cell_' + i;

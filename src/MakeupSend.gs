@@ -244,7 +244,7 @@ function planMakeupSend_(quarterId, versionNo, stage) {
     } else if (verdict.category === 'ALREADY_SENT' && record && record.versionNo !== versionNo) {
       // 收過**舊版** ⇒ 唔補寄，講明之後嘅改動行邊條路
       reason = '已經收過第 ' + record.versionNo + ' 版。之後的改動要用區一的「改動後重發」'
-        + '（只講改了甚麼），補寄不會再寄給他';
+        + '（只說明改了甚麼），補寄不會再寄給他';
     }
     const entry = {
       type: recipient.type,

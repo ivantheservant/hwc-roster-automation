@@ -221,7 +221,7 @@ console.log('\n=== B1【核心】〔檢查我的改動〕係唯讀 ===');
 
   const r = gas.apiCheckMyChanges(Q);
   check('★★★★ 答得出嘢', r.ok === true, JSON.stringify(r).slice(0, 200));
-  checkEqual('★★★★★ 冇改過 ⇒ 一格改動都冇，而且講得出「可以儲存」',
+  checkEqual('★★★★★ 冇改過 ⇒ 一格改動都冇，而且說得出「可以儲存」',
     { changes: r.changes.length, allClear: r.allClear }, { changes: 0, allClear: true });
 
   checkEqual('★★★★★ `RosterAssignments` 一個字都冇變'
@@ -243,7 +243,7 @@ console.log('\n=== B1：改一格之後，檢查要逐格講得出「由邊個�
   const before = snapshotAssignments();
   const r = gas.apiCheckMyChanges(Q);
   checkEqual('★★★★★ 認到一格改動', r.changes.length, 1);
-  checkEqual('★★★★★ 而且講得出由邊個改成邊個'
+  checkEqual('★★★★★ 而且說得出由邊個改成邊個'
     + '（只講「改咗 1 格」證明唔到系統睇到嘅就係佢改嗰格）',
     { from: r.changes[0].fromName, to: r.changes[0].toName },
     { from: beforeName, to: PEOPLE[target] });
@@ -325,7 +325,7 @@ console.log('\n=== B2：建議表要有圖例，兩種顏色嘅意思要印出�
   check('★★★★★ 而且兩種顏色嘅意思都印咗出嚟（唔可以要人自己猜）',
     flat.indexOf('黃色格') !== -1 && flat.indexOf('藍色格') !== -1, flat);
   check('★★★★ 亦都講埋「改完可以再撳一次調整」（Ivan 要求嘅重複流程）',
-    flat.indexOf('再撳一次') !== -1, flat);
+    flat.indexOf('再按一次') !== -1, flat);
 }
 
 console.log('\n=== B2：喺建議表上再改，下一次調整要以佢做起點 ===');

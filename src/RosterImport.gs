@@ -157,7 +157,7 @@ function apiCreateImportSheet(quarterId) {
       const rule = SpreadsheetApp.newDataValidation()
         .requireValueInList(names, true)
         .setAllowInvalid(true)
-        .setHelpText('可以在選單裡面選，也可以直接貼上名單以外的名——檢查的時候會逐個列出來。')
+        .setHelpText('可以在選單裏面選，也可以直接貼上名單以外的名字——檢查的時候會逐個列出來。')
         .build();
       try {
         sheet.getRange(rowNo, IMPORT_LABEL_COLUMNS + 1, 1, dateCount).setDataValidation(rule);
@@ -201,7 +201,7 @@ function readImportSheetCells_(quarterId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) {
     throw new Error(buildThreePartMessage_(
-      '找不到匯入範本「' + sheetName + '」。', '什麼都沒有改動。', ['先撳「建立匯入範本」']));
+      '找不到匯入範本「' + sheetName + '」。', '甚麼都沒有改動。', ['先按「建立匯入範本」']));
   }
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
@@ -409,13 +409,13 @@ function apiImportRosterExecute_locked_(quarterId, input) {
   const q = plan.quarterId;
   if (plan.blocked) {
     throw new Error(buildThreePartMessage_(
-      '匯入表裡面有 ' + plan.unresolved.length + ' 個名字系統認不出。',
-      '什麼都沒有改動。',
-      ['在匯入表把那幾格改成正確的寫法', '如果是新人，撳〔立即加入這個人〕', '改好再撳一次「檢查並匯入」']));
+      '匯入表裏面有 ' + plan.unresolved.length + ' 個名字系統認不出。',
+      '甚麼都沒有改動。',
+      ['在匯入表把那幾格改成正確的寫法', '如果是新人，按〔立即加入這個人〕', '改好再按一次「檢查並匯入」']));
   }
   if (plan.filledCount === 0) {
     throw new Error(buildThreePartMessage_(
-      '匯入表一格都沒有填。', '什麼都沒有改動。', ['先把人手職事表貼進「' + plan.sheetName + '」']));
+      '匯入表一格都沒有填。', '甚麼都沒有改動。', ['先把人手職事表貼進「' + plan.sheetName + '」']));
   }
   const typed = String(input.confirmText || '').trim();
   if (typed !== plan.confirmText) {
@@ -423,8 +423,8 @@ function apiImportRosterExecute_locked_(quarterId, input) {
       plan.needsRelease
         ? '有 ' + plan.violations.real.length + ' 格違反了一定要遵守的規則，需要你打字放行才能匯入。'
         : '匯入會建立一個新版本，需要你打字確認。',
-      '什麼都沒有改動。',
-      ['在確認格輸入「' + plan.confirmText + '」再撳一次']));
+      '甚麼都沒有改動。',
+      ['在確認格輸入「' + plan.confirmText + '」再按一次']));
   }
 
   const versionNo = plan.versionNoToCreate;

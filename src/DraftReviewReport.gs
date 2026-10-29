@@ -134,26 +134,26 @@ function buildDraftReviewRows_(m, blank) {
   }
 
   // ---- 四、哪些是系統排的、哪些要人手填 ----
-  rows.push(diagRow_('四、系統排了什麼、留了什麼給人手', '系統自動安排',
+  rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '系統自動安排',
     (blank.assigned || 0) + ' 格',
     '主席、報告、讀經、領詩、司琴、司事、司數、音響等崗位，'
       + '由系統按上述規則自動安排。'));
-  rows.push(diagRow_('四、系統排了什麼、留了什麼給人手', '★ 留給人手填寫',
+  rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '★ 留給人手填寫',
     (blank.manualPending || 0) + ' 格',
     '講員、翻譯、獻花這幾個崗位，系統設計上就不會自動安排——'
       + '講員由堂主任／講員安排小組決定，翻譯與獻花另有安排方式。'
       + '表上這些格顯示「' + DEFAULTS.GRID_PENDING_LABEL + '」，'
       + '是預期中的空格，不是系統排不出來。'));
-  rows.push(diagRow_('四、系統排了什麼、留了什麼給人手', '這一週不設此崗位',
+  rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '這一週不設此崗位',
     (blank.structuralNa || 0) + ' 格',
     '例如聖餐襄禮只在每月第一個主日設立，其餘主日顯示「'
       + DEFAULTS.GRID_NOT_APPLICABLE_LABEL + '」。'));
   if ((blank.specialSkip || 0) > 0) {
-    rows.push(diagRow_('四、系統排了什麼、留了什麼給人手', '特別主日另有安排',
+    rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '特別主日另有安排',
       blank.specialSkip + ' 格',
       '該週有特別安排（見表上「類型」欄），這些崗位不由系統安排。'));
   }
-  rows.push(diagRow_('四、系統排了什麼、留了什麼給人手', '★ 系統排不出來',
+  rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '★ 系統排不出來',
     (blank.genuineGap || 0) + ' 格',
     (blank.genuineGap || 0) === 0
       ? '沒有。所有應該由系統安排的格子都成功排到人。'
@@ -284,7 +284,7 @@ function runDraftReviewReport_() {
 
   lines.push('完整報告已寫入 ' + SHEETS.DIAGNOSTICS + ' 工作表，報告名稱「草稿覆核報告」，共 '
     + written + ' 行。');
-  lines.push('可以直接從那裡複製貼上電郵，或者連同職事表 PDF 一起印給堂委看。');
+  lines.push('可以直接從那裏複製貼上電郵，或者連同職事表 PDF 一起印給堂委看。');
   lines.push('');
   lines.push('這份報告用的是堂委看得懂的說法，不含任何系統內部代號。');
   lines.push('幹事自己要看的技術版本，請用「查看 ▸ 軟規則實測量度（唯讀）」。');

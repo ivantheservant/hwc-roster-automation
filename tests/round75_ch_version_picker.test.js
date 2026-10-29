@@ -232,7 +232,7 @@ console.log('\n=== CH6：畫面 ===');
   check('★★★★★★ 〔確定〕⇒ apiUseVersionAsStartPoint(季度, 0)',
     calls.some((c) => c.name === 'apiUseVersionAsStartPoint' && c.q === '2099T1' && c.no === 0), JSON.stringify(calls));
   const after = mBody().textContent;
-  check('★★★★★ 完成窗講明未儲存、要撳〔儲存〕', /還未儲存/.test(after) && /撳〔儲存〕成為新一版/.test(after), after.slice(-400));
+  check('★★★★★ 完成窗講明未儲存、要撳〔儲存〕', /還未儲存/.test(after) && /按〔儲存〕成為新一版/.test(after), after.slice(-400));
 
   // 進階與診斷
   const fs = require('fs');

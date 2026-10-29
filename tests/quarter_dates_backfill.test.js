@@ -237,7 +237,7 @@ console.log('\n=== G 選單「計算季度日期」：留空 ＝ 一次過補齊
   check('★★★★★ 提示明講「留空 ＝ 一次過補齊全部還欠日期的季度」'
     + '——2028 有四季要補，逐季輸入 QuarterID 做四次，'
     + '做少一次就有一季一直顯示「沒有填生成日期」',
-    /留空並撳「確定」＝ 一次過補齊全部還欠日期的季度/.test(fn), '');
+    /留空並按「確定」＝ 一次過補齊全部還欠日期的季度/.test(fn), '');
   check('★★★★★ 留空嗰陣行 `listQuartersMissingDates_()`',
     /missing = listQuartersMissingDates_\(\);/.test(fn), '');
   check('★★★★★ **全部算完先問一次**'

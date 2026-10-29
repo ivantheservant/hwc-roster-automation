@@ -87,7 +87,7 @@ function generateBest(quarterId, attempts) {
       stoppedBySeedInert = true;
       log_('INFO', 'generateBest: 頭 ' + attemptsRun + ' 次生成的職事表逐格完全相同，'
         + '判定這份資料下 RANDOM_SEED 不影響結果，已提早停止（原定 ' + planned + ' 次）。'
-        + '最佳結果與跑足全部次數相同。');
+        + '最佳結果與執行全部次數相同。');
       break;
     }
 
@@ -96,7 +96,7 @@ function generateBest(quarterId, attempts) {
     const averagePerAttempt = elapsed / attemptsRun;
     if (i + 1 < planned && elapsed + averagePerAttempt > MULTIRUN_TIME_BUDGET_MS) {
       stoppedByTime = true;
-      log_('WARN', 'generateBest: 為避免超時，只跑了 ' + attemptsRun + ' / ' + planned + ' 次');
+      log_('WARN', 'generateBest: 為避免超時，只執行了 ' + attemptsRun + ' / ' + planned + ' 次');
       break;
     }
   }

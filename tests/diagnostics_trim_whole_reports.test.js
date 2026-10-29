@@ -54,7 +54,7 @@ console.log('\n=== C1：夠位嗰陣乜都唔使丟 ===');
   const fresh = rowsFor('報告C', 50);
   const r = gas.planDiagnosticsTrim_(existing, fresh, '報告C', 380);
   checkEqual('★★★★ 150 行喺 380 之內 ⇒ 一行都唔丟', r.rows.length, 150);
-  checkEqual('★★★★ 冇任何報告被清走', r.droppedReportNames, []);
+  checkEqual('★★★★ 冇任何報告被清除', r.droppedReportNames, []);
   checkEqual('★★★★ 三份都仲喺度', r.keptReportNames, ['報告A', '報告B', '報告C']);
   check('★★★★ currentReportAlone=false', r.currentReportAlone === false);
 }
@@ -66,12 +66,12 @@ console.log('\n=== C1：超標嗰陣，由最舊嗰份開始「整份」丟 ==='
   const fresh = rowsFor('今次', 150);
   const r = gas.planDiagnosticsTrim_(existing, fresh, '今次', 380);
 
-  checkEqual('★★★★★ 「最舊」嗰份被整份清走（唔係斬一半）', countRows(r.rows, '最舊'), 0);
+  checkEqual('★★★★★ 「最舊」嗰份被整份清除（唔係斬一半）', countRows(r.rows, '最舊'), 0);
   checkEqual('★★★★★ 「中間」嗰份一行都冇少——**呢條就係修正嘅核心**：'
     + '丟到夠位就停，唔會為咗啱啱好貼住上限而斬多一份報告嘅一截',
     countRows(r.rows, '中間'), 150);
   checkEqual('★★★★★ 今次寫入嗰份完整保留', countRows(r.rows, '今次'), 150);
-  checkEqual('★★★★ 清走名單講得出丟咗邊份', r.droppedReportNames, ['最舊']);
+  checkEqual('★★★★ 清除名單說得出丟咗邊份', r.droppedReportNames, ['最舊']);
   check('★★★★ 結果 300 行，喺 380 之內', r.rows.length === 300, String(r.rows.length));
 }
 
@@ -100,7 +100,7 @@ console.log('\n=== C1：今次寫入嗰份永遠唔會被當成犧牲品（即�
   const fresh = [];
   const r = gas.planDiagnosticsTrim_(existing, fresh, '今次', 380);
   checkEqual('★★★★★ 「今次」完整保留，被丟嘅係「別份」', countRows(r.rows, '今次'), 200);
-  checkEqual('★★★★ 「別份」被整份清走', countRows(r.rows, '別份'), 0);
+  checkEqual('★★★★ 「別份」被整份清除', countRows(r.rows, '別份'), 0);
 }
 
 console.log('\n=== C2：單一報告自己就超過上限 ===');
@@ -109,7 +109,7 @@ console.log('\n=== C2：單一報告自己就超過上限 ===');
   const fresh = rowsFor('巨無霸', 500);   // 自己就超過 380
   const r = gas.planDiagnosticsTrim_(existing, fresh, '巨無霸', 380);
 
-  checkEqual('★★★★★ 其餘報告全部清走', countRows(r.rows, '別份'), 0);
+  checkEqual('★★★★★ 其餘報告全部清除', countRows(r.rows, '別份'), 0);
   checkEqual('★★★★★ 但「巨無霸」自己**一行都冇被斬**（寧願超標，唔可以靜靜留半截）',
     countRows(r.rows, '巨無霸'), 500);
   check('★★★★★ currentReportAlone=true ⇒ 呼叫端會喺頂部插一行明講',
@@ -133,7 +133,7 @@ console.log('\n=== C3：修剪之後要留低痕跡 ===');
   check('★★★★ 分區同「（表格狀態）」一致（跟第三十一輪嗰行同一個位置）',
     withDrop.section === gas.DIAGNOSTICS_STATUS_SECTION, withDrop.section);
   check('★★★★★ 講得出保留幾多份、清走幾多份',
-    withDrop.value.indexOf('保留 2 份') !== -1 && withDrop.value.indexOf('清走 2 份') !== -1,
+    withDrop.value.indexOf('保留 2 份') !== -1 && withDrop.value.indexOf('清除 2 份') !== -1,
     withDrop.value);
   check('★★★★ 講得出清走咗邊幾份（唔係淨係報數字）',
     withDrop.note.indexOf('丙') !== -1 && withDrop.note.indexOf('丁') !== -1, withDrop.note);
@@ -143,8 +143,8 @@ console.log('\n=== C3：修剪之後要留低痕跡 ===');
   // 而佢根本唔知應唔應該有。
   const noDrop = gas.buildDiagnosticsTrimRow_(['甲'], [], 380);
   check('★★★★★ 冇清走任何嘢嗰陣**都要寫**，而且明講「本次沒有清走任何報告」',
-    noDrop.note.indexOf('本次沒有清走任何報告') !== -1, noDrop.note);
-  check('★★★★ 冇清走嗰陣數字係 0', noDrop.value.indexOf('清走 0 份') !== -1, noDrop.value);
+    noDrop.note.indexOf('本次沒有清除任何報告') !== -1, noDrop.note);
+  check('★★★★ 冇清走嗰陣數字係 0', noDrop.value.indexOf('清除 0 份') !== -1, noDrop.value);
 }
 
 console.log('\n=== C4：380 冇被調高（呢一輪明確唔准）===');

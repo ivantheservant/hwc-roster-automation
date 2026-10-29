@@ -105,7 +105,7 @@ console.log('\n=== B1【核心】清理唔可以食情境嘅時間預算 ===');
   checkEqual('★★★★★★ 清理用咗 5 分鐘，長過 4.5 分鐘嘅預算'
     + '——短過預算嘅話，舊寫法都仲跑得晒，就驗唔到下面嗰條',
     box.report.resetMs > 4.5 * 60 * 1000, true);
-  checkEqual('★★★★★★ **三條情境全部跑到，冇一條「未跑」**'
+  checkEqual('★★★★★★ **三條情境全部執行到，冇一條「未執行」**'
     + '——舊寫法喺函式第一行起錶，清理食光預算，'
     + '重設完即刻停，17 個全部「未跑」而報告寫「用了 2 秒」',
     box.report.notRunCount, 0);
@@ -143,10 +143,10 @@ console.log('\n=== B2【核心】尾句兩種情況一齊印，唔好估 ===');
   check('★★★★★★ **「你改過程式碼」嗰行印咗**'
     + '——部機器睇唔到 Ivan 有冇 clasp push 過，'
     + '估唔到就唔好扮估到。指示錯咗兩次，佢照住撳，白撳',
-    /・你改過程式碼（有 clasp push 過） ⇒ 撳「⚠️ 跑自測」重頭跑/.test(box.lines),
+    /・你改過程式碼（有 clasp push 過） ⇒ 按「⚠️ 執行自測」從頭執行/.test(box.lines),
     box.lines.slice(-500));
   check('★★★★★★ 「你冇改過碼」嗰行都印咗',
-    /・你沒有改過程式碼，只是修了工作表的資料 ⇒ 撳「▶️ 只重跑紅色情境」/
+    /・你沒有改過程式碼，只是修了工作表的資料 ⇒ 按「▶️ 只重新執行紅色情境」/
       .test(box.lines), box.lines.slice(-500));
   check('★★★★★ 全綠嗰陣唔會印呢兩行',
     !/・你改過程式碼/.test(
@@ -377,8 +377,8 @@ console.log('\n=== C【核心】清 payloads：清之前要留低一行摘要 ==
     /S03×2/.test(audits[0].newValue) && /S05×1/.test(audits[0].newValue),
     JSON.stringify(audits[0]));
   // ⚠️ `action` 都要驗——一筆冇 action 嘅稽核紀錄事後搵唔返。
-  checkEqual('★★★★★ 而且 `action` 講得出佢係咩',
-    audits[0].action, '清走上一次自測的回傳值紀錄');
+  checkEqual('★★★★★ 而且 `action` 說得出佢係咩',
+    audits[0].action, '清除上一次自測的回傳值紀錄');
   check('★★★★★ 同埋講得出本來有幾多行',
     /3 行/.test(audits[0].oldValue), JSON.stringify(audits[0]));
 }

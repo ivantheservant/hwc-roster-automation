@@ -33,7 +33,7 @@ function apiAnnualQuartersPlan(year) {
       return {
         ok: false,
         message: buildThreePartMessage_(
-          '年份「' + String(year || '（空白）') + '」看不懂。', '什麼都沒有改動。',
+          '年份「' + String(year || '（空白）') + '」看不懂。', '甚麼都沒有改動。',
           ['請填四位數的年份，例如 2027'])
       };
     }
@@ -79,8 +79,8 @@ function apiAnnualQuartersExecute(year, confirmText) {
     return {
       ok: false,
       message: buildThreePartMessage_(
-        '沒有輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」兩個字。', '什麼都沒有改動。',
-        ['在確認格輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」再撳一次'])
+        '沒有輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」兩個字。', '甚麼都沒有改動。',
+        ['在確認格輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」再按一次'])
     };
   }
   try {
@@ -131,7 +131,7 @@ function apiAnnualCombinedPlan(year) {
       return {
         ok: false,
         message: buildThreePartMessage_(
-          '年份「' + String(year || '（空白）') + '」看不懂。', '什麼都沒有改動。',
+          '年份「' + String(year || '（空白）') + '」看不懂。', '甚麼都沒有改動。',
           ['請填四位數的年份，例如 2027'])
       };
     }
@@ -170,8 +170,8 @@ function apiAnnualCombinedExecute(year, confirmText) {
     return {
       ok: false,
       message: buildThreePartMessage_(
-        '沒有輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」兩個字。', '什麼都沒有改動。',
-        ['在確認格輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」再撳一次'])
+        '沒有輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」兩個字。', '甚麼都沒有改動。',
+        ['在確認格輸入「' + ANNUAL_TOOL_CONFIRM_TEXT + '」再按一次'])
     };
   }
   try {
@@ -475,7 +475,7 @@ function apiExportRuleReviewSheet() {
       // 幹事要知道點解突然唔同咗。
       weeksText: weeksInfo
         ? ('換算用的分母是 ' + weeksInfo.quarterId + ' 的 ' + weeksInfo.weeks + ' 個主日')
-        : '查不到一季有幾多個主日，所以小數沒有換算成次數'
+        : '查不到一季有多少個主日，所以小數沒有換算成次數'
     };
   } catch (err) {
     return zone4Failure_('匯出規則審閱表', err);

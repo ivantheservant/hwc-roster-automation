@@ -226,7 +226,7 @@ function describeSendContents_(kind) {
   // ICS 由 `buildIcsAttachmentForPerson_()` 決定：只有 OFFICIAL／RESEND
   // 而且該收件人這一季有派工才會附。這裡照實講，不誇大。
   if (stage === MAIL_STAGES.OFFICIAL || stage === MAIL_STAGES.RESEND) {
-    items.push('日曆檔（.ics，iPhone 同 Google 日曆都開得到）——只有這一季有服侍的人才會收到');
+    items.push('日曆檔（.ics，iPhone 和 Google 日曆都可以開啟）——只有這一季有服侍的人才會收到');
   }
   if (items.length === 0) items.push('只有信件內文，沒有附件');
 
@@ -339,7 +339,7 @@ function buildSendPoolSnapshot_(quarterId, kind) {
     throw new Error(buildThreePartMessage_(
       '讀不到這一季的收件名單（' + err.message + '）。',
       '一封都沒有寄出。',
-      ['撳一次「重新整理」再試',
+      ['按一次「重新整理」再試',
         '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
   }
 
@@ -404,7 +404,7 @@ function buildSendPoolSnapshot_(quarterId, kind) {
       baselineSentAt: lastSent ? lastSent.sentAt : '',
       changedCount: Object.keys(changedByPerson).length,
       sentence: lastSent
-        ? ('同 第 ' + lastSent.versionNo + ' 版（' + lastSent.sentAt + ' '
+        ? ('與第 ' + lastSent.versionNo + ' 版（' + lastSent.sentAt + ' '
           + (SEND_STAGE_LABELS_TC[lastSent.stage] || lastSent.stage) + '）比較，有 '
           + Object.keys(changedByPerson).length + ' 位的安排改過。')
         : '這一季從來沒有寄出過，所以沒有東西可以比較——'

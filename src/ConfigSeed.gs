@@ -107,15 +107,15 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.GO_LIVE_QUARTER_ID, type: CONFIG_TYPES.STR, group: 'SYSTEM',
       defaultValue: '',
       description: '哪一個季度是真正要上線那一季（例如 2027T1）。'
-        + '第 1 步指向這一季的時候，確認畫面會額外講一句「這一季是實際要上線的季度」，'
-        + '讓你撳之前知道自己動的是那一季。留空 ＝ 不會出現那一句。',
+        + '第 1 步指向這一季的時候，確認畫面會額外加一句「這一季是實際要上線的季度」，'
+        + '讓你按之前知道自己動的是那一季。留空 ＝ 不會出現那一句。',
       editable: 'TRUE'
     },
     {
       key: CONFIG_KEYS.PDF_ROSTER_ONLY, type: CONFIG_TYPES.BOOL, group: 'GRID',
       defaultValue: 'TRUE',
       description: '匯出 PDF 的時候是不是只印職事表本身，'
-        + '不印底部那段「圖例（本季實際格數）」同「本季服侍次數統計」。'
+        + '不印底部那段「圖例（本季實際格數）」和「本季服侍次數統計」。'
         + '那兩段仍然會寫在試算表的職事表上，開表就看得到，只是不印出來。'
         + '改了即時生效，不需要重新生成版本。',
       editable: 'TRUE'
@@ -180,7 +180,7 @@ function getConfigKeySeeds_() {
         + '（0–1，預設 0.2）。缺件人數 ÷ 應收人數超過這個比例就直接中止，'
         + '不會再提供「現在繼續」的選擇。實測背景：曾經在 57／57 人全部缺件的情況下'
         + '仍然可以按「繼續」，結果全體義工一個都沒有收到，而 Stage 已經前進到'
-        + ' OFFICIAL_SENT、鎖住了重跑步驟 4 的路。',
+        + ' OFFICIAL_SENT，令步驟 4 無法重新執行。',
       editable: 'TRUE'
     },
     {
@@ -204,9 +204,9 @@ function getConfigKeySeeds_() {
       defaultValue: SEASON_REHEARSAL_PROTECTED_DEFAULT,
       description: '「⚠️⚠️ 全季流程演練」絕對不可以碰的季度清單，逗號分隔'
         + '（例如「2027T1,2026T4」）。演練會真正產生版本、寄 DRY_RUN 信、'
-        + '改動 Stage，所以正式上線那一季、以及培訓要用的季度都必須列在這裡。'
+        + '改動 Stage，所以正式上線那一季、以及培訓要用的季度都必須列在這裏。'
         + '要加季度就在這一格加上去，用逗號分隔。'
-        + '⚠️ 填成空白並不會變成「什麼都不保護」——空白時系統仍然退回程式內建的預設值'
+        + '⚠️ 填成空白並不會變成「甚麼都不保護」——空白時系統仍然退回程式內建的預設值'
         + '（' + SEASON_REHEARSAL_PROTECTED_DEFAULT + '）。'
         + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
       editable: 'TRUE'
@@ -218,7 +218,7 @@ function getConfigKeySeeds_() {
         + '合堂那一天，主席／講員／傳譯／領詩／司琴由另一堂帶領，'
         + '所以這五個崗位不應該由本堂排。'
         + '「維護 ▸ 補填合堂跳過崗位」會把這一格的內容填進 SpecialSundays 的 '
-        + 'SkipPostIDs；「準備工作 ▸ ⚠️ 產生年度合堂建議」新寫入的那幾行也會帶著它。'
+        + 'SkipPostIDs；「準備工作 ▸ ⚠️ 產生年度合堂建議」新寫入的那幾行也會帶着它。'
         + '⚠️ 這一格填成空白就是空白——系統當成你的決定（「我不要任何合堂自動跳崗位」），'
         + '不會自動退回程式內建的那五個崗位。'
         + '某一次合堂實際上不只跳這五個（例如堂慶連司事都由英語堂負責），'
@@ -229,12 +229,12 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS, type: CONFIG_TYPES.LIST, group: 'SYSTEM',
       defaultValue: COMBINED_BACKFILL_BLOCKED_DEFAULT,
       description: '「維護 ▸ 補填合堂跳過崗位」絕對不可以改動的季度清單，逗號分隔。'
-        + '正式上線那一季必須列在這裡。'
+        + '正式上線那一季必須列在這裏。'
         + '⚠️ 這一格跟「' + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + '」是兩件事，'
         + '故意分開兩格：那一個守的是「演練不可以碰哪幾季」，'
         + '這一個守的是「補填工具不可以改哪幾季的資料」。'
         + '共用一格的話，日後為了演練而加減一季，就會連補填工具的保護範圍都一起改掉。'
-        + '⚠️ 填成空白並不會變成「什麼都不保護」——空白時系統仍然退回程式內建的預設值'
+        + '⚠️ 填成空白並不會變成「甚麼都不保護」——空白時系統仍然退回程式內建的預設值'
         + '（' + COMBINED_BACKFILL_BLOCKED_DEFAULT + '）。'
         + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
       editable: 'TRUE'
@@ -243,14 +243,14 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS, type: CONFIG_TYPES.LIST, group: 'SYSTEM',
       defaultValue: QUARTER_RESET_BLOCKED_DEFAULT,
       description: '「維護 ▸ ⚠️⚠️ 重設季度測試資料」絕對不可以清的季度清單，逗號分隔。'
-        + '正式上線那一季必須列在這裡。'
-        + '⚠️ 這是全系統最危險的功能之一，清走了就是真的清走了。'
+        + '正式上線那一季必須列在這裏。'
+        + '⚠️ 這是全系統最危險的功能之一，清除了就無法還原。'
         + '⚠️ 這一格跟「' + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + '」和'
         + '「' + CONFIG_KEYS.COMBINED_BACKFILL_BLOCKED_QUARTERS + '」是三件事，故意分開三格：'
         + '一個守「演練不可以碰哪幾季」，一個守「補填工具不可以改哪幾季」，'
         + '這一個守「清理不可以清哪幾季」。共用一格的話，日後改其中一邊'
         + '就會連另外兩件事的保護範圍都一起改掉。'
-        + '⚠️ 填成空白並不會變成「什麼都不保護」——空白時系統仍然退回程式內建的預設值'
+        + '⚠️ 填成空白並不會變成「甚麼都不保護」——空白時系統仍然退回程式內建的預設值'
         + '（' + QUARTER_RESET_BLOCKED_DEFAULT + '）。'
         + '想真正解除某一季的保護，只能把它從這一格移走，不能靠清空整格。',
       editable: 'TRUE'
@@ -258,12 +258,12 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.SELFTEST_QUARTER_ID, type: CONFIG_TYPES.STR, group: 'SYSTEM',
       defaultValue: SELFTEST_QUARTER_DEFAULT,
-      description: '「測試工具 ▸ ⚠️ 跑自測（沙盒季度，DRY_RUN）」專用的沙盒季度。'
-        + '⚠️ 自測機每一次開跑都會把這一季整季清乾淨（連 v0），然後由頭走一次完整流程，'
+      description: '「測試工具 ▸ ⚠️ 執行自測（沙盒季度，DRY_RUN）」專用的沙盒季度。'
+        + '⚠️ 自測機每一次開始執行都會把這一季整季清空（連 v0），然後從頭走一次完整流程，'
         + '所以這一格一定要填一個沒有真實資料的季度。'
-        + '開跑之前有三道閘擋住（不可以在 '
+        + '開始執行之前有三道關卡（不可以在 '
         + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + ' 或 '
-        + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + ' 裡面、Stage 不可以是已正式發出），'
+        + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + ' 裏面、Stage 不可以是已正式發出），'
         + '但最後一道防線仍然是這一格填得對。'
         + '⚠️ 填成空白會退回程式內建的預設值（' + SELFTEST_QUARTER_DEFAULT + '），'
         + '不會變成「隨便挑一季」。',
@@ -278,7 +278,7 @@ function getConfigKeySeeds_() {
         + 'TRUE（預設）＝跳過。那條路自測機 S08（產生個人 PDF）'
         + '和 S09（正式發出，DRY_RUN）已完整驗過，不會漏測。'
         + '想它也一起亂行，就改 FALSE。'
-        + '⚠️ 跳過的話，亂行機報告開頭會印一行講明跳了哪幾個動作，'
+        + '⚠️ 跳過的話，亂行機報告開頭會印一行說明跳了哪幾個動作，'
         + '不會讓人以為那條路驗過了。',
       editable: 'TRUE'
     },
@@ -310,13 +310,13 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.MAIL_SUMMARY_DATE_FORMAT, type: CONFIG_TYPES.STR, group: 'MAIL',
       defaultValue: DEFAULTS.MAIL_SUMMARY_DATE_FORMAT,
-      description: '個人派工摘要（{AssignmentSummary}）裡日期的顯示格式。',
+      description: '個人派工摘要（{AssignmentSummary}）裏日期的顯示格式。',
       editable: 'TRUE'
     },
     {
       key: CONFIG_KEYS.MAIL_SUMMARY_SEPARATOR, type: CONFIG_TYPES.STR, group: 'MAIL',
       defaultValue: DEFAULTS.MAIL_SUMMARY_SEPARATOR,
-      description: '個人派工摘要裡多筆派工之間的分隔符號。',
+      description: '個人派工摘要裏多筆派工之間的分隔符號。',
       editable: 'TRUE'
     },
     {
@@ -353,7 +353,7 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.SYS_LOCALE, type: CONFIG_TYPES.STR, group: 'SYS',
       defaultValue: '',
       description: '必填但目前程式碼沒有任何地方實際讀取這個值（只在 validateSetup() 的'
-        + '必填清單裡）。語意不明確，故意留空不猜，請你確認正確值後自行填入。',
+        + '必填清單裏）。語意不明確，故意留空不猜，請你確認正確值後自行填入。',
       editable: 'TRUE'
     },
     {
@@ -393,7 +393,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, type: CONFIG_TYPES.EMAIL, group: 'SYS',
       defaultValue: '',
-      description: '必填，操作者帳號，用於 v0 保護等機制的編輯者白名單。屬於帳號設定，'
+      description: '必填，操作者帳戶，用於 v0 保護等機制的編輯者白名單。屬於帳戶設定，'
         + '不應該由程式猜測，故意留空，請你自行填入。',
       editable: 'TRUE'
     },
@@ -446,10 +446,10 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.TRIGGER_AUTO_GENERATE, type: CONFIG_TYPES.BOOL, group: 'AUTOMATION',
       defaultValue: BOOLEAN_TEXT.FALSE,
-      description: '到期自動生成初稿。預設關閉——初稿一律由幹事在網頁上自己撳掣生成。'
+      description: '到期自動生成初稿。預設關閉——初稿一律由幹事在網頁上自己按〔生成初稿〕。'
         + '關閉之後系統不會自己動任何東西，全部行動由幹事發起；'
         + '「到期了還沒生成」改為由提醒信通知幹事，不會代替幹事生成。'
-        + '改成 TRUE 就會回復成到期自動生成（那條程式碼路徑一直保留著）。',
+        + '改成 TRUE 就會回復成到期自動生成（那條程式碼路徑一直保留着）。',
       editable: 'TRUE'
     },
     {
@@ -465,8 +465,8 @@ function getConfigKeySeeds_() {
       defaultValue: DEFAULTS.QUARTER_TERM_START_MONTHS,
       description: '第十七輪批次新增：T1～T4 各自由哪一個月開始，逗號分隔的四個月份數字。'
         + '預設 1,4,7,10 就是日曆季度（T1=1-3月、T2=4-6月、T3=7-9月、T4=10-12月），'
-        + '跟這個 Key 加入之前寫死在程式裡的一樣，所以不改也不會有任何行為變化。'
-        + '教會如果用學期制或財政年度等其他劃分，改這裡就可以，不需要改程式。'
+        + '跟這個 Key 加入之前寫死在程式裏的一樣，所以不改也不會有任何行為變化。'
+        + '教會如果用學期制或財政年度等其他劃分，改這裏就可以，不需要改程式。'
         + '「⚠️ 新增季度」與「⚠️ 產生下一年度四個季度」兩個工具都讀這個值。'
         + '格式不正確（不是四項、或有值不在 1-12）時會整組退回預設值並記一句 WARN。',
       editable: 'TRUE'
@@ -474,9 +474,9 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS, type: CONFIG_TYPES.INT, group: 'SCHEDULE',
       defaultValue: String(DEFAULTS.QUARTER_LOOKAHEAD_MONTHS),
-      description: '第七十五輪批次新增：提前幾多個月自動建立未來季度。幹事介面每次載入（以及每日自動排程，'
+      description: '第七十五輪批次新增：提前多少個月自動建立未來季度。幹事介面每次載入（以及每日自動排程，'
         + '如果已安裝）都會檢查：開始日期在今日之後這麼多個月內的季度，如果還沒有 Quarters 與 ServiceDates '
-        + '就逐季建立（日期計法同「產生下一年度四個季度」一樣）。進階與診斷有〔建立未來季度〕可以手動做一次。'
+        + '就逐季建立（日期計法與「產生下一年度四個季度」一樣）。進階與診斷有〔建立未來季度〕可以手動做一次。'
         + '預設 6；不是正整數時用 6 並記一句 WARN。',
       editable: 'TRUE'
     },
@@ -495,7 +495,7 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.SPECIAL_SUNDAYS_ENABLED, type: CONFIG_TYPES.BOOL, group: 'GENERATOR',
       defaultValue: 'FALSE',
       description: '第七十五輪批次新增：要不要使用 SpecialSundays（特別主日）。FALSE（預設）＝完全不讀：'
-        + '生成、請系統幫我調整、核對、匯入、開季前準備清單、PDF／公開職事表／個人頁的圖例都不理它，'
+        + '生成、請系統幫我調整、核對、匯入、開季前準備清單、PDF／公開職事表／個人頁的圖例都不理會它，'
         + '每一週照常排所有崗位。合堂等要清空崗位的週，由幹事在職事表自己清空或改名；'
         + '每週標題（例如浸禮崇拜、堂慶）在職事表的「類型」欄直接改，儲存時會記住。'
         + 'SpecialSundays 工作表和資料不會被刪；改回 TRUE 就恢復舊行為。',
@@ -505,7 +505,7 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.SEND_HOUR_LOCAL, type: CONFIG_TYPES.INT, group: 'AUTOMATION',
       defaultValue: '9',
       description: '每日自動排程檢查大約在幾點執行（0-23，只保證在該小時內觸發）。'
-        + '9 是程式碼裡 runInstallAutomation_() 本來就有的後備值，這裡沿用同一個值。',
+        + '9 是程式碼裏 runInstallAutomation_() 本來就有的後備值，這裏沿用同一個值。',
       editable: 'TRUE'
     },
     {
@@ -624,7 +624,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, type: CONFIG_TYPES.STR, group: 'MAIL',
       defaultValue: '',
-      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不理 DRY_RUN 是甚麼。要多過一個地址（例如你自己加幫手那位一齊看）就用逗號、分號、頓號或者換行分開，例如「a@example.invalid, b@example.invalid」。每一個地址都要是正確格式，有一個打錯就整批不寄——不會「寄得到那幾個先寄」。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封去到義工手上。留空＝正常寄給收件人本人。',
+      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不論 DRY_RUN 是甚麼。要填多於一個地址（例如你和另一位同工一併查看）就用逗號、分號、頓號或者換行分開，例如「a@example.invalid, b@example.invalid」。每一個地址都要是正確格式，有一個打錯就整批不寄——不會「先寄可以寄的那幾個」。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封寄到義工手上。留空＝正常寄給收件人本人。',
       editable: 'TRUE'
     },
     // ---- ICS（第十一輪批次階段 C：日曆檔）----
@@ -632,7 +632,7 @@ function getConfigKeySeeds_() {
       key: CONFIG_KEYS.ICS_SERVICE_START_TIME, type: CONFIG_TYPES.STR, group: 'ICS',
       defaultValue: DEFAULTS.ICS_SERVICE_START_TIME,
       description: '崇拜預設開始時間（HH:mm，24 小時制）。個別崗位的提早到場時間見 Posts 的 '
-        + 'EarlyArrivalMinutes 欄，不在這裡設定。',
+        + 'EarlyArrivalMinutes 欄，不在這裏設定。',
       editable: 'TRUE'
     },
     {
@@ -658,8 +658,8 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.WARN_ON_SEMI_HARD_BREAK, type: CONFIG_TYPES.BOOL, group: 'FINETUNE',
       defaultValue: 'TRUE',
-      description: '「檢查改動」／「套用修改申報」重跑規則檢查時，SEMI_HARD 級別的違反是否'
-        + '要回報。TRUE（預設，維持原行為）＝回報；FALSE＝只回報 HARD，不理 SEMI_HARD'
+      description: '「檢查改動」／「套用修改申報」重新執行規則檢查時，SEMI_HARD 級別的違反是否'
+        + '要回報。TRUE（預設，維持原行為）＝回報；FALSE＝只回報 HARD，不理會 SEMI_HARD'
         + '（HARD 一律回報，不受這個開關影響）。',
       editable: 'TRUE'
     },

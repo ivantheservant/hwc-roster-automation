@@ -185,7 +185,7 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     warn = GENERATE_TARGET_WARN_SELECTED_GENERATED;
     warnMessage = buildThreePartMessage_(
       '「' + buildQuarterLabel_(target.quarterId) + '」已經生成過了。',
-      '什麼都沒有改動。',
+      '甚麼都沒有改動。',
       ['要生成另一季，先在最上面的季度選單選那一季',
         REDO_QUARTER_HINT_TEXT]);
   } else if (allGenerated) {
@@ -194,14 +194,14 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     warn = GENERATE_TARGET_WARN_ALL_GENERATED;
     warnMessage = buildThreePartMessage_(
       '所有已建立的季度都生成過了。',
-      '什麼都沒有改動。',
+      '甚麼都沒有改動。',
       ['未來幾個月開始的季度系統會自動建立；要手動再做一次，請去「進階與診斷 ▸ 建立未來季度」',
         '已經生成過的季度：' + REDO_QUARTER_HINT_TEXT]);
   } else if (target.endDate && target.endDate < today) {
     warn = GENERATE_TARGET_WARN_PAST;
     warnMessage = buildThreePartMessage_(
       '「' + buildQuarterLabel_(target.quarterId) + '」已經完全過去了（' + target.endDate + ' 結束）。',
-      '還沒有生成，所以現在什麼都沒有改動。',
+      '還沒有生成，所以現在甚麼都沒有改動。',
       ['如果你是在補一個漏掉的舊季度，照樣生成沒有問題',
         '如果你想做的是下一季，請在最上面的季度選單改一改']);
   } else if (target.generateOn && target.generateOn > today) {
@@ -212,14 +212,14 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     warnMessage = buildThreePartMessage_(
       '「' + buildQuarterLabel_(target.quarterId) + '」的生成日期是 '
         + target.generateOn + '，還有 ' + daysUntil + ' 天。',
-      '還沒有生成，所以現在什麼都沒有改動。',
+      '還沒有生成，所以現在甚麼都沒有改動。',
       ['提早生成不會出錯，但之後義工的情況可能會變，到時要重新生成',
         '如果你只是想試一試，用一個測試季度，不要用這一季']);
   } else if (target.startDate && target.startDate <= today) {
     warn = GENERATE_TARGET_WARN_STARTED;
     warnMessage = buildThreePartMessage_(
       '「' + buildQuarterLabel_(target.quarterId) + '」已經開始了（' + target.startDate + ' 開始）。',
-      '還沒有生成，所以現在什麼都沒有改動。',
+      '還沒有生成，所以現在甚麼都沒有改動。',
       ['如果這一季真的還沒有排過，照樣生成沒有問題',
         '已經過去的那幾個主日，系統照樣會排——生成之後記得看一看']);
   }
@@ -261,7 +261,7 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
  */
 function buildPermanentLinkExplanation_() {
   return '這是唯一一條連結。它永遠指向你最近一次「儲存我的修改」的版本。'
-    + '內容改了之後不用換連結，收到的人重新開就見到新版。';
+    + '內容改了之後不用換連結，收到的人重新開就看到新版。';
 }
 
 /**

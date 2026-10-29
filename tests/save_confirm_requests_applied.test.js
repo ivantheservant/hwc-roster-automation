@@ -509,7 +509,7 @@ console.log('\n=== 甲4：失敗文案要分「一個字都冇寫」同「寫到
     clean.message.indexOf('沒有任何東西被寫入') !== -1, clean.message);
   check('★★★★★ 而且叫人直接再試，唔叫人去回退'
     + '（回退本身會建立新版本——一句嚇人嘅文案會製造一個真正多餘嘅版本）',
-    clean.message.indexOf('直接再撳一次') !== -1
+    clean.message.indexOf('直接再按一次') !== -1
       && clean.message.indexOf('回到上一個版本') === -1, clean.message);
   checkEqual('★★★★ partialWrite ＝ false', clean.partialWrite, false);
 

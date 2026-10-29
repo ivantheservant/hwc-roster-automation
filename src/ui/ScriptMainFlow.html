@@ -76,7 +76,7 @@
    * 第八十二輪批次 II 組（Ivan 決定）：幹事介面唔再有「重新生成初稿」——指去〔整季清走重來〕或者〔用這一版作起點〕。
    * 後端訊息同一句：`REDO_QUARTER_HINT_TEXT`（Constants.gs）。
    */
-  const REDO_QUARTER_HINT = '要整季重來，用下面「常用設定 ▸ 整季清走重來」之後再生成；'
+  const REDO_QUARTER_HINT = '要整季重來，用下面「常用設定 ▸ 整季重設」之後再生成；'
     + '要回到之前的內容，用第 2 步版本下拉〔用這一版作起點〕。';
 
   /** 第八十二輪批次 IG 組：〔變動的人〕灰色時嘅原因（後端 `RESEND_NEEDS_OFFICIAL_TEXT` 同一句）。 */
@@ -101,7 +101,7 @@
     if (opts.title) {
       b.title = opts.title;
     } else if (opts.disabled) {
-      b.title = '這一粒現在撳不到，而系統講不出原因——這是一個程式問題，'
+      b.title = '這個按鈕現在不能按，而系統說不出原因——這是一個程式問題，'
         + '請把這一句連同你剛才做過的事告訴開發者。';
     }
     return b;
@@ -251,7 +251,7 @@
   /** 生成日期同距離幾多日，一句人話。 */
   function describeGenerateOn(t) {
     if (!t.generateOn) {
-      return '這一季的 Quarters 沒有填生成日期（GenerateOn），所以系統講不出還有多久。';
+      return '這一季的 Quarters 沒有填生成日期（GenerateOn），所以系統說不出還有多久。';
     }
     const d = t.daysUntilGenerateOn;
     if (d === null || d === undefined) {
@@ -277,7 +277,7 @@
    * 而嗰句講嘅係「呢一季仲未到生成日期」，根本冇嘢發生過。
    */
   function firstLineOf(text) {
-    return String(text || '').split('\n')[0].replace(/^發生了什麼：\s*/, '');
+    return String(text || '').split('\n')[0].replace(/^發生了甚麼：\s*/, '');
   }
 
   /**
@@ -319,7 +319,7 @@
     const goLiveNote = t.isGoLiveQuarter
       ? make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '這一季是實際要上線的季度。生成落去就會用掉它——'
+          text: '這一季是實際要上線的季度。一旦生成就會用掉它——'
             + '如果你只是想試一試，請改用一個測試季度。',
           className: 'lines'
         })
@@ -354,7 +354,7 @@
           make('div', { text: '查不到這一季有沒有永久連結。', className: 'permalink-label' }),
           make('div', {
             text: '這不代表沒有連結，只代表系統現在看不到。'
-              + '撳一次「重新整理」再看，或者去下面「進階與診斷 ▸ 重新發佈公開連結」。',
+              + '按一次「重新整理」再看，或者去下面「進階與診斷 ▸ 重新發佈公開連結」。',
             className: 'permalink-note'
           })
         ]);
@@ -436,7 +436,7 @@
   let saveRecheckAt_ = 0;
 
   /* 第八十三輪批次 JG 組：撳〔儲存〕即時有反應——掣變灰、旁邊寫「儲存中……」，做完先還原。 */
-  const SAVE_RUNNING_TEXT = '儲存中……（可能要一至兩分鐘，請不要再撳）';
+  const SAVE_RUNNING_TEXT = '儲存中……（可能要一至兩分鐘，請不要再按）';
   let saveRunning_ = false;
 
   /**
@@ -636,7 +636,7 @@
         make('div', { text: '現在有一張建議表未處理', className: 'permalink-label' }),
         make('div', {
           text: '「' + suggestion.sheetName + '」。'
-            + '在你接受或者放棄它之前，再撳「請系統幫我調整」會以那一張做起點。',
+            + '在你接受或者放棄它之前，再按「請系統幫我調整」會以那一張做起點。',
           className: 'permalink-note'
         }),
         make('div', { className: 'row' }, [
@@ -691,7 +691,7 @@
       slot.appendChild(buildViewVersionLink(chosen));
       slot.appendChild(stepButton('用這一版作起點', () => openUseVersionAsStartPoint(chosen), {
         className: 'secondary',
-        title: '把第 ' + no + ' 版的內容寫入最新那一張職事表，之後撳〔儲存〕成為新一版。'
+        title: '把第 ' + no + ' 版的內容寫入最新那一張職事表，之後按〔儲存〕成為新一版。'
       }));
     };
     select.addEventListener('change', paint);
@@ -753,7 +753,7 @@
       title: '用第 ' + v.versionNo + ' 版作起點',
       bodyNodes: [
         para('現在的職事表上未儲存的改動會被這一版的內容蓋過，舊版本不會改變。'),
-        para('寫入之後你可以再改；撳〔儲存〕才會成為新一版（來源寫「以第 ' + v.versionNo + ' 版作起點」）。', 'muted')
+        para('寫入之後你可以再改；按〔儲存〕才會成為新一版（來源寫「以第 ' + v.versionNo + ' 版作起點」）。', 'muted')
       ],
       confirmLabel: '確定',
       cancelLabel: '取消',
@@ -772,7 +772,7 @@
                 + (r.titleCount > 0 ? '、每週標題 ' + r.titleCount + ' 週' : '') + '。',
               className: 'ok-line'
             }),
-            para('還未儲存。看過或再改之後，撳〔儲存〕成為新一版。舊版本沒有改變。', 'muted'),
+            para('還未儲存。看過或再改之後，按〔儲存〕成為新一版。舊版本沒有改變。', 'muted'),
             r.sheetUrl ? link : para('')
           ], [button('知道了', () => closeModalAndRefresh(), '')]);
         });
@@ -800,7 +800,7 @@
       openModal('名單選單', [
         make('div', { text: '已完成', className: 'ok-head' }),
         para(r.summary),
-        para('回到職事表（第 2 步那一粒）就會見到。', 'muted')
+        para('回到職事表（第 2 步的按鈕）就會看到。', 'muted')
       ], [button('知道了', () => closeModal(), '')]);
     });
   }
@@ -820,7 +820,7 @@
     return stepCard({
       num: 0,
       title: '更改各崗位的事奉人員名單',
-      note: '開一張工作表，一個崗位一欄。在裡面自由增刪改，改完回來撳「儲存並套用名單」。',
+      note: '開一張工作表，一個崗位一欄。在裏面自由增刪改，改完回來按「儲存並套用名單」。',
       acts: [
         stepButton('開啟名單工作表', openEligibilitySheet),
         stepButton('儲存並套用名單', openApplyEligibilitySheet, { className: 'secondary' })
@@ -836,11 +836,11 @@
       link.target = '_blank';
       link.rel = 'noopener';
       openModal('名單工作表', [
-        make('div', { text: '已經攤開好了', className: 'ok-head' }),
-        para('一個崗位一欄，底下是該崗位的人。加人就在那一欄下面打名，'
+        make('div', { text: '已經展開', className: 'ok-head' }),
+        para('一個崗位一欄，下面是該崗位的人。加人就在那一欄下面輸入名字，'
           + '移走就把那一格清空。'),
         link,
-        para('改完之後，回來撳「儲存並套用名單」。在你撳之前，'
+        para('改完之後，回來按「儲存並套用名單」。在你按之前，'
           + '真正的名單一格都不會變。', 'muted')
       ], [button('知道了', () => closeModal(), '')]);
     });
@@ -958,7 +958,7 @@
         className: 'ok-line'
       }));
       why.appendChild(make('div', {
-        text: '・這是「停用」，不是刪除。紀錄仍然留著，'
+        text: '・這是「停用」，不是刪除。紀錄仍然留着，'
           + '下次在那張表把他的名字打回去就會重新啟用。',
         className: 'ok-line'
       }));
@@ -987,8 +987,8 @@
 
     if (plan.blocked) {
       openModal('儲存並套用名單', nodes.concat([
-        para('把上面認不出的名字處理好，再撳一次。'
-          + '如果那是新人，可以直接撳上面那一粒〔這是新人，一併加入〕。', 'muted')
+        para('把上面認不出的名字處理好，再按一次。'
+          + '如果那是新人，可以直接按上面的〔這是新人，一併加入〕。', 'muted')
       ]), [button('知道了', () => closeModal(), '')]);
       return;
     }
@@ -1040,8 +1040,8 @@
       done.push(make('div', { className: 'warnbox' }, [
         make('div', {
           text: '你勾選的其中 ' + r.vanished.length + ' 項，在系統重新讀那張表的時候'
-            + '已經不存在了（多數是你看著這個畫面的時候又改過那張表）。'
-            + '那幾項一格都沒有動。再撳一次「儲存並套用名單」會重新看一次。',
+            + '已經不存在了（多數是你看着這個畫面的時候又改過那張表）。'
+            + '那幾項一格都沒有動。再按一次「儲存並套用名單」會重新看一次。',
           className: 'lines'
         })
       ]));
@@ -1098,8 +1098,10 @@
           className: 'secondary',
           title: has ? '寄審閱本給堂委、執事、IT、幹事、固定收件人和你自己。不會改變進度。' : notYet
         }),
+        // 第八十五輪批次 LA 組：〔給所有人〕和其餘三個寄出按鈕同一個樣式，第 3 步沒有藍色主按鈕。
         stepButton('給所有人', () => openSendDialog('ALL'), {
           disabled: !has,
+          className: 'secondary',
           title: !has ? notYet
             : (officialOnce ? '再寄一次給全部人（改動後重發，全部人都會收到）。'
               : '正式發出給全體（職事表上所有人、堂委和執事）。不可逆。')
@@ -1132,10 +1134,10 @@
       title: n > 0 ? ('要印紙本的有 ' + n + ' 位') : '下載及匯出',
       note: n > 0
         ? '這幾位查不到電郵，收不到信，但照樣要服侍。'
-          + '這裡同時可以把整季或者個人的 PDF 下載一份自己留底。'
+          + '這裏同時可以把整季或者個人的 PDF 下載一份自己保存。'
         : '這一季暫時沒有查不到電郵的人。'
-          + '這裡可以把整季或者個人的 PDF 下載一份自己留底，'
-          + '也可以在這裡加人（有些長者兩樣都要）。',
+          + '這裏可以把整季或者個人的 PDF 下載一份自己保存，'
+          + '也可以在這裏加人（有些長者兩種方式都需要）。',
       acts: [stepButton('下載及匯出', () => openPaperDialog(), {
         disabled: !d.latestVersion,
         className: n > 0 ? '' : 'secondary',

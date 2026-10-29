@@ -195,11 +195,11 @@ console.log('\n=== E3 結構與畫面文案 ===');
   const zone3 = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'ui', 'ScriptZone3.html'), 'utf8');
   check('★★★★★ 畫面頂有規格 4.4 指定嗰句',
-    zone3.indexOf('系統只會排曾任該崗位的人。新人一定要在這裡加，系統不會自己擴充。') !== -1);
+    zone3.indexOf('系統只會排曾任該崗位的人。新人一定要在這裏加，系統不會自己擴充。') !== -1);
   check('★★★★★ 批次確認畫面有「會新增 N 項資格、取消 N 項資格」',
     /會新增 ' \+ summary\.added \+ ' 項資格、取消 ' \+ summary\.removed \+ ' 項資格/.test(zone3));
   check('★★★★ 確認畫面有講「取消資格不會刪走那一行」',
-    zone3.indexOf('取消資格不會刪走那一行，做過的次數會保留。') !== -1);
+    zone3.indexOf('取消資格不會刪除那一行，做過的次數會保留。') !== -1);
   check('★★★★★ 勾返原本嘅值就當冇改過（唔會報一個「勾咗再取消勾」嘅假改動）',
     /if \(cb\.checked === cell\.eligible\) delete eligChanges\[key\];/.test(zone3));
   check('★★★★★ 人數太少嘅崗位一覽**唔理揀咗邊個崗位都顯示**'

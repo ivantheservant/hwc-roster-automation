@@ -31,7 +31,7 @@
 // ⚠️ 即係：**任何一個早期情境一旦紅咗，後面所有情境永遠跑唔到。**
 // 而自測機成個價值，就係要跑到後面嗰啲。
 //
-// 一部只跑得到頭兩個情境嘅自測機，價值唔係 2/15，係 0。
+// 一部只執行得到頭兩個情境嘅自測機，價值唔係 2/15，係 0。
 
 const fs = require('fs');
 const path = require('path');
@@ -93,7 +93,7 @@ console.log('\n=== A1【核心】續跑要跳過「已經有結論」嘅，唔�
 }
 
 // =====================================================================
-console.log('\n=== A2【核心】只重跑紅色情境 ===');
+console.log('\n=== A2【核心】只重新執行紅色情境 ===');
 {
   const clear = gas.clearFailedSelfTestState_;
   const state = {
@@ -104,12 +104,12 @@ console.log('\n=== A2【核心】只重跑紅色情境 ===');
     S05: { id: 'S05', status: 'NOT_RUN' }
   };
   const out = clear(state);
-  checkEqual('★★★★★★ 紅嗰兩個（FAILED／ERROR）被清走，下一次會重跑',
+  checkEqual('★★★★★★ 紅嗰兩個（FAILED／ERROR）被清除，下一次會重新執行',
     out.clearedIds.sort().join(','), 'S02,S03');
-  checkEqual('★★★★★ 綠嗰個保留（唔使再跑一次）',
+  checkEqual('★★★★★ 綠嗰個保留（唔使再執行一次）',
     !!out.state.S01, true);
   checkEqual('★★★★★ 跳過嗰個保留', !!out.state.S04, true);
-  checkEqual('★★★★★★ **未跑嗰個保留**'
+  checkEqual('★★★★★★ **未執行嗰個保留**'
     + '——佢本來就會跑，唔使清；清咗都係一樣，但保留先講得清楚'
     + '「呢個入口只掂紅色嗰幾個」',
     !!out.state.S05, true);
@@ -122,13 +122,13 @@ console.log('\n=== A2【核心】只重跑紅色情境 ===');
   check('★★★★★★ 「只重跑紅色情境」行 resume 模式（`true`），'
     + '**唔會**重設沙盒季度'
     + '——呢個入口嘅意思就係「保留現場，只重跑嗰幾個」',
-    /selfTestMenuEntry_\(true, '▶️ 只重跑紅色情境', true\)/.test(entry), entry);
+    /selfTestMenuEntry_\(true, '▶️ 只重新執行紅色情境', true\)/.test(entry), entry);
   check('★★★★★ 選單有呢一項',
     /runSelfTestRerunFailedFromMenu_/.test(read('src/Menu.gs')), '');
 }
 
 // =====================================================================
-console.log('\n=== A3【核心】報告最尾要講得出下一步撳邊一粒 ===');
+console.log('\n=== A3【核心】報告最尾要講得出下一步按邊一粒 ===');
 {
   // ⚠️ 以前三種情況都印同一句「撳『繼續跑自測』」，
   // 而其中一種撳咗係冇用嘅。Ivan 就係照住嗰一句撳咗三次。
@@ -144,7 +144,7 @@ console.log('\n=== A3【核心】報告最尾要講得出下一步撳邊一粒 =
     stoppedForTime: true
   })).join('\n');
   check('★★★★★★ 仲有「未跑」 ⇒ 叫佢撳〔繼續跑自測〕',
-    /繼續跑自測/.test(stillNotRun) && !/只重跑紅色情境/.test(stillNotRun),
+    /繼續執行自測/.test(stillNotRun) && !/只重新執行紅色情境/.test(stillNotRun),
     stillNotRun.slice(-400));
 
   const allRanSomeRed = gas.describeSelfTestReport_(Object.assign({}, base, {
@@ -154,8 +154,8 @@ console.log('\n=== A3【核心】報告最尾要講得出下一步撳邊一粒 =
   })).join('\n');
   check('★★★★★★ 冇「未跑」但有紅 ⇒ 叫佢撳〔只重跑紅色情境〕'
     + '——撳「繼續跑自測」係冇用嘅，而 Ivan 就係照住嗰一句白撳咗三次',
-    /只重跑紅色情境/.test(allRanSomeRed)
-      && !/由停下來的地方接住/.test(allRanSomeRed),
+    /只重新執行紅色情境/.test(allRanSomeRed)
+      && !/由停下來的地方繼續/.test(allRanSomeRed),
     allRanSomeRed.slice(-400));
 
   const allGreen = gas.describeSelfTestReport_(Object.assign({}, base, {
@@ -181,7 +181,7 @@ console.log('\n=== B3【核心】時間要講得出用喺邊 ===');
     /時間：用了 4 分 12 秒（清理 0 秒／情境 1 分 30 秒／不變量 2 分 42 秒）/
       .test(lines),
     lines);
-  checkEqual('★★★★★ 少過一分鐘就只講秒',
+  checkEqual('★★★★★ 少過一分鐘就只說秒',
     gas.describeSelfTestDuration_(42000), '42 秒');
 }
 
@@ -196,7 +196,7 @@ console.log('\n=== B1【核心】不變量分快／慢兩批 ===');
     + '——跑埋只會食埋下一次續跑嘅時間預算',
     /if \(!stoppedForTime\) \{[\s\S]{0,300}INVARIANT_SET\.FINAL/.test(CODE), '');
   check('★★★★★ 報告分兩節',
-    /全部跑完之後的整體不變量/.test(SRC), '');
+    /全部完成之後的整體不變量/.test(SRC), '');
 }
 
 // =====================================================================
@@ -216,7 +216,7 @@ console.log('\n=== D1／D2【核心】S01 只喺全新開跑時有意義 ===');
       && /status: SELFTEST_STATUS\.SKIPPED, checks: \[\], failedChecks: \[\]/.test(CODE),
     '');
   check('★★★★★ 而且講明點解',
-    /這一個只在全新開跑時有意義/.test(SRC), '');
+    /這一個只在全新開始執行時有意義/.test(SRC), '');
 
   // ── D2：直接查，唔可以用 flag 記住 ──────────────────────────
   check('★★★★★★ 「乾唔乾淨」係**直接查**（有冇版本／有冇派工），'

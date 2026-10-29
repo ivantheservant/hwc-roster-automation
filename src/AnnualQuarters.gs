@@ -77,7 +77,7 @@ function planAnnualQuarters_(year, startMonths, existingQuarterIds, existingServ
     throw new Error('planAnnualQuarters_()：第 5 個參數 dateSettings 沒有傳。'
       + '它是 readQuarterDateSettings_() 的結果，用來計算 GenerateOn／OfficialSendOn。'
       + '漏傳的話那兩欄會靜靜留空——而那正是第四十四輪批次 G 組要修的問題，'
-      + '所以這裡寧可拋錯。');
+      + '所以這裏寧可拋錯。');
   }
   const plans = [];
 

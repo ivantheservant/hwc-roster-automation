@@ -105,7 +105,7 @@ function planQuarterReset_(quarterId, includeV0) {
 
     if (versionNo === 0 && !plan.includeV0) {
       plan.manualAttention.push('v0（' + sheetName + '）：原始版本，本次選擇保留。'
-        + '如果確定要連 v0 一併清走，重新執行並選擇「連 v0 一齊清」。');
+        + '如果確定要連 v0 一併清除，重新執行並選擇「連 v0 一併清除」。');
       return;
     }
     if (isProtected && versionNo !== 0) {
@@ -239,7 +239,7 @@ function planQuarterReset_(quarterId, includeV0) {
     if (plan.eligibilityRequestRows.length > 0) {
       plan.manualAttention.push('Eligibility 有 ' + plan.eligibilityRequestRows.length
         + ' 行是由「指定服侍」申報自動加入的（Source=REQUEST）。'
-        + 'Eligibility 屬於人員基礎資料，本工具絕對不碰——但這些行會繼續影響'
+        + 'Eligibility 屬於人員基礎資料，本工具絕對不會改動——但這些行會繼續影響'
         + '重新生成的結果（那個人從此對那個崗位算合資格）。'
         + '如果是測試時亂填出來的，請自己到 Eligibility 把該行 Active 改成 FALSE 或刪除；'
         + '如果是真實的資格變更，就保留。下面已逐行列出。');
@@ -398,7 +398,7 @@ function executeQuarterReset_(plan) {
       + '　放行失效=' + (plan.releasedKeyCount || 0) + ' 項',
     newValue: '（全部清除，Stage 重設為 ' + QUARTER_STAGE.DRAFT + '）',
     source: 'MENU',
-    notes: '連 v0 一齊清：' + (plan.includeV0 ? 'YES' : 'NO')
+    notes: '連 v0 一併清除：' + (plan.includeV0 ? 'YES' : 'NO')
       + '；需要人手處理的項目：' + (plan.manualAttention.length || 0) + ' 項'
   });
 
@@ -864,7 +864,7 @@ function executeQuarterResetBatch_(entries) {
           newValue: '中途失敗',
           source: 'executeQuarterResetBatch_',
           notes: '錯誤訊息：' + err.message
-            + '　⚠️ 部分內容可能已經被清走，請對照 BEFORE 那一筆檢查'
+            + '　⚠️ 部分內容可能已經被清除，請對照 BEFORE 那一筆檢查'
         });
       } catch (err2) {
         log_('ERROR', 'QUARTER_RESET_BATCH_FAILED 寫入失敗（' + quarterId + '）: ' + err2.message);

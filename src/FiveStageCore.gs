@@ -785,13 +785,13 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
     message: '缺個人 PDF 的人數是 ' + missingCount + ' / ' + missingResult.total
       // 第六十三輪批次 A2 組：過期（內容改咗之後未重做）分開講
       + ((missingResult.stale || []).length > 0
-        ? ('（其中 ' + missingResult.stale.length + ' 人有檔，但係這一版內容改動之前產生的，已經過期）')
+        ? ('（其中 ' + missingResult.stale.length + ' 人有檔案，但檔案是這一版內容改動之前產生的，已經過期）')
         : '')
       + '（' + (ratio * 100).toFixed(1) + '%），超過容許上限 '
       + (limit * 100).toFixed(0) + '%。\n\n'
       + '⚠️ 這一步不能繼續——照樣寄出的話，這 ' + missingCount
       + ' 位義工會一個都收不到通知，\n'
-      + '而 Stage 會前進到 OFFICIAL_SENT、鎖住重跑步驟 4 的路。\n\n'
+      + '而 Stage 會前進到 OFFICIAL_SENT，令步驟 4 無法重新執行。\n\n'
       + '請先執行「準備工作 ▸ 產生個人 PDF」，補齊之後再回來。\n\n'
       + '（如果你確定這一季本來就不需要個人 PDF 附件，'
       + '請改 Email 範本的 AttachType，不要用放行的方式繞過。'

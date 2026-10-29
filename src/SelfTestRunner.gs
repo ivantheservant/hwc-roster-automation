@@ -181,13 +181,13 @@ function checkSelfTestPreconditions_(quarterId) {
   };
   if (inList(readQuarterResetBlockedQuarters_())) {
     reasons.push('「' + quarterId + '」在 '
-      + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + ' 裡面。'
-      + '自測機每次開跑都會把沙盒季度清乾淨，所以絕對不可以是受保護的季度。');
+      + CONFIG_KEYS.QUARTER_RESET_BLOCKED_QUARTERS + ' 裏面。'
+      + '自測機每次開始執行都會把沙盒季度清乾淨，所以絕對不可以是受保護的季度。');
   }
   if (inList(readRehearsalProtectedQuarters_())) {
     reasons.push('「' + quarterId + '」在 '
-      + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + ' 裡面（演練保護清單）。'
-      + '同樣不可以在上面跑自測。');
+      + CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS + ' 裏面（演練保護清單）。'
+      + '同樣不可以在上面執行自測。');
   }
 
   // ── 閘 3　Stage 唔可以已經正式發出 ───────────────────────────
@@ -238,17 +238,17 @@ function checkSelfTestPreconditions_(quarterId) {
     if (upper !== sandboxId) {
       reasons.push('「' + quarterId + '」的 Stage 已經是 '
         + QUARTER_STAGE.OFFICIAL_SENT + '，而它不是 '
-        + CONFIG_KEYS.SELFTEST_QUARTER_ID + ' 指著的那一季（' + sandboxId + '）。'
+        + CONFIG_KEYS.SELFTEST_QUARTER_ID + ' 指着的那一季（' + sandboxId + '）。'
         + '那代表這一季已經正式發出給全體，不是一個沙盒季度。');
     } else if (realSends !== 0) {
       reasons.push('「' + quarterId + '」的 Stage 已經是 '
-        + QUARTER_STAGE.OFFICIAL_SENT + '，而且 SendLog 裡面'
+        + QUARTER_STAGE.OFFICIAL_SENT + '，而且 SendLog 裏面'
         + (realSends < 0
           ? '讀不到（不能確認有沒有真的寄過信）'
           : '有 ' + realSends + ' 封是真的寄出去的（Status=' + MAIL_STATUS.SENT + '）')
         + '。'
-        + '這一季不是沙盒——自測機開跑第一件事就是把季度清乾淨，'
-        + '在這一季上面跑會刪掉真實資料。'
+        + '這一季不是沙盒——自測機開始執行第一件事就是把季度清乾淨，'
+        + '在這一季上面執行會刪掉真實資料。'
         + '請先確認 ' + CONFIG_KEYS.SELFTEST_QUARTER_ID + ' 填對了。');
     }
     // 兩個條件都中 ⇒ 放行。沙盒季度嘅 OFFICIAL_SENT 係 S09 造成嘅，
@@ -264,7 +264,7 @@ function checkSelfTestPreconditions_(quarterId) {
   if (getConfig(CONFIG_KEYS.WEBAPP_ENABLED, false) !== true) {
     reasons.push('Config 的 ' + CONFIG_KEYS.WEBAPP_ENABLED + ' 不是 TRUE。'
       + '自測機刻意只走真實入口（apiXxx），而那些入口第一句就是權限檢查，'
-      + '所以要跑自測，這一格必須是 TRUE。'
+      + '所以要執行自測，這一格必須是 TRUE。'
       + '（不會自動改它——改 Config 是你的決定，不是測試工具的。）');
   }
 
@@ -721,7 +721,7 @@ function describeAcceptedPickAttempts_(picked) {
   });
   if (picked.planError) lines.push('⚠️ ' + picked.planError);
   if ((picked.preExisting || []).length > 0) {
-    lines.push('⚠️ 這一版本身就帶著 ' + picked.preExisting.length + ' 格硬規則違反，'
+    lines.push('⚠️ 這一版本身就帶着 ' + picked.preExisting.length + ' 格硬規則違反，'
       + '不是這一次改動造成的：' + picked.preExisting.join('；'));
   }
   lines.push('最終選到 ' + picked.cells.length + ' 格：'
@@ -791,7 +791,7 @@ function selfTestOutcomeFingerprint_(outcome) {
  */
 function describeSelfTestRepeat_(repeat) {
   if (!repeat || Number(repeat.sameStreak) < 2) return '';
-  return '⛔ 這一條已經重跑 ' + Number(repeat.runCount) + ' 次，每次都是同一個結果。';
+  return '⛔ 這一條已經重新執行 ' + Number(repeat.runCount) + ' 次，每次都是同一個結果。';
 }
 
 /**
@@ -959,13 +959,13 @@ function deleteSelfTestSpecialSundays_(quarterId) {
   deleteSheetRowsInRuns_(sheet, doomed.map(function (d) { return d.sheetRow; }));
   try {
     writeAuditLog_({
-      action: '清走自測用的特殊主日',
+      action: '清除自測用的特殊主日',
       targetSheet: SHEETS.SPECIAL_SUNDAYS,
       targetKey: quarterId,
       oldValue: doomed.map(function (d) { return d.specialId; }).join('；'),
       newValue: '已刪除 ' + doomed.length + ' 行',
       source: 'selfTestResetOwnSheets_',
-      notes: '每次「⚠️ 跑自測」重設時清走，條件：QuarterID 是沙盒季度'
+      notes: '每次「⚠️ 執行自測」重設時清除，條件：QuarterID 是沙盒季度'
         + ' 而且 SpecialID 以 -SELFTEST 結尾。'
     });
   } catch (err) {
@@ -1002,7 +1002,7 @@ function clearSelfTestPayloads_() {
         if (id) scenarios[id] = (scenarios[id] || 0) + 1;
       });
     writeAuditLog_({
-      action: '清走上一次自測的回傳值紀錄',
+      action: '清除上一次自測的回傳值紀錄',
       targetSheet: SELFTEST_SHEETS.PAYLOADS,
       targetKey: '（整張表）',
       oldValue: rowCount + ' 行',
@@ -1010,7 +1010,7 @@ function clearSelfTestPayloads_() {
         return id + '×' + scenarios[id];
       }).join('、') || '（沒有情境欄）',
       source: 'clearSelfTestPayloads_',
-      notes: '每次「⚠️ 跑自測」重設時清走，只留這一行摘要。'
+      notes: '每次「⚠️ 執行自測」重設時清除，只留這一行摘要。'
     });
   } catch (err) {
     log_('WARN', '上一次回傳值紀錄的摘要寫不進 AuditLog：' + err.message);
@@ -1089,21 +1089,21 @@ function selfTestS01_(quarterId) {
   const d = selfTestCall_('S01', 'apiGetDashboardState',
     function () { return apiGetDashboardState(quarterId); });
 
-  t.equal('清乾淨之後，最新版本應該係「沒有」',
+  t.equal('清乾淨之後，最新版本應該是「沒有」',
     d.latestVersion === null ? 'null' : JSON.stringify(d.latestVersion), 'null',
     'apiGetDashboardState().latestVersion');
-  t.expect('「生成初稿」那一粒掣是亮的',
+  t.expect('「生成初稿」那個按鈕是亮的',
     !!(d.buttons && d.buttons.generate && d.buttons.generate.enabled),
     'enabled=true', JSON.stringify(d.buttons && d.buttons.generate),
     'apiGetDashboardState().buttons.generate');
-  t.expect('三粒寄出掣全部是灰的（還沒有東西可以寄）',
+  t.expect('三個寄出按鈕全部是灰的（還沒有東西可以寄）',
     ['review', 'official', 'resend'].every(function (k) {
       return !(d.buttons && d.buttons[k] && d.buttons[k].enabled);
     }), '全部 enabled=false',
     JSON.stringify(['review', 'official', 'resend'].map(function (k) {
       return k + '=' + !!(d.buttons && d.buttons[k] && d.buttons[k].enabled);
     })), 'apiGetDashboardState().buttons');
-  t.equal('未儲存改動應該係 0', (d.unsaved || {}).gridChangeCount, 0,
+  t.equal('未儲存改動應該是 0', (d.unsaved || {}).gridChangeCount, 0,
     'apiGetDashboardState().unsaved');
   return t.result();
 }
@@ -1126,7 +1126,7 @@ function selfTestS02_(quarterId) {
   });
   t.expect('RosterAssignments 真的寫了東西進去',
     rows.length > 0, '> 0 行', rows.length + ' 行',
-    'RosterAssignments 裡面 ' + quarterId + ' v0 的行數');
+    'RosterAssignments 裏面 ' + quarterId + ' v0 的行數');
 
   // ⚠️ 行數要對得上「主日數 × 崗位 slot 數」——唔可以淨係驗「大過 0」。
   // 「大過 0」呢種斷言，喺一個只生成咗一日嘅壞結果下面一樣會綠。
@@ -1179,7 +1179,7 @@ function selfTestS03_(quarterId) {
   if (picked.planError) throw new Error('S03 選格時：' + picked.planError);
 
   if ((picked.preExisting || []).length > 0) {
-    return t.skip('（跳過）第 ' + versionNo + ' 版本身就帶著 '
+    return t.skip('（跳過）第 ' + versionNo + ' 版本身就帶着 '
       + picked.preExisting.length + ' 格硬規則違反，不是這一次改動造成的：'
       + picked.preExisting.join('；')
       + '。這一條造不出「改一格而不被攔」的情境。'
@@ -1189,7 +1189,7 @@ function selfTestS03_(quarterId) {
   if (picked.cells.length === 0) {
     return t.skip('（跳過）試了 ' + picked.planCalls
       + ' 次都湊不到一格「改了不會被攔」的。'
-      + 'S04–S13 會照樣跑，但用的是原本那一版，沒有未儲存改動。');
+      + 'S04–S13 會照樣執行，但用的是原本那一版，沒有未儲存改動。');
   }
 
   const want = picked.cells.length;
@@ -1250,11 +1250,11 @@ function selfTestS04_(quarterId) {
   const s = selfTestCall_('S04', 'apiGetSendPlanSummary',
     function () { return apiGetSendPlanSummary(quarterId); });
 
-  t.equal('真實的 kind 是 NONE（三粒掣被未儲存改動擋住）', s.kind, 'NONE',
+  t.equal('真實的 kind 是 NONE（三個按鈕被未儲存改動擋住）', s.kind, 'NONE',
     'apiGetSendPlanSummary().kind');
   t.expect('而且 blockedByUnsavedOnly 是 true'
     + '——沒有它，前端會走去「現在沒有可以寄的東西」那一段，'
-    + '而「你有 N 格改動還未儲存」那一整段永遠跑不到',
+    + '而「你有 N 格改動還未儲存」那一整段永遠執行不到',
     s.blockedByUnsavedOnly === true, 'true', String(s.blockedByUnsavedOnly),
     'apiGetSendPlanSummary().blockedByUnsavedOnly');
   t.equal('未儲存格數仍然是 3', (s.unsaved || {}).gridChangeCount, 3,
@@ -1280,7 +1280,7 @@ function selfTestS04_(quarterId) {
       'canSendUnsaved=false，unresolvedCount='
         + String((s.unsaved || {}).unresolvedCount),
       '確認畫面在 canSendUnsaved=false 之下本來就回傳空預覽——'
-        + '那是對的。這裡只有一個根因，不是兩條獨立失敗。');
+        + '那是對的。這裏只有一個根因，不是兩條獨立失敗。');
     return t.result();
   }
   t.equal('而且那個確認畫面拿得到 3 格明細',
@@ -1482,9 +1482,9 @@ function selfTestS07_(quarterId) {
   //       套用得到嘅格（第五十五輪 B3），所以一筆跌落 needsInput
   //       就係一個問題。驗總數嘅話，嗰筆會等到下面 `appliedCount`
   //       先爆，而嗰陣就分唔出係「寫錯格式」定係「套用邏輯壞咗」。
-  t.equal('步驟 3 見到有待處理的申報（mode = HAS_PENDING）'
+  t.equal('步驟 3 看到有待處理的申報（mode = HAS_PENDING）'
     + '——不是這個 mode 的話，applyList／confirmList／needsInputList'
-    + '根本不會出現在回傳裡面',
+    + '根本不會出現在回傳裏面',
     plan.mode, 'HAS_PENDING',
     'apiStep3Plan().mode。其餘 mode：NO_PENDING_NEEDS_ADVANCE／'
       + 'NO_PENDING_DONE／NO_VERSION。');
@@ -1540,7 +1540,7 @@ function selfTestS07_(quarterId) {
       && String(r[R.STATUS] || '').trim() === '';
   });
   t.equal('套用之後沒有一筆的 Status 還是空白', stillPending.length, 0,
-    'Requests 裡面 ' + quarterId + ' 而 Status 空白的行數');
+    'Requests 裏面 ' + quarterId + ' 而 Status 空白的行數');
   return t.result();
 }
 
@@ -1604,7 +1604,7 @@ function selfTestS08_(quarterId) {
 
   t.expect('個人 PDF 有真的產生出來',
     doneCount > 0, '> 0 份', progress,
-    'apiGeneratePersonalPdfBatch()　跑了 ' + rounds + ' 批');
+    'apiGeneratePersonalPdfBatch()　執行了 ' + rounds + ' 批');
 
   if (stalledAt >= 0) {
     // 一批都冇前進 ⇒ 呢個係真問題，唔係「未做完」。
@@ -1613,14 +1613,14 @@ function selfTestS08_(quarterId) {
       '第 ' + rounds + ' 批之後仍然是 ' + stalledAt + ' 份',
       '批次入口叫得到但一份都沒有多產生。'
         + '這不是「還沒做完」，是它不會再前進——'
-        + '再撳「繼續跑自測」也不會有分別。');
+        + '再按「繼續執行自測」也不會有分別。');
     return t.result();
   }
 
   if (!(done && done.done === true)) {
     // ⚠️ **未做完 ⇒ `INCOMPLETE`，唔係綠、亦唔係紅。**
     return t.incomplete('（未做完）' + progress + '，還差 ' + remaining + ' 份。'
-      + '撳「測試工具 ▸ ▶️ 繼續跑自測」接住做。'
+      + '按「測試工具 ▸ ▶️ 繼續執行自測」繼續。'
       + '　⚠️ 補齊之前 S09「正式發出」會被系統攔住'
       + '（缺個人 PDF 超過 20% 就中止），那是正確的攔截。');
   }
@@ -1651,7 +1651,7 @@ function selfTestS08_(quarterId) {
   t.equal('批次做完了（done = true）'
     + '——做不完就報 INCOMPLETE，不可以報綠：'
     + '第五十八輪之前做了 7 份就收工，缺件丟給下游 S09 撞',
-    done.done, true, progress + '，跑了 ' + rounds + ' 批');
+    done.done, true, progress + '，執行了 ' + rounds + ' 批');
   t.equal('而且一份都不差', remaining, 0, progress);
   return t.result();
 }
@@ -1697,8 +1697,8 @@ function selfTestS10_(quarterId) {
       'gridChangeCount=0、unresolvedCount=0',
       'gridChangeCount=' + beforeUnsaved.gridChangeCount
         + '、unresolvedCount=' + beforeUnsaved.unresolvedCount,
-      '上一個情境留下了未清理的格。這一條不再往下跑——'
-        + '在一個污染狀態下硬跑出來的紅或綠都沒有意思。');
+      '上一個情境留下了未清理的格。這一條不再往下執行——'
+        + '在一個污染狀態下硬執行出來的紅或綠都沒有意思。');
     return t.result();
   }
 
@@ -1714,7 +1714,7 @@ function selfTestS10_(quarterId) {
 
   if (picked.planError) throw new Error('S10 選格時：' + picked.planError);
   if ((picked.preExisting || []).length > 0) {
-    return t.skip('（跳過）這一版本身就帶著 ' + picked.preExisting.length
+    return t.skip('（跳過）這一版本身就帶着 ' + picked.preExisting.length
       + ' 格硬規則違反，不是這一次改動造成的：' + picked.preExisting.join('；'));
   }
   if (picked.noCandidate) return t.skip('（跳過）' + picked.noCandidate);
@@ -1778,7 +1778,7 @@ function selfTestS10_(quarterId) {
   const touched = picked.cells.map(function (c) { return c.personId; })
     .concat(result.picks.map(function (p) { return p.pick.personId; }));
   const unexpected = changedIds.filter(function (id) { return touched.indexOf(id) === -1; });
-  t.equal('改動後重發的名單裡面沒有「我沒有碰過的人」',
+  t.equal('改動後重發的名單裏面沒有「我沒有碰過的人」',
     unexpected.length, 0,
     '碰過的是 ' + JSON.stringify(touched) + '；系統算出有改動的是 '
       + JSON.stringify(changedIds) + '；多出來的是 ' + JSON.stringify(unexpected));
@@ -1808,10 +1808,10 @@ function selfTestS11_(quarterId) {
       + '「正式」通知——對他們來說就是「究竟哪一封才算數」。');
   // ⚠️ 「被擋住」唔夠。**要講得出點解**——
   // 一句「不能執行」對幹事完全冇用。
-  t.expect('而且訊息講得出是因為已經發出過',
+  t.expect('而且訊息說得出是因為已經發出過',
     /已經.*發出|已經.*正式/.test(threw), '訊息提到已經發出過', threw, threw);
-  t.expect('訊息是三段式（發生了什麼／現在的情況／你可以怎樣做）',
-    threw.indexOf('發生了什麼') !== -1 && threw.indexOf('你可以怎樣做') !== -1,
+  t.expect('訊息是三段式（發生了甚麼／現在的情況／你可以怎樣做）',
+    threw.indexOf('發生了甚麼') !== -1 && threw.indexOf('你可以怎樣做') !== -1,
     '三段都有', threw.slice(0, 120), threw);
   return t.result();
 }
@@ -1845,7 +1845,7 @@ function selfTestS12_(quarterId) {
   //
   // ⚠️ 教訓同 S07 一樣：**唔好靠喺一大舊 JSON 入面搵一個字。**
   // 要斷言就斷言個**欄位**。
-  t.expect('回退的預覽帶著「不要用試算表版本記錄還原」那段警告',
+  t.expect('回退的預覽帶着「不要用試算表版本記錄還原」那段警告',
     String(plan.sheetsHistoryWarning || '').length > 0,
     '有 sheetsHistoryWarning', String(plan.sheetsHistoryWarning || '（空）').slice(0, 120),
     'apiRollbackPlan().sheetsHistoryWarning');
@@ -1871,18 +1871,18 @@ function selfTestS12_(quarterId) {
   // 嘅退化狀態。成因係上一版同上上版一模一樣
   //（`appliedCount=0` 都照造版本，見第五十五輪批次 A3 嗰個決策點）。
   t.expect('列得出真實差異（cellChangeCount > 0）'
-    + '——0 的話代表第 ' + before + ' 版同第 ' + target + ' 版一模一樣，'
+    + '——0 的話代表第 ' + before + ' 版和第 ' + target + ' 版一模一樣，'
     + '那是一個「回退等於沒有改動」的退化狀態，回退預覽沒有東西可以給幹事看',
     Number(plan.cellChangeCount) > 0, '> 0',
     String(plan.cellChangeCount),
     'apiRollbackPlan().cellChangeCount。如果是 0，先看第 ' + before
       + ' 版是怎樣造出來的——一個 appliedCount=0 的空套用會造出一個'
       + '跟上一版一模一樣的版本。');
-  t.equal('而且 cellChanges 的筆數同 cellChangeCount 對得上'
+  t.equal('而且 cellChanges 的筆數和 cellChangeCount 對得上'
     + '——兩個數各自算一次的話，畫面上會出現「N 格」但只列得出 M 行',
     (plan.cellChanges || []).length, Number(plan.cellChangeCount),
     'apiRollbackPlan().cellChanges');
-  t.expect('每一筆差異都講得出是哪一格',
+  t.expect('每一筆差異都說得出是哪一格',
     (plan.cellChanges || []).every(function (c) {
       return c.serviceDate && c.postId && c.slotIndex !== undefined;
     }), '每筆都有 serviceDate／postId／slotIndex',
@@ -1916,7 +1916,7 @@ function selfTestS13_(quarterId) {
   t.expect('而且拿得到檔案連結（不是只回一個空物件）',
     !!(result && (result.url || result.fileUrl)),
     '有 url', JSON.stringify(result || {}).slice(0, 200),
-    '回傳裡面找不到 url／fileUrl 就代表「報告說做好了，而檔案不知在哪」');
+    '回傳裏面找不到 url／fileUrl 就代表「報告說做好了，而檔案不知在哪」');
   return t.result();
 }
 
@@ -2118,7 +2118,7 @@ function selfTestS15_(quarterId) {
   // ⚠️ **設成 `Active=FALSE`，唔刪行。** 留住做證據——
   // 日後想知「上一次自測到底種咗啲乜」，睇得返。
   const cleanup = selfTestDeactivateSpecialSunday_(quarterId + '-SELFTEST');
-  t.expect('跑完把自測種下的那一行設成 Active=FALSE（不刪行，留住做證據）',
+  t.expect('完成後把自測種下的那一行設成 Active=FALSE（不刪行，保留作證據）',
     cleanup.done, '已停用', cleanup.detail, cleanup.detail);
   return t.result();
 }
@@ -2214,11 +2214,11 @@ function selfTestS16_(quarterId) {
     'apiSaveAndConfirmPlan()／apiSaveAndConfirmExecute()');
 
   const message = threw || String((planBlocked || {}).message || '');
-  t.expect('訊息講得出是哪一格',
+  t.expect('訊息說得出是哪一格',
     message.indexOf(cell.serviceDate) !== -1 || message.indexOf(cell.postId) !== -1,
     '提到日期或崗位', message.slice(0, 200),
     '拒絕的訊息本身');
-  t.expect('訊息講得出那一格現在是什麼字',
+  t.expect('訊息說得出那一格現在是甚麼字',
     message.indexOf('一個系統認不出的名字') !== -1,
     '提到格內現在的字', message.slice(0, 300),
     '拒絕的訊息本身');
@@ -2293,10 +2293,10 @@ function selfTestScenarios_() {
     //
     // 編號冇改，因為 `SelfTestState` 同前幾輪嘅文件都用緊嗰幾個編號。
     // 報告會按**執行次序**印，並且喺開頭講明呢一點。
-    { id: 'S01', title: '空季度：generate 之前 dashboard 講什麼', run: selfTestS01_,
+    { id: 'S01', title: '空季度：generate 之前 dashboard 說甚麼', run: selfTestS01_,
       requiresFreshQuarter: true },
     { id: 'S02', title: '生成初稿', run: selfTestS02_ },
-    { id: 'S14', title: '特殊主日 SkipPostIDs 生效（要 Stage=DRAFT，所以排在這裡）',
+    { id: 'S14', title: '特殊主日 SkipPostIDs 生效（要 Stage=DRAFT，所以排在這裏）',
       run: selfTestS14_, dependsOn: ['S02'] },
     { id: 'S15', title: '未確認的特殊主日數得到（並且收拾 S14 種下的那一行）',
       run: selfTestS15_, dependsOn: ['S14'] },
@@ -2314,14 +2314,14 @@ function selfTestScenarios_() {
       dependsOn: ['S07', 'S08'] },
     { id: 'S10', title: '改 2 格 → 儲存 → 改動後重發', run: selfTestS10_,
       dependsOn: ['S09'] },
-    { id: 'S11', title: '再撳一次正式發出 ⇒ 要被擋住，而且講得出原因',
+    { id: 'S11', title: '再按一次正式發出 ⇒ 要被擋住，而且說得出原因',
       run: selfTestS11_, dependsOn: ['S09'] },
     { id: 'S12', title: '回到上一個儲存版本（只看預覽，不執行）',
       run: selfTestS12_, dependsOn: ['S05'] },
     { id: 'S13', title: '下載及匯出：整季 PDF', run: selfTestS13_,
       dependsOn: ['S05'] },
     // ⚠️ S16 一定要排喺最後，而且佢自己收拾。放中間會污染後面每一條。
-    { id: 'S16', title: '認不出的名字：整批拒絕，而且講得出是哪幾格',
+    { id: 'S16', title: '認不出的名字：整批拒絕，而且說得出是哪幾格',
       run: selfTestS16_, dependsOn: ['S05'] },
     // ⚠️ 第五十三輪批次 B 組：S17 排喺 S16 之後，一樣自己收拾。
     //
@@ -2458,15 +2458,15 @@ function selfTestS17_(quarterId) {
   t.expect('未勾「保留我的安排」就儲存 ⇒ 被拒絕', refused !== '',
     '被拒絕', refused || '（居然存到了）',
     'apiSaveAndConfirmExecute(quarterId, {decisions: []})');
-  t.expect('而且訊息講得出有幾多格違反',
+  t.expect('而且訊息說得出有多少格違反',
     /違反了一定要遵守的規則/.test(refused), '有這一句',
     refused.slice(0, 300), '拒絕訊息原文');
-  t.expect('而且講得出「職事表沒有任何改動」——'
-    + '不講的話，幹事不知道現在到底存了沒有',
+  t.expect('而且說得出「職事表沒有任何改動」——'
+    + '不說的話，幹事不知道現在到底存了沒有',
     /職事表沒有任何改動/.test(refused), '有這一句',
     refused.slice(0, 300), '拒絕訊息原文');
-  t.expect('而且講得出要怎樣做（勾「保留我的安排」）',
-    refused.indexOf('保留我的安排') >= 0, '訊息裡面有「保留我的安排」',
+  t.expect('而且說得出要怎樣做（勾「保留我的安排」）',
+    refused.indexOf('保留我的安排') >= 0, '訊息裏面有「保留我的安排」',
     refused.slice(0, 300), '拒絕訊息原文');
 
   const stillAt = findLatestVersionNo(quarterId);
@@ -2507,8 +2507,8 @@ function selfTestS17_(quarterId) {
   });
   t.expect('AuditLog 記低了這一次放行', releaseRows.length > 0,
     '≥ 1 筆', releaseRows.length + ' 筆',
-    'AuditLog 裡面 Action=「放行硬規則違反」而且 TargetKey 有 ' + quarterId + ' 的');
-  t.expect('而且講得出放行了幾多格',
+    'AuditLog 裏面 Action=「放行硬規則違反」而且 TargetKey 有 ' + quarterId + ' 的');
+  t.expect('而且說得出放行了多少格',
     releaseRows.some(function (r) {
       // ⚠️ 用 `indexOf()` 唔用正則——`tools/lint-undeclared.js`
       // 會把 `/… \d+ …/` 讀成除法，然後報一個叫 `d` 嘅未宣告變數。
@@ -2638,7 +2638,7 @@ function writeSelfTestState_(state) {
   }
   sheet.clear();
   sheet.appendRow(['情境', '結果', '摘要', '證據（JSON）', '更新於',
-    '跑過幾次', '連續相同結果']);
+    '執行過幾次', '連續相同結果']);
   sheet.setFrozenRows(1);
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const now = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss');
@@ -2784,7 +2784,7 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     });
   } catch (err) {
     // 讀唔到就由零數起，唔可以令成次執行爆。
-    log_('WARN', '讀不回 SelfTestState 的重跑次數：' + err.message);
+    log_('WARN', '讀不回 SelfTestState 的重新執行次數：' + err.message);
   }
 
   /**
@@ -2832,7 +2832,7 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
   // ⚠️ 每一次都由同一個起點開始，結果先至可以重覆。
   // 唔清嘅話，上一次跑剩嘅嘢會令今次嘅斷言時綠時紅，
   // 而冇人分得出係程式壞咗定係上一次留低嘅垃圾。
-  let resetSummary = '（續跑，沒有重設）';
+  let resetSummary = '（繼續執行，沒有重設）';
   if (!resume) {
     try {
       const plan = planQuarterReset_(quarterId, true);
@@ -2848,7 +2848,7 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
     } catch (err) {
       return {
         blocked: true, quarterId: quarterId, quarterSource: quarter.source,
-        reasons: ['清理沙盒季度失敗，沒有跑任何情境：' + err.message],
+        reasons: ['清理沙盒季度失敗，沒有執行任何情境：' + err.message],
         results: [], invariants: null
       };
     }
@@ -2935,7 +2935,7 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
         note: '（上一次已經有結論：'
           + (previous.status === SELFTEST_STATUS.PASSED ? '綠'
             : (previous.status === SELFTEST_STATUS.SKIPPED ? '跳過' : '紅'))
-          + '，這一次不再跑）'
+          + '，這一次不再執行）'
       });
       return;
     }
@@ -2964,11 +2964,11 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
         id: scenario.id, title: scenario.title,
         status: SELFTEST_STATUS.BLOCKED, checks: [], failedChecks: [],
         note: incompleteUp.length > 0
-          ? '（被 ' + incompleteUp.join('、') + ' 擋住，沒有跑。'
+          ? '（被 ' + incompleteUp.join('、') + ' 擋住，沒有執行。'
             + '⚠️ 上游是「未做完」，不是失敗——'
-            + '撳「▶️ 繼續跑自測」讓它接住做完，這一條就會跑。）'
-          : '（被 ' + blockedBy.join('、') + ' 擋住，沒有跑。'
-            + '修好上游之後撳「▶️ 只重跑紅色情境」就會跑。）'
+            + '按「▶️ 繼續執行自測」讓它繼續做完，這一條就會執行。）'
+          : '（被 ' + blockedBy.join('、') + ' 擋住，沒有執行。'
+            + '修好上游之後按「▶️ 只重新執行紅色情境」就會執行。）'
       };
       results.push(outcome);
       byId[scenario.id] = outcome;
@@ -3010,7 +3010,7 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
         results.push({
           id: scenario.id, title: scenario.title,
           status: SELFTEST_STATUS.SKIPPED, checks: [], failedChecks: [],
-          note: '（這一個只在全新開跑時有意義。' + freshness.reason + '）'
+          note: '（這一個只在全新開始執行時有意義。' + freshness.reason + '）'
         });
         state[scenario.id] = Object.assign({
           id: scenario.id, status: SELFTEST_STATUS.SKIPPED,
@@ -3028,9 +3028,9 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       stoppedForTime = true;
       results.push({ id: scenario.id, title: scenario.title,
         status: SELFTEST_STATUS.NOT_RUN, checks: [], failedChecks: [],
-        note: '（上一次執行時間到，已停低）' });
+        note: '（上一次執行時間到，已停下）' });
       state[scenario.id] = Object.assign(
-        { id: scenario.id, status: SELFTEST_STATUS.NOT_RUN, summary: '未跑' },
+        { id: scenario.id, status: SELFTEST_STATUS.NOT_RUN, summary: '未執行' },
         carryHistory(scenario.id));
       return;
     }
@@ -3093,8 +3093,8 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
         // ⚠️ 唔算佢頭上，但要講——完全唔提嘅話，一條開跑就紅嘅
         // 不變量會靜靜噉喺成份報告度消失。
         outcome.note = (outcome.note ? outcome.note + ' ' : '')
-          + '（跑的時候 ' + carried.join('、') + ' 仍然是紅的，'
-          + '但那是開跑之前就已經這樣，不算在這一條頭上。'
+          + '（執行的時候 ' + carried.join('、') + ' 仍然是紅的，'
+          + '但那是開始執行之前就已經這樣，不算在這一條頭上。'
           + '詳情見報告開頭。）';
       }
       if (healed.length > 0) {
@@ -3165,7 +3165,7 @@ function runSelfTestMachine_(resume, rerunFailedOnly) {
       finalInvariants = runAllInvariants_(quarterId, INVARIANT_SET.FINAL);
     } catch (err) {
       finalInvariants = {
-        results: [invariantResult_('（整體不變量）', '跑不起來',
+        results: [invariantResult_('（整體不變量）', '無法執行',
           INVARIANT_STATUS.ERROR, '算得出結果', '拋錯', err.message)],
         okCount: 0, failedCount: 0, errorCount: 1, skippedCount: 0,
         notApplicableCount: 0
@@ -3246,7 +3246,7 @@ function describeSelfTestReport_(report) {
     + incompleteCount + ' 未完成　'
     + blockedCount + ' 被擋住　'
     + skippedCount + ' 跳過　'
-    + report.notRunCount + ' 未跑'];
+    + report.notRunCount + ' 未執行'];
   lines.push('沙盒季度：' + report.quarterId + '　' + report.resetSummary);
   // ── 第五十九輪批次 A3 組：**Stage 已經係 OFFICIAL_SENT 要講一句。** ──
   //
@@ -3257,12 +3257,12 @@ function describeSelfTestReport_(report) {
   if (report.stageAtStart === QUARTER_STAGE.OFFICIAL_SENT) {
     lines.push('沙盒季度目前 Stage=' + QUARTER_STAGE.OFFICIAL_SENT
       + '（S09 造成，正常）。'
-      + '撳「⚠️ 跑自測」重頭跑的話，重設那一步會把它帶回 '
+      + '按「⚠️ 執行自測」從頭執行的話，重設那一步會把它帶回 '
       + QUARTER_STAGE.DRAFT + '。');
   }
   if (report.rerunFailedOnly) {
-    lines.push('（只重跑紅色情境：'
-      + ((report.rerunIds || []).join('、') || '沒有紅色情境可以重跑')
+    lines.push('（只重新執行紅色情境：'
+      + ((report.rerunIds || []).join('、') || '沒有紅色情境可以重新執行')
       + '。沙盒季度沒有清掉。）');
   }
   lines.push('');
@@ -3272,12 +3272,12 @@ function describeSelfTestReport_(report) {
   // ⚠️ 排喺最頂係因為佢係**先決條件**：呢幾條唔清乾淨，
   // 下面每一條情境嘅綠同紅都要打個折扣。
   if (report.startupSnapshotError) {
-    lines.push('⚠️ 開跑之前影不到不變量的底相：' + report.startupSnapshotError);
+    lines.push('⚠️ 開始執行之前未能取得不變量的基準快照：' + report.startupSnapshotError);
     lines.push('　 所以下面每一條情境的「不變量」欄都可能把一個'
       + '本來就存在的問題算了在它頭上。');
     lines.push('');
   } else if ((report.startupFailures || []).length > 0) {
-    lines.push('⚠️ 開跑的時候已經存在的不變量失敗（'
+    lines.push('⚠️ 開始執行的時候已經存在的不變量失敗（'
       + report.startupFailures.length + ' 條）');
     lines.push('　 這幾條不是下面任何一個情境弄出來的，所以不算在它們頭上。');
     lines.push('　 但它們是先決條件：不清乾淨，下面每一條的綠和紅都要打個折扣。');
@@ -3303,7 +3303,7 @@ function describeSelfTestReport_(report) {
     if (repeatLine && (r.status === SELFTEST_STATUS.FAILED
       || r.status === SELFTEST_STATUS.ERROR)) {
       lines.push('　 ' + repeatLine);
-      lines.push('　　 再撳「▶️ 只重跑紅色情境」不會有分別——要修碼才會變。');
+      lines.push('　　 再按「▶️ 只重新執行紅色情境」不會有分別——要修改程式碼才會變。');
     }
     if (r.error) lines.push('　 執行時拋錯：' + r.error);
     (r.failedChecks || []).forEach(function (c) {
@@ -3325,7 +3325,7 @@ function describeSelfTestReport_(report) {
     // 每一個問題嘅第一個問句都係「呢個 API 到底回咗乜」——
     // 冇原文就答唔到，而答唔到就要 Ivan 再撳一次。
     if ((r.payloads || []).length > 0) {
-      lines.push('　 ── 這一條叫過的 API 回了什麼（原文）──');
+      lines.push('　 ── 這一條叫過的 API 回了甚麼（原文）──');
       r.payloads.forEach(function (pl) {
         lines.push('　　 ' + pl.api + '　⇒　' + pl.text);
       });
@@ -3356,14 +3356,14 @@ function describeSelfTestReport_(report) {
     // ⚠️ 排喺「被擋住」**前面**——被擋住嗰幾條通常就係佢擋住嘅，
     // 先睇到根因，後面嗰批就唔使逐條查。
     lines.push('⏳ 未做完（' + incomplete.length + ' 條，'
-      + '撳「▶️ 繼續跑自測」接住做）');
+      + '按「▶️ 繼續執行自測」繼續）');
     lines.push('');
     incomplete.forEach(function (r) { printOne(r, '⏳'); });
   }
   if (blocked.length > 0) {
     // ⚠️ 分開一節，而且講明「修好上游就會重跑」——
     // 唔講嘅話，Ivan 要逐條睇完先知道呢幾條只係連環反應。
-    lines.push('🚧 被上游擋住（' + blocked.length + ' 條，修好上游之後會重跑）');
+    lines.push('🚧 被上游擋住（' + blocked.length + ' 條，修好上游之後會重新執行）');
     lines.push('　 ' + blocked.map(function (r) { return r.id; }).join('　'));
     lines.push('');
     blocked.forEach(function (r) { printOne(r, '🚧'); });
@@ -3376,13 +3376,13 @@ function describeSelfTestReport_(report) {
   // 完整 plan）唔可以每個情境都跑，所以留到最尾一次過跑。
   if (report.finalInvariants) {
     const fin = report.finalInvariants;
-    lines.push('━━━ 全部跑完之後的整體不變量 ━━━');
+    lines.push('━━━ 全部完成之後的整體不變量 ━━━');
     describeInvariantReport_(fin).forEach(function (l) { lines.push(l); });
     lines.push('');
   } else if (report.stoppedForTime) {
-    lines.push('━━━ 全部跑完之後的整體不變量 ━━━');
-    lines.push('（還有情境沒有跑完，所以這一批先不跑——'
-      + '跑埋只會吃掉下一次續跑的時間。）');
+    lines.push('━━━ 全部完成之後的整體不變量 ━━━');
+    lines.push('（還有情境沒有完成，所以這一批先不執行——'
+      + '一併執行只會吃掉下一次繼續執行的時間。）');
     lines.push('');
   }
 
@@ -3412,18 +3412,18 @@ function describeSelfTestReport_(report) {
   // 而 S08 要嘅係**接住做**，唔係由頭再產一次。
   if (incompleteCount > 0) {
     lines.push('還有 ' + incompleteCount + ' 條未做完 ⇒ '
-      + '撳「▶️ 繼續跑自測」接住做（不是「只重跑紅色情境」）');
+      + '按「▶️ 繼續執行自測」繼續（不是「只重新執行紅色情境」）');
     if (report.notRunCount > 0) {
-      lines.push('（另外還有 ' + report.notRunCount + ' 個情境沒有跑，'
-        + '同一粒掣一齊接住。）');
+      lines.push('（另外還有 ' + report.notRunCount + ' 個情境沒有執行，'
+        + '同一個按鈕一併繼續。）');
     }
     return lines;
   }
   if (report.notRunCount > 0) {
-    lines.push('還有 ' + report.notRunCount + ' 個情境沒有跑。');
-    lines.push('撳「測試工具 ▸ ▶️ 繼續跑自測」由停下來的地方接住。');
+    lines.push('還有 ' + report.notRunCount + ' 個情境沒有執行。');
+    lines.push('按「測試工具 ▸ ▶️ 繼續執行自測」由停下來的地方繼續。');
   } else if (report.failedCount + report.errorCount + blockedCount > 0) {
-    lines.push(report.results.length + ' 個情境全部跑完了，'
+    lines.push(report.results.length + ' 個情境全部完成了，'
       + (report.failedCount + report.errorCount) + ' 個紅、'
       + blockedCount + ' 個被擋住。');
     // ── 第五十三輪批次 C3 組：**全部紅嘅都重跑過兩次以上 ⇒ 唔好再撳。** ──
@@ -3437,8 +3437,8 @@ function describeSelfTestReport_(report) {
       const times = Math.min.apply(null, stuck.map(function (r) {
         return Number(r.repeat.runCount) || 0;
       }));
-      lines.push('⛔ 那 ' + real.length + ' 條紅已經重跑過 ' + times
-        + ' 次，結果沒有變。不要再撳——');
+      lines.push('⛔ 那 ' + real.length + ' 條紅已經重新執行過 ' + times
+        + ' 次，結果沒有變。不要再按——');
       lines.push('　 把這份報告交給 Claude，要修碼。');
     } else {
       // ── 第五十六輪批次 B2 組：**估唔到就唔好扮估到。** ──────────
@@ -3450,9 +3450,9 @@ function describeSelfTestReport_(report) {
       // ⚠️ 所以唔再揀：兩種情況一齊印，等使用者自己對號入座。
       // 一句估錯嘅指示，代價係實實在在嘅——佢白撳咗幾次。
       lines.push('・你改過程式碼（有 clasp push 過）'
-        + ' ⇒ 撳「⚠️ 跑自測」重頭跑');
+        + ' ⇒ 按「⚠️ 執行自測」從頭執行');
       lines.push('・你沒有改過程式碼，只是修了工作表的資料'
-        + ' ⇒ 撳「▶️ 只重跑紅色情境」');
+        + ' ⇒ 按「▶️ 只重新執行紅色情境」');
     }
   } else {
     lines.push('全部通過。');
@@ -3508,7 +3508,7 @@ function writeSelfTestReport_(report) {
  * @returns {void}
  */
 function runSelfTestMachineFromMenu_() {
-  selfTestMenuEntry_(false, '⚠️ 跑自測（沙盒季度）');
+  selfTestMenuEntry_(false, '⚠️ 執行自測（沙盒季度）');
 }
 
 /**
@@ -3516,7 +3516,7 @@ function runSelfTestMachineFromMenu_() {
  * @returns {void}
  */
 function runSelfTestMachineResumeFromMenu_() {
-  selfTestMenuEntry_(true, '▶️ 繼續跑自測');
+  selfTestMenuEntry_(true, '▶️ 繼續執行自測');
 }
 
 /**
@@ -3530,7 +3530,7 @@ function runSelfTestMachineResumeFromMenu_() {
  * @returns {void}
  */
 function runSelfTestRerunFailedFromMenu_() {
-  selfTestMenuEntry_(true, '▶️ 只重跑紅色情境', true);
+  selfTestMenuEntry_(true, '▶️ 只重新執行紅色情境', true);
 }
 
 /**
@@ -3550,7 +3550,7 @@ function selfTestMenuEntry_(resume, title, rerunFailedOnly) {
         + '（' + describeConfigValueOrigin_(CONFIG_KEYS.SELFTEST_QUARTER_ID,
           quarter.source) + '）\n\n'
         + '⚠️ 這個工具會把 ' + quarter.value + ' 的資料整季清乾淨（連 v0），'
-        + '然後由頭走一次完整流程：生成、改格、儲存、寄審閱（模擬）、'
+        + '然後從頭走一次完整流程：生成、改格、儲存、寄審閱（模擬）、'
         + '套用申報、產生 PDF、正式發出（模擬）、改動後重發（模擬）。\n\n'
         + '全程 DRY_RUN，不會寄出任何真實電郵。\n'
         + '不會碰任何其他季度、不會改 Config、不會改人員資料。\n\n'
@@ -3683,9 +3683,9 @@ function runExportSelfTestPayloads_() {
   const sheet = ss.getSheetByName(SELFTEST_SHEETS.PAYLOADS);
   if (!sheet || sheet.getLastRow() < 2) {
     ui.alert(title,
-      '「' + SELFTEST_SHEETS.PAYLOADS + '」工作表裡面沒有東西。\n\n'
-        + '請先撳「測試工具 ▸ ⚠️ 跑自測（沙盒季度，DRY_RUN）」——'
-        + '自測機一邊跑，一邊會把每一次 API 呼叫的真實回傳值錄在那裡。',
+      '「' + SELFTEST_SHEETS.PAYLOADS + '」工作表裏面沒有東西。\n\n'
+        + '請先按「測試工具 ▸ ⚠️ 執行自測（沙盒季度，DRY_RUN）」——'
+        + '自測機一邊執行，一邊會把每一次 API 呼叫的真實回傳值錄在那裏。',
       ui.ButtonSet.OK);
     return;
   }
@@ -3746,7 +3746,7 @@ function runExportSelfTestPayloads_() {
     broken.slice(0, 10).forEach(function (b) { lines.push('　' + b); });
     lines.push('');
   }
-  lines.push('⚠️ 放進 repo 的 tests/payloads/ 之前，一定要再跑一次');
+  lines.push('⚠️ 放進 repo 的 tests/payloads/ 之前，一定要再執行一次');
   lines.push('　 node tools/scan-staged-secrets.js。');
   lines.push('　 這一支只是第一道，不是最後一道。');
   lines.push('　 洗不乾淨就不要放進去——寧願那一層做不成。');

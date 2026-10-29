@@ -236,7 +236,7 @@ function computePersonPostWeightBonus_(personId, state) {
   // 而排表結果睇落完全正常——**上一輪就係噉樣過咗一整輪都冇人發現**。
   if (entry.target === null || entry.target === undefined) {
     throw new Error('排表偏好未算好目標次數（' + personId + '｜' + state.post.postId
-      + '）。buildGeneratorContext_() 一定要傳基準資料畀 readActivePersonPostWeights_()。');
+      + '）。buildGeneratorContext_() 一定要傳基準資料給 readActivePersonPostWeights_()。');
   }
 
   const already = readPersonPostCount_(state, personId, state.post.postId);
@@ -596,7 +596,7 @@ const PERSON_POST_WEIGHT_HEADERS_TC = [
   'PersonID',
   '崗位（PostID）',
   '偏好（-3 到 3 的整數；正數＝多做幾次，負數＝少做幾次，0＝沒有偏好）',
-  '原因（例如：堂委 2026-08 決議；三個月後沒有原因就沒有人記得為什麼）',
+  '原因（例如：堂委 2026-08 決議；三個月後沒有原因就沒有人記得為甚麼）',
   '生效日（yyyy-MM-dd，留空＝即時生效）',
   '解除日（yyyy-MM-dd，留空＝仍然生效；日後解除時填這一欄，不要刪除整行）',
   'Active',

@@ -171,7 +171,7 @@ console.log('\n=== D【核心】兩個版本之間逐格邊個變成邊個 ===')
     + '而且**新版本先有嗰格都要出現**',
     diff.map(function (d) { return d.postId + '@' + d.serviceDate; }),
     ['READ@2099-07-05', 'CHAIR@2099-07-12', 'CHAIR@2099-07-19']);
-  checkEqual('★★★★★ 而且講得出由邊個變成邊個',
+  checkEqual('★★★★★ 而且說得出由邊個變成邊個',
     diff.map(function (d) { return d.fromName + '→' + d.toName; }),
     ['測乙→測丁', '測丙→', '→測戊']);
 
@@ -190,7 +190,7 @@ console.log('\n=== D【核心】逐格清單三個出口共用一個產生器 ==
   ], { CHAIR: '主席' }, 'REQUEST');
   checkEqual('★★★★★ 崗位寫中文名（幹事腦入面冇 `CHAIR` 呢個概念）',
     rows[0].postNameTC, '主席');
-  checkEqual('★★★★★ 空白要講得出係空白（印一個空字串，佢會以為自己睇漏）',
+  checkEqual('★★★★★ 空白要說得出係空白（印一個空字串，佢會以為自己睇漏）',
     rows[0].fromName, '（空白）');
   checkEqual('★★★★★ 來源要帶住（申報帶嚟嗰啲要標出嚟）', rows[0].source, 'REQUEST');
   checkEqual('★★★★ 查唔到中文名就照印 postId，唔可以印空白',
@@ -270,7 +270,7 @@ console.log('\n=== E【核心】「發生了什麼」呢個機器標記唔可以
 {
   check('★★★★★ 步卡嗰一句會剝走個標記'
     + '——嗰句講嘅係「呢一季仲未到生成日期」，根本冇嘢發生過',
-    /replace\(\/\^發生了什麼：\\s\*\/, ''\)/.test(bare(flowUi)), '');
+    /replace\(\/\^發生了甚麼：\\s\*\/, ''\)/.test(bare(flowUi)), '');
   check('★★★★★ 確認畫面唔再直接 `para(rawMessage)`',
     !/para\(t\.warnMessage\)/.test(bare(flowUi))
       && /threePartNodes\(t\.warnMessage\)/.test(bare(flowUi)), '');
@@ -278,7 +278,7 @@ console.log('\n=== E【核心】「發生了什麼」呢個機器標記唔可以
     + '（扮到有三段會令人以為系統識得分析，而其實冇）',
     /if \(!parsed\) return \[para\(String\(text \|\| ''\)\)\];/.test(bare(scriptUi)), '');
   check('★★★★★ 後端嗰個機器標記**冇改**（顯示同機器格式係兩回事）',
-    /return '發生了什麼：' \+ whatHappened/.test(read('src/WebAppGuards.gs')), '');
+    /return '發生了甚麼：' \+ whatHappened/.test(read('src/WebAppGuards.gs')), '');
 }
 
 console.log('\n=== E【核心】零改動嗰陣文案唔可以自相矛盾 ===');

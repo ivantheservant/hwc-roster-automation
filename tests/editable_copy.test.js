@@ -157,7 +157,7 @@ console.log('\n=== AJ1【核心】可編輯副本：檔名、位置、原表唔�
     created._sheets.length === 1 && created._sheets[0]._name === 'Roster_' + Q + '_v' + V,
     JSON.stringify(created._sheets.map((x) => x._name)));
   check('★★★★ 第 2 行機器鍵照樣隱藏', created._sheets[0]._log.indexOf('hideRows:2') !== -1);
-  check('★★★★★ 完成訊息講明係快照、之後改動唔會更新', /快照/.test(r.message) && /不會跟著變/.test(r.message), r.message);
+  check('★★★★★ 完成訊息講明係快照、之後改動唔會更新', /快照/.test(r.message) && /不會跟着變/.test(r.message), r.message);
   check('★★★★ 有連結同資料夾連結', /new-1/.test(r.fileUrl) && /folder/.test(r.folderUrl));
   check('★★★★ 寫 AuditLog `EDITABLE_COPY_CREATED`', s.world.audit.some((e) => e.action === 'EDITABLE_COPY_CREATED'));
   check('★★★★ 再做一次用返同一個資料夾（唔會建第二個同名）', (function () {

@@ -67,7 +67,7 @@ console.log('\n=== G2【核心】小數換算成「N 個主日之中約 M 個」
     gas.describeRuleValue_(0.5, 12));
   check('★★★★★ 分母查不到就**唔換算**，而且明講查不到'
     + '——硬用 13 換算出嚟嘅數字睇落好確定，但可能係錯嘅',
-    gas.describeRuleValue_(0.63, null).indexOf('查不到一季有幾多個主日') !== -1,
+    gas.describeRuleValue_(0.63, null).indexOf('查不到一季有多少個主日') !== -1,
     gas.describeRuleValue_(0.63, null));
   check('★★★★ 1 以上係次數，唔會被當成比例',
     gas.describeRuleValue_(8, 13) === '8');
@@ -121,7 +121,7 @@ console.log('\n=== G2 表格結構：三組、七欄 ===');
 
   check('★★★★ 七欄，而且次序同規格一樣',
     gas.RULE_REVIEW_HEADERS.join('|')
-      === '編號|規則（一句話）|這一條在做什麼|現時設定|可以改成|堂委決定|備註／原因');
+      === '編號|規則（一句話）|這一條在做甚麼|現時設定|可以改成|堂委決定|備註／原因');
   check('★★★★★ 分三組，而且組標題係人話',
     built.rows.some((r) => r[0].indexOf('一定要遵守') === 0)
     && built.rows.some((r) => r[0].indexOf('盡量遵守') === 0)

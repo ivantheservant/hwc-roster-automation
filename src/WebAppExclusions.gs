@@ -128,7 +128,7 @@ function apiListExclusions(keyword) {
  */
 function validateExclusionInput_(p, timezone) {
   const bad = function (what, actions) {
-    return { ok: false, message: buildThreePartMessage_(what, '什麼都沒有改動。', actions), values: {} };
+    return { ok: false, message: buildThreePartMessage_(what, '甚麼都沒有改動。', actions), values: {} };
   };
 
   const personId = String(p.personId || '').trim();
@@ -143,7 +143,7 @@ function validateExclusionInput_(p, timezone) {
   if (!reason) {
     return bad('沒有填原因。',
       ['寫一句就夠，例如「膝傷，暫時不能站」或者「本人要求，2026-08 面談」',
-        '三個月之後，沒有原因的限制沒有人記得為什麼，也就沒有人夠膽解除它']);
+        '三個月之後，沒有原因的限制沒有人記得為甚麼，也就沒有人夠膽解除它']);
   }
 
   let from = '';
@@ -262,7 +262,7 @@ function apiSaveExclusion(payload) {
   if (!exclusionId) {
     return {
       ok: false,
-      message: buildThreePartMessage_('沒有指定要改哪一條。', '什麼都沒有改動。',
+      message: buildThreePartMessage_('沒有指定要改哪一條。', '甚麼都沒有改動。',
         ['重新整理這一頁再試一次'])
     };
   }
@@ -277,7 +277,7 @@ function apiSaveExclusion(payload) {
       ok: false,
       message: buildThreePartMessage_(
         '找不到要改的那一條（' + exclusionId + '）。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['重新整理這一頁再試一次', '可能有人剛剛在試算表改動過這張工作表'])
     };
   }
@@ -328,7 +328,7 @@ function apiLiftExclusion(exclusionId, liftDateRaw) {
   if (!id) {
     return {
       ok: false,
-      message: buildThreePartMessage_('沒有指定要解除哪一條。', '什麼都沒有改動。',
+      message: buildThreePartMessage_('沒有指定要解除哪一條。', '甚麼都沒有改動。',
         ['重新整理這一頁再試一次'])
     };
   }
@@ -339,7 +339,7 @@ function apiLiftExclusion(exclusionId, liftDateRaw) {
       ok: false,
       message: buildThreePartMessage_(
         '解除日期「' + (parsed.rawText || String(liftDateRaw || '（空白）')) + '」看不懂。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['請用 2026-11-08 這種寫法（年-月-日）',
           '這一日之後，這個人就可以再被排到那個崗位'])
     };
@@ -350,7 +350,7 @@ function apiLiftExclusion(exclusionId, liftDateRaw) {
     return {
       ok: false,
       message: buildThreePartMessage_(
-        '找不到要解除的那一條（' + id + '）。', '什麼都沒有改動。',
+        '找不到要解除的那一條（' + id + '）。', '甚麼都沒有改動。',
         ['重新整理這一頁再試一次'])
     };
   }
@@ -361,10 +361,10 @@ function apiLiftExclusion(exclusionId, liftDateRaw) {
       ok: false,
       message: buildThreePartMessage_(
         '解除日（' + parsed.dateStr + '）比生效日（' + from + '）還要早。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['檢查解除日期有沒有打錯',
           '如果這一條根本不應該存在，請改用「修改」把「啟用」取消'
-            + '——那個意思是「這一行由頭到尾都不算數」'])
+            + '——那個意思是「這一行從頭到尾都不算數」'])
     };
   }
 

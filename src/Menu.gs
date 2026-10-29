@@ -104,6 +104,8 @@ function onOpen() {
         .addItem('重設 Requests 驗證規則', 'runResetRequestsValidations_')
         .addItem('補建 EmailRecipients 欄位', 'runSeedEmailRecipientsRole_')
         .addItem('補齊 Email 範本', 'runSeedEmailTemplates_')
+        // 第八十五輪批次 LA 組：試算表現有說明文字改用香港書面語（只改完全等於舊文字的格）
+        .addItem('更新說明文字（一次性）', 'runSheetTextUpdate_')
         .addItem('補建 NameMapping 欄位（個人專屬連結 token）', 'runEnsureNameMappingTokenColumn_')
         .addItem('補發個人專屬連結 token', 'runSeedPersonalLinkTokens_')
         .addItem('⚠️ 重新產生單一個人的 token（外洩時用）', 'runReissuePersonalLinkToken_')
@@ -146,11 +148,11 @@ function onOpen() {
         //
         // 字頭同圖示特登唔同——第三十三輪就係因為兩項字頭一樣，
         // 實測時 Ivan 撳錯咗。
-        .addItem('⚠️ 跑自測（沙盒季度，DRY_RUN）', 'runSelfTestMachineFromMenu_')
-        .addItem('▶️ 繼續跑自測', 'runSelfTestMachineResumeFromMenu_')
+        .addItem('⚠️ 執行自測（沙盒季度，DRY_RUN）', 'runSelfTestMachineFromMenu_')
+        .addItem('▶️ 繼續執行自測', 'runSelfTestMachineResumeFromMenu_')
         // 第五十輪批次 A2 組：修好一樣嘢之後，只重跑紅嗰幾個。
         // ⚠️ 唔會重設沙盒季度——呢個入口嘅意思就係「保留現場」。
-        .addItem('▶️ 只重跑紅色情境', 'runSelfTestRerunFailedFromMenu_')
+        .addItem('▶️ 只重新執行紅色情境', 'runSelfTestRerunFailedFromMenu_')
         // 第四十九輪批次 第 4 層：亂行機。
         // 隨機揀合法動作、每一步跑一次全部不變量。
         // ⚠️ 全程 DRY_RUN，每 10 步重新斷言一次。
@@ -172,7 +174,7 @@ function onOpen() {
         //   ⚠️⚠️ 全季流程演練（第一段：由頭開始）
         //   ▶️ 全季流程演練（接續上一段）
         // 幹事培訓時呢兩粒掣會再被撳錯一次，而家改成本最低。
-        .addItem('⚠️⚠️ 全季流程演練（第一段：由頭開始）', 'runSeasonRehearsal_')
+        .addItem('⚠️⚠️ 全季流程演練（第一段：從頭開始）', 'runSeasonRehearsal_')
         // 第三十二輪批次階段 B：一次執行做唔晒 58 份個人 PDF（實測要
         // 分 3 次、共 552 秒，而單次執行上限 6 分鐘）。呢一項就係
         // 把同一次演練行完嘅路，包括步驟 4、5——嗰兩步至今
@@ -819,7 +821,7 @@ function runResetRequestsValidations_() {
   const response = ui.prompt('重設 Requests 驗證規則',
     '日期下拉選單會自動涵蓋全部仍然有效（未過期）的季度，通常直接留空就可以。\n\n'
       + '如果你要處理一個已經過期的季度（例如補做上一季的紀錄），\n'
-      + '請在這裡輸入那個 QuarterID（例如 2026T4），系統會額外把它的日期加入選單：',
+      + '請在這裏輸入那個 QuarterID（例如 2026T4），系統會額外把它的日期加入選單：',
     ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
   // 留空係合法輸入：代表「淨係要未過期嘅季度」。
@@ -853,7 +855,7 @@ function runComputeQuarterDates_() {
   //「這一季的 Quarters 沒有填生成日期」。
   const response = ui.prompt('計算季度日期',
     '請輸入 QuarterID（例如 2027T1）。\n\n'
-      + '留空並撳「確定」＝ 一次過補齊全部還欠日期的季度。',
+      + '留空並按「確定」＝ 一次過補齊全部還欠日期的季度。',
     ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
   const quarterId = normalizeIdInput_(response.getResponseText());
@@ -1211,7 +1213,7 @@ function runQuarterPdfCleanup_() {
   const ui = SpreadsheetApp.getUi();
   const response = ui.prompt('⚠️⚠️ 按季度清理 PDF',
     '請輸入要清理的 QuarterID（例如 2026T4）：\n\n'
-      + '⚠️ 這個工具不分版本，會清走這個季度資料夾內的全部已辨識 PDF，'
+      + '⚠️ 這個工具不分版本，會清除這個季度資料夾內的全部已辨識 PDF，'
       + '不像「清理舊 PDF」會保留每人最新一份。適合整個季度已測試完畢、'
       + '完全不需要保留任何版本的情境。',
     ui.ButtonSet.OK_CANCEL);
@@ -1241,13 +1243,13 @@ function runQuarterPdfCleanup_() {
   ];
   plan.files.slice(0, 20).forEach(function (f) { lines.push('　' + f.name + '　' + formatFileSize_(f.sizeBytes)); });
   if (plan.files.length > 20) lines.push('　……另有 ' + (plan.files.length - 20) + ' 個');
-  lines.push('', '這個動作不分版本，即使某個版本仍在使用中也會一併清走。'
+  lines.push('', '這個動作不分版本，即使某個版本仍在使用中也會一併清除。'
     + '請確認要繼續，並在下一步逐字輸入「' + QUARTER_PDF_CLEANUP_CONFIRM_TEXT + '」：');
 
   const confirm = ui.prompt('⚠️⚠️ 按季度清理 PDF（最後確認）', lines.join('\n'), ui.ButtonSet.OK_CANCEL);
   if (confirm.getSelectedButton() !== ui.Button.OK) return;
   if (confirm.getResponseText().trim() !== QUARTER_PDF_CLEANUP_CONFIRM_TEXT) {
-    ui.alert('按季度清理 PDF', '輸入的文字不是「' + QUARTER_PDF_CLEANUP_CONFIRM_TEXT + '」，已取消，沒有清走任何東西。', ui.ButtonSet.OK);
+    ui.alert('按季度清理 PDF', '輸入的文字不是「' + QUARTER_PDF_CLEANUP_CONFIRM_TEXT + '」，已取消，沒有清除任何東西。', ui.ButtonSet.OK);
     return;
   }
 
@@ -2100,7 +2102,7 @@ function promptQuarterAndVersion_(title) {
         '你好像把「階段」填在「季度」那一格了。\n\n'
           + '收到的是「' + quarterId + '」，那是一個階段名稱，不是季度。\n'
           + '季度的寫法是 2027T3 這種（年份 ＋ T ＋ 第幾季）。\n\n'
-          + '請再撳一次，這一格填季度。',
+          + '請再按一次，這一格填季度。',
         ui.ButtonSet.OK
       );
       return null;
@@ -2132,7 +2134,7 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
   const lines = [
     'QuarterID：' + quarterId,
     '目前 Stage：' + (plan.quarterStage || '（讀取不到）'),
-    '連 v0 一齊清：' + (plan.includeV0 ? 'YES' : 'NO'),
+    '連 v0 一併清除：' + (plan.includeV0 ? 'YES' : 'NO'),
     '',
     '將會清理：',
     '　RosterVersions 登記列：' + plan.versions.length + ' 個版本（'
@@ -2188,13 +2190,13 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     if (plan.editableCopyFiles.length > 20) lines.push('　……另有 ' + (plan.editableCopyFiles.length - 20) + ' 個');
   }
   if ((plan.pdfFolders || []).length > 0) {
-    lines.push('', '將移到垃圾桶的空資料夾（版本 PDF 清走之後）：');
+    lines.push('', '將移到垃圾桶的空資料夾（版本 PDF 清除之後）：');
     plan.pdfFolders.slice(0, 20).forEach(function (f) { lines.push('　' + f.name); });
   }
 
   // 第七十五輪批次 CP 組：完全落喺呢一季、會清走嘅 Unavailable（逐行列出）
   if ((plan.unavailableInQuarterDetails || []).length > 0) {
-    lines.push('', '會清走的不能服侍日期（完全在這一季之內）：');
+    lines.push('', '會清除的不能服侍日期（完全在這一季之內）：');
     plan.unavailableInQuarterDetails.slice(0, 20).forEach(function (u) {
       lines.push('　' + (u.name ? u.name + '（' + u.personId + '）' : u.personId)
         + '　' + u.dateFrom + (u.dateTo && u.dateTo !== u.dateFrom ? ' → ' + u.dateTo : '')
@@ -2284,9 +2286,9 @@ function runResetQuarterTestData_locked_() {
   const response = ui.prompt(TITLE,
     '請輸入要重設的 QuarterID。要一次清幾季就用逗號分隔：\n'
       + '　例如　2027T1　或　2027T1,2027T2,2027T3\n\n'
-      + '這個功能會清走該季度的版本、派工紀錄、寄送紀錄、申報，'
+      + '這個功能會清除該季度的版本、派工紀錄、寄送紀錄、申報，'
       + '以及由申報自動加入的不可服侍日與該季的 PDF。\n'
-      + '人員資料、資格、Config、範本、崗位、規則、主日清單一律不碰。',
+      + '人員資料、資格、Config、範本、崗位、規則、主日清單一律不會改動。',
     ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() !== ui.Button.OK) return;
 
@@ -2311,7 +2313,7 @@ function runResetQuarterTestData_locked_() {
     msg.push('　⚠️ 把那一格清空並不會解除保護，系統會退回內建的預設清單。）');
     if (split.allowed.length === 0) {
       msg.push('');
-      msg.push('沒有其他季度可以清，這一次什麼都不會做。');
+      msg.push('沒有其他季度可以清，這一次甚麼都不會做。');
       ui.alert(TITLE, msg.join('\n'), ui.ButtonSet.OK);
       return;
     }
@@ -2324,15 +2326,15 @@ function runResetQuarterTestData_locked_() {
     // 靜靜去重嘅話，幹事以為佢揀咗三季，而畫面顯示兩季，
     // 佢會以為系統食咗一季。
     ui.alert(TITLE,
-      '輸入裡面有重複的季度：' + parsed.duplicates.join('、') + '\n\n'
-        + '重複的只會做一次，不影響結果，這裡只是講一聲。',
+      '輸入裏面有重複的季度：' + parsed.duplicates.join('、') + '\n\n'
+        + '重複的只會做一次，不影響結果，這裏只是提醒一下。',
       ui.ButtonSet.OK);
   }
 
   const v0Response = ui.alert(TITLE,
     'v0 是自動生成的原始版本，通常已加保護，預設「保留」。\n\n'
-      + '要連 v0 一齊清走嗎？\n\n'
-      + '「是」＝連 v0 一齊清（整季由零開始）\n'
+      + '要連 v0 一併清除嗎？\n\n'
+      + '「是」＝連 v0 一併清除（整季由零開始）\n'
       + '「否」＝保留 v0（只清 v1 之後的測試版本）\n\n'
       + '⚠️ 這一個選擇會套用到這一批的全部 ' + split.allowed.length + ' 季。',
     ui.ButtonSet.YES_NO_CANCEL);
@@ -2362,7 +2364,7 @@ function runResetQuarterTestData_locked_() {
 
   if (entries.length === 0) {
     ui.alert(TITLE,
-      '沒有一個季度掃描得到，什麼都不會做。\n\n'
+      '沒有一個季度掃描得到，甚麼都不會做。\n\n'
         + scanFailures.join('\n'),
       ui.ButtonSet.OK);
     return;
@@ -2373,7 +2375,7 @@ function runResetQuarterTestData_locked_() {
   // ── 合併確認畫面 ───────────────────────────────────────────────
   const lines = ['這一批共 ' + summary.totals.quarters + ' 季：'
     + entries.map(function (e) { return e.quarterId; }).join('、')];
-  lines.push('連 v0 一齊清：' + (includeV0 ? 'YES' : 'NO'));
+  lines.push('連 v0 一併清除：' + (includeV0 ? 'YES' : 'NO'));
   if (scanFailures.length > 0) {
     lines.push('');
     lines.push('⚠ 以下季度掃描不到，不會處理：');
@@ -2418,16 +2420,16 @@ function runResetQuarterTestData_locked_() {
   ui.alert(TITLE + '（確認清單）', lines.join('\n'), ui.ButtonSet.OK);
 
   const confirm = ui.prompt(TITLE + '（最後確認）',
-    '看清楚上一個視窗的清單之後，如果確定要清走這 '
+    '看清楚上一個視窗的清單之後，如果確定要清除這 '
       + entries.length + ' 季（' + entries.map(function (e) { return e.quarterId; }).join('、')
       + '）的測試資料，\n'
       + '請逐字輸入「' + QUARTER_RESET_CONFIRM_TEXT + '」：\n\n'
-      + '（輸入其他任何文字、或按取消，都不會清走任何東西）',
+      + '（輸入其他任何文字、或按取消，都不會清除任何東西）',
     ui.ButtonSet.OK_CANCEL);
   if (confirm.getSelectedButton() !== ui.Button.OK) return;
   if (confirm.getResponseText().trim() !== QUARTER_RESET_CONFIRM_TEXT) {
     ui.alert(TITLE,
-      '輸入的文字不是「' + QUARTER_RESET_CONFIRM_TEXT + '」，已取消，沒有清走任何東西。',
+      '輸入的文字不是「' + QUARTER_RESET_CONFIRM_TEXT + '」，已取消，沒有清除任何東西。',
       ui.ButtonSet.OK);
     return;
   }
@@ -2441,7 +2443,7 @@ function runResetQuarterTestData_locked_() {
     resultLines.push('');
     resultLines.push('⚠ 以下 ' + batch.failedQuarters.length + ' 季中途失敗：'
       + batch.failedQuarters.join('、'));
-    resultLines.push('　部分內容可能已經被清走。每一季的清理前摘要都寫了 AuditLog，');
+    resultLines.push('　部分內容可能已經被清除。每一季的清理前摘要都寫了 AuditLog，');
     resultLines.push('　對照 QUARTER_RESET_BATCH_BEFORE 與 QUARTER_RESET_BATCH_FAILED 兩筆檢查。');
   }
 
@@ -2637,7 +2639,7 @@ function runInstallAutomation_() {
       + '不寄給堂委或義工',
     '　2. Stage 停留在 REVIEW_SENT（已寄審閱、未套用申報）超過 ' + stuckDays + ' 天未前進 → '
       + '每日提醒幹事一次，最多提醒 ' + stuckMaxCount + ' 次',
-    '正式發出（OFFICIAL）永遠不會由這裡觸發，一律要你在「步驟 4」手動執行。',
+    '正式發出（OFFICIAL）永遠不會由這裏觸發，一律要你在「步驟 4」手動執行。',
     '同一季同一動作不會重複觸發（生成靠 Stage／版本狀態判斷，提醒靠 AuditLog 記錄，兩者都可在'
       + '「自動排程 ▸ 檢查自動排程條件（唯讀）」隨時查看目前狀態）。',
     '',

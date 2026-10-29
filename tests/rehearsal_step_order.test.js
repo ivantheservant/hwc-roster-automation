@@ -184,7 +184,7 @@ console.log('\n=== C2-2【核心】寫入失敗要把原因帶返出嚟 ===');
     /\+ wrote\.error/.test(src));
   check('★★★★★ 失敗嗰陣明講「Diagnostics 裡面沒有這份報告」'
     + '——實測就係「對話框話已寫入 170 行，但嗰一份表根本冇」',
-    src.indexOf('Diagnostics 裡面沒有這份報告') !== -1);
+    src.indexOf('Diagnostics 裏面沒有這份報告') !== -1);
 }
 
 console.log('\n=== C3【核心】逐個列出呢次演練建立咗乜 ===');

@@ -305,7 +305,7 @@ console.log('\n=== A1：重發佈失敗 ⇒ 擋住，一封都唔寄 ===');
   gas.sendStage = function () { sent++; return {}; };
   let err = null;
   try { gas.executeStep2_(Q); } catch (e) { err = e; }
-  check('★★★★★★ 擋住，而且係三段式訊息', err && /發生了什麼/.test(err.message)
+  check('★★★★★★ 擋住，而且係三段式訊息', err && /發生了甚麼/.test(err.message)
     && /一封都沒有寄出/.test(err.message), err ? err.message : '冇擋');
   check('★★★★★★ 一封都冇寄', sent === 0);
   publishShouldFail = false;

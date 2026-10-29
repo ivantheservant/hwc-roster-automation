@@ -54,7 +54,7 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   try {
     applyGridColumnWidthsForA4_(sheet, layout);
   } catch (err) {
-    log_('WARN', 'createRosterSheet：欄寬設定唔到（職事表本身已經建立好）：' + err.message);
+    log_('WARN', 'createRosterSheet：未能設定欄寬（職事表本身已經建立好）：' + err.message);
   }
 
   // ⚠️ 第四十三輪批次 B 組：**一有新版本，舊版本那些建議表就過時了。**
@@ -70,7 +70,7 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   try {
     discardStaleSuggestionSheets_(quarterId, versionNo);
   } catch (err) {
-    log_('WARN', 'createRosterSheet：清唔到過時嘅建議表（職事表本身已經建立好）：'
+    log_('WARN', 'createRosterSheet：未能清除過時的建議表（職事表本身已經建立好）：'
       + err.message);
   }
 

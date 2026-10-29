@@ -54,7 +54,7 @@ function ensureRehearsalStateSheet_() {
   const keys = [C.QUARTER_ID, C.STARTED_AT, C.SEGMENT, C.BASE_VERSION_NO, C.STEPS_DONE,
     C.PDF_ROUNDS_DONE, C.PDF_DONE, C.STOPPED_BY, C.UPDATED_AT, C.NOTES];
   const titles = ['季度', '第一段開始時間', '已完成第幾段', '演練用的版本號', '已完成步驟',
-    '累計已跑批數', 'PDF 是否產生完', '上一段為何停', '最後更新時間', '備註'];
+    '累計已執行批數', 'PDF 是否產生完', '上一段為何停', '最後更新時間', '備註'];
 
   const existingKeys = sheet.getLastColumn() > 0
     ? sheet.getRange(2, 1, 1, Math.max(sheet.getLastColumn(), keys.length)).getValues()[0]
@@ -200,7 +200,7 @@ function evaluateRehearsalResume_(state, currentLatestVersionNo) {
       ok: false, clearState: true,
       reason: '這一季在演練之後又生成過新版本（現時 v' + current
         + '，演練用的是 v' + base + '），接續下去會排練一件不存在的事。\n\n'
-        + '演練狀態已經清走，請重新由「全季流程演練」第一段開始。'
+        + '演練狀態已經清除，請重新由「全季流程演練」第一段開始。'
     };
   }
 
@@ -237,11 +237,11 @@ function executeSeasonRehearsalResume_(state) {
   if (state.pdfDone) {
     // 上一段已經產生完，今段直接行步驟 4、5。
     pdf = { finished: true, rounds: 0, roundsTotal: state.pdfRoundsDone,
-      note: '上一段已經產生完，這一段不用再跑。' };
-    steps.push({ name: '步驟 3.5：產生個人 PDF（續跑）', ok: true, seconds: 0,
+      note: '上一段已經產生完，這一段不用再執行。' };
+    steps.push({ name: '步驟 3.5：產生個人 PDF（繼續執行）', ok: true, seconds: 0,
       preconditionText: '（沒有前置條件）', preconditionMet: true, detail: pdf, error: '' });
   } else {
-    pdf = runRehearsalStep_(steps, '步驟 3.5：產生個人 PDF（續跑）',
+    pdf = runRehearsalStep_(steps, '步驟 3.5：產生個人 PDF（繼續執行）',
       { quarterId: quarterId }, function () {
         return runRehearsalPdfBatches_(quarterId, versionNo,
           segmentStartedAtMs, state.pdfRoundsDone);
@@ -258,15 +258,15 @@ function executeSeasonRehearsalResume_(state) {
       quarterId: quarterId, startedAt: state.startedAt, segment: segment,
       baseVersionNo: versionNo, stepsDone: state.stepsDone,
       pdfRoundsDone: roundsTotal, pdfDone: false,
-      stoppedBy: (pdf && pdf.stoppedBy) || '（這一段沒有跑到，見報告）',
+      stoppedBy: (pdf && pdf.stoppedBy) || '（這一段沒有執行到，見報告）',
       notes: state.notes
     });
     return {
       quarterId: quarterId, segment: segment, versionNo: versionNo,
       steps: steps, completed: false, stateCleared: false,
       startedAt: state.startedAt,
-      nextAction: '個人 PDF 還沒有產生完，請再撳一次「全季流程演練（接續上一段）」。'
-        + '產生完之後系統會自動接住行步驟 4 同步驟 5。'
+      nextAction: '個人 PDF 還沒有產生完，請再按一次「全季流程演練（接續上一段）」。'
+        + '產生完之後系統會自動繼續執行步驟 4 和步驟 5。'
     };
   }
 
@@ -331,12 +331,12 @@ function buildRehearsalResumeRows_(record) {
   const rows = [];
   const seg = record.segment;
 
-  rows.push(diagRow_('這一段是什麼', '分段',
+  rows.push(diagRow_('這一段是甚麼', '分段',
     '本次演練由多段執行完成，這是第 ' + seg + ' 段',
     '前一段見報告「' + seasonRehearsalReportName_(seg - 1) + '」。'
-    + '這一段只寫步驟 3.5 續跑、步驟 4、步驟 5，前面幾步不重複。'));
-  rows.push(diagRow_('這一段是什麼', '季度', String(record.quarterId), ''));
-  rows.push(diagRow_('這一段是什麼', '沿用版本', 'v' + record.versionNo,
+    + '這一段只寫步驟 3.5 繼續執行、步驟 4、步驟 5，前面幾步不重複。'));
+  rows.push(diagRow_('這一段是甚麼', '季度', String(record.quarterId), ''));
+  rows.push(diagRow_('這一段是甚麼', '沿用版本', 'v' + record.versionNo,
     '接續不會生成新版本。版本號對不上時工具會拒絕接續。'));
 
   record.steps.forEach(function (s) {
@@ -352,7 +352,7 @@ function buildRehearsalResumeRows_(record) {
   });
 
   if (!record.completed) {
-    rows.push(diagRow_('接下來', '還沒有完成', '需要再撳一次接續',
+    rows.push(diagRow_('接下來', '還沒有完成', '需要再按一次接續',
       String(record.nextAction)));
     return rows;
   }
@@ -364,9 +364,9 @@ function buildRehearsalResumeRows_(record) {
     '由第一段開始計。'));
   rows.push(diagRow_('總結', '這一段失敗步數', String(failed.length),
     failed.length === 0 ? '' : failed.map(function (s) { return s.name; }).join('、')));
-  rows.push(diagRow_('總結', '演練狀態', '已清走',
+  rows.push(diagRow_('總結', '演練狀態', '已清除',
     'RehearsalState 工作表已經清空——留低一行舊狀態會令下一次接續'
-    + '接住一個不存在的演練。'));
+    + '要繼續一個不存在的演練。'));
   return rows;
 }
 
@@ -379,7 +379,7 @@ function buildRehearsalResumeRows_(record) {
  */
 function describeRehearsalSpanMinutes_(startedAt) {
   const text = String(startedAt || '').trim();
-  if (text === '') return '（算不出來——狀態裡沒有開始時間）';
+  if (text === '') return '（算不出來——狀態裏沒有開始時間）';
   const t = new Date(text).getTime();
   if (isNaN(t)) return '（算不出來——開始時間「' + text + '」認不出格式）';
   return Math.round((Date.now() - t) / 60000) + ' 分鐘';
@@ -422,10 +422,10 @@ function runSeasonRehearsalResume_() {
   // ── 確認畫面 ───────────────────────────────────────────
   const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
   const pdfNote = state.pdfDone
-    ? '個人 PDF 上一段已經產生完，這一段直接行步驟 4 同步驟 5。'
-    : '這一段會續跑個人 PDF（已經跑了 ' + state.pdfRoundsDone + ' 批），'
-      + '產生完就自動接住行步驟 4 同步驟 5；還未產生完就會再停一次，'
-      + '請再撳一次接續。';
+    ? '個人 PDF 上一段已經產生完，這一段直接執行步驟 4 和步驟 5。'
+    : '這一段會繼續執行個人 PDF（已經執行了 ' + state.pdfRoundsDone + ' 批），'
+      + '產生完就自動繼續執行步驟 4 和步驟 5；還未產生完就會再停一次，'
+      + '請再按一次接續。';
 
   const confirm = ui.prompt(title,
     '接續中的演練：\n'
@@ -472,10 +472,10 @@ function runSeasonRehearsalResume_() {
     + '\n\n'
     + '報告已寫入 ' + SHEETS.DIAGNOSTICS + '，報告名稱「' + reportName + '」，共 '
     + rows.length + ' 行。\n'
-    + (wrote.ok ? '' : ('\n⚠️ 寫入失敗，Diagnostics 裡面沒有這份報告。\n原因：'
+    + (wrote.ok ? '' : ('\n⚠️ 寫入失敗，Diagnostics 裏面沒有這份報告。\n原因：'
       + wrote.error + '\n'))
     + (record.completed
-      ? '\n⚠️ 演練留下的版本、PDF、SendLog 沒有自動清走。'
+      ? '\n⚠️ 演練留下的版本、PDF、SendLog 沒有自動清除。'
         + '要清理請用「⚠️⚠️ 重設季度測試資料」。'
       : '\n' + record.nextAction),
     ui.ButtonSet.OK);

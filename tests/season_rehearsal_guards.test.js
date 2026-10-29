@@ -111,7 +111,7 @@ console.log('\n=== D2 閘 4：打字確認 ===');
     && guard(ok({ typedText: 'yes' })).blocked === true);
   check('★★★★★ 而且講明「什麼都沒有做」'
     + '——取消之後最要緊知道嘅就係「有冇做咗一半」',
-    guard(ok({ typedText: 'yes' })).reasons.join('').indexOf('什麼都沒有做') !== -1);
+    guard(ok({ typedText: 'yes' })).reasons.join('').indexOf('甚麼都沒有做') !== -1);
 }
 
 console.log('\n=== D2【核心】四道閘一次過講晒，唔係逐個拋 ===');
@@ -195,7 +195,7 @@ console.log('\n=== D4【核心】報告：PDF 逐個檔案嘅完整路徑 ===');
     text.indexOf('RosterPDF / 2027T4 / v0 / a.pdf') !== -1
     && text.indexOf('RosterPDF / b.pdf') !== -1);
   check('★★★★★ 分開數「喺子資料夾」同「仍然平鋪喺根資料夾」',
-    text.indexOf('在「季度／版本」子資料夾裡 | 1') !== -1
+    text.indexOf('在「季度／版本」子資料夾裏 | 1') !== -1
     && text.indexOf('仍然平鋪在根資料夾 | 1') !== -1, text);
 
   const noSub = gas.buildSeasonRehearsalRows_({
@@ -334,7 +334,7 @@ console.log('\n=== D1 放試算表選單，唔搬上 Web ===');
     // 「（第一段：由頭開始）」——實測時 Ivan 撳錯咗（想跑第一段、撳咗接續），
     // 因為兩項並排、字頭一模一樣。沙盒季度嘅限制本身冇變（四道閘照舊，
     // 見 SeasonRehearsal.gs），只係標籤唔再靠副標題去區分兩項。
-    /addItem\('⚠️⚠️ 全季流程演練（第一段：由頭開始）', 'runSeasonRehearsal_'\)/.test(menu));
+    /addItem\('⚠️⚠️ 全季流程演練（第一段：從頭開始）', 'runSeasonRehearsal_'\)/.test(menu));
   check('★★★★★ 標住 ⚠️⚠️（會建立版本、產生 PDF、寫 SendLog）',
     /⚠️⚠️ 全季流程演練/.test(menu));
   check('★★★★★ **冇任何 `api*` 端點**——呢個係測試工具，'

@@ -164,7 +164,7 @@ console.log('\n=== D【核心】一次補唔完 ⇒ **一封都唔寄** ===');
     + '——一句「未完成」唔夠：幹事要即刻知道**而家個信箱係空嘅**',
     r.message.indexOf('一封都未寄出') !== -1, r.message);
   check('★★★★ 講得出下一步係「再撳一次會接住做」',
-    r.message.indexOf('接住做') !== -1, r.message);
+    r.message.indexOf('繼續') !== -1, r.message);
   check('★★★★ `stillGeneratingCount` 報得準',
     r.stillGeneratingCount === 2, JSON.stringify(r));
 }
@@ -265,10 +265,10 @@ console.log('\n=== D 畫面：未寄出唔可以用綠色「已寄出」報 ==='
     /r\.pending\s*\n?\s*\?\s*\[make\('div', \{ text: '還未寄出——還在補產生 PDF', className: 'warn-head' \}\)/
       .test(uiBare), '');
   check('★★★★★ 未寄完俾一粒「接住做餘下的」，唔使佢由頭撳過',
-    /button\('接住做餘下的', \(\) => \{ closeModal\(\); runPaperEmail\(\); \}/.test(uiBare), '');
+    /button\('繼續處理餘下的', \(\) => \{ closeModal\(\); runPaperEmail\(\); \}/.test(uiBare), '');
   check('★★★★★ 確認畫面唔再叫佢「先撳產生並取得連結」'
     + '——嗰句就係 Ivan 撞到嗰個死胡同',
-    uiBare.indexOf('如果那幾份 PDF 還未產生過，先撳「產生並取得連結」。') === -1, '');
+    uiBare.indexOf('如果那幾份 PDF 還未產生過，先按「產生並取得連結」。') === -1, '');
   check('★★★★★ 改為明講「系統會在寄之前自己補產生」',
     /還未產生的，系統會在寄之前自己補產生/.test(uiBare), '');
   check('★★★★ 而且預先講明「一次可能做不完」'

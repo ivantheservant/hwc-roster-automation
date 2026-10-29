@@ -19,7 +19,7 @@ function check(label, condition, extra) {
   if (!ok && extra) console.log('      ' + String(extra).slice(0, 600));
 }
 
-const NOTICE = '已儲存排表偏好（只限 2099年1-3月）。要用新偏好調整現有的職事表，撳第 2 步〔請系統幫我調整〕；'
+const NOTICE = '已儲存排表偏好（只限 2099年1-3月）。要用新偏好調整現有的職事表，按第 2 步〔請系統幫我調整〕；'
   + '還未生成的話，生成時會自動用。';
 
 function setup(hasVersion) {

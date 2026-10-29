@@ -288,7 +288,7 @@ function readWeightGapTextByKey_(quarterId, active, nameById, posts, baselineDat
     });
     return byKey;
   } catch (err) {
-    log_('WARN', '排表偏好畫面算不到「同目標的差距」：' + err.message);
+    log_('WARN', '排表偏好畫面算不出「與目標的差距」：' + err.message);
     return null;
   }
 }
@@ -563,7 +563,7 @@ function apiSavePersonPostWeightBatch(changes, options) {
       ok: false,
       message: buildThreePartMessage_(
         '找不到季度「' + String(opts.quarterId || '') + '」的開始和結束日期。',
-        '什麼都沒有儲存。',
+        '甚麼都沒有儲存。',
         ['先在頁頂選一個季度', 'Quarters 工作表那一季要有 StartDate 和 EndDate'])
     };
   }
@@ -581,10 +581,10 @@ function apiSavePersonPostWeightBatch(changes, options) {
       ok: false,
       message: buildThreePartMessage_(
         '有 ' + missingReason.length + ' 項改動沒有填原因。',
-        '什麼都沒有儲存。',
+        '甚麼都沒有儲存。',
         [
           '每一項偏好都要填原因（例如「堂委 2026-08 決議」）',
-          '三個月之後，沒有原因的偏好沒有人記得為什麼要這樣改'
+          '三個月之後，沒有原因的偏好沒有人記得為甚麼要這樣改'
         ])
     };
   }
@@ -598,7 +598,7 @@ function apiSavePersonPostWeightBatch(changes, options) {
       ok: false,
       message: buildThreePartMessage_(
         '有 ' + outOfRange.length + ' 項的數值超出範圍。',
-        '什麼都沒有儲存。',
+        '甚麼都沒有儲存。',
         ['偏好只可以是「多兩次」到「少兩次」之間'])
     };
   }

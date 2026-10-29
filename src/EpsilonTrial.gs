@@ -185,8 +185,8 @@ function recommendEpsilon_(trials, preferenceBonus) {
     return {
       value: 0, warnings: warnings, baselineDeviation: null, bestDeviation: null,
       improvementRatio: null,
-      reason: '試算清單裡沒有 epsilon = 0 這一組，無法跟「現狀」比較。'
-        + '請重跑一次並在 epsilon 清單中加入 0。'
+      reason: '試算清單裏沒有 epsilon = 0 這一組，無法跟「現狀」比較。'
+        + '請重新執行一次並在 epsilon 清單中加入 0。'
     };
   }
 
@@ -194,7 +194,7 @@ function recommendEpsilon_(trials, preferenceBonus) {
   if (dirty.length > 0) {
     warnings.push('有 ' + dirty.length + ' 個 epsilon 值出現硬規則違反（'
       + dirty.map(function (t) { return t.epsilon; }).join('、')
-      + '），這些值一律不可使用。正常情況不應該發生，如果見到請告訴 Claude。');
+      + '），這些值一律不可使用。正常情況不應該發生，如果看到請告訴 Claude。');
   }
 
   const candidates = trials.filter(function (t) {
@@ -259,7 +259,7 @@ function recommendEpsilon_(trials, preferenceBonus) {
       + baselineDeviation.toFixed(4) + ' 改善 ' + (improvementRatio * 100).toFixed(1) + '%；'
       + '硬規則違反 0 項，準硬規則沒有比現狀差，而且產生了 '
       + best.distinctRosters + ' / ' + best.seedCount + ' 份不同的表——'
-      + '「多次生成選最好」到這裡才真正發揮作用。'
+      + '「多次生成選最好」到這裏才真正發揮作用。'
   };
 }
 
@@ -296,7 +296,7 @@ function runEpsilonTrial_(quarterId, epsilonValues, seedCount) {
       + values.length + ' 個 epsilon × ' + seeds + ' 個 seed），超出單次上限 '
       + EPSILON_TRIAL_MAX_TOTAL_ROSTERS + ' 份。\n\n'
       + 'Apps Script 單次執行上限是 6 分鐘，每份大約需要 0.3–0.45 秒，'
-      + '跑太多會中途被系統中斷、白做一場。\n\n'
+      + '執行太多會中途被系統中斷、白做一場。\n\n'
       + '建議：減少 epsilon 的數目或 seed 數（例如 5 個值 × 10 個 seed ＝ 50 份，'
       + '大約 15–25 秒），或者分兩次試不同的值。');
   }

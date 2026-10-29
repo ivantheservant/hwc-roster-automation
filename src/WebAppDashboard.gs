@@ -83,8 +83,8 @@ function buildDashboardStatusBase_(stage, versionExists, generateOnText, extras)
   }
   if (stage === QUARTER_STAGE.DRAFT && !versionExists) {
     return generateOnText
-      ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，撳下面的「生成初稿」。'
-      : '還未生成初稿。撳下面的「生成初稿」。';
+      ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，按下面的「生成初稿」。'
+      : '還未生成初稿。按下面的「生成初稿」。';
   }
   // 第八十二輪批次 IG 組：寄審閱本變成可選（〔寄給堂委／執事〕），唔再係正式發出之前一定要行嘅一步
   if (stage === QUARTER_STAGE.DRAFT) return '初稿已生成，未正式發出給全體。';
@@ -345,7 +345,7 @@ function computeDashboardButtons_(s) {
   buttons.review = {
     enabled: reviewStageOk && !unsaved.hasAny,
     disabledReason: !s.versionExists
-      ? '要先生成初稿，這一粒才會著。'
+      ? '要先生成初稿，這個按鈕才可以使用。'
       : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : ''),
     dynamicText: buildReviewButtonText_(s),
     recipientCount: s.reviewerCount,
@@ -360,7 +360,7 @@ function computeDashboardButtons_(s) {
   buttons.official = {
     enabled: officialStageOk && !s.hasOfficialRecord && !unsaved.hasAny,
     disabledReason: !s.versionExists
-      ? '要先生成初稿，這一粒才會著。'
+      ? '要先生成初稿，這個按鈕才可以使用。'
       : (s.hasOfficialRecord || s.stage === QUARTER_STAGE.OFFICIAL_SENT
         ? '已經正式發出過。之後有改動請用〔變動的人〕或者〔給所有人〕重發。'
         : (unsaved.hasAny ? buildUnsavedBlockHint_(unsaved) : '')),
@@ -429,7 +429,7 @@ function readQuarterResetAvailabilitySafe_(quarterId) {
     return describeQuarterResetAvailability_(quarterId);
   } catch (err) {
     log_('WARN', 'readQuarterResetAvailabilitySafe_ 讀不到：' + err.message);
-    return { blocked: true, reason: '暫時讀不到這一季可不可以清走。撳「重新整理」再試。' };
+    return { blocked: true, reason: '暫時無法確定這一季可不可以重設。按「重新整理」再試。' };
   }
 }
 
@@ -452,7 +452,7 @@ function computeSaveButton_(s) {
   return {
     enabled: enabled,
     hasWork: hasWork,
-    disabledReason: !s.versionExists ? '要先生成初稿，這一粒才會著。' : (hasWork ? '' : SAVE_NOTHING_TO_SAVE_TEXT),
+    disabledReason: !s.versionExists ? '要先生成初稿，這個按鈕才可以使用。' : (hasWork ? '' : SAVE_NOTHING_TO_SAVE_TEXT),
     dynamicText: buildSaveButtonText_(s)
   };
 }
@@ -482,7 +482,7 @@ function buildSaveButtonText_(s) {
   const u = s.unsaved;
   if (u.unresolvedCount > 0) {
     // 第七十五輪批次 CE 組：認唔出嘅名唔再擋，撳落去可以逐個決定
-    return '有 ' + u.unresolvedCount + ' 個名字在名單上找不到。撳〔儲存〕或者〔檢查我的改動〕，'
+    return '有 ' + u.unresolvedCount + ' 個名字在名單上找不到。按〔儲存〕或者〔檢查我的改動〕，'
       + '可以逐個選〔加入名單〕或者「這一季臨時幫手，不加入名單」。';
   }
   // 第三十四輪批次甲3：`NEEDS_INPUT` 唔再擋住流程，但**一定要講出嚟**，
@@ -494,7 +494,7 @@ function buildSaveButtonText_(s) {
 
   const noChange = u.gridChangeCount === 0 && u.pendingRequestCount === 0;
   // 第八十二輪批次 IH／IF 組：用舊版本作起點而表上冇偵測到差異
-  if (noChange && s.startPointPending) return '你用了舊版本作起點，還未儲存。撳〔儲存〕成為新一版。' + needsInput;
+  if (noChange && s.startPointPending) return '你用了舊版本作起點，還未儲存。按〔儲存〕成為新一版。' + needsInput;
   // 第八十二輪批次 IG 組：「意見已收齊」唔再擋任何嘢 ⇒ 審閱階段冇改動都只係「未偵測到」
   if (noChange) return '未偵測到你在表上改過任何格。' + needsInput;
   if (u.gridChangeCount > 0 && u.pendingRequestCount > 0) {
@@ -515,7 +515,7 @@ function buildReviewButtonText_(s) {
   // 唔係「上一批」——上一批可能係幹事自己勾嘅另一班人。照實講。
   if (last) {
     const batch = s.lastReviewBatch;
-    const defaultText = '再撳一次會寄給預設的審閱名單（' + s.reviewerCount + ' 位）。';
+    const defaultText = '再按一次會寄給預設的審閱名單（' + s.reviewerCount + ' 位）。';
     return (batch && batch.found)
       ? ('上次在 ' + last + ' 寄過（' + batch.count + ' 位）。' + defaultText)
       : ('上次在 ' + last + ' 寄過，但查不到當時的收件人。' + defaultText);
@@ -574,7 +574,7 @@ function buildUnsavedBlockHint_(unsaved) {
   if (unsaved.gridChangeCount > 0) bits.push('你在表上改了 ' + unsaved.gridChangeCount + ' 格');
   if (unsaved.unresolvedCount > 0) bits.push('有 ' + unsaved.unresolvedCount + ' 格的文字系統認不出');
   if (unsaved.pendingRequestCount > 0) bits.push('有 ' + unsaved.pendingRequestCount + ' 筆修改申報未處理');
-  return bits.join('、') + '。先撳「儲存」，這一粒才會著。';
+  return bits.join('、') + '。先按「儲存」，這個按鈕才可以使用。';
 }
 
 /**

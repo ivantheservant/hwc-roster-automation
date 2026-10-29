@@ -104,14 +104,14 @@ function apiSavePerson(payload) {
   const personId = String(p.personId || '').trim();
   if (!personId) {
     return { ok: false, message: buildThreePartMessage_(
-      '沒有收到 PersonID。', '什麼都沒有改動。', ['重新整理這一頁再試一次']) };
+      '沒有收到 PersonID。', '甚麼都沒有改動。', ['重新整理這一頁再試一次']) };
   }
 
   const nameTC = String(p.nameTC || '').trim();
   if (!nameTC) {
     return { ok: false, message: buildThreePartMessage_(
       '中文名不可以留空。',
-      '什麼都沒有改動。',
+      '甚麼都沒有改動。',
       ['填回中文名', '如果這個人已經不再服侍，請把「啟用」取消勾選，不要清空名字']) };
   }
 
@@ -138,7 +138,7 @@ function apiSavePerson(payload) {
   if (found.sheetRow === -1) {
     return { ok: false, message: buildThreePartMessage_(
       '名單上找不到 ' + personId + '。',
-      '什麼都沒有改動。',
+      '甚麼都沒有改動。',
       ['重新整理這一頁再試一次', '可能有人剛剛在試算表改動過這張表']) };
   }
 
@@ -193,14 +193,14 @@ function apiAddPerson(payload) {
   const nameTC = String(p.nameTC || '').trim();
   if (!nameTC) {
     return { ok: false, message: buildThreePartMessage_(
-      '中文名不可以留空。', '什麼都沒有加入。', ['填寫中文名再試一次']) };
+      '中文名不可以留空。', '甚麼都沒有加入。', ['填寫中文名再試一次']) };
   }
 
   const emailRaw = String(p.email || '').trim();
   if (emailRaw && !isPlausibleEmail_(emailRaw)) {
     return { ok: false, message: buildThreePartMessage_(
       '電郵「' + emailRaw + '」看起來不像一個電郵地址。',
-      '什麼都沒有加入。',
+      '甚麼都沒有加入。',
       ['檢查有沒有打漏 @ 或者網域', '如果暫時沒有電郵，把這一格留空就可以']) };
   }
 
@@ -262,7 +262,7 @@ function apiReissueToken(personId) {
   const id = normalizeIdInput_(personId);
   if (!id) {
     return { ok: false, message: buildThreePartMessage_(
-      '沒有收到 PersonID。', '什麼都沒有改動。', ['重新整理這一頁再試一次']) };
+      '沒有收到 PersonID。', '甚麼都沒有改動。', ['重新整理這一頁再試一次']) };
   }
   try {
     // 重用選單版嗰個實作，唔喺呢度另寫一次 token 產生邏輯——
@@ -330,8 +330,8 @@ function apiSaveAlias(payload) {
   const personId = String(p.personId || '').trim();
   if (!alias || !personId) {
     return { ok: false, message: buildThreePartMessage_(
-      '別名同對應的人兩樣都要填。',
-      '什麼都沒有改動。',
+      '別名和對應的人兩項都要填。',
+      '甚麼都沒有改動。',
       ['填寫別名（例如異體字的另一種寫法）', '在下拉選這個別名對應哪一位']) };
   }
 
@@ -339,7 +339,7 @@ function apiSaveAlias(payload) {
   if (!nameIndex[personId]) {
     return { ok: false, message: buildThreePartMessage_(
       '名單上找不到 ' + personId + '。',
-      '什麼都沒有改動。',
+      '甚麼都沒有改動。',
       ['重新整理這一頁再試一次']) };
   }
 
@@ -355,7 +355,7 @@ function apiSaveAlias(payload) {
     const found = findRowById_(SHEETS.NAME_ALIAS, A.ALIAS_ID, existingId);
     if (found.sheetRow === -1) {
       return { ok: false, message: buildThreePartMessage_(
-        '找不到要改的那一個別名。', '什麼都沒有改動。', ['重新整理這一頁再試一次']) };
+        '找不到要改的那一個別名。', '甚麼都沒有改動。', ['重新整理這一頁再試一次']) };
     }
     writeRowFields_(opened.sheet, opened.headers, found.sheetRow, updates);
     writeZone3Audit_({
@@ -408,7 +408,7 @@ function normalizeMemberNo_(raw) {
       value: '',
       error: buildThreePartMessage_(
         '會友編號「' + text + '」不是 5 位數字。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['會友編號一定是 5 位數字（例如 01234）', '如果暫時沒有編號，把這一格留空就可以'])
     };
   }

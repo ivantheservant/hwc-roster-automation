@@ -141,7 +141,7 @@ console.log('\n=== E1【核心】影響預估：蓋住幾多個主日、有冇�
     dateFrom: '2026-11-22', dateTo: '2026-11-08', appliesTo: 'ALL'
   });
   check('★★★★★ 開始日期遲過結束日期 ⇒ 擋住，而且講明「什麼都沒有加入」',
-    reversed.ok === false && /什麼都沒有加入/.test(reversed.message));
+    reversed.ok === false && /甚麼都沒有加入/.test(reversed.message));
 }
 
 console.log('\n=== E1【核心】過期嘅行摺埋，唔刪 ===');
@@ -209,9 +209,9 @@ console.log('\n=== E1 畫面文案：規格 4.1 指定嗰句一定要有 ===');
   check('★★★★★ 有「系統沒有『上半場不在』這種概念」',
     zone3.indexOf('系統沒有「上半場不在」這種概念。填了就代表整日不能服侍。') !== -1);
   check('★★★★★ 有「加了這一筆之後…要撳儲存」',
-    zone3.indexOf('要撳「儲存」系統才會重新檢查。') !== -1);
+    zone3.indexOf('要按「儲存」系統才會重新檢查。') !== -1);
   check('★★★★ 過期一節有講明「保留紀錄，不會刪走」',
-    zone3.indexOf('保留紀錄，不會刪走') !== -1);
+    zone3.indexOf('保留紀錄，不會刪除') !== -1);
   check('★★★★★ 儲存前有確認畫面，而且寫住會改幾多行',
     zone3.indexOf('會改動 1 行。') !== -1);
 }

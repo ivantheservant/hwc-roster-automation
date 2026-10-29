@@ -47,7 +47,7 @@ console.log('\n=== II2：第 1 步嗰句 ===');
 {
   const ui = loadUiScripts(['Script.html', 'ScriptZone1.html', 'ScriptMainFlow.html']);
   check('★★★★★ 提示句指去〔整季清走重來〕同〔用這一版作起點〕',
-    /整季清走重來/.test(vm.runInContext('REDO_QUARTER_HINT', ui)) && /用這一版作起點/.test(vm.runInContext('REDO_QUARTER_HINT', ui)));
+    /整季重設/.test(vm.runInContext('REDO_QUARTER_HINT', ui)) && /用這一版作起點/.test(vm.runInContext('REDO_QUARTER_HINT', ui)));
   const mf = read('ui/ScriptMainFlow.html');
   check('★★★★★ 灰掣原因同已生成嗰句都用 REDO_QUARTER_HINT',
     (mf.match(/REDO_QUARTER_HINT\)/g) || []).length + (mf.match(/'這一季已經生成過了。' \+ REDO_QUARTER_HINT/g) || []).length >= 2, '');
@@ -56,7 +56,7 @@ console.log('\n=== II2：第 1 步嗰句 ===');
 console.log('\n=== II3：後端訊息 ===');
 {
   const gas = loadGasSource(['Constants.gs']);
-  check('★★★★ REDO_QUARTER_HINT_TEXT 存在而且兩個入口都講', /整季清走重來/.test(gas.REDO_QUARTER_HINT_TEXT)
+  check('★★★★ REDO_QUARTER_HINT_TEXT 存在而且兩個入口都講', /整季重設/.test(gas.REDO_QUARTER_HINT_TEXT)
     && /用這一版作起點/.test(gas.REDO_QUARTER_HINT_TEXT));
   ['WebAppMainFlow.gs', 'WebAppDashboard.gs', 'WebAppGenerate.gs'].forEach((f) => {
     const c = codeOnly(read(f));

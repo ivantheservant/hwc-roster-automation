@@ -85,7 +85,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
     return blocked('GRID_SHEET_MISSING', {
       message: buildThreePartMessage_(
         '找不到「第 ' + versionNo + ' 版」的工作表（' + err.message + '）。',
-        '職事表資料本身仍然完整（在系統內部保存著），只是你看的那張表不見了。'
+        '職事表資料本身仍然完整（在系統內部保存着），只是你看的那張表不見了。'
           + '沒有任何改動。',
         ['去「進階功能 ▸ 回到上一個版本」重新建立一張',
           '如果那張表只是被改了名，把名字改回原本的就可以'])
@@ -623,7 +623,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         + plan.decisionItems.names.length + ' 個名字在名單上找不到，你還沒有決定。',
       '職事表沒有任何改動，第 ' + plan.baseVersionNo + ' 版仍然是最新一版。',
       ['在確認畫面逐格勾「保留我的安排，系統不要調整」／「這一季臨時幫手，不加入名單」，或者〔加入名單〕',
-        '如果是改錯了，撳〔返回修改〕，回到職事表把那幾格改回去，再撳「儲存」']));
+        '如果是改錯了，按〔返回修改〕，回到職事表把那幾格改回去，再按「儲存」']));
   }
 
   // ── 零改動路徑（D4）────────────────────────────────────────
@@ -688,7 +688,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     startPoint: startPointNo
   };
   const versionNote = (startPointBasis ? startPointBasis + '；' : '')
-    + '掣 1 儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
+    + '儲存並確認：人手改動 ' + resolved.changes.length + ' 格'
     + (titleChanges.length > 0 ? '、每週標題 ' + titleChanges.length + ' 週' : '')
     + (plan.requests.apply.length > 0 ? '、申報 ' + plan.requests.apply.length + ' 筆' : '');
 
@@ -860,7 +860,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
         '職事表已經儲存成第 ' + created.versionNo + ' 版。'
           + '堂委現在開連結會看到舊內容。沒有寄出任何電郵。',
         ['去「進階功能 ▸ 重新發佈公開連結」再試一次',
-          '如果連續失敗，先不要撳「寄給堂委審閱」，否則他們會看到舊版本'])
+          '如果連續失敗，先不要按「寄給堂委審閱」，否則他們會看到舊版本'])
       : ''
   };
 }
@@ -1001,7 +1001,7 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
       .getSheetByName(buildRosterSheetName_(quarterId, targetVersionNo));
     wroteSomething = registered || sheetExists;
   } catch (probeErr) {
-    log_('WARN', '儲存失敗之後查唔到寫入狀態，一律當成「可能寫咗一半」：' + probeErr.message);
+    log_('WARN', '儲存失敗之後查不到寫入狀態，一律當作「可能只寫了一半」：' + probeErr.message);
   }
 
   if (!wroteSomething) {
@@ -1015,7 +1015,7 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
         '沒有任何東西被寫入——第 ' + targetVersionNo + ' 版沒有建立，'
           + '職事表、修改申報、Stage 全部維持原樣，第 ' + baseVersionNo + ' 版仍然是最新一版。'
           + '沒有寄出任何電郵。',
-        ['直接再撳一次「儲存」就可以，不需要做任何清理',
+        ['直接再按一次「儲存」就可以，不需要做任何清理',
           '如果再試仍然一樣，把上面整段文字交給開發者'])
     };
   }
@@ -1050,7 +1050,7 @@ function executeSaveConfirmZeroChange_(quarterId, plan) {
     zeroChange: true,
     message: '沒有偵測到任何改動，不需要儲存，沒有建立新版本。'
       + (plan.stage === QUARTER_STAGE.OFFICIAL_SENT
-        ? '這一季已經正式發出過了。' : '要正式發出，撳第 3 步〔給所有人〕。')
+        ? '這一季已經正式發出過了。' : '要正式發出，按第 3 步〔給所有人〕。')
   };
 }
 
@@ -1080,7 +1080,7 @@ function assertSaveConfirmPlanStillFresh_(plan, decisions) {
 
   throw new Error(
     '職事表在你確認的期間被改動過，剛才的預覽已經過期。'
-    + '請關掉這個畫面重新撳一次「儲存」。');
+    + '請關掉這個畫面重新按一次「儲存」。');
 }
 
 /**
@@ -1128,7 +1128,7 @@ function describePublishAfterGenerate_(publish, versionNo, quarterId) {
   return '⚠️ 職事表已經生成第 ' + versionNo + ' 版，'
     + '但公開連結沒有更新成功——\n'
     + '　 收到連結的人現在看到的仍然是' + publishedVersion + '。\n'
-    + '　 請撳「⚠️ 發佈公開職事表（一季一條固定連結）」重試一次。\n'
+    + '　 請按「⚠️ 發佈公開職事表（一季一條固定連結）」重試一次。\n'
     + '　 失敗原因：' + publish.message;
 }
 
@@ -1168,7 +1168,7 @@ function tryPublishPublicRoster_(quarterId) {
     publishPublicRoster_(quarterId);
     return { failed: false, message: '' };
   } catch (err) {
-    log_('WARN', 'tryPublishPublicRoster_ 失敗（版本已儲存，唔當全盤失敗）：' + err.message);
+    log_('WARN', 'tryPublishPublicRoster_ 失敗（版本已儲存，不當作全盤失敗）：' + err.message);
     return { failed: true, message: err.message };
   }
 }
@@ -1258,7 +1258,7 @@ function evaluatePublicLinkFreshness_(quarterId) {
   if (!publishedAt) {
     out.stale = true;
     out.reason = 'UNKNOWN_PUBLISH_TIME';
-    out.message = '查不到公開連結上一次是幾時發佈的，為安全起見當作未更新。';
+    out.message = '查不到公開連結上一次是甚麼時候發佈的，為安全起見當作未更新。';
     return out;
   }
   if (lastEditAt > publishedAt) {
@@ -1302,9 +1302,9 @@ function ensurePublicLinkFreshBeforeSend_(quarterId) {
   if (publish.failed) {
     throw new Error(buildThreePartMessage_(
       '公開連結未更新到最新內容（' + freshness.message + '），而重新發佈失敗（' + publish.message + '）。',
-      '一封都沒有寄出。如果照樣寄，收件人開連結見到的是舊內容。',
+      '一封都沒有寄出。如果照樣寄，收件人開連結看到的是舊內容。',
       [
-        '撳主畫面上的「立即重新發佈」再試',
+        '按主畫面上的「立即重新發佈」再試',
         '或者去「進階與診斷 ▸ 重新發佈公開連結」',
         '發佈好之後再寄一次'
       ]));
@@ -1389,7 +1389,7 @@ function buildSavedChangeRowsForSave_(
     // 第六十五輪批次 Z 組：申報帶嚟嘅替補同日已經有另一個崗位 ⇒ 儲存完成畫面講出嚟
     noteRequestSameDayDuties_(fromRequests, diffs, quarterId, newVersionNo, postNames);
   } catch (err) {
-    log_('WARN', 'buildSavedChangeRowsForSave_ 比對唔到兩個版本（版本本身已經儲存好）：'
+    log_('WARN', 'buildSavedChangeRowsForSave_ 未能比對兩個版本（版本本身已經儲存好）：'
       + err.message);
     return manual;
   }

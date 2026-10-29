@@ -47,7 +47,7 @@
 
 /** 審閱表嘅欄（第 1 行）。次序就係實際欄次序。 */
 const RULE_REVIEW_HEADERS = [
-  '編號', '規則（一句話）', '這一條在做什麼', '現時設定', '可以改成', '堂委決定', '備註／原因'
+  '編號', '規則（一句話）', '這一條在做甚麼', '現時設定', '可以改成', '堂委決定', '備註／原因'
 ];
 
 /** 「堂委決定」同「備註」係唯一兩個會被讀返入系統嘅欄。 */
@@ -223,7 +223,7 @@ function resolveRuleReviewWeeks_(timezone) {
     const latest = quarters[quarters.length - 1];
     return { weeks: byQuarter[latest], quarterId: latest };
   } catch (err) {
-    log_('WARN', '算不到一季有幾多個主日：' + err.message);
+    log_('WARN', '算不出一季有多少個主日：' + err.message);
     return null;
   }
 }
@@ -247,7 +247,7 @@ function describeRuleValue_(value, weeks, unitId) {
   if (!scale) {
     // ⚠️ 查不到主日數就**唔換算**。硬用 13 換算出嚟嘅數字睇落好確定，
     // 但可能係錯嘅——而堂委會照住嗰個錯數做決定。
-    return '大約 ' + Math.round(num * 100) + '％的主日（查不到一季有幾多個主日，無法換算成次數）';
+    return '大約 ' + Math.round(num * 100) + '％的主日（查不到一季有多少個主日，無法換算成次數）';
   }
   return unit.describe(scale.population, Math.round(num * scale.denominator));
 }
@@ -365,7 +365,7 @@ function describeMutexGroupsForReview_(groups) {
 
   // 多過一組時逐組一行——串埋一行嘅話，堂委要自己數返邊個同邊個一組。
   return '現時有 ' + list.length + ' 組：\n' + lines.join('\n')
-    + '\n同一週之內，同一個人不會同時擔任同一組裡面的崗位。';
+    + '\n同一週之內，同一個人不會同時擔任同一組裏面的崗位。';
 }
 
 /**
@@ -520,7 +520,7 @@ function ruleReviewPlainEntry_(ruleId) {
     // 「每個人的份額按他一向的服侍量分配」開住嗰陣，呢一條**完全冇行過**。
     // 唔講嘅話，堂委會喺呢一條上面花時間調一個唔會有任何效果嘅數字。
     note: '這一條只在「每個人的份額按他一向的服侍量分配」關掉時才會生效。'
-      + '那一條開着的時候，這裏改什麼都不會有分別。',
+      + '那一條開着的時候，這裏改甚麼都不會有分別。',
     current: function (rule) {
       const v = Number(rule[COLUMNS.RULE_SETTINGS.TARGET_VALUE]);
       return isNaN(v) ? '（沒有設定）' : ('平均每人每季約 ' + v + ' 次');
@@ -842,7 +842,7 @@ function buildRuleReviewImportPlan_(sheetValues, ruleRows, weeks, ctx) {
     if (!m) {
       ignored.push({
         seq: seq, ruleText: ruleText, decision: decision, note: note,
-        reason: '系統裡面找不到這一條規則（規則名可能被改過）'
+        reason: '系統裏面找不到這一條規則（規則名可能被改過）'
       });
       return;
     }
@@ -861,7 +861,7 @@ function buildRuleReviewImportPlan_(sheetValues, ruleRows, weeks, ctx) {
       ignored.push({
         seq: seq, ruleText: ruleText, decision: decision, note: note,
         reason: decision
-          ? '看不懂這個決定（不是下拉裡面的選項），所以不會改動任何東西'
+          ? '看不懂這個決定（不是下拉裏面的選項），所以不會改動任何東西'
           : '只填了備註，沒有選決定'
       });
       return;

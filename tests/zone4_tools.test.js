@@ -207,7 +207,7 @@ console.log('\n=== F【核心】補寄：先預覽後執行，而且後端自己
     /button\('先看預覽'/.test(zone4)
     && /callServer\('apiMakeupSendPlan'/.test(zone4));
   check('★★★★ 確認畫面有「不會做的事」，講明唔會推前進度',
-    zone4.indexOf('・不會推前這一季的進度') !== -1);
+    zone4.indexOf('・不會推進這一季的進度') !== -1);
 }
 
 console.log('\n=== F 錯誤處理：一律三段式，而且指返選單（安全網）===');
@@ -215,7 +215,7 @@ console.log('\n=== F 錯誤處理：一律三段式，而且指返選單（安�
   check('★★★★★ 有共用嘅 zone4Failure_()',
     /function zone4Failure_/.test(backend));
   check('★★★★★ 訊息講明「沒有寄出任何電郵」',
-    /什麼都沒有改動，沒有寄出任何電郵。/.test(backend));
+    /甚麼都沒有改動，沒有寄出任何電郵。/.test(backend));
   check('★★★★★ 而且指返選單——嗰邊係安全網',
     backend.indexOf('用試算表上方的選單做同一件事——那邊是安全網') !== -1);
   const uses = (backend.match(/zone4Failure_\(/g) || []).length;

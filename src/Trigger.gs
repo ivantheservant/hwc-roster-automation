@@ -279,7 +279,7 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
     return Object.assign({}, base, {
       outcome: 'SKIPPED_MANUAL_MODE',
       detail: '自動生成已關閉（Config 的 TRIGGER_AUTO_GENERATE＝FALSE），'
-        + '改為提醒幹事自己生成——初稿一律由幹事在網頁上撳「生成初稿」'
+        + '改為提醒幹事自己生成——初稿一律由幹事在網頁上按「生成初稿」'
     });
   }
 
@@ -637,17 +637,17 @@ function buildAutomationCheckReport_() {
   lines.push('自動生成初稿（TRIGGER_AUTO_GENERATE）：'
     + (autoGenerateOn
       ? 'TRUE（開啟——到期會自動生成，只通知幹事）'
-      : 'FALSE（關閉——系統不會自己生成任何初稿，一律要幹事在幹事介面撳「生成初稿」）'));
+      : 'FALSE（關閉——系統不會自己生成任何初稿，一律要幹事在幹事介面按「生成初稿」）'));
   lines.push('');
   lines.push(autoGenerateOn
     ? '自動排程只做兩件事：到期自動生成初稿（只通知幹事）、'
       + 'Stage 停滯或死線接近時提醒幹事（只通知幹事，涵蓋 DRAFT／REVIEW_SENT／'
       + 'REQUESTS_APPLIED 三種情況）。'
-      + '正式發出永遠不會由這裡觸發，一律要幹事在「步驟 4」手動執行。'
+      + '正式發出永遠不會由這裏觸發，一律要幹事在「步驟 4」手動執行。'
     : '自動排程只做一件事：提醒幹事（只通知幹事，不會代替幹事做任何動作）。'
       + '提醒的情況包括：到期了還沒生成初稿、Stage 停滯、死線接近、'
       + '還有未確認日期的特殊主日。'
-      + '生成初稿與正式發出都一律要幹事自己撳掣。');
+      + '生成初稿與正式發出都一律要幹事親自操作。');
   lines.push('');
 
   let anyWouldRun = false;
@@ -671,7 +671,7 @@ function buildAutomationCheckReport_() {
       anyWouldRun = true;
       genLine += '　→ 今天執行檢查會觸發';
     } else if (generateJudgment.outcome === 'SKIPPED_MANUAL_MODE') {
-      genLine += '　（自動生成已關閉，一律由幹事自己撳掣）';
+      genLine += '　（自動生成已關閉，一律由幹事親自操作）';
     } else if (generateJudgment.outcome === 'SKIPPED_STAGE' || generateJudgment.outcome === 'SKIPPED_HAS_VERSION') {
       genLine += '　（已生成過或已進入後續流程）';
     } else if (generateJudgment.outcome === 'SKIPPED_NOT_DUE') {

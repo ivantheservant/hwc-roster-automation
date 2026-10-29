@@ -60,9 +60,9 @@ function apiHwcasPreview() {
       ok: false,
       message: buildThreePartMessage_(
         '讀不到出席系統的資料（' + err.message + '）。',
-        '什麼都沒有改動，名單完全沒有動過。',
+        '甚麼都沒有改動，名單完全沒有動過。',
         ['檢查 Config 的 HWCAS_SPREADSHEET_ID 是不是正確',
-          '檢查這個帳號有沒有那個試算表的閱讀權限',
+          '檢查這個帳戶有沒有那個試算表的閱讀權限',
           '如果一直失敗，先用試算表選單的「從 HWCAS 取電郵（產生初稿）」看看同樣的錯誤'])
     };
   }
@@ -231,8 +231,8 @@ function apiHwcasApplySelected(personIds) {
   if (Object.keys(wanted).length === 0) {
     return {
       ok: false,
-      message: buildThreePartMessage_('一行都沒有勾。', '什麼都沒有改動。',
-        ['勾選你確認過的行再撳一次', '這裡刻意預設全部不勾——每一行都要你親眼看過'])
+      message: buildThreePartMessage_('一行都沒有勾。', '甚麼都沒有改動。',
+        ['勾選你確認過的行再按一次', '這裏刻意預設全部不勾——每一行都要你親眼看過'])
     };
   }
 
@@ -258,7 +258,7 @@ function apiHwcasApplySelected(personIds) {
       skipped: skipped,
       message: buildThreePartMessage_(
         '你勾的 ' + Object.keys(wanted).length + ' 行，現在一行都不能套用。',
-        '什麼都沒有改動。',
+        '甚麼都沒有改動。',
         ['重新整理再看一次預覽——出席系統或者名單可能剛剛改過',
           '下面列出了每一行的原因'])
     };
@@ -362,9 +362,9 @@ function hwcasReadFailureResult_(err) {
     ok: false,
     message: buildThreePartMessage_(
       '讀不到出席系統的資料（' + err.message + '）。',
-      '什麼都沒有改動，名單完全沒有動過。',
+      '甚麼都沒有改動，名單完全沒有動過。',
       ['檢查 Config 的 HWCAS_SPREADSHEET_ID 是不是正確',
-        '檢查這個帳號有沒有那個試算表的閱讀權限'])
+        '檢查這個帳戶有沒有那個試算表的閱讀權限'])
   };
 }
 
@@ -449,8 +449,8 @@ function apiHwcasLinkSelected(links) {
 function hwcasLinkSelected_locked_(links) {
   const list = (links || []).filter(function (l) { return l && String(l.personId || '').trim(); });
   if (list.length === 0) {
-    return { ok: false, message: buildThreePartMessage_('一位都沒有勾。', '什麼都沒有改動。',
-      ['勾選你確認過的人再撳一次', '這裡刻意預設全部不勾——按姓名配對錯了就會寄錯人']) };
+    return { ok: false, message: buildThreePartMessage_('一位都沒有勾。', '甚麼都沒有改動。',
+      ['勾選你確認過的人再按一次', '這裏刻意預設全部不勾——按姓名配對錯了就會寄錯人']) };
   }
   const config = readConfig();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
@@ -583,11 +583,11 @@ function addPersonFromHwcas_locked_(payload) {
   const M = COLUMNS.NAME_MAPPING;
   const nameTC = String(p.nameTC || '').trim();
   if (!nameTC) {
-    return { ok: false, message: buildThreePartMessage_('中文名不可以留空。', '什麼都沒有加入。', ['用職事表上的寫法填中文名']) };
+    return { ok: false, message: buildThreePartMessage_('中文名不可以留空。', '甚麼都沒有加入。', ['用職事表上的寫法填中文名']) };
   }
   const memberNo = normalizeMemberNo_(p.memberNo);
   if (memberNo.error || !memberNo.value) {
-    return { ok: false, message: buildThreePartMessage_('沒有收到會眾編號。', '什麼都沒有加入。', ['在出席系統的搜尋結果選一位再撳']) };
+    return { ok: false, message: buildThreePartMessage_('沒有收到會眾編號。', '甚麼都沒有加入。', ['在出席系統的搜尋結果選一位再按']) };
   }
   const key = memberNoKey_(memberNo.value);
   const config = readConfig();
@@ -600,7 +600,7 @@ function addPersonFromHwcas_locked_(payload) {
   }
   const entry = hwcas.byNo[key];
   if (!entry) {
-    return { ok: false, notInHwcas: true, message: '出席系統找不到編號 ' + key + '。請辦公室先在出席系統加入他，之後再撳〔加入名單〕。' };
+    return { ok: false, notInHwcas: true, message: '出席系統找不到編號 ' + key + '。請辦公室先在出席系統加入他，之後再按〔加入名單〕。' };
   }
 
   // 編號已經喺名單上（另一個寫法）⇒ 唔新增人

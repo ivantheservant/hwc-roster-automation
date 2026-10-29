@@ -111,7 +111,7 @@ function buildPreLaunchChecklist_(quarterId) {
     dryRun ? 'TRUE（模擬模式，不會真正寄出電郵）' : 'FALSE（正式寄出模式）',
     dryRun
       ? '目前所有寄信步驟都只是模擬，不會真正寄出電郵。如果你已經測試完成、準備正式使用，'
-        + '記得到 Config 把 DRY_RUN 改為 FALSE；如果還在測試階段，維持 TRUE 是正確的，這項可以先不理。'
+        + '記得到 Config 把 DRY_RUN 改為 FALSE；如果還在測試階段，維持 TRUE 是正確的，這項可以暫時不用處理。'
       : '所有寄信步驟都會真正寄出電郵，請確保這是你有意的決定，並且已經完成測試。'
   ));
 
@@ -148,7 +148,7 @@ function buildPreLaunchChecklist_(quarterId) {
     redirectReadError
       ? '這個設定填了一個不像電郵地址的值。寄信會整批失敗，一封都寄不出。去 Config 改正，或者清空。'
       : (redirectTo
-        ? '⚠️ 現在每一封信都會改寄到 ' + redirectTo + '，收件人本人一封都收不到。這個是測試用的設定，上線前一定要把它清空——不清空的話，幹事撳「正式發出」之後系統會報告「已寄出」而全體義工其實一封都沒有收到。'
+        ? '⚠️ 現在每一封信都會改寄到 ' + redirectTo + '，收件人本人一封都收不到。這個是測試用的設定，上線前一定要把它清空——不清空的話，幹事按「正式發出」之後系統會報告「已寄出」而全體義工其實一封都沒有收到。'
         : '沒有設定轉寄，信件會正常寄給收件人本人。這是正確的。')
   ));
 
@@ -163,7 +163,7 @@ function buildPreLaunchChecklist_(quarterId) {
     !looksLikeTestPrefix,
     subjectPrefix === '' ? '（空白，沒有前綴）' : subjectPrefix,
     looksLikeTestPrefix
-      ? '目前的前綴「' + subjectPrefix + '」看起來像測試用途的字眼，正式上線前建議到 Config 檢查並清走，'
+      ? '目前的前綴「' + subjectPrefix + '」看起來像測試用途的字眼，正式上線前建議到 Config 檢查並清除，'
         + '避免收件人的電郵主旨出現「測試」一類字樣。'
       : (subjectPrefix === ''
         ? '沒有設定前綴，電郵主旨會直接使用範本原本的標題。'
@@ -231,7 +231,7 @@ function buildPreLaunchChecklist_(quarterId) {
   items.push(buildChecklistItem_(
     'Web UI 三層防護（appsscript.json 部署權限／WEBAPP_ENABLED／WEBAPP_ALLOWED_EMAILS）',
     webappReady,
-    '第 1 層分兩行講，不可以混在一起：\n'
+    '第 1 層分兩行說明，不可以混在一起：\n'
       + '　靜態設定（程式讀得到，但只是新部署的預設值）：appsscript.json 的 '
       + 'webapp.access=MYSELF\n'
       + '　各部署實際存取權（程式讀不到，必須人手核實）：\n'
@@ -247,7 +247,7 @@ function buildPreLaunchChecklist_(quarterId) {
       + '第一行都呼叫 assertWebAppRequestAllowed_()，doGet() 渲染介面前也做同樣檢查，'
       + '沒有發現任何繞過第 2、3 層的路徑。\n\n'
       + '⚠️ 上面「各部署實際存取權」是寫死的人手核實紀錄，不會隨部署變動自動更新。'
-      + '如果之後新增、刪除、或重新指定過任何部署的版本／存取權，這裡的紀錄就會過時，'
+      + '如果之後新增、刪除、或重新指定過任何部署的版本／存取權，這裏的紀錄就會過時，'
       + '記得回來手動更新 MANUAL_DEPLOYMENT_ACCESS_CHECK_（PreLaunchChecklist.gs）。'
   ));
 
@@ -277,8 +277,8 @@ function buildPreLaunchChecklist_(quarterId) {
         + '請確認這是你有意啟用的狀態（可到「自動排程 ▸ 查看自動排程狀態」查看詳情）。')
       + ' 每日檢查只做兩件事：到期自動生成初稿（GENERATE，只通知幹事覆核）、'
       + '卡在 REVIEW_SENT 太久時提醒幹事（REMIND，同樣只通知幹事）。'
-      + '正式發出（OFFICIAL）永遠不會由這裡觸發，一律要幹事在「步驟 4」手動執行——'
-      + '這是結構性防護（assertOfficialNotFromAutomationTrigger_()），不是單純「這裡沒寫」。'
+      + '正式發出（OFFICIAL）永遠不會由這裏觸發，一律要幹事在「步驟 4」手動執行——'
+      + '這是結構性防護（assertOfficialNotFromAutomationTrigger_()），不是單純「這裏沒寫」。'
   ));
 
   // 5. 職事表上的人是否都在 NameMapping 有電郵、格式是否明顯有問題
@@ -514,7 +514,7 @@ function buildPreLaunchChecklist_(quarterId) {
         ? '掃描 grid 工作表時發生錯誤，可能是最新版本的工作表找不到，建議直接打開試算表確認。'
         : (genuineGapCells.length === 0
           ? '最新版本（v' + versionNo + '）沒有「找不到合資格人選」這一類真正的問題（結構性不適用、'
-            + '特別主日跳過、講員／翻譯這類本來就待人手填寫的格子不算在這裡，見步驟 1 生成初稿的完成訊息）。'
+            + '特別主日跳過、講員／翻譯這類本來就待人手填寫的格子不算在這裏，見步驟 1 生成初稿的完成訊息）。'
           : '最新版本（v' + versionNo + '）以下格子系統排不出人（不是講員／翻譯這類本來就待人手填的，'
             + '也不是結構性不適用），建議人手指派：')),
     genuineGapCells.slice(0, 20).map(function (c) { return c.serviceDate + ' ' + c.key + '：' + c.note; })
@@ -543,7 +543,7 @@ function buildPreLaunchChecklist_(quarterId) {
         + '會被撈起，如果是矛盾組合會直接判 NEEDS_INPUT，不會自動處理；'
         + '(2) 矛盾組合——同一人同一日同時有「不能服侍」與「指定服侍」，語意互相矛盾，'
         + '套用時兩筆都會被攔下、要求你自己澄清保留哪一筆，建議提早到 Requests 工作表'
-        + '刪走其中一筆，不需要等到真正執行步驟 3／5 才處理。',
+        + '刪除其中一筆，不需要等到真正執行步驟 3／5 才處理。',
     pendingAcrossQuarters.map(function (r) {
       const flags = [];
       if (r.isOfficialSentWithPending) flags.push('⚠️ 已 OFFICIAL_SENT 仍有殘留');
@@ -607,7 +607,7 @@ function buildLaunchSequenceNotes_(dryRun, looksLikeTestPrefix, subjectPrefix, w
   let step = 1;
 
   if (looksLikeTestPrefix) {
-    notes.push('第 ' + (step++) + ' 步：先清走 MAIL_SUBJECT_PREFIX 的測試字眼「' + subjectPrefix + '」。'
+    notes.push('第 ' + (step++) + ' 步：先清除 MAIL_SUBJECT_PREFIX 的測試字眼「' + subjectPrefix + '」。'
       + '風險：低，只影響信件標題外觀，不影響任何收發邏輯，任何時候改都安全，'
       + '建議在還是 DRY_RUN=TRUE 的時候就先改好，不用等到最後一刻。');
   }
@@ -626,7 +626,7 @@ function buildLaunchSequenceNotes_(dryRun, looksLikeTestPrefix, subjectPrefix, w
   notes.push('第 ' + (step++) + ' 步（最後一步，風險最高，建議放在最後）：確認以上都處理好、'
     + '也已經用 DRY_RUN=TRUE 完整測試過至少一次四階段流程之後，才把 DRY_RUN 改為 FALSE。'
     + '風險：高——這一步之後，「步驟 2」「步驟 4」「步驟 5」與自動排程的每一次寄送都會'
-    + '真正寄出電郵，不能反悔已經寄出的那些封信。建議選一個非上線關鍵時期的季度先試跑一次'
+    + '真正寄出電郵，不能反悔已經寄出的那些封信。建議選一個非上線關鍵時期的季度先試行一次'
     + '正式模式，確認無誤後才在真正要用的季度切換。'
     + (dryRun ? '' : '（目前 DRY_RUN 已經是 FALSE，這一步已完成。）'));
 
