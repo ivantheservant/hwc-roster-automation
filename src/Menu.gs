@@ -2142,7 +2142,10 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     '　對應的 grid 工作表：' + plan.versions.filter(function (v) { return v.sheetExists; }).length + ' 張',
     '　RosterAssignments：' + plan.assignmentRows + ' 行',
     '　SendLog：' + plan.sendLogRows + ' 行',
-    '　Requests：' + plan.requestRows + ' 行',
+    // 第八十五輪批次 LB 組：幹事介面〔整季重設〕（keepManual）的 Requests 不刪，變回未處理
+    plan.keepManual
+      ? '　Requests：不刪除（' + (plan.requestResetRows || 0) + ' 項變回未處理，見「會保留」）'
+      : '　Requests：' + plan.requestRows + ' 行',
     '　Unavailable（只限 Source=REQUEST）：' + plan.unavailableRequestRows + ' 行',
     '　FineTuneProposals（主表）：' + plan.fineTuneProposalRows + ' 行',
     '　FineTuneProposals_Archive（封存表）：' + plan.fineTuneProposalArchiveRows + ' 行',
@@ -2152,12 +2155,16 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     '　清理後變空的版本 PDF 資料夾：' + (plan.pdfFolders || []).length + ' 個（移到垃圾桶）',
     '　Quarters.Stage：重設為 ' + QUARTER_STAGE.DRAFT,
     // 第七十五輪批次 CP 組
-    '　Unavailable（日期完全在這一季之內，任何來源、任何狀態）：'
-      + (plan.unavailableInQuarterDetails || []).length + ' 行（見下面）',
+    plan.keepManual
+      ? '　Unavailable（人手加入的）：保留，不清除（見「會保留」）'
+      : '　Unavailable（日期完全在這一季之內，任何來源、任何狀態）：'
+        + (plan.unavailableInQuarterDetails || []).length + ' 行（見下面）',
     '　逐格決定（CellDecisions：臨時幫手、保留我的安排）：' + (plan.cellDecisionRows || 0) + ' 行',
     '　已放行的規則違反：' + (plan.releasedKeyCount || 0) + ' 項（重設之後不再生效；AuditLog 紀錄保留）',
     '　其他工作表：' + ((plan.extraSheetNames || []).join('、') || '無'),
-    '　每週標題（ServiceDates.Title，只清這一季）：' + (plan.weekTitleDates || []).length + ' 週',
+    plan.keepManual
+      ? '　每週標題：保留，不清除'
+      : '　每週標題（ServiceDates.Title，只清這一季）：' + (plan.weekTitleDates || []).length + ' 週',
     '',
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
     '　EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays，',
@@ -2417,6 +2424,8 @@ function runResetQuarterTestData_locked_() {
   }
 
   lines.push('', '這個動作除了 PDF（移到垃圾桶）之外，全部無法復原。');
+  // 第八十五輪批次 LB 組：講明和幹事介面〔整季重設〕的分別
+  lines.push('', QUARTER_RESET_MENU_DIFFERENCE_TEXT);
   ui.alert(TITLE + '（確認清單）', lines.join('\n'), ui.ButtonSet.OK);
 
   const confirm = ui.prompt(TITLE + '（最後確認）',
@@ -2424,6 +2433,7 @@ function runResetQuarterTestData_locked_() {
       + entries.length + ' 季（' + entries.map(function (e) { return e.quarterId; }).join('、')
       + '）的測試資料，\n'
       + '請逐字輸入「' + QUARTER_RESET_CONFIRM_TEXT + '」：\n\n'
+      + QUARTER_RESET_MENU_DIFFERENCE_TEXT + '\n\n'
       + '（輸入其他任何文字、或按取消，都不會清除任何東西）',
     ui.ButtonSet.OK_CANCEL);
   if (confirm.getSelectedButton() !== ui.Button.OK) return;

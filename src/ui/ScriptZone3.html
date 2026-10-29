@@ -88,10 +88,16 @@
         ]));
       }
       nodes.push(para('會把「' + p.quarterLabel + '」重設為「還未生成初稿」（連第 0 版一併清除）。'
-        + '除了 PDF（移到垃圾桶）之外，全部無法復原。', 'strong'));
+        + '除了 PDF（移到垃圾桶）之外，清除的部分無法復原；人手加入的資料會保留。', 'strong'));
+      // 第八十五輪批次 LB 組：確認窗分兩段——「會清除」和「會保留（人手加入）」
+      nodes.push(sectionTitle('會清除'));
       const list = make('div', { className: 'sec' });
       (p.lines || []).forEach((l) => list.appendChild(make('div', { text: l || '　', className: 'vio-row' })));
       nodes.push(list);
+      nodes.push(sectionTitle('會保留（人手加入）'));
+      const keptList = make('div', { className: 'sec' });
+      (p.keptLines || []).forEach((l) => keptList.appendChild(make('div', { text: l || '　', className: 'vio-row' })));
+      nodes.push(keptList);
       if (p.nothingToDo) {
         nodes.push(para('這一季沒有找到任何可以清理的東西，不需要執行。', 'muted'));
         openModal('整季重設：' + p.quarterLabel, nodes, [button('知道了', () => closeModal(), '')]);

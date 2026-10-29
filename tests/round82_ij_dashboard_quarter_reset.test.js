@@ -42,7 +42,8 @@ console.log('\n=== IJ1／IJ3／IJ4／IJ5 ===');
   const gas = sc.gas;
   check('（準備）兩個版本', versions(sc) === 2);
   const p = gas.apiQuarterResetPlan(sc.Q);
-  const menuLines = gas.describeQuarterResetPlanLines_(sc.Q, gas.planQuarterReset_(sc.Q, true));
+  // 第八十五輪批次 LB 組（刻意改動）：幹事介面版保留人手資料（keepManual），清單仍由同一支函式砌
+  const menuLines = gas.describeQuarterResetPlanLines_(sc.Q, gas.planQuarterReset_(sc.Q, true, { keepManual: true }));
   check('★★★★★★ IJ1 清單同選單版一致（同一支 describeQuarterResetPlanLines_，連 v0）',
     JSON.stringify(p.lines) === JSON.stringify(menuLines) && p.lines.some((l) => /連 v0 一併清除：YES/.test(l)),
     JSON.stringify(p.lines).slice(0, 300));

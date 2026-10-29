@@ -9,6 +9,13 @@
  * 一律連第 0 版一齊清（整季由零開始）。要打「確認重設」先做（前端提早擋，後端再驗一次）。
  */
 
+/**
+ * 第八十五輪批次 LB 組（Ivan 選 A）：幹事介面〔整季重設〕保留人手加入的資料
+ *（不能服侍的日期 Source 不是 REQUEST、每週標題、合堂主日設定、排表偏好）；這一季的 Requests
+ * 變回「未處理」。選單「重設季度測試資料」照舊全部清除。
+ */
+const QUARTER_RESET_DASHBOARD_OPTIONS = { keepManual: true };
+
 /** 已正式發出嘅季度，確認清單最上面嗰句紅字。 */
 const QUARTER_RESET_OFFICIAL_SENT_WARNING = '這一季已經正式發出給全體，重設之後寄出紀錄亦會清除。';
 
@@ -48,15 +55,16 @@ function apiQuarterResetPlan(quarterId) {
   const avail = describeQuarterResetAvailability_(id);
   const base = { quarterId: id, quarterLabel: id ? buildQuarterLabel_(id) : '', blocked: avail.blocked,
     blockedReason: avail.reason, officialSent: false, officialSentWarning: '', lines: [], nothingToDo: true,
-    confirmText: QUARTER_RESET_CONFIRM_TEXT };
+    confirmText: QUARTER_RESET_CONFIRM_TEXT, keptLines: [] };
   if (avail.blocked) return base;
-  const plan = planQuarterReset_(id, true);
+  const plan = planQuarterReset_(id, true, QUARTER_RESET_DASHBOARD_OPTIONS);
   const summary = summariseQuarterResetBatch_([{ quarterId: id, plan: plan }]);
   const officialSent = isQuarterOfficiallySentForReset_(id, plan);
   return Object.assign(base, {
     officialSent: officialSent,
     officialSentWarning: officialSent ? QUARTER_RESET_OFFICIAL_SENT_WARNING : '',
     lines: describeQuarterResetPlanLines_(id, plan),
+    keptLines: describeQuarterResetKeptLines_(plan),
     nothingToDo: summary.nothingToDo
   });
 }
@@ -87,7 +95,7 @@ function quarterResetExecute_locked_(quarterId, typed) {
   if (avail.blocked) {
     throw new Error(buildThreePartMessage_(avail.reason, '沒有清除任何東西。', ['選另一個季度']));
   }
-  const plan = planQuarterReset_(id, true);
+  const plan = planQuarterReset_(id, true, QUARTER_RESET_DASHBOARD_OPTIONS);
   const batch = executeQuarterResetBatch_([{ quarterId: id, plan: plan }]);
   const r = batch.results[0] || { ok: false, error: '沒有結果', result: null };
   return { ok: r.ok === true, quarterId: id, failed: r.ok !== true, error: r.error || '', result: r.result };

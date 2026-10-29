@@ -20,18 +20,31 @@
 /** 執行重設前必須逐字輸入的確認字串。 */
 const QUARTER_RESET_CONFIRM_TEXT = '確認重設';
 
+/** 第八十五輪批次 LB 組：選單版確認字眼——和幹事介面〔整季重設〕的分別。 */
+const QUARTER_RESET_MENU_DIFFERENCE_TEXT = '⚠️ 這個選單版本會全部清除，包括人手加入的不能服侍日期、每週標題、'
+  + '合堂主日設定和這一季的修改申報，只供測試季度使用。'
+  + '幹事介面「常用設定 ▸ 整季重設」則會保留人手加入的資料，修改申報變回未處理。';
+
 /**
  * 掃描一個季度目前有哪些測試資料可以清理。**只讀取，完全不刪任何東西。**
  *
  * @param {string} quarterId 季度 ID
  * @param {boolean} includeV0 是否連 v0 一併清理。v0 是原始版本、通常已加保護，
  *   預設不清；true 時才會列入。
+ * @param {{keepManual: boolean}=} options 第八十五輪批次 LB 組：幹事介面〔整季重設〕傳
+ *   `keepManual: true` ⇒ 保留人手加入的資料（不能服侍的日期 Source 不是 REQUEST、每週標題、
+ *   合堂主日設定），這一季的 Requests 不刪、變回「未處理」。選單「重設季度測試資料」不傳，照舊全部清除。
  * @returns {Object} 清理計畫，含各項數量、要刪的具體目標、以及需要人手處理的項目
  */
-function planQuarterReset_(quarterId, includeV0) {
+function planQuarterReset_(quarterId, includeV0, options) {
   const plan = {
     quarterId: quarterId,
     includeV0: includeV0 === true,
+    keepManual: !!(options && options.keepManual),
+    // 第八十五輪批次 LB 組（keepManual）：會保留的人手資料
+    keptUnavailableDetails: [],
+    keptWeekTitleDates: [],
+    requestResetRows: 0,
     versions: [],          // {versionNo, sheetName, protected, sheetExists}
     versionSheetNames: [],
     assignmentRows: 0,
@@ -147,6 +160,11 @@ function planQuarterReset_(quarterId, includeV0) {
   try {
     readSheet(SHEETS.REQUESTS).forEach(function (row) {
       if (String(row[R.QUARTER_ID] || '').trim() !== quarterId) return;
+      // 第八十五輪批次 LB 組：保留模式不刪，已處理的（有 RequestID 或 Status）變回未處理
+      if (plan.keepManual) {
+        if (String(row[R.REQUEST_ID] || '').trim() || String(row[R.STATUS] || '').trim()) plan.requestResetRows++;
+        return;
+      }
       plan.requestRows++;
     });
   } catch (err) {
@@ -172,6 +190,15 @@ function planQuarterReset_(quarterId, includeV0) {
       if (!dateFrom || dateFrom < quarterStart || dateFrom > quarterEnd) return;
       const source = String(row[U.SOURCE] || '').trim().toUpperCase();
       const dateTo = toDateString(row[U.DATE_TO], timezone) || dateFrom;
+      // 第八十五輪批次 LB 組：保留模式 ⇒ 人手加入的（Source 不是 REQUEST）一律保留，有效的才列出
+      if (plan.keepManual && source !== 'REQUEST') {
+        if (isUnavailableRowActive_(row)) {
+          const keptId = String(row[U.PERSON_ID] || '').trim();
+          plan.keptUnavailableDetails.push({ personId: keptId, name: nameById[keptId] || '',
+            dateFrom: dateFrom, dateTo: dateTo, reason: String(row[U.REASON] || '').trim() });
+        }
+        return;
+      }
       if (source === 'REQUEST') {
         plan.unavailableRequestRows++;
       }
@@ -366,7 +393,7 @@ function executeQuarterReset_(plan) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const result = {
     versionRowsDeleted: 0, versionSheetsDeleted: 0, assignmentRowsDeleted: 0,
-    sendLogRowsDeleted: 0, requestRowsDeleted: 0, unavailableRowsDeleted: 0,
+    sendLogRowsDeleted: 0, requestRowsDeleted: 0, requestRowsReset: 0, unavailableRowsDeleted: 0,
     fineTuneProposalRowsDeleted: 0, fineTuneProposalArchiveRowsDeleted: 0,
     pdfTrashed: 0, editableCopiesTrashed: 0, pdfFoldersTrashed: 0, pdfFoldersKept: 0,
     cellDecisionRowsDeleted: 0, extraSheetsDeleted: 0, weekTitlesCleared: 0,
@@ -400,6 +427,9 @@ function executeQuarterReset_(plan) {
     source: 'MENU',
     notes: '連 v0 一併清除：' + (plan.includeV0 ? 'YES' : 'NO')
       + '；需要人手處理的項目：' + (plan.manualAttention.length || 0) + ' 項'
+      + (plan.keepManual ? '；保留人手加入的資料：不能服侍的日期 ' + (plan.keptUnavailableDetails || []).length
+        + ' 項、每週標題 ' + (plan.keptWeekTitleDates || []).length + ' 週、修改申報 '
+        + (plan.requestResetRows || 0) + ' 項變回未處理' : '')
   });
 
   const versionNosToClear = {};
@@ -418,9 +448,14 @@ function executeQuarterReset_(plan) {
   }, result.errors);
 
   // ---- Requests ----
-  result.requestRowsDeleted = deleteRowsMatching_(SHEETS.REQUESTS, function (record) {
-    return String(record[COLUMNS.REQUESTS.QUARTER_ID] || '').trim() === plan.quarterId;
-  }, result.errors);
+  // 第八十五輪批次 LB 組：保留模式不刪，RequestID／Status／處理結果／處理時間清空 ⇒ 變回未處理
+  if (plan.keepManual) {
+    result.requestRowsReset = resetQuarterRequestsToPending_(plan.quarterId, result.errors);
+  } else {
+    result.requestRowsDeleted = deleteRowsMatching_(SHEETS.REQUESTS, function (record) {
+      return String(record[COLUMNS.REQUESTS.QUARTER_ID] || '').trim() === plan.quarterId;
+    }, result.errors);
+  }
 
   // ---- Unavailable：Source=REQUEST 且由這一季開始的行；以及（第七十五輪批次 CP 組）
   //      日期完全落在這一季之內的行（任何 Source、任何狀態）。跨季的人手紀錄照舊不刪。
@@ -435,8 +470,11 @@ function executeQuarterReset_(plan) {
         const dateFrom = toDateString(record[U.DATE_FROM], timezone);
         if (!dateFrom || dateFrom < quarterStart || dateFrom > quarterEnd) return false;
         const dateTo = toDateString(record[U.DATE_TO], timezone) || dateFrom;
+        const isRequest = String(record[U.SOURCE] || '').trim().toUpperCase() === 'REQUEST';
+        // 第八十五輪批次 LB 組：保留模式只清由申報自動加入的
+        if (plan.keepManual) return isRequest;
         if (isUnavailableFullyInQuarter_(dateFrom, dateTo, quarterStart, quarterEnd)) return true;
-        return String(record[U.SOURCE] || '').trim().toUpperCase() === 'REQUEST';
+        return isRequest;
       }, result.errors);
     }
   }
@@ -719,7 +757,7 @@ function summariseQuarterResetBatch_(entries) {
   const perQuarter = [];
   const totals = {
     quarters: 0, versions: 0, assignmentRows: 0, sendLogRows: 0,
-    requestRows: 0, unavailableRequestRows: 0,
+    requestRows: 0, requestResetRows: 0, unavailableRequestRows: 0,
     fineTuneProposalRows: 0, fineTuneProposalArchiveRows: 0,
     pdfFiles: 0, editableCopies: 0, pdfFolders: 0, manualAttention: 0,
     // 第七十五輪批次 CP 組
@@ -751,6 +789,7 @@ function summariseQuarterResetBatch_(entries) {
     totals.assignmentRows += item.assignmentRows;
     totals.sendLogRows += item.sendLogRows;
     totals.requestRows += item.requestRows;
+    totals.requestResetRows += plan.requestResetRows || 0;
     totals.unavailableRequestRows += item.unavailableRequestRows;
     totals.fineTuneProposalRows += item.fineTuneProposalRows;
     totals.fineTuneProposalArchiveRows += item.fineTuneProposalArchiveRows;
@@ -766,7 +805,7 @@ function summariseQuarterResetBatch_(entries) {
   });
 
   const nothingToDo = totals.versions === 0 && totals.assignmentRows === 0
-    && totals.sendLogRows === 0 && totals.requestRows === 0
+    && totals.sendLogRows === 0 && totals.requestRows === 0 && totals.requestResetRows === 0
     && totals.unavailableRequestRows === 0 && totals.fineTuneProposalRows === 0
     && totals.fineTuneProposalArchiveRows === 0 && totals.pdfFiles === 0
     && totals.editableCopies === 0 && totals.pdfFolders === 0
@@ -941,7 +980,8 @@ function planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, time
     readSheet(SHEETS.SERVICE_DATES).forEach(function (r) {
       if (String(r[D.QUARTER_ID] || '').trim() !== quarterId) return;
       if (String(r[D.TITLE] === null || r[D.TITLE] === undefined ? '' : r[D.TITLE]).trim() === '') return;
-      plan.weekTitleDates.push(toDateString(r[D.SERVICE_DATE], timezone));
+      // 第八十五輪批次 LB 組：保留模式不清每週標題，只記數目
+      (plan.keepManual ? plan.keptWeekTitleDates : plan.weekTitleDates).push(toDateString(r[D.SERVICE_DATE], timezone));
     });
   } catch (err) {
     plan.manualAttention.push('檢查每週標題（ServiceDates.Title）失敗，這一項不清：' + err.message);
@@ -1019,4 +1059,70 @@ function executeQuarterResetExtras_(plan, result) {
       result.errors.push('清空每週標題失敗：' + err.message);
     }
   }
+}
+
+/**
+ * 第八十五輪批次 LB 組：這一季的 Requests 變回「未處理」——清空 RequestID、Status、處理結果、處理時間
+ * （系統以 RequestID 是否空白判斷待處理；四欄一併清空，「清理 Requests 手改痕跡」不會當成手改）。
+ * 每一行寫一筆 AuditLog。
+ * @param {string} quarterId 季度 ID
+ * @param {string[]} errors 出錯時 push 訊息
+ * @returns {number} 變回未處理的行數
+ */
+function resetQuarterRequestsToPending_(quarterId, errors) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.REQUESTS);
+    if (!sheet || sheet.getLastRow() < 3) return 0;
+    const R = COLUMNS.REQUESTS;
+    const keys = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function (k) { return String(k || '').trim(); });
+    const qCol = keys.indexOf(R.QUARTER_ID);
+    const idCol = keys.indexOf(R.REQUEST_ID);
+    const statusCol = keys.indexOf(R.STATUS);
+    const cols = [R.REQUEST_ID, R.STATUS, R.RESULT_NOTE, R.PROCESSED_AT]
+      .map(function (k) { return keys.indexOf(k); }).filter(function (c) { return c !== -1; });
+    if (qCol === -1) return 0;
+    const values = sheet.getRange(3, 1, sheet.getLastRow() - 2, keys.length).getValues();
+    let count = 0;
+    values.forEach(function (row, i) {
+      if (String(row[qCol] || '').trim() !== quarterId) return;
+      const hadId = idCol !== -1 ? String(row[idCol] || '').trim() : '';
+      const hadStatus = statusCol !== -1 ? String(row[statusCol] || '').trim() : '';
+      if (!hadId && !hadStatus) return;
+      cols.forEach(function (c) { sheet.getRange(i + 3, c + 1).setValue(''); });
+      count++;
+      writeAuditLog_({
+        action: 'REQUEST_RESET_TO_PENDING',
+        targetSheet: SHEETS.REQUESTS,
+        targetKey: quarterId + '|第 ' + (i + 3) + ' 行',
+        oldValue: 'RequestID=' + hadId + '　Status=' + hadStatus,
+        newValue: '（未處理）',
+        source: 'apiQuarterResetExecute',
+        notes: '整季重設：修改申報保留，變回未處理，之後可以再套用'
+      });
+    });
+    return count;
+  } catch (err) {
+    errors.push('把修改申報變回未處理失敗：' + err.message);
+    return 0;
+  }
+}
+
+/**
+ * 第八十五輪批次 LB 組：幹事介面〔整季重設〕確認窗「會保留（人手加入）」一段，逐項寫數目。
+ * @param {Object} plan `planQuarterReset_(…, {keepManual: true})` 的結果
+ * @returns {string[]}
+ */
+function describeQuarterResetKeptLines_(plan) {
+  const kept = plan.keptUnavailableDetails || [];
+  const lines = ['不能服侍的日期 ' + kept.length + ' 項'];
+  kept.slice(0, 20).forEach(function (u) {
+    lines.push('　' + (u.name || u.personId) + '　' + u.dateFrom
+      + (u.dateTo && u.dateTo !== u.dateFrom ? ' → ' + u.dateTo : '') + (u.reason ? '　' + u.reason : ''));
+  });
+  if (kept.length > 20) lines.push('　……另有 ' + (kept.length - 20) + ' 項');
+  lines.push('每週標題 ' + (plan.keptWeekTitleDates || []).length + ' 週');
+  lines.push('修改申報 ' + (plan.requestResetRows || 0) + ' 項（變回未處理，之後可以再套用）');
+  lines.push('排表偏好：不受影響');
+  return lines;
 }

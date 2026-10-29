@@ -7713,8 +7713,8 @@ const MUTATIONS = [
     id: "ij-keep-v0",
     why: "唔連第 0 版一齊清",
     file: "src/WebAppQuarterReset.gs",
-    find: "  const plan = planQuarterReset_(id, true);\n  const batch",
-    replace: "  const plan = planQuarterReset_(id, false);\n  const batch",
+    find: "  const plan = planQuarterReset_(id, true, QUARTER_RESET_DASHBOARD_OPTIONS);\n  const batch",
+    replace: "  const plan = planQuarterReset_(id, false, QUARTER_RESET_DASHBOARD_OPTIONS);\n  const batch",
     tests: ["tests/round82_ij_dashboard_quarter_reset.test.js"]
   },
   {
@@ -8583,6 +8583,70 @@ const MUTATIONS = [
     find: "按「▶️ 繼續執行自測」繼續（不是「只重新執行紅色情境」）",
     replace: "撳「▶️ 繼續執行自測」繼續（不是「只重新執行紅色情境」）",
     tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
+    id: "lb-dash-no-keep",
+    why: "幹事介面重設冇保留人手資料",
+    file: "src/WebAppQuarterReset.gs",
+    find: "const QUARTER_RESET_DASHBOARD_OPTIONS = { keepManual: true };",
+    replace: "const QUARTER_RESET_DASHBOARD_OPTIONS = { keepManual: false };",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-unavail-cleared",
+    why: "保留模式仍清人手不能服侍",
+    file: "src/QuarterReset.gs",
+    find: "        if (plan.keepManual) return isRequest;\n",
+    replace: "",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-title-cleared",
+    why: "保留模式仍清每週標題",
+    file: "src/QuarterReset.gs",
+    find: "      (plan.keepManual ? plan.keptWeekTitleDates : plan.weekTitleDates).push(",
+    replace: "      (false ? plan.keptWeekTitleDates : plan.weekTitleDates).push(",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-req-deleted",
+    why: "保留模式仍刪修改申報",
+    file: "src/QuarterReset.gs",
+    find: "  if (plan.keepManual) {\n    result.requestRowsReset = resetQuarterRequestsToPending_(plan.quarterId, result.errors);\n  } else {",
+    replace: "  if (false) {\n    result.requestRowsReset = resetQuarterRequestsToPending_(plan.quarterId, result.errors);\n  } else {",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-req-keep-id",
+    why: "申報保留 RequestID 唔會再處理",
+    file: "src/QuarterReset.gs",
+    find: "    const cols = [R.REQUEST_ID, R.STATUS, R.RESULT_NOTE, R.PROCESSED_AT]",
+    replace: "    const cols = [R.STATUS, R.RESULT_NOTE, R.PROCESSED_AT]",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-kept-no-count",
+    why: "保留段冇寫不能服侍數目",
+    file: "src/QuarterReset.gs",
+    find: "  const lines = ['不能服侍的日期 ' + kept.length + ' 項'];",
+    replace: "  const lines = ['不能服侍的日期'];",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-menu-no-diff",
+    why: "選單版冇講兩者分別",
+    file: "src/Menu.gs",
+    find: "      + QUARTER_RESET_MENU_DIFFERENCE_TEXT + '\\n\\n'\n",
+    replace: "",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "lb-ui-no-kept",
+    why: "確認窗冇會保留一段",
+    file: "src/ui/ScriptZone3.html",
+    find: "      nodes.push(sectionTitle('會保留（人手加入）'));\n",
+    replace: "",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
   }
 ];
 
