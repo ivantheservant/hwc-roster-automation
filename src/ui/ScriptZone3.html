@@ -42,8 +42,10 @@
     // 第八十二輪批次 IJ 組：〔整季清走重來〕（紅色危險掣）；受保護季度 ⇒ 灰掣＋原因
     const reset = (d && d.quarterReset) || { blocked: true, reason: '暫時無法確定這一季可不可以重設。按「重新整理」再試。' };
     const resetRow = zone4Row('整季重設',
-      '把這一季重設為「還未生成初稿」（連第 0 版、派工紀錄、寄出紀錄、逐格決定、這一季的不能服侍日期等一併清除），'
-        + '之後可以重新生成。人員資料、名單、規則、Config 一律不會改動。',
+      // 第八十五輪批次 LB 組（回歸時發現）：說明跟從「保留人手加入的資料」
+      '把這一季重設為「還未生成初稿」（連第 0 版、派工紀錄、寄出紀錄、逐格決定等一併清除），'
+        + '之後可以重新生成。人手加入的不能服侍日期、每週標題、合堂主日會保留，修改申報變回未處理；'
+        + '人員資料、名單、規則、Config 一律不會改動。',
       () => openQuarterResetFromDashboard(), true);
     if (reset.blocked) {
       const b = findChildByTag(resetRow, 'BUTTON');

@@ -115,6 +115,8 @@ console.log('\n=== LB5：前端確認窗分兩段 ===');
   const z3 = read('src/ui/ScriptZone3.html');
   check('★★★★★ 「會清除」「會保留（人手加入）」兩段，保留段用 keptLines',
     /sectionTitle\('會清除'\)/.test(z3) && /sectionTitle\('會保留（人手加入）'\)/.test(z3) && /p\.keptLines \|\| \[\]/.test(z3));
+  check('★★★★★ 常用設定那一行的說明寫明會保留人手加入的資料（不再寫「不能服侍日期等一併清除」）',
+    /人手加入的不能服侍日期、每週標題、合堂主日會保留/.test(z3) && !/這一季的不能服侍日期等一併清除/.test(z3));
 }
 
 console.log(fail === 0 ? '\nALL PASS' : '\n' + fail + ' FAILURE(S)');

@@ -9000,6 +9000,14 @@ const MUTATIONS = [
     find: "    body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary')]));\n",
     replace: "",
     tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lb-row-old-text",
+    why: "整季重設說明仍寫清除不能服侍",
+    file: "src/ui/ScriptZone3.html",
+    find: "        + '之後可以重新生成。人手加入的不能服侍日期、每週標題、合堂主日會保留，修改申報變回未處理；'\n",
+    replace: "        + '之後可以重新生成（這一季的不能服侍日期等一併清除）；'\n",
+    tests: ["tests/round85_lb_reset_keep_manual.test.js"]
   }
 ];
 
