@@ -336,6 +336,27 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第八十五輪批次 LF 組：季前資料自動寄出（每日檢查）開關
+      key: CONFIG_KEYS.PRESEASON_AUTO_SEND, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: 'TRUE',
+      description: '生成日之前自動寄「季前資料」（事奉人員表、暫時不做某崗位、排表偏好、不能服侍的日期、合堂主日、人手檢查）給現任堂委、執事和幹事。TRUE（預設）＝每日檢查在生成日之前 PRESEASON_DAYS_BEFORE 日寄一次；FALSE＝不自動寄（仍然可以在開季前準備按〔寄出季前資料〕）。遵守 DRY_RUN 和轉寄測試地址。',
+      editable: 'TRUE'
+    },
+    {
+      // 第八十五輪批次 LF 組：季前資料在生成日之前幾日自動寄出
+      key: CONFIG_KEYS.PRESEASON_DAYS_BEFORE, type: CONFIG_TYPES.INT, group: 'MAIL',
+      defaultValue: '14',
+      description: '季前資料在生成日（Quarters.GenerateOn）之前幾日自動寄出，預設 14。今日在「生成日 − 這個日數」到生成日前一日之間、這一季還沒有寄過、還沒有生成，才會寄。',
+      editable: 'TRUE'
+    },
+    {
+      // 第八十五輪批次 LF 組：季前資料的額外收件人
+      key: CONFIG_KEYS.PRESEASON_EXTRA_RECIPIENTS, type: CONFIG_TYPES.STR, group: 'MAIL',
+      defaultValue: '',
+      description: '季前資料除了現任堂委、執事和幹事（MAIL_ADMIN_NOTIFY）之外，另外寄給誰。填電郵地址，多於一個就用逗號、分號、頓號或者換行分開。留空＝沒有額外收件人。',
+      editable: 'TRUE'
+    },
+    {
       // 第八十五輪批次 LE 組：〔合堂主日〕可選的種類（代號=名稱，逗號分隔）
       key: CONFIG_KEYS.COMBINED_SERVICE_KINDS, type: CONFIG_TYPES.STR, group: 'SYS',
       defaultValue: 'COMBINED=合堂,BAPTISM=浸禮,ANNIVERSARY=堂慶',

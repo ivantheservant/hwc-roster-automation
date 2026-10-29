@@ -79,6 +79,8 @@
       button('排表偏好', () => openWeights(), ''),
       button('合堂主日', () => openCombinedServices(), '')
     ]));
+    // 第八十五輪批次 LF 組：〔寄出季前資料〕（先預覽內容和收件人，再寄）
+    body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary')]));
 
     // 第八十五輪批次 LD 組：人手檢查——有問題才顯示「人手不足：N 個崗位」及〔人手檢查〕
     const st = d && d.staffing;
@@ -91,6 +93,11 @@
 
     // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
     const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
+    // 第八十五輪批次 LF 組：「季前資料：已寄出（日期，自動／人手）」或「建議 <日期> 寄出（未寄）」
+    if (d && d.preseasonStatus) {
+      summary.appendChild(make('div', { text: (/已寄出/.test(d.preseasonStatus) ? '✅ ' : '⬜ ') + d.preseasonStatus,
+        className: /已寄出/.test(d.preseasonStatus) ? 'vio-row muted' : 'vio-row' }));
+    }
     // 第八十五輪批次 LD 組：沒有問題就寫「人手檢查：足夠」；讀不到就照實講
     if (st && st.error) {
       summary.appendChild(make('div', { text: '⬜ 人手檢查：暫時查不到（' + st.error + '）', className: 'vio-row' }));
@@ -145,6 +152,39 @@
           const res = await callServerMutating('apiSaveCombinedServices', currentQuarterId, items);
           openModal('合堂主日', [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
             [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /** 第八十五輪批次 LF 組：〔寄出季前資料〕——預覽（六段內容＋收件人＋沒有電郵的人）→〔寄出〕→「模擬／寄出 N 封」。 */
+  function openPreseasonSend() {
+    runAction('讀取季前資料', async () => {
+      const p = await callServer('apiPreseasonPreview', currentQuarterId);
+      const nodes = [para('會寄給寄出當日的現任堂委、執事和幹事'
+        + (p.generateDate ? '；生成日是 ' + humanDate(p.generateDate) + '。' : '。'), 'muted')];
+      (p.sections || []).forEach((s) => {
+        const box = make('div', { className: 'sec' }, [sectionTitle(s.title)]);
+        (s.lines || []).forEach((l) => box.appendChild(make('div', { text: '・' + l, className: 'vio-row' })));
+        nodes.push(box);
+      });
+      const who = make('div', { className: 'sec' }, [sectionTitle('收件人（' + (p.recipients || []).length + ' 位）')]);
+      (p.recipients || []).forEach((r) => who.appendChild(make('div', { text: '・' + r.displayName + '（' + r.why + '）', className: 'vio-row' })));
+      if ((p.noEmail || []).length > 0) {
+        who.appendChild(make('div', { text: '沒有電郵，收不到：' + p.noEmail.join('、'), className: 'err-text' }));
+      }
+      nodes.push(who);
+      if (p.sentRecord) nodes.push(para('這一季已經在 ' + p.sentRecord.date + ' 寄過一次（'
+        + (p.sentRecord.mode === 'AUTO' ? '自動' : '人手') + '）；再寄會再收到一封。', 'muted'));
+      openModal('寄出季前資料：' + (p.quarterLabel || currentQuarterId), nodes, [
+        button('寄出', () => runAction('寄出季前資料', async () => {
+          const r = await callServerMutating('apiPreseasonSend', currentQuarterId);
+          openModal('寄出季前資料', [make('div', {
+            text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
+              : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
+            className: 'ok-line'
+          })], [button('完成', () => closeModalAndRefresh(), '')]);
         }), ''),
         button('取消', () => closeModal(), 'secondary')
       ]);

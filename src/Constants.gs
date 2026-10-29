@@ -1430,6 +1430,12 @@ const CONFIG_KEYS = {
   RESEND_ONLY_CHANGED: 'RESEND_ONLY_CHANGED',
   // 第七十七輪批次 EE 組：〔給所有人〕要唔要連辦公室等固定收件人（EmailRecipients）一齊寄
   SEND_ALL_INCLUDES_FIXED: 'SEND_ALL_INCLUDES_FIXED',
+  // 第八十五輪批次 LF 組：季前資料自動寄出（每日檢查）開關
+  PRESEASON_AUTO_SEND: 'PRESEASON_AUTO_SEND',
+  // 第八十五輪批次 LF 組：季前資料在生成日之前幾日自動寄出
+  PRESEASON_DAYS_BEFORE: 'PRESEASON_DAYS_BEFORE',
+  // 第八十五輪批次 LF 組：季前資料的額外收件人
+  PRESEASON_EXTRA_RECIPIENTS: 'PRESEASON_EXTRA_RECIPIENTS',
   // 第八十五輪批次 LE 組：〔合堂主日〕可選的種類（代號=名稱，逗號分隔）
   COMBINED_SERVICE_KINDS: 'COMBINED_SERVICE_KINDS',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',

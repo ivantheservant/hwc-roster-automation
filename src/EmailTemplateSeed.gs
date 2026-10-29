@@ -191,6 +191,23 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '如有查詢，請直接回覆本郵件。',
     placeholders: '{QuarterID},{StartDate},{EndDate},{ChangedPeopleSummary},{SpreadsheetUrl},{PublicRosterUrl}',
     attachType: ATTACH_TYPE.FULL_PDF
+  },
+  // 第八十五輪批次 LF 組：季前資料（PreseasonPack.gs；不經 sendStage()，Stage 欄只作標記）
+  {
+    templateId: 'TPL_PRESEASON_TC',
+    stage: 'PRESEASON',
+    lang: 'TC',
+    subject: '{QuarterLabel} 職事表季前資料——如需更改請於 {GenerateDate} 之前通知幹事',
+    bodyHtml: '<p>各位堂委、執事、幹事：</p>'
+      + '<p>平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。以下是生成時會用到的資料，請核對：</p>'
+      + '{PreseasonContentHtml}'
+      + '<p>如需更改，請在 {GenerateDate} 之前通知幹事。</p>',
+    bodyPlain: '各位堂委、執事、幹事：\n\n'
+      + '平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。以下是生成時會用到的資料，請核對：\n\n'
+      + '{PreseasonContentPlain}\n\n'
+      + '如需更改，請在 {GenerateDate} 之前通知幹事。',
+    placeholders: '{QuarterLabel},{GenerateDate},{PreseasonContentHtml},{PreseasonContentPlain}',
+    attachType: ATTACH_TYPE.NONE
   }
 ];
 

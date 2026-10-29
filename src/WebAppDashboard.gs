@@ -710,8 +710,18 @@ function buildDashboardState_(quarterId) {
     staffing = { error: err.message, totalBlanks: 0, shortPostCount: 0, posts: [] };
   }
 
+  // 第八十五輪批次 LF 組：「這一季還要做的」季前資料那一行
+  let preseasonStatus = '';
+  try {
+    preseasonStatus = readPreseasonStatusText_(quarterId);
+  } catch (err) {
+    log_('WARN', 'apiGetDashboardState：季前資料狀態讀不到：' + err.message);
+    preseasonStatus = '季前資料：暫時查不到（' + err.message + '）';
+  }
+
   return {
     staffing: staffing,
+    preseasonStatus: preseasonStatus,
     quarterId: quarterId,
     quarterLabel: buildQuarterLabel_(quarterId),
     stage: stage,

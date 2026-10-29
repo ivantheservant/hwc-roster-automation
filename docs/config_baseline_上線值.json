@@ -407,6 +407,27 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "MAIL"
     },
+    "PRESEASON_AUTO_SEND": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "PRESEASON_DAYS_BEFORE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "14",
+      "launchTargetValue": "14",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "PRESEASON_EXTRA_RECIPIENTS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
     "COMBINED_SERVICE_KINDS": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "COMBINED=合堂,BAPTISM=浸禮,ANNIVERSARY=堂慶",

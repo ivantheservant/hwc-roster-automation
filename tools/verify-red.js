@@ -8920,6 +8920,86 @@ const MUTATIONS = [
     find: "        name.disabled = !sel.value;\n",
     replace: "",
     tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "lf-window-early",
+    why: "季前資料提早寄",
+    file: "src/PreseasonPack.gs",
+    find: "  if (f.today < from) return { send: false, reason: 'TOO_EARLY' };",
+    replace: "",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-twice",
+    why: "季前資料寄兩次",
+    file: "src/PreseasonPack.gs",
+    find: "  if (f.sent) return { send: false, reason: 'ALREADY_SENT' };",
+    replace: "",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-has-version",
+    why: "生成咗都寄季前資料",
+    file: "src/PreseasonPack.gs",
+    find: "  if (f.versionNo >= 0) return { send: false, reason: 'HAS_VERSION' };",
+    replace: "",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-no-dedupe",
+    why: "同一地址收兩封",
+    file: "src/PreseasonPack.gs",
+    find: "    if (seen[k]) { seen[k].why += '、' + why; return; }",
+    replace: "",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-no-noemail",
+    why: "冇電郵嘅人冇列出",
+    file: "src/PreseasonPack.gs",
+    find: "      if (!p.email) { if (noEmail.indexOf(p.label) === -1) noEmail.push(p.label); return; }",
+    replace: "      if (!p.email) return;",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-ignore-dryrun",
+    why: "測試模式照寄",
+    file: "src/PreseasonPack.gs",
+    find: "    if (dryRun) { simulated++; return; }",
+    replace: "",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-no-audit",
+    why: "季前資料冇記錄",
+    file: "src/PreseasonPack.gs",
+    find: "  writeAuditLog_({\n    action: PRESEASON_AUDIT_ACTION,",
+    replace: "  ({\n    action: PRESEASON_AUDIT_ACTION,",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-role-not-expanded",
+    why: "事奉人員表冇寫現任堂委",
+    file: "src/PreseasonPack.gs",
+    find: "    const roleTexts = ((eligibility.rolesByPost || {})[p.postId] || []).map(function (code) {",
+    replace: "    const roleTexts = ([]).map(function (code) {",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-unavail-any-q",
+    why: "列出其他季度嘅不能服侍",
+    file: "src/PreseasonPack.gs",
+    find: "  }).filter(function (u) { return u.from && overlaps(u.from, u.to); })",
+    replace: "  }).filter(function (u) { return !!u.from; })",
+    tests: ["tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "lf-ui-no-button",
+    why: "冇寄出季前資料掣",
+    file: "src/ui/ScriptZone2.html",
+    find: "    body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary')]));\n",
+    replace: "",
+    tests: ["tests/round85_lf_preseason.test.js"]
   }
 ];
 

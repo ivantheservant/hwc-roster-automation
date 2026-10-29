@@ -160,6 +160,15 @@ function dailyAutomationCheck_() {
             + ' 次提醒幹事：' + quarterId + ' 停留在 ' + remindJudgment.stage
             + '（' + remindJudgment.reasons.join('＋') + '）';
         }));
+
+        // 第八十五輪批次 LF 組：生成日之前 N 日自動寄季前資料（只寫 AuditLog，不寫 SendLog、不改 Stage）。
+        // 出錯只影響這一項，不影響上面的生成和提醒。
+        try {
+          report.push(runPreseasonAutoSend_(row, today, config));
+        } catch (err) {
+          log_('WARN', 'dailyAutomationCheck_: 季前資料 ' + quarterId + ' 失敗：' + err.message);
+          report.push({ quarterId: quarterId, action: 'PRESEASON', outcome: 'ERROR', detail: err.message });
+        }
       } catch (err) {
         writeAuditLog_({
           action: 'AUTOMATION_QUARTER_JUDGE_ERROR',

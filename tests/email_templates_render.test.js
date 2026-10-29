@@ -190,6 +190,21 @@ function renderAllSamples() {
     attachment: '完整版職事表 PDF（FULL_PDF）'
   });
 
+  // 第八十五輪批次 LF 組（刻意新增）：季前資料
+  add({
+    key: 'TPL_PRESEASON_TC',
+    template: byId.TPL_PRESEASON_TC,
+    recipient: RECIPIENTS.list,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', GenerateDate: '2098-12-01',
+      PreseasonContentHtml: '<p><b>一、事奉人員表</b></p><ul><li>讀經（5 人）：…</li></ul>',
+      PreseasonContentPlain: '一、事奉人員表\n・讀經（5 人）：…' },
+    purpose: '季前資料：生成日之前寄給堂委、執事、幹事核對',
+    trigger: '每日檢查在生成日之前 PRESEASON_DAYS_BEFORE 日自動寄；或者開季前準備〔寄出季前資料〕',
+    audience: '寄出當日的現任堂委、執事、MAIL_ADMIN_NOTIFY、PRESEASON_EXTRA_RECIPIENTS',
+    attachment: '無（NONE）'
+  });
+
   return samples;
 }
 
