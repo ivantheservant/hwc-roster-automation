@@ -335,6 +335,13 @@ function getConfigKeySeeds_() {
         + 'TRUE（預設）＝職事表上全部人＋堂委＋執事＋固定收件人；FALSE＝不加固定收件人。',
       editable: 'TRUE'
     },
+    {
+      // 第八十五輪批次 LE 組：〔合堂主日〕可選的種類（代號=名稱，逗號分隔）
+      key: CONFIG_KEYS.COMBINED_SERVICE_KINDS, type: CONFIG_TYPES.STR, group: 'SYS',
+      defaultValue: 'COMBINED=合堂,BAPTISM=浸禮,ANNIVERSARY=堂慶',
+      description: '開季前準備〔合堂主日〕可選的種類，格式「代號=名稱」，逗號分隔。代號寫入 ServiceDates.CombinedKind，週報系統讀取。日後要加種類（例如 MISSION=宣教主日）就在這一格加，不用改程式。留空＝退回預設三種。',
+      editable: 'TRUE'
+    },
     // ---- SYS ----
     {
       key: CONFIG_KEYS.DRY_RUN, type: CONFIG_TYPES.BOOL, group: 'SYS',

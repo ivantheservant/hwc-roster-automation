@@ -44,6 +44,9 @@ function planQuarterReset_(quarterId, includeV0, options) {
     // 第八十五輪批次 LB 組（keepManual）：會保留的人手資料
     keptUnavailableDetails: [],
     keptWeekTitleDates: [],
+    // 第八十五輪批次 LE 組：合堂主日（ServiceDates.CombinedKind）——保留模式只記數目；選單版清空
+    keptCombinedDates: [],
+    combinedDates: [],
     requestResetRows: 0,
     versions: [],          // {versionNo, sheetName, protected, sheetExists}
     versionSheetNames: [],
@@ -801,6 +804,7 @@ function summariseQuarterResetBatch_(entries) {
     totals.cellDecisionRows += plan.cellDecisionRows || 0;
     totals.extraSheets += (plan.extraSheetNames || []).length;
     totals.weekTitles += (plan.weekTitleDates || []).length;
+    totals.combined = (totals.combined || 0) + (plan.combinedDates || []).length;
     totals.releasedKeys += plan.releasedKeyCount || 0;
   });
 
@@ -810,7 +814,8 @@ function summariseQuarterResetBatch_(entries) {
     && totals.fineTuneProposalArchiveRows === 0 && totals.pdfFiles === 0
     && totals.editableCopies === 0 && totals.pdfFolders === 0
     && totals.unavailableInQuarterRows === 0 && totals.cellDecisionRows === 0
-    && totals.extraSheets === 0 && totals.weekTitles === 0 && totals.releasedKeys === 0;
+    && totals.extraSheets === 0 && totals.weekTitles === 0 && totals.releasedKeys === 0
+    && !(totals.combined > 0);
 
   return { perQuarter: perQuarter, totals: totals, nothingToDo: nothingToDo };
 }
@@ -983,6 +988,11 @@ function planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, time
       // 第八十五輪批次 LB 組：保留模式不清每週標題，只記數目
       (plan.keepManual ? plan.keptWeekTitleDates : plan.weekTitleDates).push(toDateString(r[D.SERVICE_DATE], timezone));
     });
+    readSheet(SHEETS.SERVICE_DATES).forEach(function (r) {
+      if (String(r[D.QUARTER_ID] || '').trim() !== quarterId) return;
+      if (String(r[D.COMBINED_KIND] === null || r[D.COMBINED_KIND] === undefined ? '' : r[D.COMBINED_KIND]).trim() === '') return;
+      (plan.keepManual ? plan.keptCombinedDates : plan.combinedDates).push(toDateString(r[D.SERVICE_DATE], timezone));
+    });
   } catch (err) {
     plan.manualAttention.push('檢查每週標題（ServiceDates.Title）失敗，這一項不清：' + err.message);
   }
@@ -1059,6 +1069,29 @@ function executeQuarterResetExtras_(plan, result) {
       result.errors.push('清空每週標題失敗：' + err.message);
     }
   }
+  // 第八十五輪批次 LE 組：選單版（全部清除）連合堂主日設定一併清空；保留模式 combinedDates 是空的
+  if ((plan.combinedDates || []).length > 0) {
+    try {
+      const sheet = ss.getSheetByName(SHEETS.SERVICE_DATES);
+      const keys = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const D = COLUMNS.SERVICE_DATES;
+      const qCol = keys.indexOf(D.QUARTER_ID);
+      const kCol = keys.indexOf(D.COMBINED_KIND);
+      const nCol = keys.indexOf(D.COMBINED_NAME);
+      if (qCol !== -1 && kCol !== -1 && sheet.getLastRow() >= 3) {
+        const values = sheet.getRange(3, 1, sheet.getLastRow() - 2, keys.length).getValues();
+        values.forEach(function (row, i) {
+          if (String(row[qCol] || '').trim() !== plan.quarterId) return;
+          if (String(row[kCol] === null || row[kCol] === undefined ? '' : row[kCol]).trim() === '') return;
+          sheet.getRange(i + 3, kCol + 1).setValue('');
+          if (nCol !== -1) sheet.getRange(i + 3, nCol + 1).setValue('');
+          result.combinedCleared = (result.combinedCleared || 0) + 1;
+        });
+      }
+    } catch (err) {
+      result.errors.push('清空合堂主日設定失敗：' + err.message);
+    }
+  }
 }
 
 /**
@@ -1122,6 +1155,7 @@ function describeQuarterResetKeptLines_(plan) {
   });
   if (kept.length > 20) lines.push('　……另有 ' + (kept.length - 20) + ' 項');
   lines.push('每週標題 ' + (plan.keptWeekTitleDates || []).length + ' 週');
+  lines.push('合堂主日 ' + (plan.keptCombinedDates || []).length + ' 週');
   lines.push('修改申報 ' + (plan.requestResetRows || 0) + ' 項（變回未處理，之後可以再套用）');
   lines.push('排表偏好：不受影響');
   return lines;

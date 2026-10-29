@@ -2167,6 +2167,10 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     plan.keepManual
       ? '　每週標題：保留，不清除'
       : '　每週標題（ServiceDates.Title，只清這一季）：' + (plan.weekTitleDates || []).length + ' 週',
+    // 第八十五輪批次 LE 組
+    plan.keepManual
+      ? '　合堂主日：保留，不清除'
+      : '　合堂主日（ServiceDates.CombinedKind，只清這一季）：' + (plan.combinedDates || []).length + ' 週',
     '',
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
     '　EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays，',

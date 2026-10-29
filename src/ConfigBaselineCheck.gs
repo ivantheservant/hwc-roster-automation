@@ -106,6 +106,8 @@ function getConfigBaselineSnapshot_() {
       RESEND_ONLY_CHANGED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第七十七輪批次 EE 組新增。上線目標值＝TRUE（正式發出時辦公室要收到）。
       SEND_ALL_INCLUDES_FIXED: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      // 第八十五輪批次 LE 組：〔合堂主日〕可選的種類（代號=名稱，逗號分隔）
+      COMBINED_SERVICE_KINDS: { launchTargetValue: 'COMBINED=合堂,BAPTISM=浸禮,ANNIVERSARY=堂慶', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROSTER_DRIVE_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第七十輪批次 AW 組新增。上線目標值刻意係空白——網址由管理員貼。
       USER_GUIDE_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },

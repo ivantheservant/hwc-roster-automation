@@ -355,7 +355,11 @@ const COLUMNS = {
     NOTES: 'Notes',
     // 第七十五輪批次 CC 組：每週標題（幹事喺職事表「類型」欄改，〔儲存〕時寫入）。
     // 空白 ＝ 預設（ServiceType）。舊試算表冇呢一欄 ⇒ 第一次寫入時自動加（見 WeekTitles）。
-    TITLE: 'Title'
+    TITLE: 'Title',
+    // 第八十五輪批次 LE 組：合堂主日（開季前準備〔合堂主日〕）。代號＝Config COMBINED_SERVICE_KINDS 的代號；
+    // 名稱＝自行輸入（例如「宣教月」）。空白＝不是合堂。不影響職事表和生成，只給週報系統讀。
+    COMBINED_KIND: 'CombinedKind',
+    COMBINED_NAME: 'CombinedName'
   },
   SPECIAL_SUNDAYS: {
     SPECIAL_ID: 'SpecialID',
@@ -1426,6 +1430,8 @@ const CONFIG_KEYS = {
   RESEND_ONLY_CHANGED: 'RESEND_ONLY_CHANGED',
   // 第七十七輪批次 EE 組：〔給所有人〕要唔要連辦公室等固定收件人（EmailRecipients）一齊寄
   SEND_ALL_INCLUDES_FIXED: 'SEND_ALL_INCLUDES_FIXED',
+  // 第八十五輪批次 LE 組：〔合堂主日〕可選的種類（代號=名稱，逗號分隔）
+  COMBINED_SERVICE_KINDS: 'COMBINED_SERVICE_KINDS',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
   WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
   // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，

@@ -407,6 +407,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "MAIL"
     },
+    "COMBINED_SERVICE_KINDS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "COMBINED=合堂,BAPTISM=浸禮,ANNIVERSARY=堂慶",
+      "launchTargetValue": "COMBINED=合堂,BAPTISM=浸禮,ANNIVERSARY=堂慶",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
     "ROSTER_DRIVE_FOLDER_ID": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "",

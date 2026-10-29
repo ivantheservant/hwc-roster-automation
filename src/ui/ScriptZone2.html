@@ -73,9 +73,11 @@
     // ⚠️ 第七十五輪批次 CA 組：〔不能服侍的日期〕由「名單維護」搬到呢度（Ivan：生成之前就要處理）；
     // 〔名單檢查〕搬去「進階與診斷」（唔係常用功能）。
     // 第七十七輪批次 EA 組：〔排表偏好〕由第 2 步搬到呢度，同〔不能服侍的日期〕並排（Ivan 決定）。
+    // 第八十五輪批次 LE 組：〔合堂主日〕放在同一行
     body.appendChild(row([
       button('不能服侍的日期', () => openUnavailable(), ''),
-      button('排表偏好', () => openWeights(), '')
+      button('排表偏好', () => openWeights(), ''),
+      button('合堂主日', () => openCombinedServices(), '')
     ]));
 
     // 第八十五輪批次 LD 組：人手檢查——有問題才顯示「人手不足：N 個崗位」及〔人手檢查〕
@@ -105,6 +107,48 @@
       }));
     });
     body.appendChild(summary);
+  }
+
+  /**
+   * 第八十五輪批次 LE 組：〔合堂主日〕——這一季每個主日一行：日期、種類（不是合堂／合堂／浸禮／堂慶）、名稱。
+   * 名稱只在選了種類之後才可以填；不改動職事表，只傳給週報系統。
+   */
+  function openCombinedServices() {
+    runAction('讀取合堂主日', async () => {
+      const data = await callServer('apiGetCombinedServices', currentQuarterId);
+      const rows = [];
+      const list = make('div', { className: 'sec' });
+      (data.weeks || []).forEach((w) => {
+        const sel = document.createElement('select');
+        const none = document.createElement('option');
+        none.value = ''; none.textContent = '不是合堂';
+        sel.appendChild(none);
+        (data.kinds || []).forEach((k) => {
+          const o = document.createElement('option');
+          o.value = k.code; o.textContent = k.label;
+          if (w.kind === k.code) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.value = w.kind || '';
+        const name = document.createElement('input');
+        name.type = 'text';
+        name.value = w.name || '';
+        name.placeholder = '名稱（例如宣教月，可以留空）';
+        name.disabled = !sel.value;
+        sel.addEventListener('change', () => { name.disabled = !sel.value; if (!sel.value) name.value = ''; });
+        rows.push({ serviceDate: w.serviceDate, sel: sel, name: name });
+        list.appendChild(make('div', { className: 'check-row' }, [make('span', { text: humanDate(w.serviceDate) }), sel, name]));
+      });
+      openModal('合堂主日：' + (data.quarterLabel || currentQuarterId), [para(data.note || ''), list], [
+        button('儲存', () => runAction('儲存合堂主日', async () => {
+          const items = rows.map((r) => ({ serviceDate: r.serviceDate, kind: r.sel.value, name: r.sel.value ? r.name.value : '' }));
+          const res = await callServerMutating('apiSaveCombinedServices', currentQuarterId, items);
+          openModal('合堂主日', [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
+            [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
   }
 
   /** 第八十五輪批次 LD 組：「人手不足：N 個崗位（最少 M 格會留空）」 */

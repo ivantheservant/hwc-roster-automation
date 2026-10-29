@@ -5901,7 +5901,7 @@ const MUTATIONS = [
     id: "ca-weights-not-step2",
     why: "開季前準備冇〔排表偏好〕（第七十七輪 EA 組由第 2 步搬過嚟）",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('排表偏好', () => openWeights(), '')\n",
+    find: "      button('排表偏好', () => openWeights(), ''),\n",
     replace: "",
     tests: ["tests/round75_ca_layout.test.js", "tests/round77_ea_weight_scope.test.js"]
   },
@@ -6118,8 +6118,8 @@ const MUTATIONS = [
     id: "cd-fill-btn-back",
     why: "開季前準備還原〔填講員／翻譯／獻花〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('排表偏好', () => openWeights(), '')\n    ]));",
-    replace: "      button('排表偏好', () => openWeights(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
+    find: "      button('合堂主日', () => openCombinedServices(), '')\n    ]));",
+    replace: "      button('合堂主日', () => openCombinedServices(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
     tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
   },
   {
@@ -8856,6 +8856,70 @@ const MUTATIONS = [
     find: "    staffing = computeStaffingCheck_(context);",
     replace: "    staffing = { totalBlanks: 0, posts: [], notes: [] };",
     tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "le-kinds-hardcoded",
+    why: "合堂種類唔讀 Config",
+    file: "src/WebAppCombined.gs",
+    find: "  return parseCombinedServiceKinds_(getConfig(CONFIG_KEYS.COMBINED_SERVICE_KINDS, COMBINED_SERVICE_KINDS_DEFAULT));",
+    replace: "  return parseCombinedServiceKinds_('COMBINED=合堂');",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-no-audit",
+    why: "合堂冇寫稽核",
+    file: "src/WebAppCombined.gs",
+    find: "    writeAuditLog_({\n      action: 'COMBINED_SERVICE_CHANGED',",
+    replace: "    ({\n      action: 'COMBINED_SERVICE_CHANGED',",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-name-without-kind",
+    why: "冇種類都寫名稱",
+    file: "src/WebAppCombined.gs",
+    find: "    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: kind ? String(it.name || '').trim() : '' };",
+    replace: "    wanted[String(it.serviceDate || '').trim()] = { kind: kind, name: String(it.name || '').trim() };",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-bad-kind-ok",
+    why: "亂填種類照收",
+    file: "src/WebAppCombined.gs",
+    find: "    if (kind && !valid[kind]) {",
+    replace: "    if (false) {",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-reset-clears",
+    why: "幹事介面重設清走合堂",
+    file: "src/QuarterReset.gs",
+    find: "      (plan.keepManual ? plan.keptCombinedDates : plan.combinedDates).push(",
+    replace: "      (false ? plan.keptCombinedDates : plan.combinedDates).push(",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-menu-keeps",
+    why: "選單重設冇清合堂",
+    file: "src/QuarterReset.gs",
+    find: "  if ((plan.combinedDates || []).length > 0) {\n    try {",
+    replace: "  if (false) {\n    try {",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-ui-no-button",
+    why: "開季前準備冇合堂主日掣",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('合堂主日', () => openCombinedServices(), '')\n",
+    replace: "",
+    tests: ["tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "le-ui-name-always",
+    why: "名稱冇揀種類都填得",
+    file: "src/ui/ScriptZone2.html",
+    find: "        name.disabled = !sel.value;\n",
+    replace: "",
+    tests: ["tests/round85_le_combined.test.js"]
   }
 ];
 
