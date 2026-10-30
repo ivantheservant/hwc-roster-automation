@@ -8965,7 +8965,7 @@ const MUTATIONS = [
     id: "lf-twice",
     why: "季前資料寄兩次",
     file: "src/PreseasonPack.gs",
-    find: "  if (f.sent) return { send: false, reason: 'ALREADY_SENT' };",
+    find: "  if (counted) return { send: false, reason: 'ALREADY_SENT' };",
     replace: "",
     tests: ["tests/round85_lf_preseason.test.js"]
   },
