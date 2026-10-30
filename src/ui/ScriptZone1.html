@@ -343,6 +343,7 @@
     if (typeof setSaveButtonRunning === 'function') setSaveButtonRunning(true);
     return runAction('讀取改動', async () => {
       savePlan = await callServer('apiSaveAndConfirmPlan', currentQuarterId);
+      logSaveTimings(savePlan, '儲存確認前檢查分段時間');
 
       if (savePlan.blocked) return renderSaveBlocked(savePlan);
       if (savePlan.zeroChange) return renderSaveZeroChange(savePlan);
@@ -904,10 +905,11 @@
    * 第八十三輪批次 JG 組：伺服器回嘅儲存分段時間寫入瀏覽器 console（畀維護者睇，幹事睇唔到）。
    * @param {Object} result `apiSaveAndConfirmExecute` 嘅結果
    */
-  function logSaveTimings(result) {
+  function logSaveTimings(result, title) {
     const t = result && result.timings;
     if (!Array.isArray(t) || typeof console === 'undefined') return;
-    console.info('[儲存分段時間] ' + t.map((x) => x.label + ' ' + Math.round(x.ms / 100) / 10 + 's').join('；'));
+    // 第九十一輪批次 RE 組：確認前那一次檢查亦寫入（標題「儲存確認前檢查分段時間」）
+    console.info('[' + (title || '儲存分段時間') + '] ' + t.map((x) => x.label + ' ' + Math.round(x.ms / 100) / 10 + 's').join('；'));
   }
 
   function renderSaveResult(result) {

@@ -10200,6 +10200,54 @@ const MUTATIONS = [
     find: "'系統改了這一格。原因：' + trimSentenceEnd_(p.reason || p.brokenRuleId)",
     replace: "'系統改了這一格。原因：' + (p.reason || p.brokenRuleId)",
     tests: ["tests/round91_rb_wording.test.js"]
+  },
+  {
+    id: "rc-always-rebuild",
+    why: "儲存時照舊重建 context（多 4 秒）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  if (planContext && planContext.quarterId === quarterId && Number(planContext.versionNo) === Number(baseVersionNo)) {\n    return planContext;\n  }",
+    replace: "",
+    tests: ["tests/round91_rc_re_save.test.js"]
+  },
+  {
+    id: "rc-version-ignored",
+    why: "版本號不同都沿用舊 context",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  if (planContext && planContext.quarterId === quarterId && Number(planContext.versionNo) === Number(baseVersionNo)) {",
+    replace: "  if (planContext) {",
+    tests: ["tests/round91_rc_re_save.test.js"]
+  },
+  {
+    id: "rc-out-missing",
+    why: "plan 沒有交出 context（儲存時重建）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  if (out) out.context = context;",
+    replace: "",
+    tests: ["tests/round91_rc_re_save.test.js"]
+  },
+  {
+    id: "re-mark-missing",
+    why: "沒有「申報」分段",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  mark('檢查：申報');",
+    replace: "",
+    tests: ["tests/round91_rc_re_save.test.js"]
+  },
+  {
+    id: "re-prefix-broken",
+    why: "儲存那一次的分段沒有「重新」前綴（和確認前分不開）",
+    file: "src/Utils.gs",
+    find: "  return { mark: function (label) { if (timer) timer.mark(prefix + label); } };",
+    replace: "  return { mark: function (label) { if (timer) timer.mark(label); } };",
+    tests: ["tests/round91_rc_re_save.test.js"]
+  },
+  {
+    id: "re-plan-no-timings",
+    why: "確認前的檢查沒有回傳分段時間",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  plan.timings = timer.list();",
+    replace: "",
+    tests: ["tests/round91_rc_re_save.test.js"]
   }
 ];
 

@@ -106,11 +106,12 @@ console.log('\n=== D-2 步 3：逐格決定檢查（靜態；第七十五輪 CG 
 console.log('\n=== D-2 步 1／2【核心】唔信前端傳嚟嘅狀態 ===');
 {
   const execBody = SRC.slice(SRC.indexOf('function apiSaveAndConfirmExecute'));
+  // 第九十一輪批次 RC／RE 組（刻意改動）：呼叫時多傳計時器（RE）同 `out`（RC：交出 context 給儲存沿用）
   check('★★★★★ execute 開頭就重新跑一次 plan（唔信前端送嚟嗰份）',
-    /const plan = buildSaveAndConfirmPlan_\(quarterId\);/.test(execBody));
+    /const plan = buildSaveAndConfirmPlan_\(quarterId[,)]/.test(execBody));
   // 只數呼叫點（`= buildSaveAndConfirmPlan_(` 或 `return buildSaveAndConfirmPlan_(`），
   // 唔數函式定義本身嗰行。
-  const callSites = (SRC.match(/(?:=|return)\s+buildSaveAndConfirmPlan_\(quarterId\)/g) || []).length;
+  const callSites = (SRC.match(/(?:=|return)\s+buildSaveAndConfirmPlan_\(quarterId[,)]/g) || []).length;
   check('★★★★★ plan 同 execute 行同一份程式碼（buildSaveAndConfirmPlan_），'
     + '唔係各自實作一次',
     callSites === 2, '呼叫點數 = ' + callSites);

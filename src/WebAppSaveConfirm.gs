@@ -41,16 +41,26 @@ const SAVE_CONFIRM_RELEASE_TEXT = '確認';
  */
 function apiSaveAndConfirmPlan(quarterId) {
   assertWebAppRequestAllowed_('apiSaveAndConfirmPlan');
-  return buildSaveAndConfirmPlan_(quarterId);
+  // 第九十一輪批次 RE 組：確認前那一次檢查亦分段計時（log ＋ 回傳 `timings`，前端寫入 console）。只量度，不改結果。
+  const timer = startPhaseTimer_();
+  const plan = buildSaveAndConfirmPlan_(quarterId, timer);
+  plan.timings = timer.list();
+  log_('INFO', '儲存確認前檢查分段時間（' + quarterId + '）：' + timer.summary());
+  return plan;
 }
 
 /**
  * `apiSaveAndConfirmPlan()` 嘅實作本體。`apiSaveAndConfirmExecute()` 執行之前
  * 亦會再叫一次——**兩邊行同一份程式碼**，唔可以各自實作（第十九輪嘅教訓）。
  * @param {string} quarterId 季度 ID
+ * @param {?Object=} timer 第九十一輪批次 RE 組：`startPhaseTimer_()`；有就分段計時（讀取各工作表、申報、規則分類、其他），
+ *   **只量度**，不影響任何判斷或結果
+ * @param {?Object=} out 第九十一輪批次 RC 組：有就放入 `out.context`（這一次用的 `buildFineTuneContext_()` 結果），
+ *   給 `apiSaveAndConfirmExecute_locked_()` 沿用，不再建第二次。**不可以**放進回傳的 plan（plan 會送去前端）
  * @returns {Object}
  */
-function buildSaveAndConfirmPlan_(quarterId) {
+function buildSaveAndConfirmPlan_(quarterId, timer, out) {
+  const mark = function (label) { if (timer) timer.mark(label); };
   const blocked = function (reason, extra) {
     return Object.assign({
       blocked: true, blockReason: reason, unresolved: [],
@@ -103,11 +113,13 @@ function buildSaveAndConfirmPlan_(quarterId) {
   // 由 `context.posts`（真正存在）砌一次，三處共用。
   const postNameById = {};
   (context.posts || []).forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
+  if (out) out.context = context;
 
   // ── 步 1.2　認名 ─────────────────────────────────────────────
   // ⚠️ mode 必須明確傳（第十九輪）。
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiSaveAndConfirmPlan');
+  mark('檢查：讀取各工作表');
 
   // ⚠️ 第七十五輪批次 CE／CG 組（Ivan 決定）：認唔出嘅名**唔再即時擋**。
   // 每一個有兩個選擇：〔加入名單〕（`apiAddPersonForUnresolvedName()`）或者
@@ -158,6 +170,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
     postNamesById[po.postId] = po.postNameTC;
   });
   const overlaps = findRequestGridOverlaps_(requestPlan, postNamesById);
+  mark('檢查：申報');
 
   // ── 步 1.5　規則檢查（三分類 + 準硬）─────────────────────────
   // ⚠️ 參數次序：`findStateViolations_(state, context)`——**派工狀態行先**。
@@ -221,6 +234,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
   const lateRealCount = violations.real.filter(function (v) {
     return v.violationClass === HARD_VIOLATION_CLASS.LATE_UNAVAILABLE;
   }).length;
+  mark('檢查：規則分類');
 
   // ── 步 1.6　三欄對照 ─────────────────────────────────────────
   const proposals = buildSaveConfirmProposals_(context, resolved, allViolations);
@@ -273,6 +287,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
   // 第八十二輪批次 IF 組：有起點未儲存 ⇒ 唔係零改動
   const zeroChange = resolved.changes.length === 0 && requestPlan.results.length === 0
     && titleChanges.length === 0 && !startPoint;
+  mark('檢查：其他（三欄對照、空格、起點）');
   return {
     blocked: false,
     blockReason: null,
@@ -593,6 +608,20 @@ function buildSaveConfirmProposals_(context, resolved, allViolations) {
  *
  * 理由的全文在 `src/MutationLock.gs` 檔頭。
  */
+/**
+ * 第九十一輪批次 RC 組：儲存時沿用 `buildSaveAndConfirmPlan_()` 那一次的 context；季度或版本號不同 ⇒ 照舊重建。
+ * @param {?Object} planContext `out.context`
+ * @param {string} quarterId 季度 ID
+ * @param {number} baseVersionNo plan 的基準版本
+ * @returns {Object} fine-tune context
+ */
+function reuseSaveConfirmContext_(planContext, quarterId, baseVersionNo) {
+  if (planContext && planContext.quarterId === quarterId && Number(planContext.versionNo) === Number(baseVersionNo)) {
+    return planContext;
+  }
+  return buildFineTuneContext_(quarterId, baseVersionNo);
+}
+
 function apiSaveAndConfirmExecute(quarterId, payload) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('儲存我的修改', function () {
@@ -607,8 +636,10 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
 
   // ── 1　後端重新讀 Stage 同最新版本號，唔信前端 ────────────────
   // ── 2　重新跑一次 plan，比對前端送嚟嘅決定係咪仲對應同一批格 ──
-  const plan = buildSaveAndConfirmPlan_(quarterId);
-  timer.mark('重新檢查（讀表、分類規則、申報）');
+  // 第九十一輪批次 RE 組：重新檢查分段計時（「重新檢查：讀取各工作表／申報／規則分類／其他」）
+  // 第九十一輪批次 RC 組：順便取回這一次用的 fine-tune context（`planOut.context`），下面沿用
+  const planOut = {};
+  const plan = buildSaveAndConfirmPlan_(quarterId, prefixPhaseTimer_(timer, '重新'), planOut);
   if (plan.blocked) {
     throw new Error(plan.message || ('無法儲存：' + plan.blockReason));
   }
@@ -664,7 +695,11 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   //
   // 所以有申報就交返俾佢，冇申報就維持原本嗰條（已經有測試守住）。
   // **兩條路都係「建立新版本」，但唔會有兩份實作。**
-  const context = buildFineTuneContext_(quarterId, plan.baseVersionNo);
+  // ⚠️ 第九十一輪批次 RC 組：沿用 plan 那一次的 context，不再建第二次（第八十九輪 M17：約 4 秒）。
+  // 讀碼結論：兩次之間（freshness 核對、needsDecision、零改動）**一格都沒有寫**——第一次寫入是下面的
+  // `writeWeekTitles_()`；`log_()` 只寫 Logger；兩次的參數相同（plan.baseVersionNo＝plan 內的 versionNo）。
+  // 季度或版本號不同（理論上不會）⇒ 照舊重建。
+  const context = reuseSaveConfirmContext_(planOut.context, quarterId, plan.baseVersionNo);
   const resolved = resolveAuthoritativeState_(
     context, STATE_SOURCE.GRID_OVERLAY, 'apiSaveAndConfirmExecute');
   timer.mark('讀取最新表上狀態');

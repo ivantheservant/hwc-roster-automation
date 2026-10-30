@@ -727,6 +727,16 @@ function startPhaseTimer_() {
 }
 
 /**
+ * 第九十一輪批次 RE 組：同一個計時器，標籤前面加字（例如「重新」⇒「重新檢查：讀取各工作表」）。
+ * @param {Object} timer `startPhaseTimer_()`
+ * @param {string} prefix 前綴
+ * @returns {{mark: function(string): void}}
+ */
+function prefixPhaseTimer_(timer, prefix) {
+  return { mark: function (label) { if (timer) timer.mark(prefix + label); } };
+}
+
+/**
  * 把一個值轉成有限數字；**轉唔到就回 `null`，唔會回 0。**
  *
  * ─────────────────────────────────────────────────────────────────────
