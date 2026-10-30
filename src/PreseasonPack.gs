@@ -211,7 +211,7 @@ function isPreseasonRecordSimulated_(flag, notes) {
   const f = String(flag || '').trim().toUpperCase();
   if (f === 'DRY_RUN') return true;
   if (f === 'SENT') return false;
-  return /^\s*模擬/.test(String(notes || ''));
+  return String(notes || '').trim().indexOf('模擬') === 0;
 }
 
 /**
