@@ -23,6 +23,7 @@ function check(label, condition, extra) {
 }
 const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const tick = async () => { for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r)); };
 const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.html',
   'ScriptZone4.html', 'ScriptMainFlow.html', 'ScriptSendPaper.html', 'ScriptSuggestion.html', 'ScriptRollback.html'];
 
@@ -103,6 +104,14 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   ui.google.script.url = { getLocation: (cb) => cb({ parameter: { view: 'combined', quarter: '2027T1', p: 'x' } }) };
   const r3 = ui.parseDeepLink_(await ui.readDeepLinkParams_());
   check('★★★★★ google.script.url.getLocation 的 parameter', r3.view === 'combined' && r3.quarter === '2027T1');
+  // 部署後核對發現：開機時由出席系統更新電郵（背景）完成後會重讀主畫面——不可以把深連結打開的畫面關掉
+  vm.runInContext('__ld = []; loadDashboard = async function (o) { __ld.push(o || null); }; hwcasSyncedOnLoad_ = false;'
+    + ' runAction = async function (l, fn) { await fn(); };', ui);
+  ui.callServerMutating = async () => ({ ok: true, updated: 0 });
+  ui.syncHwcasOnLoad();
+  await tick();
+  const ld = vm.runInContext('__ld', ui);
+  check('★★★★★★ 出席系統更新完成後重讀主畫面 ⇒ 保留已開的視窗（keepModal）', ld.length === 1 && ld[0] && ld[0].keepModal === true, JSON.stringify(ld));
 
   console.log('\n=== NA5：和個人專屬連結互不干擾 ===');
   const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebApp.gs']);

@@ -1832,7 +1832,9 @@
       if (r.ok && r.updated > 0) setStatus('電郵已由出席系統更新：' + r.updated + ' 位。');
       else if (r.ok === false && r.notice) setStatus(r.notice, true);
       // 狀態卡要顯示「已更新（時間）」／「讀不到…」⇒ 重讀一次主畫面
-      runAction('重新整理', loadDashboard);
+      // 第八十七輪批次 NA 組（部署後核對發現）：保留已開的視窗——深連結打開的畫面（或者幹事
+      // 已經打開的畫面）不可以被這一次背景更新關掉
+      runAction('重新整理', () => loadDashboard({ keepModal: true }));
     }).catch(() => { /* 讀唔到出席系統唔可以令主畫面出事 */ });
   }
 

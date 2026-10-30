@@ -9424,6 +9424,14 @@ const MUTATIONS = [
     find: "webapp.access=DOMAIN（",
     replace: "webapp.access=MYSELF（",
     tests: ["tests/round87_nc_domain_access.test.js"]
+  },
+  {
+    id: "na-hwcas-closes-modal",
+    why: "出席系統更新後關掉深連結視窗",
+    file: "src/ui/ScriptZone3.html",
+    find: "      runAction('重新整理', () => loadDashboard({ keepModal: true }));",
+    replace: "      runAction('重新整理', loadDashboard);",
+    tests: ["tests/round87_na_deep_link.test.js"]
   }
 ];
 
