@@ -377,6 +377,27 @@ function getConfigKeySeeds_() {
       description: '詩班名單用 Posts 哪一行（PostID，預設 CHOIR；那一行 ShowInRoster=FALSE，只作名單組別）。詩班獻詩的主日，這個名單上的人盡量不擔任任何職事表崗位。',
       editable: 'TRUE'
     },
+    {
+      // 第九十輪批次 QC 組：個人專屬連結可以申報多少季
+      key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_QUARTERS_AHEAD, type: CONFIG_TYPES.INT, group: 'SYS',
+      defaultValue: '2',
+      description: '義工在個人專屬連結申報不能服侍時，可以選哪些主日：未完結的季度之中最近的幾季（預設 2＝這一季和下一季）。過去的日子不可以選。',
+      editable: 'TRUE'
+    },
+    {
+      // 第九十輪批次 QC 組：申報截止日＝生成日之前幾日
+      key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, type: CONFIG_TYPES.INT, group: 'MAIL',
+      defaultValue: '7',
+      description: '〔寄出申報邀請〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
+      editable: 'TRUE'
+    },
+    {
+      // 第九十輪批次 QC 組：有新的義工申報 ⇒ 每日檢查通知幹事
+      key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_NOTIFY, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: 'TRUE',
+      description: '有新的義工申報（不能服侍）等候確認時，每日檢查通知幹事（MAIL_ADMIN_NOTIFY）一次，同一日最多一封。TRUE（預設）＝通知；FALSE＝不通知（仍然會在〔不能服侍的日期〕和「這一季還要做的」顯示）。遵守 DRY_RUN。',
+      editable: 'TRUE'
+    },
     // ---- SYS ----
     {
       key: CONFIG_KEYS.DRY_RUN, type: CONFIG_TYPES.BOOL, group: 'SYS',

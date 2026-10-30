@@ -184,8 +184,14 @@ console.log('\n=== B3【核心】token 錯／季度唔存在／查詢失敗，�
 
 console.log('\n=== B3【核心】唯讀頁面完全冇任何 google.script.run 呼叫 ===');
 {
-  check('★★★ ui/PersonalRoster.html 完全冇 google.script.run',
-    personalRosterHtml.indexOf('google.script.run') === -1);
+  // 第九十輪批次 QC 組（刻意改動，Ivan 2026-10-30 決定）：「申報不能服侍的日子」一段可以呼叫
+  // 個人連結公開函式（只限 personalSubmitUnavailable／personalWithdrawUnavailable，每次帶 token；
+  // 伺服器端第一句用 token 認人——見 round88_pd_public_globals 的 PD5）。其餘仍然完全唯讀。
+  const runCalls = personalRosterHtml.match(/google\.script\.run/g) || [];
+  const calledFns = (personalRosterHtml.match(/runner\.(\w+)\(/g) || []).map((s) => s.slice(7, -1)).sort();
+  check('★★★ ui/PersonalRoster.html 只有申報一段用 google.script.run，而且只呼叫兩個個人連結公開函式',
+    runCalls.length === 1 && calledFns.join(',') === 'personalSubmitUnavailable,personalWithdrawUnavailable',
+    runCalls.length + '｜' + calledFns.join(','));
   check('★ 完全冇 <form>（冇任何送出資料嘅路徑）',
     !/<form[\s>]/i.test(personalRosterHtml));
   check('★ 完全冇會改動資料嘅 HTML 元素（input[type=text/submit]、button 只有主題切換）',

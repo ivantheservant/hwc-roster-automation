@@ -449,6 +449,27 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "SYS"
     },
+    "PERSONAL_UNAVAILABLE_QUARTERS_AHEAD": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "2",
+      "launchTargetValue": "2",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
+    "PERSONAL_UNAVAILABLE_DEADLINE_DAYS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "7",
+      "launchTargetValue": "7",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "PERSONAL_UNAVAILABLE_NOTIFY": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
     "ROSTER_DRIVE_FOLDER_ID": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "",

@@ -120,6 +120,28 @@
   .how-to strong { color: var(--fg); }
 
   .updated { font-size: 12px; color: var(--muted); margin-top: 16px; }
+
+  /* 第九十輪批次 QC 組：申報不能服侍的日子 */
+  .unav {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  .unav h2 { font-size: 14px; margin: 0 0 8px; }
+  .unav h3 { font-size: 13px; margin: 12px 0 4px; }
+  .unav .muted { color: var(--muted); }
+  .unav label { display: block; padding: 4px 0; }
+  .unav label.off { color: var(--muted); }
+  .unav input[type="text"] { font: inherit; width: 100%; max-width: 420px; padding: 6px 8px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--bg); color: var(--fg); }
+  .unav button { font: inherit; padding: 6px 14px; margin-top: 8px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--header); color: var(--fg); cursor: pointer; }
+  .unav button.link { background: transparent; border: none; padding: 0 0 0 8px; margin: 0; text-decoration: underline; }
+  .unav .sub-row { padding: 3px 0; }
+  .unav .unav-msg { font-weight: 700; margin: 0 0 8px; }
+  .unav .unav-msg.err { color: #b42318; }
 </style>
 </head>
 <body>
@@ -131,6 +153,12 @@
     <button class="theme-toggle" id="themeToggleBtn" type="button">🌙 深色</button>
   </div>
 
+  <? if (data.noRoster) { ?>
+  <div class="schedule">
+    <h2>你的服侍安排</h2>
+    <p>這一季的職事表還未發出。</p>
+  </div>
+  <? } else { ?>
   <div class="schedule">
     <h2>你的服侍安排</h2>
     <? if (data.mySchedule.length === 0) { ?>
@@ -187,14 +215,117 @@
   <? if (data.footerNote) { ?>
     <p class="footer-note"><?= data.footerNote ?></p>
   <? } ?>
+  <? } ?>
+
+  <!-- 第九十輪批次 QC 組：申報不能服侍的日子（只可以呼叫 personalSubmitUnavailable／personalWithdrawUnavailable） -->
+  <div class="unav" id="unavSection">
+    <h2>申報不能服侍的日子</h2>
+    <div id="unavBody"><p class="muted">載入中……</p></div>
+  </div>
 
   <div class="how-to">
-    <p><strong>如果這一週不能服侍：</strong>請直接聯絡幹事安排調動，不要自行更改試算表內容。</p>
+    <p><strong>如果這一週不能服侍：</strong>還未排表的主日，可以在上面「申報不能服侍的日子」申報，幹事確認後生效；已經排了你的那一週，請直接聯絡幹事安排調動，不要自行更改試算表內容。</p>
   </div>
 
   <p class="updated">最後更新：<?= data.updatedAt ?>（此連結長期有效，之後排表更新會自動反映在這裏）</p>
 
   <script>
+    // 第九十輪批次 QC 組：申報不能服侍的日子。起始資料由伺服器端放入（只有這個人自己的資料）；
+    // 提交／撤回只呼叫 personalSubmitUnavailable／personalWithdrawUnavailable，伺服器端每次重新用 token 認人。
+    var UNAV_BOOT = <?!= data.unavailableJson ?>;
+    (function () {
+      var boot = UNAV_BOOT || {};
+      var token = boot.token || '';
+      var body = document.getElementById('unavBody');
+      var busy = false;
+
+      function el(tag, text, cls) {
+        var n = document.createElement(tag);
+        if (text) n.textContent = text;
+        if (cls) n.className = cls;
+        return n;
+      }
+
+      function call(fnName, args, view) {
+        if (busy) return;
+        busy = true;
+        render(view, '處理中……', false);
+        var runner = google.script.run
+          .withSuccessHandler(function (res) {
+            busy = false;
+            render((res && res.view) || view, (res && res.message) || '', !(res && res.ok));
+          })
+          .withFailureHandler(function (err) {
+            busy = false;
+            render(view, (err && err.message) || '未能完成，請稍後再試，或者聯絡幹事。', true);
+          });
+        if (fnName === 'submit') runner.personalSubmitUnavailable(token, args[0], args[1]);
+        else runner.personalWithdrawUnavailable(token, args[0]);
+      }
+
+      function render(view, msg, isErr) {
+        body.innerHTML = '';
+        if (msg) body.appendChild(el('p', msg, 'unav-msg' + (isErr ? ' err' : '')));
+        if (!view) {
+          body.appendChild(el('p', boot.error || '暫時未能申報，請聯絡幹事。', 'muted'));
+          return;
+        }
+        if (view.submissions.length > 0) {
+          body.appendChild(el('h3', '你已提交的申報'));
+          view.submissions.forEach(function (s) {
+            var line = el('div', s.label + '　' + s.statusText + (s.late ? '（截止日之後）' : '')
+              + (s.reason ? '　原因：' + s.reason : ''), 'sub-row');
+            if (s.canWithdraw) {
+              var w = el('button', '撤回', 'link');
+              w.type = 'button';
+              w.addEventListener('click', function () { call('withdraw', [s.submissionId], view); });
+              line.appendChild(w);
+            } else if (s.status === 'ACCEPTED') {
+              line.appendChild(el('span', '　如需取消，請聯絡幹事', 'muted'));
+            }
+            body.appendChild(line);
+          });
+        }
+        var boxes = [];
+        if (view.quarters.length === 0) {
+          body.appendChild(el('p', '現在沒有可以申報的主日。', 'muted'));
+          return;
+        }
+        body.appendChild(el('p', '勾選你不能服侍的主日，可以填原因，然後按〔提交〕。幹事確認之後才會生效。', 'muted'));
+        view.quarters.forEach(function (q) {
+          body.appendChild(el('h3', q.label + (q.deadline ? '（請在 ' + q.deadline + ' 之前申報）' : '')));
+          q.dates.forEach(function (d) {
+            var label = el('label', '', d.status ? 'off' : '');
+            var box = document.createElement('input');
+            box.type = 'checkbox';
+            box.disabled = !!d.status;
+            label.appendChild(box);
+            var note = d.status === 'PENDING' ? '（已申報，等候幹事確認）'
+              : d.status === 'ACCEPTED' ? '（已確認）' : d.status === 'LISTED' ? '（已在不能服侍名單）' : '';
+            label.appendChild(document.createTextNode(' ' + d.label + note));
+            body.appendChild(label);
+            if (!d.status) boxes.push({ date: d.serviceDate, box: box });
+          });
+        });
+        var reason = document.createElement('input');
+        reason.type = 'text';
+        reason.maxLength = view.maxReason;
+        reason.placeholder = '原因（可以留空，最多 ' + view.maxReason + ' 字）';
+        body.appendChild(reason);
+        var submit = el('button', '提交');
+        submit.type = 'button';
+        submit.addEventListener('click', function () {
+          var dates = boxes.filter(function (b) { return b.box.checked; }).map(function (b) { return b.date; });
+          if (dates.length === 0) { render(view, '請先勾選日子。', true); return; }
+          if (dates.length > view.maxDates) { render(view, '每次最多可以提交 ' + view.maxDates + ' 個日子，請分開提交。', true); return; }
+          call('submit', [dates, reason.value], view);
+        });
+        body.appendChild(el('div')).appendChild(submit);
+      }
+
+      render(boot.view, '', false);
+    })();
+
     // 第十一輪批次階段 D：只用 localStorage，完全冇任何伺服器端腳本呼叫
     // ——呢個頁面係 access=ANYONE 部署、匿名訪客都打得開，唔應該有任何
     // 伺服器往返嘅路徑（連讀取偏好都唔應該有），亦冇「呢個訪客係邊個」

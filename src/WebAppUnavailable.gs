@@ -128,10 +128,26 @@ function apiListUnavailable(quarterId, keyword) {
       past: past,
       // 第三十四輪批次乙3：已取消嘅獨立一組。前端要分開顯示，
       // **唔可以合返落 current**——嗰個就係本來個 bug。
-      cancelled: cancelled
+      cancelled: cancelled,
+      // 第九十輪批次 QC 組：義工在個人專屬連結的申報（等候確認）。讀不到 ⇒ 照實講，不當成沒有
+      submissions: readPendingSubmissionsSafe_(timezone)
     };
   } finally {
     endSheetReadMemo_();
+  }
+}
+
+/**
+ * 第九十輪批次 QC 組：〔不能服侍的日期〕最上面「義工申報，待確認」。
+ * @param {string} timezone 時區
+ * @returns {{items: Object[], error: string}}
+ */
+function readPendingSubmissionsSafe_(timezone) {
+  try {
+    return { items: readPendingUnavailableSubmissions_(timezone), error: '' };
+  } catch (err) {
+    log_('WARN', 'apiListUnavailable：義工申報讀不到：' + err.message);
+    return { items: [], error: err.message };
   }
 }
 

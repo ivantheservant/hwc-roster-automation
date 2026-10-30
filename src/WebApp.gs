@@ -52,6 +52,8 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiGetStaffingCheck', 'apiGetStaffingChangeNote', 'apiGetCombinedServices', 'apiPreseasonPreview',
   // 第九十輪批次 QB 組：〔詩班獻詩〕讀取
   'apiGetChoirSinging',
+  // 第九十輪批次 QC 組：〔寄出申報邀請〕預覽
+  'apiUnavailableInvitePreview',
   'apiListUnavailable', 'apiPreviewUnavailableImpact', 'apiListPeople', 'apiListAliases',
   'apiGetEligibilityMatrix', 'apiGetPersonPostWeightMatrix', 'apiGetSendAllRecipients',
   'apiGetSendChangedRecipients', 'apiListRoles', 'apiRolesTermChangePlan', 'apiRoleOverview',

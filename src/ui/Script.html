@@ -129,6 +129,8 @@
     'apiGetCombinedServices',
     // 第九十輪批次 QB 組：〔詩班獻詩〕讀取——只讀
     'apiGetChoirSinging',
+    // 第九十輪批次 QC 組：〔寄出申報邀請〕預覽——只讀
+    'apiUnavailableInvitePreview',
     // 第八十五輪批次 LF 組：〔寄出季前資料〕預覽——只讀
     'apiPreseasonPreview',
     'apiListUnavailable',
@@ -475,6 +477,8 @@
 
   /** 第八十五輪批次 LD 組：會影響人手檢查的儲存動作（名單、不能服侍、偏好、身分、暫時不做、規則、合堂）。 */
   const STAFFING_AFFECTING_CALLS = ['apiApplyEligibilitySheet', 'apiSaveEligibilityBatch', 'apiSaveUnavailable',
+    // 第九十輪批次 QC 組：接受義工申報＝加入不能服侍的日期
+    'apiDecideUnavailableSubmissions',
     'apiSavePersonPostWeightBatch', 'apiAddRole', 'apiSaveRole', 'apiRolesTermChangeExecute', 'apiAddExclusion',
     'apiSaveExclusion', 'apiLiftExclusion', 'apiRuleReviewImportExecute', 'apiSaveCombinedServices'];
   /** 下一個彈窗最上面要寫的人手提醒（寫一次就清空）。 */
@@ -866,10 +870,12 @@
     /^寄/, /^連結勾了的人$/, /^這是新人/, /^解除限制$/, /^繼續/, /^再試/, /^發佈$/, /^確定/,
     /^用這一版作起點$/, /^查看這一版$/, /^用職事表$/, /^用建議表$/, /^產生/, /^放棄/, /^改為再寄/, /^換屆$/,
     /^接受/, /^建立/, /^就是這一位/, /^取消這一筆$/, /^生成/, /^重新生成/, /^回退/, /^匯入/, /^套用/,
-    /^我改好了/, /^下載及匯出$/, /^開始調整$/
+    /^我改好了/, /^下載及匯出$/, /^開始調整$/,
+    // 第九十輪批次 QC 組：義工申報〔不接受〕〔全部接受〕（〔接受〕已由 /^接受/ 涵蓋）
+    /^不接受$/, /^全部接受$/
   ];
   /** 文字對上面的規則、但只是打開一個只看的畫面。 */
-  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料'];
+  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出申報邀請'];
   /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
   const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結'];
 

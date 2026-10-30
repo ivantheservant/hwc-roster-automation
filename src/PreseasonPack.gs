@@ -129,7 +129,15 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
       return (nameById[u.personId] || u.personId) + '　' + u.from + (u.to !== u.from ? ' 至 ' + u.to : '')
         + (u.reason ? '　原因：' + u.reason : '');
     });
-  sections.push({ title: '四、不能服侍的日期', lines: s4.length ? s4 : ['沒有'] });
+  // 第九十輪批次 QC 組：落在這一季、還沒有確認的義工申報（如有）
+  let pendingInQuarter = 0;
+  try {
+    pendingInQuarter = start && end ? countPendingUnavailableSubmissions_({ start: start, end: end }) : 0;
+  } catch (err) {
+    log_('WARN', '季前資料：義工申報讀不到：' + err.message);
+  }
+  sections.push({ title: '四、不能服侍的日期', lines: (s4.length ? s4 : ['沒有'])
+    .concat(pendingInQuarter > 0 ? ['另有 ' + pendingInQuarter + ' 項義工申報待確認'] : []) });
 
   // ⑤ 合堂主日及詩班獻詩（第九十輪批次 QB 組：加詩班獻詩的主日及詩班名單）
   const s5 = readCombinedServices_(quarterId, timezone).filter(function (c) { return c.kind; })

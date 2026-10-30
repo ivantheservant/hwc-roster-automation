@@ -48,7 +48,9 @@ const SHEETS = {
   //（「保留我的安排，系統不要調整」／「這一季臨時幫手，不加入名單」）。第一次勾選時自動建立。
   CELL_DECISIONS: 'CellDecisions',
   // 第二十六輪批次階段 C：排表偏好（某人 × 某崗位 → 比平均多／少 N 次）。
-  PERSON_POST_WEIGHT: 'PersonPostWeight'
+  PERSON_POST_WEIGHT: 'PersonPostWeight',
+  // 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍（幹事確認後才寫 Unavailable）。第一次提交時自動建立。
+  UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions'
 };
 
 /**
@@ -404,6 +406,19 @@ const COLUMNS = {
     STATUS: 'Status',
     CREATED_AT: 'CreatedAt',
     CREATED_BY: 'CreatedBy'
+  },
+  // 第九十輪批次 QC 組：義工申報（見 PersonalUnavailable.gs）
+  UNAVAILABLE_SUBMISSIONS: {
+    SUBMISSION_ID: 'SubmissionID',
+    PERSON_ID: 'PersonID',
+    SERVICE_DATE: 'ServiceDate',
+    REASON: 'Reason',
+    SUBMITTED_AT: 'SubmittedAt',
+    STATUS: 'Status',
+    DECIDED_BY: 'DecidedBy',
+    DECIDED_AT: 'DecidedAt',
+    UNAVAILABLE_ID: 'UnavailableID',
+    LATE: 'Late'
   },
   RULE_SETTINGS: {
     RULE_ID: 'RuleID',
@@ -1459,6 +1474,10 @@ const CONFIG_KEYS = {
   SAME_DAY_EXCLUSIVE_POST_IDS: 'SAME_DAY_EXCLUSIVE_POST_IDS',
   // 第九十輪批次 QB 組：詩班名單用哪一個 Posts 行（PostID，預設 CHOIR）
   CHOIR_GROUP_POST_ID: 'CHOIR_GROUP_POST_ID',
+  // 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍
+  PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: 'PERSONAL_UNAVAILABLE_QUARTERS_AHEAD',
+  PERSONAL_UNAVAILABLE_DEADLINE_DAYS: 'PERSONAL_UNAVAILABLE_DEADLINE_DAYS',
+  PERSONAL_UNAVAILABLE_NOTIFY: 'PERSONAL_UNAVAILABLE_NOTIFY',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
   WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
   // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，

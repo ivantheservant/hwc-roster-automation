@@ -9768,6 +9768,262 @@ const MUTATIONS = [
     find: "    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]) && isPostShownInRoster_(row);",
     replace: "    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);",
     tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qc-token-any",
+    why: "個人連結公開函式不認 token——任何人都可以替任何人申報",
+    file: "src/PersonalUnavailable.gs",
+    find: "  const person = findPersonByToken_(t);\n  if (!person) throw new Error(PERSONAL_LINK_INVALID_MESSAGE);",
+    replace: "  const person = findPersonByToken_(t) || { personId: 'P9701', nameTC: '' };",
+    tests: ["tests/round90_qc_personal_unavailable.test.js", "tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "qc-token-disabled",
+    why: "Web UI 停用時個人連結照樣可以寫",
+    file: "src/PersonalUnavailable.gs",
+    find: "  try {\n    assertWebAppEnabled_();\n  } catch (err) {\n    throw new Error(PERSONAL_LINK_INVALID_MESSAGE);\n  }",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js", "tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "qc-token-format",
+    why: "不是字串的 token（物件）照樣拿去讀表",
+    file: "src/PersonalUnavailable.gs",
+    find: "  const t = typeof token === 'string' ? token.trim() : '';",
+    replace: "  const t = String(token || '').trim();",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "qc-no-html-strip",
+    why: "原因不去掉 HTML",
+    file: "src/PersonalUnavailable.gs",
+    find: "    .replace(/<[^>]*>/g, '')\n    .replace(/[<>]/g, '')",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-reason-no-limit",
+    why: "原因沒有字數上限",
+    file: "src/PersonalUnavailable.gs",
+    find: "    .trim()\n    .slice(0, PERSONAL_UNAVAILABLE_REASON_MAX);",
+    replace: "    .trim();",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-ahead-all",
+    why: "可以申報所有未完結的季度（不限最近 N 季）",
+    file: "src/PersonalUnavailable.gs",
+    find: "    .slice(0, ahead)",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-past-dates",
+    why: "過去的日子都可以申報",
+    file: "src/PersonalUnavailable.gs",
+    find: "      .filter(function (d) { return d && d >= todayStr; })\n      .sort()",
+    replace: "      .filter(function (d) { return !!d; })\n      .sort()",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-max-dates",
+    why: "每次不限 20 個日子",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (wanted.length > PERSONAL_UNAVAILABLE_MAX_DATES) {",
+    replace: "  if (false) {",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-rate-limit",
+    why: "每人每日提交次數沒有上限",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (Object.keys(batchesToday).length >= PERSONAL_UNAVAILABLE_MAX_PER_DAY) {",
+    replace: "  if (false) {",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-range-check",
+    why: "不在允許範圍的日子都寫入",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (bad.length > 0) return fail(",
+    replace: "  if (false) return fail(",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-dup-dates",
+    why: "已申報的日子重複寫入",
+    file: "src/PersonalUnavailable.gs",
+    find: "  const fresh = wanted.filter(function (d) { return !allowed[d]; });",
+    replace: "  const fresh = wanted.filter(function (d) { return !!d; });",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-late-flag",
+    why: "截止日之後不標",
+    file: "src/PersonalUnavailable.gs",
+    find: "    const late = !!(q && q.deadline && now.today > q.deadline);",
+    replace: "    const late = false;",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-audit-token",
+    why: "AuditLog 寫了 token",
+    file: "src/PersonalUnavailable.gs",
+    find: "    source: 'personalSubmitUnavailable',\n    notes: '個人專屬連結申報 '",
+    replace: "    source: 'personalSubmitUnavailable',\n    notes: readPeople_().map(function (r) { return r[COLUMNS.NAME_MAPPING.PERSONAL_LINK_TOKEN]; }).join() + '個人專屬連結申報 '",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-withdraw-others",
+    why: "可以撤回別人的申報",
+    file: "src/PersonalUnavailable.gs",
+    find: "    return s.submissionId === id && s.personId === person.personId;",
+    replace: "    return s.submissionId === id;",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-withdraw-accepted",
+    why: "已確認的可以自己撤回",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (target.status === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED) {",
+    replace: "  if (false) {",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-view-others",
+    why: "個人頁列出別人的申報",
+    file: "src/PersonalUnavailable.gs",
+    find: "  const mine = readUnavailableSubmissions_(timezone).filter(function (s) { return s.personId === personId; });",
+    replace: "  const mine = readUnavailableSubmissions_(timezone);",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-json-unescaped",
+    why: "頁面嵌入的 JSON 不轉義 <（義工的原因可以跳出 script）",
+    file: "src/PersonalUnavailable.gs",
+    find: "  return JSON.stringify(obj === undefined ? null : obj)\n    .replace(/</g, '\\\\u003c')",
+    replace: "  return JSON.stringify(obj === undefined ? null : obj)",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-accept-source",
+    why: "接受的 Unavailable 沒有標 PERSONAL_LINK",
+    file: "src/PersonalUnavailable.gs",
+    find: "      rec[U.SOURCE] = UNAVAILABLE_SOURCE_PERSONAL_LINK;",
+    replace: "      rec[U.SOURCE] = WEBUI_AUDIT_SOURCE;",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-accept-twice",
+    why: "已處理的申報再接受一次（重複建立 Unavailable）",
+    file: "src/PersonalUnavailable.gs",
+    find: "    if (!s || s.status !== UNAVAILABLE_SUBMISSION_STATUS.PENDING) { skipped++; return; }",
+    replace: "    if (!s) { skipped++; return; }",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-reject-creates",
+    why: "不接受都建立 Unavailable",
+    file: "src/PersonalUnavailable.gs",
+    find: "  const accept = decision === 'ACCEPT';",
+    replace: "  const accept = decision === 'ACCEPT' || decision === 'REJECT';",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-notify-daily",
+    why: "同一日通知幹事多過一封",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (lastAt && lastAt.slice(0, 10) === today) return row('SKIP', 'ALREADY_TODAY');",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-notify-flag",
+    why: "Config 關掉照樣通知",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_NOTIFY, true) === false) return row('SKIP', 'DISABLED');",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-invite-dryrun",
+    why: "DRY_RUN 照樣寄申報邀請",
+    file: "src/UnavailableInvite.gs",
+    find: "    if (dryRun) { simulated++; return; }",
+    replace: "    if (dryRun) { simulated++; }",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-invite-everyone",
+    why: "申報邀請寄給名冊上所有人（不限事奉人員表）",
+    file: "src/UnavailableInvite.gs",
+    find: "    if (!id || !wanted[id]) return;",
+    replace: "    if (!id) return;",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-invite-no-choir",
+    why: "申報邀請漏了詩班名單",
+    file: "src/UnavailableInvite.gs",
+    find: "    if (p.postId === choirId) return true;",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-invite-no-roles",
+    why: "申報邀請不展開「堂委」「執事」",
+    file: "src/UnavailableInvite.gs",
+    find: "    (roleContext.eligibleByPost[postId] || []).forEach(function (id) {",
+    replace: "    (eligibility.byPost[postId] || []).forEach(function (id) {",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-page-no-pending",
+    why: "這一季還沒有職事表 ⇒ 個人頁變中性錯誤頁（不能申報）",
+    file: "src/WebAppPersonalLink.gs",
+    find: "    if (!isKnownQuarterSafe_(quarterId)) return renderPersonalRosterError_();\n    data = buildPersonalRosterPendingData_(quarterId, person.nameTC);",
+    replace: "    return renderPersonalRosterError_();",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-page-any-quarter",
+    why: "季度不存在都打開個人頁",
+    file: "src/WebAppPersonalLink.gs",
+    find: "    if (!isKnownQuarterSafe_(quarterId)) return renderPersonalRosterError_();\n",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js", "tests/personal_link.test.js"]
+  },
+  {
+    id: "qc-ui-no-subs",
+    why: "〔不能服侍的日期〕沒有義工申報一段",
+    file: "src/ui/ScriptZone3.html",
+    find: "    nodes.splice(0, 0, unavailableSubmissionsBox(unavailableData.submissions));",
+    replace: "",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-ui-viewonly",
+    why: "只可查看的使用者可以按〔不接受〕〔全部接受〕",
+    file: "src/ui/Script.html",
+    find: "    /^不接受$/, /^全部接受$/",
+    replace: "    /^不接受(?=X)/",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-pack-no-line",
+    why: "季前資料沒有「另有 N 項義工申報待確認」",
+    file: "src/PreseasonPack.gs",
+    find: "    .concat(pendingInQuarter > 0 ? ['另有 ' + pendingInQuarter + ' 項義工申報待確認'] : []) });",
+    replace: " });",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-zone2-no-line",
+    why: "「這一季還要做的」沒有義工申報待確認",
+    file: "src/ui/ScriptZone2.html",
+    find: "    if (d && typeof d.pendingSubmissions === 'number') {",
+    replace: "    if (false) {",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
   }
 ];
 

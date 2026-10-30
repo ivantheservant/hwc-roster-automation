@@ -205,6 +205,20 @@ function renderAllSamples() {
     attachment: '無（NONE）'
   });
 
+  // 第九十輪批次 QC 組（刻意新增）：申報邀請（每人一封，內有自己的個人專屬連結）
+  add({
+    key: 'TPL_UNAVAILABLE_INVITE_TC',
+    template: byId.TPL_UNAVAILABLE_INVITE_TC,
+    recipient: RECIPIENTS.person,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', GenerateDate: '2098-12-01', Deadline: '2098-11-24',
+      PersonalLink: 'https://example.invalid/exec?p=TOKEN&q=2099T1' },
+    purpose: '請義工用自己的個人專屬連結申報不能服侍的主日',
+    trigger: '開季前準備〔寄出申報邀請〕（先預覽，再寄）',
+    audience: '這一季事奉人員表上（自動排的崗位、領詩／司琴、詩班名單）有電郵、有個人連結的人',
+    attachment: '無（NONE）'
+  });
+
   return samples;
 }
 

@@ -208,6 +208,29 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '如需更改，請在 {GenerateDate} 之前通知幹事。',
     placeholders: '{QuarterLabel},{GenerateDate},{PreseasonContentHtml},{PreseasonContentPlain}',
     attachType: ATTACH_TYPE.NONE
+  },
+  // 第九十輪批次 QC 組：〔寄出申報邀請〕（UnavailableInvite.gs；不經 sendStage_()，Stage 欄只作標記）
+  {
+    templateId: 'TPL_UNAVAILABLE_INVITE_TC',
+    stage: 'UNAVAILABLE_INVITE',
+    lang: 'TC',
+    subject: '{QuarterLabel} 職事表：請在 {Deadline} 之前申報不能服侍的主日',
+    bodyHtml: '<p>{PersonName}：</p>'
+      + '<p>平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，'
+      + '請在 {Deadline} 之前用你的個人專屬連結申報：</p>'
+      + '<p><a href="{PersonalLink}">{PersonalLink}</a></p>'
+      + '<p>怎樣申報：打開連結，在「申報不能服侍的日子」勾選日子（可以填原因），然後按〔提交〕。'
+      + '幹事確認之後，頁面會顯示「已確認」。截止日之後仍然可以申報，但未必來得及安排。</p>'
+      + '<p>這條連結只供你本人使用，請不要轉發。</p>',
+    bodyPlain: '{PersonName}：\n\n'
+      + '平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，'
+      + '請在 {Deadline} 之前用你的個人專屬連結申報：\n\n'
+      + '{PersonalLink}\n\n'
+      + '怎樣申報：打開連結，在「申報不能服侍的日子」勾選日子（可以填原因），然後按〔提交〕。'
+      + '幹事確認之後，頁面會顯示「已確認」。截止日之後仍然可以申報，但未必來得及安排。\n\n'
+      + '這條連結只供你本人使用，請不要轉發。',
+    placeholders: '{QuarterLabel},{GenerateDate},{Deadline},{PersonalLink}',
+    attachType: ATTACH_TYPE.NONE
   }
 ];
 

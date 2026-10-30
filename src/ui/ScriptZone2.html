@@ -82,7 +82,9 @@
       button('詩班獻詩', () => openChoirSinging(), '')
     ]));
     // 第八十五輪批次 LF 組：〔寄出季前資料〕（先預覽內容和收件人，再寄）
-    body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary')]));
+    // 第九十輪批次 QC 組：〔寄出申報邀請〕（請義工用個人專屬連結申報不能服侍；先預覽，再寄）
+    body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary'),
+      button('寄出申報邀請', () => openUnavailableInvite(), 'secondary')]));
 
     // 第八十五輪批次 LD 組：人手檢查——有問題才顯示「人手不足：N 個崗位」及〔人手檢查〕
     const st = d && d.staffing;
@@ -99,6 +101,15 @@
     if (d && d.preseasonStatus) {
       summary.appendChild(make('div', { text: (/已寄出/.test(d.preseasonStatus) ? '✅ ' : '⬜ ') + d.preseasonStatus,
         className: /已寄出/.test(d.preseasonStatus) ? 'vio-row muted' : 'vio-row' }));
+    }
+    // 第九十輪批次 QC 組：義工在個人專屬連結的申報，等候幹事確認
+    if (d && typeof d.pendingSubmissions === 'number') {
+      const n = d.pendingSubmissions;
+      summary.appendChild(make('div', {
+        text: n < 0 ? '⬜ 義工申報待確認：暫時查不到' : (n > 0 ? '⬜ 義工申報待確認：' + n + ' 項——在〔不能服侍的日期〕最上面處理'
+          : '✅ 義工申報待確認：0 項'),
+        className: n === 0 ? 'vio-row muted' : 'vio-row'
+      }));
     }
     // 第八十五輪批次 LD 組：沒有問題就寫「人手檢查：足夠」；讀不到就照實講
     if (st && st.error) {
@@ -223,6 +234,47 @@
         button('寄出', () => runAction('寄出季前資料', async () => {
           const r = await callServerMutating('apiPreseasonSend', currentQuarterId);
           openModal('寄出季前資料', [make('div', {
+            text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
+              : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
+            className: 'ok-line'
+          })], [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /**
+   * 第九十輪批次 QC 組：〔寄出申報邀請〕——先預覽（人數、截止日、沒有電郵的人），再〔寄出〕。
+   */
+  function openUnavailableInvite() {
+    runAction('讀取申報邀請', async () => {
+      const p = await callServer('apiUnavailableInvitePreview', currentQuarterId);
+      const nodes = [para('每人一封，內有他自己的個人專屬連結，可以在連結上勾選不能服侍的主日；幹事確認之後才生效。', 'muted')];
+      nodes.push(make('div', { className: 'sec' }, [
+        sectionTitle('截止日'),
+        make('div', { text: p.deadline ? humanDate(p.deadline) + '（生成日 ' + humanDate(p.generateDate) + ' 之前）'
+          : '這一季沒有生成日期，信內會寫「生成日之前」。', className: 'vio-row' })
+      ]));
+      const who = make('div', { className: 'sec' }, [sectionTitle('收件人：' + p.recipientCount + ' 位')]);
+      if ((p.recipientNames || []).length > 0) who.appendChild(make('div', { text: p.recipientNames.join('、'), className: 'vio-row muted' }));
+      if ((p.noEmail || []).length > 0) {
+        who.appendChild(make('div', { text: '沒有電郵（請幹事代為輸入）：' + p.noEmail.join('、'), className: 'err-text' }));
+      }
+      if ((p.noLink || []).length > 0) {
+        who.appendChild(make('div', { text: '沒有個人專屬連結，不會寄（先按「維護 ▸ 補發個人專屬連結 token」）：' + p.noLink.join('、'), className: 'err-text' }));
+      }
+      nodes.push(who);
+      if (p.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定義工個人連結的網址，寄不出。請管理員先設定。', className: 'err-text' }));
+      if (p.sentRecord) {
+        const sr = p.sentRecord;
+        nodes.push(para(sr.real ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次；再寄會再收到一封。'
+          : '這一季在 ' + sr.date + ' 只有模擬寄出，沒有真正寄出過；模擬不算已寄出。', 'muted'));
+      }
+      openModal('寄出申報邀請：' + (p.quarterLabel || currentQuarterId), nodes, [
+        button('寄出', () => runAction('寄出申報邀請', async () => {
+          const r = await callServerMutating('apiUnavailableInviteSend', currentQuarterId);
+          openModal('寄出申報邀請', [make('div', {
             text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
               : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
             className: 'ok-line'

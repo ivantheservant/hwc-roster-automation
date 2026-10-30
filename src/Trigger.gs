@@ -183,6 +183,14 @@ function dailyAutomationCheck_() {
       }
     });
 
+    // 第九十輪批次 QC 組：有新的義工申報 ⇒ 通知幹事一次（同一日最多一封）。出錯不影響上面各季。
+    try {
+      report.push(runUnavailableSubmissionNotify_(today, config, isDryRun));
+    } catch (err) {
+      log_('WARN', 'dailyAutomationCheck_: 義工申報通知失敗：' + err.message);
+      report.push({ quarterId: '', action: 'UNAVAILABLE_SUBMISSIONS', outcome: 'ERROR', detail: err.message });
+    }
+
     return report;
   } finally {
     AUTOMATION_TRIGGER_CONTEXT_ACTIVE = false;

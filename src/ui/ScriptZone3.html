@@ -206,6 +206,8 @@
       ]),
       peopleSearchBox(keyword, (k) => openUnavailable(k, true))
     ];
+    // 第九十輪批次 QC 組：最上面「義工申報，待確認（N 項）」
+    nodes.splice(0, 0, unavailableSubmissionsBox(unavailableData.submissions));
 
     nodes.push(row([button('＋ 新增一筆', () => openUnavailableEditor(null), '')], 'row-right'));
 
@@ -285,6 +287,46 @@
     }
 
     openModal('不能服侍的日期', nodes, [button('關閉', () => closeModalAndRefresh(), '')]);
+  }
+
+  /**
+   * 第九十輪批次 QC 組：義工在個人專屬連結的申報——逐項〔接受〕〔不接受〕，另有〔全部接受〕。
+   * 接受 ⇒ 加入不能服侍的日期（Source=PERSONAL_LINK）。只可查看的使用者看得到，按鈕灰色。
+   * @param {{items: Object[], error: string}} subs `apiListUnavailable` 的 submissions
+   */
+  function unavailableSubmissionsBox(subs) {
+    const s = subs || { items: [], error: '' };
+    const items = s.items || [];
+    const box = make('div', { className: 'sec' }, [sectionTitle('義工申報，待確認（' + items.length + ' 項）')]);
+    if (s.error) {
+      box.appendChild(make('div', { text: '暫時讀不到義工申報（' + s.error + '）', className: 'err-text' }));
+      return box;
+    }
+    if (items.length === 0) {
+      box.appendChild(make('div', { text: '沒有等候確認的義工申報。', className: 'muted' }));
+      return box;
+    }
+    const decide = (ids, decision, label) => runAction(label, async () => {
+      const res = await callServerMutating('apiDecideUnavailableSubmissions', ids, decision);
+      unavailableData = await callServer('apiListUnavailable', currentQuarterId, '');
+      renderUnavailable('');
+      setStatus(res.message || '已處理。', false);
+    });
+    items.forEach((it) => {
+      const line = make('div', { className: 'prop' });
+      line.appendChild(make('div', {
+        text: it.personName + '　' + it.serviceDate + (it.late ? '　（截止日之後）' : ''),
+        className: 'prop-head'
+      }));
+      if (it.reason) line.appendChild(make('div', { text: '原因：' + it.reason, className: 'muted' }));
+      line.appendChild(row([
+        button('接受', () => decide([it.submissionId], 'ACCEPT', '接受義工申報'), 'link'),
+        button('不接受', () => decide([it.submissionId], 'REJECT', '不接受義工申報'), 'link danger')
+      ], 'row-right'));
+      box.appendChild(line);
+    });
+    box.appendChild(row([button('全部接受', () => decide(items.map((it) => it.submissionId), 'ACCEPT', '全部接受義工申報'), '')], 'row-right'));
+    return box;
   }
 
   function unavailableRow(r, opts) {

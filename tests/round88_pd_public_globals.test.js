@@ -6,6 +6,8 @@
 //
 //   PD1　src/*.gs 全部頂層 function：不以 _ 結尾的，一定是白名單（doGet、onOpen、onEdit、includeHtml）
 //        或者已歸類的 api*（開頭 assertWebAppRequestAllowed_／assertSpreadsheetEditorCaller_）。新加一個沒有歸類 ⇒ 紅
+//   PD5　第九十輪批次 QC 組：「個人連結公開函式」一類——只限 PERSONAL_LINK_PUBLIC_APIS（PersonalUnavailable.gs）；
+//        每個第一句一定是 `const person = assertPersonalLinkCaller_(token);`（用 token 認人）；頁面只呼叫這幾個
 //   PD2　白名單本身的內容（不可以靜靜加名）
 //   PD3　選單每一個 addItem 的目標函式都存在；每日觸發器指向的函式存在
 //   PD4　第八十八輪改了名的函式：舊名稱不再是頂層函式
@@ -39,6 +41,13 @@ const PUBLIC_ALLOWLIST = {
 };
 
 const GUARD = /^(?:const \w+ = )?(?:assertWebAppRequestAllowed_\((?:'api\w+')?\)|assertSpreadsheetEditorCaller_\(\));$/;
+// 第九十輪批次 QC 組：個人連結公開函式（義工的個人專屬連結頁用 google.script.run 呼叫；那個部署是任何人都打得開）。
+// 理由：義工沒有教會帳戶，不可以經幹事介面的權限檢查；所以每個函式第一句一定用 token 認人，只寫這個人自己的申報。
+const PERSONAL_GUARD = /^const person = assertPersonalLinkCaller_\(token\);$/;
+const personalSrc = read('src/PersonalUnavailable.gs');
+const PERSONAL_APIS = ((personalSrc.match(/const PERSONAL_LINK_PUBLIC_APIS = \[([^\]]*)\];/) || ['', ''])[1].match(/'([^']+)'/g) || [])
+  .map((s) => s.slice(1, -1));
+const personalFound = [];
 const files = fs.readdirSync(SRC).filter((f) => f.endsWith('.gs'));
 const topFns = {};
 const problems = [];
@@ -51,6 +60,15 @@ files.forEach((file) => {
     topFns[name] = file;
     if (/_$/.test(name)) return;
     if (Object.prototype.hasOwnProperty.call(PUBLIC_ALLOWLIST, name)) return;
+    if (PERSONAL_APIS.indexOf(name) !== -1) {
+      personalFound.push(name);
+      const sig = line.match(/^function \w+\(([^)]*)\)/);
+      let j = i + 1;
+      while (j < lines.length && (/^\s*$/.test(lines[j]) || /^\s*\/\//.test(lines[j]))) j++;
+      if (!sig || sig[1].split(',')[0].trim() !== 'token') problems.push(file + ' ' + name + '：個人連結公開函式第一個參數一定是 token');
+      if (!PERSONAL_GUARD.test((lines[j] || '').trim())) problems.push(file + ' ' + name + '：個人連結公開函式第一句沒有用 token 認人（「' + (lines[j] || '').trim() + '」）');
+      return;
+    }
     if (/^api/.test(name)) {
       let j = i + 1;
       while (j < lines.length && (/^\s*$/.test(lines[j]) || /^\s*\/\//.test(lines[j]))) j++;
@@ -63,12 +81,53 @@ files.forEach((file) => {
 
 console.log('\n=== PD1：公開的全域函式 ===');
 check('★★★★★★ 不以 _ 結尾的頂層函式只有白名單和已歸類的 api*', problems.length === 0, problems.join('\n'));
-const publicNonApi = Object.keys(topFns).filter((n) => !/_$/.test(n) && !/^api/.test(n)).sort();
+const publicNonApi = Object.keys(topFns).filter((n) => !/_$/.test(n) && !/^api/.test(n) && PERSONAL_APIS.indexOf(n) === -1).sort();
 check('★★★★★ 公開的非 api 函式正好是 doGet、includeHtml、onEdit、onOpen', publicNonApi.join(',') === 'doGet,includeHtml,onEdit,onOpen', publicNonApi.join(','));
 
 console.log('\n=== PD2：白名單本身 ===');
 check('★★★★★★ 白名單只有 4 個，每個都寫明理由', Object.keys(PUBLIC_ALLOWLIST).sort().join(',') === 'doGet,includeHtml,onEdit,onOpen'
   && Object.keys(PUBLIC_ALLOWLIST).every((k) => PUBLIC_ALLOWLIST[k].length > 10));
+
+console.log('\n=== PD5：個人連結公開函式（第九十輪批次 QC 組）===');
+check('★★★★★★ 只有兩個：personalSubmitUnavailable、personalWithdrawUnavailable（加名要寫理由並改這裏）',
+  PERSONAL_APIS.slice().sort().join(',') === 'personalSubmitUnavailable,personalWithdrawUnavailable', PERSONAL_APIS.join(','));
+check('★★★★★ 清單上每一個都真的存在（而且只在 PersonalUnavailable.gs）',
+  personalFound.slice().sort().join(',') === PERSONAL_APIS.slice().sort().join(',')
+  && PERSONAL_APIS.every((n) => topFns[n] === 'PersonalUnavailable.gs'), personalFound.join(','));
+{
+  const page = read('src/ui/PersonalRoster.html');
+  const called = (page.match(/\.(\w+)\(token/g) || []).map((s) => s.slice(1, -6));
+  const runs = (page.match(/google\.script\.run/g) || []).length;
+  check('★★★★★★ 個人頁只呼叫這兩個函式（每次都帶 token）', runs === 1 && called.slice().sort().join(',') === PERSONAL_APIS.slice().sort().join(','),
+    runs + '｜' + called.join(','));
+  const staffUi = fs.readdirSync(path.join(SRC, 'ui')).filter((f) => f !== 'PersonalRoster.html')
+    .map((f) => fs.readFileSync(path.join(SRC, 'ui', f), 'utf8')).join('\n');
+  check('★★★★ 幹事介面不呼叫個人連結公開函式', PERSONAL_APIS.every((n) => staffUi.indexOf(n) === -1));
+}
+{
+  const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebAppPersonalLink.gs', 'PersonalUnavailable.gs']);
+  let enabled = true;
+  let lookups = 0;
+  const writes = [];
+  gas.assertWebAppEnabled_ = () => { if (!enabled) throw new Error('WEBAPP_ENABLED=FALSE'); };
+  gas.findPersonByToken_ = (t) => { lookups++; return t === 'a'.repeat(32) ? { personId: 'P9701', nameTC: '假一' } : null; };
+  gas.submitPersonalUnavailable_ = () => { writes.push('submit'); return { ok: true }; };
+  gas.withdrawPersonalUnavailable_ = () => { writes.push('withdraw'); return { ok: true }; };
+  gas.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
+  const msg = (fn) => { try { fn(); return ''; } catch (e) { return e.message; } };
+  const neutral = gas.PERSONAL_LINK_INVALID_MESSAGE;
+  const bad = ['', null, undefined, 'b'.repeat(32), 'a'.repeat(31), 'a'.repeat(32) + ' x', { toString: () => 'a'.repeat(32) }, ['a'.repeat(32)]];
+  check('★★★★★★ token 錯、格式不對、不是字串 ⇒ 兩個函式都是同一句中性錯誤，甚麼都沒有寫',
+    bad.every((t) => msg(() => gas.personalSubmitUnavailable(t, ['2099-01-04'], '')) === neutral
+      && msg(() => gas.personalWithdrawUnavailable(t, 'SUB-1')) === neutral) && writes.length === 0, writes.join(','));
+  check('★★★★★ 格式不對的 token 不用讀表', (() => { lookups = 0; msg(() => gas.personalSubmitUnavailable('x', [], '')); return lookups === 0; })());
+  enabled = false;
+  check('★★★★★ Web UI 停用 ⇒ 正確的 token 也只得中性錯誤', msg(() => gas.personalSubmitUnavailable('a'.repeat(32), [], '')) === neutral && writes.length === 0);
+  enabled = true;
+  gas.personalSubmitUnavailable('a'.repeat(32), [], '');
+  gas.personalWithdrawUnavailable('a'.repeat(32), 'SUB-1');
+  check('★★★★ 正確的 token ⇒ 才會做', writes.join(',') === 'submit,withdraw', writes.join(','));
+}
 
 console.log('\n=== PD3：選單、觸發器的目標函式都存在 ===');
 const menu = read('src/Menu.gs');

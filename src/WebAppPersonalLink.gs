@@ -31,6 +31,9 @@
  *   唔存在」，會俾人知道 token 系統本身嘅存在同格式，方便暴力嘗試）。
  * - 呢個頁面**完全唔可以有任何寫入路徑**——冇表單、冇按鈕會改動資料、
  *   冇 `google.script.run` 呼叫（連讀取都冇，全部資料伺服器端渲染好先送出）。
+ *   第九十輪批次 QC 組（Ivan 2026-10-30 決定）改為：**唯一**的例外是「申報不能服侍的日子」那一段，
+ *   只可以呼叫 `PERSONAL_LINK_PUBLIC_APIS`（PersonalUnavailable.gs）那兩個函式——每個第一句用 token 認人，
+ *   只寫 `UnavailableSubmissions` 這個人自己的行，不會直接改 `Unavailable` 或職事表。
  * - token 外洩點算：`runReissuePersonalLinkToken_()` 可以幫單一個人重新
  *   產生一個新 token，舊連結即時失效。
  */
@@ -338,16 +341,71 @@ function renderPersonalRosterPage_(e) {
   try {
     data = buildPersonalRosterPageData_(quarterId, person.personId, person.nameTC);
   } catch (err) {
-    // 季度唔存在、仲未生成過任何版本——都算「連結無效」，唔透露細節。
+    // 季度唔存在 ⇒ 「連結無效」，唔透露細節。
+    // 第九十輪批次 QC 組：季度存在、只係仲未有職事表 ⇒ 照樣打開（「這一季的職事表還未發出」＋申報一段）。
     log_('WARN', 'renderPersonalRosterPage_ 查無資料（quarterId=' + quarterId + '）：' + err.message);
-    return renderPersonalRosterError_();
+    if (!isKnownQuarterSafe_(quarterId)) return renderPersonalRosterError_();
+    data = buildPersonalRosterPendingData_(quarterId, person.nameTC);
   }
+  // 第九十輪批次 QC 組：「申報不能服侍的日子」——只有這個人自己的資料；token 只交給這一頁自己用
+  data.unavailableJson = jsonForInlineScript_(buildPersonalUnavailableBoot_(person.personId, token));
 
   const template = HtmlService.createTemplateFromFile(UI_FILES.PERSONAL_ROSTER);
   template.data = data;
   return template.evaluate()
     .setTitle(data.quarterId + ' 職事表')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * 第九十輪批次 QC 組：季度存不存在（讀不到 ⇒ 當不存在，回中性錯誤頁）。
+ * @param {string} quarterId 季度 ID
+ * @returns {boolean}
+ */
+function isKnownQuarterSafe_(quarterId) {
+  try {
+    return !!findQuarter_(quarterId);
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * 第九十輪批次 QC 組：還未有職事表的季度——頁面只有標題、「這一季的職事表還未發出」和申報一段。
+ * @param {string} quarterId 季度 ID
+ * @param {string} personNameTC 這個人的中文名
+ * @returns {Object} 和 buildPersonalRosterPageData_() 同一形狀（表格部分是空的）
+ */
+function buildPersonalRosterPendingData_(quarterId, personNameTC) {
+  return {
+    quarterId: quarterId,
+    versionNo: -1,
+    noRoster: true,
+    personName: personNameTC,
+    dateColumns: [],
+    monthGroups: [],
+    postRows: [],
+    mySchedule: [],
+    legendRows: [],
+    footerNote: '',
+    updatedAt: nowTimestamp_()
+  };
+}
+
+/**
+ * 第九十輪批次 QC 組：頁面上「申報不能服侍的日子」的起始資料。讀不到 ⇒ `error`（頁面寫「請聯絡幹事」）。
+ * @param {string} personId 已經用 token 認出來的人
+ * @param {string} token 這個人自己的 token（頁面呼叫公開函式時要帶）
+ * @returns {{token: string, view: ?Object, error: string}}
+ */
+function buildPersonalUnavailableBoot_(personId, token) {
+  try {
+    const now = personalUnavailableToday_();
+    return { token: token, view: buildPersonalUnavailableView_(personId, now.today, now.timezone), error: '' };
+  } catch (err) {
+    log_('WARN', '個人頁申報一段讀不到（' + personId + '）：' + err.message);
+    return { token: token, view: null, error: '暫時未能申報，請聯絡幹事。' };
+  }
 }
 
 /**
