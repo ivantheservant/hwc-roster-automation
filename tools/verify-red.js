@@ -8810,6 +8810,14 @@ const MUTATIONS = [
     tests: ["tests/round85_ld_staffing.test.js"]
   },
   {
+    id: "la-unavail-old-cover",
+    why: "確認窗仍寫蓋住本季",
+    file: "src/ui/ScriptZone3.html",
+    find: "          text: '涵蓋本季 ' + preview.coveredDates.length + ' 個主日'",
+    replace: "          text: '蓋住本季 ' + preview.coveredDates.length + ' 個主日'",
+    tests: ["tests/round85_la_hk_wording.test.js"]
+  },
+  {
     id: "ld-flow-freetext-blank",
     why: "臨時幫手格當成空格補人",
     file: "src/StaffingCheck.gs",

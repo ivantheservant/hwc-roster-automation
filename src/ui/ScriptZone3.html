@@ -488,8 +488,8 @@
     }
     node.appendChild(make('div', {
       text: res.coveredDates.length === 0
-        ? '這個日期範圍沒有蓋住本季任何一個主日。'
-        : '這個日期範圍蓋住本季 ' + res.coveredDates.length + ' 個主日：'
+        ? '這個日期範圍沒有涵蓋本季任何一個主日。'
+        : '這個日期範圍涵蓋本季 ' + res.coveredDates.length + ' 個主日：'
           + res.coveredDates.join('、'),
       className: 'lines'
     }));
@@ -522,7 +522,7 @@
           className: 'vio-row'
         }),
         make('div', {
-          text: '蓋住本季 ' + preview.coveredDates.length + ' 個主日'
+          text: '涵蓋本季 ' + preview.coveredDates.length + ' 個主日'
             + (preview.conflicts.length > 0 ? '，其中 ' + preview.conflicts.length + ' 格他已經被排了' : ''),
           className: 'vio-row'
         })
