@@ -394,14 +394,15 @@ function computeStaffingCheck_(ctx) {
 }
 
 /**
- * 一個崗位的一段話（例如「讀經：13 週需要 13 人次；名單上 5 人，每人每季最多 1 次 ⇒ 最多排到 5 週，有 8 週會留空。……」）。
+ * 一個崗位的一段話（例如「「讀經」：13 週需要 13 人次；名單上 5 人，每人每季最多 1 次 ⇒ 最多排到 5 週，有 8 週會留空。……」）。
  * @param {Object} b computeStaffingCheck_ 每個崗位的結果
  * @returns {string}
  */
 function describeStaffingPost_(b) {
   const main = Object.keys(b.reasons).sort(function (x, y) { return b.reasons[y] - b.reasons[x]; })[0];
   const unit = b.slotCount === 1 ? '週' : '人次';
-  const n = b.postNameTC;
+  // 第八十六輪批次 MC 組：崗位名稱一律加「」（中英文、數字相連時才讀得清楚，例如「PPT 控制」）
+  const n = '「' + b.postNameTC + '」';
   const head = n + '：' + b.weeks + ' 週需要 ' + b.needed + ' 人次；';
   const tail = '有 ' + b.blanks + (b.slotCount === 1 ? ' 週' : ' 格') + '會留空。';
   if (main === STAFFING_REASON.POST_MAX) {
@@ -606,9 +607,9 @@ function apiGetStaffingCheck(quarterId) {
  */
 function describeStaffingChange_(before, after) {
   if (!after || after.totalBlanks <= 0) return '';
-  const names = after.posts.map(function (p) { return p.postNameTC; }).join('、');
+  const names = after.posts.map(function (p) { return '「' + p.postNameTC + '」'; }).join('、');
   const worse = before && after.totalBlanks > before.totalBlanks;
-  return '⚠ 人手檢查：' + names + ' 人手不足，最少會有 ' + after.totalBlanks + ' 格留空'
+  return '⚠ 人手檢查：' + names + '人手不足，最少會有 ' + after.totalBlanks + ' 格留空'
     + (worse ? '（比之前多了 ' + (after.totalBlanks - before.totalBlanks) + ' 格）' : '')
     + '。按「開季前準備 ▸ 人手檢查」看詳情。';
 }

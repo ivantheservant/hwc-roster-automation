@@ -1,7 +1,7 @@
 // 第八十五輪批次 LD 組：每人每季崗位上限、人手檢查、生成不可以多留空。
 // 執行方式：node tests/round85_ld_staffing.test.js
 //
-//   LD1　讀經 5 人、每人每季最多 1 次、13 週 ⇒ 人手檢查寫 8 格；一段話照 Ivan 的例子
+//   LD1　讀經 5 人、每人每季最多 1 次、13 週 ⇒ 人手檢查寫 8 格；一段話照 Ivan 的例子（第八十六輪 MC 組刻意改動：崗位名稱加「」）
 //   LD2　新硬規則：生成不會排超過上限；檢查我的改動／儲存（findStateViolations_）、核對職事表認得
 //   LD3　貪心法會失敗的例子：增廣補空格 ⇒ 達到最少留空；生成（多個種子）留空數＝人手檢查最少留空數
 //   LD4　同週不可兼任（主席＋聖餐襄禮）
@@ -62,7 +62,7 @@ console.log('\n=== LD1：讀經 5 人、上限 1、13 週 ===');
   check('★★★★★★ 最少留空 8 格', r.totalBlanks === 8, JSON.stringify(r));
   const p = r.posts[0];
   check('★★★★★★ 一段話照 Ivan 的例子',
-    p && p.text === '讀經：13 週需要 13 人次；名單上 5 人，每人每季最多 1 次 ⇒ 最多排到 5 週，有 8 週會留空。可以：在讀經名單加人，或者把讀經的上限改高。', p && p.text);
+    p && p.text === '「讀經」：13 週需要 13 人次；名單上 5 人，每人每季最多 1 次 ⇒ 最多排到 5 週，有 8 週會留空。可以：在「讀經」名單加人，或者把「讀經」的上限改高。', p && p.text);
   check('★★★★★ 逐週列出原因（每人每季上限）', p.blankWeeks.length === 8 && p.blankWeeks.every((w) => w.reasonCode === 'POST_MAX'),
     JSON.stringify(p.blankWeeks.slice(0, 2)));
   const off = ctxOf({ serviceDates: weeks(13), posts: [post('READ', '讀經', { maxPerPersonPerQuarter: 1 })],
@@ -199,7 +199,7 @@ console.log('\n=== LD6：規則審閱表、生成確認窗、主畫面 ===');
     }
   }
   const plan2 = g.apiGenerateDraftPlan(sc.Q);
-  check('★★★★★★ 生成確認窗：讀經人手不足 3 格', plan2.staffing.totalBlanks === 3 && /^讀經：4 週需要 4 人次/.test(plan2.staffing.posts[0].text), JSON.stringify(plan2.staffing));
+  check('★★★★★★ 生成確認窗：讀經人手不足 3 格', plan2.staffing.totalBlanks === 3 && /^「讀經」：4 週需要 4 人次/.test(plan2.staffing.posts[0].text), JSON.stringify(plan2.staffing));
   // 主畫面摘要＋快取
   const store = {};
   g.CacheService = { getScriptCache: () => ({ get: (k) => store[k] || null, put: (k, v) => { store[k] = v; }, remove: (k) => { delete store[k]; } }) };
@@ -212,7 +212,7 @@ console.log('\n=== LD6：規則審閱表、生成確認窗、主畫面 ===');
   const third = g.readStaffingCheck_(sc.Q);
   check('★★★★★ 名單改了 ⇒ 簽名變、重新計算（0 格）', third.cached === false && third.totalBlanks === 0);
   const note = g.describeStaffingChange_({ totalBlanks: 0 }, first);
-  check('★★★★★ 改動之後的一句：人手不足（比之前多了）', /^⚠ 人手檢查：讀經 人手不足，最少會有 3 格留空（比之前多了 3 格）/.test(note), note);
+  check('★★★★★ 改動之後的一句：人手不足（比之前多了）', /^⚠ 人手檢查：「讀經」人手不足，最少會有 3 格留空（比之前多了 3 格）/.test(note), note);
   check('★★★★ 足夠 ⇒ 不寫', g.describeStaffingChange_(first, third) === '');
 }
 
@@ -270,7 +270,7 @@ console.log('\n=== LD9：畫面 ===');
   ui.renderZone2Body(Object.assign({}, base, { staffing: { totalBlanks: 1, shortPostCount: 1, posts: [{ postNameTC: 'PPT 控制', blanks: 1 }] } }));
   let body = ui.document.getElementById('zone2Body');
   const btns = body.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
-  check('★★★★★★ 人手不足 ⇒「人手不足：1 個崗位」＋〔人手檢查〕', /人手不足：1 個崗位（最少 1 格會留空）——PPT 控制/.test(body.textContent)
+  check('★★★★★★ 人手不足 ⇒「人手不足：1 個崗位」＋〔人手檢查〕', /人手不足：1 個崗位（最少 1 格會留空）——「PPT 控制」/.test(body.textContent)
     && btns.indexOf('人手檢查') !== -1, body.textContent.slice(0, 300));
   ui.renderZone2Body(Object.assign({}, base, { staffing: { totalBlanks: 0, shortPostCount: 0, posts: [] } }));
   body = ui.document.getElementById('zone2Body');

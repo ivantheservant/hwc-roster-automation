@@ -9112,6 +9112,38 @@ const MUTATIONS = [
     find: "    return contents && contents.attachType === 'NONE' ? '寄送中，請稍候' : '產生 PDF 並寄送，請稍候';",
     replace: "    return '寄送中，請稍候';",
     tests: ["tests/round86_mb_wait_label.test.js"]
+  },
+  {
+    id: "mc-post-no-quote",
+    why: "一段話的崗位名稱沒有引號",
+    file: "src/StaffingCheck.gs",
+    find: "  const n = '「' + b.postNameTC + '」';",
+    replace: "  const n = b.postNameTC;",
+    tests: ["tests/round86_mc_quote_post.test.js", "tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "mc-change-no-quote",
+    why: "改動後提示的崗位名稱沒有引號",
+    file: "src/StaffingCheck.gs",
+    find: "  const names = after.posts.map(function (p) { return '「' + p.postNameTC + '」'; }).join('、');",
+    replace: "  const names = after.posts.map(function (p) { return p.postNameTC; }).join('、');",
+    tests: ["tests/round86_mc_quote_post.test.js", "tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "mc-change-space",
+    why: "改動後提示的引號後多一個空格",
+    file: "src/StaffingCheck.gs",
+    find: "  return '⚠ 人手檢查：' + names + '人手不足，最少會有 '",
+    replace: "  return '⚠ 人手檢查：' + names + ' 人手不足，最少會有 '",
+    tests: ["tests/round86_mc_quote_post.test.js"]
+  },
+  {
+    id: "mc-short-no-quote",
+    why: "開季前準備那一行的崗位名稱沒有引號",
+    file: "src/ui/ScriptZone2.html",
+    find: "st.posts.map((p) => '「' + p.postNameTC + '」').join('、')",
+    replace: "st.posts.map((p) => p.postNameTC).join('、')",
+    tests: ["tests/round86_mc_quote_post.test.js", "tests/round85_ld_staffing.test.js"]
   }
 ];
 

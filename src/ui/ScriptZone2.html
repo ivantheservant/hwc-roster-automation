@@ -200,7 +200,7 @@
   /** 第八十五輪批次 LD 組：「人手不足：N 個崗位（最少 M 格會留空）」 */
   function staffingShortText(st) {
     return '人手不足：' + st.shortPostCount + ' 個崗位（最少 ' + st.totalBlanks + ' 格會留空）'
-      + ((st.posts || []).length ? '——' + st.posts.map((p) => p.postNameTC).join('、') : '');
+      + ((st.posts || []).length ? '——' + st.posts.map((p) => '「' + p.postNameTC + '」').join('、') : '');
   }
 
   /** 第八十五輪批次 LD 組：〔人手檢查〕——逐個崗位、逐週列出原因。 */
