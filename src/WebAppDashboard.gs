@@ -894,6 +894,8 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
   const diagStartedAtMs = Date.now();
   let gridChangeCount = 0;
   let unresolvedCount = 0;
+  // 第九十輪批次 QA 組：同日兼任（含未儲存的改動；勾了「保留我的安排」的不計）
+  let sameDay = { count: 0, items: [], postsLabel: '' };
 
   if (versionNo >= 0) {
     try {
@@ -907,6 +909,14 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
       unresolvedCount = resolved.unresolved.filter(function (u) {
         return !dIndex.isTempHelper(u.serviceDate + '|' + u.postId + '|' + u.slotIndex, u.text);
       }).length;
+      try {
+        sameDay = summariseSameDayExclusive_(resolved.state, context, function (key) {
+          return dIndex.isKept(key, currentCellTextForDecision_(context, key));
+        });
+      } catch (err) {
+        log_('WARN', 'readDashboardUnsavedState_ 算不到同日兼任：' + err.message);
+        sameDay = { count: 0, items: [], postsLabel: '', error: err.message };
+      }
     } catch (err) {
       // grid 工作表被刪／改名嗰類。**唔可以當成「零改動」**——
       // 零改動會令掣 2／3／4 全部亮起，等於話「冇嘢未處理」，
@@ -972,6 +982,8 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
     unresolvedCount: unresolvedCount,
     pendingRequestCount: pendingRequestCount,
     needsInputCount: needsInputCount,
+    // 第九十輪批次 QA 組：狀態卡「N 格同日兼任」（只是提醒，不計入 hasAny）
+    sameDay: sameDay,
     // ⚠️ `needsInputCount` **刻意唔計入 `hasAny`**——見上面嘅判斷。
     hasAny: gridChangeCount > 0 || unresolvedCount > 0 || pendingRequestCount > 0
   };

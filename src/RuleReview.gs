@@ -485,6 +485,17 @@ function ruleReviewPlainEntry_(ruleId) {
       return list.map(function (p) { return p.postNameTC + '：每人每季最多 ' + p.limit + ' 次'; }).join('／');
     }
   };
+  // 第九十輪批次 QA 組：同日不兼任——預設開啟（`RULE_DEFAULT_ENABLED`），現時設定列出崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
+  table[RULE_IDS.SAME_DAY_EXCLUSIVE] = {
+    text: '擔任領詩、司琴等崗位的人，同一個主日不再擔任其他崗位',
+    what: '某人某個主日做了這些崗位（由幹事照音樂部名單在職事表填），那一日就不可以再做任何其他崗位。'
+      + '填了之後有衝突，系統會提醒；〔請系統幫我調整〕會保留領詩／司琴那一格，改另一個崗位。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      const label = (ctx && ctx.sameDayExclusiveLabel) || '';
+      return label ? ('有生效：' + label) : '有生效，但現時沒有設定崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）';
+    }
+  };
   table[RULE_IDS.PERSON_POST_EXCLUDED] = {
     text: '堂委會決定暫時不做某崗位的人，不會被排到那個崗位',
     what: '在「暫時不做某崗位」登記了的人，在登記那段時間之內不會被排到那個崗位。解除是填一個解除日期，不是刪掉紀錄。',

@@ -62,6 +62,8 @@ function buildGeneratorContext_(quarterId) {
     unavailable: unavailable,
     specialByDate: specialByDate,
     rules: rules,
+    // 第九十輪批次 QA 組：同日不兼任的崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
+    sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
     priorWeeks: readPriorWeeks_(quarterStart, carryOverWeeks, timezone),
     existingAssignments: readQuarterAssignments_(quarterId, timezone),
     quotaByPerson: computePersonQuotas_(eligibility, peopleById, serviceDates, posts, rules, maxPerQuarterDefault),
@@ -374,6 +376,10 @@ function buildRoster_(context) {
 
     ratioState.weeksCounted++;
 
+    // 第九十輪批次 QA 組：這一週鎖定格裏已經有人的同日不兼任崗位（領詩、司琴）——
+    // 鎖定格按崗位次序才登記，排在它前面的崗位也要先避開那個人。
+    const sameDayReserved = buildSameDayReservedForWeek_(context, serviceDate, special);
+
     for (let p = 0; p < context.posts.length; p++) {
       const post = context.posts[p];
       const skipReason = getSkipReason_(post, serviceDate, special, rules);
@@ -415,6 +421,7 @@ function buildRoster_(context) {
           serviceDate: serviceDate,
           weekByPost: weekByPost,
           weekByPerson: weekByPerson,
+          sameDayReserved: sameDayReserved,
           previousWeek: previousWeek,
           quarterCount: quarterCount,
           postCount: postCount,
@@ -457,6 +464,46 @@ function buildRoster_(context) {
   const result = { assignments: assignments, warnings: warnings };
   result.blankRepair = repairRosterBlanksWithStaffingFlow_(context, result);
   return result;
+}
+
+/**
+ * 第九十輪批次 QA 組：這一週鎖定格（SpecialSundays.LockPostIDs）裏已經有人的同日不兼任崗位。
+ * @param {Object} context 生成器 context
+ * @param {Object} serviceDate 主日
+ * @param {Object} special 該主日的特別安排
+ * @returns {Object.<string, string>} {PersonID: PostID}
+ */
+function buildSameDayReservedForWeek_(context, serviceDate, special) {
+  const out = {};
+  const ids = context.sameDayExclusivePostIds;
+  if (!isSameDayExclusiveActive_(context.rules, ids)) return out;
+  (special.lockPostIds || []).forEach(function (postId) {
+    if (ids.indexOf(postId) === -1) return;
+    const post = findPost_(context.posts, postId);
+    const slots = post ? post.slotCount : 1;
+    for (let slot = 1; slot <= slots; slot++) {
+      const locked = (context.existingAssignments || {})[serviceDate.serviceDate + '|' + postId + '|' + slot];
+      if (locked && locked.personId && !out[locked.personId]) out[locked.personId] = postId;
+    }
+  });
+  return out;
+}
+
+/**
+ * 排同日不兼任崗位時，這個人今日已經有的其他崗位（中文名，「、」分隔）。
+ * @param {Object} state 排表狀態
+ * @param {string} personId 候選人
+ * @param {string} postId 正在排的崗位
+ * @returns {string}
+ */
+function describeSameDayOtherPosts_(state, personId, postId) {
+  const ids = (state.weekByPerson[personId] || []).filter(function (id) { return id !== postId; });
+  const reserved = (state.sameDayReserved || {})[personId];
+  if (reserved && reserved !== postId && ids.indexOf(reserved) === -1) ids.push(reserved);
+  return ids.map(function (id) {
+    const p = findPost_(state.context.posts, id);
+    return p ? p.postNameTC : id;
+  }).join('、') || '其他崗位';
 }
 
 /**
@@ -1047,6 +1094,23 @@ function evaluateViolations_(personId, state) {
     if (exclusion) {
       violations.push(makeViolation_(rules, RULE_IDS.PERSON_POST_EXCLUDED,
         buildPersonPostExcludedReason_(post, exclusion)));
+    }
+  }
+
+  // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）
+  const sameDayIds = state.context.sameDayExclusivePostIds;
+  if (isSameDayExclusiveActive_(rules, sameDayIds)) {
+    const anchorPostId = sameDayExclusiveAnchorForCandidate_(post.postId, state.weekByPerson[personId] || [],
+      (state.sameDayReserved || {})[personId] || null, sameDayIds);
+    if (anchorPostId) {
+      const person = state.context.peopleById[personId];
+      const anchorPost = findPost_(state.context.posts, anchorPostId);
+      // 正在排的就是同日不兼任崗位 ⇒「已經是<今日其他崗位>，同日不可以再做<這個崗位>」
+      const already = anchorPostId === post.postId
+        ? describeSameDayOtherPosts_(state, personId, post.postId)
+        : (anchorPost ? anchorPost.postNameTC : anchorPostId);
+      violations.push(makeViolation_(rules, RULE_IDS.SAME_DAY_EXCLUSIVE, buildSameDayExclusiveReason_(
+        person ? person.nameTC : personId, state.serviceDate.serviceDate, already, post.postNameTC)));
     }
   }
 

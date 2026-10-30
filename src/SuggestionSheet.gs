@@ -673,7 +673,11 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
       continue;
     }
 
-    const replacement = findReplacementPerson_(violation, workingState, context);
+    // 第九十輪批次 QA 組：同日兼任而這一格亦是人手填的崗位（例如同一人做領詩又做司琴）⇒ 系統不改，
+    // 列入「需要人手處理」（兩格都是幹事照音樂部名單填的）。
+    const replacement = isSameDayExclusiveManualOnlyViolation_(violation, context.posts)
+      ? { personId: '', reason: SAME_DAY_MANUAL_ONLY_NOTE }
+      : findReplacementPerson_(violation, workingState, context);
     const post = findPostById_(context.posts, violation.postId);
     proposals.push({
       serviceDate: violation.serviceDate,
@@ -726,6 +730,13 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
   // ⚠️ 一定要排喺修違反**之後**：先修好壞嘅，再填空嘅。
   // 倒轉做嘅話，填空嗰陣會參考住一個仲有違反嘅狀態，
   // 而填落去嗰個人有機會啱啱好令嗰個違反更難修。
+  // 第九十輪批次 QA 組：勾了保留／已放行／系統不動的格，補空格的網絡一律當固定格——
+  // 否則網絡會把「模型認為不合法」的格（例如保留了的同日兼任）當成空格、把人調走，等於推翻幹事的決定。
+  const untouchedKeys = {};
+  untouchedManual.forEach(function (u) { untouchedKeys[u.key] = true; });
+  workingState.forEach(function (s) {
+    if (untouchedKeys[cellKey_(s.serviceDate, s.postId, s.slotIndex)]) s.kept = true;
+  });
   const gap = proposeGapFills_(context, workingState);
 
   return {

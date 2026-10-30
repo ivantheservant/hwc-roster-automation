@@ -33,7 +33,9 @@ const STAFFING_REASON = {
   POST_MAX: 'POST_MAX',
   MUTEX: 'MUTEX',
   QUARTER_MAX: 'QUARTER_MAX',
-  DISTINCT: 'DISTINCT'
+  DISTINCT: 'DISTINCT',
+  // 第九十輪批次 QA 組
+  SAME_DAY: 'SAME_DAY'
 };
 
 const STAFFING_REASON_TEXT = {
@@ -45,14 +47,17 @@ const STAFFING_REASON_TEXT = {
   POST_MAX: '每人每季上限',
   MUTEX: '同週不可兼任',
   QUARTER_MAX: '每人每季總次數上限',
-  DISTINCT: '同一崗位同週不可重複'
+  DISTINCT: '同一崗位同週不可重複',
+  SAME_DAY: '名單上的人那一日已經擔任不可以兼任的崗位（例如領詩、司琴）'
 };
 
 /** 人手檢查有計入的硬規則（其餘被設成 HARD 的規則會列在 notes）。 */
 const STAFFING_MODELED_RULE_IDS = [
   'HARD_ELIGIBILITY', 'HARD_UNAVAILABLE', 'HARD_DISTINCT_SLOT', 'HARD_MUTEX_GROUP', 'HARD_ROLE_REQUIRED',
   'HARD_PERSON_POST_EXCLUDED', 'HARD_POST_MAX_PER_PERSON', 'HARD_COMMUNION_FIRST_SUNDAY',
-  'HARD_NO_AUTO_PREACHER', 'HARD_SPECIAL_SUNDAY_SKIP', 'SOFT_MAX_PER_QUARTER'
+  'HARD_NO_AUTO_PREACHER', 'HARD_SPECIAL_SUNDAY_SKIP', 'SOFT_MAX_PER_QUARTER',
+  // 第九十輪批次 QA 組：已填的同日不兼任格（固定格、最新一版已填的領詩／司琴）
+  'HARD_SAME_DAY_EXCLUSIVE'
 ];
 
 /**
@@ -177,6 +182,48 @@ function staffingCandidatesOn_(ctx, post, dateStr) {
 }
 
 /**
+ * 第九十輪批次 QA 組：人手檢查／補空格網絡要知道「誰某日已經定了做甚麼崗位」（同日不兼任用）。
+ * 來源：固定格（`opts.fixed`）＋ `ctx.sameDayFixed`（人手檢查讀最新一版已填的領詩／司琴）。**純函式。**
+ * @param {Object} ctx 規則 context（`rules`、`sameDayExclusivePostIds`、可有 `sameDayFixed`）
+ * @param {Object[]} fixed 固定格 {serviceDate, postId, personId}
+ * @returns {Object.<string, string[]>} {'日期|PersonID': [PostID…]}；規則沒有生效 ⇒ {}
+ */
+function buildStaffingSameDayBusy_(ctx, fixed) {
+  const out = {};
+  if (!isSameDayExclusiveActive_(ctx.rules, ctx.sameDayExclusivePostIds)) return out;
+  (fixed || []).concat(ctx.sameDayFixed || []).forEach(function (f) {
+    if (!f || !f.personId) return;
+    const k = f.serviceDate + '|' + f.personId;
+    if (!out[k]) out[k] = [];
+    if (out[k].indexOf(f.postId) === -1) out[k].push(f.postId);
+  });
+  return out;
+}
+
+/**
+ * 第九十輪批次 QA 組：從候選人中拿走「那一日已定了的崗位令他不可以再做這個崗位」的人。**純函式。**
+ * （他已經定了同日不兼任崗位；或者這個崗位本身是同日不兼任而他已經定了別的崗位。）
+ * @param {{pool: string[], candidates: string[], removed: Object}} cand `staffingCandidatesOn_()` 的結果
+ * @param {Object.<string, string[]>} busy `buildStaffingSameDayBusy_()`
+ * @param {string} dateStr 主日
+ * @param {string} postId 崗位
+ * @param {string[]} exclusivePostIds 同日不兼任崗位
+ * @returns {Object} 同一形狀（`removed.SAME_DAY` 記拿走幾多人）
+ */
+function filterStaffingSameDay_(cand, busy, dateStr, postId, exclusivePostIds) {
+  if (!busy || Object.keys(busy).length === 0) return cand;
+  let removedCount = 0;
+  const candidates = cand.candidates.filter(function (id) {
+    const anchor = sameDayExclusiveAnchorForCandidate_(postId, busy[dateStr + '|' + id] || [], null, exclusivePostIds);
+    if (anchor) { removedCount++; return false; }
+    return true;
+  });
+  const removed = Object.assign({}, cand.removed);
+  removed.SAME_DAY = (removed.SAME_DAY || 0) + removedCount;
+  return { pool: cand.pool, candidates: candidates, removed: removed };
+}
+
+/**
  * 建立人手檢查的網絡。**純函式。**
  * @param {Object} ctx 規則 context（另外要有 serviceDates、specialByDate、maxPerQuarterDefault）
  * @param {Object=} opts {fixed: [{serviceDate, postId, personId}]}：已經定下（不改動）的格，先扣容量、不放入網絡
@@ -223,6 +270,9 @@ function buildStaffingModel_(ctx, opts) {
     fixedSlot[k] = (fixedSlot[k] || 0) + 1;
   });
 
+  // 第九十輪批次 QA 組：同日不兼任——已定下的格（固定格＋最新一版已填的領詩／司琴）
+  const sameDayBusy = buildStaffingSameDayBusy_(ctx, opts.fixed || []);
+
   const personNode = {};
   const personEdge = {};
   const ppNode = {};
@@ -266,7 +316,8 @@ function buildStaffingModel_(ctx, opts) {
       if (need === 0) return;
       const node = flowAddNode_(g);
       const sinkEdge = flowAddEdge_(g, node, T, need);
-      const cand = staffingCandidatesOn_(ctx, post, sd.serviceDate);
+      const cand = filterStaffingSameDay_(staffingCandidatesOn_(ctx, post, sd.serviceDate), sameDayBusy,
+        sd.serviceDate, post.postId, ctx.sameDayExclusivePostIds || []);
       const limit = postMaxPerPersonOf_(rules, post);
       const distinct = distinctOn && post.distinctWithinPost;
       const edgeCap = distinct ? 1 : need;
@@ -332,12 +383,15 @@ function staffingClassifyBlank_(model, slot) {
   if (c.pool.length === 0) return STAFFING_REASON.NO_POOL;
   if (c.candidates.length === 0) {
     const r = c.removed;
+    if ((r.SAME_DAY || 0) > 0 && r.UNAVAILABLE === 0 && r.ROLE === 0 && r.EXCLUDED === 0) return STAFFING_REASON.SAME_DAY;
     if (r.UNAVAILABLE > 0 && r.ROLE === 0 && r.EXCLUDED === 0) return STAFFING_REASON.ALL_UNAVAILABLE;
     if (r.ROLE > 0 && r.UNAVAILABLE === 0 && r.EXCLUDED === 0) return STAFFING_REASON.ROLE;
     if (r.EXCLUDED > 0 && r.UNAVAILABLE === 0 && r.ROLE === 0) return STAFFING_REASON.EXCLUDED;
     return STAFFING_REASON.MIXED_FILTERS;
   }
   const counts = {};
+  // 第九十輪批次 QA 組：名單上被「那一日已經擔任不可以兼任的崗位」拿走的人亦計入原因
+  if ((c.removed.SAME_DAY || 0) > 0) counts[STAFFING_REASON.SAME_DAY] = c.removed.SAME_DAY;
   const g = model.g;
   c.candidates.forEach(function (id) {
     let why = STAFFING_REASON.DISTINCT;
@@ -511,6 +565,7 @@ function buildStaffingContext_(quarterId) {
     };
   });
   const config = readConfig_();
+  const sameDayIds = readSameDayExclusivePostIds_();
   return {
     quarterId: quarterId,
     serviceDates: readServiceDatesNormalized_(quarterId, timezone),
@@ -522,8 +577,36 @@ function buildStaffingContext_(quarterId) {
     unavailable: readUnavailableNormalized_(timezone),
     specialByDate: buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone),
     rules: readRules_(),
-    maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER
+    maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER,
+    // 第九十輪批次 QA 組：同日不兼任——最新一版已填的領詩／司琴，那個人當日不再計入其他崗位的人手
+    sameDayExclusivePostIds: sameDayIds,
+    sameDayFixed: readSameDayFixedCells_(quarterId, sameDayIds, timezone)
   };
+}
+
+/**
+ * 第九十輪批次 QA 組：這一季最新一版已填（有 PersonID）的同日不兼任格。未有版本／讀不到 ⇒ []。
+ * @param {string} quarterId 季度 ID
+ * @param {string[]} ids 同日不兼任崗位
+ * @param {string} timezone 時區
+ * @returns {{serviceDate: string, postId: string, personId: string}[]}
+ */
+function readSameDayFixedCells_(quarterId, ids, timezone) {
+  if (!ids || ids.length === 0) return [];
+  try {
+    const versionNo = findLatestVersionNo_(quarterId);
+    if (!(versionNo >= 0)) return [];
+    const C = COLUMNS.ROSTER_ASSIGNMENTS;
+    return readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+      return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo
+        && ids.indexOf(row[C.POST_ID]) !== -1 && row[C.PERSON_ID];
+    }).map(function (row) {
+      return { serviceDate: toDateString_(row[C.SERVICE_DATE], timezone), postId: row[C.POST_ID], personId: row[C.PERSON_ID] };
+    });
+  } catch (err) {
+    log_('WARN', 'readSameDayFixedCells_（' + quarterId + '）讀不到，人手檢查當作未填：' + err.message);
+    return [];
+  }
 }
 
 /**
@@ -536,7 +619,7 @@ function staffingSignature_(ctx) {
     ctx.roles, ctx.personPostExclusions, ctx.unavailable.map(function (u) {
       return [u.personId, u.dateFrom, u.dateTo, u.appliesTo, u.postIds];
     }), Object.keys(ctx.peopleById).sort().map(function (id) { return [id, ctx.peopleById[id].maxPerQuarter]; }),
-    ctx.specialByDate, ctx.rules, ctx.maxPerQuarterDefault]);
+    ctx.specialByDate, ctx.rules, ctx.maxPerQuarterDefault, ctx.sameDayExclusivePostIds || [], ctx.sameDayFixed || []]);
   let h = 5381;
   for (let i = 0; i < parts.length; i++) h = ((h * 33) ^ parts.charCodeAt(i)) >>> 0;
   return parts.length + '-' + h.toString(16);
@@ -670,6 +753,12 @@ function repairRosterBlanksWithStaffingFlow_(context, result) {
     log_('WARN', 'repairRosterBlanksWithStaffingFlow_：補空格會令同週兼任，照舊用貪心法結果');
     return { before: aug.blanksBefore, after: aug.blanksBefore, changed: 0 };
   }
+  // 第九十輪批次 QA 組：補空格不可以新增同日兼任（領詩、司琴）
+  if (isSameDayExclusiveActive_(context.rules, context.sameDayExclusivePostIds)
+      && !sameDayExclusiveNotWorse_(context.sameDayExclusivePostIds, context.posts, cells, next)) {
+    log_('WARN', 'repairRosterBlanksWithStaffingFlow_：補空格會令同日兼任，照舊用貪心法結果');
+    return { before: aug.blanksBefore, after: aug.blanksBefore, changed: 0 };
+  }
   const filledKeys = {};
   aug.changes.forEach(function (ch) {
     const i = byKey[ch.serviceDate + '|' + ch.postId + '|' + ch.slotIndex];
@@ -700,7 +789,8 @@ function repairRosterBlanksWithStaffingFlow_(context, result) {
 function augmentGapFillsWithStaffingFlow_(context, workingState) {
   const cells = workingState.map(function (s) {
     return { serviceDate: s.serviceDate, postId: s.postId, slotIndex: s.slotIndex, personId: s.personId || '',
-      fixed: !!(s.freeText || (s.isManual && s.personId)) };
+      // 第九十輪批次 QA 組：勾了保留／已放行的格（`kept`）亦固定
+      fixed: !!(s.freeText || (s.isManual && s.personId) || s.kept) };
   });
   const aug = augmentAssignmentsWithStaffingFlow_(context, cells);
   if (aug.changes.length === 0 || aug.blanksAfter >= aug.blanksBefore) {
@@ -714,6 +804,11 @@ function augmentGapFillsWithStaffingFlow_(context, workingState) {
     if (i !== undefined) next[i].personId = ch.to;
   });
   if (!staffingCellsKeepMutex_(context, next)) return { changes: [], before: aug.blanksBefore, after: aug.blanksBefore };
+  // 第九十輪批次 QA 組：補空格不可以新增同日兼任（領詩、司琴）
+  if (isSameDayExclusiveActive_(context.rules, context.sameDayExclusivePostIds)
+      && !sameDayExclusiveNotWorse_(context.sameDayExclusivePostIds, context.posts, cells, next)) {
+    return { changes: [], before: aug.blanksBefore, after: aug.blanksBefore };
+  }
   aug.changes.forEach(function (ch) {
     const i = byKey[cellKey_(ch.serviceDate, ch.postId, ch.slotIndex)];
     if (i !== undefined) workingState[i].personId = ch.to;

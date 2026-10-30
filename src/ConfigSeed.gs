@@ -363,6 +363,13 @@ function getConfigKeySeeds_() {
       description: '開季前準備〔合堂主日〕可選的種類，格式「代號=名稱」，逗號分隔。代號寫入 ServiceDates.CombinedKind，週報系統讀取。日後要加種類（例如 MISSION=宣教主日）就在這一格加，不用改程式。留空＝退回預設三種。',
       editable: 'TRUE'
     },
+    {
+      // 第九十輪批次 QA 組：同日不兼任的崗位（HARD_SAME_DAY_EXCLUSIVE）
+      key: CONFIG_KEYS.SAME_DAY_EXCLUSIVE_POST_IDS, type: CONFIG_TYPES.STR, group: 'SYS',
+      defaultValue: 'WORSHIP,PIANO',
+      description: '擔任這些崗位的人，同一個主日不可以再擔任任何其他崗位。PostID，逗號分隔。',
+      editable: 'TRUE'
+    },
     // ---- SYS ----
     {
       key: CONFIG_KEYS.DRY_RUN, type: CONFIG_TYPES.BOOL, group: 'SYS',

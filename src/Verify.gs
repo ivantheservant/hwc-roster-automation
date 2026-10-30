@@ -59,7 +59,9 @@ function buildVerifyContext_(quarterId, versionNo) {
     roles: roleContext.roles,
     personPostExclusions: roleContext.exclusions,
     unavailable: readUnavailableNormalized_(timezone),
-    rules: readRules_()
+    rules: readRules_(),
+    // 第九十輪批次 QA 組：同日不兼任的崗位
+    sameDayExclusivePostIds: readSameDayExclusivePostIds_()
   };
 }
 
@@ -581,6 +583,19 @@ function checkHardRuleViolations_(context) {
     });
   }
 
+  // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）——違反掛在那個人當日其他崗位的格（同 findStateViolations_()）
+  const sameDayHits = [];
+  if (isSameDayExclusiveActive_(context.rules || {}, context.sameDayExclusivePostIds)) {
+    findSameDayExclusiveConflicts_(context.assignments, context.sameDayExclusivePostIds, context.posts)
+      .forEach(function (x) {
+        const anchorPost = postById[x.anchor.postId];
+        const cellPost = postById[x.cell.postId];
+        sameDayHits.push(mk(x.cell, RULE_IDS.SAME_DAY_EXCLUSIVE, buildSameDayExclusiveReason_(
+          x.cell.personName || x.cell.personId, x.cell.serviceDate,
+          anchorPost ? anchorPost.postNameTC : x.anchor.postId, cellPost ? cellPost.postNameTC : x.cell.postId)));
+      });
+  }
+
   const groups = [
     { label: '不在這個崗位的名單上', items: notEligible },
     { label: '違反 Unavailable', items: unavailableHits },
@@ -589,7 +604,8 @@ function checkHardRuleViolations_(context) {
     { label: 'AutoGenerate=FALSE 崗位被派人', items: autoGenerateHits },
     { label: '違反身分限制（規則 1／2：報告限堂委、當值堂委限堂委或執事）', items: roleViolations },
     { label: '違反個人崗位限制（規則 3）', items: exclusionViolations },
-    { label: '超過每人每季崗位上限', items: postMaxHits }
+    { label: '超過每人每季崗位上限', items: postMaxHits },
+    { label: '同日兼任（擔任領詩、司琴等同日不兼任崗位的人當日另有崗位）', items: sameDayHits }
   ];
   const total = groups.reduce(function (sum, g) { return sum + g.items.length; }, 0);
   // `all` 係全部項目攤平——分類函式要一次過睇晒，唔應該逐 group 各自分類

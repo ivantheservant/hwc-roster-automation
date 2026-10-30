@@ -671,6 +671,8 @@ const RULE_IDS = {
   PERSON_POST_EXCLUDED: 'HARD_PERSON_POST_EXCLUDED',
   // 第八十五輪批次 LD 組：Posts.MaxPerPersonPerQuarter——某人在這一季這個崗位已達上限 ⇒ 不再排他。
   POST_MAX_PER_PERSON: 'HARD_POST_MAX_PER_PERSON',
+  // 第九十輪批次 QA 組：擔任 Config SAME_DAY_EXCLUSIVE_POST_IDS 崗位（領詩、司琴）的人，同一個主日不可以再擔任其他崗位
+  SAME_DAY_EXCLUSIVE: 'HARD_SAME_DAY_EXCLUSIVE',
   NO_CONSECUTIVE: 'SEMI_NO_CONSECUTIVE',
   // 第十六輪批次階段 C（教會新規則 4）：堂委盡量集中喺指定嘅幾個崗位，
   // 其餘崗位盡量唔排。軟規則——排唔到人嗰陣仍然可以派，只係扣分。
@@ -792,7 +794,9 @@ const RULE_LEVEL_PENALTY = {
 const RULE_DEFAULT_LEVELS = {
   [RULE_IDS.ROLE_REQUIRED]: RULE_LEVELS.HARD,
   [RULE_IDS.PERSON_POST_EXCLUDED]: RULE_LEVELS.HARD,
-  [RULE_IDS.POST_MAX_PER_PERSON]: RULE_LEVELS.HARD
+  [RULE_IDS.POST_MAX_PER_PERSON]: RULE_LEVELS.HARD,
+  // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）
+  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD
 };
 
 /**
@@ -805,7 +809,9 @@ const RULE_DEFAULT_ENABLED = {
   [RULE_IDS.ROLE_REQUIRED]: true,
   [RULE_IDS.PERSON_POST_EXCLUDED]: true,
   // 第八十五輪批次 LD 組：和 HARD_ROLE_REQUIRED 一樣預設開啟；RuleSettings 有行就照該行
-  [RULE_IDS.POST_MAX_PER_PERSON]: true
+  [RULE_IDS.POST_MAX_PER_PERSON]: true,
+  // 第九十輪批次 QA 組：同日不兼任——預設開啟；RuleSettings 有行就照該行
+  [RULE_IDS.SAME_DAY_EXCLUSIVE]: true
 };
 
 /**
@@ -1438,6 +1444,8 @@ const CONFIG_KEYS = {
   PRESEASON_EXTRA_RECIPIENTS: 'PRESEASON_EXTRA_RECIPIENTS',
   // 第八十五輪批次 LE 組：〔合堂主日〕可選的種類（代號=名稱，逗號分隔）
   COMBINED_SERVICE_KINDS: 'COMBINED_SERVICE_KINDS',
+  // 第九十輪批次 QA 組：同日不兼任的崗位（PostID，逗號分隔）
+  SAME_DAY_EXCLUSIVE_POST_IDS: 'SAME_DAY_EXCLUSIVE_POST_IDS',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
   WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
   // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，

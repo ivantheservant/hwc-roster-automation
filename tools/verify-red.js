@@ -9496,6 +9496,118 @@ const MUTATIONS = [
     find: "    const sheet = range && typeof range.getSheet === 'function' ? range.getSheet() : null;",
     replace: "    const sheet = range ? { getName: function () { return SHEETS.CONFIG; } } : null;",
     tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "qa-anchor-not-other",
+    why: "同日兼任違反掛回錨那一格（領詩），〔請系統幫我調整〕會改走人手填的領詩",
+    file: "src/SameDayExclusive.gs",
+    find: "      if (c.postId === anchor.postId) return;\n      out.push({ cell: c, anchor: anchor });",
+    replace: "      if (c.postId === anchor.postId) return;\n      out.push({ cell: anchor, anchor: c });",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-fsv-missing",
+    why: "findStateViolations_ 拿走同日不兼任——檢查我的改動、儲存、寄出全部看不到",
+    file: "src/FineTune.gs",
+    find: "  if (isSameDayExclusiveActive_(rules, context.sameDayExclusivePostIds)) {\n    findSameDayExclusiveConflicts_(state,",
+    replace: "  if (false && isSameDayExclusiveActive_(rules, context.sameDayExclusivePostIds)) {\n    findSameDayExclusiveConflicts_(state,",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-default-off",
+    why: "同日不兼任預設變成關掉（RuleSettings 沒有行就不生效）",
+    file: "src/Constants.gs",
+    find: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: true\n};",
+    replace: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: false\n};",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-default-soft",
+    why: "同日不兼任跌做 SOFT——生成照樣排、不擋儲存",
+    file: "src/Constants.gs",
+    find: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD\n};",
+    replace: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.SOFT\n};",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-ignore-rule-off",
+    why: "RuleSettings 關掉都照查（規則不可關）",
+    file: "src/SameDayExclusive.gs",
+    find: "    && isRuleEnabledAllowingDefault_(rules || {}, RULE_IDS.SAME_DAY_EXCLUSIVE);",
+    replace: "    && true;",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-manual-only-gone",
+    why: "兩格都是人手填的崗位，系統照樣換人",
+    file: "src/SameDayExclusive.gs",
+    find: "  return !!post && !post.autoGenerate;",
+    replace: "  return false;",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-gen-no-check",
+    why: "生成不查同日不兼任——當日領詩的人照樣排司事",
+    file: "src/Generator.gs",
+    find: "  if (isSameDayExclusiveActive_(rules, sameDayIds)) {\n    const anchorPostId",
+    replace: "  if (false) {\n    const anchorPostId",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-gen-no-reserve",
+    why: "鎖定格的領詩不預留——排在它前面的崗位會排到同一人",
+    file: "src/Generator.gs",
+    find: "      if (locked && locked.personId && !out[locked.personId]) out[locked.personId] = postId;",
+    replace: "      if (false && locked && locked.personId && !out[locked.personId]) out[locked.personId] = postId;",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-staff-no-busy",
+    why: "人手檢查不理已填的領詩——那個人照樣計入其他崗位人手",
+    file: "src/StaffingCheck.gs",
+    find: "  (fixed || []).concat(ctx.sameDayFixed || []).forEach(function (f) {",
+    replace: "  [].forEach(function (f) {",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-flow-moves-kept",
+    why: "補空格網絡把保留了的格調走",
+    file: "src/StaffingCheck.gs",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId) || s.kept) };",
+    replace: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-kept-counted",
+    why: "狀態卡把勾了「保留我的安排」的格照計",
+    file: "src/SameDayExclusive.gs",
+    find: "    if (isKeptKey && isKeptKey(key)) return;",
+    replace: "    if (false) return;",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-verify-missing",
+    why: "核對職事表沒有同日兼任一組",
+    file: "src/Verify.gs",
+    find: "  if (isSameDayExclusiveActive_(context.rules || {}, context.sameDayExclusivePostIds)) {",
+    replace: "  if (false) {",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-review-missing",
+    why: "規則審閱表沒有同日不兼任",
+    file: "src/RuleReview.gs",
+    find: "  table[RULE_IDS.SAME_DAY_EXCLUSIVE] = {",
+    replace: "  table['X_SAME_DAY'] = {",
+    tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qa-card-missing",
+    why: "狀態卡沒有接上同日兼任",
+    file: "src/ui/Script.html",
+    find: "      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay));",
+    replace: ";",
+    tests: ["tests/round90_qa_same_day.test.js"]
   }
 ];
 

@@ -318,8 +318,17 @@ function buildRuleReviewContext_() {
     log_('WARN', '規則審閱表讀不到崗位名單上的身分：' + err.message);
   }
 
+  // 第九十輪批次 QA 組：同日不兼任的崗位（中文名）
+  let sameDayExclusiveLabel = '';
+  try {
+    sameDayExclusiveLabel = describeSameDayExclusivePosts_(readSameDayExclusivePostIds_(), readPostsNormalized_());
+  } catch (err) {
+    log_('WARN', '規則審閱表讀不到同日不兼任的崗位：' + err.message);
+  }
+
   return {
     exclusionCurrentCount: exclusionCurrentCount,
+    sameDayExclusiveLabel: sameDayExclusiveLabel,
     eligibilityRolePosts: eligibilityRolePosts,
     postMaxPosts: postMaxPosts,
     // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然

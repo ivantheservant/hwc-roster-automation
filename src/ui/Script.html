@@ -1212,6 +1212,36 @@
     return nodes;
   }
 
+  /**
+   * 第九十輪批次 QA 組：狀態卡「N 格同日兼任：領詩／司琴的人當日另有崗位」。
+   * 資料由後端 `summariseSameDayExclusive_()`（經 `unsaved.sameDay`），已勾「保留我的安排」的不計。
+   * @param {?Object} sd `{count, items, postsLabel}`
+   * @returns {Element[]} 冇嘢要講就係空陣列
+   */
+  function buildSameDayNodes(sd) {
+    const nodes = [];
+    if (!sd || !(sd.count > 0)) return nodes;
+    const box = make('div', { className: 'warnbox' }, [
+      make('div', {
+        text: sd.count + ' 格同日兼任：' + (sd.postsLabel || '領詩／司琴') + '的人當日另有崗位',
+        className: 'warn-head'
+      })
+    ]);
+    (sd.items || []).slice(0, 10).forEach((it) => {
+      box.appendChild(make('div', { text: it.reason || '', className: 'vio-row' }));
+    });
+    if ((sd.items || []).length > 10) {
+      box.appendChild(make('div', { text: '另有 ' + (sd.items.length - 10) + ' 格。', className: 'muted' }));
+    }
+    box.appendChild(make('div', {
+      text: '按「請系統幫我調整」會保留' + (sd.postsLabel || '領詩／司琴') + '那一格，改另一個崗位；'
+        + '要照樣保留，在〔檢查我的改動〕勾「保留我的安排」。',
+      className: 'muted'
+    }));
+    nodes.push(box);
+    return nodes;
+  }
+
   function row(nodes, className) { return make('div', { className: className || 'row' }, nodes); }
 
   /** 一個唔會被 innerHTML 影響嘅清空。 */
@@ -2331,7 +2361,9 @@
     const warnBox = clear(el('statusWarnings'));
     const warnNodes = buildSendWarningNodes(d.sendWarnings, { compact: true })
       // 第六十七輪批次 AI 組：名單改了之後有幾多格的人已唔喺名單上
-      .concat(buildEligibilityImpactNodes(d.eligibilityImpact));
+      .concat(buildEligibilityImpactNodes(d.eligibilityImpact))
+      // 第九十輪批次 QA 組：同日兼任（領詩／司琴的人當日另有崗位；含未儲存的改動）
+      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay));
     warnNodes.forEach((n) => warnBox.appendChild(n));
     warnBox.hidden = warnNodes.length === 0;
 

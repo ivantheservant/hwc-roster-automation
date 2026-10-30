@@ -69,6 +69,8 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     peopleById: indexPeopleById_(),
     unavailable: readUnavailableNormalized_(timezone),
     rules: readRules_(),
+    // 第九十輪批次 QA 組：同日不兼任的崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
+    sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
     maxMoves: Number(config[CONFIG_KEYS.FINETUNE_MAX_MOVES]) || DEFAULTS.FINETUNE_MAX_MOVES,
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || 8,
     // 預設 TRUE（維持原行為：SEMI_HARD 違反一律回報）。讀一次存進 context，
@@ -520,6 +522,20 @@ function findStateViolations_(state, context) {
     });
   }
 
+  // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）——違反掛在那個人當日**其他崗位**的格（錨那一格不掛），
+  // 所以〔請系統幫我調整〕會保留人手填的領詩／司琴，改另一格。見 SameDayExclusive.gs。
+  // `context.sameDayExclusivePostIds` 由 `buildFineTuneContext_()` 放入；自組的 context（測試）沒有 ⇒ 不檢查。
+  if (isSameDayExclusiveActive_(rules, context.sameDayExclusivePostIds)) {
+    findSameDayExclusiveConflicts_(state, context.sameDayExclusivePostIds, context.posts).forEach(function (x) {
+      const person = (context.peopleById || {})[x.cell.personId];
+      const anchorPost = postById[x.anchor.postId];
+      const cellPost = postById[x.cell.postId];
+      add(x.cell, RULE_IDS.SAME_DAY_EXCLUSIVE, buildSameDayExclusiveReason_(
+        person ? person.nameTC : x.cell.personId, x.cell.serviceDate,
+        anchorPost ? anchorPost.postNameTC : x.anchor.postId, cellPost ? cellPost.postNameTC : x.cell.postId));
+    });
+  }
+
   // 次數上限每人只回報一次，掛在該人最後一個主日的格上。
   // 若放在逐格迴圈內，一個做了 9 次的人會產生 9 項違規，把提案清單淹沒。
   if (isRuleEnabled_(rules, RULE_IDS.MAX_PER_QUARTER)) {
@@ -631,7 +647,10 @@ function proposeMinimalFix_(quarterId, versionNo) {
     const key = cellKey_(violation.serviceDate, violation.postId, violation.slotIndex);
     handled[key] = true;
 
-    const replacement = findReplacementPerson_(violation, workingState, context);
+    // 第九十輪批次 QA 組：同日兼任而這一格亦是人手填的崗位 ⇒ 不改（同 SuggestionSheet.gs）
+    const replacement = isSameDayExclusiveManualOnlyViolation_(violation, context.posts)
+      ? { personId: '', reason: SAME_DAY_MANUAL_ONLY_NOTE }
+      : findReplacementPerson_(violation, workingState, context);
     const original = originalByKey[key] || {};
     if (!original.personId) {
       log_('WARN', 'proposeMinimalFix_: 找不到 ' + key + ' 在 v' + versionNo

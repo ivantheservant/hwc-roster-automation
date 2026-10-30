@@ -57,7 +57,9 @@ const EXCL_TEXT = '堂委會決定暫時不做某崗位的人，不會被排到�
   const exclIdx = built.rows.indexOf(rowOf(EXCL_TEXT));
   check('★★★★★★ KF1 兩條都列出', roleIdx > 0 && exclIdx > 0, JSON.stringify(built.rows.map((r) => r[1])));
   check('★★★★★★ KF1 排喺「一定要遵守」最後（盡量遵守之前、其他硬規則之後）',
-    semiTitle === Math.max(roleIdx, exclIdx) + 1 && built.rows.indexOf(rowOf(gas.ruleReviewPlainEntry_(ID.UNAVAILABLE).text)) < Math.min(roleIdx, exclIdx),
+    // 第九十輪批次 QA 組（刻意改動）：RULE_DEFAULT_ENABLED 多了 HARD_SAME_DAY_EXCLUSIVE（按代號排序在最後）
+    semiTitle === Math.max(roleIdx, exclIdx, built.rows.indexOf(rowOf(gas.ruleReviewPlainEntry_(ID.SAME_DAY_EXCLUSIVE).text))) + 1
+      && built.rows.indexOf(rowOf(gas.ruleReviewPlainEntry_(ID.UNAVAILABLE).text)) < Math.min(roleIdx, exclIdx),
     JSON.stringify(built.rows.map((r) => r[0] + ' ' + r[1])));
   check('★★★★★ KF1 選項「同意／要討論」', rowOf(ROLE_TEXT)[4] === '同意\n要討論' && rowOf(EXCL_TEXT)[4] === '同意\n要討論');
   check('★★★★★ KF1 這一條在做甚麼（身分要求）', rowOf(ROLE_TEXT)[2] === '崗位設定了身分要求的話，系統只會排有那個身分的人；身分以那一個主日當日為準。', rowOf(ROLE_TEXT)[2]);
