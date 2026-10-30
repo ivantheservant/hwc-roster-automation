@@ -335,7 +335,9 @@
     box.appendChild(make('div', {
       text: r.personName + '　' + r.dateFrom + ' 至 ' + r.dateTo
         + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + r.postIds.join('、'))
-        + (o.cancelled ? '　（已取消）' : ''),
+        + (o.cancelled ? '　（已取消）' : '')
+        // 第九十輪批次 QC 組：義工在個人專屬連結申報、幹事接受的那幾筆，講明來源
+        + (r.source === 'PERSONAL_LINK' ? '　（來源：個人連結）' : ''),
       className: 'prop-head'
     }));
     if (r.reason) box.appendChild(make('div', { text: '原因：' + r.reason, className: 'muted' }));

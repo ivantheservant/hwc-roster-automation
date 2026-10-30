@@ -10048,6 +10048,14 @@ const MUTATIONS = [
     find: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1]);",
     replace: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, '', args[0], args[1]);",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-ui-no-source",
+    why: "生效清單沒有講明是義工在個人連結申報的",
+    file: "src/ui/ScriptZone3.html",
+    find: "        + (r.source === 'PERSONAL_LINK' ? '　（來源：個人連結）' : ''),",
+    replace: "        + '',",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
   }
 ];
 

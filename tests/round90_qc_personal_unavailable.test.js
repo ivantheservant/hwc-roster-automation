@@ -447,7 +447,10 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   const btns = body.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
   check('★★★★★ 開季前準備有〔寄出申報邀請〕', btns.indexOf('寄出申報邀請') !== -1, btns.join('、'));
   // 〔不能服侍的日期〕最上面
-  const data = { quarterStart: '2099-01-01', quarterEnd: '2099-01-31', today: '2098-12-10', people: [], posts: [], current: [], past: [], cancelled: [],
+  const cur = (id, name, source) => ({ unavailableId: id, personId: 'P9701', personName: name, dateFrom: '2099-01-11', dateTo: '2099-01-11',
+    appliesTo: 'ALL', postIds: [], reason: '', source: source, status: 'ACTIVE', inQuarter: true });
+  const data = { quarterStart: '2099-01-01', quarterEnd: '2099-01-31', today: '2098-12-10', people: [], posts: [],
+    current: [cur('U1', '假戊', 'PERSONAL_LINK'), cur('U2', '假己', 'WEBUI')], past: [], cancelled: [],
     submissions: { items: [{ submissionId: 'S1', personId: 'P9701', personName: '假甲', serviceDate: '2099-01-11', reason: '出外', late: true },
       { submissionId: 'S2', personId: 'P9703', personName: '假丙', serviceDate: '2099-01-18', reason: '', late: false }], error: '' } };
   vm.runInContext('unavailableData = ' + JSON.stringify(data) + ';', ui);
@@ -459,6 +462,8 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   check('★★★★★ 逐項〔接受〕〔不接受〕＋〔全部接受〕', mbtn.filter((t) => t === '接受').length === 2 && mbtn.filter((t) => t === '不接受').length === 2
     && mbtn.indexOf('全部接受') !== -1, mbtn.join('、'));
   check('★★★★ 截止日之後的標出來、原因', /假甲　2099-01-11　（截止日之後）/.test(mb.textContent) && /原因：出外/.test(mb.textContent));
+  check('★★★★★ 生效清單：接受了的義工申報寫「（來源：個人連結）」；幹事自己加的不寫',
+    /假戊　2099-01-11 至 2099-01-11　全部崗位　（來源：個人連結）/.test(mb.textContent) && !/假己[^假]*來源/.test(mb.textContent), mb.textContent.slice(0, 600));
   // 只可查看 ⇒ 看得到，按鈕灰色
   vm.runInContext('setViewOnly_(true);', ui);
   ui.renderUnavailable('');
