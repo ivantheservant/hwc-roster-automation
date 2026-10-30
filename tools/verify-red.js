@@ -9088,6 +9088,30 @@ const MUTATIONS = [
     find: "只有模擬寄出（",
     replace: "寄過一次（",
     tests: ["tests/round86_ma_preseason_sim.test.js"]
+  },
+  {
+    id: "mb-wait-always-pdf",
+    why: "揀不附仍寫產生 PDF",
+    file: "src/ui/ScriptZone1.html",
+    find: "    return contents && contents.attachType === 'NONE' ? '寄送中，請稍候' : '產生 PDF 並寄送，請稍候';",
+    replace: "    return '產生 PDF 並寄送，請稍候';",
+    tests: ["tests/round86_mb_wait_label.test.js"]
+  },
+  {
+    id: "mb-wait-hardcoded",
+    why: "重發確認後等候牌寫死",
+    file: "src/ui/ScriptZone1.html",
+    find: "        onConfirm: () => runAction(resendWaitLabel_(plan.contents), async () => {",
+    replace: "        onConfirm: () => runAction('產生 PDF 並寄送，請稍候', async () => {",
+    tests: ["tests/round86_mb_wait_label.test.js"]
+  },
+  {
+    id: "mb-wait-never-pdf",
+    why: "有附 PDF 時也不寫產生 PDF",
+    file: "src/ui/ScriptZone1.html",
+    find: "    return contents && contents.attachType === 'NONE' ? '寄送中，請稍候' : '產生 PDF 並寄送，請稍候';",
+    replace: "    return '寄送中，請稍候';",
+    tests: ["tests/round86_mb_wait_label.test.js"]
   }
 ];
 

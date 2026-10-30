@@ -1877,6 +1877,15 @@
     return nodes;
   }
 
+  /**
+   * 第八十六輪批次 MB 組：改動後重發的等候牌按這一次實際揀的附件寫。
+   * 揀「不附」⇒ 不會產生 PDF，只寫「寄送中，請稍候」；有附 PDF（或者讀不到附件資料）⇒ 照舊。
+   * @param {?{attachType: string}} contents 後端 `describeConfirmContents_()` 的結果
+   */
+  function resendWaitLabel_(contents) {
+    return contents && contents.attachType === 'NONE' ? '寄送中，請稍候' : '產生 PDF 並寄送，請稍候';
+  }
+
   function openResend(sendOptions) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
@@ -1921,7 +1930,7 @@
         requireTyping: true,
         confirmLabel: '確定重發',
         danger: true,
-        onConfirm: () => runAction('產生 PDF 並寄送，請稍候', async () => {
+        onConfirm: () => runAction(resendWaitLabel_(plan.contents), async () => {
           await resendGeneratePdfsThenSend('', sendOpts);
         })
       });
