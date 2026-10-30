@@ -95,7 +95,7 @@
       const box = make('div', { className: 'sec sec-warn' }, [
         sectionTitle('這 ' + r.blanks.length + ' 格還沒有人'),
         make('div', {
-          text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。',
+          text: manualPostsPhrase() + '那幾欄不算在內——它們本來就留給你自己填。',
           className: 'muted'
         })
       ]);
@@ -441,7 +441,7 @@
       const box = make('div', { className: 'sec sec-warn' }, [
         sectionTitle('這 ' + r.unfillable.length + ' 格系統仍然找不到人'),
         make('div', {
-          text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。',
+          text: manualPostsPhrase() + '那幾欄不算在內——它們本來就留給你自己填。',
           className: 'muted'
         })
       ]);

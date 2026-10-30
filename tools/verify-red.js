@@ -10056,6 +10056,110 @@ const MUTATIONS = [
     find: "        + (r.source === 'PERSONAL_LINK' ? '　（來源：個人連結）' : ''),",
     replace: "        + '',",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "ra-autogen-ignored",
+    why: "AutoGenerate=FALSE 的崗位不算人手填",
+    file: "src/ManualPosts.gs",
+    find: "  return autoGenerate === false || frequency === POST_FREQUENCY.AS_NEEDED;",
+    replace: "  return frequency === POST_FREQUENCY.AS_NEEDED;",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-asneeded-ignored",
+    why: "AS_NEEDED（翻譯）不算人手填",
+    file: "src/ManualPosts.gs",
+    find: "  return autoGenerate === false || frequency === POST_FREQUENCY.AS_NEEDED;",
+    replace: "  return autoGenerate === false;",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-raw-row-ignored",
+    why: "原始行的 AutoGenerate 讀不到（readPosts_ 的呼叫端全部變成沒有人手崗位）",
+    file: "src/ManualPosts.gs",
+    find: "  const autoGenerate = normalized ? post.autoGenerate : isTrueValue_(post[COLUMNS.POSTS.AUTO_GENERATE]);",
+    replace: "  const autoGenerate = normalized ? post.autoGenerate : true;",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-legend-no-names",
+    why: "圖例「待填」那一行沒有崗位名稱",
+    file: "src/RosterWriter.gs",
+    find: "    manualPostNames: describeManualFillPostNames_(posts)",
+    replace: "    manualPostNames: ''",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-done-count-list",
+    why: "完成窗格數仍然只用清單（講員／翻譯／獻花），和圖例不一致",
+    file: "src/WebAppGenerate.gs",
+    find: "    manualPendingCount: result.blankBreakdown ? result.blankBreakdown.manualPendingCount : sumManualFillItems_(preQuarter),",
+    replace: "    manualPendingCount: sumManualFillItems_(preQuarter),",
+    tests: ["tests/round91_ra_manual_posts.test.js", "tests/manual_pending_count.test.js"]
+  },
+  {
+    id: "ra-plan-no-names",
+    why: "生成確認窗沒有崗位名稱",
+    file: "src/WebAppGenerate.gs",
+    find: "    manualPostNames: describeManualFillPostNames_(context.posts),",
+    replace: "",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-done-no-names",
+    why: "完成窗沒有崗位名稱",
+    file: "src/WebAppGenerate.gs",
+    find: "    manualPostNames: result.manualPostNames || '',",
+    replace: "",
+    tests: ["tests/round91_ra_manual_posts.test.js", "tests/manual_pending_count.test.js"]
+  },
+  {
+    id: "ra-list-no-other",
+    why: "「這一季還要做的」沒有領詩等其他人手崗位",
+    file: "src/WebAppPreQuarter.gs",
+    find: "  ]).concat((input.otherManualPosts || []).map(function (p) {",
+    replace: "  ]).concat(([]).map(function (p) {",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-sum-no-prefix",
+    why: "退回清單加總時不計其他人手崗位",
+    file: "src/WebAppGenerate.gs",
+    find: ".indexOf(MANUAL_EMPTY_ITEM_PREFIX) === 0;",
+    replace: ".indexOf(MANUAL_EMPTY_ITEM_PREFIX) === 99;",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-rule-text-old",
+    why: "規則審閱表仍寫講員、翻譯、獻花",
+    file: "src/RuleReview.gs",
+    find: "    text: '人手填寫的崗位不自動排',",
+    replace: "    text: '講員、翻譯、獻花不由系統安排',",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-rule-current-none",
+    why: "規則審閱表現時設定沒有列崗位",
+    file: "src/RuleReview.gs",
+    find: "      return names ? ('有生效：' + names) : '有生效，但現時沒有人手填寫的崗位';",
+    replace: "      return '有生效';",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-ui-confirm-old",
+    why: "生成確認窗寫死講員、翻譯、獻花",
+    file: "src/ui/ScriptZone1.html",
+    find: "        text: '・' + manualPostsPhrase(plan.manualPostNames) + '不會自動排，要你之後人手填',",
+    replace: "        text: '・講員、翻譯、獻花不會自動排，要你之後人手填',",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "ra-phrase-no-names",
+    why: "畫面句子不用伺服器給的名稱",
+    file: "src/ui/Script.html",
+    find: "    const n = String(names || (dashboardState_ && dashboardState_.manualPostNames) || '').trim();",
+    replace: "    const n = '';",
+    tests: ["tests/round91_ra_manual_posts.test.js"]
   }
 ];
 

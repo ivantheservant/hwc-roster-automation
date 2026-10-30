@@ -93,15 +93,16 @@ console.log('\n=== C【核心】兩邊用同一個函式，唔係各寫一次 ==
   const fn = gen.slice(gen.indexOf('function apiGenerateDraftExecute_locked_'));
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3);
 
-  check('★★★★★ 生成完成用 sumManualFillItems_(preQuarter)，'
-    + '而 preQuarter 係 planPreQuarterChecklist_() 出嚟嗰個'
-    + '——即係同區二**同一個函式嘅同一次結果**',
-    /manualPendingCount: sumManualFillItems_\(preQuarter\)/.test(body)
+  // ⚠️ 第九十一輪批次 RA 組（刻意改動，第九十輪 V5）：完成窗的格數改為和工作表圖例「待填」那一行**同一個來源**
+  //（blankBreakdown＝summariseBlankAssignments_()＝classifyGridCell_() 的 MANUAL_PENDING）。
+  // 領詩、司琴改為人手填之後，清單只計講員／翻譯／獻花，完成窗寫 26 格、圖例寫 65 格。
+  // 清單（「這一季還要做的」）仍然逐項列出，sumManualFillItems_() 只在沒有 blankBreakdown 時退回用。
+  check('★★★★★ 生成完成的格數用 blankBreakdown.manualPendingCount（和圖例同一個來源），沒有才退回清單加總',
+    /manualPendingCount: result\.blankBreakdown \? result\.blankBreakdown\.manualPendingCount : sumManualFillItems_\(preQuarter\)/.test(body)
     && /planPreQuarterChecklist_\(buildPreQuarterChecklistInputs_\(quarterId\)\)/.test(body));
 
-  check('★★★★★ **唔再用** blankBreakdown.manualPendingCount'
-    + '（嗰個係「三個崗位全部空格」，冇睇 TranslationRequired）',
-    body.indexOf('blankBreakdown.manualPendingCount') === -1);
+  check('★★★★★ 完成窗同時帶人手填寫崗位的名稱（manualPostNames）',
+    /manualPostNames: result\.manualPostNames/.test(body));
 
   check('★★★★★ sumManualFillItems_ 入面冇自己再寫一次翻譯判斷',
     !/translationRequired|TRANSLATION_REQUIRED/.test(

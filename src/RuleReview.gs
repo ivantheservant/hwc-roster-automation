@@ -445,9 +445,15 @@ function ruleReviewPlainEntry_(ruleId) {
     text: '聖餐襄禮只在每月第一個主日',
     what: '其餘主日這個崗位根本不存在，不是「留空待填」。'
   };
+  // 第九十一輪批次 RA 組：崗位按 Posts.AutoGenerate=FALSE（及 Frequency=AS_NEEDED）列出，不看 ScopePostIDs
   table[RULE_IDS.NO_AUTO_GENERATE] = {
-    text: '講員、翻譯、獻花不由系統安排',
-    what: '這三個崗位一定要人手填。系統會把格子留空，並在「開季前準備」提醒還有多少格未填。'
+    text: '人手填寫的崗位不自動排',
+    what: '這些崗位設定為不由系統安排，一定要人手填。系統會把格子留空，並在「開季前準備」提醒還有多少格未填。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      const names = (ctx && ctx.manualPostNames) || '';
+      return names ? ('有生效：' + names) : '有生效，但現時沒有人手填寫的崗位';
+    }
   };
   table[RULE_IDS.SPECIAL_SUNDAY_SKIP] = {
     text: '特別主日標明「這一週不用排」的崗位不會排人',

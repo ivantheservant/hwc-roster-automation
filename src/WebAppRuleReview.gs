@@ -326,9 +326,13 @@ function buildRuleReviewContext_() {
     log_('WARN', '規則審閱表讀不到同日不兼任的崗位：' + err.message);
   }
 
+  // 第九十一輪批次 RA 組：人手填寫的崗位（Posts.AutoGenerate=FALSE）
+  const manualPostNames = readManualFillPostNamesSafe_();
+
   return {
     exclusionCurrentCount: exclusionCurrentCount,
     sameDayExclusiveLabel: sameDayExclusiveLabel,
+    manualPostNames: manualPostNames,
     eligibilityRolePosts: eligibilityRolePosts,
     postMaxPosts: postMaxPosts,
     // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然

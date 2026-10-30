@@ -97,6 +97,8 @@ function apiGenerateDraftPlan(quarterId) {
     quarterLabel: buildQuarterLabel_(quarterId),
     serviceDateCount: context.serviceDates.length,
     postCount: context.posts.length,
+    // 第九十一輪批次 RA 組：生成確認窗「…不會自動排」的崗位名稱（Posts.AutoGenerate=FALSE）
+    manualPostNames: describeManualFillPostNames_(context.posts),
     staffing: staffing,
     attemptsPlanned: readMultiRunAttempts_(),
     timeBudgetMinutes: Math.round(MULTIRUN_TIME_BUDGET_MS / 60000)
@@ -221,7 +223,13 @@ function apiGenerateDraftExecute_locked_(quarterId) {
     // 而家改為直接由 `planPreQuarterChecklist_()` 嘅結果加總——
     // 即係**同一個函式**，唔係「兩邊各寫一次一樣嘅判斷」。
     // 兩邊各寫一次就一定會有一日分岔（本專案燒過好多次）。
-    manualPendingCount: sumManualFillItems_(preQuarter),
+    //
+    // ⚠️ 第九十一輪批次 RA 組（刻意改動）：完成窗的格數改為和**工作表圖例「待填」那一行同一個來源**
+    // （`summariseBlankAssignments_()`＝`classifyGridCell_()` 的 MANUAL_PENDING 格數）。第九十輪 V5：
+    // 領詩、司琴改為人手填之後，完成窗寫 26 格（清單只計講員／翻譯／獻花），圖例寫 65 格。
+    // 「這一季還要做的」各項（例如翻譯只計要翻譯的主日）仍然逐項列出，那是另一個問題（還要做甚麼）。
+    manualPendingCount: result.blankBreakdown ? result.blankBreakdown.manualPendingCount : sumManualFillItems_(preQuarter),
+    manualPostNames: result.manualPostNames || '',
     attemptsRun: result.attemptsRun,
     attemptsPlanned: result.attemptsPlanned,
     // 階段 A7：跑少咗次數一定要講出嚟，唔可以靜靜接受一個較差嘅結果。
@@ -250,7 +258,9 @@ function sumManualFillItems_(preQuarter) {
   if (!preQuarter || preQuarter.undoneItemCount === -1) return -1;
   const MANUAL_FILL_ITEM_IDS = ['preacherEmpty', 'translationEmpty', 'flowerEmpty'];
   return (preQuarter.items || []).reduce(function (sum, item) {
-    return MANUAL_FILL_ITEM_IDS.indexOf(item.id) === -1 ? sum : sum + (item.count || 0);
+    // 第九十一輪批次 RA 組：其他人手填寫崗位的項目（manualEmpty_<PostID>）一併計
+    const manual = MANUAL_FILL_ITEM_IDS.indexOf(item.id) !== -1 || String(item.id || '').indexOf(MANUAL_EMPTY_ITEM_PREFIX) === 0;
+    return manual ? sum + (item.count || 0) : sum;
   }, 0);
 }
 

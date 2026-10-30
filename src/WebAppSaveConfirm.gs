@@ -1265,7 +1265,7 @@ function evaluatePublicLinkFreshness_(quarterId) {
     out.stale = true;
     out.reason = 'EDITED_AFTER_PUBLISH';
     out.message = '公開連結在 ' + publishedAt + ' 發佈，之後在 ' + lastEditAt
-      + ' 這一版有格子改過（例如填講員／翻譯／獻花），公開連結上看不到。';
+      + ' 這一版有格子改過（例如填了人手填寫的崗位），公開連結上看不到。';
   }
   return out;
 }

@@ -244,8 +244,10 @@ console.log('\n=== A2：圖例逐類都有，而且附上本季實際格數 ==='
   const pendingRow = rows.filter(function (r) { return r[0] === gas.DEFAULTS.GRID_PENDING_LABEL; })[0];
   check('★★ 「待填：39 格」有寫出嚟，即刻解釋咗點解表上有咁多空位',
     pendingRow && pendingRow[2] === '39 格');
-  check('★ 待填嗰行有講明係邊幾個崗位（講員／翻譯／獻花）',
-    pendingRow && /講員/.test(pendingRow[1]) && /翻譯/.test(pendingRow[1]),
+  // 第九十一輪批次 RA 組（刻意改動）：崗位名稱由 layout.manualPostNames（Posts.AutoGenerate=FALSE）而來，
+  // 不再寫死；這個純函式測試的 layout 沒有名稱 ⇒ 只寫「此崗位不由系統自動安排，需要人手填寫」
+  check('★ 待填嗰行講明係人手填寫（崗位名稱另有 RA 測試）',
+    pendingRow && /不由系統自動安排/.test(pendingRow[1]) && /需要人手填寫/.test(pendingRow[1]),
     pendingRow ? pendingRow[1] : '');
   // 第六十八輪批次 AO 組：匯入嘅版本全部係人手編好（MANUAL），圖例第一行唔可以話「系統自動安排」
   const assignedLegend = rows.filter(function (r) { return r[0] === '（姓名）'; })[0];

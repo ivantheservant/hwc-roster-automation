@@ -732,6 +732,8 @@ function buildDashboardState_(quarterId) {
     staffing: staffing,
     preseasonStatus: preseasonStatus,
     pendingSubmissions: pendingSubmissions,
+    // 第九十一輪批次 RA 組：畫面上「人手填寫的崗位（…）」的名稱（Posts.AutoGenerate=FALSE）
+    manualPostNames: readManualFillPostNamesSafe_(),
     quarterId: quarterId,
     quarterLabel: buildQuarterLabel_(quarterId),
     stage: stage,

@@ -894,7 +894,7 @@ function lookupExistingPersonalPdf_(context, recipient) {
   }
   const stamp = context._pdfContentStamp;
   if (isPersonalPdfStale_(file.getLastUpdated(), stamp.updatedAt, stamp.timezone)) {
-    const error = new Error('這份 PDF（' + fileName + '）是填講員／翻譯／獻花之前產生的，'
+    const error = new Error('這份 PDF（' + fileName + '）是在職事表填人手填寫的崗位之前產生的，'
       + '內容已經過期。請重新執行『產生個人 PDF』（過期的會自動重新產生）。');
     error.missing = true;
     throw error;

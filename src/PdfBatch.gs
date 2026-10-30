@@ -929,7 +929,7 @@ function buildPersonalPdfVersionReport_(diag) {
   if (diag.latestStaleCount > 0) {
     lines.push('');
     lines.push('⚠️ 最新版本 ' + latestKey + ' 之中有 ' + diag.latestStaleCount
-      + ' 份是這一版內容改動之前產生的（例如填講員／翻譯／獻花之前），已經過期。');
+      + ' 份是這一版內容改動之前產生的（例如在職事表填人手填寫的崗位之前），已經過期。');
     lines.push('請重新執行「產生個人 PDF」——過期的會自動重新產生，不需要先手動刪除。');
   }
   return lines.join('\n');

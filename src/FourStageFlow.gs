@@ -77,7 +77,7 @@ function runFourStageStep1_() {
       '留空共 ' + result.blank + ' 格，細分如下（階段 C 起不再是一個含糊的數字）：',
       '　結構性不適用（不需要任何人處理，例如非首主日的聖餐襄禮）：' + b.structuralNaCount + ' 格',
       '　因特別主日跳過（通常不需要處理，但建議留意）：' + b.specialSkipCount + ' 格',
-      '　待人手填寫（系統設計上本來就不自動生成，例如講員／翻譯／獻花）：' + b.manualPendingCount + ' 格',
+      '　待人手填寫（系統設計上本來就不自動生成：' + (result.manualPostNames || '人手填寫的崗位') + '）：' + b.manualPendingCount + ' 格',
       '　⚠ 系統應該排但排不出（真正的問題，建議優先處理）：' + b.genuineGapCount + ' 格'
     ];
     if (b.genuineGapCount > 0) {

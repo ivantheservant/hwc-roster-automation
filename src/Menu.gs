@@ -447,7 +447,7 @@ function runCheckPersonalPdfIntegrity_() {
     const stale = result.stale || [];
     if (stale.length > 0) {
       lines.push('⚠️ 檔案存在但已經過期（這一版內容在 ' + result.contentUpdatedAt
-        + ' 改過，例如填講員／翻譯／獻花，這些 PDF 在那之前產生）：' + stale.length + ' 人');
+        + ' 改過，例如填了人手填寫的崗位，這些 PDF 在那之前產生）：' + stale.length + ' 人');
       stale.slice(0, 30).forEach(function (p) {
         lines.push('　' + p.nameTC + '（' + p.personId + '）　' + p.fileName);
       });

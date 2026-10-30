@@ -33,7 +33,7 @@ function describeRuleForCommittee_(ruleId) {
   map[RULE_IDS.DISTINCT_SLOT] = '同一週同一崗位不會重複安排同一個人';
   map[RULE_IDS.UNAVAILABLE] = '不會安排已表明當日不能服侍的人';
   map[RULE_IDS.COMMUNION_FIRST_SUNDAY] = '聖餐襄禮只安排在每月第一個主日';
-  map[RULE_IDS.NO_AUTO_GENERATE] = '講員、翻譯、獻花不由系統安排';
+  map[RULE_IDS.NO_AUTO_GENERATE] = '人手填寫的崗位不由系統安排';
   map[RULE_IDS.MUTEX_GROUP] = '同一週不會安排同一個人擔任互相衝突的崗位';
   map[RULE_IDS.NO_CONSECUTIVE] = '同一崗位盡量不連續兩週由同一個人擔任';
   // 第十七輪批次階段 D2：呢兩條係第十六輪新增嘅教會身分規則。冇加入呢個
@@ -143,8 +143,9 @@ function buildDraftReviewRows_(m, blank) {
       + '由系統按上述規則自動安排。'));
   rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '★ 留給人手填寫',
     (blank.manualPending || 0) + ' 格',
-    '講員、翻譯、獻花這幾個崗位，系統設計上就不會自動安排——'
-      + '講員由堂主任／講員安排小組決定，翻譯與獻花另有安排方式。'
+    // 第九十一輪批次 RA 組：崗位名稱由 Posts.AutoGenerate=FALSE 組成
+    manualFillPostsPhrase_(readManualFillPostNamesSafe_()) + '，系統設計上就不會自動安排——'
+      + '由幹事照負責同工給的名單在職事表填寫。'
       + '表上這些格顯示「' + DEFAULTS.GRID_PENDING_LABEL + '」，'
       + '是預期中的空格，不是系統排不出來。'));
   rows.push(diagRow_('四、系統排了甚麼、留了甚麼給人手', '這一週不設此崗位',
@@ -266,7 +267,7 @@ function runDraftReviewReport_() {
       + '平均每人 ' + d.average.toFixed(1) + ' 次，最多的一位 ' + d.maxCount + ' 次。',
     '',
     '系統自動安排：' + blank.assigned + ' 格',
-    '留給人手填寫（講員／翻譯／獻花）：' + blank.manualPending + ' 格',
+    '留給人手填寫（' + (readManualFillPostNamesSafe_() || '人手填寫的崗位') + '）：' + blank.manualPending + ' 格',
     '這一週不設此崗位：' + blank.structuralNa + ' 格',
     '系統排不出來：' + blank.genuineGap + ' 格'
       + (blank.genuineGap === 0 ? '　✅' : '　⚠ 需要人手處理'),

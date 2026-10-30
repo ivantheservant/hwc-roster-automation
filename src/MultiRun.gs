@@ -414,6 +414,8 @@ function performRosterGeneration_(quarterId) {
     assigned: assigned,
     blank: genResult.assignments.length - assigned,
     blankBreakdown: blankBreakdown,
+    // 第九十一輪批次 RA 組：完成窗「人手填的崗位」名稱（按 Posts.AutoGenerate=FALSE）
+    manualPostNames: readManualFillPostNamesSafe_(),
     warnings: genResult.warnings.length,
     attemptsRun: genResult.attemptsRun,
     attemptsPlanned: genResult.attemptsPlanned,

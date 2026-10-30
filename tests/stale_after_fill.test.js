@@ -274,8 +274,9 @@ console.log('\n=== A2【核心】個人 PDF 三個入口都判定過期 ===');
   } catch (err) { thrown = err; }
   check('★★★★★★ 寄信嗰刻：過期 ⇒ 當缺件（missing=true）',
     thrown && thrown.missing === true, thrown ? thrown.message : '冇拋錯');
-  check('★★★★★ 訊息講明「填講員之前產生，請重新執行產生個人 PDF」',
-    thrown && /填講員/.test(thrown.message) && /產生個人 PDF/.test(thrown.message));
+  // 第九十一輪批次 RA 組（刻意改動）：「填講員／翻譯／獻花」改為「填人手填寫的崗位」
+  check('★★★★★ 訊息講明「填人手填寫的崗位之前產生，請重新執行產生個人 PDF」',
+    thrown && /人手填寫的崗位之前產生/.test(thrown.message) && /產生個人 PDF/.test(thrown.message));
 }
 
 console.log('\n=== A1【核心】寄給堂委審閱之前自動重發佈 ===');

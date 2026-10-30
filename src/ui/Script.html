@@ -69,6 +69,17 @@
    */
   let dashboardState_ = null;
 
+  /**
+   * 第九十一輪批次 RA 組：「人手填寫的崗位（講員、翻譯、獻花、領詩、司琴）」——名稱由伺服器按
+   * Posts.AutoGenerate=FALSE 組成（`names` 優先，否則用主畫面狀態）；沒有名稱 ⇒「人手填寫的崗位」。
+   * @param {string=} names 名稱
+   * @returns {string}
+   */
+  function manualPostsPhrase(names) {
+    const n = String(names || (dashboardState_ && dashboardState_.manualPostNames) || '').trim();
+    return n ? '人手填寫的崗位（' + n + '）' : '人手填寫的崗位';
+  }
+
   /** 有寫入動作跑過但未刷新。`getDashboard()` 見到就會先刷新。 */
   let dashboardStale_ = false;
 
@@ -1089,7 +1100,7 @@
       }
       if (compact) box.appendChild(list);
       box.appendChild(make('div', {
-        text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。這不會阻擋你寄出。',
+        text: manualPostsPhrase() + '那幾欄不算在內——它們本來就留給你自己填。這不會阻擋你寄出。',
         className: 'muted'
       }));
       nodes.push(box);

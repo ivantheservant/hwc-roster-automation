@@ -128,7 +128,7 @@
         className: 'vio-row'
       }),
       make('div', {
-        text: '・講員、翻譯、獻花不會自動排，要你之後人手填',
+        text: '・' + manualPostsPhrase(plan.manualPostNames) + '不會自動排，要你之後人手填',
         className: 'vio-row'
       }),
       make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
@@ -195,7 +195,7 @@
     // -1 ＝ 算唔到。唔可以當成 0（0 等於話「檢查過，冇嘢要填」）。
     if (res.manualPendingCount > 0) {
       nodes.push(make('div', {
-        text: '另有 ' + res.manualPendingCount + ' 格是要你人手填的（講員、翻譯、獻花），'
+        text: '另有 ' + res.manualPendingCount + ' 格是' + manualPostsPhrase(res.manualPostNames) + '，要你人手填，'
           + '這不算問題。',
         className: 'muted'
       }));
@@ -731,7 +731,7 @@
         }));
       }
       box.appendChild(make('div', {
-        text: '講員／翻譯／獻花那幾欄不算在內——它們本來就留給你自己填。',
+        text: manualPostsPhrase() + '那幾欄不算在內——它們本來就留給你自己填。',
         className: 'muted'
       }));
       nodes.push(box);

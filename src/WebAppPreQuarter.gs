@@ -37,6 +37,9 @@ function isCombinedServiceRow_(row) {
 /** 第七十五輪批次 CD 組：講員／翻譯／獻花未填時嘅提示。 */
 const MANUAL_FILL_HINT_TC = '生成之後在職事表直接填';
 
+/** 第九十一輪批次 RA 組：講員／翻譯／獻花以外的人手填寫崗位，清單項目 id＝這個前綴＋PostID。 */
+const MANUAL_EMPTY_ITEM_PREFIX = 'manualEmpty_';
+
 /**
  * 區二五項各自嘅 count。**純計算，唔碰任何 Google API**，方便離線測試。
  *
@@ -104,7 +107,11 @@ function planPreQuarterChecklist_(input) {
       hint: MANUAL_FILL_HINT_TC
     },
     { id: 'flowerEmpty', label: '獻花未填', count: countEmptyWeeks(input.flowerPostId), hint: MANUAL_FILL_HINT_TC }
-  ]);
+  ]).concat((input.otherManualPosts || []).map(function (p) {
+    // 第九十一輪批次 RA 組：其他人手填寫的崗位（Posts.AutoGenerate=FALSE，例如領詩、司琴）逐個列出
+    return { id: MANUAL_EMPTY_ITEM_PREFIX + p.postId, label: p.postNameTC + '未填', count: countEmptyWeeks(p.postId),
+      hint: MANUAL_FILL_HINT_TC };
+  }));
 
   return {
     // N ＝ count > 0 嘅**項數**，唔係全部 count 加埋。
@@ -233,6 +240,11 @@ function buildPreQuarterChecklistInputs_(quarterId) {
   });
 
   const postIds = findPreacherTranslationPostIds_();
+  // 第九十一輪批次 RA 組：講員／翻譯／獻花以外、每週都要人手填的崗位（Posts.AutoGenerate=FALSE，不是 AS_NEEDED）
+  const knownManual = [postIds.preacherPostId, postIds.translationPostId, postIds.flowerPostId].filter(Boolean);
+  const otherManualPosts = readPostsNormalized_().filter(function (p) {
+    return p.autoGenerate === false && p.frequency !== POST_FREQUENCY.AS_NEEDED && knownManual.indexOf(p.postId) === -1;
+  }).map(function (p) { return { postId: p.postId, postNameTC: p.postNameTC || p.postId }; });
 
   // 「有冇填咗人」：
   // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：講員／翻譯／獻花一律喺職事表直接填，
@@ -240,7 +252,7 @@ function buildPreQuarterChecklistInputs_(quarterId) {
   // 讀唔到工作表（例如被改名）⇒ 退返資料層（`RosterAssignments`），唔可以當全部未填。
   const versionNo = findLatestVersionNo_(quarterId);
   const filledByDatePost = {};
-  const manualPostIds = [postIds.preacherPostId, postIds.translationPostId, postIds.flowerPostId].filter(Boolean);
+  const manualPostIds = knownManual.concat(otherManualPosts.map(function (p) { return p.postId; }));
   const gridExists = versionNo >= 0 && !!SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(buildRosterSheetName_(quarterId, versionNo));
   if (gridExists) {
@@ -268,6 +280,7 @@ function buildPreQuarterChecklistInputs_(quarterId) {
     preacherPostId: postIds.preacherPostId,
     translationPostId: postIds.translationPostId,
     flowerPostId: postIds.flowerPostId,
+    otherManualPosts: otherManualPosts,
     versionNo: versionNo,
     timezone: timezone
   };

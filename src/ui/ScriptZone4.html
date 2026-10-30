@@ -138,7 +138,7 @@
           + (r.naCount > 0 ? '（共 ' + r.naCount + ' 格）' : '') + '。'),
         link,
         para('每格有名單選單，但直接貼上名單以外的名字也可以——「檢查並匯入」會逐個列出來。'
-          + '講員、翻譯、獻花照舊自己填。', 'muted'),
+          + manualPostsPhrase() + '照舊自己填。', 'muted'),
         para('在你按「檢查並匯入」並且打字確認之前，系統一格派工都不會變。', 'muted')
       ], [button('知道了', () => closeModal(), '')]);
     });
@@ -236,7 +236,7 @@
       nodes.push(box);
     }
     if ((plan.freeText || []).length > 0) {
-      nodes.push(para('講員／翻譯／獻花那幾欄有 ' + plan.freeText.length + ' 格是名單以外的名字（例如客席講員），會照樣收進去。', 'muted'));
+      nodes.push(para(manualPostsPhrase() + '那幾欄有 ' + plan.freeText.length + ' 格是名單以外的名字（例如客席講員），會照樣收進去。', 'muted'));
     }
 
     // 第四點：這一季在系統外已經寄過嗎？預設「未寄過」

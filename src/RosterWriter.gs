@@ -206,7 +206,9 @@ function buildGridLayout_(quarterId, assignments) {
     headers: headers, keys: keys, rows: rows, dates: dates,
     cellIndex: cellIndex, classCounts: classCounts, labels: labels,
     // 第七十五輪批次 CC 組：圖例要唔要列「特殊主日」（見 buildLegendRows_()）
-    specialSundaysEnabled: isSpecialSundaysEnabled_()
+    specialSundaysEnabled: isSpecialSundaysEnabled_(),
+    // 第九十一輪批次 RA 組：圖例「待填」那一行的崗位名稱（按 Posts.AutoGenerate=FALSE，不寫死）
+    manualPostNames: describeManualFillPostNames_(posts)
   };
 }
 
@@ -530,7 +532,9 @@ function buildLegendRows_(layout) {
     // 第六十八輪批次 AO 組：匯入人手編好的版本（Basis=IMPORT，全部 MANUAL）都用呢個圖例，
     // 「系統自動安排」對佢哋唔啱；改成中性、更短嘅「已排定人選」（只改字，唔改排版／欄寬）。
     ['（姓名）', '已排定人選', countText(GRID_CELL_CLASS.ASSIGNED)],
-    [labels.pending, '此崗位不由系統自動安排（講員、翻譯、獻花），需要人手填寫',
+    // 第九十一輪批次 RA 組：崗位名稱由 Posts.AutoGenerate=FALSE 組成（不再寫死講員、翻譯、獻花）
+    [labels.pending, '此崗位不由系統自動安排' + (layout.manualPostNames ? '（' + layout.manualPostNames + '）' : '')
+      + '，需要人手填寫',
       countText(GRID_CELL_CLASS.MANUAL_PENDING)],
     [labels.na, '這一週不設此崗位（例如聖餐襄禮只在每月第一個主日）',
       countText(GRID_CELL_CLASS.STRUCTURAL_NA)],
