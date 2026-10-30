@@ -174,7 +174,7 @@ console.log('\n=== QA3：〔請系統幫我調整〕===');
     JSON.stringify(ws));
   check('★★★★ 保留／放行／系統不動的格在補空格前標 kept', /if \(untouchedKeys\[cellKey_\(s\.serviceDate, s\.postId, s\.slotIndex\)\]\) s\.kept = true;/.test(read('src/SuggestionSheet.gs')));
   check('★★★★ FineTune.gs 舊入口（proposeMinimalFix_）一樣不改人手格',
-    /isSameDayExclusiveManualOnlyViolation_\(violation, context\.posts\)/.test(read('src/FineTune.gs')));
+    /isManualOnlyRuleViolation_\(violation, context\.posts\)/.test(read('src/FineTune.gs')));
 }
 
 console.log('\n=== QA4：生成 ===');

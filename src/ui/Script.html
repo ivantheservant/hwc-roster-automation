@@ -127,6 +127,8 @@
     'apiGetStaffingChangeNote',
     // 第八十五輪批次 LE 組：〔合堂主日〕讀取——只讀
     'apiGetCombinedServices',
+    // 第九十輪批次 QB 組：〔詩班獻詩〕讀取——只讀
+    'apiGetChoirSinging',
     // 第八十五輪批次 LF 組：〔寄出季前資料〕預覽——只讀
     'apiPreseasonPreview',
     'apiListUnavailable',
@@ -923,6 +925,8 @@
   /** `view` 可用值 → 打開哪一個畫面。日後加畫面只加一行。 */
   const DEEP_LINK_VIEWS = {
     combined: () => openCombinedServices(),
+    // 第九十輪批次 QB 組
+    choir: () => openChoirSinging(),
     unavailable: () => openUnavailable(),
     weights: () => openWeights(),
     staffing: () => openStaffingCheck(),

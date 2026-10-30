@@ -127,16 +127,33 @@ function readSheet_(sheetName) {
 
 /**
  * 讀取 Posts 工作表，只回傳 Active=TRUE 的職位，並按 DisplayOrder 由小到大排序。
+ * @param {{includeGroups: boolean}=} opts `includeGroups` ⇒ 連 ShowInRoster=FALSE 的名單組別一併回傳
  * @returns {Object[]} 職位物件陣列
  */
-function readPosts_() {
+function readPosts_(opts) {
+  // 第九十輪批次 QB 組：`ShowInRoster=FALSE` 的行（例如詩班）只作名單組別，**不是職事表崗位**——
+  // 職事表欄、PDF、個人頁、公開職事表、服侍次數、人手檢查、生成、修改申報下拉、規則審閱表都經這裏讀，
+  // 一律不見。只有「崗位名單」工作表（EligibilitySheetEditor.gs）傳 `{includeGroups: true}`。
+  const includeGroups = !!(opts && opts.includeGroups);
   const rows = readSheet_(SHEETS.POSTS).filter(function (row) {
-    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);
+    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]) && (includeGroups || isPostShownInRoster_(row));
   });
   rows.sort(function (a, b) {
     return Number(a[COLUMNS.POSTS.DISPLAY_ORDER]) - Number(b[COLUMNS.POSTS.DISPLAY_ORDER]);
   });
   return rows;
+}
+
+/**
+ * 第九十輪批次 QB 組：Posts 一行是不是職事表崗位。`ShowInRoster` 留空（或欄不存在）／TRUE ⇒ 是；FALSE ⇒ 只作名單組別。
+ * @param {Object} row Posts 一行
+ * @returns {boolean}
+ */
+function isPostShownInRoster_(row) {
+  const v = row[COLUMNS.POSTS.SHOW_IN_ROSTER];
+  if (v === undefined || v === null || v === '') return true;
+  if (v === false) return false;
+  return String(v).trim().toUpperCase() !== 'FALSE';
 }
 
 /**
@@ -223,8 +240,8 @@ function readEligibility_() {
  * 讀取 Posts 並正規化為排表與核對邏輯共用的物件格式（只含 Active=TRUE，按 DisplayOrder 排序）。
  * @returns {Object[]} 正規化後的崗位物件陣列
  */
-function readPostsNormalized_() {
-  return readPosts_().map(function (row) {
+function readPostsNormalized_(opts) {
+  return readPosts_(opts).map(function (row) {
     return {
       postId: row[COLUMNS.POSTS.POST_ID],
       postNameTC: row[COLUMNS.POSTS.POST_NAME_TC],
@@ -242,7 +259,9 @@ function readPostsNormalized_() {
       // 所以未補建這一欄的舊環境完全不受影響。
       requiredRoles: String(row[COLUMNS.POSTS.REQUIRED_ROLES] || '').trim(),
       // 第八十五輪批次 LD 組：每人每季最多幾次；留空（或欄不存在）＝不限（null）
-      maxPerPersonPerQuarter: parsePostMaxPerPerson_(row[COLUMNS.POSTS.MAX_PER_PERSON_PER_QUARTER])
+      maxPerPersonPerQuarter: parsePostMaxPerPerson_(row[COLUMNS.POSTS.MAX_PER_PERSON_PER_QUARTER]),
+      // 第九十輪批次 QB 組：FALSE＝只作名單組別（只有 `{includeGroups: true}` 才會讀到）
+      showInRoster: isPostShownInRoster_(row)
     };
   });
 }
@@ -274,7 +293,9 @@ function readServiceDatesNormalized_(quarterId, timezone) {
       isFirstSundayOfMonth: isTrueValue_(row[COLUMNS.SERVICE_DATES.IS_FIRST_SUNDAY_OF_MONTH]),
       serviceType: row[COLUMNS.SERVICE_DATES.SERVICE_TYPE],
       specialId: row[COLUMNS.SERVICE_DATES.SPECIAL_ID],
-      autoGenerate: isTrueValue_(row[COLUMNS.SERVICE_DATES.AUTO_GENERATE])
+      autoGenerate: isTrueValue_(row[COLUMNS.SERVICE_DATES.AUTO_GENERATE]),
+      // 第九十輪批次 QB 組：詩班獻詩（欄不存在 ⇒ false）
+      choirSinging: isTrueValue_(row[COLUMNS.SERVICE_DATES.CHOIR_SINGING])
     };
   });
   rows.sort(function (a, b) { return a.weekIndex - b.weekIndex; });

@@ -44,7 +44,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   r = parse({ view: 'combined\n', quarter: '2027T1\u0000<b>' + 'x'.repeat(80) });
   check('★★★★ 控制字元去掉、最多 40 字', r.view === 'combined' && r.quarter.indexOf('\u0000') === -1 && r.quarter.length === 40, JSON.stringify(r));
   const views = Object.keys(vm.runInContext('DEEP_LINK_VIEWS', ui)).sort().join(',');
-  check('★★★★★★ view 可用值：combined、preseason、staffing、unavailable、weights（常數表）', views === 'combined,preseason,staffing,unavailable,weights', views);
+  // 第九十輪批次 QB 組（刻意改動）：多了 choir（〔詩班獻詩〕）
+  check('★★★★★★ view 可用值：choir、combined、preseason、staffing、unavailable、weights（常數表）', views === 'choir,combined,preseason,staffing,unavailable,weights', views);
   check('★★★★★ 參數名稱是 view、quarter（不是 p、q）', JSON.stringify(vm.runInContext('DEEP_LINK_PARAMS', ui)) === '{"VIEW":"view","QUARTER":"quarter"}');
 
   console.log('\n=== NA2：主畫面載入完成後 ===');

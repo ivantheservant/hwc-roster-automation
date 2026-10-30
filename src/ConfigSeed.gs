@@ -370,6 +370,13 @@ function getConfigKeySeeds_() {
       description: '擔任這些崗位的人，同一個主日不可以再擔任任何其他崗位。PostID，逗號分隔。',
       editable: 'TRUE'
     },
+    {
+      // 第九十輪批次 QB 組：詩班名單（SEMI_CHOIR_SUNDAY）
+      key: CONFIG_KEYS.CHOIR_GROUP_POST_ID, type: CONFIG_TYPES.STR, group: 'SYS',
+      defaultValue: 'CHOIR',
+      description: '詩班名單用 Posts 哪一行（PostID，預設 CHOIR；那一行 ShowInRoster=FALSE，只作名單組別）。詩班獻詩的主日，這個名單上的人盡量不擔任任何職事表崗位。',
+      editable: 'TRUE'
+    },
     // ---- SYS ----
     {
       key: CONFIG_KEYS.DRY_RUN, type: CONFIG_TYPES.BOOL, group: 'SYS',

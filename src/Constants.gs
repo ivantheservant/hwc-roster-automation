@@ -231,7 +231,10 @@ const COLUMNS = {
     // 「一個崗位一列」嘅資料結構。見 Roles.gs 檔頭。
     REQUIRED_ROLES: 'RequiredRoles',
     // 第八十五輪批次 LD 組：每人每季在這個崗位最多幾次（留空＝不限）。HARD_POST_MAX_PER_PERSON 用。
-    MAX_PER_PERSON_PER_QUARTER: 'MaxPerPersonPerQuarter'
+    MAX_PER_PERSON_PER_QUARTER: 'MaxPerPersonPerQuarter',
+    // 第九十輪批次 QB 組：是否在職事表顯示。留空或 TRUE＝顯示（職事表崗位）；FALSE＝只作名單組別（例如詩班），
+    // 只出現在「崗位名單」工作表，不是職事表崗位（見 readPosts_()）。
+    SHOW_IN_ROSTER: 'ShowInRoster'
   },
   NAME_MAPPING: {
     PERSON_ID: 'PersonID',
@@ -359,7 +362,9 @@ const COLUMNS = {
     // 第八十五輪批次 LE 組：合堂主日（開季前準備〔合堂主日〕）。代號＝Config COMBINED_SERVICE_KINDS 的代號；
     // 名稱＝自行輸入（例如「宣教月」）。空白＝不是合堂。不影響職事表和生成，只給週報系統讀。
     COMBINED_KIND: 'CombinedKind',
-    COMBINED_NAME: 'CombinedName'
+    COMBINED_NAME: 'CombinedName',
+    // 第九十輪批次 QB 組：詩班獻詩（開季前準備〔詩班獻詩〕）。TRUE＝這個主日詩班獻詩；空白＝不是。週報系統讀取。
+    CHOIR_SINGING: 'ChoirSinging'
   },
   SPECIAL_SUNDAYS: {
     SPECIAL_ID: 'SpecialID',
@@ -674,6 +679,8 @@ const RULE_IDS = {
   // 第九十輪批次 QA 組：擔任 Config SAME_DAY_EXCLUSIVE_POST_IDS 崗位（領詩、司琴）的人，同一個主日不可以再擔任其他崗位
   SAME_DAY_EXCLUSIVE: 'HARD_SAME_DAY_EXCLUSIVE',
   NO_CONSECUTIVE: 'SEMI_NO_CONSECUTIVE',
+  // 第九十輪批次 QB 組：詩班獻詩的主日，詩班名單上的人盡量不擔任任何職事表崗位
+  CHOIR_SUNDAY: 'SEMI_CHOIR_SUNDAY',
   // 第十六輪批次階段 C（教會新規則 4）：堂委盡量集中喺指定嘅幾個崗位，
   // 其餘崗位盡量唔排。軟規則——排唔到人嗰陣仍然可以派，只係扣分。
   ROLE_POST_FOCUS: 'SOFT_ROLE_POST_FOCUS',
@@ -796,7 +803,9 @@ const RULE_DEFAULT_LEVELS = {
   [RULE_IDS.PERSON_POST_EXCLUDED]: RULE_LEVELS.HARD,
   [RULE_IDS.POST_MAX_PER_PERSON]: RULE_LEVELS.HARD,
   // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）
-  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD
+  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD,
+  // 第九十輪批次 QB 組：詩班獻詩（準硬規則：避開，找不到其他人才排並提醒）
+  [RULE_IDS.CHOIR_SUNDAY]: RULE_LEVELS.SEMI_HARD
 };
 
 /**
@@ -811,7 +820,9 @@ const RULE_DEFAULT_ENABLED = {
   // 第八十五輪批次 LD 組：和 HARD_ROLE_REQUIRED 一樣預設開啟；RuleSettings 有行就照該行
   [RULE_IDS.POST_MAX_PER_PERSON]: true,
   // 第九十輪批次 QA 組：同日不兼任——預設開啟；RuleSettings 有行就照該行
-  [RULE_IDS.SAME_DAY_EXCLUSIVE]: true
+  [RULE_IDS.SAME_DAY_EXCLUSIVE]: true,
+  // 第九十輪批次 QB 組：詩班獻詩——預設開啟；沒有勾任何主日／詩班名單空白 ⇒ 完全沒有影響
+  [RULE_IDS.CHOIR_SUNDAY]: true
 };
 
 /**
@@ -1446,6 +1457,8 @@ const CONFIG_KEYS = {
   COMBINED_SERVICE_KINDS: 'COMBINED_SERVICE_KINDS',
   // 第九十輪批次 QA 組：同日不兼任的崗位（PostID，逗號分隔）
   SAME_DAY_EXCLUSIVE_POST_IDS: 'SAME_DAY_EXCLUSIVE_POST_IDS',
+  // 第九十輪批次 QB 組：詩班名單用哪一個 Posts 行（PostID，預設 CHOIR）
+  CHOIR_GROUP_POST_ID: 'CHOIR_GROUP_POST_ID',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
   WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
   // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，

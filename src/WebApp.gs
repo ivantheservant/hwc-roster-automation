@@ -50,6 +50,8 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiStep4GetMissingPdfWarnings', 'apiStep4GetSendPreview', 'apiStep5Plan', 'apiListVersionsForRollback',
   'apiRollbackPlan', 'apiListSpecialSundays', 'apiWebListPreacherPending', 'apiGetPreQuarterChecklist',
   'apiGetStaffingCheck', 'apiGetStaffingChangeNote', 'apiGetCombinedServices', 'apiPreseasonPreview',
+  // 第九十輪批次 QB 組：〔詩班獻詩〕讀取
+  'apiGetChoirSinging',
   'apiListUnavailable', 'apiPreviewUnavailableImpact', 'apiListPeople', 'apiListAliases',
   'apiGetEligibilityMatrix', 'apiGetPersonPostWeightMatrix', 'apiGetSendAllRecipients',
   'apiGetSendChangedRecipients', 'apiListRoles', 'apiRolesTermChangePlan', 'apiRoleOverview',

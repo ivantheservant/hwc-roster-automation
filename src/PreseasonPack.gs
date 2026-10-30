@@ -131,10 +131,18 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
     });
   sections.push({ title: '四、不能服侍的日期', lines: s4.length ? s4 : ['沒有'] });
 
-  // ⑤ 合堂主日
+  // ⑤ 合堂主日及詩班獻詩（第九十輪批次 QB 組：加詩班獻詩的主日及詩班名單）
   const s5 = readCombinedServices_(quarterId, timezone).filter(function (c) { return c.kind; })
     .map(function (c) { return c.serviceDate + '　' + describeCombinedService_(c); });
-  sections.push({ title: '五、合堂主日', lines: s5.length ? s5 : ['沒有'] });
+  readChoirSinging_(quarterId, timezone).filter(function (c) { return c.singing; })
+    .forEach(function (c) { s5.push(c.serviceDate + '　詩班獻詩'); });
+  s5.sort();  // 每行以日期開頭 ⇒ 合堂和詩班獻詩按日期排在一起
+  const choir = readChoirMembersOnSafe_(start || todayStr, timezone);
+  const choirLine = choir.error
+    ? '詩班名單：（讀不到：' + choir.error + '）'
+    : '詩班名單（' + choir.ids.length + ' 人）' + (choir.ids.length
+      ? '：' + choir.ids.map(function (id) { return nameById[id] || id; }).join('、') : '');
+  sections.push({ title: '五、合堂主日及詩班獻詩', lines: (s5.length ? s5 : ['沒有']).concat([choirLine]) });
 
   // ⑥ 人手檢查
   let s6;

@@ -106,8 +106,9 @@ console.log('\n=== LE5：畫面 ===');
   const body = ui.document.getElementById('zone2Body');
   const rowBtns = body.flatten().filter((n) => n.className === 'row' || /\brow\b/.test(n.className || ''))
     .map((r) => r.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent)).filter((l) => l.indexOf('合堂主日') !== -1)[0];
+  // 第九十輪批次 QB 組（刻意改動）：同一行最後多了〔詩班獻詩〕
   check('★★★★★★ 〔合堂主日〕在〔不能服侍的日期〕〔排表偏好〕同一行',
-    JSON.stringify(rowBtns) === JSON.stringify(['不能服侍的日期', '排表偏好', '合堂主日']), JSON.stringify(rowBtns));
+    JSON.stringify(rowBtns) === JSON.stringify(['不能服侍的日期', '排表偏好', '合堂主日', '詩班獻詩']), JSON.stringify(rowBtns));
   ui.callServer = async function (name) {
     if (name === 'apiGetCombinedServices') {
       return { quarterLabel: '2028年7-9月', note: '這個設定會傳給週報系統，不會改動職事表；合堂時不需要的崗位，請在職事表自行清空。',

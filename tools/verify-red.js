@@ -9608,6 +9608,166 @@ const MUTATIONS = [
     find: "      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay));",
     replace: ";",
     tests: ["tests/round90_qa_same_day.test.js"]
+  },
+  {
+    id: "qb-show-ignored",
+    why: "readPosts_ 不理 ShowInRoster——詩班變成職事表崗位（多一欄、生成、人手檢查都見到）",
+    file: "src/SheetReader.gs",
+    find: "    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]) && (includeGroups || isPostShownInRoster_(row));",
+    replace: "    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-show-text-false",
+    why: "文字 FALSE 當顯示",
+    file: "src/SheetReader.gs",
+    find: "  return String(v).trim().toUpperCase() !== 'FALSE';",
+    replace: "  return true;",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-elig-no-groups",
+    why: "崗位名單工作表不展開名單組別——詩班名單無處可填",
+    file: "src/EligibilitySheetEditor.gs",
+    find: "  const posts = readPostsNormalized_({ includeGroups: true }).filter(function (p) { return p.active !== false; });",
+    replace: "  const posts = readPostsNormalized_().filter(function (p) { return p.active !== false; });",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-row-dup",
+    why: "建立詩班名單不查已有——按兩次加兩行",
+    file: "src/PostSeedChoir.gs",
+    find: "  if (exists) return null;\n  let maxOrder = 0;",
+    replace: "  let maxOrder = 0;",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-row-shown",
+    why: "建立的詩班行 ShowInRoster 留空——詩班出現在職事表",
+    file: "src/PostSeedChoir.gs",
+    find: "  values[P.SHOW_IN_ROSTER] = false;",
+    replace: "  values[P.SHOW_IN_ROSTER] = '';",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-default-off",
+    why: "SEMI_CHOIR_SUNDAY 預設關掉",
+    file: "src/Constants.gs",
+    find: "  [RULE_IDS.CHOIR_SUNDAY]: true",
+    replace: "  [RULE_IDS.CHOIR_SUNDAY]: false",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-default-hard",
+    why: "SEMI_CHOIR_SUNDAY 變 HARD——詩班員全部被擋，找不到人就留空",
+    file: "src/Constants.gs",
+    find: "  [RULE_IDS.CHOIR_SUNDAY]: RULE_LEVELS.SEMI_HARD",
+    replace: "  [RULE_IDS.CHOIR_SUNDAY]: RULE_LEVELS.HARD",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-role-ignored",
+    why: "詩班名單的「執事」不按當日身分——卸任的人照樣當詩班員",
+    file: "src/ChoirRule.gs",
+    find: "  return !eligibilityRoleTokenFailure_(ctx, choirId, personId, dateStr);",
+    replace: "  return true;",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-any-sunday",
+    why: "每個主日都當詩班獻詩",
+    file: "src/ChoirRule.gs",
+    find: "  if (!choirSinging || !personId || !ctx) return false;",
+    replace: "  if (!personId || !ctx) return false;",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-fsv-missing",
+    why: "findStateViolations_ 不查詩班——檢查我的改動、人手填的格都不提醒",
+    file: "src/FineTune.gs",
+    find: "    if (isChoirSundayConflict_(context, cell.personId, !!(dateInfo[cell.serviceDate] || {}).choirSinging, cell.serviceDate)) {",
+    replace: "    if (false) {",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-gen-missing",
+    why: "生成不避開詩班員",
+    file: "src/Generator.gs",
+    find: "  if (isChoirSundayConflict_(state.context, personId, !!state.serviceDate.choirSinging, state.serviceDate.serviceDate)) {",
+    replace: "  if (false) {",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-manual-fixable",
+    why: "人手填的格的詩班提醒當成系統可以改",
+    file: "src/SameDayExclusive.gs",
+    find: "  if (!violation || (violation.ruleId !== RULE_IDS.SAME_DAY_EXCLUSIVE && violation.ruleId !== RULE_IDS.CHOIR_SUNDAY)) return false;",
+    replace: "  if (!violation || violation.ruleId !== RULE_IDS.SAME_DAY_EXCLUSIVE) return false;",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-save-no-audit",
+    why: "儲存詩班獻詩不寫 AuditLog",
+    file: "src/WebAppChoir.gs",
+    find: "    changed++;\n    writeAuditLog_({",
+    replace: "    changed++;\n    if (false) writeAuditLog_({",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-save-no-column",
+    why: "舊試算表沒有 ChoirSinging 欄就寫不進去",
+    file: "src/WebAppChoir.gs",
+    find: "  if (keys.indexOf(D.CHOIR_SINGING) === -1) {\n    const col",
+    replace: "  if (false) {\n    const col",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-reset-clears",
+    why: "整季重設（幹事介面）連詩班獻詩都清",
+    file: "src/QuarterReset.gs",
+    find: "      (plan.keepManual ? plan.keptChoirDates : plan.choirDates).push(",
+    replace: "      plan.choirDates.push(",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-pack-no-list",
+    why: "季前資料沒有詩班名單一行",
+    file: "src/PreseasonPack.gs",
+    find: "(s5.length ? s5 : ['沒有']).concat([choirLine])",
+    replace: "(s5.length ? s5 : ['沒有'])",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-pack-no-sort",
+    why: "季前資料合堂和詩班獻詩不按日期",
+    file: "src/PreseasonPack.gs",
+    find: "  s5.sort();",
+    replace: "",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-ui-no-button",
+    why: "開季前準備沒有〔詩班獻詩〕",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('詩班獻詩', () => openChoirSinging(), '')",
+    replace: "      null",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-no-deeplink",
+    why: "view=choir 不認得",
+    file: "src/ui/Script.html",
+    find: "    choir: () => openChoirSinging(),",
+    replace: "",
+    tests: ["tests/round90_qb_choir.test.js"]
+  },
+  {
+    id: "qb-selftest-count",
+    why: "自我檢查把名單組別當漏讀",
+    file: "src/SelfTest.gs",
+    find: "    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]) && isPostShownInRoster_(row);",
+    replace: "    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);",
+    tests: ["tests/round90_qb_choir.test.js"]
   }
 ];
 

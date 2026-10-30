@@ -496,6 +496,15 @@ function ruleReviewPlainEntry_(ruleId) {
       return label ? ('有生效：' + label) : '有生效，但現時沒有設定崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）';
     }
   };
+  // 第九十輪批次 QB 組：詩班獻詩——準硬規則，預設開啟（`RULE_DEFAULT_ENABLED`），列在「盡量遵守」
+  table[RULE_IDS.CHOIR_SUNDAY] = {
+    text: '詩班獻詩的主日，詩班員盡量不擔任其他崗位',
+    what: '開季前準備〔詩班獻詩〕勾了的主日，詩班名單上的人盡量不排其他崗位；找不到其他人才會排，並提醒。'
+      + '詩班名單在「崗位名單」工作表的「詩班」一欄（可以寫名字，亦可以寫「堂委」「執事」）。',
+    current: function (rule) {
+      return isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED]) ? '有生效' : '已關掉';
+    }
+  };
   table[RULE_IDS.PERSON_POST_EXCLUDED] = {
     text: '堂委會決定暫時不做某崗位的人，不會被排到那個崗位',
     what: '在「暫時不做某崗位」登記了的人，在登記那段時間之內不會被排到那個崗位。解除是填一個解除日期，不是刪掉紀錄。',
@@ -782,7 +791,8 @@ function buildRuleReviewSheetRows_(ruleRows, weeks, ctx) {
     const synthetic = {};
     synthetic[R.RULE_ID] = id;
     synthetic[R.ENABLED] = existing ? existing[R.ENABLED] : (RULE_DEFAULT_ENABLED[id] === true);
-    synthetic[R.LEVEL] = RULE_LEVELS.HARD;
+    // 第九十輪批次 QB 組：按預設級別分組（SEMI_CHOIR_SUNDAY 是準硬規則，列在「盡量遵守」）
+    synthetic[R.LEVEL] = RULE_DEFAULT_LEVELS[id] || RULE_LEVELS.HARD;
     synthetic[R.TARGET_VALUE] = existing ? existing[R.TARGET_VALUE] : '';
     return synthetic;
   });
@@ -792,7 +802,7 @@ function buildRuleReviewSheetRows_(ruleRows, weeks, ctx) {
     const inGroup = (ruleRows || []).filter(function (r) {
       const level = String(r[R.LEVEL] || RULE_LEVELS.SOFT).trim().toUpperCase();
       return level === group.level && !isAppended(r);
-    }).concat(group.level === RULE_LEVELS.HARD ? appendedRows : []);
+    }).concat(appendedRows.filter(function (r) { return r[R.LEVEL] === group.level; }));
     if (inGroup.length === 0) return;
 
     rows.push([group.title, '', '', '', '', '', '']);

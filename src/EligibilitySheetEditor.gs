@@ -131,7 +131,8 @@ function buildEligibilitySheet_() {
   if (existing) ss.deleteSheet(existing);
   const sheet = ss.insertSheet(ELIGIBILITY_SHEET_NAME);
 
-  const posts = readPostsNormalized_().filter(function (p) { return p.active !== false; });
+  // 第九十輪批次 QB 組：連「只作名單組別」的行（例如詩班，ShowInRoster=FALSE）一併展開
+  const posts = readPostsNormalized_({ includeGroups: true }).filter(function (p) { return p.active !== false; });
   const eligibility = readEligibility_();
   const N = COLUMNS.NAME_MAPPING;
   const nameById = {};
@@ -233,7 +234,8 @@ function planEligibilitySheetApply_(quarterId) {
     ELIGIBILITY_SHEET_FIRST_DATA_ROW, 1,
     lastRow - ELIGIBILITY_SHEET_FIRST_DATA_ROW + 1, lastCol).getValues();
 
-  const posts = readPostsNormalized_();
+  // 第九十輪批次 QB 組：「只作名單組別」的行（詩班）一樣可以儲存
+  const posts = readPostsNormalized_({ includeGroups: true });
   const postNameById = {};
   posts.forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
 

@@ -12,7 +12,7 @@
  * 某人某日擔任同日不兼任崗位（「錨」：按 Posts 次序第一個同日不兼任的崗位）⇒ 他那一日**其他崗位**
  * 的每一格都是違反（違反掛在那幾格，不掛在錨）。所以〔請系統幫我調整〕會保留領詩／司琴那一格，
  * 改另一個崗位那一格；另一格亦是人手填的崗位（AutoGenerate=FALSE）⇒ 系統不改，列入「需要人手處理」
- * （見 `isSameDayExclusiveManualOnlyViolation_()`）。
+ * （見 `isManualOnlyRuleViolation_()`）。
  *
  * 同一崗位同日兩格同一人不在這裏處理（那是 HARD_DISTINCT_SLOT）。
  *
@@ -23,6 +23,8 @@
 
 /** 兩格都是人手填的崗位時〔請系統幫我調整〕的一句（列入「需要人手處理」）。 */
 const SAME_DAY_MANUAL_ONLY_NOTE = '兩格都是人手填的崗位，系統不會改，需要人手處理';
+/** 第九十輪批次 QB 組：詩班獻詩而那一格是人手填的崗位。 */
+const CHOIR_MANUAL_ONLY_NOTE = '這一格是人手填的崗位，系統不會改；要照樣保留，勾「保留我的安排」';
 
 /**
  * Config `SAME_DAY_EXCLUSIVE_POST_IDS`（PostID 陣列，去空白、去重）。
@@ -143,10 +145,20 @@ function sameDayExclusiveAnchorForCandidate_(postId, postsAlreadyToday, reserved
  * @param {Object[]} posts 崗位
  * @returns {boolean}
  */
-function isSameDayExclusiveManualOnlyViolation_(violation, posts) {
-  if (!violation || violation.ruleId !== RULE_IDS.SAME_DAY_EXCLUSIVE) return false;
+function isManualOnlyRuleViolation_(violation, posts) {
+  // 第九十輪批次 QB 組：SEMI_CHOIR_SUNDAY 同一做法（人手填的格照樣提醒，系統不改）
+  if (!violation || (violation.ruleId !== RULE_IDS.SAME_DAY_EXCLUSIVE && violation.ruleId !== RULE_IDS.CHOIR_SUNDAY)) return false;
   const post = (posts || []).filter(function (p) { return p.postId === violation.postId; })[0];
   return !!post && !post.autoGenerate;
+}
+
+/**
+ * 人手填的格、系統不改時的一句。
+ * @param {Object} violation 違反
+ * @returns {string}
+ */
+function manualOnlyRuleNote_(violation) {
+  return violation && violation.ruleId === RULE_IDS.CHOIR_SUNDAY ? CHOIR_MANUAL_ONLY_NOTE : SAME_DAY_MANUAL_ONLY_NOTE;
 }
 
 /**

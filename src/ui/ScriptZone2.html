@@ -77,7 +77,9 @@
     body.appendChild(row([
       button('不能服侍的日期', () => openUnavailable(), ''),
       button('排表偏好', () => openWeights(), ''),
-      button('合堂主日', () => openCombinedServices(), '')
+      button('合堂主日', () => openCombinedServices(), ''),
+      // 第九十輪批次 QB 組：〔詩班獻詩〕放在〔合堂主日〕旁邊
+      button('詩班獻詩', () => openChoirSinging(), '')
     ]));
     // 第八十五輪批次 LF 組：〔寄出季前資料〕（先預覽內容和收件人，再寄）
     body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary')]));
@@ -151,6 +153,40 @@
           const items = rows.map((r) => ({ serviceDate: r.serviceDate, kind: r.sel.value, name: r.sel.value ? r.name.value : '' }));
           const res = await callServerMutating('apiSaveCombinedServices', currentQuarterId, items);
           openModal('合堂主日', [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
+            [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /**
+   * 第九十輪批次 QB 組：〔詩班獻詩〕——這一季每個主日一行，勾選「詩班獻詩」→〔儲存〕。
+   * 那幾個主日，詩班名單上的人盡量不擔任其他崗位（SEMI_CHOIR_SUNDAY）；亦傳給週報系統。
+   */
+  function openChoirSinging() {
+    runAction('讀取詩班獻詩', async () => {
+      const data = await callServer('apiGetChoirSinging', currentQuarterId);
+      const rows = [];
+      const list = make('div', { className: 'sec' });
+      (data.weeks || []).forEach((w) => {
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !!w.singing;
+        rows.push({ serviceDate: w.serviceDate, box: box });
+        list.appendChild(make('label', { className: 'check-row' }, [box, make('span', { text: humanDate(w.serviceDate) + '　詩班獻詩' })]));
+      });
+      const head = [para(data.note || '')];
+      if (data.choirCount === 0) {
+        head.push(para('詩班名單現時是空的——在「開季前準備 ▸ 開啟名單工作表」的「詩班」一欄填。', 'muted'));
+      } else if (data.choirCount > 0) {
+        head.push(para('詩班名單：' + data.choirCount + ' 人。', 'muted'));
+      }
+      openModal('詩班獻詩：' + (data.quarterLabel || currentQuarterId), head.concat([list]), [
+        button('儲存', () => runAction('儲存詩班獻詩', async () => {
+          const items = rows.map((r) => ({ serviceDate: r.serviceDate, singing: !!r.box.checked }));
+          const res = await callServerMutating('apiSaveChoirSinging', currentQuarterId, items);
+          openModal('詩班獻詩', [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
             [button('完成', () => closeModalAndRefresh(), '')]);
         }), ''),
         button('取消', () => closeModal(), 'secondary')

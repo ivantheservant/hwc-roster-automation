@@ -81,7 +81,8 @@ console.log('\n=== LF2：內容六段 ===');
   const sc = scene();
   const pack = sc.gas.buildPreseasonPack_(sc.Q, '2098-12-10', '2098-12-20');
   const t = (i) => pack.sections[i].lines.join('\n');
-  check('★★★★★ 六段，次序照規格', pack.sections.map((s) => s.title).join('／') === '一、事奉人員表／二、暫時不做某崗位／三、排表偏好／四、不能服侍的日期／五、合堂主日／六、人手檢查',
+  // 第九十輪批次 QB 組（刻意改動）：第五段改名「合堂主日及詩班獻詩」
+  check('★★★★★ 六段，次序照規格', pack.sections.map((s) => s.title).join('／') === '一、事奉人員表／二、暫時不做某崗位／三、排表偏好／四、不能服侍的日期／五、合堂主日及詩班獻詩／六、人手檢查',
     pack.sections.map((s) => s.title).join('／'));
   check('★★★★★★ ① 每個自動排的崗位一行；「堂委」寫明現任；人數', /^主席（6 人）：/.test(t(0)) && /領詩（4 人）：堂委（現任 2 位：假甲、假庚）、假丙、假乙、假甲/.test(t(0)), t(0));
   check('★★★★★ ② 暫時不做某崗位', /假丙　主席　原因：堂委會決定/.test(t(1)), t(1));

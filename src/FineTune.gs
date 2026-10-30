@@ -71,6 +71,8 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     rules: readRules_(),
     // 第九十輪批次 QA 組：同日不兼任的崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
     sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
+    // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行（SEMI_CHOIR_SUNDAY）
+    choirGroupPostId: readChoirGroupPostId_(),
     maxMoves: Number(config[CONFIG_KEYS.FINETUNE_MAX_MOVES]) || DEFAULTS.FINETUNE_MAX_MOVES,
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || 8,
     // 預設 TRUE（維持原行為：SEMI_HARD 違反一律回報）。讀一次存進 context，
@@ -456,6 +458,11 @@ function findStateViolations_(state, context) {
         && isPersonUnavailable_(cell.personId, cell.serviceDate, cell.postId, context.unavailable)) {
       add(cell, RULE_IDS.UNAVAILABLE, '該日已表明不能服侍');
     }
+    // 第九十輪批次 QB 組：詩班獻詩的主日，詩班名單上的人盡量不擔任崗位（準硬規則）
+    if (isChoirSundayConflict_(context, cell.personId, !!(dateInfo[cell.serviceDate] || {}).choirSinging, cell.serviceDate)) {
+      const choirPerson = (context.peopleById || {})[cell.personId];
+      add(cell, RULE_IDS.CHOIR_SUNDAY, buildChoirSundayReason_(choirPerson ? choirPerson.nameTC : cell.personId, cell.serviceDate));
+    }
     if (post && post.frequency === POST_FREQUENCY.FIRST_SUNDAY && isRuleEnabled_(rules, RULE_IDS.COMMUNION_FIRST_SUNDAY)) {
       const info = dateInfo[cell.serviceDate];
       if (info && !info.isFirstSundayOfMonth) {
@@ -648,8 +655,8 @@ function proposeMinimalFix_(quarterId, versionNo) {
     handled[key] = true;
 
     // 第九十輪批次 QA 組：同日兼任而這一格亦是人手填的崗位 ⇒ 不改（同 SuggestionSheet.gs）
-    const replacement = isSameDayExclusiveManualOnlyViolation_(violation, context.posts)
-      ? { personId: '', reason: SAME_DAY_MANUAL_ONLY_NOTE }
+    const replacement = isManualOnlyRuleViolation_(violation, context.posts)
+      ? { personId: '', reason: manualOnlyRuleNote_(violation) }
       : findReplacementPerson_(violation, workingState, context);
     const original = originalByKey[key] || {};
     if (!original.personId) {

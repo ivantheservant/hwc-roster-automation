@@ -146,7 +146,8 @@ console.log('\n=== G2 表格結構：三組、七欄 ===');
     // 第八十四輪批次 KF 組：「一定要遵守」最後一定加 RULE_DEFAULT_ENABLED 嗰兩條（RuleSettings 冇都列）⇒ 3＋2
     // 第八十五輪批次 LD 組（刻意改動）：RULE_DEFAULT_ENABLED 多了 HARD_POST_MAX_PER_PERSON ⇒ 3＋3
     // 第九十輪批次 QA 組（刻意改動）：再多 HARD_SAME_DAY_EXCLUSIVE ⇒ 3＋4
-    && built.meta.filter((m) => !!m).length === 7);
+    // 第九十輪批次 QB 組（刻意改動）：「盡量遵守」組再多 SEMI_CHOIR_SUNDAY ⇒ 3＋5
+    && built.meta.filter((m) => !!m).length === 8);
   check('★★★★★ 「堂委決定」同「備註」兩欄一律留空俾人填',
     built.rows.filter((r, i) => built.meta[i]).every((r) => r[5] === '' && r[6] === ''));
 }

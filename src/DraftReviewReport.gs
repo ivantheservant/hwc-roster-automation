@@ -43,6 +43,7 @@ function describeRuleForCommittee_(ruleId) {
   map[RULE_IDS.PERSON_POST_EXCLUDED] = '個別同工按教會安排暫時不擔任某些崗位';
   map[RULE_IDS.POST_MAX_PER_PERSON] = '某些崗位每人每季最多做幾次';
   map[RULE_IDS.SAME_DAY_EXCLUSIVE] = '擔任領詩、司琴等崗位的人，同一個主日不再擔任其他崗位';
+  map[RULE_IDS.CHOIR_SUNDAY] = '詩班獻詩的主日，詩班員盡量不擔任其他崗位';
   map[RULE_IDS.ROLE_POST_FOCUS] = '堂委盡量集中在指定的幾個崗位，避免負擔過重';
   return map[ruleId] || '規則檢查';
 }

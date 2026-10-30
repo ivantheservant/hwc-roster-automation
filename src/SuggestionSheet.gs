@@ -675,8 +675,9 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
 
     // 第九十輪批次 QA 組：同日兼任而這一格亦是人手填的崗位（例如同一人做領詩又做司琴）⇒ 系統不改，
     // 列入「需要人手處理」（兩格都是幹事照音樂部名單填的）。
-    const replacement = isSameDayExclusiveManualOnlyViolation_(violation, context.posts)
-      ? { personId: '', reason: SAME_DAY_MANUAL_ONLY_NOTE }
+    // 第九十輪批次 QB 組：詩班獻詩而這一格是人手填的崗位（例如詩班員做領詩）⇒ 一樣不改，只提醒
+    const replacement = isManualOnlyRuleViolation_(violation, context.posts)
+      ? { personId: '', reason: manualOnlyRuleNote_(violation) }
       : findReplacementPerson_(violation, workingState, context);
     const post = findPostById_(context.posts, violation.postId);
     proposals.push({

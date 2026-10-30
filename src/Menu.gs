@@ -87,6 +87,9 @@ function onOpen() {
         .addItem('補建 Posts 欄位（崗位身分要求）', 'runSeedPostRequiredRoles_')
         // 第八十五輪批次 LD 組：每人每季崗位上限（HARD_POST_MAX_PER_PERSON）
         .addItem('補建 Posts 欄位（每人每季最多幾次）', 'runSeedPostMaxPerPerson_')
+        // 第九十輪批次 QB 組：詩班名單（ShowInRoster=FALSE 的名單組別）
+        .addItem('補建 Posts 欄位（是否在職事表顯示）', 'runSeedPostShowInRoster_')
+        .addItem('建立詩班名單', 'runCreateChoirGroup_')
         .addItem('補建身分名單工作表', 'runEnsureRoleSheets_')
         .addItem('補建排表偏好工作表', 'runEnsurePersonPostWeightSheet_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')
@@ -2171,6 +2174,10 @@ function describeQuarterResetPlanLines_(quarterId, plan) {
     plan.keepManual
       ? '　合堂主日：保留，不清除'
       : '　合堂主日（ServiceDates.CombinedKind，只清這一季）：' + (plan.combinedDates || []).length + ' 週',
+    // 第九十輪批次 QB 組
+    plan.keepManual
+      ? '　詩班獻詩：保留，不清除'
+      : '　詩班獻詩（ServiceDates.ChoirSinging，只清這一季）：' + (plan.choirDates || []).length + ' 週',
     '',
     '不會碰：Eligibility、NameMapping、NameAlias、Config、EmailTemplates、',
     '　EmailRecipients、Posts、RuleSettings、ServiceDates、SpecialSundays，',

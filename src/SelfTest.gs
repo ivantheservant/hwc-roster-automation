@@ -105,8 +105,9 @@ function testConfigTypes_() {
 function testPostsReading_() {
   const all = readSheet_(SHEETS.POSTS);
   const active = readPosts_();
+  // 第九十輪批次 QB 組：ShowInRoster=FALSE 的名單組別（例如詩班）不是職事表崗位，readPosts_() 不回傳
   const expectedActive = all.filter(function (row) {
-    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);
+    return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]) && isPostShownInRoster_(row);
   }).length;
 
   const problems = [];

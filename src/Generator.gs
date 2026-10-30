@@ -64,6 +64,8 @@ function buildGeneratorContext_(quarterId) {
     rules: rules,
     // 第九十輪批次 QA 組：同日不兼任的崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
     sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
+    // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行（SEMI_CHOIR_SUNDAY）
+    choirGroupPostId: readChoirGroupPostId_(),
     priorWeeks: readPriorWeeks_(quarterStart, carryOverWeeks, timezone),
     existingAssignments: readQuarterAssignments_(quarterId, timezone),
     quotaByPerson: computePersonQuotas_(eligibility, peopleById, serviceDates, posts, rules, maxPerQuarterDefault),
@@ -1095,6 +1097,13 @@ function evaluateViolations_(personId, state) {
       violations.push(makeViolation_(rules, RULE_IDS.PERSON_POST_EXCLUDED,
         buildPersonPostExcludedReason_(post, exclusion)));
     }
+  }
+
+  // 第九十輪批次 QB 組：詩班獻詩的主日，詩班名單上的人盡量不排（準硬規則：扣分，找不到其他人才排並提醒）
+  if (isChoirSundayConflict_(state.context, personId, !!state.serviceDate.choirSinging, state.serviceDate.serviceDate)) {
+    const choirPerson = state.context.peopleById[personId];
+    violations.push(makeViolation_(rules, RULE_IDS.CHOIR_SUNDAY,
+      buildChoirSundayReason_(choirPerson ? choirPerson.nameTC : personId, state.serviceDate.serviceDate)));
   }
 
   // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）
