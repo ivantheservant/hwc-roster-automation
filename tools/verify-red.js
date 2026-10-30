@@ -10024,6 +10024,30 @@ const MUTATIONS = [
     find: "    if (d && typeof d.pendingSubmissions === 'number') {",
     replace: "    if (false) {",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-anchor-ignored",
+    why: "不理連結的季度，只列今日最近的兩季（邀請較後的季度時義工找不到那一季）",
+    file: "src/PersonalUnavailable.gs",
+    find: "  const from = Math.max(0, open.map(function (q) { return q.quarterId; }).indexOf(anchor));",
+    replace: "  const from = 0;",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-anchor-not-passed",
+    why: "提交時不用連結的季度核對日子",
+    file: "src/PersonalUnavailable.gs",
+    find: "    return submitPersonalUnavailable_(person, dates, reason, typeof quarterId === 'string' ? quarterId : '');",
+    replace: "    return submitPersonalUnavailable_(person, dates, reason, '');",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+  },
+  {
+    id: "qc-page-no-quarter",
+    why: "個人頁提交時沒有帶連結的季度",
+    file: "src/ui/PersonalRoster.html",
+    find: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1]);",
+    replace: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, '', args[0], args[1]);",
+    tests: ["tests/round90_qc_personal_unavailable.test.js"]
   }
 ];
 

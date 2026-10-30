@@ -348,7 +348,7 @@ function renderPersonalRosterPage_(e) {
     data = buildPersonalRosterPendingData_(quarterId, person.nameTC);
   }
   // 第九十輪批次 QC 組：「申報不能服侍的日子」——只有這個人自己的資料；token 只交給這一頁自己用
-  data.unavailableJson = jsonForInlineScript_(buildPersonalUnavailableBoot_(person.personId, token));
+  data.unavailableJson = jsonForInlineScript_(buildPersonalUnavailableBoot_(person.personId, token, quarterId));
 
   const template = HtmlService.createTemplateFromFile(UI_FILES.PERSONAL_ROSTER);
   template.data = data;
@@ -396,15 +396,17 @@ function buildPersonalRosterPendingData_(quarterId, personNameTC) {
  * 第九十輪批次 QC 組：頁面上「申報不能服侍的日子」的起始資料。讀不到 ⇒ `error`（頁面寫「請聯絡幹事」）。
  * @param {string} personId 已經用 token 認出來的人
  * @param {string} token 這個人自己的 token（頁面呼叫公開函式時要帶）
- * @returns {{token: string, view: ?Object, error: string}}
+ * @param {string} quarterId 連結的季度（`q`；由這一季開始列出可以申報的主日）
+ * @returns {{token: string, quarterId: string, view: ?Object, error: string}}
  */
-function buildPersonalUnavailableBoot_(personId, token) {
+function buildPersonalUnavailableBoot_(personId, token, quarterId) {
   try {
     const now = personalUnavailableToday_();
-    return { token: token, view: buildPersonalUnavailableView_(personId, now.today, now.timezone), error: '' };
+    return { token: token, quarterId: quarterId,
+      view: buildPersonalUnavailableView_(personId, now.today, now.timezone, quarterId), error: '' };
   } catch (err) {
     log_('WARN', '個人頁申報一段讀不到（' + personId + '）：' + err.message);
-    return { token: token, view: null, error: '暫時未能申報，請聯絡幹事。' };
+    return { token: token, quarterId: quarterId, view: null, error: '暫時未能申報，請聯絡幹事。' };
   }
 }
 

@@ -236,6 +236,7 @@
     (function () {
       var boot = UNAV_BOOT || {};
       var token = boot.token || '';
+      var quarterId = boot.quarterId || '';
       var body = document.getElementById('unavBody');
       var busy = false;
 
@@ -259,8 +260,8 @@
             busy = false;
             render(view, (err && err.message) || '未能完成，請稍後再試，或者聯絡幹事。', true);
           });
-        if (fnName === 'submit') runner.personalSubmitUnavailable(token, args[0], args[1]);
-        else runner.personalWithdrawUnavailable(token, args[0]);
+        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1]);
+        else runner.personalWithdrawUnavailable(token, quarterId, args[0]);
       }
 
       function render(view, msg, isErr) {

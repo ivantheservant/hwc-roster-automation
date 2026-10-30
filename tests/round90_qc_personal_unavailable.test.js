@@ -105,18 +105,18 @@ console.log('\n=== QC1：token ===');
   const neutral = g.PERSONAL_LINK_INVALID_MESSAGE;
   const bad = ['', 'z'.repeat(32), tok(99), tok(1).slice(1), null, 42];
   check('★★★★★★ token 錯／格式不對／不是字串 ⇒ 中性錯誤（不講原因）',
-    bad.every((t) => neutralOf(() => g.personalSubmitUnavailable(t, [T1[1]], '')) === neutral), neutral);
+    bad.every((t) => neutralOf(() => g.personalSubmitUnavailable(t, '', [T1[1]], '')) === neutral), neutral);
   check('★★★★★★ 甚麼都沒有寫（沒有建立工作表、沒有 AuditLog）',
     !sc.ss.getSheetByName('UnavailableSubmissions') && sc.audits('PERSONAL_UNAVAILABLE_SUBMITTED').length === 0);
   // NameMapping Active=FALSE ⇒ 同樣認不到
   const nm = sc.ss.getSheetByName(sc.S.NAME_MAPPING);
   const keys = nm.getRange(2, 1, 1, nm.getLastColumn()).getValues()[0];
   nm.getRange(4, keys.indexOf('Active') + 1).setValue(false);   // 第 4 行＝P9702
-  check('★★★★★ 停用的人（Active=FALSE）⇒ 中性錯誤', neutralOf(() => g.personalSubmitUnavailable(tok(2), [T1[1]], '')) === neutral);
+  check('★★★★★ 停用的人（Active=FALSE）⇒ 中性錯誤', neutralOf(() => g.personalSubmitUnavailable(tok(2), '', [T1[1]], '')) === neutral);
   const cfg = sc.ss.getSheetByName(sc.S.CONFIG);
   for (let r = 3; r <= cfg.getLastRow(); r++) if (cfg.getRange(r, 1).getValue() === 'WEBAPP_ENABLED') cfg.getRange(r, 2).setValue('FALSE');
   g.reloadConfigCache_ && g.reloadConfigCache_();
-  check('★★★★★ Web UI 停用 ⇒ 正確 token 也是中性錯誤', neutralOf(() => g.personalSubmitUnavailable(tok(1), [T1[1]], '')) === neutral);
+  check('★★★★★ Web UI 停用 ⇒ 正確 token 也是中性錯誤', neutralOf(() => g.personalSubmitUnavailable(tok(1), '', [T1[1]], '')) === neutral);
 }
 
 // =====================================================================
@@ -128,7 +128,7 @@ console.log('\n=== QC2：提交 ===');
   check('★★★★★★ 可以選的：未完結的最近 2 季（T1、T2），T3 不在', view0.quarters.map((q) => q.quarterId).join() === '2099T1,2099T2',
     JSON.stringify(view0.quarters.map((q) => q.quarterId)));
   check('★★★★ 截止日＝生成日（開始日前 21 日）前 7 日', view0.quarters[0].deadline === '2098-12-04', view0.quarters[0].deadline);
-  const res = g.personalSubmitUnavailable(tok(1), [T1[1], T1[2], T1[1]], '<b>出外</b> 旅行<script>x</script>');
+  const res = g.personalSubmitUnavailable(tok(1), '', [T1[1], T1[2], T1[1]], '<b>出外</b> 旅行<script>x</script>');
   check('★★★★★★ 提交兩個日子（重複的只算一次）', res.ok && res.added === 2, JSON.stringify(res));
   const subs = sc.subs();
   check('★★★★★★ 只寫自己的行（PersonID＝P9701）、狀態 PENDING', subs.length === 2 && subs.every((s) => s.personId === 'P9701' && s.status === 'PENDING'),
@@ -143,13 +143,13 @@ console.log('\n=== QC2：提交 ===');
     res.view.submissions.length === 2 && res.view.submissions.every((s) => s.statusText === '等候幹事確認' && s.canWithdraw));
   check('★★★★ 那兩日在選擇清單變成「已申報」（不可以再勾）',
     res.view.quarters[0].dates.filter((d) => d.status === 'PENDING').map((d) => d.serviceDate).join() === [T1[1], T1[2]].join());
-  const again = g.personalSubmitUnavailable(tok(1), [T1[1]], '');
+  const again = g.personalSubmitUnavailable(tok(1), '', [T1[1]], '');
   check('★★★★★ 已申報的日子再提交 ⇒ 不重複', !again.ok && sc.subs().length === 2, JSON.stringify(again));
-  check('★★★★★★ 不在範圍的日子（T3）⇒ 拒絕、甚麼都沒有寫', !g.personalSubmitUnavailable(tok(1), [T3[0]], '').ok && sc.subs().length === 2);
-  check('★★★★★ 不是主日／格式不對 ⇒ 拒絕', !g.personalSubmitUnavailable(tok(1), ['2099-01-05'], '').ok
-    && !g.personalSubmitUnavailable(tok(1), ['x'], '').ok && !g.personalSubmitUnavailable(tok(1), '2099-01-04', '').ok && sc.subs().length === 2);
+  check('★★★★★★ 不在範圍的日子（T3）⇒ 拒絕、甚麼都沒有寫', !g.personalSubmitUnavailable(tok(1), '', [T3[0]], '').ok && sc.subs().length === 2);
+  check('★★★★★ 不是主日／格式不對 ⇒ 拒絕', !g.personalSubmitUnavailable(tok(1), '', ['2099-01-05'], '').ok
+    && !g.personalSubmitUnavailable(tok(1), '', ['x'], '').ok && !g.personalSubmitUnavailable(tok(1), '', '2099-01-04', '').ok && sc.subs().length === 2);
   sc.today = '2099-01-12';
-  check('★★★★★★ 過去的日子 ⇒ 拒絕', !g.personalSubmitUnavailable(tok(1), [T1[0]], '').ok && sc.subs().length === 2);
+  check('★★★★★★ 過去的日子 ⇒ 拒絕', !g.personalSubmitUnavailable(tok(1), '', [T1[0]], '').ok && sc.subs().length === 2);
   sc.today = '2098-12-10';
   check('★★★★★ 每次最多 20 個日子（超過 ⇒ 拒絕）', /最多可以提交 20 個/.test(g.submitPersonalUnavailable_({ personId: 'P9703' },
     Array.from({ length: 21 }, (_, i) => '2099-0' + (1 + (i % 2)) + '-' + String(i + 1).padStart(2, '0')), '').message));
@@ -158,20 +158,20 @@ console.log('\n=== QC2：提交 ===');
   const sc2 = scene();
   const dates = T1.concat(T2);
   let lastOk = true;
-  for (let i = 0; i < 6; i++) lastOk = sc2.gas.personalSubmitUnavailable(tok(4), [dates[i]], '').ok && lastOk;
+  for (let i = 0; i < 6; i++) lastOk = sc2.gas.personalSubmitUnavailable(tok(4), '', [dates[i]], '').ok && lastOk;
   // 撤回再提交同一日也算一次
   for (let i = 0; i < 4; i++) {
     const s = sc2.subs().filter((x) => x.personId === 'P9704' && x.status === 'PENDING')[0];
-    sc2.gas.personalWithdrawUnavailable(tok(4), s.submissionId);
-    lastOk = sc2.gas.personalSubmitUnavailable(tok(4), [s.serviceDate], '').ok && lastOk;
+    sc2.gas.personalWithdrawUnavailable(tok(4), '', s.submissionId);
+    lastOk = sc2.gas.personalSubmitUnavailable(tok(4), '', [s.serviceDate], '').ok && lastOk;
   }
   const s11 = sc2.subs().filter((x) => x.personId === 'P9704' && x.status === 'PENDING')[0];
-  sc2.gas.personalWithdrawUnavailable(tok(4), s11.submissionId);
-  const eleventh = sc2.gas.personalSubmitUnavailable(tok(4), [s11.serviceDate], '');
+  sc2.gas.personalWithdrawUnavailable(tok(4), '', s11.submissionId);
+  const eleventh = sc2.gas.personalSubmitUnavailable(tok(4), '', [s11.serviceDate], '');
   check('★★★★★★ 每人每日最多 10 次提交（第 11 次拒絕）', lastOk && !eleventh.ok && /上限/.test(eleventh.message), JSON.stringify(eleventh));
-  check('★★★★ 別人不受影響', sc2.gas.personalSubmitUnavailable(tok(5), [T1[0]], '').ok);
+  check('★★★★ 別人不受影響', sc2.gas.personalSubmitUnavailable(tok(5), '', [T1[0]], '').ok);
   sc2.today = '2098-12-11';
-  check('★★★★ 第二日可以再提交', sc2.gas.personalSubmitUnavailable(tok(4), [s11.serviceDate], '').ok);
+  check('★★★★ 第二日可以再提交', sc2.gas.personalSubmitUnavailable(tok(4), '', [s11.serviceDate], '').ok);
   // 已經在不能服侍名單 ⇒ 不用再申報
   const U = sc.C.UNAVAILABLE;
   sc.appendRows(sc.ss, sc.S.UNAVAILABLE, Object.keys(U).map((k) => U[k]), [{ [U.UNAVAILABLE_ID]: 'U1', [U.PERSON_ID]: 'P9702',
@@ -180,11 +180,24 @@ console.log('\n=== QC2：提交 ===');
   check('★★★★ 已在不能服侍名單的日子 ⇒「已在不能服侍名單」，不可以勾', v2.quarters[0].dates.every((d) => d.status === 'LISTED'));
   // 截止日之前提交 ⇒ 不標
   const sc3 = scene({ today: '2098-12-01' });
-  sc3.gas.personalSubmitUnavailable(tok(3), [T1[0]], '');
+  sc3.gas.personalSubmitUnavailable(tok(3), '', [T1[0]], '');
   check('★★★★ 截止日之前提交 ⇒ 不標「截止日之後」', sc3.subs()[0].late === false);
   check('★★★★ UnavailableSubmissions 第 1 行中文標題、第 2 行機器鍵',
     sc3.ss.getSheetByName('UnavailableSubmissions').getRange(2, 1, 1, 10).getValues()[0].join() === sc3.gas.unavailableSubmissionKeys_().join()
     && sc3.ss.getSheetByName('UnavailableSubmissions').getRange(1, 1).getValue() === '申報編號');
+}
+{
+  // 第九十輪回歸 V3 修正：由連結的季度（q）開始列出——邀請較後的季度時，義工要找得到那一季
+  const sc = scene();
+  const g = sc.gas;
+  const ids = (q) => g.buildPersonalUnavailableView_('P9701', sc.today, sc.TZ, q).quarters.map((x) => x.quarterId).join();
+  check('★★★★★★ 連結 q＝2099T2 ⇒ 由 T2 開始兩季（T2、T3），不是今日最近的 T1', ids('2099T2') === '2099T2,2099T3', ids('2099T2'));
+  check('★★★★★ q 不存在／空白 ⇒ 由今日最近的未完結季度開始（T1、T2）', ids('2077T1') === '2099T1,2099T2' && ids('') === '2099T1,2099T2');
+  const r = g.personalSubmitUnavailable(tok(1), '2099T2', [T3[0]], '');
+  check('★★★★★★ 連結 q＝2099T2 ⇒ 可以申報 T3 的主日', r.ok && r.added === 1 && r.view.quarters[0].quarterId === '2099T2', JSON.stringify(r).slice(0, 300));
+  check('★★★★★ 同一個日子，連結 q＝2099T1（只到 T2）⇒ 不可以申報', !g.personalSubmitUnavailable(tok(3), '2099T1', [T3[0]], '').ok);
+  check('★★★★ 撤回後回傳的頁面亦由連結的季度開始', g.personalWithdrawUnavailable(tok(1), '2099T2', r.view.submissions[0].submissionId).view.quarters[0].quarterId === '2099T2');
+  check('★★★★ 季度不是字串 ⇒ 當作沒有傳（由最近的季度開始）', g.personalSubmitUnavailable(tok(4), { x: 1 }, [T1[0]], '').ok);
 }
 
 // =====================================================================
@@ -192,20 +205,20 @@ console.log('\n=== QC3：撤回 ===');
 {
   const sc = scene();
   const g = sc.gas;
-  g.personalSubmitUnavailable(tok(1), [T1[1], T1[2]], '');
-  g.personalSubmitUnavailable(tok(3), [T1[1]], '');
+  g.personalSubmitUnavailable(tok(1), '', [T1[1], T1[2]], '');
+  g.personalSubmitUnavailable(tok(3), '', [T1[1]], '');
   const mine = sc.subs().filter((s) => s.personId === 'P9701');
   const other = sc.subs().filter((s) => s.personId === 'P9703')[0];
-  const r1 = g.personalWithdrawUnavailable(tok(1), other.submissionId);
+  const r1 = g.personalWithdrawUnavailable(tok(1), '', other.submissionId);
   check('★★★★★★ 不可以撤回別人的（找不到，同一句）', !r1.ok && /找不到/.test(r1.message)
     && sc.subs().filter((s) => s.submissionId === other.submissionId)[0].status === 'PENDING', JSON.stringify(r1));
-  const r2 = g.personalWithdrawUnavailable(tok(1), mine[0].submissionId);
+  const r2 = g.personalWithdrawUnavailable(tok(1), '', mine[0].submissionId);
   check('★★★★★★ 撤回自己的 ⇒ WITHDRAWN；頁面不再列出', r2.ok && sc.subs().filter((s) => s.submissionId === mine[0].submissionId)[0].status === 'WITHDRAWN'
     && r2.view.submissions.length === 1, JSON.stringify(r2));
   check('★★★★ AuditLog 撤回（只寫 PersonID）', sc.audits('PERSONAL_UNAVAILABLE_WITHDRAWN').length === 1
     && JSON.stringify(sc.audits()).indexOf(tok(1)) === -1);
   g.decideUnavailableSubmissions_([mine[1].submissionId], 'ACCEPT', 'clerk@example.invalid');
-  const r3 = g.personalWithdrawUnavailable(tok(1), mine[1].submissionId);
+  const r3 = g.personalWithdrawUnavailable(tok(1), '', mine[1].submissionId);
   check('★★★★★★ 已確認的不可以自己取消（「如需取消，請聯絡幹事」）', !r3.ok && /如需取消，請聯絡幹事/.test(r3.message), JSON.stringify(r3));
   const v = g.buildPersonalUnavailableView_('P9701', sc.today, sc.TZ);
   check('★★★★★ 個人頁：已確認、不可以撤回', v.submissions.length === 1 && v.submissions[0].statusText === '已確認' && !v.submissions[0].canWithdraw);
@@ -216,9 +229,9 @@ console.log('\n=== QC4：幹事確認 ===');
 {
   const sc = scene();
   const g = sc.gas; const U = sc.C.UNAVAILABLE;
-  g.personalSubmitUnavailable(tok(1), [T1[1]], '出外');
-  g.personalSubmitUnavailable(tok(3), [T1[2]], '');
-  g.personalSubmitUnavailable(tok(4), [T1[3]], '');
+  g.personalSubmitUnavailable(tok(1), '', [T1[1]], '出外');
+  g.personalSubmitUnavailable(tok(3), '', [T1[2]], '');
+  g.personalSubmitUnavailable(tok(4), '', [T1[3]], '');
   const list = g.apiListUnavailable(sc.Q, '');
   check('★★★★★★ 〔不能服侍的日期〕有「義工申報，待確認」三項（名字、日期、原因、截止日之後）',
     list.submissions.items.length === 3 && list.submissions.items[0].personName === sc.PEOPLE.P9701
@@ -253,7 +266,7 @@ console.log('\n=== QC4：幹事確認 ===');
   g.apiGenerateDraftExecute(sc.Q);
   const name = sc.getCell(0, T1[1], 'READ#1');
   const pid = Object.keys(sc.PEOPLE).filter((id) => sc.PEOPLE[id] === name)[0];
-  g.personalSubmitUnavailable(tok(Number(pid.slice(-2))), [T1[1]], '');
+  g.personalSubmitUnavailable(tok(Number(pid.slice(-2))), sc.Q, [T1[1]], '');
   sc.today = '2099-06-01';   // 接受的時間一定晚過版本
   g.apiDecideUnavailableSubmissions(g.apiListUnavailable(sc.Q, '').submissions.items.map((i) => i.submissionId), 'ACCEPT');
   const w = g.summariseVersionSendWarnings_(sc.Q, 0);
@@ -272,11 +285,14 @@ console.log('\n=== QC5：個人頁 ===');
     createHtmlOutput: (h) => ({ html: h, setTitle() { return this; } }),
     createTemplateFromFile: () => ({ evaluate() { rendered = this; return { setTitle() { return this; }, addMetaTag() { return this; } }; } })
   };
-  g.personalSubmitUnavailable(tok(3), [T1[0]], '<img src=x onerror=alert(1)>a</script>b');
+  g.personalSubmitUnavailable(tok(3), '', [T1[0]], '<img src=x onerror=alert(1)>a</script>b');
   const out = g.renderPersonalRosterPage_({ parameter: { p: tok(1), q: sc.Q } });
   check('★★★★★★ 這一季還沒有職事表、token 正確 ⇒ 照樣打開（noRoster）', rendered && rendered.data.noRoster === true && !out.html, JSON.stringify(rendered && rendered.data).slice(0, 300));
   const boot = JSON.parse(rendered.data.unavailableJson);
-  check('★★★★★ 頁面資料：自己的 token、可以申報的季度', boot.token === tok(1) && boot.view.quarters.length === 2);
+  check('★★★★★ 頁面資料：自己的 token、連結的季度、可以申報的季度', boot.token === tok(1) && boot.quarterId === sc.Q
+    && boot.view.quarters.length === 2 && boot.view.quarters[0].quarterId === sc.Q);
+  check('★★★★★ 頁面提交／撤回都帶連結的季度', /runner\.personalSubmitUnavailable\(token, quarterId, /.test(read('src/ui/PersonalRoster.html'))
+    && /runner\.personalWithdrawUnavailable\(token, quarterId, /.test(read('src/ui/PersonalRoster.html')));
   rendered = null;
   g.renderPersonalRosterPage_({ parameter: { p: tok(3), q: sc.Q } });
   const json3 = rendered.data.unavailableJson;
@@ -308,11 +324,11 @@ console.log('\n=== QC6：每日檢查通知幹事 ===');
   const notified = [];
   g.notifyAdmin_ = (subject, body, to, dry) => notified.push({ subject, body, to, dry });
   check('★★★★ 沒有申報 ⇒ 不通知', g.runUnavailableSubmissionNotify_(sc.today, cfg, true).outcome === 'SKIP' && notified.length === 0);
-  g.personalSubmitUnavailable(tok(1), [T1[1]], '出外');
+  g.personalSubmitUnavailable(tok(1), '', [T1[1]], '出外');
   const r1 = g.runUnavailableSubmissionNotify_(sc.today, cfg, true);
   check('★★★★★★ 有新的申報 ⇒ 通知幹事一次（DRY_RUN 照傳）', r1.outcome === 'SENT' && notified.length === 1 && notified[0].dry === true
     && notified[0].to === 'clerk@example.invalid' && notified[0].body.indexOf(sc.PEOPLE.P9701) !== -1, JSON.stringify(notified));
-  g.personalSubmitUnavailable(tok(3), [T1[1]], '');
+  g.personalSubmitUnavailable(tok(3), '', [T1[1]], '');
   check('★★★★★★ 同一日最多一封', g.runUnavailableSubmissionNotify_(sc.today, cfg, true).detail === 'ALREADY_TODAY' && notified.length === 1);
   sc.today = '2098-12-11';
   const r3 = g.runUnavailableSubmissionNotify_(sc.today, cfg, true);
@@ -320,12 +336,12 @@ console.log('\n=== QC6：每日檢查通知幹事 ===');
   sc.today = '2098-12-12';
   check('★★★★★ 沒有新的 ⇒ 不通知', g.runUnavailableSubmissionNotify_(sc.today, cfg, true).detail === 'NOTHING_NEW' && notified.length === 2);
   const sc2 = scene({ config: { PERSONAL_UNAVAILABLE_NOTIFY: ['FALSE', 'BOOL'] } });
-  sc2.gas.personalSubmitUnavailable(tok(1), [T1[1]], '');
+  sc2.gas.personalSubmitUnavailable(tok(1), '', [T1[1]], '');
   check('★★★★★ Config 關掉 ⇒ 不通知', sc2.gas.runUnavailableSubmissionNotify_(sc2.today, sc2.gas.readConfig_(), true).detail === 'DISABLED');
   check('★★★★ 每日檢查有呼叫（出錯不影響其他季度）', /runUnavailableSubmissionNotify_\(today, config, isDryRun\)/.test(read('src/Trigger.gs')));
   // 真正的 notifyAdmin_：DRY_RUN ⇒ 不寄
   const sc3 = scene();
-  sc3.gas.personalSubmitUnavailable(tok(1), [T1[1]], '');
+  sc3.gas.personalSubmitUnavailable(tok(1), '', [T1[1]], '');
   sc3.gas.runUnavailableSubmissionNotify_(sc3.today, sc3.gas.readConfig_(), true);
   check('★★★★★ DRY_RUN ⇒ 沒有真正寄出', sc3.mails.length === 0);
 }
@@ -401,8 +417,8 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
 {
   const sc = scene();
   const g = sc.gas;
-  g.personalSubmitUnavailable(tok(1), [T1[1]], '');
-  g.personalSubmitUnavailable(tok(3), [T2[0]], '');
+  g.personalSubmitUnavailable(tok(1), '', [T1[1]], '');
+  g.personalSubmitUnavailable(tok(3), '', [T2[0]], '');
   check('★★★★★ 待確認數目：全部 2 項；落在 T1 的 1 項', g.countPendingUnavailableSubmissions_(null) === 2
     && g.countPendingUnavailableSubmissions_({ start: '2099-01-01', end: '2099-01-31' }) === 1);
   const X = sc.C.PERSON_POST_EXCLUSIONS;

@@ -12,6 +12,8 @@
  *   已生成的季度，之後就走現有「之後才申報不能服侍」那一套提醒（按 Unavailable.CreatedAt 判斷）。
  *
  * ── 安全（個人連結部署是 access=ANYONE）────────────────────────────
+ *   - 可以申報的主日：由連結的季度（`q`）開始、未完結的 N 季（Config PERSONAL_UNAVAILABLE_QUARTERS_AHEAD，預設 2）；
+ *     `q` 已完結或不存在 ⇒ 由今日最近的未完結季度開始。過去的日子一律不可以選。
  *   - 公開函式只有 `PERSONAL_LINK_PUBLIC_APIS` 列的兩個（提交、撤回）。每個第一句一定是
  *     `const person = assertPersonalLinkCaller_(token);`——用 token 認人（NameMapping.PersonalLinkToken、Active），
  *     認不到 ⇒ 中性錯誤（PERSONAL_LINK_INVALID_MESSAGE），不透露原因。測試 round88_pd_public_globals 逐個核對。
@@ -138,17 +140,20 @@ function assertPersonalLinkCaller_(token) {
 }
 
 /**
- * 可以申報的季度：未完結（EndDate ≥ 今日）的季度之中，按開始日最近的 N 季（Config，預設 2）。
+ * 可以申報的季度：未完結（EndDate ≥ 今日）的季度之中，按開始日排，取 N 季（Config，預設 2）。
+ * 第九十輪回歸 V3 修正：由連結的季度（`q`，例如邀請信的那一季）開始——否則邀請義工申報較後的季度時，
+ * 頁面只列出今日最近的兩季，義工找不到要申報的那一季。`q` 已完結或不存在 ⇒ 由最近的未完結季度開始。
  * @param {string} todayStr 今日
  * @param {string} timezone 時區
+ * @param {string=} anchorQuarterId 連結的季度（`q`）
  * @returns {Object[]} {quarterId, label, startDate, endDate, generateDate, deadline}
  */
-function listPersonalUnavailableQuarters_(todayStr, timezone) {
+function listPersonalUnavailableQuarters_(todayStr, timezone, anchorQuarterId) {
   const Q = COLUMNS.QUARTERS;
   const ahead = Math.max(1, Number(getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_QUARTERS_AHEAD, 2)) || 2);
   const deadlineDays = Math.max(0, Number(getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, 7)) || 0);
   const config = readConfig_();
-  return readSheet_(SHEETS.QUARTERS)
+  const open = readSheet_(SHEETS.QUARTERS)
     .map(function (r) {
       const generateDate = readPreseasonGenerateDate_(r, config);
       return {
@@ -160,7 +165,10 @@ function listPersonalUnavailableQuarters_(todayStr, timezone) {
       };
     })
     .filter(function (q) { return q.quarterId && q.endDate && q.endDate >= todayStr; })
-    .sort(function (a, b) { return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); })
+    .sort(function (a, b) { return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); });
+  const anchor = String(anchorQuarterId || '').trim();
+  const from = Math.max(0, open.map(function (q) { return q.quarterId; }).indexOf(anchor));
+  return open.slice(from)
     .slice(0, ahead)
     .map(function (q) { q.label = buildQuarterLabel_(q.quarterId); return q; });
 }
@@ -180,12 +188,13 @@ function personalUnavailableDayLabel_(dateStr) {
  * @param {string} personId 已經用 token 認出來的人
  * @param {string} todayStr 今日
  * @param {string} timezone 時區
+ * @param {string=} anchorQuarterId 連結的季度（`q`）
  * @returns {{quarters: Object[], submissions: Object[], maxDates: number, maxReason: number}}
  */
-function buildPersonalUnavailableView_(personId, todayStr, timezone) {
+function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuarterId) {
   const D = COLUMNS.SERVICE_DATES;
   const U = COLUMNS.UNAVAILABLE;
-  const quarters = listPersonalUnavailableQuarters_(todayStr, timezone);
+  const quarters = listPersonalUnavailableQuarters_(todayStr, timezone, anchorQuarterId);
   const mine = readUnavailableSubmissions_(timezone).filter(function (s) { return s.personId === personId; });
   const byDate = {};
   mine.forEach(function (s) {
@@ -259,18 +268,19 @@ function personalUnavailableToday_() {
 /**
  * 個人連結公開函式：提交不能服侍的日子。**只寫 `UnavailableSubmissions` 這個人自己的行。**
  * @param {string} token 個人連結 token
+ * @param {string} quarterId 連結的季度（`q`；決定可以申報哪幾季）
  * @param {string[]} dates 主日（yyyy-MM-dd）
  * @param {string} reason 原因（可以空白）
  * @returns {{ok: boolean, message: string, added: number, view: Object}}
  */
-function personalSubmitUnavailable(token, dates, reason) {
+function personalSubmitUnavailable(token, quarterId, dates, reason) {
   const person = assertPersonalLinkCaller_(token);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
     return { ok: false, message: '系統繁忙，請稍後再試。', added: 0 };
   }
   try {
-    return submitPersonalUnavailable_(person, dates, reason);
+    return submitPersonalUnavailable_(person, dates, reason, typeof quarterId === 'string' ? quarterId : '');
   } finally {
     lock.releaseLock();
   }
@@ -281,13 +291,14 @@ function personalSubmitUnavailable(token, dates, reason) {
  * @param {{personId: string, nameTC: string}} person 這個人
  * @param {*} dates 頁面送來的日期
  * @param {*} reason 頁面送來的原因
+ * @param {string=} anchorQuarterId 連結的季度
  * @returns {{ok: boolean, message: string, added: number, view: Object}}
  */
-function submitPersonalUnavailable_(person, dates, reason) {
+function submitPersonalUnavailable_(person, dates, reason, anchorQuarterId) {
   const now = personalUnavailableToday_();
   const fail = function (message) {
     return { ok: false, message: message, added: 0,
-      view: buildPersonalUnavailableView_(person.personId, now.today, now.timezone) };
+      view: buildPersonalUnavailableView_(person.personId, now.today, now.timezone, anchorQuarterId) };
   };
   if (!Array.isArray(dates) || dates.length === 0) return fail('請先勾選日子。');
   const wanted = [];
@@ -298,7 +309,7 @@ function submitPersonalUnavailable_(person, dates, reason) {
   if (wanted.length > PERSONAL_UNAVAILABLE_MAX_DATES) {
     return fail('每次最多可以提交 ' + PERSONAL_UNAVAILABLE_MAX_DATES + ' 個日子，請分開提交。');
   }
-  const view = buildPersonalUnavailableView_(person.personId, now.today, now.timezone);
+  const view = buildPersonalUnavailableView_(person.personId, now.today, now.timezone, anchorQuarterId);
   const allowed = {};
   const quarterOf = {};
   view.quarters.forEach(function (q) {
@@ -348,23 +359,24 @@ function submitPersonalUnavailable_(person, dates, reason) {
   });
   return { ok: true, added: fresh.length,
     message: '已提交 ' + fresh.length + ' 個日子，等候幹事確認。',
-    view: buildPersonalUnavailableView_(person.personId, now.today, now.timezone) };
+    view: buildPersonalUnavailableView_(person.personId, now.today, now.timezone, anchorQuarterId) };
 }
 
 /**
  * 個人連結公開函式：撤回一項**等候確認**的申報。只可以撤回自己的。
  * @param {string} token 個人連結 token
+ * @param {string} quarterId 連結的季度（`q`；回傳的頁面資料用）
  * @param {string} submissionId 申報編號
  * @returns {{ok: boolean, message: string, view: Object}}
  */
-function personalWithdrawUnavailable(token, submissionId) {
+function personalWithdrawUnavailable(token, quarterId, submissionId) {
   const person = assertPersonalLinkCaller_(token);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(10000)) {
     return { ok: false, message: '系統繁忙，請稍後再試。' };
   }
   try {
-    return withdrawPersonalUnavailable_(person, submissionId);
+    return withdrawPersonalUnavailable_(person, submissionId, typeof quarterId === 'string' ? quarterId : '');
   } finally {
     lock.releaseLock();
   }
@@ -374,15 +386,16 @@ function personalWithdrawUnavailable(token, submissionId) {
  * 撤回的實際內容。
  * @param {{personId: string}} person 這個人
  * @param {*} submissionId 頁面送來的編號
+ * @param {string=} anchorQuarterId 連結的季度
  * @returns {{ok: boolean, message: string, view: Object}}
  */
-function withdrawPersonalUnavailable_(person, submissionId) {
+function withdrawPersonalUnavailable_(person, submissionId, anchorQuarterId) {
   const now = personalUnavailableToday_();
   const id = typeof submissionId === 'string' ? submissionId.trim() : '';
   const target = readUnavailableSubmissions_(now.timezone).filter(function (s) {
     return s.submissionId === id && s.personId === person.personId;
   })[0];
-  const view = function () { return buildPersonalUnavailableView_(person.personId, now.today, now.timezone); };
+  const view = function () { return buildPersonalUnavailableView_(person.personId, now.today, now.timezone, anchorQuarterId); };
   // 不是自己的、找不到 ⇒ 同一句（不透露那個編號是不是別人的）
   if (!target) return { ok: false, message: '找不到這一項申報，請重新整理頁面。', view: view() };
   if (target.status === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED) {

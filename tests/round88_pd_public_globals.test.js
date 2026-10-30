@@ -118,14 +118,14 @@ check('★★★★★ 清單上每一個都真的存在（而且只在 Personal
   const neutral = gas.PERSONAL_LINK_INVALID_MESSAGE;
   const bad = ['', null, undefined, 'b'.repeat(32), 'a'.repeat(31), 'a'.repeat(32) + ' x', { toString: () => 'a'.repeat(32) }, ['a'.repeat(32)]];
   check('★★★★★★ token 錯、格式不對、不是字串 ⇒ 兩個函式都是同一句中性錯誤，甚麼都沒有寫',
-    bad.every((t) => msg(() => gas.personalSubmitUnavailable(t, ['2099-01-04'], '')) === neutral
-      && msg(() => gas.personalWithdrawUnavailable(t, 'SUB-1')) === neutral) && writes.length === 0, writes.join(','));
-  check('★★★★★ 格式不對的 token 不用讀表', (() => { lookups = 0; msg(() => gas.personalSubmitUnavailable('x', [], '')); return lookups === 0; })());
+    bad.every((t) => msg(() => gas.personalSubmitUnavailable(t, '', ['2099-01-04'], '')) === neutral
+      && msg(() => gas.personalWithdrawUnavailable(t, '', 'SUB-1')) === neutral) && writes.length === 0, writes.join(','));
+  check('★★★★★ 格式不對的 token 不用讀表', (() => { lookups = 0; msg(() => gas.personalSubmitUnavailable('x', '', [], '')); return lookups === 0; })());
   enabled = false;
-  check('★★★★★ Web UI 停用 ⇒ 正確的 token 也只得中性錯誤', msg(() => gas.personalSubmitUnavailable('a'.repeat(32), [], '')) === neutral && writes.length === 0);
+  check('★★★★★ Web UI 停用 ⇒ 正確的 token 也只得中性錯誤', msg(() => gas.personalSubmitUnavailable('a'.repeat(32), '', [], '')) === neutral && writes.length === 0);
   enabled = true;
-  gas.personalSubmitUnavailable('a'.repeat(32), [], '');
-  gas.personalWithdrawUnavailable('a'.repeat(32), 'SUB-1');
+  gas.personalSubmitUnavailable('a'.repeat(32), '', [], '');
+  gas.personalWithdrawUnavailable('a'.repeat(32), '', 'SUB-1');
   check('★★★★ 正確的 token ⇒ 才會做', writes.join(',') === 'submit,withdraw', writes.join(','));
 }
 
