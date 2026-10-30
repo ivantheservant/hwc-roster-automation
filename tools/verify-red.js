@@ -6118,8 +6118,8 @@ const MUTATIONS = [
     id: "cd-fill-btn-back",
     why: "開季前準備還原〔填講員／翻譯／獻花〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('合堂主日', () => openCombinedServices(), '')\n    ]));",
-    replace: "      button('合堂主日', () => openCombinedServices(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
+    find: "      button('詩班獻詩', () => openChoirSinging(), '')\n    ]));",
+    replace: "      button('詩班獻詩', () => openChoirSinging(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
     tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
   },
   {
@@ -8469,7 +8469,7 @@ const MUTATIONS = [
     id: "kf-no-append",
     why: "預設開啟嘅硬規則冇列",
     file: "src/RuleReview.gs",
-    find: "    }).concat(group.level === RULE_LEVELS.HARD ? appendedRows : []);",
+    find: "    }).concat(appendedRows.filter(function (r) { return r[R.LEVEL] === group.level; }));",
     replace: "    }).concat([]);",
     tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
   },
@@ -8493,8 +8493,8 @@ const MUTATIONS = [
     id: "kf-keep-level",
     why: "Level寫錯唔當硬規則",
     file: "src/RuleReview.gs",
-    find: "    synthetic[R.LEVEL] = RULE_LEVELS.HARD;",
-    replace: "    synthetic[R.LEVEL] = existing ? existing[R.LEVEL] : RULE_LEVELS.HARD;",
+    find: "    synthetic[R.LEVEL] = RULE_DEFAULT_LEVELS[id] || RULE_LEVELS.HARD;",
+    replace: "    synthetic[R.LEVEL] = existing ? existing[R.LEVEL] : (RULE_DEFAULT_LEVELS[id] || RULE_LEVELS.HARD);",
     tests: ["tests/round84_kf_rule_review_default_hard.test.js"]
   },
   {
@@ -8805,8 +8805,8 @@ const MUTATIONS = [
     id: "ld-tune-moves-manual",
     why: "調整調開人手改嘅格",
     file: "src/StaffingCheck.gs",
-    find: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
-    replace: "      fixed: false };",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId) || s.kept) };",
+    replace: "      fixed: !!s.kept };",
     tests: ["tests/round85_ld_staffing.test.js"]
   },
   {
@@ -8829,16 +8829,16 @@ const MUTATIONS = [
     id: "ld-ft-temp-not-fixed",
     why: "調整時臨時幫手格可以改",
     file: "src/StaffingCheck.gs",
-    find: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
-    replace: "      fixed: !!(s.isManual && s.personId) };",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId) || s.kept) };",
+    replace: "      fixed: !!((s.isManual && s.personId) || s.kept) };",
     tests: ["tests/round85_ld_staffing.test.js"]
   },
   {
     id: "ld-ft-cleared-fixed",
     why: "人手清空嘅格唔再填",
     file: "src/StaffingCheck.gs",
-    find: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
-    replace: "      fixed: !!(s.freeText || s.isManual) };",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId) || s.kept) };",
+    replace: "      fixed: !!(s.freeText || s.isManual || s.kept) };",
     tests: ["tests/round85_ld_staffing.test.js"]
   },
   {
@@ -8941,7 +8941,7 @@ const MUTATIONS = [
     id: "le-ui-no-button",
     why: "開季前準備冇合堂主日掣",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('合堂主日', () => openCombinedServices(), '')\n",
+    find: "      button('合堂主日', () => openCombinedServices(), ''),\n",
     replace: "",
     tests: ["tests/round85_le_combined.test.js"]
   },
@@ -9029,8 +9029,8 @@ const MUTATIONS = [
     id: "lf-ui-no-button",
     why: "冇寄出季前資料掣",
     file: "src/ui/ScriptZone2.html",
-    find: "    body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary')]));\n",
-    replace: "",
+    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button('寄出申報邀請'",
+    replace: "button('寄出申報邀請'",
     tests: ["tests/round85_lf_preseason.test.js"]
   },
   {
@@ -9317,8 +9317,8 @@ const MUTATIONS = [
     id: "nb-allowed-blocked",
     why: "寄出季前資料預覽也變灰",
     file: "src/ui/Script.html",
-    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料'];",
-    replace: "  const VIEW_ONLY_ALLOWED_LABELS = [];",
+    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出申報邀請'];",
+    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出申報邀請'];",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
   {
@@ -9517,16 +9517,16 @@ const MUTATIONS = [
     id: "qa-default-off",
     why: "同日不兼任預設變成關掉（RuleSettings 沒有行就不生效）",
     file: "src/Constants.gs",
-    find: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: true\n};",
-    replace: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: false\n};",
+    find: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: true,",
+    replace: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: false,",
     tests: ["tests/round90_qa_same_day.test.js"]
   },
   {
     id: "qa-default-soft",
     why: "同日不兼任跌做 SOFT——生成照樣排、不擋儲存",
     file: "src/Constants.gs",
-    find: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD\n};",
-    replace: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.SOFT\n};",
+    find: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD,",
+    replace: "  [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.SOFT,",
     tests: ["tests/round90_qa_same_day.test.js"]
   },
   {

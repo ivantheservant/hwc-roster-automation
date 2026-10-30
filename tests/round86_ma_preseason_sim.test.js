@@ -121,7 +121,10 @@ console.log('\n=== MA4：預覽窗 ===');
   audit(g, sc, 'MANUAL|2098-12-08|DRY_RUN', '模擬 4 封');
   const p = g.apiPreseasonPreview(sc.Q);
   check('★★★★★ 預覽回傳 sentRecord：simulated、real＝null', p.sentRecord && p.sentRecord.real === null && p.sentRecord.simulated === true, JSON.stringify(p.sentRecord));
-  const z2 = fs.readFileSync('src/ui/ScriptZone2.html', 'utf8');
+  // 第九十輪批次 QC 組：〔寄出申報邀請〕視窗亦有同樣字眼 ⇒ 只看 openPreseasonSend() 那一段
+  const z2all = fs.readFileSync('src/ui/ScriptZone2.html', 'utf8');
+  const z2from = z2all.indexOf('function openPreseasonSend()');
+  const z2 = z2all.slice(z2from, z2all.indexOf('\n  function ', z2from + 10));
   check('★★★★★★ 預覽窗：只有模擬 ⇒ 「只有模擬寄出…模擬不算已寄出」；有真正 ⇒ 「真正寄出過一次」',
     /只有模擬寄出/.test(z2) && /模擬不算已寄出/.test(z2) && /真正寄出過一次/.test(z2));
 }
