@@ -17,9 +17,9 @@ MailApp）。呢份文件係俾你 deploy 之後、第一次真正用瀏覽器�
    - `DRY_RUN` = `TRUE`（測試模式，唔會真正寄信）
    - `WEBAPP_ENABLED` = `FALSE`（先維持關閉，deploy 完先開）
    - `WEBAPP_ALLOWED_EMAILS` = 只填你自己嘅電郵（先淨係你一個人可以用）
-2. **試算表嘅 `appsscript.json`**：`webapp.access` 應該係 `MYSELF`
-   （只有部署者本人可以打開網址）——呢個係 Ivan 你自己 deploy，
-   `MYSELF` 啱嘅。
+2. **試算表嘅 `appsscript.json`**：`webapp.access` 應該係 `DOMAIN`
+   （第八十七輪起：教會網域 內的人到達得到網址；真正誰可以用由
+   `WEBAPP_ALLOWED_EMAILS`（可以修改）和 `WEBAPP_VIEWER_EMAILS`（只可查看）決定）。
 3. **準備一個測試季度**：唔好直接用真實季度做第一次測試。可以用
    選單「準備工作 ▸ ⚠️ 新增季度」開一個新嘅測試季度（例如
    `9999T1`），或者揀一個你唔怕整亂、已經有齊資料嘅舊季度。
@@ -32,7 +32,7 @@ MailApp）。呢份文件係俾你 deploy 之後、第一次真正用瀏覽器�
 1. Apps Script 編輯器右上角「部署 ▸ 新增部署」。
 2. 類型揀「網頁應用程式」。
 3. 執行身分：`我`（對應 `appsscript.json` 嘅 `USER_DEPLOYING`）。
-4. 存取權限：`只有我自己`（對應 `MYSELF`）。
+4. 存取權限：`教會網域 內的所有人`（對應 `DOMAIN`，第八十七輪起）。
 5. 部署完成後會攞到一個網址，記低嚟但**先唔好打開**。
 6. 返去 `Config` 工作表，將 `WEBAPP_ENABLED` 改做 `TRUE`。
 7. 現在先打開網址。

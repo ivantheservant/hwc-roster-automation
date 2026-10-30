@@ -6,8 +6,8 @@
  * ## 點解需要兩個部署、doGet() 要嚴格分流
  *
  * 現有 Web App（`WebApp.gs` 嘅 `doGet()`）係幹事操作介面，部署權限係
- * `access=MYSELF`——淨係部署嗰個 Google 帳戶（幹事本人）先打得開。義工唔可能
- * 有嗰個帳戶，所以個人連結需要一個**唔同嘅部署**，`access=ANYONE`。
+ * `access=DOMAIN`（第八十七輪起；之前係 `MYSELF`）——要登入教會帳戶，而且要喺使用名單上先用得到。
+ * 義工唔一定有教會帳戶，所以個人連結需要一個**唔同嘅部署**，`access=ANYONE`。
  *
  * 同一個 script project 可以有多個部署，各自嘅 access 獨立設定，但**全部
  * 部署共用同一份程式碼、同一個 `doGet()` 入口**。即係話：`access=ANYONE`

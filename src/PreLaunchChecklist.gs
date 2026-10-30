@@ -34,8 +34,9 @@ const MANUAL_DEPLOYMENT_ACCESS_CHECK_ = {
   deployments: [
     { purpose: '義工個人專屬連結', deployLabel: 'Untitled', version: 'Version 4',
       executeAs: 'Me', whoHasAccess: 'Anyone' },
+    // 第八十七輪批次 NC 組：幹事介面改為 DOMAIN（由部署腳本按 appsscript.json 設定），待人手在「管理部署」核實
     { purpose: '幹事介面', deployLabel: '2026-08-17 第二十一輪…', version: 'Version 4',
-      executeAs: 'Me', whoHasAccess: 'Only myself' }
+      executeAs: 'Me', whoHasAccess: 'Anyone within 教會網域（第八十七輪起，待人手核實；之前是 Only myself）' }
   ]
 };
 
@@ -207,6 +208,9 @@ function buildPreLaunchChecklist_(quarterId) {
   const allowedRaw = getConfig(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
   const allowedList = (Array.isArray(allowedRaw) ? allowedRaw : []).filter(Boolean);
   const scriptAccount = String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
+  // 第八十七輪批次 NB 組：只可查看的人
+  const viewerRaw = getConfig(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS, []);
+  const viewerList = (Array.isArray(viewerRaw) ? viewerRaw : []).filter(Boolean);
   let webappReady = true;
   let webappGuidance;
   if (webappEnabled) {
@@ -233,7 +237,7 @@ function buildPreLaunchChecklist_(quarterId) {
     webappReady,
     '第 1 層分兩行說明，不可以混在一起：\n'
       + '　靜態設定（程式讀得到，但只是新部署的預設值）：appsscript.json 的 '
-      + 'webapp.access=MYSELF\n'
+      + 'webapp.access=DOMAIN（第八十七輪起：教會網域 內的人；真正誰可以用由第 3 層名單決定）\n'
       + '　各部署實際存取權（程式讀不到，必須人手核實）：\n'
       + deploymentCheckLines + '\n'
       + '　　最後一次人手核實：' + MANUAL_DEPLOYMENT_ACCESS_CHECK_.checkedOnDate
@@ -241,11 +245,14 @@ function buildPreLaunchChecklist_(quarterId) {
       + '　第 2 層：WEBAPP_ENABLED=' + (webappEnabled ? 'TRUE' : 'FALSE') + '\n'
       + '　第 3 層：WEBAPP_ALLOWED_EMAILS='
       + (allowedList.length > 0 ? allowedList.join('、') : '（空白）')
-      + '　SCRIPT_ACCOUNT_EMAIL=' + (scriptAccount || '（空白）'),
+      + '　SCRIPT_ACCOUNT_EMAIL=' + (scriptAccount || '（空白）')
+      + '　WEBAPP_VIEWER_EMAILS（只可查看）=' + (viewerList.length > 0 ? viewerList.join('、') : '（空白）'),
     webappGuidance + '\n\n程式碼稽核結論：WebApp.gs／WebAppFlow.gs 全部 api* 函式'
       + '（數量隨版本增減，見 tests/webapp_access_guard.test.js 的自動掃描結果）'
       + '第一行都呼叫 assertWebAppRequestAllowed_()，doGet() 渲染介面前也做同樣檢查，'
-      + '沒有發現任何繞過第 2、3 層的路徑。\n\n'
+      + '沒有發現任何繞過第 2、3 層的路徑。第八十七輪起：不傳參數＝當作改動（只有 WEBAPP_ALLOWED_EMAILS 的人可以用）；'
+      + '唯讀的 api 傳入自己的名字並列在 WEBAPP_READ_ONLY_APIS，只可查看的人才可以用'
+      + '（tests/round87_nb_api_permission.test.js 逐個核對全部 api*）。\n\n'
       + '⚠️ 上面「各部署實際存取權」是寫死的人手核實紀錄，不會隨部署變動自動更新。'
       + '如果之後新增、刪除、或重新指定過任何部署的版本／存取權，這裏的紀錄就會過時，'
       + '記得回來手動更新 MANUAL_DEPLOYMENT_ACCESS_CHECK_（PreLaunchChecklist.gs）。'
