@@ -456,6 +456,24 @@ function escapeRegExp_(text) {
 }
 
 /**
+ * 第九十一輪批次 RB 組：去掉句子結尾的「。；，、」（之後再接標點時不會重複，例如「。；」「。。」）。
+ * @param {*} text 句子
+ * @returns {string}
+ */
+function trimSentenceEnd_(text) {
+  return String(text === null || text === undefined ? '' : text).trim().replace(/[。；，、]+$/, '');
+}
+
+/**
+ * 第九十一輪批次 RB 組：用「；」接幾段原因。每段結尾的標點先去掉，不會出現「……錄影。；建議改派……」。
+ * @param {string[]} parts 原因
+ * @returns {string}
+ */
+function joinReasonParts_(parts) {
+  return (parts || []).map(trimSentenceEnd_).filter(function (s) { return !!s; }).join('；');
+}
+
+/**
  * 產生統一格式的時間戳字串，供所有寫入儲存格的時間欄位使用。
  *
  * 刻意寫入**字串**而非 Date 物件：Date 物件在儲存格的顯示會受試算表本身的

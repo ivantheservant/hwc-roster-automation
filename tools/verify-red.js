@@ -10160,6 +10160,46 @@ const MUTATIONS = [
     find: "    const n = String(names || (dashboardState_ && dashboardState_.manualPostNames) || '').trim();",
     replace: "    const n = '';",
     tests: ["tests/round91_ra_manual_posts.test.js"]
+  },
+  {
+    id: "rb-staffing-no-sameday",
+    why: "人手檢查說明句沒有同日不兼任",
+    file: "src/ui/ScriptZone2.html",
+    find: "同週不可兼任、同日不兼任、每人每季上限",
+    replace: "同週不可兼任、每人每季上限",
+    tests: ["tests/round91_rb_wording.test.js"]
+  },
+  {
+    id: "rb-reset-no-choir",
+    why: "整季重設說明沒有詩班獻詩",
+    file: "src/ui/ScriptZone3.html",
+    find: "每週標題、合堂主日、詩班獻詩會保留",
+    replace: "每週標題、合堂主日會保留",
+    tests: ["tests/round91_rb_wording.test.js", "tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "rb-trim-noop",
+    why: "不去掉結尾標點（又出現「。；」）",
+    file: "src/Utils.gs",
+    find: "  return String(text === null || text === undefined ? '' : text).trim().replace(/[。；，、]+$/, '');",
+    replace: "  return String(text === null || text === undefined ? '' : text).trim();",
+    tests: ["tests/round91_rb_wording.test.js"]
+  },
+  {
+    id: "rb-finetune-old-join",
+    why: "〔請系統幫我調整〕原因直接接「；」",
+    file: "src/FineTune.gs",
+    find: "      reason: joinReasonParts_([violation.reason, replacement.reason])",
+    replace: "      reason: violation.reason + '；' + replacement.reason",
+    tests: ["tests/round91_rb_wording.test.js"]
+  },
+  {
+    id: "rb-note-no-trim",
+    why: "建議表格註原因後再加「。」",
+    file: "src/SuggestionSheet.gs",
+    find: "'系統改了這一格。原因：' + trimSentenceEnd_(p.reason || p.brokenRuleId)",
+    replace: "'系統改了這一格。原因：' + (p.reason || p.brokenRuleId)",
+    tests: ["tests/round91_rb_wording.test.js"]
   }
 ];
 

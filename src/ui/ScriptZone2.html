@@ -301,7 +301,7 @@
 
   /** 人手檢查的內容（生成確認窗、季前資料預覽也用同一份）。 */
   function staffingCheckNodes(r) {
-    const nodes = [para('只計一定要遵守的規則（名單、不能服侍、身分要求、暫時不做、同週不可兼任、每人每季上限）。'
+    const nodes = [para('只計一定要遵守的規則（名單、不能服侍、身分要求、暫時不做、同週不可兼任、同日不兼任、每人每季上限）。'
       + '盡量遵守的規則和排表偏好不計——那些可以違反並提醒。', 'muted')];
     if (!r || r.totalBlanks === 0) {
       nodes.push(make('div', { text: '人手足夠：每一格都排得到人。', className: 'ok-line' }));

@@ -684,7 +684,8 @@ function proposeMinimalFix_(quarterId, versionNo) {
       suggestedPersonId: replacement.personId,
       brokenRuleId: violation.ruleId,
       severity: violation.severity,
-      reason: violation.reason + '；' + replacement.reason
+      // 第九十一輪批次 RB 組：違規原因本身以「。」結尾，直接接「；」會變成「。；」
+      reason: joinReasonParts_([violation.reason, replacement.reason])
     });
 
     if (replacement.personId) {

@@ -230,8 +230,9 @@ console.log('\n=== D2：fine-tune 提案嘅 Reason 欄會帶埋違規原因 ==='
   // 呢度用靜態檢查鎖住呢條串接關係——真正跑 proposeMinimalFix_() 需要 grid 工作表，
   // 而串接關係本身先係呢一項要守住嘅嘢。
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'FineTune.gs'), 'utf8');
+  // 第九十一輪批次 RB 組（刻意改動）：改用 joinReasonParts_()（先去掉違規原因結尾的「。」，不會「。；」）
   check('★★★★ 提案 reason 由 violation.reason 串接而成（唔會另外造一句冇資訊嘅文字）',
-    src.indexOf("violation.reason + '；' + replacement.reason") !== -1);
+    src.indexOf('joinReasonParts_([violation.reason, replacement.reason])') !== -1);
   check('★★★ 而且真係寫入 Reason 欄', src.indexOf('record[C.REASON] = p.reason') !== -1);
 }
 

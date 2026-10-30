@@ -447,7 +447,7 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     notes[key] = p.kind === 'FILL_GAP'
       ? ('這一格本來排不出（⚠ 未能安排）。系統建議派 「'
         + (p.suggestedName || '（空白）') + '」。')
-      : ('系統改了這一格。原因：' + (p.reason || p.brokenRuleId)
+      : ('系統改了這一格。原因：' + trimSentenceEnd_(p.reason || p.brokenRuleId)
         + '。原本是「' + (p.manualName || '（空白）') + '」，改成「'
         + (p.suggestedName || '（空白）') + '」。');
   });
@@ -705,8 +705,8 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
       // `FineTune.gs` 那一份（`proposeMinimalFix_()`）本來就寫對了
       //（`violation.reason + '；' + replacement.reason`）。這裡是同一個概念
       // 的第二份，而且是走了樣那一份。現在跟回它。
-      reason: [violation.reason, replacement.reason]
-        .filter(Boolean).join('；') || violation.ruleId
+      // 第九十一輪批次 RB 組：每段結尾的標點先去掉，不會出現「。；」
+      reason: joinReasonParts_([violation.reason, replacement.reason]) || violation.ruleId
     });
 
     if (!replacement.personId) {
