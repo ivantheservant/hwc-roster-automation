@@ -124,15 +124,15 @@ console.log('\n=== EH4：字眼 ===');
     && JSON.stringify(gas.formatVersionNoRanges_([2, 3])) === '["2、3"]'
     && JSON.stringify(gas.formatVersionNoRanges_([7])) === '["7"]');
   const realHist = gas.listSendHistory_;
-  const realLatest = gas.findLatestVersionNo;
+  const realLatest = gas.findLatestVersionNo_;
   gas.listSendHistory_ = () => [];
-  gas.findLatestVersionNo = () => 5;
+  gas.findLatestVersionNo_ = () => 5;
   check('★★★★★★ 「第 1 至 5 版都未寄過給任何人」', gas.buildSendHistoryView_(sc.Q).warnSentence === '⚠️ 目前是第 5 版，第 1 至 5 版都未寄過給任何人。', gas.buildSendHistoryView_(sc.Q).warnSentence);
   gas.listSendHistory_ = () => [{ versionNo: 3, sent: 1, stage: 'REVIEW', sentAt: 'x', total: 1, noEmail: 0, failed: 0 }];
-  gas.findLatestVersionNo = () => 6;
+  gas.findLatestVersionNo_ = () => 6;
   check('★★★★★ 「第 1、2、4 至 6 版未寄過給任何人」', gas.buildSendHistoryView_(sc.Q).warnSentence === '⚠️ 目前是第 6 版，第 1、2、4 至 6 版未寄過給任何人。', gas.buildSendHistoryView_(sc.Q).warnSentence);
   gas.listSendHistory_ = realHist;
-  gas.findLatestVersionNo = realLatest;
+  gas.findLatestVersionNo_ = realLatest;
 }
 
 console.log('\n=== EH2 補充：上一版原因旗標嗰條防線仍然要守 ===');

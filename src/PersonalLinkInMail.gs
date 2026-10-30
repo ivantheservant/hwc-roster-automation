@@ -147,7 +147,7 @@ function indexPersonalLinkTokens_() {
   const N = COLUMNS.NAME_MAPPING;
   const out = {};
   try {
-    readPeople().forEach(function (row) {
+    readPeople_().forEach(function (row) {
       const id = String(row[N.PERSON_ID] || '').trim();
       const token = String(row[N.PERSONAL_LINK_TOKEN] || '').trim();
       if (id && token) out[id] = token;

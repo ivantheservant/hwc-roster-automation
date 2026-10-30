@@ -119,7 +119,7 @@ function buildHardViolationKey_(quarterId, v) {
 /**
  * 由 AuditLog 讀出某季度已放行嘅違反 key。
  *
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)` 嘅結果
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)` 嘅結果
  * @param {string} quarterId 季度 ID
  * @returns {Object.<string, boolean>} 已放行嘅 key 集合
  */
@@ -132,7 +132,7 @@ function readReleasedHardViolationKeys_(auditRows, quarterId) {
 
 /**
  * 第六十七輪批次 AG 組：同上，但每個 key 帶返「放行嗰陣儲存成邊一版」。
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)` 嘅結果
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)` 嘅結果
  * @param {string} quarterId 季度 ID
  * @returns {Object.<string, {versionNo: ?number}>}
  */
@@ -182,7 +182,7 @@ function readReleasedHardViolationInfo_(auditRows, quarterId) {
  *
  * 用 6 欄 key 比對，所以格內換咗人就自然唔再算已放行——同新格式一樣嘅語意。
  *
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)` 嘅結果
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)` 嘅結果
  * @param {string} quarterId 季度 ID
  * @returns {Object.<string, {versionNo: ?number}>} 完整 6 欄 key → 放行版本
  */
@@ -198,11 +198,11 @@ function readMainFlowLegacyReleasedInfo_(auditRows, quarterId) {
 
   // 淨係有舊紀錄先讀派工表（一次），按版本索引「日期|PostID|slot → PersonID」
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const personByVersionCell = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
-    const k = Number(row[A.VERSION_NO]) + '|' + toDateString(row[A.SERVICE_DATE], timezone)
+    const k = Number(row[A.VERSION_NO]) + '|' + toDateString_(row[A.SERVICE_DATE], timezone)
       + '|' + row[A.POST_ID] + '|' + String(row[A.SLOT_INDEX]);
     personByVersionCell[k] = String(row[A.PERSON_ID] || '').trim();
   });
@@ -256,7 +256,7 @@ function readMainFlowLegacyReleasedInfo_(auditRows, quarterId) {
  * 呢個係舊資料本身資訊不足造成嘅，唔係做法揀錯。
  * 新格式冇呢個問題——由本輪起寫入嘅紀錄一律係完整 6 欄 key。
  *
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)` 嘅結果
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)` 嘅結果
  * @param {string} quarterId 季度 ID
  * @returns {Object.<string, boolean>} 已放行嘅**縮減** key（`日期|RuleID`）集合
  */
@@ -384,10 +384,10 @@ function listUnreleasedHardViolations_(quarterId, versionNo, violations) {
   if (judgeable.length === 0 || !quarterId) return [];
   try {
     const vNo = (versionNo === null || versionNo === undefined || isNaN(Number(versionNo)))
-      ? findLatestVersionNo(quarterId) : Number(versionNo);
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+      ? findLatestVersionNo_(quarterId) : Number(versionNo);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const classified = classifyHardViolations_(
-      judgeable, buildHardViolationClassContext_(quarterId, vNo, readUnavailableNormalized(timezone)));
+      judgeable, buildHardViolationClassContext_(quarterId, vNo, readUnavailableNormalized_(timezone)));
     // 第八十三輪批次 JA 組：之後才申報不能服侍＝冇人放行過 ⇒ 一樣係未放行
     return classified.real.concat(classified.lateUnavailable);
   } catch (err) {
@@ -589,7 +589,7 @@ function readVersionCreatedAtMs_(quarterId, versionNo) {
  */
 function readOptionalSheetRows_(sheetName) {
   try {
-    return readSheet(sheetName) || [];
+    return readSheet_(sheetName) || [];
   } catch (err) {
     log_('WARN', 'buildHardViolationClassContext_: 讀 ' + sheetName + ' 失敗，當作沒有紀錄。' + err.message);
     return [];

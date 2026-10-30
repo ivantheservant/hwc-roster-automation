@@ -177,9 +177,9 @@ console.log('\n=== B1 回歸：REHEARSAL_PROTECTED_QUARTERS 真係補返咗 ==='
 console.log('\n=== B3：DEFAULTS 三方對照——冇任何 `DEFAULTS.X` 會解析成 undefined ===');
 {
   // 真正嘅風險唔係「CONFIG_KEYS 有、DEFAULTS 冇同名欄位」——好多 Key 嘅
-  // fallback 本來就係喺呼叫點直接寫（例如 `getConfig(CONFIG_KEYS.DRY_RUN, true)`）
+  // fallback 本來就係喺呼叫點直接寫（例如 `getConfig_(CONFIG_KEYS.DRY_RUN, true)`）
   // 或者來自另一組常數（`SCORE_DEFAULTS`）。真正嘅風險係
-  // **`getConfig(key, DEFAULTS.X)` 入面嗰個 `DEFAULTS.X` 其實唔存在**
+  // **`getConfig_(key, DEFAULTS.X)` 入面嗰個 `DEFAULTS.X` 其實唔存在**
   // ⇒ 傳咗 `undefined` 落去 ⇒ 又一個「缺失被當成正常值」嘅入口。
   // 所以呢度掃嘅係 `src/` 入面實際寫出嚟嘅 `DEFAULTS.` 引用。
   const fs = require('fs');
@@ -198,7 +198,7 @@ console.log('\n=== B3：DEFAULTS 三方對照——冇任何 `DEFAULTS.X` 會解
     }
   });
   check('★★★★★ src/ 入面每一處 `DEFAULTS.X` 都真係有對應欄位'
-    + '（解析成 undefined ⇒ getConfig() 會攞住 undefined 當 fallback）',
+    + '（解析成 undefined ⇒ getConfig_() 會攞住 undefined 當 fallback）',
     bad.length === 0, bad.join('\n'));
 }
 

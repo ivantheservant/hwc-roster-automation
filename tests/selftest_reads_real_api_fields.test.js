@@ -132,15 +132,15 @@ function runS07(planReturn) {
     R.REQUEST_TYPE, R.STATUS, R.CREATED_AT];
   gas.log_ = function () {};
   gas.selfTestRecordPayload_ = function () {};
-  gas.getConfig = function () { return 'Asia/Hong_Kong'; };
-  gas.findLatestVersionNo = function () { return 2; };
+  gas.getConfig_ = function () { return 'Asia/Hong_Kong'; };
+  gas.findLatestVersionNo_ = function () { return 2; };
   gas.Utilities = { formatDate: function () { return '2028-06-01 00:00:00'; } };
   gas.indexPeopleById_ = function () {
     return { P1: { personId: 'P1', nameTC: '假甲乙' },
       P2: { personId: 'P2', nameTC: '假丙丁' },
       P3: { personId: 'P3', nameTC: '假戊己' } };
   };
-  gas.readPostsNormalized = function () {
+  gas.readPostsNormalized_ = function () {
     return [{ postId: 'ANNOUNCE', postNameTC: '報告', slotCount: 1 },
       { postId: 'CHAIR', postNameTC: '主席', slotCount: 1 },
       { postId: 'USHER', postNameTC: '司事', slotCount: 1 }];
@@ -152,7 +152,7 @@ function runS07(planReturn) {
       { serviceDate: '2028-07-16', postId: 'USHER', slotIndex: 1, personId: 'P3' }
     ];
   };
-  gas.readSheet = function () { return []; };
+  gas.readSheet_ = function () { return []; };
   gas.apiStep3Plan = function () { return planReturn; };
   gas.apiStep3Apply = function () {
     return { appliedCount: 3, rejectedCount: 0, needsInputCount: 0, advanced: true };
@@ -286,7 +286,7 @@ function runS10(planReturn) {
   ]);
   gas.log_ = function () {};
   gas.selfTestRecordPayload_ = function () {};
-  gas.findLatestVersionNo = function () { return 2; };
+  gas.findLatestVersionNo_ = function () { return 2; };
   gas.apiGetDashboardState = function () {
     return { unsaved: { gridChangeCount: 0, unresolvedCount: 0 } };
   };

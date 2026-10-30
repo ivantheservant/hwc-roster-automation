@@ -155,7 +155,7 @@ console.log('\n=== D-2 步 5 失敗【核心】唔前進 Stage、唔發佈公開
     /直接再按一次/.test(failFn));
   check('★★★★★ 兩種情況係靠**去睇實際狀態**分（有冇登記版本／grid 工作表在唔在），'
     + '唔係靠估',
-    /findLatestVersionNo\(/.test(failFn) && /getSheetByName\(/.test(failFn));
+    /findLatestVersionNo_\(/.test(failFn) && /getSheetByName\(/.test(failFn));
   check('★★★★★ 查唔到嗰陣一律當成「可能寫咗一半」（安全方向）',
     /wroteSomething = true/.test(failFn));
   check('★★★★ 兩種都回 ok:false 同 versionCreated:false，前端分辨得出「完全失敗」',
@@ -208,12 +208,12 @@ console.log('\n=== D-3【核心】零改動路徑 ===');
 console.log('\n=== D-2 步 4／5：重用既有寫入路徑，唔重新抄一次 ===');
 {
   check('★★★★★ 用 materialiseManualEdits_()（內含逐格 AuditLog → '
-    + 'createRosterSheet() → writeAssignments()），冇喺呢度抄多次',
+    + 'createRosterSheet_() → writeAssignments_()），冇喺呢度抄多次',
     // 第七十五輪批次 CC 組：多咗第 5 個參數（只改每週標題都要建立新一版）
     // 第八十二輪批次 IF 組：多傳起點版本號（用舊版本作起點、冇偵測到差異都建立新一版）
     /materialiseManualEdits_\(context, resolved\.changes, resolved\.state, 'apiSaveAndConfirmExecute',\s*\{ titleChangeCount: titleChanges\.length, startPointVersionNo: startPointNo \}\)/.test(SRC));
-  check('★★★★ 之後補 registerVersion()，Basis 用既有常數',
-    /registerVersion\([\s\S]{0,200}?VERSION_VALUES\.BASIS_FINE_TUNE/.test(SRC));
+  check('★★★★ 之後補 registerVersion_()，Basis 用既有常數',
+    /registerVersion_\([\s\S]{0,200}?VERSION_VALUES\.BASIS_FINE_TUNE/.test(SRC));
   check('★★★★★ 只喺 REVIEW_SENT 一種情況先前進 Stage（決定 D3）',
     /if \(plan\.stage === QUARTER_STAGE\.REVIEW_SENT\) \{\s*\n\s*advanceQuarterStage_/.test(SRC));
 }

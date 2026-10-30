@@ -119,7 +119,7 @@ console.log('\n=== C2 後端真係有備好「全部在職嘅人」 ===');
     path.join(__dirname, '..', 'src', 'WebAppPreQuarter.gs'), 'utf8');
   check('★★★★★ buildPreQuarterPeopleHintInputs_() 有讀名單出 allActivePersonIds',
     /allActivePersonIds: allActivePersonIds/.test(src)
-    && /readSheet\(SHEETS\.NAME_MAPPING\)[\s\S]{0,200}?isTrueValue_\(row\[M\.ACTIVE\]\)/.test(src));
+    && /readSheet_\(SHEETS\.NAME_MAPPING\)[\s\S]{0,200}?isTrueValue_\(row\[M\.ACTIVE\]\)/.test(src));
   check('★★★★ 已停用嘅唔會入清單（佢哋唔會再被排，個電郵冇機會用到）',
     /filter\(function \(row\) \{ return isTrueValue_\(row\[M\.ACTIVE\]\); \}\)/.test(src));
 }

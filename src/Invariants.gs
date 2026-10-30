@@ -139,7 +139,7 @@ function buildDialogNumberRegistry_() {
       },
       verify: function (quarterId, sendOptions) {
         // 另一條路：直接由收件人解析器數，唔經 `planStep2_()`。
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         return resolveActualRecipients_(
           quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions).length;
       }
@@ -162,11 +162,11 @@ function buildDialogNumberRegistry_() {
           : '';
       },
       produce: function (quarterId, sendOptions) {
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         return planStep4SendPreview_(quarterId, versionNo, sendOptions).recipientCount;
       },
       verify: function (quarterId, sendOptions) {
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         return resolveActualRecipients_(
           quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions).length;
       }
@@ -180,13 +180,13 @@ function buildDialogNumberRegistry_() {
           : '';
       },
       produce: function (quarterId) {
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         return readDashboardUnsavedState_(quarterId, versionNo).gridChangeCount;
       },
       verify: function (quarterId) {
         // 另一條路：直接由「儲存並確認」嗰個 plan 數——
         // 佢係真正會被寫入去嗰一份。
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         const context = buildFineTuneContext_(quarterId, versionNo);
         const resolved = resolveAuthoritativeState_(
           context, STATE_SOURCE.GRID_OVERLAY, 'I08.dashboard.gridChangeCount');
@@ -302,7 +302,7 @@ function invariantDialogNumbers_(quarterId) {
   //
   // 唔可以靠讀 `err.message` 嘅字去分「唔適用」同「算錯咗」——
   // 錯誤訊息會改，而改咗之後一條真失敗就會靜靜變成「唔適用」。
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const stage = (function () {
     try { return getQuarterStage_(quarterId); } catch (err) { return ''; }
   })();
@@ -373,7 +373,7 @@ function invariantAssignmentUniqueness_(quarterId) {
   const seen = {};
   const dups = [];
   let scanned = 0;
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     const qid = String(row[A.QUARTER_ID] || '').trim();
     if (only && qid !== only) return;
     scanned++;
@@ -402,7 +402,7 @@ function invariantStageDomain_() {
   const Q = COLUMNS.QUARTERS;
   const allowed = Object.keys(QUARTER_STAGE).map(function (k) { return QUARTER_STAGE[k]; });
   const bad = [];
-  readSheet(SHEETS.QUARTERS).forEach(function (row) {
+  readSheet_(SHEETS.QUARTERS).forEach(function (row) {
     const quarterId = String(row[Q.QUARTER_ID] || '').trim();
     if (!quarterId) return;
     const stage = String(row[Q.STAGE] || '').trim();
@@ -429,11 +429,11 @@ function invariantSendLogVersions_() {
   const S = COLUMNS.SEND_LOG;
   const V = COLUMNS.ROSTER_VERSIONS;
   const known = {};
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     known[String(row[V.QUARTER_ID] || '').trim() + '|' + Number(row[V.VERSION_NO])] = true;
   });
   const orphans = [];
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     const quarterId = String(row[S.QUARTER_ID] || '').trim();
     if (!quarterId) return;
     const raw = row[S.VERSION_NO];
@@ -465,7 +465,7 @@ function invariantProtectedV0_() {
   });
   const bad = [];
   let checked = 0;
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     const quarterId = String(row[V.QUARTER_ID] || '').trim();
     if (blocked.indexOf(quarterId.toUpperCase()) === -1) return;
     if (Number(row[V.VERSION_NO]) !== 0) return;
@@ -492,13 +492,13 @@ function invariantProtectedV0_() {
  */
 function invariantPublicLinkVersion_(quarterId) {
   const P = COLUMNS.PUBLIC_LINKS;
-  const latest = findLatestVersionNo(quarterId);
+  const latest = findLatestVersionNo_(quarterId);
   if (latest < 0) {
     return invariantResult_('I09', '公開連結指向最新儲存的版本',
       INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）',
       '這一季還沒有任何版本', quarterId + ' 還沒有任何版本，所以沒有東西可以發佈。');
   }
-  const row = readSheet(SHEETS.PUBLIC_LINKS).filter(function (r) {
+  const row = readSheet_(SHEETS.PUBLIC_LINKS).filter(function (r) {
     return String(r[P.QUARTER_ID] || '').trim() === quarterId;
   })[0];
   if (!row) {
@@ -512,7 +512,7 @@ function invariantPublicLinkVersion_(quarterId) {
     published === latest ? INVARIANT_STATUS.OK : INVARIANT_STATUS.FAILED,
     'v' + latest, 'v' + published,
     'PublicLinks.LastPublishedVersion=' + published
-      + '；findLatestVersionNo()=' + latest
+      + '；findLatestVersionNo_()=' + latest
       + '。不一致代表收信的人開連結看到的，不是最新那一版。');
 }
 
@@ -527,7 +527,7 @@ function invariantPublicLinkVersion_(quarterId) {
  * @returns {Object} `invariantResult_()`
  */
 function invariantDryRunNoRealSend_(quarterId) {
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   if (!isDryRun) {
     return invariantResult_('I10', '模擬模式下沒有真實寄出紀錄',
       INVARIANT_STATUS.NOT_APPLICABLE, '（這個狀態下不適用）',
@@ -535,7 +535,7 @@ function invariantDryRunNoRealSend_(quarterId) {
   }
   const S = COLUMNS.SEND_LOG;
   const real = [];
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[S.QUARTER_ID] || '').trim() !== quarterId) return;
     if (String(row[S.STATUS] || '').trim() !== MAIL_STATUS.SENT) return;
     real.push(String(row[S.SEND_ID] || '') + '／' + String(row[S.SENT_AT] || ''));

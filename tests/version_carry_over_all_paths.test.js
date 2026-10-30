@@ -13,7 +13,7 @@
 // 　　　　　　　⇒ PDF 圖例把 79 格報成「系統未能安排」
 // 第三十六輪 A　 `materialiseManualEdits_()` 丟 `personName`
 // 　　　　　　　⇒ 講員一格變成「⚠ 未能安排」（**資料遺失**）
-// 第三十六輪　　 `applyDecisions()` 兩樣都丟（第五條路，一直冇人查過）
+// 第三十六輪　　 `applyDecisions_()` 兩樣都丟（第五條路，一直冇人查過）
 //
 // 每次嘅測試都只斷言「數量對」——273 格仍然係 273 格，所以三次都逃得過。
 // **數量對而內容錯**先係呢幾輪反覆出現嘅形態。
@@ -221,16 +221,16 @@ function setGrid(v, date, post, text) {
   for (let c = 0; c < keys.length; c++) if (String(keys[c] || '') === post + '#1') { col = c + 1; break; }
   if (col === -1) return false;
   for (let r = 3; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) === date) {
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) === date) {
       sh.getRange(r, col).setValue(text); return true;
     }
   }
   return false;
 }
 function cellOf(v, date, post) {
-  return gas.readSheet(S.ROSTER_ASSIGNMENTS).find(function (r) {
+  return gas.readSheet_(S.ROSTER_ASSIGNMENTS).find(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === v
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
   });
 }
 const KEY = function (date, post) { return date + '|' + post + '|1'; };
@@ -308,7 +308,7 @@ console.log('\n=== 路 1／5：performRosterGeneration_()（生成初稿）===')
 
 console.log('\n=== 路 2／5：applyRequests_()（有申報嗰條路）===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
   const before = cellOf(base, DATES[2], 'READ')[A.PERSON_ID];
   const target = Object.keys(PEOPLE).find(function (id) { return id !== before; });
   const R = C.REQUESTS;
@@ -323,7 +323,7 @@ console.log('\n=== 路 2／5：applyRequests_()（有申報嗰條路）===');
   const res = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('★★★★ 成功', res.ok === true, JSON.stringify(res).slice(0, 200));
 
-  const next = gas.findLatestVersionNo(Q);
+  const next = gas.findLatestVersionNo_(Q);
   assertCarriedOver('applyRequests_', base, next, [KEY(DATES[2], 'READ')]);
   checkEqual('★★★★★ 申報真係生效', String(cellOf(next, DATES[2], 'READ')[A.PERSON_ID]), target);
   checkEqual('★★★★★ **講員嗰格嘅自由文字原封不動**',
@@ -332,7 +332,7 @@ console.log('\n=== 路 2／5：applyRequests_()（有申報嗰條路）===');
 
 console.log('\n=== 路 3／5：materialiseManualEdits_()（純人手改動）===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
   const before = cellOf(base, DATES[1], 'CHAIR')[A.PERSON_ID];
   const target = Object.keys(PEOPLE).find(function (id) { return id !== before; });
   check('（前置）grid 改一格', setGrid(base, DATES[1], 'CHAIR', PEOPLE[target]));
@@ -343,7 +343,7 @@ console.log('\n=== 路 3／5：materialiseManualEdits_()（純人手改動）===
   const res = gas.apiSaveAndConfirmExecute(Q, { decisions: plan.gridChanges, confirmedRequestRows: [] });
   check('★★★★ 成功', res.ok === true, JSON.stringify(res).slice(0, 200));
 
-  const next = gas.findLatestVersionNo(Q);
+  const next = gas.findLatestVersionNo_(Q);
   assertCarriedOver('materialiseManualEdits_', base, next, [KEY(DATES[1], 'CHAIR')]);
   checkEqual('★★★★★ 人手改動生效', String(cellOf(next, DATES[1], 'CHAIR')[A.PERSON_ID]), target);
 
@@ -368,7 +368,7 @@ console.log('\n=== 路 3／5：materialiseManualEdits_()（純人手改動）===
 
 console.log('\n=== 路 4／5：apiRollbackExecute()（回到上一個版本）===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
   const targetVersion = 0;
   const plan = gas.apiRollbackPlan(Q, targetVersion);
   check('★★★★ rollback plan 唔會 blocked', plan.blocked !== true,
@@ -377,7 +377,7 @@ console.log('\n=== 路 4／5：apiRollbackExecute()（回到上一個版本）==
   const res = gas.apiRollbackExecute(Q, targetVersion, gas.ROLLBACK_CONFIRM_TEXT);
   check('★★★★ 成功', res && res.ok !== false, JSON.stringify(res).slice(0, 300));
 
-  const next = gas.findLatestVersionNo(Q);
+  const next = gas.findLatestVersionNo_(Q);
   check('★★★★★ 建立咗新版本（唔係刪走舊版本）', next === base + 1, 'base=' + base + ' next=' + next);
 
   // 回退嘅「基準」係目標版本——新版本應該逐格等於 v0（一格都冇改動清單）。
@@ -390,9 +390,9 @@ console.log('\n=== 路 4／5：apiRollbackExecute()（回到上一個版本）==
     String(cellOf(next, DATES[0], 'PREACH')[A.PERSON_NAME_SNAPSHOT]), GUEST);
 }
 
-console.log('\n=== 路 5／5：applyDecisions()（微調提案）——真入口端到端 ===');
+console.log('\n=== 路 5／5：applyDecisions_()（微調提案）——真入口端到端 ===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
 
   // 造一個真嘅違反：加一位只做「讀經」嘅人，然後喺 grid 把佢擺入「主席」。
   // ⚠️ 呢兩樣都係**幹事嘅輸入**（NameMapping 同 grid 打字），手砌係正路。
@@ -432,15 +432,15 @@ console.log('\n=== 路 5／5：applyDecisions()（微調提案）——真入口
   check('（前置）幹事把提案全部設成「還原為原本的人」', decided >= 1, 'decided=' + decided);
 
   // ── 真入口二：套用決定 ────────────────────────────────────────
-  const result = gas.applyDecisions(detect.batchId);
-  check('★★★★★ 真入口 applyDecisions() 行得完（第五條路，之前三輪都只係讀原始碼）',
+  const result = gas.applyDecisions_(detect.batchId);
+  check('★★★★★ 真入口 applyDecisions_() 行得完（第五條路，之前三輪都只係讀原始碼）',
     !!(result && result.sheetName), JSON.stringify(result).slice(0, 300));
 
-  const next = gas.findLatestVersionNo(Q);
+  const next = gas.findLatestVersionNo_(Q);
   checkEqual('★★★★ 真係建立咗新一版', next, base + 1);
 
   // ★★★ 核心：呢條路一直冇端到端查過。兩個 bug 都喺呢度出現過。
-  assertCarriedOver('applyDecisions', base, next, [KEY(DATES[3], 'CHAIR')]);
+  assertCarriedOver('applyDecisions_', base, next, [KEY(DATES[3], 'CHAIR')]);
 
   checkEqual('★★★★★ 「還原為原本的人」真係生效',
     String(cellOf(next, DATES[3], 'CHAIR')[A.PERSON_ID]), origChair);
@@ -476,7 +476,7 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
   // 點解要特登砌呢個情境
   // ─────────────────────────────────────────────────────────────────
   //
-  // `applyDecisions()` 入面 `touchedByDecision` 同 `s.isManual` 喺絕大部分
+  // `applyDecisions_()` 入面 `touchedByDecision` 同 `s.isManual` 喺絕大部分
   // 情況下結果一樣，唯一分得出嘅時候係：
   //   • 呢一格**唔係**幹事喺 grid 改嘅（isManual = false）
   //   • 但係今次決定令佢**變成空白**（搵唔到替補）
@@ -486,7 +486,7 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
   // 造法：把「讀經」嘅資格全部關掉 ⇒ 每一格讀經都違反 HARD_ELIGIBILITY，
   // 而且搵唔到任何替補 ⇒ 系統建議係空白。
   //（改資格表係幹事嘅正常操作，季中收到人退出就會噉做。）
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
   const E = C.ELIGIBILITY;
   const esh = ss.getSheetByName(S.ELIGIBILITY);
   const ehead = esh.getRange(2, 1, 1, esh.getLastColumn()).getValues()[0];
@@ -517,7 +517,7 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
     if (String(psh.getRange(r, col(P.BATCH_ID)).getValue()) !== detect.batchId) continue;
     if (String(psh.getRange(r, col(P.SUGGESTED_PERSON_ID)).getValue() || '')) continue;
     psh.getRange(r, col(P.DECISION)).setValue(gas.FINETUNE_DECISION.ACCEPT_SUGGESTED);
-    touched.push(KEY(gas.toDateString(psh.getRange(r, col(P.SERVICE_DATE_ID)).getValue(), TZ)
+    touched.push(KEY(gas.toDateString_(psh.getRange(r, col(P.SERVICE_DATE_ID)).getValue(), TZ)
       || '', 'READ'));
   }
   check('（前置）幹事把「搵唔到替補」嗰啲設成「採用系統建議」', touched.length > 0);
@@ -527,8 +527,8 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
     beforeNames[d] = String(cellOf(base, d, 'READ')[A.PERSON_NAME_SNAPSHOT] || '');
   });
 
-  const r5b = gas.applyDecisions(detect.batchId);
-  const next = gas.findLatestVersionNo(Q);
+  const r5b = gas.applyDecisions_(detect.batchId);
+  const next = gas.findLatestVersionNo_(Q);
 
   // ⚠️ 第三十九輪批次（順手）：保留現況係啱嘅，但**一定要講**。
   //
@@ -552,7 +552,7 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
   // 實測結果：**決定永遠唔會把一格洗成空白。**
   // ─────────────────────────────────────────────────────────────────
   //
-  // `applyDecisions()` 嘅關卡係 `ACCEPT_SUGGESTED && entry.suggested`
+  // `applyDecisions_()` 嘅關卡係 `ACCEPT_SUGGESTED && entry.suggested`
   //（FineTune.gs）——建議係空白嗰陣會跌落 `else`，即係同 KEEP_MANUAL 一樣
   // 保留現況。`REVERT_ORIGINAL` 亦都有 `revertBlocked` 擋住同一件事。
   //
@@ -579,7 +579,7 @@ console.log('\n=== 路 5b：決定落喺「冇人喺 grid 改過」嘅格上面 
 console.log('\n=== C：守門本身要擋得住（用一個真嘅壞版本試）===');
 {
   // 人手把最新版本嘅 ruleFlags 清空 ⇒ 守門一定要嘈。
-  const v = gas.findLatestVersionNo(Q);
+  const v = gas.findLatestVersionNo_(Q);
   const sh = ss.getSheetByName(S.ROSTER_ASSIGNMENTS);
   const h = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
   const col = function (k) { return h.indexOf(k) + 1; };

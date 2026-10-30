@@ -46,12 +46,12 @@ console.log('\n=== CB2：ensureLookaheadQuarters_() 逐季寫、逐季記錄 ===
 {
   const executed = [];
   const audits = [];
-  gas.getConfig = (key, fb) => {
+  gas.getConfig_ = (key, fb) => {
     if (key === gas.CONFIG_KEYS.SYS_TIMEZONE) return 'Pacific/Auckland';
     if (key === gas.CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS) return 9;
     return fb;
   };
-  // ⚠️ formatDate 唔可以回常數——planAnnualQuarters_() 數主日要靠佢逐日推。
+  // ⚠️ formatDate_ 唔可以回常數——planAnnualQuarters_() 數主日要靠佢逐日推。
   // 「今日」由 Date 替身控制（只影響冇參數嘅 new Date()）。
   const RealDate = Date;
   gas.Date = class extends RealDate { constructor(...a) { if (a.length === 0) super('2026-10-24T12:00:00Z'); else super(...a); } };
@@ -86,7 +86,7 @@ console.log('\n=== CB3：Config 唔係正整數 ⇒ 預設 6 ===');
 {
   ['', 'abc', 0, -3, 2.5].forEach((bad) => {
     warns.length = 0;
-    gas.getConfig = (key, fb) => (key === gas.CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS ? bad : fb);
+    gas.getConfig_ = (key, fb) => (key === gas.CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS ? bad : fb);
     check('★★★★★ 「' + bad + '」⇒ 6，並記 WARN', gas.readQuarterLookaheadMonths_() === 6 && warns.length === 1);
   });
   check('★★★★ 預設值係 6', gas.DEFAULTS.QUARTER_LOOKAHEAD_MONTHS === 6);

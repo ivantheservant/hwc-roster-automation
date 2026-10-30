@@ -102,7 +102,7 @@ function parseMailRedirectTargets_(raw) {
  * @returns {string[]} 轉寄地址；沒有設定時回空陣列
  */
 function readMailRedirectTargets_() {
-  const raw = getConfig(CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, '');
+  const raw = getConfig_(CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, '');
   const value = String(raw === null || raw === undefined ? '' : raw).trim();
   if (!value) return [];
 

@@ -85,8 +85,8 @@ console.log('\n=== EE3：〔選擇其他〕預設勾選 ===');
 console.log('\n=== EE4：officialSentOnce／〔變動的人〕 ===');
 {
   const L = sc.C.SEND_LOG;
-  const realRead = gas.readSheet;
-  const withLog = (rows) => { gas.readSheet = (n) => (n === sc.S.SEND_LOG ? rows : realRead(n)); };
+  const realRead = gas.readSheet_;
+  const withLog = (rows) => { gas.readSheet_ = (n) => (n === sc.S.SEND_LOG ? rows : realRead(n)); };
   const row = (stage, status) => ({ [L.QUARTER_ID]: sc.Q, [L.STAGE]: stage, [L.STATUS]: status, [L.VERSION_NO]: 0, [L.SENT_AT]: '2099-01-02 10:00:00' });
   withLog([row('REVIEW', 'DRY_RUN')]);
   check('★★★★★ 只寄過審閱本 ⇒ officialSentOnce=false', gas.readSendLogSummaryForDashboard_(sc.Q, sc.TZ).officialSentOnce === false);
@@ -114,7 +114,7 @@ console.log('\n=== EE4：officialSentOnce／〔變動的人〕 ===');
   gas.planResendChangedPersons_ = () => ({ versionNo: 3, changed: [] });
   check('★★★★★ 冇人改過 ⇒ noChanges', gas.apiGetSendChangedRecipients(sc.Q).noChanges === true);
   gas.planResendChangedPersons_ = realPlan;
-  gas.readSheet = realRead;
+  gas.readSheet_ = realRead;
 }
 
 console.log('\n=== EE5：正式發出之後〔給所有人〕 ===');
@@ -139,7 +139,7 @@ console.log('\n=== EE5：正式發出之後〔給所有人〕 ===');
   check('★★★★★ 改動後重發四個入口都認 resendHasExplicitRecipients_（冇人改過都要行落去）',
     (flow.match(/resendHasExplicitRecipients_\(sendOptions\)/g) || []).length >= 4);
   check('★★★★★ 唔改 RESEND_ONLY_CHANGED 呢個全域設定（Mailer 照讀、種子照 TRUE、冇任何地方寫佢）',
-    /getConfig\(CONFIG_KEYS\.RESEND_ONLY_CHANGED, true\)/.test(read('src/Mailer.gs'))
+    /getConfig_\(CONFIG_KEYS\.RESEND_ONLY_CHANGED, true\)/.test(read('src/Mailer.gs'))
     && /key: CONFIG_KEYS\.RESEND_ONLY_CHANGED, type: CONFIG_TYPES\.BOOL, group: 'MAIL',\n\s+defaultValue: 'TRUE'/.test(read('src/ConfigSeed.gs'))
     && !/setConfig[^\n]*RESEND_ONLY_CHANGED/.test(read('src/WebAppSendPlan.gs') + read('src/ResendFlow.gs') + read('src/WebAppFlow.gs')));
 }

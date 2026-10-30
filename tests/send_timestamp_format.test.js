@@ -86,13 +86,13 @@ console.log('\n=== B2【核心】排序要用真時間，唔可以用顯示文�
     sendRow({ stage: M.OFFICIAL, sentAt: aug }),
     sendRow({ stage: M.OFFICIAL, sentAt: dec })
   ];
-  gas.readSheet = function () { return rows; };
+  gas.readSheet_ = function () { return rows; };
   const summary = gas.readSendLogSummaryForDashboard_('2026T4', TZ);
   checkEqual('★★★★★ 新寫法揀到真正最新嗰筆（12 月，唔係 8 月）',
     summary.lastSentAt[M.OFFICIAL], '2026-12-04 09:00');
 
   // 順序倒轉再試一次，證明結果同讀入次序無關。
-  gas.readSheet = function () { return rows.slice().reverse(); };
+  gas.readSheet_ = function () { return rows.slice().reverse(); };
   checkEqual('★★★★ 讀入次序倒轉都係同一個答案',
     gas.readSendLogSummaryForDashboard_('2026T4', TZ).lastSentAt[M.OFFICIAL],
     '2026-12-04 09:00');

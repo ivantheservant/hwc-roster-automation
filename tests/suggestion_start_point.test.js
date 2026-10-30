@@ -225,7 +225,7 @@ function setGrid(sheetName, date, post, text) {
   }
   if (col === -1) return false;
   for (let r = keyRow + 1; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
     sh.getRange(r, col).setValue(text);
     return true;
   }
@@ -241,20 +241,20 @@ function readGrid(sheetName, date, post) {
     if (String(head[i]) === post + '#1') { col = i + 1; break; }
   }
   for (let r = keyRow + 1; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
     return String(sh.getRange(r, col).getValue() || '').trim();
   }
   return '';
 }
 
 function snapshotAssignments() {
-  return JSON.stringify(gas.readSheet(S.ROSTER_ASSIGNMENTS));
+  return JSON.stringify(gas.readSheet_(S.ROSTER_ASSIGNMENTS));
 }
 
 // =====================================================================
 console.log('\n=== 前置：生成初稿 ===');
 check('★★★★ 生成成功', gas.apiGenerateDraftExecute(Q) !== undefined);
-const V0 = gas.findLatestVersionNo(Q);
+const V0 = gas.findLatestVersionNo_(Q);
 const GRID = gas.buildRosterSheetName_(Q, V0);
 check('★★★★ 有一張 grid', !!ss.getSheetByName(GRID), GRID);
 
@@ -450,7 +450,7 @@ console.log('\n=== B：藍色格嘅備註要講得出「點解改」 ===');
   // 唔准嘅話，備註係「你改的這一格違反了規則⋯⋯系統沒有動它」——
   // 兩句都要有測試守住，而下面守嘅係「系統真係動嗰陣講唔講得出原因」。
   const startForNotes = gas.resolveSuggestionStartPoint_(
-    Q, gas.findLatestVersionNo(Q), 'GRID');
+    Q, gas.findLatestVersionNo_(Q), 'GRID');
   // ⚠️ 第七十五輪批次 CF 組：冇勾「保留我的安排」⇒ 系統直接調整（唔使再准），所以直接睇系統改過嘅格。
   const built = gas.buildSuggestionState_(Q, startForNotes);
   const noteTexts = Object.keys(built.notes).map(function (k) { return built.notes[k]; });

@@ -6,7 +6,7 @@
 // ═════════════════════════════════════════════════════════════════════
 //
 //     ⚠️ I09｜預期 v3｜實際 v2｜PublicLinks.LastPublishedVersion=2；
-//     findLatestVersionNo()=3。不一致代表收信的人開連結看到的，
+//     findLatestVersionNo_()=3。不一致代表收信的人開連結看到的，
 //     不是最新那一版。
 //
 // v2 係「儲存並確認」造嘅（有發佈）。
@@ -22,14 +22,14 @@
 // 於是所有**唔經嗰支函式造版本**嘅路一條都冇數過。
 //
 // **呢一次由資料嗰邊數起：邊個會喺 `RosterVersions` 加行。**
-// `registerVersion()` 一共有六個真呼叫點——查出嚟有兩條漏咗發佈，
-// 而其中一條（`applyDecisions()`）連 Ivan 嗰張清單都冇。
+// `registerVersion_()` 一共有六個真呼叫點——查出嚟有兩條漏咗發佈，
+// 而其中一條（`applyDecisions_()`）連 Ivan 嗰張清單都冇。
 //
 // ═════════════════════════════════════════════════════════════════════
 // ⚠️ 呢一份唔驗字串
 // ═════════════════════════════════════════════════════════════════════
 //
-// 佢 stub 住 `registerVersion()`（＝「加一行 `RosterVersions`」嗰個
+// 佢 stub 住 `registerVersion_()`（＝「加一行 `RosterVersions`」嗰個
 // choke point）同 `publishPublicRoster_()`，記低呼叫次序，
 // 然後真正叫落每一條路，斷言**每一次加行之後都跟住一次發佈**。
 
@@ -65,8 +65,8 @@ console.log('\n=== A1【核心】由資料嗰邊數：邊個會喺 `RosterVersio
     const code = read('src/' + f)
       .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     code.split('\n').forEach(function (line, i) {
-      if (!/(^|[^\w.])registerVersion\s*\(/.test(line)) return;
-      if (/^function registerVersion/.test(line.trim())) return;
+      if (!/(^|[^\w.])registerVersion_\s*\(/.test(line)) return;
+      if (/^function registerVersion_/.test(line.trim())) return;
       sites.push(f + ':' + (i + 1));
     });
   });
@@ -94,7 +94,7 @@ function sandbox(files) {
   const gas = loadGasSource(files);
   const calls = [];
   gas.log_ = function () {};
-  gas.registerVersion = function (quarterId, versionNo) {
+  gas.registerVersion_ = function (quarterId, versionNo) {
     calls.push('register:v' + versionNo);
   };
   gas.publishPublicRoster_ = function () { calls.push('publish'); };
@@ -113,20 +113,20 @@ console.log('\n=== A2【核心】套用修改申報：加完行一定跟住發�
   ]);
   const gas = box.gas;
   // 只留住「造版本 ＋ 發佈」嗰一段，其餘寫入全部換走。
-  gas.createRosterSheet = function () { return 'Roster_2028T3_v3'; };
-  gas.writeAssignments = function () {};
+  gas.createRosterSheet_ = function () { return 'Roster_2028T3_v3'; };
+  gas.writeAssignments_ = function () {};
   gas.markPendingBackfillCells_ = function () {};
   gas.writeNewEligibilityRows_ = function () { return 0; };
   gas.writeNewUnavailableRows_ = function () { return 0; };
   gas.writeRequestOutcomes_ = function () {};
   gas.markProposalsApplied_ = function () {};
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.buildRequestApplyOutcomes_ = function () { return []; };
 
   // ⚠️ `applyRequests_()` 內部好長。呢一條只驗**最後嗰一段**：
-  // 加完行之後有冇發佈。所以由 `registerVersion()` 嗰句開始重演。
+  // 加完行之後有冇發佈。所以由 `registerVersion_()` 嗰句開始重演。
   const SRC = read('src/RequestsApply.gs');
-  const at = SRC.indexOf('    registerVersion(plan.quarterId, newVersionNo, sheetName');
+  const at = SRC.indexOf('    registerVersion_(plan.quarterId, newVersionNo, sheetName');
   const end = SRC.indexOf('\n  return {', at);
   // ⚠️ 呢一段本來喺一個 `try {` 入面，所以要自己補返個 `try {`——
   // 唔補嘅話嗰個 `} catch` 會唔對稱。
@@ -158,14 +158,14 @@ console.log('\n=== A2【核心】微調 ▸ 套用決定：加完行一定跟住
     'StateSource.gs', 'WebAppGuards.gs', 'WebAppSaveConfirm.gs', 'FineTune.gs'
   ]);
   const gas = box.gas;
-  gas.createRosterSheet = function () { return 'Roster_2028T3_v4'; };
-  gas.writeAssignments = function () {};
+  gas.createRosterSheet_ = function () { return 'Roster_2028T3_v4'; };
+  gas.writeAssignments_ = function () {};
   gas.markProposalsApplied_ = function () {};
   gas.archiveOldProposals_ = function () { return 0; };
-  gas.findLatestVersionNo = function () { return 4; };
+  gas.findLatestVersionNo_ = function () { return 4; };
 
   const SRC = read('src/FineTune.gs');
-  const at = SRC.indexOf('  registerVersion(quarterId, newVersionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE');
+  const at = SRC.indexOf('  registerVersion_(quarterId, newVersionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE');
   const end = SRC.indexOf('\n  return {', at);
   const tail = SRC.slice(at, end);
   const runTail = new Function('ctx', 'with (ctx) {'
@@ -179,7 +179,7 @@ console.log('\n=== A2【核心】微調 ▸ 套用決定：加完行一定跟住
   try { publish = runTail(gas); } catch (err) { threw = err.message; }
   checkEqual('★★★★★ 冇拋錯', threw, '');
   checkEqual('★★★★★★ **加完行之後跟住發佈**'
-    + '——`applyDecisions()` 係第二條漏咗嘅路，'
+    + '——`applyDecisions_()` 係第二條漏咗嘅路，'
     + '而由「某支函式嘅 caller」數起嗰陣完全見唔到佢',
     box.calls.join(' → '), 'register:v4 → publish');
   check('★★★★★ 而且拎得返個結果出嚟畀呼叫端講',
@@ -237,10 +237,10 @@ console.log('\n=== A2 匯入人手編好的職事表：加完行一定跟住發�
       assignments: []
     };
   };
-  gas.getConfig = function (k, d) { return d; };
-  gas.createRosterSheet = function () { return 'Roster_2028T3_v4'; };
-  gas.writeAssignments = function () {};
-  gas.protectV0 = function () {};
+  gas.getConfig_ = function (k, d) { return d; };
+  gas.createRosterSheet_ = function () { return 'Roster_2028T3_v4'; };
+  gas.writeAssignments_ = function () {};
+  gas.protectV0_ = function () {};
   gas.writeAuditLog_ = function () {};
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
   gas.buildGridSheetUrl_ = function () { return ''; };
@@ -262,13 +262,13 @@ console.log('\n=== A1【核心】已經發佈咗最新嗰版 ⇒ 唔使再發一
   let published = 0;
   gas.log_ = function () {};
   gas.publishPublicRoster_ = function () { published++; };
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.findPublicLinkRow_ = function () { return { lastPublishedVersion: 3 }; };
   // 第六十三輪批次 A 組：「已經係最新」而家仲要睇同一版發佈之後有冇人改過
   //（`evaluatePublicLinkFreshness_()`）。呢度嘅情境係「冇人改過」，
   // 所以長表一格都冇 UpdatedAt。
-  gas.readSheet = function () { return []; };
-  gas.getConfig = function (_k, d) { return d; };
+  gas.readSheet_ = function () { return []; };
+  gas.getConfig_ = function (_k, d) { return d; };
 
   const first = gas.tryPublishPublicRoster_('2028T3');
   checkEqual('★★★★★★ 已經係第 3 版 ⇒ **唔再發一次**', published, 0);

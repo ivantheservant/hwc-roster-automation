@@ -197,17 +197,17 @@ console.log('\n=== 第十四輪批次階段 D：buildSpecialSundayExternalOwnerI
     { [S.ACTIVE]: 'TRUE', [S.SERVICE_DATE]: '2026-11-01', [S.EXTERNAL_OWNER]: '' }, // 冇填 ExternalOwner
     { [S.ACTIVE]: 'FALSE', [S.SERVICE_DATE]: '2026-12-06', [S.EXTERNAL_OWNER]: '華語堂' } // Active=FALSE 唔應該計入
   ];
-  // 刻意唔載入 SheetReader.gs——嗰個檔案本身會宣告 readSpecialSundays()，
+  // 刻意唔載入 SheetReader.gs——嗰個檔案本身會宣告 readSpecialSundays_()，
   // vm 沙箱入面 top-level function 宣告會蓋過呢度預先設低嘅 override，
   // 令假資料完全冧唔到用。改為連 isTrueValue_ 都一齊用 override 提供
   // （原始碼一樣簡單：value===true 或者 trim().toUpperCase()==='TRUE'）。
   const gas2 = loadGasSource(['Constants.gs', 'Utils.gs', 'RosterWriter.gs'], {
-    readSpecialSundays: function () { return fakeRows; },
+    readSpecialSundays_: function () { return fakeRows; },
     isTrueValue_: function (value) {
       if (value === true) return true;
       return String(value).trim().toUpperCase() === 'TRUE';
     },
-    toDateString: function (v) { return v; } // 呢個測試嘅日期已經係字串，唔需要真正轉換
+    toDateString_: function (v) { return v; } // 呢個測試嘅日期已經係字串，唔需要真正轉換
   });
   const index = gas2.buildSpecialSundayExternalOwnerIndex_('2026T4', 'Pacific/Auckland');
   checkEqual('★★★ 有填 ExternalOwner 嘅 Active 主日會加入索引',

@@ -13,7 +13,7 @@
  * 即係一次造版本寫咗一半：grid 同長表寫咗，登記嗰一步冇行到。
  *
  * 後果：
- *   ・日後 2026T4 任何一條造版本嘅路，`createRosterSheet()` 都會因為
+ *   ・日後 2026T4 任何一條造版本嘅路，`createRosterSheet_()` 都會因為
  *     `Roster_2026T4_v2` 撞名而失敗（`MultiRun.gs` 嘅設計會先擋住，唔會再留
  *     孤兒，但幹事會見到一個睇唔明嘅錯）
  *   ・跨季「連續兩週」之前會讀到佢（I 組已修）
@@ -63,7 +63,7 @@ function findOrphanVersions_() {
     return byKey[key];
   };
 
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     const quarterId = String(row[A.QUARTER_ID] || '').trim();
     const versionNo = row[A.VERSION_NO];
     if (!quarterId || versionNo === '' || versionNo === null || !isFinite(Number(versionNo))) return;

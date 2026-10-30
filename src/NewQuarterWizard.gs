@@ -30,14 +30,14 @@ const QUARTER_TERM_START_MONTH = { 1: 1, 2: 4, 3: 7, 4: 10 };
  * 半套設定（例如只有三項啱）比完全用預設值更危險，會令某一季嘅日期
  * 靜靜噉錯開。
  *
- * 呢個 Key 喺 ConfigSeed 登記為 `LIST` 型，所以 `readConfig()` 會回傳
+ * 呢個 Key 喺 ConfigSeed 登記為 `LIST` 型，所以 `readConfig_()` 會回傳
  * **陣列**（`['1','4','7','10']`）而唔係字串。`String(陣列)` 啱啱好就係
  * 逗號分隔嘅字串，所以下面 `String(...)` 之後再 `splitList_()` 兩種形態
- * 都處理得到——`getConfig()` 退回 `DEFAULTS`（字串）嗰陣亦都一樣。
+ * 都處理得到——`getConfig_()` 退回 `DEFAULTS`（字串）嗰陣亦都一樣。
  * @returns {Object.<number, number>} {1: 起始月, 2: …, 3: …, 4: …}
  */
 function readQuarterTermStartMonths_() {
-  const raw = String(getConfig(CONFIG_KEYS.QUARTER_TERM_START_MONTHS,
+  const raw = String(getConfig_(CONFIG_KEYS.QUARTER_TERM_START_MONTHS,
     DEFAULTS.QUARTER_TERM_START_MONTHS) || '').trim();
   const parts = splitList_(raw).map(function (s) { return Number(s); });
 
@@ -107,7 +107,7 @@ function planNewQuarterWizard_(year, term, customStartDate) {
       + '如果要重新計算日期，請用「準備工作 ▸ ⚠️ 計算季度日期」；如果要清掉重來，'
       + '請自行到 Quarters／ServiceDates 工作表人手刪除對應的列（本工具不會幫你刪）。');
   }
-  if (readServiceDates(quarterId).length > 0) {
+  if (readServiceDates_(quarterId).length > 0) {
     throw new Error('ServiceDates 已經有 ' + quarterId + ' 的主日紀錄（雖然 Quarters 沒有這一季），'
       + '為免資料衝突，本工具拒絕執行，請自行檢查 ServiceDates 工作表。');
   }
@@ -131,7 +131,7 @@ function planNewQuarterWizard_(year, term, customStartDate) {
       + '請檢查年份／季別／自訂開始日是否輸入正確。');
   }
 
-  const config = readConfig();
+  const config = readConfig_();
   const guardMode = String(config[CONFIG_KEYS.SEND_WEEKDAY_GUARD] || 'NONE').toUpperCase();
   const leadGenerate = Number(config[CONFIG_KEYS.LEAD_DAYS_GENERATE]);
   const leadOfficial = Number(config[CONFIG_KEYS.LEAD_DAYS_OFFICIAL]);

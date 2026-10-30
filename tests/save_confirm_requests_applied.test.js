@@ -21,7 +21,7 @@
 //
 // ⚠️ 全部由真入口 `apiSaveAndConfirmPlan` / `apiSaveAndConfirmExecute` 叫落去，
 // 用 `tests/helpers/mock_sheets_realistic.js`，**唔 stub**
-// `buildFineTuneContext_()`／`resolveAuthoritativeState_()`／`createRosterSheet()`
+// `buildFineTuneContext_()`／`resolveAuthoritativeState_()`／`createRosterSheet_()`
 // ——嗰三個正正就係出事嗰條路。
 
 const { loadGasSource } = require('./helpers/gas_loader');
@@ -253,7 +253,7 @@ function addRequest(dateStr, postNameTC, personNameTC, type) {
 
 /** 讀 Requests 全部行（含 RequestID／Status）。 */
 function readRequests() {
-  return gas.readSheet(gas.SHEETS.REQUESTS).filter(function (r) {
+  return gas.readSheet_(gas.SHEETS.REQUESTS).filter(function (r) {
     return r[gas.COLUMNS.REQUESTS.QUARTER_ID] === Q;
   });
 }
@@ -261,9 +261,9 @@ function readRequests() {
 /** 某一版某一格而家係邊個。 */
 function whoIsOn(versionNo, dateStr, postId) {
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  const row = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).find(function (r) {
+  const row = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).find(function (r) {
     return r[C.QUARTER_ID] === Q && Number(r[C.VERSION_NO]) === versionNo
-      && gas.toDateString(r[C.SERVICE_DATE], TZ) === dateStr && r[C.POST_ID] === postId;
+      && gas.toDateString_(r[C.SERVICE_DATE], TZ) === dateStr && r[C.POST_ID] === postId;
   });
   return row ? String(row[C.PERSON_ID] || '') : '(冇呢一格)';
 }
@@ -278,7 +278,7 @@ function editGridCell(versionNo, dateStr, postId, slotIndex, text) {
   for (let c = 0; c < keys.length; c++) if (String(keys[c] || '') === wanted) { col = c + 1; break; }
   if (col === -1) return false;
   for (let r = 3; r <= sheet.getLastRow(); r++) {
-    if (gas.toDateString(sheet.getRange(r, 1).getValue(), TZ) === dateStr) {
+    if (gas.toDateString_(sheet.getRange(r, 1).getValue(), TZ) === dateStr) {
       sheet.getRange(r, col).setValue(text);
       return true;
     }
@@ -331,7 +331,7 @@ console.log('\n=== 甲1：0 格人手改動 ＋ 1 筆可套用申報 ⇒ 要成�
   check('★★★★★ 真正建立咗新版本', result && result.ok === true && result.versionCreated === true,
     JSON.stringify(result).slice(0, 400));
 
-  checkEqual('★★★★★ 建立咗 v1', gas.findLatestVersionNo(Q), 1);
+  checkEqual('★★★★★ 建立咗 v1', gas.findLatestVersionNo_(Q), 1);
   checkEqual('★★★★★ **申報真正生效**：' + DATES[2] + ' 讀經而家係 ' + newPerson
     + '（修正之前三張表都仍然係原本嗰個）', whoIsOn(1, DATES[2], 'READ'), newPerson);
 
@@ -432,7 +432,7 @@ console.log('\n=== 甲2：1 格人手改動 ＋ 1 筆申報（同一格）⇒ gr
   const R = gas.COLUMNS.REQUESTS;
   const overridden = readRequests().find(function (r) { return r.__sheetRow === overriddenRow; })
     || readRequests().filter(function (r) {
-      return gas.toDateString(r[R.SERVICE_DATE], TZ) === DATES[1] && r[R.POST_NAME] === '主席';
+      return gas.toDateString_(r[R.SERVICE_DATE], TZ) === DATES[1] && r[R.POST_NAME] === '主席';
     })[0];
   check('（前置）搵返被蓋過嗰一行', !!overridden, String(overriddenRow));
   if (overridden) {
@@ -455,7 +455,7 @@ console.log('\n=== 甲3：只剩 NEEDS_INPUT 申報 ⇒ 唔可以令「正式發
     JSON.stringify(plan.requests));
   checkEqual('★★★★ 冇任何可套用申報', plan.requests.apply.length, 0);
 
-  const versionNo = gas.findLatestVersionNo(Q);
+  const versionNo = gas.findLatestVersionNo_(Q);
   const unsaved = gas.readDashboardUnsavedState_(Q, versionNo);
   checkEqual('★★★★★ **pendingRequestCount ＝ 0**——NEEDS_INPUT 唔算「未處理」，'
     + '佢永遠唔會自動改動職事表，擋住佢冇保護到任何嘢，只會令幹事無路可走',
@@ -479,7 +479,7 @@ console.log('\n=== 甲1：0 格 ＋ 0 筆 ⇒ zeroChange 路徑，行為不變 =
   const headers = reqSheet.getRange(2, 1, 1, reqSheet.getLastColumn()).getValues()[0];
   const dateCol = headers.indexOf(gas.COLUMNS.REQUESTS.SERVICE_DATE) + 1;
   for (let r = 3; r <= reqSheet.getLastRow(); r++) {
-    if (gas.toDateString(reqSheet.getRange(r, dateCol).getValue(), TZ) === '2099-01-03') {
+    if (gas.toDateString_(reqSheet.getRange(r, dateCol).getValue(), TZ) === '2099-01-03') {
       [gas.COLUMNS.REQUESTS.SERVICE_DATE, gas.COLUMNS.REQUESTS.POST_NAME,
         gas.COLUMNS.REQUESTS.PERSON_NAME, gas.COLUMNS.REQUESTS.REQUEST_TYPE].forEach(function (k) {
         reqSheet.getRange(r, headers.indexOf(k) + 1).setValue('');
@@ -492,16 +492,16 @@ console.log('\n=== 甲1：0 格 ＋ 0 筆 ⇒ zeroChange 路徑，行為不變 =
   checkEqual('★★★★ 0 筆待處理申報', plan.requests.apply.length + plan.requests.needsInput.length, 0);
   check('★★★★★ zeroChange ＝ true（現有行為不變）', plan.zeroChange === true);
 
-  const before = gas.findLatestVersionNo(Q);
+  const before = gas.findLatestVersionNo_(Q);
   const result = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('★★★★ 成功而且冇建立版本', result.ok === true && result.versionCreated === false,
     JSON.stringify(result).slice(0, 300));
-  checkEqual('★★★★ 版本號冇變', gas.findLatestVersionNo(Q), before);
+  checkEqual('★★★★ 版本號冇變', gas.findLatestVersionNo_(Q), before);
 }
 
 console.log('\n=== 甲4：失敗文案要分「一個字都冇寫」同「寫到一半」 ===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
 
   // 情況一：乾淨失敗（版本未建立）。
   const clean = gas.buildSaveConfirmFailureResult_(Q, base, new Error('測試用：建立版本之前就失敗'));

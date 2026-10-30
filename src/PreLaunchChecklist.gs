@@ -74,7 +74,7 @@ function scanGenuineGapCells_(quarterId, versionNo) {
   const lastCol = sheet.getLastColumn();
   if (lastRow < 3) return [];
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
   const dateValues = sheet.getRange(3, 1, lastRow - 2, 1).getValues();
   const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
@@ -82,7 +82,7 @@ function scanGenuineGapCells_(quarterId, versionNo) {
 
   const results = [];
   for (let r = 0; r < values.length; r++) {
-    const dateStr = toDateString(dateValues[r][0], timezone);
+    const dateStr = toDateString_(dateValues[r][0], timezone);
     for (let c = 3; c < keys.length; c++) {
       if (String(keys[c] || '').indexOf('#') === -1) continue;
       const note = String(notes[r][c] || '').trim();
@@ -102,10 +102,10 @@ function scanGenuineGapCells_(quarterId, versionNo) {
  */
 function buildPreLaunchChecklist_(quarterId) {
   const items = [];
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   // 1. DRY_RUN 是否仍是 TRUE
-  const dryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const dryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   items.push(buildChecklistItem_(
     'DRY_RUN（是否仍在模擬寄信模式）',
     !dryRun,
@@ -154,7 +154,7 @@ function buildPreLaunchChecklist_(quarterId) {
   ));
 
   // 2. MAIL_SUBJECT_PREFIX 是否仍有測試字眼
-  const subjectPrefix = String(getConfig(CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '') || '');
+  const subjectPrefix = String(getConfig_(CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '') || '');
   const testKeywords = ['test', '測試', 'demo', 'temp', 'sample', 'debug'];
   const prefixLower = subjectPrefix.toLowerCase();
   const looksLikeTestPrefix = subjectPrefix !== ''
@@ -204,12 +204,12 @@ function buildPreLaunchChecklist_(quarterId) {
   // 也已經先做同樣兩項檢查，未通過只會回傳說明頁，不會渲染任何介面。
   // 這是程式碼審閱的結論，不是這裡執行時重新掃描一次原始碼——Apps Script
   // 沒有安全、通用的方式讓程式碼在執行階段讀取並解析自己的原始碼檔案。
-  const webappEnabled = getConfig(CONFIG_KEYS.WEBAPP_ENABLED, false) === true;
-  const allowedRaw = getConfig(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
+  const webappEnabled = getConfig_(CONFIG_KEYS.WEBAPP_ENABLED, false) === true;
+  const allowedRaw = getConfig_(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
   const allowedList = (Array.isArray(allowedRaw) ? allowedRaw : []).filter(Boolean);
-  const scriptAccount = String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
+  const scriptAccount = String(getConfig_(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
   // 第八十七輪批次 NB 組：只可查看的人
-  const viewerRaw = getConfig(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS, []);
+  const viewerRaw = getConfig_(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS, []);
   const viewerList = (Array.isArray(viewerRaw) ? viewerRaw : []).filter(Boolean);
   let webappReady = true;
   let webappGuidance;
@@ -264,8 +264,8 @@ function buildPreLaunchChecklist_(quarterId) {
   // 以及明確講清楚每日檢查涵蓋 GENERATE／REMIND，OFFICIAL 是刻意永遠不會由這裡
   // 觸發（見 Trigger.gs 的 assertOfficialNotFromAutomationTrigger_() 結構性防護）。
   const triggers = listAutomationTriggers_();
-  const triggerSendHour = getConfig(CONFIG_KEYS.SEND_HOUR_LOCAL, null);
-  const triggerTimezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const triggerSendHour = getConfig_(CONFIG_KEYS.SEND_HOUR_LOCAL, null);
+  const triggerTimezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const expectedTriggerDesc = '函式：' + AUTOMATION_TRIGGER_FUNCTION
     + '　頻率：每日一次　執行時間：' + (triggerSendHour === null || triggerSendHour === ''
       ? '（Config 的 SEND_HOUR_LOCAL 未設定，安裝時會退回預設 09:00）'
@@ -294,13 +294,13 @@ function buildPreLaunchChecklist_(quarterId) {
   // Email 格式驗證——目的是在幹事按下「正式發出」之前主動抓到，而不是等
   // 真正寄送時才失敗、事後才在 SendLog 看到一筆「失敗」。
   const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const peopleById = indexPeopleById_();
   let missingEmailPeople = [];
   let malformedEmailPeople = [];
   if (versionNo >= 0) {
     const seen = {};
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] !== quarterId) return;
       if (Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) !== versionNo) return;
       const personId = row[COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID];
@@ -336,7 +336,7 @@ function buildPreLaunchChecklist_(quarterId) {
   // 6. Eligibility 是否有明顯測試用的行
   const eligTestKeywords = ['test', '測試', 'demo', 'temp', 'sample'];
   const suspiciousEligibility = [];
-  readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+  readSheet_(SHEETS.ELIGIBILITY).forEach(function (row) {
     const personId = row[COLUMNS.ELIGIBILITY.PERSON_ID];
     const person = peopleById[personId];
     const haystack = (String(personId || '') + ' ' + String((person && person.nameTC) || '')).toLowerCase();
@@ -356,13 +356,13 @@ function buildPreLaunchChecklist_(quarterId) {
   ));
 
   // 7. Unavailable 是否有過期或語意不清的行
-  const todayStr = toDateString(new Date(), timezone);
+  const todayStr = toDateString_(new Date(), timezone);
   const expiredUnavailable = [];
   const unclearUnavailable = [];
-  readSheet(SHEETS.UNAVAILABLE).forEach(function (row) {
+  readSheet_(SHEETS.UNAVAILABLE).forEach(function (row) {
     const personId = row[COLUMNS.UNAVAILABLE.PERSON_ID];
-    const dateFrom = toDateString(row[COLUMNS.UNAVAILABLE.DATE_FROM], timezone);
-    const dateTo = toDateString(row[COLUMNS.UNAVAILABLE.DATE_TO], timezone);
+    const dateFrom = toDateString_(row[COLUMNS.UNAVAILABLE.DATE_FROM], timezone);
+    const dateTo = toDateString_(row[COLUMNS.UNAVAILABLE.DATE_TO], timezone);
     const statusRaw = row[COLUMNS.UNAVAILABLE.STATUS];
     const status = String(statusRaw || '').trim().toUpperCase();
     const appliesTo = String(row[COLUMNS.UNAVAILABLE.APPLIES_TO] || '').trim().toUpperCase();
@@ -431,7 +431,7 @@ function buildPreLaunchChecklist_(quarterId) {
   ));
 
   // 9. v0 是否仍受保護
-  const v0Rows = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (row) {
+  const v0Rows = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (row) {
     return row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] === quarterId
       && Number(row[COLUMNS.ROSTER_VERSIONS.VERSION_NO]) === 0;
   });
@@ -471,7 +471,7 @@ function buildPreLaunchChecklist_(quarterId) {
         .filter(function (v) { return v.severity === RULE_LEVELS.HARD; });
       hardClassified = classifyHardViolations_(hardViolations,
         buildHardViolationClassContext_(quarterId, versionNo,
-          readUnavailableNormalized(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE))));
+          readUnavailableNormalized_(getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE))));
     } catch (err) {
       violationsError = err.message;
     }

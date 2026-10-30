@@ -168,13 +168,13 @@ function buildRound75Scene(opts) {
   // ── 小工具 ───────────────────────────────────────────────────
   const A = C.ROSTER_ASSIGNMENTS;
   function rows(versionNo) {
-    return gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (r) {
+    return gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) {
       return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo;
     });
   }
   function cellRow(versionNo, dateStr, postId) {
     return rows(versionNo).find(function (r) {
-      return gas.toDateString(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === postId;
+      return gas.toDateString_(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === postId;
     });
   }
   function gridSheet(versionNo) { return ss.getSheetByName('Roster_' + Q + '_v' + versionNo); }
@@ -183,7 +183,7 @@ function buildRound75Scene(opts) {
     const keys = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
     const col = keys.indexOf(key) + 1;
     for (let r = 3; r <= sh.getLastRow(); r++) {
-      if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) === dateStr) return { sh: sh, row: r, col: col };
+      if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) === dateStr) return { sh: sh, row: r, col: col };
     }
     return null;
   }

@@ -206,7 +206,7 @@ function planPreQuarterPeopleHints_(input) {
  * @returns {Object}
  */
 function buildPreQuarterChecklistInputs_(quarterId) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const S = COLUMNS.SPECIAL_SUNDAYS;
 
   // 第七十五輪批次 CC 組：特別主日關咗 ⇒ 當冇（清單唔列兩項、唔會因 SkipPostIDs 而少計）
@@ -216,16 +216,16 @@ function buildPreQuarterChecklistInputs_(quarterId) {
   });
 
   // ⚠️ `TranslationRequired` 喺 `SpecialSundays`，**唔喺 `ServiceDates`**
-  // （`readServiceDatesNormalized()` 完全冇呢一欄）。要靠日期夾埋兩張表。
+  // （`readServiceDatesNormalized_()` 完全冇呢一欄）。要靠日期夾埋兩張表。
   // 冇對應特別主日嗰啲主日 ⇒ 唔需要翻譯。
   const translationRequiredByDate = {};
   specialRows.forEach(function (row) {
     if (!isTrueValue_(row[S.ACTIVE])) return;
-    const d = toDateString(row[S.SERVICE_DATE], timezone);
+    const d = toDateString_(row[S.SERVICE_DATE], timezone);
     if (d && isTrueValue_(row[S.TRANSLATION_REQUIRED])) translationRequiredByDate[d] = true;
   });
 
-  const serviceDates = readServiceDatesNormalized(quarterId, timezone).map(function (d) {
+  const serviceDates = readServiceDatesNormalized_(quarterId, timezone).map(function (d) {
     return {
       serviceDate: d.serviceDate,
       translationRequired: translationRequiredByDate[d.serviceDate] === true
@@ -238,7 +238,7 @@ function buildPreQuarterChecklistInputs_(quarterId) {
   // ⚠️ 第七十五輪批次 CD 組（Ivan 決定）：講員／翻譯／獻花一律喺職事表直接填，
   // 所以**照最新職事表工作表計**（`isGridCellFilledByPerson_()` 認佔位文字，唔會把「待填」當人名）。
   // 讀唔到工作表（例如被改名）⇒ 退返資料層（`RosterAssignments`），唔可以當全部未填。
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const filledByDatePost = {};
   const manualPostIds = [postIds.preacherPostId, postIds.translationPostId, postIds.flowerPostId].filter(Boolean);
   const gridExists = versionNo >= 0 && !!SpreadsheetApp.getActiveSpreadsheet()
@@ -251,12 +251,12 @@ function buildPreQuarterChecklistInputs_(quarterId) {
     });
   } else if (versionNo >= 0) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
       if (Number(row[A.VERSION_NO]) !== versionNo) return;
       if (!String(row[A.PERSON_ID] || '').trim()
         && !String(row[A.PERSON_NAME_SNAPSHOT] || '').trim()) return;
-      filledByDatePost[toDateString(row[A.SERVICE_DATE], timezone) + '|' + row[A.POST_ID]] = true;
+      filledByDatePost[toDateString_(row[A.SERVICE_DATE], timezone) + '|' + row[A.POST_ID]] = true;
     });
   }
 
@@ -311,7 +311,7 @@ function apiGetPreQuarterChecklist(quarterId) {
  */
 function buildPreQuarterPeopleHintInputs_(quarterId, baseInputs) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const assignments = baseInputs.versionNo < 0 ? [] : readSheet(SHEETS.ROSTER_ASSIGNMENTS)
+  const assignments = baseInputs.versionNo < 0 ? [] : readSheet_(SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return String(row[A.QUARTER_ID] || '').trim() === quarterId
         && Number(row[A.VERSION_NO]) === baseInputs.versionNo;
@@ -322,9 +322,9 @@ function buildPreQuarterPeopleHintInputs_(quarterId, baseInputs) {
 
   const quarterRow = findQuarter_(quarterId);
   const quarterStartDate = quarterRow
-    ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], baseInputs.timezone) : '';
+    ? toDateString_(quarterRow[COLUMNS.QUARTERS.START_DATE], baseInputs.timezone) : '';
 
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const eligibleCountByPost = {};
   // 第八十五輪批次 LC 組：名單上的「堂委」「執事」按季度開始日的現任展開
   const rolesForCount = Object.keys(eligibility.rolesByPost || {}).length > 0
@@ -337,7 +337,7 @@ function buildPreQuarterPeopleHintInputs_(quarterId, baseInputs) {
   // ⚠️ 已停用嘅人唔檢查——佢哋唔會再被排，個電郵冇機會用到，
   // 而報一堆已停用嘅人只會令真正要處理嗰幾個淹沒咗。
   const M = COLUMNS.NAME_MAPPING;
-  const allActivePersonIds = readSheet(SHEETS.NAME_MAPPING)
+  const allActivePersonIds = readSheet_(SHEETS.NAME_MAPPING)
     .filter(function (row) { return isTrueValue_(row[M.ACTIVE]); })
     .map(function (row) { return String(row[M.PERSON_ID] || '').trim(); })
     .filter(function (id) { return id !== ''; });

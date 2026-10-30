@@ -223,7 +223,7 @@ console.log('\n=== D1／D2【核心】S01 只喺全新開跑時有意義 ===');
     + '唔係用一個 flag 記住「今次有冇重設過」'
     + '——記住嘅嘢會同真實狀態分岔，而且「重設過」同'
     + '「而家係全新」根本唔係同一件事',
-    /function isSelfTestQuarterFresh_\(quarterId\) \{[\s\S]{0,600}findLatestVersionNo\(quarterId\)[\s\S]{0,600}SHEETS\.ROSTER_ASSIGNMENTS/
+    /function isSelfTestQuarterFresh_\(quarterId\) \{[\s\S]{0,600}findLatestVersionNo_\(quarterId\)[\s\S]{0,600}SHEETS\.ROSTER_ASSIGNMENTS/
       .test(CODE), '');
   check('★★★★★★ 查唔到狀態 ⇒ **當成唔乾淨**，唔可以當成全新'
     + '——當成全新就會喺一個唔知咩狀態嘅季度上面'

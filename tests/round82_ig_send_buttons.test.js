@@ -111,7 +111,7 @@ console.log('\n=== IG2：〔寄給堂委／執事〕名單 ===');
   check('★★★★ 每組人數', r.counts.COMMITTEE === 2 && r.counts.DEACON === 1 && r.counts.IT === 1 && r.counts.CLERK === 1 && r.counts.FIXED === 1,
     JSON.stringify(r.counts));
   // 登入者本人就係其中一位堂委 ⇒ 唔另外加
-  const p1 = gas.readSheet(sc.S.NAME_MAPPING).filter((row) => row[sc.C.NAME_MAPPING.PERSON_ID] === 'P9701')[0];
+  const p1 = gas.readSheet_(sc.S.NAME_MAPPING).filter((row) => row[sc.C.NAME_MAPPING.PERSON_ID] === 'P9701')[0];
   const sc2 = scene(String(p1[sc.C.NAME_MAPPING.EMAIL]).toUpperCase());
   const r2 = sc2.gas.apiGetSendCommitteeRecipients(sc2.Q);
   check('★★★★★★ 登入者本人已經喺名單（大小寫唔同都認得）⇒ 唔重複', r2.extraEmails.length === 0 && r2.selfInPool === true

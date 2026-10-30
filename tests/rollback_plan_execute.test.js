@@ -48,10 +48,10 @@ console.log('\n=== E1【核心】ParentVersionNo 寫實際父版本，唔係目�
   // 由 v3 回到 v2、建立 v4：ParentVersionNo 要寫 3，唔係 2。
   // 寫 2 嘅話，版本鏈會變成 v2 有兩個仔，睇落好似分咗支——
   // 但實情係一條直線，只不過 v4 嘅**內容**取自 v2。
-  check('★★★★★ registerVersion 傳 plan.currentVersionNo 做 ParentVersionNo',
-    /registerVersion\([\s\S]{0,400}?plan\.currentVersionNo,/.test(execFn));
+  check('★★★★★ registerVersion_ 傳 plan.currentVersionNo 做 ParentVersionNo',
+    /registerVersion_\([\s\S]{0,400}?plan\.currentVersionNo,/.test(execFn));
   check('★★★★★ **冇**傳 target 做 ParentVersionNo',
-    !/registerVersion\([\s\S]{0,400}?^\s*target,/m.test(execFn));
+    !/registerVersion_\([\s\S]{0,400}?^\s*target,/m.test(execFn));
   check('★★★★ 而且有註解講明點解（唔係啱好撞啱）',
     /ParentVersionNo 寫\*\*實際父版本\*\*，唔係目標版本/.test(execFn)
     || /ParentVersionNo 寫.{0,10}實際父版本/.test(execFn));

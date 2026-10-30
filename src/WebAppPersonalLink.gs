@@ -59,7 +59,7 @@ function generatePersonalLinkToken_() {
  */
 function planPersonalLinkTokenSeed_() {
   const C = COLUMNS.NAME_MAPPING;
-  return readPeople()
+  return readPeople_()
     .filter(function (row) { return !String(row[C.PERSONAL_LINK_TOKEN] || '').trim(); })
     .map(function (row) { return { personId: row[C.PERSON_ID], nameTC: row[C.NAME_TC] }; });
 }
@@ -142,7 +142,7 @@ function seedPersonalLinkTokens_(missing) {
  *
  * @param {string} personId 要重新產生 token 嘅人。呼叫端（`runReissuePersonalLinkToken_()`）
  *   已經用 `normalizeIdInput_()` 處理過全形／零闊度字元，呢個函式內部只再做
- *   `.trim()`（同 `findLatestVersionNo()` 等 QuarterID 查詢一致嘅做法——
+ *   `.trim()`（同 `findLatestVersionNo_()` 等 QuarterID 查詢一致嘅做法——
  *   正規化喺輸入捕捉點做一次就夠，唔需要每個讀表比對點都重複做）。
  * @returns {{personId: string, nameTC: string, newToken: string}}
  */
@@ -187,7 +187,7 @@ function reissuePersonalLinkToken_(personId) {
  * @returns {?{personId: string, nameTC: string}}
  */
 function findPersonByToken_(token) {
-  return matchPersonByToken_(readPeople(), token); // readPeople() 已經只含 Active=TRUE
+  return matchPersonByToken_(readPeople_(), token); // readPeople_() 已經只含 Active=TRUE
 }
 
 /**
@@ -233,24 +233,24 @@ function matchPersonByToken_(rows, token) {
  *   mySchedule: Object[], legendRows: Array[], footerNote: string, updatedAt: string}}
  */
 function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error('季度 ' + quarterId + ' 還沒有任何版本。');
   }
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const assignments = readVersionAssignmentsForGrid_(quarterId, versionNo);
   const layout = buildGridLayout_(quarterId, assignments);
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
   // 第七十五輪批次 CC 組：日期下面嗰行標題＝特別主日名稱（如開住）再由每週標題蓋過
   const specialTitleByDate = buildDisplayTitleIndex_(quarterId, timezone);
   // 第十三輪批次階段 A4：日期格式同 PublicRoster.gs 嘅
   // buildPublicRosterContent_() 共用同一套 Config Key，義工喺公開連結／
   // 個人連結見到嘅係同一套顯示邏輯。
   const displayOptions = {
-    dateFormatPattern: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
+    dateFormatPattern: String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
   };
   const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
-  const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
+  const gapColor = getConfig_(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
 
   // 逐格判斷係咪呢個人自己嘅——同步喺 postRows[].cells[] 加 `mine` 旗標，
   // 亦順手收集「你的服侍安排」摘要。
@@ -278,11 +278,11 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
   });
   mySchedule.sort(function (a, b) { return a.serviceDate < b.serviceDate ? -1 : 1; });
 
-  const showLegend = getConfig(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
-  const footerNote = String(getConfig(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '');
+  const showLegend = getConfig_(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
+  const footerNote = String(getConfig_(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '');
   // 第十四輪批次階段 A：同 PublicRoster.gs 一致，BLANK 崗位說明改成圖例
   // 加一行，唔再逐格重複寫。
-  const blankNote = String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '');
+  const blankNote = String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '');
   const blankLegendEntry = buildBlankRowLegendEntry_(blankNote, transposed.blankPendingCount);
   const legendRows = showLegend
     ? buildLegendRows_(layout).concat(blankLegendEntry ? [blankLegendEntry] : [])

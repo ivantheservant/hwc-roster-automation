@@ -32,7 +32,7 @@ const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'PdfExp
 
 // buildAttachmentName_() 會讀 Config 拎 pattern；用替身避開試算表。
 // （同 state_source_authority.test.js 一樣，一定要喺載入之後先設。）
-gas.getConfig = function (key, fallback) {
+gas.getConfig_ = function (key, fallback) {
   if (key === 'ATTACH_NAME_PATTERN') return '{QuarterID}_{VersionNo}_粵語堂職事表_{PersonName}.pdf';
   return fallback;
 };

@@ -133,7 +133,7 @@ console.log('\n=== D2【核心】四道閘一次過講晒，唔係逐個拋 ==='
     return end === -1 ? rest : rest.slice(0, end);
   })();
   check('★★★★ 而且係純函式：唔讀 Config、唔讀工作表',
-    body.length > 200 && !/getConfig|readSheet|SpreadsheetApp|DriveApp/.test(body),
+    body.length > 200 && !/getConfig_|readSheet_|SpreadsheetApp|DriveApp/.test(body),
     body.slice(0, 200));
 }
 

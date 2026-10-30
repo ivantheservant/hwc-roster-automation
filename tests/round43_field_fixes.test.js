@@ -209,7 +209,7 @@ function colOf(sh, postKey) {
 function rowOf(sh, dateStr) {
   const kr = keyRowOf(sh);
   for (let r = kr + 1; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) === dateStr) return r;
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) === dateStr) return r;
   }
   return -1;
 }
@@ -239,7 +239,7 @@ function readGrid(sheetName, dateStr, postKey) {
 // =====================================================================
 console.log('\n=== 前置：生成初稿 ===');
 check('★★★★ 生成成功', gas.apiGenerateDraftExecute(Q) !== undefined);
-const V0 = gas.findLatestVersionNo(Q);
+const V0 = gas.findLatestVersionNo_(Q);
 const GRID = gas.buildRosterSheetName_(Q, V0);
 
 // =====================================================================
@@ -388,10 +388,10 @@ console.log('\n=== B【核心】儲存之後即刻撳建議：唔可以整一張
   check('（前置）而家仲有改動', before.changes.length > 0, String(before.changes.length));
 
   // 把改動還原返，模擬「儲存完之後 grid 同版本紀錄一致」。
-  const orig = gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (row) {
+  const orig = gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (row) {
     return String(row[C.ROSTER_ASSIGNMENTS.QUARTER_ID] || '') === Q
       && Number(row[C.ROSTER_ASSIGNMENTS.VERSION_NO]) === V0
-      && gas.toDateString(row[C.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === DATES[3]
+      && gas.toDateString_(row[C.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === DATES[3]
       && row[C.ROSTER_ASSIGNMENTS.POST_ID] === 'CHAIR';
   })[0];
   setGrid(GRID, DATES[3], 'CHAIR#1',
@@ -430,7 +430,7 @@ console.log('\n=== B：舊版本嘅建議表要清走 ===');
     JSON.stringify(accepted).slice(0, 200));
 
   // 再喺 v1 上面整一張建議表——**呢一張先係之後會過時嗰張**。
-  const v1 = gas.findLatestVersionNo(Q);
+  const v1 = gas.findLatestVersionNo_(Q);
   check('（前置）而家係 v' + v1, v1 >= 1, String(v1));
   check('（前置）喺 v1 改一格',
     setGrid(gas.buildRosterSheetName_(Q, v1), DATES[4], 'CHAIR#1', PEOPLE.P9804));
@@ -445,10 +445,10 @@ console.log('\n=== B：舊版本嘅建議表要清走 ===');
 
   // ⚠️ 回退有一道閘：grid 上有未儲存改動就唔准回退。
   // 所以要先把嗰一格改返原樣（建議表本身唔受影響，佢係另一張表）。
-  const back = gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (row) {
+  const back = gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (row) {
     return String(row[C.ROSTER_ASSIGNMENTS.QUARTER_ID] || '') === Q
       && Number(row[C.ROSTER_ASSIGNMENTS.VERSION_NO]) === v1
-      && gas.toDateString(row[C.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === DATES[4]
+      && gas.toDateString_(row[C.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === DATES[4]
       && row[C.ROSTER_ASSIGNMENTS.POST_ID] === 'CHAIR';
   })[0];
   setGrid(gas.buildRosterSheetName_(Q, v1), DATES[4], 'CHAIR#1',
@@ -466,7 +466,7 @@ console.log('\n=== B：舊版本嘅建議表要清走 ===');
     + '而其中一張係由一個已經被取代嘅版本算出嚟',
     names.filter(function (n) { return /_建議$/.test(n); }).length === 0,
     names.join('、'));
-  check('★★★★★ 而且掛喺 `createRosterSheet()`（五條建立版本嘅路唯一匯合點）',
+  check('★★★★★ 而且掛喺 `createRosterSheet_()`（五條建立版本嘅路唯一匯合點）',
     /discardStaleSuggestionSheets_\(quarterId, versionNo\)/
       .test(bare(read('src/RosterWriter.gs'))), '');
   check('★★★★★ 清嘅時候名字比對要嚴格'
@@ -477,7 +477,7 @@ console.log('\n=== B：舊版本嘅建議表要清走 ===');
 // =====================================================================
 console.log('\n=== D【核心】「⚠ 未能安排」嗰啲格要試住填 ===');
 {
-  const latest = gas.findLatestVersionNo(Q);
+  const latest = gas.findLatestVersionNo_(Q);
   const grid = gas.buildRosterSheetName_(Q, latest);
   // 人手清空兩格 ⇒ 造出「應該有人而冇人」。
   check('（前置）清空一格', setGrid(grid, DATES[6], 'READ#1', ''));
@@ -660,7 +660,7 @@ console.log('\n=== E／F：收件人選擇同自行輸入電郵 ===');
       opts.slice(opts.indexOf('function appendExtraEmailRecipients_'))), '');
   check('★★★★★ 紙本嗰邊：**仍然完全唔會讀任何收件人名單**'
     + '——嗰個「結構上不可能寄俾義工」嘅保證冇鬆開',
-    !/readPeople\(\)|EMAIL_RECIPIENTS/.test(
+    !/readPeople_\(\)|EMAIL_RECIPIENTS/.test(
       bare(read('src/PaperPack.gs')).slice(
         bare(read('src/PaperPack.gs')).indexOf('function apiEmailPaperPackToSelf'))), '');
 }

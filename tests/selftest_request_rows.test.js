@@ -62,8 +62,8 @@ function sandbox(opts) {
 
   gas.log_ = function () {};
   gas.selfTestRecordPayload_ = function () {};
-  gas.getConfig = function () { return 'Asia/Hong_Kong'; };
-  gas.findLatestVersionNo = function () { return 2; };
+  gas.getConfig_ = function () { return 'Asia/Hong_Kong'; };
+  gas.findLatestVersionNo_ = function () { return 2; };
   gas.Utilities = { formatDate: function () { return '2028-06-01 00:00:00'; } };
   gas.indexPeopleById_ = function () {
     return {
@@ -72,9 +72,9 @@ function sandbox(opts) {
       P3: { personId: 'P3', nameTC: '假戊己' }
     };
   };
-  gas.readPostsNormalized = function () { return opts.posts; };
+  gas.readPostsNormalized_ = function () { return opts.posts; };
   gas.selfTestPickCells_ = function () { return opts.cells; };
-  gas.readSheet = function () { return []; };
+  gas.readSheet_ = function () { return []; };
   // ⚠️⚠️ 第五十七輪批次：**呢個 stub 本來寫錯咗。**
   //
   // 舊寫法回 `{results: […]}`——而 `apiStep3Plan()` 根本冇嗰個欄位。
@@ -282,9 +282,9 @@ console.log('\n=== B1 唔准寫死中文崗位名 ===');
   const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const s07 = CODE.slice(CODE.indexOf('function selfTestS07_('),
     CODE.indexOf('function selfTestS08_('));
-  check('★★★★★★ 由 `readPostsNormalized()` 現場查'
+  check('★★★★★★ 由 `readPostsNormalized_()` 現場查'
     + '——寫死嘅話，日後有人改咗崗位名，自測機就會無聲無息噉壞掉',
-    /readPostsNormalized\(\)\.forEach/.test(s07), s07.slice(0, 900));
+    /readPostsNormalized_\(\)\.forEach/.test(s07), s07.slice(0, 900));
   // ⚠️ 唔可以用「有冇兩個中文字嘅字串」去驗——`'存在'`（工作表存在）
   // 都會中，而佢同崗位名完全無關。要驗**寫入嗰一句本身**。
   check('★★★★★ 崗位欄填嘅係查返嚟嗰個名，唔係一個字面值',

@@ -20,8 +20,8 @@
 // ⚠️ 呢一份唔驗字串
 // ═════════════════════════════════════════════════════════════════════
 //
-// 佢 stub 住每一個寫入動作（`createRosterSheet`／`writeAssignments`／
-// `registerVersion`／`publishPublicRoster_`），記低邊個被叫過，
+// 佢 stub 住每一個寫入動作（`createRosterSheet_`／`writeAssignments_`／
+// `registerVersion_`／`publishPublicRoster_`），記低邊個被叫過，
 // 然後真正行 `applyRequests_()` 最後嗰一段。
 
 const fs = require('fs');
@@ -66,16 +66,16 @@ function runTail(opts) {
   gas.decorateViolations_ = function (v) { return v; };
   gas.makeWarning_ = function () { return {}; };
   gas.buildRosterSheetName_ = function (q, v) { return 'Roster_' + q + '_v' + v; };
-  gas.createRosterSheet = function () { calls.push('createRosterSheet'); return 'Roster_2028T3_v3'; };
-  gas.writeAssignments = function () { calls.push('writeAssignments'); };
-  gas.registerVersion = function () { calls.push('registerVersion'); };
+  gas.createRosterSheet_ = function () { calls.push('createRosterSheet_'); return 'Roster_2028T3_v3'; };
+  gas.writeAssignments_ = function () { calls.push('writeAssignments_'); };
+  gas.registerVersion_ = function () { calls.push('registerVersion_'); };
   gas.markPendingBackfillCells_ = function () { calls.push('markPendingBackfillCells_'); };
   gas.writeNewEligibilityRows_ = function () { calls.push('writeNewEligibilityRows_'); return 0; };
   gas.writeNewUnavailableRows_ = function () { calls.push('writeNewUnavailableRows_'); return 0; };
   gas.writeRequestOutcomes_ = function () { calls.push('writeRequestOutcomes_'); };
   gas.publishPublicRoster_ = function () { calls.push('publish'); };
   gas.findPublicLinkRow_ = function () { return null; };
-  gas.findLatestVersionNo = function () { return 2; };
+  gas.findLatestVersionNo_ = function () { return 2; };
 
   const at = SRC.indexOf('  const violationCheckState = assignments.map(function (a) {');
   const end = SRC.indexOf('\n}\n', SRC.indexOf('    violations: violations\n  };'));
@@ -106,9 +106,9 @@ console.log('\n=== A1【核心】一筆都套用唔到 ⇒ 一個寫入動作都
   const box = runTail({ outcomes: [outcome(S.NEEDS_INPUT), outcome(S.NEEDS_INPUT),
     outcome(S.NEEDS_INPUT)] });
 
-  checkEqual('★★★★★★ **冇造 grid 工作表**', box.calls.indexOf('createRosterSheet'), -1);
-  checkEqual('★★★★★★ **冇寫 RosterAssignments**', box.calls.indexOf('writeAssignments'), -1);
-  checkEqual('★★★★★★ **冇加 RosterVersions 行**', box.calls.indexOf('registerVersion'), -1);
+  checkEqual('★★★★★★ **冇造 grid 工作表**', box.calls.indexOf('createRosterSheet_'), -1);
+  checkEqual('★★★★★★ **冇寫 RosterAssignments**', box.calls.indexOf('writeAssignments_'), -1);
+  checkEqual('★★★★★★ **冇加 RosterVersions 行**', box.calls.indexOf('registerVersion_'), -1);
   checkEqual('★★★★★★ **冇發佈公開連結**'
     + '——冇造新版本，公開連結就冇嘢要更新',
     box.calls.indexOf('publish'), -1);
@@ -155,9 +155,9 @@ console.log('\n=== A1【核心】有一筆套用到 ⇒ 照造版本 ===');
   const box = runTail({ outcomes: [outcome(S.APPLIED), outcome(S.NEEDS_INPUT)] });
 
   check('★★★★★★ 造咗 grid 工作表、寫咗長表、加咗版本行',
-    box.calls.indexOf('createRosterSheet') >= 0
-      && box.calls.indexOf('writeAssignments') >= 0
-      && box.calls.indexOf('registerVersion') >= 0, box.calls.join('、'));
+    box.calls.indexOf('createRosterSheet_') >= 0
+      && box.calls.indexOf('writeAssignments_') >= 0
+      && box.calls.indexOf('registerVersion_') >= 0, box.calls.join('、'));
   checkEqual('★★★★★★ 而且發佈咗公開連結'
     + '——第五十五輪 A 組嗰條唔可以被今輪整跌',
     box.calls.indexOf('publish') >= 0, true);
@@ -183,7 +183,7 @@ console.log('\n=== A1【核心】「冇任何格被寫」唔止睇 appliedCount 
     const box = runTail(Object.assign({ outcomes: [outcome(S.NEEDS_INPUT)] }, pair[1]));
     check('★★★★★★ 【' + pair[0] + '】仍然要造版本'
       + '——唔造嘅話，嗰幾格就會蒸發咗',
-      box.calls.indexOf('registerVersion') >= 0, box.calls.join('、'));
+      box.calls.indexOf('registerVersion_') >= 0, box.calls.join('、'));
   });
 }
 
@@ -204,10 +204,10 @@ console.log('\n=== A2 措辭同「儲存並確認」嗰邊對齊 ===');
 console.log('\n=== A1 反證：判斷一定要喺寫入之前 ===');
 {
   // ⚠️ 「造咗版本先發現係空然後刪返」——刪版本呢種動作唔應該存在。
-  // 所以要驗個判斷排喺 `createRosterSheet()` **之前**。
+  // 所以要驗個判斷排喺 `createRosterSheet_()` **之前**。
   const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const guardAt = CODE.indexOf('  if (wroteNothing) {');
-  const writeAt = CODE.indexOf('  const sheetName = createRosterSheet(');
+  const writeAt = CODE.indexOf('  const sheetName = createRosterSheet_(');
   check('★★★★★★ **判斷排喺第一個寫入動作之前**'
     + '——造咗先刪返嘅話，一次失敗就會留低一個孤兒版本',
     guardAt > 0 && writeAt > 0 && guardAt < writeAt,

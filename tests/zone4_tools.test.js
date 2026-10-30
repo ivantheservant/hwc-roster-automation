@@ -71,7 +71,7 @@ console.log('\n=== F【核心】唔可以叫 run*_()（佢哋會叫 ui.alert，�
   [['核對職事表', 'apiVerifyRoster('],
     ['列出待補格子', 'listPendingBackfillCells_('],
     ['草稿覆核報告', 'measureSoftRuleMetrics_('],
-    ['匯出職事表 PDF', 'exportRosterPdf('],
+    ['匯出職事表 PDF', 'exportRosterPdf_('],
     ['產生個人 PDF', 'generatePersonalPdfBatch_('],
     ['補寄預覽', 'planMakeupSend_('],
     ['補寄執行', 'executeMakeupSend_(']
@@ -147,7 +147,7 @@ console.log('\n=== F 待補格子唔收版本號 ===');
   check('★★★★★ 用最新版本，唔叫幹事揀'
     + '——「而家仲有邊幾格未填」永遠係問最新版本；'
     + '叫佢揀只會令佢對住一份同現況無關嘅清單去填格',
-    /findLatestVersionNo\(id\)/.test(body)
+    /findLatestVersionNo_\(id\)/.test(body)
     && /function apiListPendingBackfillCellsForZone4\(quarterId\)/.test(backend));
   check('★★★★ 冇版本時講一句人話，唔會拋錯',
     body.indexOf('這一季還沒有生成過任何版本') !== -1);
@@ -157,7 +157,7 @@ console.log('\n=== F【核心】匯出 PDF：檔案大細唔可以砌一個假�
 {
   const body = bodyOf(backend, 'apiExportRosterPdf');
   check('★★★★★ 大細由 Drive 攞，唔係 `result.fileSize || 0`'
-    + '——`exportRosterPdf()` 根本冇回 fileSize，'
+    + '——`exportRosterPdf_()` 根本冇回 fileSize，'
     + '嗰種寫法永遠印「0 B」，而「0 B」睇落係一個真實而且嚇人嘅數字',
     /DriveApp\.getFileById\(result\.fileId\)/.test(body)
     && !/result\.fileSize/.test(stripComments(body)));

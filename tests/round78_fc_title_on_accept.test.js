@@ -33,11 +33,11 @@ gas.apiGenerateDraftExecute(sc.Q);
 const others = (v, post, d) => ['P9701', 'P9702', 'P9703', 'P9704', 'P9705'].map(sc.nameOf)
   .filter((n) => n !== sc.getCell(v, d, post))[0];
 const sourceOf = (no) => gas.listQuarterVersionChoices_(sc.Q, sc.TZ).filter((v) => v.versionNo === no)[0].sourceText;
-const versionRow = (no) => gas.readSheet(sc.S.ROSTER_VERSIONS)
+const versionRow = (no) => gas.readSheet_(sc.S.ROSTER_VERSIONS)
   .filter((r) => r[V.QUARTER_ID] === sc.Q && Number(r[V.VERSION_NO]) === no)[0];
 const serviceDateTitle = (d) => {
   const SD = sc.C.SERVICE_DATES;
-  const row = gas.readSheet(sc.S.SERVICE_DATES).filter((r) => gas.toDateString(r[SD.SERVICE_DATE], sc.TZ) === d)[0];
+  const row = gas.readSheet_(sc.S.SERVICE_DATES).filter((r) => gas.toDateString_(r[SD.SERVICE_DATE], sc.TZ) === d)[0];
   return row ? String(row[SD.TITLE] || '') : null;
 };
 /** 建議表上改一格（建議表頂有圖例，機器鍵唔喺第 2 行） */
@@ -46,7 +46,7 @@ function setSuggestionCell(versionNo, dateStr, key, value) {
   const all = sh.getDataRange().getValues();
   const keyRow = all.findIndex((r) => r.some((v) => String(v).indexOf('#') !== -1));
   const col = all[keyRow].indexOf(key);
-  const row = all.findIndex((r, i) => i > keyRow && gas.toDateString(r[0], sc.TZ) === dateStr);
+  const row = all.findIndex((r, i) => i > keyRow && gas.toDateString_(r[0], sc.TZ) === dateStr);
   sh.getRange(row + 1, col + 1).setValue(value);
 }
 

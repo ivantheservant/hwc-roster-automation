@@ -4,7 +4,7 @@
 // 背景（第七輪批次的發現）：30 個不同 seed 產生逐格完全相同的職事表。原因是
 // compareCandidates_() 只在 score 與 selectionScore **完全相等**時才輪到
 // tieBreak（唯一用到 seed 的地方），而 score 含連續浮點數 selectionScore，
-// 實務上兩個人不會剛好相等。結果 generateBest() 跑 20 次＝同一份表算 20 次。
+// 實務上兩個人不會剛好相等。結果 generateBest_() 跑 20 次＝同一份表算 20 次。
 //
 // 本檔案做兩件事：
 //   1. 【回歸保證】驗證 epsilon=0（預設值）時，行為跟加入這個機制之前**逐格相同**，
@@ -185,7 +185,7 @@ console.log('\n=== B2 對照表：不同 epsilon 值的實際效果（' + SEED_C
       distinct: Object.keys(signatures).length,
       hardTotal: hardTotal,
       semiAvg: (semiTotal / SEED_COUNT).toFixed(1),
-      // 「最佳可達」＝這批 seed 之中主席兼報告比例最高的一份。generateBest()
+      // 「最佳可達」＝這批 seed 之中主席兼報告比例最高的一份。generateBest_()
       // 揀的就是最好的一份，所以這個數字比平均值更能反映實際會用到的品質。
       bestChair: Math.max.apply(null, chairRatios) * 100,
       chair: span(chairRatios.map(function (v) { return v * 100; }), 1),
@@ -218,7 +218,7 @@ console.log('\n=== B2 對照表：不同 epsilon 值的實際效果（' + SEED_C
   checkEqual('★★ 對照表中沒有任何一個 epsilon 出現硬規則違反', anyHard.length, 0);
 
   // ---- 建議值 ----
-  // 判斷準則刻意對齊 generateBest() 實際在做的事：它跑 N 次然後**揀最好的一份**，
+  // 判斷準則刻意對齊 generateBest_() 實際在做的事：它跑 N 次然後**揀最好的一份**，
   // 所以真正重要的不是「平均品質」，而是「最好的那一份能去到幾好」。
   // 這裡用「最佳可達的主席兼報告比例距離目標 0.63 有多遠」當主要指標
   // （那是全部軟規則之中最難達成、也是歷史基準最明確的一項），
@@ -255,9 +255,9 @@ console.log('\n=== B2 對照表：不同 epsilon 值的實際效果（' + SEED_C
     + '「查看 ▸ 試算不同 epsilon 的效果（唯讀）」在真實資料上量度。');
 }
 
-console.log('\n=== B4：generateBest() 的提早停止與 epsilon 相容 ===');
+console.log('\n=== B4：generateBest_() 的提早停止與 epsilon 相容 ===');
 {
-  // MultiRun.gs 的 generateBest() 要讀試算表，測試不能直接呼叫。這裡驗證的是
+  // MultiRun.gs 的 generateBest_() 要讀試算表，測試不能直接呼叫。這裡驗證的是
   // 它用來決定要不要提早停止的那個條件本身：seedProbeEnabled = !(epsilon > 0)。
   const seedProbeEnabled = function (epsilon) { return !(epsilon > 0); };
   check('★ epsilon=0（預設）時提早停止偵測仍然啟用（維持上一輪的最佳化）',

@@ -184,13 +184,13 @@ console.log('\n=== A2 附帶發現：RANDOM_SEED 對生成結果沒有影響（�
   // score 與 selectionScore 完全相等時才會被比較——selectionScore 是連續
   // 浮點數，實務上幾乎不會完全相等，所以換 seed 產生的職事表逐格一樣。
   //
-  // 影響：generateBest()（MultiRun.gs）原本設計為「跑 N 次揀最好」，在這種
-  // 資料下等於把同一份表算 N 次。本輪已經在 generateBest() 加了偵測與提早
+  // 影響：generateBest_()（MultiRun.gs）原本設計為「跑 N 次揀最好」，在這種
+  // 資料下等於把同一份表算 N 次。本輪已經在 generateBest_() 加了偵測與提早
   // 停止（見 MULTIRUN_SEED_PROBE_ATTEMPTS），輸出不變、時間大幅節省。
   //
   // 這個測試刻意寫成「記錄現況」而不是「斷言必須如此」：如果日後有人改動
   // 選人邏輯令 seed 真的產生分別，這一項會失敗，那時應該同步更新這裡的
-  // 說明與 generateBest() 的偵測邏輯，而不是當成 bug。
+  // 說明與 generateBest_() 的偵測邏輯，而不是當成 bug。
   const signatures = {};
   for (let seed = 1; seed <= 10; seed++) {
     const ctx = mock.buildGeneratorContextMock({ gas: gas, randomSeed: seed });
@@ -201,16 +201,16 @@ console.log('\n=== A2 附帶發現：RANDOM_SEED 對生成結果沒有影響（�
   checkEqual('★ 10 個不同 seed 只產生 1 份不同的職事表（記錄現況，見上方說明）', distinct, 1);
 }
 
-console.log('\n=== generateBest() 的「seed 無效就提早停止」偵測（本輪新增）===');
+console.log('\n=== generateBest_() 的「seed 無效就提早停止」偵測（本輪新增）===');
 {
   // 載入 MultiRun.gs 取得真正的 buildRosterSignature_()／isBetterCandidate_()。
-  // generateBest() 本身要讀試算表（buildGeneratorContext_），沒辦法在這裡直接
+  // generateBest_() 本身要讀試算表（buildGeneratorContext_），沒辦法在這裡直接
   // 呼叫，所以這一節移植它的迴圈停止條件（5 行），但簽名計算與「哪個候選較好」
   // 這兩個關鍵判斷都用正式碼真正那兩個函式，不是另寫一份。
   const gasMulti = loadGasSource(
     ['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Generator.gs', 'FineTune.gs', 'MultiRun.gs']);
 
-  /** 移植 generateBest() 的迴圈停止條件（逐字對應正式碼）。 */
+  /** 移植 generateBest_() 的迴圈停止條件（逐字對應正式碼）。 */
   function simulateGenerateBest(planned, rosterForAttempt, evaluationForAttempt) {
     let best = null;
     let attemptsRun = 0;

@@ -32,14 +32,14 @@ const W = gas.COLUMNS.PERSON_POST_WEIGHT;
 gas.assertWebAppRequestAllowed_ = function () {};
 gas.beginSheetReadMemo_ = function () {};
 gas.endSheetReadMemo_ = function () {};
-gas.getConfig = function (key, fallback) { return fallback; };
+gas.getConfig_ = function (key, fallback) { return fallback; };
 gas.Utilities = { formatDate: function () { return '2026-08-18'; } };
 gas.nowTimestamp_ = function () { return '2026-08-18 10:00'; };
 gas.compactTimestamp_ = function () { return '20260818100000'; };
 const FAKE_ACTOR = 'tester' + '@' + ['exam', 'ple', '.', 'invalid'].join('');
 gas.Session = { getActiveUser: function () { return { getEmail: function () { return FAKE_ACTOR; } }; } };
 gas.buildPersonNameIndex_ = function () { return { P9001: '測試甲' }; };
-gas.readPosts = function () {
+gas.readPosts_ = function () {
   const P = gas.COLUMNS.POSTS;
   const r = {};
   r[P.POST_ID] = 'CHAIR'; r[P.POST_NAME_TC] = '主席'; r[P.AUTO_GENERATE] = 'TRUE';
@@ -180,7 +180,7 @@ console.log('\n=== C4 矩陣：只列有資格嘅人 ===');
   const E = gas.COLUMNS.ELIGIBILITY;
   const M = gas.COLUMNS.NAME_MAPPING;
   gas.readOptionalSheet_ = function () { return [weightRow({ adjust: 1 })]; };
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.NAME_MAPPING) {
       const a = {}; a[M.PERSON_ID] = 'P9001'; a[M.NAME_TC] = '測試甲';
       const b = {}; b[M.PERSON_ID] = 'P9002'; b[M.NAME_TC] = '測試乙';

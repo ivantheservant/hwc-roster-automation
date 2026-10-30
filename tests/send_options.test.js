@@ -246,7 +246,7 @@ console.log('\n=== A：今次用咗咩選項一定要記低 ===');
     + '唔標明就查唔到「點解嗰次冇附件」',
     (text.match(/（幹事改過）/g) || []).length === 3, text);
 
-  check('★★★★★ `sendStage()` 會把佢寫入 AuditLog（自由文字，一定寫得入）',
+  check('★★★★★ `sendStage_()` 會把佢寫入 AuditLog（自由文字，一定寫得入）',
     /describeSendDecision_\(context\.sendDecision\)/.test(mailer), '');
   check('★★★★★ `sendResendStage_()` 一樣',
     /describeSendDecision_\(context\.sendDecision\)/.test(resend), '');

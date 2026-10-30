@@ -3,13 +3,13 @@
  * 每項回傳 PASS / FAIL 與說明，結果寫入 SelfTest_Result 工作表。
  * @returns {{results: Object[], passed: number, failed: number, sheetName: string}} 測試結果
  */
-function runSelfTest() {
+function runSelfTestChecks_() {
   const tests = [
     { name: '1. Config 讀取與 Type 轉換', run: testConfigTypes_ },
     { name: '2. Posts 讀取、過濾與排序', run: testPostsReading_ },
     { name: '3. Eligibility 雙向索引對稱', run: testEligibilitySymmetry_ },
     { name: '4. NameAlias 全部可解析', run: testAliasResolution_ },
-    { name: '5. normalizeName 回傳正名', run: testNormalizeName_ },
+    { name: '5. normalizeName_ 回傳正名', run: testNormalizeName_ },
     { name: '6. 每崗位人數 >= SlotCount', run: testEligibilityCoverage_ },
     { name: '7. 硬規則違反五項全為 0', run: testHardRuleViolations_ },
     { name: '8. 附件檔名產生邏輯', run: testAttachmentNaming_ },
@@ -48,19 +48,19 @@ function runSelfTest() {
 }
 
 /**
- * 測試 1：readConfig() 能讀到全部 Key，且 INT / BOOL / DEC / LIST 各抽驗一項轉換正確。
+ * 測試 1：readConfig_() 能讀到全部 Key，且 INT / BOOL / DEC / LIST 各抽驗一項轉換正確。
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testConfigTypes_() {
-  const config = readConfig();
-  const rawRows = readSheet(SHEETS.CONFIG);
+  const config = readConfig_();
+  const rawRows = readSheet_(SHEETS.CONFIG);
   const problems = [];
 
   const sheetKeys = rawRows
     .map(function (row) { return row[COLUMNS.CONFIG.KEY]; })
     .filter(function (k) { return !!k; });
   const missing = sheetKeys.filter(function (k) { return !(k in config); });
-  if (missing.length > 0) problems.push('readConfig 缺少 Key: ' + missing.join(', '));
+  if (missing.length > 0) problems.push('readConfig_ 缺少 Key: ' + missing.join(', '));
 
   const typeByKey = {};
   rawRows.forEach(function (row) {
@@ -99,12 +99,12 @@ function testConfigTypes_() {
 }
 
 /**
- * 測試 2：readPosts() 回傳的行數、Active 過濾與 DisplayOrder 排序是否正確。
+ * 測試 2：readPosts_() 回傳的行數、Active 過濾與 DisplayOrder 排序是否正確。
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testPostsReading_() {
-  const all = readSheet(SHEETS.POSTS);
-  const active = readPosts();
+  const all = readSheet_(SHEETS.POSTS);
+  const active = readPosts_();
   const expectedActive = all.filter(function (row) {
     return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);
   }).length;
@@ -130,11 +130,11 @@ function testPostsReading_() {
 }
 
 /**
- * 測試 3：readEligibility() 的 byPost 與 byPerson 兩個索引是否互相對稱。
+ * 測試 3：readEligibility_() 的 byPost 與 byPerson 兩個索引是否互相對稱。
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testEligibilitySymmetry_() {
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const problems = [];
   let pairCount = 0;
 
@@ -167,16 +167,16 @@ function testEligibilitySymmetry_() {
 }
 
 /**
- * 測試 4：NameAlias 表中每個 Active 的別名，resolvePersonId() 都能解析到對應的 PersonID。
+ * 測試 4：NameAlias 表中每個 Active 的別名，resolvePersonId_() 都能解析到對應的 PersonID。
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testAliasResolution_() {
-  const aliasMap = readNameAlias();
+  const aliasMap = readNameAlias_();
   const aliases = Object.keys(aliasMap);
   const problems = [];
 
   aliases.forEach(function (alias) {
-    const resolved = resolvePersonId(alias);
+    const resolved = resolvePersonId_(alias);
     if (resolved !== aliasMap[alias]) {
       problems.push('「' + alias + '」解析為 ' + (resolved || 'null') + '，預期 ' + aliasMap[alias]);
     }
@@ -186,28 +186,28 @@ function testAliasResolution_() {
     pass: problems.length === 0,
     detail: '共 ' + aliases.length + ' 個別名，全部解析正確',
     action: problems.slice(0, 5).join('；')
-      + (problems.length > 0 ? '（注意：若別名與某人的正名相同，resolvePersonId 會先命中正名）' : '')
+      + (problems.length > 0 ? '（注意：若別名與某人的正名相同，resolvePersonId_ 會先命中正名）' : '')
   };
 }
 
 /**
- * 測試 5「normalizeName 回傳正名」的 fallback 樣本——只在 NameAlias 表目前
+ * 測試 5「normalizeName_ 回傳正名」的 fallback 樣本——只在 NameAlias 表目前
  * 沒有足夠 Active 資料時才會用到。刻意選不太可能撞名的虛構姓名，且刻意不寫成
  * 任何形式的「別名 → 正名」對照（因為它們根本不在 NameAlias 表裡，
  * testNormalizeName_() 用它們驗證的是「查無別名時原樣回傳」這條路徑，
- * 不是「別名正確解析成正名」那條路徑——兩條路徑合起來才是 normalizeName() 的
+ * 不是「別名正確解析成正名」那條路徑——兩條路徑合起來才是 normalizeName_() 的
  * 完整行為，缺了真實資料時至少還能驗到後者）。
  */
 const SELF_TEST_FALLBACK_NAME_ALIASES = ['陳大文', '李小明', '王美美'];
 
 /**
- * 測試 5：normalizeName() 能把 NameAlias 表裡的異體字姓名正確解析回正名。
+ * 測試 5：normalizeName_() 能把 NameAlias 表裡的異體字姓名正確解析回正名。
  *
  * 追加階段 AQ：樣本改為執行時從 NameAlias 動態取樣，不再寫死任何特定姓名
  * ——這個專案的原始碼打算公開到 GitHub，寫死真實會友姓名當測試資料本身就是
  * 要修的問題。優先取 NameAlias 現有 Active 資料的前 3 筆，用真正的
- * `resolvePersonId()` 比對驗證解析是否正確；資料不足 3 筆（含完全沒有、或
- * `readNameAlias()` 本身讀取失敗）時，其餘名額用 `SELF_TEST_FALLBACK_NAME_ALIASES`
+ * `resolvePersonId_()` 比對驗證解析是否正確；資料不足 3 筆（含完全沒有、或
+ * `readNameAlias_()` 本身讀取失敗）時，其餘名額用 `SELF_TEST_FALLBACK_NAME_ALIASES`
  * 的虛構姓名補齊，改驗證「查無別名時原樣回傳、不出錯」——不會因為讀不到真實
  * 資料就整項略過不測，跟原本「不在表中就略過」的做法不同。
  * `detail` 會逐筆標明這一筆用的是「NameAlias 真實資料」還是「虛構 fallback 資料」。
@@ -217,7 +217,7 @@ function testNormalizeName_() {
   const SAMPLE_SIZE = 3;
   let aliasMap = {};
   try {
-    aliasMap = readNameAlias();
+    aliasMap = readNameAlias_();
   } catch (err) {
     aliasMap = {}; // 讀取失敗一律當作沒有真實資料可用，全部落入 fallback
   }
@@ -231,9 +231,9 @@ function testNormalizeName_() {
   const problems = [];
 
   realNames.forEach(function (name) {
-    const normalized = normalizeName(name);
+    const normalized = normalizeName_(name);
     const expectedId = aliasMap[name];
-    const resolvedId = resolvePersonId(normalized);
+    const resolvedId = resolvePersonId_(normalized);
     details.push(name + ' → ' + normalized + '（NameAlias 真實資料）');
     if (resolvedId !== expectedId) {
       problems.push(name + ' 正規化為「' + normalized + '」，但它對應 ' + resolvedId + '，預期 ' + expectedId);
@@ -241,11 +241,11 @@ function testNormalizeName_() {
   });
 
   fallbackNames.forEach(function (name) {
-    const normalized = normalizeName(name);
+    const normalized = normalizeName_(name);
     details.push(name + ' → ' + normalized + '（虛構 fallback 資料，僅驗證查無別名時原樣回傳）');
     if (normalized !== name) {
-      problems.push('虛構姓名「' + name + '」不應該被解析成別的名字，但 normalizeName() 回傳了「' + normalized + '」'
-        + '——可能剛好與真實資料同名，或 normalizeName() 邏輯有誤');
+      problems.push('虛構姓名「' + name + '」不應該被解析成別的名字，但 normalizeName_() 回傳了「' + normalized + '」'
+        + '——可能剛好與真實資料同名，或 normalizeName_() 邏輯有誤');
     }
   });
 
@@ -264,8 +264,8 @@ function testNormalizeName_() {
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testEligibilityCoverage_() {
-  const posts = readPostsNormalized();
-  const eligibility = readEligibility();
+  const posts = readPostsNormalized_();
+  const eligibility = readEligibility_();
   const shortfalls = [];
 
   posts.forEach(function (post) {
@@ -356,9 +356,9 @@ function testHardRuleViolations_() {
  * @returns {?{quarterId: string, versionNo: number}} 目標；搵唔到回傳 null
  */
 function resolveSelfTestTarget_() {
-  const configured = String(getConfig(CONFIG_KEYS.SELF_TEST_QUARTER_ID, '') || '').trim();
+  const configured = String(getConfig_(CONFIG_KEYS.SELF_TEST_QUARTER_ID, '') || '').trim();
   if (configured) {
-    const versionNo = findLatestVersionNo(configured);
+    const versionNo = findLatestVersionNo_(configured);
     if (versionNo >= 0) return { quarterId: configured, versionNo: versionNo };
     // 設定咗但搵唔到版本：唔好靜靜咁跌返去另一季（噉樣會令人以為
     // 自己設定嘅嗰季通過咗測試）。直接當搵唔到，訊息會叫人先生成。
@@ -377,7 +377,7 @@ function resolveSelfTestTarget_() {
   });
   if (!best) return null;
 
-  const versionNo = findLatestVersionNo(best);
+  const versionNo = findLatestVersionNo_(best);
   return versionNo >= 0 ? { quarterId: best, versionNo: versionNo } : null;
 }
 
@@ -386,7 +386,7 @@ function resolveSelfTestTarget_() {
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testAttachmentNaming_() {
-  const pattern = String(getConfig(CONFIG_KEYS.ATTACH_NAME_PATTERN, DEFAULTS.ATTACH_NAME_PATTERN));
+  const pattern = String(getConfig_(CONFIG_KEYS.ATTACH_NAME_PATTERN, DEFAULTS.ATTACH_NAME_PATTERN));
   const fakeQuarter = 'TEST9T9';
   const fakeName = '測試人員';
   const generated = buildAttachmentName_(fakeQuarter, 9, fakeName);
@@ -456,7 +456,7 @@ function testAssignmentHash_() {
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testDryRunPath_() {
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const problems = [];
 
   const mockRecipient = {
@@ -513,7 +513,7 @@ function testDryRunPath_() {
  * @returns {{pass: boolean, detail: string, action: string}} 測試結果
  */
 function testFineTuneDetection_() {
-  const rules = readRules();
+  const rules = readRules_();
   if (!isRuleEnabled_(rules, RULE_IDS.NO_CONSECUTIVE)) {
     return {
       pass: true,
@@ -522,7 +522,7 @@ function testFineTuneDetection_() {
     };
   }
 
-  const blockingPost = readPostsNormalized().filter(function (p) {
+  const blockingPost = readPostsNormalized_().filter(function (p) {
     return p.autoGenerate && p.allowConsecutive === ALLOW_CONSECUTIVE.BLOCK;
   })[0];
   if (!blockingPost) {
@@ -533,7 +533,7 @@ function testFineTuneDetection_() {
     };
   }
 
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const pool = eligibility.byPost[blockingPost.postId] || [];
   if (pool.length < 2) {
     return {
@@ -543,11 +543,11 @@ function testFineTuneDetection_() {
     };
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   // 第二十一輪批次階段 B：目標唔再寫死，改用同一個解析函式。
   const selfTestTarget = resolveSelfTestTarget_();
   if (!selfTestTarget) return { pass: true, detail: '找不到已生成版本的季度，略過', action: '' };
-  const serviceDates = readServiceDatesNormalized(selfTestTarget.quarterId, timezone);
+  const serviceDates = readServiceDatesNormalized_(selfTestTarget.quarterId, timezone);
   if (serviceDates.length < 2) {
     return { pass: true, detail: '主日不足 2 週，略過', action: '' };
   }
@@ -557,7 +557,7 @@ function testFineTuneDetection_() {
   // （下面兩個 filter 只留 NO_CONSECUTIVE，誤報嘅身分違規被隔走咗），
   // 但屬於同一個 bug class，而且一旦有人放寬嗰個 filter 就會即刻誤判。
   // 而家由同一個 buildRoleContext_() 取，唔另外讀一次工作表。
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   const context = {
     rules: rules,
@@ -634,14 +634,14 @@ function testMissingTemplates_() {
     }
   });
 
-  // 確認 sendStage 對缺失範本會給出明確錯誤訊息而非崩潰
+  // 確認 sendStage_ 對缺失範本會給出明確錯誤訊息而非崩潰
   if (missing.length > 0) {
     try {
       // 第二十一輪批次階段 B：目標唔再寫死。呢度只係想確認「缺範本會唔會
       // 報一個清楚嘅錯」，用邊一季都得，所以搵唔到就略過呢一小段。
       const probeTarget = resolveSelfTestTarget_();
       if (!probeTarget) throw new Error('找不到已生成版本的季度，略過這一項探測');
-      sendStage(probeTarget.quarterId, probeTarget.versionNo, missing[0]);
+      sendStage_(probeTarget.quarterId, probeTarget.versionNo, missing[0]);
       problems.push(missing[0] + ' 沒有範本卻沒有報錯');
     } catch (err) {
       if (err.message.indexOf('找不到') === -1) {
@@ -674,7 +674,7 @@ function writeSelfTestSheet_(results) {
   if (existing) ss.deleteSheet(existing);
   const sheet = ss.insertSheet(sheetName);
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   sheet.getRange(1, 1).setValue(
     '自我測試結果　執行時間：' + nowTimestamp_()
       + '　（本測試不寄電郵、不改資料表、不建立版本）'

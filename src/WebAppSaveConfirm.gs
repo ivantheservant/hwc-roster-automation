@@ -67,7 +67,7 @@ function buildSaveAndConfirmPlan_(quarterId) {
 
   // ── 步 1.1　取現況 ───────────────────────────────────────────
   const stage = getQuarterStage_(quarterId);
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     return blocked('NO_VERSION', {
       message: buildThreePartMessage_(
@@ -486,10 +486,10 @@ function classifySaveConfirmViolations_(quarterId, versionNo, allViolations) {
   let released = [];
   let lateUnavailable = [];
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const classified = classifyHardViolations_(
       judgeable,
-      buildHardViolationClassContext_(quarterId, versionNo, readUnavailableNormalized(timezone)));
+      buildHardViolationClassContext_(quarterId, versionNo, readUnavailableNormalized_(timezone)));
     lateUnavailable = classified.lateUnavailable;
     real = classified.real.concat(lateUnavailable);
     released = classified.released;
@@ -576,8 +576,8 @@ function buildSaveConfirmProposals_(context, resolved, allViolations) {
 /**
  * 掣 1 步 1.7–1.9：實際寫入。
  *
- * 次序固定（規格步 1.8）：`AuditLog` 逐格 → `createRosterSheet()` →
- * `writeAssignments()` → `registerVersion()` → 前進 Stage → 發佈公開連結。
+ * 次序固定（規格步 1.8）：`AuditLog` 逐格 → `createRosterSheet_()` →
+ * `writeAssignments_()` → `registerVersion_()` → 前進 Stage → 發佈公開連結。
  *
  * @param {string} quarterId 季度 ID
  * @param {Object} payload `{decisions, confirmedRequestRows, releaseText}`
@@ -723,7 +723,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
       // 第八十二輪批次 IF 組：用舊版本作起點、grid 冇偵測到差異 ⇒ 照樣建立新一版（起點本身就係改動）
       created = materialiseManualEdits_(context, resolved.changes, resolved.state, 'apiSaveAndConfirmExecute',
         { titleChangeCount: titleChanges.length, startPointVersionNo: startPointNo });
-      registerVersion(
+      registerVersion_(
         quarterId, created.versionNo, created.sheetName,
         startPointBasis || VERSION_VALUES.BASIS_FINE_TUNE, plan.baseVersionNo,
         plan.violations.kept.length + plan.violations.semiHard.length + plan.violations.semiKept.length,
@@ -806,7 +806,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   // 第四十一輪批次 C 組：逐格明細要寫崗位中文名，唔可以寫 PostID。
   // 幹事腦入面冇 `CHAIR` 呢個概念。
   const savedPostNames = {};
-  readPostsNormalized().forEach(function (po) { savedPostNames[po.postId] = po.postNameTC; });
+  readPostsNormalized_().forEach(function (po) { savedPostNames[po.postId] = po.postNameTC; });
 
   timer.mark('放行紀錄、進度');
 
@@ -905,10 +905,10 @@ function countManualChangesBeyondStartPoint_(quarterId, startPointNo, changes, c
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
   const labels = context && context.gridRender ? context.gridRender.labels : null;
   const byKey = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== Number(startPointNo)) return;
-    const key = cellKey_(toDateString(row[A.SERVICE_DATE], context.timezone),
+    const key = cellKey_(toDateString_(row[A.SERVICE_DATE], context.timezone),
       String(row[A.POST_ID] || '').trim(), Number(row[A.SLOT_INDEX]));
     byKey[key] = {
       personId: String(row[A.PERSON_ID] || '').trim(),
@@ -962,11 +962,11 @@ function listStartPointCellDiffs_(quarterId, startNo, baseNo, context, postNameB
   const byVersion = {};
   byVersion[startNo] = {};
   byVersion[baseNo] = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     const v = Number(row[A.VERSION_NO]);
     if (!byVersion[v]) return;
-    const serviceDate = toDateString(row[A.SERVICE_DATE], context.timezone);
+    const serviceDate = toDateString_(row[A.SERVICE_DATE], context.timezone);
     const postId = String(row[A.POST_ID] || '').trim();
     const slotIndex = Number(row[A.SLOT_INDEX]);
     byVersion[v][cellKey_(serviceDate, postId, slotIndex)] = {
@@ -996,7 +996,7 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
 
   let wroteSomething = true;   // 查唔到就當寫咗（安全方向）
   try {
-    const registered = findLatestVersionNo(quarterId) > baseVersionNo;
+    const registered = findLatestVersionNo_(quarterId) > baseVersionNo;
     const sheetExists = !!SpreadsheetApp.getActiveSpreadsheet()
       .getSheetByName(buildRosterSheetName_(quarterId, targetVersionNo));
     wroteSomething = registered || sheetExists;
@@ -1117,7 +1117,7 @@ function describePublishAfterGenerate_(publish, versionNo, quarterId) {
   let publishedVersion = '（查不到）';
   try {
     const P = COLUMNS.PUBLIC_LINKS;
-    const row = readSheet(SHEETS.PUBLIC_LINKS).filter(function (r) {
+    const row = readSheet_(SHEETS.PUBLIC_LINKS).filter(function (r) {
       return String(r[P.QUARTER_ID] || '').trim() === quarterId;
     })[0];
     publishedVersion = row ? ('第 ' + Number(row[P.LAST_PUBLISHED_VERSION]) + ' 版')
@@ -1223,7 +1223,7 @@ function publicLinkAlreadyAtLatest_(quarterId) {
  *   lastEditAt: string, lastPublishedAt: string}}
  */
 function evaluatePublicLinkFreshness_(quarterId) {
-  const latest = findLatestVersionNo(quarterId);
+  const latest = findLatestVersionNo_(quarterId);
   const row = findPublicLinkRow_(quarterId);
   const hasLink = !!(row && String(row.fileUrl || '').trim());
   const publishedNo = row ? Number(row.lastPublishedVersion) : NaN;
@@ -1245,7 +1245,7 @@ function evaluatePublicLinkFreshness_(quarterId) {
     return out;
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const publishedAt = normalizeSheetTimestamp_(
     row.lastPublishedAtRaw !== undefined ? row.lastPublishedAtRaw : row.lastPublishedAt, timezone);
   const lastEditAt = readLatestAssignmentUpdatedAt_(quarterId, latest, timezone);
@@ -1328,14 +1328,14 @@ function ensurePublicLinkFreshBeforeSend_(quarterId) {
  */
 function noteRequestSameDayDuties_(rows, diffs, quarterId, versionNo, postNames) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const byPersonDate = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== Number(versionNo)) return;
     const personId = String(row[A.PERSON_ID] || '').trim();
     if (!personId) return;
-    const k = personId + '|' + toDateString(row[A.SERVICE_DATE], timezone);
+    const k = personId + '|' + toDateString_(row[A.SERVICE_DATE], timezone);
     (byPersonDate[k] = byPersonDate[k] || []).push({ postId: row[A.POST_ID], slotIndex: Number(row[A.SLOT_INDEX]) });
   });
   (diffs || []).forEach(function (d, i) {

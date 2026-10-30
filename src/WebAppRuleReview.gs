@@ -135,7 +135,7 @@ function apiAnnualCombinedPlan(year) {
           ['請填四位數的年份，例如 2027'])
       };
     }
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const plan = planAnnualCombinedWithContext_(y, timezone);
     return {
       ok: true,
@@ -178,7 +178,7 @@ function apiAnnualCombinedExecute(year, confirmText) {
     const preview = apiAnnualCombinedPlan(year);
     if (!preview.ok) return preview;
 
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const plan = planAnnualCombinedWithContext_(preview.year, timezone);
     const result = writeAnnualCombinedSundays_(plan);
 
@@ -237,7 +237,7 @@ function buildRuleReviewContext_() {
   // 實測：`Posts` 入面 `CHAIR` 同 `COMMUNION` 兩行都有 `CHAIR_COMMUNION`，
   // 但匯出只列到「主席」一個。
   //
-  // `readPostsNormalized()` → `readPosts()` 會 `filter(Active=TRUE)`。
+  // `readPostsNormalized_()` → `readPosts_()` 會 `filter(Active=TRUE)`。
   // 一個 `Active=FALSE` 嘅組員就會靜靜消失，而畫面上剩返一個成員嘅組
   // 睇落同「配置漏咗」一模一樣——兩件完全唔同嘅事。
   //
@@ -246,7 +246,7 @@ function buildRuleReviewContext_() {
   //（其餘用途——`postNameById`、身分要求——照舊用已過濾嗰個，
   //  因為嗰兩樣講嘅係「而家生效嘅崗位」。）
   try {
-    readSheet(SHEETS.POSTS).forEach(function (row) {
+    readSheet_(SHEETS.POSTS).forEach(function (row) {
       const postId = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
       if (!postId) return;
       const group = String(row[COLUMNS.POSTS.MUTEX_GROUP] || '').trim();
@@ -265,7 +265,7 @@ function buildRuleReviewContext_() {
   // 第八十五輪批次 LD 組：每人每季崗位上限（Posts.MaxPerPersonPerQuarter）逐個崗位列出
   const postMaxPosts = [];
   try {
-    readPostsNormalized().forEach(function (p) {
+    readPostsNormalized_().forEach(function (p) {
       if (p.maxPerPersonPerQuarter !== null && p.maxPerPersonPerQuarter !== undefined) {
         postMaxPosts.push({ postId: p.postId, postNameTC: p.postNameTC || p.postId, limit: p.maxPerPersonPerQuarter });
       }
@@ -288,7 +288,7 @@ function buildRuleReviewContext_() {
   // 第八十四輪批次 KF 組：「暫時不做某崗位」今日生效中有幾多項（讀唔到 ⇒ null，只寫「有生效」，唔作數字）
   let exclusionCurrentCount = null;
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     exclusionCurrentCount = readPersonPostExclusionsSafe_(timezone).filter(function (e) {
       return isEffectiveOn_(e.effectiveFrom, e.effectiveTo, today);
@@ -300,10 +300,10 @@ function buildRuleReviewContext_() {
   // 第八十五輪批次 LC 組：崗位名單上寫「堂委」「執事」的崗位（以今日的現任展開顯示）
   const eligibilityRolePosts = [];
   try {
-    const eligibility = readEligibility();
+    const eligibility = readEligibility_();
     const rolesByPost = eligibility.rolesByPost || {};
     if (Object.keys(rolesByPost).length > 0) {
-      const display = readRolesForDisplay_(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+      const display = readRolesForDisplay_(getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
       const nameById = readPersonNameIndex_();
       Object.keys(rolesByPost).sort().forEach(function (postId) {
         eligibilityRolePosts.push({
@@ -357,26 +357,26 @@ function buildRuleReviewContext_() {
  */
 function resolveRuleReviewAdjacentPairActual_() {
   try {
-    const rules = readRules();
+    const rules = readRules_();
     const rule = rules[RULE_IDS.ANNOUNCE_RELIEF];
     if (!rule) return null;
     const scope = splitList_(rule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]);
     if (scope.length === 0) return null;
 
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const weeksInfo = resolveRuleReviewWeeks_(timezone);
     if (!weeksInfo) return null;
 
     const quarterId = weeksInfo.quarterId;
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo === null || versionNo === undefined || versionNo < 0) return null;
 
     const D = COLUMNS.SERVICE_DATES;
-    const dates = readSheet(SHEETS.SERVICE_DATES)
+    const dates = readSheet_(SHEETS.SERVICE_DATES)
       .filter(function (row) { return String(row[D.QUARTER_ID] || '').trim() === quarterId; })
       .map(function (row) {
         return {
-          date: toDateString(row[D.SERVICE_DATE], timezone),
+          date: toDateString_(row[D.SERVICE_DATE], timezone),
           week: Number(row[D.WEEK_INDEX])
         };
       })
@@ -386,13 +386,13 @@ function resolveRuleReviewAdjacentPairActual_() {
 
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     const byDate = {};
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
       if (Number(row[A.VERSION_NO]) !== versionNo) return;
       if (scope.indexOf(String(row[A.POST_ID] || '').trim()) === -1) return;
       const personId = String(row[A.PERSON_ID] || '').trim();
       if (!personId) return;
-      const d = toDateString(row[A.SERVICE_DATE], timezone);
+      const d = toDateString_(row[A.SERVICE_DATE], timezone);
       if (!byDate[d]) byDate[d] = [];
       byDate[d].push(personId);
     });
@@ -429,11 +429,11 @@ function resolveRuleReviewAdjacentPairActual_() {
 function apiExportRuleReviewSheet() {
   assertWebAppRequestAllowed_();
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const weeksInfo = resolveRuleReviewWeeks_(timezone);
     const weeks = weeksInfo ? weeksInfo.weeks : null;
     const built = buildRuleReviewSheetRows_(
-      readSheet(SHEETS.RULE_SETTINGS), weeks, buildRuleReviewContext_());
+      readSheet_(SHEETS.RULE_SETTINGS), weeks, buildRuleReviewContext_());
 
     const stamp = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     const name = '規則審閱表　' + stamp;
@@ -517,7 +517,7 @@ function apiExportRuleReviewSheet() {
 function apiListRuleReviewSheets() {
   assertWebAppRequestAllowed_('apiListRuleReviewSheets');
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const folder = getOrCreateRuleReviewFolder_();
     const files = [];
     const it = folder.getFiles();
@@ -556,13 +556,13 @@ function apiRuleReviewImportPlan(fileId) {
     const id = String(fileId || '').trim();
     if (!id) return { ok: false, message: '沒有選要讀哪一份。' };
 
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const weeksInfo = resolveRuleReviewWeeks_(timezone);
     const sheet = SpreadsheetApp.openById(id).getSheets()[0];
     const values = sheet.getDataRange().getValues();
 
     const plan = buildRuleReviewImportPlan_(
-      values, readSheet(SHEETS.RULE_SETTINGS),
+      values, readSheet_(SHEETS.RULE_SETTINGS),
       weeksInfo ? weeksInfo.weeks : null, buildRuleReviewContext_());
 
     return {

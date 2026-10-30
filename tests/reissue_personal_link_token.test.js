@@ -5,7 +5,7 @@
 //
 // 修正做法同 QuarterID 一致：只喺輸入捕捉點（runReissuePersonalLinkToken_()）
 // 用 normalizeIdInput_() 處理，唔改讀表比對嗰邊（sheet 值本身理應乾淨，
-// 而且同 findLatestVersionNo() 等既有做法保持一致）。
+// 而且同 findLatestVersionNo_() 等既有做法保持一致）。
 //
 // 呢個測試檔用真正嘅原始碼（loadGasSource）＋一個支援 getLastRow/
 // getLastColumn 嘅假試算表，實測 reissuePersonalLinkToken_() 本身嘅行為

@@ -32,7 +32,7 @@ const TZ = 'Pacific/Auckland';
 gas.assertWebAppRequestAllowed_ = function () {};
 gas.beginSheetReadMemo_ = function () {};
 gas.endSheetReadMemo_ = function () {};
-gas.getConfig = function (key, fallback) { return fallback; };
+gas.getConfig_ = function (key, fallback) { return fallback; };
 gas.Utilities = { formatDate: function (d, tz, fmt) {
   const iso = new Date(d.getTime()).toISOString();
   if (fmt === 'yyyy-MM-dd' || tz === 'UTC') return iso.slice(0, 10);
@@ -42,7 +42,7 @@ gas.nowTimestamp_ = function () { return '2098-12-20 10:00:00'; };
 gas.compactTimestamp_ = function () { return '20981220100000'; };
 gas.Session = { getActiveUser: function () { return { getEmail: function () { return 'k@example.invalid'; } }; } };
 gas.buildPersonNameIndex_ = function () { return { P9701: '假甲' }; };
-gas.readPosts = function () {
+gas.readPosts_ = function () {
   const P = gas.COLUMNS.POSTS;
   const r = {}; r[P.POST_ID] = 'CHAIR'; r[P.POST_NAME_TC] = '主席'; r[P.AUTO_GENERATE] = 'TRUE';
   return [r];
@@ -160,7 +160,7 @@ console.log('\n=== EA3：矩陣按季度 ===');
   gas.readOptionalSheet_ = function () {
     return [row({ id: 'Q', adjust: 1, from: '2099-01-01', to: '2099-03-31', createdAt: '2098-12-01 10:00:00' })];
   };
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.NAME_MAPPING) { const a = {}; a[M.PERSON_ID] = 'P9701'; a[M.NAME_TC] = '假甲'; return [a]; }
     if (name === gas.SHEETS.ELIGIBILITY) {
       const e = {}; e[E.PERSON_ID] = 'P9701'; e[E.POST_ID] = 'CHAIR'; e[E.ELIGIBLE] = 'TRUE'; e[E.ACTIVE] = 'TRUE'; return [e];

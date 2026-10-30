@@ -131,11 +131,11 @@ function describeFields_(byField, fieldOrder) {
  * @returns {{sheetRow: number, record: Object}} 搵唔到時 sheetRow = -1
  */
 function findRowById_(sheetName, idColumn, idValue) {
-  const rows = readSheet(sheetName);
+  const rows = readSheet_(sheetName);
   const target = String(idValue || '').trim();
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][idColumn] || '').trim() === target) {
-      // readSheet 由第 3 行開始（第 1 行係說明、第 2 行係標題），所以 +3。
+      // readSheet_ 由第 3 行開始（第 1 行係說明、第 2 行係標題），所以 +3。
       return { sheetRow: i + 3, record: rows[i] };
     }
   }
@@ -149,7 +149,7 @@ function findRowById_(sheetName, idColumn, idValue) {
 function buildPersonNameIndex_() {
   const C = COLUMNS.NAME_MAPPING;
   const index = {};
-  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
     const id = String(row[C.PERSON_ID] || '').trim();
     if (id) index[id] = String(row[C.NAME_TC] || '').trim() || id;
   });

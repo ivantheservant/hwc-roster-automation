@@ -65,7 +65,7 @@ function gate(opts) {
   const gas = loadGasSource(FILES);
   const C = gas.COLUMNS.SEND_LOG;
   gas.log_ = function () {};
-  gas.getConfig = function (key, dflt) {
+  gas.getConfig_ = function (key, dflt) {
     if (key === gas.CONFIG_KEYS.DRY_RUN) {
       return opts.dryRun === undefined ? true : opts.dryRun;
     }
@@ -84,7 +84,7 @@ function gate(opts) {
     return opts.protectedQuarters || [];
   };
   gas.getQuarterStage_ = function () { return opts.stage; };
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (opts.sendLogThrows) throw new Error('找不到工作表: SendLog');
     if (name !== gas.SHEETS.SEND_LOG) return [];
     return (opts.sendLog || []).map(function (r) {
@@ -202,7 +202,7 @@ console.log('\n=== A1 Stage 唔係 OFFICIAL_SENT ⇒ 根本唔使查 SendLog ===
   let readCalls = 0;
   const gas = loadGasSource(FILES);
   gas.log_ = function () {};
-  gas.getConfig = function (key, dflt) {
+  gas.getConfig_ = function (key, dflt) {
     if (key === gas.CONFIG_KEYS.DRY_RUN) return true;
     if (key === gas.CONFIG_KEYS.WEBAPP_ENABLED) return true;
     return dflt;
@@ -211,7 +211,7 @@ console.log('\n=== A1 Stage 唔係 OFFICIAL_SENT ⇒ 根本唔使查 SendLog ===
   gas.readQuarterResetBlockedQuarters_ = function () { return []; };
   gas.readRehearsalProtectedQuarters_ = function () { return []; };
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
-  gas.readSheet = function () { readCalls++; return []; };
+  gas.readSheet_ = function () { readCalls++; return []; };
   const out = gas.checkSelfTestPreconditions_('2028T3');
   checkEqual('★★★★★ 放行', out.ok, true);
   checkEqual('★★★★★ 而且一次 SendLog 都冇讀過'

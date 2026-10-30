@@ -33,7 +33,7 @@ function checkNoLiteralUndefinedOrNull(label, text) {
 
 console.log('\n=== Config 完全沒有這個 Key（模擬「補建 Config 參數」從未執行過）===');
 {
-  const emptyConfig = {}; // readConfig() 對一張沒有登記任何 Key 的 Config 工作表就是回傳這樣的物件
+  const emptyConfig = {}; // readConfig_() 對一張沒有登記任何 Key 的 Config 工作表就是回傳這樣的物件
 
   const dryRun = describeConfigValue_(emptyConfig, 'DRY_RUN', true);
   check('★ DRY_RUN 缺 Key → value 用預設值 true（不是 undefined）', dryRun.value, true);

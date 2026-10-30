@@ -3,7 +3,7 @@
  * Web UI 版本（`WebAppFlow.gs`）共用同一份實作。
  *
  * 這個檔案裡的函式只做三件事：檢查 Stage、呼叫既有的業務邏輯函式
- * （`planApplyRequests_`／`applyRequests_`／`sendStage`／`computeResendDiff_`／
+ * （`planApplyRequests_`／`applyRequests_`／`sendStage_`／`computeResendDiff_`／
  * `sendResendStage_`／`generatePersonalPdfBatchForPeople_` 等，全部原封不動，
  * 一行都沒有改）、回傳結構化的結果物件——**完全不呼叫 `SpreadsheetApp.getUi()`，
  * 也不組合任何要給人看的多行文字**。文字怎麼排、對話框怎麼分段，各自留給呼叫端：
@@ -209,7 +209,7 @@ function planStep2_(quarterId, sendOptions) {
   // 舊寫法只准 `DRAFT`，即係「一季只可以俾堂委睇一次」，
   // 同實際運作對唔上。
   requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
   // ⚠️ 第四十七輪批次 B1 組：**用實際會寄嗰一份名單嚟數。**
   //
@@ -227,7 +227,7 @@ function planStep2_(quarterId, sendOptions) {
     recipientPreview: summariseRecipientsForPreview_(recipients),
     // 第六十三輪批次 T 組：附件同日曆檔
     contents: describeConfirmContents_(MAIL_STAGES.REVIEW, sendOptions),
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 階段 A（收尾輪）新增：>0 代表這個版本＋這個階段在 SendLog 已經有人收過信，
     // 很可能是上次執行中途中斷後重新執行——見 Mailer.gs 的
     // countAlreadySentForStage_() 說明，只示警不阻擋。
@@ -240,16 +240,16 @@ function planStep2_(quarterId, sendOptions) {
 /**
  * 步驟 2 的實際執行：寄審閱信、Stage 前進到 REVIEW_SENT。
  * @param {string} quarterId 季度 ID
- * @returns {Object} `sendStage()` 的回傳結果
+ * @returns {Object} `sendStage_()` 的回傳結果
  */
 function executeStep2_(quarterId, sendOptions) {
   requireQuarterStage_(quarterId, STEP2_ALLOWED_STAGES_, '步驟 2：寄給堂委審閱');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
   // ⚠️ 第六十三輪批次 A 組：填咗講員而公開連結未跟上 ⇒ 先重發佈。
   // 堂委收到嘅審閱信信末就係嗰條連結。
   const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
-  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);
+  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);
   result.publicLinkRepublished = fresh.republished;
 
   // 第二十三輪批次階段 E1（決定 D2）：**一律設為 `REVIEW_SENT`，唔係「前進一格」。**
@@ -295,7 +295,7 @@ function planStep3_(quarterId) {
     return { mode: 'NO_PENDING_DONE', stage: stage, skippedIncompleteCount: plan.skippedIncompleteCount };
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     return { mode: 'NO_VERSION', stage: stage, skippedIncompleteCount: plan.skippedIncompleteCount };
   }
@@ -353,7 +353,7 @@ function executeStep3Release_(quarterId, releaseText) {
   if (stage === QUARTER_STAGE.REQUESTS_APPLIED) {
     return { advanced: false, alreadyAdvanced: true };
   }
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
   const violations = recomputeLatestVersionViolations_(quarterId, versionNo);
   if (!resolveHardViolationRelease_(violations, releaseText)) {
@@ -386,7 +386,7 @@ function declineWithFreshPlan_(quarterId) {
  */
 function planStep4Warnings_(quarterId) {
   requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 
   let pendingRequests = [];
@@ -437,7 +437,7 @@ function countOfficialReach_(quarterId, versionNo) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
   const peopleById = indexPeopleById_();
   const expected = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== Number(versionNo)) return;
     const personId = String(row[A.PERSON_ID] || '').trim();
@@ -536,7 +536,7 @@ function planStep4SendPreview_(quarterId, versionNo, sendOptions) {
       : '',
     // 第六十三輪批次 T 組
     contents: describeConfirmContents_(MAIL_STAGES.OFFICIAL, sendOptions),
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 階段 A（收尾輪）新增：見 planStep2_() 同一段說明——步驟 4 的收件人數量
     // 遠多於步驟 2（約 60 人 vs 幾位堂委），實際撞到 Apps Script 執行逾時的
     // 風險也高得多，這個警示對步驟 4 更重要。
@@ -549,11 +549,11 @@ function planStep4SendPreview_(quarterId, versionNo, sendOptions) {
 /**
  * 步驟 4 的實際執行：正式寄出、Stage 前進到 OFFICIAL_SENT。
  * @param {string} quarterId 季度 ID
- * @returns {Object} `sendStage()` 的回傳結果
+ * @returns {Object} `sendStage_()` 的回傳結果
  */
 function executeStep4Send_(quarterId, sendOptions) {
   requireQuarterStage_(quarterId, STEP4_ALLOWED_STAGES_, '步驟 4：正式發出');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 
   // 第十九輪批次階段 C1：真正寄之前再擋一次。
@@ -567,7 +567,7 @@ function executeStep4Send_(quarterId, sendOptions) {
 
   // ⚠️ 第六十三輪批次 A 組：見 `ensurePublicLinkFreshBeforeSend_()`。
   const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
-  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
+  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
   result.publicLinkRepublished = fresh.republished;
 
   // 第十九輪批次階段 C2：**寄送結果唔理想就唔前進 Stage。**
@@ -644,7 +644,7 @@ function executeStep5Apply_(plan, confirmedSheetRows) {
  */
 function planStep5ChangedList_(quarterId) {
   requireQuarterStage_(quarterId, STEP5_ALLOWED_STAGES_, '步驟 5：改動後重發');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
   const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.RESEND);
   const changedList = computeResendDiff_(context);
@@ -708,7 +708,7 @@ function planStep5SendPreview_(quarterId, versionNo, context, changedList, sendO
     // 因為幹事可以勾咗一個唔喺「有改動」名單入面嘅人。
     recipientCount: recipients.length,
     recipientPreview: summariseRecipientsForPreview_(recipients),
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false
   };
 }
 
@@ -764,7 +764,7 @@ function executeStep5Send_(quarterId, versionNo, changedList, sendOptions) {
 function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
   const limit = typeof maxRatio === 'number'
     ? maxRatio
-    : Number(getConfig(CONFIG_KEYS.STEP4_MAX_MISSING_PDF_RATIO, DEFAULTS.STEP4_MAX_MISSING_PDF_RATIO));
+    : Number(getConfig_(CONFIG_KEYS.STEP4_MAX_MISSING_PDF_RATIO, DEFAULTS.STEP4_MAX_MISSING_PDF_RATIO));
 
   if (!missingResult || !missingResult.applicable || !missingResult.total) {
     return { blocked: false, ratio: 0, missingCount: 0, total: 0, maxRatio: limit, message: '' };
@@ -818,7 +818,7 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
  * 原則：**「系統試過但未成功、而且補救得到」嘅一律唔算完成。**
  * 「無論點做都唔會成功」（冇電郵）就唔應該卡住流程。
  *
- * @param {Object} sendResult `sendStage()` 嘅結果
+ * @param {Object} sendResult `sendStage_()` 嘅結果
  * @returns {{ok: boolean, unhandledCount: number, breakdown: Object, message: string}}
  */
 function evaluateStep4SendOutcome_(sendResult) {
@@ -863,7 +863,7 @@ function evaluateStep4SendOutcome_(sendResult) {
  * 但**讀落去似乎冇事**（「失敗：0」）。57 位義工冇收到通知呢件事，
  * 要人自己由四個數字入面推出嚟。數字唔會講故事，結論句要自己講。
  *
- * @param {Object} sendResult `sendStage()` 嘅結果
+ * @param {Object} sendResult `sendStage_()` 嘅結果
  * @returns {string} 一句結論
  */
 function buildStep4OutcomeSentence_(sendResult, reach) {

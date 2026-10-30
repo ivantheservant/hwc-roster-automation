@@ -14,7 +14,7 @@
 //      但畫面冇任何方法送 `false` 出去——後端有能力，介面上到唔到。
 //
 // 乙3　列表完全冇睇 `Status`，`CANCELLED` 照樣列喺「生效中」。
-//      而排表引擎（`readUnavailableNormalized()`）係啱嘅。
+//      而排表引擎（`readUnavailableNormalized_()`）係啱嘅。
 //      ⚠️ **危險嘅方向**：幹事會以為一條已經取消嘅限制仍然生效。
 //
 // 呢份測試最重要嗰一條係最後嗰個：**引擎讀到嘅生效筆數，
@@ -146,7 +146,7 @@ function listView() {
 }
 /** 排表引擎見到嘅生效筆數。 */
 function engineActiveCount() {
-  return gas.readUnavailableNormalized(TZ).length;
+  return gas.readUnavailableNormalized_(TZ).length;
 }
 
 console.log('\n=== 乙3 前置：兩層對「生效」用同一個判斷函式 ===');
@@ -184,7 +184,7 @@ console.log('\n=== 乙1：AppliesTo=ALL 一定要寫入空 PostIDs ===');
   check('★★★★ 儲存成功', res.ok === true, JSON.stringify(res));
 
   const U = gas.COLUMNS.UNAVAILABLE;
-  const rows = gas.readSheet(gas.SHEETS.UNAVAILABLE);
+  const rows = gas.readSheet_(gas.SHEETS.UNAVAILABLE);
   checkEqual('★★★★ 寫咗一行', rows.length, 1);
   checkEqual('★★★★★ AppliesTo ＝ ALL', String(rows[0][U.APPLIES_TO]), 'ALL');
   checkEqual('★★★★★ **PostIDs 一定係空**——ALL 之下嗰個勾唔應該留低任何痕跡，'
@@ -225,7 +225,7 @@ console.log('\n=== 乙2：介面可以取消一筆（走 active:false 路徑）=
   });
   check('★★★★★ `active: false` 儲存成功', res.ok === true, JSON.stringify(res));
 
-  const row = gas.readSheet(gas.SHEETS.UNAVAILABLE)[0];
+  const row = gas.readSheet_(gas.SHEETS.UNAVAILABLE)[0];
   checkEqual('★★★★★ Status 寫成 CANCELLED（唔係刪除——一律停用不刪除）',
     String(row[U.STATUS]), gas.UNAVAILABLE_VALUES.STATUS_CANCELLED);
 
@@ -286,7 +286,7 @@ console.log('\n=== 乙3【重點】：引擎讀到嘅生效筆數 ＝ 畫面「�
   checkEqual('★★★★ 已取消變 3 筆（全部保留，一筆都冇刪）', view2.cancelled.length, 3);
   checkEqual('★★★★★ 總數守恆：生效 ＋ 已取消 ＋ 已過去 ＝ 工作表總行數',
     view2.current.length + view2.cancelled.length + view2.past.length,
-    gas.readSheet(gas.SHEETS.UNAVAILABLE).length);
+    gas.readSheet_(gas.SHEETS.UNAVAILABLE).length);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

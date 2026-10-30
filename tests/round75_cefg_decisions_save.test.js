@@ -67,7 +67,7 @@ console.log('\n=== CE2／CF3：未決定都照樣調整（唔整個拒絕）==='
     const keys = sugSheet.getRange(2, 1, 1, sugSheet.getLastColumn()).getValues()[0];
     let r0 = -1;
     for (let r = 1; r <= sugSheet.getLastRow(); r++) {
-      if (gas.toDateString(sugSheet.getRange(r, 1).getValue(), sc.TZ) === dateStr) { r0 = r; break; }
+      if (gas.toDateString_(sugSheet.getRange(r, 1).getValue(), sc.TZ) === dateStr) { r0 = r; break; }
     }
     // 建議表頂有圖例；用第 1 欄日期定位，機器鍵行自己搵
     let keyRow = 2;
@@ -96,7 +96,7 @@ console.log('\n=== CG1：未決定 ⇒ 未可以儲存 ===');
     && plan.violations.semiHard.some((v) => v.serviceDate === D[1] && v.postId === 'READ'));
   let threw = null;
   try { gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] }); } catch (e) { threw = e; }
-  check('★★★★★★ execute 拋錯、冇建立版本', threw && gas.findLatestVersionNo(sc.Q) === 0, threw && threw.message);
+  check('★★★★★★ execute 拋錯、冇建立版本', threw && gas.findLatestVersionNo_(sc.Q) === 0, threw && threw.message);
 }
 
 console.log('\n=== CE1／CF2：勾選即時記住 ===');
@@ -110,7 +110,7 @@ console.log('\n=== CE1／CF2：勾選即時記住 ===');
   check('★★★★★★ 重新讀：ivan 已勾臨時幫手', chk.unresolved.filter((u) => u.key === KEY_IVAN)[0].checked === true);
   check('★★★★★★ 重新讀：領詩已勾保留', chk.violations.filter((v) => v.key === KEY_WORSHIP)[0].checked === true);
   check('★★★★ 讀經冇勾（預設唔勾）', chk.violations.filter((v) => v.key === KEY_READ)[0].checked === false);
-  const audit = gas.readSheet(sc.S.AUDIT_LOG).filter((x) => x[sc.C.AUDIT_LOG.ACTION] === 'CELL_DECISIONS_SET');
+  const audit = gas.readSheet_(sc.S.AUDIT_LOG).filter((x) => x[sc.C.AUDIT_LOG.ACTION] === 'CELL_DECISIONS_SET');
   check('★★★★ AuditLog 記一行', audit.length === 1);
 
   // 取消再勾返：CANCELLED ⇒ 唔算
@@ -143,7 +143,7 @@ console.log('\n=== CG2：全部決定咗 ⇒ 儲存 ===');
   check('★★★★★ 新一版職事表照顯示 ivan', sc.getCell(1, D[2], 'CHAIR#1') === 'ivan');
   const worship = sc.cellRow(1, D[3], 'WORSHIP');
   check('★★★★★ 領詩照你嘅安排（P9704）', worship[A.PERSON_ID] === 'P9704');
-  const rel = gas.readSheet(sc.S.AUDIT_LOG).filter((x) => /RELEASED_KEYS:/.test(String(x[sc.C.AUDIT_LOG.NOTES] || '')));
+  const rel = gas.readSheet_(sc.S.AUDIT_LOG).filter((x) => /RELEASED_KEYS:/.test(String(x[sc.C.AUDIT_LOG.NOTES] || '')));
   check('★★★★★★ 勾咗保留嘅一定要遵守違反 ⇒ 寫咗機器可讀放行紀錄', rel.length >= 1, JSON.stringify(rel.slice(-1)));
   check('★★★★ 結果講返放行咗幾多格', res.releasedViolationCount === 1);
   check('★★★★★ 儲存後再 plan：零改動', gas.apiSaveAndConfirmPlan(sc.Q).zeroChange === true);

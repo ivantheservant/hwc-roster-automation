@@ -166,12 +166,12 @@ function planSpecialSundaysColumnBackfill_() {
  */
 function describeSpecialSundaysConfirmedRows_() {
   const C = COLUMNS.SPECIAL_SUNDAYS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  return readSheet(SHEETS.SPECIAL_SUNDAYS).map(function (row) {
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return readSheet_(SHEETS.SPECIAL_SUNDAYS).map(function (row) {
     return {
       specialId: String(row[C.SPECIAL_ID] || '').trim(),
       quarterId: String(row[C.QUARTER_ID] || '').trim(),
-      serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+      serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
       title: String(row[C.TITLE] || '').trim(),
       type: String(row[C.TYPE] || '').trim(),
       active: isTrueValue_(row[C.ACTIVE]),

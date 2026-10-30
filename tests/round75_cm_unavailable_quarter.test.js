@@ -32,9 +32,9 @@ gas.Utilities = {
   }
 };
 gas.assertWebAppRequestAllowed_ = function () {};
-gas.getConfig = (key, fallback) => (key === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : fallback);
+gas.getConfig_ = (key, fallback) => (key === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : fallback);
 gas.log_ = function () {};
-gas.readPosts = () => [];
+gas.readPosts_ = () => [];
 gas.beginSheetReadMemo_ = function () {};
 gas.endSheetReadMemo_ = function () {};
 
@@ -51,7 +51,7 @@ const people = ['P9701', 'P9702', 'P9703', 'P9704'].map((id) => {
   const r = {}; r[M.PERSON_ID] = id; r[M.NAME_TC] = '人' + id.slice(-1); r[M.ACTIVE] = 'TRUE'; return r;
 });
 const quarter = {}; quarter[Q.QUARTER_ID] = '2099T3'; quarter[Q.START_DATE] = '2099-07-01'; quarter[Q.END_DATE] = '2099-09-30';
-gas.readSheet = function (name) {
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.NAME_MAPPING) return people;
   if (name === gas.SHEETS.QUARTERS) return [quarter];
   if (name === gas.SHEETS.UNAVAILABLE) {

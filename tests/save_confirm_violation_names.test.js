@@ -158,7 +158,7 @@ gas.apiSavePreacherTranslationEntry(Q, DATES[0], 'FLOWER', 1, PEOPLE.P9701);
   const col = function (k) { return headers.indexOf(k) + 1; };
   for (let r = 3; r <= sheet.getLastRow(); r++) {
     if (String(sheet.getRange(r, col(A.POST_ID)).getValue()) !== 'FLOWER') continue;
-    if (gas.toDateString(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== DATES[0]) continue;
+    if (gas.toDateString_(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== DATES[0]) continue;
     sheet.getRange(r, col(A.ASSIGN_SOURCE)).setValue('AUTO');
   }
 })();

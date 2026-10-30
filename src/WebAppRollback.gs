@@ -60,16 +60,16 @@ function apiListVersionsForRollback(quarterId) {
   assertWebAppRequestAllowed_('apiListVersionsForRollback');
 
   const V = COLUMNS.ROSTER_VERSIONS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const latestVersionNo = findLatestVersionNo(quarterId);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const latestVersionNo = findLatestVersionNo_(quarterId);
 
-  const versions = readSheet(SHEETS.ROSTER_VERSIONS)
+  const versions = readSheet_(SHEETS.ROSTER_VERSIONS)
     .filter(function (row) { return String(row[V.QUARTER_ID] || '').trim() === quarterId; })
     .map(function (row) {
       const versionNo = Number(row[V.VERSION_NO]);
       return {
         versionNo: versionNo,
-        createdAt: toDateString(row[V.CREATED_AT], timezone),
+        createdAt: toDateString_(row[V.CREATED_AT], timezone),
         basisText: buildVersionBasisText_(row[V.BASIS]),
         isCurrent: versionNo === latestVersionNo,
         isProtected: isTrueValue_(row[V.PROTECTED])
@@ -91,7 +91,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
   assertWebAppRequestAllowed_('apiRollbackPlan');
 
   const target = Number(targetVersionNo);
-  const currentVersionNo = findLatestVersionNo(quarterId);
+  const currentVersionNo = findLatestVersionNo_(quarterId);
 
   if (currentVersionNo < 0) {
     return rollbackBlocked_('NO_VERSION', buildThreePartMessage_(
@@ -143,7 +143,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
   }
 
   const postNames = {};
-  readPostsNormalized().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+  readPostsNormalized_().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
   const keyOf = function (a) { return a.serviceDate + '|' + a.postId + '|' + a.slotIndex; };
   const currentByKey = {};
   currentRows.forEach(function (a) { currentByKey[keyOf(a)] = a; });
@@ -318,9 +318,9 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
         ruleFlags: a.ruleFlags || []
       };
     });
-    sheetName = createRosterSheet(quarterId, newVersionNo, assignments, []);
-    writeAssignments(quarterId, newVersionNo, assignments);
-    registerVersion(
+    sheetName = createRosterSheet_(quarterId, newVersionNo, assignments, []);
+    writeAssignments_(quarterId, newVersionNo, assignments);
+    registerVersion_(
       quarterId, newVersionNo, sheetName,
       '回到第 ' + target + ' 版',
       // ⚠️ ParentVersionNo 寫**實際父版本**，唔係目標版本。見檔頭說明。
@@ -410,13 +410,13 @@ function buildVersionAuthorResolver_() {
   };
   try {
     const R = COLUMNS.EMAIL_RECIPIENTS;
-    readSheet(SHEETS.EMAIL_RECIPIENTS).forEach(function (r) { add(r[R.EMAIL], r[R.DISPLAY_NAME]); });
+    readSheet_(SHEETS.EMAIL_RECIPIENTS).forEach(function (r) { add(r[R.EMAIL], r[R.DISPLAY_NAME]); });
   } catch (err) {
     log_('WARN', 'buildVersionAuthorResolver_ 讀不到 EmailRecipients：' + err.message);
   }
   try {
     const N = COLUMNS.NAME_MAPPING;
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (r) { add(r[N.EMAIL], r[N.NAME_TC]); });
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (r) { add(r[N.EMAIL], r[N.NAME_TC]); });
   } catch (err) {
     log_('WARN', 'buildVersionAuthorResolver_ 讀不到 NameMapping：' + err.message);
   }
@@ -438,9 +438,9 @@ function buildVersionAuthorResolver_() {
  */
 function listQuarterVersionChoices_(quarterId, timezone) {
   const V = COLUMNS.ROSTER_VERSIONS;
-  const latestVersionNo = findLatestVersionNo(quarterId);
+  const latestVersionNo = findLatestVersionNo_(quarterId);
   const authorOf = buildVersionAuthorResolver_();
-  return readSheet(SHEETS.ROSTER_VERSIONS)
+  return readSheet_(SHEETS.ROSTER_VERSIONS)
     .filter(function (row) { return String(row[V.QUARTER_ID] || '').trim() === quarterId; })
     .map(function (row) {
       const versionNo = Number(row[V.VERSION_NO]);
@@ -474,7 +474,7 @@ function listQuarterVersionChoices_(quarterId, timezone) {
  */
 function findVersionRowForPicker_(quarterId, versionNo) {
   const V = COLUMNS.ROSTER_VERSIONS;
-  const row = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+  const row = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
     return String(r[V.QUARTER_ID] || '').trim() === quarterId && Number(r[V.VERSION_NO]) === versionNo;
   })[0];
   if (!row) {
@@ -499,7 +499,7 @@ function findVersionRowForPicker_(quarterId, versionNo) {
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
  * @param {Object} renderContext `buildGridRenderContext_()`（要有 `typeTextByDate`）
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)`
  * @returns {Object.<string, string>} 日期 → 標題文字
  */
 function readVersionWeekTitles_(quarterId, versionNo, renderContext, auditRows) {
@@ -533,7 +533,7 @@ function readVersionWeekTitles_(quarterId, versionNo, renderContext, auditRows) 
 
 /**
  * 把第 `sourceVersionNo` 版**儲存咗嘅內容**（`RosterAssignments`＋每週標題）按機器鍵寫入一張工作表。
- * 只寫內容唔同嘅格；只寫有改嘅行（資料行冇公式，見 `createRosterSheet()`）。
+ * 只寫內容唔同嘅格；只寫有改嘅行（資料行冇公式，見 `createRosterSheet_()`）。
  * @param {string} quarterId 季度 ID
  * @param {number} sourceVersionNo 內容來源版本
  * @param {Object} sheet 要寫入嘅工作表
@@ -551,7 +551,7 @@ function writeVersionContentIntoSheet_(quarterId, sourceVersionNo, sheet, timezo
   const renderContext = buildGridRenderContext_(quarterId, timezone);
   let auditRows = [];
   try {
-    auditRows = readSheet(SHEETS.AUDIT_LOG);
+    auditRows = readSheet_(SHEETS.AUDIT_LOG);
   } catch (err) {
     log_('WARN', 'writeVersionContentIntoSheet_ 讀不到 AuditLog（每週標題用現在的）：' + err.message);
   }
@@ -568,7 +568,7 @@ function writeVersionContentIntoSheet_(quarterId, sourceVersionNo, sheet, timezo
   const typeCol = keys[WEEK_TITLE_GRID_COLUMN - 1] === GRID_KEYS.TYPE ? WEEK_TITLE_GRID_COLUMN - 1 : -1;
   const rowByDate = {};
   values.forEach(function (r, i) {
-    const d = toDateString(r[0], timezone);
+    const d = toDateString_(r[0], timezone);
     if (d && rowByDate[d] === undefined) rowByDate[d] = i;
   });
 
@@ -623,7 +623,7 @@ function apiOpenVersionForViewing(quarterId, versionNo) {
 }
 
 function openVersionForViewing_locked_(quarterId, target) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const found = findVersionRowForPicker_(quarterId, target);
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(found.sheetName);
   if (!sheet) {
@@ -635,7 +635,7 @@ function openVersionForViewing_locked_(quarterId, target) {
   let protectedNow = false;
   let restoredCells = 0;
   let restoreFailed = '';
-  if (target !== findLatestVersionNo(quarterId)) {
+  if (target !== findLatestVersionNo_(quarterId)) {
     try {
       const r = writeVersionContentIntoSheet_(quarterId, target, sheet, timezone);
       restoredCells = r.cellCount + r.titleCount;
@@ -655,7 +655,7 @@ function openVersionForViewing_locked_(quarterId, target) {
   }
   return {
     // 第七十七輪批次 EB 組：舊版本開**唯讀顯示網址**（`/preview#gid=`）；最新一版照舊開 `/edit`（佢係要改嗰張）
-    url: target === findLatestVersionNo(quarterId)
+    url: target === findLatestVersionNo_(quarterId)
       ? buildGridSheetUrl_(found.sheetName) : buildGridSheetViewUrl_(found.sheetName),
     sheetName: found.sheetName,
     protectedNow: protectedNow, restoredCells: restoredCells, restoreFailed: restoreFailed
@@ -676,8 +676,8 @@ function apiUseVersionAsStartPoint(quarterId, versionNo) {
 }
 
 function useVersionAsStartPoint_locked_(quarterId, target) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const latest = findLatestVersionNo(quarterId);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const latest = findLatestVersionNo_(quarterId);
   if (latest < 0) {
     throw new Error(buildThreePartMessage_('這一季還沒有任何版本。', '職事表沒有任何改動。',
       ['先在第 1 步生成職事表']));

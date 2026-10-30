@@ -106,7 +106,7 @@ gas.CacheService = {
 // 由綠變紅嘅測試，而變紅嗰陣同被測嘅程式一啲關係都冇。
 //
 // ⚠️ 但**只可以造假「而家」嗰一刻**。`Utilities.formatDate()` 全系統
-// 都用嚟格式化任何一個日期（`toDateString()` 就係靠佢），一律回 FAKE_TODAY
+// 都用嚟格式化任何一個日期（`toDateString_()` 就係靠佢），一律回 FAKE_TODAY
 // 嘅話，所有日期都會變成同一日——實測過：長表搵唔到任何一格。
 // 所以只有「傳入嘅時間同執行嗰刻相差一秒之內」先當成「而家」。
 const FAKE_TODAY = '2099-02-15';
@@ -341,7 +341,7 @@ console.log('\n=== A3【核心】第 3 步：下拉選單唔可以變成限制 =
     JSON.stringify(r.skipped));
 
   // ★★★ 呢一條係整個功能嘅關鍵。
-  const sheet = ss.getSheetByName(gas.buildRosterSheetName_(Q_NOW, gas.findLatestVersionNo(Q_NOW)));
+  const sheet = ss.getSheetByName(gas.buildRosterSheetName_(Q_NOW, gas.findLatestVersionNo_(Q_NOW)));
   const keys = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
   const chairCol = keys.indexOf('CHAIR#1') + 1;
   const rule = sheet.getRange(3, chairCol, 1, 1).getDataValidation
@@ -427,7 +427,7 @@ console.log('\n=== A4：改好之後，新增同移走都要逐項列出 ===');
 
   // ★ 停用，唔係刪行。
   const E = C.ELIGIBILITY;
-  const rows = gas.readSheet(S.ELIGIBILITY).filter(function (r) {
+  const rows = gas.readSheet_(S.ELIGIBILITY).filter(function (r) {
     return r[E.POST_ID] === 'READ';
   });
   checkEqual('★★★★★ 移走 ＝ 停用，**冇刪任何一行**'
@@ -508,7 +508,7 @@ console.log('\n=== D：NameMapping 查唔到嘅人唔可以被略過 ===');
   const head = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
   const line = new Array(head.length).fill('');
   const col = function (k) { return head.indexOf(k); };
-  const v = gas.findLatestVersionNo(Q_NOW);
+  const v = gas.findLatestVersionNo_(Q_NOW);
   line[col(A.QUARTER_ID)] = Q_NOW;
   line[col(A.VERSION_NO)] = v;
   line[col(A.SERVICE_DATE)] = DATES_NOW[0];

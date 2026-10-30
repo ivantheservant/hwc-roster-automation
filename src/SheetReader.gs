@@ -1,18 +1,18 @@
 /**
- * 第二十三輪批次階段 C：**只喺明確開啟期間生效**嘅 `readSheet()` 記憶體快取。
+ * 第二十三輪批次階段 C：**只喺明確開啟期間生效**嘅 `readSheet_()` 記憶體快取。
  *
  * ─────────────────────────────────────────────────────────────────────
  * 點解要有，同埋點解係「opt-in」而唔係一律開
  * ─────────────────────────────────────────────────────────────────────
  *
  * `apiGetDashboardState()` 要一次過算出成版嘢（四粒掣嘅狀態、未儲存改動、
- * 區二未做完項數），期間會經過幾個各自 `readSheet()` 嘅既有函式
+ * 區二未做完項數），期間會經過幾個各自 `readSheet_()` 嘅既有函式
  * （`buildFineTuneContext_()`／`buildMailContext_()`／`readPendingRequests_()`…）。
  * 唔做嘢嘅話，`RosterAssignments`（幾百行）同 `SendLog`（只會單調增長、
  * 冇歸檔機制）喺同一次呼叫入面會被完整讀幾次——純粹浪費。
  *
  * ⚠️ **點解唔一律開快取**：全域快取會令「寫入之後再讀」讀到過時資料。
- * 本專案好多流程正正係噉（`writeAssignments()` 之後再 `readSheet()` 核對），
+ * 本專案好多流程正正係噉（`writeAssignments_()` 之後再 `readSheet_()` 核對），
  * 一律開快取就會種一個極難查嘅 bug——而且係「靜靜讀到舊資料」呢一類，
  * 同本專案已經燒過幾次嘅 bug class 同源。
  *
@@ -23,7 +23,7 @@
 let SHEET_READ_MEMO_ = null;
 
 /**
- * 開始 `readSheet()` 快取。**只可以喺完全唔寫入嘅純讀取流程用**，
+ * 開始 `readSheet_()` 快取。**只可以喺完全唔寫入嘅純讀取流程用**，
  * 而且一定要配 `try/finally` 確保收尾。
  * @returns {void}
  */
@@ -32,7 +32,7 @@ function beginSheetReadMemo_() {
 }
 
 /**
- * 結束 `readSheet()` 快取，之後恢復每次都真正讀表。
+ * 結束 `readSheet_()` 快取，之後恢復每次都真正讀表。
  * @returns {void}
  */
 function endSheetReadMemo_() {
@@ -50,8 +50,8 @@ function endSheetReadMemo_() {
  * 攞返嚟嘅陣列或者入面嘅 row（`.sort()`／`.push()`／改 property），
  * 同一次呼叫之後再讀同一張表就會攞到**被改過嘅資料**。
  *
- * 逐個 `readSheet()` 呼叫點掃描過（第二十四輪階段 A1）：
- * - 全部 `record[C.X] = …` 嘅賦值都係喺**新建嘅 `{}`** 上面，唔係 readSheet 出嚟嘅 row
+ * 逐個 `readSheet_()` 呼叫點掃描過（第二十四輪階段 A1）：
+ * - 全部 `record[C.X] = …` 嘅賦值都係喺**新建嘅 `{}`** 上面，唔係 readSheet_ 出嚟嘅 row
  * - 四處 `.sort()` 全部喺 `.filter()`／`.map()` **之後**先排（嗰啲已經係新陣列）
  *
  * 所以**目前冇任何一處會 mutate**——呢個係將來風險，唔係現有 bug。
@@ -64,7 +64,7 @@ function endSheetReadMemo_() {
  * | 淺複本（採用）| 改動只影響呼叫者自己嗰份，快取保持乾淨 |
  *
  * ⚠️ **靜靜失敗正正就係本專案已經燒過幾次嘅 bug class。** 但更決定性嘅
- * 理由係**語意一致**：冇快取嗰陣，每次 `readSheet()` 都回傳全新物件。
+ * 理由係**語意一致**：冇快取嗰陣，每次 `readSheet_()` 都回傳全新物件。
  * 淺複本令**有快取同冇快取嘅行為完全一樣**；freeze 就會令兩者唔同
  * ——而且個分別只會喺「有開快取」嗰條路徑先浮現，即係
  * **測試全綠、偏偏就係實際會行嗰條路出事**。
@@ -89,7 +89,7 @@ function cloneMemoRows_(rows) {
  * @param {string} sheetName 工作表名稱
  * @returns {Object[]} 物件陣列，屬性名稱對應標題列；找不到資料時回傳空陣列
  */
-function readSheet(sheetName) {
+function readSheet_(sheetName) {
   if (SHEET_READ_MEMO_ && Object.prototype.hasOwnProperty.call(SHEET_READ_MEMO_, sheetName)) {
     return cloneMemoRows_(SHEET_READ_MEMO_[sheetName]);
   }
@@ -129,8 +129,8 @@ function readSheet(sheetName) {
  * 讀取 Posts 工作表，只回傳 Active=TRUE 的職位，並按 DisplayOrder 由小到大排序。
  * @returns {Object[]} 職位物件陣列
  */
-function readPosts() {
-  const rows = readSheet(SHEETS.POSTS).filter(function (row) {
+function readPosts_() {
+  const rows = readSheet_(SHEETS.POSTS).filter(function (row) {
     return isTrueValue_(row[COLUMNS.POSTS.ACTIVE]);
   });
   rows.sort(function (a, b) {
@@ -143,8 +143,8 @@ function readPosts() {
  * 讀取 NameMapping 工作表（會友/義工名冊），只回傳 Active=TRUE 的人。
  * @returns {Object[]} 人員物件陣列
  */
-function readPeople() {
-  return readSheet(SHEETS.NAME_MAPPING).filter(function (row) {
+function readPeople_() {
+  return readSheet_(SHEETS.NAME_MAPPING).filter(function (row) {
     return isTrueValue_(row[COLUMNS.NAME_MAPPING.ACTIVE]);
   });
 }
@@ -157,8 +157,8 @@ function readPeople() {
  *   byPost 為 {PostID: [PersonID...]}、byPerson 為 {PersonID: [PostID...]}、
  *   historicalCount 為 {PostID: {PersonID: HistoricalCount}}
  */
-function readEligibility() {
-  const rows = readSheet(SHEETS.ELIGIBILITY);
+function readEligibility_() {
+  const rows = readSheet_(SHEETS.ELIGIBILITY);
   const byPost = {};
   const byPerson = {};
   const historicalCount = {};
@@ -223,8 +223,8 @@ function readEligibility() {
  * 讀取 Posts 並正規化為排表與核對邏輯共用的物件格式（只含 Active=TRUE，按 DisplayOrder 排序）。
  * @returns {Object[]} 正規化後的崗位物件陣列
  */
-function readPostsNormalized() {
-  return readPosts().map(function (row) {
+function readPostsNormalized_() {
+  return readPosts_().map(function (row) {
     return {
       postId: row[COLUMNS.POSTS.POST_ID],
       postNameTC: row[COLUMNS.POSTS.POST_NAME_TC],
@@ -265,11 +265,11 @@ function parsePostMaxPerPerson_(raw) {
  * @param {string} timezone 時區名稱
  * @returns {Object[]} 正規化後的主日物件陣列
  */
-function readServiceDatesNormalized(quarterId, timezone) {
-  const rows = readServiceDates(quarterId).map(function (row) {
+function readServiceDatesNormalized_(quarterId, timezone) {
+  const rows = readServiceDates_(quarterId).map(function (row) {
     return {
       serviceDateId: row[COLUMNS.SERVICE_DATES.SERVICE_DATE_ID],
-      serviceDate: toDateString(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone),
+      serviceDate: toDateString_(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone),
       weekIndex: Number(row[COLUMNS.SERVICE_DATES.WEEK_INDEX]),
       isFirstSundayOfMonth: isTrueValue_(row[COLUMNS.SERVICE_DATES.IS_FIRST_SUNDAY_OF_MONTH]),
       serviceType: row[COLUMNS.SERVICE_DATES.SERVICE_TYPE],
@@ -304,7 +304,7 @@ function readServiceDatesNormalized(quarterId, timezone) {
  *
  * 而家兩邊都叫呢一個函式。要改「點先算生效」就改呢度一個地方。
  *
- * @param {Object} row `readUnavailable()` 出嚟嘅一列
+ * @param {Object} row `readUnavailable_()` 出嚟嘅一列
  * @returns {boolean} 生效（`Status` 係 ACTIVE）先回 true
  */
 function isUnavailableRowActive_(row) {
@@ -312,14 +312,14 @@ function isUnavailableRowActive_(row) {
     === UNAVAILABLE_VALUES.STATUS_ACTIVE;
 }
 
-function readUnavailableNormalized(timezone) {
-  return readUnavailable()
+function readUnavailableNormalized_(timezone) {
+  return readUnavailable_()
     .filter(isUnavailableRowActive_)
     .map(function (row) {
       return {
         personId: row[COLUMNS.UNAVAILABLE.PERSON_ID],
-        dateFrom: toDateString(row[COLUMNS.UNAVAILABLE.DATE_FROM], timezone),
-        dateTo: toDateString(row[COLUMNS.UNAVAILABLE.DATE_TO], timezone),
+        dateFrom: toDateString_(row[COLUMNS.UNAVAILABLE.DATE_FROM], timezone),
+        dateTo: toDateString_(row[COLUMNS.UNAVAILABLE.DATE_TO], timezone),
         appliesTo: String(row[COLUMNS.UNAVAILABLE.APPLIES_TO] || UNAVAILABLE_VALUES.APPLIES_TO_ALL).toUpperCase(),
         postIds: splitList_(row[COLUMNS.UNAVAILABLE.POST_IDS]),
         // 第二十一輪批次階段 A：硬規則違反三分類要判斷「呢行申報係咪
@@ -334,8 +334,8 @@ function readUnavailableNormalized(timezone) {
  * 讀取 NameAlias 工作表，建立 Alias 到 PersonID 的對照。只計入 Active=TRUE 的紀錄。
  * @returns {Object.<string, string>} {alias: personId}
  */
-function readNameAlias() {
-  const rows = readSheet(SHEETS.NAME_ALIAS);
+function readNameAlias_() {
+  const rows = readSheet_(SHEETS.NAME_ALIAS);
   const map = {};
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -353,8 +353,8 @@ function readNameAlias() {
  * @param {string} quarterId 季度 ID，例如 "2026T4"
  * @returns {Object[]} 該季度的主日物件陣列
  */
-function readServiceDates(quarterId) {
-  return readSheet(SHEETS.SERVICE_DATES).filter(function (row) {
+function readServiceDates_(quarterId) {
+  return readSheet_(SHEETS.SERVICE_DATES).filter(function (row) {
     return row[COLUMNS.SERVICE_DATES.QUARTER_ID] === quarterId;
   });
 }
@@ -368,7 +368,7 @@ function readServiceDates(quarterId) {
  */
 function isSpecialSundaysEnabled_() {
   try {
-    return getConfig(CONFIG_KEYS.SPECIAL_SUNDAYS_ENABLED, DEFAULTS.SPECIAL_SUNDAYS_ENABLED) === true;
+    return getConfig_(CONFIG_KEYS.SPECIAL_SUNDAYS_ENABLED, DEFAULTS.SPECIAL_SUNDAYS_ENABLED) === true;
   } catch (err) {
     return false;
   }
@@ -379,11 +379,11 @@ function isSpecialSundaysEnabled_() {
  * @param {string} quarterId 季度 ID，例如 "2026T4"
  * @returns {Object[]} 該季度的特別主日物件陣列
  */
-function readSpecialSundays(quarterId) {
+function readSpecialSundays_(quarterId) {
   // 第七十五輪批次 CC 組：關咗（預設）⇒ 一律當冇特別主日。呢度係生成、調整、核對、匯入、
   // 角色影響、軟規則量度、grid 標題／外部單位索引嘅共同入口，所以只喺呢度關一次。
   if (!isSpecialSundaysEnabled_()) return [];
-  return readSheet(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {
+  return readSheet_(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {
     return row[COLUMNS.SPECIAL_SUNDAYS.QUARTER_ID] === quarterId;
   });
 }
@@ -392,16 +392,16 @@ function readSpecialSundays(quarterId) {
  * 讀取 Unavailable 工作表（請假／不可用時段），回傳所有紀錄。
  * @returns {Object[]} 不可用時段物件陣列
  */
-function readUnavailable() {
-  return readSheet(SHEETS.UNAVAILABLE);
+function readUnavailable_() {
+  return readSheet_(SHEETS.UNAVAILABLE);
 }
 
 /**
  * 讀取 RuleSettings 工作表，回傳以 RuleID 為鍵的規則物件對照表。
  * @returns {Object.<string, Object>} {ruleId: 規則物件}
  */
-function readRules() {
-  const rows = readSheet(SHEETS.RULE_SETTINGS);
+function readRules_() {
+  const rows = readSheet_(SHEETS.RULE_SETTINGS);
   const map = {};
   for (let i = 0; i < rows.length; i++) {
     const ruleId = rows[i][COLUMNS.RULE_SETTINGS.RULE_ID];
@@ -435,7 +435,7 @@ function isTrueValue_(value) {
 function readLatestAssignmentUpdatedAt_(quarterId, versionNo, timezone) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
   let max = null;
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== Number(versionNo)) return;
     const t = normalizeSheetTimestamp_(row[A.UPDATED_AT], timezone);
@@ -463,7 +463,7 @@ function buildSpecialSundayByDate_(specialRows, timezone) {
   (specialRows || [])
     .filter(function (row) { return isTrueValue_(row[S.ACTIVE]); })
     .forEach(function (row) {
-      const dateStr = toDateString(row[S.SERVICE_DATE], timezone);
+      const dateStr = toDateString_(row[S.SERVICE_DATE], timezone);
       if (!dateStr) return;
       byDate[dateStr] = {
         specialId: row[S.SPECIAL_ID],
@@ -497,7 +497,7 @@ function isVersionNoticeSent_(quarterId, versionNo, sendLogRows) {
     // 連 SendLog 工作表都未建立 ⇒ 從來冇寄過任何嘢；其他讀取失敗唔吞，照樣拋出（唔可以靜靜當成「未寄」）
     if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SEND_LOG)) return false;
   }
-  return (sendLogRows || readSheet(SHEETS.SEND_LOG)).some(function (row) {
+  return (sendLogRows || readSheet_(SHEETS.SEND_LOG)).some(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return false;
     if (Number(row[C.VERSION_NO]) !== Number(versionNo)) return false;
     const stage = String(row[C.STAGE] || '').trim();
@@ -547,10 +547,10 @@ const WEEK_TITLE_GRID_COLUMN = 3;
 function buildWeekTitleIndex_(quarterId, timezone) {
   const S = COLUMNS.SERVICE_DATES;
   const index = {};
-  readServiceDates(quarterId).forEach(function (row) {
+  readServiceDates_(quarterId).forEach(function (row) {
     const title = String(row[S.TITLE] === undefined || row[S.TITLE] === null ? '' : row[S.TITLE]).trim();
     if (!title) return;
-    const d = toDateString(row[S.SERVICE_DATE], timezone);
+    const d = toDateString_(row[S.SERVICE_DATE], timezone);
     if (d) index[d] = title;
   });
   return index;
@@ -578,8 +578,8 @@ function buildTypeTextByDate_(quarterId, timezone) {
   const S = COLUMNS.SERVICE_DATES;
   const specialTitles = buildSpecialSundayTitleIndex_(quarterId, timezone);
   const out = {};
-  readServiceDates(quarterId).forEach(function (row) {
-    const d = toDateString(row[S.SERVICE_DATE], timezone);
+  readServiceDates_(quarterId).forEach(function (row) {
+    const d = toDateString_(row[S.SERVICE_DATE], timezone);
     if (!d) return;
     out[d] = resolveWeekTypeText_(row[S.SERVICE_TYPE], specialTitles[d], row[S.TITLE]);
   });
@@ -634,7 +634,7 @@ function readGridTypeColumnUnsafe_(sheetName, timezone) {
   const values = sheet.getRange(3, 1, lastRow - 2, WEEK_TITLE_GRID_COLUMN).getValues();
   const out = {};
   values.forEach(function (row) {
-    const d = toDateString(row[0], timezone);
+    const d = toDateString_(row[0], timezone);
     if (d) out[d] = String(row[WEEK_TITLE_GRID_COLUMN - 1] === null || row[WEEK_TITLE_GRID_COLUMN - 1] === undefined
       ? '' : row[WEEK_TITLE_GRID_COLUMN - 1]).trim();
   });
@@ -715,7 +715,7 @@ function writeWeekTitles_(quarterId, titleChanges, timezone, source) {
   let written = 0;
   values.forEach(function (row, i) {
     if (String(row[qCol] || '').trim() !== quarterId) return;
-    const d = toDateString(row[dCol], timezone);
+    const d = toDateString_(row[dCol], timezone);
     const change = byDate[d];
     if (!change) return;
     const defaultText = describeServiceType_(row[tCol], specialTitles[d]);
@@ -762,7 +762,7 @@ function restoreBaseSheetAfterNewVersion_(quarterId, baseVersionNo, source) {
   const base = Number(baseVersionNo);
   if (isNaN(base) || base < 0) return out;
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const sheetName = findVersionRowForPicker_(quarterId, base).sheetName;
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
     if (!sheet) throw new Error('找不到工作表「' + sheetName + '」');
@@ -855,7 +855,7 @@ function readGridFilledManualCells_(quarterId, versionNo, postIds, timezone) {
   const keys = gridSheet.getRange(2, 1, 1, lastCol).getValues()[0];
   const body = gridSheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
   body.forEach(function (row) {
-    const date = toDateString(row[0], timezone);
+    const date = toDateString_(row[0], timezone);
     if (!date) return;
     keys.forEach(function (key, ci) {
       const m = /^(.+)#(\d+)$/.exec(String(key || ''));
@@ -901,11 +901,11 @@ function readActiveCellDecisions_(quarterId, timezone) {
   }
   if (!exists) return [];
   const D = COLUMNS.CELL_DECISIONS;
-  return readSheet(SHEETS.CELL_DECISIONS).filter(function (row) {
+  return readSheet_(SHEETS.CELL_DECISIONS).filter(function (row) {
     return String(row[D.QUARTER_ID] || '').trim() === quarterId
       && String(row[D.STATUS] || '').trim() === CELL_DECISION_STATUS.ACTIVE;
   }).map(function (row) {
-    const serviceDate = toDateString(row[D.SERVICE_DATE], timezone);
+    const serviceDate = toDateString_(row[D.SERVICE_DATE], timezone);
     const postId = String(row[D.POST_ID] || '').trim();
     const slotIndex = Number(row[D.SLOT_INDEX]) || 1;
     return {
@@ -1069,7 +1069,7 @@ const VERSION_START_POINT_ACTION = 'VERSION_START_POINT';
  * 儲存嗰陣：最新一版（`baseVersionNo`）之上有冇「以第 M 版作起點」。
  * 只認**最後一個**而且係喺 `baseVersionNo` 之上寫嘅標記——之後有任何新版本，
  * 基準版本號就唔同，舊標記自然唔再算。
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)`
  * @param {string} quarterId 季度 ID
  * @param {number} baseVersionNo 儲存時嘅基準版本
  * @returns {?number} 起點版本號；冇就 null
@@ -1100,7 +1100,7 @@ const QUARTER_RESET_AFTER_ACTION = 'QUARTER_RESET_BATCH_AFTER';
 
 /**
  * 該季最後一次重設嘅時間（`yyyy-MM-dd HH:mm:ss`）；冇就 null。
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)`
  * @param {string} quarterId 季度 ID
  * @param {string} timezone 時區
  * @returns {?string}
@@ -1126,7 +1126,7 @@ function findLastQuarterResetAt_(auditRows, quarterId, timezone) {
  */
 function readVersionCreatedAtForStartPoint_(quarterId, versionNo, timezone) {
   const V = COLUMNS.ROSTER_VERSIONS;
-  const row = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+  const row = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
     return String(r[V.QUARTER_ID] || '').trim() === quarterId && Number(r[V.VERSION_NO]) === Number(versionNo);
   })[0];
   return row ? normalizeSheetTimestamp_(row[V.CREATED_AT], timezone) : null;
@@ -1194,8 +1194,8 @@ function parseVersionChangeCounts_(value) {
 
 function readStartPointBasisForSave_(quarterId, baseVersionNo) {
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-    const auditRows = readSheet(SHEETS.AUDIT_LOG);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const auditRows = readSheet_(SHEETS.AUDIT_LOG);
     // 第七十七輪批次 EH 組（F1）：標記要唔早過基準版本建立時間、亦唔早過該季最後一次重設
     const m = findStartPointForSave_(auditRows, quarterId, baseVersionNo, {
       timezone: timezone,
@@ -1217,7 +1217,7 @@ function readPersonNameIndex_() {
   const out = {};
   try {
     const N = COLUMNS.NAME_MAPPING;
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (r) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (r) {
       const id = String(r[N.PERSON_ID] || '').trim();
       if (id) out[id] = String(r[N.NAME_TC] || '').trim();
     });
@@ -1236,7 +1236,7 @@ const QUARTER_RESET_AUDIT_ACTION = '重設季度測試資料';
 /**
  * 呢一季**最後一次**重設喺 AuditLog 第幾行（陣列索引）；冇重設過 ⇒ -1。
  * AuditLog 只會加、唔會改，行嘅次序就係時間次序。
- * @param {Array[]} auditRows `readSheet(SHEETS.AUDIT_LOG)`
+ * @param {Array[]} auditRows `readSheet_(SHEETS.AUDIT_LOG)`
  * @param {string} quarterId 季度 ID
  * @returns {number}
  */
@@ -1284,7 +1284,7 @@ function tempHelperNameFromPaperKey_(key) {
  *
  * ⚠️ 寄出窗「這幾位收不到電郵」（`buildUnreachablePeople_()`）同第 4 步紙本名單
  * （`apiGetPaperListState()`）都經呢度——兩邊人數一定一樣。
- *   ・有 PersonID ⇒ 睇 `NameMapping`（`readPeople()`）有冇電郵
+ *   ・有 PersonID ⇒ 睇 `NameMapping`（`readPeople_()`）有冇電郵
  *   ・冇 PersonID 有名，喺系統排嘅崗位（`Posts.AutoGenerate = TRUE`）⇒ 臨時幫手（CE 組）
  *   ・冇 PersonID 有名，喺人手崗位（例如外請講員）⇒ 唔列名，只數
  * @param {string} quarterId 季度 ID
@@ -1297,19 +1297,19 @@ function splitVersionPeopleForNotice_(quarterId, versionNo) {
   const N = COLUMNS.NAME_MAPPING;
   const emailById = {};
   const nameById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[N.PERSON_ID] || '').trim();
     if (!id) return;
     emailById[id] = String(row[N.EMAIL] || '').trim();
     nameById[id] = String(row[N.NAME_TC] || '').trim();
   });
   const autoByPost = {};
-  readPostsNormalized().forEach(function (p) { autoByPost[p.postId] = p.autoGenerate === true; });
+  readPostsNormalized_().forEach(function (p) { autoByPost[p.postId] = p.autoGenerate === true; });
 
   const countById = {};
   const tempCount = {};
   const external = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== versionNo) return;
     const id = String(row[A.PERSON_ID] || '').trim();
@@ -1448,7 +1448,7 @@ function describeHwcasSyncForDashboard_() {
   const s = readHwcasSyncStatus_();
   let when = s.lastText;
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     if (when.indexOf(today) === 0) when = '今日 ' + when.slice(11, 16);
   } catch (err) { /* 照用原文 */ }
@@ -1470,7 +1470,7 @@ function countPeopleEmailGaps_() {
   let noEmail = 0;
   let unlinked = 0;
   try {
-    readPeople().forEach(function (row) {
+    readPeople_().forEach(function (row) {
       if (!String(row[M.EMAIL] || '').trim()) noEmail++;
       if (!memberNoKey_(row[M.MEMBER_NO])) unlinked++;
     });

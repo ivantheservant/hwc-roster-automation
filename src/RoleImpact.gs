@@ -239,24 +239,24 @@ function computeChairAnnounceUpperBound_(chairPost, announcePost, chairAvail, an
  * @returns {Object} 供 `buildRoleImpactRows_()` 組報告用
  */
 function collectRoleImpact_(quarterId) {
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
 
-  const serviceDates = readServiceDatesNormalized(quarterId, timezone);
+  const serviceDates = readServiceDatesNormalized_(quarterId, timezone);
   if (serviceDates.length === 0) {
     throw new Error('找不到 ' + quarterId + ' 的主日資料（ServiceDates）。'
       + '請先用「準備工作 ▸ ⚠️ 新增季度」或「⚠️ 產生下一年度四個季度」建立這一季。');
   }
 
-  const posts = readPostsNormalized();
-  const eligibility = readEligibility();
+  const posts = readPostsNormalized_();
+  const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
-  const rules = readRules();
-  const unavailable = readUnavailableNormalized(timezone);
+  const rules = readRules_();
+  const unavailable = readUnavailableNormalized_(timezone);
   const maxPerQuarterDefault = Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER;
 
   const peopleById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = row[COLUMNS.NAME_MAPPING.PERSON_ID];
     const rawMax = row[COLUMNS.NAME_MAPPING.MAX_PER_QUARTER];
     peopleById[id] = {
@@ -266,10 +266,10 @@ function collectRoleImpact_(quarterId) {
   });
 
   const specialByDate = {};
-  readSpecialSundays(quarterId)
+  readSpecialSundays_(quarterId)
     .filter(function (row) { return isTrueValue_(row[COLUMNS.SPECIAL_SUNDAYS.ACTIVE]); })
     .forEach(function (row) {
-      const dateStr = toDateString(row[COLUMNS.SPECIAL_SUNDAYS.SERVICE_DATE], timezone);
+      const dateStr = toDateString_(row[COLUMNS.SPECIAL_SUNDAYS.SERVICE_DATE], timezone);
       specialByDate[dateStr] = {
         skipPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.SKIP_POST_IDS]),
         lockPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.LOCK_POST_IDS])
@@ -286,7 +286,7 @@ function collectRoleImpact_(quarterId) {
       const applicableDates = listApplicableDatesForPost_(post, serviceDates, specialByDate, rules);
       const slotsNeeded = applicableDates.length * post.slotCount;
 
-      // 收窄之前：Eligibility 名單（`readEligibility()` 已經剔走 Eligible=FALSE），
+      // 收窄之前：Eligibility 名單（`readEligibility_()` 已經剔走 Eligible=FALSE），
       // 再扣走唔喺在職名單嘅人——同 `pickPerson_()` 嘅第一層過濾一致。
       const beforeIds = (eligibility.byPost[post.postId] || [])
         .filter(function (id) { return !!peopleById[id]; });

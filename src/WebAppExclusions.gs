@@ -39,7 +39,7 @@ function apiListExclusions(keyword) {
   try {
     const X = COLUMNS.PERSON_POST_EXCLUSIONS;
     const M = COLUMNS.NAME_MAPPING;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
 
     let raw = [];
@@ -54,7 +54,7 @@ function apiListExclusions(keyword) {
     const nameIndex = buildPersonNameIndex_();
     const postNames = {};
     const posts = [];
-    readPosts().forEach(function (row) {
+    readPosts_().forEach(function (row) {
       const postId = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
       if (!postId) return;
       const nameTC = String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim() || postId;
@@ -63,7 +63,7 @@ function apiListExclusions(keyword) {
     });
 
     const people = [];
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const id = String(row[M.PERSON_ID] || '').trim();
       if (!id) return;
       if (!isTrueValue_(row[M.ACTIVE])) return;
@@ -80,7 +80,7 @@ function apiListExclusions(keyword) {
       const nameTC = nameIndex[personId] || personId;
       if (!matchesPeopleSearch_(keyword, [nameTC, personId, postNames[postId] || postId])) return;
 
-      const to = toDateString(row[X.EFFECTIVE_TO], timezone);
+      const to = toDateString_(row[X.EFFECTIVE_TO], timezone);
       const item = {
         exclusionId: String(row[X.EXCLUSION_ID] || '').trim(),
         personId: personId,
@@ -91,7 +91,7 @@ function apiListExclusions(keyword) {
         postNameTC: postNames[postId] || postId,
         unknownPost: !postNames[postId],
         reason: String(row[X.REASON] || '').trim(),
-        effectiveFrom: toDateString(row[X.EFFECTIVE_FROM], timezone),
+        effectiveFrom: toDateString_(row[X.EFFECTIVE_FROM], timezone),
         effectiveTo: to,
         active: isTrueValue_(row[X.ACTIVE]),
         notes: String(row[X.NOTES] || '').trim()
@@ -213,7 +213,7 @@ function apiAddExclusion(payload) {
   assertWebAppRequestAllowed_();
   const p = payload || {};
   const X = COLUMNS.PERSON_POST_EXCLUSIONS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const check = validateExclusionInput_(p, timezone);
   if (!check.ok) return { ok: false, message: check.message };
@@ -256,7 +256,7 @@ function apiSaveExclusion(payload) {
   assertWebAppRequestAllowed_();
   const p = payload || {};
   const X = COLUMNS.PERSON_POST_EXCLUSIONS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const exclusionId = String(p.exclusionId || '').trim();
   if (!exclusionId) {
@@ -322,7 +322,7 @@ function apiSaveExclusion(payload) {
 function apiLiftExclusion(exclusionId, liftDateRaw) {
   assertWebAppRequestAllowed_();
   const X = COLUMNS.PERSON_POST_EXCLUSIONS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const id = String(exclusionId || '').trim();
   if (!id) {
@@ -355,7 +355,7 @@ function apiLiftExclusion(exclusionId, liftDateRaw) {
     };
   }
 
-  const from = toDateString(found.record[X.EFFECTIVE_FROM], timezone);
+  const from = toDateString_(found.record[X.EFFECTIVE_FROM], timezone);
   if (from && parsed.dateStr < from) {
     return {
       ok: false,

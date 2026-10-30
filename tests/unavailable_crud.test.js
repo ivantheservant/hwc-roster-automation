@@ -38,7 +38,7 @@ gas.Utilities = {
   }
 };
 gas.assertWebAppRequestAllowed_ = function () {};
-gas.getConfig = function (key, fallback) {
+gas.getConfig_ = function (key, fallback) {
   return key === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : fallback;
 };
 
@@ -88,21 +88,21 @@ console.log('\n=== E1【核心】日期一律經 parseOfficerDateInput_()，唔�
 
 console.log('\n=== E1【核心】影響預估：蓋住幾多個主日、有冇已經排咗 ===');
 {
-  gas.findLatestVersionNo = function () { return 1; };
-  gas.readServiceDatesNormalized = function () {
+  gas.findLatestVersionNo_ = function () { return 1; };
+  gas.readServiceDatesNormalized_ = function () {
     return [
       { serviceDate: '2026-11-01' }, { serviceDate: '2026-11-08' },
       { serviceDate: '2026-11-15' }, { serviceDate: '2026-11-22' },
       { serviceDate: '2026-11-29' }
     ];
   };
-  gas.readPosts = function () {
+  gas.readPosts_ = function () {
     const P = gas.COLUMNS.POSTS;
     const mk = function (id, name) { const r = {}; r[P.POST_ID] = id; r[P.POST_NAME_TC] = name; return r; };
     return [mk('READ', '讀經'), mk('WORSHIP', '領詩')];
   };
   const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) {
       const r = {};
       r[A.QUARTER_ID] = '2026T4'; r[A.VERSION_NO] = 1;
@@ -146,7 +146,7 @@ console.log('\n=== E1【核心】影響預估：蓋住幾多個主日、有冇�
 
 console.log('\n=== E1【核心】過期嘅行摺埋，唔刪 ===');
 {
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.NAME_MAPPING) return [personRow('P9001', '測試甲')];
     if (name === gas.SHEETS.UNAVAILABLE) {
       return [
@@ -156,7 +156,7 @@ console.log('\n=== E1【核心】過期嘅行摺埋，唔刪 ===');
     }
     return [];
   };
-  gas.readPosts = function () { return []; };
+  gas.readPosts_ = function () { return []; };
   gas.beginSheetReadMemo_ = function () {};
   gas.endSheetReadMemo_ = function () {};
 
@@ -169,7 +169,7 @@ console.log('\n=== E1【核心】過期嘅行摺埋，唔刪 ===');
 
 console.log('\n=== E1 名單上搵唔到嗰個人：唔可以顯示空白 ===');
 {
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.NAME_MAPPING) return [];
     if (name === gas.SHEETS.UNAVAILABLE) {
       return [unavailRow({ id: 'U3', personId: 'P9999', from: '2099-01-01', to: '2099-01-31' })];

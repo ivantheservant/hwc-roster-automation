@@ -495,13 +495,13 @@ function augmentAssignmentsWithStaffingFlow_(ctx, cells) {
  * @returns {Object} 規則 context
  */
 function buildStaffingContext_(quarterId) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const posts = readPostsNormalized();
-  const eligibility = readEligibility();
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const posts = readPostsNormalized_();
+  const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   eligibility.byPost = roleContext.eligibleByPost;
   const peopleById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     if (!isTrueValue_(row[COLUMNS.NAME_MAPPING.ACTIVE])) return;
     const rawMax = row[COLUMNS.NAME_MAPPING.MAX_PER_QUARTER];
     peopleById[row[COLUMNS.NAME_MAPPING.PERSON_ID]] = {
@@ -510,18 +510,18 @@ function buildStaffingContext_(quarterId) {
       maxPerQuarter: (rawMax === '' || rawMax === null || rawMax === undefined) ? null : Number(rawMax)
     };
   });
-  const config = readConfig();
+  const config = readConfig_();
   return {
     quarterId: quarterId,
-    serviceDates: readServiceDatesNormalized(quarterId, timezone),
+    serviceDates: readServiceDatesNormalized_(quarterId, timezone),
     posts: posts,
     eligibility: eligibility,
     roles: roleContext.roles,
     personPostExclusions: roleContext.exclusions,
     peopleById: peopleById,
-    unavailable: readUnavailableNormalized(timezone),
-    specialByDate: buildSpecialSundayByDate_(readSpecialSundays(quarterId), timezone),
-    rules: readRules(),
+    unavailable: readUnavailableNormalized_(timezone),
+    specialByDate: buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone),
+    rules: readRules_(),
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER
   };
 }

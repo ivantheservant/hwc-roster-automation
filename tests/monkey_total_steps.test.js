@@ -333,8 +333,8 @@ console.log('\n=== B1 步號真係跨批續落去（跑一次真迴圈）===');
   gas.checkSelfTestPreconditions_ = function () { return { ok: true, reasons: [] }; };
   gas.assertMonkeyDryRunStillOn_ = function () {};
   gas.writeMonkeyLog_ = function () {};
-  gas.readConfig = function () { return {}; };
-  gas.getConfig = function (key, dflt) { return dflt; };
+  gas.readConfig_ = function () { return {}; };
+  gas.getConfig_ = function (key, dflt) { return dflt; };
   gas.runAllInvariants_ = function () { return { results: [] }; };
   let n = 0;
   gas.monkeyReadFacts_ = function () {

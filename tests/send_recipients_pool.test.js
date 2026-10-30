@@ -80,8 +80,8 @@ function setup(opts) {
     ];
   };
   gas.Utilities = { formatDate: function () { return '2027-10-01'; } };
-  gas.getConfig = function (_k, d) { return d; };
-  gas.readSheet = function (name) {
+  gas.getConfig_ = function (_k, d) { return d; };
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.EMAIL_RECIPIENTS) {
       const R = gas.COLUMNS.EMAIL_RECIPIENTS;
       const row = {};
@@ -238,7 +238,7 @@ console.log('\n=== A4【核心】Stage 冇拆走，只係唔再決定收件人 =
   check('★★★★★ `sendKindToStage_()` 冇拆走'
     + '——版本紀錄、`SendLog`、稽核、重發比對全部靠 Stage',
     /function sendKindToStage_\(kind\)/.test(read('src/WebAppSendPlan.gs')), '');
-  check('★★★★★ 而且 `sendStage()` 照樣把 Stage 寫入 `SendLog` 同 `AuditLog`',
+  check('★★★★★ 而且 `sendStage_()` 照樣把 Stage 寫入 `SendLog` 同 `AuditLog`',
     /'Stage=' \+ stage \+ '　收件人='/.test(read('src/Mailer.gs')), '');
 }
 
@@ -300,7 +300,7 @@ console.log('\n=== B3【核心】寄出紀錄：這一季寄過幾次 ===');
       return iso.slice(0, 10) + ' ' + iso.slice(11, 16);
     }
   };
-  gas.findLatestVersionNo = function () { return 10; };
+  gas.findLatestVersionNo_ = function () { return 10; };
 
   const history = gas.listSendHistory_('2027T3');
   check('★★★★★ 歸成三批（同一次寄送有幾十行，要按階段 ＋ 版本 ＋ 分鐘歸批）',
@@ -324,11 +324,11 @@ console.log('\n=== B3【核心】寄出紀錄：這一季寄過幾次 ===');
     view.warnSentence.indexOf('9') !== -1 && view.warnSentence.indexOf('10') !== -1,
     view.warnSentence);
   check('★★★★ 資料來源係 `SendLog`，冇另開一張表',
-    /readSheet\(SHEETS\.SEND_LOG\)/.test(read('src/SendRecipients.gs'))
+    /readSheet_\(SHEETS\.SEND_LOG\)/.test(read('src/SendRecipients.gs'))
     && read('src/SendRecipients.gs').indexOf('SEND_HISTORY') === -1, '');
 
   // 反證：現時嗰版寄過 ⇒ 唔應該再提醒。
-  gas.findLatestVersionNo = function () { return 8; };
+  gas.findLatestVersionNo_ = function () { return 8; };
   const view2 = gas.buildSendHistoryView_('2027T3');
   check('★★★★★★ （反證）現時嗰版寄過 ⇒ **冇**嗰句提醒'
     + '——一句永遠都出嘅提醒，等於冇提醒',
@@ -370,7 +370,7 @@ console.log('\n=== B2【核心】「有改動」一定要講明相對邊一版 =
 // =====================================================================
 console.log('\n=== B2 逐個人要講明**改咗乜**，唔淨係一個名單 ===');
 {
-  gas.readPostsNormalized = function () {
+  gas.readPostsNormalized_ = function () {
     return [{ postId: 'CHAIR', postNameTC: '主席' }];
   };
   gas.indexPeopleById_ = function () {

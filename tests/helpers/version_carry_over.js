@@ -11,7 +11,7 @@
 // | --- | --- | --- | --- |
 // | 第三十四輪甲5 | `materialiseManualEdits_()` | `ruleFlags` | PDF 圖例把 79 格報成「系統未能安排」 |
 // | 第三十六輪 A | `materialiseManualEdits_()` | `personName` | 講員一格變成「⚠ 未能安排」 |
-// | 第三十六輪（第五條路） | `applyDecisions()` | `personName` ＋ `ruleFlags` | 未上線，靠呢條斷言先揪到 |
+// | 第三十六輪（第五條路） | `applyDecisions_()` | `personName` ＋ `ruleFlags` | 未上線，靠呢條斷言先揪到 |
 // | 第三十六輪（第六個實例） | `apiRollbackExecute()` | `serviceDateId` | 成版空白，加咗第五個欄位之後即刻揪到 |
 //
 // 每一次都係同一句：**建立新版本嗰陣，冇被改動嘅嘢冇被完整搬過去。**
@@ -24,7 +24,7 @@
 /** 一格嘅識別鍵。同 `cellKey_()` 一致。 */
 function cellKeyOf(gas, row, timezone) {
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  return gas.toDateString(row[C.SERVICE_DATE], timezone)
+  return gas.toDateString_(row[C.SERVICE_DATE], timezone)
     + '|' + row[C.POST_ID] + '|' + String(row[C.SLOT_INDEX]);
 }
 
@@ -41,7 +41,7 @@ function cellKeyOf(gas, row, timezone) {
 function snapshotVersion(gas, quarterId, versionNo, timezone) {
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
   const out = {};
-  gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
     if (Number(row[C.VERSION_NO]) !== versionNo) return;
     out[cellKeyOf(gas, row, timezone)] = {
@@ -133,7 +133,7 @@ function auditCellClasses(gas, quarterId, versionNo, expectNonGapBlanks) {
   byClass[gas.GRID_CELL_CLASS.SPECIAL_SKIP] = 'specialSkip';
   byClass[gas.GRID_CELL_CLASS.GENUINE_GAP] = 'genuineGap';
 
-  gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
     if (Number(row[C.VERSION_NO]) !== versionNo) return;
     counts.total++;

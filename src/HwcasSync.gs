@@ -7,8 +7,8 @@
  * @returns {{sheetName: string, matched: number, ambiguous: number, unmatched: number,
  *   missingInHwcas: number, total: number}} 配對統計
  */
-function syncHwcasEmails() {
-  const config = readConfig();
+function syncHwcasEmails_() {
+  const config = readConfig_();
   const source = readHwcasMembers_(config);
   source.fieldColumns = readHwcasFieldColumns_(config);
   const draft = buildHwcasDraft_(source.records, source.fieldColumns, source.headers);
@@ -27,7 +27,7 @@ function syncHwcasEmails() {
 /**
  * 唯讀開啟 HWCAS 試算表，只讀取 Config 的 HWCAS_READ_COLUMNS 指定的欄位。
  * 明確排除任何未列出的欄位（例如密碼欄），並且不做任何寫入。
- * @param {Object.<string, *>} config readConfig() 的結果
+ * @param {Object.<string, *>} config readConfig_() 的結果
  * @returns {{records: Object[], headers: Object.<string, string>, columns: string[]}} 讀到的資料
  */
 function readHwcasMembers_(config) {
@@ -76,7 +76,7 @@ function readHwcasMembers_(config) {
 /**
  * 讀取 Config 的 HWCAS_COL_* 欄位對應。每項都是選填：
  * 姓名與電郵未設定時退回啟發式偵測，其餘三項未設定時該欄留空不寫入。
- * @param {Object.<string, *>} config readConfig() 的結果
+ * @param {Object.<string, *>} config readConfig_() 的結果
  * @returns {{name: string, email: string, memberNo: string, lastAttendance: string, meetingPoint: string}}
  *   各欄對應的 HWCAS 欄位字母；未設定者為空字串
  */
@@ -119,8 +119,8 @@ function columnLetterToIndex_(letter) {
  * @returns {Object[]} 配對初稿陣列
  */
 function buildHwcasDraft_(hwcasRecords, fieldColumns, headers) {
-  const people = readPeople();
-  const aliasMap = readNameAlias();
+  const people = readPeople_();
+  const aliasMap = readNameAlias_();
   const columns = fieldColumns || {};
   const columnHeaders = headers || {};
 
@@ -294,9 +294,9 @@ function matchSingleName_(name, byName, aliasMap) {
 }
 
 /**
- * 用已載入的索引解析單一姓名，等同 normalizeName() 後再比對，但不重複讀取工作表。
+ * 用已載入的索引解析單一姓名，等同 normalizeName_() 後再比對，但不重複讀取工作表。
  *
- * 直接呼叫 normalizeName() 會令每一次比對都重讀 NameMapping 與 NameAlias；
+ * 直接呼叫 normalizeName_() 會令每一次比對都重讀 NameMapping 與 NameAlias；
  * 529 行 × 3 欄會產生上千次讀取，執行時間無法接受。
  *
  * @param {string} rawName 原始姓名
@@ -474,7 +474,7 @@ function writeHwcasDraftSheet_(draft, source) {
 
 /**
  * 讀出席系統一次，以會眾編號為鍵。**唯讀**（經 `readHwcasMembers_()`）。
- * @param {Object.<string, *>} config `readConfig()` 嘅結果
+ * @param {Object.<string, *>} config `readConfig_()` 嘅結果
  * @returns {{byNo: Object, all: Object[], duplicateNos: string[], records: Object[], fieldColumns: Object, headers: Object}}
  */
 function readHwcasByMemberNo_(config) {
@@ -521,7 +521,7 @@ function analyseHwcasLinks_(hwcas) {
   const unlinked = [];
   const notFound = [];
   const byNo = {};
-  readSheet(SHEETS.NAME_MAPPING).forEach(function (row, i) {
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (row, i) {
     const personId = String(row[M.PERSON_ID] || '').trim();
     if (!personId) return;
     const person = {
@@ -570,11 +570,11 @@ function analyseHwcasLinks_(hwcas) {
  * @returns {Object} {updated, emailChanged, notFound, duplicates, unlinkedCount, noEmailInHwcasCount, syncedAtText}
  */
 function syncPeopleFromHwcasByMemberNo_() {
-  const config = readConfig();
+  const config = readConfig_();
   const hwcas = readHwcasByMemberNo_(config);
   const analysis = analyseHwcasLinks_(hwcas);
   const M = COLUMNS.NAME_MAPPING;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const now = nowTimestamp_();
 
@@ -590,8 +590,8 @@ function syncPeopleFromHwcasByMemberNo_() {
       updates[M.EMAIL_VERIFIED_AT] = today;
     }
     if (String(row[M.EMAIL_SOURCE] || '').trim() !== EMAIL_SOURCE_HWCAS) updates[M.EMAIL_SOURCE] = EMAIL_SOURCE_HWCAS;
-    const la = toDateString(h.lastAttendance, timezone);
-    if (la && la !== toDateString(row[M.LAST_ATTENDANCE], timezone)) updates[M.LAST_ATTENDANCE] = la;
+    const la = toDateString_(h.lastAttendance, timezone);
+    if (la && la !== toDateString_(row[M.LAST_ATTENDANCE], timezone)) updates[M.LAST_ATTENDANCE] = la;
     const mp = String(h.meetingPoint === null || h.meetingPoint === undefined ? '' : h.meetingPoint).trim();
     if (mp && mp !== String(row[M.MEETING_POINT] || '').trim()) updates[M.MEETING_POINT] = mp;
     if (Object.keys(updates).length === 0) return;

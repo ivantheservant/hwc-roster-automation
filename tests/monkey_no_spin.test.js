@@ -123,7 +123,7 @@ console.log('\n=== A1 `unresolvedCount` 要真係由主畫面讀返嚟 ===');
     return { stage: 'OFFICIAL_SENT',
       unsaved: { gridChangeCount: 7, unresolvedCount: 2 }, buttons: {} };
   };
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   const facts = gas.monkeyReadFacts_('2028T3');
   checkEqual('★★★★★★ **`unresolvedCount` 由主畫面讀返嚟，唔係寫死 0**',
     facts.unresolvedCount, 2);
@@ -169,8 +169,8 @@ function machine(opts) {
   gas.assertMonkeyDryRunStillOn_ = function () {};
   // ⚠️ 迴圈入面有嘢會讀 Config，而 Config 行 `CacheService`——
   // 沙箱唔提供。一律短路。
-  gas.readConfig = function () { return {}; };
-  gas.getConfig = function (key, dflt) { return dflt; };
+  gas.readConfig_ = function () { return {}; };
+  gas.getConfig_ = function (key, dflt) { return dflt; };
   gas.writeMonkeyLog_ = function () {};
   gas.runAllInvariants_ = function () {
     return { results: [], okCount: 0, failedCount: 0, errorCount: 0,
@@ -318,7 +318,7 @@ console.log('\n=== A2【核心】「寫一格認不出的名字」自己收拾 =
   const gas = loadGasSource(FILES);
   const writes = [];
   gas.log_ = function () {};
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.selfTestPickCells_ = function () {
     return [{ serviceDate: '2028-07-02', postId: 'CHAIR', slotIndex: 1,
       personId: 'P1' }];

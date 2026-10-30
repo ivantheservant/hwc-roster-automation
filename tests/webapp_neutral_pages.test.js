@@ -31,7 +31,7 @@ function sandbox(opts) {
     createTemplateFromFile: function () { throw new Error('唔應該渲染 Index'); }
   };
   gas.Session = { getActiveUser: function () { return { getEmail: function () { return opts.email || ''; } }; } };
-  gas.getConfig = function (key, d) {
+  gas.getConfig_ = function (key, d) {
     if (key === gas.CONFIG_KEYS.WEBAPP_ENABLED) return opts.enabled;
     if (key === gas.CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS) return ['staff@example.invalid'];
     return d;

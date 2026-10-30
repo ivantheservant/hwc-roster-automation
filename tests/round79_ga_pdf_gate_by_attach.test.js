@@ -42,16 +42,16 @@ const PEOPLE = ['P9701', 'P9702', 'P9703', 'P9704', 'P9705'].map((id) => ({ pers
 
 gas.findEmailTemplate_ = function () { return { attachType: TEMPLATE_ATTACH }; };
 gas.findEmailTemplateById_ = function () { return null; };
-gas.getConfig = function (_k, d) { return d; };
+gas.getConfig_ = function (_k, d) { return d; };
 gas.requireQuarterStage_ = function () {};
 gas.assertWebAppRequestAllowed_ = function () {};
 gas.listPeopleNeedingPersonalPdf_ = function () { return PEOPLE; };
 gas.listRosterPdfInfoForQuarter_ = function () { return new Map(); };   // 一份都冇
 gas.readPersonalPdfContentStamp_ = function () { return { updatedAt: '', timezone: 'UTC' }; };
 gas.buildAttachmentName_ = function (q, v, n) { return q + '_' + v + '_' + n + '.pdf'; };
-gas.findLatestVersionNo = function () { return 1; };
+gas.findLatestVersionNo_ = function () { return 1; };
 gas.ensurePublicLinkFreshBeforeSend_ = function () { return { republished: false }; };
-gas.sendStage = function () { sendCalled++; throw new Error('SEND_REACHED'); };
+gas.sendStage_ = function () { sendCalled++; throw new Error('SEND_REACHED'); };
 gas.log_ = function () {};
 
 function warnings(opts) { return gas.apiStep4GetMissingPdfWarnings(Q, 1, opts); }
@@ -70,7 +70,7 @@ console.log('\n=== GA1【核心】揀「不附」⇒ 唔擋 ===');
   check('★★★★★★ 前端問嘅檢查：applicable=false、blocked=false（唔使產生 58 份）',
     w.applicable === false && w.blocked === false && w.missingTotal === 0, JSON.stringify(w));
   const s = sendOutcome({ attachType: 'NONE', includeIcs: false });
-  check('★★★★★★ 後端閘門放行（行到 sendStage）', s.sent === true && s.blocked === false, s.msg);
+  check('★★★★★★ 後端閘門放行（行到 sendStage_）', s.sent === true && s.blocked === false, s.msg);
 }
 
 console.log('\n=== GA2：揀「整季 PDF」⇒ 唔查個人 PDF ===');

@@ -31,7 +31,7 @@ const gas = loadGasSource([
 
 // 姓名解析替身（一定要喺載入之後先設，理由見 state_source_authority.test.js）
 const PEOPLE = { 假甲: 'P9001', 假乙: 'P9002', 假丙: 'P9003', 假丁: 'P9004' };
-gas.resolvePersonId = function (name) { return PEOPLE[name] || null; };
+gas.resolvePersonId_ = function (name) { return PEOPLE[name] || null; };
 
 let fail = 0;
 function check(label, condition, extra) {

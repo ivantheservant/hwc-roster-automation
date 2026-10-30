@@ -213,7 +213,7 @@ function resolveRuleReviewWeeks_(timezone) {
   try {
     const D = COLUMNS.SERVICE_DATES;
     const byQuarter = {};
-    readSheet(SHEETS.SERVICE_DATES).forEach(function (row) {
+    readSheet_(SHEETS.SERVICE_DATES).forEach(function (row) {
       const q = String(row[D.QUARTER_ID] || '').trim();
       if (!q) return;
       byQuarter[q] = (byQuarter[q] || 0) + 1;
@@ -341,7 +341,7 @@ function describeMutexGroupsForReview_(groups) {
     //
     // 實測：`Posts` 入面 `CHAIR` 同 `COMMUNION` 兩行都有 `CHAIR_COMMUNION`，
     // 但匯出只列到「主席」——因為讀組員嗰段行咗
-    // `readPostsNormalized()`（會 filter `Active=TRUE`）。
+    // `readPostsNormalized_()`（會 filter `Active=TRUE`）。
     // 一個停用嘅組員靜靜消失之後，畫面上剩返一個成員嘅組
     // 睇落同「配置漏咗」一模一樣，而正確嘅下一步完全唔同。
     const members = g.members || null;
@@ -749,7 +749,7 @@ function describeRuleForReview_(rule, level, weeks, ctx) {
 /**
  * 砌出整份審閱表嘅內容（**純運算，唔碰 Drive**）。
  *
- * @param {Object[]} ruleRows `readSheet(SHEETS.RULE_SETTINGS)` 嘅結果
+ * @param {Object[]} ruleRows `readSheet_(SHEETS.RULE_SETTINGS)` 嘅結果
  * @param {?number} weeks 一季主日數
  * @param {?Object} ctx `{mutexGroups, gatedPosts}`；唔傳嘅話互斥組同身分要求
  *   嗰兩條會講「現時一組都沒有設」——所以呼叫端**一定要傳**

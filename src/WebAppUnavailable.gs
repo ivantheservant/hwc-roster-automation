@@ -36,14 +36,14 @@ function apiListUnavailable(quarterId, keyword) {
   try {
     const U = COLUMNS.UNAVAILABLE;
     const M = COLUMNS.NAME_MAPPING;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     // 第七十五輪批次 CM 組：每一筆標明「同揀咗嘅季度重唔重疊」，前端預設只顯示重疊而生效中嘅。
     const range = readQuarterDateRangeForUnavailable_(quarterId, timezone);
 
     const peopleById = {};
     const people = [];
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const id = String(row[M.PERSON_ID] || '').trim();
       if (!id) return;
       const entry = {
@@ -60,21 +60,21 @@ function apiListUnavailable(quarterId, keyword) {
     const past = [];
     // 第三十四輪批次乙3：新增第三組。**唔刪走**——一律停用不刪除。
     const cancelled = [];
-    readSheet(SHEETS.UNAVAILABLE).forEach(function (row) {
+    readSheet_(SHEETS.UNAVAILABLE).forEach(function (row) {
       const personId = String(row[U.PERSON_ID] || '').trim();
       if (!personId) return;
       const person = peopleById[personId];
       if (!matchesPeopleSearch_(keyword,
         [person ? person.nameTC : '', person ? person.nameEN : '', personId])) return;
 
-      const dateTo = toDateString(row[U.DATE_TO], timezone);
+      const dateTo = toDateString_(row[U.DATE_TO], timezone);
       const item = {
         unavailableId: String(row[U.UNAVAILABLE_ID] || '').trim(),
         personId: personId,
         // 名單上冇呢個人（例如已經改咗 PersonID）唔可以顯示做空白——
         // 空白會令幹事以為呢一行壞咗而想刪。
         personName: person ? person.nameTC : '（名單上找不到 ' + personId + '）',
-        dateFrom: toDateString(row[U.DATE_FROM], timezone),
+        dateFrom: toDateString_(row[U.DATE_FROM], timezone),
         dateTo: dateTo,
         appliesTo: String(row[U.APPLIES_TO] || UNAVAILABLE_VALUES.APPLIES_TO_ALL).trim(),
         postIds: splitList_(row[U.POST_IDS]),
@@ -118,7 +118,7 @@ function apiListUnavailable(quarterId, keyword) {
       quarterEnd: range ? range.end : '',
       people: people.filter(function (p) { return p.active; })
         .sort(function (a, b) { return a.nameTC < b.nameTC ? -1 : 1; }),
-      posts: readPosts().map(function (row) {
+      posts: readPosts_().map(function (row) {
         return {
           postId: row[COLUMNS.POSTS.POST_ID],
           postNameTC: row[COLUMNS.POSTS.POST_NAME_TC]
@@ -149,8 +149,8 @@ function readQuarterDateRangeForUnavailable_(quarterId, timezone) {
   try {
     const q = findQuarter_(String(quarterId || '').trim());
     if (!q) return null;
-    const start = toDateString(q[COLUMNS.QUARTERS.START_DATE], timezone);
-    const end = toDateString(q[COLUMNS.QUARTERS.END_DATE], timezone);
+    const start = toDateString_(q[COLUMNS.QUARTERS.START_DATE], timezone);
+    const end = toDateString_(q[COLUMNS.QUARTERS.END_DATE], timezone);
     return (start && end) ? { start: start, end: end } : null;
   } catch (err) {
     log_('WARN', 'readQuarterDateRangeForUnavailable_ 讀不到季度日期：' + err.message);
@@ -191,7 +191,7 @@ function unavailableOverlapsRange_(dateFrom, dateTo, range) {
 function apiPreviewUnavailableImpact(payload) {
   assertWebAppRequestAllowed_('apiPreviewUnavailableImpact');
   const p = payload || {};
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const from = parseUnavailableDate_(p.dateFrom, timezone, '開始日期');
   const to = parseUnavailableDate_(p.dateTo, timezone, '結束日期');
@@ -212,7 +212,7 @@ function apiPreviewUnavailableImpact(payload) {
     // 蓋住本季邊幾個主日
     let coveredDates = [];
     try {
-      coveredDates = readServiceDatesNormalized(p.quarterId, timezone)
+      coveredDates = readServiceDatesNormalized_(p.quarterId, timezone)
         .map(function (d) { return d.serviceDate; })
         .filter(function (d) { return d >= from.dateStr && d <= to.dateStr; });
     } catch (err) {
@@ -221,21 +221,21 @@ function apiPreviewUnavailableImpact(payload) {
 
     // 呢個人喺嗰幾日已經被排咗啲乜
     const conflicts = [];
-    const versionNo = findLatestVersionNo(p.quarterId);
+    const versionNo = findLatestVersionNo_(p.quarterId);
     if (versionNo >= 0 && coveredDates.length > 0) {
       const A = COLUMNS.ROSTER_ASSIGNMENTS;
       const postNames = {};
-      readPosts().forEach(function (row) {
+      readPosts_().forEach(function (row) {
         postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
       });
       const wantedPostIds = String(p.appliesTo || UNAVAILABLE_VALUES.APPLIES_TO_ALL)
         === UNAVAILABLE_VALUES.APPLIES_TO_ALL ? null : (p.postIds || []);
 
-      readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+      readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
         if (String(row[A.QUARTER_ID] || '').trim() !== p.quarterId) return;
         if (Number(row[A.VERSION_NO]) !== versionNo) return;
         if (String(row[A.PERSON_ID] || '').trim() !== String(p.personId || '').trim()) return;
-        const d = toDateString(row[A.SERVICE_DATE], timezone);
+        const d = toDateString_(row[A.SERVICE_DATE], timezone);
         if (coveredDates.indexOf(d) === -1) return;
         const postId = String(row[A.POST_ID] || '').trim();
         if (wantedPostIds && wantedPostIds.indexOf(postId) === -1) return;
@@ -274,7 +274,7 @@ function apiSaveUnavailable(payload) {
   assertWebAppRequestAllowed_();
   const p = payload || {};
   const U = COLUMNS.UNAVAILABLE;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const personId = String(p.personId || '').trim();
   if (!personId) {

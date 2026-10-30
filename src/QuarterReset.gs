@@ -112,7 +112,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
   // 可編輯副本／版本 PDF 資料夾要靠佢分「孤兒」（版本已經冇登記，例如上一次重設之前留低嘅）
   // 同「登記咗但今次唔清」（要保留）。
   const registeredVersionNos = {};
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     if (String(row[V.QUARTER_ID] || '').trim() !== quarterId) return;
     const versionNo = Number(row[V.VERSION_NO]);
     registeredVersionNos[versionNo] = true;
@@ -145,7 +145,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
 
   // ---- RosterAssignments：只算屬於這個季度、且版本在清理範圍內的行 ----
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (!versionNosToClear[Number(row[A.VERSION_NO])]) return;
     plan.assignmentRows++;
@@ -153,7 +153,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
 
   // ---- SendLog：這個季度的全部紀錄 ----
   const S = COLUMNS.SEND_LOG;
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[S.QUARTER_ID] || '').trim() !== quarterId) return;
     plan.sendLogRows++;
   });
@@ -161,7 +161,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
   // ---- Requests：這個季度的全部行 ----
   const R = COLUMNS.REQUESTS;
   try {
-    readSheet(SHEETS.REQUESTS).forEach(function (row) {
+    readSheet_(SHEETS.REQUESTS).forEach(function (row) {
       if (String(row[R.QUARTER_ID] || '').trim() !== quarterId) return;
       // 第八十五輪批次 LB 組：保留模式不刪，已處理的（有 RequestID 或 Status）變回未處理
       if (plan.keepManual) {
@@ -179,20 +179,20 @@ function planQuarterReset_(quarterId, includeV0, options) {
   // Unavailable 沒有 QuarterID 欄，只能靠日期範圍判斷屬於哪一季。
   const U = COLUMNS.UNAVAILABLE;
   const quarter = findQuarter_(quarterId);
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const quarterStart = quarter ? toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
-  const quarterEnd = quarter ? toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const quarterStart = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+  const quarterEnd = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
 
   if (!quarterStart || !quarterEnd) {
     plan.manualAttention.push('Quarters 找不到 ' + quarterId + ' 的起訖日期，'
       + '無法判斷 Unavailable 哪些行屬於這一季，因此 Unavailable 完全不清，請自行檢查。');
   } else {
     const nameById = readPersonNameIndex_();
-    readSheet(SHEETS.UNAVAILABLE).forEach(function (row) {
-      const dateFrom = toDateString(row[U.DATE_FROM], timezone);
+    readSheet_(SHEETS.UNAVAILABLE).forEach(function (row) {
+      const dateFrom = toDateString_(row[U.DATE_FROM], timezone);
       if (!dateFrom || dateFrom < quarterStart || dateFrom > quarterEnd) return;
       const source = String(row[U.SOURCE] || '').trim().toUpperCase();
-      const dateTo = toDateString(row[U.DATE_TO], timezone) || dateFrom;
+      const dateTo = toDateString_(row[U.DATE_TO], timezone) || dateFrom;
       // 第八十五輪批次 LB 組：保留模式 ⇒ 人手加入的（Source 不是 REQUEST）一律保留，有效的才列出
       if (plan.keepManual && source !== 'REQUEST') {
         if (isUnavailableRowActive_(row)) {
@@ -222,7 +222,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
         plan.unavailableManualDetails.push({
           personId: String(row[U.PERSON_ID] || '').trim(),
           dateFrom: dateFrom,
-          dateTo: toDateString(row[U.DATE_TO], timezone),
+          dateTo: toDateString_(row[U.DATE_TO], timezone),
           source: String(row[U.SOURCE] || '').trim() || '（空白）',
           appliesTo: String(row[U.APPLIES_TO] || '').trim(),
           postIds: String(row[U.POST_IDS] || '').trim(),
@@ -250,20 +250,20 @@ function planQuarterReset_(quarterId, includeV0, options) {
   // 變成合資格，而且因為 HistoricalCount=0，還會輕微改變配額與選人分數的正規化。
   try {
     const E = COLUMNS.ELIGIBILITY;
-    readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+    readSheet_(SHEETS.ELIGIBILITY).forEach(function (row) {
       if (String(row[E.SOURCE] || '').trim().toUpperCase() !== 'REQUEST') return;
       // 第二十二輪批次階段 B1／B2：Active 是 boolean，之前用
       // `String(row[E.ACTIVE] || '').trim()` 會把 `false` 吞成空字串
       // （`false || '' → ''`），畫面印出「Active=」睇落好似冇值。
       // AddedAt 是 Date 物件，之前直接 `String(dateObj)` 會印出完整
-      // 帶時區嘅英文長格式；改用 toDateString()（系統寫入嘅資料，
+      // 帶時區嘅英文長格式；改用 toDateString_()（系統寫入嘅資料，
       // 讀取路徑用寬鬆嘅那個函式，見它自己的檔頭說明）輸出 yyyy-MM-dd。
       plan.eligibilityRequestRows.push({
         eligibilityId: String(row[E.ELIGIBILITY_ID] || '').trim(),
         personId: String(row[E.PERSON_ID] || '').trim(),
         postId: String(row[E.POST_ID] || '').trim(),
         active: displayCellValue_(row[E.ACTIVE]),
-        addedAt: toDateString(row[E.ADDED_AT], timezone)
+        addedAt: toDateString_(row[E.ADDED_AT], timezone)
       });
     });
     if (plan.eligibilityRequestRows.length > 0) {
@@ -344,7 +344,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
     const publicLinksSheet = ss.getSheetByName(SHEETS.PUBLIC_LINKS);
     if (publicLinksSheet) {
       const C = COLUMNS.PUBLIC_LINKS;
-      const row = readSheet(SHEETS.PUBLIC_LINKS).find(function (r) {
+      const row = readSheet_(SHEETS.PUBLIC_LINKS).find(function (r) {
         return String(r[C.QUARTER_ID] || '').trim() === quarterId;
       });
       if (row && String(row[C.FILE_ID] || '').trim()) {
@@ -361,7 +361,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
   // 自動搬走舊嘅，見 archiveOldProposals_()），但封存表只會不斷累積、需要按季度清。
   try {
     const FT = COLUMNS.FINE_TUNE_PROPOSALS;
-    plan.fineTuneProposalRows = readSheet(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
+    plan.fineTuneProposalRows = readSheet_(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
       return String(row[FT.QUARTER_ID] || '').trim() === quarterId;
     }).length;
   } catch (err) {
@@ -371,7 +371,7 @@ function planQuarterReset_(quarterId, includeV0, options) {
     const ftArchiveSheet = ss.getSheetByName(FINETUNE_ARCHIVE_SHEET);
     if (ftArchiveSheet) {
       const FT = COLUMNS.FINE_TUNE_PROPOSALS;
-      plan.fineTuneProposalArchiveRows = readSheet(FINETUNE_ARCHIVE_SHEET).filter(function (row) {
+      plan.fineTuneProposalArchiveRows = readSheet_(FINETUNE_ARCHIVE_SHEET).filter(function (row) {
         return String(row[FT.QUARTER_ID] || '').trim() === quarterId;
       }).length;
     }
@@ -464,15 +464,15 @@ function executeQuarterReset_(plan) {
   //      日期完全落在這一季之內的行（任何 Source、任何狀態）。跨季的人手紀錄照舊不刪。
   if (plan.unavailableRequestRows > 0 || (plan.unavailableInQuarterDetails || []).length > 0) {
     const U = COLUMNS.UNAVAILABLE;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const quarter = findQuarter_(plan.quarterId);
-    const quarterStart = quarter ? toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
-    const quarterEnd = quarter ? toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
+    const quarterStart = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+    const quarterEnd = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
     if (quarterStart && quarterEnd) {
       result.unavailableRowsDeleted = deleteRowsMatching_(SHEETS.UNAVAILABLE, function (record) {
-        const dateFrom = toDateString(record[U.DATE_FROM], timezone);
+        const dateFrom = toDateString_(record[U.DATE_FROM], timezone);
         if (!dateFrom || dateFrom < quarterStart || dateFrom > quarterEnd) return false;
-        const dateTo = toDateString(record[U.DATE_TO], timezone) || dateFrom;
+        const dateTo = toDateString_(record[U.DATE_TO], timezone) || dateFrom;
         const isRequest = String(record[U.SOURCE] || '').trim().toUpperCase() === 'REQUEST';
         // 第八十五輪批次 LB 組：保留模式只清由申報自動加入的
         if (plan.keepManual) return isRequest;
@@ -968,7 +968,7 @@ function planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, time
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   try {
     if (ss.getSheetByName(SHEETS.CELL_DECISIONS)) {
-      plan.cellDecisionRows = readSheet(SHEETS.CELL_DECISIONS).filter(function (r) {
+      plan.cellDecisionRows = readSheet_(SHEETS.CELL_DECISIONS).filter(function (r) {
         return String(r[COLUMNS.CELL_DECISIONS.QUARTER_ID] || '').trim() === quarterId;
       }).length;
     }
@@ -982,23 +982,23 @@ function planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, time
   }
   try {
     const D = COLUMNS.SERVICE_DATES;
-    readSheet(SHEETS.SERVICE_DATES).forEach(function (r) {
+    readSheet_(SHEETS.SERVICE_DATES).forEach(function (r) {
       if (String(r[D.QUARTER_ID] || '').trim() !== quarterId) return;
       if (String(r[D.TITLE] === null || r[D.TITLE] === undefined ? '' : r[D.TITLE]).trim() === '') return;
       // 第八十五輪批次 LB 組：保留模式不清每週標題，只記數目
-      (plan.keepManual ? plan.keptWeekTitleDates : plan.weekTitleDates).push(toDateString(r[D.SERVICE_DATE], timezone));
+      (plan.keepManual ? plan.keptWeekTitleDates : plan.weekTitleDates).push(toDateString_(r[D.SERVICE_DATE], timezone));
     });
-    readSheet(SHEETS.SERVICE_DATES).forEach(function (r) {
+    readSheet_(SHEETS.SERVICE_DATES).forEach(function (r) {
       if (String(r[D.QUARTER_ID] || '').trim() !== quarterId) return;
       if (String(r[D.COMBINED_KIND] === null || r[D.COMBINED_KIND] === undefined ? '' : r[D.COMBINED_KIND]).trim() === '') return;
-      (plan.keepManual ? plan.keptCombinedDates : plan.combinedDates).push(toDateString(r[D.SERVICE_DATE], timezone));
+      (plan.keepManual ? plan.keptCombinedDates : plan.combinedDates).push(toDateString_(r[D.SERVICE_DATE], timezone));
     });
   } catch (err) {
     plan.manualAttention.push('檢查每週標題（ServiceDates.Title）失敗，這一項不清：' + err.message);
   }
   try {
     plan.releasedKeyCount = Object.keys(
-      readReleasedHardViolationKeys_(readSheet(SHEETS.AUDIT_LOG), quarterId)).length;
+      readReleasedHardViolationKeys_(readSheet_(SHEETS.AUDIT_LOG), quarterId)).length;
   } catch (err) {
     plan.manualAttention.push('檢查放行紀錄失敗：' + err.message);
   }
@@ -1008,11 +1008,11 @@ function planQuarterResetExtras_(plan, quarterId, quarterStart, quarterEnd, time
       const X = COLUMNS.PERSON_POST_EXCLUSIONS;
       const names = readPersonNameIndex_();
       const postNames = {};
-      readPostsNormalized().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
-      readSheet(SHEETS.PERSON_POST_EXCLUSIONS).forEach(function (r) {
+      readPostsNormalized_().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+      readSheet_(SHEETS.PERSON_POST_EXCLUSIONS).forEach(function (r) {
         if (r[X.ACTIVE] !== undefined && r[X.ACTIVE] !== '' && !isTrueValue_(r[X.ACTIVE])) return;
-        const from = toDateString(r[X.EFFECTIVE_FROM], timezone);
-        const to = toDateString(r[X.EFFECTIVE_TO], timezone);
+        const from = toDateString_(r[X.EFFECTIVE_FROM], timezone);
+        const to = toDateString_(r[X.EFFECTIVE_TO], timezone);
         if (from && from > quarterEnd) return;
         if (to && to < quarterStart) return;
         const id = String(r[X.PERSON_ID] || '').trim();

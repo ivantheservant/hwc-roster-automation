@@ -128,34 +128,34 @@ console.log('\n=== H【核心】設定本身有問題 ⇒ 拋錯，唔可以當�
 {
   // ⚠️ 當成「冇設定」＝ 喺應該轉寄嘅時候真係寄咗俾義工。
   // 呢個係唯一一個「寧可寄唔出」嘅情況。
-  gas.getConfig = function () { return '唔係一個電郵'; };
+  gas.getConfig_ = function () { return '唔係一個電郵'; };
   let threw = null;
   try { gas.readMailRedirectTarget_(); } catch (e) { threw = e; }
   check('★★★★★ 填咗一個唔似電郵嘅值 ⇒ 拋錯', threw !== null);
   check('★★★★ 而且講「一封都冇寄出」',
     threw && threw.message.indexOf('一封都沒有寄出') !== -1, threw && threw.message);
 
-  gas.getConfig = function () { return '  '; };
+  gas.getConfig_ = function () { return '  '; };
   checkEqual('★★★★★ 空白（含只有空格）⇒ 回空字串，即係正常運作',
     gas.readMailRedirectTarget_(), '');
 
-  gas.getConfig = function () { return 'ivan@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid'; };
   checkEqual('★★★★ 正常值 ⇒ 原樣回', gas.readMailRedirectTarget_(), 'ivan@example.invalid');
 }
 
 console.log('\n=== H：介面標籤 ===');
 {
-  gas.getConfig = function () { return ''; };
+  gas.getConfig_ = function () { return ''; };
   checkEqual('★★★★★ 冇設定 ⇒ 冇標籤（空字串）', gas.buildMailRedirectBadgeText_(), '');
 
-  gas.getConfig = function () { return 'ivan@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid'; };
   const badge = gas.buildMailRedirectBadgeText_();
   check('★★★★★ 有設定 ⇒ 一定要有標籤，而且寫住寄去邊'
     + '——**唔可以靜靜生效**，佢最壞嘅失敗方式係「唔記得閂」',
     badge.indexOf('ivan@example.invalid') !== -1 && badge.indexOf('全部信件轉寄') !== -1,
     badge);
 
-  gas.getConfig = function () { return '亂噏'; };
+  gas.getConfig_ = function () { return '亂噏'; };
   const bad = gas.buildMailRedirectBadgeText_();
   check('★★★★★ 設定有問題都要有標籤，唔可以靜靜變返「冇設定」',
     bad !== '' && bad.indexOf('有問題') !== -1, bad);
@@ -239,7 +239,7 @@ console.log('\n=== H：Config 有 seed，而且說明講得出用途同風險 ==
 // 就回 `false`（它本來就係驗**一個**地址嘅）。
 console.log('\n=== E【核心】兩個地址用逗號分隔 ⇒ 唔再拋錯 ===');
 {
-  gas.getConfig = function () { return 'ivan@example.invalid, helper@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid, helper@example.invalid'; };
   let threw = null;
   let targets = null;
   try { targets = gas.readMailRedirectTargets_(); } catch (e) { threw = e; }
@@ -265,7 +265,7 @@ console.log('\n=== E 分隔符要收得闊（幹事喺一格入面點打都算�
     ['淨係空格', 'a@example.invalid b@example.invalid'],
     ['前後有多餘空白', '  a@example.invalid ,  b@example.invalid  ']
   ].forEach(function (pair) {
-    gas.getConfig = function () { return pair[1]; };
+    gas.getConfig_ = function () { return pair[1]; };
     checkEqual('★★★★ ' + pair[0], gas.readMailRedirectTargets_(), expected);
   });
   check('★★★★★ 只認半形逗號係唔夠嘅'
@@ -276,7 +276,7 @@ console.log('\n=== E 分隔符要收得闊（幹事喺一格入面點打都算�
 
 console.log('\n=== E【核心】有一個打錯 ⇒ **整批拋**，唔可以「寄得到嗰幾個先寄」 ===');
 {
-  gas.getConfig = function () { return 'ivan@example.invalid, 打錯咗, b@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid, 打錯咗, b@example.invalid'; };
   let threw = null;
   try { gas.readMailRedirectTargets_(); } catch (e) { threw = e; }
   check('★★★★★ 有拋錯', threw !== null);
@@ -296,31 +296,31 @@ console.log('\n=== E【核心】有一個打錯 ⇒ **整批拋**，唔可以「
 
 console.log('\n=== E 幾個邊界 ===');
 {
-  gas.getConfig = function () { return 'ivan@example.invalid, ivan@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid, ivan@example.invalid'; };
   checkEqual('★★★★ 同一個地址填兩次 ⇒ 只寄一次（唔算錯，但唔好寄兩封）',
     gas.readMailRedirectTargets_(), ['ivan@example.invalid']);
 
-  gas.getConfig = function () { return '  '; };
+  gas.getConfig_ = function () { return '  '; };
   checkEqual('★★★★★ 空白 ⇒ 空陣列，即係正常運作（行為同修正之前一樣）',
     gas.readMailRedirectTargets_(), []);
   checkEqual('★★★★★ 而 `readMailRedirectTarget_()` 照樣回空字串',
     gas.readMailRedirectTarget_(), '');
 
-  gas.getConfig = function () { return ',,、;'; };
+  gas.getConfig_ = function () { return ',,、;'; };
   let threw = null;
   try { gas.readMailRedirectTargets_(); } catch (e) { threw = e; }
   check('★★★★★ 成格得幾個分隔符 ⇒ **拋錯**，唔可以當成「冇設定」'
     + '——當成冇設定就會喺應該轉寄嘅時候真係寄咗俾義工',
     threw !== null, '');
 
-  gas.getConfig = function () { return 'ivan@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid'; };
   checkEqual('★★★★★ 填一個嘅時候，行為同修正之前一模一樣',
     gas.readMailRedirectTarget_(), 'ivan@example.invalid');
 }
 
 console.log('\n=== E 標籤同上線前檢查都要逐個列出嚟 ===');
 {
-  gas.getConfig = function () { return 'ivan@example.invalid、helper@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid、helper@example.invalid'; };
   const badge = gas.buildMailRedirectBadgeText_();
   check('★★★★★ 標籤**逐個列出**，唔係淨係講「2 個地址」'
     + '——呢個標籤唯一嘅用途就係俾幹事一眼認得出「呢個唔係我要嘅設定」；'
@@ -329,7 +329,7 @@ console.log('\n=== E 標籤同上線前檢查都要逐個列出嚟 ===');
     && badge.indexOf('helper@example.invalid') !== -1, badge);
   check('★★★★ 而且順便講埋共幾多個', badge.indexOf('共 2 個地址') !== -1, badge);
 
-  gas.getConfig = function () { return 'ivan@example.invalid'; };
+  gas.getConfig_ = function () { return 'ivan@example.invalid'; };
   const one = gas.buildMailRedirectBadgeText_();
   check('★★★★ 得一個嗰陣唔好畫蛇添足講「共 1 個地址」',
     one.indexOf('共 1 個') === -1 && one.indexOf('ivan@example.invalid') !== -1, one);

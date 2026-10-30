@@ -134,13 +134,13 @@ console.log('\n=== AU2 apiGetLastReviewSendOptions：回 PICK 選項；已不在
       ['rev@example.invalid', 'typed@example.invalid']));
   gas.readRolesSafe_ = function () { return []; };
   gas.Utilities = { formatDate: function (d) { return new Date(d).toISOString().slice(0, 10) + ' ' + new Date(d).toISOString().slice(11, 16); } };
-  gas.getConfig = function (_k, d) { return d; };
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.getConfig_ = function (_k, d) { return d; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.beginSheetReadMemo_ = function () {};
   gas.endSheetReadMemo_ = function () {};
   gas.assertWebAppRequestAllowed_ = function () {};
   let log = sendLog;
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.EMAIL_RECIPIENTS) return [listRow('rev@example.invalid', '審閱丙', 'REVIEW', 'REVIEWER')];
     if (name === gas.SHEETS.SEND_LOG) return log;
     return [];
@@ -226,7 +226,7 @@ console.log('\n=== AU3 畫面：句子按實際情況寫；〔改為再寄一次
     check('★★★★★ SendLog 整個檔仍然只讀一次（WebAppDashboard.gs 嘅規矩）',
       (read('src/WebAppDashboard.gs').split('\n')
         .filter(function (l) { return !/^\s*(\/\/|\*|\/\*)/.test(l); }).join('\n')
-        .match(/readSheet\(SHEETS\.SEND_LOG\)/g) || []).length === 1, '');
+        .match(/readSheet_\(SHEETS\.SEND_LOG\)/g) || []).length === 1, '');
     console.log(fail === 0 ? 'OK' : fail + ' FAILURE(S)');
     process.exit(fail === 0 ? 0 : 1);
   });

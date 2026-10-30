@@ -125,10 +125,10 @@ console.log('\n=== Z：處理結果、儲存完成畫面都講 ===');
     const r = {}; r[A.QUARTER_ID] = '2099T1'; r[A.VERSION_NO] = 2; r[A.SERVICE_DATE] = date;
     r[A.POST_ID] = postId; r[A.SLOT_INDEX] = slot; r[A.PERSON_ID] = personId; return r;
   };
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [row(D1, 'CHAIR', 1, 'P9701'), row(D1, 'USHER', 1, 'P9701'), row(D2, 'USHER', 2, 'P9702')];
   };
-  gas.getConfig = function (_k, d) { return d; };
+  gas.getConfig_ = function (_k, d) { return d; };
   const diffs = [
     { serviceDate: D1, postId: 'USHER', slotIndex: 1, fromName: '假九', toName: '假一', fromPersonId: 'P9799', toPersonId: 'P9701' },
     { serviceDate: D2, postId: 'USHER', slotIndex: 2, fromName: '假三', toName: '假二', fromPersonId: 'P9703', toPersonId: 'P9702' }

@@ -104,12 +104,12 @@ function runPlan(grid, postsOverride) {
       };
     }
   };
-  gas.readPostsNormalized = function () {
+  gas.readPostsNormalized_ = function () {
     return postsOverride
       || [{ postId: 'SOUND', postNameTC: '音響' }, { postId: 'USHER', postNameTC: '司事' }];
   };
-  gas.readEligibility = function () { return { byPost: JSON.parse(JSON.stringify(BEFORE)) }; };
-  gas.readPeople = function () {
+  gas.readEligibility_ = function () { return { byPost: JSON.parse(JSON.stringify(BEFORE)) }; };
+  gas.readPeople_ = function () {
     return PEOPLE.map(function (p) {
       const row = {};
       row[gas.COLUMNS.NAME_MAPPING.PERSON_ID] = p.personId;
@@ -117,10 +117,10 @@ function runPlan(grid, postsOverride) {
       return row;
     });
   };
-  // ⚠️ `resolvePersonId()` 係「名 → 既有 ID」嘅唯一入口。
+  // ⚠️ `resolvePersonId_()` 係「名 → 既有 ID」嘅唯一入口。
   // 呢度**唔會**幫佢開新 ID——如果正式碼喺搵唔到嗰陣走去開一個，
   // 下面 `createdIds` 就會有嘢，而嗰個正正就係 Ivan 驚嗰件事。
-  gas.resolvePersonId = function (name) {
+  gas.resolvePersonId_ = function (name) {
     const hit = PEOPLE.filter(function (p) { return p.nameTC === String(name).trim(); })[0];
     return hit ? hit.personId : null;
   };
@@ -128,9 +128,9 @@ function runPlan(grid, postsOverride) {
     createdIds.push('（有人叫過開新 ID）');
     return 'P9999';
   };
-  gas.findLatestVersionNo = function () { return -1; };
-  gas.getConfig = function (_k, d) { return d; };
-  gas.readSheet = function () { return []; };
+  gas.findLatestVersionNo_ = function () { return -1; };
+  gas.getConfig_ = function (_k, d) { return d; };
+  gas.readSheet_ = function () { return []; };
 
   return { plan: gas.planEligibilitySheetApply_('2027T3'), createdIds: createdIds };
 }

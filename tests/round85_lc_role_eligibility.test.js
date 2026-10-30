@@ -78,12 +78,12 @@ function scene(opts) {
   return sc;
 }
 const readOn = (sc, versionNo) => sc.rows(versionNo).filter((r) => r[sc.A.POST_ID] === 'READ')
-  .map((r) => ({ d: sc.gas.toDateString(r[sc.A.SERVICE_DATE], sc.TZ), p: String(r[sc.A.PERSON_ID] || '') }));
+  .map((r) => ({ d: sc.gas.toDateString_(r[sc.A.SERVICE_DATE], sc.TZ), p: String(r[sc.A.PERSON_ID] || '') }));
 
 console.log('\n=== LC1：讀取 ===');
 {
   const sc = scene();
-  const e = sc.gas.readEligibility();
+  const e = sc.gas.readEligibility_();
   check('★★★★★ rolesByPost.READ＝[COMMITTEE]', JSON.stringify(e.rolesByPost.READ) === '["COMMITTEE"]', JSON.stringify(e.rolesByPost));
   check('★★★★★ byPost.READ 只有真人（P9704），沒有代號', JSON.stringify(e.byPost.READ) === '["P9704"]', JSON.stringify(e.byPost.READ));
   check('★★★★ 停用那一行的歷史次數在 historicalCountAll', e.historicalCountAll.READ.P9701 === 7);
@@ -199,7 +199,7 @@ console.log('\n=== LC7：畫面 ===');
   check('★★★★ 「堂委」本來就在名單 ⇒ 沒有被當成新增或移除',
     !plan.added.concat(plan.removed).some((x) => x.personId === 'ROLE:COMMITTEE'), JSON.stringify(plan));
   gas.apiApplyEligibilitySheet_locked_(sc.Q);
-  check('★★★★★ 套用之後 Eligibility 有 ROLE:DEACON 那一行', JSON.stringify(gas.readEligibility().rolesByPost.READ.sort()) === '["COMMITTEE","DEACON"]');
+  check('★★★★★ 套用之後 Eligibility 有 ROLE:DEACON 那一行', JSON.stringify(gas.readEligibility_().rolesByPost.READ.sort()) === '["COMMITTEE","DEACON"]');
   // 崗位資格逐格畫面
   const m = gas.apiGetEligibilityMatrix();
   const roleRow = m.people.filter((p) => p.personId === 'ROLE:COMMITTEE')[0];

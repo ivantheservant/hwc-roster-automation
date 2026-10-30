@@ -119,17 +119,17 @@ function applyRequestsValidations_(sheet, quarterId) {
   const postCol = keys.indexOf(COLUMNS.REQUESTS.POST_NAME) + 1;
   const personCol = keys.indexOf(COLUMNS.REQUESTS.PERSON_NAME) + 1;
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   // ⚠️ 第六十三輪批次 E 組：QuarterID 欄都要下拉（之前冇），季度同日期下拉
   // 用同一個 `selectValidQuarterIdsForRequests_()`——兩邊唔可以各揀一套。
   const quarterOptions = selectValidQuarterIdsForRequests_(
-    readSheet(SHEETS.QUARTERS), quarterId, toDateString(new Date(), timezone), timezone);
+    readSheet_(SHEETS.QUARTERS), quarterId, toDateString_(new Date(), timezone), timezone);
   // 第十九輪批次階段 F1：`Requests` 係**跨季度共用嘅一張表**，
   // 但日期下拉選單之前只讀一個季度，所以幹事處理 2026T4 嘅申報嗰陣，
   // 選單只有 2027T1 嘅日期，要人手打字，打完格右上角出紅色三角。
   const dateOptions = collectRequestDateOptions_(quarterId, timezone);
-  const postOptions = readPostsNormalized().map(function (p) { return p.postNameTC; });
-  const personOptions = readPeople().map(function (row) { return row[COLUMNS.NAME_MAPPING.NAME_TC]; });
+  const postOptions = readPostsNormalized_().map(function (p) { return p.postNameTC; });
+  const personOptions = readPeople_().map(function (row) { return row[COLUMNS.NAME_MAPPING.NAME_TC]; });
 
   const dataRowCount = Math.max(1, sheet.getMaxRows() - 2);
   applyWarningListValidation_(sheet, quarterCol, dataRowCount, quarterOptions);
@@ -320,7 +320,7 @@ function cleanRequestsTampering_(plan) {
  *
  * `Requests` 唔係逐季一張表，係**跨季度共用嘅一張表**（申報入面有
  * QuarterID 欄）。但 `applyRequestsValidations_()` 之前用
- * `readServiceDatesNormalized(quarterId, ...)`，一次只讀一個季度。
+ * `readServiceDatesNormalized_(quarterId, ...)`，一次只讀一個季度。
  *
  * 實測後果：幹事處理 2026T4 嘅申報嗰陣，選單只有 2027T1 嘅日期，
  * 要人手打字，打完格右上角出紅色三角（驗證警告）。功能上唔擋輸入，
@@ -351,14 +351,14 @@ function cleanRequestsTampering_(plan) {
  * @returns {string[]} 排好序、去重之後嘅日期字串
  */
 function collectRequestDateOptions_(focusQuarterId, timezone) {
-  const todayStr = toDateString(new Date(), timezone);
+  const todayStr = toDateString_(new Date(), timezone);
   const quarterIds = selectValidQuarterIdsForRequests_(
-    readSheet(SHEETS.QUARTERS), focusQuarterId, todayStr, timezone);
+    readSheet_(SHEETS.QUARTERS), focusQuarterId, todayStr, timezone);
 
   const seen = {};
   const dates = [];
   quarterIds.forEach(function (qid) {
-    readServiceDatesNormalized(qid, timezone).forEach(function (d) {
+    readServiceDatesNormalized_(qid, timezone).forEach(function (d) {
       if (!d.serviceDate || seen[d.serviceDate]) return;
       seen[d.serviceDate] = true;
       dates.push(d.serviceDate);
@@ -373,7 +373,7 @@ function collectRequestDateOptions_(focusQuarterId, timezone) {
  * 揀出「仍然有效」嘅季度 ID。抽做純函式係為咗測得到——
  * 準則本身係一個判斷，唔應該困喺一個要讀試算表嘅函式入面。
  *
- * @param {Array[]} quarterRows `readSheet(SHEETS.QUARTERS)` 嘅結果
+ * @param {Array[]} quarterRows `readSheet_(SHEETS.QUARTERS)` 嘅結果
  * @param {string} focusQuarterId 一定要納入嘅季度
  * @param {string} todayStr 今日（yyyy-MM-dd）
  * @param {string} timezone 時區
@@ -386,7 +386,7 @@ function selectValidQuarterIdsForRequests_(quarterRows, focusQuarterId, todayStr
   (quarterRows || []).forEach(function (row) {
     const qid = row[COLUMNS.QUARTERS.QUARTER_ID];
     if (!qid) return;
-    const endDate = toDateString(row[COLUMNS.QUARTERS.END_DATE], timezone);
+    const endDate = toDateString_(row[COLUMNS.QUARTERS.END_DATE], timezone);
     // 讀唔到 EndDate 就當佢有效——寧可多幾個日期選項，
     // 都好過因為一格空白而令成個季度喺選單度消失（缺失唔應該
     // 被當成「已過期」呢個有意義嘅答案，見第十八輪批次）。

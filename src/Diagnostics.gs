@@ -441,7 +441,7 @@ function tryWriteDiagnosticsDetailed_(reportName, rows) {
  */
 function collectKeyStateRows_() {
   const rows = [];
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const section = function (name, fn) {
     try {
@@ -457,11 +457,11 @@ function collectKeyStateRows_() {
   section('Quarters', function () {
     const Q = COLUMNS.QUARTERS;
     const V = COLUMNS.ROSTER_VERSIONS;
-    const quarters = readSheet(SHEETS.QUARTERS);
+    const quarters = readSheet_(SHEETS.QUARTERS);
     if (quarters.length === 0) rows.push(diagRow_('Quarters', '（沒有資料）', '', ''));
 
     const versionsByQuarter = {};
-    readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (v) {
+    readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (v) {
       const qId = String(v[V.QUARTER_ID] || '').trim();
       if (!qId) return;
       if (!versionsByQuarter[qId]) versionsByQuarter[qId] = [];
@@ -475,11 +475,11 @@ function collectKeyStateRows_() {
       const latestVersionNo = versionNos.length > 0 ? Math.max.apply(null, versionNos) : -1;
       rows.push(diagRow_('Quarters', quarterId,
         String(q[Q.STAGE] || '（空白，視同 DRAFT）'),
-        'StageUpdatedAt=' + (toDateString(q[Q.STAGE_UPDATED_AT], timezone) || String(q[Q.STAGE_UPDATED_AT] || '（空白）'))
-          + '　StartDate=' + toDateString(q[Q.START_DATE], timezone)
-          + '　EndDate=' + toDateString(q[Q.END_DATE], timezone)
-          + '　GenerateOn=' + (toDateString(q[Q.GENERATE_ON], timezone) || '（空白，執行時退回 LEAD_DAYS_GENERATE 推算）')
-          + '　OfficialSendOn=' + (toDateString(q[Q.OFFICIAL_SEND_ON], timezone) || '（空白，執行時退回 LEAD_DAYS_OFFICIAL 推算）')
+        'StageUpdatedAt=' + (toDateString_(q[Q.STAGE_UPDATED_AT], timezone) || String(q[Q.STAGE_UPDATED_AT] || '（空白）'))
+          + '　StartDate=' + toDateString_(q[Q.START_DATE], timezone)
+          + '　EndDate=' + toDateString_(q[Q.END_DATE], timezone)
+          + '　GenerateOn=' + (toDateString_(q[Q.GENERATE_ON], timezone) || '（空白，執行時退回 LEAD_DAYS_GENERATE 推算）')
+          + '　OfficialSendOn=' + (toDateString_(q[Q.OFFICIAL_SEND_ON], timezone) || '（空白，執行時退回 LEAD_DAYS_OFFICIAL 推算）')
           + '　最新版本=' + (latestVersionNo >= 0 ? 'v' + latestVersionNo : '（尚未生成）')
           + '　版本總數=' + versionNos.length));
     });
@@ -488,7 +488,7 @@ function collectKeyStateRows_() {
   // ---- RosterVersions：最新五個版本 ----
   section('RosterVersions', function () {
     const V = COLUMNS.ROSTER_VERSIONS;
-    const versions = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (v) {
+    const versions = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (v) {
       return String(v[V.QUARTER_ID] || '').trim() !== '';
     });
     rows.push(diagRow_('RosterVersions', '（全表版本總數）', versions.length, ''));
@@ -510,14 +510,14 @@ function collectKeyStateRows_() {
         'WarningCount=' + String(v[V.WARNING_COUNT] || 0)
           + '　Parent=v' + displayCellValue_(v[V.PARENT_VERSION_NO])
           + '　Protected=' + displayCellValue_(v[V.PROTECTED])
-          + '　CreatedAt=' + toDateString(v[V.CREATED_AT], timezone)));
+          + '　CreatedAt=' + toDateString_(v[V.CREATED_AT], timezone)));
     });
   });
 
   // ---- SendLog：每個批次的統計（不逐行） ----
   section('SendLog', function () {
     const S = COLUMNS.SEND_LOG;
-    const logs = readSheet(SHEETS.SEND_LOG);
+    const logs = readSheet_(SHEETS.SEND_LOG);
     rows.push(diagRow_('SendLog', '（全表紀錄總數）', logs.length, ''));
 
     const batches = {};
@@ -579,7 +579,7 @@ function collectKeyStateRows_() {
     const R = COLUMNS.REQUESTS;
     let requests;
     try {
-      requests = readSheet(SHEETS.REQUESTS);
+      requests = readSheet_(SHEETS.REQUESTS);
     } catch (err) {
       rows.push(diagRow_('Requests', '（工作表不存在）', '', '請先執行「維護 ▸ 建立 Requests 工作表」'));
       return;
@@ -590,7 +590,7 @@ function collectKeyStateRows_() {
     const statusCounts = {};
     const quarterCounts = {};
     requests.forEach(function (r) {
-      const dateText = toDateString(r[R.SERVICE_DATE], timezone);
+      const dateText = toDateString_(r[R.SERVICE_DATE], timezone);
       const person = String(r[R.PERSON_NAME] || '').trim();
       const post = String(r[R.POST_NAME] || '').trim();
       const type = String(r[R.REQUEST_TYPE] || '').trim();
@@ -617,13 +617,13 @@ function collectKeyStateRows_() {
   // ---- Unavailable：全部行（這張表細） ----
   section('Unavailable', function () {
     const U = COLUMNS.UNAVAILABLE;
-    const unavailable = readSheet(SHEETS.UNAVAILABLE);
+    const unavailable = readSheet_(SHEETS.UNAVAILABLE);
     rows.push(diagRow_('Unavailable', '（資料列總數）', unavailable.length, ''));
     unavailable.forEach(function (u) {
       const personId = String(u[U.PERSON_ID] || '').trim();
       if (!personId) return;
       rows.push(diagRow_('Unavailable', personId,
-        toDateString(u[U.DATE_FROM], timezone) + ' → ' + toDateString(u[U.DATE_TO], timezone),
+        toDateString_(u[U.DATE_FROM], timezone) + ' → ' + toDateString_(u[U.DATE_TO], timezone),
         'AppliesTo=' + String(u[U.APPLIES_TO] || '')
           + '　PostIDs=' + String(u[U.POST_IDS] || '（空白）')
           + '　Source=' + String(u[U.SOURCE] || '')
@@ -649,7 +649,7 @@ function collectKeyStateRows_() {
       byVersion[key].count++;
       if (byVersion[key].minSize === null || size < byVersion[key].minSize) byVersion[key].minSize = size;
     });
-    const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+    const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
     Object.keys(byVersion).sort().forEach(function (key) {
       const v = byVersion[key];
       const flag = (v.minSize !== null && v.minSize < minBytes) ? '⚠️ 低於門檻 ' + minBytes + ' bytes' : '';
@@ -686,7 +686,7 @@ function collectKeyStateRows_() {
   // 統一標註「Config 未設定，用預設值」，不再是這裡自己一套 undefined 判斷）----
   section('自動排程 Trigger', function () {
     const triggers = listAutomationTriggers_();
-    const config = readConfig();
+    const config = readConfig_();
     const sendHour = describeConfigValue_(config, CONFIG_KEYS.SEND_HOUR_LOCAL, 9);
     const tz = describeConfigValue_(config, CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     rows.push(diagRow_('自動排程 Trigger', '（目前安裝數量）', triggers.length,
@@ -700,7 +700,7 @@ function collectKeyStateRows_() {
   // Key；階段 A（第五輪批次）全部改用 describeConfigValue_()——原本 DRY_RUN／
   // WEBAPP_ENABLED 兩個是直接 String(config[KEY])，Config 工作表沒有登記這個
   // Key 時會顯示字面文字「undefined」，行為本身安全（其他地方都是用
-  // getConfig() 取得正確的生效值），但這份報告顯示的內容具誤導性。現在統一
+  // getConfig_() 取得正確的生效值），但這份報告顯示的內容具誤導性。現在統一
   // 顯示「實際生效的值」，並在使用了程式碼預設值時明確標註，不會再有任何一個
   // 值顯示成 undefined／null／看起來空白卻沒有說明）----
   // ---- PersonPostWeight：排表偏好（第二十七輪批次階段 B1）----
@@ -738,14 +738,14 @@ function collectKeyStateRows_() {
     // 已解除嘅只出總數——保留紀錄係為咗日後查「當時點決定」，
     // 唔係為咗每次都印一次。
     const released = all.filter(function (row) {
-      return toDateString(row[W.EFFECTIVE_TO], timezone) !== '';
+      return toDateString_(row[W.EFFECTIVE_TO], timezone) !== '';
     });
     rows.push(diagRow_('PersonPostWeight', '（已解除，保留紀錄）', released.length,
       '解除＝填了 EffectiveTo，不是刪行'));
   });
 
   section('Config', function () {
-    const config = readConfig();
+    const config = readConfig_();
     const dryRun = describeConfigValue_(config, CONFIG_KEYS.DRY_RUN, true);
     rows.push(diagRow_('Config', CONFIG_KEYS.DRY_RUN, dryRun.display,
       dryRun.value === false ? '⚠️ FALSE 代表會真正寄出電郵' : 'TRUE 代表不會真正寄出'));

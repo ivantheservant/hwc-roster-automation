@@ -65,7 +65,7 @@ let SEND_LOG = [
 ];
 const RA_ROWS = [raRow(5, 'P9801'), raRow(5, 'P9801'), raRow(5, 'P9803'), raRow(5, 'P9804'),
   raRow(6, 'P9801'), raRow(6, 'P9802'), raRow(6, 'P9803'), raRow(6, 'P9804')];
-gas.readSheet = function (name) {
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.SEND_LOG) return SEND_LOG;
   if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) return RA_ROWS;
   return [];
@@ -84,8 +84,8 @@ const baseline = gas.readResendBaseline_(Q);
   check('★★★★ 未正式發出過 ⇒ null', gas.readResendBaseline_(Q) === null);
   SEND_LOG = prev;
   check('★★★★ 讀唔到 ⇒ 安全版回 null', (function () {
-    const r = gas.readSheet; gas.readSheet = function () { throw new Error('x'); };
-    const out = gas.readResendBaselineSafe_(Q); gas.readSheet = r; return out === null;
+    const r = gas.readSheet_; gas.readSheet_ = function () { throw new Error('x'); };
+    const out = gas.readResendBaselineSafe_(Q); gas.readSheet_ = r; return out === null;
   })());
 }
 
@@ -131,7 +131,7 @@ const diff = gas.computeResendDiff_(ctx);
 
 console.log('\n=== HB3【核心】〔變動的人〕列出甲、乙兩位 ===');
 gas.buildMailContext_ = function () { return makeContext(true); };
-gas.findLatestVersionNo = function () { return 6; };
+gas.findLatestVersionNo_ = function () { return 6; };
 gas.readSendLogSummaryForDashboard_ = function () { return { officialSentOnce: true }; };
 gas.readResendChangeNotes_ = function () { return {}; };
 gas.findLastSentSnapshot_ = function () { return { versionNo: 5, sentAt: '2098-06-10 22:00', stage: 'OFFICIAL' }; };

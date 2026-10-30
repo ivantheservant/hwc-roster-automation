@@ -22,7 +22,7 @@ function shiftDateString_(dateStr, days) {
 }
 
 // =====================================================================
-// 假「資料庫」：Quarters／RosterVersions／AuditLog，操作介面模仿 readSheet()
+// 假「資料庫」：Quarters／RosterVersions／AuditLog，操作介面模仿 readSheet_()
 // 回傳物件陣列的形狀。
 // =====================================================================
 function makeDb() {
@@ -296,7 +296,7 @@ console.log('\n=== OFFICIAL 永遠不會被 REMIND 機制觸發（結構性防�
 {
   // 移植 Trigger.gs 的 AUTOMATION_TRIGGER_CONTEXT_ACTIVE ＋
   // assertOfficialNotFromAutomationTrigger_() 結構性防護：任何在自動排程
-  // 執行期間嘗試呼叫 sendStage(..., OFFICIAL) 的動作都必須被拒絕。這裡直接
+  // 執行期間嘗試呼叫 sendStage_(..., OFFICIAL) 的動作都必須被拒絕。這裡直接
   // 驗證這道防護本身邏輯正確，並且確認 REMIND 的判斷／執行路徑
   // （judgeRemindAction_／executeRemind_）從頭到尾沒有任何一個分支的
   // action 字串等於 'OFFICIAL' 或呼叫任何寄送流程——REMIND 一律經

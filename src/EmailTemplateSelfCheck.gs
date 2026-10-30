@@ -64,21 +64,21 @@ function buildDemoMailPlaceholders_() {
  * @returns {string} 虛構的派工摘要文字
  */
 function buildDemoAssignmentSummary_() {
-  const posts = readPosts();
+  const posts = readPosts_();
   const postNames = {};
   posts.forEach(function (row) { postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC]; });
   const demoPostIds = posts.slice(0, 2).map(function (row) { return row[COLUMNS.POSTS.POST_ID]; });
   const demoAssignments = demoPostIds.map(function (postId, i) {
     return { serviceDate: i === 0 ? '2099-01-03' : '2099-01-17', postId: postId };
   });
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return buildAssignmentSummary_(demoAssignments, postNames, timezone);
 }
 
 /**
  * 上線前規劃：對單一範本列做完整的自我檢查，純讀取（除了 Posts／Config 之外
  * 不讀取任何跟真實季度／會友有關的資料）。
- * @param {Object} templateRow readSheet(SHEETS.EMAIL_TEMPLATES) 的一列原始資料
+ * @param {Object} templateRow readSheet_(SHEETS.EMAIL_TEMPLATES) 的一列原始資料
  * @param {string} subjectPrefix Config 的 MAIL_SUBJECT_PREFIX
  * @param {string} demoSummary buildDemoAssignmentSummary_() 的結果，所有範本共用
  * @returns {Object} 單一範本的檢查結果
@@ -130,9 +130,9 @@ function checkOneEmailTemplate_(templateRow, subjectPrefix, demoSummary) {
 function buildEmailTemplateSelfCheckReport_() {
   PREVIEW_MODE_ACTIVE = true;
   try {
-    const subjectPrefix = String(getConfig(CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '') || '');
+    const subjectPrefix = String(getConfig_(CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '') || '');
     const demoSummary = buildDemoAssignmentSummary_();
-    return readSheet(SHEETS.EMAIL_TEMPLATES).map(function (row) {
+    return readSheet_(SHEETS.EMAIL_TEMPLATES).map(function (row) {
       return checkOneEmailTemplate_(row, subjectPrefix, demoSummary);
     });
   } finally {

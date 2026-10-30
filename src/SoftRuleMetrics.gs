@@ -7,13 +7,13 @@
  * 歷史習慣」是兩件事——後者一直沒有數字可以看。
  *
  * 跟既有工具的分工（刻意不重複造輪子）：
- * - `Verify.gs` 的 `verifyRoster()` 已經算過其中幾項，但它**會建立一張
+ * - `Verify.gs` 的 `verifyRoster_()` 已經算過其中幾項，但它**會建立一張
  *   `Verify_XXXX_vN` 工作表**，不是唯讀工具；而且它的目標欄取自 RuleSettings
  *   的 TargetValue，不是「歷史 78 週基準」，兩者用途不同。
  *   本檔案**直接重用**它的 `buildVerifyContext_()`／`computeChairEqAnnounceRatio_()`／
  *   `computeAnnounceConsecutiveRatio_()`／`computeServiceDistribution_()`，
  *   不另外抄一份計算邏輯——抄一份的話兩邊遲早會算出不同的數字。
- * - `MultiRun.gs` 的 `compareMultiRun()` 算的是「多份候選表的比較」，
+ * - `MultiRun.gs` 的 `compareMultiRun_()` 算的是「多份候選表的比較」，
  *   而且會寫 `MultiRun_Result` 工作表，同樣不是唯讀。
  *
  * 本檔案自己新增的，是那兩個既有工具都沒有的兩項：
@@ -23,7 +23,7 @@
  *   （例如某崗位有 12 個人合資格，實際整季只用了 3 個）是排表品質的重要警號，
  *   但完全不會被任何既有指標反映出來。
  *
- * 唯讀保證：本檔案只呼叫 `readSheet()`／`readConfig()` 這類讀取函式與
+ * 唯讀保證：本檔案只呼叫 `readSheet_()`／`readConfig_()` 這類讀取函式與
  * `writeDiagnosticsReport_()`，完全沒有其他 `setValue`／`insertSheet`／
  * `deleteSheet` 呼叫，也不會產生版本、不會寄信。
  */
@@ -43,7 +43,7 @@ const SOFT_METRIC_JUDGEMENT = {
  * @returns {{ratioTolerance: number, countToleranceRatio: number, postUsageMinRatio: number}}
  */
 function readSoftMetricThresholds_() {
-  const config = readConfig();
+  const config = readConfig_();
   return {
     ratioTolerance: readNumericConfig_(config,
       CONFIG_KEYS.SOFT_METRIC_RATIO_TOLERANCE, DEFAULTS.SOFT_METRIC_RATIO_TOLERANCE),
@@ -142,7 +142,7 @@ function listConsecutiveSamePersonViolations_(assignments, posts, sortedDates) {
  * 純函式，不讀任何工作表。
  * @param {Object[]} assignments 已正規化的派工紀錄
  * @param {Object[]} posts 已正規化的崗位清單
- * @param {Object.<string, string[]>} eligibleByPost `readEligibility().byPost`
+ * @param {Object.<string, string[]>} eligibleByPost `readEligibility_().byPost`
  * @param {number} minRatio 動用率低於這個值就標為偏低
  * @returns {Object[]} 每個崗位一項，含 usedCount／eligibleCount／ratio／judgement／unusedPeople
  */
@@ -447,19 +447,19 @@ function measureChairAnnounceCeiling_(context, availabilityByPost) {
  */
 function buildAvailabilityByPostForMetrics_(context) {
   try {
-    const config = readConfig();
+    const config = readConfig_();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
 
     const peopleById = {};
-    readPeople().forEach(function (row) {
+    readPeople_().forEach(function (row) {
       peopleById[row[COLUMNS.NAME_MAPPING.PERSON_ID]] = true;
     });
 
     const specialByDate = {};
-    readSpecialSundays(context.quarterId)
+    readSpecialSundays_(context.quarterId)
       .filter(function (row) { return isTrueValue_(row[COLUMNS.SPECIAL_SUNDAYS.ACTIVE]); })
       .forEach(function (row) {
-        const dateStr = toDateString(row[COLUMNS.SPECIAL_SUNDAYS.SERVICE_DATE], timezone);
+        const dateStr = toDateString_(row[COLUMNS.SPECIAL_SUNDAYS.SERVICE_DATE], timezone);
         specialByDate[dateStr] = {
           skipPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.SKIP_POST_IDS]),
           lockPostIds: splitList_(row[COLUMNS.SPECIAL_SUNDAYS.LOCK_POST_IDS])
@@ -796,10 +796,10 @@ function buildSoftRuleMetricRows_(m) {
 function buildPersonPostWeightMetricRows_(quarterId, versionNo) {
   const section = '5. 排表偏好';
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const quarterRow = findQuarter_(quarterId);
     const refDate = quarterRow
-      ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+      ? toDateString_(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
     const weights = readActivePersonPostWeights_(
       refDate, timezone, buildWeightBaselineData_(quarterId, timezone));
 
@@ -809,15 +809,15 @@ function buildPersonPostWeightMetricRows_(quarterId, versionNo) {
     }
 
     const postNames = {};
-    readPosts().forEach(function (row) {
+    readPosts_().forEach(function (row) {
       postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
     });
     const report = buildPersonPostWeightReport_(
       readVersionAssignmentsRaw_(quarterId, versionNo),
       weights, indexPeopleById_(), postNames, {
-        rules: readRules(),
+        rules: readRules_(),
         defaultLimit:
-          Number(getConfig(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
+          Number(getConfig_(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
           || DEFAULTS.MAX_PER_QUARTER
       });
 
@@ -1002,16 +1002,16 @@ function runSoftRuleMetrics_() {
   // 而唔係睇住數字調。包 try/catch：呢一節係附加資訊，
   // 讀唔到唔應該令整份量度報告失敗。
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const quarterRow = findQuarter_(metrics.quarterId);
     const refDate = quarterRow
-      ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+      ? toDateString_(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
     // ⚠️ 一定要傳基準資料，否則目標次數會退化成「0 ＋ 偏好」，
     // 而報告會理直氣壯咁印一個同排表實際追嗰個唔同嘅目標。
     const weights = readActivePersonPostWeights_(
       refDate, timezone, buildWeightBaselineData_(metrics.quarterId, timezone));
     const postNames = {};
-    readPosts().forEach(function (row) {
+    readPosts_().forEach(function (row) {
       postNames[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
     });
     // 第二十七輪批次階段 B2：把每季上限嘅來源一併傳落去，
@@ -1021,9 +1021,9 @@ function runSoftRuleMetrics_() {
     const report = buildPersonPostWeightReport_(
       readVersionAssignmentsRaw_(metrics.quarterId, metrics.versionNo),
       weights, indexPeopleById_(), postNames, {
-        rules: readRules(),
+        rules: readRules_(),
         defaultLimit:
-          Number(getConfig(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
+          Number(getConfig_(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
           || DEFAULTS.MAX_PER_QUARTER
       });
     report.lines.forEach(function (l) { lines.push(l); });

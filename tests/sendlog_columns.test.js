@@ -96,7 +96,7 @@ console.log('\n=== E2【核心】轉寄生效 ＋ 缺欄 ⇒ 直接擋住 ===');
   });
 
   const setRedirect = function (value) {
-    gas.getConfig = function (key, fallback) {
+    gas.getConfig_ = function (key, fallback) {
       if (key === gas.CONFIG_KEYS.MAIL_REDIRECT_ALL_TO) return value;
       return fallback;
     };
@@ -157,7 +157,7 @@ console.log('\n=== E2【核心】轉寄生效 ＋ 缺欄 ⇒ 直接擋住 ===');
     warned.some(function (w) { return /DeliveredTo/.test(w); }), JSON.stringify(warned));
 
   // ── 讀唔到轉寄設定 ⇒ **當成有生效** ────────────────────────
-  gas.getConfig = function () { throw new Error('故意爆：讀不到 Config'); };
+  gas.getConfig_ = function () { throw new Error('故意爆：讀不到 Config'); };
   threw = '';
   try { assertReady(withoutIntended); } catch (err) { threw = err.message; }
   check('★★★★★★ 讀唔到轉寄設定 ⇒ **當成有生效，照擋**'
@@ -215,7 +215,7 @@ console.log('\n=== C【核心】不變量：「唔適用」唔可以當成失敗
     + '——錯誤訊息會改，而改咗之後一條真失敗就會靜靜變成「唔適用」',
     /唔可以靠讀錯誤訊息嘅字/.test(src), '');
   check('★★★★★★ 實作真係喺叫之前自己查（版本號 ＋ Stage）',
-    /const versionNo = findLatestVersionNo\(quarterId\);[\s\S]{0,400}getQuarterStage_\(quarterId\)/
+    /const versionNo = findLatestVersionNo_\(quarterId\);[\s\S]{0,400}getQuarterStage_\(quarterId\)/
       .test(src), '');
 
   // ── ⚠️ 以下兩節**真係行一次** `invariantDialogNumbers_()` ─────────
@@ -228,7 +228,7 @@ console.log('\n=== C【核心】不變量：「唔適用」唔可以當成失敗
   // 睇佢**實際回咩 status**。
 
   // (a) 一個版本都未有 ⇒ 三個登記數字全部 `NOT_APPLICABLE`
-  gas.findLatestVersionNo = function () { return -1; };
+  gas.findLatestVersionNo_ = function () { return -1; };
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
   const naResults = gas.invariantDialogNumbers_('2028T3');
   check('★★★★★★ 一個版本都未有 ⇒ 全部 `NOT_APPLICABLE`'
@@ -249,7 +249,7 @@ console.log('\n=== C【核心】不變量：「唔適用」唔可以當成失敗
   //
   // 特登令其中一條路拋錯——正好就係「前置條件成立咗，
   // 而其中一條路拋錯」嗰種情況。
-  gas.findLatestVersionNo = function () { return 1; };
+  gas.findLatestVersionNo_ = function () { return 1; };
   gas.getQuarterStage_ = function () { return gas.QUARTER_STAGE.REQUESTS_APPLIED; };
   gas.planStep2_ = function () { throw new Error('故意爆：算不出來'); };
   gas.planStep4SendPreview_ = function () { throw new Error('故意爆：算不出來'); };

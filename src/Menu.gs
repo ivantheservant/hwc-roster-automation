@@ -202,11 +202,11 @@ function onOpen() {
 }
 
 /**
- * 選單項目「檢查設定」的執行入口：呼叫 validateSetup() 並用對話框顯示結果。
+ * 選單項目「檢查設定」的執行入口：呼叫 validateSetup_() 並用對話框顯示結果。
  * @returns {void}
  */
 function runValidateSetup_() {
-  const issues = validateSetup();
+  const issues = validateSetup_();
   const ui = SpreadsheetApp.getUi();
 
   const rows = [diagRow_('檢查設定', '問題總數', issues.length, '')];
@@ -278,8 +278,8 @@ function runExportKeyState_() {
 function runReloadConfig_() {
   const ui = SpreadsheetApp.getUi();
   try {
-    reloadConfigCache();
-    const config = readConfig();
+    reloadConfigCache_();
+    const config = readConfig_();
     // 階段 A（第五輪批次）修正：DRY_RUN 原本是 `config[CONFIG_KEYS.DRY_RUN]`
     // 直接接字串，Config 工作表沒有登記這個 Key 時會顯示字面文字
     // 「DRY_RUN：undefined」——改用 describeConfigValue_() 顯示實際生效值。
@@ -373,7 +373,7 @@ function runCheckAssignmentVersions_() {
     const result = summariseAssignmentVersions_();
     const lines = [
       'RosterAssignments 資料列總數：' + result.totalRows,
-      '（不含第 1 行說明與第 2 行標題；readSheet() 會略過整行全空的列）',
+      '（不含第 1 行說明與第 2 行標題；readSheet_() 會略過整行全空的列）',
       '',
       '按季度＋版本分組：'
     ];
@@ -940,7 +940,7 @@ function runComputeQuarterDates_() {
 
 /**
  * 選單項目「生成職事表」的執行入口：詢問 QuarterID，依序執行
- * generateRoster → writeAssignments → createRosterSheet → registerVersion → protectV0，
+ * generateRoster → writeAssignments_ → createRosterSheet_ → registerVersion_ → protectV0_，
  * 最後以對話框顯示警告數目。
  * @returns {void}
  */
@@ -994,7 +994,7 @@ function runGenerateRoster_() {
 
 /**
  * 選單項目「核對職事表」的執行入口：詢問 QuarterID 與版本號，
- * 執行 verifyRoster() 並以對話框顯示摘要。版本號留空時採用最新版本。
+ * 執行 verifyRoster_() 並以對話框顯示摘要。版本號留空時採用最新版本。
  * @returns {void}
  */
 function runVerifyRoster_() {
@@ -1004,7 +1004,7 @@ function runVerifyRoster_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('核對中，請稍候…', '職事表系統', 60);
-    const result = verifyRoster(target.quarterId, target.versionNo);
+    const result = verifyRoster_(target.quarterId, target.versionNo);
     ui.alert('核對職事表', buildVerifySummaryText_(result), ui.ButtonSet.OK);
   } catch (err) {
     log_('ERROR', 'runVerifyRoster_ 失敗: ' + err.message);
@@ -1029,8 +1029,8 @@ function runExportPdf_() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('匯出中，請稍候…', '職事表系統', 60);
     const result = personId
-      ? exportPersonalPdf(target.quarterId, target.versionNo, personId)
-      : exportRosterPdf(target.quarterId, target.versionNo);
+      ? exportPersonalPdf_(target.quarterId, target.versionNo, personId)
+      : exportRosterPdf_(target.quarterId, target.versionNo);
 
     const lines = ['已產生檔案：', '', result.fileName, '', '存放資料夾：' + result.folderName];
     if (personId) {
@@ -1275,7 +1275,7 @@ function runQuarterPdfCleanup_() {
 }
 
 /**
- * 選單項目「清除一批 SendLog 記錄」的執行入口：按批次前綴（一次 sendStage()
+ * 選單項目「清除一批 SendLog 記錄」的執行入口：按批次前綴（一次 sendStage_()
  * 執行寫入的那一組列）整批刪除 SendLog 記錄，方便清掉測試期間累積的垃圾記錄。
  * 只操作 SendLog 工作表，不碰任何其他工作表；沒有「清除全部」的選項，
  * 一律要輸入完整的批次前綴字串才能刪除，避免手滑刪錯。
@@ -1348,7 +1348,7 @@ function runDeleteSendLogBatch_() {
 }
 
 /**
- * 選單項目「寄送（測試模式）」的執行入口：詢問季度、版本與階段，執行 sendStage()。
+ * 選單項目「寄送（測試模式）」的執行入口：詢問季度、版本與階段，執行 sendStage_()。
  * Config 的 DRY_RUN=TRUE 時不會真正寄出，只寫入 SendLog。
  * @returns {void}
  */
@@ -1370,7 +1370,7 @@ function runSendStage_() {
     return;
   }
 
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   if (!isDryRun) {
     const confirm = ui.alert(
       '⚠️ 注意：DRY_RUN 是 FALSE',
@@ -1410,7 +1410,7 @@ function runSendStage_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('處理中，請稍候…', '職事表系統', 60);
-    const result = sendStage(target.quarterId, target.versionNo, stage);
+    const result = sendStage_(target.quarterId, target.versionNo, stage);
 
     const durationSec = result.durationMs / 1000;
     const lines = [
@@ -1467,8 +1467,8 @@ function runDetectChanges_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('分析中，請稍候…', '職事表系統', 60);
-    const result = proposeMinimalFix(target.quarterId, target.versionNo);
-    const written = writeProposals(result);
+    const result = proposeMinimalFix_(target.quarterId, target.versionNo);
+    const written = writeProposals_(result);
 
     const softCount = result.violations.filter(function (v) {
       return v.severity === RULE_LEVELS.SOFT;
@@ -1552,7 +1552,7 @@ function runApplyDecisions_() {
   // 執行前先檢查有無未決定的行：PENDING 等同「保留現況」，
   // 幹事很容易只設定了第一行就去套用，結果其餘提案默默沒有生效
   try {
-    const summary = summariseBatchDecisions(batchId);
+    const summary = summariseBatchDecisions_(batchId);
     if (summary.total === 0) {
       ui.alert('套用決定', '找不到批次 ' + batchId + ' 的提案。', ui.ButtonSet.OK);
       return;
@@ -1573,14 +1573,14 @@ function runApplyDecisions_() {
       if (confirm !== ui.Button.YES) return;
     }
   } catch (err) {
-    log_('ERROR', 'summariseBatchDecisions 失敗: ' + err.message);
+    log_('ERROR', 'summariseBatchDecisions_ 失敗: ' + err.message);
     ui.alert('套用決定', '讀取批次失敗：\n\n' + err.message, ui.ButtonSet.OK);
     return;
   }
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('套用中，請稍候…', '職事表系統', 60);
-    const result = applyDecisions(batchId);
+    const result = applyDecisions_(batchId);
     const lines = [
       '已建立新版本 ' + result.sheetName,
       '',
@@ -1652,7 +1652,7 @@ function runHwcasSync_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('讀取 HWCAS 中，請稍候…', '職事表系統', 60);
-    const result = syncHwcasEmails();
+    const result = syncHwcasEmails_();
     ui.alert(
       '從 HWCAS 取電郵',
       '已產生 ' + result.sheetName + '\n\n'
@@ -1671,7 +1671,7 @@ function runHwcasSync_() {
 }
 
 /**
- * 選單項目「自我測試」的執行入口：執行 runSelfTest() 並以對話框顯示逐項結果。
+ * 選單項目「自我測試」的執行入口：執行 runSelfTestChecks_() 並以對話框顯示逐項結果。
  * 此測試不寄電郵、不改資料表、不建立版本。
  * @returns {void}
  */
@@ -1679,7 +1679,7 @@ function runSelfTest_() {
   const ui = SpreadsheetApp.getUi();
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('測試中，請稍候…', '職事表系統', 60);
-    const result = runSelfTest();
+    const result = runSelfTestChecks_();
 
     const lines = [
       result.failed === 0
@@ -1709,7 +1709,7 @@ function runApplyHwcasDraft_() {
 
   let plan;
   try {
-    plan = planHwcasApply();
+    plan = planHwcasApply_();
   } catch (err) {
     ui.alert('套用 HWCAS 初稿', '執行失敗：\n\n' + err.message, ui.ButtonSet.OK);
     return;
@@ -1756,7 +1756,7 @@ function runApplyHwcasDraft_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('寫入中，請稍候…', '職事表系統', 60);
-    const result = applyHwcasDraft({ overwriteExisting: overwriteExisting });
+    const result = applyHwcasDraft_({ overwriteExisting: overwriteExisting });
 
     const lines = [
       '已寫入：' + result.written + ' 行',
@@ -1838,7 +1838,7 @@ function formatPendingNames_(people) {
 function runApplyTimezoneSettings_() {
   const ui = SpreadsheetApp.getUi();
   try {
-    const result = applyTimezoneSettings();
+    const result = applyTimezoneSettings_();
     ui.alert(
       '修正試算表時區設定',
       (result.changed ? '已更新試算表設定：' : '設定本來已經正確：') + '\n\n'
@@ -1868,7 +1868,7 @@ function runDebugSoftRules_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('模擬中，請稍候…', '職事表系統', 60);
-    const summary = debugSoftRules(quarterId);
+    const summary = debugSoftRules_(quarterId);
     ui.alert(
       '診斷 SOFT 規則（唯讀）',
       '模擬結果（未寫入任何工作表）：\n\n'
@@ -1895,7 +1895,7 @@ function runDebugGridHeaders_() {
   if (!target) return;
 
   try {
-    const result = debugGridHeaders(target.quarterId, target.versionNo);
+    const result = debugGridHeaders_(target.quarterId, target.versionNo);
     if (!result) {
       ui.alert('診斷欄標題（唯讀）', '找不到該版本的工作表。', ui.ButtonSet.OK);
       return;
@@ -1924,7 +1924,7 @@ function runDebugPersonalHighlight_() {
   if (!personId) return;
 
   try {
-    const located = debugPersonalHighlight(target.quarterId, target.versionNo, personId);
+    const located = debugPersonalHighlight_(target.quarterId, target.versionNo, personId);
     if (!located) {
       ui.alert('診斷 highlight（唯讀）', '找不到該版本的工作表。', ui.ButtonSet.OK);
       return;
@@ -1942,7 +1942,7 @@ function runDebugPersonalHighlight_() {
 
 /**
  * 組出寫入 RosterVersions.Notes 的備註文字，記錄採用的 seed 供日後重現。
- * @param {Object} result generateBest() 的結果
+ * @param {Object} result generateBest_() 的結果
  * @returns {string} 備註文字
  */
 function buildSeedNote_(result) {
@@ -1969,7 +1969,7 @@ function runCompareMultiRun_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('多次生成中，請稍候…', '職事表系統', 300);
-    const result = compareMultiRun(quarterId);
+    const result = compareMultiRun_(quarterId);
 
     ui.alert(
       '多次生成比較',
@@ -2010,7 +2010,7 @@ function runTuneParameters_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('掃描中，可能需要數分鐘…', '職事表系統', 300);
-    const result = tuneParameters(quarterId);
+    const result = tuneParameters_(quarterId);
 
     if (!result.done) {
       ui.alert(
@@ -2070,7 +2070,7 @@ function promptQuarterAndVersion_(title) {
   if (versionResponse.getSelectedButton() !== ui.Button.OK) return null;
 
   const versionText = versionResponse.getResponseText().trim();
-  const versionNo = versionText === '' ? findLatestVersionNo(quarterId) : Number(versionText);
+  const versionNo = versionText === '' ? findLatestVersionNo_(quarterId) : Number(versionText);
 
   // 追加階段 T：原本兩種完全不同的失敗原因共用同一句「找不到有效的版本號。」，
   // 令人以為是「這個版本不存在」，實際上更常見的原因是輸入的文字不是純數字
@@ -2630,15 +2630,15 @@ function runPreviewEmailTemplate_() {
  */
 function runInstallAutomation_() {
   const ui = SpreadsheetApp.getUi();
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const rawHour = Number(config[CONFIG_KEYS.SEND_HOUR_LOCAL]);
   const hour = isNaN(rawHour) ? 9 : Math.min(23, Math.max(0, Math.round(rawHour)));
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const scriptTimezone = Session.getScriptTimeZone();
   const existing = listAutomationTriggers_();
-  const stuckDays = getConfig(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
-  const stuckMaxCount = getConfig(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT);
+  const stuckDays = getConfig_(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
+  const stuckMaxCount = getConfig_(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT);
   const adminEmail = String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || '');
 
   const lines = [
@@ -2683,7 +2683,7 @@ function runInstallAutomation_() {
   }
 
   try {
-    const result = installAutomationTrigger();
+    const result = installAutomationTrigger_();
     ui.alert('安裝自動排程', '已安裝，每日約 ' + result.hour + ':00 執行一次檢查。', ui.ButtonSet.OK);
   } catch (err) {
     log_('ERROR', 'runInstallAutomation_ 失敗: ' + err.message);
@@ -2735,7 +2735,7 @@ function runViewAutomationStatus_() {
   const ui = SpreadsheetApp.getUi();
   try {
     const triggers = listAutomationTriggers_();
-    const config = readConfig();
+    const config = readConfig_();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
 
@@ -2749,9 +2749,9 @@ function runViewAutomationStatus_() {
     }
     lines.push('', '今天（' + timezone + '）：' + today, '', '各季度排程：');
 
-    readSheet(SHEETS.QUARTERS).forEach(function (row) {
+    readSheet_(SHEETS.QUARTERS).forEach(function (row) {
       const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
-      const startDate = toDateString(row[COLUMNS.QUARTERS.START_DATE], timezone);
+      const startDate = toDateString_(row[COLUMNS.QUARTERS.START_DATE], timezone);
       if (!quarterId) return;
       const schedule = computeAutomationSchedule_(row, config);
       const generateJudgment = judgeGenerateAction_(quarterId, schedule.generateDate, today);
@@ -2902,7 +2902,7 @@ function describeRemindStatus_(judgment) {
 
 /**
  * 把核對結果整理成對話框用的摘要文字。
- * @param {{report: Object, sheetName: string}} result verifyRoster() 的結果
+ * @param {{report: Object, sheetName: string}} result verifyRoster_() 的結果
  * @returns {string} 摘要文字
  */
 function buildVerifySummaryText_(result) {

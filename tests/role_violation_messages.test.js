@@ -227,7 +227,7 @@ console.log('\n=== D2：fine-tune 提案嘅 Reason 欄會帶埋違規原因 ==='
 {
   // 提案嘅 reason 係 `violation.reason + '；' + replacement.reason`（FineTune.gs），
   // 即係共用訊息會原封不動帶入 FineTuneProposals 嘅 Reason 欄。
-  // 呢度用靜態檢查鎖住呢條串接關係——真正跑 proposeMinimalFix() 需要 grid 工作表，
+  // 呢度用靜態檢查鎖住呢條串接關係——真正跑 proposeMinimalFix_() 需要 grid 工作表，
   // 而串接關係本身先係呢一項要守住嘅嘢。
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'FineTune.gs'), 'utf8');
   check('★★★★ 提案 reason 由 violation.reason 串接而成（唔會另外造一句冇資訊嘅文字）',

@@ -11,7 +11,7 @@
 //     任何格」；隨即撳「寄出」，卻正確攔住「你有 1 格改動還未儲存」
 //
 // 讀碼睇唔出分別：兩邊都叫 `readDashboardUnsavedState_()`；唯一分別係狀態卡
-// 喺 `apiGetDashboardState()` 嘅 `readSheet()` 記憶入面行。
+// 喺 `apiGetDashboardState()` 嘅 `readSheet_()` 記憶入面行。
 //
 // 呢個測試係**重現嘗試**：用真入口生成、真 grid 工作表、真申報表，逐個情境
 // 比較「狀態卡（開記憶）」同「寄出閘（冇記憶）」讀到嘅數字。
@@ -194,7 +194,7 @@ function editGridChair(versionNo, row) {
     .filter(function (n) { return n !== cur; })[0];
   g.getRange(row, col).setValue(other);
 }
-/** 狀態卡（`apiGetDashboardState()`，開住 readSheet 記憶）同寄出閘（冇記憶）各讀一次。 */
+/** 狀態卡（`apiGetDashboardState()`，開住 readSheet_ 記憶）同寄出閘（冇記憶）各讀一次。 */
 function readBoth(versionNo) {
   const dash = gas.apiGetDashboardState(Q);
   const gate = gas.readDashboardUnsavedState_(Q, versionNo);
@@ -210,7 +210,7 @@ function pick(o) {
   return JSON.stringify(out);
 }
 
-const v0 = gas.findLatestVersionNo(Q);
+const v0 = gas.findLatestVersionNo_(Q);
 setStage('REVIEW_SENT');
 
 // =====================================================================
@@ -242,7 +242,7 @@ console.log('\n=== S2（現場第二次）：grid 改咗 1 格 ⇒ 第 2 步要�
 console.log('\n=== S3：儲存成新版本之後，喺新版本再改 1 格（現場第二次係喺儲存後嘅版本改） ===');
 {
   const saved = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
-  const v1 = gas.findLatestVersionNo(Q);
+  const v1 = gas.findLatestVersionNo_(Q);
   check('（前提）儲存成新版本', saved && saved.ok !== false && v1 === v0 + 1, JSON.stringify(saved).slice(0, 300));
   const r0 = readBoth(v1);
   check('（前提）儲存完 ⇒ 冇未儲存改動', r0.dash.unsaved.hasAny === false && same(r0.dash.unsaved, r0.gate),

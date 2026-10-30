@@ -49,13 +49,13 @@ function setup(opts) {
   const log = { sent: [], generatedFor: [], audit: [] };
   gas.assertWebAppRequestAllowed_ = function () {};
   gas.Session = { getActiveUser: function () { return { getEmail: function () { return 'clerk@example.invalid'; } }; } };
-  gas.findLatestVersionNo = function () { return 7; };
+  gas.findLatestVersionNo_ = function () { return 7; };
   gas.buildRosterSheetName_ = function () { return '職事表 2027T3 v7'; };
   gas.buildQuarterLabel_ = function () { return '2027 年第三季'; };
   gas.writeAuditLog_ = function (row) { log.audit.push(row); };
   gas.DriveApp = { getFileById: function () { return { getBlob: function () { return {}; } }; } };
   gas.MailApp = { sendEmail: function (m) { log.sent.push(m); } };
-  gas.getConfig = function (_k, d) { return d; };
+  gas.getConfig_ = function (_k, d) { return d; };
 
   // 資料夾入面而家有邊幾份。產生一次就會多幾份。
   const present = {};

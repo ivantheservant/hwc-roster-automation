@@ -133,7 +133,7 @@ function countRealSendsForQuarter_(quarterId) {
   if (upper === '') return -1;
   try {
     const C = COLUMNS.SEND_LOG;
-    return readSheet(SHEETS.SEND_LOG).filter(function (row) {
+    return readSheet_(SHEETS.SEND_LOG).filter(function (row) {
       return String(row[C.QUARTER_ID] || '').trim().toUpperCase() === upper
         && String(row[C.STATUS] || '').trim().toUpperCase() === MAIL_STATUS.SENT;
     }).length;
@@ -162,7 +162,7 @@ function checkSelfTestPreconditions_(quarterId) {
   // ── 閘 1　DRY_RUN ────────────────────────────────────────────
   // ⚠️ 一定要 `=== true`。讀唔到（`undefined`）**唔算通過**——
   // 「查不到」同「查到係 TRUE」係兩件事，而估錯嗰邊嘅代價係真係寄信。
-  if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {
+  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== true) {
     reasons.push('DRY_RUN 不是 TRUE。自測機會走完整個寄送流程，'
       + 'DRY_RUN=FALSE 時那些信會真的寄出去。'
       + '自測機不會在真實寄信模式下執行。');
@@ -261,7 +261,7 @@ function checkSelfTestPreconditions_(quarterId) {
   // 就係 `assertWebAppRequestAllowed_()`。跳過入口去叫入面嗰啲函式，
   // 就跳過咗成串前置檢查——而第四十七輪個 bug 正正就係喺嗰串檢查
   // 嘅次序入面。所以呢度停低，唔會退回去。
-  if (getConfig(CONFIG_KEYS.WEBAPP_ENABLED, false) !== true) {
+  if (getConfig_(CONFIG_KEYS.WEBAPP_ENABLED, false) !== true) {
     reasons.push('Config 的 ' + CONFIG_KEYS.WEBAPP_ENABLED + ' 不是 TRUE。'
       + '自測機刻意只走真實入口（apiXxx），而那些入口第一句就是權限檢查，'
       + '所以要執行自測，這一格必須是 TRUE。'
@@ -375,7 +375,7 @@ function selfTestWriteGridCell_(quarterId, versionNo, serviceDate, postId, slotI
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error('找不到工作表：' + sheetName);
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   // 第 2 行係機器鍵（`POSTID#slot`），第 3 行起係資料，第 1 欄係日期。
@@ -387,7 +387,7 @@ function selfTestWriteGridCell_(quarterId, versionNo, serviceDate, postId, slotI
 
   const dates = sheet.getRange(3, 1, Math.max(0, lastRow - 2), 1).getValues();
   for (let i = 0; i < dates.length; i++) {
-    if (toDateString(dates[i][0], timezone) !== serviceDate) continue;
+    if (toDateString_(dates[i][0], timezone) !== serviceDate) continue;
     sheet.getRange(i + 3, col).setValue(text);
     return true;
   }
@@ -404,16 +404,16 @@ function selfTestWriteGridCell_(quarterId, versionNo, serviceDate, postId, slotI
  */
 function selfTestPickCells_(quarterId, versionNo, howMany) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const out = [];
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (out.length >= howMany) return;
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== versionNo) return;
     const personId = String(row[A.PERSON_ID] || '').trim();
     if (!personId) return;
     out.push({
-      serviceDate: toDateString(row[A.SERVICE_DATE], timezone),
+      serviceDate: toDateString_(row[A.SERVICE_DATE], timezone),
       postId: String(row[A.POST_ID] || '').trim(),
       slotIndex: row[A.SLOT_INDEX],
       personId: personId
@@ -505,15 +505,15 @@ function selfTestCellKey_(x) {
  */
 function selfTestBuildCandidatePool_(quarterId, versionNo) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const peopleById = indexPeopleById_();
-  const byPost = (readEligibility() || {}).byPost || {};
+  const byPost = (readEligibility_() || {}).byPost || {};
   const allIds = Object.keys(peopleById).filter(function (id) {
     return peopleById[id] && peopleById[id].nameTC;
   });
 
   const pool = [];
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== versionNo) return;
     const personId = String(row[A.PERSON_ID] || '').trim();
@@ -529,7 +529,7 @@ function selfTestBuildCandidatePool_(quarterId, versionNo) {
     if (!chosen) return;
 
     pool.push({
-      serviceDate: toDateString(row[A.SERVICE_DATE], timezone),
+      serviceDate: toDateString_(row[A.SERVICE_DATE], timezone),
       postId: postId,
       slotIndex: row[A.SLOT_INDEX],
       personId: personId,
@@ -849,7 +849,7 @@ function selfTestRecordPayload_(scenarioId, apiName, value) {
       sheet.appendRow(['情境', 'API', '回傳值（JSON）', '錄於']);
       sheet.setFrozenRows(1);
     }
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     sheet.appendRow([scenarioId, apiName, JSON.stringify(value),
       Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss')]);
     // 第五十六輪批次 C 組：太長就由最舊嗰邊剪起。
@@ -1114,13 +1114,13 @@ function selfTestS02_(quarterId) {
   selfTestCall_('S02', 'apiGenerateDraftExecute',
     function () { return apiGenerateDraftExecute(quarterId); });
 
-  const versionNo = findLatestVersionNo(quarterId);
-  t.equal('生成之後最新版本是 v0', versionNo, 0, 'findLatestVersionNo()');
+  const versionNo = findLatestVersionNo_(quarterId);
+  t.equal('生成之後最新版本是 v0', versionNo, 0, 'findLatestVersionNo_()');
   t.equal('Stage 是 ' + QUARTER_STAGE.DRAFT, getQuarterStage_(quarterId),
     QUARTER_STAGE.DRAFT, 'getQuarterStage_()');
 
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return String(r[A.QUARTER_ID] || '').trim() === quarterId
       && Number(r[A.VERSION_NO]) === 0;
   });
@@ -1130,20 +1130,20 @@ function selfTestS02_(quarterId) {
 
   // ⚠️ 行數要對得上「主日數 × 崗位 slot 數」——唔可以淨係驗「大過 0」。
   // 「大過 0」呢種斷言，喺一個只生成咗一日嘅壞結果下面一樣會綠。
-  const dates = readServiceDatesNormalized(quarterId,
-    getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+  const dates = readServiceDatesNormalized_(quarterId,
+    getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
   t.expect('每一個主日都有派工',
     dates.length > 0 && dates.every(function (d) {
       return rows.some(function (r) {
-        return toDateString(r[A.SERVICE_DATE],
-          getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)) === d.serviceDate;
+        return toDateString_(r[A.SERVICE_DATE],
+          getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)) === d.serviceDate;
       });
     }),
     dates.length + ' 個主日全部有派工',
     dates.filter(function (d) {
       return !rows.some(function (r) {
-        return toDateString(r[A.SERVICE_DATE],
-          getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)) === d.serviceDate;
+        return toDateString_(r[A.SERVICE_DATE],
+          getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)) === d.serviceDate;
       });
     }).map(function (d) { return d.serviceDate; }).join('、') || '（全部都有）',
     'ServiceDates ' + dates.length + ' 個主日對 RosterAssignments');
@@ -1158,7 +1158,7 @@ function selfTestS02_(quarterId) {
  */
 function selfTestS03_(quarterId) {
   const t = selfTestCollector_('S03');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
 
   // ⚠️⚠️ 第五十四輪批次 A 組：**寫入之後問系統，唔再自己實作接受條件。**
   // 見 `selfTestBuildCandidatePool_()` 檔頭嗰段。
@@ -1296,7 +1296,7 @@ function selfTestS05_(quarterId) {
   // S14 而家排喺 S02 之後（見登記表嗰段），所以到咗呢度可能已經係 v1。
   // 寫死一個數字嘅話，日後任何一個情境多建一個版本，
   // 呢一條就會紅——而佢紅嗰陣講嘅唔係真問題。
-  const before = findLatestVersionNo(quarterId);
+  const before = findLatestVersionNo_(quarterId);
   const plan = selfTestCall_('S05', 'apiSaveAndConfirmPlan',
     function () { return apiSaveAndConfirmPlan(quarterId); });
   t.equal('plan 看到 3 格 grid 改動', (plan.gridChanges || []).length, 3,
@@ -1306,8 +1306,8 @@ function selfTestS05_(quarterId) {
     function () { return apiSaveAndConfirmExecute(quarterId, { decisions: [] }); });
 
   t.equal('儲存之後多了一個版本（v' + before + ' ⇒ v' + (before + 1) + '）',
-    findLatestVersionNo(quarterId), before + 1,
-    'findLatestVersionNo()：儲存前 v' + before
+    findLatestVersionNo_(quarterId), before + 1,
+    'findLatestVersionNo_()：儲存前 v' + before
       + '；apiSaveAndConfirmExecute() 回傳 ' + JSON.stringify(saved).slice(0, 200));
   const d = selfTestCall_('S05', 'apiGetDashboardState',
     function () { return apiGetDashboardState(quarterId); });
@@ -1367,7 +1367,7 @@ function selfTestS06_(quarterId) {
 /** S07：真嘅寫 3 筆 Requests，然後套用。 */
 function selfTestS07_(quarterId) {
   const t = selfTestCollector_('S07');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const R = COLUMNS.REQUESTS;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1393,10 +1393,10 @@ function selfTestS07_(quarterId) {
   // 比對嗰句喺 `validateRequest_()`（RequestsApply.gs）：
   //     `context.posts.filter(function (p) { return p.postNameTC === req.postNameText; })`
   //
-  // ⚠️ 由 `readPostsNormalized()` 現場查，**唔准寫死中文名**——
+  // ⚠️ 由 `readPostsNormalized_()` 現場查，**唔准寫死中文名**——
   // 寫死嘅話，日後有人改咗崗位名，自測機就會無聲無息噉壞掉。
   const postNameById = {};
-  readPostsNormalized().forEach(function (p) {
+  readPostsNormalized_().forEach(function (p) {
     if (p.postNameTC) postNameById[p.postId] = p.postNameTC;
   });
 
@@ -1430,7 +1430,7 @@ function selfTestS07_(quarterId) {
   // ⚠️ **真嘅 append 落張工作表**，唔係喺記憶體造。
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(function (v) { return String(v || '').trim(); });
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   let appended = 0;
   cells.forEach(function (c) {
     const row = new Array(headers.length).fill('');
@@ -1535,7 +1535,7 @@ function selfTestS07_(quarterId) {
 
   // 套用之後，Status 一定要寫返落張表——唔寫嘅話，
   // 同一批申報下次會再被當成「未處理」。
-  const stillPending = readSheet(SHEETS.REQUESTS).filter(function (r) {
+  const stillPending = readSheet_(SHEETS.REQUESTS).filter(function (r) {
     return String(r[R.QUARTER_ID] || '').trim() === quarterId
       && String(r[R.STATUS] || '').trim() === '';
   });
@@ -1547,7 +1547,7 @@ function selfTestS07_(quarterId) {
 /** S08：產生個人 PDF。 */
 function selfTestS08_(quarterId) {
   const t = selfTestCollector_('S08');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
 
   // ═══════════════════════════════════════════════════════════════════
   // ⚠️⚠️ 第五十八輪批次 A2 組：**做唔完唔可以報綠。**
@@ -1659,7 +1659,7 @@ function selfTestS08_(quarterId) {
 /** S09：正式發出（DRY_RUN）。 */
 function selfTestS09_(quarterId) {
   const t = selfTestCollector_('S09');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const preview = selfTestCall_('S09', 'apiStep4GetSendPreview',
     function () { return apiStep4GetSendPreview(quarterId, versionNo, null); });
   const result = selfTestCall_('S09', 'apiStep4Confirm',
@@ -1702,7 +1702,7 @@ function selfTestS10_(quarterId) {
     return t.result();
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   // ⚠️ 第五十四輪批次 A2 組：同 S03 行**同一條批量路**——
   // 寫入之後問系統，唔自己實作接受條件。
   // S10 一樣係改格，所以一樣會撞到同一堆閘。一齊修，唔可以只修 S03。
@@ -1819,7 +1819,7 @@ function selfTestS11_(quarterId) {
 /** S12：回到上一個版本。 */
 function selfTestS12_(quarterId) {
   const t = selfTestCollector_('S12');
-  const before = findLatestVersionNo(quarterId);
+  const before = findLatestVersionNo_(quarterId);
   if (before < 1) {
     return t.skip('（跳過）這一季只有第 0 版，回退不到。'
       + '前面的情境沒有造出第二個版本。');
@@ -1891,8 +1891,8 @@ function selfTestS12_(quarterId) {
 
   t.expect('而且預覽本身沒有動到版本'
     + '——「先算後做」：看一眼不應該改任何東西',
-    findLatestVersionNo(quarterId) === before,
-    'v' + before, 'v' + findLatestVersionNo(quarterId),
+    findLatestVersionNo_(quarterId) === before,
+    'v' + before, 'v' + findLatestVersionNo_(quarterId),
     '叫過 apiRollbackPlan() 之後最新版本號');
   return t.result();
 }
@@ -1900,7 +1900,7 @@ function selfTestS12_(quarterId) {
 /** S13：下載及匯出——整季 PDF。 */
 function selfTestS13_(quarterId) {
   const t = selfTestCollector_('S13');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   let result = null;
   let threw = '';
   try {
@@ -1930,10 +1930,10 @@ function selfTestS13_(quarterId) {
 function selfTestS14_(quarterId) {
   const t = selfTestCollector_('S14');
   const S = COLUMNS.SPECIAL_SUNDAYS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const dates = readServiceDatesNormalized(quarterId, timezone);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const dates = readServiceDatesNormalized_(quarterId, timezone);
   if (dates.length === 0) {
-    t.expect('這一季有主日', false, '≥ 1 個', '0 個', 'readServiceDatesNormalized()');
+    t.expect('這一季有主日', false, '≥ 1 個', '0 個', 'readServiceDatesNormalized_()');
     return t.result();
   }
   const targetDate = dates[0].serviceDate;
@@ -2023,7 +2023,7 @@ function selfTestS14_(quarterId) {
   //
   // ⚠️ **冇繞過保護直接叫 `performRosterGeneration_()`。**
   // 繞過去就等於冇行過真實入口，而呢一層嘅價值就係嗰件事。
-  const versionBefore = findLatestVersionNo(quarterId);
+  const versionBefore = findLatestVersionNo_(quarterId);
   let regenerated = null;
   let regenerateError = '';
   try {
@@ -2033,7 +2033,7 @@ function selfTestS14_(quarterId) {
     regenerateError = err.message;
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
 
   // ⚠️⚠️ 第五十一輪批次 C2 組：**先驗「重新生成真係發生咗」。**
   //
@@ -2053,10 +2053,10 @@ function selfTestS14_(quarterId) {
     return t.result();
   }
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const chairOnThatDay = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const chairOnThatDay = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return String(r[A.QUARTER_ID] || '').trim() === quarterId
       && Number(r[A.VERSION_NO]) === versionNo
-      && toDateString(r[A.SERVICE_DATE], timezone) === targetDate
+      && toDateString_(r[A.SERVICE_DATE], timezone) === targetDate
       && String(r[A.POST_ID] || '').trim() === 'CHAIR'
       && String(r[A.PERSON_ID] || '').trim() !== '';
   });
@@ -2075,7 +2075,7 @@ function selfTestS14_(quarterId) {
     const rows = grid.getRange(3, 1, Math.max(0, grid.getLastRow() - 2), 1).getValues();
     let text = '（找不到那一格）';
     for (let i = 0; i < rows.length; i++) {
-      if (toDateString(rows[i][0], timezone) !== targetDate) continue;
+      if (toDateString_(rows[i][0], timezone) !== targetDate) continue;
       if (col > 0) text = String(grid.getRange(i + 3, col).getValue() || '');
       break;
     }
@@ -2092,7 +2092,7 @@ function selfTestS14_(quarterId) {
 function selfTestS15_(quarterId) {
   const t = selfTestCollector_('S15');
   // S14 已經寫咗一行 `Confirmed=FALSE`。
-  const rows = readSpecialSundays(quarterId).filter(function (r) {
+  const rows = readSpecialSundays_(quarterId).filter(function (r) {
     return isUnconfirmedSpecialSunday_(r);
   });
   t.expect('系統數得到那一個未確認的特殊主日',
@@ -2167,7 +2167,7 @@ function selfTestDeactivateSpecialSunday_(specialId) {
  */
 function selfTestS16_(quarterId) {
   const t = selfTestCollector_('S16');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const cells = selfTestPickCells_(quarterId, versionNo, 1);
   if (cells.length === 0) {
     t.expect('找得到一格有人的來改', false, '≥ 1 格', '0 格',
@@ -2183,7 +2183,7 @@ function selfTestS16_(quarterId) {
     originalName !== '', '有人名', originalName || '（查不到）',
     'indexPeopleById_()[' + cell.personId + ']');
 
-  const versionsBefore = findLatestVersionNo(quarterId);
+  const versionsBefore = findLatestVersionNo_(quarterId);
   const wrote = selfTestWriteGridCell_(quarterId, versionNo, cell.serviceDate,
     cell.postId, cell.slotIndex, '一個系統認不出的名字');
   t.expect('那一格真的寫進 grid', wrote, '寫得到', String(wrote),
@@ -2224,8 +2224,8 @@ function selfTestS16_(quarterId) {
     '拒絕的訊息本身');
 
   t.equal('職事表沒有任何改動（版本數沒有增加）',
-    findLatestVersionNo(quarterId), versionsBefore,
-    'findLatestVersionNo()：拒絕之前 v' + versionsBefore);
+    findLatestVersionNo_(quarterId), versionsBefore,
+    'findLatestVersionNo_()：拒絕之前 v' + versionsBefore);
 
   // ── ⚠️ 自己收拾 ────────────────────────────────────────────
   //
@@ -2256,12 +2256,12 @@ function selfTestS16_(quarterId) {
  * @returns {{fresh: boolean, reason: string}}
  */
 function isSelfTestQuarterFresh_(quarterId) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo >= 0) {
     return { fresh: false, reason: '這一季已經有 v' + versionNo + '。' };
   }
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return String(r[A.QUARTER_ID] || '').trim() === quarterId;
   });
   if (rows.length > 0) {
@@ -2423,7 +2423,7 @@ function selfTestPickViolatingCell_(quarterId, versionNo) {
  */
 function selfTestS17_(quarterId) {
   const t = selfTestCollector_('S17');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const target = selfTestPickViolatingCell_(quarterId, versionNo);
   if (!target) {
     return t.skip('（跳過）這一季找不到「改一格就剛好違反一條硬規則」的格，'
@@ -2469,9 +2469,9 @@ function selfTestS17_(quarterId) {
     refused.indexOf('保留我的安排') >= 0, '訊息裏面有「保留我的安排」',
     refused.slice(0, 300), '拒絕訊息原文');
 
-  const stillAt = findLatestVersionNo(quarterId);
+  const stillAt = findLatestVersionNo_(quarterId);
   t.equal('被拒絕之後，版本號沒有變——說「沒有任何改動」就真的不可以有',
-    stillAt, versionNo, 'findLatestVersionNo()');
+    stillAt, versionNo, 'findLatestVersionNo_()');
 
   // ── 3　勾「保留我的安排」再儲存 ⇒ 存得到 ────────────────────
   let released = null;
@@ -2492,16 +2492,16 @@ function selfTestS17_(quarterId) {
     releaseThrew === '' && !!released, '存得到',
     releaseThrew || JSON.stringify(released).slice(0, 400),
     'apiSetCellDecisions(...) → apiSaveAndConfirmExecute(quarterId, {decisions: []})');
-  const afterRelease = findLatestVersionNo(quarterId);
+  const afterRelease = findLatestVersionNo_(quarterId);
   t.expect('而且真的多了一版', afterRelease > versionNo,
-    '> ' + versionNo, String(afterRelease), 'findLatestVersionNo()');
+    '> ' + versionNo, String(afterRelease), 'findLatestVersionNo_()');
 
   // ── 4　AuditLog 要記低放行了幾多格 ──────────────────────────
   //
   // ⚠️ 沒有這一筆的話，一個違反了硬規則、由人手放行的版本，
   // 事後**沒有任何方法分得出它同一個乾淨版本的分別**。
   const A = COLUMNS.AUDIT_LOG;
-  const releaseRows = readSheet(SHEETS.AUDIT_LOG).filter(function (r) {
+  const releaseRows = readSheet_(SHEETS.AUDIT_LOG).filter(function (r) {
     return String(r[A.ACTION] || '').trim() === '放行硬規則違反'
       && String(r[A.TARGET_KEY] || '').indexOf(quarterId) >= 0;
   });
@@ -2523,7 +2523,7 @@ function selfTestS17_(quarterId) {
   // ⚠️ 把那一格改回原本的人，再乾淨儲存一次。
   // 不收拾的話，這一季就永遠帶住一格違反，而下一次重跑
   // 每一條情境都會見到它。
-  const newVersionNo = findLatestVersionNo(quarterId);
+  const newVersionNo = findLatestVersionNo_(quarterId);
   let cleaned = false;
   let cleanupNote = '';
   try {
@@ -2640,7 +2640,7 @@ function writeSelfTestState_(state) {
   sheet.appendRow(['情境', '結果', '摘要', '證據（JSON）', '更新於',
     '執行過幾次', '連續相同結果']);
   sheet.setFrozenRows(1);
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const now = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm:ss');
   Object.keys(state).sort().forEach(function (id) {
     let evidence = '';
@@ -3656,7 +3656,7 @@ function scrubPayloadText_(text, maps) {
 function buildScrubNameMap_() {
   const C = COLUMNS.NAME_MAPPING;
   const names = [];
-  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
     [row[C.NAME_TC], row[C.NAME_EN]].forEach(function (raw) {
       const name = String(raw || '').trim();
       // 一個字嘅「名」多數係雜訊，換走反而會整爛其他字。
@@ -3715,7 +3715,7 @@ function runExportSelfTestPayloads_() {
     return;
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stamp = Utilities.formatDate(new Date(), timezone, 'yyyyMMdd-HHmmss');
   const fileName = 'selftest-payloads-' + stamp + '.json';
   let url = '';

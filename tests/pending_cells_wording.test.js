@@ -90,8 +90,8 @@ console.log('\n=== C1 查不到就講查不到 ===');
 console.log('\n=== C1 版本：仍然用最新版本，唔叫幹事揀 ===');
 {
   const body = bodyOf(zone4, 'apiListPendingBackfillCellsForZone4');
-  check('★★★★ 用 findLatestVersionNo()（「而家仲有邊幾格未填」永遠問最新版本）',
-    /findLatestVersionNo\(id\)/.test(body));
+  check('★★★★ 用 findLatestVersionNo_()（「而家仲有邊幾格未填」永遠問最新版本）',
+    /findLatestVersionNo_\(id\)/.test(body));
   check('★★★★ 冇版本時講一句人話，唔會拋錯',
     body.indexOf('這一季還沒有生成過任何版本') !== -1);
 }

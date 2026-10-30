@@ -53,7 +53,7 @@ function apiListRoles(keyword) {
   try {
     const R = COLUMNS.ROLES;
     const M = COLUMNS.NAME_MAPPING;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
 
     let raw = [];
@@ -70,7 +70,7 @@ function apiListRoles(keyword) {
     // 全部人（供「新增一行」嘅下拉用）——只列在職嘅，但**唔會**因此
     // 隱藏已停用者本來就有嘅身分行（歷史紀錄一律照顯示）。
     const allPeople = [];
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const id = String(row[M.PERSON_ID] || '').trim();
       if (!id) return;
       if (!isTrueValue_(row[M.ACTIVE])) return;
@@ -86,8 +86,8 @@ function apiListRoles(keyword) {
       const nameTC = nameIndex[personId] || personId;
       if (!matchesPeopleSearch_(keyword, [nameTC, personId])) return;
 
-      const from = toDateString(row[R.EFFECTIVE_FROM], timezone);
-      const to = toDateString(row[R.EFFECTIVE_TO], timezone);
+      const from = toDateString_(row[R.EFFECTIVE_FROM], timezone);
+      const to = toDateString_(row[R.EFFECTIVE_TO], timezone);
       const active = isTrueValue_(row[R.ACTIVE]);
       const roleCode = String(row[R.ROLE_CODE] || '').trim().toUpperCase();
 
@@ -219,7 +219,7 @@ function apiAddRole(payload) {
   assertWebAppRequestAllowed_();
   const p = payload || {};
   const R = COLUMNS.ROLES;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const check = validateRoleInput_(p, timezone);
   if (!check.ok) return { ok: false, message: check.message };
@@ -268,7 +268,7 @@ function apiSaveRole(payload) {
   assertWebAppRequestAllowed_();
   const p = payload || {};
   const R = COLUMNS.ROLES;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const roleId = String(p.roleAssignmentId || '').trim();
   if (!roleId) {
@@ -334,7 +334,7 @@ function apiSaveRole(payload) {
 function apiRolesTermChangePlan(endDateRaw) {
   assertWebAppRequestAllowed_('apiRolesTermChangePlan');
   const R = COLUMNS.ROLES;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const parsed = parseOfficerDateInput_(endDateRaw, timezone);
   if (!parsed.ok) {
@@ -369,8 +369,8 @@ function apiRolesTermChangePlan(endDateRaw) {
     const personId = String(row[R.PERSON_ID] || '').trim();
     if (!personId) return;
     if (!isTrueValue_(row[R.ACTIVE])) return;
-    const from = toDateString(row[R.EFFECTIVE_FROM], timezone);
-    const to = toDateString(row[R.EFFECTIVE_TO], timezone);
+    const from = toDateString_(row[R.EFFECTIVE_FROM], timezone);
+    const to = toDateString_(row[R.EFFECTIVE_TO], timezone);
     // 已經有「生效至」嘅唔會再掂——佢哋已經卸任過，唔應該被改成另一個日期。
     if (to) return;
     // 生效日仲未到嘅都唔掂（例如已經預先加咗下一屆）。
@@ -493,7 +493,7 @@ function apiRolesTermChangeExecute(endDateRaw, confirmText) {
  */
 function apiRoleOverview() {
   assertWebAppRequestAllowed_('apiRoleOverview');
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   try {
     const overview = collectRoleOverview_(timezone, today);

@@ -13,7 +13,7 @@
 //              ⇒ **而 `DRY_RUN` 就係 BOOL。**嗰格一旦被試算表轉成非文字，
 //                 `DRY_RUN` 靜靜變 `false` ＝ 真係寄信俾全體義工。
 //
-// ⚠️ 而呢一份**每一段都由 `getConfig()` 呢個真入口叫落去**。
+// ⚠️ 而呢一份**每一段都由 `getConfig_()` 呢個真入口叫落去**。
 // 第三十一輪階段 A 就係被呢一點燒過：測試直接餵純函式，
 // 「證明」咗一個由頭到尾冇生效過嘅修正。
 
@@ -40,7 +40,7 @@ function threw(fn) {
 const SHEETS_DATE = 'Sat Dec 30 1899 10:45:00 GMT+1130 (New Zealand Daylight Time)';
 
 /**
- * 砌一個載好 Config.gs 嘅沙箱，並且**由 `getConfig()` 入口攞值**。
+ * 砌一個載好 Config.gs 嘅沙箱，並且**由 `getConfig_()` 入口攞值**。
  * @param {Array<[string, string, *]>} triples `[key, type, value]`
  */
 function makeGas(triples) {
@@ -58,7 +58,7 @@ function makeGas(triples) {
     row[C.VALUE] = t[2];
     return row;
   });
-  gas.readSheet = function () { return rows; };
+  gas.readSheet_ = function () { return rows; };
   return gas;
 }
 
@@ -80,20 +80,20 @@ console.log('\n=== A5【核心】正常值：行為同改動前完全一樣 ==='
     ['N_STR', 'STR', ' hello '],
     ['N_ENUM', 'ENUM', 'WEEKLY']
   ]);
-  checkEqual("★★★★★ INT '3' ⇒ 3", gas.getConfig('N_INT', 999), 3);
-  checkEqual('★★★★ INT 負數照舊', gas.getConfig('N_INT_NEG', 999), -7);
+  checkEqual("★★★★★ INT '3' ⇒ 3", gas.getConfig_('N_INT', 999), 3);
+  checkEqual('★★★★ INT 負數照舊', gas.getConfig_('N_INT_NEG', 999), -7);
   checkEqual('★★★★★ INT 0 唔會被當成「冇設定」而退去 fallback'
     + '——0 係一個合法設定值',
-    gas.getConfig('N_INT_ZERO', 999), 0);
-  checkEqual("★★★★★ DEC '3.5' ⇒ 3.5", gas.getConfig('N_DEC', 999), 3.5);
-  checkEqual("★★★★★ BOOL 'TRUE' ⇒ true", gas.getConfig('N_BOOL_UPPER', null), true);
-  checkEqual("★★★★★ BOOL 'true'（細楷）⇒ true", gas.getConfig('N_BOOL_LOWER', null), true);
+    gas.getConfig_('N_INT_ZERO', 999), 0);
+  checkEqual("★★★★★ DEC '3.5' ⇒ 3.5", gas.getConfig_('N_DEC', 999), 3.5);
+  checkEqual("★★★★★ BOOL 'TRUE' ⇒ true", gas.getConfig_('N_BOOL_UPPER', null), true);
+  checkEqual("★★★★★ BOOL 'true'（細楷）⇒ true", gas.getConfig_('N_BOOL_LOWER', null), true);
   checkEqual("★★★★★ BOOL 'FALSE' ⇒ false（而且唔係經 fallback 攞返嚟）",
-    gas.getConfig('N_BOOL_FALSE', 'FALLBACK'), false);
-  checkEqual('★★★★★ LIST 逐項 trim', gas.getConfig('N_LIST', null), ['a', 'b', 'c']);
+    gas.getConfig_('N_BOOL_FALSE', 'FALLBACK'), false);
+  checkEqual('★★★★★ LIST 逐項 trim', gas.getConfig_('N_LIST', null), ['a', 'b', 'c']);
   checkEqual('★★★★★ STR 照舊 trim，唔會被新防線攔住',
-    gas.getConfig('N_STR', null), 'hello');
-  checkEqual('★★★★ ENUM 照舊', gas.getConfig('N_ENUM', null), 'WEEKLY');
+    gas.getConfig_('N_STR', null), 'hello');
+  checkEqual('★★★★ ENUM 照舊', gas.getConfig_('N_ENUM', null), 'WEEKLY');
 }
 
 console.log('\n=== A5 空字串：三種型別各自嘅舊行為都要保住 ===');
@@ -102,10 +102,10 @@ console.log('\n=== A5 空字串：三種型別各自嘅舊行為都要保住 ===
     ['E_INT', 'INT', ''], ['E_DEC', 'DEC', '  '],
     ['E_BOOL', 'BOOL', ''], ['E_LIST', 'LIST', '']
   ]);
-  // `convertConfigValue_()` 回 `null`，而 `getConfig()` 對 `null` 會用 fallback。
+  // `convertConfigValue_()` 回 `null`，而 `getConfig_()` 對 `null` 會用 fallback。
   checkEqual('★★★★★ INT 空白 ⇒ 純函式回 null',
     gas.convertConfigValue_('', 'INT', 'E_INT'), null);
-  checkEqual('★★★★ 由入口睇就係退去 fallback', gas.getConfig('E_INT', 42), 42);
+  checkEqual('★★★★ 由入口睇就係退去 fallback', gas.getConfig_('E_INT', 42), 42);
   checkEqual('★★★★★ BOOL 空白 ⇒ false（**唔可以改成拋錯**——'
     + '幾十個呼叫點都靠住「冇設定 ＝ 唔開」）',
     gas.convertConfigValue_('', 'BOOL', 'E_BOOL'), false);
@@ -116,15 +116,15 @@ console.log('\n=== A5 空字串：三種型別各自嘅舊行為都要保住 ===
  * A5-2　認唔出就要嘈——**由入口叫落去**
  * ══════════════════════════════════════════════════════════════ */
 
-console.log('\n=== A5【核心】被 Sheets 正規化嘅值 ⇒ 由 getConfig() 拋錯 ===');
+console.log('\n=== A5【核心】被 Sheets 正規化嘅值 ⇒ 由 getConfig_() 拋錯 ===');
 {
   [['PDF_BATCH_SIZE', 'INT'], ['SOME_RATIO', 'DEC'], ['DRY_RUN', 'BOOL'],
     ['SOME_LIST', 'LIST']].forEach(function (t) {
     const gas = makeGas([[t[0], t[1], SHEETS_DATE]]);
-    const msg = threw(function () { gas.getConfig(t[0], '安全預設'); });
+    const msg = threw(function () { gas.getConfig_(t[0], '安全預設'); });
     check('★★★★★ ' + t[1] + '（' + t[0] + '）⇒ 拋錯，唔會靜靜回預設值',
       msg !== null, '完全冇拋錯，回咗：' + JSON.stringify(
-        (function () { try { return gas.getConfig(t[0], '安全預設'); } catch (e) { return '(threw)'; } })()));
+        (function () { try { return gas.getConfig_(t[0], '安全預設'); } catch (e) { return '(threw)'; } })()));
     check('★★★★★ 而且訊息含 Key 名（唔係「某個參數」）',
       (msg || '').indexOf(t[0]) !== -1, msg);
   });
@@ -133,7 +133,7 @@ console.log('\n=== A5【核心】被 Sheets 正規化嘅值 ⇒ 由 getConfig() 
 console.log('\n=== A2【核心】錯誤訊息要講齊四件事 ===');
 {
   const gas = makeGas([['PDF_BATCH_SIZE', 'INT', SHEETS_DATE]]);
-  const msg = threw(function () { gas.getConfig('PDF_BATCH_SIZE', 25); }) || '';
+  const msg = threw(function () { gas.getConfig_('PDF_BATCH_SIZE', 25); }) || '';
   check('★★★★★ 1／講得出係邊個 Key 同宣告型別',
     msg.indexOf('PDF_BATCH_SIZE') !== -1 && msg.indexOf('INT') !== -1, msg);
   check('★★★★★ 2／逐字印返讀到嘅原值（加引號）',
@@ -150,7 +150,7 @@ console.log('\n=== A2【核心】錯誤訊息要講齊四件事 ===');
 console.log('\n=== A2【核心】DRY_RUN 要有專屬嗰一句 ===');
 {
   const gas = makeGas([['DRY_RUN', 'BOOL', SHEETS_DATE]]);
-  const msg = threw(function () { gas.getConfig('DRY_RUN', true); }) || '';
+  const msg = threw(function () { gas.getConfig_('DRY_RUN', true); }) || '';
   check('★★★★★ **明講呢個參數控制會唔會真正寄出電郵**'
     + '——舊行為係靜靜變 false，即係真係寄咗俾全體義工',
     msg.indexOf('真正寄出電郵') !== -1, msg);
@@ -158,7 +158,7 @@ console.log('\n=== A2【核心】DRY_RUN 要有專屬嗰一句 ===');
     msg.indexOf('任何寄送動作都會被擋住') !== -1, msg);
 
   const other = makeGas([['PDF_BATCH_SIZE', 'INT', SHEETS_DATE]]);
-  const otherMsg = threw(function () { other.getConfig('PDF_BATCH_SIZE', 25); }) || '';
+  const otherMsg = threw(function () { other.getConfig_('PDF_BATCH_SIZE', 25); }) || '';
   check('★★★★ 而其他參數唔會有嗰句（唔可以句句都講寄信，講到冇人再睇）',
     otherMsg.indexOf('真正寄出電郵') === -1, otherMsg);
 }
@@ -168,11 +168,11 @@ console.log('\n=== A1【核心】INT 要擋小數；DEC 唔擋 ===');
   const gas = makeGas([['I', 'INT', '3.5'], ['D', 'DEC', '3.5'],
     ['INF', 'INT', 'Infinity'], ['DINF', 'DEC', 'Infinity']]);
   check("★★★★★ INT '3.5' ⇒ 拋錯（INT 就係整數）",
-    (threw(function () { gas.getConfig('I', 1); }) || '').indexOf('小數') !== -1,
-    String(threw(function () { return gas.getConfig('I', 1); })));
-  checkEqual("★★★★★ DEC '3.5' ⇒ 3.5（唔可以順手一齊擋）", gas.getConfig('D', 1), 3.5);
-  check('★★★★ INT Infinity ⇒ 拋錯', threw(function () { gas.getConfig('INF', 1); }) !== null);
-  check('★★★★ DEC Infinity ⇒ 一樣拋錯', threw(function () { gas.getConfig('DINF', 1); }) !== null);
+    (threw(function () { gas.getConfig_('I', 1); }) || '').indexOf('小數') !== -1,
+    String(threw(function () { return gas.getConfig_('I', 1); })));
+  checkEqual("★★★★★ DEC '3.5' ⇒ 3.5（唔可以順手一齊擋）", gas.getConfig_('D', 1), 3.5);
+  check('★★★★ INT Infinity ⇒ 拋錯', threw(function () { gas.getConfig_('INF', 1); }) !== null);
+  check('★★★★ DEC Infinity ⇒ 一樣拋錯', threw(function () { gas.getConfig_('DINF', 1); }) !== null);
 }
 
 console.log('\n=== A1 BOOL 只認 TRUE／FALSE，其餘要嘈 ===');
@@ -182,9 +182,9 @@ console.log('\n=== A1 BOOL 只認 TRUE／FALSE，其餘要嘈 ===');
   ['B1', 'B2', 'B3'].forEach(function (k) {
     check('★★★★★ BOOL「' + k + '」認唔出 ⇒ 拋錯'
       + '（舊行為係靜靜當成 false，而 false 對 DRY_RUN 嚟講就係「真係寄」）',
-      threw(function () { gas.getConfig(k, null); }) !== null);
+      threw(function () { gas.getConfig_(k, null); }) !== null);
   });
-  checkEqual("★★★★ 'False' 大小寫混合仍然認得", gas.getConfig('B4', null), false);
+  checkEqual("★★★★ 'False' 大小寫混合仍然認得", gas.getConfig_('B4', null), false);
 }
 
 console.log('\n=== A1 STR／ENUM／EMAIL 一律唔改（唔可以攔住下游嘅治本）===');
@@ -198,11 +198,11 @@ console.log('\n=== A1 STR／ENUM／EMAIL 一律唔改（唔可以攔住下游嘅
     check('★★★★★ ' + k + ' 唔會喺呢一層拋錯'
       + '——`ICS_SERVICE_START_TIME` 靠下游 `normalizeTimeOfDay_()` 處理，'
       + '喺呢度攔住會令第三十一輪嗰個治本永遠用唔著',
-      threw(function () { gas.getConfig(k, ''); }) === null,
-      String(threw(function () { return gas.getConfig(k, ''); })));
+      threw(function () { gas.getConfig_(k, ''); }) === null,
+      String(threw(function () { return gas.getConfig_(k, ''); })));
   });
   checkEqual('★★★★ 而且值原樣傳落去，冇被改過',
-    gas.getConfig('ICS_SERVICE_START_TIME', ''), SHEETS_DATE);
+    gas.getConfig_('ICS_SERVICE_START_TIME', ''), SHEETS_DATE);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -217,25 +217,25 @@ console.log('\n=== A3【核心】一個 key 壞，其他 key 照讀得到 ===');
     ['GOOD_BOOL', 'BOOL', 'TRUE'],
     ['GOOD_STR', 'STR', 'hello']
   ]);
-  checkEqual('★★★★★ 好嗰個 INT 照讀得到', gas.getConfig('GOOD_INT', 999), 25);
-  checkEqual('★★★★★ 好嗰個 BOOL 照讀得到', gas.getConfig('GOOD_BOOL', null), true);
-  checkEqual('★★★★★ 好嗰個 STR 照讀得到', gas.getConfig('GOOD_STR', null), 'hello');
+  checkEqual('★★★★★ 好嗰個 INT 照讀得到', gas.getConfig_('GOOD_INT', 999), 25);
+  checkEqual('★★★★★ 好嗰個 BOOL 照讀得到', gas.getConfig_('GOOD_BOOL', null), true);
+  checkEqual('★★★★★ 好嗰個 STR 照讀得到', gas.getConfig_('GOOD_STR', null), 'hello');
   check('★★★★★ **只有讀壞嗰個先拋錯**'
-    + '——喺 `readConfig()` 整批炸嘅話，幹事會見到每一粒掣都彈同一個錯，'
+    + '——喺 `readConfig_()` 整批炸嘅話，幹事會見到每一粒掣都彈同一個錯，'
     + '完全睇唔出係邊一格出事',
-    threw(function () { gas.getConfig('BAD_INT', 1); }) !== null);
-  check('★★★★★ 而 `readConfig()` 自己唔會拋',
-    threw(function () { gas.readConfig(); }) === null,
-    String(threw(function () { return gas.readConfig(); })));
+    threw(function () { gas.getConfig_('BAD_INT', 1); }) !== null);
+  check('★★★★★ 而 `readConfig_()` 自己唔會拋',
+    threw(function () { gas.readConfig_(); }) === null,
+    String(threw(function () { return gas.readConfig_(); })));
 }
 
 console.log('\n=== A3 記號要捱得住 JSON 來回（快取層）===');
 {
   const gas = makeGas([['BAD_INT', 'INT', SHEETS_DATE]]);
-  const marker = gas.readConfig()['BAD_INT'];
+  const marker = gas.readConfig_()['BAD_INT'];
   const roundTripped = JSON.parse(JSON.stringify(marker));
   check('★★★★★ `JSON.parse(JSON.stringify())` 之後仲認得出'
-    + '——`readConfig()` 會把結果 stringify 落快取。'
+    + '——`readConfig_()` 會把結果 stringify 落快取。'
     + '用 Error 物件或者 Symbol 就會喺嗰一轉靜靜變成 `{}`，'
     + '然後個壞格會變成一個睇落正常嘅物件',
     gas.isConfigTypeErrorMarker_(roundTripped) === true, JSON.stringify(roundTripped));
@@ -245,7 +245,7 @@ console.log('\n=== A3 記號要捱得住 JSON 來回（快取層）===');
 console.log('\n=== A3 顯示層唔可以印 [object Object] 或者扮成「用緊預設值」 ===');
 {
   const gas = makeGas([['BAD_INT', 'INT', SHEETS_DATE]]);
-  const d = gas.describeConfigValue_(gas.readConfig(), 'BAD_INT', 25);
+  const d = gas.describeConfigValue_(gas.readConfig_(), 'BAD_INT', 25);
   check('★★★★★ 唔會印 `[object Object]`', d.display.indexOf('[object Object]') === -1, d.display);
   check('★★★★★ **亦唔會扮成「Config 未設定，用預設值」**'
     + '——嗰句會令人以為冇事，實情係嗰格壞咗',

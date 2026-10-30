@@ -152,7 +152,7 @@ function limitSendWarningList_(items) {
 function summariseEligibilityImpact_(quarterId) {
   const out = { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
   try {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     out.versionNo = versionNo;
     if (!(versionNo >= 0)) return out;
     const context = buildFineTuneContext_(quarterId, versionNo, { skipGrid: true });

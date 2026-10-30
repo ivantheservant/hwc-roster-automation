@@ -40,7 +40,7 @@ function parseCombinedServiceKinds_(raw) {
  * @returns {Object[]} [{code, label}]
  */
 function readCombinedServiceKinds_() {
-  return parseCombinedServiceKinds_(getConfig(CONFIG_KEYS.COMBINED_SERVICE_KINDS, COMBINED_SERVICE_KINDS_DEFAULT));
+  return parseCombinedServiceKinds_(getConfig_(CONFIG_KEYS.COMBINED_SERVICE_KINDS, COMBINED_SERVICE_KINDS_DEFAULT));
 }
 
 /**
@@ -54,12 +54,12 @@ function readCombinedServices_(quarterId, timezone) {
   const labelOf = {};
   kinds.forEach(function (k) { labelOf[k.code] = k.label; });
   const D = COLUMNS.SERVICE_DATES;
-  return readSheet(SHEETS.SERVICE_DATES)
+  return readSheet_(SHEETS.SERVICE_DATES)
     .filter(function (r) { return String(r[D.QUARTER_ID] || '').trim() === quarterId; })
     .map(function (r) {
       const kind = String(r[D.COMBINED_KIND] === undefined || r[D.COMBINED_KIND] === null ? '' : r[D.COMBINED_KIND]).trim().toUpperCase();
       return {
-        serviceDate: toDateString(r[D.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(r[D.SERVICE_DATE], timezone),
         kind: kind,
         kindLabel: kind ? (labelOf[kind] || kind) : '',
         name: kind ? String(r[D.COMBINED_NAME] === undefined || r[D.COMBINED_NAME] === null ? '' : r[D.COMBINED_NAME]).trim() : ''
@@ -112,7 +112,7 @@ function ensureServiceDatesCombinedColumns_(sheet) {
 function apiGetCombinedServices(quarterId) {
   assertWebAppRequestAllowed_('apiGetCombinedServices');
   const id = String(quarterId || '').trim();
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   beginSheetReadMemo_();
   try {
     return {
@@ -141,7 +141,7 @@ function apiSaveCombinedServices(quarterId, items) {
 }
 
 function saveCombinedServices_(quarterId, items) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const kinds = readCombinedServiceKinds_();
   const valid = {};
   kinds.forEach(function (k) { valid[k.code] = k.label; });
@@ -170,7 +170,7 @@ function saveCombinedServices_(quarterId, items) {
   let changed = 0;
   values.forEach(function (row, i) {
     if (String(row[qCol] || '').trim() !== quarterId) return;
-    const d = toDateString(row[dCol], timezone);
+    const d = toDateString_(row[dCol], timezone);
     const w = wanted[d];
     if (!w) return;
     const oldKind = String(row[cols.kindCol - 1] || '').trim().toUpperCase();

@@ -131,11 +131,11 @@ function buildEligibilitySheet_() {
   if (existing) ss.deleteSheet(existing);
   const sheet = ss.insertSheet(ELIGIBILITY_SHEET_NAME);
 
-  const posts = readPostsNormalized().filter(function (p) { return p.active !== false; });
-  const eligibility = readEligibility();
+  const posts = readPostsNormalized_().filter(function (p) { return p.active !== false; });
+  const eligibility = readEligibility_();
   const N = COLUMNS.NAME_MAPPING;
   const nameById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[N.PERSON_ID] || '').trim();
     if (!id) return;
     nameById[id] = String(row[N.NAME_TC] || '').trim();
@@ -233,11 +233,11 @@ function planEligibilitySheetApply_(quarterId) {
     ELIGIBILITY_SHEET_FIRST_DATA_ROW, 1,
     lastRow - ELIGIBILITY_SHEET_FIRST_DATA_ROW + 1, lastCol).getValues();
 
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
   const postNameById = {};
   posts.forEach(function (p) { postNameById[p.postId] = p.postNameTC; });
 
-  const current = readEligibility();
+  const current = readEligibility_();
   const unresolved = [];
   const wanted = {};   // postId -> {personId: true}
 
@@ -259,7 +259,7 @@ function planEligibilitySheetApply_(quarterId) {
       // 第八十五輪批次 LC 組：「堂委」「執事」（ROLE_LABELS_TC 的標籤）不是「認不出的名字」
       const roleCode = resolveEligibilityRoleLabel_(text);
       if (roleCode) { wanted[postId][eligibilityRoleTokenOf_(roleCode)] = true; return; }
-      const personId = resolvePersonId(text);
+      const personId = resolvePersonId_(text);
       if (!personId) {
         unresolved.push({
           // ⚠️ `postNameTC` 一定要帶出去：畫面上那一粒〔這是新人，一併加入〕
@@ -278,12 +278,12 @@ function planEligibilitySheetApply_(quarterId) {
   // ── 比對 ─────────────────────────────────────────────────────
   const N = COLUMNS.NAME_MAPPING;
   const nameById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[N.PERSON_ID] || '').trim();
     if (id) nameById[id] = String(row[N.NAME_TC] || '').trim();
   });
   // 第八十五輪批次 LC 組：身分代號顯示成「堂委（現任 6 位：甲、乙……）」（以今日為準）
-  const tz = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const tz = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   describeEligibilityRoleTokensInto_(nameById, wanted, current, tz);
 
   const added = [];
@@ -316,10 +316,10 @@ function planEligibilitySheetApply_(quarterId) {
   // 一個他核對不到的數字，同沒有講差不多。
   const assignedNow = {};
   const assignedDates = {};
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo >= 0) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
       if (Number(row[A.VERSION_NO]) !== versionNo) return;
       const pid = String(row[A.PERSON_ID] || '').trim();
@@ -327,7 +327,7 @@ function planEligibilitySheetApply_(quarterId) {
       const key = pid + '|' + row[A.POST_ID];
       assignedNow[key] = (assignedNow[key] || 0) + 1;
       if (!assignedDates[key]) assignedDates[key] = [];
-      assignedDates[key].push(toDateString(row[A.SERVICE_DATE], tz));
+      assignedDates[key].push(toDateString_(row[A.SERVICE_DATE], tz));
     });
   }
   removed.forEach(function (r) {
@@ -452,7 +452,7 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
   // ── 新增：先找有沒有一行停用了的，有就重新啟用；沒有才新增一行 ──
   //
   // ⚠️ 不先找就直接新增，同一個人同一個崗位會累積出好幾行
-  // （每停用再加入一次就多一行），而 `readEligibility()` 讀到的是
+  // （每停用再加入一次就多一行），而 `readEligibility_()` 讀到的是
   // 「有沒有一行 Active=TRUE」，所以畫面看起來完全正常，
   // 只有那張表會愈來愈長、愈來愈難看得懂。
   let addedCount = 0;
@@ -496,7 +496,7 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
   // 但要記低，而且回傳畀畫面講一句。
   let dropdownNote = '';
   try {
-    const v = findLatestVersionNo(quarterId);
+    const v = findLatestVersionNo_(quarterId);
     if (v >= 0) applyGridNameDropdowns_(quarterId, v);
   } catch (err) {
     log_('WARN', '名單已套用，但下拉選單未能更新：' + err.message);
@@ -542,7 +542,7 @@ function apiApplyEligibilitySheet_locked_(quarterId, selectedKeys) {
  * （「堂委（現任 6 位：甲、乙……）」，以今日為準）。讀不到身分名單 ⇒ 只寫標籤，不擋預覽。
  * @param {Object.<string, string>} nameById 會就地加入
  * @param {Object} wanted 名單工作表上的 {postId: {id: true}}
- * @param {Object} current `readEligibility()` 的結果
+ * @param {Object} current `readEligibility_()` 的結果
  * @param {string} tz 時區
  */
 function describeEligibilityRoleTokensInto_(nameById, wanted, current, tz) {

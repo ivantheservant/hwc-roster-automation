@@ -115,7 +115,7 @@ function ensurePublicLinksSheet_() {
 function findPublicLinkRow_(quarterId) {
   ensurePublicLinksSheet_();
   const C = COLUMNS.PUBLIC_LINKS;
-  const rows = readSheet(SHEETS.PUBLIC_LINKS);
+  const rows = readSheet_(SHEETS.PUBLIC_LINKS);
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][C.QUARTER_ID] || '').trim() === quarterId) {
       return {
@@ -177,7 +177,7 @@ function upsertPublicLinkRow_(quarterId, fields) {
  * @returns {string} 檔案名稱
  */
 function buildPublicRosterFileName_(quarterId) {
-  const pattern = String(getConfig(
+  const pattern = String(getConfig_(
     CONFIG_KEYS.PUBLIC_ROSTER_FILE_NAME_PATTERN, DEFAULTS.PUBLIC_ROSTER_FILE_NAME_PATTERN));
   return applyPublicRosterFileNamePattern_(pattern, quarterId);
 }
@@ -196,7 +196,7 @@ function applyPublicRosterFileNamePattern_(pattern, quarterId) {
 /**
  * 組出公開試算表要寫入的內容。**這是全個功能唯一決定「公開檔案入面有咩」
  * 的地方**——刻意寫成一個唔碰 `SpreadsheetApp`／`DriveApp` 的純函式（只用
- * `readSheet()`／`getConfig()` 呢類讀取），方便用真正嘅原始碼直接測試
+ * `readSheet_()`／`getConfig_()` 呢類讀取），方便用真正嘅原始碼直接測試
  * 「絕對唔會漏咗啲乜嘢出去」。
  *
  * 第十二輪批次階段 A：版面由「日期做列、崗位做欄」改為「崗位做列、日期做欄」
@@ -225,23 +225,23 @@ function buildPublicRosterContent_(quarterId, versionNo) {
     throw new Error('找不到 ' + quarterId + ' v' + versionNo + ' 的派工紀錄，無法發佈。');
   }
   const layout = buildGridLayout_(quarterId, assignments);
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const posts = readPostsNormalized();
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const posts = readPostsNormalized_();
   // 第七十五輪批次 CC 組：日期下面嗰行標題＝特別主日名稱（如開住）再由每週標題蓋過
   const specialTitleByDate = buildDisplayTitleIndex_(quarterId, timezone);
   // 第十三輪批次階段 A4：日期格式可以喺 Config 調，見
   // transposeRosterForPublicView_() 的 displayOptions 說明。
   const displayOptions = {
-    dateFormatPattern: String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
+    dateFormatPattern: String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
   };
   const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
 
-  const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
-  const showLegend = getConfig(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
-  const footerNote = String(getConfig(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '');
+  const gapColor = getConfig_(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
+  const showLegend = getConfig_(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
+  const footerNote = String(getConfig_(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '');
   // 第十四輪批次階段 A：BLANK 崗位（獻花／翻譯）嘅說明改成圖例入面加一行，
   // 唔再逐格重複寫，見 buildBlankRowLegendEntry_() 檔頭說明。
-  const blankNote = String(getConfig(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '');
+  const blankNote = String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '');
   const blankLegendEntry = buildBlankRowLegendEntry_(blankNote, transposed.blankPendingCount);
   const legendRows = showLegend
     ? buildLegendRows_(layout).concat(blankLegendEntry ? [blankLegendEntry] : [])
@@ -504,7 +504,7 @@ function clearPublicRosterOnQuarterReset_(quarterId) {
  *   created: boolean, recreated: boolean}}
  */
 function publishPublicRoster_(quarterId) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error('季度 ' + quarterId + ' 還沒有任何版本，請先執行「步驟 1：生成初稿」。');
   }
@@ -613,7 +613,7 @@ function evaluatePublicLinkSharing_(access, permission) {
  */
 function checkPublicLinksSharing_() {
   ensurePublicLinksSheet_();
-  return readSheet(SHEETS.PUBLIC_LINKS).map(function (row) {
+  return readSheet_(SHEETS.PUBLIC_LINKS).map(function (row) {
     const C = COLUMNS.PUBLIC_LINKS;
     const quarterId = String(row[C.QUARTER_ID] || '').trim();
     const fileId = String(row[C.FILE_ID] || '').trim();
@@ -767,7 +767,7 @@ function enforcePublicRosterReadOnly_(spreadsheet) {
   } catch (err) {
     log_('WARN', '公開職事表設定分享（只可檢視）失敗：' + err.message);
   }
-  const scriptAccount = String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
+  const scriptAccount = String(getConfig_(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '') || '').trim();
   spreadsheet.getSheets().forEach(function (sheet) {
     try {
       const existing = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);

@@ -9,8 +9,8 @@
  * @returns {{written: number, skipped: number, skippedReasons: Object,
  *   pendingEmail: Object[], updatedPeople: Object[]}} 執行結果
  */
-function applyHwcasDraft(options) {
-  const plan = planHwcasApply();
+function applyHwcasDraft_(options) {
+  const plan = planHwcasApply_();
   const overwrite = !!(options && options.overwriteExisting);
   const targets = overwrite ? plan.applicable : plan.newOnly;
 
@@ -52,7 +52,7 @@ function applyHwcasDraft(options) {
  * @returns {{applicable: Object[], newOnly: Object[], conflicts: Object[],
  *   skipped: Object[], skippedReasons: Object, pendingEmail: Object[], totalRows: number}} 分析結果
  */
-function planHwcasApply() {
+function planHwcasApply_() {
   const rows = readDraftRows_();
   if (rows.length === 0) {
     throw new Error('找不到 ' + SHEETS.NAME_MAPPING_DRAFT + ' 的資料，請先執行「從 HWCAS 取電郵（產生初稿）」');
@@ -143,7 +143,7 @@ function buildPendingEmailList_(applicable, matchedInHwcas) {
   const hwcasNoEmail = [];
   const notInHwcas = [];
 
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const personId = row[COLUMNS.NAME_MAPPING.PERSON_ID];
     const email = String(row[COLUMNS.NAME_MAPPING.EMAIL] || '').trim();
     if (email) return;
@@ -194,7 +194,7 @@ function describeSkipReason_(matchType) {
 function readDraftRows_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.NAME_MAPPING_DRAFT);
   if (!sheet) return [];
-  return readSheet(SHEETS.NAME_MAPPING_DRAFT);
+  return readSheet_(SHEETS.NAME_MAPPING_DRAFT);
 }
 
 /**
@@ -203,7 +203,7 @@ function readDraftRows_() {
  * @returns {Object.<string, {congregation: string, memberType: string}>} 以前綴為鍵的對照表
  */
 function readCongregationPrefixMap_() {
-  const raw = getConfig(CONFIG_KEYS.HWCAS_CONGREGATION_PREFIXES, null);
+  const raw = getConfig_(CONFIG_KEYS.HWCAS_CONGREGATION_PREFIXES, null);
   const entries = (raw && raw.length > 0) ? raw : HWCAS_CONGREGATION_PREFIX_DEFAULT;
 
   const map = {};

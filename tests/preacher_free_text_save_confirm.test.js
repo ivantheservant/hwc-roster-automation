@@ -191,7 +191,7 @@ function buildFixture() {
         [C.RULE_SETTINGS.PRIORITY]: 1 }
     ]);
 
-  // ⚠️ `NameAlias` 一定要有——`resolvePersonId()` 會讀佢。
+  // ⚠️ `NameAlias` 一定要有——`resolvePersonId_()` 會讀佢。
   // 只有喺**真正有人手改動**嗰陣先會行到嗰條路，所以呢張表遲咗先要
   // ——而「遲咗先要」本身就係 A 組修正生效嘅旁證：講員嗰幾格根本冇行到解析。
   ['ROSTER_VERSIONS', 'ROSTER_ASSIGNMENTS', 'SEND_LOG', 'AUDIT_LOG',
@@ -219,7 +219,7 @@ function setGridCell(versionNo, dateStr, postId, text) {
   for (let c = 0; c < keys.length; c++) if (String(keys[c] || '') === postId + '#1') { col = c + 1; break; }
   if (col === -1) return false;
   for (let r = 3; r <= sheet.getLastRow(); r++) {
-    if (gas.toDateString(sheet.getRange(r, 1).getValue(), TZ) === dateStr) {
+    if (gas.toDateString_(sheet.getRange(r, 1).getValue(), TZ) === dateStr) {
       sheet.getRange(r, col).setValue(text);
       return true;
     }
@@ -236,7 +236,7 @@ function setAssignmentSnapshot(versionNo, dateStr, postId, nameText) {
     if (String(sheet.getRange(r, col(A.QUARTER_ID)).getValue()) !== Q) continue;
     if (Number(sheet.getRange(r, col(A.VERSION_NO)).getValue()) !== versionNo) continue;
     if (String(sheet.getRange(r, col(A.POST_ID)).getValue()) !== postId) continue;
-    if (gas.toDateString(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== dateStr) continue;
+    if (gas.toDateString_(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== dateStr) continue;
     sheet.getRange(r, col(A.PERSON_NAME_SNAPSHOT)).setValue(nameText);
     return true;
   }
@@ -244,9 +244,9 @@ function setAssignmentSnapshot(versionNo, dateStr, postId, nameText) {
 }
 function whoIsOn(versionNo, dateStr, postId, field) {
   const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  const row = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).find(function (r) {
+  const row = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).find(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === postId;
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === postId;
   });
   return row ? String(row[field] || '') : '(冇呢一格)';
 }
@@ -353,7 +353,7 @@ console.log('\n=== A：講員已填 ＋ 一筆可套用申報 ⇒ 成功，講�
   check('★★★★★ 成功建立新版本', result.ok === true && result.versionCreated === true,
     JSON.stringify(result).slice(0, 300));
 
-  const v = gas.findLatestVersionNo(Q);
+  const v = gas.findLatestVersionNo_(Q);
   checkEqual('★★★★★ 申報生效', whoIsOn(v, DATES[2], 'READ',
     gas.COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID), target);
   checkEqual('★★★★★ **講員嗰格原封不動**（自由文字跟住新版本帶落去，冇被清除）',

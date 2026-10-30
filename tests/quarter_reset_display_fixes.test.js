@@ -4,7 +4,7 @@
 // B1：Eligibility.Active 是 boolean，`String(x || '').trim()` 會把 `false`
 //     吞成空字串，畫面印出「Active=」睇落好似冇值——改用 displayCellValue_()。
 // B2：Eligibility.AddedAt 是 Date 物件，直接 String() 會印出完整帶時區嘅
-//     英文長格式——改用 toDateString() 輸出 yyyy-MM-dd。
+//     英文長格式——改用 toDateString_() 輸出 yyyy-MM-dd。
 // B3：受保護版本（Protected=TRUE）嘅 PDF 之前唔會受保護——版本登記行／grid／
 //     RosterAssignments 三樣都保得住，但 PDF 冇睇 Protected，照樣被清走。
 //     現在改成 PDF 清理直接重用 planQuarterReset_() 已經算好嘅
@@ -16,7 +16,7 @@ const path = require('path');
 
 const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs']);
 
-// Date 物件經 toDateString() 要用 Utilities.formatDate；測試沙箱嘅 GAS stub
+// Date 物件經 toDateString_() 要用 Utilities.formatDate；測試沙箱嘅 GAS stub
 // 一被呼叫就拋錯，所以換一個確定性替身（做法同 officer_date_input.test.js）。
 gas.Utilities = {
   formatDate: function (date, timezone, format) {
@@ -63,10 +63,10 @@ console.log('\n=== B2【核心】Eligibility.AddedAt：Date 物件要轉成 yyyy
   const asDate = new Date(Date.UTC(2026, 7, 13));   // 2026-08-13
   checkEqual('★★★★★ Date 物件 ⇒ yyyy-MM-dd'
     + '（實測撞到：直接 String(dateObj) 印出 "Thu Aug 13 2026 00:00:00 GMT+1200 …"）',
-    gas.toDateString(asDate, 'Pacific/Auckland'), '2026-08-13');
+    gas.toDateString_(asDate, 'Pacific/Auckland'), '2026-08-13');
   checkEqual('★★★ 空字串 ⇒ 空字串（冇加入時間就唔顯示，唔係印 fallback 文字——'
     + '呢個欄位喺 Menu.gs 自己用 `e.addedAt ? … : \'\'` 判斷有冇值）',
-    gas.toDateString('', 'Pacific/Auckland'), '');
+    gas.toDateString_('', 'Pacific/Auckland'), '');
 }
 
 console.log('\n=== B1／B2：正式碼真係改用咗新寫法，唔係淨係測一份移植版本 ===');
@@ -75,8 +75,8 @@ console.log('\n=== B1／B2：正式碼真係改用咗新寫法，唔係淨係測
     path.join(__dirname, '..', 'src', 'QuarterReset.gs'), 'utf8');
   check('★★★★★ Active 欄位用 displayCellValue_()，唔再用 `|| \'\'`',
     /active:\s*displayCellValue_\(row\[E\.ACTIVE\]\)/.test(source), source);
-  check('★★★★★ AddedAt 欄位用 toDateString()，唔再直接 String()',
-    /addedAt:\s*toDateString\(row\[E\.ADDED_AT\],\s*timezone\)/.test(source), source);
+  check('★★★★★ AddedAt 欄位用 toDateString_()，唔再直接 String()',
+    /addedAt:\s*toDateString_\(row\[E\.ADDED_AT\],\s*timezone\)/.test(source), source);
 }
 
 // ---------------------------------------------------------------------
@@ -143,8 +143,8 @@ console.log('\n=== 階段 C 順帶發現：Diagnostics.gs 嘅 RosterVersions 報
   check('★★★★ ParentVersionNo 欄位用 displayCellValue_()'
     + '（之前 v0 做 Parent 時，`0 || \'\'` 會印成 "Parent=v" 冇個位）',
     /displayCellValue_\(v\[V\.PARENT_VERSION_NO\]\)/.test(source), source);
-  check('★★★ CreatedAt 欄位用 toDateString()，唔再直接 String(Date)',
-    /toDateString\(v\[V\.CREATED_AT\], timezone\)/.test(source), source);
+  check('★★★ CreatedAt 欄位用 toDateString_()，唔再直接 String(Date)',
+    /toDateString_\(v\[V\.CREATED_AT\], timezone\)/.test(source), source);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

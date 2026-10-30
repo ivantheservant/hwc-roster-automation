@@ -110,11 +110,11 @@ console.log('\n=== B3 後端一直都有回 linkedToNameMapping ===');
   const fn = backend.slice(backend.indexOf('function apiSavePreacherTranslationEntry_locked_'));
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3);
   check('★★★★★ 回傳有 linkedToNameMapping', /linkedToNameMapping/.test(body));
-  check('★★★★ 判斷準則係 resolvePersonId() 有冇搵到人',
-    /resolvePersonId\(trimmedName\)/.test(body));
+  check('★★★★ 判斷準則係 resolvePersonId_() 有冇搵到人',
+    /resolvePersonId_\(trimmedName\)/.test(body));
 }
 
-console.log('\n=== B3 核實 resolvePersonId() 嘅判斷準則 ===');
+console.log('\n=== B3 核實 resolvePersonId_() 嘅判斷準則 ===');
 {
   // 呢一段係任務要求嘅「順便核實一次」。結論寫入稽核文件。
   const NM = gas.COLUMNS.NAME_MAPPING;
@@ -128,7 +128,7 @@ console.log('\n=== B3 核實 resolvePersonId() 嘅判斷準則 ===');
   };
 
   // ⚠️ 全部用明顯假嘅 PersonID（P9xxx）同假名——呢個 repo 係公開嘅。
-  gas.readSheet = function (sheetName) {
+  gas.readSheet_ = function (sheetName) {
     if (sheetName === gas.SHEETS.NAME_MAPPING) {
       return [nmRow('P9001', '測試甲'), nmRow('P9002', '測試乙')];
     }
@@ -136,17 +136,17 @@ console.log('\n=== B3 核實 resolvePersonId() 嘅判斷準則 ===');
     return [];
   };
 
-  checkEqual('★★★★ 完全一樣 ⇒ 對得上', gas.resolvePersonId('測試甲'), 'P9001');
+  checkEqual('★★★★ 完全一樣 ⇒ 對得上', gas.resolvePersonId_('測試甲'), 'P9001');
   checkEqual('★★★★★ 經 NameAlias 亦對得上（別名係一條真出路）',
-    gas.resolvePersonId('測試甲別寫'), 'P9001');
+    gas.resolvePersonId_('測試甲別寫'), 'P9001');
   checkEqual('★★★★★ 差一個字 ⇒ **對唔上**，唔會估最接近嗰個'
     + '——估錯就會寄錯人，兩邊都唔知發生咗咩事',
-    gas.resolvePersonId('測試丙'), null);
+    gas.resolvePersonId_('測試丙'), null);
   checkEqual('★★★★★ 前後有空格 ⇒ 對唔上（呼叫端已經 trim，但呢個函式本身唔會）',
-    gas.resolvePersonId(' 測試甲'), null);
+    gas.resolvePersonId_(' 測試甲'), null);
   checkEqual('★★★★★ 全形字 ⇒ 對唔上（冇做全形正規化）'
     + '——所以異體字／輸入法差異一定要靠 NameAlias 明確登記，唔會自動對到',
-    gas.resolvePersonId('測試甲'.replace('甲', 'Ａ')), null);
+    gas.resolvePersonId_('測試甲'.replace('甲', 'Ａ')), null);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

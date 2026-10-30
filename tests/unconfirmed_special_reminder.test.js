@@ -25,9 +25,9 @@ function checkEqual(label, actual, expected) {
 }
 
 // =====================================================================
-// 最細嘅假試算表：只需要支援 readSheet() 用到嘅幾個方法
+// 最細嘅假試算表：只需要支援 readSheet_() 用到嘅幾個方法
 // （getLastRow／getLastColumn／getRange().getValues()）。
-// 每張表：第 1 行說明（readSheet 會跳過）、第 2 行機器鍵、第 3 行起資料。
+// 每張表：第 1 行說明（readSheet_ 會跳過）、第 2 行機器鍵、第 3 行起資料。
 // =====================================================================
 class FakeRange {
   constructor(sheet, row, col, numRows, numCols) {
@@ -130,7 +130,7 @@ function buildGas(opts) {
   }
 
   return loadGasSource(
-    // RosterWriter.gs：resolveRemindReferenceDate_() 會呼叫 findLatestVersionNo()
+    // RosterWriter.gs：resolveRemindReferenceDate_() 會呼叫 findLatestVersionNo_()
     ['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs', 'QuarterStage.gs',
       'RosterWriter.gs', 'Roles.gs', 'AnnualCombined.gs', 'Trigger.gs'],
     {
@@ -159,8 +159,8 @@ console.log('\n=== D2【核心】接近生成日期 + 有未確認特殊主日 �
     generateOn: '2027-03-10',
     specialSundays: [specialRow('2027-05-23', '五月合堂（日期待確認）', 'TRUE', 'FALSE')]
   });
-  const config = gas.readConfig();
-  const quarterRow = gas.readSheet('Quarters')[0];
+  const config = gas.readConfig_();
+  const quarterRow = gas.readSheet_('Quarters')[0];
 
   // 今日 2027-03-05，距離生成日期 5 日（門檻 7 日）→ 應該觸發
   const j = gas.judgeRemindAction_('2027T2', quarterRow, '2027-03-05', config);
@@ -179,8 +179,8 @@ console.log('\n=== D2：仲未接近生成日期 → 唔會因為呢個維度提
     generateOn: '2027-03-10',
     specialSundays: [specialRow('2027-05-23', '五月合堂（日期待確認）', 'TRUE', 'FALSE')]
   });
-  const config = gas.readConfig();
-  const quarterRow = gas.readSheet('Quarters')[0];
+  const config = gas.readConfig_();
+  const quarterRow = gas.readSheet_('Quarters')[0];
 
   // 今日 2027-02-01，距離生成日期 37 日（門檻 7 日）→ 唔應該因為呢個維度觸發
   const j = gas.judgeRemindAction_('2027T2', quarterRow, '2027-02-01', config);
@@ -200,8 +200,8 @@ console.log('\n=== D2【核心】接近生成日期，但全部特殊主日都�
       specialRow('2027-05-23', '舊有嘅特殊主日（Confirmed 欄留空）', 'TRUE', '')
     ]
   });
-  const config = gas.readConfig();
-  const quarterRow = gas.readSheet('Quarters')[0];
+  const config = gas.readConfig_();
+  const quarterRow = gas.readSheet_('Quarters')[0];
   const j = gas.judgeRemindAction_('2027T2', quarterRow, '2027-03-05', config);
 
   check('★★★★★ 全部已確認（含 Confirmed 留空嘅舊列）→ 唔會觸發呢個維度'
@@ -216,8 +216,8 @@ console.log('\n=== D2：Active=FALSE 嘅特殊主日唔會觸發提醒 ===');
     // 幹事已經決定唔用呢一列（例如今年冇堂慶），唔應該再叫佢去確認一個唔會用嘅日期
     specialSundays: [specialRow('2027-05-23', '今年取消', 'FALSE', 'FALSE')]
   });
-  const config = gas.readConfig();
-  const quarterRow = gas.readSheet('Quarters')[0];
+  const config = gas.readConfig_();
+  const quarterRow = gas.readSheet_('Quarters')[0];
   const j = gas.judgeRemindAction_('2027T2', quarterRow, '2027-03-05', config);
   check('★★★★ Active=FALSE 嘅列唔算未確認',
     j.reasons.indexOf('UNCONFIRMED_SPECIAL') === -1, JSON.stringify(j.reasons));
@@ -226,8 +226,8 @@ console.log('\n=== D2：Active=FALSE 嘅特殊主日唔會觸發提醒 ===');
 console.log('\n=== 向後相容【核心】：SpecialSundays 工作表唔存在時唔會拋錯 ===');
 {
   const gas = buildGas({ generateOn: '2027-03-10', specialSundays: null });
-  const config = gas.readConfig();
-  const quarterRow = gas.readSheet('Quarters')[0];
+  const config = gas.readConfig_();
+  const quarterRow = gas.readSheet_('Quarters')[0];
 
   let threw = null;
   let j = null;
@@ -235,7 +235,7 @@ console.log('\n=== 向後相容【核心】：SpecialSundays 工作表唔存在�
     j = gas.judgeRemindAction_('2027T2', quarterRow, '2027-03-05', config);
   } catch (e) { threw = e; }
 
-  check('★★★★★ 工作表未建立時唔會拋錯（readSheet() 本身係會拋「找不到工作表」嘅，'
+  check('★★★★★ 工作表未建立時唔會拋錯（readSheet_() 本身係會拋「找不到工作表」嘅，'
     + '所以一定要行 readOptionalSheet_()）', threw === null, threw && threw.message);
   check('★★★★ 而且唔會因為呢個維度觸發提醒',
     j && j.reasons.indexOf('UNCONFIRMED_SPECIAL') === -1, j && JSON.stringify(j.reasons));
@@ -248,8 +248,8 @@ console.log('\n=== 唔影響既有兩個維度：Stage=OFFICIAL_SENT 時一律�
     stage: 'OFFICIAL_SENT',
     specialSundays: [specialRow('2027-05-23', '五月合堂（日期待確認）', 'TRUE', 'FALSE')]
   });
-  const config = gas.readConfig();
-  const quarterRow = gas.readSheet('Quarters')[0];
+  const config = gas.readConfig_();
+  const quarterRow = gas.readSheet_('Quarters')[0];
   const j = gas.judgeRemindAction_('2027T2', quarterRow, '2027-03-05', config);
 
   checkEqual('★★★★★ 已經正式發出嘅季度唔會因為新維度而被提醒'

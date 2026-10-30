@@ -161,9 +161,9 @@ gas.writeToPossiblyProtectedGridSheet_ = function (sheet, fn) { fn(); return fal
 })();
 
 function flowerRow(versionNo, dateStr) {
-  return gas.readSheet(S.ROSTER_ASSIGNMENTS).find(function (r) {
+  return gas.readSheet_(S.ROSTER_ASSIGNMENTS).find(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === 'FLOWER';
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === 'FLOWER';
   });
 }
 /** 直接改長表某一格嘅 AssignSource——模擬「生成器錯誤地自己排咗」。 */
@@ -175,7 +175,7 @@ function setFlowerSource(versionNo, dateStr, source) {
     if (String(sheet.getRange(r, col(A.QUARTER_ID)).getValue()) !== Q) continue;
     if (Number(sheet.getRange(r, col(A.VERSION_NO)).getValue()) !== versionNo) continue;
     if (String(sheet.getRange(r, col(A.POST_ID)).getValue()) !== 'FLOWER') continue;
-    if (gas.toDateString(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== dateStr) continue;
+    if (gas.toDateString_(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== dateStr) continue;
     sheet.getRange(r, col(A.ASSIGN_SOURCE)).setValue(source);
     return true;
   }
@@ -204,7 +204,7 @@ function gridCell(versionNo, dateStr, postId) {
   const keys = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0];
   const col = keys.indexOf(postId + '#1') + 1;
   for (let r = 3; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) === dateStr) return String(sh.getRange(r, col).getValue());
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) === dateStr) return String(sh.getRange(r, col).getValue());
   }
   return null;
 }
@@ -250,7 +250,7 @@ console.log('\n=== BC1／BC4　已正式發出 ⇒ 不改 RosterAssignments，�
   check('★★★★★★ RosterAssignments **完全冇動**（已寄出嗰一版嘅內容唔可以被改寫）',
     JSON.stringify(flowerRow(0, target)) === rowBefore, JSON.stringify(flowerRow(0, target)));
   check('★★★★★ grid 工作表嗰一格已經有人名', gridCell(0, target, 'FLOWER') === PEOPLE.P9703, gridCell(0, target, 'FLOWER'));
-  const audit = gas.readSheet(S.AUDIT_LOG).filter(function (r) { return r[C.AUDIT_LOG.ACTION] === 'FILL_PREACHER_TRANSLATION'; });
+  const audit = gas.readSheet_(S.AUDIT_LOG).filter(function (r) { return r[C.AUDIT_LOG.ACTION] === 'FILL_PREACHER_TRANSLATION'; });
   check('★★★★ AuditLog 記一行，備註講明只寫工作表',
     audit.length > 0 && /只寫了職事表工作表/.test(String(audit[audit.length - 1][C.AUDIT_LOG.NOTES])),
     JSON.stringify(audit.slice(-1)));
@@ -319,7 +319,7 @@ console.log('\n=== BC8　〔儲存及寄出〕之後：工作表上嗰格成為�
   check('★★★★★ 兩格都偵測到', (plan.gridChanges || []).length === 2, JSON.stringify(plan.gridChanges).slice(0, 400));
   const result = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('★★★★★ 建立新版本', result.ok === true && result.versionCreated === true, JSON.stringify(result).slice(0, 300));
-  const v1 = gas.findLatestVersionNo(Q);
+  const v1 = gas.findLatestVersionNo_(Q);
   check('★★★★ 新版本號 = 1', v1 === 1);
   const r2 = flowerRow(1, DATES[2]);
   const r3 = flowerRow(1, DATES[3]);

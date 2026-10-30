@@ -103,7 +103,7 @@ function describeEligibilityRoleToken_(roleCode, roles, nameById, dateStr, maxNa
 /**
  * 經身分代號展開的候選人（候選池超集）＋「只經身分取得資格」的人。**純函式。**
  *
- * @param {Object} eligibility `readEligibility()` 的結果（要有 `rolesByPost`）
+ * @param {Object} eligibility `readEligibility_()` 的結果（要有 `rolesByPost`）
  * @param {Object[]} roles `readRolesSafe_()` 的結果
  * @returns {{addByPost: Object.<string, string[]>, roleOnlyByPost: Object.<string, Object.<string, string[]>>}}
  *   addByPost＝要加入候選池的人；roleOnlyByPost[postId][personId]＝此人經哪幾個身分取得資格
@@ -137,7 +137,7 @@ function buildEligibilityRoleExpansion_(eligibility, roles) {
 /**
  * 經身分加入的人沿用原本那一行的 HistoricalCount（就地補入 `eligibility.historicalCount`）。
  * 名字本身在名單上的人照舊；從來沒有那一行的人＝0（新任，確實沒有歷史）。
- * @param {Object} eligibility `readEligibility()` 的結果（會就地修改 historicalCount）
+ * @param {Object} eligibility `readEligibility_()` 的結果（會就地修改 historicalCount）
  * @param {Object.<string, Object.<string, string[]>>} roleOnlyByPost `buildEligibilityRoleExpansion_()` 的結果
  * @returns {void}
  */
@@ -172,7 +172,7 @@ function eligibilityRoleTokenFailure_(context, postId, personId, dateStr) {
 
 /**
  * 顯示／輸入用：某崗位名單「名字＋身分代號」的完整清單（崗位名單工作表、預覽用）。
- * @param {Object} eligibility `readEligibility()` 的結果
+ * @param {Object} eligibility `readEligibility_()` 的結果
  * @param {string} postId 崗位
  * @returns {string[]} PersonID 與身分代號（`ROLE:…`）
  */
@@ -184,7 +184,7 @@ function eligibilityEntriesOfPost_(eligibility, postId) {
 
 /**
  * 某一日的候選名單（名字＋當日現任）——按崗位列人的畫面（排表偏好、選單等）用。
- * @param {Object} eligibility `readEligibility()` 的結果
+ * @param {Object} eligibility `readEligibility_()` 的結果
  * @param {Object[]} roles `readRolesSafe_()` 的結果
  * @param {string} postId 崗位
  * @param {string} dateStr yyyy-MM-dd

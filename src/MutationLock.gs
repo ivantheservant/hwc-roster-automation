@@ -20,7 +20,7 @@
  *
  * 而繞過去的後果不是「多做一次」——是**兩個請求同時在改同一批資料**：
  *
- *   ・兩邊各自 `findLatestVersionNo()` 讀到同一個 v，
+ *   ・兩邊各自 `findLatestVersionNo_()` 讀到同一個 v，
  *     然後各自建立 `Roster_..._v(N+1)` ⇒ 第二個 `insertSheet()` 撞名失敗，
  *     而第一個已經寫了一半 `RosterAssignments`
  *   ・或者兩個版本都建立成功，而 `RosterVersions` 有兩行 v(N+1)

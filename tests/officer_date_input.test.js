@@ -5,7 +5,7 @@
 // 點解要收窄
 // ─────────────────────────────────────────────────────────────────────
 //
-// `toDateString()` 接受 `dd/MM/yyyy`，即係 `05/06/2027` 一律當**6 月 5 日**。
+// `toDateString_()` 接受 `dd/MM/yyyy`，即係 `05/06/2027` 一律當**6 月 5 日**。
 // 呢個係**無聲噉猜**——猜錯就係把人排錯主日，而且冇任何提示。
 //
 // 而且原本嘅錯誤訊息寫「斜線、句點、日月倒轉、全形數字都認不出來」，
@@ -108,14 +108,14 @@ console.log('\n=== C2【核心】訊息同實際行為必須一致 ===');
 
 console.log('\n=== C3【核心】兩個函式各自服務一邊，唔可以混用 ===');
 {
-  // `toDateString()` 服務「讀系統寫入嘅資料」——**唔可以收緊**，
+  // `toDateString_()` 服務「讀系統寫入嘅資料」——**唔可以收緊**，
   // 否則既有資料會讀唔到。
-  checkEqual('★★★★★ toDateString() 仍然收斜線'
+  checkEqual('★★★★★ toDateString_() 仍然收斜線'
     + '（Requests 有一行歷史紀錄係 2027/05/09、已 APPLIED，'
     + '收緊嘅話讀嗰行就會出事）',
-    gas.toDateString('2027/05/09', TZ), '2027-05-09');
-  checkEqual('★★★★ toDateString() 仍然收 dd/MM/yyyy（既有資料相容）',
-    gas.toDateString('09/05/2027', TZ), '2027-05-09');
+    gas.toDateString_('2027/05/09', TZ), '2027-05-09');
+  checkEqual('★★★★ toDateString_() 仍然收 dd/MM/yyyy（既有資料相容）',
+    gas.toDateString_('09/05/2027', TZ), '2027-05-09');
 
   checkEqual('★★★★★ 但同一個字串，幹事輸入路徑唔收'
     + '——兩個函式服務唔同一邊，呢個分家就係階段 C 嘅重點',
@@ -125,7 +125,7 @@ console.log('\n=== C3【核心】兩個函式各自服務一邊，唔可以混�
   const fs = require('fs');
   const path = require('path');
   const utils = fs.readFileSync(path.join(__dirname, '..', 'src', 'Utils.gs'), 'utf8');
-  check('★★★★ toDateString() 有寫明服務「讀系統寫入嘅資料」同埋唔可以收緊',
+  check('★★★★ toDateString_() 有寫明服務「讀系統寫入嘅資料」同埋唔可以收緊',
     utils.indexOf('讀系統自己寫入嘅資料') !== -1 && utils.indexOf('唔可以收緊') !== -1);
   check('★★★★ parseOfficerDateInput_() 有寫明服務幹事輸入',
     utils.indexOf('幹事輸入**嘅日期，只收兩種寫法') !== -1
@@ -151,9 +151,9 @@ console.log('\n=== C：認唔到嘅日期唔可以被靜靜略過 ===');
   const fn = src.slice(src.indexOf('function readPendingRequests_'));
   const body = fn.slice(0, fn.indexOf('\n}\n') + 3);
 
-  check('★★★★★ readPendingRequests_ 用 parseOfficerDateInput_，唔再用 toDateString',
+  check('★★★★★ readPendingRequests_ 用 parseOfficerDateInput_，唔再用 toDateString_',
     body.indexOf('parseOfficerDateInput_(') !== -1
-      && body.indexOf('toDateString(row[dateCol]') === -1, body.slice(0, 400));
+      && body.indexOf('toDateString_(row[dateCol]') === -1, body.slice(0, 400));
   check('★★★★★ 認唔到嘅日期照樣傳落去（由 validateRequest_ 報 NEEDS_INPUT），'
     + '唔可以當成空白 return 走——噉樣就變成靜靜吞咗一筆申報',
     body.indexOf('rawDateText') !== -1);

@@ -234,7 +234,7 @@ function buildIcsCalendarText_(opts) {
  */
 function readEarlyArrivalMinutesByPost_() {
   var map = {};
-  readPostsNormalized().forEach(function (p) {
+  readPostsNormalized_().forEach(function (p) {
     map[p.postId] = p.earlyArrivalMinutes || 0;
   });
   return map;
@@ -270,10 +270,10 @@ function buildIcsAttachmentForPerson_(context, recipient, personAssignments) {
   // 長格式，落到 shiftIcsLocalDateTime_() 就會算出 NaN 日期，寄出嘅 ICS
   // 附件時間全部係壞嘅。詳細成因見 normalizeTimeOfDay_()（Utils.gs）檔頭。
   var defaultStart = normalizeTimeOfDay_(
-    getConfig(CONFIG_KEYS.ICS_SERVICE_START_TIME, DEFAULTS.ICS_SERVICE_START_TIME),
+    getConfig_(CONFIG_KEYS.ICS_SERVICE_START_TIME, DEFAULTS.ICS_SERVICE_START_TIME),
     DEFAULTS.ICS_SERVICE_START_TIME);
   var defaultEnd = normalizeTimeOfDay_(
-    getConfig(CONFIG_KEYS.ICS_SERVICE_END_TIME, DEFAULTS.ICS_SERVICE_END_TIME),
+    getConfig_(CONFIG_KEYS.ICS_SERVICE_END_TIME, DEFAULTS.ICS_SERVICE_END_TIME),
     DEFAULTS.ICS_SERVICE_END_TIME);
 
   var icsText = buildIcsCalendarText_({

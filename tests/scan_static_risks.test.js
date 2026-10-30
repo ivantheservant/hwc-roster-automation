@@ -146,42 +146,42 @@ console.log('\n=== 規則 6【核心】由渲染輸出反推資料（第二十�
   const badBody = [
     'function detect_(context) {',
     '  const gridText = context.gridValues[key];',
-    '  const id = resolvePersonId(gridText);',
+    '  const id = resolvePersonId_(gridText);',
     '}'
   ].join('\n');
-  check('★★★★★ 讀 grid 文字之後直接 resolvePersonId ⇒ 要捉到'
+  check('★★★★★ 讀 grid 文字之後直接 resolvePersonId_ ⇒ 要捉到'
     + '（呢個就係令「把人手改動寫成新版本」喺有合堂嘅季度完全用唔到嗰個寫法）',
-    scanner.shouldFlagReversal('  const id = resolvePersonId(gridText);', badBody));
+    scanner.shouldFlagReversal('  const id = resolvePersonId_(gridText);', badBody));
 
   // 修正之後：行渲染器比對
   const goodBody = [
     'function detect_(context) {',
     '  const gridText = context.gridValues[key];',
     '  const expected = renderExpectedGridText_(a, a.postId, a.serviceDate, context.gridRender);',
-    '  const id = resolvePersonId(gridText);',
+    '  const id = resolvePersonId_(gridText);',
     '}'
   ].join('\n');
   check('★★★★★ 反向：已經行渲染器比對就唔報'
     + '（否則修好咗都會一直嘈，冇人會再睇）',
-    !scanner.shouldFlagReversal('  const id = resolvePersonId(gridText);', goodBody));
+    !scanner.shouldFlagReversal('  const id = resolvePersonId_(gridText);', goodBody));
 
   // 表單輸入唔應該報——呢個係實測撞到嘅誤報
   const formBody = [
     'function saveFill_(quarterId, postId, name) {',
     '  const trimmedName = String(name).trim();',
     '  const sheetName = buildRosterSheetName_(quarterId, versionNo);',
-    '  const personId = resolvePersonId(trimmedName) || \'\';',
+    '  const personId = resolvePersonId_(trimmedName) || \'\';',
     '}'
   ].join('\n');
   check('★★★★★ 反向：表單輸入（側邊欄打字）唔報'
     + '——反推本來就係佢嘅工作。第一版用「有冇掂過 grid」做訊號，'
     + '就係喺呢度誤報咗（嗰個函式只係之後會**寫入** grid）',
     !scanner.shouldFlagReversal(
-      '  const personId = resolvePersonId(trimmedName) || \'\';', formBody));
+      '  const personId = resolvePersonId_(trimmedName) || \'\';', formBody));
 
   check('★★★★ 變數名講明係格內容嘅話，即使冇 gridValues 都報',
     scanner.shouldFlagReversal(
-      '  const id = resolvePersonId(cellText);', 'function f_() {\n  const id = resolvePersonId(cellText);\n}'));
+      '  const id = resolvePersonId_(cellText);', 'function f_() {\n  const id = resolvePersonId_(cellText);\n}'));
 }
 
 console.log('\n=== I2：報告要寫得成檔案（唔可以淨係印喺 console）===');

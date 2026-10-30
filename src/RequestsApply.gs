@@ -45,12 +45,12 @@ function readPendingRequests_(quarterId) {
   const personCol = keys.indexOf(C.PERSON_NAME);
   const typeCol = keys.indexOf(C.REQUEST_TYPE);
 
-  // 追加階段 AB：日期欄一律經 toDateString() 正規化成 yyyy-MM-dd 再往下傳。
+  // 追加階段 AB：日期欄一律經 toDateString_() 正規化成 yyyy-MM-dd 再往下傳。
   // 由下拉選單揀入的日期，Google 試算表會自動辨識成真正的日期值，讀出來是
   // Date 物件；原本這裡用 String() 直接轉，會得出
   // 「Sun Oct 04 2026 00:00:00 GMT+1300 (New Zealand Daylight Time)」，
   // 跟已正規化的 ServiceDates 永遠對不上，令所有申報被誤判成 NEEDS_INPUT。
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   // ⚠️⚠️ 第六十三輪批次 E 組：**QuarterID 唔可以一對唔上就靜靜略過。**
   //
@@ -69,7 +69,7 @@ function readPendingRequests_(quarterId) {
   // ⚠️ 空白而日期又認唔到 ⇒ 判斷唔到屬於邊一季，仍然唔會喺呢一季出現。
   const targetQuarter = String(quarterId || '').toUpperCase();
   const quarterDates = {};
-  readServiceDatesNormalized(quarterId, timezone).forEach(function (d) {
+  readServiceDatesNormalized_(quarterId, timezone).forEach(function (d) {
     if (d.serviceDate) quarterDates[d.serviceDate] = true;
   });
 
@@ -148,11 +148,11 @@ function readPendingRequests_(quarterId) {
  */
 function readVersionRuleFlags_(quarterId, versionNo) {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const map = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId || Number(row[C.VERSION_NO]) !== versionNo) return;
-    const key = cellKey_(toDateString(row[C.SERVICE_DATE], timezone), row[C.POST_ID], row[C.SLOT_INDEX]);
+    const key = cellKey_(toDateString_(row[C.SERVICE_DATE], timezone), row[C.POST_ID], row[C.SLOT_INDEX]);
     map[key] = splitList_(row[C.RULE_FLAGS]);
   });
   return map;
@@ -184,7 +184,7 @@ function readVersionRuleFlags_(quarterId, versionNo) {
 function buildRequestConflictKeys_(pending) {
   const typesByKey = {};
   pending.forEach(function (req) {
-    const personId = resolvePersonId(req.personNameText);
+    const personId = resolvePersonId_(req.personNameText);
     if (!personId) return;
     const key = personId + '|' + req.serviceDateText;
     if (!typesByKey[key]) typesByKey[key] = {};
@@ -224,7 +224,7 @@ function scanPendingRequestsAllQuarters_() {
   try {
     const R = COLUMNS.REQUESTS;
     const seen = {};
-    readSheet(SHEETS.REQUESTS).forEach(function (row) {
+    readSheet_(SHEETS.REQUESTS).forEach(function (row) {
       const qid = String(row[R.QUARTER_ID] || '').trim();
       if (qid && !seen[qid]) { seen[qid] = true; allQuarterIds.push(qid); }
     });
@@ -240,7 +240,7 @@ function scanPendingRequestsAllQuarters_() {
       const personId = key.slice(0, sep);
       const date = key.slice(sep + 1);
       const requests = pending.filter(function (r) {
-        return resolvePersonId(r.personNameText) === personId && r.serviceDateText === date;
+        return resolvePersonId_(r.personNameText) === personId && r.serviceDateText === date;
       });
       return { personId: personId, date: date, requests: requests };
     });
@@ -301,7 +301,7 @@ function validateRequest_(req, context, assignByKey, conflictKeys) {
   // AutoGenerate=FALSE 的崗位（講員／翻譯／獻花等）不會落入上面那個判斷式——
   // 那是「留給人手安排」，不是「崗位不存在」，本來就應該仍可申報，不需要額外處理。
 
-  const personId = resolvePersonId(req.personNameText);
+  const personId = resolvePersonId_(req.personNameText);
   if (!personId) {
     return { category: 'NEEDS_INPUT', reason: '名單上找不到「' + req.personNameText + '」。如果是新人，請先用「新增人員」加入；如果是舊人，請留意同音字或異體字。' };
   }
@@ -391,7 +391,7 @@ function resolveDesignatedSlot_(workingByKey, serviceDate, post, personId) {
  *   skippedIncompleteCount 為日期／崗位／姓名／類型未填滿四欄而被整行略過的申報數
  */
 function planApplyRequests_(quarterId) {
-  const baseVersionNo = findLatestVersionNo(quarterId);
+  const baseVersionNo = findLatestVersionNo_(quarterId);
   if (baseVersionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」');
 
   const context = buildFineTuneContext_(quarterId, baseVersionNo);
@@ -658,7 +658,7 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
     }
   });
 
-  const newVersionNo = findLatestVersionNo(plan.quarterId) + 1;
+  const newVersionNo = findLatestVersionNo_(plan.quarterId) + 1;
   const assignments = Object.keys(workingByKey).map(function (k) { return workingByKey[k]; });
 
   // 第十九輪批次階段 A2：幹事喺 grid 上嘅人手改動而家會跟住新版本一齊
@@ -745,25 +745,25 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
 
   // 先建 grid 工作表：若名稱衝突會在寫入長表之前就中止，避免留下孤兒資料列
   // （同 MultiRun.gs 的 performRosterGeneration_() 既有慣例）。
-  const sheetName = createRosterSheet(plan.quarterId, newVersionNo, assignments, warnings);
-  writeAssignments(plan.quarterId, newVersionNo, assignments);
+  const sheetName = createRosterSheet_(plan.quarterId, newVersionNo, assignments, warnings);
+  writeAssignments_(plan.quarterId, newVersionNo, assignments);
 
   // 階段 A（收尾輪）新增：這裡的道理跟 performRosterGeneration_() 的
-  // registerVersion() 那段完全一樣——Apps Script 沒有交易機制，grid 工作表與
+  // registerVersion_() 那段完全一樣——Apps Script 沒有交易機制，grid 工作表與
   // RosterAssignments 這時已經真正寫入了。原本這裡之後的五個寫入
-  // （registerVersion／markPendingBackfillCells_／writeNewEligibilityRows_／
+  // （registerVersion_／markPendingBackfillCells_／writeNewEligibilityRows_／
   // writeNewUnavailableRows_／writeRequestOutcomes_）完全沒有保護，任何一個
   // 中途失敗（配額錯誤、Apps Script 執行逾時等）都會留下「有 grid 工作表、有
   // RosterAssignments 列，但 RosterVersions 沒有登記」的孤兒版本，而且 Requests
   // 那批申報的 RequestID 仍然空白（writeRequestOutcomes_ 是最後一步）——幹事
   // 完全不知道發生過什麼事，重新執行本步驟時，如果孤兒版本連 RosterVersions
-  // 都沒登記，findLatestVersionNo() 還是會算出同一個版本號，createRosterSheet()
+  // 都沒登記，findLatestVersionNo_() 還是會算出同一個版本號，createRosterSheet_()
   // 會直接因為「工作表已存在」而失敗，卡住整個流程。
   // 這裡跟步驟 1 一樣不嘗試自動回滾，只把已經寫了什麼、需要人手怎麼處理講清楚。
   let newEligibilityCount = 0;
   let newUnavailableCount = 0;
   try {
-    registerVersion(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false, versionNote || '',
+    registerVersion_(plan.quarterId, newVersionNo, sheetName, basis || VERSION_VALUES.BASIS_REQUESTS_APPLIED, plan.baseVersionNo, warnings.length, false, versionNote || '',
       // 第七十七輪批次 EC 組：有人手改動就記低格數（來源會寫「套用修改申報後＋人手改動 N 格」）
       changeCounts || null);
     markPendingBackfillCells_(sheetName, pendingBackfillCells);
@@ -800,7 +800,7 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
   // 現場（第五十五輪實測）：
   //
   //     ⚠️ I09｜預期 v3｜實際 v2｜PublicLinks.LastPublishedVersion=2；
-  //     findLatestVersionNo()=3
+  //     findLatestVersionNo_()=3
   //
   // v2 係「儲存並確認」造嘅（有發佈），v3 係步驟 3 套用修改申報
   // 造嘅——冇發佈。收到連結嘅人開連結見到嘅係 v2。
@@ -1144,8 +1144,8 @@ function markPendingBackfillCells_(sheetName, cells) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error('找不到工作表: ' + sheetName);
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const fillColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const fillColor = getConfig_(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
 
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
@@ -1154,7 +1154,7 @@ function markPendingBackfillCells_(sheetName, cells) {
 
   const rowByDate = {};
   dateValues.forEach(function (row, i) {
-    const d = toDateString(row[0], timezone);
+    const d = toDateString_(row[0], timezone);
     if (d) rowByDate[d] = i + 3;
   });
   const colByKey = {};
@@ -1202,16 +1202,16 @@ function listPendingBackfillCells_(quarterId, versionNo) {
   const lastCol = sheet.getLastColumn();
   if (lastRow < 3) return [];
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
 
   const pendingKeys = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId || Number(row[C.VERSION_NO]) !== versionNo) return;
     // 第七十六輪批次 DB 組：「有冇人」同一個定義（有 PersonID 或者有名都算有人）
     if (isCellFilled_(row[C.PERSON_ID], row[C.PERSON_NAME_SNAPSHOT]) || row[C.ASSIGN_SOURCE] !== ASSIGN_SOURCE.SKIPPED) return;
     if (splitList_(row[C.RULE_FLAGS]).indexOf(RULE_IDS.ELIGIBILITY) === -1) return;
-    const key = cellKey_(toDateString(row[C.SERVICE_DATE], timezone), row[C.POST_ID], row[C.SLOT_INDEX]);
+    const key = cellKey_(toDateString_(row[C.SERVICE_DATE], timezone), row[C.POST_ID], row[C.SLOT_INDEX]);
     pendingKeys[key] = true;
   });
   if (Object.keys(pendingKeys).length === 0) return [];
@@ -1222,7 +1222,7 @@ function listPendingBackfillCells_(quarterId, versionNo) {
 
   const results = [];
   for (let r = 0; r < dateValues.length; r++) {
-    const dateStr = toDateString(dateValues[r][0], timezone);
+    const dateStr = toDateString_(dateValues[r][0], timezone);
     for (let c = 3; c < keys.length; c++) {
       const rawKey = String(keys[c] || '');
       const hashIdx = rawKey.indexOf('#');
@@ -1279,7 +1279,7 @@ function writeNewEligibilityRows_(rows) {
  *
  * 追加階段 AC：申報的語意是「當日整日不能服侍」（堂委的回覆通常是「某人去了外地」，
  * 不是「某人那日不想做讀經但可以做司事」），所以一律 AppliesTo=ALL、PostIds 留空，
- * 不再限定單一崗位。`readUnavailableNormalized()` 本來就把 AppliesTo 留空的情況
+ * 不再限定單一崗位。`readUnavailableNormalized_()` 本來就把 AppliesTo 留空的情況
  * 預設成 APPLIES_TO_ALL，這裡明確填 'ALL' 是同一個意思，寫清楚而已。
  *
  * @param {Object[]} rows 要新增的資料，每項為 {personId, dateFrom, dateTo,
@@ -1434,7 +1434,7 @@ function describeUnknownRequestDate_(dateText, quarterId) {
   // 第二十一輪批次階段 C2：訊息必須同**實際接受嘅格式**完全一致。
   //
   // 修正之前呢句寫「斜線、句點、日月倒轉、全形數字都認不出來」，
-  // 但當時 toDateString() 其實收斜線同日月倒轉——幹事照住訊息改，
+  // 但當時 toDateString_() 其實收斜線同日月倒轉——幹事照住訊息改，
   // 反而改到一個系統會靜靜猜錯嘅寫法。而家兩邊一致：
   // 只收「儲存格本身是日期值」同「文字 yyyy-MM-dd」。
   if (parseFailed) {

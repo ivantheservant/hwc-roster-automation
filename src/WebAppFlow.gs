@@ -43,8 +43,8 @@
 function apiGetFlowState(quarterId) {
   assertWebAppRequestAllowed_();
   const stage = getQuarterStage_(quarterId);
-  const latestVersionNo = findLatestVersionNo(quarterId);
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const latestVersionNo = findLatestVersionNo_(quarterId);
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
 
   const step1 = { versionExists: latestVersionNo >= 0 };
   if (step1.versionExists) {
@@ -59,7 +59,7 @@ function apiGetFlowState(quarterId) {
   const availability = computeFiveStepAvailability_(stage, step1.versionExists);
 
   // 階段 D（收尾輪）修正：原本三個 lastSentAt 各自呼叫 findLastSendTimestamp_()，
-  // 即各自獨立呼叫一次 readSheet(SHEETS.SEND_LOG)——同一次 apiGetFlowState() 執行
+  // 即各自獨立呼叫一次 readSheet_(SHEETS.SEND_LOG)——同一次 apiGetFlowState() 執行
   // 內把整張 SendLog 完整讀了三次。SendLog 只會隨使用時間單調增長（目前已有幾百行，
   // 沒有歸檔機制，見 docs/系統範圍稽核.md 階段 D 的規模壓力評估），這個函式在
   // Web UI 幾乎每個操作之後都會被呼叫一次（見 Script.html 的 closeWizardAndRefresh()），
@@ -90,7 +90,7 @@ function apiGetFlowState(quarterId) {
 function findVersionCreatedAt_(quarterId, versionNo) {
   const V = COLUMNS.ROSTER_VERSIONS;
   let found = null;
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     if (row[V.QUARTER_ID] === quarterId && Number(row[V.VERSION_NO]) === versionNo) {
       found = String(row[V.CREATED_AT] || '') || null;
     }
@@ -114,7 +114,7 @@ function findLastSendTimestampsByStage_(quarterId, stages) {
   const latestByStage = {};
   stages.forEach(function (s) { latestByStage[s] = null; });
 
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
     const stage = row[C.STAGE];
     if (stages.indexOf(stage) === -1) return;
@@ -576,7 +576,7 @@ function apiStep5Plan(quarterId, sendOptions) {
     confirmGroups: confirmGroups,
     // 第六十三輪批次 T 組：附件同日曆檔
     contents: describeConfirmContents_(MAIL_STAGES.RESEND, sendOptions),
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     // 第六十七輪批次 AG／AH 組
     sendWarnings: summariseVersionSendWarnings_(quarterId, changedPlan.versionNo),
     // 第七十七輪批次 EG 組
@@ -845,7 +845,7 @@ function buildUnreachablePeople_(quarterId, versionNo) {
   const out = { people: [], externalNameCount: 0, error: '' };
   try {
     const v = (versionNo === null || versionNo === undefined || versionNo === '')
-      ? findLatestVersionNo(quarterId) : Number(versionNo);
+      ? findLatestVersionNo_(quarterId) : Number(versionNo);
     if (isNaN(v) || v < 0) return out;
     // 第七十六輪批次 DC 組：同第 4 步紙本名單同一份（`splitVersionPeopleForNotice_()`），人數一定一樣
     const split = splitVersionPeopleForNotice_(quarterId, v);

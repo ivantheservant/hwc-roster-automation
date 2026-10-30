@@ -6,7 +6,7 @@
 // ═════════════════════════════════════════════════════════════════════
 //
 //     ⚠️ 不變量：I09｜預期 v1｜實際 v0｜PublicLinks.LastPublishedVersion=0；
-//     findLatestVersionNo()=1。不一致代表收信的人開連結看到的，不是最新那一版。
+//     findLatestVersionNo_()=1。不一致代表收信的人開連結看到的，不是最新那一版。
 //
 // S14 經「進階功能 ▸ 重新生成初稿」造出 v1。v1 造咗出嚟，
 // 但 `PublicLinks.LastPublishedVersion` 仍然係 0。
@@ -103,7 +103,7 @@ function freshSandbox(opts) {
   gas.countDistinctServiceDates_ = function () { return 13; };
   gas.countDistinctPosts_ = function () { return 8; };
   gas.log_ = function () {};
-  gas.readSheet = function () { return []; };
+  gas.readSheet_ = function () { return []; };
   gas.SpreadsheetApp = {
     getActiveSpreadsheet: function () {
       return { toast: function () {} };

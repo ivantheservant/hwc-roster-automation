@@ -33,7 +33,7 @@ const P = gas.COLUMNS.POSTS;
 gas.assertWebAppRequestAllowed_ = function () {};
 gas.beginSheetReadMemo_ = function () {};
 gas.endSheetReadMemo_ = function () {};
-gas.getConfig = function (key, fallback) { return fallback; };
+gas.getConfig_ = function (key, fallback) { return fallback; };
 gas.Utilities = { formatDate: function () { return '2026-08-18'; } };
 // 假電郵動態組出嚟——見 name_mapping_crud.test.js 嘅說明。
 const FAKE_ACTOR = 'tester' + '@' + ['exam', 'ple', '.', 'invalid'].join('');
@@ -66,8 +66,8 @@ function eligRow(o) {
 
 console.log('\n=== E3【核心】「有資格」＝ Eligible 同 Active 兩樣都 TRUE ===');
 {
-  gas.readPosts = function () { return [postRow('READ', '讀經'), postRow('WORSHIP', '領詩')]; };
-  gas.readSheet = function (name) {
+  gas.readPosts_ = function () { return [postRow('READ', '讀經'), postRow('WORSHIP', '領詩')]; };
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.NAME_MAPPING) {
       return [personRow('P9001', '測試甲'), personRow('P9002', '測試乙')];
     }

@@ -130,7 +130,7 @@ console.log('\n=== F【核心】Config 關咗就完全唔截 ===');
   check('★★★★★ 讀 `PDF_ROSTER_ONLY`，唔係 true 就回 undefined'
     + '（回 undefined ＝ `exportSheetAsPdfBlob_()` 一個參數都唔加，'
     + '即係同今日一模一樣）',
-    /getConfig\(CONFIG_KEYS\.PDF_ROSTER_ONLY, DEFAULTS\.PDF_ROSTER_ONLY\) !== true/.test(body)
+    /getConfig_\(CONFIG_KEYS\.PDF_ROSTER_ONLY, DEFAULTS\.PDF_ROSTER_ONLY\) !== true/.test(body)
       && /return undefined;/.test(body), body.slice(0, 400));
   check('★★★★★ 而且 `findRosterGridLastRow_()` 回 0 嗰陣都回 undefined'
     + '——傳 `{lastRow: 0}` 落去會變成 `r2=0`，即係一份空白 PDF',
@@ -229,7 +229,7 @@ console.log('\n=== F：設欄寬嗰個函式本身 ===');
     /try \{\s*\n\s*applyGridColumnWidthsForA4_\(sheet, layout\);\s*\n\s*\} catch/
       .test(writerBare), '');
   check('★★★★ 但唔可以靜靜失敗——要寫 log',
-    /log_\('WARN', 'createRosterSheet：未能設定欄寬/.test(writer), '');
+    /log_\('WARN', 'createRosterSheet_：未能設定欄寬/.test(writer), '');
   check('★★★★★ 排喺 `autoResizeColumns()` **之後**'
     + '——排之前嘅話，autoResize 會即刻把佢設嘅寬度改返',
     writerBare.indexOf('sheet.autoResizeColumns(1, layout.keys.length);')

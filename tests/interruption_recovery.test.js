@@ -4,7 +4,7 @@
 // (1) countAlreadySentForStage_()（Mailer.gs 新函式）——步驟 2／4 確認視窗
 //     用來偵測「這個版本＋階段好像已經寄過」的純邏輯；
 // (2) applyRequests_()（RequestsApply.gs）新增的孤兒版本保護——
-//     registerVersion 之後的五個寫入包一層 try/catch，任何一步失敗都要
+//     registerVersion_ 之後的五個寫入包一層 try/catch，任何一步失敗都要
 //     拋出講清楚「已經寫了什麼、要怎麼人手復原」的錯誤訊息，逐字對應正式碼。
 
 // ---- 移植：countAlreadySentForStage_()（Mailer.gs，SendLog 換成假陣列）----
@@ -29,7 +29,7 @@ function applyRequestsWriteSequence_(sheetName, quarterId, newVersionNo, writers
   let newEligibilityCount = 0;
   let newUnavailableCount = 0;
   try {
-    writers.registerVersion();
+    writers.registerVersion_();
     writers.markPendingBackfillCells();
     newEligibilityCount = writers.writeNewEligibilityRows();
     newUnavailableCount = writers.writeNewUnavailableRows();
@@ -112,23 +112,23 @@ console.log('\n=== applyRequests_ 孤兒版本保護：全部寫入成功時正�
 {
   const calls = [];
   const result = applyRequestsWriteSequence_('Roster_2027T1_v11', '2027T1', 11, {
-    registerVersion: function () { calls.push('registerVersion'); },
+    registerVersion_: function () { calls.push('registerVersion_'); },
     markPendingBackfillCells: function () { calls.push('markPendingBackfillCells'); },
     writeNewEligibilityRows: function () { calls.push('writeNewEligibilityRows'); return 2; },
     writeNewUnavailableRows: function () { calls.push('writeNewUnavailableRows'); return 1; },
     writeRequestOutcomes: function () { calls.push('writeRequestOutcomes'); }
   });
   check('★ 五個寫入按順序全部執行', calls,
-    ['registerVersion', 'markPendingBackfillCells', 'writeNewEligibilityRows', 'writeNewUnavailableRows', 'writeRequestOutcomes']);
+    ['registerVersion_', 'markPendingBackfillCells', 'writeNewEligibilityRows', 'writeNewUnavailableRows', 'writeRequestOutcomes']);
   check('★ 正確回傳兩個計數', result, { newEligibilityCount: 2, newUnavailableCount: 1 });
 }
 
-console.log('\n=== applyRequests_ 孤兒版本保護：registerVersion 失敗 → 拋出孤兒版本錯誤訊息 ===');
+console.log('\n=== applyRequests_ 孤兒版本保護：registerVersion_ 失敗 → 拋出孤兒版本錯誤訊息 ===');
 {
-  checkThrows('★ registerVersion 失敗時的錯誤訊息包含工作表名、季度版本、RequestID／RosterVersions 檢查指引',
+  checkThrows('★ registerVersion_ 失敗時的錯誤訊息包含工作表名、季度版本、RequestID／RosterVersions 檢查指引',
     function () {
       applyRequestsWriteSequence_('Roster_2027T1_v11', '2027T1', 11, {
-        registerVersion: function () { throw new Error('模擬 RosterVersions 寫入配額錯誤'); },
+        registerVersion_: function () { throw new Error('模擬 RosterVersions 寫入配額錯誤'); },
         markPendingBackfillCells: function () { throw new Error('不應該執行到這裡'); },
         writeNewEligibilityRows: function () { throw new Error('不應該執行到這裡'); },
         writeNewUnavailableRows: function () { throw new Error('不應該執行到這裡'); },
@@ -145,7 +145,7 @@ console.log('\n=== applyRequests_ 孤兒版本保護：最後一步（writeReque
   checkThrows('★ 即使前四步都成功，最後一步失敗仍然拋出同一種孤兒版本錯誤（此時 RosterVersions 其實已經有登記）',
     function () {
       applyRequestsWriteSequence_('Roster_2027T1_v12', '2027T1', 12, {
-        registerVersion: function () { calls.push('registerVersion'); },
+        registerVersion_: function () { calls.push('registerVersion_'); },
         markPendingBackfillCells: function () { calls.push('markPendingBackfillCells'); },
         writeNewEligibilityRows: function () { calls.push('writeNewEligibilityRows'); return 0; },
         writeNewUnavailableRows: function () { calls.push('writeNewUnavailableRows'); return 0; },
@@ -155,7 +155,7 @@ console.log('\n=== applyRequests_ 孤兒版本保護：最後一步（writeReque
     ['Roster_2027T1_v12', '模擬 Requests 寫入時逾時', 'RequestID']
   );
   check('★ 前四步＋第五步本身都確實執行過（不是提早中斷，是第五步執行到一半才失敗）', calls,
-    ['registerVersion', 'markPendingBackfillCells', 'writeNewEligibilityRows', 'writeNewUnavailableRows', 'writeRequestOutcomes']);
+    ['registerVersion_', 'markPendingBackfillCells', 'writeNewEligibilityRows', 'writeNewUnavailableRows', 'writeRequestOutcomes']);
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

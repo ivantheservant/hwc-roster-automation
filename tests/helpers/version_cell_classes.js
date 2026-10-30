@@ -49,7 +49,7 @@ function countVersionCellClasses(gas, quarterId, versionNo) {
   byClass[gas.GRID_CELL_CLASS.SPECIAL_SKIP] = 'specialSkip';
   byClass[gas.GRID_CELL_CLASS.GENUINE_GAP] = 'genuineGap';
 
-  gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
     if (Number(row[C.VERSION_NO]) !== versionNo) return;
     counts.total++;
@@ -82,16 +82,16 @@ function countVersionCellClasses(gas, quarterId, versionNo) {
  */
 function diffVersionRuleFlags(gas, quarterId, fromVersion, toVersion, exemptKeys) {
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = gas.getConfig(gas.CONFIG_KEYS.SYS_TIMEZONE, gas.DEFAULTS.TIMEZONE);
+  const timezone = gas.getConfig_(gas.CONFIG_KEYS.SYS_TIMEZONE, gas.DEFAULTS.TIMEZONE);
   const exempt = {};
   (exemptKeys || []).forEach(function (k) { exempt[k] = true; });
 
   const read = function (versionNo) {
     const map = {};
-    gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (row[C.QUARTER_ID] !== quarterId) return;
       if (Number(row[C.VERSION_NO]) !== versionNo) return;
-      const key = gas.toDateString(row[C.SERVICE_DATE], timezone)
+      const key = gas.toDateString_(row[C.SERVICE_DATE], timezone)
         + '|' + row[C.POST_ID] + '|' + String(row[C.SLOT_INDEX]);
       map[key] = gas.splitList_(row[C.RULE_FLAGS]).slice().sort().join(',');
     });

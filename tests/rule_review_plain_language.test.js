@@ -152,10 +152,10 @@ console.log('\n=== B3【核心】互斥組同身分要求：讀實際資料，�
   const backend = read('src/WebAppRuleReview.gs');
   check('★★★★★ 而且真係由 Posts 讀出嚟（唔係另一份寫死清單）',
     /function buildRuleReviewContext_/.test(backend)
-    && /readPostsNormalized\(\)\.forEach/.test(backend));
+    && /readPostsNormalized_\(\)\.forEach/.test(backend));
   check('★★★★★ 匯出同匯入兩邊都傳咗 ctx'
     + '——只傳一邊嘅話，匯入時對唔返選項，堂委填咗都唔會生效',
-    /buildRuleReviewSheetRows_\(\s*\n?\s*readSheet\(SHEETS\.RULE_SETTINGS\), weeks, buildRuleReviewContext_\(\)\)/.test(backend)
+    /buildRuleReviewSheetRows_\(\s*\n?\s*readSheet_\(SHEETS\.RULE_SETTINGS\), weeks, buildRuleReviewContext_\(\)\)/.test(backend)
     && /buildRuleReviewImportPlan_\([\s\S]{0,200}?buildRuleReviewContext_\(\)\)/.test(backend));
   check('★★★★ 讀唔到 Posts 要記低（唔可以靜靜當成「一組都冇設」）',
     /catch \(err\)[\s\S]{0,200}?互斥組／身分要求會顯示為「沒有設」/.test(backend));

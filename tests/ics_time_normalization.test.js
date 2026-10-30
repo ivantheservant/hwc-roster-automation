@@ -161,9 +161,9 @@ console.log('\n=== A2：正式碼真係改用咗 normalizeTimeOfDay_，唔係淨
     /defaultStart\s*=\s*normalizeTimeOfDay_\(/.test(src), src.slice(0, 200));
   check('★★★★★ defaultEnd 用 normalizeTimeOfDay_',
     /defaultEnd\s*=\s*normalizeTimeOfDay_\(/.test(src));
-  check('★★★★★ 舊嘅 String(getConfig(…ICS_SERVICE…)) 寫法已經冇晒'
+  check('★★★★★ 舊嘅 String(getConfig_(…ICS_SERVICE…)) 寫法已經冇晒'
     + '——就係嗰句令 Date 物件變成英文長格式',
-    !/String\(getConfig\(CONFIG_KEYS\.ICS_SERVICE_(START|END)_TIME/.test(src));
+    !/String\(getConfig_\(CONFIG_KEYS\.ICS_SERVICE_(START|END)_TIME/.test(src));
   check('★★★★ shiftIcsLocalDateTime_ 有 isNaN 防線',
     /timeParts\.some\(isNaN\)/.test(src));
 }

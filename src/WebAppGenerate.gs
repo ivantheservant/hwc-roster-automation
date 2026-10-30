@@ -21,7 +21,7 @@
  * 執行時間（階段 A7 嘅量度結果）
  * ─────────────────────────────────────────────────────────────────────
  *
- * `generateBest()` **本身已經有時間預算**（`MULTIRUN_TIME_BUDGET_MS`，
+ * `generateBest_()` **本身已經有時間預算**（`MULTIRUN_TIME_BUDGET_MS`，
  * 現時 180000 毫秒＝3 分鐘）：每跑完一次就量度平均耗時，如果再跑多一次
  * 會超出預算就停低，並且喺結果回傳 `stoppedByTime: true`。
  *
@@ -30,8 +30,8 @@
  * 呈現出嚟**（見 `apiGenerateDraftExecute()` 嘅回傳同前端）。
  *
  * Apps Script 單次執行上限係 6 分鐘，`google.script.run` 亦係同一個配額。
- * 3 分鐘預算用喺多次生成，剩返 3 分鐘俾 `createRosterSheet()`／
- * `writeAssignments()`／`registerVersion()`——實測數字見
+ * 3 分鐘預算用喺多次生成，剩返 3 分鐘俾 `createRosterSheet_()`／
+ * `writeAssignments_()`／`registerVersion_()`——實測數字見
  * `docs/系統範圍稽核.md` 第二十五輪嘅表。
  */
 
@@ -43,7 +43,7 @@
 function apiGenerateDraftPlan(quarterId) {
   assertWebAppRequestAllowed_('apiGenerateDraftPlan');
 
-  const existingVersionNo = findLatestVersionNo(quarterId);
+  const existingVersionNo = findLatestVersionNo_(quarterId);
   if (existingVersionNo >= 0) {
     return {
       blocked: true,
@@ -133,7 +133,7 @@ function apiGenerateDraftExecute_locked_(quarterId) {
 
   // 再檢查一次。前端撳掣同後端執行之間可能有人（或者另一個分頁）
   // 已經生成咗——只信 plan 嗰次嘅檢查就會建立兩個版本。
-  const existingVersionNo = findLatestVersionNo(quarterId);
+  const existingVersionNo = findLatestVersionNo_(quarterId);
   if (existingVersionNo >= 0) {
     return {
       ok: false,
@@ -195,7 +195,7 @@ function apiGenerateDraftExecute_locked_(quarterId) {
     preQuarter = { undoneItemCount: -1, items: [], error: err.message };
   }
 
-  const versionRow = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+  const versionRow = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
     return String(r[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] || '').trim() === quarterId
       && Number(r[COLUMNS.ROSTER_VERSIONS.VERSION_NO]) === result.versionNo;
   })[0];
@@ -289,7 +289,7 @@ function countDistinctAssignmentField_(quarterId, versionNo, columnKey) {
   try {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     const seen = {};
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
       if (Number(row[A.VERSION_NO]) !== versionNo) return;
       const value = String(row[columnKey] === null || row[columnKey] === undefined

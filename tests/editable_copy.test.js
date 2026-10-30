@@ -104,8 +104,8 @@ function setup(opts) {
     getSheetByName: (n) => (n === source._name ? source : null)
   };
   gas.assertWebAppRequestAllowed_ = function () {};
-  gas.findLatestVersionNo = function () { return opts && opts.noVersion ? -1 : V; };
-  gas.getConfig = function (k, d) { return k === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : d; };
+  gas.findLatestVersionNo_ = function () { return opts && opts.noVersion ? -1 : V; };
+  gas.getConfig_ = function (k, d) { return k === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : d; };
   gas.buildRosterSheetName_ = function (q, v) { return 'Roster_' + q + '_v' + v; };
   gas.writeAuditLog_ = function (e) { world.audit.push(e); };
   gas.log_ = function (level, msg) { world.logs.push(level + ' ' + msg); };
@@ -187,16 +187,16 @@ console.log('\n=== AJ2【核心】正式發出成功之後自動做副本；做�
     gas.assertNoUnsavedChanges_ = function () { return { released: false }; };
     gas.logSendWithUnsavedRelease_ = function () {};
     gas.requireQuarterStage_ = function () {};
-    gas.findLatestVersionNo = function () { return V; };
+    gas.findLatestVersionNo_ = function () { return V; };
     gas.checkMissingPersonalPdfs_ = function () { return { missing: [], total: 0 }; };
     gas.evaluateStep4MissingPdfGate_ = function () { return { blocked: false }; };
     gas.ensurePublicLinkFreshBeforeSend_ = function () { return { republished: false }; };
-    gas.sendStage = function () { return { isDryRun: true, sent: 0, dryRun: 5, skipped: 0, unchanged: 0, failed: 0, errorPdf: 0, errorPdfMissing: 0 }; };
+    gas.sendStage_ = function () { return { isDryRun: true, sent: 0, dryRun: 5, skipped: 0, unchanged: 0, failed: 0, errorPdf: 0, errorPdfMissing: 0 }; };
     gas.evaluateStep4SendOutcome_ = function () { return { ok: true, message: '', unhandledCount: 0 }; };
     gas.countOfficialReach_ = function () { return null; };
     gas.buildStep4OutcomeSentence_ = function () { return '寄了。'; };
     gas.advanceQuarterStage_ = function (q, st) { world.advanced.push(st); };
-    gas.getConfig = function (k, d) { return k === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : d; };
+    gas.getConfig_ = function (k, d) { return k === gas.CONFIG_KEYS.SYS_TIMEZONE ? TZ : d; };
     gas.buildRosterSheetName_ = function (q, v) { return 'Roster_' + q + '_v' + v; };
     gas.writeAuditLog_ = function () {};
     gas.log_ = function (level, msg) { world.logs.push(level + ' ' + msg); };

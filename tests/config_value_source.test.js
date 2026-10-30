@@ -20,14 +20,14 @@
 // 佢去 Config 工作表搵唔到嗰一格，於是佢會以為自己睇漏咗眼。
 //
 // ─────────────────────────────────────────────────────────────────────
-// 根源：`getConfig()` 分唔到三件事
+// 根源：`getConfig_()` 分唔到三件事
 // ─────────────────────────────────────────────────────────────────────
 //
 //   一、張表有嗰一行、有值　　　⇒ `SHEET`
 //   二、張表有嗰一行、格係空白　⇒ `DEFAULT`
 //   三、張表**根本冇嗰一行**　　⇒ `MISSING`
 //
-// 二同三喺 `getConfig()` 眼中一模一樣，而對幹事嚟講差好遠：
+// 二同三喺 `getConfig_()` 眼中一模一樣，而對幹事嚟講差好遠：
 // 「格係空白」佢搵得到嗰一格去填；「冇嗰一行」佢點搵都搵唔到。
 
 const fs = require('fs');
@@ -55,47 +55,47 @@ const gas = loadGasSource([
 ]);
 
 /**
- * 把 `readConfig()` 換成一份指定嘅假 Config。
+ * 把 `readConfig_()` 換成一份指定嘅假 Config。
  *
- * ⚠️ 直接換 `readConfig`，唔係換 `getConfig`——要驗嘅正正就係
- * 「`getConfigWithSource()` 點樣讀同一份資料」。
+ * ⚠️ 直接換 `readConfig_`，唔係換 `getConfig_`——要驗嘅正正就係
+ * 「`getConfigWithSource_()` 點樣讀同一份資料」。
  *
  * @param {Object} config 假 Config
  * @returns {void}
  */
 function useConfig(config) {
-  gas.readConfig = function () { return config; };
+  gas.readConfig_ = function () { return config; };
 }
 
 // =====================================================================
-console.log('\n=== B1【核心】`getConfigWithSource()` 分得出三種來源 ===');
+console.log('\n=== B1【核心】`getConfigWithSource_()` 分得出三種來源 ===');
 {
   const KEY = 'COMBINED_DEFAULT_SKIP_POST_IDS';
   const DEF = 'CHAIR,PREACHER,TRANSLATOR,WORSHIP,PIANO';
 
   useConfig({ COMBINED_DEFAULT_SKIP_POST_IDS: 'CHAIR' });
-  const fromSheet = gas.getConfigWithSource(KEY, DEF);
+  const fromSheet = gas.getConfigWithSource_(KEY, DEF);
   checkEqual('★★★★★ 張表有值 ⇒ `SHEET`', fromSheet.source, 'SHEET');
   checkEqual('★★★★★ 而且用張表嗰個值', fromSheet.value, 'CHAIR');
 
   useConfig({ COMBINED_DEFAULT_SKIP_POST_IDS: '' });
-  const blank = gas.getConfigWithSource(KEY, DEF);
+  const blank = gas.getConfigWithSource_(KEY, DEF);
   checkEqual('★★★★★★ 張表**有嗰一行、格係空白** ⇒ `DEFAULT`'
     + '——佢搵得到嗰一格去填，同「冇嗰一行」係兩件事',
     blank.source, 'DEFAULT');
   checkEqual('★★★★★ 而且退回內建預設', blank.value, DEF);
 
   useConfig({ SOME_OTHER_KEY: 'x' });
-  const missing = gas.getConfigWithSource(KEY, DEF);
+  const missing = gas.getConfigWithSource_(KEY, DEF);
   checkEqual('★★★★★★ 張表**根本冇嗰一行** ⇒ `MISSING`'
-    + '——呢個就係現場嗰個情況，而 `getConfig()` 由頭到尾分唔出',
+    + '——呢個就係現場嗰個情況，而 `getConfig_()` 由頭到尾分唔出',
     missing.source, 'MISSING');
   checkEqual('★★★★★ 一樣退回內建預設', missing.value, DEF);
 
   // ⚠️ `undefined`／`null` 都要當「有行但係空白」，唔可以扮成 SHEET。
   useConfig({ COMBINED_DEFAULT_SKIP_POST_IDS: null });
   checkEqual('★★★★★ 格入面係 `null` ⇒ `DEFAULT`',
-    gas.getConfigWithSource(KEY, DEF).source, 'DEFAULT');
+    gas.getConfigWithSource_(KEY, DEF).source, 'DEFAULT');
 
   // ── 型別壞格 ────────────────────────────────────────────────
   //
@@ -106,8 +106,8 @@ console.log('\n=== B1【核心】`getConfigWithSource()` 分得出三種來源 =
     COMBINED_DEFAULT_SKIP_POST_IDS: { __configTypeError__: true, message: '型別認不出來' }
   });
   let threw = '';
-  try { gas.getConfigWithSource(KEY, DEF); } catch (err) { threw = err.message; }
-  checkEqual('★★★★★★ 型別壞格照樣拋錯（同 `getConfig()` 一致）'
+  try { gas.getConfigWithSource_(KEY, DEF); } catch (err) { threw = err.message; }
+  checkEqual('★★★★★★ 型別壞格照樣拋錯（同 `getConfig_()` 一致）'
     + '——靜靜回一個「用緊預設值」會令一個壞格睇落好正常',
     threw, '型別認不出來');
   checkEqual('★★★★★★ 而 `getConfigWithSourceSafe_()` 唔拋，'
@@ -151,7 +151,7 @@ console.log('\n=== B2【核心】畫面嗰句要跟住來源改 ===');
 // =====================================================================
 console.log('\n=== B2 接線【核心】三個工具真係講埋來源 ===');
 {
-  // ⚠️ 呢一節最易假綠：`getConfigWithSource()` 寫好晒、測試全綠，
+  // ⚠️ 呢一節最易假綠：`getConfigWithSource_()` 寫好晒、測試全綠，
   // 而畫面上面仲寫住寫死嘅「來自 Config「X」」。
   const files = {
     'src/CombinedSkipBackfill.gs': 'COMBINED_DEFAULT_SKIP_POST_IDS',

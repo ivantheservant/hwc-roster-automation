@@ -35,14 +35,14 @@
 // ——照返實測嗰個形狀，因為名單次序會影響 SendLog 嘅寫入次序同分批 flush。
 //
 // ⚠️ 由真入口叫落去（A4，冇商量餘地）：
-//   步驟 4　`apiStep4Confirm`（WebAppFlow.gs → executeStep4Send_ → sendStage）
+//   步驟 4　`apiStep4Confirm`（WebAppFlow.gs → executeStep4Send_ → sendStage_）
 //   步驟 5　`apiStep5Plan` → `apiStep5SendPreview` → `apiStep5SendConfirm`
 //           （WebAppFlow.gs → executeStep5Send_ → sendResendStage_ → deliverOne_）
 // 冇任何一步直接叫 `deliverOne_()`。
 //
 // 用 `tests/helpers/mock_sheets_realistic.js`（第三十二輪新寫），唔用舊嘅
 // `sheet_mock.js`——後者冇 `getLastRow()`／`getLastColumn()`，而
-// `getQuarterStage_()` 呢類函式係直接讀 `SpreadsheetApp` 唔經 `readSheet()`。
+// `getQuarterStage_()` 呢類函式係直接讀 `SpreadsheetApp` 唔經 `readSheet_()`。
 
 const { loadGasSource } = require('./helpers/gas_loader');
 const {
@@ -151,27 +151,27 @@ gas.readDashboardUnsavedState_ = function () {
 // 讀 grid 工作表。由**真正寫入嘅 RosterAssignments** 重組 context，令下游
 // 真正嘅硬規則檢查照跑（規則表本身係空嘅 ⇒ 冇違反），唔係直接假裝「零違反」。
 gas.buildFineTuneContext_ = function (quarterId, versionNo) {
-  const config = gas.readConfig();
+  const config = gas.readConfig_();
   const timezone = config[gas.CONFIG_KEYS.SYS_TIMEZONE] || TZ;
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  const original = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS)
+  const original = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
     })
     .map(function (row) {
       return {
         serviceDateId: row[C.SERVICE_DATE_ID],
-        serviceDate: gas.toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: gas.toDateString_(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID], slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID], personName: row[C.PERSON_NAME_SNAPSHOT],
         assignSource: row[C.ASSIGN_SOURCE]
       };
     });
-  const posts = gas.readPostsNormalized();
+  const posts = gas.readPostsNormalized_();
   const postNames = {};
   posts.forEach(function (p) { postNames[p.postId] = p.postNameTC; });
   const peopleById = {};
-  gas.readPeople().forEach(function (row) {
+  gas.readPeople_().forEach(function (row) {
     const N = gas.COLUMNS.NAME_MAPPING;
     peopleById[row[N.PERSON_ID]] = {
       personId: row[N.PERSON_ID], nameTC: row[N.NAME_TC], email: row[N.EMAIL] || ''
@@ -180,9 +180,9 @@ gas.buildFineTuneContext_ = function (quarterId, versionNo) {
   return {
     quarterId: quarterId, versionNo: versionNo, timezone: timezone,
     posts: posts, postNames: postNames,
-    serviceDates: gas.readServiceDatesNormalized(quarterId, timezone),
-    rules: gas.readRules(), peopleById: peopleById, eligibility: gas.readEligibility(),
-    unavailable: gas.readUnavailableNormalized(timezone),
+    serviceDates: gas.readServiceDatesNormalized_(quarterId, timezone),
+    rules: gas.readRules_(), peopleById: peopleById, eligibility: gas.readEligibility_(),
+    unavailable: gas.readUnavailableNormalized_(timezone),
     maxMoves: 999, maxPerQuarterDefault: 8, warnOnSemiHard: true,
     roles: { rows: [] }, personPostExclusions: [],
     original: original, gridValues: {}, gridRender: { labels: {} }
@@ -375,7 +375,7 @@ buildFixture();
 function sendLogByPerson(stage) {
   const C = gas.COLUMNS.SEND_LOG;
   const out = {};
-  gas.readSheet(gas.SHEETS.SEND_LOG).forEach(function (row) {
+  gas.readSheet_(gas.SHEETS.SEND_LOG).forEach(function (row) {
     if (row[C.STAGE] !== stage) return;
     if (!row[C.PERSON_ID]) return;
     out[row[C.PERSON_ID]] = row[C.STATUS];
@@ -392,7 +392,7 @@ function countStatus(map, status) {
 
 console.log('\n=== 前置：fixture 真係 57 人、7 位冇電郵 ===');
 {
-  const people = gas.readPeople();
+  const people = gas.readPeople_();
   checkEqual('★★★★ NameMapping 有 57 人', people.length, PERSON_COUNT);
   const noEmail = people.filter(function (r) { return !r[gas.COLUMNS.NAME_MAPPING.EMAIL]; });
   checkEqual('★★★★ 其中 7 位冇電郵（照 2027T4 v10 實測形狀）', noEmail.length, 7);
@@ -407,7 +407,7 @@ console.log('\n=== 步驟 4：正式發出（apiStep4Confirm，真入口）===')
 
   checkEqual('★★★★★ Stage → OFFICIAL_SENT（真正由 executeStep4Send_() 前進）',
     gas.getQuarterStage_(Q), gas.QUARTER_STAGE.OFFICIAL_SENT);
-  checkEqual('★★★★★ 50 位有電郵嘅人真正被 sendStage() 記成 DRY_RUN',
+  checkEqual('★★★★★ 50 位有電郵嘅人真正被 sendStage_() 記成 DRY_RUN',
     countStatus(log, gas.MAIL_STATUS.DRY_RUN), PERSON_COUNT - 7);
   checkEqual('★★★★★ 7 位冇電郵嘅人真正被記成 SKIPPED_NO_EMAIL',
     countStatus(log, gas.MAIL_STATUS.SKIPPED_NO_EMAIL), 7);

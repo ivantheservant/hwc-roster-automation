@@ -5,9 +5,9 @@
  * EmailRecipients 有沒有未填的佔位文字（例如「（請填入 CC list 電郵）」）。
  * @returns {string[]} 問題描述陣列；沒有問題時回傳空陣列
  */
-function validateSetup() {
+function validateSetup_() {
   // 「檢查設定」的意義就是核對目前試算表的真實狀態，不應該讀到過期的 Config 快取
-  reloadConfigCache();
+  reloadConfigCache_();
 
   let issues = [];
   issues = issues.concat(validateEligibilityOrphans_());
@@ -20,9 +20,9 @@ function validateSetup() {
   issues = issues.concat(validateEmailRecipientsRole_());
 
   if (issues.length === 0) {
-    log_('INFO', 'validateSetup: 沒有發現問題');
+    log_('INFO', 'validateSetup_: 沒有發現問題');
   } else {
-    log_('WARN', 'validateSetup: 發現 ' + issues.length + ' 個問題');
+    log_('WARN', 'validateSetup_: 發現 ' + issues.length + ' 個問題');
     for (let i = 0; i < issues.length; i++) {
       log_('WARN', issues[i]);
     }
@@ -36,9 +36,9 @@ function validateSetup() {
  */
 function validateEligibilityOrphans_() {
   const issues = [];
-  const eligibilityRows = readSheet(SHEETS.ELIGIBILITY);
-  const people = readSheet(SHEETS.NAME_MAPPING);
-  const posts = readSheet(SHEETS.POSTS);
+  const eligibilityRows = readSheet_(SHEETS.ELIGIBILITY);
+  const people = readSheet_(SHEETS.NAME_MAPPING);
+  const posts = readSheet_(SHEETS.POSTS);
 
   const personIds = {};
   for (let i = 0; i < people.length; i++) {
@@ -77,7 +77,7 @@ function validateEligibilityOrphans_() {
  */
 function validateNameAliasDuplicates_() {
   const issues = [];
-  const rows = readSheet(SHEETS.NAME_ALIAS);
+  const rows = readSheet_(SHEETS.NAME_ALIAS);
   const seen = {};
   for (let i = 0; i < rows.length; i++) {
     const alias = rows[i][COLUMNS.NAME_ALIAS.ALIAS];
@@ -96,7 +96,7 @@ function validateNameAliasDuplicates_() {
  */
 function validateNameMappingDuplicates_() {
   const issues = [];
-  const rows = readSheet(SHEETS.NAME_MAPPING);
+  const rows = readSheet_(SHEETS.NAME_MAPPING);
   const seen = {};
   for (let i = 0; i < rows.length; i++) {
     const name = rows[i][COLUMNS.NAME_MAPPING.NAME_TC];
@@ -115,7 +115,7 @@ function validateNameMappingDuplicates_() {
  */
 function validatePostsSlotCount_() {
   const issues = [];
-  const rows = readSheet(SHEETS.POSTS);
+  const rows = readSheet_(SHEETS.POSTS);
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const slotCount = Number(row[COLUMNS.POSTS.SLOT_COUNT]);
@@ -132,8 +132,8 @@ function validatePostsSlotCount_() {
  */
 function validateServiceDatesSpecialId_() {
   const issues = [];
-  const serviceDates = readSheet(SHEETS.SERVICE_DATES);
-  const specialSundays = readSheet(SHEETS.SPECIAL_SUNDAYS);
+  const serviceDates = readSheet_(SHEETS.SERVICE_DATES);
+  const specialSundays = readSheet_(SHEETS.SPECIAL_SUNDAYS);
 
   const specialIds = {};
   for (let i = 0; i < specialSundays.length; i++) {
@@ -151,13 +151,13 @@ function validateServiceDatesSpecialId_() {
 }
 
 /**
- * 檢查必填 Config Key（見 getRequiredConfigKeys()）是否缺失或未設值。
+ * 檢查必填 Config Key（見 getRequiredConfigKeys_()）是否缺失或未設值。
  * @returns {string[]} 問題描述陣列
  */
 function validateRequiredConfig_() {
   const issues = [];
-  const config = readConfig();
-  const requiredKeys = getRequiredConfigKeys();
+  const config = readConfig_();
+  const requiredKeys = getRequiredConfigKeys_();
   for (let i = 0; i < requiredKeys.length; i++) {
     const key = requiredKeys[i];
     const value = config[key];
@@ -176,7 +176,7 @@ function validateRequiredConfig_() {
  */
 function validateEmailRecipientPlaceholders_() {
   const issues = [];
-  const rows = readSheet(SHEETS.EMAIL_RECIPIENTS);
+  const rows = readSheet_(SHEETS.EMAIL_RECIPIENTS);
   const C = COLUMNS.EMAIL_RECIPIENTS;
   const checkColumns = [C.EMAIL, C.DISPLAY_NAME];
 
@@ -215,7 +215,7 @@ function isPlaceholderText_(value) {
  */
 function validateEmailRecipientsRole_() {
   const issues = [];
-  const rows = readSheet(SHEETS.EMAIL_RECIPIENTS);
+  const rows = readSheet_(SHEETS.EMAIL_RECIPIENTS);
   const C = COLUMNS.EMAIL_RECIPIENTS;
   const validRoles = [RECIPIENT_ROLE.REVIEWER, RECIPIENT_ROLE.ALL];
 

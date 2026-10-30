@@ -8,9 +8,9 @@
 // 三次重複讀取是純粹浪費。改成 findLastSendTimestampsByStage_()，一次過讀完
 // SendLog、三個階段的最後寄送時間一次算齊。這裡驗證：(1) 合併後算出的結果跟
 // 逐一分開算完全一致（純粹的效能重構，不改變行為）；(2) 底層資料只被讀取一次
-// （用呼叫次數計數的假 readSheet 驗證）。
+// （用呼叫次數計數的假 readSheet_ 驗證）。
 
-// ---- 移植：findLastSendTimestampsByStage_()（WebAppFlow.gs，readSheet 換成
+// ---- 移植：findLastSendTimestampsByStage_()（WebAppFlow.gs，readSheet_ 換成
 //      可注入的假函式，方便計數呼叫次數）----
 function findLastSendTimestampsByStage_(readSendLogFn, quarterId, stages) {
   const latestByStage = {};

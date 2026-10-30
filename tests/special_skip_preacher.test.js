@@ -171,9 +171,9 @@ gas.applyTimestampFormat_ = function () {};
 console.log('\n=== 前置：用真入口生成（第 2 週係合堂，講員喺 SkipPostIDs）===');
 gas.apiGenerateDraftExecute(Q);
 function flagsOf(dateStr, postId) {
-  const row = gas.readSheet(S.ROSTER_ASSIGNMENTS).find(function (r) {
+  const row = gas.readSheet_(S.ROSTER_ASSIGNMENTS).find(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === 0
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === postId;
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === postId;
   });
   return row ? gas.splitList_(row[A.RULE_FLAGS]) : null;
 }
@@ -222,7 +222,7 @@ console.log('\n=== B：生成器同開季前準備讀同一個函式 ===');
   const path = require('path');
   const read = function (f) { return fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8'); };
   check('★★★★ 生成器用 buildSpecialSundayByDate_()',
-    /buildSpecialSundayByDate_\(readSpecialSundays\(quarterId\), timezone\)/.test(read('Generator.gs')));
+    /buildSpecialSundayByDate_\(readSpecialSundays_\(quarterId\), timezone\)/.test(read('Generator.gs')));
   check('★★★★ 開季前準備用同一支',
     /buildSpecialSundayByDate_\(specialRows, input\.timezone\)/.test(read('WebAppPreQuarter.gs')));
 }

@@ -22,7 +22,7 @@ function check(label, condition, extra) {
 const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'PublicRoster.gs']);
 const warns = [];
 gas.log_ = (lvl, msg) => { if (lvl === 'WARN') warns.push(msg); };
-gas.getConfig = (key, fb) => (key === gas.CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL ? 'system@example.invalid' : fb);
+gas.getConfig_ = (key, fb) => (key === gas.CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL ? 'system@example.invalid' : fb);
 
 console.log('\n=== CL1／CL2：唯讀顯示網址 ===');
 {
@@ -36,7 +36,7 @@ console.log('\n=== CL1／CL2：唯讀顯示網址 ===');
   const C = gas.COLUMNS.PUBLIC_LINKS;
   const row = {}; row[C.QUARTER_ID] = '2099T3'; row[C.FILE_ID] = 'FID9'; row[C.FILE_URL] = 'https://docs.google.com/spreadsheets/d/FID9/edit';
   gas.ensurePublicLinksSheet_ = () => ({});
-  gas.readSheet = (name) => (name === gas.SHEETS.PUBLIC_LINKS ? [row] : []);
+  gas.readSheet_ = (name) => (name === gas.SHEETS.PUBLIC_LINKS ? [row] : []);
   const r = gas.findPublicLinkRow_('2099T3');
   check('★★★★★★ findPublicLinkRow_() 回 /preview（狀態卡、電郵、個人頁全部經呢度）',
     r && r.fileUrl === 'https://docs.google.com/spreadsheets/d/FID9/preview', r && r.fileUrl);

@@ -292,7 +292,7 @@ function materialiseManualEdits_(context, changes, state, source, opts) {
     };
   });
 
-  const newVersionNo = findLatestVersionNo(context.quarterId) + 1;
+  const newVersionNo = findLatestVersionNo_(context.quarterId) + 1;
 
   // 逐格寫 AuditLog：邊格、由邊個變邊個。時間同帳戶由 writeAuditLog_() 自己補。
   changes.forEach(function (c) {
@@ -308,8 +308,8 @@ function materialiseManualEdits_(context, changes, state, source, opts) {
     });
   });
 
-  const sheetName = createRosterSheet(context.quarterId, newVersionNo, assignments, []);
-  writeAssignments(context.quarterId, newVersionNo, assignments);
+  const sheetName = createRosterSheet_(context.quarterId, newVersionNo, assignments, []);
+  writeAssignments_(context.quarterId, newVersionNo, assignments);
 
   return { versionNo: newVersionNo, sheetName: sheetName, cellCount: changes.length + titleChangeCount };
 }
@@ -329,7 +329,7 @@ function runManualEditsPreview_() {
   const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     ui.alert('人手改動預覽（唯讀）', '找不到 ' + quarterId + ' 已生成的版本。', ui.ButtonSet.OK);
     return;
@@ -363,7 +363,7 @@ function runMaterialiseManualEdits_() {
   const quarterId = normalizeIdInput_(response.getResponseText());
   if (!quarterId) return;
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     ui.alert('把工作表的人手改動寫成新版本', '找不到 ' + quarterId + ' 已生成的版本。', ui.ButtonSet.OK);
     return;

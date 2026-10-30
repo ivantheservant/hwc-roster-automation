@@ -143,7 +143,7 @@ console.log('\n=== E：接上寄信路徑 ===');
     body.slice(0, 900));
   check('★★★★★ 攞唔到連結嗰陣會數低',
     /_noPersonalLinkCount = \(context\._noPersonalLinkCount \|\| 0\) \+ 1/.test(bare), '');
-  check('★★★★★ 而且 `sendStage()` 會把個數字報返出去'
+  check('★★★★★ 而且 `sendStage_()` 會把個數字報返出去'
     + '——靜靜略過嘅話，嗰幾位收到嘅信會比其他人少一段而冇人知',
     /noPersonalLinkCount: context\._noPersonalLinkCount \|\| 0/.test(mailer), '');
 }
@@ -155,7 +155,7 @@ console.log('\n=== E：token 對照表一次過讀好 ===');
     /personalTokenById: indexPersonalLinkTokens_\(\)/.test(mailer), '');
   const src = fs.readFileSync(path.join(SRC, 'PersonalLinkInMail.gs'), 'utf8');
   check('★★★★★ 讀唔到唔可以令整批寄信失敗（個人連結係錦上添花）',
-    /try \{[\s\S]{0,400}readPeople\(\)[\s\S]{0,400}\} catch/.test(src), '');
+    /try \{[\s\S]{0,400}readPeople_\(\)[\s\S]{0,400}\} catch/.test(src), '');
   check('★★★★ 但要寫 log', /log_\('WARN'[\s\S]{0,80}indexPersonalLinkTokens_/.test(src), '');
 }
 

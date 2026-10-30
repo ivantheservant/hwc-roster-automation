@@ -4,13 +4,13 @@
  * @param {string} name 輸入的姓名（可能是別名或正名）
  * @returns {string} 正名；找不到對應時回傳原始輸入
  */
-function normalizeName(name) {
+function normalizeName_(name) {
   if (!name) return name;
-  const aliasMap = readNameAlias();
+  const aliasMap = readNameAlias_();
   const personId = aliasMap[name];
   if (!personId) return name;
 
-  const people = readSheet(SHEETS.NAME_MAPPING);
+  const people = readSheet_(SHEETS.NAME_MAPPING);
   for (let i = 0; i < people.length; i++) {
     if (people[i][COLUMNS.NAME_MAPPING.PERSON_ID] === personId) {
       return people[i][COLUMNS.NAME_MAPPING.NAME_TC] || name;
@@ -25,15 +25,15 @@ function normalizeName(name) {
  * @param {string} name 姓名（正名或別名）
  * @returns {?string} 找到的 PersonID；找不到則回傳 null
  */
-function resolvePersonId(name) {
+function resolvePersonId_(name) {
   if (!name) return null;
-  const people = readSheet(SHEETS.NAME_MAPPING);
+  const people = readSheet_(SHEETS.NAME_MAPPING);
   for (let i = 0; i < people.length; i++) {
     if (people[i][COLUMNS.NAME_MAPPING.NAME_TC] === name) {
       return people[i][COLUMNS.NAME_MAPPING.PERSON_ID];
     }
   }
-  const aliasMap = readNameAlias();
+  const aliasMap = readNameAlias_();
   return aliasMap[name] || null;
 }
 
@@ -46,7 +46,7 @@ function resolvePersonId(name) {
  * `.trim()`，冇處理**全形字元**。中文輸入法一旦切咗去全形模式，打「2026T4」
  * 會變成「２０２６Ｔ４」——喺對話框嘅小字型入面同半形字幾乎睇唔出分別，
  * 但 `'２０２６Ｔ４' === '2026T4'` 係 `false`。呢類輸入唔會被 `.trim()`
- * 處理，會令 `findLatestVersionNo()`／`readServiceDates()` 呢類靠嚴格
+ * 處理，會令 `findLatestVersionNo_()`／`readServiceDates_()` 呢類靠嚴格
  * 相等比對嘅查詢靜靜噉搵唔到、回傳「已存在但你打嘅嗰個字串搵唔到」呢種
  * 睇落好似資料有問題、其實係輸入有問題嘅假象。
  *
@@ -85,9 +85,9 @@ function normalizeIdInput_(raw) {
  * @param {Date} date 日期物件
  * @returns {string} 格式化後的日期字串
  */
-function formatDate(date) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  return toDateString(date, timezone);
+function formatDate_(date) {
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return toDateString_(date, timezone);
 }
 
 /**
@@ -95,8 +95,8 @@ function formatDate(date) {
  * @param {string} str 日期字串，格式為 yyyy-MM-dd
  * @returns {Date} 解析後的日期物件
  */
-function parseDate(str) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+function parseDate_(str) {
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return Utilities.parseDate(str + ' 00:00:00', timezone, 'yyyy-MM-dd HH:mm:ss');
 }
 
@@ -124,7 +124,7 @@ function parseDate(str) {
  * @param {string} timezone 時區名稱，例如 "Pacific/Auckland"
  * @returns {string} yyyy-MM-dd 格式字串；空值時回傳空字串；無法辨識時回傳原字串
  */
-function toDateString(value, timezone) {
+function toDateString_(value, timezone) {
   // ⚠️ 第二十一輪批次階段 C：呢個函式服務嘅係「**讀系統自己寫入嘅資料**」
   // （ServiceDates／RosterAssignments／Unavailable／Quarters 等等）。
   //
@@ -157,16 +157,16 @@ function toDateString(value, timezone) {
  * 第二十一輪批次階段 C：**幹事輸入**嘅日期，只收兩種寫法。
  *
  * ─────────────────────────────────────────────────────────────────────
- * 點解要同 `toDateString()` 分家
+ * 點解要同 `toDateString_()` 分家
  * ─────────────────────────────────────────────────────────────────────
  *
- * `toDateString()` 服務嘅係「**讀系統自己寫入嘅資料**」——ServiceDates、
+ * `toDateString_()` 服務嘅係「**讀系統自己寫入嘅資料**」——ServiceDates、
  * RosterAssignments、Unavailable 等等。嗰啲值係系統寫嘅，格式受控，
  * 寬鬆少少冇問題，而且**唔可以收緊**：收緊會令舊資料讀唔到。
  *
  * 但佢同時被用嚟讀**幹事打入去嘅** Requests 日期欄，而嗰邊寬鬆係有害嘅：
  *
- * `toDateString()` 會接受 `dd/MM/yyyy`，即係 `05/06/2027` 一律當
+ * `toDateString_()` 會接受 `dd/MM/yyyy`，即係 `05/06/2027` 一律當
  * **6 月 5 日**。呢個係**無聲噉猜**——猜錯就係把人排錯主日，
  * 而且冇任何提示。日／月次序喺唔同地方習慣唔同，冇得靠估。
  *
@@ -306,7 +306,7 @@ function displayCellValue_(value, fallback) {
  * @param {string} fallback 值係空白時回傳嘅預設時間（例如 `'10:45'`）
  * @param {string=} timezone 格式化 Date 物件用嘅時區。**省略時會讀 Config 嘅
  *   `SYS_TIMEZONE`**——分開一個參數係為咗令呢個函式喺 Node 測試環境
- *   （冇 Config 可讀）一樣測得到，同 `toDateString()` 一貫做法一致。
+ *   （冇 Config 可讀）一樣測得到，同 `toDateString_()` 一貫做法一致。
  * @returns {string} `HH:mm`
  * @throws {Error} 認唔出格式時拋錯，訊息含實際收到嘅值同預期格式
  */
@@ -315,7 +315,7 @@ function normalizeTimeOfDay_(value, fallback, timezone) {
 
   // Google 試算表把「睇落似時間」嘅格自動轉成 Date（1899-12-30 當日）。
   if (Object.prototype.toString.call(value) === '[object Date]') {
-    const tz = timezone || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const tz = timezone || getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     return Utilities.formatDate(value, tz, 'HH:mm');
   }
 
@@ -352,7 +352,7 @@ function normalizeTimeOfDay_(value, fallback, timezone) {
   // 就係呢個。
   //
   // ⚠️ 第二十三輪嘅測試「證明」咗修正有效，係因為佢**直接餵一個 Date 物件
-  // 落純函式**——冇經過 `getConfig()` → `convertConfigValue_()` 嗰一層。
+  // 落純函式**——冇經過 `getConfig_()` → `convertConfigValue_()` 嗰一層。
   // 呢個星期同一個形狀出現咗三次。
   //
   // ⚠️ 判斷特登收得好窄：**一定要有 `時:分:秒` 呢個形狀**才嘗試 parse。
@@ -367,7 +367,7 @@ function normalizeTimeOfDay_(value, fallback, timezone) {
   if (/\d{1,2}:\d{2}:\d{2}/.test(text)) {
     const parsed = new Date(text);
     if (!isNaN(parsed.getTime())) {
-      const tz2 = timezone || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+      const tz2 = timezone || getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
       return Utilities.formatDate(parsed, tz2, 'HH:mm');
     }
   }
@@ -468,7 +468,7 @@ function escapeRegExp_(text) {
  * @returns {string} yyyy-MM-dd HH:mm:ss 格式的字串
  */
 function nowTimestamp_(date) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return Utilities.formatDate(date || new Date(), timezone, 'yyyy-MM-dd HH:mm:ss');
 }
 
@@ -506,7 +506,7 @@ function normalizeSheetTimestamp_(value, timezone) {
  * @returns {string} yyyyMMddHHmmss 格式的字串
  */
 function compactTimestamp_(date) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return Utilities.formatDate(date || new Date(), timezone, 'yyyyMMddHHmmss');
 }
 
@@ -515,9 +515,9 @@ function compactTimestamp_(date) {
  * 這會影響儲存格中 Date 物件的顯示方式，以及試算表內建函式的日期運算。
  * @returns {{before: Object, after: Object, changed: boolean}} 改動前後的設定
  */
-function applyTimezoneSettings() {
+function applyTimezoneSettings_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const targetTimezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const targetTimezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const targetLocale = SPREADSHEET_LOCALE_NZ;
 
   const before = { timeZone: ss.getSpreadsheetTimeZone(), locale: ss.getSpreadsheetLocale() };
@@ -548,7 +548,7 @@ function applyTimezoneSettings() {
  */
 function applyTimestampFormat_(sheet, headers, columnNames, startRow, rowCount) {
   if (rowCount <= 0) return;
-  const format = String(getConfig(CONFIG_KEYS.SYS_TIMESTAMP_FORMAT, DEFAULTS.TIMESTAMP_FORMAT));
+  const format = String(getConfig_(CONFIG_KEYS.SYS_TIMESTAMP_FORMAT, DEFAULTS.TIMESTAMP_FORMAT));
 
   columnNames.forEach(function (columnName) {
     const columnIndex = headers.indexOf(columnName) + 1;

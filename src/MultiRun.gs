@@ -10,7 +10,7 @@
  * @param {number=} attempts 嘗試次數；未提供時讀 Config 的 MULTIRUN_ATTEMPTS（預設 20）
  * @returns {Object} 最佳結果與全部嘗試的摘要
  */
-function generateBest(quarterId, attempts) {
+function generateBest_(quarterId, attempts) {
   const context = buildGeneratorContext_(quarterId);
   const baseSeed = context.randomSeed;
   const planned = attempts !== undefined && attempts !== null
@@ -85,7 +85,7 @@ function generateBest(quarterId, attempts) {
     if (seedProbeEnabled && allIdenticalSoFar
       && attemptsRun >= MULTIRUN_SEED_PROBE_ATTEMPTS && attemptsRun < planned) {
       stoppedBySeedInert = true;
-      log_('INFO', 'generateBest: 頭 ' + attemptsRun + ' 次生成的職事表逐格完全相同，'
+      log_('INFO', 'generateBest_: 頭 ' + attemptsRun + ' 次生成的職事表逐格完全相同，'
         + '判定這份資料下 RANDOM_SEED 不影響結果，已提早停止（原定 ' + planned + ' 次）。'
         + '最佳結果與執行全部次數相同。');
       break;
@@ -96,7 +96,7 @@ function generateBest(quarterId, attempts) {
     const averagePerAttempt = elapsed / attemptsRun;
     if (i + 1 < planned && elapsed + averagePerAttempt > MULTIRUN_TIME_BUDGET_MS) {
       stoppedByTime = true;
-      log_('WARN', 'generateBest: 為避免超時，只執行了 ' + attemptsRun + ' / ' + planned + ' 次');
+      log_('WARN', 'generateBest_: 為避免超時，只執行了 ' + attemptsRun + ' / ' + planned + ' 次');
       break;
     }
   }
@@ -129,7 +129,7 @@ function generateBest(quarterId, attempts) {
 }
 
 /**
- * 階段 A（Opus 深度輪）新增：把一份職事表壓成一個字串簽名，供 generateBest()
+ * 階段 A（Opus 深度輪）新增：把一份職事表壓成一個字串簽名，供 generateBest_()
  * 判斷兩次生成的結果是否逐格完全相同。
  *
  * 只取「每一格派了誰」——那正是職事表的全部內容，其餘欄位（assignSource、
@@ -259,7 +259,7 @@ function computeDistributionChiSquare_(histogram) {
  * @returns {number} 嘗試次數，至少為 1
  */
 function readMultiRunAttempts_() {
-  const config = readConfig();
+  const config = readConfig_();
   const attempts = readNumericConfig_(config, CONFIG_KEYS.MULTIRUN_ATTEMPTS, DEFAULTS.MULTIRUN_ATTEMPTS);
   return Math.max(1, Math.round(attempts));
 }
@@ -268,7 +268,7 @@ function readMultiRunAttempts_() {
  * 把多次生成的全部結果寫入 MultiRun_Result 工作表（同名工作表會重建），
  * 依總偏差由細至大排序，最佳一行標綠色、有硬規則違反的行標紅色。
  * @param {string} quarterId 季度 ID
- * @param {Object[]} results generateBest() 回傳的 results
+ * @param {Object[]} results generateBest_() 回傳的 results
  * @param {Object} baseline 歷史基準值
  * @returns {string} 工作表名稱
  */
@@ -279,7 +279,7 @@ function writeMultiRunSheet_(quarterId, results, baseline) {
   if (existing) ss.deleteSheet(existing);
   const sheet = ss.insertSheet(sheetName);
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   sheet.getRange(1, 1).setValue(
     '多次生成比較　' + quarterId
       + '　執行時間：' + nowTimestamp_()
@@ -332,11 +332,11 @@ function writeMultiRunSheet_(quarterId, results, baseline) {
  * 診斷用：執行多次生成並把全部結果寫入 MultiRun_Result，不建立任何職事表版本。
  * @param {string} quarterId 季度 ID
  * @param {number=} attempts 嘗試次數；未提供時讀 Config
- * @returns {Object} generateBest() 的結果，另附 sheetName
+ * @returns {Object} generateBest_() 的結果，另附 sheetName
  */
-function compareMultiRun(quarterId, attempts) {
-  const best = generateBest(quarterId, attempts);
-  const baseline = readTuneBaseline_(readRules());
+function compareMultiRun_(quarterId, attempts) {
+  const best = generateBest_(quarterId, attempts);
+  const baseline = readTuneBaseline_(readRules_());
   best.sheetName = writeMultiRunSheet_(quarterId, best.results, baseline);
   return best;
 }
@@ -350,27 +350,27 @@ function compareMultiRun(quarterId, attempts) {
  *   attemptsRun、attemptsPlanned、stoppedByTime、attemptIndex、seed、deviation、protected
  */
 function performRosterGeneration_(quarterId) {
-  const genResult = generateBest(quarterId);
-  const previousVersionNo = findLatestVersionNo(quarterId);
+  const genResult = generateBest_(quarterId);
+  const previousVersionNo = findLatestVersionNo_(quarterId);
   const versionNo = previousVersionNo + 1;
 
   // 先建 grid 工作表：若名稱衝突會在寫入長表之前就中止，避免留下孤兒資料列
-  const sheetName = createRosterSheet(quarterId, versionNo, genResult.assignments, genResult.warnings);
-  writeAssignments(quarterId, versionNo, genResult.assignments);
+  const sheetName = createRosterSheet_(quarterId, versionNo, genResult.assignments, genResult.warnings);
+  writeAssignments_(quarterId, versionNo, genResult.assignments);
 
   // 階段 G：Apps Script 沒有真正的交易（transaction），grid 工作表與
-  // RosterAssignments 這時已經真正寫入了。如果接下來的 protectV0()／
-  // registerVersion() 失敗（例如 RosterVersions 剛好被誰刪掉、或一次性的
+  // RosterAssignments 這時已經真正寫入了。如果接下來的 protectV0_()／
+  // registerVersion_() 失敗（例如 RosterVersions 剛好被誰刪掉、或一次性的
   // 配額錯誤），會留下「有 grid 工作表、有 RosterAssignments 列，但
-  // RosterVersions 完全沒有登記」的孤兒版本——findLatestVersionNo() 找不到它，
+  // RosterVersions 完全沒有登記」的孤兒版本——findLatestVersionNo_() 找不到它，
   // 之後任何操作都會當作它不存在，等於「做了一半又不知道做到哪」。這裡不嘗試
   // 自動回滾（自動刪除剛寫好的資料风险更高，可能刪錯或刪一半），只在失敗時
   // 把「已經寫了什麼、需要人手怎麼處理」講清楚，讓幹事或下一次對話的 Claude
   // 有足夠資訊接續，而不是看到一句看不出所以然的原始錯誤訊息。
-  const shouldProtect = versionNo === 0 && getConfig(CONFIG_KEYS.V0_PROTECT, false) === true;
+  const shouldProtect = versionNo === 0 && getConfig_(CONFIG_KEYS.V0_PROTECT, false) === true;
   try {
-    if (shouldProtect) protectV0(sheetName);
-    registerVersion(
+    if (shouldProtect) protectV0_(sheetName);
+    registerVersion_(
       quarterId, versionNo, sheetName, VERSION_VALUES.BASIS_AUTO_GENERATE,
       previousVersionNo < 0 ? null : previousVersionNo,
       genResult.warnings.length, shouldProtect, buildSeedNote_(genResult)
@@ -399,7 +399,7 @@ function performRosterGeneration_(quarterId) {
   // Confirmed 欄）都唔應該令一次成功嘅生成變成失敗。
   let unconfirmedSpecials = [];
   try {
-    const tz = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const tz = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     unconfirmedSpecials = listUnconfirmedSpecialSundays_(quarterId, tz);
   } catch (err) {
     log_('WARN', 'performRosterGeneration_: 讀取未確認特殊主日失敗，略過這項提示：' + err.message);

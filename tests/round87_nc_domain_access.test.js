@@ -30,7 +30,7 @@ console.log('\n=== NC2：第 3 層名單照舊生效 ===');
 function run(email) {
   const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebApp.gs']);
   gas.Session = { getActiveUser: () => ({ getEmail: () => email }) };
-  gas.getConfig = function (key, d) {
+  gas.getConfig_ = function (key, d) {
     if (key === gas.CONFIG_KEYS.WEBAPP_ENABLED) return true;
     if (key === gas.CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS) return ['staff@example.invalid'];
     if (key === gas.CONFIG_KEYS.WEBAPP_VIEWER_EMAILS) return ['viewer@example.invalid'];

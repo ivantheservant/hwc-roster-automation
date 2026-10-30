@@ -117,7 +117,7 @@ gas.Utilities = {
 };
 gas.log_ = function () {};
 
-// ⚠️ **`createRosterSheet()` 冇 stub**——`apiGetRosterGrid` 要讀真 grid 工作表。
+// ⚠️ **`createRosterSheet_()` 冇 stub**——`apiGetRosterGrid` 要讀真 grid 工作表。
 gas.buildSeedNote_ = function (r) {
   return 'seed=' + r.seed + '　第 ' + r.attemptIndex + ' / ' + r.attemptsRun + ' 次';
 };
@@ -284,7 +284,7 @@ console.log('\n=== 生成 v0 之後：apiGetRosterGrid 真正讀到 grid ===');
     DATES.every(function (d) { return text.indexOf(d) !== -1; }),
     DATES.join(',') + ' / ' + text.slice(0, 400));
   // ⚠️ `apiGetRosterGrid` 係俾前端畫表用嘅，所以欄標題係**中文崗位名**，
-  // 唔係 PostID——由 `readPostsNormalized()` 讀真 Posts 表譯出嚟。
+  // 唔係 PostID——由 `readPostsNormalized_()` 讀真 Posts 表譯出嚟。
   // 呢一條順便釘住咗「幹事見到嘅係人話，唔係內部代號」。
   check('★★★★★ 欄標題係中文崗位名（由真 Posts 表譯出嚟，唔係內部代號）',
     Array.isArray(grid.headers)
@@ -301,7 +301,7 @@ console.log('\n=== apiGetDashboardState：真正反映「已經有版本」===')
 {
   const d = gas.apiGetDashboardState(Q);
   check('★★★★★ 答得出', !!d && typeof d === 'object', JSON.stringify(d).slice(0, 300));
-  check('★★★★★ 真正讀到最新版本（由 findLatestVersionNo() 讀真試算表，'
+  check('★★★★★ 真正讀到最新版本（由 findLatestVersionNo_() 讀真試算表，'
     + '唔係測試傳一個假 state 落 computeDashboardButtons_()）',
     d.latestVersion !== null && d.latestVersion !== undefined,
     JSON.stringify(d.latestVersion));

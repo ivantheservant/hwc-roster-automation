@@ -127,11 +127,11 @@ console.log('\n=== AW1 最新一份可編輯副本：按建立時間，同一時
   // 真正彈窗後端：副本資料夾內 第 9 版（舊）同 第 2 版（新）
   const d = buildDrive();
   gas.assertWebAppRequestAllowed_ = function () {};
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.resolveMailAttachmentFolder_ = function () { return d.root; };
   gas.findPublicLinkRow_ = function () { return null; };
   gas.buildAttachmentName_ = function (q, v, label) { return q + '_v' + v + '_' + label + '.pdf'; };
-  gas.getConfig = function (_k, dflt) { return dflt; };
+  gas.getConfig_ = function (_k, dflt) { return dflt; };
   const r = gas.apiGetRecoveryLinks(Q);
   check('★★★★★★ 「最新一份」是較新建立嗰份（第 2 版，2000），唔係版本號最大嗰份（第 9 版）',
     /copy-new/.test(r.editableCopy.url) && /第2版/.test(r.editableCopy.note), JSON.stringify(r.editableCopy));
@@ -149,14 +149,14 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
     r[V.QUARTER_ID] = Q; r[V.VERSION_NO] = no; r[V.PROTECTED] = !!prot; r[V.SHEET_NAME] = 'Roster_' + Q + '_v' + no;
     return r;
   };
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.ROSTER_VERSIONS) {
       return [versionRow(3), versionRow(5), versionRow(6), versionRow(7, true)];
     }
     return [];
   };
   gas.SpreadsheetApp = { getActiveSpreadsheet: function () { return { getSheetByName: function () { return null; } }; } };
-  gas.getConfig = function (_k, dflt) { return dflt; };
+  gas.getConfig_ = function (_k, dflt) { return dflt; };
   gas.findQuarter_ = function () { return null; };
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
   gas.resolveMailAttachmentFolder_ = function () { return d.root; };
@@ -183,7 +183,7 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
     return r;
   };
   // 版本 2、3、5、6、7、9 都登記，7 受保護
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.ROSTER_VERSIONS) {
       // 版本 4 冇登記（孤兒）
       return [versionRow(2), versionRow(3), versionRow(5), versionRow(6), versionRow(7, true), versionRow(8, true), versionRow(9)];
@@ -192,7 +192,7 @@ console.log('\n=== AW2 重設季度：可編輯副本 ＋ 清理後變空嘅版�
   };
   const trashedSheets = [];
   gas.SpreadsheetApp = { getActiveSpreadsheet: function () { return { getSheetByName: function () { return null; } }; } };
-  gas.getConfig = function (_k, dflt) { return dflt; };
+  gas.getConfig_ = function (_k, dflt) { return dflt; };
   gas.findQuarter_ = function () { return null; };
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
   gas.resolveMailAttachmentFolder_ = function () { return d.root; };
@@ -263,16 +263,16 @@ console.log('\n=== AW3 USER_GUIDE_URL：有值畫連結；空白寫指南章名�
   const gas = load();
   const d = buildDrive();
   gas.assertWebAppRequestAllowed_ = function () {};
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.resolveMailAttachmentFolder_ = function () { return d.root; };
   gas.findPublicLinkRow_ = function () { return null; };
   gas.buildAttachmentName_ = function (q, v, label) { return q + '_v' + v + '_' + label + '.pdf'; };
 
-  gas.getConfig = function (_k, dflt) { return dflt; };
+  gas.getConfig_ = function (_k, dflt) { return dflt; };
   const blank = gas.apiGetRecoveryLinks(Q);
   check('★★★★★★ 空白 ⇒ 寫「詳細步驟見《職事表系統使用指南》「系統出問題時」一章」',
     blank.guideUrl === '' && blank.guideSentence === '詳細步驟見《職事表系統使用指南》「系統出問題時」一章。', JSON.stringify(blank));
-  gas.getConfig = function (k, dflt) { return k === gas.CONFIG_KEYS.USER_GUIDE_URL ? ' https://docs.invalid/guide ' : dflt; };
+  gas.getConfig_ = function (k, dflt) { return k === gas.CONFIG_KEYS.USER_GUIDE_URL ? ' https://docs.invalid/guide ' : dflt; };
   const set = gas.apiGetRecoveryLinks(Q);
   check('★★★★★★ 有值 ⇒ 回連結（去掉空白）＋「詳細步驟見使用指南」',
     set.guideUrl === 'https://docs.invalid/guide' && /詳細步驟見使用指南/.test(set.guideSentence), JSON.stringify(set));

@@ -43,7 +43,7 @@ function escapePreseasonHtml_(s) {
 /**
  * 這一季的生成日（和每日檢查同一個算法：Quarters.GenerateOn，空白就按 Config 推算）。
  * @param {Object} quarterRow Quarters 一行
- * @param {Object} config readConfig()
+ * @param {Object} config readConfig_()
  * @returns {string} yyyy-MM-dd；算不到 ⇒ ''
  */
 function readPreseasonGenerateDate_(quarterRow, config) {
@@ -62,15 +62,15 @@ function readPreseasonGenerateDate_(quarterRow, config) {
  * @returns {{quarterId: string, quarterLabel: string, generateDate: string, sections: Object[], html: string, plain: string}}
  */
 function buildPreseasonPack_(quarterId, todayStr, generateDate) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const quarter = findQuarter_(quarterId);
-  const start = quarter ? toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
-  const end = quarter ? toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
+  const start = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+  const end = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
   const nameById = readPersonNameIndex_();
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
   const postName = {};
   posts.forEach(function (p) { postName[p.postId] = p.postNameTC || p.postId; });
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const roles = readRolesSafe_(timezone);
   const overlaps = function (from, to) {
     if (!start || !end) return true;
@@ -119,9 +119,9 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
 
   // ④ 不能服侍的日期（落在這一季、有效的）
   const U = COLUMNS.UNAVAILABLE;
-  const s4 = readUnavailable().filter(isUnavailableRowActive_).map(function (row) {
-    const from = toDateString(row[U.DATE_FROM], timezone);
-    const to = toDateString(row[U.DATE_TO], timezone) || from;
+  const s4 = readUnavailable_().filter(isUnavailableRowActive_).map(function (row) {
+    const from = toDateString_(row[U.DATE_FROM], timezone);
+    const to = toDateString_(row[U.DATE_TO], timezone) || from;
     return { personId: String(row[U.PERSON_ID] || '').trim(), from: from, to: to, reason: String(row[U.REASON] || '').trim() };
   }).filter(function (u) { return u.from && overlaps(u.from, u.to); })
     .sort(function (a, b) { return a.from < b.from ? -1 : (a.from > b.from ? 1 : 0); })
@@ -165,10 +165,10 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
  * @returns {{recipients: Object[], noEmail: string[]}} recipients＝[{email, displayName, why}]
  */
 function buildPreseasonRecipients_(todayStr) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const M = COLUMNS.NAME_MAPPING;
   const people = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[M.PERSON_ID] || '').trim();
     if (id) people[id] = { label: String(row[M.NAME_TC] || '').trim() || id, email: String(row[M.EMAIL] || '').trim() };
   });
@@ -194,8 +194,8 @@ function buildPreseasonRecipients_(todayStr) {
   const split = function (raw) {
     return String(raw || '').split(/[,;、\s]+/).map(function (s) { return s.trim(); }).filter(function (s) { return !!s; });
   };
-  split(getConfig(CONFIG_KEYS.MAIL_ADMIN_NOTIFY, '')).forEach(function (e) { add(e, '幹事', '幹事'); });
-  split(getConfig(CONFIG_KEYS.PRESEASON_EXTRA_RECIPIENTS, '')).forEach(function (e) { add(e, e, '額外收件人'); });
+  split(getConfig_(CONFIG_KEYS.MAIL_ADMIN_NOTIFY, '')).forEach(function (e) { add(e, '幹事', '幹事'); });
+  split(getConfig_(CONFIG_KEYS.PRESEASON_EXTRA_RECIPIENTS, '')).forEach(function (e) { add(e, e, '額外收件人'); });
   return { recipients: recipients, noEmail: noEmail };
 }
 
@@ -224,7 +224,7 @@ function readPreseasonSentRecord_(quarterId) {
   const A = COLUMNS.AUDIT_LOG;
   let found = null;
   let real = null;
-  readSheet(SHEETS.AUDIT_LOG).forEach(function (row) {
+  readSheet_(SHEETS.AUDIT_LOG).forEach(function (row) {
     if (row[A.ACTION] !== PRESEASON_AUDIT_ACTION) return;
     if (String(row[A.TARGET_KEY] || '').trim() !== quarterId) return;
     const parts = String(row[A.NEW_VALUE] || '').split('|');
@@ -284,7 +284,7 @@ function describePreseasonStatus_(sent, generateDate, daysBefore) {
  * @returns {{dryRun: boolean, sent: number, simulated: number, failed: Object[], recipients: Object[], noEmail: string[]}}
  */
 function sendPreseasonPack_(quarterId, mode) {
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const quarterRow = findQuarter_(quarterId);
@@ -295,7 +295,7 @@ function sendPreseasonPack_(quarterId, mode) {
   const placeholders = { QuarterLabel: pack.quarterLabel, QuarterID: quarterId, GenerateDate: generateDate || '生成日',
     PreseasonContentHtml: pack.html, PreseasonContentPlain: pack.plain };
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
-  const dryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const dryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const context = { senderName: String(config[CONFIG_KEYS.MAIL_SENDER_NAME] || ''), replyTo: String(config[CONFIG_KEYS.MAIL_REPLY_TO] || '') };
   let sent = 0;
   let simulated = 0;
@@ -331,20 +331,20 @@ function sendPreseasonPack_(quarterId, mode) {
  * 每日檢查呼叫：到了時間就自動寄一次。
  * @param {Object} quarterRow Quarters 一行
  * @param {string} today yyyy-MM-dd
- * @param {Object} config readConfig()
+ * @param {Object} config readConfig_()
  * @returns {Object} 報告一行 {quarterId, action, outcome, detail}
  */
 function runPreseasonAutoSend_(quarterRow, today, config) {
   const quarterId = String(quarterRow[COLUMNS.QUARTERS.QUARTER_ID] || '').trim();
   const judgment = judgePreseasonAutoSend_({
-    enabled: getConfig(CONFIG_KEYS.PRESEASON_AUTO_SEND, true) !== false,
-    daysBefore: Number(getConfig(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)),
+    enabled: getConfig_(CONFIG_KEYS.PRESEASON_AUTO_SEND, true) !== false,
+    daysBefore: Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)),
     generateDate: readPreseasonGenerateDate_(quarterRow, config),
     today: today,
     sent: readPreseasonSentRecord_(quarterId),
-    dryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     stage: String(quarterRow[COLUMNS.QUARTERS.STAGE] || QUARTER_STAGE.DRAFT).trim().toUpperCase(),
-    versionNo: findLatestVersionNo(quarterId)
+    versionNo: findLatestVersionNo_(quarterId)
   });
   if (!judgment.send) {
     if (judgment.reason === 'NO_GENERATE_DATE') log_('INFO', '季前資料：' + quarterId + ' 沒有生成日期，不會自動寄出');
@@ -365,7 +365,7 @@ function apiPreseasonPreview(quarterId) {
   const id = String(quarterId || '').trim();
   beginSheetReadMemo_();
   try {
-    const config = readConfig();
+    const config = readConfig_();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     const row = findQuarter_(id);
@@ -373,7 +373,7 @@ function apiPreseasonPreview(quarterId) {
     const pack = buildPreseasonPack_(id, today, generateDate);
     const who = buildPreseasonRecipients_(today);
     return { quarterId: id, quarterLabel: pack.quarterLabel, generateDate: generateDate, sections: pack.sections,
-      recipients: who.recipients, noEmail: who.noEmail, dryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+      recipients: who.recipients, noEmail: who.noEmail, dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
       sentRecord: readPreseasonSentRecord_(id) };
   } finally {
     endSheetReadMemo_();
@@ -398,9 +398,9 @@ function apiPreseasonSend(quarterId) {
  * @returns {string}
  */
 function readPreseasonStatusText_(quarterId) {
-  const config = readConfig();
+  const config = readConfig_();
   const row = findQuarter_(quarterId);
   const generateDate = row ? readPreseasonGenerateDate_(row, config) : '';
   return describePreseasonStatus_(readPreseasonSentRecord_(quarterId), generateDate,
-    Number(getConfig(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)));
+    Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)));
 }

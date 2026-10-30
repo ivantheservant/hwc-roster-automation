@@ -25,7 +25,7 @@ const sc = buildRound75Scene({ extraFiles: ['CellDecisions.gs', 'WebAppZone4.gs'
 const gas = sc.gas;
 const D = sc.DATES;
 const V = sc.C.ROSTER_VERSIONS;
-// 舊試算表冇 ChangeCounts 欄：先把 RosterVersions 重新種成 12 欄（冇 ChangeCounts），驗 registerVersion() 會自己補欄
+// 舊試算表冇 ChangeCounts 欄：先把 RosterVersions 重新種成 12 欄（冇 ChangeCounts），驗 registerVersion_() 會自己補欄
 {
   const { seedSheet } = require('./helpers/mock_sheets_realistic.js');
   const oldKeys = Object.keys(V).filter((k) => k !== 'CHANGE_COUNTS').map((k) => V[k]);
@@ -33,7 +33,7 @@ const V = sc.C.ROSTER_VERSIONS;
   seedSheet(sc.ss, sc.S.ROSTER_VERSIONS, oldKeys.map(() => ''), oldKeys, []);
 }
 gas.apiGenerateDraftExecute(sc.Q);
-const versionRow = (no) => gas.readSheet(sc.S.ROSTER_VERSIONS).filter((r) => r[V.QUARTER_ID] === sc.Q && Number(r[V.VERSION_NO]) === no)[0];
+const versionRow = (no) => gas.readSheet_(sc.S.ROSTER_VERSIONS).filter((r) => r[V.QUARTER_ID] === sc.Q && Number(r[V.VERSION_NO]) === no)[0];
 const sourceOf = (no) => gas.listQuarterVersionChoices_(sc.Q, sc.TZ).filter((v) => v.versionNo === no)[0].sourceText;
 const others = (post, d, not) => ['P9701', 'P9702', 'P9703', 'P9704', 'P9705'].map(sc.nameOf).filter((n) => n !== not && n !== sc.getCell(0, d, post))[0];
 

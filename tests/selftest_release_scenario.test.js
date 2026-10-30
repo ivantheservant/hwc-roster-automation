@@ -243,9 +243,9 @@ console.log('\n=== B2【核心】放行要留低痕跡 ===');
   gas.materialiseManualEdits_ = function () {
     return { versionNo: 2, sheetName: 'Roster_2028T3_v2', cellCount: 1 };
   };
-  gas.registerVersion = function () {};
-  gas.readPostsNormalized = function () { return []; };
-  gas.readSheet = function () { return []; };
+  gas.registerVersion_ = function () {};
+  gas.readPostsNormalized_ = function () { return []; };
+  gas.readSheet_ = function () { return []; };
   gas.getQuarterStage_ = function () { return gas.QUARTER_STAGE.DRAFT; };
   gas.buildSaveAndConfirmPlan_ = function () {
     // 第七十五輪批次 CF／CG 組：打字放行換成逐格勾「保留我的安排」——勾咗嘅一定要遵守違反喺 `violations.kept`
@@ -308,9 +308,9 @@ console.log('\n=== B2 冇放行嘅乾淨儲存 ⇒ 一筆都唔好寫 ===');
   gas.materialiseManualEdits_ = function () {
     return { versionNo: 2, sheetName: 'Roster_2028T3_v2', cellCount: 1 };
   };
-  gas.registerVersion = function () {};
-  gas.readPostsNormalized = function () { return []; };
-  gas.readSheet = function () { return []; };
+  gas.registerVersion_ = function () {};
+  gas.readPostsNormalized_ = function () { return []; };
+  gas.readSheet_ = function () { return []; };
   gas.getQuarterStage_ = function () { return gas.QUARTER_STAGE.DRAFT; };
   gas.buildSaveAndConfirmPlan_ = function () {
     return {

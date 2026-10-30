@@ -57,21 +57,21 @@ console.log('\n=== 一【核心】開跑之前四道閘，一道都唔可以繞�
   };
   const withConfig = function (over) {
     const c = Object.assign({}, base, over || {});
-    gas.getConfig = function (key, fallback) {
+    gas.getConfig_ = function (key, fallback) {
       return Object.prototype.hasOwnProperty.call(c, key) ? c[key] : fallback;
     };
-    // ⚠️ **`readConfig()` 都要頂替。**
+    // ⚠️ **`readConfig_()` 都要頂替。**
     //
     // `readQuarterResetBlockedQuarters_()` 同 `readSelfTestQuarterDetail_()`
-    // 行嘅係 `getConfigWithSourceSafe_()` → `getConfigWithSource()` →
-    // `readConfig()`，唔經 `getConfig()`。淨係頂替 `getConfig()` 嘅話，
-    // `readConfig()` 會喺沙箱度撞到 `CacheService` 個 trap 而拋錯，
+    // 行嘅係 `getConfigWithSourceSafe_()` → `getConfigWithSource_()` →
+    // `readConfig_()`，唔經 `getConfig_()`。淨係頂替 `getConfig_()` 嘅話，
+    // `readConfig_()` 會喺沙箱度撞到 `CacheService` 個 trap 而拋錯，
     // 然後 `…Safe_()` 靜靜退回程式內建預設值。
     //
     // 結果：斷言仍然綠，但佢**驗緊嘅唔係我以為嗰件事**——
     // 佢驗緊「內建預設值啱唔啱」，而唔係「Config 嗰一格生唔生效」。
     // 呢個就係本輪要處理嗰種假綠燈嘅最細一個樣。
-    gas.readConfig = function () { return c; };
+    gas.readConfig_ = function () { return c; };
   };
   gas.getQuarterStage_ = function () { return 'DRAFT'; };
 

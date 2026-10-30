@@ -16,13 +16,13 @@
  * ⚠️ 這不是從零做
  * ─────────────────────────────────────────────────────────────────────
  *
- * 系統本來就有這條路：`FineTune.gs` 的 `proposeMinimalFix()`
+ * 系統本來就有這條路：`FineTune.gs` 的 `proposeMinimalFix_()`
  * （最小改動修復被破壞的規則）、`analyseManualState_()`（逐格比對現時
  * grid 同最新版本，算出改了甚麼、違反了甚麼、認不出甚麼）。
  *
  * 這一組做的是**把它接上主流程**，不是重新寫一套。
  * 接上去的同時，那條路就終於會被真人跑到——那本身是額外的好處：
- * `applyDecisions()` 是第三十七輪查出「五條建立版本的路之中唯一一條
+ * `applyDecisions_()` 是第三十七輪查出「五條建立版本的路之中唯一一條
  * 從來沒有端到端跑過」那一條。
  *
  * ─────────────────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ function apiCheckMyChanges(quarterId) {
   assertWebAppRequestAllowed_('apiCheckMyChanges');
   beginSheetReadMemo_();
   try {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) {
       return { ok: false, message: '這一季還沒有生成過任何版本。' };
     }
@@ -241,10 +241,10 @@ function readGridTextFromSheet_(sheetName, timezone) {
 
   const result = {};
   values.forEach(function (row) {
-    const dateStr = toDateString(row[0], timezone);
+    const dateStr = toDateString_(row[0], timezone);
     // ⚠️ 第四十二輪批次 A 組：**一定要嚴格**。
     //
-    // `toDateString()` 認不出的時候會**原樣回傳**（那是它刻意的，
+    // `toDateString_()` 認不出的時候會**原樣回傳**（那是它刻意的，
     // 為了讀得返歷史資料）。所以「不是空字串」不等於「是一個日期」——
     // 圖例那幾行、最底那行指紋，全部都會變成一個看起來合法的 key，
     // 而那些假 key 會令兩次指紋比對永遠對不上。
@@ -293,7 +293,7 @@ function readSuggestionTypeColumn_(sheetName, timezone) {
   const values = sheet.getRange(keyRow + 1, 1, lastRow - keyRow, WEEK_TITLE_GRID_COLUMN).getValues();
   const out = {};
   values.forEach(function (row) {
-    const d = toDateString(row[0], timezone);
+    const d = toDateString_(row[0], timezone);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
     const v = row[WEEK_TITLE_GRID_COLUMN - 1];
     out[d] = String(v === null || v === undefined ? '' : v).trim();
@@ -333,7 +333,7 @@ function mergeWeekTitleChanges_(fromGrid, fromSuggestion) {
 function buildSuggestionState_(quarterId, start, allowedKeys) {
   const versionNo = start.versionNo;
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const context = buildFineTuneContext_(quarterId, versionNo);
 
   if (start.source === SUGGESTION_START.SUGGESTION) {
@@ -370,7 +370,7 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
 
   // ── 二、系統的最小改動建議 ───────────────────────────────────
   //
-  // ⚠️ 用返 `proposeMinimalFix()`——**不在這裡重寫一套修復邏輯**。
+  // ⚠️ 用返 `proposeMinimalFix_()`——**不在這裡重寫一套修復邏輯**。
   // 它已經有「循序處理、每產生一項建議就視為已生效」那一套，
   // 重寫一定會分岔。
   // ⚠️ 第四十六輪批次 C 組：把「邊幾格係幹事親手改嘅」同
@@ -573,11 +573,11 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
 }
 
 /**
- * 同 `proposeMinimalFix()` 一樣，但用一份**已經算好的** analysis，
+ * 同 `proposeMinimalFix_()` 一樣，但用一份**已經算好的** analysis，
  * 不再自己叫一次 `buildFineTuneContext_()`。
  *
  * ⚠️ 存在的理由：這裡的起點可能是建議表（不是正式那一張），
- * 而 `proposeMinimalFix()` 寫死了自己去讀正式那一張。
+ * 而 `proposeMinimalFix_()` 寫死了自己去讀正式那一張。
  * 兩者的修復邏輯必須是同一段——所以這裡**不重寫**，
  * 只是把「起點從哪裡來」這一件事抽出來。
  *
@@ -697,7 +697,7 @@ function proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys,
       // 「原因：建議改派 試甲」是一句同義反覆——它答的是「改成什麼」，
       // 而 Ivan 要的是「為什麼改」。
       //
-      // `FineTune.gs` 那一份（`proposeMinimalFix()`）本來就寫對了
+      // `FineTune.gs` 那一份（`proposeMinimalFix_()`）本來就寫對了
       //（`violation.reason + '；' + replacement.reason`）。這裡是同一個概念
       // 的第二份，而且是走了樣那一份。現在跟回它。
       reason: [violation.reason, replacement.reason]
@@ -781,7 +781,7 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
     if (key) allowedKeys[key] = true;
   });
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error(buildThreePartMessage_(
       '這一季還沒有生成過任何版本。', '甚麼都沒有改動。', ['先在第 1 步生成職事表']));
@@ -867,7 +867,7 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
   // ⚠️ 建議表那一個指紋要**讀返出嚟先算**，不可以用寫入之前那份資料算。
   // 用同一個 `readGridTextFromSheet_()` 讀，下一次比對才會是同一把尺；
   // 兩把尺的話，幹事一格都沒有改，系統都會以為他改過。
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   suggestionStep_('記低這一次的起點指紋', function () {
     const gridFp = fingerprintGridText_(
       readGridTextFromSheet_(start.gridSheetName, timezone));
@@ -1000,7 +1000,7 @@ function writeSuggestionSheet_(quarterId, built, sheetName) {
   const postNames = {};
   context.posts.forEach(function (p) { postNames[p.postId] = p.postNameTC; });
 
-  // 把狀態轉成 `createRosterSheet()` 要的形狀，再用同一個版面產生器——
+  // 把狀態轉成 `createRosterSheet_()` 要的形狀，再用同一個版面產生器——
   // 不另寫一套版面，否則建議表同正式表會慢慢長得不一樣。
   const assignments = built.state.map(function (s) {
     // 用上游算好的中繼資料——這個函式刻意完全不碰 `context.original`
@@ -1186,7 +1186,7 @@ function apiAcceptSuggestion(quarterId) {
 }
 
 function apiAcceptSuggestion_locked_(quarterId) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const sheetName = buildSuggestionSheetName_(quarterId, versionNo);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss.getSheetByName(sheetName)) {
@@ -1197,7 +1197,7 @@ function apiAcceptSuggestion_locked_(quarterId) {
         '或者再按一次「請系統幫我調整」']));
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const context = buildFineTuneContext_(quarterId, versionNo);
   // ⚠️ 建議表**就是**這一次要儲存的 grid。把它當成 gridValues 餵落去，
   // 下游那一條路就完全不用知道有「建議表」這一回事。
@@ -1258,12 +1258,14 @@ function apiAcceptSuggestion_locked_(quarterId) {
   const created = materialiseManualEdits_(
     context, resolved.changes, resolved.state, 'apiAcceptSuggestion',
     { titleChangeCount: titleChanges.length });
-  // ⚠️ 參數次序：第 7 個係 ，第 8 個先係 。
+  // ⚠️ 參數次序：第 7 個係 isProtected，第 8 個先係 notes。
   // 傳漏一個就會把說明寫落「有冇保護」嗰一欄，而畫面睇落完全正常。
-  registerVersion(
+  // 第八十八輪批次：新版本的父版本＝建議所根據的版本（versionNo）；用具名變數，參數次序檢查才分得出
+  const parentVersionNo = versionNo;
+  registerVersion_(
     quarterId, created.versionNo, created.sheetName,
     // 第七十五輪批次 CH 組：版本下拉要分得出「系統調整」同「人手改動」
-    VERSION_VALUES.BASIS_SUGGESTION, versionNo, 0, false,
+    VERSION_VALUES.BASIS_SUGGESTION, parentVersionNo, 0, false,
     '接受系統建議版本：' + resolved.changes.length + ' 格'
       + (titleChanges.length > 0 ? '、每週標題 ' + titleChanges.length + ' 週' : '')
       + (changeCounts ? '（人手 ' + changeCounts.manual + '、系統 ' + changeCounts.system + '）' : ''),
@@ -1319,7 +1321,7 @@ function apiAcceptSuggestion_locked_(quarterId) {
  */
 function apiDiscardSuggestion(quarterId) {
   assertWebAppRequestAllowed_();
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const removed = discardSuggestionSheet_(quarterId, versionNo);
   return {
     ok: true,
@@ -1355,7 +1357,7 @@ function discardSuggestionSheet_(quarterId, versionNo) {
  */
 function apiGetSuggestionState(quarterId) {
   assertWebAppRequestAllowed_('apiGetSuggestionState');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) return { hasSuggestion: false, sheetName: '', url: '' };
   const sheetName = buildSuggestionSheetName_(quarterId, versionNo);
   const has = !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
@@ -1513,7 +1515,7 @@ const SUGGESTION_START = { GRID: 'GRID', SUGGESTION: 'SUGGESTION' };
  * @returns {Object} {source, needsChoice, gridChanged, suggestionChanged, ...}
  */
 function resolveSuggestionStartPoint_(quarterId, versionNo, requested) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const gridName = buildRosterSheetName_(quarterId, versionNo);
   const suggestionName = buildSuggestionSheetName_(quarterId, versionNo);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1651,7 +1653,7 @@ function discardStaleSuggestionSheets_(quarterId, keepVersionNo) {
  *
  * > 系統幫我調整 → 為什麼不安排那些「⚠ 未能安排」？它應該做得到。
  *
- * 他是對的。`proposeMinimalFix()` 本來只處理「幹事改動造成的規則違反」
+ * 他是對的。`proposeMinimalFix_()` 本來只處理「幹事改動造成的規則違反」
  * ——一格**根本沒有人**不算違反（`findStateViolations_()` 開頭第一句就是
  * `if (!cell.personId) return;`），所以那些格由頭到尾沒有被看過一眼。
  *
@@ -1806,7 +1808,7 @@ const WEIGHT_TUNE_MAX_MOVES = 30;
  */
 function readWeightsForQuarterTune_(quarterId, timezone) {
   const quarterRow = findQuarter_(quarterId);
-  const refDate = quarterRow ? toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+  const refDate = quarterRow ? toDateString_(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone) : '';
   return readActivePersonPostWeights_(refDate, timezone, buildWeightBaselineData_(quarterId, timezone));
 }
 

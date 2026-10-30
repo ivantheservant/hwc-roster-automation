@@ -82,7 +82,7 @@ function ensureRehearsalStateSheet_() {
 function readRehearsalState_() {
   let rows;
   try {
-    rows = readSheet(SHEETS.REHEARSAL_STATE);
+    rows = readSheet_(SHEETS.REHEARSAL_STATE);
   } catch (err) {
     return null;   // 張表未建過 ＝ 從來未演練過
   }
@@ -408,7 +408,7 @@ function runSeasonRehearsalResume_() {
 
   let latest;
   try {
-    latest = findLatestVersionNo(state.quarterId);
+    latest = findLatestVersionNo_(state.quarterId);
   } catch (err) {
     latest = NaN;
   }
@@ -420,7 +420,7 @@ function runSeasonRehearsalResume_() {
   }
 
   // ── 確認畫面 ───────────────────────────────────────────
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const pdfNote = state.pdfDone
     ? '個人 PDF 上一段已經產生完，這一段直接執行步驟 4 和步驟 5。'
     : '這一段會繼續執行個人 PDF（已經執行了 ' + state.pdfRoundsDone + ' 批），'

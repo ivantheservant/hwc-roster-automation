@@ -3,7 +3,7 @@
  * 每步開始前都用 requireQuarterStage_()（QuarterStage.gs）檢查 Stage，成功後才呼叫
  * advanceQuarterStage_() 前進——這是全專案唯一會呼叫 advanceQuarterStage_() 的地方。
  *
- * 步驟 2、4 直接重用既有的 sendStage()（Mailer.gs）寄送管線，不重寫寄信邏輯：
+ * 步驟 2、4 直接重用既有的 sendStage_()（Mailer.gs）寄送管線，不重寫寄信邏輯：
  * 步驟 2 用新增的 MAIL_STAGES.REVIEW（收件人＝EmailRecipients.Role=REVIEWER，
  * 附件＝完整版 PDF，沿用 FULL_PDF 既有的「不存在就自動匯出一次」機制）；
  * 步驟 4 就是既有的 MAIL_STAGES.OFFICIAL（收件人＝表內所有人，附件＝已產生的個人 PDF，
@@ -491,7 +491,7 @@ function reportCancelledWithNeedsInput_(ui, title, plan) {
  * 步驟 4：正式發出。要求 Stage = REQUESTS_APPLIED。執行前檢查是否仍有 PENDING 的
  * Requests、是否仍有待補的黃色格子，有的話列出讓幹事決定；再沿用既有的個人 PDF
  * 缺件檢查（checkMissingPersonalPdfs_()）。實際寄送直接呼叫既有的
- * sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL)，不重寫寄信邏輯。
+ * sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL)，不重寫寄信邏輯。
  * 成功後 Stage → OFFICIAL_SENT。
  * @returns {void}
  */
@@ -677,7 +677,7 @@ function runFourStageStep5_locked_() {
     return;
   }
 
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
 
   // ---- 第一段：套用 Requests，完全重用步驟 3 的邏輯。Requests 已是 0 筆待處理時
   //      整段略過——這正是支援重試的關鍵：上次已經套用過的話，這次直接跳到比對改動者。
@@ -1003,7 +1003,7 @@ function remindUnreleasedHardViolations_(ui, quarterId, title, violations) {
     return 0;
   }
   if (unreleased.length === 0) return 0;
-  logUnreleasedHardViolationsAtSend_(quarterId, title + '（選單）', findLatestVersionNo(quarterId), unreleased);
+  logUnreleasedHardViolationsAtSend_(quarterId, title + '（選單）', findLatestVersionNo_(quarterId), unreleased);
   ui.alert(title + '：提醒',
     '這一版有 ' + unreleased.length + ' 格違反一定要遵守的規則，而且還未放行'
       + '（例如儲存之後改了名單）。這不會阻擋重發，但收到的人會看到這些安排。\n\n'

@@ -63,7 +63,7 @@ const RA_ROWS = [
   raRow(6, 'P9811', '2098-09-20', 'READ'), raRow(6, 'P9812', '2098-07-05', 'USHER'),
   raRow(6, 'P9813', '2098-07-12', 'USHER'), raRow(6, 'P9814', '2098-07-19', 'CHAIR')
 ];
-gas.readSheet = function (name) {
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.SEND_LOG) return SEND_LOG;
   if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) return RA_ROWS;
   return [];
@@ -89,7 +89,7 @@ gas.buildMailContext_ = function () {
     resendBaseline: baseline
   };
 };
-gas.findLatestVersionNo = function () { return 6; };
+gas.findLatestVersionNo_ = function () { return 6; };
 gas.readSendLogSummaryForDashboard_ = function () { return { officialSentOnce: true }; };
 gas.readResendChangeNotes_ = function () { return {}; };
 gas.findLastSentSnapshot_ = function () { return { versionNo: 5, sentAt: '2098-06-10 22:00', stage: 'OFFICIAL' }; };

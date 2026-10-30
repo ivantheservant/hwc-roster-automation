@@ -5,7 +5,7 @@
  * @param {number} versionNo 版本號
  * @returns {{report: Object, sheetName: string}} 核對報告與產生的工作表名稱
  */
-function verifyRoster(quarterId, versionNo) {
+function verifyRoster_(quarterId, versionNo) {
   const context = buildVerifyContext_(quarterId, versionNo);
   if (context.assignments.length === 0) {
     throw new Error('找不到 ' + quarterId + ' v' + versionNo + ' 的派工紀錄');
@@ -22,17 +22,17 @@ function verifyRoster(quarterId, versionNo) {
  * @returns {Object} 供 buildVerifyReport_() 使用的 context
  */
 function buildVerifyContext_(quarterId, versionNo) {
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
 
-  const assignments = readSheet(SHEETS.ROSTER_ASSIGNMENTS)
+  const assignments = readSheet_(SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
     })
     .map(function (row) {
       return {
-        serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID],
         slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID],
@@ -44,8 +44,8 @@ function buildVerifyContext_(quarterId, versionNo) {
   // 第十六輪批次階段 B：身分名單與個人崗位排除。三條路徑
   // （生成／步驟 3-5 重跑／核對）用同一個 `buildRoleContext_()`，
   // 見 Roles.gs 檔頭嘅 B1 說明。
-  const posts = readPostsNormalized();
-  const eligibility = readEligibility();
+  const posts = readPostsNormalized_();
+  const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   eligibility.byPost = roleContext.eligibleByPost;
 
@@ -53,13 +53,13 @@ function buildVerifyContext_(quarterId, versionNo) {
     quarterId: quarterId,
     versionNo: versionNo,
     assignments: assignments,
-    serviceDates: readServiceDatesNormalized(quarterId, timezone),
+    serviceDates: readServiceDatesNormalized_(quarterId, timezone),
     posts: posts,
     eligibility: eligibility,
     roles: roleContext.roles,
     personPostExclusions: roleContext.exclusions,
-    unavailable: readUnavailableNormalized(timezone),
-    rules: readRules()
+    unavailable: readUnavailableNormalized_(timezone),
+    rules: readRules_()
   };
 }
 

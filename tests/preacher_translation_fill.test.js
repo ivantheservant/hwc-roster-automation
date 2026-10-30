@@ -38,7 +38,7 @@ function findPreacherTranslationPostIds_(db) {
 }
 
 // ---- 移植：apiListPreacherTranslationPending() 的核心（去掉 UI/工作表 I/O）----
-function findLatestVersionNo(db, quarterId) {
+function findLatestVersionNo_(db, quarterId) {
   const rows = db.assignments.filter(a => a.quarterId === quarterId);
   if (rows.length === 0) return -1;
   return Math.max(...rows.map(a => a.versionNo));
@@ -49,7 +49,7 @@ function apiListPreacherTranslationPending(db, quarterId) {
   if (!ids.preacherPostId && !ids.translationPostId && !ids.flowerPostId) {
     throw new Error('Posts 工作表找不到名稱為「講員」「翻譯」或「獻花」的崗位，無法使用這個工具。');
   }
-  const versionNo = findLatestVersionNo(db, quarterId);
+  const versionNo = findLatestVersionNo_(db, quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本，請先執行「步驟 1：生成初稿」。');
 
   const targetPostIds = [ids.preacherPostId, ids.translationPostId, ids.flowerPostId].filter(Boolean);
@@ -76,7 +76,7 @@ function apiSavePreacherTranslationEntry(db, quarterId, serviceDate, postId, slo
     throw new Error('這個工具只能填寫「講員」「翻譯」或「獻花」崗位的格子，收到的 PostID「' + postId + '」不屬於這三個崗位。');
   }
 
-  const versionNo = findLatestVersionNo(db, quarterId);
+  const versionNo = findLatestVersionNo_(db, quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 
   const row = db.assignments.find(function (a) {
@@ -219,7 +219,7 @@ console.log('\n=== 用真正原始碼驗證 findPreacherTranslationPostIds_()（
 {
   // 上面全部測試移植咗一份邏輯（同其他測試檔一致嘅慣例），但移植版本走樣
   // 都會照樣全綠、測唔到正式碼改壞——呢度額外用 loadGasSource() 載入真正
-  // 嘅 src/PreacherTranslationFill.gs，只覆寫 readPosts()（唯一嘅 GAS 依賴），
+  // 嘅 src/PreacherTranslationFill.gs，只覆寫 readPosts_()（唯一嘅 GAS 依賴），
   // 直接驗證真正嘅 findPreacherTranslationPostIds_() 有冇正確搵到「獻花」。
   const { loadGasSource } = require('./helpers/gas_loader.js');
   // 先載入一次淨係攞 COLUMNS 常數（唔需要 overrides）——COLUMNS.POSTS.POST_NAME_TC／
@@ -232,7 +232,7 @@ console.log('\n=== 用真正原始碼驗證 findPreacherTranslationPostIds_()（
     { [constants.COLUMNS.POSTS.POST_NAME_TC]: '獻花', [constants.COLUMNS.POSTS.POST_ID]: 'FLOWER' }
   ];
   const gas = loadGasSource(['Constants.gs', 'PreacherTranslationFill.gs'], {
-    readPosts: function () { return POSTS_ROWS; }
+    readPosts_: function () { return POSTS_ROWS; }
   });
   const ids = gas.findPreacherTranslationPostIds_();
   check('★★★★ 真正原始碼嘅 findPreacherTranslationPostIds_() 正確搵到三個崗位嘅 PostID',

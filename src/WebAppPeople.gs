@@ -46,17 +46,17 @@ function apiListPeople(keyword) {
   beginSheetReadMemo_();
   try {
     const M = COLUMNS.NAME_MAPPING;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
     // 重複中文名——**只係提示，唔會自動處理任何嘢。**
     const nameCount = {};
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const n = String(row[M.NAME_TC] || '').trim();
       if (n) nameCount[n] = (nameCount[n] || 0) + 1;
     });
 
     const people = [];
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const personId = String(row[M.PERSON_ID] || '').trim();
       if (!personId) return;
       const nameTC = String(row[M.NAME_TC] || '').trim();
@@ -74,7 +74,7 @@ function apiListPeople(keyword) {
         email: email,
         hasEmail: email !== '',
         emailSource: String(row[M.EMAIL_SOURCE] || '').trim(),
-        emailVerifiedAt: toDateString(row[M.EMAIL_VERIFIED_AT], timezone),
+        emailVerifiedAt: toDateString_(row[M.EMAIL_VERIFIED_AT], timezone),
         active: isTrueValue_(row[M.ACTIVE]),
         maxPerQuarter: String(row[M.MAX_PER_QUARTER] === null || row[M.MAX_PER_QUARTER] === undefined
           ? '' : row[M.MAX_PER_QUARTER]).trim(),
@@ -157,7 +157,7 @@ function apiSavePerson(payload) {
   if (emailRaw !== oldEmail) {
     updates[M.EMAIL_SOURCE] = '手動';
     updates[M.EMAIL_VERIFIED_AT] = Utilities.formatDate(
-      new Date(), getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd');
+      new Date(), getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd');
   }
 
   const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
@@ -211,7 +211,7 @@ function apiAddPerson(payload) {
   // 係完全正常嘅事，阻擋咗就會令幹事加唔到第二個人。
   const existingIds = {};
   let duplicateWarning = '';
-  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
     const id = String(row[M.PERSON_ID] || '').trim();
     if (id) existingIds[id] = true;
     if (String(row[M.NAME_TC] || '').trim() === nameTC) {
@@ -233,7 +233,7 @@ function apiAddPerson(payload) {
   if (emailRaw) {
     record[M.EMAIL_SOURCE] = '手動';
     record[M.EMAIL_VERIFIED_AT] = Utilities.formatDate(
-      new Date(), getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd');
+      new Date(), getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd');
   }
 
   const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
@@ -300,7 +300,7 @@ function apiListAliases() {
   assertWebAppRequestAllowed_('apiListAliases');
   const A = COLUMNS.NAME_ALIAS;
   const nameIndex = buildPersonNameIndex_();
-  const aliases = readSheet(SHEETS.NAME_ALIAS)
+  const aliases = readSheet_(SHEETS.NAME_ALIAS)
     .filter(function (row) { return String(row[A.ALIAS] || '').trim() !== ''; })
     .map(function (row) {
       const personId = String(row[A.PERSON_ID] || '').trim();

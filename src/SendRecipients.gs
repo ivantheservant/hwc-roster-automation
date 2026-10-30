@@ -141,7 +141,7 @@ function buildSendRecipientPool_(context, timezone) {
 
   // ── 三、`EmailRecipients` ────────────────────────────────────
   const R = COLUMNS.EMAIL_RECIPIENTS;
-  readSheet(SHEETS.EMAIL_RECIPIENTS).forEach(function (row) {
+  readSheet_(SHEETS.EMAIL_RECIPIENTS).forEach(function (row) {
     if (!isTrueValue_(row[R.ACTIVE])) return;
     const email = String(row[R.EMAIL] || '').trim();
     if (!email) return;
@@ -298,7 +298,7 @@ function addChangedPersonsMissingFromPool_(pool, changedByPerson, peopleById) {
  */
 function listSendPoolRecipients_(context) {
   const timezone = context.timezone
-    || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    || getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return buildSendRecipientPool_(context, timezone).map(function (item) {
     return {
       type: item.type,
@@ -348,7 +348,7 @@ function resolveSendRecipientPool_(stage, context, decision) {
  *
  *   確認窗　`planStep2_()` → `countReviewerRecipients_()`
  *           ⇒ 只數 `EmailRecipients` 上 `Role=REVIEWER` 而且 `Active=TRUE` = 3
- *   完成窗　`executeStep2_()` → `sendStage()`
+ *   完成窗　`executeStep2_()` → `sendStage_()`
  *           ⇒ 第四十六輪新加嘅收件人池（`SendRecipients.gs`）= 9
  *
  * 即係：**第四十六輪把「實際寄給誰」重做咗，但冇一併改
@@ -503,11 +503,11 @@ function maskEmailForPreview_(email) {
  */
 function listSendHistory_(quarterId) {
   const C = COLUMNS.SEND_LOG;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const byBatch = {};
   const order = [];
 
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     const stage = String(row[C.STAGE] || '').trim();
     const versionNo = Number(row[C.VERSION_NO]);
@@ -555,7 +555,7 @@ function listSendHistory_(quarterId) {
  * ⚠️ **純函式**：由呼叫端傳入 SendLog 行（`WebAppDashboard.gs` 要求 SendLog
  * 整個檔只讀一次，所以呢度唔自己讀）。
  *
- * @param {Object[]} rows `readSheet(SHEETS.SEND_LOG)` 的結果
+ * @param {Object[]} rows `readSheet_(SHEETS.SEND_LOG)` 的結果
  * @param {string} quarterId 季度 ID
  * @param {string} timezone 時區
  * @returns {{found: boolean, sentAt: string, versionNo: ?number, count: number,
@@ -691,6 +691,6 @@ function formatServiceDateForOperator_(dateStr) {
  */
 function readPostNameMap_() {
   const map = {};
-  readPostsNormalized().forEach(function (p) { map[p.postId] = p.postNameTC; });
+  readPostsNormalized_().forEach(function (p) { map[p.postId] = p.postNameTC; });
   return map;
 }

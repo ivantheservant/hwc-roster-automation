@@ -4,7 +4,7 @@
  * ============================================================
  * 為什麼需要（背景）
  * ============================================================
- * 這兩張表只增不減，而 readSheet()（SheetReader.gs）每次都是整表讀取——
+ * 這兩張表只增不減，而 readSheet_()（SheetReader.gs）每次都是整表讀取——
  * 沒有伺服器端篩選這回事，Google Sheets 的 getValues() 一定把整個範圍取回來。
  * 每生成一個版本就多約 195 行 RosterAssignments、每寄一次信就多幾十行
  * SendLog，用幾年之後這兩張表會漲到幾萬行，令步驟 3／5 與生成初稿越來越慢。
@@ -17,7 +17,7 @@
  * ＋ 方向三（在全面體檢加規模提示）**，不採用方向二。逐一說明：
  *
  * - **採用方向一**：封存單位是「整個季度」，搬到 SendLog_Archive／
- *   RosterAssignments_Archive 兩張新表。優點是 readSheet() 與全部讀取邏輯
+ *   RosterAssignments_Archive 兩張新表。優點是 readSheet_() 與全部讀取邏輯
  *   一行都不用改——正在用的資料仍然在原本那張表、格式完全一樣。這正好符合
  *   本輪「執行部分必須是最保守的做法」的要求。
  *
@@ -90,7 +90,7 @@ function isBaselineSendStatus_(status) {
  */
 function classifyQuartersForArchive_(today, timezone) {
   const C = COLUMNS.QUARTERS;
-  const rows = readSheet(SHEETS.QUARTERS).filter(function (row) { return !!row[C.QUARTER_ID]; });
+  const rows = readSheet_(SHEETS.QUARTERS).filter(function (row) { return !!row[C.QUARTER_ID]; });
 
   const quarters = rows.map(function (row) {
     const quarterId = row[C.QUARTER_ID];
@@ -98,8 +98,8 @@ function classifyQuartersForArchive_(today, timezone) {
     try { stage = getQuarterStage_(quarterId); } catch (err) { stage = ''; }
     return {
       quarterId: quarterId,
-      startDate: toDateString(row[C.START_DATE], timezone),
-      endDate: toDateString(row[C.END_DATE], timezone),
+      startDate: toDateString_(row[C.START_DATE], timezone),
+      endDate: toDateString_(row[C.END_DATE], timezone),
       stage: stage
     };
   });
@@ -140,7 +140,7 @@ function classifyQuartersForArchive_(today, timezone) {
  * @returns {Object} 計畫內容，見下方回傳欄位說明
  */
 function planArchive_(today) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const asOf = today || Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
 
   const quarters = classifyQuartersForArchive_(asOf, timezone);
@@ -151,7 +151,7 @@ function planArchive_(today) {
   const assignments = planAssignmentsArchive_(archivableIds, timezone);
 
   // 安全檢查：CARRY_OVER_WEEKS 有沒有大到「保留的季度都不夠用」
-  const carryOverWeeks = Number(getConfig(CONFIG_KEYS.CARRY_OVER_WEEKS, 0)) || 0;
+  const carryOverWeeks = Number(getConfig_(CONFIG_KEYS.CARRY_OVER_WEEKS, 0)) || 0;
   const keptQuarters = quarters.slice(0, ARCHIVE_KEEP_RECENT_QUARTERS);
   const warnings = [];
   if (carryOverWeeks > 13 * ARCHIVE_KEEP_RECENT_QUARTERS) {
@@ -186,9 +186,9 @@ function planArchive_(today) {
  */
 function planSendLogArchive_(archivableIds) {
   const C = COLUMNS.SEND_LOG;
-  const rows = readSheet(SHEETS.SEND_LOG);
+  const rows = readSheet_(SHEETS.SEND_LOG);
 
-  // 先找出每個「季度＋PersonID」最後一次已確實處理的列。readSheet() 依工作表
+  // 先找出每個「季度＋PersonID」最後一次已確實處理的列。readSheet_() 依工作表
   // 由上至下回傳，而 SendLog 一律 append，所以後出現的就是較新的——這跟
   // readLastSendRecordByPerson_() 用同一個假設（它也是逐行覆寫、取最後一個）。
   const baselineIndexByKey = {};
@@ -235,7 +235,7 @@ function planSendLogArchive_(archivableIds) {
  */
 function planAssignmentsArchive_(archivableIds, timezone) {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS);
+  const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS);
   const rowsToArchive = [];
   const byQuarter = {};
 
@@ -281,14 +281,14 @@ function executeArchive_(plan) {
 /**
  * 把來源表指定的資料列搬到封存表：先複製、後刪除。
  *
- * rowIndexes 是 readSheet() 回傳陣列的索引（0-based，已略過第 1、2 行的
+ * rowIndexes 是 readSheet_() 回傳陣列的索引（0-based，已略過第 1、2 行的
  * 說明列與標題列，也已經略過整行全空的列）——所以**不可以**直接當成工作表
  * 列號用。這裡重新讀一次原始範圍、按同一套「略過全空列」的規則對齊，
  * 確保搬的是同一批列。
  *
  * @param {string} sourceName 來源工作表名稱
  * @param {string} archiveName 封存工作表名稱
- * @param {number[]} rowIndexes readSheet() 索引清單
+ * @param {number[]} rowIndexes readSheet_() 索引清單
  * @returns {number} 實際搬移的列數
  */
 function moveRowsToArchive_(sourceName, archiveName, rowIndexes) {
@@ -306,8 +306,8 @@ function moveRowsToArchive_(sourceName, archiveName, rowIndexes) {
   const headerRow = source.getRange(2, 1, 1, lastCol).getValues()[0];
   const dataRows = source.getRange(3, 1, lastRow - 2, lastCol).getValues();
 
-  // 依 readSheet() 的規則重建「索引 → 實際工作表列號」的對照：
-  // readSheet() 會略過整行全空的列，所以兩者不是簡單的 +3。
+  // 依 readSheet_() 的規則重建「索引 → 實際工作表列號」的對照：
+  // readSheet_() 會略過整行全空的列，所以兩者不是簡單的 +3。
   const sheetRowByIndex = [];
   dataRows.forEach(function (row, i) {
     const isEmpty = row.every(function (v) { return v === '' || v === null; });

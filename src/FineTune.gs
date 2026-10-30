@@ -8,18 +8,18 @@
  */
 function buildFineTuneContext_(quarterId, versionNo, opts) {
   const skipGrid = !!(opts && opts.skipGrid);
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
 
-  const original = readSheet(SHEETS.ROSTER_ASSIGNMENTS)
+  const original = readSheet_(SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
     })
     .map(function (row) {
       return {
         serviceDateId: row[C.SERVICE_DATE_ID],
-        serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID],
         slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID],
@@ -42,8 +42,8 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
   // `buildGeneratorContext_()` 完全一致（增補後嘅名單蓋過 `eligibility.byPost`），
   // 確保「生成嗰陣容許嘅安排」同「步驟 3／5 重跑規則檢查」用同一份資料、
   // 同一套增補邏輯——唔會出現生成完全乾淨、一重跑就話違規呢種矛盾。
-  const posts = readPostsNormalized();
-  const eligibility = readEligibility();
+  const posts = readPostsNormalized_();
+  const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   eligibility.byPost = roleContext.eligibleByPost;
 
@@ -59,29 +59,29 @@ function buildFineTuneContext_(quarterId, versionNo, opts) {
     // 第二十輪批次階段 A2：算「呢一格本來應該渲染成咩」要用嘅三樣嘢
     // （顯示標籤、逐崗位 EmptyDisplay、逐日期 ExternalOwner）。
     gridRender: buildGridRenderContext_(quarterId, timezone, posts),
-    serviceDates: readServiceDatesNormalized(quarterId, timezone),
+    serviceDates: readServiceDatesNormalized_(quarterId, timezone),
     // 第八十五輪批次 LD 組：特別主日跳過的崗位（人手檢查／補空格的網絡要知道哪些格本來就不設）
-    specialByDate: buildSpecialSundayByDate_(readSpecialSundays(quarterId), timezone),
+    specialByDate: buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone),
     posts: posts,
     eligibility: eligibility,
     roles: roleContext.roles,
     personPostExclusions: roleContext.exclusions,
     peopleById: indexPeopleById_(),
-    unavailable: readUnavailableNormalized(timezone),
-    rules: readRules(),
+    unavailable: readUnavailableNormalized_(timezone),
+    rules: readRules_(),
     maxMoves: Number(config[CONFIG_KEYS.FINETUNE_MAX_MOVES]) || DEFAULTS.FINETUNE_MAX_MOVES,
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || 8,
     // 預設 TRUE（維持原行為：SEMI_HARD 違反一律回報）。讀一次存進 context，
-    // 不要放進 findStateViolations_() 內部才讀——那個函式在 proposeMinimalFix()／
+    // 不要放進 findStateViolations_() 內部才讀——那個函式在 proposeMinimalFix_()／
     // findReplacementPerson_() 的候選人迴圈裡會被呼叫很多次，每次都讀一次 Config
     // 會有不必要的額外開銷。
-    warnOnSemiHard: getConfig(CONFIG_KEYS.WARN_ON_SEMI_HARD_BREAK, true) === true
+    warnOnSemiHard: getConfig_(CONFIG_KEYS.WARN_ON_SEMI_HARD_BREAK, true) === true
   };
 }
 
 /**
  * 讀取 grid 工作表的現況，把每格的姓名解析回 PersonID。
- * 透過第 2 行的機器鍵與第 1 欄的日期定位，姓名以 resolvePersonId() 精確比對。
+ * 透過第 2 行的機器鍵與第 1 欄的日期定位，姓名以 resolvePersonId_() 精確比對。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
  * @param {string} timezone 時區
@@ -99,7 +99,7 @@ function readGridPersonIds_(quarterId, versionNo, timezone) {
 
   const result = {};
   values.forEach(function (row) {
-    const dateStr = toDateString(row[0], timezone);
+    const dateStr = toDateString_(row[0], timezone);
     if (!dateStr) return;
     for (let c = 3; c < keys.length; c++) {
       const key = String(keys[c] || '');
@@ -301,7 +301,7 @@ function buildGridOverlayState_(context) {
     }
 
     // 到這裡才是真正的人手改動
-    const resolvedId = normalizedGrid === '' ? '' : (resolvePersonId(normalizedGrid) || '');
+    const resolvedId = normalizedGrid === '' ? '' : (resolvePersonId_(normalizedGrid) || '');
 
     // 第二道防線：解析到嘅人同原本一樣 ⇒ 實際上冇改到嘢。
     //
@@ -600,7 +600,7 @@ function findStateViolations_(state, context) {
  * @param {number} versionNo 版本號
  * @returns {{batchId: string, proposals: Object[], changes: Object[], violations: Object[]}} 建議方案
  */
-function proposeMinimalFix(quarterId, versionNo) {
+function proposeMinimalFix_(quarterId, versionNo) {
   const context = buildFineTuneContext_(quarterId, versionNo);
   const analysis = analyseManualState_(context);
   const batchId = 'FT-' + quarterId + '-v' + versionNo + '-'
@@ -634,7 +634,7 @@ function proposeMinimalFix(quarterId, versionNo) {
     const replacement = findReplacementPerson_(violation, workingState, context);
     const original = originalByKey[key] || {};
     if (!original.personId) {
-      log_('WARN', 'proposeMinimalFix: 找不到 ' + key + ' 在 v' + versionNo
+      log_('WARN', 'proposeMinimalFix_: 找不到 ' + key + ' 在 v' + versionNo
         + ' 的原始派工，OriginalPersonID 會留空，該行不能使用 REVERT_ORIGINAL');
     }
 
@@ -715,9 +715,9 @@ function nameOfPersonId_(context, personId) {
  * @param {string} batchId 批次 ID
  * @returns {{total: number, pending: number, byDecision: Object.<string, number>}} 統計結果
  */
-function summariseBatchDecisions(batchId) {
+function summariseBatchDecisions_(batchId) {
   const C = COLUMNS.FINE_TUNE_PROPOSALS;
-  const rows = readSheet(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
+  const rows = readSheet_(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
     return row[C.BATCH_ID] === batchId;
   });
 
@@ -974,10 +974,10 @@ function resolveAssignmentLimit_(personId, context) {
 
 /**
  * 把建議方案寫入 FineTuneProposals 工作表（附加在現有資料之後），Decision 欄留空待決定。
- * @param {Object} result proposeMinimalFix() 的結果
+ * @param {Object} result proposeMinimalFix_() 的結果
  * @returns {number} 寫入的列數
  */
-function writeProposals(result) {
+function writeProposals_(result) {
   if (result.proposals.length === 0) return 0;
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.FINE_TUNE_PROPOSALS);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.FINE_TUNE_PROPOSALS);
@@ -1045,9 +1045,9 @@ function applyDecisionValidation_(sheet, headers) {
  * @param {string} batchId 批次 ID
  * @returns {{sheetName: string, versionNo: number, accepted: number, total: number}} 新版本資訊
  */
-function applyDecisions(batchId) {
+function applyDecisions_(batchId) {
   const C = COLUMNS.FINE_TUNE_PROPOSALS;
-  const proposalRows = readSheet(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
+  const proposalRows = readSheet_(SHEETS.FINE_TUNE_PROPOSALS).filter(function (row) {
     return row[C.BATCH_ID] === batchId;
   });
   if (proposalRows.length === 0) throw new Error('找不到批次: ' + batchId);
@@ -1141,11 +1141,11 @@ function applyDecisions(batchId) {
     // ⚠️ 第三十六輪批次：**呢度係第五條建立版本嘅路，而且兩樣都壞。**
     // ─────────────────────────────────────────────────────────────────
     //
-    // 全系統一共有五條路會 `writeAssignments()` 建立新版本：
+    // 全系統一共有五條路會 `writeAssignments_()` 建立新版本：
     //   1. `performRosterGeneration_()`（MultiRun.gs）　　生成初稿
     //   2. `applyRequests_()`（RequestsApply.gs）　　　　 套用申報
     //   3. `materialiseManualEdits_()`（StateSource.gs）　純人手改動
-    //   4. `applyDecisions()`（**呢度**）　　　　　　　　 微調提案
+    //   4. `applyDecisions_()`（**呢度**）　　　　　　　　 微調提案
     //   5. `apiRollbackExecute()`（WebAppRollback.gs）　　回到上一個版本
     //
     // 之前三輪逐個修 2、3，但**冇人數過總共有幾多條**，所以呢一條
@@ -1198,12 +1198,12 @@ function applyDecisions(batchId) {
       targetKey: batchId + ' / ' + blocked.key,
       oldValue: '',
       newValue: '',
-      source: 'applyDecisions',
+      source: 'applyDecisions_',
       notes: 'Decision 為 REVERT_ORIGINAL 但 OriginalPersonID 為空，已略過該行以免寫入空值'
     });
   });
 
-  const newVersionNo = findLatestVersionNo(quarterId) + 1;
+  const newVersionNo = findLatestVersionNo_(quarterId) + 1;
   const remainingViolations = findStateViolations_(
     assignments.map(function (a) {
       return {
@@ -1221,17 +1221,17 @@ function applyDecisions(batchId) {
     return makeWarning_(v, v.ruleId, v.reason);
   });
 
-  const sheetName = createRosterSheet(quarterId, newVersionNo, assignments, warnings);
-  writeAssignments(quarterId, newVersionNo, assignments);
-  registerVersion(quarterId, newVersionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE, baseVersionNo, warnings.length, false);
+  const sheetName = createRosterSheet_(quarterId, newVersionNo, assignments, warnings);
+  writeAssignments_(quarterId, newVersionNo, assignments);
+  registerVersion_(quarterId, newVersionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE, baseVersionNo, warnings.length, false);
   // 第七十八輪批次 FB 組：起點嗰張舊表還原成佢自己嗰一版
-  restoreBaseSheetAfterNewVersion_(quarterId, baseVersionNo, 'applyDecisions');
+  restoreBaseSheetAfterNewVersion_(quarterId, baseVersionNo, 'applyDecisions_');
   markProposalsApplied_(batchId, newVersionNo);
   const archived = archiveOldProposals_(batchId);
 
   // ── 第五十五輪批次 A 組：**造完版本一定要更新公開連結。** ──────
   //
-  // ⚠️ 呢一條係由**資料嗰邊**數出嚟嘅——`registerVersion()` 一共有
+  // ⚠️ 呢一條係由**資料嗰邊**數出嚟嘅——`registerVersion_()` 一共有
   // 六個真呼叫點，而由「某支函式嘅 caller」數起嗰陣完全見唔到佢。
   //
   // 唔發佈嘅話，幹事喺「微調 ▸ 套用決定」改完，收到連結嗰班人

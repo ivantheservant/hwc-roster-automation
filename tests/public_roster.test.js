@@ -431,7 +431,7 @@ console.log('\n=== A4（第二十六輪階段 A2-3 改寫）：查唔到要回 n
     /function assertPublicRosterUrlAvailableForStage_/.test(mailerSource)
     && /indexOf\('\{PublicRosterUrl\}'\)/.test(mailerSource));
 
-  check('★★★★★ sendStage() 喺**寄第一封之前**就叫嗰道關卡'
+  check('★★★★★ sendStage_() 喺**寄第一封之前**就叫嗰道關卡'
     + '——擺後面會變成「寄咗一半先發現」，而已經寄出嗰啲收唔返',
     // ⚠️ 第四十輪批次 A 組：本來搵 `listRecipients_(stage, context).forEach`，
     // 加咗「收件範圍」之後個迴圈多咗一層包裝，字面對唔上——但要守嗰件事冇變。

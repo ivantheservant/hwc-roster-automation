@@ -69,7 +69,7 @@ const context = {
   postNames: {},
   timezone: 'Asia/Hong_Kong'
 };
-gas.findLatestVersionNo = function () { return 3; };
+gas.findLatestVersionNo_ = function () { return 3; };
 gas.buildMailContext_ = function () { return context; };
 
 // =====================================================================

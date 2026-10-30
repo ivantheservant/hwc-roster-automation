@@ -20,7 +20,7 @@ function buildAuditLogSummaryReport_(limit) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.AUDIT_LOG);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.AUDIT_LOG);
 
-  const allRows = readSheet(SHEETS.AUDIT_LOG);
+  const allRows = readSheet_(SHEETS.AUDIT_LOG);
   const C = COLUMNS.AUDIT_LOG;
   const totalRows = allRows.length;
   const sample = allRows.slice(Math.max(0, totalRows - limit));

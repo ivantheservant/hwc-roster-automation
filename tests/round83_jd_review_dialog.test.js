@@ -55,7 +55,7 @@ console.log('\n=== JD2／JD4：「收不到電郵」只由這一次的收件人�
   check('★★★★★★ JD2 審閱本完成窗：同一份（有執事、冇職事表上嘅人）',
     names(done.unreachable).indexOf(sc.nameOf('P9702')) !== -1 && names(done.unreachable).indexOf(sc.nameOf('P9705')) === -1,
     JSON.stringify(done.unreachable));
-  const onRoster = gas.readSheet(sc.S.ROSTER_ASSIGNMENTS).some((r) => r[sc.C.ROSTER_ASSIGNMENTS.PERSON_ID] === 'P9705');
+  const onRoster = gas.readSheet_(sc.S.ROSTER_ASSIGNMENTS).some((r) => r[sc.C.ROSTER_ASSIGNMENTS.PERSON_ID] === 'P9705');
   const roster = gas.buildUnreachablePeople_(sc.Q, null);
   check('★★★★★ JD4〔給所有人〕照舊用職事表嗰一份（職事表上冇電郵嘅人喺度）',
     !onRoster || names(roster).indexOf(sc.nameOf('P9705')) !== -1, JSON.stringify([onRoster, roster]));

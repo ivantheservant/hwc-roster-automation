@@ -122,12 +122,12 @@ console.log('\n=== B 資料來源：仍然係讀 Posts，唔係讀試算表 Desc
   const src = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'WebAppRuleReview.gs'), 'utf8');
   // ⚠️ 第三十輪批次階段 D1：組員改成由**原始行**讀。
-  // `readPostsNormalized()` → `readPosts()` 會 `filter(Active=TRUE)`，
+  // `readPostsNormalized_()` → `readPosts_()` 會 `filter(Active=TRUE)`，
   // 一個停用嘅組員就會靜靜消失，而剩返一個成員嘅組睇落同
   // 「配置漏咗」一模一樣——兩件完全唔同嘅事。
   check('★★★★★ `buildRuleReviewContext_()` 由**原始** Posts 行砌組'
-    + '（唔再用會過濾 Active 嘅 `readPostsNormalized()`）',
-    /readSheet\(SHEETS\.POSTS\)\.forEach[\s\S]{0,600}?mutexByGroup\[group\]\.push/.test(src));
+    + '（唔再用會過濾 Active 嘅 `readPostsNormalized_()`）',
+    /readSheet_\(SHEETS\.POSTS\)\.forEach[\s\S]{0,600}?mutexByGroup\[group\]\.push/.test(src));
   check('★★★★★ 同一組入面**全部**崗位都 push 入去（唔係只 push 第一個）',
     /if \(!mutexByGroup\[group\]\) mutexByGroup\[group\] = \[\];\s*\n\s*mutexByGroup\[group\]\.push/
       .test(src));

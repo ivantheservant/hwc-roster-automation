@@ -55,8 +55,8 @@ function log(v, personId, status) {
 }
 gas.indexPeopleById_ = function () { return PEOPLE; };
 gas.log_ = function () {};
-gas.getConfig = function (_k, d) { return d; };
-gas.readSheet = function (name) {
+gas.getConfig_ = function (_k, d) { return d; };
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) {
     return ['P9501', 'P9502', 'P9503', 'P9504', 'P9505'].map(function (id) { return cell(2, id); })
       .concat([cell(1, 'P9599')]);

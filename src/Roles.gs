@@ -43,7 +43,7 @@
  * ## 兩張表都係可選嘅
  *
  * `readRolesSafe_()`／`readPersonPostExclusionsSafe_()` 喺工作表唔存在時
- * 回傳空陣列而唔係拋錯（`readSheet()` 本身係會拋 `找不到工作表: X` 嘅）。
+ * 回傳空陣列而唔係拋錯（`readSheet_()` 本身係會拋 `找不到工作表: X` 嘅）。
  * 冇資料 ⇒ 冇人持有任何身分 ⇒ 唯一嘅後果係「有身分要求嘅崗位排唔到人」，
  * 而 `Posts.RequiredRoles` 空白嘅話連呢個後果都冇——即係**未建表之前，
  * 成個系統嘅行為同以前一模一樣**，唔會因為 push 咗新版就突然爆錯。
@@ -93,9 +93,9 @@ function getPersonPostExclusionsHeaderKeys_() {
 }
 
 /**
- * 讀一張**可能未建立**的工作表：存在就照 `readSheet()` 讀，唔存在就回傳空陣列。
+ * 讀一張**可能未建立**的工作表：存在就照 `readSheet_()` 讀，唔存在就回傳空陣列。
  *
- * 唔直接改 `readSheet()` 嘅行為——嗰個函式拋錯係啱嘅（`Posts`／`NameMapping`
+ * 唔直接改 `readSheet_()` 嘅行為——嗰個函式拋錯係啱嘅（`Posts`／`NameMapping`
  * 呢類核心表唔見咗，靜靜返空陣列只會令排表結果詭異噉變空，遠差過即刻拋錯）。
  * 呢度只係為咗兩張**新增而且可選**嘅表另開一個明確嘅入口。
  *
@@ -105,7 +105,7 @@ function getPersonPostExclusionsHeaderKeys_() {
 function readOptionalSheet_(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return [];
-  return readSheet(sheetName);
+  return readSheet_(sheetName);
 }
 
 /**
@@ -123,8 +123,8 @@ function readRolesSafe_(timezone) {
         // 身分代號一律轉大寫再比對：試算表上打 `committee` 同 `COMMITTEE`
         // 應該係同一回事，唔應該因為大小寫令規則靜靜噉唔生效。
         roleCode: String(row[C.ROLE_CODE] || '').trim().toUpperCase(),
-        effectiveFrom: toDateString(row[C.EFFECTIVE_FROM], timezone),
-        effectiveTo: toDateString(row[C.EFFECTIVE_TO], timezone)
+        effectiveFrom: toDateString_(row[C.EFFECTIVE_FROM], timezone),
+        effectiveTo: toDateString_(row[C.EFFECTIVE_TO], timezone)
       };
     })
     .filter(function (r) { return r.personId && r.roleCode; });
@@ -144,8 +144,8 @@ function readPersonPostExclusionsSafe_(timezone) {
         personId: String(row[C.PERSON_ID] || '').trim(),
         postId: String(row[C.POST_ID] || '').trim(),
         reason: String(row[C.REASON] || '').trim(),
-        effectiveFrom: toDateString(row[C.EFFECTIVE_FROM], timezone),
-        effectiveTo: toDateString(row[C.EFFECTIVE_TO], timezone)
+        effectiveFrom: toDateString_(row[C.EFFECTIVE_FROM], timezone),
+        effectiveTo: toDateString_(row[C.EFFECTIVE_TO], timezone)
       };
     })
     .filter(function (r) { return r.personId && r.postId; });
@@ -227,7 +227,7 @@ function describeRoleCodes_(roleCodes) {
 
 /**
  * 取得某崗位嘅身分要求。`Posts.RequiredRoles` 留空 ⇒ 空陣列 ⇒ 冇要求。
- * @param {Object} post 已正規化的崗位物件（`readPostsNormalized()` 的一項）
+ * @param {Object} post 已正規化的崗位物件（`readPostsNormalized_()` 的一項）
  * @returns {string[]} 身分代號陣列（已大寫）
  */
 function requiredRolesOfPost_(post) {
@@ -259,7 +259,7 @@ function requiredRolesOfPost_(post) {
  * - 候選池 ＝ `Eligibility` 名單 **∪** 持有所需身分嘅人
  *   （解決「新任堂委冇歷史紀錄」）；
  * - 再減去 `Eligibility` 入面明確 `Eligible=FALSE` 嘅人
- *   （保留幹事嘅覆寫權，見 `readEligibility()` 嘅 `explicitlyExcluded`）；
+ *   （保留幹事嘅覆寫權，見 `readEligibility_()` 嘅 `explicitlyExcluded`）；
  * - 最後由 `HARD_ROLE_REQUIRED` 呢條新硬規則**逐格逐日**檢查真正嘅身分
  *   （解決「前任堂委有歷史紀錄但已經卸任」——佢仲喺 `Eligibility` 入面，
  *   聯集唔會踢走佢，但硬規則會）。
@@ -269,7 +269,7 @@ function requiredRolesOfPost_(post) {
  * 喺生成、步驟 3／5 重跑、核對三條路徑都有跑。池做日期過濾反而要知道
  * 「邊一季」，三條路徑各自傳一次季度資訊，多咗出錯嘅機會而冇任何好處。
  *
- * @param {Object} eligibility `readEligibility()` 的結果
+ * @param {Object} eligibility `readEligibility_()` 的結果
  * @param {Object[]} posts 已正規化的崗位清單
  * @param {Object[]} roles `readRolesSafe_()` 的結果
  * @returns {Object.<string, string[]>} 增補後的 {PostID: [PersonID...]}
@@ -310,7 +310,7 @@ function buildRoleAugmentedEligibleByPost_(eligibility, posts, roles) {
  * `buildVerifyContext_()`）都呼叫呢一個函式，確保三者睇到嘅係同一份資料、
  * 用同一套增補邏輯——唔會出現「生成嗰陣容許、核對嗰陣話違規」呢種鬼故。
  *
- * @param {Object} eligibility `readEligibility()` 的結果
+ * @param {Object} eligibility `readEligibility_()` 的結果
  * @param {Object[]} posts 已正規化的崗位清單
  * @param {string} timezone 時區名稱
  * @returns {{roles: Object[], exclusions: Object[], eligibleByPost: Object.<string, string[]>}}
@@ -487,7 +487,7 @@ function buildPersonPostExcludedReason_(post, exclusion) {
  *   用 `getSkipReason_()` 篩走跳過嘅週）
  * @param {Object} roleContext `buildRoleContext_()` 嘅結果
  * @param {Object.<string, Object>} peopleById 在職人員索引
- * @param {Object[]} unavailable `readUnavailableNormalized()` 嘅結果
+ * @param {Object[]} unavailable `readUnavailableNormalized_()` 嘅結果
  * @returns {{pool: string[], byPerson: Object.<string, string[]>, usableSlotCount: number}}
  *   pool＝可服侍至少一個主日嘅 PersonID（已排序）；
  *   byPerson＝{PersonID: [可服侍嘅日期…]}；
@@ -592,10 +592,10 @@ function ensureSimpleSheet_(sheetName, headersTC, keys) {
 function collectRoleOverview_(timezone, today) {
   const roles = readRolesSafe_(timezone);
   const exclusions = readPersonPostExclusionsSafe_(timezone);
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
 
   const activePeopleIds = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     activePeopleIds[String(row[COLUMNS.NAME_MAPPING.PERSON_ID] || '').trim()] = true;
   });
 
@@ -788,7 +788,7 @@ function runRoleOverview_() {
   const ui = SpreadsheetApp.getUi();
   const title = '身分名單概況（唯讀）';
   try {
-    const config = readConfig();
+    const config = readConfig_();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     const overview = collectRoleOverview_(timezone, today);

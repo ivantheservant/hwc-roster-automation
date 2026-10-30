@@ -46,7 +46,7 @@ const EMAIL_B = 'b' + '@' + FAKE_DOMAIN;
 gas.assertWebAppRequestAllowed_ = function () {};
 gas.beginSheetReadMemo_ = function () {};
 gas.endSheetReadMemo_ = function () {};
-gas.getConfig = function (key, fallback) { return fallback; };
+gas.getConfig_ = function (key, fallback) { return fallback; };
 gas.Utilities = { formatDate: function () { return '2026-08-18'; } };
 
 function person(o) {
@@ -81,7 +81,7 @@ console.log('\n=== E2【核心】MemberNo 前導零唔可以被試算表食走 =
 console.log('\n=== E2【核心】撞名只警告，唔阻擋 ===');
 {
   let appended = null;
-  gas.readSheet = function () { return [person({ id: 'P9001', name: '測試甲' })]; };
+  gas.readSheet_ = function () { return [person({ id: 'P9001', name: '測試甲' })]; };
   gas.openSheetForEdit_ = function () { return { sheet: {}, headers: [M.PERSON_ID, M.NAME_TC] }; };
   gas.appendRowFields_ = function (sheet, headers, record) { appended = record; return 9; };
   gas.writeZone3Audit_ = function () {};
@@ -111,7 +111,7 @@ console.log('\n=== E2 PersonID 編號規則 ===');
 console.log('\n=== E2【核心】Active=FALSE 唔係刪行 ===');
 {
   let written = null;
-  gas.readSheet = function () { return [person({ id: 'P9001', name: '測試甲', email: EMAIL_A })]; };
+  gas.readSheet_ = function () { return [person({ id: 'P9001', name: '測試甲', email: EMAIL_A })]; };
   gas.openSheetForEdit_ = function () { return { sheet: {}, headers: Object.keys(M).map(function (k) { return M[k]; }) }; };
   gas.writeRowFields_ = function (sheet, headers, sheetRow, updates) { written = updates; return []; };
   gas.writeZone3Audit_ = function () {};
@@ -131,7 +131,7 @@ console.log('\n=== E2【核心】Active=FALSE 唔係刪行 ===');
 console.log('\n=== E2【核心】PersonID 唔可以改 ===');
 {
   let written = null;
-  gas.readSheet = function () { return [person({ id: 'P9001', name: '測試甲' })]; };
+  gas.readSheet_ = function () { return [person({ id: 'P9001', name: '測試甲' })]; };
   gas.writeRowFields_ = function (sheet, headers, sheetRow, updates) { written = updates; return []; };
 
   gas.apiSavePerson({ personId: 'P9001', nameTC: '測試甲改咗名' });
@@ -150,7 +150,7 @@ console.log('\n=== E2【核心】PersonID 唔可以改 ===');
 console.log('\n=== E2 電郵：只有真係改咗先動 EmailSource ===');
 {
   let written = null;
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [person({ id: 'P9001', name: '測試甲', email: EMAIL_A })];
   };
   gas.writeRowFields_ = function (sheet, headers, sheetRow, updates) { written = updates; return []; };
@@ -174,7 +174,7 @@ console.log('\n=== E2 電郵：只有真係改咗先動 EmailSource ===');
 
 console.log('\n=== E2 中文名唔可以清空 ===');
 {
-  gas.readSheet = function () { return [person({ id: 'P9001', name: '測試甲' })]; };
+  gas.readSheet_ = function () { return [person({ id: 'P9001', name: '測試甲' })]; };
   const res = gas.apiSavePerson({ personId: 'P9001', nameTC: '' });
   // 訊息要指出**正確嘅做法**（取消勾「啟用」），唔係淨係話「唔准」——
   // 只講「唔准」嘅話，幹事會諗唔到佢其實想做嘅嘢有另一個做法。

@@ -135,13 +135,13 @@ function planAnnualQuarters_(year, startMonths, existingQuarterIds, existingServ
  */
 function readExistingQuarterAndServiceDateIds_() {
   const quarterIds = {};
-  readSheet(SHEETS.QUARTERS).forEach(function (row) {
+  readSheet_(SHEETS.QUARTERS).forEach(function (row) {
     const id = String(row[COLUMNS.QUARTERS.QUARTER_ID] || '').trim();
     if (id) quarterIds[id] = true;
   });
 
   const serviceDateIds = {};
-  readSheet(SHEETS.SERVICE_DATES).forEach(function (row) {
+  readSheet_(SHEETS.SERVICE_DATES).forEach(function (row) {
     const id = String(row[COLUMNS.SERVICE_DATES.SERVICE_DATE_ID] || '').trim();
     if (id) serviceDateIds[id] = true;
   });
@@ -430,7 +430,7 @@ function selectLookaheadQuarterPlans_(today, months, planYear) {
  * @returns {number}
  */
 function readQuarterLookaheadMonths_() {
-  const raw = getConfig(CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS, DEFAULTS.QUARTER_LOOKAHEAD_MONTHS);
+  const raw = getConfig_(CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS, DEFAULTS.QUARTER_LOOKAHEAD_MONTHS);
   const n = Number(raw);
   if (!isFinite(n) || n < 1 || Math.floor(n) !== n) {
     log_('WARN', 'Config ' + CONFIG_KEYS.QUARTER_LOOKAHEAD_MONTHS + '＝「' + raw + '」不是正整數，改用預設 '
@@ -446,7 +446,7 @@ function readQuarterLookaheadMonths_() {
  * @returns {{months: number, horizon: string, created: string[], serviceDatesWritten: number}}
  */
 function ensureLookaheadQuarters_(source) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const months = readQuarterLookaheadMonths_();
   const startMonths = readQuarterTermStartMonths_();

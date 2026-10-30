@@ -40,7 +40,7 @@ function buildQuarterLabel_(quarterId) {
 
   const year = m[1];
   const term = Number(m[2]);
-  const monthsRaw = getConfig(CONFIG_KEYS.QUARTER_TERM_START_MONTHS, DEFAULTS.QUARTER_TERM_START_MONTHS);
+  const monthsRaw = getConfig_(CONFIG_KEYS.QUARTER_TERM_START_MONTHS, DEFAULTS.QUARTER_TERM_START_MONTHS);
   const months = String(monthsRaw).split(',').map(function (s) { return Number(String(s).trim()); });
   if (months.length !== 4 || months.some(isNaN)) return year + '年　第 ' + term + ' 季';
 
@@ -100,7 +100,7 @@ function buildDashboardStatusBase_(stage, versionExists, generateOnText, extras)
  * ⚠️ 第二十五輪批次階段 B1 修：呢個對照表以前唔存在，`Basis` 係原封不動
  * 印上狀態卡嘅，幹事見到嘅係 `REQUESTS_APPLIED` 呢種內部代號（違反規格 1.3）。
  *
- * 全專案掃過一次，`registerVersion()` 嘅 basis 參數一共有五個來源：
+ * 全專案掃過一次，`registerVersion_()` 嘅 basis 參數一共有五個來源：
  *   `VERSION_VALUES.BASIS_AUTO_GENERATE`／`BASIS_FINE_TUNE`／
  *   `BASIS_REQUESTS_APPLIED`／`BASIS_RESEND`（Constants.gs），
  *   以及 `WebAppRollback.gs` 傳入嘅「回到第 N 版」——後者本身已經係人話，
@@ -160,7 +160,7 @@ function buildVersionBasisText_(basis) {
  * 第七十七輪批次 EC 組：一個版本嘅來源（人話）——版本下拉、狀態卡、進階與診斷嘅版本清單**同一支**。
  *
  * Ivan（手動測試 B）：「有些修改是人手改完＋系統調整，可不可以在每一個版本反映是人手、系統還是兩者都有？」
- * 數字由 `RosterVersions.ChangeCounts` 嚟（`registerVersion()` 嗰陣寫入）：
+ * 數字由 `RosterVersions.ChangeCounts` 嚟（`registerVersion_()` 嗰陣寫入）：
  *   只有人手：「人手改動 N 格」　只有系統：「系統調整 M 格」　兩者：「人手改動 N 格＋系統調整 M 格」
  *   以舊版本作起點：「以第 K 版作起點」，再有人手改動就加「＋人手改動 N 格」
  *   系統生成、重新生成、匯入、套用修改申報後：照現有文字（套用申報時有人手改動 ⇒ 加「＋人手改動 N 格」）
@@ -246,7 +246,7 @@ function normalizeSentAt_(value, timezone) {
  */
 function readSendLogSummaryForDashboard_(quarterId, timezone) {
   const C = COLUMNS.SEND_LOG;
-  const tz = timezone || getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const tz = timezone || getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stages = [MAIL_STAGES.REVIEW, MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND];
   const lastSentAt = {};
   const bestSortKey = {};
@@ -259,7 +259,7 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   //
   // ⚠️ **摺入呢一次讀，唔另開一次。** `WebAppDashboard.gs` 由第十九輪
   // 起就守住「SendLog 只喺一個地方讀」，而 `tests/webapp_dashboard_state.test.js`
-  // 會靜態檢查 `readSheet(SHEETS.SEND_LOG)` 只出現一次。
+  // 會靜態檢查 `readSheet_(SHEETS.SEND_LOG)` 只出現一次。
   // 另開一次讀嘅代價唔止係慢：兩次讀之間張表可以變，
   // 而畫面上兩個數字就會對唔上。
   let latestOptions = '';
@@ -267,7 +267,7 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   // 第七十輪批次 AU 組：上一批審閱本實際寄給咗幾多位（同一次讀入面順手收集）
   const reviewRows = [];
 
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     const stage = String(row[C.STAGE] || '').trim();
     if (stage === MAIL_STAGES.OFFICIAL) hasOfficialRecord = true;
@@ -465,7 +465,7 @@ function computeSaveButton_(s) {
  */
 function apiGetSaveButtonState(quarterId) {
   assertWebAppRequestAllowed_('apiGetSaveButtonState');
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const versionExists = versionNo >= 0;
   const s = {
     versionExists: versionExists,
@@ -585,7 +585,7 @@ function buildUnsavedBlockHint_(unsaved) {
 function apiGetDashboardState(quarterId) {
   assertWebAppRequestAllowed_('apiGetDashboardState');
 
-  // 全程零寫入，所以開 readSheet 快取安全——見 SheetReader.gs 檔頭嘅警告。
+  // 全程零寫入，所以開 readSheet_ 快取安全——見 SheetReader.gs 檔頭嘅警告。
   beginSheetReadMemo_();
   try {
     return buildDashboardState_(quarterId);
@@ -600,15 +600,15 @@ function apiGetDashboardState(quarterId) {
  * @returns {Object}
  */
 function buildDashboardState_(quarterId) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stage = getQuarterStage_(quarterId);
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const versionExists = versionNo >= 0;
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
 
   const quarterRow = findQuarter_(quarterId);
   const generateOnText = quarterRow
-    ? toDateString(quarterRow[COLUMNS.QUARTERS.GENERATE_ON], timezone) : '';
+    ? toDateString_(quarterRow[COLUMNS.QUARTERS.GENERATE_ON], timezone) : '';
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const daysUntilGenerateOn = generateOnText ? daysBetween_(today, generateOnText) : null;
 
@@ -616,14 +616,14 @@ function buildDashboardState_(quarterId) {
   let latestVersion = null;
   if (versionExists) {
     const V = COLUMNS.ROSTER_VERSIONS;
-    const row = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+    const row = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
       return String(r[V.QUARTER_ID] || '').trim() === quarterId
         && Number(r[V.VERSION_NO]) === versionNo;
     })[0];
     latestVersion = {
       versionNo: versionNo,
       // ⚠️ 唔可以 String(Date)——第二十二輪已經喺 Diagnostics 修過同一個位。
-      createdAt: row ? toDateString(row[V.CREATED_AT], timezone) : '',
+      createdAt: row ? toDateString_(row[V.CREATED_AT], timezone) : '',
       // 第七十七輪批次 EC 組：同版本下拉同一支（有格數就寫「人手改動 N 格＋系統調整 M 格」）
       basisText: row ? buildVersionSourceText_(row) : '（沒有說明）',
       // A6：常駐「開啟職事表」連結。搵唔到嗰張工作表就係空字串——
@@ -846,7 +846,7 @@ function computeSendBlockedByUnsavedOnly_(facts) {
  * 嗰句由 `describeSendDecision_()`（`SendOptions.gs`）寫入，
  * 兩邊講嘅係同一件事。
  *
- * ⚠️ 寫成純函式，係為咗**唔使另開一次 `readSheet(SHEETS.SEND_LOG)`**。
+ * ⚠️ 寫成純函式，係為咗**唔使另開一次 `readSheet_(SHEETS.SEND_LOG)`**。
  * 呢一支檔案由第十九輪起就守住「SendLog 只喺一個地方讀」。
  *
  * @param {string} optionsText `SendLog` 的 `SendOptions` 欄
@@ -993,7 +993,7 @@ function readDashboardUnsavedState_(quarterId, versionNo) {
  *
  * 已經查過（詳見 docs 第六十三輪 S 組）：
  *   ・前端冇快取：「重新整理」每次都叫 `apiGetDashboardState()`
- *   ・伺服器冇快取：`readSheet()` 嘅記憶只喺同一次呼叫入面生效
+ *   ・伺服器冇快取：`readSheet_()` 嘅記憶只喺同一次呼叫入面生效
  *   ・用真程式＋擬真試算表重現（`tests/dashboard_unsaved_consistency.test.js`）：
  *     狀態卡（開記憶）同寄出閘（冇記憶）三個情境都讀到一樣嘅數字
  * 所以未搵到程式上嘅原因。最可能係試算表改動未寫到伺服器就被讀——但未證實。
@@ -1043,7 +1043,7 @@ function countDashboardOfficialTargets_(quarterId, versionNo, versionExists) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     const peopleById = indexPeopleById_();
     const seen = {};
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
       if (Number(row[A.VERSION_NO]) !== versionNo) return;
       const personId = String(row[A.PERSON_ID] || '').trim();

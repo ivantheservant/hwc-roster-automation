@@ -2,7 +2,7 @@
  * REVIEW／REMIND／OFFICIAL／RESEND 四個電郵範本的預設內容。
  *
  * 注意 Stage 用的是 MAIL_STAGES.REMIND（值為 "REMIND"），不是「REMINDER」：
- * sendStage() 與 findEmailTemplate_() 全部以 MAIL_STAGES 的值比對 Stage 欄，
+ * sendStage_() 與 findEmailTemplate_() 全部以 MAIL_STAGES 的值比對 Stage 欄，
  * 若這裡寫成 "REMINDER" 會導致 REMIND 階段永遠找不到範本。
  *
  * 內容為書面語繁體中文、教會幹事對義工通知的語氣，之後可直接在 EmailTemplates
@@ -50,7 +50,7 @@ const EMAIL_TEMPLATE_SEEDS = [
     //
     // ⚠️ 這個範本目前只有兩種情況會真正用到：(1) 幹事自己用「測試工具 ▸ 寄送
     // （測試模式）」手動指定 Stage=REMIND 測試；(2) 日後如果有程式碼改成透過
-    // sendStage() 寄送 REMIND（目前沒有）。**自動排程實際寄出的「Stage 停滯
+    // sendStage_() 寄送 REMIND（目前沒有）。**自動排程實際寄出的「Stage 停滯
     // ／死線接近」提醒，完全不經過這個範本**——那是 Trigger.gs 的
     // judgeRemindAction_() 直接呼叫 Mailer.gs 的 notifyAdminStageReminder_()，
     // 訊息文字在程式碼裡直接組出，不讀 EmailTemplates。保留、更新這個範本
@@ -117,7 +117,7 @@ const EMAIL_TEMPLATE_SEEDS = [
     // 三個問題疊在一起，就是一封讀起來明顯壞掉、而且講了兩句不實內容的信。
     //
     // 修正方式沿用步驟 5 已經驗證過的同一套做法（TPL_RESEND_LIST_TC）：
-    // LIST 收件人用自己的範本，附完整版 PDF。sendStage() 依收件人類型選範本，
+    // LIST 收件人用自己的範本，附完整版 PDF。sendStage_() 依收件人類型選範本，
     // 見 Mailer.gs。
     templateId: 'TPL_OFFICIAL_LIST_TC',
     stage: MAIL_STAGES.OFFICIAL,
@@ -192,7 +192,7 @@ const EMAIL_TEMPLATE_SEEDS = [
     placeholders: '{QuarterID},{StartDate},{EndDate},{ChangedPeopleSummary},{SpreadsheetUrl},{PublicRosterUrl}',
     attachType: ATTACH_TYPE.FULL_PDF
   },
-  // 第八十五輪批次 LF 組：季前資料（PreseasonPack.gs；不經 sendStage()，Stage 欄只作標記）
+  // 第八十五輪批次 LF 組：季前資料（PreseasonPack.gs；不經 sendStage_()，Stage 欄只作標記）
   {
     templateId: 'TPL_PRESEASON_TC',
     stage: 'PRESEASON',
@@ -223,7 +223,7 @@ const EMAIL_TEMPLATE_SEEDS = [
  */
 function planEmailTemplateSeed_() {
   const existingTemplateIds = {};
-  readSheet(SHEETS.EMAIL_TEMPLATES).forEach(function (row) {
+  readSheet_(SHEETS.EMAIL_TEMPLATES).forEach(function (row) {
     const id = String(row[COLUMNS.EMAIL_TEMPLATES.TEMPLATE_ID] || '').trim();
     if (id) existingTemplateIds[id] = true;
   });

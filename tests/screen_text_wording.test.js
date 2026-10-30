@@ -4,7 +4,7 @@
 //   AY1　「不在 Eligibility 名單內」→「不在這個崗位的名單上」（FineTune／Verify／其他畫面文字）
 //   AY2　沒有改動時撳〔儲存〕，彈窗標題「儲存並確認」→「儲存」（與主流程按鈕一致）
 //   AY3　修改申報認不到名字：「名單上找不到「X」。如果是新人，請先用「新增人員」加入；如果是舊人，請留意同音字或異體字。」
-//   AY4　「指定服侍」和「不能服侍」認名字共用同一支 `resolvePersonId()`（包括 NameAlias）
+//   AY4　「指定服侍」和「不能服侍」認名字共用同一支 `resolvePersonId_()`（包括 NameAlias）
 
 const fs = require('fs');
 const path = require('path');
@@ -68,8 +68,8 @@ console.log('\n=== AY3／AY4 申報認不到名字的句子；兩條路認名一
   const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'StateSource.gs', 'FineTune.gs', 'RequestsApply.gs']);
   const N = gas.COLUMNS.NAME_MAPPING;
   const person = {}; person[N.PERSON_ID] = 'P9001'; person[N.NAME_TC] = '假甲';
-  gas.readSheet = function (name) { return name === gas.SHEETS.NAME_MAPPING ? [person] : []; };
-  gas.readNameAlias = function () { return { 假甲別名: 'P9001' }; };
+  gas.readSheet_ = function (name) { return name === gas.SHEETS.NAME_MAPPING ? [person] : []; };
+  gas.readNameAlias_ = function () { return { 假甲別名: 'P9001' }; };
 
   const context = {
     quarterId: '2099T1',
@@ -103,8 +103,8 @@ console.log('\n=== AY3／AY4 申報認不到名字的句子；兩條路認名一
     JSON.stringify([aliasDesig.category, aliasCannot.category]));
 
   const src = stripComments(read('src/RequestsApply.gs'));
-  check('★★★★★ RequestsApply.gs 只用 resolvePersonId() 認名，冇另寫一套讀 NameMapping',
-    !/readSheet\(SHEETS\.NAME_MAPPING\)/.test(src) && (src.match(/resolvePersonId\(/g) || []).length >= 3, '');
+  check('★★★★★ RequestsApply.gs 只用 resolvePersonId_() 認名，冇另寫一套讀 NameMapping',
+    !/readSheet_\(SHEETS\.NAME_MAPPING\)/.test(src) && (src.match(/resolvePersonId_\(/g) || []).length >= 3, '');
 }
 
 console.log('\n=== 第七十三輪文字組：畫面上叫幹事去撳「儲存並確認」（舊名）一律改為「儲存」 ===');

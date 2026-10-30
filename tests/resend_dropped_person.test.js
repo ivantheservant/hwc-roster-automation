@@ -79,7 +79,7 @@ gas.assertWebAppRequestAllowed_ = function () {};
 gas.beginSheetReadMemo_ = function () {};
 gas.endSheetReadMemo_ = function () {};
 gas.readRolesSafe_ = function () { return []; };
-gas.getConfig = function (_k, d) { return d; };
+gas.getConfig_ = function (_k, d) { return d; };
 gas.Utilities = {
   formatDate: function (date, tz, fmt) {
     const d = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date);
@@ -91,10 +91,10 @@ gas.Utilities = {
   DigestAlgorithm: { SHA_256: 'SHA_256' },
   Charset: { UTF_8: 'UTF_8' }
 };
-gas.toDateString = function (v) { return String(v); };
-gas.findLatestVersionNo = function () { return 3; };
+gas.toDateString_ = function (v) { return String(v); };
+gas.findLatestVersionNo_ = function () { return 3; };
 gas.indexPeopleById_ = function () { return PEOPLE; };
-gas.readSheet = function (name) {
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) return ASSIGNMENTS;
   if (name === gas.SHEETS.SEND_LOG) return [logRow('P9105'), logRow('P9111')];
   return [];

@@ -89,7 +89,7 @@ seedSheet(sc.ss, sc.S.NAME_MAPPING, KEYS.map(() => ''), KEYS, [
   person('P9706', "'00006", 'p9706@example.invalid'),   // 重複編號
   person('P9707', "'00006", '')                         // 重複編號、冇電郵
 ]);
-const rowOf = (id) => gas.readSheet(sc.S.NAME_MAPPING).filter((r) => r[M.PERSON_ID] === id)[0];
+const rowOf = (id) => gas.readSheet_(sc.S.NAME_MAPPING).filter((r) => r[M.PERSON_ID] === id)[0];
 
 console.log('\n=== EG1：按會眾編號更新電郵 ===');
 {
@@ -109,7 +109,7 @@ console.log('\n=== EG1：按會眾編號更新電郵 ===');
   check('★★★★★ 只寫有改變嘅行：P9702 電郵一樣 ⇒ 只改 EmailSource；冇改嘅格唔寫',
     writes.every((w) => Object.keys(w.updates).indexOf(M.NAME_TC) === -1 && Object.keys(w.updates).indexOf(M.ACTIVE) === -1)
     && writes.some((w) => w.updates[M.EMAIL] === 'p9701-new@example.invalid') && r.updated >= 3, JSON.stringify(writes));
-  check('★★★★ 最後出席日期一齊更新', gas.toDateString(rowOf('P9701')[M.LAST_ATTENDANCE], sc.TZ) === '2099-01-04', String(rowOf('P9701')[M.LAST_ATTENDANCE]));
+  check('★★★★ 最後出席日期一齊更新', gas.toDateString_(rowOf('P9701')[M.LAST_ATTENDANCE], sc.TZ) === '2099-01-04', String(rowOf('P9701')[M.LAST_ATTENDANCE]));
   check('★★★★ 回傳：冇會眾編號 1 位、出席系統冇電郵 1 位', r.unlinkedCount === 1 && r.noEmailInHwcasCount === 1, JSON.stringify(r));
 }
 

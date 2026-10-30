@@ -31,7 +31,7 @@ const gas = loadGasSource([
 // =====================================================================
 console.log('\n=== AV1 批註只寫中文原因 ===');
 {
-  gas.getConfig = function (_k, d) { return d; };
+  gas.getConfig_ = function (_k, d) { return d; };
   const key = '2028-07-02|CHAIR|1';
   const layout = {
     rows: [{}], keys: ['a'],
@@ -61,7 +61,7 @@ console.log('\n=== AV1 批註只寫中文原因 ===');
 console.log('\n=== AV2 義工 PDF 的匯出網址不印批註 ===');
 {
   let url = null;
-  gas.getConfig = function (_k, d) { return d; };
+  gas.getConfig_ = function (_k, d) { return d; };
   gas.ScriptApp = { getOAuthToken: function () { return 't'; } };
   gas.fetchWithRetry_ = function (u) {
     url = u;

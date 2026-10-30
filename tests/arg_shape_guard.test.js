@@ -159,7 +159,7 @@ console.log('\n=== A2 防線一定要載入到（`ArgShape.gs` 零依賴）===')
 {
   check('★★★★★ `ArgShape.gs` 冇叫任何試算表 API'
     + '——一個「參數檢查」如果自己都要讀試算表，就冇辦法喺最早期擋住',
-    !/SpreadsheetApp|DriveApp|readSheet|getConfig/.test(argShapeSrc));
+    !/SpreadsheetApp|DriveApp|readSheet_|getConfig_/.test(argShapeSrc));
   check('★★★★★ 測試 loader 會自動載入佢'
     + '——唔自動載嘅話，每一份測試都要自己記得補一行，'
     + '而漏咗嘅錯誤（`requireStateArg_ is not defined`）同測試本身完全無關',

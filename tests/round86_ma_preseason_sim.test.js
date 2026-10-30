@@ -94,11 +94,11 @@ console.log('\n=== MA2：自動寄出判斷 ===');
   real.gas.MailApp = { sendEmail: function () {} };
   real.gas.assertNotPreviewMode_ = function () {};
   audit(real.gas, real, 'MANUAL|2098-12-08|DRY_RUN', '模擬 4 封');
-  const out = real.gas.runPreseasonAutoSend_(real.gas.readSheet(real.S.QUARTERS)[0], '2098-12-10', real.gas.readConfig());
+  const out = real.gas.runPreseasonAutoSend_(real.gas.readSheet_(real.S.QUARTERS)[0], '2098-12-10', real.gas.readConfig_());
   check('★★★★★★ 整條路：真正模式、只有模擬紀錄 ⇒ 自動寄出', out.outcome === 'SENT' && /寄出 4 封/.test(out.detail), JSON.stringify(out));
   const test = scene();
   audit(test.gas, test, 'MANUAL|2098-12-08|DRY_RUN', '模擬 4 封');
-  const out2 = test.gas.runPreseasonAutoSend_(test.gas.readSheet(test.S.QUARTERS)[0], '2098-12-10', test.gas.readConfig());
+  const out2 = test.gas.runPreseasonAutoSend_(test.gas.readSheet_(test.S.QUARTERS)[0], '2098-12-10', test.gas.readConfig_());
   check('★★★★★★ 整條路：測試模式、有模擬紀錄 ⇒ 略過', out2.outcome === 'SKIP' && out2.detail === 'ALREADY_SENT', JSON.stringify(out2));
 }
 

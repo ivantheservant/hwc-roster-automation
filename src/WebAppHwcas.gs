@@ -7,8 +7,8 @@
  * 同選單版嘅分別
  * ─────────────────────────────────────────────────────────────────────
  *
- * 選單版係兩步：`syncHwcasEmails()` 產生 `NameMapping_Draft` 工作表，
- * 之後 `applyHwcasDraft()` 把「可套用」嗰批**整批**寫入。
+ * 選單版係兩步：`syncHwcasEmails_()` 產生 `NameMapping_Draft` 工作表，
+ * 之後 `applyHwcasDraft_()` 把「可套用」嗰批**整批**寫入。
  *
  * Web 版合併成三步：**預覽差異 → 逐行勾選 → 套用**。
  *
@@ -41,7 +41,7 @@
 function apiHwcasPreview() {
   assertWebAppRequestAllowed_('apiHwcasPreview');
 
-  const config = readConfig();
+  const config = readConfig_();
   const spreadsheetId = String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim();
   if (!spreadsheetId) {
     // 規格 4.2：呢句要講人話，唔可以拋一個 `Config 的 X 未設定`。
@@ -266,7 +266,7 @@ function apiHwcasApplySelected(personIds) {
 
   const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
   const C = COLUMNS.NAME_MAPPING;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
 
   let written = 0;
@@ -376,7 +376,7 @@ function hwcasReadFailureResult_(err) {
  */
 function apiHwcasLinkPreview() {
   assertWebAppRequestAllowed_('apiHwcasLinkPreview');
-  const config = readConfig();
+  const config = readConfig_();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
   let hwcas;
   try {
@@ -385,7 +385,7 @@ function apiHwcasLinkPreview() {
     return hwcasReadFailureResult_(err);
   }
   const analysis = analyseHwcasLinks_(hwcas);
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   // 候選人：按姓名（NameTC＋NameAlias）對——同舊「從出席系統補電郵」同一支配對，唔另寫
   const draft = buildHwcasDraft_(hwcas.records, hwcas.fieldColumns, hwcas.headers);
@@ -400,7 +400,7 @@ function apiHwcasLinkPreview() {
       hwcasName: String(d.hwcasName || ''),
       emailMasked: maskEmailForPreview_(d.hwcasEmail),
       hasEmail: !!String(d.hwcasEmail || '').trim(),
-      lastAttendance: toDateString(d.lastAttendance, timezone),
+      lastAttendance: toDateString_(d.lastAttendance, timezone),
       matchType: d.matchType,
       note: String(d.note || '')
     });
@@ -452,7 +452,7 @@ function hwcasLinkSelected_locked_(links) {
     return { ok: false, message: buildThreePartMessage_('一位都沒有勾。', '甚麼都沒有改動。',
       ['勾選你確認過的人再按一次', '這裏刻意預設全部不勾——按姓名配對錯了就會寄錯人']) };
   }
-  const config = readConfig();
+  const config = readConfig_();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
   let hwcas;
   try {
@@ -514,7 +514,7 @@ function hwcasLinkSelected_locked_(links) {
 function apiHwcasSearchPeople(keyword) {
   assertWebAppRequestAllowed_('apiHwcasSearchPeople');
   const kw = String(keyword || '').trim();
-  const config = readConfig();
+  const config = readConfig_();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
   if (!kw) return { ok: true, keyword: '', candidates: [] };
   let hwcas;
@@ -523,13 +523,13 @@ function apiHwcasSearchPeople(keyword) {
   } catch (err) {
     return hwcasReadFailureResult_(err);
   }
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const prefixMap = readCongregationPrefixMap_();
 
   // 名單上已經有呢個編號嘅人
   const M = COLUMNS.NAME_MAPPING;
   const existingByNo = {};
-  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
     const no = memberNoKey_(row[M.MEMBER_NO]);
     if (no && !existingByNo[no]) existingByNo[no] = { personId: String(row[M.PERSON_ID] || '').trim(), nameTC: String(row[M.NAME_TC] || '').trim() };
   });
@@ -537,7 +537,7 @@ function apiHwcasSearchPeople(keyword) {
   // 搜尋字串：本身 ＋ 佢係別名嘅話，正名都一齊搵
   const terms = [kw];
   try {
-    const aliasMap = readNameAlias();
+    const aliasMap = readNameAlias_();
     const nameIndex = buildPersonNameIndex_();
     if (aliasMap[kw] && nameIndex[aliasMap[kw]] && terms.indexOf(nameIndex[aliasMap[kw]]) === -1) terms.push(nameIndex[aliasMap[kw]]);
   } catch (err) { /* 別名讀唔到就只用原字 */ }
@@ -556,7 +556,7 @@ function apiHwcasSearchPeople(keyword) {
       memberType: derived.memberType,
       emailMasked: maskEmailForPreview_(e.email),
       hasEmail: !!e.email,
-      lastAttendance: toDateString(e.lastAttendance, timezone),
+      lastAttendance: toDateString_(e.lastAttendance, timezone),
       existingPersonId: ex ? ex.personId : '',
       existingNameTC: ex ? ex.nameTC : ''
     };
@@ -590,7 +590,7 @@ function addPersonFromHwcas_locked_(payload) {
     return { ok: false, message: buildThreePartMessage_('沒有收到會眾編號。', '甚麼都沒有加入。', ['在出席系統的搜尋結果選一位再按']) };
   }
   const key = memberNoKey_(memberNo.value);
-  const config = readConfig();
+  const config = readConfig_();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
   let hwcas;
   try {
@@ -606,7 +606,7 @@ function addPersonFromHwcas_locked_(payload) {
   // 編號已經喺名單上（另一個寫法）⇒ 唔新增人
   const existingIds = {};
   let existing = null;
-  readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
     const id = String(row[M.PERSON_ID] || '').trim();
     if (id) existingIds[id] = true;
     if (!existing && memberNoKey_(row[M.MEMBER_NO]) === key) {
@@ -621,7 +621,7 @@ function addPersonFromHwcas_locked_(payload) {
     };
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const derived = deriveCongregationAndType_(key, readCongregationPrefixMap_());
   const personId = allocatePersonId_(existingIds);
@@ -635,7 +635,7 @@ function addPersonFromHwcas_locked_(payload) {
   record[M.EMAIL] = entry.email;
   record[M.EMAIL_SOURCE] = EMAIL_SOURCE_HWCAS;
   if (entry.email) record[M.EMAIL_VERIFIED_AT] = today;
-  const la = toDateString(entry.lastAttendance, timezone);
+  const la = toDateString_(entry.lastAttendance, timezone);
   if (la) record[M.LAST_ATTENDANCE] = la;
   const mp = String(entry.meetingPoint === null || entry.meetingPoint === undefined ? '' : entry.meetingPoint).trim();
   if (mp) record[M.MEETING_POINT] = mp;

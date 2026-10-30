@@ -60,7 +60,7 @@ function buildSandbox(opts) {
   };
 
   const overrides = {
-    getConfig: function (key) { return key === 'DRY_RUN' ? dryRunValue : undefined; },
+    getConfig_: function (key) { return key === 'DRY_RUN' ? dryRunValue : undefined; },
     log_: function () {},
     assertNotPreviewMode_: function () {},
     buildMailContext_: function () { return context; },
@@ -101,7 +101,7 @@ console.log('\n=== 【核心】DRY_RUN 不是 FALSE 就一定拒絕，不會被�
 }
 {
   const { gas, calls } = buildSandbox({ dryRunValue: 'TRUE' }); // Config 常見寫法：字串 "TRUE"，不是 boolean true
-  checkThrows('★★ DRY_RUN 值是字串 "TRUE"（不是 boolean）一樣被拒絕（同 getConfig 全專案既有慣例 !== false 一致）',
+  checkThrows('★★ DRY_RUN 值是字串 "TRUE"（不是 boolean）一樣被拒絕（同 getConfig_ 全專案既有慣例 !== false 一致）',
     function () { gas.sendIcsTestEmail_('2027T1', 3, 'P001', 'myaddress@x.com'); }, /DRY_RUN/);
 }
 
@@ -182,7 +182,7 @@ console.log('\n=== 選單入口（runSendIcsTestEmail_）：DRY_RUN 仍為 TRUE 
   const start = source.indexOf('function runSendIcsTestEmail_');
   const body = source.slice(start);
   check('★★★ runSendIcsTestEmail_ 一開始就檢查 DRY_RUN，唔係一路 prompt 到最後先發現寄唔到',
-    /const dryRun = getConfig\(CONFIG_KEYS\.DRY_RUN, true\) !== false;/.test(body)
+    /const dryRun = getConfig_\(CONFIG_KEYS\.DRY_RUN, true\) !== false;/.test(body)
       && body.indexOf('if (dryRun) {') < body.indexOf('promptQuarterAndVersion_'));
 }
 

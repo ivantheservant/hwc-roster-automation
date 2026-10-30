@@ -106,8 +106,8 @@ function readActivePersonPostWeights_(referenceDate, timezone, baselineData) {
     if (!personId || !postId) return;
     if (!isTrueValue_(row[W.ACTIVE])) return;
 
-    const from = toDateString(row[W.EFFECTIVE_FROM], timezone);
-    const to = toDateString(row[W.EFFECTIVE_TO], timezone);
+    const from = toDateString_(row[W.EFFECTIVE_FROM], timezone);
+    const to = toDateString_(row[W.EFFECTIVE_TO], timezone);
     if (from && referenceDate && from > referenceDate) return;
     if (to && referenceDate && to < referenceDate) return;
 
@@ -375,11 +375,11 @@ function buildWeightBaselineData_(quarterId, timezone) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
   const E = COLUMNS.ELIGIBILITY;
 
-  const quarters = readSheet(SHEETS.QUARTERS)
+  const quarters = readSheet_(SHEETS.QUARTERS)
     .map(function (row) {
       return {
         quarterId: String(row[Q.QUARTER_ID] || '').trim(),
-        startDate: toDateString(row[Q.START_DATE], timezone)
+        startDate: toDateString_(row[Q.START_DATE], timezone)
       };
     })
     .filter(function (q) { return q.quarterId && q.startDate; })
@@ -395,12 +395,12 @@ function buildWeightBaselineData_(quarterId, timezone) {
   for (let i = earlier.length - 1; i >= 0 && !prev; i--) {
     const candidate = earlier[i];
     let versionNo = -1;
-    try { versionNo = findLatestVersionNo(candidate.quarterId); }
+    try { versionNo = findLatestVersionNo_(candidate.quarterId); }
     catch (err) { versionNo = -1; }
     if (versionNo < 0) continue;
 
     const byKey = {};
-    readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (String(row[A.QUARTER_ID] || '').trim() !== candidate.quarterId) return;
       if (Number(row[A.VERSION_NO]) !== versionNo) return;
       const personId = String(row[A.PERSON_ID] || '').trim();
@@ -424,7 +424,7 @@ function buildWeightBaselineData_(quarterId, timezone) {
   // 而且畫面會標明「用歷史平均做基準」，唔會扮成上一季嘅實數。
   const historicalByKey = {};
   try {
-    readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+    readSheet_(SHEETS.ELIGIBILITY).forEach(function (row) {
       const personId = String(row[E.PERSON_ID] || '').trim();
       const postId = String(row[E.POST_ID] || '').trim();
       if (!personId || !postId) return;

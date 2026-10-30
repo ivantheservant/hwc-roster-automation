@@ -56,7 +56,7 @@ const MUTATIONS = [
   },
   {
     id: 'dropdown-auto-on-create',
-    why: '把 `createRosterSheet()` 收尾嗰個自動套用拆走'
+    why: '把 `createRosterSheet_()` 收尾嗰個自動套用拆走'
       + '——每一張新 grid 都冇咗名單選單，而幹事以為有（介面已經冇咗嗰一步）',
     file: 'src/RosterWriter.gs',
     find: '    dropdownResult = applyGridNameDropdowns_(quarterId, versionNo);',
@@ -255,7 +255,7 @@ const MUTATIONS = [
   },
   {
     id: 'finetune-report-norepl',
-    why: '把 `applyDecisions()` 還原成「找不到替補就靜靜計入 manualKept」'
+    why: '把 `applyDecisions_()` 還原成「找不到替補就靜靜計入 manualKept」'
       + '——幹事只會見到「沿用你的改動 N 項」，以為系統照他意思做了，'
       + '實際上那幾格一格都沒有動過',
     file: 'src/FineTune.gs',
@@ -265,7 +265,7 @@ const MUTATIONS = [
   },
   {
     id: 'finetune-keep-source',
-    why: '把 `applyDecisions()` 還原成「冇 PersonID 就一律 SKIPPED」'
+    why: '把 `applyDecisions_()` 還原成「冇 PersonID 就一律 SKIPPED」'
       + '——第三十八輪 D 組查出嘅真 bug：撳「套用決定」會把講員格由 MANUAL 壓成 SKIPPED',
     file: 'src/FineTune.gs',
     find: ": (originalRow.assignSource || ASSIGN_SOURCE.SKIPPED)),",
@@ -384,7 +384,7 @@ const MUTATIONS = [
     why: '把「會移走」還原成淨係講一個數字，唔講邊幾個主日'
       + '——一個幹事核對唔到嘅數字，同冇講差唔多',
     file: 'src/EligibilitySheetEditor.gs',
-    find: '      assignedDates[key].push(toDateString(row[A.SERVICE_DATE], tz));',
+    find: '      assignedDates[key].push(toDateString_(row[A.SERVICE_DATE], tz));',
     replace: '      assignedDates[key].push(\'\');',
     tests: ['tests/eligibility_sheet_item_pick.test.js']
   },
@@ -1177,11 +1177,11 @@ const MUTATIONS = [
     file: 'src/FiveStageCore.gs',
     find: '    recipientCount: recipients.length,\n'
       + '    recipientPreview: summariseRecipientsForPreview_(recipients),\n'
-      + '    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false\n'
+      + '    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false\n'
       + '  };\n}',
     replace: '    recipientCount: changedList.length,\n'
       + '    recipientPreview: summariseRecipientsForPreview_(recipients),\n'
-      + '    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false\n'
+      + '    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false\n'
       + '  };\n}',
     // ⚠️ **只列 `preview_matches_send.test.js`。**
     // `e2e_five_stage_flow.test.js` 喺呢幾條突變下面仍然綠——
@@ -1622,7 +1622,7 @@ const MUTATIONS = [
     file: 'src/Invariants.gs',
     find: '      verify: function (quarterId, sendOptions) {' + '\n'
       + '        // 另一條路：直接由收件人解析器數，唔經 `planStep2_()`。' + '\n'
-      + '        const versionNo = findLatestVersionNo(quarterId);' + '\n'
+      + '        const versionNo = findLatestVersionNo_(quarterId);' + '\n'
       + '        return resolveActualRecipients_(' + '\n'
       + '          quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions).length;' + '\n'
       + '      }',
@@ -1662,8 +1662,8 @@ const MUTATIONS = [
       + '——自測機會走完整個寄送流程，'
       + 'DRY_RUN=FALSE 嗰陣嗰啲信會真係寄出去畀全體義工',
     file: 'src/SelfTestRunner.gs',
-    find: '  if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {',
-    replace: '  if (getConfig(CONFIG_KEYS.DRY_RUN, true) === false) {',
+    find: '  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== true) {',
+    replace: '  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) === false) {',
     tests: ['tests/selftest_runner.test.js']
   },
   {
@@ -1772,7 +1772,7 @@ const MUTATIONS = [
       + '——一次亂行行幾分鐘，中間有人改咗 Config，'
       + '後面嗰幾十步就會真係寄信',
     file: 'src/MonkeyRun.gs',
-    find: '      if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {',
+    find: '      if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== true) {',
     replace: '      if (false) {',
     tests: ['tests/monkey_run.test.js']
   },
@@ -3421,7 +3421,7 @@ const MUTATIONS = [
     why: '慢動作寫死跳過，唔讀 Config'
       + '——Ivan 明確講過之後要改得返。寫死咗就改唔返',
     file: 'src/MonkeyRun.gs',
-    find: '  return getConfig(CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, true) === true;',
+    find: '  return getConfig_(CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, true) === true;',
     replace: '  return true;',
     tests: ['tests/monkey_speed.test.js']
   },
@@ -3781,7 +3781,7 @@ const MUTATIONS = [
     // 第六十五輪批次 X 組：改為經 `buildQuarterNoticeReceivedIndex_()`
     find: '  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage);',
     replace: '  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage,'
-      + ' readSheet(SHEETS.SEND_LOG).filter(function (r) {'
+      + ' readSheet_(SHEETS.SEND_LOG).filter(function (r) {'
       + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === versionNo; }));',
     tests: ['tests/makeup_any_version.test.js']
   },
@@ -3793,7 +3793,7 @@ const MUTATIONS = [
     // 第六十五輪批次 X 組：改為經 `buildQuarterNoticeReceivedIndex_()`
     find: '  const recordByKey = buildQuarterNoticeReceivedIndex_(plan.quarterId, plan.stage);',
     replace: '  const recordByKey = buildQuarterNoticeReceivedIndex_(plan.quarterId, plan.stage,'
-      + ' readSheet(SHEETS.SEND_LOG).filter(function (r) {'
+      + ' readSheet_(SHEETS.SEND_LOG).filter(function (r) {'
       + ' return Number(r[COLUMNS.SEND_LOG.VERSION_NO]) === plan.versionNo; }));',
     tests: ['tests/makeup_any_version.test.js']
   },
@@ -3860,9 +3860,9 @@ const MUTATIONS = [
       + '——審閱信信末嗰條連結開出嚟，講員一欄全部「待確認」',
     file: 'src/FiveStageCore.gs',
     find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
-      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
     replace: '  const fresh = { republished: false };\n'
-      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
     tests: ['tests/stale_after_fill.test.js']
   },
   {
@@ -3870,9 +3870,9 @@ const MUTATIONS = [
     why: '正式發出之前唔確保公開連結係最新',
     file: 'src/FiveStageCore.gs',
     find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
-      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
     replace: '  const fresh = { republished: false };\n'
-      + '  const result = sendStage(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
     tests: ['tests/stale_after_fill.test.js']
   },
   {
@@ -3994,10 +3994,10 @@ const MUTATIONS = [
     file: 'src/SheetReader.gs',
     find: '    .filter(function (row) { return isTrueValue_(row[S.ACTIVE]); })\n'
       + '    .forEach(function (row) {\n'
-      + '      const dateStr = toDateString(row[S.SERVICE_DATE], timezone);\n'
+      + '      const dateStr = toDateString_(row[S.SERVICE_DATE], timezone);\n'
       + '      if (!dateStr) return;',
     replace: '    .forEach(function (row) {\n'
-      + '      const dateStr = toDateString(row[S.SERVICE_DATE], timezone);\n'
+      + '      const dateStr = toDateString_(row[S.SERVICE_DATE], timezone);\n'
       + '      if (!dateStr) return;',
     tests: ['tests/special_skip_preacher.test.js']
   },
@@ -4145,7 +4145,7 @@ const MUTATIONS = [
     why: '`onEdit` 唔清快取'
       + '——DRY_RUN 改返 TRUE 之後五分鐘之內寄送路徑仍然讀到 FALSE',
     file: 'src/Config.gs',
-    find: "    reloadConfigCache();\n  } catch (err) {\n    log_('WARN', 'onEdit",
+    find: "    reloadConfigCache_();\n  } catch (err) {\n    log_('WARN', 'onEdit",
     replace: "  } catch (err) {\n    log_('WARN', 'onEdit",
     tests: ['tests/config_onedit.test.js']
   },
@@ -4459,7 +4459,7 @@ const MUTATIONS = [
     file: 'src/FiveStageCore.gs',
     find: '  const received = buildQuarterNoticeReceivedIndex_(quarterId, MAIL_STAGES.OFFICIAL);',
     replace: '  const received = buildSendStatusByRecipient_('
-      + 'readSheet(SHEETS.SEND_LOG), quarterId, MAIL_STAGES.OFFICIAL);',
+      + 'readSheet_(SHEETS.SEND_LOG), quarterId, MAIL_STAGES.OFFICIAL);',
     tests: ['tests/notice_received_index.test.js']
   },
   {
@@ -4467,7 +4467,7 @@ const MUTATIONS = [
     why: '補寄預覽自己另外只睇 OFFICIAL',
     file: 'src/MakeupSend.gs',
     find: '  const recordByKey = buildQuarterNoticeReceivedIndex_(quarterId, stage);',
-    replace: '  const recordByKey = buildSendStatusByRecipient_(readSheet(SHEETS.SEND_LOG), quarterId, stage);',
+    replace: '  const recordByKey = buildSendStatusByRecipient_(readSheet_(SHEETS.SEND_LOG), quarterId, stage);',
     tests: ['tests/notice_received_index.test.js']
   },
   {
@@ -4790,7 +4790,7 @@ const MUTATIONS = [
     why: '舊格式紀錄唔用紀錄上嗰一版核對、改用最新版——指向舊版本嗰格另一個人都當已放行',
     file: 'src/HardViolationClass.gs',
     find: "      const personId = personByVersionCell[versionNo + '|' + m[1] + '|' + m[2] + '|' + m[3]];",
-    replace: "      const personId = personByVersionCell[findLatestVersionNo(quarterId) + '|' + m[1] + '|' + m[2] + '|' + m[3]];",
+    replace: "      const personId = personByVersionCell[findLatestVersionNo_(quarterId) + '|' + m[1] + '|' + m[2] + '|' + m[3]];",
     tests: ['tests/hard_release_remembered.test.js']
   },
   {
@@ -5042,8 +5042,8 @@ const MUTATIONS = [
     id: 'af-basis-not-import',
     why: '匯入嘅版本 Basis 寫錯做 FINE_TUNE——狀態卡講唔出係匯入',
     file: 'src/RosterImport.gs',
-    find: '  registerVersion(q, versionNo, sheetName, VERSION_VALUES.BASIS_IMPORT,',
-    replace: '  registerVersion(q, versionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE,',
+    find: '  registerVersion_(q, versionNo, sheetName, VERSION_VALUES.BASIS_IMPORT,',
+    replace: '  registerVersion_(q, versionNo, sheetName, VERSION_VALUES.BASIS_FINE_TUNE,',
     tests: ['tests/roster_import.test.js']
   },
   {
@@ -5588,8 +5588,8 @@ const MUTATIONS = [
     id: 'ay-name-paths-split',
     why: '「不能服侍」唔經 NameAlias 認名',
     file: 'src/RequestsApply.gs',
-    find: '  const personId = resolvePersonId(req.personNameText);\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
-    replace: '  const personId = (req.requestType === REQUEST_TYPE.CANNOT_SERVE ? null : resolvePersonId(req.personNameText));\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
+    find: '  const personId = resolvePersonId_(req.personNameText);\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
+    replace: '  const personId = (req.requestType === REQUEST_TYPE.CANNOT_SERVE ? null : resolvePersonId_(req.personNameText));\n  if (!personId) {\n    return { category: \'NEEDS_INPUT\', reason: \'名單上找不到',
     tests: ['tests/screen_text_wording.test.js']
   },
   {
@@ -6021,8 +6021,8 @@ const MUTATIONS = [
     id: "cc-read-special-always",
     why: "特別主日關咗都照讀（生成會跳過崗位）",
     file: "src/SheetReader.gs",
-    find: "  if (!isSpecialSundaysEnabled_()) return [];\n  return readSheet(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {",
-    replace: "  return readSheet(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {",
+    find: "  if (!isSpecialSundaysEnabled_()) return [];\n  return readSheet_(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {",
+    replace: "  return readSheet_(SHEETS.SPECIAL_SUNDAYS).filter(function (row) {",
     tests: ["tests/round75_cc_special_off_week_title.test.js"]
   },
   {
@@ -6328,7 +6328,7 @@ const MUTATIONS = [
     id: "ch-view-latest-locked",
     why: "查看最新一版都加保護",
     file: "src/WebAppRollback.gs",
-    find: "  if (target !== findLatestVersionNo(quarterId)) {\n    try {\n      const r = writeVersionContentIntoSheet_",
+    find: "  if (target !== findLatestVersionNo_(quarterId)) {\n    try {\n      const r = writeVersionContentIntoSheet_",
     replace: "  if (true) {\n    try {\n      const r = writeVersionContentIntoSheet_",
     tests: ["tests/round75_ch_version_picker.test.js"]
   },
@@ -6352,8 +6352,8 @@ const MUTATIONS = [
     id: "ch-suggest-as-manual",
     why: "接受建議表嘅版本寫成人手調整",
     file: "src/SuggestionSheet.gs",
-    find: "    VERSION_VALUES.BASIS_SUGGESTION, versionNo, 0, false,",
-    replace: "    VERSION_VALUES.BASIS_FINE_TUNE, versionNo, 0, false,",
+    find: "    VERSION_VALUES.BASIS_SUGGESTION, parentVersionNo, 0, false,",
+    replace: "    VERSION_VALUES.BASIS_FINE_TUNE, parentVersionNo, 0, false,",
     tests: ["tests/round75_ch_version_picker.test.js"]
   },
   {
@@ -6731,13 +6731,13 @@ const MUTATIONS = [
     id: "eb-open-returns-edit",
     why: "apiOpenVersionForViewing 回 /edit 網址",
     file: "src/WebAppRollback.gs",
-    find: "    url: target === findLatestVersionNo(quarterId)\n      ? buildGridSheetUrl_(found.sheetName) : buildGridSheetViewUrl_(found.sheetName),",
+    find: "    url: target === findLatestVersionNo_(quarterId)\n      ? buildGridSheetUrl_(found.sheetName) : buildGridSheetViewUrl_(found.sheetName),",
     replace: "    url: buildGridSheetUrl_(found.sheetName),",
     tests: ["tests/round77_eb_view_version_readonly.test.js"]
   },
   {
     id: "ec-counts-not-saved",
-    why: "registerVersion 冇寫 ChangeCounts（版本來源永遠冇格數）",
+    why: "registerVersion_ 冇寫 ChangeCounts（版本來源永遠冇格數）",
     file: "src/RosterWriter.gs",
     find: "  record[C.CHANGE_COUNTS] = formatVersionChangeCounts_(changeCounts || null);",
     replace: "  record[C.CHANGE_COUNTS] = '';",
@@ -8893,7 +8893,7 @@ const MUTATIONS = [
     id: "le-kinds-hardcoded",
     why: "合堂種類唔讀 Config",
     file: "src/WebAppCombined.gs",
-    find: "  return parseCombinedServiceKinds_(getConfig(CONFIG_KEYS.COMBINED_SERVICE_KINDS, COMBINED_SERVICE_KINDS_DEFAULT));",
+    find: "  return parseCombinedServiceKinds_(getConfig_(CONFIG_KEYS.COMBINED_SERVICE_KINDS, COMBINED_SERVICE_KINDS_DEFAULT));",
     replace: "  return parseCombinedServiceKinds_('COMBINED=合堂');",
     tests: ["tests/round85_le_combined.test.js"]
   },
@@ -9061,7 +9061,7 @@ const MUTATIONS = [
     id: "ma-auto-no-dryrun",
     why: "自動寄出不傳 dryRun 給判斷",
     file: "src/PreseasonPack.gs",
-    find: "    dryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,\n    stage:",
+    find: "    dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,\n    stage:",
     replace: "    stage:",
     tests: ["tests/round86_ma_preseason_sim.test.js"]
   },
@@ -9432,6 +9432,70 @@ const MUTATIONS = [
     find: "      runAction('重新整理', () => loadDashboard({ keepModal: true }));",
     replace: "      runAction('重新整理', loadDashboard);",
     tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "pd-readsheet-public",
+    why: "readSheet 改回公開名稱",
+    file: "src/SheetReader.gs",
+    find: "function readSheet_(sheetName) {",
+    replace: "function readSheet(sheetName) {",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pd-new-public-fn",
+    why: "新加一個公開函式沒有歸類",
+    file: "src/Utils.gs",
+    find: "function toDateString_(value, timezone) {",
+    replace: "function toDateStringPublic(value, timezone) { return toDateString_(value, timezone); }\nfunction toDateString_(value, timezone) {",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pd-allowlist-grow",
+    why: "白名單靜靜加名",
+    file: "tests/round88_pd_public_globals.test.js",
+    find: "  includeHtml: 'ui/Index.html 模板用（只准讀 ui/ 的檔，見 PC1）'\n};",
+    replace: "  includeHtml: 'ui/Index.html 模板用（只准讀 ui/ 的檔，見 PC1）',\n  readSheet: '方便測試直接呼叫讀工作表'\n};",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pd-menu-target-gone",
+    why: "選單指向不存在的函式",
+    file: "src/Menu.gs",
+    find: "'runFourStageStep1_')",
+    replace: "'runFourStageStepOne_')",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pd-trigger-target-gone",
+    why: "每日觸發器指向不存在的函式",
+    file: "src/Trigger.gs",
+    find: "const AUTOMATION_TRIGGER_FUNCTION = 'dailyAutomationCheck_';",
+    replace: "const AUTOMATION_TRIGGER_FUNCTION = 'dailyAutomationCheck';",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pc-include-any-file",
+    why: "includeHtml 不檢查 ui/",
+    file: "src/WebApp.gs",
+    find: "  if (!INCLUDE_HTML_NAME_PATTERN.test(name) || name.indexOf('..') !== -1) {",
+    replace: "  if (false) {",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pc-include-loose-re",
+    why: "includeHtml 名稱規則放寬",
+    file: "src/WebApp.gs",
+    find: "const INCLUDE_HTML_NAME_PATTERN = /^ui\\/[A-Za-z0-9_\\-\\/]+$/;",
+    replace: "const INCLUDE_HTML_NAME_PATTERN = /ui/;",
+    tests: ["tests/round88_pd_public_globals.test.js"]
+  },
+  {
+    id: "pc-onedit-plain-obj",
+    why: "onEdit 普通物件也清快取",
+    file: "src/Config.gs",
+    find: "    const sheet = range && typeof range.getSheet === 'function' ? range.getSheet() : null;",
+    replace: "    const sheet = range ? { getName: function () { return SHEETS.CONFIG; } } : null;",
+    tests: ["tests/round88_pd_public_globals.test.js"]
   }
 ];
 

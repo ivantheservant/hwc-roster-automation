@@ -322,7 +322,7 @@ console.log('\n=== A3【核心】v0 受保護（Protected=TRUE）時，寫入 gr
   const { gas, scenario } = buildGas();
   const gridSheet = scenario.ss.sheets['Roster_2026T4_v0'];
 
-  // 模擬 protectV0() 喺 v0 生成之後留低嘅保護狀態：只留一個特定編輯者。
+  // 模擬 protectV0_() 喺 v0 生成之後留低嘅保護狀態：只留一個特定編輯者。
   const protection = gridSheet.protect().setDescription('v0 原始版，建立後鎖定');
   protection.removeEditors(protection.getEditors());
   protection.addEditor('script-account@x.com');

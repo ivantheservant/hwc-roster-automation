@@ -133,7 +133,7 @@ console.log('\n=== 結構性要求 ===');
   check('★★★★★ 規則狀態明確傳 GRID_OVERLAY，mode 唔可以省略（第十九輪）',
     /resolveAuthoritativeState_\(\s*\n?\s*context, STATE_SOURCE\.GRID_OVERLAY, 'apiSaveAndConfirmPlan'\)/.test(SRC));
   check('★★★★★ plan 完全冇寫入（冇 write／setValue／advanceQuarterStage_ 之類）',
-    !/function buildSaveAndConfirmPlan_[\s\S]*?\n\}/.exec(SRC)[0].match(/writeAssignments|createRosterSheet|registerVersion|setValue|advanceQuarterStage_|publishPublicRoster_/));
+    !/function buildSaveAndConfirmPlan_[\s\S]*?\n\}/.exec(SRC)[0].match(/writeAssignments_|createRosterSheet_|registerVersion_|setValue|advanceQuarterStage_|publishPublicRoster_/));
   // 第七十五輪批次 CE 組：UNRESOLVED_NAMES 唔再係 blockReason（改為逐個決定）
   check('★★★★ 兩種 blockReason（NO_VERSION／GRID_SHEET_MISSING）都有',
     /'NO_VERSION'/.test(SRC) && /'GRID_SHEET_MISSING'/.test(SRC));

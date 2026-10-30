@@ -103,7 +103,7 @@ function upsertCellDecisions_(quarterId, items, timezone) {
     for (let i = 0; i < body.length; i++) {
       const r = body[i];
       if (String(r[col(D.QUARTER_ID)] || '').trim() === quarterId
-        && toDateString(r[col(D.SERVICE_DATE)], timezone) === it.serviceDate
+        && toDateString_(r[col(D.SERVICE_DATE)], timezone) === it.serviceDate
         && String(r[col(D.POST_ID)] || '').trim() === it.postId
         && Number(r[col(D.SLOT_INDEX)]) === it.slotIndex
         && String(r[col(D.KIND)] || '').trim() === it.kind) { rowIndex = i; break; }
@@ -152,7 +152,7 @@ function apiSetCellDecisions(quarterId, items) {
     if (!q) throw new Error('無法記錄這一項決定：沒有季度。請按「重新整理」再試。');
     const list = (Array.isArray(items) ? items : []).map(normalizeCellDecisionItem_);
     if (list.length === 0) return { ok: true, written: 0 };
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const written = upsertCellDecisions_(q, list, timezone);
     writeAuditLog_({
       action: 'CELL_DECISIONS_SET',
@@ -203,7 +203,7 @@ function clearCellDecisionsForQuarter_(quarterId) {
 function countCellDecisionsForQuarter_(quarterId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss.getSheetByName(SHEETS.CELL_DECISIONS)) return 0;
-  return readSheet(SHEETS.CELL_DECISIONS).filter(function (r) {
+  return readSheet_(SHEETS.CELL_DECISIONS).filter(function (r) {
     return String(r[COLUMNS.CELL_DECISIONS.QUARTER_ID] || '').trim() === quarterId;
   }).length;
 }

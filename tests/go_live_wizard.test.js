@@ -31,7 +31,7 @@ const wizardSource = fs.readFileSync(path.join(SRC, 'GoLiveWizard.gs'), 'utf8');
 
 // ---------------------------------------------------------------------------
 // 移植：assessGoLiveState_() 嘅判斷邏輯（逐字對應 GoLiveWizard.gs，
-// readConfig()／describeConfigValue_() 換成直接傳入值）
+// readConfig_()／describeConfigValue_() 換成直接傳入值）
 // ---------------------------------------------------------------------------
 function assessGoLiveState(dryRunValue, subjectPrefixValue) {
   const dryRun = dryRunValue !== false;
@@ -150,7 +150,7 @@ console.log('\n=== 安全性：setConfigValue_() 唔可以自動新增 Config �
   check('★ 冇任何 appendRow／getLastRow()+1 嘅寫入',
     setBody.indexOf('appendRow') === -1 && !/getLastRow\(\)\s*\+\s*1/.test(setBody));
   check('★★ 改完即刻清 Config 快取（否則之後嘅檢查會讀返舊值）',
-    setBody.indexOf('reloadConfigCache()') !== -1);
+    setBody.indexOf('reloadConfigCache_()') !== -1);
   check('★ 每次改值都寫 AuditLog（含改動前後嘅值）',
     setBody.indexOf('writeAuditLog_') !== -1 && setBody.indexOf('oldValue') !== -1);
 }
@@ -159,7 +159,7 @@ console.log('\n=== 安全性：嚮導唔會順手做任何其他嘢 ===');
 {
   // 上線切換應該只掂兩個 Config 值，唔可以順手寄信、改 Stage、生成版本
   const FORBIDDEN = [
-    ['sendStage(', '寄信'],
+    ['sendStage_(', '寄信'],
     ['MailApp', '直接寄信'],
     ['advanceQuarterStage_', '改動季度 Stage'],
     ['performRosterGeneration_', '生成職事表'],

@@ -8,7 +8,7 @@
  * @param {Object[]} warnings performRosterGeneration_() 產生的警告清單
  * @returns {string} 建立的工作表名稱
  */
-function createRosterSheet(quarterId, versionNo, assignments, warnings) {
+function createRosterSheet_(quarterId, versionNo, assignments, warnings) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetName = buildRosterSheetName_(quarterId, versionNo);
 
@@ -31,7 +31,7 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
     .setWrap(true)
     .setVerticalAlignment('middle');
 
-  log_('INFO', 'createRosterSheet 標題陣列：' + JSON.stringify(layout.headers));
+  log_('INFO', 'createRosterSheet_ 標題陣列：' + JSON.stringify(layout.headers));
 
   // 第 3 行起：每個主日一行
   if (layout.rows.length > 0) {
@@ -54,7 +54,7 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   try {
     applyGridColumnWidthsForA4_(sheet, layout);
   } catch (err) {
-    log_('WARN', 'createRosterSheet：未能設定欄寬（職事表本身已經建立好）：' + err.message);
+    log_('WARN', 'createRosterSheet_：未能設定欄寬（職事表本身已經建立好）：' + err.message);
   }
 
   // ⚠️ 第四十三輪批次 B 組：**一有新版本，舊版本那些建議表就過時了。**
@@ -70,7 +70,7 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   try {
     discardStaleSuggestionSheets_(quarterId, versionNo);
   } catch (err) {
-    log_('WARN', 'createRosterSheet：未能清除過時的建議表（職事表本身已經建立好）：'
+    log_('WARN', 'createRosterSheet_：未能清除過時的建議表（職事表本身已經建立好）：'
       + err.message);
   }
 
@@ -92,13 +92,13 @@ function createRosterSheet(quarterId, versionNo, assignments, warnings) {
   try {
     dropdownResult = applyGridNameDropdowns_(quarterId, versionNo);
   } catch (err) {
-    log_('WARN', 'createRosterSheet：名單下拉選單套用不到（職事表本身已經建立好）：'
+    log_('WARN', 'createRosterSheet_：名單下拉選單套用不到（職事表本身已經建立好）：'
       + err.message);
     dropdownResult = { failed: true, error: err.message, columns: [], skipped: [] };
   }
   // 呼叫端要拿得到就讀這一個。回傳值維持是工作表名稱——
   // 改回傳形狀會影響五條路，不值得。
-  createRosterSheet.lastDropdownResult = dropdownResult;
+  createRosterSheet_.lastDropdownResult = dropdownResult;
 
   return sheetName;
 }
@@ -122,9 +122,9 @@ function buildRosterSheetName_(quarterId, versionNo) {
  *   headers 為中文標題、keys 為機器鍵、rows 為資料列、cellIndex 為 "date|postId|slot" 對應欄號
  */
 function buildGridLayout_(quarterId, assignments) {
-  const posts = readPosts();
-  const serviceDates = readServiceDates(quarterId);
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const posts = readPosts_();
+  const serviceDates = readServiceDates_(quarterId);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const labels = readGridCellLabels_();
   const pendingLabel = labels.pending;
   const naLabel = labels.na;
@@ -166,7 +166,7 @@ function buildGridLayout_(quarterId, assignments) {
   const dates = serviceDates
     .map(function (row) {
       return {
-        serviceDate: toDateString(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone),
         weekIndex: Number(row[COLUMNS.SERVICE_DATES.WEEK_INDEX]),
         serviceType: row[COLUMNS.SERVICE_DATES.SERVICE_TYPE],
         // 第七十五輪批次 CC 組：幹事喺「類型」欄改過嘅每週標題（空白 ＝ 預設）
@@ -212,15 +212,15 @@ function buildGridLayout_(quarterId, assignments) {
 
 /**
  * 第十輪批次階段 A：讀齊四種留空格子的顯示文字，一次過讀完傳落去，
- * 避免逐格呼叫 `getConfig()`。全部可在 Config 調整，冇一個寫死。
+ * 避免逐格呼叫 `getConfig_()`。全部可在 Config 調整，冇一個寫死。
  * @returns {{pending: string, na: string, specialSkip: string, gap: string}}
  */
 function readGridCellLabels_() {
   return {
-    pending: getConfig(CONFIG_KEYS.GRID_PENDING_LABEL, DEFAULTS.GRID_PENDING_LABEL),
-    na: getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL),
-    specialSkip: getConfig(CONFIG_KEYS.GRID_SPECIAL_SKIP_LABEL, DEFAULTS.GRID_SPECIAL_SKIP_LABEL),
-    gap: getConfig(CONFIG_KEYS.GRID_GAP_LABEL, DEFAULTS.GRID_GAP_LABEL)
+    pending: getConfig_(CONFIG_KEYS.GRID_PENDING_LABEL, DEFAULTS.GRID_PENDING_LABEL),
+    na: getConfig_(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL),
+    specialSkip: getConfig_(CONFIG_KEYS.GRID_SPECIAL_SKIP_LABEL, DEFAULTS.GRID_SPECIAL_SKIP_LABEL),
+    gap: getConfig_(CONFIG_KEYS.GRID_GAP_LABEL, DEFAULTS.GRID_GAP_LABEL)
   };
 }
 
@@ -266,9 +266,9 @@ function resolveGridCellText_(assignment, cellClass, emptyDisplay, labels, speci
 function buildSpecialSundayTitleIndex_(quarterId, timezone) {
   const S = COLUMNS.SPECIAL_SUNDAYS;
   const index = {};
-  readSpecialSundays(quarterId).forEach(function (row) {
+  readSpecialSundays_(quarterId).forEach(function (row) {
     if (!isTrueValue_(row[S.ACTIVE])) return;
-    const dateStr = toDateString(row[S.SERVICE_DATE], timezone);
+    const dateStr = toDateString_(row[S.SERVICE_DATE], timezone);
     if (!dateStr) return;
     const title = String(row[S.TITLE] || '').trim() || String(row[S.TYPE] || '').trim();
     if (title) index[dateStr] = title;
@@ -296,9 +296,9 @@ function buildSpecialSundayTitleIndex_(quarterId, timezone) {
 function buildSpecialSundayExternalOwnerIndex_(quarterId, timezone) {
   const S = COLUMNS.SPECIAL_SUNDAYS;
   const index = {};
-  readSpecialSundays(quarterId).forEach(function (row) {
+  readSpecialSundays_(quarterId).forEach(function (row) {
     if (!isTrueValue_(row[S.ACTIVE])) return;
-    const dateStr = toDateString(row[S.SERVICE_DATE], timezone);
+    const dateStr = toDateString_(row[S.SERVICE_DATE], timezone);
     if (!dateStr) return;
     const owner = String(row[S.EXTERNAL_OWNER] || '').trim();
     if (owner) index[dateStr] = owner;
@@ -374,10 +374,10 @@ function resolveEmptyDisplayText_(rawEmptyDisplay, pendingLabel, naLabel) {
  * （`{serviceDate, postId, slotIndex, personId, personName, assignSource, ruleFlags}`，
  * `ruleFlags` 是陣列，不是逗號分隔字串）。
  *
- * 存在的理由：`createRosterSheet()` 當下用的是生成器剛產生、還在記憶體裡的
+ * 存在的理由：`createRosterSheet_()` 當下用的是生成器剛產生、還在記憶體裡的
  * 陣列（`ruleFlags` 本來就是陣列）；但「發佈公開職事表」（`PublicRoster.gs`）
  * 與「個人專屬連結」（`WebAppPersonalLink.gs`）都是**事後**重新讀取已經寫入
- * 長表的某個版本，`RuleFlags` 這時已經被 `writeAssignments()` 序列化成字串，
+ * 長表的某個版本，`RuleFlags` 這時已經被 `writeAssignments_()` 序列化成字串，
  * 兩者形狀不同、不能直接傳給 `buildGridLayout_()`。這個函式只做一次轉換，
  * 供上述兩個新功能共用，不會各自重複一份轉換邏輯。
  *
@@ -387,8 +387,8 @@ function resolveEmptyDisplayText_(rawEmptyDisplay, pendingLabel, naLabel) {
  */
 function readVersionAssignmentsForGrid_(quarterId, versionNo) {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  return readSheet(SHEETS.ROSTER_ASSIGNMENTS)
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return readSheet_(SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
     })
@@ -397,7 +397,7 @@ function readVersionAssignmentsForGrid_(quarterId, versionNo) {
         // ⚠️ 第三十六輪批次：**`serviceDateId` 本來冇帶出嚟。**
         //
         // `apiRollbackExecute()`（WebAppRollback.gs）用呢個函式攞目標版本
-        // 嘅內容再 `writeAssignments()`，而佢寫 `serviceDateId: a.serviceDateId`
+        // 嘅內容再 `writeAssignments_()`，而佢寫 `serviceDateId: a.serviceDateId`
         // ——`undefined` ⇒ **回退建立嘅新版本，成版 ServiceDateID 全部空白**。
         // 實測（呢一輪嘅五路測試）：v3 十六格全部空白。
         //
@@ -405,7 +405,7 @@ function readVersionAssignmentsForGrid_(quarterId, versionNo) {
         // 呢個係第六個實例，而且係靠 C 組嗰條共用斷言先揪到
         //（本來只比四個欄位，加咗呢一個之後即刻紅）。
         serviceDateId: row[C.SERVICE_DATE_ID],
-        serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID],
         slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID],
@@ -473,7 +473,7 @@ function applyCellMarks_(sheet, layout, warningIndex) {
       // 係同一件事（系統排唔到、要人手補），資料層訊號亦都一模一樣
       // （PersonID 空 + AssignSource=SKIPPED + RuleFlags 含 HARD_ELIGIBILITY），
       // 所以 listPendingBackfillCells_() 本來就會列到呢啲格。一種顏色一個意思。
-      backgrounds[r][c] = getConfig(
+      backgrounds[r][c] = getConfig_(
         CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
     } else if (cellClass === GRID_CELL_CLASS.SPECIAL_SKIP) {
       // 階段 A（第六輪）：特別主日跳過的格子用獨立底色，跟一般略過的灰底
@@ -655,8 +655,8 @@ function buildMonthGroups_(dateColumns) {
  * @param {Object} layout `buildGridLayout_()` 的結果
  * @param {{postId: string, postNameTC: string, slotCount: number}[]} posts
  *   崗位清單，必須同 `buildGridLayout_()` 內部用嚟組 `layout.keys` 嘅
- *   `readPosts()` 次序完全一致（呼叫端負責保證，通常直接傳
- *   `readPostsNormalized()` 嘅結果）
+ *   `readPosts_()` 次序完全一致（呼叫端負責保證，通常直接傳
+ *   `readPostsNormalized_()` 嘅結果）
  * @param {Object.<string, string>} specialTitleByDate {yyyy-MM-dd: 特別主日名稱}
  * @param {{dateFormatPattern: string}=} displayOptions
  *   `dateFormatPattern` 見 `formatShortDateLabel_()`
@@ -765,8 +765,8 @@ function buildBlankRowLegendEntry_(blankNote, count) {
  * @returns {number} 這一段實際佔用的行數（供統計區接落去排）
  */
 function writeLegendSection_(sheet, layout) {
-  const showLegend = getConfig(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
-  const footerNote = String(getConfig(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '').trim();
+  const showLegend = getConfig_(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
+  const footerNote = String(getConfig_(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '').trim();
   if (!showLegend && !footerNote) return 0;
 
   let row = layout.rows.length + 4;
@@ -782,7 +782,7 @@ function writeLegendSection_(sheet, layout) {
     sheet.getRange(row, 1, legendRows.length, 3).setValues(legendRows);
 
     // 每一行嘅第一格用返該類別喺表上嘅實際底色，令圖例同表格對得上
-    const gapColor = getConfig(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
+    const gapColor = getConfig_(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
     const markerColors = [
       [null], [GRID_COLORS.SKIPPED], [GRID_COLORS.SKIPPED],
       [GRID_COLORS.SPECIAL_SKIP], [gapColor]
@@ -844,7 +844,7 @@ function writeStatsSection_(sheet, layout, assignments, extraOffset) {
  * @param {Object[]} assignments 派工結果
  * @returns {number} 寫入的列數
  */
-function writeAssignments(quarterId, versionNo, assignments) {
+function writeAssignments_(quarterId, versionNo, assignments) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_ASSIGNMENTS);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_ASSIGNMENTS);
   if (assignments.length === 0) return 0;
@@ -893,7 +893,7 @@ function writeAssignments(quarterId, versionNo, assignments) {
  * @param {string=} notes 備註，例如採用的 seed，供日後重現該版本
  * @returns {void}
  */
-function registerVersion(quarterId, versionNo, sheetName, basis, parentVersionNo, warningCount, isProtected, notes, changeCounts) {
+function registerVersion_(quarterId, versionNo, sheetName, basis, parentVersionNo, warningCount, isProtected, notes, changeCounts) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_VERSIONS);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_VERSIONS);
 
@@ -948,8 +948,8 @@ function registerVersion(quarterId, versionNo, sheetName, basis, parentVersionNo
  * @param {string} quarterId 季度 ID
  * @returns {number} 最大版本號；尚未有任何版本時回傳 -1
  */
-function findLatestVersionNo(quarterId) {
-  const rows = readSheet(SHEETS.ROSTER_VERSIONS).filter(function (row) {
+function findLatestVersionNo_(quarterId) {
+  const rows = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (row) {
     return row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] === quarterId;
   });
   let max = -1;
@@ -964,7 +964,7 @@ function findLatestVersionNo(quarterId) {
  * 第十五輪批次新增：列出 `RosterVersions` 入面實際出現過嘅全部 QuarterID
  * （去重，由新到舊排）。
  *
- * 存在嘅理由：`findLatestVersionNo()` 搵唔到版本時，單單話「找不到 X 已生成
+ * 存在嘅理由：`findLatestVersionNo_()` 搵唔到版本時，單單話「找不到 X 已生成
  * 的版本」冇俾使用者足夠資訊判斷係「呢一季真係未生成」定係「打嘅 QuarterID
  * 同資料庫入面嘅唔一致」（例如全形字元、隱形字元——見
  * `normalizeIdInput_()` 檔頭說明）。呼叫端可以將呢個清單接落錯誤訊息，
@@ -974,7 +974,7 @@ function findLatestVersionNo(quarterId) {
  */
 function listKnownQuarterIds_() {
   const ids = {};
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     const id = String(row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] || '').trim();
     if (id) ids[id] = true;
   });
@@ -1015,7 +1015,7 @@ function buildQuarterNotFoundMessage_(quarterId) {
  */
 function summariseAssignmentVersions_() {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS);
+  const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS);
   const byKey = {};
 
   rows.forEach(function (row) {
@@ -1057,12 +1057,12 @@ function summariseAssignmentVersions_() {
  * @param {string} sheetName 要保護的工作表名稱
  * @returns {void}
  */
-function protectV0(sheetName) {
+function protectV0_(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) throw new Error('找不到工作表: ' + sheetName);
 
   const protection = sheet.protect().setDescription('v0 原始版，建立後鎖定');
-  const scriptAccount = getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '');
+  const scriptAccount = getConfig_(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '');
 
   protection.removeEditors(protection.getEditors());
   if (scriptAccount) protection.addEditor(scriptAccount);
@@ -1078,7 +1078,7 @@ function protectV0(sheetName) {
  *
  * 「人手改動偵測」（`buildGridOverlayState_()`，FineTune.gs）原本嘅方向係
  * **由 grid 文字反推 PersonID**：見到一格有字、而 `RosterAssignments`
- * 嗰格冇人名，就當成「幹事改咗嘢」，再 `resolvePersonId()` 查係邊個。
+ * 嗰格冇人名，就當成「幹事改咗嘢」，再 `resolvePersonId_()` 查係邊個。
  *
  * 呢個方向有一個根本問題：**grid 上面唔係淨係得人名。** 仲有一批
  * 「顯示用」嘅文字：
@@ -1139,7 +1139,7 @@ function renderExpectedGridText_(assignment, postId, serviceDate, renderContext)
  *
  * @param {string} quarterId 季度 ID
  * @param {string} timezone 時區
- * @param {Object[]=} posts 已讀好嘅 `readPostsNormalized()` 結果（可選，慳一次讀取）
+ * @param {Object[]=} posts 已讀好嘅 `readPostsNormalized_()` 結果（可選，慳一次讀取）
  * @returns {{labels: Object, emptyDisplayByPostId: Object, externalOwnerByDate: Object}}
  */
 function buildGridRenderContext_(quarterId, timezone, posts) {
@@ -1148,7 +1148,7 @@ function buildGridRenderContext_(quarterId, timezone, posts) {
   // 擺喺呢度而唔係另外讀一次 `Posts`——呢個 context 本身就係
   // 「人手改動偵測要用嘅逐崗位資料」，多一個欄位唔使多讀一次表。
   const autoGenerateByPostId = {};
-  (posts || readPostsNormalized()).forEach(function (p) {
+  (posts || readPostsNormalized_()).forEach(function (p) {
     emptyDisplayByPostId[p.postId] = p.emptyDisplay;
     autoGenerateByPostId[p.postId] = p.autoGenerate !== false;
   });
@@ -1197,7 +1197,7 @@ function buildGridRenderContext_(quarterId, timezone, posts) {
  * ⚠️ **只改顯示格式，不改儲存的值。** 格子裡面仍然是一個真正的日期值
  *（`setValues()` 寫 `'2027-01-03'` 的時候，試算表本來就會自動轉成日期值——
  * `tests/helpers/mock_sheets_realistic.js` 的 `looksLikeSheetsAutoDate_()`
- * 就是照住這一點模擬的）。全部讀回 grid 的路都走 `toDateString(value, tz)`，
+ * 就是照住這一點模擬的）。全部讀回 grid 的路都走 `toDateString_(value, tz)`，
  * 那個函式收 Date 物件收得很好，所以顯示格式改極都不會影響比對。
  *
  * 慳出來的位讓給人名欄——那是 Ivan 兩次都提到的一點。
@@ -1300,18 +1300,18 @@ function diffVersionAssignments_(quarterId, fromVersionNo, toVersionNo) {
   if (Number(fromVersionNo) === Number(toVersionNo)) return [];
 
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const before = {};
   const after = {};
   const beforeId = {};
   const afterId = {};
 
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     const v = Number(row[A.VERSION_NO]);
     if (v !== fromVersionNo && v !== toVersionNo) return;
     const key = cellKey_(
-      toDateString(row[A.SERVICE_DATE], timezone), row[A.POST_ID], row[A.SLOT_INDEX]);
+      toDateString_(row[A.SERVICE_DATE], timezone), row[A.POST_ID], row[A.SLOT_INDEX]);
     const name = String(row[A.PERSON_NAME_SNAPSHOT] || '').trim();
     // ⚠️ 第四十六輪批次 B 組：連 `PersonID` 一齊記低。
     //

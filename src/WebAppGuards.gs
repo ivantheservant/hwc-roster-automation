@@ -142,7 +142,7 @@ function resolveAllowUnsavedFlag_(sendOptions) {
  * @throws {Error} 有未儲存改動而又冇放行時拋三段式訊息
  */
 function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   const state = readDashboardUnsavedState_(quarterId, versionNo);
   if (!state.hasAny) return { versionNo: versionNo, state: state, released: false };
 
@@ -211,7 +211,7 @@ function assertNeverOfficiallySent_(quarterId) {
   const C = COLUMNS.SEND_LOG;
   let lastSentAt = '';
   let count = 0;
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;
     count++;
@@ -316,7 +316,7 @@ function assertPublicLinkReady_(quarterId) {
  */
 function apiRepublishPublicLink(quarterId) {
   assertWebAppRequestAllowed_();
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     return {
       ok: false,
@@ -346,7 +346,7 @@ function apiRepublishPublicLink(quarterId) {
 }
 
 function planResendChangedPersons_(quarterId) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error('找不到 ' + quarterId + ' 已生成的版本。');
 
   const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.RESEND);

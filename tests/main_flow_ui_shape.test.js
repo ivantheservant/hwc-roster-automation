@@ -49,7 +49,7 @@ console.log('\n=== A【核心】五步齊全，而且順序係幹事真實嘅工
   // ⚠️ 第四十一輪批次 A 組：由**六步**變**五步**。
   //
   // 原本嘅第 3 步（加名單選單）而家全自動——
-  //   `createRosterSheet()` 收尾自動套用（五條建立版本嘅路都經過嗰度）
+  //   `createRosterSheet_()` 收尾自動套用（五條建立版本嘅路都經過嗰度）
   //   `apiApplyEligibilitySheet()` 套用完名單順帶再跑一次
   // 所以佢唔再出現喺主流程，收咗落「進階與診斷」做手動補救。
   // ⚠️ 第四十三輪批次 H 組：主流程由五步減成**四步**。
@@ -105,12 +105,12 @@ console.log('\n=== A【核心】五步齊全，而且順序係幹事真實嘅工
 console.log('\n=== A【核心】下拉選單全自動 ===');
 {
   const writer = fs.readFileSync(path.join(SRC_GS, 'RosterWriter.gs'), 'utf8');
-  // ⚠️ 掛喺 `createRosterSheet()` 而唔係逐條路各加一次，係刻意嘅：
+  // ⚠️ 掛喺 `createRosterSheet_()` 而唔係逐條路各加一次，係刻意嘅：
   // 嗰個函式係五條建立版本嘅路唯一嘅匯合點。
   // 逐條路各加一次，就一定會有一條唔記得——本專案反覆出事嘅形狀。
-  const body = writer.slice(writer.indexOf('function createRosterSheet('),
+  const body = writer.slice(writer.indexOf('function createRosterSheet_('),
     writer.indexOf('function buildRosterSheetName_'));
-  check('★★★★★ `createRosterSheet()` 收尾會套用下拉選單'
+  check('★★★★★ `createRosterSheet_()` 收尾會套用下拉選單'
     + '——五條建立版本嘅路都經過佢，所以每一張新 grid 都自動有',
     /applyGridNameDropdowns_\(quarterId, versionNo\)/.test(body), body.slice(-400));
   check('★★★★★ 而且失敗**唔會令整個建立版本失敗**'

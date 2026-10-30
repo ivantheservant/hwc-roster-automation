@@ -80,7 +80,7 @@ console.log('\n=== FB2【核心】〔接受這個建議版本〕：舊表還原�
 console.log('\n=== FB3：所有建立新版本、以舊表作起點嘅路都叫同一支 ===');
 {
   const callers = fs.readdirSync(path.join(ROOT, 'src')).filter((f) => /\.gs$/.test(f))
-    .filter((f) => /\bregisterVersion\(/.test(read('src/' + f).replace(/^\s*(\/\/|\*).*$/gm, '')))
+    .filter((f) => /\bregisterVersion_\(/.test(read('src/' + f).replace(/^\s*(\/\/|\*).*$/gm, '')))
     .filter((f) => f !== 'RosterWriter.gs');
   const missing = callers.filter((f) => f !== 'MultiRun.gs'
     && !/restoreBaseSheetAfterNewVersion_\(/.test(read('src/' + f)));
@@ -105,7 +105,7 @@ console.log('\n=== FB4【核心】還原失敗唔可以令儲存失敗 ===');
   check('★★★★★★ 儲存照樣成功（第 3 版）', !threw && r && r.ok === true && r.versionNo === 3, threw || JSON.stringify(r).slice(0, 300));
   check('★★★★★★ 結果帶住原因', r && /受保護，寫不到/.test(r.baseSheetRestoreFailed || ''), r && r.baseSheetRestoreFailed);
   const A = sc.C.AUDIT_LOG;
-  const logged = gas.readSheet(sc.S.AUDIT_LOG).filter((a) => a[A.ACTION] === 'BASE_SHEET_RESTORE_FAILED');
+  const logged = gas.readSheet_(sc.S.AUDIT_LOG).filter((a) => a[A.ACTION] === 'BASE_SHEET_RESTORE_FAILED');
   check('★★★★★ AuditLog 記低（第 2 版、原因、查看時會再試）', logged.length === 1
     && logged[0][A.TARGET_KEY] === sc.Q + '-v2' && /受保護，寫不到/.test(logged[0][A.NOTES]) && /查看時系統會再試/.test(logged[0][A.NOTES]),
     JSON.stringify(logged));

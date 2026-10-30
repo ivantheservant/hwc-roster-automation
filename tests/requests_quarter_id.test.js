@@ -193,7 +193,7 @@ console.log('\n=== E【核心】驗證同套用 ===');
     JSON.stringify(cat[5]));
   check('★★★★ 空白嗰筆照常驗證（可以套用）', cat[3] && cat[3].category === 'APPLY', JSON.stringify(cat[3]));
   gas.applyRequests_(plan, [], undefined, 'e-test', []);
-  const rows = gas.readSheet(S.REQUESTS);
+  const rows = gas.readSheet_(S.REQUESTS);
   const note3 = String(rows[0][RQ.RESULT_NOTE] || '');
   check('★★★★★★ 處理結果寫明「QuarterID 空白，按日期判斷為 2099T1」',
     /^QuarterID 空白，按日期判斷為 2099T1；/.test(note3), note3);

@@ -231,7 +231,7 @@ function monkeyActions_() {
       // 兩份邏輯必定分岔——而分岔之後，下一次撞規則嗰陣
       // 冇人分得出邊一份答錯。
       run: function (quarterId, rnd) {
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         const howMany = 1 + Math.floor(rnd() * 3);
         const picked = selfTestPickAcceptedCells_(
           quarterId, versionNo, howMany, MONKEY_SCENARIO_ID);
@@ -288,7 +288,7 @@ function monkeyActions_() {
       weight: MONKEY_RARE_WEIGHT,
       legal: function (facts) { return facts.hasVersion; },
       run: function (quarterId, rnd) {
-        const versionNo = findLatestVersionNo(quarterId);
+        const versionNo = findLatestVersionNo_(quarterId);
         const cells = selfTestPickCells_(quarterId, versionNo, 1);
         if (cells.length === 0) return { skipped: '找不到一格有人的來改' };
         const cell = cells[0];
@@ -415,7 +415,7 @@ function monkeyActions_() {
       id: '回到上一個儲存版本',
       legal: function (facts) { return facts.latestVersionNo > 0; },
       run: function (quarterId) {
-        const target = findLatestVersionNo(quarterId) - 1;
+        const target = findLatestVersionNo_(quarterId) - 1;
         return apiRollbackPlan(quarterId, target);
       },
       // `apiRollbackPlan()` 只係算，唔會真回退。同上：純算就唔准改嘢。
@@ -559,7 +559,7 @@ function monkeyPickWeighted_(legal, rnd) {
  * @returns {boolean} `true` ＝ 跳過
  */
 function monkeySkipSlowActions_() {
-  return getConfig(CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, true) === true;
+  return getConfig_(CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS, true) === true;
 }
 
 /**
@@ -589,7 +589,7 @@ function monkeyStateFingerprint_(facts) {
  */
 function monkeyReadFacts_(quarterId) {
   const state = buildDashboardState_(quarterId);
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   return {
     hasVersion: versionNo >= 0,
     latestVersionNo: versionNo,
@@ -702,7 +702,7 @@ function runMonkey_(steps, seed, skipDraws, priorSteps) {
     // 開跑嗰陣驗一次係唔夠嘅——一次亂行可以行幾分鐘，
     // 而中間有人（或者另一支程式）改咗 Config，後面嗰幾十步就會真係寄信。
     if (i % MONKEY_DRY_RUN_RECHECK_EVERY === 1 && i > 1) {
-      if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== true) {
+      if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== true) {
         failures.push({
           step: absStep, kind: 'DRY_RUN',
           detail: '第 ' + absStep + ' 步之前重新檢查，DRY_RUN 已經不是 TRUE。'
@@ -1297,7 +1297,7 @@ function runMonkeyFromMenu_() {
 
   // ⚠️ seed 由幹事決定，預設用當日日期——同一日重跑會走同一條路，
   // 而想換一條路就自己改一個數字。
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const defaultSeed = Number(Utilities.formatDate(new Date(), timezone, 'yyyyMMdd'));
   const seedResponse = ui.prompt(title,
     '隨機種子？（留空 ＝ ' + defaultSeed + '）\n\n'

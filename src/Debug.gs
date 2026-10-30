@@ -7,13 +7,13 @@
  * @param {string} quarterId 季度 ID，例如 "2026T4"
  * @returns {Object} 診斷摘要，同時已寫入 Logger
  */
-function debugSoftRules(quarterId) {
+function debugSoftRules_(quarterId) {
   const context = buildGeneratorContext_(quarterId);
   context.trace = [];
   const result = buildRoster_(context);
 
   const lines = [];
-  lines.push('=== debugSoftRules ' + quarterId + ' ===');
+  lines.push('=== debugSoftRules_ ' + quarterId + ' ===');
   lines.push('');
   lines.push(describeRuleSetting_(context.rules, RULE_IDS.CHAIR_EQ_ANNOUNCE));
   lines.push(describeRuleSetting_(context.rules, RULE_IDS.CHAIR_PREFER_DUAL));
@@ -212,7 +212,7 @@ function getChairAnnounceScope_(rules) {
 
 /**
  * 計算同時具備主席與報告資格的人數。
- * @param {Object} eligibility readEligibility() 的結果
+ * @param {Object} eligibility readEligibility_() 的結果
  * @param {{chairPostId: string, announcePostId: string}} scope 崗位組合
  * @returns {number} 兩個崗位都合資格的人數
  */
@@ -298,11 +298,11 @@ function summariseTrace_(result, context, scope) {
  * @param {number} versionNo 版本號
  * @returns {{headers: string[], keys: string[]}} 實際讀到的兩行內容
  */
-function debugGridHeaders(quarterId, versionNo) {
+function debugGridHeaders_(quarterId, versionNo) {
   const sheetName = buildRosterSheetName_(quarterId, versionNo);
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) {
-    log_('ERROR', 'debugGridHeaders: 找不到工作表 ' + sheetName);
+    log_('ERROR', 'debugGridHeaders_: 找不到工作表 ' + sheetName);
     return null;
   }
 
@@ -310,7 +310,7 @@ function debugGridHeaders(quarterId, versionNo) {
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
 
-  const lines = ['=== debugGridHeaders ' + sheetName + ' ==='];
+  const lines = ['=== debugGridHeaders_ ' + sheetName + ' ==='];
   lines.push('共 ' + lastCol + ' 欄');
   lines.push('');
   lines.push('欄號　中文標題（第1行）　　機器鍵（第2行）');

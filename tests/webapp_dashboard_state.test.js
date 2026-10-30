@@ -243,9 +243,9 @@ console.log('\n=== 規格 1.6【核心】disabledReason 一律寫「怎樣才按
 
 console.log('\n=== 規格 1.1／5.1：季度與版本一律寫人話 ===');
 {
-  // buildQuarterLabel_ 讀 Config，離線要換走 getConfig。
-  const savedGetConfig = gas.getConfig;
-  gas.getConfig = function (key, fallback) {
+  // buildQuarterLabel_ 讀 Config，離線要換走 getConfig_。
+  const savedGetConfig = gas.getConfig_;
+  gas.getConfig_ = function (key, fallback) {
     if (key === gas.CONFIG_KEYS.QUARTER_TERM_START_MONTHS) return '1,4,7,10';
     return fallback;
   };
@@ -253,7 +253,7 @@ console.log('\n=== 規格 1.1／5.1：季度與版本一律寫人話 ===');
   checkEqual('★★★★ 2027T1 ⇒ 2027年1-3月', gas.buildQuarterLabel_('2027T1'), '2027年1-3月');
   checkEqual('★★★ 認唔出格式就原樣回傳，唔可以砌一個似層層嘅名出嚟',
     gas.buildQuarterLabel_('唔知咩'), '唔知咩');
-  gas.getConfig = savedGetConfig;
+  gas.getConfig_ = savedGetConfig;
 
   // ── 第二十五輪批次階段 B1：Basis 內部代號唔可以漏落畫面 ──────────
   //
@@ -288,17 +288,17 @@ console.log('\n=== 結構性要求（靜態檢查正式碼）===');
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppDashboard.gs'), 'utf8');
   check('★★★★★ 第一行有 assertWebAppRequestAllowed_()',
     /function apiGetDashboardState\(quarterId\) \{\s*\n\s*assertWebAppRequestAllowed_\('apiGetDashboardState'\);/.test(src));
-  check('★★★★★ 用 readSheet 快取包住，而且有 finally 收尾'
+  check('★★★★★ 用 readSheet_ 快取包住，而且有 finally 收尾'
     + '（漏咗 finally 會令之後全部讀取都用緊過時快取）',
     /beginSheetReadMemo_\(\);[\s\S]*?finally \{[\s\S]*?endSheetReadMemo_\(\);/.test(src));
   // ⚠️ 第四十八輪批次：**先剝走註釋先數。**
-  // 一句寫住「唔好另開一次 `readSheet(SHEETS.SEND_LOG)`」嘅註釋，
+  // 一句寫住「唔好另開一次 `readSheet_(SHEETS.SEND_LOG)`」嘅註釋，
   // 唔係第二次讀——但佢會令呢一條測試變紅，
   // 而下一個人最容易嘅解法就係把嗰句註釋刪走。
   // 一條逼人刪註釋先過到嘅測試，係喺教人做錯嘢。
   const codeOnly = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★ SendLog 只喺一個地方讀（一次過算齊三個階段 + 有冇 OFFICIAL 紀錄）',
-    (codeOnly.match(/readSheet\(SHEETS\.SEND_LOG\)/g) || []).length === 1);
+    (codeOnly.match(/readSheet_\(SHEETS\.SEND_LOG\)/g) || []).length === 1);
   check('★★★★★ 規則狀態明確傳 GRID_OVERLAY（第十九輪：唔可以省略 mode）',
     /resolveAuthoritativeState_\(\s*\n?\s*context, STATE_SOURCE\.GRID_OVERLAY/.test(src));
   check('★★★★ grid 讀唔到時唔可以當成「零改動」'

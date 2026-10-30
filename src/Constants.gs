@@ -72,7 +72,7 @@ const ARCHIVE_CONFIRM_TEXT = '確認封存';
 /**
  * 階段 B（Opus 深度輪）：「🩺 全面體檢」提示「建議規劃封存」的行數門檻。
  *
- * 這幾張表只增不減、readSheet() 每次整表讀取（見 docs/系統範圍稽核.md 第六輪
+ * 這幾張表只增不減、readSheet_() 每次整表讀取（見 docs/系統範圍稽核.md 第六輪
  * 階段 D 的規模評估）。門檻的用途只是**提早提醒**，不是「超過就會壞」——
  * 現時真實資料約 762 行 SendLog，離門檻還很遠。
  */
@@ -89,10 +89,10 @@ const ARCHIVE_SIZE_HINT_ROWS = {
 const MULTIRUN_TIME_BUDGET_MS = 180000;
 
 /**
- * 階段 A（Opus 深度輪）新增：generateBest() 用來偵測「換 seed 到底有沒有令
+ * 階段 A（Opus 深度輪）新增：generateBest_() 用來偵測「換 seed 到底有沒有令
  * 結果不同」的探測次數。
  *
- * 背景：generateBest() 的設計是「用多個不同的 seed 各生成一份，再揀最貼近
+ * 背景：generateBest_() 的設計是「用多個不同的 seed 各生成一份，再揀最貼近
  * 歷史基準的一份」，但 seed 唯一的用途是 pickPerson_() 裡的 `tieBreak`，
  * 而 tieBreak 只在**兩位候選人的 score 與 selectionScore 完全相等**時才會被
  * 拿來比較（見 compareCandidates_()）。selectionScore 是連續浮點數，實務上
@@ -433,7 +433,7 @@ const COLUMNS = {
     STATUS: 'Status',
     // 追加階段 T 查證過 CurrentVersion 是死欄位（沒有任何程式碼讀寫過），
     // 追加階段 I 已依你的決定移除這個欄位的註冊。「目前用哪個版本」一律由
-    // findLatestVersionNo()（RosterWriter.gs）即時掃描 RosterVersions、
+    // findLatestVersionNo_()（RosterWriter.gs）即時掃描 RosterVersions、
     // 取 VersionNo 最大值決定；四階段流程步驟 3（RequestsApply.gs 的
     // planApplyRequests_()）也是呼叫這個函式，不依賴任何欄位。
     // Quarters 工作表上原本的 CurrentVersion 欄本身還在（程式沒有自動刪除
@@ -469,7 +469,7 @@ const COLUMNS = {
     NOTES: 'Notes',
     // 第七十七輪批次 EC 組：呢一版「人手改動幾多格、系統調整幾多格、以邊一版作起點」
     // （`manual=N;system=M;start=K`，見 `formatVersionChangeCounts_()`／`parseVersionChangeCounts_()`）。
-    // 舊試算表冇呢一欄 ⇒ `registerVersion()` 會喺最尾補一欄；舊版本冇數字 ⇒ 來源文字照舊。
+    // 舊試算表冇呢一欄 ⇒ `registerVersion_()` 會喺最尾補一欄；舊版本冇數字 ⇒ 來源文字照舊。
     CHANGE_COUNTS: 'ChangeCounts'
   },
   EMAIL_RECIPIENTS: {
@@ -1152,7 +1152,7 @@ const AUTOMATION_ACTIONS = {
   OFFICIAL: 'TRIGGER_OFFICIAL'
 };
 
-/** 未填寫資料時常見的佔位文字標記，validateSetup() 用來偵測未完成設定的欄位。 */
+/** 未填寫資料時常見的佔位文字標記，validateSetup_() 用來偵測未完成設定的欄位。 */
 const PLACEHOLDER_MARKER = '請填入';
 
 /** HWCAS 配對初稿的配對結果類型。 */
@@ -1380,7 +1380,7 @@ const CONFIG_KEYS = {
   // 否則一份「50 步、零失敗」嘅報告會令人以為嗰條路驗過。
   MONKEY_SKIP_SLOW_ACTIONS: 'MONKEY_SKIP_SLOW_ACTIONS',
   PDF_BATCH_SIZE: 'PDF_BATCH_SIZE',
-  // 階段 G 新增：sendStage()／sendResendStage_() 每處理幾個收件人就把 SendLog
+  // 階段 G 新增：sendStage_()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
   SEND_LOG_FLUSH_BATCH_SIZE: 'SEND_LOG_FLUSH_BATCH_SIZE',
   PDF_REGENERATE_IF_EXISTS: 'PDF_REGENERATE_IF_EXISTS',
@@ -1499,7 +1499,7 @@ const CONFIG_KEYS = {
 
 /**
  * 核心讀取層運作所需的必填 Config Key。
- * validateSetup() 會檢查這些 Key 是否有已解析的值（Value 或 Default）。
+ * validateSetup_() 會檢查這些 Key 是否有已解析的值（Value 或 Default）。
  *
  * 刻意寫成函式而非 const 陣列：Apps Script 會把所有 .gs 檔案的頂層程式碼
  * 按檔名字母序依次求值，const 之間一旦有前向引用就會拋
@@ -1508,7 +1508,7 @@ const CONFIG_KEYS = {
  *
  * @returns {string[]} 必填的 Config Key 清單
  */
-function getRequiredConfigKeys() {
+function getRequiredConfigKeys_() {
   return [
     CONFIG_KEYS.LEAD_DAYS_GENERATE,
     CONFIG_KEYS.LEAD_DAYS_OFFICIAL,
@@ -1526,7 +1526,7 @@ function getRequiredConfigKeys() {
 /**
  * 第四十八輪批次 B 組：一個 Config 值「由邊度嚟」。
  *
- * ⚠️ `DEFAULT` 同 `MISSING` 對 `getConfig()` 嚟講一模一樣，
+ * ⚠️ `DEFAULT` 同 `MISSING` 對 `getConfig_()` 嚟講一模一樣，
  * 而對幹事嚟講差好遠：
  *   `DEFAULT` ＝ 張表有嗰一行、格係空白　⇒ 佢搵得到嗰一格去填
  *   `MISSING` ＝ 張表**根本冇嗰一行**　　⇒ 佢點搵都搵唔到
@@ -1596,7 +1596,7 @@ const UNAVAILABLE_VALUES = {
   APPLIES_TO_ALL: 'ALL',
   STATUS_ACTIVE: 'ACTIVE',
   // 第三十四輪批次乙2：本來 `apiSaveUnavailable()` 直接寫死字串 'CANCELLED'，
-  // 而讀嗰邊（`readUnavailableNormalized()`）淨係認 ACTIVE，兩邊各自寫一次
+  // 而讀嗰邊（`readUnavailableNormalized_()`）淨係認 ACTIVE，兩邊各自寫一次
   // 就係兩個真相來源。而家寫成常數，兩邊都讀同一個。
   // ⚠️ 一律停用，**唔刪**——刪咗就冇咗紀錄。
   STATUS_CANCELLED: 'CANCELLED'

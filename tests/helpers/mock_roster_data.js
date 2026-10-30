@@ -30,7 +30,7 @@ const POST = {
 };
 
 /**
- * 崗位定義。形狀對照 readPostsNormalized()（SheetReader.gs）的輸出。
+ * 崗位定義。形狀對照 readPostsNormalized_()（SheetReader.gs）的輸出。
  * @returns {Object[]} 正規化後的崗位陣列
  */
 function buildPosts() {
@@ -128,7 +128,7 @@ function buildPeople(count) {
 }
 
 /**
- * 依「每個崗位要有幾多個合資格的人」組出 eligibility，形狀對照 readEligibility()。
+ * 依「每個崗位要有幾多個合資格的人」組出 eligibility，形狀對照 readEligibility_()。
  * 分配方式是輪流指派（人數不足時會重複用同一批人），確保結果可重現、
  * 不受亂數影響——測試要能夠準確控制「這個崗位剛好得 N 個人」這種條件。
  * @param {Object.<string, Object>} peopleById 全部人員
@@ -173,7 +173,7 @@ function buildEligibility(peopleById, poolSizeByPost, options) {
 }
 
 /**
- * 組出 RuleSettings 對照表，形狀對照 readRules()。全部規則預設 Enabled=TRUE，
+ * 組出 RuleSettings 對照表，形狀對照 readRules_()。全部規則預設 Enabled=TRUE，
  * Level 對照真實設定（硬規則 HARD、連續兩週 SEMI_HARD、其餘 SOFT）。
  * @param {Object=} overrides 選填，{ruleId: {欄位: 值}} 逐條覆寫
  * @returns {Object.<string, Object>} rules
@@ -323,7 +323,7 @@ function buildGeneratorContextMock(options) {
 }
 
 /**
- * 組出 Unavailable 紀錄，形狀對照 readUnavailableNormalized()。
+ * 組出 Unavailable 紀錄，形狀對照 readUnavailableNormalized_()。
  * @param {string[]} personIds 對象
  * @param {string} dateFrom 起始日期
  * @param {string} dateTo 結束日期

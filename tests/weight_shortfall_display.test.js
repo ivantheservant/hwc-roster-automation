@@ -182,9 +182,9 @@ console.log('\n=== C【核心】畫面同後端：一個欄位、一份計算 ==
   check('★★★★ 一條偏好都冇 ⇒ 回空 map（查得到，只係冇嘢講）',
     /if \(!active \|\| !active\.rows \|\| active\.rows\.length === 0\) \{[\s\S]{0,200}?return \{\};/
       .test(backend));
-  check('★★★★★ 日期經 `toDateString()` 正規化先用'
+  check('★★★★★ 日期經 `toDateString_()` 正規化先用'
     + '——由工作表讀出嚟可能係 Date 物件，而原因判斷會攞佢做前後一週比較',
-    /serviceDate: toDateString\(row\[A\.SERVICE_DATE\], timezone\)/.test(backend));
+    /serviceDate: toDateString_\(row\[A\.SERVICE_DATE\], timezone\)/.test(backend));
   check('★★★★★ 每季上限讀唔到 ⇒ 傳 `null`，唔係傳一個估出嚟嘅數',
     /function buildWeightLimitContextSafely_[\s\S]{0,400}?catch \(err\) \{[\s\S]{0,200}?return null;/
       .test(backend));

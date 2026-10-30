@@ -135,7 +135,7 @@ function evaluateSeasonRehearsalGuards_(input) {
 function readRehearsalProtectedQuarters_() {
   let raw = '';
   try {
-    raw = String(getConfig(CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS,
+    raw = String(getConfig_(CONFIG_KEYS.REHEARSAL_PROTECTED_QUARTERS,
       SEASON_REHEARSAL_PROTECTED_DEFAULT) || '').trim();
   } catch (err) {
     raw = SEASON_REHEARSAL_PROTECTED_DEFAULT;
@@ -161,9 +161,9 @@ function readSeasonRehearsalBaseline_(quarterId) {
   };
   return {
     stage: safe('stage', function () { return getQuarterStage_(quarterId); }),
-    latestVersionNo: safe('version', function () { return findLatestVersionNo(quarterId); }),
+    latestVersionNo: safe('version', function () { return findLatestVersionNo_(quarterId); }),
     sendLogRows: safe('sendlog', function () {
-      return readSheet(SHEETS.SEND_LOG).filter(function (row) {
+      return readSheet_(SHEETS.SEND_LOG).filter(function (row) {
         return String(row[COLUMNS.SEND_LOG.QUARTER_ID] || '').trim() === quarterId;
       }).length;
     }),
@@ -475,7 +475,7 @@ function executeSeasonRehearsal_(quarterId) {
 
   // ── 步 3　儲存並確認（零改動路徑）────────────────────────
   // 呢一步先係令 Stage 由 REVIEW_SENT 前進到 REQUESTS_APPLIED 嗰個。
-  const versionBefore = gen ? gen.versionNo : findLatestVersionNo(quarterId);
+  const versionBefore = gen ? gen.versionNo : findLatestVersionNo_(quarterId);
   runRehearsalStep_(steps, '步驟 3：儲存並確認（零改動）',
     { quarterId: quarterId, stepKey: FLOW_STEP_KEYS.SAVE_CONFIRM }, function () {
       const stageBefore = getQuarterStage_(quarterId);
@@ -496,7 +496,7 @@ function executeSeasonRehearsal_(quarterId) {
         executed = done.ok ? ('已執行：' + done.action) : ('失敗：' + done.error);
       }
       const stageAfter = getQuarterStage_(quarterId);
-      const versionAfter = findLatestVersionNo(quarterId);
+      const versionAfter = findLatestVersionNo_(quarterId);
       return {
         stageBefore: stageBefore,
         stageAfter: stageAfter,
@@ -533,7 +533,7 @@ function executeSeasonRehearsal_(quarterId) {
   // 喺報告寫一個唔存在嘅前置條件，即係 B2 要修嗰個毛病嘅翻版。
   runRehearsalStep_(steps, '步驟 3.5：產生個人 PDF',
     { quarterId: quarterId }, function () {
-      const versionNo = findLatestVersionNo(quarterId);
+      const versionNo = findLatestVersionNo_(quarterId);
       if (versionNo < 0) throw new Error('這一季還沒有版本，產生不到個人 PDF。');
 
       return runRehearsalPdfBatches_(quarterId, versionNo, rehearsalStartedAtMs);
@@ -580,7 +580,7 @@ function executeSeasonRehearsal_(quarterId) {
   // 清理嗰陣先知邊啲可以動。
   const created = { versions: [], pdfPaths: [] };
   const firstNew = (Number(baseline.latestVersionNo) || -1) + 1;
-  const lastNew = findLatestVersionNo(quarterId);
+  const lastNew = findLatestVersionNo_(quarterId);
   for (let v = firstNew; v <= lastNew; v++) created.versions.push(v);
 
   // PDF：檔名開頭係 `{quarterId}_v{呢次建立嘅版本}` 嘅先算「呢次新建」。
@@ -655,7 +655,7 @@ function executeSeasonRehearsal_(quarterId) {
  */
 function countRehearsalSendLogRows_(quarterId) {
   try {
-    return readSheet(SHEETS.SEND_LOG).filter(function (row) {
+    return readSheet_(SHEETS.SEND_LOG).filter(function (row) {
       return String(row[COLUMNS.SEND_LOG.QUARTER_ID] || '').trim() === quarterId;
     }).length;
   } catch (err) {
@@ -716,7 +716,7 @@ function readRehearsalPdfPaths_(quarterId, newVersionNos) {
  */
 function readRehearsalIcsSample_(quarterId) {
   try {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) return { available: false, reason: '這一季還沒有版本', lines: [] };
     const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.OFFICIAL);
     const recipients = listRecipients_(MAIL_STAGES.OFFICIAL, context)
@@ -756,7 +756,7 @@ function readRehearsalIcsSample_(quarterId) {
  */
 function readRehearsalHighlightSample_(quarterId) {
   try {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) {
       return { available: false, reason: '這一季還沒有版本', personId: '', cellCount: 0 };
     }
@@ -997,7 +997,7 @@ function runSeasonRehearsal_() {
 
   // ── 四道閘 ─────────────────────────────────────────────
   const guard = evaluateSeasonRehearsalGuards_({
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     quarterId: quarterId,
     protectedQuarters: readRehearsalProtectedQuarters_(),
     typedText: null
@@ -1037,7 +1037,7 @@ function runSeasonRehearsal_() {
   if (confirm.getSelectedButton() !== ui.Button.OK) return;
 
   const typed = evaluateSeasonRehearsalGuards_({
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     quarterId: quarterId,
     protectedQuarters: readRehearsalProtectedQuarters_(),
     typedText: confirm.getResponseText()

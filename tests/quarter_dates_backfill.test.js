@@ -193,7 +193,7 @@ console.log('\n=== G【核心】補返舊嗰啲：列出仲欠日期嘅季度 ==
     ['', '', '', ''],                                        // 空行
     ['2028T3', '2028-07-01', '', '']
   ];
-  gas.readConfig = function () { return {}; };
+  gas.readConfig_ = function () { return {}; };
   gas.SpreadsheetApp = {
     getActiveSpreadsheet: function () {
       return {

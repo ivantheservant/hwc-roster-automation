@@ -43,9 +43,9 @@ function scanGridCellClassification_(quarterId, versionNo) {
     return { structuralNa: 0, specialSkip: 0, manualPending: 0, genuineGap: [], totalCells: 0, weekCount: 0, columnCount: 0 };
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const naLabel = getConfig(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL);
-  const gapColor = String(getConfig(
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const naLabel = getConfig_(CONFIG_KEYS.GRID_NOT_APPLICABLE_LABEL, DEFAULTS.GRID_NOT_APPLICABLE_LABEL);
+  const gapColor = String(getConfig_(
     CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR)).toUpperCase();
   const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
   const dateValues = sheet.getRange(3, 1, lastRow - 2, 1).getValues();
@@ -67,12 +67,12 @@ function scanGridCellClassification_(quarterId, versionNo) {
   // buildGridIndex_() 一直以嚟嘅做法一致（嗰邊本來就只索引 parse 到日期嘅行）。
   let weekRowCount = 0;
   for (let r = 0; r < values.length; r++) {
-    if (!toDateString(dateValues[r][0], timezone)) break;
+    if (!toDateString_(dateValues[r][0], timezone)) break;
     weekRowCount++;
   }
 
   for (let r = 0; r < weekRowCount; r++) {
-    const dateStr = toDateString(dateValues[r][0], timezone);
+    const dateStr = toDateString_(dateValues[r][0], timezone);
     for (let c = 3; c < keys.length; c++) {
       if (String(keys[c] || '').indexOf('#') === -1) continue;
       const bg = String(backgrounds[r][c] || '').toUpperCase();
@@ -131,17 +131,17 @@ function buildPdfContentSelfCheckReport_(quarterId, versionNo) {
   if (!sheet) throw new Error('找不到工作表: ' + sheetName);
 
   // ---- 完整版：週數／崗位欄是否齊全 ----
-  const expectedWeekCount = readServiceDates(quarterId).length;
-  const expectedColumnCount = readPosts().reduce(function (sum, row) {
+  const expectedWeekCount = readServiceDates_(quarterId).length;
+  const expectedColumnCount = readPosts_().reduce(function (sum, row) {
     return sum + (Number(row[COLUMNS.POSTS.SLOT_COUNT]) || 1);
   }, 0);
   const classification = scanGridCellClassification_(quarterId, versionNo);
   const layout = estimatePdfColumnWidth_(classification.columnCount);
 
   // ---- 個人版：真正呼叫 locatePersonCells_() 對樣本人物做定位測試 ----
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const allAssignments = readSheet(SHEETS.ROSTER_ASSIGNMENTS);
+  const allAssignments = readSheet_(SHEETS.ROSTER_ASSIGNMENTS);
   const thisVersionRows = allAssignments.filter(function (row) {
     return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
   });

@@ -52,7 +52,7 @@ function sendRow(o) {
 
 console.log('\n=== D【核心】真係讀到上次嘅摘要 ===');
 {
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [
       sendRow({ personId: 'P1', summary: '2026-10-05　主席' }),
       sendRow({ personId: 'P2', summary: '2026-10-12　司琴；2026-11-02　領詩' })
@@ -65,7 +65,7 @@ console.log('\n=== D【核心】真係讀到上次嘅摘要 ===');
 
 console.log('\n=== D【核心】攞唔到唔可以擺空字串入去 ===');
 {
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [
       sendRow({ personId: 'P1', summary: '2026-10-05　主席' }),
       // 舊紀錄（本輪之前寄嘅）冇填 summary
@@ -83,7 +83,7 @@ console.log('\n=== D【核心】攞唔到唔可以擺空字串入去 ===');
 
 console.log('\n=== D 只計「已確實處理」嘅紀錄（沿用既有白名單）===');
 {
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [
       sendRow({ personId: 'P1', summary: '舊嘅', status: gas.MAIL_STATUS.SENT }),
       sendRow({ personId: 'P1', summary: '新嘅', status: gas.MAIL_STATUS.SENT })
@@ -92,7 +92,7 @@ console.log('\n=== D 只計「已確實處理」嘅紀錄（沿用既有白名�
   checkEqual('★★★★★ 同一個人有多筆時，攞最後一筆（工作表由上而下＝時間先後）',
     gas.readLastSummaryByPerson_('2026T4').P1, '新嘅');
 
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [sendRow({ personId: 'P9', summary: '唔應該計', status: 'FAILED' })];
   };
   check('★★★★★ 寄失敗嗰啲唔計'
@@ -102,7 +102,7 @@ console.log('\n=== D 只計「已確實處理」嘅紀錄（沿用既有白名�
 
 console.log('\n=== D 只計本季（唔可以撈到第二季嘅摘要）===');
 {
-  gas.readSheet = function () {
+  gas.readSheet_ = function () {
     return [
       sendRow({ personId: 'P1', quarterId: '2026T3', summary: '上一季嘅' }),
       sendRow({ personId: 'P2', quarterId: '2026T4', summary: '本季嘅' })

@@ -149,13 +149,13 @@ console.log('\n=== C1【核心】後端真係帶住嗰個警告欄位 ===');
   ]);
   gas.log_ = function () {};
   gas.assertWebAppRequestAllowed_ = function () {};
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.getQuarterStage_ = function () { return gas.QUARTER_STAGE.OFFICIAL_SENT; };
   gas.readDashboardUnsavedState_ = function () {
     return { hasAny: false, gridChangeCount: 0, unresolvedCount: 0,
       pendingRequestCount: 0 };
   };
-  gas.readPostsNormalized = function () {
+  gas.readPostsNormalized_ = function () {
     return [{ postId: 'USHER', postNameTC: '司事', slotCount: 1 }];
   };
   gas.readVersionAssignmentsForGrid_ = function (quarterId, versionNo) {

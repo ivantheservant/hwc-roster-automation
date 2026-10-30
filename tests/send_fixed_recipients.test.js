@@ -72,12 +72,12 @@ function setup(sendLog) {
       return iso.slice(0, 10) + ' ' + iso.slice(11, 16);
     }
   };
-  gas.getConfig = function (_k, d) { return d; };
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.getConfig_ = function (_k, d) { return d; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.beginSheetReadMemo_ = function () {};
   gas.endSheetReadMemo_ = function () {};
   gas.assertWebAppRequestAllowed_ = function () {};
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.EMAIL_RECIPIENTS) return emailRecipientRows();
     if (name === gas.SHEETS.SEND_LOG) return sendLog || [];
     return [];

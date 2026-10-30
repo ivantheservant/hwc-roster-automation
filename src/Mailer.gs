@@ -14,13 +14,13 @@
 /**
  * 階段 A（收尾輪）新增：計算「這個季度＋版本＋階段」目前 SendLog 已經有幾多個
  * 收件人有 SENT／DRY_RUN 紀錄——純粹用來提醒幹事「這個組合好像已經寄過」，
- * **不會**跳過任何收件人、不影響 sendStage() 實際寄不寄。跟 RESEND 的
+ * **不會**跳過任何收件人、不影響 sendStage_() 實際寄不寄。跟 RESEND 的
  * lastHashByPerson（會真的讓內容沒變的人被跳過）是完全不同的機制。
  *
- * 存在的理由：sendStage() 對 REVIEW／OFFICIAL／GENERATE 三個階段完全沒有
+ * 存在的理由：sendStage_() 對 REVIEW／OFFICIAL／GENERATE 三個階段完全沒有
  * 「已經寄過就跳過」的判斷（只有 RESEND 有），如果步驟 2／4 執行到一半中斷
  * （Apps Script 逾時、Drive/Sheets 暫時性錯誤），Stage 這時還沒前進
- * （advanceQuarterStage_() 是 sendStage() 完全跑完之後才呼叫，見
+ * （advanceQuarterStage_() 是 sendStage_() 完全跑完之後才呼叫，見
  * FiveStageCore.gs 的 executeStep2_()／executeStep4Send_()），幹事很自然會
  * 重新執行同一個步驟——這時如果 DRY_RUN=FALSE，已經真正收到信的人會收到
  * 第二封重複的信。這個函式讓步驟 2／4 的確認視窗在偵測到這種情況時主動示警，
@@ -42,7 +42,7 @@ function countAlreadySentForStage_(quarterId, versionNo, stage) {
   // 第六十七輪批次 AF 組：匯入時聲明「已在系統外寄給全體」嘅 EXTERNAL 都算收過
   const baselineStatuses = [MAIL_STATUS.SENT, MAIL_STATUS.DRY_RUN, MAIL_STATUS.EXTERNAL];
   const seen = {};
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
     if (Number(row[C.VERSION_NO]) !== versionNo) return;
     if (row[C.STAGE] !== stage) return;
@@ -81,18 +81,18 @@ function resolveStageTemplates_(stage) {
     };
   }
   // 其餘階段維持原本行為：REVIEW／REMIND 只有 LIST 收件人、只有一個範本；
-  // RESEND 不經過 sendStage()（步驟 5 用 ResendFlow.gs 的 sendResendStage_()）。
+  // RESEND 不經過 sendStage_()（步驟 5 用 ResendFlow.gs 的 sendResendStage_()）。
   return { person: findEmailTemplate_(stage), list: null };
 }
 
-function sendStage(quarterId, versionNo, stage, sendOptions) {
-  assertNotPreviewMode_('sendStage');
+function sendStage_(quarterId, versionNo, stage, sendOptions) {
+  assertNotPreviewMode_('sendStage_');
   // 追加階段 N：OFFICIAL 永遠不可以由自動排程觸發，結構性防護見 Trigger.gs 的
   // assertOfficialNotFromAutomationTrigger_()——目前 dailyAutomationCheck_() 根本
   // 沒有任何路徑會走到這裡，這一行是防日後不小心改壞的第二道防線。
   if (stage === MAIL_STAGES.OFFICIAL) assertOfficialNotFromAutomationTrigger_(quarterId);
   const startedAt = Date.now();
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const templates = resolveStageTemplates_(stage);
   const template = templates.person;
   if (!template) throw new Error('EmailTemplates 中找不到 Stage=' + stage + ' 的範本（也沒有 OFFICIAL 可退回使用）');
@@ -139,7 +139,7 @@ function sendStage(quarterId, versionNo, stage, sendOptions) {
   // 注意：這不是完整的「安全重試」——重新執行 OFFICIAL／GENERATE／REVIEW 仍然會
   // 對全部收件人重新寄送一次（不像 RESEND 有 lastHashByPerson 判斷「內容沒變就
   // 跳過」），只是把「完全沒有任何紀錄」的最壞情況縮小成「有紀錄、只是不完整」。
-  const flushBatchSize = Number(getConfig(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
+  const flushBatchSize = Number(getConfig_(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
   // 收件範圍係上游嘅決定，喺呢度執行一次就算。
   //
@@ -183,7 +183,7 @@ function sendStage(quarterId, versionNo, stage, sendOptions) {
     targetKey: 'SEND-' + compactTimestamp_(),
     newValue: 'Stage=' + stage + '　收件人=' + outcomes.length
       + '　模式=' + (isDryRun ? 'DRY_RUN（模擬）' : '正式寄出'),
-    source: 'sendStage',
+    source: 'sendStage_',
     notes: '成功=' + countStatus_(outcomes, MAIL_STATUS.SENT) + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
       + '　查無電郵=' + countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
       // 第四十輪批次 A 組：今次用咗咩選項。SendLog 嗰欄可能唔存在，
@@ -218,17 +218,17 @@ function sendStage(quarterId, versionNo, stage, sendOptions) {
  * @returns {Object} 供寄信流程使用的 context
  */
 function buildMailContext_(quarterId, versionNo, stage) {
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
 
-  const assignments = readSheet(SHEETS.ROSTER_ASSIGNMENTS)
+  const assignments = readSheet_(SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
     })
     .map(function (row) {
       return {
-        serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID],
         slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID]
@@ -237,7 +237,7 @@ function buildMailContext_(quarterId, versionNo, stage) {
 
   const quarter = findQuarter_(quarterId) || {};
   const postNames = {};
-  readPostsNormalized().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+  readPostsNormalized_().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
 
   return {
     quarterId: quarterId,
@@ -263,9 +263,9 @@ function buildMailContext_(quarterId, versionNo, stage) {
     placeholders: {
       QuarterID: quarterId,
       VersionNo: 'v' + versionNo,
-      StartDate: toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone),
-      EndDate: toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone),
-      OfficialSendDate: toDateString(quarter[COLUMNS.QUARTERS.OFFICIAL_SEND_ON], timezone),
+      StartDate: toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone),
+      EndDate: toDateString_(quarter[COLUMNS.QUARTERS.END_DATE], timezone),
+      OfficialSendDate: toDateString_(quarter[COLUMNS.QUARTERS.OFFICIAL_SEND_ON], timezone),
       SpreadsheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(),
       // 第三輪批次下一輪（新一批階段 B）新增：目前的四階段流程 Stage 與建議下一步，
       // 供 docs/系統範圍稽核.md 建議的新 TPL_REMIND_TC 範本使用。用 try/catch
@@ -283,7 +283,7 @@ function buildMailContext_(quarterId, versionNo, stage) {
     },
     // 第四十一輪批次 E 組：個人專屬連結要嘅兩樣嘢。
     // 喺呢度一次過讀好，唔好喺 deliverOne_() 逐個人讀一次表。
-    volunteerBaseUrl: String(getConfig(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),
+    volunteerBaseUrl: String(getConfig_(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),
     personalTokenById: indexPersonalLinkTokens_()
   };
 }
@@ -418,7 +418,7 @@ function groupAssignmentsByPerson_(assignments) {
  */
 function indexPeopleById_() {
   const map = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const personId = row[COLUMNS.NAME_MAPPING.PERSON_ID];
     const rawMax = row[COLUMNS.NAME_MAPPING.MAX_PER_QUARTER];
     map[personId] = {
@@ -460,7 +460,7 @@ function indexPeopleById_() {
 function listRecipients_(stage, context) {
   const recipients = [];
 
-  readSheet(SHEETS.EMAIL_RECIPIENTS).forEach(function (row) {
+  readSheet_(SHEETS.EMAIL_RECIPIENTS).forEach(function (row) {
     if (!isTrueValue_(row[COLUMNS.EMAIL_RECIPIENTS.ACTIVE])) return;
 
     if (stage === MAIL_STAGES.REVIEW) {
@@ -637,7 +637,7 @@ function deliverOne_(recipient, template, context, isDryRun) {
   // RESEND_ONLY_CHANGED=FALSE 之下由呼叫端硬塞進來的全體名單）⇒ 才輪到
   // hash 這個保險絲。`RESEND_ONLY_CHANGED` 的原意（範本文字改了想強制
   // 全體重寄）完全保留，預設 TRUE 對其他人的行為一模一樣。
-  const resendOnlyChanged = getConfig(CONFIG_KEYS.RESEND_ONLY_CHANGED, true) === true;
+  const resendOnlyChanged = getConfig_(CONFIG_KEYS.RESEND_ONLY_CHANGED, true) === true;
   const upstreamNotifyReason = (context.notifyReasonByPerson || {})[recipient.personId] || '';
   if (context.stage === MAIL_STAGES.RESEND
       && recipient.type === RECIPIENT_TYPE.PERSON
@@ -713,7 +713,7 @@ function deliverOne_(recipient, template, context, isDryRun) {
       context.volunteerBaseUrl, (context.personalTokenById || {})[recipient.personId],
       context.quarterId);
     // ⚠️ 拿不到 token 要記低。靜靜略過的話，那幾位收到的信會比其他人
-    // 少一段，而沒有人知道。`sendStage()` 會把這個數字報出去。
+    // 少一段，而沒有人知道。`sendStage_()` 會把這個數字報出去。
     if (!personalUrl) {
       context._noPersonalLinkCount = (context._noPersonalLinkCount || 0) + 1;
     }
@@ -766,7 +766,7 @@ function deliverOne_(recipient, template, context, isDryRun) {
 function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attachment, icsAttachment) {
   // 防呆：即使呼叫端判斷錯誤，這裡再擋一次
   assertNotPreviewMode_('sendRealEmail_');
-  if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== false) {
+  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false) {
     throw new Error('DRY_RUN 仍為 TRUE，拒絕寄出');
   }
   const options = { htmlBody: bodyHtml };
@@ -802,7 +802,7 @@ function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attach
  * NONE 或不適用（例如 PERSONAL_PDF 但收件人不是個人）時回傳 null，不視為錯誤。
  * 真正失敗（找不到工作表、Shared Drive 未設定等）一律 throw，由呼叫端記為 ERROR_PDF。
  *
- * FULL_PDF 在同一次 sendStage() 執行中只會產生與存檔一次（用 context 記住結果），
+ * FULL_PDF 在同一次 sendStage_() 執行中只會產生與存檔一次（用 context 記住結果），
  * 所有 LIST 收件人共用同一個檔案，不會每個收件人各建一份完整版。
  * 存檔一律經 saveOrOverwriteFile_()：同名檔案先移到垃圾桶再重建，
  * 不會每次執行都在資料夾裡多一個檔案。
@@ -877,7 +877,7 @@ function lookupExistingPersonalPdf_(context, recipient) {
     error.missing = true;
     throw error;
   }
-  const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+  const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
   const sizeBytes = file.getSize();
   if (sizeBytes < minBytes) {
     const error = new Error('找到 ' + fileName + '，但檔案大小只有 ' + sizeBytes + ' bytes'
@@ -915,7 +915,7 @@ function lookupExistingPersonalPdf_(context, recipient) {
 }
 
 /**
- * 產生（或沿用）整季完整版 PDF 附件，同一次 sendStage() 執行只做一次，
+ * 產生（或沿用）整季完整版 PDF 附件，同一次 sendStage_() 執行只做一次，
  * 結果暫存在 context._fullRosterAttachment，之後每個收件人直接沿用同一份。
  * @param {Object} context 寄信 context
  * @returns {{blob: Blob, fileName: string, fileId: string, folderName: string, sizeBytes: number, retries: number}} 附件資訊
@@ -945,13 +945,13 @@ function buildFullRosterAttachmentCached_(context) {
  * 在每次真正呼叫 Google 試算表匯出（會打到 UrlFetchApp）之前加入固定間隔，
  * 主動降低觸發速率限制（HTTP 429）的機率，跟 fetchWithRetry_() 的被動重試互補。
  * 第一次匯出不用等，之後每次都先等 PDF_EXPORT_PACING_MS 毫秒（預設 500ms）。
- * 用 context._exportCount 判斷是不是第一次，範圍是單次 sendStage() 執行。
+ * 用 context._exportCount 判斷是不是第一次，範圍是單次 sendStage_() 執行。
  * @param {Object} context 寄信 context
  * @returns {void}
  */
 function applyExportPacing_(context) {
   const pacingMs = Math.max(0, Math.round(
-    getConfig(CONFIG_KEYS.PDF_EXPORT_PACING_MS, DEFAULTS.PDF_EXPORT_PACING_MS)));
+    getConfig_(CONFIG_KEYS.PDF_EXPORT_PACING_MS, DEFAULTS.PDF_EXPORT_PACING_MS)));
   if ((context._exportCount || 0) > 0 && pacingMs > 0) {
     Utilities.sleep(pacingMs);
   }
@@ -959,10 +959,10 @@ function applyExportPacing_(context) {
 }
 
 /**
- * 解析（或沿用）寄送附件用的 Shared Drive 資料夾，同一次 sendStage() 執行只解析一次。
+ * 解析（或沿用）寄送附件用的 Shared Drive 資料夾，同一次 sendStage_() 執行只解析一次。
  *
  * 這是修正「同一批次內有人 ERROR_PDF、有人成功」不一致問題的關鍵：原本每個收件人
- * 各自呼叫 getConfig() 讀 ROSTER_DRIVE_FOLDER_ID，而 getConfig() 背後的 readConfig()
+ * 各自呼叫 getConfig_() 讀 ROSTER_DRIVE_FOLDER_ID，而 getConfig_() 背後的 readConfig_()
  * 用 CacheService 的腳本快取（5 分鐘 TTL，全腳本共用，不是單次執行內的快取）。
  * 如果快取剛好在 58 人的迴圈跑到一半時過期，前面幾人會讀到舊值（成功），
  * 後面讀到新值（失敗），造成同一批次結果不一致。
@@ -1028,13 +1028,13 @@ function computeAssignmentHash_(personAssignments) {
  * @returns {string} 摘要文字；沒有派工時回傳空字串
  */
 function buildAssignmentSummary_(personAssignments, postNames, timezone) {
-  const dateFormat = String(getConfig(CONFIG_KEYS.MAIL_SUMMARY_DATE_FORMAT, DEFAULTS.MAIL_SUMMARY_DATE_FORMAT));
-  const separator = String(getConfig(CONFIG_KEYS.MAIL_SUMMARY_SEPARATOR, DEFAULTS.MAIL_SUMMARY_SEPARATOR));
+  const dateFormat = String(getConfig_(CONFIG_KEYS.MAIL_SUMMARY_DATE_FORMAT, DEFAULTS.MAIL_SUMMARY_DATE_FORMAT));
+  const separator = String(getConfig_(CONFIG_KEYS.MAIL_SUMMARY_SEPARATOR, DEFAULTS.MAIL_SUMMARY_SEPARATOR));
   const tz = timezone || DEFAULTS.TIMEZONE;
 
   return personAssignments
     .map(function (a) {
-      const dateLabel = Utilities.formatDate(parseDate(a.serviceDate), tz, dateFormat);
+      const dateLabel = Utilities.formatDate(parseDate_(a.serviceDate), tz, dateFormat);
       return dateLabel + ' ' + (postNames[a.postId] || a.postId);
     })
     .join(separator);
@@ -1065,7 +1065,7 @@ function buildAssignmentSummary_(personAssignments, postNames, timezone) {
 function readLastSendRecordByPerson_(quarterId) {
   const C = COLUMNS.SEND_LOG;
   const baselineStatuses = RESEND_BASELINE_STATUSES;
-  const rows = readSheet(SHEETS.SEND_LOG).filter(function (row) {
+  const rows = readSheet_(SHEETS.SEND_LOG).filter(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return false;
     if (!row[C.PERSON_ID]) return false;
     return baselineStatuses.indexOf(String(row[C.STATUS] || '').toUpperCase()) !== -1;
@@ -1148,7 +1148,7 @@ function readResendBaseline_(quarterId) {
   const A = COLUMNS.ROSTER_ASSIGNMENTS;
   let latest = null;
   const everSentById = {};
-  readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
     const stage = String(row[C.STAGE] || '').trim();
     const status = String(row[C.STATUS] || '').trim().toUpperCase();
@@ -1163,7 +1163,7 @@ function readResendBaseline_(quarterId) {
   });
   if (!latest) return null;
   const assignedById = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
     if (Number(row[A.VERSION_NO]) !== latest.versionNo) return;
     const personId = String(row[A.PERSON_ID] || '').trim();
@@ -1227,7 +1227,7 @@ function readLastStatusByPerson_(quarterId) {
  */
 function findEmailTemplate_(stage) {
   const C = COLUMNS.EMAIL_TEMPLATES;
-  const rows = readSheet(SHEETS.EMAIL_TEMPLATES).filter(function (row) {
+  const rows = readSheet_(SHEETS.EMAIL_TEMPLATES).filter(function (row) {
     return isTrueValue_(row[C.ACTIVE]);
   });
 
@@ -1252,7 +1252,7 @@ function findEmailTemplate_(stage) {
  */
 function findEmailTemplateById_(templateId) {
   const C = COLUMNS.EMAIL_TEMPLATES;
-  const rows = readSheet(SHEETS.EMAIL_TEMPLATES).filter(function (row) {
+  const rows = readSheet_(SHEETS.EMAIL_TEMPLATES).filter(function (row) {
     return isTrueValue_(row[C.ACTIVE]) && row[C.TEMPLATE_ID] === templateId;
   });
   return rows.length > 0 ? normalizeEmailTemplateRow_(rows[0]) : null;
@@ -1261,7 +1261,7 @@ function findEmailTemplateById_(templateId) {
 /**
  * 把 EmailTemplates 的一列原始資料整理成寄送流程共用的範本物件格式，
  * 供 findEmailTemplate_()／findEmailTemplateById_() 共用，避免兩處重複同一段轉換邏輯。
- * @param {Object} row readSheet(SHEETS.EMAIL_TEMPLATES) 的一列
+ * @param {Object} row readSheet_(SHEETS.EMAIL_TEMPLATES) 的一列
  * @returns {Object} 範本物件
  */
 function normalizeEmailTemplateRow_(row) {
@@ -1331,7 +1331,7 @@ function applyPlaceholders_(text, placeholders, recipient, summary) {
   Object.keys(placeholders).forEach(function (key) {
     // ⚠️ 第二十六輪批次階段 A2-3：`null` 代表「查唔到」（例如未發佈公開連結）。
     // 呢度轉成空字串**只係安全嘅**，因為
-    // `assertPublicRosterUrlAvailableForStage_()` 已經喺 `sendStage()` 入面
+    // `assertPublicRosterUrlAvailableForStage_()` 已經喺 `sendStage_()` 入面
     // 擋咗「範本要用但冇值」嗰種情況——即係行到呢度嘅 `null`，
     // 一定係「呢個範本根本冇用到嗰個 placeholder」。
     // 冇咗嗰道關卡嘅話，呢一行就會變成「靜靜把缺失變成空白」。
@@ -1504,7 +1504,7 @@ function notifyAdmin_(subject, body, adminEmail, isDryRun) {
   }
 
   // 防呆：與 sendRealEmail_ 一樣，寄出前再確認一次 Config
-  if (isDryRun || !adminEmail || getConfig(CONFIG_KEYS.DRY_RUN, true) !== false) {
+  if (isDryRun || !adminEmail || getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false) {
     log_('INFO', '[DRY_RUN] 不寄出管理員通知 → ' + adminEmail + '\n' + subject + '\n' + body);
     return;
   }
@@ -1532,7 +1532,7 @@ function notifyAdminNoEmail_(noEmailPeople, context, isDryRun) {
  * ——寄給堂委審閱是步驟 2 的責任，要幹事看過初稿、決定沒問題了才手動執行。
  * @param {string} quarterId 季度 ID
  * @param {Object} genResult performRosterGeneration_() 的結果，至少含 sheetName
- * @param {Object} config readConfig() 的結果
+ * @param {Object} config readConfig_() 的結果
  * @param {boolean} isDryRun 是否為測試模式
  * @returns {void}
  */
@@ -1556,7 +1556,7 @@ function notifyAdminGenerateDone_(quarterId, genResult, config, isDryRun) {
  * @param {Object} judgment judgeRemindAction_() 的結果（outcome=WOULD_RUN 時呼叫），
  *   至少含 stage、reasons、reminderCount、maxCount、daysStuck、daysUntilDeadline、
  *   stuckDays、deadlineDays
- * @param {Object} config readConfig() 的結果
+ * @param {Object} config readConfig_() 的結果
  * @param {boolean} isDryRun 是否為測試模式
  * @returns {void}
  */
@@ -1645,7 +1645,7 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
 function buildAdminConsoleLinkText_() {
   const lines = [];
 
-  const stewardUrl = String(getConfig(
+  const stewardUrl = String(getConfig_(
     CONFIG_KEYS.WEBAPP_STEWARD_URL, DEFAULTS.WEBAPP_STEWARD_URL) || '').trim();
   if (stewardUrl) {
     lines.push('幹事介面：' + stewardUrl);

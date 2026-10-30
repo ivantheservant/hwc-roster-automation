@@ -88,14 +88,14 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
 
   const keys = sheet.getRange(keyRow, 1, 1, lastCol).getValues()[0].map(String);
 
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
   const postById = {};
   posts.forEach(function (p) { postById[p.postId] = p; });
 
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const N = COLUMNS.NAME_MAPPING;
   const nameById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[N.PERSON_ID] || '').trim();
     // ⚠️ 停用的人不進選單，但**不會**從既有格子移走——那是另一件事，
     // 由名單維護那一步負責。這裡只影響「有沒有得揀」。
@@ -107,7 +107,7 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
   // 某一日已不是那個身分，儲存時由 HARD_ELIGIBILITY 逐日檢查）。
   const roleTokensByPost = eligibility.rolesByPost || {};
   const rolesForDropdown = Object.keys(roleTokensByPost).length > 0
-    ? (readRolesForDisplay_(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)).roles || []) : [];
+    ? (readRolesForDisplay_(getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)).roles || []) : [];
 
   const columns = [];
   const skipped = [];
@@ -182,7 +182,7 @@ function applyNameDropdownsToSheet_(sheet, sheetName, keyRow) {
  */
 function apiApplyGridNameDropdowns(quarterId) {
   assertWebAppRequestAllowed_();
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error(buildThreePartMessage_(
       '這一季還沒有生成過任何版本。',

@@ -33,7 +33,7 @@ const Q = '2098T4';
 const ss = new RealisticMockSpreadsheet();
 gas.SpreadsheetApp = { getActiveSpreadsheet: function () { return ss; } };
 gas.Session = { getActiveUser: function () { return { getEmail: function () { return 'j@example.invalid'; } }; } };
-gas.getConfig = function (_k, d) { return d; };
+gas.getConfig_ = function (_k, d) { return d; };
 gas.nowTimestamp_ = function () { return '2098-10-01 09:00:00'; };
 gas.compactTimestamp_ = function () { return '20981001090000'; };
 gas.log_ = function () {};
@@ -78,7 +78,7 @@ const plan = gas.findOrphanVersions_();
 console.log('\n=== J2【核心】清理：只刪未登記嘅 ===');
 {
   const result = gas.executeOrphanVersionCleanup_(plan);
-  const left = gas.readSheet(S.ROSTER_ASSIGNMENTS);
+  const left = gas.readSheet_(S.ROSTER_ASSIGNMENTS);
   check('★★★★★★ v2 嘅 3 行刪咗', result.deletedRows === 3
     && left.every(function (r) { return Number(r[A.VERSION_NO]) !== 2; }), JSON.stringify(result));
   check('★★★★★★ 已登記嘅 v0、v1 一行都冇少', left.length === 6
@@ -88,7 +88,7 @@ console.log('\n=== J2【核心】清理：只刪未登記嘅 ===');
     !ss.getSheetByName('Roster_2098T4_v2') && !ss.getSheetByName('Roster_2098T4_v5')
     && !!ss.getSheetByName('Roster_2098T4_v0') && !!ss.getSheetByName('Roster_2098T4_v1')
     && !!ss.getSheetByName('Roster_notes'));
-  check('★★★★★ 每一項寫 AuditLog', gas.readSheet(S.AUDIT_LOG).filter(function (r) {
+  check('★★★★★ 每一項寫 AuditLog', gas.readSheet_(S.AUDIT_LOG).filter(function (r) {
     return r[C.AUDIT_LOG.ACTION] === '清理孤兒版本';
   }).length === 2);
   check('★★★★ 清完再搵 ⇒ 冇', gas.findOrphanVersions_().length === 0);
@@ -108,7 +108,7 @@ console.log('\n=== J：界線寫清楚 ===');
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'OrphanVersions.gs'), 'utf8');
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   check('★★★★★ 刻意唔受 QUARTER_RESET_BLOCKED_QUARTERS 限制，而且有寫理由',
-    !/getConfig\(CONFIG_KEYS\.QUARTER_RESET_BLOCKED_QUARTERS/.test(code)
+    !/getConfig_\(CONFIG_KEYS\.QUARTER_RESET_BLOCKED_QUARTERS/.test(code)
     && /刻意唔受/.test(src) && /一行已登記嘅資料都唔會刪/.test(src));
   check('★★★★★ 要打字確認', /ORPHAN_VERSION_CONFIRM_TEXT = '確認清理孤兒版本'/.test(src)
     && /getResponseText\(\)\.trim\(\) !== ORPHAN_VERSION_CONFIRM_TEXT/.test(src));

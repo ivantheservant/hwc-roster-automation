@@ -20,7 +20,7 @@ const path = require('path');
 
 const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'ConfigBaselineCheck.gs']);
 
-// Date 物件經 toDateString()／normalizeConfigValueForCompare_() 會用
+// Date 物件經 toDateString_()／normalizeConfigValueForCompare_() 會用
 // Utilities.formatDate；測試沙箱嘅 GAS stub 一被呼叫就拋錯，換確定性替身。
 gas.Utilities = {
   formatDate: function (date, timezone, format) {

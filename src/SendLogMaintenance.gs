@@ -1,12 +1,12 @@
 /**
  * 「清除一批 SendLog 記錄」：測試期間 SendLog 會累積大量測試產生的記錄，
- * 這個工具讓幹事按「批次」（一次 sendStage() 執行寫入的那一組列）整批刪除，
+ * 這個工具讓幹事按「批次」（一次 sendStage_() 執行寫入的那一組列）整批刪除，
  * 不用人手 scroll 選取行號。**只操作 SendLog 工作表，不碰任何其他工作表**，
  * 也**沒有「清除全部」這種選項**——一律要輸入完整的批次前綴字串才能刪除。
  *
  * 批次的判斷依據：SendID 的組成是
  * `[QuarterID, 'v'+VersionNo, Stage, idStamp, 序號].join('-')`
- * （見 Mailer.gs 的 writeSendLogRows_()），同一次 sendStage() 執行內，
+ * （見 Mailer.gs 的 writeSendLogRows_()），同一次 sendStage_() 執行內，
  * 全部收件人的 idStamp 相同、只有序號不同——把 SendID 去掉最後一段（序號）
  * 就是「批次前綴」，同一批次的所有列一定有相同的批次前綴。
  */

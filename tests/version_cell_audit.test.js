@@ -171,7 +171,7 @@ check('（前置）用真入口填一格講員',
 
 console.log('\n=== G 組：好版本要判 OK（成日嘈就冇人會再睇佢）===');
 {
-  const results = gas.auditAllVersionCellClasses();
+  const results = gas.auditAllVersionCellClasses_();
   checkEqual('★★★★ 掃到一個版本', results.length, 1);
   const r = results[0];
   checkEqual('★★★★★ 由真入口產生嘅版本判 OK', r.level, 'OK');
@@ -219,7 +219,7 @@ console.log('\n=== G 組：指紋一——所有冇人嘅格都被算成「排�
   });
   check('（前置）造咗一個 RuleFlags 被清空嘅版本', n > 0, 'n=' + n);
 
-  const r = gas.auditAllVersionCellClasses().filter(function (x) { return x.versionNo === 1; })[0];
+  const r = gas.auditAllVersionCellClasses_().filter(function (x) { return x.versionNo === 1; })[0];
   checkEqual('★★★★★ 判 BAD', r.level, 'BAD');
   check('★★★★★ 而且講得出係「未能安排 ＝ 總格數 − 有派人」呢個指紋'
     + '（唔講出嚟嘅話，幹事只會以為系統排得差，唔會知係資料壞咗）',
@@ -245,7 +245,7 @@ console.log('\n=== G 組：指紋二——上一版有名、呢一版變空白 =
   });
   check('（前置）造咗一個講員名冇咗嘅 v3', n > 0, 'n=' + n);
 
-  const r = gas.auditAllVersionCellClasses().filter(function (x) { return x.versionNo === 3; })[0];
+  const r = gas.auditAllVersionCellClasses_().filter(function (x) { return x.versionNo === 3; })[0];
   checkEqual('★★★★★ 判 BAD', r.level, 'BAD');
   check('★★★★★ 而且**講得出上一版係邊一版、掉咗嘅係邊個名**'
     + '——呢句就係幹事補返個名嘅唯一線索（系統自己補唔到：'
@@ -263,14 +263,14 @@ console.log('\n=== G 組：指紋二——上一版有名、呢一版變空白 =
 
 console.log('\n=== G 組：呢個工具只看，唔改 ===');
 {
-  const before = JSON.stringify(gas.readSheet(S.ROSTER_ASSIGNMENTS));
-  const versionsBefore = JSON.stringify(gas.readSheet(S.ROSTER_VERSIONS));
-  gas.auditAllVersionCellClasses();
+  const before = JSON.stringify(gas.readSheet_(S.ROSTER_ASSIGNMENTS));
+  const versionsBefore = JSON.stringify(gas.readSheet_(S.ROSTER_VERSIONS));
+  gas.auditAllVersionCellClasses_();
   checkEqual('★★★★★ RosterAssignments 一個字都冇變'
     + '（呢個工具刻意冇寫自動修復——見 VersionCellAudit.gs 檔頭）',
-    JSON.stringify(gas.readSheet(S.ROSTER_ASSIGNMENTS)), before);
+    JSON.stringify(gas.readSheet_(S.ROSTER_ASSIGNMENTS)), before);
   checkEqual('★★★★★ RosterVersions 一個字都冇變',
-    JSON.stringify(gas.readSheet(S.ROSTER_VERSIONS)), versionsBefore);
+    JSON.stringify(gas.readSheet_(S.ROSTER_VERSIONS)), versionsBefore);
 
   const src = require('fs').readFileSync(
     require('path').join(__dirname, '..', 'src', 'VersionCellAudit.gs'), 'utf8');

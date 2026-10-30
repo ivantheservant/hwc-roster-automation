@@ -124,7 +124,7 @@ lines.push('   `PERSONAL_PDF` ＋ 非 PERSON 收件人一律回傳 `null`，**�
 lines.push('');
 lines.push('**修正**：新增 `TPL_OFFICIAL_LIST_TC`，用返步驟 5 已經驗證過嘅同一套');
 lines.push('做法（`TPL_RESEND_LIST_TC` 一直都係咁做）——LIST 收件人用自己嘅範本、');
-lines.push('附完整版 PDF。`sendStage()` 依收件人類型揀範本（見 `Mailer.gs` 嘅');
+lines.push('附完整版 PDF。`sendStage_()` 依收件人類型揀範本（見 `Mailer.gs` 嘅');
 lines.push('`resolveStageTemplates_()`）。**向後相容**：工作表未加呢一行之前，');
 lines.push('系統會自動退回用舊範本，唔會因為缺一行而寄唔到信。');
 lines.push('');

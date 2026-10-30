@@ -32,7 +32,7 @@ sc.setCell(0, D[2], 'CHAIR#1', sc.getCell(0, D[0], 'CHAIR#1'));
 const sh = sc.gridSheet(0);
 let row2 = -1;
 for (let r = 3; r <= sh.getLastRow(); r++) {
-  if (gas.toDateString(sh.getRange(r, 1).getValue(), sc.TZ) === D[1]) row2 = r;
+  if (gas.toDateString_(sh.getRange(r, 1).getValue(), sc.TZ) === D[1]) row2 = r;
 }
 const oldTitle = sh.getRange(row2, 3).getValue();
 sh.getRange(row2, 3).setValue('Baptism Service');

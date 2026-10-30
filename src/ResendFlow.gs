@@ -9,7 +9,7 @@
  * 這個檔案只新增「比對改動者」與「寄送」這兩步。入口見 FourStageFlow.gs 的
  * runFourStageStep5_()，選單登記在 Menu.gs。
  *
- * 不重用 sendStage()：findEmailTemplate_() 依 Stage 找範本，Stage=RESEND 現在
+ * 不重用 sendStage_()：findEmailTemplate_() 依 Stage 找範本，Stage=RESEND 現在
  * 同時有 TPL_RESEND_TC（PERSON）與 TPL_RESEND_LIST_TC（LIST）兩個範本，
  * 依 Stage 找會有歧義（見 Mailer.gs 的 findEmailTemplate_() 檔頭註解）。
  * sendResendStage_() 改用 findEmailTemplateById_() 直接指定各自要用哪一個範本，
@@ -278,7 +278,7 @@ function listResendPdfTargetPersonIds_(context, sendOptions, changedPersonIds) {
 function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
   assertNotPreviewMode_('sendResendStage_');
   const startedAt = Date.now();
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
 
   const personTemplate = findEmailTemplateById_('TPL_RESEND_TC');
   if (!personTemplate) throw new Error('EmailTemplates 找不到 TPL_RESEND_TC，請先執行「維護 ▸ 補齊 Email 範本」');
@@ -286,7 +286,7 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
   if (!listTemplate) throw new Error('EmailTemplates 找不到 TPL_RESEND_LIST_TC，請先執行「維護 ▸ 補齊 Email 範本」');
 
   // 需求 3：附件要存 Shared Drive 時，一開始就驗證資料夾，無效立即中止——
-  // 跟 sendStage() 同一個把關理由，這裡兩個範本都需要附件（PERSONAL_PDF／FULL_PDF）。
+  // 跟 sendStage_() 同一個把關理由，這裡兩個範本都需要附件（PERSONAL_PDF／FULL_PDF）。
   resolveMailAttachmentFolder_();
 
   const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.RESEND);
@@ -310,8 +310,8 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
   });
 
   const outcomes = [];
-  // 階段 G：跟 sendStage() 同一個理由，分批寫入 SendLog，見 Mailer.gs 的說明。
-  const flushBatchSize = Number(getConfig(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
+  // 階段 G：跟 sendStage_() 同一個理由，分批寫入 SendLog，見 Mailer.gs 的說明。
+  const flushBatchSize = Number(getConfig_(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE)) || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
   const maybeFlush_ = function () {
     if (outcomes.length - flushedCount >= flushBatchSize) {
@@ -373,7 +373,7 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
 
   const retryCount = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
 
-  // 階段 F 新增：跟 sendStage() 同一套批次記錄方式。
+  // 階段 F 新增：跟 sendStage_() 同一套批次記錄方式。
   writeAuditLog_({
     action: '寄送批次',
     targetSheet: SHEETS.SEND_LOG,
@@ -383,7 +383,7 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
     source: 'sendResendStage_',
     notes: '成功=' + countStatus_(outcomes, MAIL_STATUS.SENT) + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
       + '　查無電郵=' + countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
-      // 第四十輪批次 A 組：今次用咗咩選項（同 sendStage() 一致）。
+      // 第四十輪批次 A 組：今次用咗咩選項（同 sendStage_() 一致）。
       + '　' + describeSendDecision_(context.sendDecision)
   });
 

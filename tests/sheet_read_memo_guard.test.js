@@ -1,11 +1,11 @@
-// 第二十四輪批次階段 A1：`readSheet()` 快取要回傳複本，唔可以回傳快取本身。
+// 第二十四輪批次階段 A1：`readSheet_()` 快取要回傳複本，唔可以回傳快取本身。
 // 執行方式：node tests/sheet_read_memo_guard.test.js
 //
 // ─────────────────────────────────────────────────────────────────────
 // 呢個測試防嘅係一個**將來**風險，唔係現有 bug
 // ─────────────────────────────────────────────────────────────────────
 //
-// 掃描過全部 `readSheet()` 呼叫點（第二十四輪階段 A1）：
+// 掃描過全部 `readSheet_()` 呼叫點（第二十四輪階段 A1）：
 //   • 全部 `record[C.X] = …` 都係喺新建嘅 `{}` 上面
 //   • 四處 `.sort()` 全部喺 `.filter()`／`.map()` 之後
 // 所以目前冇任何一處會 mutate。
@@ -113,23 +113,23 @@ console.log('\n=== A1：快取開關本身 ===');
       fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppDashboard.gs'), 'utf8')));
 }
 
-console.log('\n=== A1：掃描結論——目前冇任何一處會 mutate readSheet 嘅結果 ===');
+console.log('\n=== A1：掃描結論——目前冇任何一處會 mutate readSheet_ 嘅結果 ===');
 {
   // 呢一段把階段 A1 嘅掃描結論鎖死做斷言：日後如果有人真係喺
-  // readSheet 結果上面直接 sort／push，呢度就要重新檢視。
+  // readSheet_ 結果上面直接 sort／push，呢度就要重新檢視。
   const srcDir = path.join(__dirname, '..', 'src');
   const files = fs.readdirSync(srcDir).filter(function (f) { return f.endsWith('.gs'); });
 
   const offenders = [];
   files.forEach(function (f) {
     const text = fs.readFileSync(path.join(srcDir, f), 'utf8');
-    // 直接喺 readSheet(...) 嘅回傳值上面 sort／push／splice／reverse
-    const re = /readSheet\([^)]*\)\s*\.\s*(sort|push|splice|reverse)\s*\(/g;
+    // 直接喺 readSheet_(...) 嘅回傳值上面 sort／push／splice／reverse
+    const re = /readSheet_\([^)]*\)\s*\.\s*(sort|push|splice|reverse)\s*\(/g;
     let m;
     while ((m = re.exec(text)) !== null) offenders.push(f + '：.' + m[1] + '()');
   });
 
-  checkEqual('★★★★★ 冇任何一處直接 mutate readSheet() 嘅回傳值'
+  checkEqual('★★★★★ 冇任何一處直接 mutate readSheet_() 嘅回傳值'
     + '（有嘅話代表階段 A1 嘅掃描結論已經過時，要重新檢視快取安全性）',
     offenders, []);
 }

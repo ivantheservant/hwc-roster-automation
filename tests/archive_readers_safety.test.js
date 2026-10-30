@@ -36,7 +36,7 @@ function checkEqual(label, actual, expected) {
 
 // ---------------------------------------------------------------------------
 // 移植：Archive.gs 的封存資格判斷與兩張表的封存計畫（逐字對應正式碼，
-// readSheet() 換成傳入的假資料陣列）
+// readSheet_() 換成傳入的假資料陣列）
 // ---------------------------------------------------------------------------
 const ARCHIVE_KEEP_RECENT_QUARTERS = gas.ARCHIVE_KEEP_RECENT_QUARTERS;
 const MAIL_STATUS = gas.MAIL_STATUS;
@@ -107,7 +107,7 @@ function applyArchive(rows, plan) {
 }
 
 // ---------------------------------------------------------------------------
-// 移植：各個讀取者（逐字對應正式碼，只把 readSheet() 換成傳入陣列）
+// 移植：各個讀取者（逐字對應正式碼，只把 readSheet_() 換成傳入陣列）
 // ---------------------------------------------------------------------------
 
 /** Mailer.gs 的 readLastSendRecordByPerson_()——步驟 5 hash 比對的基準來源。 */
@@ -148,7 +148,7 @@ function computeResendDiff_(currentHashByPerson, lastRecordByPerson, peopleWithE
 
 /** Generator.gs 的 readPriorWeeks_()（真正那一份，由沙箱載入的正式碼）。 */
 function callReadPriorWeeks(assignmentRows, quarterStartDate, carryOverWeeks) {
-  // 正式碼讀 readSheet() 之後用 toDateString() 正規化；這裡的假資料本身
+  // 正式碼讀 readSheet_() 之後用 toDateString_() 正規化；這裡的假資料本身
   // 已經是 yyyy-MM-dd，所以直接移植它的分組邏輯（逐字對應）。
   if (carryOverWeeks <= 0) return [];
   const rows = assignmentRows.filter(function (r) { return r.serviceDate && r.serviceDate < quarterStartDate; });

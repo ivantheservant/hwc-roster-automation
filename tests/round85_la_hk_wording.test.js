@@ -204,7 +204,7 @@ console.log('\n=== LA6：一次性更新說明文字 ===');
   check('★★★★★ Unavailable!A1、RuleSettings 互斥組都改了',
     ss.getSheetByName(S.UNAVAILABLE).getRange(1, 1).getValue() === items[18].new
     && ss.getSheetByName(S.RULE_SETTINGS).getRange(3, 2).getValue() === mutex.new);
-  const audit = gas.readSheet(S.AUDIT_LOG).filter((r) => r[C.AUDIT_LOG.ACTION] === 'SHEET_TEXT_UPDATED');
+  const audit = gas.readSheet_(S.AUDIT_LOG).filter((r) => r[C.AUDIT_LOG.ACTION] === 'SHEET_TEXT_UPDATED');
   check('★★★★★ 每格一筆 AuditLog（共 19 筆，有舊值和新值）', audit.length === 19
     && audit.every((r) => r[C.AUDIT_LOG.OLD_VALUE] && r[C.AUDIT_LOG.NEW_VALUE]), audit.length);
   const r2 = gas.apiApplySheetTextUpdate();

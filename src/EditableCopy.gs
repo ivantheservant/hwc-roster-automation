@@ -74,7 +74,7 @@ function createEditableRosterCopy_(quarterId, versionNo, source) {
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('找不到工作表「' + sheetName + '」，做不到副本。');
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const fileName = buildEditableCopyFileName_(quarterId, versionNo, new Date(), timezone);
   const folder = getOrCreateEditableCopyFolder_(quarterId);
 
@@ -120,7 +120,7 @@ function createEditableRosterCopy_(quarterId, versionNo, source) {
 function apiCreateEditableRosterCopy(quarterId) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('建立可編輯副本', function () {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) {
       throw new Error(buildThreePartMessage_(
         '這一季還沒有生成過任何版本。', '甚麼都沒有產生。', ['先在第 1 步生成職事表']));
@@ -282,7 +282,7 @@ function listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedF
 function apiGetRecoveryLinks(quarterId) {
   assertWebAppRequestAllowed_('apiGetRecoveryLinks');
   const q = String(quarterId || '').trim();
-  const versionNo = findLatestVersionNo(q);
+  const versionNo = findLatestVersionNo_(q);
   const out = {
     quarterId: q,
     versionNo: versionNo,
@@ -297,7 +297,7 @@ function apiGetRecoveryLinks(quarterId) {
   };
 
   try {
-    out.guideUrl = String(getConfig(CONFIG_KEYS.USER_GUIDE_URL, DEFAULTS.USER_GUIDE_URL) || '').trim();
+    out.guideUrl = String(getConfig_(CONFIG_KEYS.USER_GUIDE_URL, DEFAULTS.USER_GUIDE_URL) || '').trim();
     if (out.guideUrl) out.guideSentence = '詳細步驟見使用指南。';
   } catch (err) {
     // 讀唔到 Config 唔應該令整個彈窗冧：照寫章名

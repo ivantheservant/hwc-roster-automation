@@ -273,8 +273,8 @@ function compareConfigValues_(rawCurrent, targetValue, type, timezone) {
 /**
  * 純比對邏輯，不碰任何 Google API——方便離線測試。
  * @param {Object} snapshot getConfigBaselineSnapshot_() 的結果
- * @param {Object[]} configRows readSheet(SHEETS.CONFIG) 的結果
- * @param {Object[]} quarterRows readSheet(SHEETS.QUARTERS) 的結果
+ * @param {Object[]} configRows readSheet_(SHEETS.CONFIG) 的結果
+ * @param {Object[]} quarterRows readSheet_(SHEETS.QUARTERS) 的結果
  * @param {string} timezone 時區名稱（比對 Quarters 日期用）
  * @returns {{snapshotDate: string,
  *   config: {mismatched: Object[], matched: Object[], newKeysInSheet: Object[]},
@@ -356,8 +356,8 @@ function planConfigBaselineCheck_(snapshot, configRows, quarterRows, timezone) {
     const quarterId = String(row[Q.QUARTER_ID] || '').trim();
     if (!quarterId) return;
     const def = snapshot.quarters[quarterId];
-    const currentGenerateOn = toDateString(row[Q.GENERATE_ON], timezone);
-    const currentOfficialSendOn = toDateString(row[Q.OFFICIAL_SEND_ON], timezone);
+    const currentGenerateOn = toDateString_(row[Q.GENERATE_ON], timezone);
+    const currentOfficialSendOn = toDateString_(row[Q.OFFICIAL_SEND_ON], timezone);
 
     if (!def) {
       quarterNewInSheet.push({
@@ -403,9 +403,9 @@ function planConfigBaselineCheck_(snapshot, configRows, quarterRows, timezone) {
 function buildConfigBaselineCheckInputs_() {
   return {
     snapshot: getConfigBaselineSnapshot_(),
-    configRows: readSheet(SHEETS.CONFIG),
-    quarterRows: readSheet(SHEETS.QUARTERS),
-    timezone: getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)
+    configRows: readSheet_(SHEETS.CONFIG),
+    quarterRows: readSheet_(SHEETS.QUARTERS),
+    timezone: getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE)
   };
 }
 

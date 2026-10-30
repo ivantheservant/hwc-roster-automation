@@ -319,7 +319,7 @@ function apiGetSendRecipientPool(quarterId, kind) {
  * @returns {Object} `{ok, versionNo, pool, groups, fixedMembers, lastSent, changed}`；`ok=false` 帶 `message`
  */
 function buildSendPoolSnapshot_(quarterId, kind) {
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     return {
       ok: false,
@@ -343,7 +343,7 @@ function buildSendPoolSnapshot_(quarterId, kind) {
         '如果一直讀不到，去「進階與診斷 ▸ 核對職事表」看看這一版有沒有問題']));
   }
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const pool = buildSendRecipientPool_(context, timezone);
 
   // ── 第七十輪批次 AT 組：辦公室等固定收件人 ─────────────────
@@ -428,7 +428,7 @@ function apiGetSendAllRecipients(quarterId, kind) {
   try {
     const snap = buildSendPoolSnapshot_(quarterId, kind);
     if (!snap.ok) return snap;
-    const includesFixed = getConfig(CONFIG_KEYS.SEND_ALL_INCLUDES_FIXED, true) === true;
+    const includesFixed = getConfig_(CONFIG_KEYS.SEND_ALL_INCLUDES_FIXED, true) === true;
     const wanted = [SEND_SOURCE.ROSTER, SEND_SOURCE.COMMITTEE, SEND_SOURCE.DEACON]
       .concat(includesFixed ? [SEND_SOURCE.FIXED] : []);
     const inScope = snap.pool.filter(function (item) {
@@ -615,10 +615,10 @@ function listChangedPeopleWithoutEmail_(quarterId, plan, people) {
   const baseline = context.resendBaseline || null;
   if (baseline) {
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
-    const before = groupAssignmentsByPerson_(readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+    const before = groupAssignmentsByPerson_(readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
       return row[A.QUARTER_ID] === quarterId && Number(row[A.VERSION_NO]) === baseline.versionNo;
     }).map(function (row) {
-      return { serviceDate: toDateString(row[A.SERVICE_DATE], context.timezone), postId: row[A.POST_ID],
+      return { serviceDate: toDateString_(row[A.SERVICE_DATE], context.timezone), postId: row[A.POST_ID],
         slotIndex: Number(row[A.SLOT_INDEX]), personId: row[A.PERSON_ID] };
     }));
     const now = context.assignmentsByPerson || {};
@@ -662,11 +662,11 @@ function apiGetLastReviewSendOptions(quarterId) {
   assertWebAppRequestAllowed_('apiGetLastReviewSendOptions');
   beginSheetReadMemo_();
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-    const batch = findLastReviewBatch_(readSheet(SHEETS.SEND_LOG), quarterId, timezone);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const batch = findLastReviewBatch_(readSheet_(SHEETS.SEND_LOG), quarterId, timezone);
     if (!batch.found) return { ok: true, found: false };
 
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) return { ok: true, found: false };
     const context = buildMailContext_(quarterId, versionNo, MAIL_STAGES.REVIEW);
     const pool = buildSendRecipientPool_(context, timezone);
@@ -732,7 +732,7 @@ function formatVersionNoRanges_(list) {
 
 function buildSendHistoryView_(quarterId) {
   const batches = listSendHistory_(quarterId);
-  const currentVersionNo = findLatestVersionNo(quarterId);
+  const currentVersionNo = findLatestVersionNo_(quarterId);
 
   const sentVersions = {};
   batches.forEach(function (b) {

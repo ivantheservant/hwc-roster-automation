@@ -65,7 +65,7 @@ function runS08(opts) {
   gas.selfTestRecordPayload_ = function (id, api, value) {
     payloads.push({ api: api, value: value });
   };
-  gas.findLatestVersionNo = function () { return 3; };
+  gas.findLatestVersionNo_ = function () { return 3; };
   gas.apiGeneratePersonalPdfBatch = function () {
     const b = opts.batches[Math.min(n, opts.batches.length - 1)];
     n++;

@@ -52,22 +52,22 @@
 // ⚠️ 邊啲嘢真係由 `src/` 執行、邊啲刻意換走——同埋點解
 // ─────────────────────────────────────────────────────────────────────
 //
-// 真：`readSheet()`／`getQuarterStage_()`／`advanceQuarterStage_()`／
-// `setQuarterStage_()`／`findLatestVersionNo()`／`registerVersion()`／
-// `writeAssignments()`／`generateBest()`（排表演算法本身）／
+// 真：`readSheet_()`／`getQuarterStage_()`／`advanceQuarterStage_()`／
+// `setQuarterStage_()`／`findLatestVersionNo_()`／`registerVersion_()`／
+// `writeAssignments_()`／`generateBest_()`（排表演算法本身）／
 // `planApplyRequests_()`／`applyRequests_()`／`findStateViolations_()`／
 // `resolveHardViolationRelease_()`／`evaluateStep4MissingPdfGate_()`／
-// `evaluateStep4SendOutcome_()`／`sendStage()`（Mailer.gs，真正行過
+// `evaluateStep4SendOutcome_()`／`sendStage_()`（Mailer.gs，真正行過
 // DRY_RUN 判斷、收件人篩選、SendLog 寫入）／`computeResendDiff_()`／
 // `sendResendStage_()`／全部 Stage 前置檢查同 guard。
 //
 // 換走（連同理由）：
 //
-//   `createRosterSheet()` —— grid 版面渲染（合併／底色）係顯示關注，
+//   `createRosterSheet_()` —— grid 版面渲染（合併／底色）係顯示關注，
 //     唔係流程控制。真正跑會建一個完整職事表 grid 工作表，超出呢份
 //     測試想證嘅嘢（`grid_cell_presentation.test.js` 已經用
 //     `sheet_mock.js` 覆蓋緊呢一塊）。換走之後 `RosterAssignments`
-//     長表仍然由**真正**嘅 `writeAssignments()` 寫入。
+//     長表仍然由**真正**嘅 `writeAssignments_()` 寫入。
 //
 //   `buildFineTuneContext_()`／`resolveAuthoritativeState_()` —— 呢兩個
 //     函式嘅工作係讀 grid 工作表、偵測人手改動。因為冇建立真正嘅 grid
@@ -197,7 +197,7 @@ gas.Utilities = {
     }
     return date.toISOString();
   },
-  // `Utils.gs` 嘅 `parseDate()` 會叫 `Utilities.parseDate(str, tz, 'yyyy-MM-dd HH:mm:ss')`
+  // `Utils.gs` 嘅 `parseDate_()` 會叫 `Utilities.parseDate(str, tz, 'yyyy-MM-dd HH:mm:ss')`
   // 將字串解析做指定時區嘅 Date。用「猜測 UTC → 用該時區格式化返嚟比對差距 → 修正」
   // 呢個標準技巧模擬，唔靠任何外部套件，2-3 次疊代已經穩定收斂（包括 DST 邊界）。
   parseDate: function (str, tz, fmt) {
@@ -238,7 +238,7 @@ gas.Utilities = {
 gas.log_ = function () {};   // Logger.log 本身已經由 gas_loader 靜音，呢度連帶埋 log_() 嘅噪音
 
 // ── 邊界一：grid 版面渲染（見檔頭說明）─────────────────────────
-gas.createRosterSheet = function (quarterId, versionNo) {
+gas.createRosterSheet_ = function (quarterId, versionNo) {
   return gas.buildRosterSheetName_(quarterId, versionNo);
 };
 
@@ -253,20 +253,20 @@ gas.buildSeedNote_ = function (result) {
 //
 // 由**真正寫入**嘅 `RosterAssignments` 重組 context，明確回報「冇人手
 // 改動」。呢個唔係任意假資料——`original` 陣列嘅內容逐格對返
-// `readSheet(SHEETS.ROSTER_ASSIGNMENTS)` 真正有嘅嘢。
+// `readSheet_(SHEETS.ROSTER_ASSIGNMENTS)` 真正有嘅嘢。
 gas.buildFineTuneContext_ = function (quarterId, versionNo) {
-  const config = gas.readConfig();
+  const config = gas.readConfig_();
   const timezone = config[gas.CONFIG_KEYS.SYS_TIMEZONE] || TZ;
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
 
-  const original = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS)
+  const original = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS)
     .filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
     })
     .map(function (row) {
       return {
         serviceDateId: row[C.SERVICE_DATE_ID],
-        serviceDate: gas.toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: gas.toDateString_(row[C.SERVICE_DATE], timezone),
         postId: row[C.POST_ID],
         slotIndex: Number(row[C.SLOT_INDEX]),
         personId: row[C.PERSON_ID],
@@ -275,12 +275,12 @@ gas.buildFineTuneContext_ = function (quarterId, versionNo) {
       };
     });
 
-  const posts = gas.readPostsNormalized();
+  const posts = gas.readPostsNormalized_();
   const postNames = {};
   posts.forEach(function (p) { postNames[p.postId] = p.postNameTC; });
 
   const peopleById = {};
-  gas.readPeople().forEach(function (row) {
+  gas.readPeople_().forEach(function (row) {
     const N = gas.COLUMNS.NAME_MAPPING;
     const personId = row[N.PERSON_ID];
     peopleById[personId] = {
@@ -296,15 +296,15 @@ gas.buildFineTuneContext_ = function (quarterId, versionNo) {
     timezone: timezone,
     posts: posts,
     postNames: postNames,
-    serviceDates: gas.readServiceDatesNormalized(quarterId, timezone),
-    rules: gas.readRules(),
+    serviceDates: gas.readServiceDatesNormalized_(quarterId, timezone),
+    rules: gas.readRules_(),
     peopleById: peopleById,
-    eligibility: gas.readEligibility(),
+    eligibility: gas.readEligibility_(),
     // ⚠️ `unavailable`／`maxMoves`／`warnOnSemiHard` 呢幾個真正嘅
     // `buildFineTuneContext_()` 都有——`findStateViolations_()` 直接
     // 讀 `context.unavailable`（唔係經第二個參數），漏咗會喺
     // `isPersonUnavailable_()` 度爆 `Cannot read properties of undefined`。
-    unavailable: gas.readUnavailableNormalized(timezone),
+    unavailable: gas.readUnavailableNormalized_(timezone),
     maxMoves: 999,
     maxPerQuarterDefault: 8,
     warnOnSemiHard: true,
@@ -575,17 +575,17 @@ let v0 = -1;
 
   const result = gas.apiGenerateDraftExecute(Q);
   check('★★★★★ **執行成功**（`ok !== false`）——由 apiGenerateDraftExecute()'
-    + ' 真正叫 performRosterGeneration_() → generateBest() → writeAssignments() → registerVersion()',
+    + ' 真正叫 performRosterGeneration_() → generateBest_() → writeAssignments_() → registerVersion_()',
     result.ok !== false, JSON.stringify(result));
   v0 = result.versionNo;
   checkEqual('★★★★★ 建立 v0', v0, 0);
   checkEqual('★★★★★ Stage 仍然是 DRAFT（步驟 1 不前進 Stage，真正讀出嚟）',
     gas.getQuarterStage_(Q), gas.QUARTER_STAGE.DRAFT);
 
-  const assignments = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS);
+  const assignments = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS);
   checkEqual('★★★★★ RosterAssignments 真正寫入咗 26 格（13 主日 × 2 崗位）',
     assignments.length, 26);
-  const versions = gas.readSheet(gas.SHEETS.ROSTER_VERSIONS);
+  const versions = gas.readSheet_(gas.SHEETS.ROSTER_VERSIONS);
   checkEqual('★★★★ RosterVersions 真正登記咗 1 個版本', versions.length, 1);
 
   const second = gas.apiGenerateDraftExecute(Q);
@@ -607,10 +607,10 @@ console.log('\n=== 步驟 2：寄給堂委審閱（apiStep2Preview → apiStep2C
   assertPreviewMatchesSend(check, '步驟 2 寄給堂委審閱', preview.recipientCount, result);
   checkEqual('★★★★★ Stage → REVIEW_SENT（由 executeStep2_() 的 setQuarterStage_() 真正寫入）',
     gas.getQuarterStage_(Q), gas.QUARTER_STAGE.REVIEW_SENT);
-  checkEqual('★★★★★ **1 位審閱者真正被 sendStage() 記成 DRY_RUN**'
+  checkEqual('★★★★★ **1 位審閱者真正被 sendStage_() 記成 DRY_RUN**'
     + '（唔係測試自己塞落 SendLog）', result.dryRun, 1);
 
-  const sendLog = gas.readSheet(gas.SHEETS.SEND_LOG).filter(function (r) {
+  const sendLog = gas.readSheet_(gas.SHEETS.SEND_LOG).filter(function (r) {
     return r[gas.COLUMNS.SEND_LOG.STAGE] === 'REVIEW';
   });
   checkEqual('★★★★★ SendLog 真正有一行 REVIEW 階段嘅紀錄', sendLog.length, 1);
@@ -619,21 +619,21 @@ console.log('\n=== 步驟 2：寄給堂委審閱（apiStep2Preview → apiStep2C
 console.log('\n=== 步驟 3：套用修改申報——加入含特例與矛盾組合的申報（apiStep3Plan/Apply/Release）===');
 {
   const R = gas.COLUMNS.REQUESTS;
-  const dates = gas.readSheet(gas.SHEETS.SERVICE_DATES)
+  const dates = gas.readSheet_(gas.SHEETS.SERVICE_DATES)
     .sort(function (a, b) { return Number(a[gas.COLUMNS.SERVICE_DATES.WEEK_INDEX]) - Number(b[gas.COLUMNS.SERVICE_DATES.WEEK_INDEX]); })
-    .map(function (r) { return gas.toDateString(r[gas.COLUMNS.SERVICE_DATES.SERVICE_DATE], TZ); });
+    .map(function (r) { return gas.toDateString_(r[gas.COLUMNS.SERVICE_DATES.SERVICE_DATE], TZ); });
 
   // ⚠️ 「不能服侍」要求嗰個人**真係**喺嗰個崗位有派工——`validateRequest_()`
   // 揸唔到就會判 NEEDS_INPUT（「查無此人在此崗位的派工紀錄」，呢個係
   // 正確行為，唔係 bug）。真正嘅生成器唔係簡單輪替，邊個坐邊一週要
   // **由真正寫入嘅 v0 讀返出嚟**，唔可以假設。
-  const v0rows = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const v0rows = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[gas.COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] === Q
       && Number(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) === v0;
   });
   const chairOn = function (dateStr) {
     const row = v0rows.find(function (r) {
-      return gas.toDateString(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === dateStr
+      return gas.toDateString_(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === dateStr
         && r[gas.COLUMNS.ROSTER_ASSIGNMENTS.POST_ID] === 'CHAIR';
     });
     return row ? row[gas.COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID] : null;
@@ -675,22 +675,22 @@ console.log('\n=== 步驟 3：套用修改申報——加入含特例與矛盾�
   const applyResult = gas.apiStep3Apply(Q, true);
   check('★★★★★ 套用成功、有前進或者需要放行其中一樣',
     typeof applyResult.advanced === 'boolean', JSON.stringify(applyResult));
-  checkEqual('★★★★★ 套用後建立 v1（真正 registerVersion() 登記）',
-    gas.findLatestVersionNo(Q), 1);
+  checkEqual('★★★★★ 套用後建立 v1（真正 registerVersion_() 登記）',
+    gas.findLatestVersionNo_(Q), 1);
 
-  const v1rows = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const v1rows = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[gas.COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] === Q
       && Number(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) === 1;
   });
   const chairWeek3 = v1rows.find(function (r) {
-    return gas.toDateString(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === dates[2]
+    return gas.toDateString_(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === dates[2]
       && r[gas.COLUMNS.ROSTER_ASSIGNMENTS.POST_ID] === 'CHAIR';
   });
   check('★★★★★ ' + chairWeek3PersonId + ' 第 3 週已經不再擔任 CHAIR（真正被 CANNOT_SERVE 頂替）',
     chairWeek3 && chairWeek3[gas.COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID] !== chairWeek3PersonId,
     JSON.stringify(chairWeek3));
   const chairWeek1 = v1rows.find(function (r) {
-    return gas.toDateString(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === dates[0]
+    return gas.toDateString_(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ) === dates[0]
       && r[gas.COLUMNS.ROSTER_ASSIGNMENTS.POST_ID] === 'CHAIR';
   });
   checkEqual('★★★★★ P9004（特例一）第 1 週真正被指定擔任 CHAIR',
@@ -708,16 +708,16 @@ console.log('\n=== 步驟 3：硬規則違反時不放行、Stage 停住，修�
 {
   // 由真正嘅入口，喺目前最新版本手動注入一格違反資格嘅指派
   // （模擬「套用申報之後才發現有問題」嘅情境），驗證閘門真係擋得住。
-  const versionNo = gas.findLatestVersionNo(Q);
+  const versionNo = gas.findLatestVersionNo_(Q);
   const C = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  const dates = gas.readSheet(gas.SHEETS.SERVICE_DATES)
+  const dates = gas.readSheet_(gas.SHEETS.SERVICE_DATES)
     .sort(function (a, b) { return Number(a[gas.COLUMNS.SERVICE_DATES.WEEK_INDEX]) - Number(b[gas.COLUMNS.SERVICE_DATES.WEEK_INDEX]); })
-    .map(function (r) { return gas.toDateString(r[gas.COLUMNS.SERVICE_DATES.SERVICE_DATE], TZ); });
+    .map(function (r) { return gas.toDateString_(r[gas.COLUMNS.SERVICE_DATES.SERVICE_DATE], TZ); });
 
-  const rows = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS);
+  const rows = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS);
   const week1Chair = rows.find(function (r) {
     return r[C.QUARTER_ID] === Q && Number(r[C.VERSION_NO]) === versionNo
-      && gas.toDateString(r[C.SERVICE_DATE], TZ) === dates[0] && r[C.POST_ID] === 'CHAIR';
+      && gas.toDateString_(r[C.SERVICE_DATE], TZ) === dates[0] && r[C.POST_ID] === 'CHAIR';
   });
   // P9003 冇 CHAIR 資格（見 Eligibility fixture）——直接改呢個真正儲存格。
   ss.getSheetByName(gas.SHEETS.ROSTER_ASSIGNMENTS)._cells.forEach; // no-op，避免 lint 誤解
@@ -811,12 +811,12 @@ console.log('\n=== 步驟 4：正式發出（含無電郵特例，apiStep4Get*Wa
   checkEqual('★★★★★ Stage → OFFICIAL_SENT（真正由 executeStep4Send_() 前進）',
     gas.getQuarterStage_(Q), gas.QUARTER_STAGE.OFFICIAL_SENT);
 
-  const noEmailLog = gas.readSheet(gas.SHEETS.SEND_LOG).filter(function (l) {
+  const noEmailLog = gas.readSheet_(gas.SHEETS.SEND_LOG).filter(function (l) {
     return l[gas.COLUMNS.SEND_LOG.STAGE] === 'OFFICIAL'
       && l[gas.COLUMNS.SEND_LOG.STATUS] === gas.MAIL_STATUS.SKIPPED_NO_EMAIL;
   });
   check('★★★★★ 特例二／三（P9005／P9006）首次正式發出時都還沒有電郵'
-    + ' → 兩人都真正被 sendStage() 記為 SKIPPED_NO_EMAIL',
+    + ' → 兩人都真正被 sendStage_() 記為 SKIPPED_NO_EMAIL',
     ['P9005', 'P9006'].every(function (p) {
       return noEmailLog.some(function (l) { return l[gas.COLUMNS.SEND_LOG.PERSON_ID] === p; });
     }), JSON.stringify(noEmailLog));
@@ -837,8 +837,8 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物（apiStep5
 {
   const R = gas.COLUMNS.REQUESTS;
 
-  const versionNo = gas.findLatestVersionNo(Q);
-  const p9004Rows = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const versionNo = gas.findLatestVersionNo_(Q);
+  const p9004Rows = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[gas.COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] === Q
       && Number(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) === versionNo
       && r[gas.COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID] === 'P9004';
@@ -851,7 +851,7 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物（apiStep5
   appendRows(ss, gas.SHEETS.REQUESTS, [
     R.REQUEST_ID, R.QUARTER_ID, R.SERVICE_DATE, R.POST_NAME, R.PERSON_NAME, R.REQUEST_TYPE, R.STATUS
   ], p9004Rows.map(function (row) {
-    return { [R.QUARTER_ID]: Q, [R.SERVICE_DATE]: gas.toDateString(row[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ),
+    return { [R.QUARTER_ID]: Q, [R.SERVICE_DATE]: gas.toDateString_(row[gas.COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], TZ),
       [R.POST_NAME]: '主席', [R.PERSON_NAME]: PEOPLE.P9004.nameTC,
       [R.REQUEST_TYPE]: gas.REQUEST_TYPE.CANNOT_SERVE, [R.STATUS]: '' };
   }));
@@ -878,8 +878,8 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物（apiStep5
   check('★★★★ Requests 全部真正套用咗（P9004 幾多格就幾多筆申報）',
     applyResult.appliedCount >= p9004Rows.length, JSON.stringify(applyResult));
 
-  const newVersionNo = gas.findLatestVersionNo(Q);
-  const newRows = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const newVersionNo = gas.findLatestVersionNo_(Q);
+  const newRows = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[gas.COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] === Q
       && Number(r[gas.COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) === newVersionNo;
   });
@@ -899,7 +899,7 @@ console.log('\n=== 步驟 5：改動後重發——三個特例人物（apiStep5
   assertPreviewMatchesSend(check, '步驟 5 改動後重發',
     sendPreview.recipientCount, sendResult);
 
-  const resendLog = gas.readSheet(gas.SHEETS.SEND_LOG).filter(function (l) {
+  const resendLog = gas.readSheet_(gas.SHEETS.SEND_LOG).filter(function (l) {
     return l[gas.COLUMNS.SEND_LOG.STAGE] === 'RESEND';
   });
   check('★★★★★ P9004（特例一）真正被 sendResendStage_() 記到「已寄出」'

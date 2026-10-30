@@ -44,11 +44,11 @@ let configValues = {};
 let stageValue = Q.DRAFT;
 let latestVersionNo = -1;
 
-gas.getConfig = function (key, fallback) {
+gas.getConfig_ = function (key, fallback) {
   return Object.prototype.hasOwnProperty.call(configValues, key) ? configValues[key] : fallback;
 };
 gas.getQuarterStage_ = function () { return stageValue; };
-gas.findLatestVersionNo = function () { return latestVersionNo; };
+gas.findLatestVersionNo_ = function () { return latestVersionNo; };
 
 function reset() {
   configValues = {};
@@ -129,7 +129,7 @@ console.log('\n=== A2【核心】維度四：到期咗但完全冇版本 ⇒ 一
     + '——少咗「完全冇版本」就會喺已經生成之後繼續嘈',
     /notGeneratedTriggered\s*=\s*!!schedulePeek\.generateDate/.test(body)
     && /today >= schedulePeek\.generateDate/.test(body)
-    && /findLatestVersionNo\(quarterId\) < 0/.test(body));
+    && /findLatestVersionNo_\(quarterId\) < 0/.test(body));
 
   check('★★★★★ 呢個維度**唔受 maxCount 上限限制**'
     + '——其餘三個維度講「你慢咗」，提三次就夠；'

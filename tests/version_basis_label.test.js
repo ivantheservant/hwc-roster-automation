@@ -42,7 +42,7 @@ function checkEqual(label, actual, expected) {
   if (!ok) console.log(`      got=${JSON.stringify(actual)}\n      expected=${JSON.stringify(expected)}`);
 }
 
-console.log('\n=== B1【核心】全部 registerVersion() 用過嘅 Basis 值都要譯到 ===');
+console.log('\n=== B1【核心】全部 registerVersion_() 用過嘅 Basis 值都要譯到 ===');
 {
   // ⚠️ 呢個清單**唔係人手抄**，係由 Constants.gs 嘅 VERSION_VALUES 攞——
   // 將來有人加多個 BASIS_XXX 而唔加對照，呢條測試會即刻失敗。

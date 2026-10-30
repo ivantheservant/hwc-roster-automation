@@ -13,7 +13,7 @@ function isReviewerRecipientRow_(row) {
 }
 function isTrueValue_(v) { return String(v).trim().toUpperCase() === 'TRUE'; }
 
-// ---- 移植：EmailRecipientsSeed.gs 的 countReviewerRecipients_()（改吃陣列而非 readSheet）----
+// ---- 移植：EmailRecipientsSeed.gs 的 countReviewerRecipients_()（改吃陣列而非 readSheet_）----
 function countReviewerRecipients_(rows) {
   return rows.filter(isReviewerRecipientRow_).length;
 }

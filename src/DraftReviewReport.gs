@@ -210,7 +210,7 @@ function countCellClassesFromAssignments_(quarterId, versionNo) {
   byClass[GRID_CELL_CLASS.SPECIAL_SKIP] = 'specialSkip';
   byClass[GRID_CELL_CLASS.GENUINE_GAP] = 'genuineGap';
 
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId || Number(row[C.VERSION_NO]) !== versionNo) return;
     const cellClass = classifyGridCell_({
       personId: row[C.PERSON_ID],

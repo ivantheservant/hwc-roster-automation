@@ -50,7 +50,7 @@ function listNoAutoAssignPostIds_() {
   const ids = {};
 
   try {
-    readPosts().forEach(function (row) {
+    readPosts_().forEach(function (row) {
       if (isTrueValue_(row[COLUMNS.POSTS.AUTO_GENERATE])) return;
       const id = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
       if (id) ids[id] = true;
@@ -60,7 +60,7 @@ function listNoAutoAssignPostIds_() {
   }
 
   try {
-    const rules = readRules();
+    const rules = readRules_();
     const rule = rules[RULE_IDS.NO_AUTO_GENERATE];
     if (rule) {
       splitList_(rule[COLUMNS.RULE_SETTINGS.SCOPE_POST_IDS]).forEach(function (id) {
@@ -101,7 +101,7 @@ function apiGetEligibilityMatrix() {
     // **唔寫死崗位代碼**（崗位代碼喺唔同試算表可能唔同，寫死就會靜靜失效）。
     const noAutoPostIds = listNoAutoAssignPostIds_();
 
-    const posts = readPosts().map(function (row) {
+    const posts = readPosts_().map(function (row) {
       const postId = String(row[COLUMNS.POSTS.POST_ID] || '').trim();
       return {
         postId: postId,
@@ -113,7 +113,7 @@ function apiGetEligibilityMatrix() {
     }).filter(function (p) { return p.postId !== ''; });
 
     const people = [];
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const personId = String(row[M.PERSON_ID] || '').trim();
       if (!personId) return;
       // 停用嘅人照顯示（佢哋可能仲有資格紀錄要睇），但標示出嚟。
@@ -128,7 +128,7 @@ function apiGetEligibilityMatrix() {
 
     // 第八十五輪批次 LC 組：「堂委」「執事」（ROLE_LABELS_TC）排在最前，勾了就寫一行 PersonID＝`ROLE:…`；
     // 名稱寫「堂委（現任 6 位：甲、乙……）」（以今日為準）。
-    const display = readRolesForDisplay_(getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+    const display = readRolesForDisplay_(getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
     const todayStr = display.today;
     const roles = display.roles;
     const nameById = {};
@@ -140,7 +140,7 @@ function apiGetEligibilityMatrix() {
 
     // 格內容：`PersonID|PostID` → {eligible, historicalCount}
     const cells = {};
-    readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+    readSheet_(SHEETS.ELIGIBILITY).forEach(function (row) {
       const personId = String(row[E.PERSON_ID] || '').trim();
       const postId = String(row[E.POST_ID] || '').trim();
       if (!personId || !postId) return;
@@ -226,14 +226,14 @@ function apiSaveEligibilityBatch(changes, quarterId) {
   const opened = openSheetForEdit_(SHEETS.ELIGIBILITY);
   const nameIndex = buildPersonNameIndex_();
   const postNames = {};
-  readPosts().forEach(function (row) {
+  readPosts_().forEach(function (row) {
     postNames[String(row[COLUMNS.POSTS.POST_ID] || '').trim()] =
       String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim();
   });
 
   // 先讀一次現況，逐項比對——避免逐項各讀一次成張表。
   const existing = {};
-  readSheet(SHEETS.ELIGIBILITY).forEach(function (row, i) {
+  readSheet_(SHEETS.ELIGIBILITY).forEach(function (row, i) {
     const personId = String(row[E.PERSON_ID] || '').trim();
     const postId = String(row[E.POST_ID] || '').trim();
     if (!personId || !postId) return;
@@ -245,7 +245,7 @@ function apiSaveEligibilityBatch(changes, quarterId) {
   // 撞過同一件事：未格式化嘅 Date 物件顯示出嚟係
   // `Mon Aug 17 2026 ... GMT+1200`，而且排序會用字串比大細。
   const todayStr = Utilities.formatDate(
-    new Date(), getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd');
+    new Date(), getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd');
 
   let added = 0;
   let removed = 0;
@@ -329,7 +329,7 @@ function apiGetEligibilityViewOnly(quarterId) {
   assertWebAppRequestAllowed_('apiGetEligibilityViewOnly');
   beginSheetReadMemo_();
   try {
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
     return buildEligibilityViewOnly_(String(quarterId || '').trim(), today);
   } finally {
@@ -344,12 +344,12 @@ function apiGetEligibilityViewOnly(quarterId) {
  * @returns {{quarterId: string, quarterLabel: string, posts: Object[]}}
  */
 function buildEligibilityViewOnly_(quarterId, todayStr) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const quarter = quarterId ? findQuarter_(quarterId) : null;
-  const start = quarter ? toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
-  const end = quarter ? toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
+  const start = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+  const end = quarter ? toDateString_(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
   const nameById = readPersonNameIndex_();
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const roles = readRolesSafe_(timezone);
   const exclusionsByPost = {};
   readPersonPostExclusionsSafe_(timezone).forEach(function (e) {
@@ -357,7 +357,7 @@ function buildEligibilityViewOnly_(quarterId, todayStr) {
     if (end && e.effectiveFrom && e.effectiveFrom > end) return;
     (exclusionsByPost[e.postId] = exclusionsByPost[e.postId] || {})[e.personId] = e.reason || '';
   });
-  const posts = readPostsNormalized().filter(function (p) { return p.autoGenerate; }).map(function (p) {
+  const posts = readPostsNormalized_().filter(function (p) { return p.autoGenerate; }).map(function (p) {
     const excluded = exclusionsByPost[p.postId] || {};
     const ids = ((eligibility.byPost || {})[p.postId] || []).slice();
     const names = ids.map(function (id) {

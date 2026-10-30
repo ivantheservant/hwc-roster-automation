@@ -6,7 +6,7 @@
  * （"Exceeded maximum execution time"，不是可以 catch 的例外，中斷前已處理的人
  * 也未必有任何紀錄）。改為選單「產生個人 PDF」分批執行、進度存在 Script Properties，
  * 每批處理到接近時間上限就停下存進度，下次按同一個選單、輸入同一個季度／版本即可接續，
- * 用法與「診斷工具 → 參數掃描」（見 Tune.gs 的 tuneParameters()）完全同一手法。
+ * 用法與「診斷工具 → 參數掃描」（見 Tune.gs 的 tuneParameters_()）完全同一手法。
  *
  * 寄送階段（Mailer.gs 的 OFFICIAL／RESEND）不再即時匯出 PDF，
  * 改為直接讀取這裡已經產生好、存在 Shared Drive 的檔案。
@@ -39,9 +39,9 @@ function generatePersonalPdfBatch_(quarterId, versionNo) {
   const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);
 
   const progress = loadPdfBatchProgress_(quarterId, versionNo);
-  const forceRegenerate = getConfig(CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, false) === true;
+  const forceRegenerate = getConfig_(CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, false) === true;
   const batchSize = Math.max(1, Math.round(
-    getConfig(CONFIG_KEYS.PDF_BATCH_SIZE, DEFAULTS.PDF_BATCH_SIZE)));
+    getConfig_(CONFIG_KEYS.PDF_BATCH_SIZE, DEFAULTS.PDF_BATCH_SIZE)));
 
   // 效能優化：以下兩者在同一批要處理的所有人之間完全共用，一次讀取即可，
   // 不必像原本那樣每個人各自重讀一次。分別解決實測的兩個效能熱點：
@@ -278,9 +278,9 @@ function generatePersonalPdfBatchForPeople_(quarterId, versionNo, personIds) {
   const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);
 
   const progress = loadPdfResendBatchProgress_(quarterId, versionNo, personIds);
-  const forceRegenerate = getConfig(CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, false) === true;
+  const forceRegenerate = getConfig_(CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, false) === true;
   const batchSize = Math.max(1, Math.round(
-    getConfig(CONFIG_KEYS.PDF_BATCH_SIZE, DEFAULTS.PDF_BATCH_SIZE)));
+    getConfig_(CONFIG_KEYS.PDF_BATCH_SIZE, DEFAULTS.PDF_BATCH_SIZE)));
 
   // ⚠️ 第六十三輪批次 A2 組：連最後更新時間一齊列——「已存在」仲要「唔係過期」
   const existingFileSizes = forceRegenerate ? null : listExistingFileInfo_(folder);
@@ -371,7 +371,7 @@ function isPersonalPdfStale_(fileLastUpdated, contentUpdatedAt, timezone) {
  * @returns {{timezone: string, updatedAt: ?string}}
  */
 function readPersonalPdfContentStamp_(quarterId, versionNo) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return { timezone: timezone, updatedAt: readLatestAssignmentUpdatedAt_(quarterId, versionNo, timezone) };
 }
 
@@ -385,7 +385,7 @@ function readPersonalPdfContentStamp_(quarterId, versionNo) {
  */
 function readVersionAssignmentsRaw_(quarterId, versionNo) {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  return readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+  return readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
     return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
   });
 }
@@ -427,7 +427,7 @@ function generateOnePersonalPdf_(
 ) {
   const personName = lookupPersonName_(personId);
   const fileName = buildAttachmentName_(quarterId, versionNo, personName);
-  const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+  const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
 
   // 階段 E（第五輪批次）修正：forceRegenerate=TRUE 時，「是否已存在」這個問題
   // 的答案永遠不影響結果（下面的 `!forceRegenerate && alreadyExists` 一定是
@@ -505,7 +505,7 @@ function generateOnePersonalPdf_(
  */
 function planPersonalPdfIntegrityCheck_(quarterId, versionNo) {
   const people = listPeopleNeedingPersonalPdf_(quarterId, versionNo);
-  const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+  const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
   // ⚠️ 第二十六輪批次階段 B：**一定要新舊兩處都睇。**
   // 淨係睇子資料夾嘅話，舊季度（檔案平舖喺根）會全部報「缺件」——
   // 而檔案其實好地地喺度。呢種「報告話缺，實際唔缺」比漏報更難查。
@@ -555,7 +555,7 @@ function planPersonalPdfIntegrityCheck_(quarterId, versionNo) {
 function listPeopleNeedingPersonalPdf_(quarterId, versionNo) {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
   const personIds = {};
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[C.QUARTER_ID] !== quarterId) return;
     if (Number(row[C.VERSION_NO]) !== versionNo) return;
     const personId = row[C.PERSON_ID];
@@ -623,7 +623,7 @@ function checkMissingPersonalPdfs_(quarterId, versionNo, stage, sendOptions) {
   // 不要對每個人各自查詢一次 Drive（見 listExistingFileSizes_()）。
   // 追加階段 AG：大小不足門檻的檔案也算缺件——0 bytes 的檔案存在不代表可用。
   // 第二十六輪批次階段 B：新舊兩處都睇（見 planPersonalPdfIntegrityCheck_ 嘅說明）。
-  const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+  const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
   const existingFileInfo = listRosterPdfInfoForQuarter_(quarterId);
   // ⚠️ 第六十三輪批次 A2 組：過期（內容改咗之後未重做）都算缺件——
   // 寄出去嘅會係一份印住「待確認」嘅舊表。但**分開講**：
@@ -846,7 +846,7 @@ function pdfBatchClientFields_(result) {
  */
 function diagnosePersonalPdfVersions_(quarterId) {
   const folder = resolveMailAttachmentFolder_();
-  const latestVersionNo = findLatestVersionNo(quarterId);
+  const latestVersionNo = findLatestVersionNo_(quarterId);
   // 第二十六輪批次階段 B：經共用入口，新舊兩處都會計到。
 
   // 用一個唔可能出現喺真實姓名入面嘅哨兵字串去反推檔名格式，

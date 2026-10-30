@@ -163,9 +163,9 @@ gas.writeToPossiblyProtectedGridSheet_ = function (sheet, fn) { fn(); return fal
 })();
 
 function flowerRow(versionNo, dateStr) {
-  return gas.readSheet(S.ROSTER_ASSIGNMENTS).find(function (r) {
+  return gas.readSheet_(S.ROSTER_ASSIGNMENTS).find(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === 'FLOWER';
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === dateStr && r[A.POST_ID] === 'FLOWER';
   });
 }
 /** 直接改長表某一格嘅 AssignSource——模擬「生成器錯誤地自己排咗」。 */
@@ -177,7 +177,7 @@ function setFlowerSource(versionNo, dateStr, source) {
     if (String(sheet.getRange(r, col(A.QUARTER_ID)).getValue()) !== Q) continue;
     if (Number(sheet.getRange(r, col(A.VERSION_NO)).getValue()) !== versionNo) continue;
     if (String(sheet.getRange(r, col(A.POST_ID)).getValue()) !== 'FLOWER') continue;
-    if (gas.toDateString(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== dateStr) continue;
+    if (gas.toDateString_(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== dateStr) continue;
     sheet.getRange(r, col(A.ASSIGN_SOURCE)).setValue(source);
     return true;
   }

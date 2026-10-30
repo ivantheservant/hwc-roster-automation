@@ -9,8 +9,8 @@
  * ＋ICS 附件），但只寄去一個由操作者當場輸入嘅測試電郵地址——**絕對唔會寄去
  * 任何義工自己嘅電郵**，亦唔會影響任何人之後真正嘅寄送判斷。
  *
- * ## 點解要獨立一個函式，唔重用 sendStage()
- * `sendStage()`（`Mailer.gs`）一定會寄畀 `listRecipients_()` 傳返嘅全部
+ * ## 點解要獨立一個函式，唔重用 sendStage_()
+ * `sendStage_()`（`Mailer.gs`）一定會寄畀 `listRecipients_()` 傳返嘅全部
  * 收件人（可能幾十人），冇「淨係寄一個人」呢個參數，唔可以借嚟做單一測試信。
  *
  * ## 點解唔寫入 SendLog
@@ -49,7 +49,7 @@
  */
 function sendIcsTestEmail_(quarterId, versionNo, personId, testEmail) {
   assertNotPreviewMode_('sendIcsTestEmail_');
-  if (getConfig(CONFIG_KEYS.DRY_RUN, true) !== false) {
+  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false) {
     throw new Error('Config 的 DRY_RUN 目前不是 FALSE，無法寄出測試信。\n\n'
       + '請先到 Config 工作表暫時將 DRY_RUN 改為 FALSE，測試完成、確認收到之後'
       + '記得改回 TRUE（除非你正準備正式發出，那就不用改回去）。');
@@ -128,7 +128,7 @@ function runSendIcsTestEmail_() {
   const ui = SpreadsheetApp.getUi();
   const title = '寄送單一 ICS／highlight 測試信';
 
-  const dryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const dryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   if (dryRun) {
     ui.alert(title,
       '⚠️ Config 的 DRY_RUN 目前是 TRUE，這個工具無法運作（它必須真正寄出這一封信，'

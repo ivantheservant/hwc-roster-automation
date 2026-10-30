@@ -174,9 +174,9 @@ function buildFixture() {
 buildFixture();
 
 function cellOf(v, date, post) {
-  return gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (r) {
+  return gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === v
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
   })[0];
 }
 
@@ -190,7 +190,7 @@ function setGrid(v, date, post, text) {
   }
   if (col === -1) return false;
   for (let r = 3; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
     sh.getRange(r, col).setValue(text);
     return true;
   }
@@ -198,7 +198,7 @@ function setGrid(v, date, post, text) {
 }
 
 function requestRowsFor(quarterId) {
-  return gas.readSheet(S.REQUESTS).filter(function (r) { return r[R.QUARTER_ID] === quarterId; });
+  return gas.readSheet_(S.REQUESTS).filter(function (r) { return r[R.QUARTER_ID] === quarterId; });
 }
 
 // =====================================================================
@@ -214,7 +214,7 @@ checkEqual('（前置）Stage 已經行到步驟 3 可以做嘅位置',
 // =====================================================================
 console.log('\n=== F 組【核心】步驟 3 嗰條路：grid 贏，而且申報要記低 ===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
   const before = String(cellOf(base, DATES[2], 'CHAIR')[A.PERSON_ID]);
   const mine = Object.keys(PEOPLE).find(function (id) { return id !== before; });
   const theirs = Object.keys(PEOPLE).find(function (id) { return id !== before && id !== mine; });
@@ -238,12 +238,12 @@ console.log('\n=== F 組【核心】步驟 3 嗰條路：grid 贏，而且申報
   const res = gas.apiStep3Apply(Q, []);
   check('★★★★ 步驟 3 行得完', !!res, JSON.stringify(res).slice(0, 200));
 
-  const next = gas.findLatestVersionNo(Q);
+  const next = gas.findLatestVersionNo_(Q);
   checkEqual('★★★★★ **幹事親手改嗰個人留低咗**'
     + '（修正之前：申報會靜靜蓋過去，幹事改完跑完步驟 3 就冇咗，冇任何提示）',
     String(cellOf(next, DATES[2], 'CHAIR')[A.PERSON_ID]), mine);
 
-  const req = requestRowsFor(Q).filter(function (r) { return gas.toDateString(r[R.SERVICE_DATE], TZ) === DATES[2] && r[R.POST_NAME] === '主席'; })[0];
+  const req = requestRowsFor(Q).filter(function (r) { return gas.toDateString_(r[R.SERVICE_DATE], TZ) === DATES[2] && r[R.POST_NAME] === '主席'; })[0];
   checkEqual('★★★★★ 而嗰筆申報唔可以就噉消失——Status 要寫得出佢冇被套用',
     String(req[R.STATUS]), gas.REQUEST_STATUS.REJECTED);
   check('★★★★★ 而且處理結果欄講得出**點解**（義工提交嘅要求唔可以無聲無息消失）',
@@ -254,7 +254,7 @@ console.log('\n=== F 組【核心】步驟 3 嗰條路：grid 贏，而且申報
 // =====================================================================
 console.log('\n=== F 組：反方向——冇人手改動嗰格，申報照樣要生效 ===');
 {
-  const base = gas.findLatestVersionNo(Q);
+  const base = gas.findLatestVersionNo_(Q);
   const before = String(cellOf(base, DATES[4], 'READ')[A.PERSON_ID]);
   const theirs = Object.keys(PEOPLE).find(function (id) { return id !== before; });
 
@@ -265,12 +265,12 @@ console.log('\n=== F 組：反方向——冇人手改動嗰格，申報照樣�
       [R.REQUEST_TYPE]: gas.REQUEST_TYPE.DESIGNATED_SERVE, [R.STATUS]: '' }]);
 
   gas.apiStep3Apply(Q, []);
-  const next = gas.findLatestVersionNo(Q);
+  const next = gas.findLatestVersionNo_(Q);
 
   checkEqual('★★★★★ 冇人手改動嗰格，申報照樣套用'
     + '（唔係就代表修正把所有申報都擋咗，等於整個申報功能失效）',
     String(cellOf(next, DATES[4], 'READ')[A.PERSON_ID]), theirs);
-  const req = requestRowsFor(Q).filter(function (r) { return gas.toDateString(r[R.SERVICE_DATE], TZ) === DATES[4] && r[R.POST_NAME] === '讀經'; })[0];
+  const req = requestRowsFor(Q).filter(function (r) { return gas.toDateString_(r[R.SERVICE_DATE], TZ) === DATES[4] && r[R.POST_NAME] === '讀經'; })[0];
   checkEqual('★★★★★ 而且 Status 係 APPLIED',
     String(req[R.STATUS]), gas.REQUEST_STATUS.APPLIED);
 }

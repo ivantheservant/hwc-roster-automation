@@ -245,21 +245,21 @@ function setGrid(sheetName, date, post, text) {
   }
   if (col === -1) return false;
   for (let r = keyRow + 1; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
     sh.getRange(r, col).setValue(text);
     return true;
   }
   return false;
 }
 function whoIsOn(versionNo, date, post) {
-  const row = gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const row = gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
   })[0];
   return row ? String(row[A.PERSON_ID] || '') : null;
 }
 function gridOf(versionNo) { return gas.buildRosterSheetName_(Q, versionNo); }
-function auditRows() { return gas.readSheet(S.AUDIT_LOG); }
+function auditRows() { return gas.readSheet_(S.AUDIT_LOG); }
 /** 稽核表嘅標題行唔一定係第 1 行（fixture 有一行表名）——掃出嚟。 */
 function auditHeader(sh) {
   for (let r = 1; r <= Math.min(sh.getLastRow(), 5); r++) {
@@ -299,7 +299,7 @@ const CELL_DATE = 2;   // DATES[2] 主席——放落唔合資格嘅人
 // =====================================================================
 console.log('\n=== 前置：生成初稿，幹事把唔合資格嘅人放落主席 ===');
 check('（前置）生成成功', gas.apiGenerateDraftExecute(Q) !== undefined);
-const V0 = gas.findLatestVersionNo(Q);
+const V0 = gas.findLatestVersionNo_(Q);
 const ORIGINAL_CHAIR = whoIsOn(V0, DATES[CELL_DATE], 'CHAIR');
 check('（前置）v0 嗰格本來有合資格嘅人', ORIGINAL_CHAIR && READ_ONLY.indexOf(ORIGINAL_CHAIR) === -1, ORIGINAL_CHAIR);
 check('（前置）打字：假丁 → 主席', setGrid(gridOf(V0), DATES[CELL_DATE], 'CHAIR', PEOPLE.P9604));
@@ -324,7 +324,7 @@ console.log('\n=== AG1【核心】第一次儲存要打字放行，而且寫落�
   const result = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('★★★★★ 勾咗「保留我的安排」⇒ 建立新版本',
     result.ok === true && result.versionCreated === true, JSON.stringify(result).slice(0, 300));
-  V1 = gas.findLatestVersionNo(Q);
+  V1 = gas.findLatestVersionNo_(Q);
   checkEqual('★★★★ 新版本嗰格就係假丁', whoIsOn(V1, DATES[CELL_DATE], 'CHAIR'), 'P9604');
 
   const rows = auditRows().filter(function (r) { return r[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_ACTION; });
@@ -468,7 +468,7 @@ console.log('\n=== AH1【核心】人手清空一格 ⇒ 寄出前嘅資料有�
     && plan.blankCells[0].serviceDate === DATES[5], JSON.stringify(plan.blankCells));
   const result = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
   check('（前置）儲存成功', result.ok === true && result.versionCreated === true, JSON.stringify(result).slice(0, 200));
-  V2 = gas.findLatestVersionNo(Q);
+  V2 = gas.findLatestVersionNo_(Q);
   checkEqual('（前置）新版本嗰格真係冇人', whoIsOn(V2, DATES[5], 'READ'), '');
 
   const review = gas.apiStep2Preview(Q, {});

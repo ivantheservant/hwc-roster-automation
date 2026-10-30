@@ -105,21 +105,21 @@ const GENERATE_TARGET_WARN_SELECTED_GENERATED = 'SELECTED_GENERATED';
  * @returns {Object} 目標季度同警告
  */
 function resolveGenerateTargetQuarter_(selectedQuarterId) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const goLiveQuarterId = String(
-    getConfig(CONFIG_KEYS.GO_LIVE_QUARTER_ID, DEFAULTS.GO_LIVE_QUARTER_ID) || '').trim();
+    getConfig_(CONFIG_KEYS.GO_LIVE_QUARTER_ID, DEFAULTS.GO_LIVE_QUARTER_ID) || '').trim();
   const C = COLUMNS.QUARTERS;
 
-  const quarters = readSheet(SHEETS.QUARTERS).map(function (row) {
+  const quarters = readSheet_(SHEETS.QUARTERS).map(function (row) {
     const quarterId = String(row[C.QUARTER_ID] || '').trim();
     return {
       quarterId: quarterId,
-      startDate: toDateString(row[C.START_DATE], timezone),
-      endDate: toDateString(row[C.END_DATE], timezone),
+      startDate: toDateString_(row[C.START_DATE], timezone),
+      endDate: toDateString_(row[C.END_DATE], timezone),
       // 第四十輪批次 E 組：生成日期。幹事要一眼看得到自己在做什麼。
-      generateOn: toDateString(row[C.GENERATE_ON], timezone),
-      versionNo: findLatestVersionNo(quarterId)
+      generateOn: toDateString_(row[C.GENERATE_ON], timezone),
+      versionNo: findLatestVersionNo_(quarterId)
     };
   }).filter(function (q) { return q.quarterId !== ''; });
 
@@ -235,7 +235,7 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
     daysUntilGenerateOn: daysUntil,
     alreadyGenerated: target.versionNo >= 0,
     // ⚠️ 第四十二輪批次 C 組：掣旁邊要同時顯示「現時有幾多個版本」。
-    // `findLatestVersionNo()` 回 -1 代表一個都沒有；版本由 v0 起計，
+    // `findLatestVersionNo_()` 回 -1 代表一個都沒有；版本由 v0 起計，
     // 所以「有幾多個」＝ 最新版本號 ＋ 1。
     versionCount: target.versionNo >= 0 ? target.versionNo + 1 : 0,
     latestVersionNo: target.versionNo,
@@ -329,7 +329,7 @@ function readSuggestionStateSafely_(quarterId) {
  */
 function countPeopleWithoutEmail_(quarterId) {
   try {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) return 0;
     return listPeopleNeedingPaper_(quarterId, versionNo).length;
   } catch (err) {
@@ -388,7 +388,7 @@ function apiGetPaperListState(quarterId) {
   assertWebAppRequestAllowed_('apiGetPaperListState');
   beginSheetReadMemo_();
   try {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) {
       return { versionNo: -1, noEmail: [], withEmail: [], tempHelpers: [], message: '這一季還沒有生成過任何版本。' };
     }

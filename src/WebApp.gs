@@ -72,7 +72,7 @@ const WEBAPP_READ_ONLY_EXCEPTIONS = ['apiVerifyRosterForZone4'];
  * @returns {void}
  */
 function assertWebAppEnabled_() {
-  if (getConfig(CONFIG_KEYS.WEBAPP_ENABLED, false) !== true) {
+  if (getConfig_(CONFIG_KEYS.WEBAPP_ENABLED, false) !== true) {
     throw new Error('Web UI 目前已停用（Config 的 WEBAPP_ENABLED 不是 TRUE）。');
   }
 }
@@ -83,7 +83,7 @@ function assertWebAppEnabled_() {
  * @returns {string[]}
  */
 function readWebAppEmailList_(key) {
-  const configured = getConfig(key, []);
+  const configured = getConfig_(key, []);
   return (Array.isArray(configured) ? configured : String(configured || '').split(','))
     .map(function (e) { return String(e).trim().toLowerCase(); })
     .filter(Boolean);
@@ -100,7 +100,7 @@ function resolveWebAppRole_(email) {
   const explicitList = readWebAppEmailList_(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS);
   const editors = explicitList.length > 0
     ? explicitList
-    : [String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '')).trim().toLowerCase()].filter(Boolean);
+    : [String(getConfig_(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '')).trim().toLowerCase()].filter(Boolean);
   const viewers = readWebAppEmailList_(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS);
   let role = '';
   if (email && editors.indexOf(email) !== -1) role = WEBAPP_ROLE.EDITOR;
@@ -277,13 +277,24 @@ function renderWebAppForbiddenPage_() {
   ).setTitle('粵語堂職事表系統');
 }
 
+/** 第八十八輪批次 PC 組：`includeHtml()` 只可以讀 `ui/` 下面的檔（字母、數字、`/`、`_`、`-`，不可以有 `..`）。 */
+const INCLUDE_HTML_NAME_PATTERN = /^ui\/[A-Za-z0-9_\-\/]+$/;
+
 /**
  * 讓 HTML 檔案可以引入其他 HTML 片段（樣式、腳本）。
+ *
+ * 第八十八輪批次 PC 組：這是少數**必須保持公開**（不以 `_` 結尾）的函式——`ui/Index.html` 的模板用它。
+ * 公開函式可以被這個腳本送出的任何網頁用 `google.script.run` 呼叫，所以只准讀 `ui/` 下面的介面檔，
+ * 其他名稱一律拒絕（不讀檔）。
  * @param {string} fileName 檔案名稱，例如 "ui/Style"
  * @returns {string} 該檔案的內容
  */
 function includeHtml(fileName) {
-  return HtmlService.createHtmlOutputFromFile(fileName).getContent();
+  const name = String(fileName === undefined || fileName === null ? '' : fileName);
+  if (!INCLUDE_HTML_NAME_PATTERN.test(name) || name.indexOf('..') !== -1) {
+    throw new Error('includeHtml 只可以讀 ui/ 下面的介面檔。');
+  }
+  return HtmlService.createHtmlOutputFromFile(name).getContent();
 }
 
 /**
@@ -327,8 +338,8 @@ function apiSetThemePreference(theme) {
  */
 function apiListQuarters() {
   assertWebAppRequestAllowed_('apiListQuarters');
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  return readSheet(SHEETS.QUARTERS).map(function (row) {
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  return readSheet_(SHEETS.QUARTERS).map(function (row) {
     const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
     return {
       quarterId: quarterId,
@@ -337,9 +348,9 @@ function apiListQuarters() {
       // 冇任何意義，佢腦入面嗰個概念係「十月至十二月嗰季」。
       label: buildQuarterLabel_(quarterId),
       status: row[COLUMNS.QUARTERS.STATUS],
-      startDate: toDateString(row[COLUMNS.QUARTERS.START_DATE], timezone),
-      endDate: toDateString(row[COLUMNS.QUARTERS.END_DATE], timezone),
-      latestVersionNo: findLatestVersionNo(quarterId)
+      startDate: toDateString_(row[COLUMNS.QUARTERS.START_DATE], timezone),
+      endDate: toDateString_(row[COLUMNS.QUARTERS.END_DATE], timezone),
+      latestVersionNo: findLatestVersionNo_(quarterId)
     };
   });
 }
@@ -352,7 +363,7 @@ function apiListQuarters() {
 function apiListVersions(quarterId) {
   assertWebAppRequestAllowed_();
   const C = COLUMNS.ROSTER_VERSIONS;
-  return readSheet(SHEETS.ROSTER_VERSIONS)
+  return readSheet_(SHEETS.ROSTER_VERSIONS)
     .filter(function (row) { return row[C.QUARTER_ID] === quarterId; })
     .map(function (row) {
       return {
@@ -376,7 +387,7 @@ function apiListVersions(quarterId) {
  * 不是「規則不一致」：階段 E 檢視時發現的真實風險是，Web UI 可以在
  * Stage 已經前進到 `REQUESTS_APPLIED`／`OFFICIAL_SENT` 之後，繞過使用者所在的
  * 選單情境，不知不覺建立一個新版本——而步驟 3／4／5 全部用
- * `findLatestVersionNo()` 認定「目前是哪一版」，這樣的新版本會在使用者不知情下
+ * `findLatestVersionNo_()` 認定「目前是哪一版」，這樣的新版本會在使用者不知情下
  * 變成之後步驟的底本。要求 `Stage=DRAFT` 正是四階段流程步驟 1 本身的前置條件
  * （`runFourStageStep1_()`），這裡是把同一個防線也套用在 Web UI 上，
  * 防止它在生成初稿的時機以外的任何時候插入一個新版本。
@@ -423,7 +434,7 @@ function apiGenerateRoster(quarterId) {
 /**
  * 判斷 RosterAssignments.RuleFlags 的原始文字（逗號分隔，例如 "HARD_COMMUNION_FIRST_SUNDAY"）
  * 是否含有結構性不適用的 RuleID。與 RosterWriter.gs 的 isStructuralNotApplicable_()
- * 判斷邏輯相同，差別只在於這裡的輸入已經被 writeAssignments() 序列化成字串，
+ * 判斷邏輯相同，差別只在於這裡的輸入已經被 writeAssignments_() 序列化成字串，
  * 不是原始陣列。
  * @param {string} flagsText RuleFlags 欄的原始文字
  * @returns {boolean} 是否為結構性不適用
@@ -441,7 +452,7 @@ function isStructuralNotApplicableFlagsText_(flagsText) {
  */
 function apiGetRosterGrid(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   // 第十輪批次階段 A：改為跟 grid／PDF 完全共用同一套分類與文字對照
   // （classifyGridCell_() ＋ resolveGridCellText_()），令三個顯示面
   // （grid 工作表、由 grid 匯出的 PDF、Web UI）永遠講同一件事。
@@ -450,14 +461,14 @@ function apiGetRosterGrid(quarterId, versionNo) {
   const labels = readGridCellLabels_();
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
 
-  const assignments = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+  const assignments = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
     return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
   });
   if (assignments.length === 0) throw new Error('找不到 ' + quarterId + ' v' + versionNo + ' 的派工紀錄');
 
   const byKey = {};
   assignments.forEach(function (row) {
-    const key = toDateString(row[C.SERVICE_DATE], timezone) + '|' + row[C.POST_ID] + '|' + row[C.SLOT_INDEX];
+    const key = toDateString_(row[C.SERVICE_DATE], timezone) + '|' + row[C.POST_ID] + '|' + row[C.SLOT_INDEX];
     byKey[key] = {
       // classifyGridCell_() 要嘅形狀：RuleFlags 喺長表係逗號分隔字串，
       // 拆返做陣列先餵入去，判斷邏輯就同 grid 嗰邊一模一樣。
@@ -469,7 +480,7 @@ function apiGetRosterGrid(quarterId, versionNo) {
     };
   });
 
-  const posts = readPostsNormalized();
+  const posts = readPostsNormalized_();
   const headers = [GRID_LABELS.DATE, GRID_LABELS.WEEK];
   const cellKeys = [];
   const emptyDisplayByPostId = {};
@@ -481,7 +492,7 @@ function apiGetRosterGrid(quarterId, versionNo) {
     }
   });
 
-  const rows = readServiceDatesNormalized(quarterId, timezone).map(function (d) {
+  const rows = readServiceDatesNormalized_(quarterId, timezone).map(function (d) {
     const row = [
       { text: d.serviceDate, state: 'meta' },
       { text: String(d.weekIndex), state: 'meta' }
@@ -519,7 +530,7 @@ function apiGetRosterGrid(quarterId, versionNo) {
  * 追加階段 AV：這個函式會寫入一張新的 `Verify_` 工作表，但**沒有**加 Stage 檢查
  * ——對應的選單項目「測試工具 ▸ 核對職事表」（`runVerifyRoster_()`）本身也沒有
  * Stage 限制，設計上任何 Stage、任何版本都可以核對。它不會改動
- * RosterAssignments／RosterVersions，不會影響 `findLatestVersionNo()` 認定的
+ * RosterAssignments／RosterVersions，不會影響 `findLatestVersionNo_()` 認定的
  * 「目前版本」，跟 `apiGenerateRoster()` 那種會實際改變流程狀態的風險不同，
  * 所以刻意維持與選單版本一致、不額外加限制（見 HANDOFF.md 決策 AV-2）。
  * @param {string} quarterId 季度 ID
@@ -528,7 +539,7 @@ function apiGetRosterGrid(quarterId, versionNo) {
  */
 function apiVerifyRoster(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
-  const result = verifyRoster(quarterId, versionNo);
+  const result = verifyRoster_(quarterId, versionNo);
   return {
     sheetName: result.sheetName,
     rows: result.report.rows,
@@ -557,8 +568,8 @@ function apiVerifyRoster(quarterId, versionNo) {
  */
 function apiDetectChanges(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
-  const result = proposeMinimalFix(quarterId, versionNo);
-  const written = writeProposals(result);
+  const result = proposeMinimalFix_(quarterId, versionNo);
+  const written = writeProposals_(result);
   const people = indexPeopleById_();
   const nameOf = function (personId) {
     if (!personId) return '（空白）';

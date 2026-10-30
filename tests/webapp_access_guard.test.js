@@ -71,7 +71,7 @@ console.log('\n=== D3：WEBAPP_ENABLED=FALSE 時，任何 api 函式的防護關
     () => assertWebAppRequestAllowed_(disabledConfig, 'admin@example.invalid'));
 
   // Config 值不是嚴格 boolean true（例如字串 'TRUE'、1、undefined）也一律視為未啟用——
-  // 呼叫端已經用 getConfig(...) 轉換成正確的布林值，這裡測的是「非嚴格 true 一律擋」
+  // 呼叫端已經用 getConfig_(...) 轉換成正確的布林值，這裡測的是「非嚴格 true 一律擋」
   // 這個防呆本身沒有被弱化。
   ['TRUE', 1, undefined, null, ''].forEach(function (v) {
     checkThrows('★ WEBAPP_ENABLED=' + JSON.stringify(v) + '（非嚴格 boolean true）→ 一律拒絕',

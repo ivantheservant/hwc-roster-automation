@@ -12,7 +12,7 @@ function makeDb() {
   return {
     requests: [], // {quarterId, requestId, serviceDateText, personNameText, requestType}
     quarterStages: {}, // quarterId -> stage
-    nameToPersonId: {} // 姓名 -> PersonID（模擬 resolvePersonId）
+    nameToPersonId: {} // 姓名 -> PersonID（模擬 resolvePersonId_）
   };
 }
 function resolvePersonId_(db, name) { return db.nameToPersonId[name] || ''; }

@@ -121,7 +121,7 @@ function countVersionCellClasses_(rows) {
 function findLostNamesBetweenVersions_(prevRows, rows, timezone) {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
   const keyOf = function (row) {
-    return toDateString(row[C.SERVICE_DATE], timezone)
+    return toDateString_(row[C.SERVICE_DATE], timezone)
       + '|' + row[C.POST_ID] + '|' + row[C.SLOT_INDEX];
   };
   const nameOf = function (row) {
@@ -146,7 +146,7 @@ function findLostNamesBetweenVersions_(prevRows, rows, timezone) {
     if (flags.indexOf(RULE_IDS.NO_AUTO_GENERATE) === -1) return;
 
     lost.push({
-      serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+      serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
       postId: row[C.POST_ID],
       slotIndex: row[C.SLOT_INDEX],
       lostName: nameOf(prev)
@@ -204,9 +204,9 @@ function judgeVersionCellCounts_(c, lost, prevVersionNo) {
  * 掃描所有季度的所有版本，回傳逐版的清點結果。**唯讀，不改任何資料。**
  * @returns {Object[]} 逐版一筆，含 quarterId／versionNo／counts／level／note
  */
-function auditAllVersionCellClasses() {
+function auditAllVersionCellClasses_() {
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const all = readSheet(SHEETS.ROSTER_ASSIGNMENTS);
+  const all = readSheet_(SHEETS.ROSTER_ASSIGNMENTS);
 
   const byVersion = {};
   const order = [];
@@ -225,7 +225,7 @@ function auditAllVersionCellClasses() {
     return a.versionNo - b.versionNo;
   });
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const startedAt = Date.now();
   const results = [];
   let stoppedEarly = false;
@@ -271,7 +271,7 @@ function auditAllVersionCellClasses() {
  * ⚠️ 這是這個工具唯一會寫的東西。它**不會**碰 RosterAssignments、
  * RosterVersions、任何 grid 工作表，也不會碰任何一季的資料。
  *
- * @param {Object[]} results `auditAllVersionCellClasses()` 的結果
+ * @param {Object[]} results `auditAllVersionCellClasses_()` 的結果
  * @returns {string} 工作表名稱
  */
 function writeVersionCellAuditSheet_(results) {
@@ -335,7 +335,7 @@ function writeVersionCellAuditSheet_(results) {
  * **不會為了這一份而調高**。所以只寫摘要同「看來壞了」那幾個版本，
  * 不逐版寫——逐版寫會把其他報告擠走。
  *
- * @param {Object[]} results `auditAllVersionCellClasses()` 的結果
+ * @param {Object[]} results `auditAllVersionCellClasses_()` 的結果
  * @param {string} sheetName 明細寫在哪一張表
  * @returns {{diagnosticsOk: boolean, diagnosticsError: string}}
  */
@@ -392,7 +392,7 @@ function runVersionCellAudit_() {
   const ui = SpreadsheetApp.getUi();
   let results;
   try {
-    results = auditAllVersionCellClasses();
+    results = auditAllVersionCellClasses_();
   } catch (err) {
     log_('ERROR', 'runVersionCellAudit_ 失敗: ' + err.message);
     ui.alert('清點格子分類', '讀取失敗：\n\n' + err.message, ui.ButtonSet.OK);

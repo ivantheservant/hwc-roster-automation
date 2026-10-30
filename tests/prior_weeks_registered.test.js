@@ -33,7 +33,7 @@ const assignments = [
   // v2：寫咗一半、冇登記嘅孤兒版本——最後一週換咗人
   cell(2, '2099-03-22', 'P9601'), cell(2, '2099-03-29', 'P9699')
 ];
-gas.readSheet = function (name) {
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) return assignments;
   if (name === gas.SHEETS.ROSTER_VERSIONS) return versions;
   return [];

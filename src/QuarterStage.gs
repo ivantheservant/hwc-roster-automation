@@ -4,7 +4,7 @@
  *
  * Stage 只可由 FourStageFlow.gs 的四個步驟函式呼叫 advanceQuarterStage_() 改動，
  * 這個檔案本身與其他任何地方都只讀不寫——這是專案慣例（跟「ScriptApp.newTrigger()
- * 只能在 installAutomationTrigger() 呼叫」同一種以註解＋紀律把關的做法，不是語言層級強制）。
+ * 只能在 installAutomationTrigger_() 呼叫」同一種以註解＋紀律把關的做法，不是語言層級強制）。
  */
 
 /**
@@ -220,7 +220,7 @@ function computeQuarterDateFromLead_(startDate, leadDays, guardMode) {
  * @returns {{leadGenerate: ?number, leadOfficial: ?number, guardMode: string}}
  */
 function readQuarterDateSettings_() {
-  const config = readConfig();
+  const config = readConfig_();
   const g = Number(config[CONFIG_KEYS.LEAD_DAYS_GENERATE]);
   const o = Number(config[CONFIG_KEYS.LEAD_DAYS_OFFICIAL]);
   return {
@@ -243,10 +243,10 @@ function planComputeQuarterDates_(quarterId) {
   const info = findQuarterRowInfo_(quarterId);
   if (!info) throw new Error('Quarters 找不到季度: ' + quarterId);
 
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const guardMode = String(config[CONFIG_KEYS.SEND_WEEKDAY_GUARD] || 'NONE').toUpperCase();
-  const startDate = toDateString(info.values[COLUMNS.QUARTERS.START_DATE], timezone);
+  const startDate = toDateString_(info.values[COLUMNS.QUARTERS.START_DATE], timezone);
   if (!startDate) throw new Error(quarterId + ' 的 StartDate 是空白，無法計算');
 
   const defs = [
@@ -256,7 +256,7 @@ function planComputeQuarterDates_(quarterId) {
 
   const fields = defs.map(function (def) {
     const columnIndex = info.headers.indexOf(def.key) + 1;
-    const currentValue = toDateString(info.values[def.key], timezone);
+    const currentValue = toDateString_(info.values[def.key], timezone);
     const leadDays = Number(config[def.leadDaysKey]);
     const computedValue = computeQuarterDateFromLead_(startDate, leadDays, guardMode);
     return {
@@ -297,7 +297,7 @@ function listQuartersMissingDates_() {
   const lastCol = sheet.getLastColumn();
   if (lastRow < 3 || lastCol === 0) return [];
 
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const headers = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
   const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
@@ -309,11 +309,11 @@ function listQuartersMissingDates_() {
   values.forEach(function (row) {
     const quarterId = String(row[idx[Q.QUARTER_ID]] || '').trim();
     if (!quarterId) return;
-    const startDate = toDateString(row[idx[Q.START_DATE]], timezone);
+    const startDate = toDateString_(row[idx[Q.START_DATE]], timezone);
     const g = idx[Q.GENERATE_ON] === undefined
-      ? '' : toDateString(row[idx[Q.GENERATE_ON]], timezone);
+      ? '' : toDateString_(row[idx[Q.GENERATE_ON]], timezone);
     const o = idx[Q.OFFICIAL_SEND_ON] === undefined
-      ? '' : toDateString(row[idx[Q.OFFICIAL_SEND_ON]], timezone);
+      ? '' : toDateString_(row[idx[Q.OFFICIAL_SEND_ON]], timezone);
     if (g && o) return;
     out.push({
       quarterId: quarterId,

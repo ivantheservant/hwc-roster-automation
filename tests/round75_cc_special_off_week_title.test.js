@@ -32,7 +32,7 @@ function specialRow(sc) {
 function typeCell(sc, versionNo, dateStr) {
   const sh = sc.gridSheet(versionNo);
   for (let r = 3; r <= sh.getLastRow(); r++) {
-    if (sc.gas.toDateString(sh.getRange(r, 1).getValue(), sc.TZ) === dateStr) return { sh: sh, row: r };
+    if (sc.gas.toDateString_(sh.getRange(r, 1).getValue(), sc.TZ) === dateStr) return { sh: sh, row: r };
   }
   return null;
 }
@@ -42,9 +42,9 @@ console.log('\n=== CC1／CC2／CC3：預設關閉 ===');
   const sc = buildRound75Scene({ specialRows: [] });
   sc.appendRows(sc.ss, sc.S.SPECIAL_SUNDAYS, Object.keys(sc.C.SPECIAL_SUNDAYS).map((k) => sc.C.SPECIAL_SUNDAYS[k]), [specialRow(sc)]);
   const gas = sc.gas;
-  check('（前置）SpecialSundays 有一行合堂（第 2 週跳過主席）', gas.readSheet(sc.S.SPECIAL_SUNDAYS).length === 1);
+  check('（前置）SpecialSundays 有一行合堂（第 2 週跳過主席）', gas.readSheet_(sc.S.SPECIAL_SUNDAYS).length === 1);
   check('★★★★★ 預設 isSpecialSundaysEnabled_() = false', gas.isSpecialSundaysEnabled_() === false);
-  check('★★★★★★ readSpecialSundays() 回空（全部讀者共同入口）', gas.readSpecialSundays(sc.Q).length === 0);
+  check('★★★★★★ readSpecialSundays_() 回空（全部讀者共同入口）', gas.readSpecialSundays_(sc.Q).length === 0);
   gas.apiGenerateDraftExecute(sc.Q);
   const chair = sc.cellRow(0, sc.DATES[1], 'CHAIR');
   check('★★★★★★ 第 2 週主席照常排咗人（冇因特別主日跳過）', chair && chair[sc.A.PERSON_ID], JSON.stringify(chair));
@@ -93,7 +93,7 @@ console.log('\n=== CC5／CC6／CC7：每週標題 ===');
 
   const res = gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] });
   check('★★★★★★ 只改標題都會建立新一版', res.ok === true && res.versionNo === 1, JSON.stringify(res).slice(0, 300));
-  const sd = gas.readServiceDates(sc.Q).filter((r) => gas.toDateString(r[sc.C.SERVICE_DATES.SERVICE_DATE], sc.TZ) === sc.DATES[1])[0];
+  const sd = gas.readServiceDates_(sc.Q).filter((r) => gas.toDateString_(r[sc.C.SERVICE_DATES.SERVICE_DATE], sc.TZ) === sc.DATES[1])[0];
   check('★★★★★★ ServiceDates.Title 寫咗', sd && sd[sc.C.SERVICE_DATES.TITLE] === 'Baptism Service', JSON.stringify(sd));
   const pos1 = typeCell(sc, 1, sc.DATES[1]);
   check('★★★★★★ 新一版「類型」顯示新標題', pos1 && pos1.sh.getRange(pos1.row, 3).getValue() === 'Baptism Service');
@@ -101,13 +101,13 @@ console.log('\n=== CC5／CC6／CC7：每週標題 ===');
   check('★★★★★ 公開版／個人頁嘅標題索引有佢', gas.buildDisplayTitleIndex_(sc.Q, sc.TZ)[sc.DATES[1]] === 'Baptism Service');
   check('★★★★★ 儲存後再檢查：冇改動', gas.apiSaveAndConfirmPlan(sc.Q).zeroChange === true);
   check('★★★★ 儲存結果逐格明細有標題一行', (res.savedChanges || []).some((r) => r.isTitle));
-  const audit = gas.readSheet(sc.S.AUDIT_LOG).filter((r) => r[sc.C.AUDIT_LOG.ACTION] === 'WEEK_TITLE_CHANGED');
+  const audit = gas.readSheet_(sc.S.AUDIT_LOG).filter((r) => r[sc.C.AUDIT_LOG.ACTION] === 'WEEK_TITLE_CHANGED');
   check('★★★★ AuditLog 有 WEEK_TITLE_CHANGED', audit.length === 1);
 
   // 改返預設
   pos1.sh.getRange(pos1.row, 3).setValue('主日崇拜');
   const res2 = gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] });
-  const sd2 = gas.readServiceDates(sc.Q).filter((r) => gas.toDateString(r[sc.C.SERVICE_DATES.SERVICE_DATE], sc.TZ) === sc.DATES[1])[0];
+  const sd2 = gas.readServiceDates_(sc.Q).filter((r) => gas.toDateString_(r[sc.C.SERVICE_DATES.SERVICE_DATE], sc.TZ) === sc.DATES[1])[0];
   check('★★★★★★ 改返預設 ⇒ Title 清空', res2.versionNo === 2 && String(sd2[sc.C.SERVICE_DATES.TITLE] || '') === '', JSON.stringify(sd2));
   check('★★★★ 第 2 版顯示「主日崇拜」', typeCell(sc, 2, sc.DATES[1]).sh.getRange(typeCell(sc, 2, sc.DATES[1]).row, 3).getValue() === '主日崇拜');
 }

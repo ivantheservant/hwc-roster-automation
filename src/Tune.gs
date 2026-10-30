@@ -12,7 +12,7 @@
  * @returns {{done: boolean, completed: number, total: number, remaining: number,
  *   sheetName: (string|undefined), best: (Object|undefined)}} 執行結果
  */
-function tuneParameters(quarterId) {
+function tuneParameters_(quarterId) {
   const combos = buildTuneCombos_();
   const progress = loadTuneProgress_(quarterId);
 
@@ -32,7 +32,7 @@ function tuneParameters(quarterId) {
   const remaining = combos.length - progress.nextIndex;
   if (remaining > 0) {
     saveTuneProgress_(progress);
-    log_('INFO', 'tuneParameters: 已完成 ' + progress.nextIndex + '/' + combos.length + ' 組，尚餘 ' + remaining);
+    log_('INFO', 'tuneParameters_: 已完成 ' + progress.nextIndex + '/' + combos.length + ' 組，尚餘 ' + remaining);
     return { done: false, completed: progress.nextIndex, total: combos.length, remaining: remaining };
   }
 
@@ -251,7 +251,7 @@ function loadTuneProgress_(quarterId) {
       const saved = JSON.parse(raw);
       if (saved && saved.quarterId === quarterId) return saved;
     } catch (err) {
-      log_('WARN', 'tuneParameters: 進度紀錄損毀，重新開始。' + err.message);
+      log_('WARN', 'tuneParameters_: 進度紀錄損毀，重新開始。' + err.message);
     }
   }
   return { quarterId: quarterId, nextIndex: 0, rows: [] };
@@ -288,7 +288,7 @@ function writeTuneSheet_(quarterId, sortedRows, baseline) {
   if (existing) ss.deleteSheet(existing);
   const sheet = ss.insertSheet(sheetName);
 
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   sheet.getRange(1, 1).setValue(
     '參數掃描結果　' + quarterId
       + '　執行時間：' + nowTimestamp_()

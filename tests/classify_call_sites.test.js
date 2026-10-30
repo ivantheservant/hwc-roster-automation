@@ -127,7 +127,7 @@ const CONVERTERS = [
     name: 'WebApp.gs 網頁版 grid 嘅 `byKey`',
     file: 'WebApp.gs',
     from: 'const byKey = {};',
-    to: 'const posts = readPostsNormalized();'
+    to: 'const posts = readPostsNormalized_();'
   },
   {
     name: 'DraftReviewReport.gs 圖例計數（直接寫喺呼叫點）',

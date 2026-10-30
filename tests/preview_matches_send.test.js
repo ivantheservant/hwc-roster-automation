@@ -19,7 +19,7 @@
 //
 //   確認窗　`planStep2_()` → `countReviewerRecipients_()`
 //           ⇒ 只數 `EmailRecipients` 上 `Role=REVIEWER` 而且 `Active=TRUE`
-//   完成窗　`executeStep2_()` → `sendStage()`
+//   完成窗　`executeStep2_()` → `sendStage_()`
 //           ⇒ 第四十六輪新做嘅收件人池（`SendRecipients.gs`）
 //
 // 即係：**第四十六輪把「實際寄給誰」重做咗，但冇一併改
@@ -95,11 +95,11 @@ function setup() {
       effectiveFrom: '', effectiveTo: '' }];
   };
   gas.Utilities = { formatDate: function () { return '2027-10-01'; } };
-  gas.getConfig = function (key, d) {
+  gas.getConfig_ = function (key, d) {
     if (key === gas.CONFIG_KEYS.DRY_RUN) return true;
     return d;
   };
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.EMAIL_RECIPIENTS) {
       const R = gas.COLUMNS.EMAIL_RECIPIENTS;
       return ['r1', 'r2', 'r3'].map(function (n) {
@@ -118,7 +118,7 @@ function setup() {
   gas.resolveStageTemplates_ = function () {
     return { person: { attachType: 'FULL_PDF' }, list: { attachType: 'FULL_PDF' } };
   };
-  gas.findLatestVersionNo = function () { return 5; };
+  gas.findLatestVersionNo_ = function () { return 5; };
   gas.requireQuarterStage_ = function () {};
   gas.countAlreadySentForStage_ = function () { return 0; };
   gas.countReviewerRecipients_ = function () { return 3; };

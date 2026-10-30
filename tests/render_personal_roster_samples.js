@@ -73,7 +73,7 @@ function buildSampleLayout() {
     cellIndex: cellIndex,
     classCounts: classCounts,
     // buildLegendRows_() 喺冇傳 labels 時會退回 readGridCellLabels_()
-    // （要真正 GAS 環境嘅 getConfig()），呢度直接用 Constants.gs 嘅
+    // （要真正 GAS 環境嘅 getConfig_()），呢度直接用 Constants.gs 嘅
     // DEFAULTS（純資料，已經喺呢個 gas bundle 入面），避免載入 Config.gs。
     labels: {
       pending: gas.DEFAULTS.GRID_PENDING_LABEL,

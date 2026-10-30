@@ -127,7 +127,7 @@ console.log('\n=== A2-3 邊個階段要擋，由**範本實際文字**決定 ===
     /if \(needing\.length === 0\) return;/.test(body));
   check('★★★★ 有連結 ⇒ 即刻返回，唔做任何嘢',
     /if \(publicRosterUrl\) return;/.test(body));
-  check('★★★★★ sendStage() 喺**寄第一封之前**就叫嗰道關卡'
+  check('★★★★★ sendStage_() 喺**寄第一封之前**就叫嗰道關卡'
     + '——擺後面會變成「寄咗一半先發現」，而已經寄出嗰啲收唔返',
     // ⚠️ 第四十輪批次 A 組：呢度本來搵 `listRecipients_(stage, context).forEach`
     // 呢一句字。加咗「收件範圍」之後，嗰個迴圈變成

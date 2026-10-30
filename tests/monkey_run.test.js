@@ -114,7 +114,7 @@ console.log('\n=== 三【核心】五樣絕對唔准做嘅嘢 ===');
     ['改 Config', /setConfigValue_|SHEETS\.CONFIG/],
     ['改人員資料', /apiSavePerson|apiAddPerson|SHEETS\.NAME_MAPPING/],
     ['重設季度', /executeQuarterReset_|planQuarterReset_/],
-    ['真正寄出（繞過 DRY_RUN）', /sendStage\(|MailApp|GmailApp/]
+    ['真正寄出（繞過 DRY_RUN）', /sendStage_\(|MailApp|GmailApp/]
   ];
   forbidden.forEach(function (pair) {
     check('★★★★★★ 動作清單入面冇「' + pair[0] + '」',
@@ -129,7 +129,7 @@ console.log('\n=== 三【核心】五樣絕對唔准做嘅嘢 ===');
     + '——開跑嗰陣驗一次係唔夠嘅：一次亂行行幾分鐘，'
     + '中間有人改咗 Config，後面嗰幾十步就會真係寄信',
     /MONKEY_DRY_RUN_RECHECK_EVERY/.test(CODE)
-      && /getConfig\(CONFIG_KEYS\.DRY_RUN, true\) !== true/.test(CODE), '');
+      && /getConfig_\(CONFIG_KEYS\.DRY_RUN, true\) !== true/.test(CODE), '');
   check('★★★★★★ 而且一發現就即刻 `break`，唔係記一筆繼續行',
     /DRY_RUN 已經不是 TRUE。'[\s\S]{0,400}break;/.test(SRC), '');
 

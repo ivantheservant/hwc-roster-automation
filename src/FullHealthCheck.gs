@@ -12,7 +12,7 @@
  *
  * 這次整合進「全面體檢」的 9 項（全部不需要幹事另外輸入季度／版本，可以
  * 完全自動跑完）：
- *   1. 檢查設定（validateSetup()）
+ *   1. 檢查設定（validateSetup_()）
  *   2. 檢查 Config 行數（planConfigRowAudit_()）
  *   3. 檢查各版本派工紀錄（summariseAssignmentVersions_()，純資訊）
  *   4. 電郵範本自我檢查（buildEmailTemplateSelfCheckReport_()）
@@ -74,10 +74,10 @@ function healthItem_(section, severity, label, summary, note, details) {
 }
 
 /**
- * 1. 檢查設定——純函式包裝，把既有 validateSetup() 的結果轉成健檢分級。
+ * 1. 檢查設定——純函式包裝，把既有 validateSetup_() 的結果轉成健檢分級。
  * 有問題一律 MUST：這些是會直接影響核心功能（生成／寄送／規則判斷）的
  * 設定缺陷，不像上線前檢查裡有些項目「兩種狀態都可能是有意的選擇」。
- * @param {string[]} issues validateSetup() 的回傳值
+ * @param {string[]} issues validateSetup_() 的回傳值
  * @returns {Object} healthItem_() 的結果
  */
 function classifySetupHealth_(issues) {
@@ -131,7 +131,7 @@ function classifyConfigRowHealth_(audit) {
  * 因為 `DRY_RUN` 係 BOOL，而佢壞咗嘅後果（真係寄信）同其他參數
  * 唔係同一個量級。
  *
- * @param {Object[]} rows Config 工作表的原始列（`readSheet(SHEETS.CONFIG)`）
+ * @param {Object[]} rows Config 工作表的原始列（`readSheet_(SHEETS.CONFIG)`）
  * @returns {Object} healthItem_() 的結果
  */
 function classifyConfigValueTypeHealth_(rows) {
@@ -167,10 +167,10 @@ function classifyConfigValueTypeHealth_(rows) {
 /**
  * 逐個 Config 參數試轉一次型，回報邊啲會拋錯。**純函式**，可離線測。
  *
- * ⚠️ 特登唔用 `readConfig()`——嗰邊會把失敗變成 marker 然後快取。
+ * ⚠️ 特登唔用 `readConfig_()`——嗰邊會把失敗變成 marker 然後快取。
  * 呢度要見到「試轉」嘅原始結果，而且要連原值一齊報返出嚟。
  *
- * @param {Object[]} rows `readSheet(SHEETS.CONFIG)` 的結果
+ * @param {Object[]} rows `readSheet_(SHEETS.CONFIG)` 的結果
  * @returns {{checked: number, problems: Object[]}}
  */
 function auditConfigValueTypes_(rows) {
@@ -397,9 +397,9 @@ function buildFullHealthCheckReport_(quarterId) {
     }
   }
 
-  run(function () { return classifySetupHealth_(validateSetup()); });
+  run(function () { return classifySetupHealth_(validateSetup_()); });
   run(function () { return classifyConfigRowHealth_(planConfigRowAudit_()); });
-  run(function () { return classifyConfigValueTypeHealth_(readSheet(SHEETS.CONFIG)); });
+  run(function () { return classifyConfigValueTypeHealth_(readSheet_(SHEETS.CONFIG)); });
   run(function () { return classifyAssignmentVersionsHealth_(summariseAssignmentVersions_()); });
   // 第六十三輪批次 J 組：未登記嘅孤兒版本（見 OrphanVersions.gs）
   run(function () { return classifyOrphanVersionsHealth_(findOrphanVersions_()); });
@@ -425,9 +425,9 @@ function buildFullHealthCheckReport_(quarterId) {
   run(function () { return classifyInvariantsHealth_(runAllInvariants_(quarterId)); });
   run(function () {
     const counts = {};
-    counts[SHEETS.SEND_LOG] = readSheet(SHEETS.SEND_LOG).length;
-    counts[SHEETS.ROSTER_ASSIGNMENTS] = readSheet(SHEETS.ROSTER_ASSIGNMENTS).length;
-    counts[SHEETS.AUDIT_LOG] = readSheet(SHEETS.AUDIT_LOG).length;
+    counts[SHEETS.SEND_LOG] = readSheet_(SHEETS.SEND_LOG).length;
+    counts[SHEETS.ROSTER_ASSIGNMENTS] = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).length;
+    counts[SHEETS.AUDIT_LOG] = readSheet_(SHEETS.AUDIT_LOG).length;
     return classifyTableSizeHealth_(counts);
   });
 

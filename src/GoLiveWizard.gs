@@ -46,7 +46,7 @@ const GO_LIVE_TEST_SUBJECT_PREFIX = '[測試] ';
  *   dryRunOff: boolean, phase: string, description: string}}
  */
 function assessGoLiveState_() {
-  const config = readConfig();
+  const config = readConfig_();
   const dryRun = describeConfigValue_(config, CONFIG_KEYS.DRY_RUN, true).value !== false;
   const subjectPrefix = String(describeConfigValue_(config, CONFIG_KEYS.MAIL_SUBJECT_PREFIX, '').value || '');
 
@@ -87,7 +87,7 @@ function assessGoLiveState_() {
  * 刻意**只改既有嘅行，搵唔到就拋錯**，唔會自動新增——上線切換唔應該順手
  * 建立新設定。要新增 Key 請用「維護 ▸ 補建 Config 參數」。
  *
- * 改完即刻清 Config 快取（`readConfig()` 有 5 分鐘 CacheService 快取），
+ * 改完即刻清 Config 快取（`readConfig_()` 有 5 分鐘 CacheService 快取），
  * 否則之後嘅檢查會讀返舊值，令幹事以為冇改到。
  *
  * @param {string} key Config 嘅 Key
@@ -129,7 +129,7 @@ function setConfigValue_(key, value, source) {
   if (updatedAtCol > 0) sheet.getRange(targetRow, updatedAtCol).setValue(now);
   if (updatedByCol > 0) sheet.getRange(targetRow, updatedByCol).setValue(actor);
 
-  reloadConfigCache();
+  reloadConfigCache_();
 
   writeAuditLog_({
     action: '上線切換：改 Config',

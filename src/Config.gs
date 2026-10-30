@@ -3,14 +3,14 @@
  * （預設 5 分鐘，可用 Config 自己的 SYS_CONFIG_CACHE_SECONDS 覆寫，見 readCacheTtlSeconds_）。
  * @returns {Object.<string, *>} 以 Key 為屬性名稱、已轉換型別的值組成的物件
  */
-function readConfig() {
+function readConfig_() {
   const cache = CacheService.getScriptCache();
   const cached = cache.get(CACHE_KEYS.CONFIG);
   if (cached) {
     return JSON.parse(cached);
   }
 
-  const rows = readSheet(SHEETS.CONFIG);
+  const rows = readSheet_(SHEETS.CONFIG);
   const config = {};
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -19,13 +19,13 @@ function readConfig() {
     // ⚠️ 第三十二輪批次階段 A3：**一個壞格唔可以令全個系統停擺。**
     //
     // `convertConfigValue_()` 而家認唔出就會拋錯（呢個係階段 A1 嘅重點）。
-    // 但如果喺呢度直接拋，一格壞就代表 `readConfig()` 拋錯，
-    // 而 `readConfig()` 幾乎係所有功能嘅第一步——幹事會見到成個系統
+    // 但如果喺呢度直接拋，一格壞就代表 `readConfig_()` 拋錯，
+    // 而 `readConfig_()` 幾乎係所有功能嘅第一步——幹事會見到成個系統
     // 每一粒掣都彈同一個錯，睇唔出係邊一格出事。
     //
-    // 所以呢度記低唔即拋，等 `getConfig(嗰個 key)` 真係被叫先拋。
+    // 所以呢度記低唔即拋，等 `getConfig_(嗰個 key)` 真係被叫先拋。
     // 揀「記低後補拋」唔揀「轉型延後」嘅理由見稽核文件——
-    // 簡單講：`readConfig()` 快取嘅係**已轉型**嘅結果，
+    // 簡單講：`readConfig_()` 快取嘅係**已轉型**嘅結果，
     // 轉型延後就要連快取層一齊改，改動面大好多。
     try {
       config[key] = convertConfigValue_(row[COLUMNS.CONFIG.VALUE], row[COLUMNS.CONFIG.TYPE], key);
@@ -53,18 +53,18 @@ function readCacheTtlSeconds_(config) {
 }
 
 /**
- * 清除 Config 的快取，讓下一次 readConfig() 直接從工作表重新讀取。
- * 供選單「重新載入設定」與 validateSetup() 開頭呼叫。
+ * 清除 Config 的快取，讓下一次 readConfig_() 直接從工作表重新讀取。
+ * 供選單「重新載入設定」與 validateSetup_() 開頭呼叫。
  * @returns {void}
  */
-function reloadConfigCache() {
+function reloadConfigCache_() {
   CacheService.getScriptCache().remove(CACHE_KEYS.CONFIG);
 }
 
 /**
  * ⚠️ 第六十三輪批次 G 組：**改 `Config` 工作表就即刻清快取。**（簡單觸發器）
  *
- * `readConfig()` 快取 300 秒，而全專案之前冇任何 `onEdit`。把 `DRY_RUN`
+ * `readConfig_()` 快取 300 秒，而全專案之前冇任何 `onEdit`。把 `DRY_RUN`
  * 由 FALSE 改返 TRUE 而唔記得撳「重新載入設定」⇒ 最多五分鐘之內，寄送
  * 路徑仍然讀到 FALSE——即係以為已經閂咗真寄，其實仲開緊。
  *
@@ -82,7 +82,7 @@ function onEdit(e) {
     const range = e && e.range;
     const sheet = range && typeof range.getSheet === 'function' ? range.getSheet() : null;
     if (!sheet || sheet.getName() !== SHEETS.CONFIG) return;
-    reloadConfigCache();
+    reloadConfigCache_();
   } catch (err) {
     log_('WARN', 'onEdit：清 Config 快取失敗：' + err.message);
   }
@@ -94,8 +94,8 @@ function onEdit(e) {
  * @param {*} fallback 找不到或值為空時要回傳的預設值
  * @returns {*} 轉換後的 Config 值，或 fallback
  */
-function getConfig(key, fallback) {
-  const config = readConfig();
+function getConfig_(key, fallback) {
+  const config = readConfig_();
   const value = config[key];
   // ⚠️ 型別認唔出嘅 key，喺呢度先拋——而且**一定要喺 fallback 判斷之前**。
   // 排喺後面嘅話，一個壞格會啱啱好行去 fallback 嗰條路（`value` 唔係空，
@@ -112,7 +112,7 @@ function getConfig(key, fallback) {
 /**
  * 「呢個 key 轉型失敗咗」嘅記號。
  *
- * ⚠️ 一定要 **JSON 可以來回**——`readConfig()` 會 `JSON.stringify()` 落快取，
+ * ⚠️ 一定要 **JSON 可以來回**——`readConfig_()` 會 `JSON.stringify()` 落快取，
  * 下一次由快取讀返出嚟。用 `Error` 物件或者 `Symbol` 都會喺嗰一轉消失，
  * 然後個壞格就會靜靜變成 `{}` 一個睇落正常嘅物件。
  *
@@ -140,11 +140,11 @@ function isConfigTypeErrorMarker_(value) {
  * `config[KEY] + ''` 直接顯示，Config 工作表根本沒有這個 Key（例如從未
  * 執行過「補建 Config 參數」）時，`config[KEY]` 是 `undefined`，字面顯示
  * 出來就是文字「undefined」——系統實際運作時是安全的（別處都是用
- * `getConfig(key, fallback)` 取得正確的生效值），只是這個報告顯示的內容
- * 本身具誤導性，會讓人以為這個開關真的沒有生效值。跟 `getConfig()` 用
+ * `getConfig_(key, fallback)` 取得正確的生效值），只是這個報告顯示的內容
+ * 本身具誤導性，會讓人以為這個開關真的沒有生效值。跟 `getConfig_()` 用
  * 同一個「undefined／null／空字串都算沒有設定」判斷準則，保證兩者對
  * 「是否使用預設值」的認定一致。
- * @param {Object.<string, *>} config readConfig() 的結果（或其子集，只要含這個 key）
+ * @param {Object.<string, *>} config readConfig_() 的結果（或其子集，只要含這個 key）
  * @param {string} key Config 的 Key
  * @param {*} fallback Config 沒有設定時要用的預設值
  * @returns {{value: *, usedFallback: boolean, display: string}}
@@ -318,31 +318,31 @@ function buildConfigTypeErrorMessage_(key, type, str, why) {
  * 兩句都啱，合埋就係呃人：畫面叫幹事「呢個值嚟自 Config」，
  * 佢去 Config 工作表**搵唔到嗰一格**，於是佢會以為自己睇漏咗眼。
  *
- * ⚠️ `getConfig()` 分唔到三件事：
+ * ⚠️ `getConfig_()` 分唔到三件事：
  *
  *   一、張表有嗰一行、有值　　　⇒ `SHEET`
  *   二、張表有嗰一行、格係空白　⇒ `DEFAULT`（退回程式內建值）
  *   三、張表**根本冇嗰一行**　　⇒ `MISSING`（退回程式內建值）
  *
- * 二同三喺 `getConfig()` 眼中一模一樣，而對幹事嚟講差好遠：
+ * 二同三喺 `getConfig_()` 眼中一模一樣，而對幹事嚟講差好遠：
  * 「格係空白」佢搵得到嗰一格去填；「冇嗰一行」佢點搵都搵唔到。
  *
- * ⚠️ **唔改 `getConfig()` 本身嘅簽名**——全專案叫佢嘅地方太多，
+ * ⚠️ **唔改 `getConfig_()` 本身嘅簽名**——全專案叫佢嘅地方太多，
  * 改簽名嘅風險遠大過另開一支。
  */
 
 /**
- * 同 `getConfig()` 取同一個值，但**連「呢個值由邊度嚟」一齊回**。
+ * 同 `getConfig_()` 取同一個值，但**連「呢個值由邊度嚟」一齊回**。
  *
  * @param {string} key Config 的 Key
  * @param {*} fallback Config 沒有設定時要用的預設值
  * @returns {{value: *, source: string, fallback: *}}
  *   `source` 係 `'SHEET'`／`'DEFAULT'`／`'MISSING'`
  */
-function getConfigWithSource(key, fallback) {
-  const config = readConfig();
+function getConfigWithSource_(key, fallback) {
+  const config = readConfig_();
 
-  // ⚠️ 型別壞咗嘅 key 照樣拋——同 `getConfig()` 一致。
+  // ⚠️ 型別壞咗嘅 key 照樣拋——同 `getConfig_()` 一致。
   // 呢度靜靜回一個「用緊預設值」會令一個壞格睇落好正常。
   const raw = config[key];
   if (isConfigTypeErrorMarker_(raw)) {
@@ -370,7 +370,7 @@ function getConfigWithSource(key, fallback) {
  * 冇人分得出邊個啱。
  *
  * @param {string} key Config 的 Key
- * @param {string} source `getConfigWithSource()` 回的 `source`
+ * @param {string} source `getConfigWithSource_()` 回的 `source`
  * @returns {string} 一句說明；`SHEET` 的時候是簡短那一句
  */
 function describeConfigValueOrigin_(key, source) {
@@ -404,7 +404,7 @@ function describeConfigValueOrigin_(key, source) {
  */
 function getConfigWithSourceSafe_(key, fallback) {
   try {
-    const result = getConfigWithSource(key, fallback);
+    const result = getConfigWithSource_(key, fallback);
     return { value: result.value, source: result.source };
   } catch (err) {
     return { value: fallback, source: CONFIG_VALUE_SOURCES.ERROR };

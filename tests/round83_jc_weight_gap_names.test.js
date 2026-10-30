@@ -26,14 +26,14 @@ const gas = loadGasSource([
   'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs',
   'WebAppGuards.gs', 'WebAppRoster3Common.gs', 'PersonPostWeight.gs', 'WebAppWeightEdit.gs'
 ]);
-gas.getConfig = function (key, fallback) { return fallback; };
+gas.getConfig_ = function (key, fallback) { return fallback; };
 gas.log_ = function () {};
-gas.findLatestVersionNo = function () { return 0; };
+gas.findLatestVersionNo_ = function () { return 0; };
 gas.buildWeightLimitContextSafely_ = function () { return null; };
 const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;
 let rowsFor = [];
 gas.readVersionAssignmentsRaw_ = function () { return rowsFor; };
-gas.toDateString = function (v) { return String(v); };
+gas.toDateString_ = function (v) { return String(v); };
 
 const active = { rows: [{ personId: 'P9706', postId: 'ANNOUNCE', adjust: 1, reason: 'demo', scope: 'QUARTER' }],
   invalid: [], byKey: {} };

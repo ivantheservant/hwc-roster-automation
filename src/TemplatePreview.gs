@@ -10,7 +10,7 @@
  * 都只讀，沒有副作用）與純字串代入函式 applyPlaceholders_()。
  *
  * ⚠️ 額外的結構性防護（PREVIEW_MODE_ACTIVE）：previewEmailTemplate_() 執行期間
- * 會把這個旗標設為 true，sendStage()／sendRealEmail_()（Mailer.gs）開頭都會檢查
+ * 會把這個旗標設為 true，sendStage_()／sendRealEmail_()（Mailer.gs）開頭都會檢查
  * 這個旗標，一旦偵測到就立即拋錯中止，不會往下執行。這是「就算日後不小心讓預覽
  * 函式走到寄送函式，也會在第一時間被攔下」的防線，跟現有 sendRealEmail_() 自己
  * 再檢查一次 DRY_RUN 的雙重防呆是同一種做法。
@@ -24,7 +24,7 @@
 let PREVIEW_MODE_ACTIVE = false;
 
 /**
- * 檢查目前是否處於預覽模式，是的話立即拋錯。供 sendStage()／sendRealEmail_()
+ * 檢查目前是否處於預覽模式，是的話立即拋錯。供 sendStage_()／sendRealEmail_()
  * 等實際寄送／寫入的函式在開頭呼叫，作為結構性防護。
  * @param {string} functionName 呼叫端的函式名稱，用於錯誤訊息
  * @returns {void}

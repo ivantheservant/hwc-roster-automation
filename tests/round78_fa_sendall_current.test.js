@@ -45,7 +45,7 @@ const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'Mailer.gs', 'WebAppGuard
     }
   }
 });
-gas.getConfig = function (key, fallback) { return fallback; };
+gas.getConfig_ = function (key, fallback) { return fallback; };
 
 const context = {
   postNames: { READ: '讀經', USHER1: '司事1' },

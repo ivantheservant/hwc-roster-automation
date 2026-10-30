@@ -5,7 +5,7 @@
  * @returns {Object} 供 buildRoster_() 使用的 context
  */
 function buildGeneratorContext_(quarterId) {
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
 
   const quarter = findQuarter_(quarterId);
@@ -13,11 +13,11 @@ function buildGeneratorContext_(quarterId) {
     throw new Error('找不到季度: ' + quarterId + '（請檢查 Quarters 工作表）');
   }
 
-  const serviceDates = readServiceDatesNormalized(quarterId, timezone);
-  const posts = readPostsNormalized();
+  const serviceDates = readServiceDatesNormalized_(quarterId, timezone);
+  const posts = readPostsNormalized_();
 
   const peopleById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const personId = row[COLUMNS.NAME_MAPPING.PERSON_ID];
     const rawMax = row[COLUMNS.NAME_MAPPING.MAX_PER_QUARTER];
     peopleById[personId] = {
@@ -28,17 +28,17 @@ function buildGeneratorContext_(quarterId) {
   });
 
   // Status 非 ACTIVE 的請假紀錄視為已撤回，不納入判斷。
-  const unavailable = readUnavailableNormalized(timezone);
+  const unavailable = readUnavailableNormalized_(timezone);
 
   // Active=FALSE 的特別主日（例如範例列）不套用。
   // 第六十三輪批次 B 組：同「開季前準備」用同一個函式（buildSpecialSundayByDate_）。
-  const specialByDate = buildSpecialSundayByDate_(readSpecialSundays(quarterId), timezone);
+  const specialByDate = buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone);
 
   const carryOverWeeks = Number(config[CONFIG_KEYS.CARRY_OVER_WEEKS]) || 0;
-  const quarterStart = toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone);
+  const quarterStart = toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone);
 
-  const rules = readRules();
-  const eligibility = readEligibility();
+  const rules = readRules_();
+  const eligibility = readEligibility_();
   const maxPerQuarterDefault = Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER;
 
   // 第十六輪批次階段 B：身分名單（堂委／執事）與個人崗位排除。
@@ -85,7 +85,7 @@ function buildGeneratorContext_(quarterId) {
     // 因為回 0 會令整個偏好機制靜靜失效而排表結果睇落完全正常
     //（上一輪就係噉樣過咗一整輪都冇人發現）。
     personPostWeights: readActivePersonPostWeights_(
-      toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone), timezone,
+      toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone), timezone,
       buildWeightBaselineData_(quarterId, timezone))
   };
 }
@@ -99,7 +99,7 @@ function buildGeneratorContext_(quarterId) {
  * 配額 = (該人全崗位 HistoricalCount 總和 / 全體總和) × 本季可派格數 × 配額倍率
  * 四捨五入後，最少 1 次，最多不超過該人的 MaxPerQuarter（個人值或 Config 預設）。
  *
- * @param {Object} eligibility readEligibility() 的結果
+ * @param {Object} eligibility readEligibility_() 的結果
  * @param {Object.<string, Object>} peopleById 在職人員索引
  * @param {Object[]} serviceDates 本季的主日清單
  * @param {Object[]} posts 崗位清單
@@ -172,7 +172,7 @@ function readQuotaMultiplier_(rules) {
 /**
  * 讀取三個計分量級。三個 Key 都是選填：缺少、留空或數值無效時採用 SCORE_DEFAULTS。
  * 讓量級可在 Config 調校，不需要改動程式碼。
- * @param {Object.<string, *>} config readConfig() 的結果
+ * @param {Object.<string, *>} config readConfig_() 的結果
  * @returns {{chairDualBonus: number, preferenceBonus: number, selectionWeight: number}} 計分量級
  */
 function readScoreWeights_(config) {
@@ -185,7 +185,7 @@ function readScoreWeights_(config) {
 
 /**
  * 讀取一個選填的數值型 Config，缺少或無效時回傳預設值。
- * @param {Object.<string, *>} config readConfig() 的結果
+ * @param {Object.<string, *>} config readConfig_() 的結果
  * @param {string} key Config 的 Key
  * @param {number} fallback 預設值
  * @returns {number} 讀到的數值或預設值
@@ -201,7 +201,7 @@ function readNumericConfig_(config, key, fallback) {
  * 讀取 Config 的 SELECTION_WEIGHT_HISTORICAL（歷史服侍次數的加權比重）。
  * 此 Key 為選填：缺少、留空或數值無效時一律回傳 0，
  * 即完全按「最久沒服侍者優先」排序，行為與未設定此權重時相同。
- * @param {Object.<string, *>} config readConfig() 的結果
+ * @param {Object.<string, *>} config readConfig_() 的結果
  * @returns {number} 介於 0 與 1 之間的權重
  */
 function readHistoricalWeight_(config) {
@@ -218,7 +218,7 @@ function readHistoricalWeight_(config) {
  * @returns {?Object} 該季度的資料列；找不到時回傳 null
  */
 function findQuarter_(quarterId) {
-  const rows = readSheet(SHEETS.QUARTERS);
+  const rows = readSheet_(SHEETS.QUARTERS);
   for (let i = 0; i < rows.length; i++) {
     if (rows[i][COLUMNS.QUARTERS.QUARTER_ID] === quarterId) return rows[i];
   }
@@ -245,8 +245,8 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
   // 影響——但嗰個係運氣：差嘅格一落喺最後兩週，「連續兩週」就會用一份
   // 從來冇確認過嘅安排去判斷。
   const registered = readRegisteredVersionKeys_();
-  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
-    const dateStr = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+  const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
     if (!dateStr || dateStr >= quarterStartDate) return false;
     return registered[registeredVersionKey_(
       row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID], row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO])] === true;
@@ -256,7 +256,7 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
   // 每個主日只保留最大版本號的紀錄
   const maxVersionByDate = {};
   rows.forEach(function (row) {
-    const dateStr = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
     const versionNo = Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) || 0;
     if (maxVersionByDate[dateStr] === undefined || versionNo > maxVersionByDate[dateStr]) {
       maxVersionByDate[dateStr] = versionNo;
@@ -265,7 +265,7 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
 
   const byDate = {};
   rows.forEach(function (row) {
-    const dateStr = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
     if ((Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) || 0) !== maxVersionByDate[dateStr]) return;
     const personId = row[COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID];
     if (!personId) return;
@@ -286,7 +286,7 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
 function readRegisteredVersionKeys_() {
   const V = COLUMNS.ROSTER_VERSIONS;
   const out = {};
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     out[registeredVersionKey_(row[V.QUARTER_ID], row[V.VERSION_NO])] = true;
   });
   return out;
@@ -310,12 +310,12 @@ function registeredVersionKey_(quarterId, versionNo) {
  * @returns {Object.<string, Object>} 以 "serviceDate|postId|slotIndex" 為鍵的紀錄對照
  */
 function readQuarterAssignments_(quarterId, timezone) {
-  const rows = readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+  const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
     return row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] === quarterId;
   });
   const result = {};
   rows.forEach(function (row) {
-    const dateStr = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
     const key = dateStr + '|' + row[COLUMNS.ROSTER_ASSIGNMENTS.POST_ID] + '|' + row[COLUMNS.ROSTER_ASSIGNMENTS.SLOT_INDEX];
     const versionNo = Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) || 0;
     if (!result[key] || versionNo >= result[key].versionNo) {
@@ -536,7 +536,7 @@ function getSkipReason_(post, serviceDate, special, rules) {
  *   `findStateViolations_()`（FineTune.gs）——儲存、套用申報、提案、回退
  *   `checkHardRuleViolations_()`（Verify.gs）——核對職事表
  *
- * @param {?Object} post 崗位（`readPostsNormalized()` 形狀）
+ * @param {?Object} post 崗位（`readPostsNormalized_()` 形狀）
  * @param {?string} assignSource 呢一格嘅來源；唔知就傳 `null`
  * @returns {boolean} 係咪違反
  */
@@ -559,7 +559,7 @@ function isNoAutoGenerateViolation_(post, assignSource) {
  *   `findStateViolations_()`（FineTune.gs）——儲存、檢查我的改動、請系統幫我調整、匯入檢查、提案、回退
  *   `checkHardRuleViolations_()`（Verify.gs）——核對職事表
  *
- * @param {?Object} post 崗位（`readPostsNormalized()` 形狀）
+ * @param {?Object} post 崗位（`readPostsNormalized_()` 形狀）
  * @returns {boolean} true＝要查名單
  */
 function isEligibilityCheckedPost_(post) {
@@ -701,7 +701,7 @@ function pickPerson_(state) {
  * 沒有作用」這個問題：`score = penalty - bonus - selectionScore × selectionWeight`，
  * 其中 `selectionScore` 是連續浮點數，兩個人的 score 實務上幾乎不可能剛好相等，
  * 所以 `a.score !== b.score` 幾乎永遠成立，`tieBreak`（唯一用到 seed 的地方）
- * 永遠輪不到——實測 30 個不同 seed 產生逐格完全相同的職事表，`generateBest()`
+ * 永遠輪不到——實測 30 個不同 seed 產生逐格完全相同的職事表，`generateBest_()`
  * 跑 20 次等於把同一份表算 20 次。
  *
  * **epsilon = 0 時，本函式的行為跟加入這個參數之前逐字相同**：
@@ -1316,7 +1316,7 @@ function evaluateAnnounceRelief_(personId, state) {
  * @param {Object.<string, string[]>} previousWeek 上一週各崗位的派人
  * @param {Object.<string, Object>} rules RuleSettings 對照表
  * @param {Object} ratioState 比例累計狀態，會就地更新
- * @param {Object} eligibility readEligibility() 的結果，用於判斷是否具備配對崗位資格
+ * @param {Object} eligibility readEligibility_() 的結果，用於判斷是否具備配對崗位資格
  * @returns {void}
  */
 function updateRatioState_(post, personId, weekByPost, previousWeek, rules, ratioState, eligibility) {

@@ -49,7 +49,7 @@ function sandbox(opts) {
   } };
   const exportCalls = [];
   const plan = JSON.parse(JSON.stringify(opts.failPlan || {}));
-  gas.getConfig = function (key, d) {
+  gas.getConfig_ = function (key, d) {
     if (key === gas.CONFIG_KEYS.PDF_BATCH_SIZE && opts.batchSize) return opts.batchSize;
     return d;
   };
@@ -110,7 +110,7 @@ console.log('\n=== AC【核心】Web API 全部交出 failedCount＋errors ===')
 
   // 指定人版（補寄用）
   const m = sandbox({ ids: IDS, failPlan: { P9802: 99 } });
-  m.gas.findLatestVersionNo = function () { return 3; };
+  m.gas.findLatestVersionNo_ = function () { return 3; };
   m.gas.planMakeupSend_ = function () { return {}; };
   m.gas.findMakeupPdfGaps_ = function () {
     return { people: [{ personId: 'P9802', nameTC: '姓02' }, { personId: 'P9804', nameTC: '姓04' }], absentCount: 2, staleCount: 0 };
@@ -145,7 +145,7 @@ console.log('\n=== AC：自測機 S08——有失敗 ⇒ 紅（唔報綠），S0
   function s08(apiResult) {
     const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
       'QuarterStage.gs', 'Invariants.gs', 'SelfTestRunner.gs']);
-    gas.findLatestVersionNo = function () { return 3; };
+    gas.findLatestVersionNo_ = function () { return 3; };
     gas.selfTestCall_ = function (_id, _api, fn) { return fn(); };
     gas.selfTestRecordPayload_ = function () {};
     gas.selfTestOutOfTime_ = function () { return false; };

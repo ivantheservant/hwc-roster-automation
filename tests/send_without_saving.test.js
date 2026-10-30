@@ -318,9 +318,9 @@ console.log('\n=== A5【核心】唔准碰嘅嘢 ===');
   check('★★★★★ `ResendFlow.gs` 由頭到尾冇讀 grid overlay',
     !/GRID_OVERLAY/.test(resend), '');
   const core = read('src/FiveStageCore.gs');
-  check('★★★★★★ `planStep5ChangedList_()` 用 `findLatestVersionNo()`'
+  check('★★★★★★ `planStep5ChangedList_()` 用 `findLatestVersionNo_()`'
     + '（已儲存嘅版本），唔係讀表上未儲存嗰個狀態',
-    /function planStep5ChangedList_\(quarterId\) \{[\s\S]{0,400}findLatestVersionNo\(quarterId\)/
+    /function planStep5ChangedList_\(quarterId\) \{[\s\S]{0,400}findLatestVersionNo_\(quarterId\)/
       .test(core) && !/planStep5ChangedList_[\s\S]{0,400}GRID_OVERLAY/.test(core), '');
 
   // 公開連結嗰邊一格都唔好改。

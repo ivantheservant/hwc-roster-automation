@@ -224,7 +224,7 @@ function sendRecipientKey_(recipient) {
  * 按收件範圍篩收件人。
  *
  * ⚠️ 呢個係**執行上游決定**，唔係喺呢度再判斷一次。
- * `CHANGED_ONLY` 喺 `sendStage()` 呢條路上冇意義（REVIEW／OFFICIAL 本來就係
+ * `CHANGED_ONLY` 喺 `sendStage_()` 呢條路上冇意義（REVIEW／OFFICIAL 本來就係
  * 寄全部），所以當成 ALL——而唔係靜靜寄零封。
  *
  * @param {Object[]} recipients `listRecipients_()` 嘅結果

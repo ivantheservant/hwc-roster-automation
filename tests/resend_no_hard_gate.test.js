@@ -61,9 +61,9 @@ gas.withUnsavedReleaseNote_ = function (o) { return o; };
 gas.log_ = function () {};
 gas.writeAuditLog_ = function (e) { auditLog.push(e); };
 gas.planStep5ChangedList_ = function () { return { versionNo: 5, changedList: changedList, context: {} }; };
-gas.getConfig = function () { return 'Pacific/Auckland'; };
-gas.readUnavailableNormalized = function () { return []; };
-gas.findLatestVersionNo = function () { return 5; };
+gas.getConfig_ = function () { return 'Pacific/Auckland'; };
+gas.readUnavailableNormalized_ = function () { return []; };
+gas.findLatestVersionNo_ = function () { return 5; };
 gas.buildHardViolationClassContext_ = function () {
   return {
     quarterId: Q, releasedKeys: releasedKeys, releasedVersionByKey: {}, legacyReleasedKeys: {},

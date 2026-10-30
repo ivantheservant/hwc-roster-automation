@@ -85,7 +85,7 @@ function sandbox(opts) {
   const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebApp.gs']);
   const audits = [];
   gas.Session = { getActiveUser: () => ({ getEmail: () => opts.email || '' }) };
-  gas.getConfig = function (key, d) {
+  gas.getConfig_ = function (key, d) {
     if (key === gas.CONFIG_KEYS.WEBAPP_ENABLED) return opts.enabled !== false;
     if (key === gas.CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS) return opts.editors || [];
     if (key === gas.CONFIG_KEYS.WEBAPP_VIEWER_EMAILS) return opts.viewers || [];

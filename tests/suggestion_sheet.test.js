@@ -11,7 +11,7 @@
 // Ivan 講「一個好重要嘅缺失功能」：改完之後要有得檢查、有得叫系統幫手調整，
 // 而且要喺一張新工作表睇建議版本、兩種顏色分開「我改嘅」同「系統改嘅」。
 //
-// ⚠️ 呢一組**唔係由零做**。系統本來就有 `proposeMinimalFix()` 同
+// ⚠️ 呢一組**唔係由零做**。系統本來就有 `proposeMinimalFix_()` 同
 // `analyseManualState_()`。呢一組係把佢哋接上主流程。
 //
 // 所以呢一份守嘅係三件事：
@@ -196,7 +196,7 @@ function setGrid(sheetName, date, post, text) {
   }
   if (col === -1) return false;
   for (let r = keyRow + 1; r <= sh.getLastRow(); r++) {
-    if (gas.toDateString(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
+    if (gas.toDateString_(sh.getRange(r, 1).getValue(), TZ) !== date) continue;
     sh.getRange(r, col).setValue(text);
     return true;
   }
@@ -204,13 +204,13 @@ function setGrid(sheetName, date, post, text) {
 }
 
 function snapshotAssignments() {
-  return JSON.stringify(gas.readSheet(S.ROSTER_ASSIGNMENTS));
+  return JSON.stringify(gas.readSheet_(S.ROSTER_ASSIGNMENTS));
 }
 
 // =====================================================================
 console.log('\n=== 前置：生成初稿 ===');
 check('★★★★ 生成成功', gas.apiGenerateDraftExecute(Q) !== undefined);
-const V0 = gas.findLatestVersionNo(Q);
+const V0 = gas.findLatestVersionNo_(Q);
 const GRID0 = gas.buildRosterSheetName_(Q, V0);
 
 // =====================================================================
@@ -232,9 +232,9 @@ console.log('\n=== B1【核心】〔檢查我的改動〕係唯讀 ===');
 
 console.log('\n=== B1：改一格之後，檢查要逐格講得出「由邊個改成邊個」 ===');
 {
-  const beforeName = PEOPLE[gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (row) {
+  const beforeName = PEOPLE[gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (row) {
     return row[A.QUARTER_ID] === Q && Number(row[A.VERSION_NO]) === V0
-      && gas.toDateString(row[A.SERVICE_DATE], TZ) === DATES[2] && row[A.POST_ID] === 'CHAIR';
+      && gas.toDateString_(row[A.SERVICE_DATE], TZ) === DATES[2] && row[A.POST_ID] === 'CHAIR';
   })[0][A.PERSON_ID]];
   const target = Object.keys(PEOPLE).find(function (id) { return PEOPLE[id] !== beforeName; });
 
@@ -273,7 +273,7 @@ console.log('\n=== B2（第七十五輪 CE 組）認唔出嘅名唔再整個拒�
   // ⚠️ 第七十五輪批次 CE 組（Ivan 決定）：現場 image8 ——「有 1 格的名字系統認不出。什麼都沒有改動，
   // 也沒有建立建議表」。改為：照樣調整其他格；名字嗰格（臨時幫手／未決定）唔郁，列做「未決定」。
   // 佢仍然唔會溜入正式版本：接受建議表、儲存都要先決定（加入名單或勾「這一季臨時幫手」）。
-  const latest = gas.findLatestVersionNo(Q);
+  const latest = gas.findLatestVersionNo_(Q);
   const gridNow = gas.buildRosterSheetName_(Q, latest);
   check('（前置）喺正式表打一個唔喺名單上嘅名',
     setGrid(gridNow, DATES[5], 'CHAIR', '又一個唔存在嘅人'));
@@ -354,16 +354,16 @@ console.log('\n=== B3【核心】〔接受〕行嘅係已經修好過嗰條路 =
     /materialiseManualEdits_\(/.test(body.slice(0, 2500)), body.slice(0, 400));
   check('★★★★★ **冇另寫一套建立版本嘅邏輯**'
     + '——另寫就變成第六條路，而前面五條每一條都出過同一類 bug',
-    !/writeAssignments\(/.test(body.slice(0, 2500))
-    && !/createRosterSheet\(/.test(body.slice(0, 2500)), body.slice(0, 600));
+    !/writeAssignments_\(/.test(body.slice(0, 2500))
+    && !/createRosterSheet_\(/.test(body.slice(0, 2500)), body.slice(0, 600));
 }
 
 console.log('\n=== B3：接受之後，建議表要清走 ===');
 {
-  const before = gas.findLatestVersionNo(Q);
+  const before = gas.findLatestVersionNo_(Q);
   const r = gas.apiAcceptSuggestion(Q);
   check('★★★★ 接受成功', r.ok === true, JSON.stringify(r).slice(0, 200));
-  checkEqual('★★★★★ 真係建立咗新一版', gas.findLatestVersionNo(Q), before + 1);
+  checkEqual('★★★★★ 真係建立咗新一版', gas.findLatestVersionNo_(Q), before + 1);
 
   const oldName = gas.buildRosterSheetName_(Q, before) + '_建議';
   check('★★★★★ 建議表已經清走'
@@ -375,15 +375,15 @@ console.log('\n=== B3：接受之後，建議表要清走 ===');
 
 console.log('\n=== B3：接受之後，冇改動嘅格四個欄位要逐字搬過去 ===');
 {
-  // ⚠️ 呢個係第三十六輪嗰條共用斷言嘅精神：`applyDecisions()` 嗰條路
+  // ⚠️ 呢個係第三十六輪嗰條共用斷言嘅精神：`applyDecisions_()` 嗰條路
   // 第三十七輪查出兩個 bug（`personName`／`ruleFlags` 都會遺失），
   // 而第三十八輪修完**只有靜態驗證**。而家佢會俾真人用到，所以一定要驗。
-  const v = gas.findLatestVersionNo(Q);
+  const v = gas.findLatestVersionNo_(Q);
   const rows = function (ver) {
     const out = {};
-    gas.readSheet(S.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    gas.readSheet_(S.ROSTER_ASSIGNMENTS).forEach(function (row) {
       if (row[A.QUARTER_ID] !== Q || Number(row[A.VERSION_NO]) !== ver) return;
-      out[gas.toDateString(row[A.SERVICE_DATE], TZ) + '|' + row[A.POST_ID]] = {
+      out[gas.toDateString_(row[A.SERVICE_DATE], TZ) + '|' + row[A.POST_ID]] = {
         personId: String(row[A.PERSON_ID] || ''),
         personName: String(row[A.PERSON_NAME_SNAPSHOT] || ''),
         assignSource: String(row[A.ASSIGN_SOURCE] || ''),
@@ -416,7 +416,7 @@ console.log('\n=== B：放棄 ===');
   // ⚠️ 第四十三輪批次 B 組：**啱啱接受完，grid 同版本紀錄一模一樣**，
   // 而嗰種情況系統唔會再建立建議表（建立咗接受唔到，見 apiBuildSuggestion）。
   // 所以要先真係改一格，先至有嘢可以建議。
-  const latestNow = gas.findLatestVersionNo(Q);
+  const latestNow = gas.findLatestVersionNo_(Q);
   const gridNow2 = gas.buildRosterSheetName_(Q, latestNow);
   const someone = PEOPLE[Object.keys(PEOPLE)[1]];
   check('（前置）先喺正式表改一格', setGrid(gridNow2, DATES[6], 'CHAIR', someone));
@@ -424,12 +424,12 @@ console.log('\n=== B：放棄 ===');
   const built = gas.apiBuildSuggestion(Q);
   check('（前置）再產生一張建議表', built.ok === true, JSON.stringify(built).slice(0, 200));
   const before = snapshotAssignments();
-  const versionBefore = gas.findLatestVersionNo(Q);
+  const versionBefore = gas.findLatestVersionNo_(Q);
 
   const r = gas.apiDiscardSuggestion(Q);
   check('★★★★ 放棄成功', r.ok === true && r.removed === true, JSON.stringify(r));
   checkEqual('★★★★★ `RosterAssignments` 一個字都冇變', snapshotAssignments(), before);
-  checkEqual('★★★★★ 亦都冇建立新版本', gas.findLatestVersionNo(Q), versionBefore);
+  checkEqual('★★★★★ 亦都冇建立新版本', gas.findLatestVersionNo_(Q), versionBefore);
   checkEqual('★★★★ 建議表冇咗', gas.apiGetSuggestionState(Q).hasSuggestion, false);
 
   const again = gas.apiDiscardSuggestion(Q);

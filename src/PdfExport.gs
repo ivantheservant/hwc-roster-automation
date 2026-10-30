@@ -5,7 +5,7 @@
  * @param {number} versionNo 版本號
  * @returns {{fileId: string, fileName: string, folderName: string}} 產生的檔案資訊
  */
-function exportRosterPdf(quarterId, versionNo) {
+function exportRosterPdf_(quarterId, versionNo) {
   const built = buildFullRosterPdfBlob_(quarterId, versionNo);
   return saveBlobToRosterFolder_(built.blob);
 }
@@ -36,7 +36,7 @@ function buildFullRosterPdfBlob_(quarterId, versionNo) {
  * @param {string} personId 對象的 PersonID
  * @returns {{fileId: string, fileName: string, folderName: string}} 產生的檔案資訊
  */
-function exportPersonalPdf(quarterId, versionNo, personId) {
+function exportPersonalPdf_(quarterId, versionNo, personId) {
   const built = buildPersonalPdfBlob_(quarterId, versionNo, personId);
   const saved = saveBlobToRosterFolder_(built.blob);
   saved.highlighted = built.highlighted;
@@ -47,7 +47,7 @@ function exportPersonalPdf(quarterId, versionNo, personId) {
 /**
  * 產生個人版職事表 PDF 的 blob，不寫入 Drive：先複製一份 grid 工作表，
  * 把該人的格加上底色，匯出後刪除暫存工作表。是否加底色由 Config 的
- * ATTACH_HIGHLIGHT_PERSONAL 決定。供 exportPersonalPdf()（選單）與
+ * ATTACH_HIGHLIGHT_PERSONAL 決定。供 exportPersonalPdf_()（選單）與
  * generateMailAttachment_()（電郵附件）共用，避免重複實作 highlight／匯出邏輯。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -88,7 +88,7 @@ function buildPersonalPdfBlob_(quarterId, versionNo, personId, versionAssignment
         throw new Error(
           '在 ' + ctx.sheetName + ' 中找不到 ' + personName + '（' + personId + '）的任何一格。\n'
             + '已掃描 ' + located.scanned + ' 格資料。\n'
-            + '請確認該人在這一版有被派工；可執行 debugPersonalHighlight() 查看詳情。'
+            + '請確認該人在這一版有被派工；可執行 debugPersonalHighlight_() 查看詳情。'
         );
       }
     }
@@ -154,7 +154,7 @@ function openPersonalPdfRenderContext_(quarterId, versionNo) {
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) throw new Error('找不到工作表: ' + sheetName);
 
-  const wantHighlight = getConfig(CONFIG_KEYS.ATTACH_HIGHLIGHT_PERSONAL, false) === true;
+  const wantHighlight = getConfig_(CONFIG_KEYS.ATTACH_HIGHLIGHT_PERSONAL, false) === true;
   const gridIndex = wantHighlight ? buildGridIndex_(sheet) : null;
 
   const tempSheet = sheet.copyTo(ss).setName(SHEET_PREFIXES.TEMP_PDF + 'batch_' + Date.now());
@@ -238,7 +238,7 @@ function applyPersonHighlightToContext_(ctx, matched) {
  *   資料不足以建索引時回傳 null
  */
 function buildGridIndex_(sheet) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   if (lastRow < 3 || lastCol < 4) return null;
@@ -252,7 +252,7 @@ function buildGridIndex_(sheet) {
   const values = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
   const rowByDate = {};
   values.forEach(function (row, i) {
-    const dateStr = toDateString(row[0], timezone);
+    const dateStr = toDateString_(row[0], timezone);
     if (dateStr) rowByDate[dateStr] = i + 3;
   });
 
@@ -278,17 +278,17 @@ function buildGridIndex_(sheet) {
  * @param {number} versionNo 版本號
  * @param {string} personId 對象的 PersonID
  * @param {Object[]=} versionAssignments 選填，已經篩到這個 quarterId／versionNo 的
- *   RosterAssignments 原始列（readSheet() 的物件格式）。批次產生多人 PDF 時
+ *   RosterAssignments 原始列（readSheet_() 的物件格式）。批次產生多人 PDF 時
  *   （見 PdfBatch.gs），58 個人各自呼叫這個函式都要重讀一次整份 RosterAssignments，
  *   實測是「略過已存在」以外、另一個沒被注意到的效能熱點；改成外面只讀一次、
  *   篩到這個版本，傳進來讓每個人共用，這裡只需要再篩 PersonID。不傳這個參數時
  *   完全比照原本的行為，自己讀一次、篩三個條件，供其他呼叫端（例如選單「匯出 PDF」
- *   單獨匯出一人、debugPersonalHighlight() 診斷）維持不變。
+ *   單獨匯出一人、debugPersonalHighlight_() 診斷）維持不變。
  * @returns {{personName: string, scanned: number, matched: Object[], method: string}}
  *   matched 每項為 {row, column, key}
  */
 function locatePersonCells_(sheet, quarterId, versionNo, personId, versionAssignments, gridIndex) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const personName = lookupPersonName_(personId);
   const empty = { personName: personName, scanned: 0, matched: [], method: 'NONE' };
 
@@ -304,7 +304,7 @@ function locatePersonCells_(sheet, quarterId, versionNo, personId, versionAssign
   const scanned = index.scanned;
 
   const C = COLUMNS.ROSTER_ASSIGNMENTS;
-  const sourceRows = versionAssignments || readSheet(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+  const sourceRows = versionAssignments || readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
     return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo;
   });
   // 第七十六輪批次 DC 組：臨時幫手按**名字**搵佢嗰幾格（冇 PersonID）
@@ -316,7 +316,7 @@ function locatePersonCells_(sheet, quarterId, versionNo, personId, versionAssign
 
   const matched = [];
   mine.forEach(function (row) {
-    const dateStr = toDateString(row[C.SERVICE_DATE], timezone);
+    const dateStr = toDateString_(row[C.SERVICE_DATE], timezone);
     const key = row[C.POST_ID] + '#' + row[C.SLOT_INDEX];
     const r = rowByDate[dateStr];
     const c = columnByKey[key];
@@ -362,21 +362,21 @@ function locatePersonCells_(sheet, quarterId, versionNo, personId, versionAssign
  * @param {string} personId 對象的 PersonID，例如 "P0001"
  * @returns {Object} 定位結果，同時已寫入 Logger
  */
-function debugPersonalHighlight(quarterId, versionNo, personId) {
+function debugPersonalHighlight_(quarterId, versionNo, personId) {
   const sheetName = buildRosterSheetName_(quarterId, versionNo);
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) {
-    log_('ERROR', 'debugPersonalHighlight: 找不到工作表 ' + sheetName);
+    log_('ERROR', 'debugPersonalHighlight_: 找不到工作表 ' + sheetName);
     return null;
   }
 
   const located = locatePersonCells_(sheet, quarterId, versionNo, personId);
   const lines = [
-    '=== debugPersonalHighlight ===',
+    '=== debugPersonalHighlight_ ===',
     '工作表：' + sheetName,
     'PersonID：' + personId,
     '反查到的姓名：' + (located.personName || '（查不到，NameMapping 沒有此 PersonID）'),
-    'ATTACH_HIGHLIGHT_PERSONAL：' + getConfig(CONFIG_KEYS.ATTACH_HIGHLIGHT_PERSONAL, false),
+    'ATTACH_HIGHLIGHT_PERSONAL：' + getConfig_(CONFIG_KEYS.ATTACH_HIGHLIGHT_PERSONAL, false),
     '掃描了 ' + located.scanned + ' 格',
     '命中 ' + located.matched.length + ' 格',
     '定位方式：' + located.method
@@ -407,7 +407,7 @@ function debugPersonalHighlight(quarterId, versionNo, personId) {
  * @returns {{blob: Blob, retries: number}} PDF 內容與實際重試次數
  */
 function exportSheetAsPdfBlob_(sheet, fileName, opts) {
-  const orientation = String(getConfig(CONFIG_KEYS.ATTACH_PAGE_ORIENTATION, PAGE_ORIENTATION.LANDSCAPE)).toUpperCase();
+  const orientation = String(getConfig_(CONFIG_KEYS.ATTACH_PAGE_ORIENTATION, PAGE_ORIENTATION.LANDSCAPE)).toUpperCase();
   const isPortrait = orientation === PAGE_ORIENTATION.PORTRAIT;
   const ssId = sheet.getParent().getId();
 
@@ -452,7 +452,7 @@ function exportSheetAsPdfBlob_(sheet, fileName, opts) {
   ].concat(rangeParams).join('&');
 
   const url = 'https://docs.google.com/spreadsheets/d/' + ssId + '/export?' + params;
-  const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+  const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
   const result = fetchWithRetry_(url, {
     headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
     muteHttpExceptions: true
@@ -502,9 +502,9 @@ function exportSheetAsPdfBlob_(sheet, fileName, opts) {
  */
 function fetchWithRetry_(url, options, minBytes) {
   const maxRetries = Math.max(0, Math.round(
-    getConfig(CONFIG_KEYS.PDF_EXPORT_MAX_RETRIES, DEFAULTS.PDF_EXPORT_MAX_RETRIES)));
+    getConfig_(CONFIG_KEYS.PDF_EXPORT_MAX_RETRIES, DEFAULTS.PDF_EXPORT_MAX_RETRIES)));
   let delayMs = Math.max(0, Math.round(
-    getConfig(CONFIG_KEYS.PDF_EXPORT_RETRY_DELAY_MS, DEFAULTS.PDF_EXPORT_RETRY_DELAY_MS)));
+    getConfig_(CONFIG_KEYS.PDF_EXPORT_RETRY_DELAY_MS, DEFAULTS.PDF_EXPORT_RETRY_DELAY_MS)));
 
   let attempt = 0;
   while (true) {
@@ -595,7 +595,7 @@ function saveOrOverwriteFile_(folder, fileName, blob) {
  * @returns {boolean} 是否確認其實已經成功
  */
 function checkFileActuallySucceeded_(folder, fileName, sinceDate) {
-  const minBytes = Math.max(0, Math.round(getConfig(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
+  const minBytes = Math.max(0, Math.round(getConfig_(CONFIG_KEYS.PDF_MIN_SIZE_BYTES, DEFAULTS.PDF_MIN_SIZE_BYTES)));
   const files = folder.getFilesByName(fileName);
   while (files.hasNext()) {
     const file = files.next();
@@ -612,7 +612,7 @@ function checkFileActuallySucceeded_(folder, fileName, sinceDate) {
  * @returns {Folder} Drive 資料夾
  */
 function resolveRosterFolder_() {
-  const folderId = String(getConfig(CONFIG_KEYS.ROSTER_DRIVE_FOLDER_ID, '')).trim();
+  const folderId = String(getConfig_(CONFIG_KEYS.ROSTER_DRIVE_FOLDER_ID, '')).trim();
   if (folderId) return DriveApp.getFolderById(folderId);
 
   log_('WARN', 'Config 的 ROSTER_DRIVE_FOLDER_ID 未設定，PDF 改存到試算表所在的資料夾');
@@ -649,7 +649,7 @@ function isPersonalMyDriveFolder_(folder) {
  * @returns {Folder} Shared Drive 資料夾
  */
 function resolveMailAttachmentFolder_() {
-  const folderId = String(getConfig(CONFIG_KEYS.ROSTER_DRIVE_FOLDER_ID, '')).trim();
+  const folderId = String(getConfig_(CONFIG_KEYS.ROSTER_DRIVE_FOLDER_ID, '')).trim();
   if (!folderId) {
     throw new Error('Config 的 ROSTER_DRIVE_FOLDER_ID 未設定。寄送附件必須存於 Shared Drive，'
       + '請在 Config 填入 Shared Drive 資料夾的 ID。');
@@ -773,7 +773,7 @@ function scanPdfStatsByQuarterVersion_(folder, fileSizes) {
   const pattern = /^(.+?)_v(\d+)_/;
 
   const latestVersionByQuarter = {};
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     const qid = String(row[COLUMNS.ROSTER_VERSIONS.QUARTER_ID] || '').trim();
     if (!qid) return;
     const vNo = Number(row[COLUMNS.ROSTER_VERSIONS.VERSION_NO]);
@@ -869,7 +869,7 @@ function executeQuarterPdfCleanup_(plan) {
  * @returns {string} 檔案名稱（確保以 .pdf 結尾）
  */
 function buildAttachmentName_(quarterId, versionNo, personName) {
-  const pattern = String(getConfig(CONFIG_KEYS.ATTACH_NAME_PATTERN, DEFAULTS.ATTACH_NAME_PATTERN));
+  const pattern = String(getConfig_(CONFIG_KEYS.ATTACH_NAME_PATTERN, DEFAULTS.ATTACH_NAME_PATTERN));
   let name = pattern
     .split('{QuarterID}').join(quarterId)
     .split('{PersonName}').join(personName || '')
@@ -887,7 +887,7 @@ function lookupPersonName_(personId) {
   // 第七十六輪批次 DC 組：臨時幫手（`NAME:名字`）冇 PersonID，個名就喺鍵入面
   const tempName = tempHelperNameFromPaperKey_(personId);
   if (tempName) return tempName;
-  const people = readSheet(SHEETS.NAME_MAPPING);
+  const people = readSheet_(SHEETS.NAME_MAPPING);
   for (let i = 0; i < people.length; i++) {
     if (people[i][COLUMNS.NAME_MAPPING.PERSON_ID] === personId) {
       return people[i][COLUMNS.NAME_MAPPING.NAME_TC] || personId;
@@ -949,7 +949,7 @@ function findRosterGridLastRow_(sheet) {
  * @returns {{lastRow: number}|undefined} 傳給 `exportSheetAsPdfBlob_()` 的選項
  */
 function resolveRosterOnlyExportOpts_(sheet) {
-  if (getConfig(CONFIG_KEYS.PDF_ROSTER_ONLY, DEFAULTS.PDF_ROSTER_ONLY) !== true) return undefined;
+  if (getConfig_(CONFIG_KEYS.PDF_ROSTER_ONLY, DEFAULTS.PDF_ROSTER_ONLY) !== true) return undefined;
   const lastRow = findRosterGridLastRow_(sheet);
   if (lastRow <= 0) return undefined;
   return { lastRow: lastRow };

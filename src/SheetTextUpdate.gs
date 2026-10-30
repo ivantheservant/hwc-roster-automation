@@ -100,7 +100,7 @@ function describeSheetTextItem_(item) {
 
 /**
  * 找出某一項在試算表的位置（列、欄，1 起計）。找不到 ⇒ null。
- * 表頭在第 2 行，資料由第 3 行開始（與 readSheet() 相同）。
+ * 表頭在第 2 行，資料由第 3 行開始（與 readSheet_() 相同）。
  * @param {Object} ss 試算表
  * @param {Object} item 一項
  * @returns {?{sheet: Object, row: number, col: number}}

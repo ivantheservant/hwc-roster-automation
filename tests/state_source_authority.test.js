@@ -28,14 +28,14 @@ const mock = require('./helpers/mock_roster_data.js');
 const gas = loadGasSource(FILES_FOR_GENERATOR.concat(['Verify.gs', 'RosterWriter.gs', 'StateSource.gs']));
 
 // ⚠️ 呢個替身**一定要喺 loadGasSource() 之後先設**，唔可以用 overrides 參數。
-// `resolvePersonId` 喺 .gs 入面係一個 top-level `function` 宣告，載入嗰陣
+// `resolvePersonId_` 喺 .gs 入面係一個 top-level `function` 宣告，載入嗰陣
 // 會覆蓋 sandbox 上面同名嘅屬性——用 overrides 傳入去係會被蓋走嘅
 // （實測：仍然行到真嘅版本，於是撞 SpreadsheetApp stub 拋錯）。
 // 載入之後再賦值就冇呢個問題，因為 top-level function 就係全域物件嘅屬性。
 //
 // 用替身嘅理由：grid 疊加只會對「真正改動過」嘅格做姓名解析，
 // 我哋要測嘅係疊加邏輯，唔係 People 工作表嘅讀取路徑。
-gas.resolvePersonId = function (name) {
+gas.resolvePersonId_ = function (name) {
   const map = { '假甲': 'P9001', '假乙': 'P9002', '假丙': 'P9003', '假丁': 'P9004' };
   return map[name] || null;
 };

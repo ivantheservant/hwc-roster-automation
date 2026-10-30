@@ -118,11 +118,11 @@ function fakeContext() {
 /** 換走最外層 IO，令端點可以喺 Node 真正行一次。 */
 function stubIo(overrides) {
   gas.assertWebAppRequestAllowed_ = function () {};
-  gas.getConfig = function (key, fallback) { return fallback; };
-  gas.readConfig = function () { return {}; };
+  gas.getConfig_ = function (key, fallback) { return fallback; };
+  gas.readConfig_ = function () { return {}; };
   gas.log_ = function () {};
   gas.getQuarterStage_ = function () { return gas.QUARTER_STAGE.REVIEW_SENT; };
-  gas.findLatestVersionNo = function () { return 1; };
+  gas.findLatestVersionNo_ = function () { return 1; };
   gas.buildFineTuneContext_ = function () { return fakeContext(); };
   gas.resolveAuthoritativeState_ = function () {
     return { state: fakeState(), changes: [], unresolved: [] };
@@ -130,8 +130,8 @@ function stubIo(overrides) {
   gas.planApplyRequests_ = function () {
     return { results: [], skippedIncompleteCount: 0, quarterId: '2027T4' };
   };
-  gas.readSheet = function () { return []; };
-  gas.readPostsNormalized = function () { return POSTS; };
+  gas.readSheet_ = function () { return []; };
+  gas.readPostsNormalized_ = function () { return POSTS; };
   gas.buildSaveConfirmProposals_ = function () { return []; };
   Object.keys(overrides || {}).forEach(function (k) { gas[k] = overrides[k]; });
 }
@@ -201,7 +201,7 @@ console.log('\n=== A3 反面：把參數次序改返轉頭，呢一份要即刻�
 console.log('\n=== A3【核心】「回到上一個版本」預覽由端點入口行一次 ===');
 {
   stubIo({
-    findLatestVersionNo: function () { return 2; },
+    findLatestVersionNo_: function () { return 2; },
     readDashboardUnsavedState_: function () {
       return { hasAny: false, gridChangeCount: 0, unresolvedCount: 0, pendingRequestCount: 0 };
     },
@@ -293,7 +293,7 @@ console.log('\n=== D4【核心】步驟 2「寄給堂委審閱」由端點入口
 
   check('★★★★★ **`apiStep2Preview()` 唔會拋錯**'
     + '——由端點到 IO 之間每一行都真正行過，包括 `requireQuarterStage_()`'
-    + '同 `findLatestVersionNo()` 嘅回傳點樣被用',
+    + '同 `findLatestVersionNo_()` 嘅回傳點樣被用',
     thrown === null, thrown && (thrown.message + '\n' + thrown.stack));
   check('★★★★★ 而且真係攞到收件人數同版本號',
     result !== null && result.recipientCount === 4 && result.versionNo === 1,
@@ -338,7 +338,7 @@ console.log('\n=== D4 步驟 2 冇版本 ⇒ 要講「請先生成初稿」，�
   stubIo({
     countReviewerRecipients_: function () { return 4; },
     countAlreadySentForStage_: function () { return 0; },
-    findLatestVersionNo: function () { return -1; }
+    findLatestVersionNo_: function () { return -1; }
   });
   let thrown = null;
   try { gas.apiStep2Preview('2027T4'); } catch (err) { thrown = err; }

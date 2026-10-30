@@ -58,11 +58,11 @@ function log(stage, v, personId, status) {
 let SEND_LOG = [];
 gas.indexPeopleById_ = function () { return PEOPLE; };
 gas.log_ = function () {};
-gas.getConfig = function (_k, d) { return d; };
+gas.getConfig_ = function (_k, d) { return d; };
 gas.buildMailContext_ = function () { return {}; };
 gas.listRecipients_ = function () { return RECIPIENTS; };
 gas.findEmailTemplate_ = function () { return { attachType: 'NONE' }; };
-gas.readSheet = function (name) {
+gas.readSheet_ = function (name) {
   if (name === gas.SHEETS.ROSTER_ASSIGNMENTS) return ['P9401', 'P9402', 'P9403'].map(cell);
   if (name === gas.SHEETS.SEND_LOG) return SEND_LOG;
   return [];

@@ -131,9 +131,9 @@ function sandbox(opts) {
 
   gas.log_ = function () {};
   gas.selfTestRecordPayload_ = function () {};
-  gas.getConfig = function () { return 'Asia/Hong_Kong'; };
-  gas.toDateString = function (v) { return String(v); };
-  gas.findLatestVersionNo = function () { return 0; };
+  gas.getConfig_ = function () { return 'Asia/Hong_Kong'; };
+  gas.toDateString_ = function (v) { return String(v); };
+  gas.findLatestVersionNo_ = function () { return 0; };
 
   const people = opts.people || { P1: '假甲乙', P2: '假丙丁', P3: '假戊己', P4: '假庚辛' };
   gas.indexPeopleById_ = function () {
@@ -143,13 +143,13 @@ function sandbox(opts) {
     });
     return m;
   };
-  gas.readEligibility = function () {
+  gas.readEligibility_ = function () {
     return { byPost: opts.byPost || {}, byPerson: {}, historicalCount: {},
       explicitlyExcluded: {} };
   };
 
   const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name !== gas.SHEETS.ROSTER_ASSIGNMENTS) return [];
     return (opts.rows || []).map(function (r) {
       const row = {};

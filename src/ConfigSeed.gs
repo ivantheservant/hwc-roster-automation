@@ -1,5 +1,5 @@
 /**
- * 程式碼實際會用 getConfig()／CONFIG_KEYS 讀取、但可能還沒出現在 Config 工作表的
+ * 程式碼實際會用 getConfig_()／CONFIG_KEYS 讀取、但可能還沒出現在 Config 工作表的
  * 參數定義。選單「補建 Config 參數」只會把這裡列出、工作表目前沒有的 Key
  * 加到最後一行，絕不修改任何既有行的 Value——已經在工作表裡的設定一律維持原樣，
  * 即使跟這裡的 defaultValue 不同也不會被覆寫或刪除。
@@ -10,7 +10,7 @@
  * ⚠️ 這份清單曾經漏過大部分的 Key（只收錄了近幾輪追加階段新增的 5 個），
  * 導致「補建 Config 參數」對 40 幾個實際會用到的 Key 完全視而不見、誤判成
  * 「都已存在」。這是實測抓到的真實 bug（GRID_PENDING_FILL_COLOR 事件）。
- * 現在已經逐一比對全部 `getConfig()`／`config[CONFIG_KEYS.X]` 呼叫點，
+ * 現在已經逐一比對全部 `getConfig_()`／`config[CONFIG_KEYS.X]` 呼叫點，
  * 補齊成一份完整清單，並在下方加了 checkConfigKeyRegistryGaps_() 自我檢查，
  * 執行「補建 Config 參數」時一律會報告 CONFIG_KEYS 裡有沒有任何 Key
  * 沒被這份清單涵蓋，不會再靜靜地漏掉。
@@ -18,14 +18,14 @@
  * 【對於「正確值因人而異、猜錯有實際後果」的 Key（LEAD_DAYS_* 這類排程日數），
  * 這裡刻意不猜一個看起來合理但其實不知道對不對的數字，而是給空白 Value
  * （Type 仍然正確設定），Description 講清楚「必填，請自行填入」——空白 Value
- * 在效果上等同這一行完全不存在（getConfig() 的 fallback 一樣會生效），
+ * 在效果上等同這一行完全不存在（getConfig_() 的 fallback 一樣會生效），
  * 所以這樣做不會比「完全沒有這個 Key」更差，卻能讓你在 Config 工作表上
  * 直接看到這個 Key 存在、需要你填，而不是要靠翻程式碼才知道。】
  *
  * 刻意寫成函式而非 const 陣列：本檔案（C 開頭）依字母序會比 Constants.gs 更早載入，
  * 若在頂層直接引用 CONFIG_KEYS／CONFIG_TYPES／DEFAULTS 會拋
  * "Cannot access 'CONFIG_KEYS' before initialization"（跟 Constants.gs 的
- * getRequiredConfigKeys() 是同一個理由、同一種寫法）。改為函式後，
+ * getRequiredConfigKeys_() 是同一個理由、同一種寫法）。改為函式後，
  * 這些引用只在呼叫當下才求值，那時候全部檔案都已經載入完畢。
  * @returns {Object[]} Key 定義清單
  */
@@ -42,7 +42,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, type: CONFIG_TYPES.INT, group: 'PDF_BATCH',
       defaultValue: String(DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE),
-      description: '寄送流程（sendStage()／sendResendStage_()）每處理幾個收件人就把 '
+      description: '寄送流程（sendStage_()／sendResendStage_()）每處理幾個收件人就把 '
         + 'SendLog 寫入一次，不是全部寄完才一次寫入。設太大時，Apps Script 逾時中途中斷'
         + '會遺失較多筆還沒寫入的紀錄；設太小則寫入次數變多、稍微變慢。',
       editable: 'TRUE'
@@ -380,7 +380,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.SYS_LOCALE, type: CONFIG_TYPES.STR, group: 'SYS',
       defaultValue: '',
-      description: '必填但目前程式碼沒有任何地方實際讀取這個值（只在 validateSetup() 的'
+      description: '必填但目前程式碼沒有任何地方實際讀取這個值（只在 validateSetup_() 的'
         + '必填清單裏）。語意不明確，故意留空不猜，請你確認正確值後自行填入。',
       editable: 'TRUE'
     },
@@ -807,7 +807,7 @@ function getConfigKeyKnownUnusedKeys_() {
  * 跟 GRID_PENDING_FILL_COLOR 同一種疏漏——新增了 Config Key 但忘記把它加進
  * getConfigKeySeeds_()。這個檢查不需要真的去解析程式碼原始碼（Apps Script 環境
  * 沒有簡單的方法讀自己的原始碼），改用 CONFIG_KEYS 本身當作「程式碼用到的 Key」的
- * 可靠代理——目前逐一核對過，CONFIG_KEYS 之外沒有任何 getConfig() 呼叫用到別的
+ * 可靠代理——目前逐一核對過，CONFIG_KEYS 之外沒有任何 getConfig_() 呼叫用到別的
  * Key 名稱，所以只要日後新 Key 都照專案慣例先加進 CONFIG_KEYS，這個檢查就抓得到。
  * @returns {{unexpectedGaps: string[], knownGaps: Object[]}}
  *   unexpectedGaps 為需要留意的 Key 名稱；knownGaps 每項為 {key, reason}
@@ -846,7 +846,7 @@ function checkConfigKeyRegistryGaps_() {
  */
 function planConfigKeySeed_() {
   const existingKeys = {};
-  readSheet(SHEETS.CONFIG).forEach(function (row) {
+  readSheet_(SHEETS.CONFIG).forEach(function (row) {
     const key = row[COLUMNS.CONFIG.KEY];
     if (key) existingKeys[String(key)] = true;
   });
@@ -863,7 +863,7 @@ function planConfigKeySeed_() {
 
 /**
  * 追加階段 P：逐行核對 Config 工作表的實際內容，只讀不寫，供「檢查 Config 行數
- * （唯讀）」使用。跟 planConfigKeySeed_() 的差異：那邊用 readSheet()（會靜靜略過
+ * （唯讀）」使用。跟 planConfigKeySeed_() 的差異：那邊用 readSheet_()（會靜靜略過
  * 整行全空的列，也不記錄列號，且用物件當 Set 判斷 Key 存不存在時，同一個 Key
  * 出現兩次會被合併成一次、完全看不出來），這裡改用 getRange().getValues() 逐格
  * 讀取、自己保留列號，才有辦法回報「哪一列是空白」「哪個 Key 重複、重複在哪幾列」

@@ -124,7 +124,7 @@ console.log('\n=== G【核心】唔標示嗰一份真係冇 highlight ===');
 
 console.log('\n=== G：檔案要存喺幹事搵得返嗰個資料夾 ===');
 {
-  // ⚠️ `exportRosterPdf()` 存去 ROSTER_DRIVE_FOLDER_ID 嗰個總資料夾，
+  // ⚠️ `exportRosterPdf_()` 存去 ROSTER_DRIVE_FOLDER_ID 嗰個總資料夾，
   // 而紙本其他檔全部喺**嗰一版自己嘅子資料夾**。存去兩個地方嘅話，
   // 幹事撳「開啟資料夾」會搵唔到自己啱啱做好嗰一份。
   const fn = packBare.slice(packBare.indexOf('function apiGeneratePlainPaper_locked_'));

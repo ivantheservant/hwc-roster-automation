@@ -245,9 +245,9 @@ console.log('\n=== 第十四輪批次階段 E：真正原始碼有處理 FineTun
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'QuarterReset.gs'), 'utf8');
 
   check('★★★★ planQuarterReset_() 會讀 FineTuneProposals（主表）',
-    /plan\.fineTuneProposalRows\s*=\s*readSheet\(SHEETS\.FINE_TUNE_PROPOSALS\)/.test(source), true);
+    /plan\.fineTuneProposalRows\s*=\s*readSheet_\(SHEETS\.FINE_TUNE_PROPOSALS\)/.test(source), true);
   check('★★★★ planQuarterReset_() 會讀 FineTuneProposals_Archive（封存表）',
-    /plan\.fineTuneProposalArchiveRows\s*=\s*readSheet\(FINETUNE_ARCHIVE_SHEET\)/.test(source), true);
+    /plan\.fineTuneProposalArchiveRows\s*=\s*readSheet_\(FINETUNE_ARCHIVE_SHEET\)/.test(source), true);
   check('★★★★ executeQuarterReset_() 真正刪除主表符合條件嘅行',
     /result\.fineTuneProposalRowsDeleted\s*=\s*deleteRowsMatching_\(SHEETS\.FINE_TUNE_PROPOSALS/.test(source), true);
   check('★★★★ executeQuarterReset_() 真正刪除封存表符合條件嘅行（有先檢查表存唔存在）',

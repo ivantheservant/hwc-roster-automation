@@ -12,8 +12,8 @@
  * Config 的 `SCORE_TIE_EPSILON` 改成非零值。
  *
  * 唯讀保證（這是本工具最重要的性質）：
- * - 完全**不呼叫** `performRosterGeneration_()`、`createRosterSheet()`、
- *   `writeAssignments()`、`registerVersion()` 這些會寫入的函式；
+ * - 完全**不呼叫** `performRosterGeneration_()`、`createRosterSheet_()`、
+ *   `writeAssignments_()`、`registerVersion_()` 這些會寫入的函式；
  * - 只呼叫 `buildGeneratorContext_()`（讀）與 `buildRoster_()`（純運算，
  *   `Generator.gs` 全檔沒有任何 Google Apps Script API 呼叫，見
  *   `tests/helpers/gas_loader.js` 的查證說明）；
@@ -21,7 +21,7 @@
  * - **不會改動 Config**——`epsilon` 是直接寫進記憶體中的 context 物件，
  *   不經過 Config 工作表，執行完 Config 的 `SCORE_TIE_EPSILON` 仍然是原值。
  *
- * 刻意不重用 `compareMultiRun()`：那個函式會建立 `MultiRun_Result` 工作表，
+ * 刻意不重用 `compareMultiRun_()`：那個函式會建立 `MultiRun_Result` 工作表，
  * 不是唯讀的，而且它只跑一組設定，沒有「同一份資料、不同 epsilon 對照」的概念。
  */
 
@@ -150,9 +150,9 @@ function summariseEpsilonTrialRecords_(epsilon, seedCount, distinctRosters,
  * 第十輪批次階段 C：**由程式直接判斷應該用邊一個 epsilon 值**，唔係丟一堆
  * 指標俾幹事自己諗。
  *
- * 判斷準則刻意對齊 `generateBest()` 實際做緊嘅嘢：佢跑 N 次然後**揀最好嗰份**，
+ * 判斷準則刻意對齊 `generateBest_()` 實際做緊嘅嘢：佢跑 N 次然後**揀最好嗰份**，
  * 所以真正緊要嘅唔係平均品質，而係「最好嗰份可以去到幾好」——即係
- * `deviation.min`（總偏差最細嗰份，`generateBest()` 就係揀佢）。
+ * `deviation.min`（總偏差最細嗰份，`generateBest_()` 就係揀佢）。
  *
  * 逐層篩選：
  * 1. 硬規則違反必須係 0——有違反嘅一律出局，冇得商量。

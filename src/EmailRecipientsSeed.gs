@@ -78,7 +78,7 @@ function seedEmailRecipientsRole_(plan) {
  * 是同一份規則寫在兩個地方，容易改一邊漏一邊（見 B1 測試 `mailer_recipients.test.js`
  * 專門驗證兩邊結果一致）。合併風險低：兩處原本的邏輯逐字比對完全相同，這裡只是
  * 把它抽成一個函式，不改變任何一邊的行為。
- * @param {Object} row readSheet(SHEETS.EMAIL_RECIPIENTS) 的一列
+ * @param {Object} row readSheet_(SHEETS.EMAIL_RECIPIENTS) 的一列
  * @returns {boolean} true＝這一行是這次審閱信的收件人
  */
 function isReviewerRecipientRow_(row) {
@@ -92,7 +92,7 @@ function isReviewerRecipientRow_(row) {
  * @returns {number} 審閱者人數
  */
 function countReviewerRecipients_() {
-  return readSheet(SHEETS.EMAIL_RECIPIENTS).filter(isReviewerRecipientRow_).length;
+  return readSheet_(SHEETS.EMAIL_RECIPIENTS).filter(isReviewerRecipientRow_).length;
 }
 
 /**
@@ -107,7 +107,7 @@ function countReviewerRecipients_() {
 function buildRecipientRoleStageMatrix_() {
   const C = COLUMNS.EMAIL_RECIPIENTS;
   const allMailStages = [MAIL_STAGES.GENERATE, MAIL_STAGES.REMIND, MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND];
-  return readSheet(SHEETS.EMAIL_RECIPIENTS)
+  return readSheet_(SHEETS.EMAIL_RECIPIENTS)
     .filter(function (row) { return isTrueValue_(row[C.ACTIVE]); })
     .map(function (row) {
       const role = String(row[C.ROLE] || '').trim().toUpperCase();

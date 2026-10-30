@@ -153,23 +153,23 @@ function buildFixture() {
 buildFixture();
 
 function whoIsOn(versionNo, date, post) {
-  const row = gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const row = gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo
-      && gas.toDateString(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
+      && gas.toDateString_(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post;
   })[0];
   return row ? String(row[A.PERSON_ID] || '') : null;
 }
 function cellsOf(versionNo, personId, post) {
-  return gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (r) {
+  return gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo
       && r[A.POST_ID] === post && String(r[A.PERSON_ID] || '') === personId;
-  }).map(function (r) { return gas.toDateString(r[A.SERVICE_DATE], TZ); });
+  }).map(function (r) { return gas.toDateString_(r[A.SERVICE_DATE], TZ); });
 }
 
 // =====================================================================
 console.log('\n=== 前置：生成初稿 ===');
 check('（前置）生成成功', gas.apiGenerateDraftExecute(Q) !== undefined);
-const V0 = gas.findLatestVersionNo(Q);
+const V0 = gas.findLatestVersionNo_(Q);
 const TARGET = whoIsOn(V0, DATES[1], 'CHAIR');
 const TARGET_CELLS = cellsOf(V0, TARGET, 'CHAIR');
 check('（前置）嗰個人喺 v0 做過主席', TARGET && TARGET_CELLS.length >= 1, JSON.stringify(TARGET_CELLS));

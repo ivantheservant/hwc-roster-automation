@@ -55,10 +55,10 @@ const RECIPIENTS = [
 
 gas.buildMailContext_ = function () { return {}; };
 gas.listRecipients_ = function () { return RECIPIENTS; };
-gas.readSheet = function (name) { return name === gas.SHEETS.SEND_LOG ? SEND_LOG : []; };
-gas.getConfig = function (_k, d) { return d; };
+gas.readSheet_ = function (name) { return name === gas.SHEETS.SEND_LOG ? SEND_LOG : []; };
+gas.getConfig_ = function (_k, d) { return d; };
 gas.findEmailTemplate_ = function () { return { attachType: 'PERSONAL_PDF' }; };
-gas.findLatestVersionNo = function () { return 3; };
+gas.findLatestVersionNo_ = function () { return 3; };
 gas.assertWebAppRequestAllowed_ = function () {};
 // 第六十五輪批次 W 組：預覽會問個人 PDF 有冇缺——呢份測試唔關 PDF 事，當全部齊
 gas.checkMissingPersonalPdfs_ = function () { return { applicable: true, missing: [], absent: [], stale: [] }; };

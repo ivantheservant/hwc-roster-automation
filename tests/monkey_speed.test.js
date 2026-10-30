@@ -73,8 +73,8 @@ function machine(opts) {
   gas.checkSelfTestPreconditions_ = function () { return { ok: true, reasons: [] }; };
   gas.assertMonkeyDryRunStillOn_ = function () {};
   gas.writeMonkeyLog_ = function () {};
-  gas.readConfig = function () { return {}; };
-  gas.getConfig = function (key, dflt) {
+  gas.readConfig_ = function () { return {}; };
+  gas.getConfig_ = function (key, dflt) {
     if (key === gas.CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS) {
       return opts.skipSlow === undefined ? true : opts.skipSlow;
     }
@@ -257,8 +257,8 @@ console.log('\n=== C 開關要係真 Config，唔可以寫死 ===');
   const SRC = read('src/MonkeyRun.gs');
   check('★★★★★★ `CONFIG_KEYS` 有登記',
     gas.CONFIG_KEYS.MONKEY_SKIP_SLOW_ACTIONS === 'MONKEY_SKIP_SLOW_ACTIONS', '');
-  check('★★★★★★ **真係經 `getConfig()` 讀，唔係寫死**',
-    /getConfig\(CONFIG_KEYS\.MONKEY_SKIP_SLOW_ACTIONS, true\) === true/.test(SRC), '');
+  check('★★★★★★ **真係經 `getConfig_()` 讀，唔係寫死**',
+    /getConfig_\(CONFIG_KEYS\.MONKEY_SKIP_SLOW_ACTIONS, true\) === true/.test(SRC), '');
   const seed = read('src/ConfigSeed.gs');
   check('★★★★★ `ConfigSeed.gs` 有 row，型別 BOOL、預設 TRUE',
     /MONKEY_SKIP_SLOW_ACTIONS, type: CONFIG_TYPES\.BOOL/.test(seed)

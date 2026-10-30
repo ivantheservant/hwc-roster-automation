@@ -41,18 +41,18 @@
  *
  * OFFICIAL（正式發出）永遠不會由這裡觸發——四階段流程的步驟 4 一定要幹事在
  * 選單或 Web UI 手動執行，因為那是真正寄給全部義工、不可逆的動作。
- * Mailer.gs 的 sendStage() 有一道結構性防護（assertOfficialNotFromAutomationTrigger_()）：
+ * Mailer.gs 的 sendStage_() 有一道結構性防護（assertOfficialNotFromAutomationTrigger_()）：
  * 只要偵測到目前是在這個函式的執行期間（AUTOMATION_TRIGGER_CONTEXT_ACTIVE），
  * OFFICIAL 階段一律直接拒絕並記入 AuditLog，即使日後不小心在這裡加了一行呼叫
- * sendStage(..., MAIL_STAGES.OFFICIAL) 也會被擋下來，不是只靠「這裡沒寫」這種
+ * sendStage_(..., MAIL_STAGES.OFFICIAL) 也會被擋下來，不是只靠「這裡沒寫」這種
  * 容易被以後的修改破壞的保證。REMIND 的擴大範圍完全沒有改動這道防護，也沒有
- * 新增任何呼叫 sendStage() 的路徑——REMIND 一律經 notifyAdmin_() 寄出，那個
- * 函式跟 sendStage() 是完全獨立的兩條路徑，見下面 notifyAdminStageReminder_()
+ * 新增任何呼叫 sendStage_() 的路徑——REMIND 一律經 notifyAdmin_() 寄出，那個
+ * 函式跟 sendStage_() 是完全獨立的兩條路徑，見下面 notifyAdminStageReminder_()
  * 與 Mailer.gs。
  *
  * 安全設計：
  * - 本檔案完全不會自己呼叫 ScriptApp.newTrigger()——那只發生在
- *   installAutomationTrigger()，而它只被選單「安裝自動排程」呼叫，
+ *   installAutomationTrigger_()，而它只被選單「安裝自動排程」呼叫，
  *   需要人手點擊並在確認視窗打字輸入「確認安裝」才會執行。
  * - DRY_RUN=TRUE 時，生成職事表版本這一步仍會真實發生（那本來就不是電郵），
  *   只有「真正寄出電郵」這一步會被攔截（notifyAdmin_() 內建的機制，見 Mailer.gs）。
@@ -67,7 +67,7 @@
 const AUTOMATION_TRIGGER_FUNCTION = 'dailyAutomationCheck_';
 
 /**
- * 追加階段 N：dailyAutomationCheck_() 執行期間設為 true，讓 sendStage() 能判斷
+ * 追加階段 N：dailyAutomationCheck_() 執行期間設為 true，讓 sendStage_() 能判斷
  * 目前是不是由自動排程觸發呼叫，藉此擋掉 OFFICIAL 階段（結構性防護，見
  * assertOfficialNotFromAutomationTrigger_()，Mailer.gs）。用 try/finally 確保
  * 無論成功或拋錯都會重設，手法跟 TemplatePreview.gs 的 PREVIEW_MODE_ACTIVE 一致。
@@ -76,7 +76,7 @@ var AUTOMATION_TRIGGER_CONTEXT_ACTIVE = false;
 
 /**
  * 追加階段 N 的結構性防護：OFFICIAL 階段永遠不可以由自動排程的每日檢查觸發，
- * 一定要幹事在選單或 Web UI 按掣才能執行。呼叫端（Mailer.gs 的 sendStage()）
+ * 一定要幹事在選單或 Web UI 按掣才能執行。呼叫端（Mailer.gs 的 sendStage_()）
  * 在 stage === MAIL_STAGES.OFFICIAL 時呼叫這裡；只要偵測到目前是在
  * dailyAutomationCheck_() 的執行期間就直接拒絕並記入 AuditLog，留下「曾經有
  * 東西嘗試從自動排程觸發正式發出」的紀錄，方便日後追查是不是程式碼哪裡不小心接錯。
@@ -110,10 +110,10 @@ function assertOfficialNotFromAutomationTrigger_(quarterId) {
 function dailyAutomationCheck_() {
   AUTOMATION_TRIGGER_CONTEXT_ACTIVE = true;
   try {
-    const config = readConfig();
+    const config = readConfig_();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
-    const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+    const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
     const report = [];
 
     // 第七十五輪批次 CB 組：先確保未來 N 個月內開始嘅季度已建立（逐季、寫 AuditLog）。
@@ -129,7 +129,7 @@ function dailyAutomationCheck_() {
       report.push({ quarterId: '', action: 'LOOKAHEAD', outcome: 'ERROR', detail: err.message });
     }
 
-    readSheet(SHEETS.QUARTERS).forEach(function (row) {
+    readSheet_(SHEETS.QUARTERS).forEach(function (row) {
       const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
       if (!quarterId) return;
 
@@ -214,17 +214,17 @@ function dailyAutomationCheck_() {
  * 沒有任何呼叫端讀取（REMIND 已經完全由 REMIND_STUCK_DAYS 驅動，不再是日期概念），
  * 已依你的指示移除這段計算，連同 LEAD_DAYS_REMIND／RemindOn 一併從註冊移除。
  *
- * @param {Object} quarterRow Quarters 的一列資料（readSheet 的物件格式）
- * @param {Object.<string, *>} config readConfig() 的結果
+ * @param {Object} quarterRow Quarters 的一列資料（readSheet_ 的物件格式）
+ * @param {Object.<string, *>} config readConfig_() 的結果
  * @returns {{generateDate: string, officialDate: string}} 生成的有效日期、正式寄送的名義日期
  */
 function computeAutomationSchedule_(quarterRow, config) {
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
-  const startDate = toDateString(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone);
+  const startDate = toDateString_(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone);
   const guardMode = String(config[CONFIG_KEYS.SEND_WEEKDAY_GUARD] || 'NONE').toUpperCase();
 
   const resolve = function (storedValue, leadDaysKey) {
-    const stored = toDateString(storedValue, timezone);
+    const stored = toDateString_(storedValue, timezone);
     if (stored) return stored;
     const leadDays = Number(config[leadDaysKey]);
     if (!startDate || isNaN(leadDays)) return '';
@@ -284,7 +284,7 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
   // 「尚未到期」，幹事會以為「到咗期就會自己生成」，直到嗰日先發現唔會。
   // 擺喺最前面，`SKIPPED_MANUAL_MODE` 就係**每一日**嘅答案，
   // 唯讀檢查報告任何時候睇都講同一件事。
-  if (getConfig(CONFIG_KEYS.TRIGGER_AUTO_GENERATE, DEFAULTS.TRIGGER_AUTO_GENERATE) !== true) {
+  if (getConfig_(CONFIG_KEYS.TRIGGER_AUTO_GENERATE, DEFAULTS.TRIGGER_AUTO_GENERATE) !== true) {
     return Object.assign({}, base, {
       outcome: 'SKIPPED_MANUAL_MODE',
       detail: '自動生成已關閉（Config 的 TRIGGER_AUTO_GENERATE＝FALSE），'
@@ -305,7 +305,7 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
       detail: 'Stage 目前是「' + stage + '」，不是 DRAFT，代表已經生成過或已進入後續流程，不會重複生成'
     });
   }
-  if (findLatestVersionNo(quarterId) >= 0) {
+  if (findLatestVersionNo_(quarterId) >= 0) {
     return Object.assign({}, base, { outcome: 'SKIPPED_HAS_VERSION', detail: '已經有生成過的版本，不會重複生成' });
   }
   return Object.assign({}, base, {
@@ -335,11 +335,11 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
  */
 function resolveRemindReferenceDate_(quarterId, stage, quarterRow, timezone) {
   if (stage === QUARTER_STAGE.DRAFT) {
-    const versionNo = findLatestVersionNo(quarterId);
+    const versionNo = findLatestVersionNo_(quarterId);
     if (versionNo < 0) return '';
     return findLatestVersionCreatedDate_(quarterId, versionNo, timezone);
   }
-  return toDateString(quarterRow[COLUMNS.QUARTERS.STAGE_UPDATED_AT], timezone);
+  return toDateString_(quarterRow[COLUMNS.QUARTERS.STAGE_UPDATED_AT], timezone);
 }
 
 /**
@@ -347,7 +347,7 @@ function resolveRemindReferenceDate_(quarterId, stage, quarterRow, timezone) {
  * 跟 WebAppFlow.gs 的 findVersionCreatedAt_() 不同——那個函式回傳的是
  * String() 直接轉換的原始值（給畫面顯示用，可能是完整時間戳文字），這裡
  * 需要的是可以直接餵給 daysBetween_() 的純日期字串，所以另外用
- * toDateString() 正規化，不重用那個函式的輸出。
+ * toDateString_() 正規化，不重用那個函式的輸出。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
  * @param {string} timezone 時區名稱
@@ -356,9 +356,9 @@ function resolveRemindReferenceDate_(quarterId, stage, quarterRow, timezone) {
 function findLatestVersionCreatedDate_(quarterId, versionNo, timezone) {
   const V = COLUMNS.ROSTER_VERSIONS;
   let found = '';
-  readSheet(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_VERSIONS).forEach(function (row) {
     if (row[V.QUARTER_ID] === quarterId && Number(row[V.VERSION_NO]) === versionNo) {
-      found = toDateString(row[V.CREATED_AT], timezone);
+      found = toDateString_(row[V.CREATED_AT], timezone);
     }
   });
   return found;
@@ -385,9 +385,9 @@ function findLatestVersionCreatedDate_(quarterId, versionNo, timezone) {
  * 之後次數會重新從零開始算。
  *
  * @param {string} quarterId 季度 ID
- * @param {Object} quarterRow Quarters 的一列資料（readSheet 的物件格式）
+ * @param {Object} quarterRow Quarters 的一列資料（readSheet_ 的物件格式）
  * @param {string} today 今天的日期字串
- * @param {Object} config readConfig() 的結果
+ * @param {Object} config readConfig_() 的結果
  * @returns {{quarterId: string, action: string, targetKey: string, stage: string, targetDate: string,
  *   outcome: string, detail: string, reasons: string[], reminderCount: number, maxCount: number,
  *   daysStuck: (number|null), daysUntilDeadline: (number|null), stuckDays: (number|undefined),
@@ -400,7 +400,7 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   const stage = getQuarterStage_(quarterId);
   const targetKey = quarterId + '|' + stage;
   const base = { quarterId: quarterId, action: action, targetKey: targetKey, stage: stage, targetDate: '' };
-  const maxCount = getConfig(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT);
+  const maxCount = getConfig_(CONFIG_KEYS.REMIND_STUCK_MAX_COUNT, DEFAULTS.REMIND_STUCK_MAX_COUNT);
 
   if (stage === QUARTER_STAGE.OFFICIAL_SENT) {
     return Object.assign({}, base, {
@@ -430,7 +430,7 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   // 呢個維度即刻唔會再觸發（見 HANDOFF.md 上線前檢查）。
   const notGeneratedTriggered = !!schedulePeek.generateDate
     && today >= schedulePeek.generateDate
-    && findLatestVersionNo(quarterId) < 0;
+    && findLatestVersionNo_(quarterId) < 0;
 
   if (!notGeneratedTriggered && reminderCount >= maxCount) {
     return Object.assign({}, base, {
@@ -447,7 +447,7 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   }
 
   // 維度一：停滯時間
-  const stuckDays = getConfig(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
+  const stuckDays = getConfig_(CONFIG_KEYS.REMIND_STUCK_DAYS, DEFAULTS.REMIND_STUCK_DAYS);
   const referenceDate = resolveRemindReferenceDate_(quarterId, stage, quarterRow, timezone);
   let daysStuck = null;
   let stuckTriggered = false;
@@ -457,7 +457,7 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   }
 
   // 維度二：死線接近
-  const deadlineDays = getConfig(CONFIG_KEYS.REMIND_DEADLINE_DAYS, DEFAULTS.REMIND_DEADLINE_DAYS);
+  const deadlineDays = getConfig_(CONFIG_KEYS.REMIND_DEADLINE_DAYS, DEFAULTS.REMIND_DEADLINE_DAYS);
   const schedule = computeAutomationSchedule_(quarterRow, config);
   let daysUntilDeadline = null;
   let deadlineTriggered = false;
@@ -477,7 +477,7 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   // 觸發時機用**生成日期**（generateDate）而唔係正式發出日期：五月嗰次
   // 合堂嘅日期一定要喺生成之前確認好，因為 SkipPostIDs 係喺生成嗰陣先
   // 套用落去——生成完先發現日期錯咗就要成張表重新生成。預設提前 7 日。
-  const unconfirmedLeadDays = getConfig(
+  const unconfirmedLeadDays = getConfig_(
     CONFIG_KEYS.REMIND_UNCONFIRMED_SPECIAL_DAYS, DEFAULTS.REMIND_UNCONFIRMED_SPECIAL_DAYS);
   let unconfirmedSpecials = [];
   let daysUntilGenerate = null;
@@ -557,12 +557,12 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
  * @returns {string[]} 已成功提醒的日期（yyyy-MM-dd）清單
  */
 function readReminderLog_(quarterId, stage, timezone) {
-  const rows = readSheet(SHEETS.AUDIT_LOG);
+  const rows = readSheet_(SHEETS.AUDIT_LOG);
   const C = COLUMNS.AUDIT_LOG;
   const key = quarterId + '|' + stage;
   return rows
     .filter(function (row) { return row[C.ACTION] === AUTOMATION_ACTIONS.REMIND && row[C.TARGET_KEY] === key; })
-    .map(function (row) { return toDateString(row[C.NEW_VALUE], timezone); })
+    .map(function (row) { return toDateString_(row[C.NEW_VALUE], timezone); })
     .filter(function (d) { return !!d; });
 }
 
@@ -622,10 +622,10 @@ function executeAutomationAction_(judgment, today, workFn) {
  * @returns {{lines: string[], anyWouldRun: boolean, today: string, isDryRun: boolean}}
  */
 function buildAutomationCheckReport_() {
-  const config = readConfig();
+  const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const triggers = listAutomationTriggers_();
   const adminEmail = String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || '');
 
@@ -641,7 +641,7 @@ function buildAutomationCheckReport_() {
   // 第二十五輪批次階段 A2：呢句話原本寫死咗「自動排程會生成初稿」。
   // 開關關咗之後嗰句就係假嘅——而呢份報告嘅**唯一用途**就係
   // 「話俾幹事知系統會自己做啲乜」，講錯咗等於報告冇咗價值。
-  const autoGenerateOn = getConfig(
+  const autoGenerateOn = getConfig_(
     CONFIG_KEYS.TRIGGER_AUTO_GENERATE, DEFAULTS.TRIGGER_AUTO_GENERATE) === true;
   lines.push('自動生成初稿（TRIGGER_AUTO_GENERATE）：'
     + (autoGenerateOn
@@ -661,7 +661,7 @@ function buildAutomationCheckReport_() {
 
   let anyWouldRun = false;
 
-  const quarterRows = readSheet(SHEETS.QUARTERS).filter(function (row) {
+  const quarterRows = readSheet_(SHEETS.QUARTERS).filter(function (row) {
     return !!row[COLUMNS.QUARTERS.QUARTER_ID];
   });
   if (quarterRows.length === 0) {
@@ -714,10 +714,10 @@ function buildAutomationCheckReport_() {
  * 本函式只應該由選單「安裝自動排程」（經過確認視窗）呼叫，不應該在其他地方自動呼叫。
  * @returns {{hour: number}} 實際採用的觸發小時
  */
-function installAutomationTrigger() {
+function installAutomationTrigger_() {
   removeAutomationTriggers_();
 
-  const config = readConfig();
+  const config = readConfig_();
   const rawHour = Number(config[CONFIG_KEYS.SEND_HOUR_LOCAL]);
   const hour = isNaN(rawHour) ? 9 : Math.min(23, Math.max(0, Math.round(rawHour)));
 

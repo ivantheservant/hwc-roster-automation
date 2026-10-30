@@ -45,7 +45,7 @@ if (plan0.needsDecision) {
 }
 const saved = gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] });
 check('（準備）第 1 版建立', saved && saved.versionNo === 1, JSON.stringify(saved).slice(0, 300));
-const auditBefore = gas.readSheet(S.AUDIT_LOG);
+const auditBefore = gas.readSheet_(S.AUDIT_LOG);
 const releasedBefore = Object.keys(gas.readReleasedHardViolationKeys_(auditBefore, sc.Q));
 check('（準備）有放行紀錄', releasedBefore.length >= 1, JSON.stringify(releasedBefore));
 // 另一季嘅決定（唔可以被清）
@@ -84,7 +84,7 @@ seedSheet(sc.ss, S.PERSON_POST_EXCLUSIONS, ['X'], Object.keys(X).map((k) => X[k]
   { [X.EXCLUSION_ID]: 'X2', [X.PERSON_ID]: 'P9703', [X.POST_ID]: 'READ', [X.REASON]: '舊',
     [X.EFFECTIVE_FROM]: '2098-01-01', [X.EFFECTIVE_TO]: '2098-06-30', [X.ACTIVE]: true }
 ]);
-const exclusionsBefore = JSON.stringify(gas.readSheet(S.PERSON_POST_EXCLUSIONS));
+const exclusionsBefore = JSON.stringify(gas.readSheet_(S.PERSON_POST_EXCLUSIONS));
 
 console.log('\n=== 計畫（確認清單）===');
 const plan = gas.planQuarterReset_(sc.Q, true);
@@ -112,21 +112,21 @@ console.log('\n=== 執行 ===');
 const res = gas.executeQuarterReset_(plan);
 {
   check('（準備）冇出錯', res.errors.length === 0, JSON.stringify(res.errors));
-  const left = gas.readSheet(S.UNAVAILABLE).map((r) => r[U.UNAVAILABLE_ID]).sort();
+  const left = gas.readSheet_(S.UNAVAILABLE).map((r) => r[U.UNAVAILABLE_ID]).sort();
   check('★★★★★★ CP1 Unavailable：U1／U5／U6 清走；U2（跨季）、U3（季前）、U4（其他季）留', JSON.stringify(left)
     === JSON.stringify(['U2', 'U3', 'U4']), JSON.stringify(left));
-  const dec = gas.readSheet(S.CELL_DECISIONS).map((r) => r[C.CELL_DECISIONS.QUARTER_ID]);
+  const dec = gas.readSheet_(S.CELL_DECISIONS).map((r) => r[C.CELL_DECISIONS.QUARTER_ID]);
   check('★★★★★★ CP2 呢一季嘅決定清走；其他季度留', JSON.stringify(dec) === JSON.stringify([otherQ]), JSON.stringify(dec));
   const names = sc.ss.getSheets().map((s) => s.getName());
   check('★★★★★★ CP4 呢一季嘅匯入／核對／建議表刪咗', !names.some((n) => n === '匯入_' + sc.Q || /^Verify_2099T1_v\d+$/.test(n)
     || /^Roster_2099T1_v\d+_建議$/.test(n)), JSON.stringify(names));
   check('★★★★★ CP4 名字相似嘅表、其他季度嘅表唔郁', names.indexOf('匯入_' + sc.Q + '_備份') !== -1
     && names.indexOf('Roster_' + sc.Q + '_v1_建議名單') !== -1 && names.indexOf('Verify_' + otherQ + '_v0') !== -1);
-  const titles = gas.readSheet(S.SERVICE_DATES).map((r) => String(r[C.SERVICE_DATES.TITLE] || ''));
+  const titles = gas.readSheet_(S.SERVICE_DATES).map((r) => String(r[C.SERVICE_DATES.TITLE] || ''));
   check('★★★★★ CP5 每週標題清空', titles.every((t) => t === ''), JSON.stringify(titles));
-  check('★★★★★★ CP6 PersonPostExclusions 一格都冇改', JSON.stringify(gas.readSheet(S.PERSON_POST_EXCLUSIONS)) === exclusionsBefore);
+  check('★★★★★★ CP6 PersonPostExclusions 一格都冇改', JSON.stringify(gas.readSheet_(S.PERSON_POST_EXCLUSIONS)) === exclusionsBefore);
 
-  const audit = gas.readSheet(S.AUDIT_LOG);
+  const audit = gas.readSheet_(S.AUDIT_LOG);
   const releaseRows = audit.filter((r) => r[C.AUDIT_LOG.ACTION] === '硬規則放行');
   check('★★★★★ CP3 AuditLog 嘅放行紀錄冇刪', releaseRows.length >= 1);
   check('★★★★★★ CP3 重設之後讀唔返舊放行', Object.keys(gas.readReleasedHardViolationKeys_(audit, sc.Q)).length === 0
@@ -145,7 +145,7 @@ console.log('\n=== 重設之後再生成：同一格要重新確認 ===');
     && rule.checked === false && rule.released !== true, JSON.stringify(p.decisionItems));
 
   // 放行喺重設之後先寫 ⇒ 照樣有效
-  const audit = gas.readSheet(S.AUDIT_LOG).slice();
+  const audit = gas.readSheet_(S.AUDIT_LOG).slice();
   audit.push({ [C.AUDIT_LOG.ACTION]: '硬規則放行', [C.AUDIT_LOG.TARGET_KEY]: sc.Q,
     [C.AUDIT_LOG.NOTES]: 'RELEASED_KEYS:' + sc.Q + '|' + D[3] + '|WORSHIP|1|P9704|HARD_ELIGIBILITY' });
   check('★★★★★ 重設之後嘅放行照樣有效', Object.keys(gas.readReleasedHardViolationKeys_(audit, sc.Q)).length === 1);

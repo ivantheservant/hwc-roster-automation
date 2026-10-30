@@ -60,20 +60,21 @@ console.log('\n=== CH1／CH2：版本清單 ===');
   check('★★★★★ 來源：人手改動／系統調整／由人手職事表匯入（冇格數嘅舊版本照舊）',
     src('FINE_TUNE', 0) === '人手改動' && src('SUGGESTION', 1) === '系統調整'
       && src('IMPORT', '') === '由人手職事表匯入');
+  // 第八十八輪：父版本改用具名變數 parentVersionNo
   check('★★★★ 接受建議表嘅版本寫 SUGGESTION（唔再同人手調整混埋）',
-    /VERSION_VALUES\.BASIS_SUGGESTION, versionNo, 0, false,/.test(require('fs').readFileSync(
+    /VERSION_VALUES\.BASIS_SUGGESTION, parentVersionNo, 0, false,/.test(require('fs').readFileSync(
       require('path').join(__dirname, '..', 'src', 'SuggestionSheet.gs'), 'utf8')));
 
   // 由誰：DisplayName → NameTC → 電郵 @ 前面
-  const realRead = gas.readSheet;
-  gas.readSheet = function (name) {
+  const realRead = gas.readSheet_;
+  gas.readSheet_ = function (name) {
     if (name === sc.S.EMAIL_RECIPIENTS) {
       return [{ [sc.C.EMAIL_RECIPIENTS.EMAIL]: 'Admin@Example.invalid', [sc.C.EMAIL_RECIPIENTS.DISPLAY_NAME]: '幹事甲' }];
     }
     return realRead(name);
   };
   const who = gas.buildVersionAuthorResolver_();
-  gas.readSheet = realRead;
+  gas.readSheet_ = realRead;
   check('★★★★★ 由誰：有顯示名稱用顯示名稱（電郵唔分大細楷）', who('admin@example.invalid') === '幹事甲');
   check('★★★★★ 由誰：冇顯示名稱就用名單名字', who('p9702@example.invalid') === sc.nameOf('P9702'));
   check('★★★★★ 由誰：都冇就電郵 @ 前面部分（唔顯示成條電郵）', who('someone@example.invalid') === 'someone');
@@ -81,7 +82,7 @@ console.log('\n=== CH1／CH2：版本清單 ===');
 
 console.log('\n=== CH3：用第 0 版作起點 ===');
 {
-  const versionsBefore = gas.readSheet(sc.S.ROSTER_VERSIONS).length;
+  const versionsBefore = gas.readSheet_(sc.S.ROSTER_VERSIONS).length;
   const v0RowsBefore = JSON.stringify(sc.rows(0));
   const v1RowsBefore = JSON.stringify(sc.rows(1));
   const v0SheetBefore = JSON.stringify(sc.gridSheet(0).getDataRange().getValues());
@@ -93,11 +94,11 @@ console.log('\n=== CH3：用第 0 版作起點 ===');
     sc.getCell(1, D[1], '_TYPE'));
   check('★★★★★ 未儲存嘅改動被蓋過', sc.getCell(1, D[2], 'READ#1') === sc.getCell(0, D[2], 'READ#1'));
   check('★★★★ 回報寫入幾多格、幾多週', r.ok === true && r.cellCount === 2 && r.titleCount === 1, JSON.stringify(r));
-  check('★★★★★★ 唔建立新版本', gas.readSheet(sc.S.ROSTER_VERSIONS).length === versionsBefore);
+  check('★★★★★★ 唔建立新版本', gas.readSheet_(sc.S.ROSTER_VERSIONS).length === versionsBefore);
   check('★★★★★★ 舊版本一律唔改：第 0、1 版派工紀錄、第 0 版工作表原封不動',
     JSON.stringify(sc.rows(0)) === v0RowsBefore && JSON.stringify(sc.rows(1)) === v1RowsBefore
       && JSON.stringify(sc.gridSheet(0).getDataRange().getValues()) === v0SheetBefore);
-  const marks = gas.readSheet(sc.S.AUDIT_LOG).filter((a) => a[sc.C.AUDIT_LOG.ACTION] === 'VERSION_START_POINT');
+  const marks = gas.readSheet_(sc.S.AUDIT_LOG).filter((a) => a[sc.C.AUDIT_LOG.ACTION] === 'VERSION_START_POINT');
   check('★★★★★ AuditLog 有一個起點標記（季度、寫入時最新一版、起點）', marks.length === 1
     && marks[0][sc.C.AUDIT_LOG.TARGET_KEY] === sc.Q && String(marks[0][sc.C.AUDIT_LOG.OLD_VALUE]) === '1'
     && String(marks[0][sc.C.AUDIT_LOG.NEW_VALUE]) === '0', JSON.stringify(marks));
@@ -120,7 +121,7 @@ console.log('\n=== CH4：儲存 ⇒ 來源「以第 0 版作起點」===');
   const saved = gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] });
   check('（準備）第 2 版建立', saved && saved.versionNo === 2, JSON.stringify(saved).slice(0, 300));
   const V = sc.C.ROSTER_VERSIONS;
-  const v2 = gas.readSheet(sc.S.ROSTER_VERSIONS).filter((r) => Number(r[V.VERSION_NO]) === 2)[0];
+  const v2 = gas.readSheet_(sc.S.ROSTER_VERSIONS).filter((r) => Number(r[V.VERSION_NO]) === 2)[0];
   check('★★★★★★ 新一版來源寫「以第 0 版作起點」', v2 && v2[V.BASIS] === '以第 0 版作起點', v2 && v2[V.BASIS]);
   const list = gas.listQuarterVersionChoices_(sc.Q, sc.TZ);
   check('★★★★★ 下拉顯示「以第 0 版作起點」', /^第 2 版　.*　以第 0 版作起點　k$/.test(list[0].label), list[0].label);
@@ -129,7 +130,7 @@ console.log('\n=== CH4：儲存 ⇒ 來源「以第 0 版作起點」===');
 
   sc.setCell(2, D[3], 'CHAIR#1', otherChair);
   gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] });
-  const v3 = gas.readSheet(sc.S.ROSTER_VERSIONS).filter((r) => Number(r[V.VERSION_NO]) === 3)[0];
+  const v3 = gas.readSheet_(sc.S.ROSTER_VERSIONS).filter((r) => Number(r[V.VERSION_NO]) === 3)[0];
   check('★★★★★★ 再之後嘅儲存唔再沿用起點（照寫人手調整）', v3 && v3[V.BASIS] === 'FINE_TUNE', v3 && v3[V.BASIS]);
 }
 

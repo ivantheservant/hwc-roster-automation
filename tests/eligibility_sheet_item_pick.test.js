@@ -217,7 +217,7 @@ console.log('\n=== D：「會移走」要講齊三件事 ===');
     + '——一個佢核對唔到嘅數字，同冇講差唔多',
     /r\.assignedDates \|\| \[\]/.test(uiBare) && /humanDate\(d\)/.test(uiBare), '');
   check('★★★★★ 後端真係有出嗰批日期',
-    /assignedDates\[key\]\.push\(toDateString\(row\[A\.SERVICE_DATE\], tz\)\)/.test(srcBare), '');
+    /assignedDates\[key\]\.push\(toDateString_\(row\[A\.SERVICE_DATE\], tz\)\)/.test(srcBare), '');
   check('★★★★ 日期有排序（亂序嘅話佢對唔到住職事表睇）',
     /\(assignedDates\[key\] \|\| \[\]\)\.sort\(\)/.test(srcBare), '');
 }

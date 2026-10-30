@@ -7,12 +7,12 @@
 //
 // `mock_roster_data.js` 組出嚟嘅係**已經正規化**嘅 `context` 物件（即係
 // `buildGeneratorContext_()` 執行完之後嗰個形狀），唔係試算表原始儲存格
-// ——用嚟直接餵生成器，跳過咗 `readSheet()` 呢一層。呢份 e2e 測試嘅重點
+// ——用嚟直接餵生成器，跳過咗 `readSheet_()` 呢一層。呢份 e2e 測試嘅重點
 // 正正係唔可以跳過呢一層。
 //
 // `sheet_mock.js` 有 `getRange().setValues()`／合併／格式化，但冇
 // `getLastRow()`／`getLastColumn()`（佢係為咗測公開試算表版面轉置嗰類
-// 「畫面點render」而寫嘅，唔係為咗俾 `readSheet()` 用）。
+// 「畫面點render」而寫嘅，唔係為咗俾 `readSheet_()` 用）。
 //
 // ⚠️ 本專案燒過三次嘅 bug class：**mock 餵乾淨字串，真正嘅
 // `SpreadsheetApp` 餵 JS 物件。** 第三十一輪嗰個「ICS 時間治本從來冇生效
@@ -28,8 +28,8 @@
 //
 // 做得到：`getLastRow()`／`getLastColumn()`／`getRange(row,col,numRows,
 // numCols).getValues()/.setValues()/.getValue()/.setValue()`、
-// `insertSheet()`／`getSheetByName()`——即係 `readSheet()`／
-// `findQuarterRowInfo_()`／`registerVersion()`／`advanceQuarterStage_()`
+// `insertSheet()`／`getSheetByName()`——即係 `readSheet_()`／
+// `findQuarterRowInfo_()`／`registerVersion_()`／`advanceQuarterStage_()`
 // 呢類「讀寫一定範圍嘅儲存格」嘅函式，可以喺 Node 度真正執行一次。
 //
 // 做唔到：合併格、底色、字型呢類版面格式化——呢類方法一律做成
@@ -231,7 +231,7 @@ class RealisticMockSheet {
   getName() { return this._name; }
   setName(n) { this._name = n; return this; }
 
-  // ⚠️ `readSheet()`／`findQuarterRowInfo_()` 全部靠呢兩個方法決定
+  // ⚠️ `readSheet_()`／`findQuarterRowInfo_()` 全部靠呢兩個方法決定
   // 「有幾多行／欄有資料」——呢個 mock 嘅核心就係要令佢哋答得啱。
   getLastRow() { return this._maxRow; }
   getLastColumn() { return this._maxCol; }
@@ -323,9 +323,9 @@ class RealisticMockSheet {
   activate() { return this; }
   hideSheet() { return this; }
   showSheet() { return this; }
-  // 第三十三輪批次階段 F1：`createRosterSheet()` 會 `hideRows(2)`
+  // 第三十三輪批次階段 F1：`createRosterSheet_()` 會 `hideRows(2)`
   //（機器鍵嗰行）。隱藏與否唔影響 `getValues()`，所以係 no-op——
-  // 但一定要存在，唔係 `createRosterSheet()` 會中途拋錯，
+  // 但一定要存在，唔係 `createRosterSheet_()` 會中途拋錯，
   // 而**工作表已經建立咗**，變成一張半成品 grid。
   hideRows() { return this; }
 
@@ -392,7 +392,7 @@ class RealisticMockSpreadsheet {
  * @param {RealisticMockSpreadsheet} spreadsheet
  * @param {string} sheetName SHEETS.* 嘅值
  * @param {string[]} titles 第 1 行（人睇嘅中文標題，內容唔重要，齊列數就得）
- * @param {string[]} keys 第 2 行（COLUMNS.* 嘅機器鍵，`readSheet()` 靠呢一行）
+ * @param {string[]} keys 第 2 行（COLUMNS.* 嘅機器鍵，`readSheet_()` 靠呢一行）
  * @param {Object[]} rows 資料列，每項一個 `{key: value}` 物件，缺嘅 key 當空字串
  * @returns {RealisticMockSheet}
  */

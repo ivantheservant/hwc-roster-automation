@@ -68,7 +68,7 @@ console.log('\n=== LE2／LE3：儲存、不改動職事表 ===');
     open2.weeks[1].kind === 'BAPTISM' && open2.weeks[2].kind === 'COMBINED' && open2.weeks[2].name === 'Mission Month'
     && open2.weeks[3].kind === '' && open2.weeks[3].name === '', JSON.stringify(open2.weeks));
   check('★★★★ 顯示「合堂：Mission Month」', g.describeCombinedService_(open2.weeks[2]) === '合堂：Mission Month');
-  const audit = g.readSheet(S.AUDIT_LOG).filter((r) => r[C.AUDIT_LOG.ACTION] === 'COMBINED_SERVICE_CHANGED');
+  const audit = g.readSheet_(S.AUDIT_LOG).filter((r) => r[C.AUDIT_LOG.ACTION] === 'COMBINED_SERVICE_CHANGED');
   check('★★★★★ 每改一週寫 AuditLog（2 筆）', audit.length === 2 && /浸禮/.test(audit[0][C.AUDIT_LOG.NEW_VALUE]), JSON.stringify(audit.map((a) => a[C.AUDIT_LOG.NEW_VALUE])));
   let threw = '';
   try { g.apiSaveCombinedServices(sc.Q, [{ serviceDate: D[0], kind: 'XXX', name: '' }]); } catch (err) { threw = err.message; }
@@ -77,8 +77,8 @@ console.log('\n=== LE2／LE3：儲存、不改動職事表 ===');
   check('★★★★ 沒有改動 ⇒ 0 週', again.changed === 0);
   const after = JSON.stringify(sc.rows(0).map((r) => [r[C.ROSTER_ASSIGNMENTS.POST_ID], r[C.ROSTER_ASSIGNMENTS.PERSON_ID]]));
   check('★★★★★★ 不改動職事表（派工不變）', before === after);
-  check('★★★★★ 不改每週標題', g.readSheet(S.SERVICE_DATES).every((r) => !r[C.SERVICE_DATES.TITLE]));
-  check('★★★★ 版本數不變（沒有新版本）', g.readSheet(S.ROSTER_VERSIONS).length === 1);
+  check('★★★★★ 不改每週標題', g.readSheet_(S.SERVICE_DATES).every((r) => !r[C.SERVICE_DATES.TITLE]));
+  check('★★★★ 版本數不變（沒有新版本）', g.readSheet_(S.ROSTER_VERSIONS).length === 1);
 }
 
 console.log('\n=== LE4：整季重設 ===');

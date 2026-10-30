@@ -54,7 +54,7 @@
  * @returns {{preacherPostId: ?string, translationPostId: ?string, flowerPostId: ?string}}
  */
 function findPreacherTranslationPostIds_() {
-  const posts = readPosts();
+  const posts = readPosts_();
   let preacherPostId = null;
   let translationPostId = null;
   let flowerPostId = null;
@@ -108,17 +108,17 @@ function apiListPreacherTranslationPending(quarterId) {
       + '請檢查 Posts.PostName_TC 是否跟這幾個字完全一致。');
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error(buildQuarterNotFoundMessage_(quarterId));
 
   const postNameById = {};
-  readPosts().forEach(function (row) {
+  readPosts_().forEach(function (row) {
     postNameById[row[COLUMNS.POSTS.POST_ID]] = row[COLUMNS.POSTS.POST_NAME_TC];
   });
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const weekIndexByDate = {};
-  readServiceDates(quarterId).forEach(function (row) {
-    weekIndexByDate[toDateString(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone)] =
+  readServiceDates_(quarterId).forEach(function (row) {
+    weekIndexByDate[toDateString_(row[COLUMNS.SERVICE_DATES.SERVICE_DATE], timezone)] =
       Number(row[COLUMNS.SERVICE_DATES.WEEK_INDEX]);
   });
 
@@ -129,7 +129,7 @@ function apiListPreacherTranslationPending(quarterId) {
   const sheetFilled = writesToSheetOnly
     ? readGridFilledManualCells_(quarterId, versionNo, targetPostIds, timezone) : {};
   const pending = [];
-  readSheet(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
     if (row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID] !== quarterId) return;
     if (Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) !== versionNo) return;
     const postId = row[COLUMNS.ROSTER_ASSIGNMENTS.POST_ID];
@@ -140,7 +140,7 @@ function apiListPreacherTranslationPending(quarterId) {
     if (splitList_(row[COLUMNS.ROSTER_ASSIGNMENTS.RULE_FLAGS])
       .indexOf(RULE_IDS.SPECIAL_SUNDAY_SKIP) !== -1) return;
 
-    const serviceDate = toDateString(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const serviceDate = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
     const sheetOnlyName = sheetFilled[serviceDate + '|' + postId + '|' + Number(row[COLUMNS.ROSTER_ASSIGNMENTS.SLOT_INDEX])] || '';
     pending.push({
       serviceDate: serviceDate,
@@ -209,11 +209,11 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
     throw new Error('這個工具只能填寫「講員」「翻譯」或「獻花」崗位的格子，收到的 PostID「' + postId + '」不屬於這三個崗位。');
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) throw new Error(buildQuarterNotFoundMessage_(quarterId));
 
-  const personId = resolvePersonId(trimmedName) || '';
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const personId = resolvePersonId_(trimmedName) || '';
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   // ⚠️ 第七十四輪批次 BC 組：最新一版**已經通知過人**（正式發出／改動後重發）⇒ 唔可以改寫佢嘅
   // `RosterAssignments`（寄出紀錄同內容會對唔上，而且「只寄給安排有改動的人」比較嘅兩版變成同一版，
@@ -239,7 +239,7 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
       const row = values[i];
       if (row[colIndex[C.QUARTER_ID] - 1] !== quarterId) continue;
       if (Number(row[colIndex[C.VERSION_NO] - 1]) !== versionNo) continue;
-      if (toDateString(row[colIndex[C.SERVICE_DATE] - 1], timezone) !== serviceDate) continue;
+      if (toDateString_(row[colIndex[C.SERVICE_DATE] - 1], timezone) !== serviceDate) continue;
       if (row[colIndex[C.POST_ID] - 1] !== postId) continue;
       if (Number(row[colIndex[C.SLOT_INDEX] - 1]) !== Number(slotIndex)) continue;
       targetSheetRow = i + 3;
@@ -262,7 +262,7 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
 
   // ---- 2. 更新 grid 工作表對應儲存格：填入姓名、清掉「待人手填寫」的底色與備註 ----
   // ⚠️ 第十五輪批次階段 A3：講員／翻譯／獻花一定係喺 v0 剛生成之後就要填，
-  // 而 v0 一定會被 protectV0() 保護（只留 Config 嘅 SCRIPT_ACCOUNT_EMAIL
+  // 而 v0 一定會被 protectV0_() 保護（只留 Config 嘅 SCRIPT_ACCOUNT_EMAIL
   // 可編輯）——「寫入受保護版本」係呢個工具嘅正常路徑，唔係例外情況。
   // 試算表擁有者本身唔會被保護擋住（Google 嘅限制：擁有者永遠可編輯），
   // 但為咗俾任何有權限執行呢個選單嘅人（唔止擁有者）都用得到，呢度做法係
@@ -280,7 +280,7 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
       const gridDates = gridSheet.getRange(3, 1, Math.max(0, gridLastRow - 2), 1).getValues();
       let gridRow = -1;
       for (let i = 0; i < gridDates.length; i++) {
-        if (toDateString(gridDates[i][0], timezone) === serviceDate) { gridRow = i + 3; break; }
+        if (toDateString_(gridDates[i][0], timezone) === serviceDate) { gridRow = i + 3; break; }
       }
       const gridCol = gridKeys.indexOf(postId + '#' + slotIndex) + 1;
       if (gridRow !== -1 && gridCol !== 0) {
@@ -317,7 +317,7 @@ function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId,
 /**
  * 第十五輪批次階段 A3 新增：喺一個「可能已經受保護」嘅 grid 工作表上安全咁
  * 執行一次寫入——如果冇任何保護，直接執行 `writeFn`；如果有（例如 v0 被
- * `protectV0()` 保護咗），暫時解除全部工作表級保護、執行 `writeFn`、再用
+ * `protectV0_()` 保護咗），暫時解除全部工作表級保護、執行 `writeFn`、再用
  * 原本一模一樣嘅設定（描述、編輯者名單、網域編輯權）重新套用返，執行完
  * 保護狀態同執行前完全一致，唔會削弱保護本身嘅意義。
  *

@@ -19,8 +19,8 @@
  *      （放行用 AG 組嘅格式記住）；空格只警告（AH 組同一支）；灰格有名就警告並忽略；
  *       講員／翻譯／獻花照收（`MANUAL`），客席講員認唔出名字唔算錯。
  *   三、匯入成為版本（`apiImportRosterExecute()`）——冇版本 ⇒ 第 0 版；有 ⇒ 新一版。
- *       `Basis=IMPORT`、全部格 `AssignSource=MANUAL`，**走現有嘅 `createRosterSheet()`／
- *       `writeAssignments()`／`registerVersion()`**，之後重新發佈公開連結。
+ *       `Basis=IMPORT`、全部格 `AssignSource=MANUAL`，**走現有嘅 `createRosterSheet_()`／
+ *       `writeAssignments_()`／`registerVersion_()`**，之後重新發佈公開連結。
  *       幹事可以聲明「已經在系統外寄給全體」⇒ Stage 推到 `OFFICIAL_SENT`，每位有派工嘅人
  *       寫一行 `SendLog`（`Stage=OFFICIAL`、`Status=EXTERNAL`、hash 照現有算法），**唔寄任何電郵**。
  *
@@ -41,16 +41,16 @@ function buildImportSheetName_(quarterId) {
  *   `rows[i] = {postId, slotIndex, label, post}`；`naByKey['date|post|slot'] = ruleId`
  */
 function buildImportLayout_(quarterId) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const posts = readPostsNormalized()
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const posts = readPostsNormalized_()
     .filter(function (p) { return p.postId; })
     .sort(function (a, b) { return (a.displayOrder || 0) - (b.displayOrder || 0); });
-  const serviceDates = readServiceDatesNormalized(quarterId, timezone);
+  const serviceDates = readServiceDatesNormalized_(quarterId, timezone);
   if (serviceDates.length === 0) {
     throw new Error('ServiceDates 找不到 ' + quarterId + ' 的主日，請先在「開季前準備」建立這一季。');
   }
-  const specialByDate = buildSpecialSundayByDate_(readSpecialSundays(quarterId), timezone);
-  const rules = readRules();
+  const specialByDate = buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone);
+  const rules = readRules_();
 
   const rows = [];
   const naByKey = {};
@@ -135,9 +135,9 @@ function apiCreateImportSheet(quarterId) {
     }
 
     // 灰格＋下拉（容許名單以外嘅字——同 grid 嘅名單選單同一條規矩，見 GridNameDropdown.gs 檔頭）
-    const eligibility = readEligibility();
+    const eligibility = readEligibility_();
     const nameById = {};
-    readPeople().forEach(function (row) {
+    readPeople_().forEach(function (row) {
       const id = String(row[COLUMNS.NAME_MAPPING.PERSON_ID] || '').trim();
       if (id) nameById[id] = String(row[COLUMNS.NAME_MAPPING.NAME_TC] || '').trim();
     });
@@ -207,9 +207,9 @@ function readImportSheetCells_(quarterId) {
   const lastCol = sheet.getLastColumn();
   if (lastRow <= IMPORT_HEADER_ROWS || lastCol <= IMPORT_LABEL_COLUMNS) return {};
   const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  // ⚠️ 試算表會把 `yyyy-MM-dd` 字串自動變成日期值——同 grid 第 1 欄一樣，用 `toDateString()` 讀返
-  const dateKeys = values[1].map(function (v) { return v ? toDateString(v, timezone) : ''; });
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  // ⚠️ 試算表會把 `yyyy-MM-dd` 字串自動變成日期值——同 grid 第 1 欄一樣，用 `toDateString_()` 讀返
+  const dateKeys = values[1].map(function (v) { return v ? toDateString_(v, timezone) : ''; });
   const out = {};
   for (let r = IMPORT_HEADER_ROWS; r < values.length; r++) {
     const key = String(values[r][1] || '').trim();
@@ -230,9 +230,9 @@ function readImportSheetCells_(quarterId) {
  * `listGenuineBlankCells_()`（AH 組同一支）認得灰格同講員格唔算空格。
  */
 function buildImportRuleContext_(layout, state) {
-  const config = readConfig();
+  const config = readConfig_();
   const posts = layout.posts;
-  const eligibility = readEligibility();
+  const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, layout.timezone);
   eligibility.byPost = roleContext.eligibleByPost;
   return {
@@ -248,11 +248,11 @@ function buildImportRuleContext_(layout, state) {
     roles: roleContext.roles,
     personPostExclusions: roleContext.exclusions,
     peopleById: indexPeopleById_(),
-    unavailable: readUnavailableNormalized(layout.timezone),
-    rules: readRules(),
+    unavailable: readUnavailableNormalized_(layout.timezone),
+    rules: readRules_(),
     maxMoves: Number(config[CONFIG_KEYS.FINETUNE_MAX_MOVES]) || DEFAULTS.FINETUNE_MAX_MOVES,
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || 8,
-    warnOnSemiHard: getConfig(CONFIG_KEYS.WARN_ON_SEMI_HARD_BREAK, true) === true
+    warnOnSemiHard: getConfig_(CONFIG_KEYS.WARN_ON_SEMI_HARD_BREAK, true) === true
   };
 }
 
@@ -269,7 +269,7 @@ function buildImportPlan_(quarterId) {
   const postNames = {};
   layout.posts.forEach(function (p) { postNames[p.postId] = p.postNameTC; });
   const nameById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[COLUMNS.NAME_MAPPING.PERSON_ID] || '').trim();
     if (id) nameById[id] = String(row[COLUMNS.NAME_MAPPING.NAME_TC] || '').trim();
   });
@@ -308,7 +308,7 @@ function buildImportPlan_(quarterId) {
       }
 
       filledCount++;
-      const personId = resolvePersonId(typed) || '';
+      const personId = resolvePersonId_(typed) || '';
       if (!personId) {
         if (r.post.autoGenerate === false) {
           // 客席講員唔喺名單係正常嘅（同填講員工具嘅規則）。
@@ -330,7 +330,7 @@ function buildImportPlan_(quarterId) {
     });
   });
 
-  const latestVersionNo = findLatestVersionNo(q);
+  const latestVersionNo = findLatestVersionNo_(q);
   const plan = {
     ok: true,
     quarterId: q,
@@ -428,7 +428,7 @@ function apiImportRosterExecute_locked_(quarterId, input) {
   }
 
   const versionNo = plan.versionNoToCreate;
-  const shouldProtect = versionNo === 0 && getConfig(CONFIG_KEYS.V0_PROTECT, false) === true;
+  const shouldProtect = versionNo === 0 && getConfig_(CONFIG_KEYS.V0_PROTECT, false) === true;
   const assignments = plan.assignments.map(function (a) {
     return {
       serviceDateId: a.serviceDateId, serviceDate: a.serviceDate, postId: a.postId, slotIndex: a.slotIndex,
@@ -437,10 +437,10 @@ function apiImportRosterExecute_locked_(quarterId, input) {
   });
 
   // ⚠️ 一定要走現有建立版本嘅函式——唔另寫一套寫入
-  const sheetName = createRosterSheet(q, versionNo, assignments, []);
-  writeAssignments(q, versionNo, assignments);
-  if (shouldProtect) protectV0(sheetName);
-  registerVersion(q, versionNo, sheetName, VERSION_VALUES.BASIS_IMPORT,
+  const sheetName = createRosterSheet_(q, versionNo, assignments, []);
+  writeAssignments_(q, versionNo, assignments);
+  if (shouldProtect) protectV0_(sheetName);
+  registerVersion_(q, versionNo, sheetName, VERSION_VALUES.BASIS_IMPORT,
     plan.hasVersion ? plan.latestVersionNo : null, 0, shouldProtect,
     IMPORT_VERSION_NOTE + '（' + plan.sheetName + '，' + plan.filledCount + ' 格）');
   // 第七十八輪批次 FB 組：之前最新嗰張表還原成佢自己嗰一版（冇版本 ⇒ 乜都唔做）
@@ -496,11 +496,11 @@ function apiImportRosterExecute_locked_(quarterId, input) {
  * @returns {number} 寫了幾多行
  */
 function writeExternalSendBaseline_(quarterId, versionNo, assignments) {
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const byPerson = groupAssignmentsByPerson_(assignments);
   const peopleById = indexPeopleById_();
   const postNames = {};
-  readPostsNormalized().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
+  readPostsNormalized_().forEach(function (p) { postNames[p.postId] = p.postNameTC; });
 
   const outcomes = Object.keys(byPerson).map(function (personId) {
     const person = peopleById[personId] || {};

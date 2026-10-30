@@ -4,10 +4,10 @@
  * ============================================================
  * 解決什麼問題
  * ============================================================
- * 步驟 2（寄給堂委審閱）與步驟 4（正式發出）的 sendStage() 是「先逐個收件人
+ * 步驟 2（寄給堂委審閱）與步驟 4（正式發出）的 sendStage_() 是「先逐個收件人
  * 寄完，最後才令 Stage 前進」。如果中途撞到 Apps Script 的 6 分鐘上限（步驟 4
  * 約六十位收件人，最容易發生），Stage 仍然停在原地，幹事很自然會重新執行同一
- * 個步驟——但 sendStage() 對 REVIEW／OFFICIAL **沒有**「已經寄過就跳過」的
+ * 個步驟——但 sendStage_() 對 REVIEW／OFFICIAL **沒有**「已經寄過就跳過」的
  * 判斷（那只有 RESEND 靠 hash 比對才有），於是已經收過信的人會再收一封。
  *
  * 上一輪（第六輪批次階段 A）已經加了偵測與警示，但幹事見到警示之後仍然只能
@@ -36,7 +36,7 @@
  * - **plan-only 優先**（C2）：planMakeupSend_() 完全唯讀，列出四類名單與判定
  *   原因，確認無誤才可以執行。
  * - **復用既有寄送邏輯**（C3）：executeMakeupSend_() 用的是 deliverOne_()、
- *   findEmailTemplate_()、writeSendLogRows_()——跟 sendStage() 同一套，沒有
+ *   findEmailTemplate_()、writeSendLogRows_()——跟 sendStage_() 同一套，沒有
  *   另寫一份會走樣的副本。差別只在於「收件人名單是補寄清單而不是全部」。
  * - **SendLog 可分辨**（C3）：補寄那一批的 SendID 中間會多一段 `MAKEUP`
  *   （見 Mailer.gs 的 writeSendLogRows_()）。**刻意不改 Stage 欄**——Stage
@@ -91,7 +91,7 @@ const MAKEUP_RECEIVED_STATUSES = [
  * 唔好直接叫呢一支——用 `buildQuarterNoticeReceivedIndex_()`，
  * 「邊幾個階段算收過」只可以喺嗰度決定。
  *
- * @param {Object[]} sendLogRows readSheet(SHEETS.SEND_LOG) 的結果
+ * @param {Object[]} sendLogRows readSheet_(SHEETS.SEND_LOG) 的結果
  * @param {string} quarterId 季度 ID
  * @param {(string|string[])} stage 階段（或者幾個階段）
  * @returns {Object.<string, {status: string, versionNo: number, stage: string}>}
@@ -149,7 +149,7 @@ function buildQuarterNoticeReceivedIndex_(quarterId, stage, sendLogRows) {
     ? [MAIL_STAGES.OFFICIAL, MAIL_STAGES.RESEND]
     : [stage];
   return buildSendStatusByRecipient_(
-    sendLogRows || readSheet(SHEETS.SEND_LOG), quarterId, stages);
+    sendLogRows || readSheet_(SHEETS.SEND_LOG), quarterId, stages);
 }
 
 /**
@@ -275,7 +275,7 @@ function planMakeupSend_(quarterId, versionNo, stage) {
     versionNo: versionNo,
     stage: stage,
     attachType: attachType,
-    isDryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
+    isDryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     totalExpected: recipients.length,
     alreadySent: alreadySent,
     needsResend: needsResend,
@@ -286,8 +286,8 @@ function planMakeupSend_(quarterId, versionNo, stage) {
 /**
  * 實際補寄：只寄給計畫中 needsResend 的人。
  *
- * **完全復用 sendStage() 那一套寄送邏輯**（findEmailTemplate_／deliverOne_／
- * writeSendLogRows_），沒有另寫一份。跟 sendStage() 唯一的差別是收件人名單，
+ * **完全復用 sendStage_() 那一套寄送邏輯**（findEmailTemplate_／deliverOne_／
+ * writeSendLogRows_），沒有另寫一份。跟 sendStage_() 唯一的差別是收件人名單，
  * 以及 context.sendIdTag 令 SendLog 的 SendID 帶上 MAKEUP 標記。
  *
  * **絕不改動 Quarters.Stage**——這個函式完全沒有呼叫 advanceQuarterStage_()。
@@ -297,7 +297,7 @@ function planMakeupSend_(quarterId, versionNo, stage) {
  */
 function executeMakeupSend_(plan) {
   assertNotPreviewMode_('executeMakeupSend_');
-  // 沿用 sendStage() 的結構性防護：OFFICIAL 永遠不可以由自動排程觸發，
+  // 沿用 sendStage_() 的結構性防護：OFFICIAL 永遠不可以由自動排程觸發，
   // 補寄工具同樣要受這道防線約束（它也會真正寄信給全體義工）。
   if (plan.stage === MAIL_STAGES.OFFICIAL) assertOfficialNotFromAutomationTrigger_(plan.quarterId);
 
@@ -327,7 +327,7 @@ function executeMakeupSend_(plan) {
     resolveMailAttachmentFolder_();
   }
 
-  const isDryRun = getConfig(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const context = buildMailContext_(plan.quarterId, plan.versionNo, plan.stage);
   context.sendIdTag = MAKEUP_SEND_ID_TAG;
 
@@ -348,7 +348,7 @@ function executeMakeupSend_(plan) {
   });
 
   const outcomes = [];
-  const flushBatchSize = Number(getConfig(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE))
+  const flushBatchSize = Number(getConfig_(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE))
     || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
   targets.forEach(function (recipient) {

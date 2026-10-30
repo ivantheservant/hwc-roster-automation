@@ -86,7 +86,7 @@ console.log('\n=== C【核心】攞唔到鎖嗰陣，真入口真係唔會做嘢
   gas.log_ = function () {};
   let touched = 0;
   // 任何真正嘅內容一行到就會碰到呢幾支——攞唔到鎖就唔應該碰
-  ['findLatestVersionNo', 'requireQuarterStage_', 'assertNoUnsavedChanges_',
+  ['findLatestVersionNo_', 'requireQuarterStage_', 'assertNoUnsavedChanges_',
     'findPreacherTranslationPostIds_', 'planApplyRequests_', 'planStep5ChangedList_',
     'generatePersonalPdfBatch_', 'planMakeupSend_'].forEach(function (n) {
     gas[n] = function () { touched++; throw new Error('唔應該行到 ' + n); };

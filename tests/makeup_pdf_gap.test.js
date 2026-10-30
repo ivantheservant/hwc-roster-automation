@@ -57,10 +57,10 @@ let batchCall = null;
 
 gas.buildMailContext_ = function () { return {}; };
 gas.listRecipients_ = function () { return RECIPIENTS; };
-gas.readSheet = function () { return []; };
-gas.getConfig = function (_k, d) { return d; };
+gas.readSheet_ = function () { return []; };
+gas.getConfig_ = function (_k, d) { return d; };
 gas.findEmailTemplate_ = function () { return { attachType: ATTACH }; };
-gas.findLatestVersionNo = function () { return 3; };
+gas.findLatestVersionNo_ = function () { return 3; };
 gas.assertWebAppRequestAllowed_ = function () {};
 gas.assertNotPreviewMode_ = function () {};
 gas.assertOfficialNotFromAutomationTrigger_ = function () {};

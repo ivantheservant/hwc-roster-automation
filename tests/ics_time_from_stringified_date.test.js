@@ -132,10 +132,10 @@ console.log('\n=== A2【核心】認唔出仍然要嘈，唔可以順手加返 f
 }
 
 /* ══════════════════════════════════════════════════════════════
- * A4　**由真正嘅入口叫落去**：getConfig() → convertConfigValue_()
+ * A4　**由真正嘅入口叫落去**：getConfig_() → convertConfigValue_()
  * ══════════════════════════════════════════════════════════════ */
 
-console.log('\n=== A4【最重要】由 getConfig() 入口落去，唔係直接叫純函式 ===');
+console.log('\n=== A4【最重要】由 getConfig_() 入口落去，唔係直接叫純函式 ===');
 {
   const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'Config.gs']);
   gas.Utilities = makeUtilities();
@@ -154,9 +154,9 @@ console.log('\n=== A4【最重要】由 getConfig() 入口落去，唔係直接�
   rows[1][C.KEY] = gas.CONFIG_KEYS.SYS_TIMEZONE;
   rows[1][C.VALUE] = TZ;
   rows[1][C.TYPE] = 'STR';
-  gas.readSheet = function () { return rows; };
+  gas.readSheet_ = function () { return rows; };
 
-  const fromConfig = gas.getConfig(gas.CONFIG_KEYS.ICS_SERVICE_START_TIME, '00:00');
+  const fromConfig = gas.getConfig_(gas.CONFIG_KEYS.ICS_SERVICE_START_TIME, '00:00');
 
   check('★★★★★ **確認中間嗰層真係把 Date 變咗文字**'
     + '——呢個就係第二十三輪漏咗嘅一層',
@@ -181,9 +181,9 @@ console.log('\n=== A4 Config 那一格已經係純文字時，一樣要行得通
   rows[0][C.KEY] = gas.CONFIG_KEYS.ICS_SERVICE_START_TIME;
   rows[0][C.VALUE] = '10:45';
   rows[0][C.TYPE] = 'STR';
-  gas.readSheet = function () { return rows; };
+  gas.readSheet_ = function () { return rows; };
 
-  const fromConfig = gas.getConfig(gas.CONFIG_KEYS.ICS_SERVICE_START_TIME, '00:00');
+  const fromConfig = gas.getConfig_(gas.CONFIG_KEYS.ICS_SERVICE_START_TIME, '00:00');
   checkEqual('★★★★★ 純文字格 ⇒ 「10:45」（而且冇掂過 Utilities.formatDate）',
     gas.normalizeTimeOfDay_(fromConfig, '00:00', TZ), '10:45');
 }

@@ -136,7 +136,7 @@ function readCombinedBackfillBlockedQuartersDetail_() {
  * ⚠️ 而認得太闊亦都係錯：浸禮主日、宣教主日呢啲日子係**要排人**嘅，
  * 誤判就會喺唔應該跳嘅日子跳咗五個崗位，而個表面上睇落好正常。
  *
- * @param {Object} row 一行 `SpecialSundays`（`readSheet()` 出嚟嗰種物件）
+ * @param {Object} row 一行 `SpecialSundays`（`readSheet_()` 出嚟嗰種物件）
  * @returns {boolean} 係合堂就 true
  */
 function isCombinedSpecialSunday_(row) {
@@ -232,7 +232,7 @@ function classifyCombinedSkipRows_(rows, defaultSkip, blockedQuarters) {
 function planCombinedSkipBackfill_() {
   const skip = readCombinedDefaultSkipPostIdsDetail_();
   const blocked = readCombinedBackfillBlockedQuartersDetail_();
-  const rows = readSheet(SHEETS.SPECIAL_SUNDAYS);
+  const rows = readSheet_(SHEETS.SPECIAL_SUNDAYS);
   const plan = classifyCombinedSkipRows_(rows, skip.value, blocked.value);
   plan.defaultSkip = skip.value;
   plan.defaultSkipSource = skip.source;
@@ -266,7 +266,7 @@ function executeCombinedSkipBackfill_(plan) {
         '如果整張表的欄位都不對，先把它修好再執行這個工具']));
   }
 
-  // `readSheet()` 由第 3 行開始，所以 rowIndex 0 ＝ 試算表第 3 行。
+  // `readSheet_()` 由第 3 行開始，所以 rowIndex 0 ＝ 試算表第 3 行。
   plan.willFill.forEach(function (item) {
     sheet.getRange(item.rowIndex + 3, col).setValue(item.newValue);
   });

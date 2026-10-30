@@ -51,7 +51,7 @@ const FILES = ['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'Diagnostics.gs',
 
 /**
  * 一個假 `RehearsalState` 工作表：所有寫入都記落 `sheetRows`，
- * 而 `readSheet()` 讀返同一個陣列——即係真係模擬到「寫完再讀」。
+ * 而 `readSheet_()` 讀返同一個陣列——即係真係模擬到「寫完再讀」。
  */
 function makeGas(opts) {
   const o = opts || {};
@@ -63,7 +63,7 @@ function makeGas(opts) {
   const store = { rows: (o.initialRows || []).slice() };
   const calls = { alerts: [], toasts: [], writes: 0, clears: 0 };
 
-  gas.readSheet = function (name) {
+  gas.readSheet_ = function (name) {
     if (name === gas.SHEETS.REHEARSAL_STATE) {
       return store.rows.map(function (arr) {
         const row = {};
@@ -213,7 +213,7 @@ console.log('\n=== B6【核心】PDF 未產生完 ⇒ 更新狀態，唔行步�
   const gas = env.gas;
   let step4Called = 0;
   let step5Called = 0;
-  gas.findLatestVersionNo = function () { return 7; };
+  gas.findLatestVersionNo_ = function () { return 7; };
   gas.readRehearsalPdfPaths_ = function () { return { available: true, files: [] }; };
   // 每一批都回「仲未 done」。
   gas.generatePersonalPdfBatch_ = function () {
@@ -253,7 +253,7 @@ console.log('\n=== B6【最重要】PDF 產生完 ⇒ 步驟 4／5 真係行到�
   const gas = env.gas;
   let step4Called = 0;
   let step5Called = 0;
-  gas.findLatestVersionNo = function () { return 7; };
+  gas.findLatestVersionNo_ = function () { return 7; };
   gas.planStep4Warnings_ = function () { return { versionNo: 7, pendingCells: [] }; };
   gas.planStep4MissingPdf_ = function () { return { missing: [] }; };
   gas.planStep4SendPreview_ = function () { return { recipientCount: 58, isDryRun: true }; };

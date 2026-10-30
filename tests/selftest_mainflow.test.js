@@ -213,7 +213,7 @@ console.log('\n=== C【核心】S14：真實入口靜靜噉冇做嘢 ===');
   check('★★★★★★ 叫之前記低版本號，叫完再讀一次，斷言**增加咗**'
     + '——冇呢一條，一個「乜都冇做」嘅呼叫會令後面每一條斷言'
     + '攞住舊版本去驗',
-    /const versionBefore = findLatestVersionNo\(quarterId\);/.test(s14)
+    /const versionBefore = findLatestVersionNo_\(quarterId\);/.test(s14)
       && /versionNo, versionBefore \+ 1,/.test(s14), s14.slice(0, 900));
   check('★★★★★★ 冇新版本 ⇒ **唔往下驗**，而且貼出回傳值'
     + '——第五十輪就係噉報咗「那一天的 CHAIR 在 v0 有 1 個有人的格」，'

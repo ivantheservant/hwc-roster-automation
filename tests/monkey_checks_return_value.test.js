@@ -72,8 +72,8 @@ function runOneStep(opts) {
   gas.assertMonkeyDryRunStillOn_ = function () {};
   // 第六十一輪批次 C 組：`runMonkey_()` 開跑就讀一次 Config
   //（跳唔跳過慢動作），而 Config 行 `CacheService`——沙箱唔提供。
-  gas.readConfig = function () { return {}; };
-  gas.getConfig = function (key, dflt) { return dflt; };
+  gas.readConfig_ = function () { return {}; };
+  gas.getConfig_ = function (key, dflt) { return dflt; };
 
   // ⚠️ **唔換 `monkeyActions_()`**——要驗嘅正正係真嗰張表上面
   // 嗰個 `expect`。淨係換佢底下嗰個真實入口。
@@ -186,7 +186,7 @@ console.log('\n=== C 共通規則：`legal` 話得而系統回 `ok: false` ===')
     factsAfter: { hasVersion: true, latestVersionNo: 1, stage: 'DRAFT',
       gridChangeCount: 0, buttons: NO_BUTTONS },
     stubs: {
-      findLatestVersionNo: function () { return 1; },
+      findLatestVersionNo_: function () { return 1; },
       selfTestPickCells_: function () { return []; },
       apiSaveAndConfirmExecute: function () {
         return { ok: false, message: '有 3 格的名字認不出來，整批拒絕。' };

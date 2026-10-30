@@ -46,10 +46,10 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     const E = COLUMNS.ELIGIBILITY;
     const M = COLUMNS.NAME_MAPPING;
     const W = COLUMNS.PERSON_POST_WEIGHT;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
 
-    const posts = readPosts()
+    const posts = readPosts_()
       .filter(function (row) {
         // 唔自動排嘅崗位（講員／翻譯／獻花）冇「排幾多次」呢個概念。
         return isTrueValue_(row[COLUMNS.POSTS.AUTO_GENERATE]);
@@ -63,7 +63,7 @@ function apiGetPersonPostWeightMatrix(quarterId) {
       .filter(function (p) { return p.postId !== ''; });
 
     const nameById = {};
-    readSheet(SHEETS.NAME_MAPPING).forEach(function (row) {
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (row) {
       const id = String(row[M.PERSON_ID] || '').trim();
       if (id) nameById[id] = String(row[M.NAME_TC] || '').trim() || id;
     });
@@ -72,7 +72,7 @@ function apiGetPersonPostWeightMatrix(quarterId) {
     const eligibleByPost = {};
     // 第八十五輪批次 LC 組：名單上的「堂委」「執事」（PersonID＝`ROLE:…`）按參考日期展開成現任的人
     const roleTokensByPost = {};
-    readSheet(SHEETS.ELIGIBILITY).forEach(function (row) {
+    readSheet_(SHEETS.ELIGIBILITY).forEach(function (row) {
       const personId = String(row[E.PERSON_ID] || '').trim();
       const postId = String(row[E.POST_ID] || '').trim();
       if (!personId || !postId) return;
@@ -118,8 +118,8 @@ function apiGetPersonPostWeightMatrix(quarterId) {
           postId: String(row[W.POST_ID] || '').trim(),
           adjust: Number(row[W.ADJUST]) || 0,
           reason: String(row[W.REASON] || '').trim(),
-          effectiveFrom: toDateString(row[W.EFFECTIVE_FROM], timezone),
-          effectiveTo: toDateString(row[W.EFFECTIVE_TO], timezone),
+          effectiveFrom: toDateString_(row[W.EFFECTIVE_FROM], timezone),
+          effectiveTo: toDateString_(row[W.EFFECTIVE_TO], timezone),
           active: isTrueValue_(row[W.ACTIVE])
         };
       });
@@ -221,7 +221,7 @@ function buildWeightBaselineDataSafely_(quarterId) {
   if (!id) return null;
   try {
     return buildWeightBaselineData_(
-      id, getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
+      id, getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE));
   } catch (err) {
     log_('WARN', '排表偏好畫面讀不到基準資料：' + err.message);
     return null;
@@ -277,18 +277,18 @@ function readWeightGapTextByKey_(quarterId, active, nameById, posts, baselineDat
         return Object.assign({}, w, { baseline: base.baseline, target: computeWeightTarget_(base.baseline, w.adjust) });
       })
     });
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) return null;
 
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
-    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const assignments = readVersionAssignmentsRaw_(id, versionNo).map(function (row) {
       return {
         personId: String(row[A.PERSON_ID] || '').trim(),
         postId: String(row[A.POST_ID] || '').trim(),
         // ⚠️ 由工作表讀出嚟嘅日期可能係 Date 物件，唔可以直接當字串用
         //（`explainWeightShortfall_()` 會拎佢嚟做前後一週嘅比較）。
-        serviceDate: toDateString(row[A.SERVICE_DATE], timezone)
+        serviceDate: toDateString_(row[A.SERVICE_DATE], timezone)
       };
     });
 
@@ -324,8 +324,8 @@ function readWeightGapTextByKey_(quarterId, active, nameById, posts, baselineDat
  */
 function buildWeightLimitContextSafely_() {
   try {
-    const rules = readRules();
-    const config = readConfig();
+    const rules = readRules_();
+    const config = readConfig_();
     const fallback = Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]);
     return {
       rules: rules,
@@ -341,7 +341,7 @@ function readThisQuarterPostCounts_(quarterId) {
   const id = String(quarterId || '').trim();
   if (!id) return null;
   try {
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) return null;
     const A = COLUMNS.ROSTER_ASSIGNMENTS;
     const byKey = {};
@@ -386,7 +386,7 @@ function readQuarterLoadForWeights_(quarterId) {
   if (!id) return none('還沒有選季度，所以看不到誰接近每季上限。');
 
   try {
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) {
       return none('這一季還沒有生成過任何版本，所以看不到誰接近每季上限。');
     }
@@ -396,9 +396,9 @@ function readQuarterLoadForWeights_(quarterId) {
     // 呢度用返同排表一樣嗰個 resolve 函式，唔可以自己再寫一次
     // ——寫兩次就一定會有一日分岔，而畫面同排表講唔同嘅嘢係最難查嘅一種。
     const limitContext = {
-      rules: readRules(),
+      rules: readRules_(),
       defaultLimit:
-        Number(getConfig(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
+        Number(getConfig_(CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER, DEFAULTS.MAX_PER_QUARTER))
         || DEFAULTS.MAX_PER_QUARTER
     };
 
@@ -441,8 +441,8 @@ function resolveWeightQuarterScope_(quarterId, timezone) {
   const info = findQuarterRowInfo_(id);
   if (!info) return null;
   const Q = COLUMNS.QUARTERS;
-  const startDate = toDateString(info.values[Q.START_DATE], timezone);
-  const endDate = toDateString(info.values[Q.END_DATE], timezone);
+  const startDate = toDateString_(info.values[Q.START_DATE], timezone);
+  const endDate = toDateString_(info.values[Q.END_DATE], timezone);
   if (!startDate || !endDate) return null;
   return { quarterId: id, label: buildQuarterLabel_(id), startDate: startDate, endDate: endDate };
 }
@@ -579,7 +579,7 @@ function apiSavePersonPostWeightBatch(changes, options) {
   }
 
   const W = COLUMNS.PERSON_POST_WEIGHT;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const scope = resolveWeightQuarterScope_(opts.quarterId, timezone);
   if (!scope) {
     return {
@@ -629,7 +629,7 @@ function apiSavePersonPostWeightBatch(changes, options) {
   const opened = openSheetForEdit_(SHEETS.PERSON_POST_WEIGHT);
   const nameIndex = buildPersonNameIndex_();
   const postNames = {};
-  readPosts().forEach(function (row) {
+  readPosts_().forEach(function (row) {
     postNames[String(row[COLUMNS.POSTS.POST_ID] || '').trim()] =
       String(row[COLUMNS.POSTS.POST_NAME_TC] || '').trim();
   });
@@ -642,8 +642,8 @@ function apiSavePersonPostWeightBatch(changes, options) {
       personId: String(row[W.PERSON_ID] || '').trim(),
       postId: String(row[W.POST_ID] || '').trim(),
       adjust: Math.round(Number(row[W.ADJUST])) || 0,
-      effectiveFrom: toDateString(row[W.EFFECTIVE_FROM], timezone),
-      effectiveTo: toDateString(row[W.EFFECTIVE_TO], timezone),
+      effectiveFrom: toDateString_(row[W.EFFECTIVE_FROM], timezone),
+      effectiveTo: toDateString_(row[W.EFFECTIVE_TO], timezone),
       active: isTrueValue_(row[W.ACTIVE]),
       createdAt: normalizeSheetTimestamp_(row[W.CREATED_AT], timezone) || ''
     };

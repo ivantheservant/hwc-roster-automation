@@ -17,7 +17,7 @@
 //
 // 呢一輪正面處理：**唔 stub 佢哋**，改為用
 // `tests/helpers/mock_sheets_realistic.js` 建一張真正嘅 grid 工作表
-//（由**真正嘅 `createRosterSheet()`** 寫出嚟，唔係測試自己砌），
+//（由**真正嘅 `createRosterSheet_()`** 寫出嚟，唔係測試自己砌），
 // 然後喺上面改一格，再由真入口叫落去。
 //
 // 所以呢份測試真正行過嘅路係：
@@ -115,7 +115,7 @@ gas.Utilities = {
 };
 gas.log_ = function () {};
 
-// ⚠️ **`createRosterSheet()` 冇 stub** ——呢份測試嘅重點就係要有一張
+// ⚠️ **`createRosterSheet_()` 冇 stub** ——呢份測試嘅重點就係要有一張
 // 由正式碼寫出嚟嘅真 grid 工作表。呢個係同 e2e_five_stage_flow.test.js
 // 最大嘅分別（嗰邊「邊界一」把佢 stub 走咗）。
 //
@@ -254,7 +254,7 @@ let gridSheetName = '';
 
   gridSheetName = gas.buildRosterSheetName_(Q, 0);
   const sheet = ss.getSheetByName(gridSheetName);
-  check('★★★★★ **真正嘅 grid 工作表由 createRosterSheet() 建立咗**'
+  check('★★★★★ **真正嘅 grid 工作表由 createRosterSheet_() 建立咗**'
     + '（呢個就係第三十二輪略過咗嗰件事）', !!sheet, gridSheetName);
   if (sheet) {
     check('★★★★ grid 有第 2 行機器鍵同資料行', sheet.getLastRow() >= 3, String(sheet.getLastRow()));
@@ -273,7 +273,7 @@ function findGridCell(postId, slotIndex, dateStr) {
   }
   if (col === -1) return null;
   for (let r = 3; r <= sheet.getLastRow(); r++) {
-    const cellDate = gas.toDateString(sheet.getRange(r, 1).getValue(), TZ);
+    const cellDate = gas.toDateString_(sheet.getRange(r, 1).getValue(), TZ);
     if (cellDate === dateStr) {
       return { row: r, col: col, key: wanted, currentText: String(sheet.getRange(r, col).getValue() || '').trim() };
     }
@@ -294,9 +294,9 @@ console.log('\n=== 幹事喺 grid 上改一格：plan 要真正偵測到 ===');
 const dates = [];
 {
   const D = gas.COLUMNS.SERVICE_DATES;
-  gas.readSheet(gas.SHEETS.SERVICE_DATES)
+  gas.readSheet_(gas.SHEETS.SERVICE_DATES)
     .sort(function (a, b) { return Number(a[D.WEEK_INDEX]) - Number(b[D.WEEK_INDEX]); })
-    .forEach(function (r) { dates.push(gas.toDateString(r[D.SERVICE_DATE], TZ)); });
+    .forEach(function (r) { dates.push(gas.toDateString_(r[D.SERVICE_DATE], TZ)); });
 }
 let editedCell = null;
 let newPersonName = '';
@@ -347,17 +347,17 @@ console.log('\n=== apiSaveAndConfirmExecute：真正寫成新一版 ===');
   const result = gas.apiSaveAndConfirmExecute(Q, payload);
   check('★★★★★ 執行成功', result && result.blocked !== true, JSON.stringify(result).slice(0, 500));
 
-  const newVersionNo = gas.findLatestVersionNo(Q);
+  const newVersionNo = gas.findLatestVersionNo_(Q);
   checkEqual('★★★★★ 真正建立咗 v1', newVersionNo, 1);
 
   const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;
-  const rows = gas.readSheet(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+  const rows = gas.readSheet_(gas.SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
     return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === newVersionNo;
   });
   check('★★★★ v1 有派工紀錄', rows.length > 0, String(rows.length));
 
   const target = rows.find(function (r) {
-    return gas.toDateString(r[A.SERVICE_DATE], TZ) === dates[1] && r[A.POST_ID] === 'CHAIR';
+    return gas.toDateString_(r[A.SERVICE_DATE], TZ) === dates[1] && r[A.POST_ID] === 'CHAIR';
   });
   check('★★★★★ **人手改動真正寫入咗 v1**（第 2 週主席變成 ' + newPersonName + '）',
     !!target && String(target[A.PERSON_NAME_SNAPSHOT] || '').indexOf(newPersonName) !== -1,

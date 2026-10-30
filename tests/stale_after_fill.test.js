@@ -120,7 +120,7 @@ gas.publishPublicRoster_ = function (quarterId) {
   publishCount++;
   const at = nowText();
   linkRow = { quarterId: quarterId, fileUrl: 'https://example.invalid/public',
-    lastPublishedAt: at, lastPublishedAtRaw: at, lastPublishedVersion: gas.findLatestVersionNo(quarterId) };
+    lastPublishedAt: at, lastPublishedAtRaw: at, lastPublishedVersion: gas.findLatestVersionNo_(quarterId) };
   return { versionNo: linkRow.lastPublishedVersion };
 };
 
@@ -215,7 +215,7 @@ check('（前置）有人要個人 PDF', chairPeople.length > 0);
 
 console.log('\n=== 填一格講員（直接改最新版本，唔造新版本）===');
 gas.apiSavePreacherTranslationEntry(Q, DATES[0], 'PREACH', 1, '客席某牧師');
-check('（前置）仍然係第 0 版', gas.findLatestVersionNo(Q) === 0);
+check('（前置）仍然係第 0 版', gas.findLatestVersionNo_(Q) === 0);
 
 console.log('\n=== A1【核心】公開連結判定過期 ===');
 {
@@ -281,7 +281,7 @@ console.log('\n=== A2【核心】個人 PDF 三個入口都判定過期 ===');
 console.log('\n=== A1【核心】寄給堂委審閱之前自動重發佈 ===');
 {
   let sent = 0;
-  gas.sendStage = function () { sent++; return { isDryRun: true, sent: 0, dryRun: 1, skipped: 0, failed: 0 }; };
+  gas.sendStage_ = function () { sent++; return { isDryRun: true, sent: 0, dryRun: 1, skipped: 0, failed: 0 }; };
   const before = publishCount;
   const r = gas.executeStep2_(Q);
   check('★★★★★★ 寄之前自動重發佈咗一次', publishCount === before + 1, publishCount);
@@ -302,7 +302,7 @@ console.log('\n=== A1：重發佈失敗 ⇒ 擋住，一封都唔寄 ===');
   check('（前置）又過期', gas.evaluatePublicLinkFreshness_(Q).stale === true);
   publishShouldFail = true;
   let sent = 0;
-  gas.sendStage = function () { sent++; return {}; };
+  gas.sendStage_ = function () { sent++; return {}; };
   let err = null;
   try { gas.executeStep2_(Q); } catch (e) { err = e; }
   check('★★★★★★ 擋住，而且係三段式訊息', err && /發生了甚麼/.test(err.message)
@@ -334,7 +334,7 @@ console.log('\n=== A：判斷只有一份，每處都叫佢 ===');
     check('★★★★★ ' + fn + '() 寄之前叫 ensurePublicLinkFreshBeforeSend_()',
       body.indexOf('ensurePublicLinkFreshBeforeSend_(quarterId)') !== -1
       && body.indexOf('ensurePublicLinkFreshBeforeSend_(quarterId)')
-        < Math.max(body.indexOf('sendStage('), body.indexOf('sendResendStage_(')));
+        < Math.max(body.indexOf('sendStage_('), body.indexOf('sendResendStage_(')));
   });
   check('★★★★★ Dashboard 嘅 publicLink.stale 由同一支判斷出',
     /publicLink\.stale = !!\(freshness\.hasLink && freshness\.stale\)/.test(read('WebAppDashboard.gs'))

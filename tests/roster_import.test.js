@@ -112,7 +112,7 @@ gas.findPublicLinkRow_ = function () { return null; };
 gas.writeToPossiblyProtectedGridSheet_ = function (sheet, fn) { fn(); return false; };
 gas.resolveMailAttachmentFolder_ = function () { return null; };
 gas.checkMissingPersonalPdfs_ = function () { return { missing: [], total: 0 }; };
-gas.protectV0 = function () { protectCalls++; };
+gas.protectV0_ = function () { protectCalls++; };
 let protectCalls = 0;
 
 function buildFixture() {
@@ -199,9 +199,9 @@ const IMPORT = gas.buildImportSheetName_(Q);
 /** 匯入表定位：第 2 行日期鍵、第 2 欄 `POST#slot`。 */
 function importCell(date, key) {
   const sh = ss.getSheetByName(IMPORT);
-  // 試算表會把日期字串自動變成日期值——同系統一樣用 toDateString 讀返
+  // 試算表會把日期字串自動變成日期值——同系統一樣用 toDateString_ 讀返
   const keys = sh.getRange(2, 1, 1, sh.getLastColumn()).getValues()[0].map(function (v) {
-    return v instanceof Date ? gas.toDateString(v, TZ) : String(v);
+    return v instanceof Date ? gas.toDateString_(v, TZ) : String(v);
   });
   const col = keys.indexOf(date) + 1;
   let row = -1;
@@ -213,10 +213,10 @@ function importCell(date, key) {
 }
 function setImport(date, key, text) { importCell(date, key).setValue(text); }
 function rowsOf(versionNo) {
-  return gas.readSheet(S.ROSTER_ASSIGNMENTS).filter(function (r) { return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo; });
+  return gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) { return r[A.QUARTER_ID] === Q && Number(r[A.VERSION_NO]) === versionNo; });
 }
 function cellOf(versionNo, date, post) {
-  return rowsOf(versionNo).filter(function (r) { return gas.toDateString(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post; })[0];
+  return rowsOf(versionNo).filter(function (r) { return gas.toDateString_(r[A.SERVICE_DATE], TZ) === date && r[A.POST_ID] === post; })[0];
 }
 function setPostSlotCount(postId, n) {
   const sh = ss.getSheetByName(S.POSTS);
@@ -247,7 +247,7 @@ console.log('\n=== AF1【核心】範本：崗位、位置數、主日、灰格�
     JSON.stringify(builtRules));
   check('★★★★ 主席嘅選單只有合資格嘅人（唔包括只做讀經嘅）',
     builtRules.some(function (x) { return x.list.indexOf(PEOPLE.P9601) !== -1 && x.list.indexOf(PEOPLE.P9604) === -1; }), JSON.stringify(builtRules));
-  checkEqual('★★★★ 一格派工都冇寫', gas.readSheet(S.ROSTER_ASSIGNMENTS).length, 0);
+  checkEqual('★★★★ 一格派工都冇寫', gas.readSheet_(S.ROSTER_ASSIGNMENTS).length, 0);
 
   const again = gas.apiCreateImportSheet(Q);
   check('★★★★ 已存在 ⇒ 唔覆蓋，直接回傳', again.created === false && again.sheetName === IMPORT);
@@ -282,7 +282,7 @@ console.log('\n=== AF2【核心】檢查：認唔出 ⇒ 擋；硬規則 ⇒ 要
   check('★★★★ 回前端唔帶成千格 assignments', plan.assignments === undefined);
   let threw = null;
   try { gas.apiImportRosterExecute(Q, { confirmText: gas.IMPORT_CONFIRM_TEXT }); } catch (e) { threw = e; }
-  check('★★★★★★ 擋住嗰陣匯入會拋錯、乜都冇寫', threw && /認不出/.test(threw.message) && gas.readSheet(S.ROSTER_ASSIGNMENTS).length === 0, threw && threw.message);
+  check('★★★★★★ 擋住嗰陣匯入會拋錯、乜都冇寫', threw && /認不出/.test(threw.message) && gas.readSheet_(S.ROSTER_ASSIGNMENTS).length === 0, threw && threw.message);
 
   // 改成唔合資格嘅人（假丁只做讀經）⇒ 要放行；灰格打名 ⇒ 警告
   setImport(DATES[2], 'CHAIR#1', PEOPLE.P9604);
@@ -311,13 +311,13 @@ console.log('\n=== AF3【核心】匯入：零版本 ⇒ 第 0 版、Basis=IMPOR
   check('★★★★★ 唔打字 ⇒ 拒絕', threw && /打字放行/.test(threw.message), threw && threw.message);
   threw = null;
   try { gas.apiImportRosterExecute(Q, { confirmText: gas.IMPORT_CONFIRM_TEXT }); } catch (e) { threw = e; }
-  check('★★★★★ 有違反而只打「' + gas.IMPORT_CONFIRM_TEXT + '」⇒ 拒絕', threw !== null && gas.readSheet(S.ROSTER_ASSIGNMENTS).length === 0);
+  check('★★★★★ 有違反而只打「' + gas.IMPORT_CONFIRM_TEXT + '」⇒ 拒絕', threw !== null && gas.readSheet_(S.ROSTER_ASSIGNMENTS).length === 0);
 
   const r = gas.apiImportRosterExecute(Q, { confirmText: gas.IMPORT_RELEASE_CONFIRM_TEXT, sentExternally: false });
   check('★★★★★★ 匯入成第 0 版', r.ok === true && r.versionNo === 0, JSON.stringify(r).slice(0, 300));
-  checkEqual('★★★★★ findLatestVersionNo = 0', gas.findLatestVersionNo(Q), 0);
+  checkEqual('★★★★★ findLatestVersionNo_ = 0', gas.findLatestVersionNo_(Q), 0);
   const V = C.ROSTER_VERSIONS;
-  const vrow = gas.readSheet(S.ROSTER_VERSIONS).filter(function (x) { return x[V.QUARTER_ID] === Q; })[0];
+  const vrow = gas.readSheet_(S.ROSTER_VERSIONS).filter(function (x) { return x[V.QUARTER_ID] === Q; })[0];
   checkEqual('★★★★★★ Basis = IMPORT', vrow && vrow[V.BASIS], gas.VERSION_VALUES.BASIS_IMPORT);
   check('★★★★ 版本說明「由人手職事表匯入」', /由人手職事表匯入/.test(String(vrow && vrow[V.NOTES])), vrow && vrow[V.NOTES]);
   check('★★★★ 狀態卡譯做「由人手職事表匯入」', gas.apiGetDashboardState(Q).latestVersion.basisText === '由人手職事表匯入');
@@ -338,7 +338,7 @@ console.log('\n=== AF3【核心】匯入：零版本 ⇒ 第 0 版、Basis=IMPOR
   checkEqual('★★★★ Stage 仍然 DRAFT', gas.getQuarterStage_(Q), gas.QUARTER_STAGE.DRAFT);
   check('★★★★ 重新發佈咗公開連結', publishCalls === 1);
 
-  const release = gas.readSheet(S.AUDIT_LOG).filter(function (x) { return x[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_ACTION; });
+  const release = gas.readSheet_(S.AUDIT_LOG).filter(function (x) { return x[C.AUDIT_LOG.ACTION] === gas.HARD_RELEASE_ACTION; });
   check('★★★★★★ 放行紀錄係 AG 組格式（6 欄 key ＋ RELEASED_VERSION:0）',
     release.length === 1 && String(release[0][C.AUDIT_LOG.NOTES]).indexOf(gas.HARD_RELEASE_KEY_PREFIX) !== -1
     && String(release[0][C.AUDIT_LOG.NOTES]).indexOf(gas.HARD_RELEASE_VERSION_PREFIX + '0') !== -1, JSON.stringify(release));
@@ -367,7 +367,7 @@ console.log('\n=== AF4【核心】「已經在系統外寄給全體」⇒ OFFICI
   checkEqual('★★★★★ 建立第 2 版', r.versionNo, 2);
   checkEqual('★★★★★★ Stage = OFFICIAL_SENT', gas.getQuarterStage_(Q), gas.QUARTER_STAGE.OFFICIAL_SENT);
   const L = C.SEND_LOG;
-  const ext = gas.readSheet(S.SEND_LOG).filter(function (x) { return x[L.QUARTER_ID] === Q; });
+  const ext = gas.readSheet_(S.SEND_LOG).filter(function (x) { return x[L.QUARTER_ID] === Q; });
   const persons = {};
   rowsOf(2).forEach(function (x) { if (x[A.PERSON_ID]) persons[x[A.PERSON_ID]] = true; });
   checkEqual('★★★★★★ 每位有派工嘅人一行、Stage=OFFICIAL、Status=EXTERNAL',
@@ -375,7 +375,7 @@ console.log('\n=== AF4【核心】「已經在系統外寄給全體」⇒ OFFICI
     { n: Object.keys(persons).length, stages: true, status: true });
   check('★★★★★ hash 照現有算法（同 computeAssignmentHash_ 一致）', ext.every(function (x) {
     const mine = rowsOf(2).filter(function (y) { return x[L.PERSON_ID] && y[A.PERSON_ID] === x[L.PERSON_ID]; }).map(function (y) {
-      return { serviceDate: gas.toDateString(y[A.SERVICE_DATE], TZ), postId: y[A.POST_ID], slotIndex: Number(y[A.SLOT_INDEX]) };
+      return { serviceDate: gas.toDateString_(y[A.SERVICE_DATE], TZ), postId: y[A.POST_ID], slotIndex: Number(y[A.SLOT_INDEX]) };
     });
     return String(x[L.ASSIGNMENT_HASH]) === gas.computeAssignmentHash_(mine);
   }));
@@ -407,18 +407,18 @@ console.log('\n=== AF4【核心】「已經在系統外寄給全體」⇒ OFFICI
   const col = head.indexOf('READ#1') + 1;
   let done = false;
   for (let x = keyRow + 1; x <= sh.getLastRow(); x++) {
-    if (gas.toDateString(sh.getRange(x, 1).getValue(), TZ) === DATES[1]) { sh.getRange(x, col).setValue(PEOPLE.P9603); done = true; break; }
+    if (gas.toDateString_(sh.getRange(x, 1).getValue(), TZ) === DATES[1]) { sh.getRange(x, col).setValue(PEOPLE.P9603); done = true; break; }
   }
   check('（前置）改咗一格', done);
   const saved = gas.apiSaveAndConfirmExecute(Q, { decisions: [], confirmedRequestRows: [] });
-  check('（前置）儲存成第 3 版', saved.ok === true && gas.findLatestVersionNo(Q) === 3, JSON.stringify(saved).slice(0, 200));
+  check('（前置）儲存成第 3 版', saved.ok === true && gas.findLatestVersionNo_(Q) === 3, JSON.stringify(saved).slice(0, 200));
   // 第六十九輪批次 AS 組：匯入（IMPORT）之後再儲存一次（FINE_TUNE）⇒ 狀態卡版本來源是人手改動，
   // 唔可以停喺「由人手職事表匯入」。（查過：呢條係綠 ⇒ 唔係 bug；補驗時見到舊字多數係畫面未刷新。）
   // 第七十七輪批次 EC 組：來源帶格數 ⇒「人手改動 1 格」。
   const dashAs = gas.apiGetDashboardState(Q).latestVersion;
   checkEqual('★★★★★★ 匯入後儲存一次：最新版本 basisText＝人手改動 1 格', { v: dashAs.versionNo, t: dashAs.basisText },
     { v: 3, t: '人手改動 1 格' });
-  const basisOfV3 = gas.readSheet(S.ROSTER_VERSIONS).filter(function (r) {
+  const basisOfV3 = gas.readSheet_(S.ROSTER_VERSIONS).filter(function (r) {
     return r[C.ROSTER_VERSIONS.QUARTER_ID] === Q && Number(r[C.ROSTER_VERSIONS.VERSION_NO]) === 3;
   })[0];
   checkEqual('★★★★★ RosterVersions 第 3 版 Basis＝FINE_TUNE', basisOfV3 && basisOfV3[C.ROSTER_VERSIONS.BASIS], gas.VERSION_VALUES.BASIS_FINE_TUNE);

@@ -70,7 +70,7 @@ function apiListSpecialSundays(quarterId) {
   assertWebAppRequestAllowed_('apiListSpecialSundays');
 
   const S = COLUMNS.SPECIAL_SUNDAYS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   const rows = readOptionalSheetRows_(SHEETS.SPECIAL_SUNDAYS)
     .map(function (row, index) {
@@ -84,7 +84,7 @@ function apiListSpecialSundays(quarterId) {
       return {
         sheetRow: item.sheetRow,
         specialId: String(row[S.SPECIAL_ID] || ''),
-        serviceDate: toDateString(row[S.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[S.SERVICE_DATE], timezone),
         type: String(row[S.TYPE] || ''),
         title: String(row[S.TITLE] || ''),
         skipPostIds: splitList_(row[S.SKIP_POST_IDS]),
@@ -100,11 +100,11 @@ function apiListSpecialSundays(quarterId) {
   return {
     rows: rows,
     // 「哪些崗位不用排」用 checkbox 陣列，唔叫幹事打 `WORSHIP,PIANO`
-    posts: readPostsNormalized().map(function (p) {
+    posts: readPostsNormalized_().map(function (p) {
       return { postId: p.postId, postNameTC: p.postNameTC };
     }),
     // 改日期時要即時警告「唔喺本季主日之內」
-    serviceDates: readServiceDatesNormalized(quarterId, timezone).map(function (d) {
+    serviceDates: readServiceDatesNormalized_(quarterId, timezone).map(function (d) {
       return d.serviceDate;
     })
   };
@@ -130,7 +130,7 @@ function apiSaveSpecialSunday(payload) {
 
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
   const S = COLUMNS.SPECIAL_SUNDAYS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
   // 唔信前端傳嚟嘅季度：由該行自己讀返，確認真係本季嗰行。
   const before = sheet.getRange(sheetRow, 1, 1, headers.length).getValues()[0];
@@ -189,7 +189,7 @@ function apiAddSpecialSunday(payload) {
 
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
   const S = COLUMNS.SPECIAL_SUNDAYS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const targetRow = sheet.getLastRow() + 1;
 
   const updates = {};
@@ -242,7 +242,7 @@ function writeSpecialSundayRow_(sheet, headers, sheetRow, updates) {
 /** 把一行整理成 AuditLog 睇得明嘅一句。 */
 function describeSpecialSundayRow_(byKey, timezone) {
   const S = COLUMNS.SPECIAL_SUNDAYS;
-  return '日期=' + toDateString(byKey[S.SERVICE_DATE], timezone)
+  return '日期=' + toDateString_(byKey[S.SERVICE_DATE], timezone)
     + '　類型=' + displayCellValue_(byKey[S.TYPE], '（空白）')
     + '　名稱=' + displayCellValue_(byKey[S.TITLE], '（空白）')
     + '　跳過崗位=' + displayCellValue_(byKey[S.SKIP_POST_IDS], '（無）')
@@ -257,7 +257,7 @@ function describeSpecialSundayRow_(byKey, timezone) {
 function buildServiceDateWarning_(quarterId, serviceDate, timezone) {
   if (!serviceDate) return '';
   try {
-    const dates = readServiceDatesNormalized(quarterId, timezone)
+    const dates = readServiceDatesNormalized_(quarterId, timezone)
       .map(function (d) { return d.serviceDate; });
     if (dates.indexOf(serviceDate) !== -1) return '';
     return '⚠️ ' + serviceDate + ' 不是這一季的主日。'

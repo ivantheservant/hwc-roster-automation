@@ -21,7 +21,7 @@
  *
  * 選單版嘅 `run*_()` 全部會叫 `ui.alert()`。喺 Web App 環境冇 Sheets UI，
  * 一叫就會爆。所以呢個檔案**唔會呼叫任何 `run*_()`**，只叫佢哋裡面
- * 嗰啲純運算函式（`exportRosterPdf()`／`generatePersonalPdfBatch_()`／
+ * 嗰啲純運算函式（`exportRosterPdf_()`／`generatePersonalPdfBatch_()`／
  * `listPendingBackfillCells_()`／`planMakeupSend_()` …）。
  *
  * 呢啲純運算函式本來就已經拆好咗（歷史上為咗寫離線測試而拆），
@@ -40,14 +40,14 @@
 function apiListVersionsForZone4(quarterId) {
   assertWebAppRequestAllowed_('apiListVersionsForZone4');
   const V = COLUMNS.ROSTER_VERSIONS;
-  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const id = String(quarterId || '').trim();
   if (!id) {
     return { ok: false, versions: [], message: '還沒有選季度。' };
   }
 
   try {
-    const versions = readSheet(SHEETS.ROSTER_VERSIONS)
+    const versions = readSheet_(SHEETS.ROSTER_VERSIONS)
       .filter(function (v) { return String(v[V.QUARTER_ID] || '').trim() === id; })
       .map(function (v) {
         const no = Number(v[V.VERSION_NO]);
@@ -150,7 +150,7 @@ function apiListPendingBackfillCellsForZone4(quarterId) {
   assertWebAppRequestAllowed_('apiListPendingBackfillCellsForZone4');
   try {
     const id = String(quarterId || '').trim();
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) {
       return zone4Report_([{
         heading: '待補格子',
@@ -291,9 +291,9 @@ function apiDraftReviewReportForZone4(quarterId, versionNo) {
 function apiExportRosterPdf(quarterId, versionNo) {
   assertWebAppRequestAllowed_();
   try {
-    const result = exportRosterPdf(String(quarterId || '').trim(), Number(versionNo));
+    const result = exportRosterPdf_(String(quarterId || '').trim(), Number(versionNo));
 
-    // ⚠️ `exportRosterPdf()` 只回 {fileId, fileName, folderName}。
+    // ⚠️ `exportRosterPdf_()` 只回 {fileId, fileName, folderName}。
     // 檔案大細同連結要自己由 Drive 攞——**唔可以喺呢度砌一個
     // `result.fileSize || 0` 出嚟**，嗰個永遠會印「0 B」，
     // 而「0 B」睇落就係一個真實嘅（而且好嚇人嘅）數字。
@@ -381,13 +381,13 @@ function apiMakeupSendStages(quarterId) {
   assertWebAppRequestAllowed_('apiMakeupSendStages');
   try {
     const id = String(quarterId || '').trim();
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) {
       return { ok: true, stages: [], message: '' };
     }
     const S = COLUMNS.SEND_LOG;
     const sent = {};
-    readSheet(SHEETS.SEND_LOG).forEach(function (row) {
+    readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
       if (String(row[S.QUARTER_ID] || '').trim() !== id) return;
       sent[String(row[S.STAGE] || '').trim()] = true;
     });
@@ -417,7 +417,7 @@ function apiMakeupSendPlan(quarterId, stage) {
   assertWebAppRequestAllowed_('apiMakeupSendPlan');
   try {
     const id = String(quarterId || '').trim();
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) {
       return { ok: false, message: '這一季還沒有生成過任何版本。' };
     }
@@ -496,7 +496,7 @@ function apiMakeupGenerateMissingPdfs_locked_(quarterId, stage) {
   assertWebAppRequestAllowed_();
   try {
     const id = String(quarterId || '').trim();
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) {
       return { ok: false, message: '這一季還沒有生成過任何版本。' };
     }
@@ -547,7 +547,7 @@ function apiMakeupSendExecute_locked_(quarterId, stage) {
     // 第七十七輪批次 EG 組：寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀唔到唔會令補寄失敗）
     syncPeopleFromHwcasBeforeSend_();
     const id = String(quarterId || '').trim();
-    const versionNo = findLatestVersionNo(id);
+    const versionNo = findLatestVersionNo_(id);
     if (versionNo < 0) {
       return { ok: false, message: '這一季還沒有生成過任何版本。' };
     }

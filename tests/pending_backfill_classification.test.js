@@ -12,7 +12,7 @@
 //
 // 修正後 listPendingBackfillCells_() 改成從 RosterAssignments 資料層判斷：
 // PersonID 空 + AssignSource=SKIPPED + RuleFlags 含 HARD_ELIGIBILITY 才是
-// 待補格。這份測試把該判斷邏輯逐字移植出來（readSheet() 換成傳入陣列，
+// 待補格。這份測試把該判斷邏輯逐字移植出來（readSheet_() 換成傳入陣列，
 // 跟本專案其他測試檔一貫的做法一致），常數（RULE_IDS／ASSIGN_SOURCE）
 // 則直接用 gas_loader 載入 Constants.gs 的正式碼，避免測試用的常數值
 // 跟正式碼漂移。
@@ -42,7 +42,7 @@ function checkEqual(label, actual, expected) {
 
 // ---------------------------------------------------------------------------
 // 移植：listPendingBackfillCells_() 修正後的資料層分類邏輯（逐字對應
-// RequestsApply.gs，readSheet(SHEETS.ROSTER_ASSIGNMENTS) 換成傳入陣列）
+// RequestsApply.gs，readSheet_(SHEETS.ROSTER_ASSIGNMENTS) 換成傳入陣列）
 // ---------------------------------------------------------------------------
 function classifyPendingBackfillKeys_(rows, quarterId, versionNo) {
   const pendingKeys = {};

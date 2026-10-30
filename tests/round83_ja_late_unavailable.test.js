@@ -108,7 +108,7 @@ console.log('\n=== JA1／JA2／JA3／JA4：一個完整情境 ===');
   check('★★★★★★ JA4 勾咗 ⇒ 唔再要求決定', plan2.needsDecision === false, JSON.stringify(plan2.decisionItems));
   const r = save(gas, sc);
   check('（前置）第 1 版建立', r && r.versionNo === 1, JSON.stringify(r).slice(0, 300));
-  const audit = gas.readSheet(sc.S.AUDIT_LOG);
+  const audit = gas.readSheet_(sc.S.AUDIT_LOG);
   const AC = sc.C.AUDIT_LOG;
   check('★★★★★★ JA4 AuditLog 有放行紀錄（RELEASED_KEYS 有那一格）', audit.some((row) =>
     row[AC.ACTION] === gas.HARD_RELEASE_ACTION && String(row[AC.NOTES]).indexOf(D[1] + '|READ|1|' + readP + '|HARD_UNAVAILABLE') !== -1),

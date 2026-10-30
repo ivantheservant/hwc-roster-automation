@@ -178,11 +178,11 @@ console.log('\n=== B3【核心】S14 upsert：搵到就覆寫，搵唔到先 app
     const overwritten = [];
     gas.log_ = function () {};
     gas.selfTestRecordPayload_ = function () {};
-    gas.getConfig = function () { return 'Asia/Hong_Kong'; };
-    gas.readServiceDatesNormalized = function () {
+    gas.getConfig_ = function () { return 'Asia/Hong_Kong'; };
+    gas.readServiceDatesNormalized_ = function () {
       return [{ serviceDate: '2028-07-02' }];
     };
-    gas.findLatestVersionNo = function () { return 1; };
+    gas.findLatestVersionNo_ = function () { return 1; };
     // 重新生成／驗證嗰幾段唔係呢一條要驗嘅嘢，全部短路。
     gas.apiGenerateRoster = function () { throw new Error('（測試到此為止）'); };
     gas.SpreadsheetApp = {

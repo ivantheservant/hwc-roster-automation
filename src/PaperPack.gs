@@ -89,7 +89,7 @@ function apiGeneratePaperPack_locked_(quarterId, personIds) {
       ['在上面的名單勾選要印的人，再按一次']));
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error(buildThreePartMessage_(
       '這一季還沒有生成過任何版本。',
@@ -143,7 +143,7 @@ function listPaperPackFiles_(quarterId, versionNo, personIds) {
   const folder = getOrCreateRosterSubfolder_(quarterId, versionNo);
   const N = COLUMNS.NAME_MAPPING;
   const nameById = {};
-  readPeople().forEach(function (row) {
+  readPeople_().forEach(function (row) {
     const id = String(row[N.PERSON_ID] || '').trim();
     if (id) nameById[id] = String(row[N.NAME_TC] || '').trim();
   });
@@ -279,7 +279,7 @@ function apiEmailPaperPackToSelf_locked_(quarterId, personIds, extraEmails) {
         '如果一直查不到，改用「下載」那一個出口——它會給你一條資料夾連結']));
   }
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error(buildThreePartMessage_(
       '這一季還沒有生成過任何版本。', '一封都沒有寄出。', ['先在第 1 步生成職事表']));
@@ -483,10 +483,10 @@ function extractDriveFileId_(url) {
  * 幹事撳之前就會見到「每一份都一樣，所以只做一個檔，你印 N 份」。
  *
  * ─────────────────────────────────────────────────────────────────────
- * ⚠️ 為什麼不是叫 `exportRosterPdf()`
+ * ⚠️ 為什麼不是叫 `exportRosterPdf_()`
  * ─────────────────────────────────────────────────────────────────────
  *
- * `exportRosterPdf()` 存去 `ROSTER_DRIVE_FOLDER_ID` 那個總資料夾。
+ * `exportRosterPdf_()` 存去 `ROSTER_DRIVE_FOLDER_ID` 那個總資料夾。
  * 紙本這條路的其他檔全部在**那一版自己的子資料夾**裡面，
  * 幹事撳「開啟資料夾」見到的是那一個。存去兩個不同地方的話，
  * 他會在資料夾裡面找不到自己剛剛做好的那一份。
@@ -523,7 +523,7 @@ function apiGeneratePlainPaper(quarterId, copies) {
 
 function apiGeneratePlainPaper_locked_(quarterId, copies) {
 
-  const versionNo = findLatestVersionNo(quarterId);
+  const versionNo = findLatestVersionNo_(quarterId);
   if (versionNo < 0) {
     throw new Error(buildThreePartMessage_(
       '這一季還沒有生成過任何版本。',

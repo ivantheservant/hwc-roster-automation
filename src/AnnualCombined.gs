@@ -210,7 +210,7 @@ function planAnnualCombinedSundays_(year) {
  * 另外寫 `isTrueValue_()`——`isTrueValue_('')` 係 `false`，直接用就會令
  * 全部既有列變成「未確認」，提醒機制即刻噴一堆假警報。
  *
- * @param {Object} row `SpecialSundays` 的一列（readSheet 的物件格式）
+ * @param {Object} row `SpecialSundays` 的一列（readSheet_ 的物件格式）
  * @returns {boolean} 是否未確認
  */
 function isUnconfirmedSpecialSunday_(row) {
@@ -241,7 +241,7 @@ function listUnconfirmedSpecialSundays_(quarterId, timezone) {
     .map(function (row) {
       return {
         specialId: row[C.SPECIAL_ID],
-        serviceDate: toDateString(row[C.SERVICE_DATE], timezone),
+        serviceDate: toDateString_(row[C.SERVICE_DATE], timezone),
         type: row[C.TYPE],
         title: row[C.TITLE]
       };
@@ -277,10 +277,10 @@ function describeUnconfirmedSpecialSundays_(unconfirmed) {
  */
 function findQuarterIdForDate_(dateStr, timezone) {
   const C = COLUMNS.QUARTERS;
-  const rows = readSheet(SHEETS.QUARTERS);
+  const rows = readSheet_(SHEETS.QUARTERS);
   for (let i = 0; i < rows.length; i++) {
-    const start = toDateString(rows[i][C.START_DATE], timezone);
-    const end = toDateString(rows[i][C.END_DATE], timezone);
+    const start = toDateString_(rows[i][C.START_DATE], timezone);
+    const end = toDateString_(rows[i][C.END_DATE], timezone);
     if (!start || !end) continue;
     if (dateStr >= start && dateStr <= end) return String(rows[i][C.QUARTER_ID] || '');
   }
@@ -298,7 +298,7 @@ function planAnnualCombinedWithContext_(year, timezone) {
   const C = COLUMNS.SPECIAL_SUNDAYS;
   const existing = {};
   readOptionalSheet_(SHEETS.SPECIAL_SUNDAYS).forEach(function (row) {
-    const d = toDateString(row[C.SERVICE_DATE], timezone);
+    const d = toDateString_(row[C.SERVICE_DATE], timezone);
     if (d) existing[d] = true;
   });
 
@@ -434,7 +434,7 @@ function runAnnualCombinedWizard_() {
 
   let plan;
   try {
-    const config = readConfig();
+    const config = readConfig_();
     const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
     plan = planAnnualCombinedWithContext_(year, timezone);
   } catch (err) {

@@ -34,7 +34,7 @@ function scene(config) {
   gas.apiSaveAndConfirmExecute(sc.Q, { decisions: [], confirmedRequestRows: [] });
   return sc;
 }
-const versions = (sc) => sc.gas.readSheet(sc.S.ROSTER_VERSIONS).filter((r) => r[sc.C.ROSTER_VERSIONS.QUARTER_ID] === sc.Q).length;
+const versions = (sc) => sc.gas.readSheet_(sc.S.ROSTER_VERSIONS).filter((r) => r[sc.C.ROSTER_VERSIONS.QUARTER_ID] === sc.Q).length;
 
 console.log('\n=== IJ1／IJ3／IJ4／IJ5 ===');
 {
@@ -63,7 +63,7 @@ console.log('\n=== IJ1／IJ3／IJ4／IJ5 ===');
   const r = gas.apiQuarterResetExecute(sc.Q, '確認重設');
   check('★★★★★★ IJ5 清走：ok、0 個版本', r.ok === true && versions(sc) === 0, JSON.stringify(r).slice(0, 300));
   check('★★★★★ Stage 回 DRAFT', gas.getQuarterStage_(sc.Q) === gas.QUARTER_STAGE.DRAFT, gas.getQuarterStage_(sc.Q));
-  const audit = gas.readSheet(sc.S.AUDIT_LOG).map((row) => String(row[sc.C.AUDIT_LOG.ACTION]));
+  const audit = gas.readSheet_(sc.S.AUDIT_LOG).map((row) => String(row[sc.C.AUDIT_LOG.ACTION]));
   check('★★★★★ AuditLog 做之前／之後兩筆（同選單同一支 executeQuarterResetBatch_）',
     audit.indexOf('QUARTER_RESET_BATCH_BEFORE') !== -1 && audit.indexOf('QUARTER_RESET_BATCH_AFTER') !== -1);
   check('★★★★ 主畫面：還未生成（0 個版本）', gas.apiGetDashboardState(sc.Q).latestVersion === null);

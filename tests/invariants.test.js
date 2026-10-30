@@ -53,10 +53,10 @@ console.log('\n=== 一【核心】算唔出 ⇒ 報 ERROR，唔可以報 ok ==='
   gas.SpreadsheetApp = {
     getActiveSpreadsheet: function () { throw new Error('故意爆：讀不到試算表'); }
   };
-  gas.readSheet = function () { throw new Error('故意爆：讀不到工作表'); };
-  gas.getConfig = function () { throw new Error('故意爆：讀不到 Config'); };
+  gas.readSheet_ = function () { throw new Error('故意爆：讀不到工作表'); };
+  gas.getConfig_ = function () { throw new Error('故意爆：讀不到 Config'); };
   gas.readQuarterResetBlockedQuarters_ = function () { throw new Error('故意爆'); };
-  gas.findLatestVersionNo = function () { throw new Error('故意爆'); };
+  gas.findLatestVersionNo_ = function () { throw new Error('故意爆'); };
   gas.buildDashboardState_ = function () { throw new Error('故意爆'); };
 
   const report = gas.runAllInvariants_('2028T3');
@@ -164,9 +164,9 @@ console.log('\n=== 五 冇季度嗰陣要**明講**跳過咗邊幾條 ===');
 {
   // ⚠️ 靜靜少驗四條，而個報告睇落一樣係「全部通過」——
   // 呢個就係第四十七輪 C 組「未確認的特殊主日永遠係 0」嗰種形狀。
-  gas.readSheet = function () { return []; };
+  gas.readSheet_ = function () { return []; };
   gas.SpreadsheetApp = { getActiveSpreadsheet: function () { return { getSheetByName: function () { return null; } }; } };
-  gas.getConfig = function (k, d) { return d; };
+  gas.getConfig_ = function (k, d) { return d; };
   gas.readQuarterResetBlockedQuarters_ = function () { return ['2026T4']; };
 
   const report = gas.runAllInvariants_('');
