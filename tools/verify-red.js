@@ -8805,8 +8805,32 @@ const MUTATIONS = [
     id: "ld-tune-moves-manual",
     why: "調整調開人手改嘅格",
     file: "src/StaffingCheck.gs",
-    find: "      fixed: !!(s.isManual || s.freeText) };",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
     replace: "      fixed: false };",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-flow-freetext-blank",
+    why: "臨時幫手格當成空格補人",
+    file: "src/StaffingCheck.gs",
+    find: "  const isFixedCell = function (c) { return !!c.fixed; };",
+    replace: "  const isFixedCell = function (c) { return !!(c.fixed && c.personId); };",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-ft-temp-not-fixed",
+    why: "調整時臨時幫手格可以改",
+    file: "src/StaffingCheck.gs",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
+    replace: "      fixed: !!(s.isManual && s.personId) };",
+    tests: ["tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "ld-ft-cleared-fixed",
+    why: "人手清空嘅格唔再填",
+    file: "src/StaffingCheck.gs",
+    find: "      fixed: !!(s.freeText || (s.isManual && s.personId)) };",
+    replace: "      fixed: !!(s.freeText || s.isManual) };",
     tests: ["tests/round85_ld_staffing.test.js"]
   },
   {

@@ -432,12 +432,15 @@ function describeStaffingPost_(b) {
  *
  * @param {Object} ctx 規則 context
  * @param {Object[]} cells 每一格 {serviceDate, postId, slotIndex, personId, fixed}
- *   fixed＝不可以改（人手填、鎖定、已決定）；其餘可以按增廣路徑改動
+ *   fixed＝不可以改（人手填、鎖定、已決定）；其餘可以按增廣路徑改動。
+ *   fixed 而沒有 PersonID（臨時幫手、外請講員等有名而不在名單的格）＝位置已經有人，不是空格
  * @returns {{changes: Object[], blanksBefore: number, blanksAfter: number}}
  *   changes：{serviceDate, postId, slotIndex, from, to}；不合法（違反模型的硬規則）的起點格當作 fixed
  */
 function augmentAssignmentsWithStaffingFlow_(ctx, cells) {
-  const fixed = cells.filter(function (c) { return c.fixed && c.personId; });
+  // 第八十五輪回歸：固定的格一律佔住位置（模型按格數扣減需要的人數）；有 PersonID 的另外扣那個人的容量
+  const isFixedCell = function (c) { return !!c.fixed; };
+  const fixed = cells.filter(isFixedCell);
   const model = buildStaffingModel_(ctx, { fixed: fixed });
   const slotByKey = {};
   model.slots.forEach(function (s) { slotByKey[s.serviceDate + '|' + s.post.postId] = s; });
@@ -446,7 +449,7 @@ function augmentAssignmentsWithStaffingFlow_(ctx, cells) {
   const startByKey = {};
   let blanksBefore = 0;
   cells.forEach(function (c) {
-    if (c.fixed && c.personId) return;
+    if (isFixedCell(c)) return;
     const key = c.serviceDate + '|' + c.postId;
     const slot = slotByKey[key];
     if (!slot) return;
@@ -687,7 +690,8 @@ function repairRosterBlanksWithStaffingFlow_(context, result) {
 
 /**
  * 第八十五輪批次 LD 組：〔請系統幫我調整〕逐格填空之後仍然有空格 ⇒ 用同一個網絡補（可能要把別格的人調開）。
- * 人手填的格（isManual）、有名而沒有 PersonID 的格（freeText）不改。
+ * 人手填了人的格（isManual）、有名而沒有 PersonID 的格（freeText：臨時幫手等）不改，而且不當成空格；
+ * 人手清空的格和逐格填空一樣，可以填。
  * @param {Object} context fine-tune context
  * @param {Object[]} workingState 工作狀態（就地修改）
  * @returns {{changes: Object[], before: number, after: number}}
@@ -695,7 +699,7 @@ function repairRosterBlanksWithStaffingFlow_(context, result) {
 function augmentGapFillsWithStaffingFlow_(context, workingState) {
   const cells = workingState.map(function (s) {
     return { serviceDate: s.serviceDate, postId: s.postId, slotIndex: s.slotIndex, personId: s.personId || '',
-      fixed: !!(s.isManual || s.freeText) };
+      fixed: !!(s.freeText || (s.isManual && s.personId)) };
   });
   const aug = augmentAssignmentsWithStaffingFlow_(context, cells);
   if (aug.changes.length === 0 || aug.blanksAfter >= aug.blanksBefore) {

@@ -232,6 +232,33 @@ console.log('\n=== LD7：〔請系統幫我調整〕用網絡補 ===');
   check('★★★★★ 人手改的格不調開', r2.changes.length === 0 && state2[0].personId === 'PB');
 }
 
+console.log('\n=== LD10（回歸時發現）：臨時幫手那一格不是空格 ===');
+{
+  // 第 1 週系統排了 PB；第 2 週人手填了臨時幫手 ivan（有名而沒有 PersonID）；第 3 週 PA、PB 都不能服侍 ⇒ 排不出
+  const ws = weeks(3);
+  const off = (pid, i) => ({ personId: pid, dateFrom: ws[i].serviceDate, dateTo: ws[i].serviceDate, appliesTo: 'ALL', postIds: [] });
+  const ctx = ctxOf({ serviceDates: ws, posts: [post('REP', '報告')], byPost: { REP: ['PA', 'PB'] }, people: ['PA', 'PB'],
+    unavailable: [off('PA', 2), off('PB', 2)] });
+  const state = [{ serviceDate: ws[0].serviceDate, postId: 'REP', slotIndex: 1, personId: 'PB' },
+    { serviceDate: ws[1].serviceDate, postId: 'REP', slotIndex: 1, personId: '', freeText: 'ivan', isManual: true },
+    { serviceDate: ws[2].serviceDate, postId: 'REP', slotIndex: 1, personId: '' }];
+  const r = gas.augmentGapFillsWithStaffingFlow_(ctx, state);
+  check('★★★★★★ 臨時幫手 ivan 那一格不會被當成空格填人（系統沒有動）',
+    r.changes.length === 0 && state[1].personId === '' && state[1].freeText === 'ivan', JSON.stringify(r));
+  // 人手清空的格（isManual、沒有人也沒有名）照樣可以填——和逐格填空一樣
+  const state2 = [{ serviceDate: ws[0].serviceDate, postId: 'REP', slotIndex: 1, personId: 'PB' },
+    { serviceDate: ws[1].serviceDate, postId: 'REP', slotIndex: 1, personId: '', freeText: '', isManual: true },
+    { serviceDate: ws[2].serviceDate, postId: 'REP', slotIndex: 1, personId: '' }];
+  const r2 = gas.augmentGapFillsWithStaffingFlow_(ctx, state2);
+  check('★★★★★ 人手清空的格照樣由網絡填上', r2.after < r2.before && state2[1].personId !== '', JSON.stringify(r2));
+  // 生成：鎖定而沒有人的格同樣佔住位置
+  const cells = [{ serviceDate: ws[0].serviceDate, postId: 'REP', slotIndex: 1, personId: '', fixed: true },
+    { serviceDate: ws[1].serviceDate, postId: 'REP', slotIndex: 1, personId: '' }];
+  const a = gas.augmentAssignmentsWithStaffingFlow_(ctx, cells);
+  check('★★★★★ 固定而沒有 PersonID 的格不出現在改動裏；另一格照填',
+    a.changes.length === 1 && a.changes[0].serviceDate === ws[1].serviceDate, JSON.stringify(a.changes));
+}
+
 console.log('\n=== LD9：畫面 ===');
 {
   const vm = require('vm');
