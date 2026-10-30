@@ -175,8 +175,14 @@
         who.appendChild(make('div', { text: '沒有電郵，收不到：' + p.noEmail.join('、'), className: 'err-text' }));
       }
       nodes.push(who);
-      if (p.sentRecord) nodes.push(para('這一季已經在 ' + p.sentRecord.date + ' 寄過一次（'
-        + (p.sentRecord.mode === 'AUTO' ? '自動' : '人手') + '）；再寄會再收到一封。', 'muted'));
+      // 第八十六輪批次 MA 組：講明之前是模擬還是真正寄出（模擬不算已寄出）
+      if (p.sentRecord) {
+        const sr = p.sentRecord;
+        const modeOf = (m) => (m === 'AUTO' ? '自動' : '人手');
+        nodes.push(para(sr.real
+          ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次（' + modeOf(sr.real.mode) + '）；再寄會再收到一封。'
+          : '這一季在 ' + sr.date + ' 只有模擬寄出（' + modeOf(sr.mode) + '），沒有真正寄出過；模擬不算已寄出。', 'muted'));
+      }
       openModal('寄出季前資料：' + (p.quarterLabel || currentQuarterId), nodes, [
         button('寄出', () => runAction('寄出季前資料', async () => {
           const r = await callServerMutating('apiPreseasonSend', currentQuarterId);

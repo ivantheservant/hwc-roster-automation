@@ -200,26 +200,48 @@ function buildPreseasonRecipients_(todayStr) {
 }
 
 /**
- * 這一季最後一次寄季前資料的紀錄（AuditLog）。
+ * 第八十六輪批次 MA 組：一筆紀錄是不是「模擬」。
+ * 第三段 `DRY_RUN` ⇒ 模擬；`SENT` ⇒ 真正寄出。沒有第三段的舊紀錄：看備註開頭（「模擬 N 封」／「寄出 N 封」），
+ * 兩樣都不是 ⇒ 當作真正寄出（寧可少寄一次，也不要重複寄給堂委）。
+ * @param {string} flag NEW_VALUE 第三段
+ * @param {string} notes AuditLog 備註
+ * @returns {boolean}
+ */
+function isPreseasonRecordSimulated_(flag, notes) {
+  const f = String(flag || '').trim().toUpperCase();
+  if (f === 'DRY_RUN') return true;
+  if (f === 'SENT') return false;
+  return /^\s*模擬/.test(String(notes || ''));
+}
+
+/**
+ * 這一季寄季前資料的紀錄（AuditLog）。
  * @param {string} quarterId 季度 ID
- * @returns {?{date: string, mode: string}}
+ * @returns {?{date: string, mode: string, simulated: boolean, real: ?{date: string, mode: string}}}
+ *   `date`／`mode`／`simulated`＝最後一筆（不論真假）；`real`＝最後一筆真正寄出的（沒有 ⇒ null）
  */
 function readPreseasonSentRecord_(quarterId) {
   const A = COLUMNS.AUDIT_LOG;
   let found = null;
+  let real = null;
   readSheet(SHEETS.AUDIT_LOG).forEach(function (row) {
     if (row[A.ACTION] !== PRESEASON_AUDIT_ACTION) return;
     if (String(row[A.TARGET_KEY] || '').trim() !== quarterId) return;
     const parts = String(row[A.NEW_VALUE] || '').split('|');
-    found = { date: parts[1] || '', mode: parts[0] || '' };
+    const simulated = isPreseasonRecordSimulated_(parts[2], row[A.NOTES]);
+    found = { date: parts[1] || '', mode: parts[0] || '', simulated: simulated };
+    if (!simulated) real = { date: parts[1] || '', mode: parts[0] || '' };
   });
+  if (found) found.real = real;
   return found;
 }
 
 /**
  * 自動寄出的判斷。**純函式。**
+ * 第八十六輪批次 MA 組：`dryRun === false`（真正寄出模式）⇒ 只有「真正寄出」的紀錄（`sent.real`）才算已寄；
+ * 測試模式（其餘情況）⇒ 任何紀錄都算（避免每日重複模擬）。
  * @param {{enabled: boolean, daysBefore: number, generateDate: string, today: string,
- *   sent: ?Object, stage: string, versionNo: number}} f
+ *   sent: ?Object, dryRun: boolean, stage: string, versionNo: number}} f
  * @returns {{send: boolean, reason: string}}
  */
 function judgePreseasonAutoSend_(f) {
@@ -228,7 +250,8 @@ function judgePreseasonAutoSend_(f) {
   const from = shiftDateString_(f.generateDate, -Math.max(0, Number(f.daysBefore) || 0));
   if (f.today < from) return { send: false, reason: 'TOO_EARLY' };
   if (f.today >= f.generateDate) return { send: false, reason: 'TOO_LATE' };
-  if (f.sent) return { send: false, reason: 'ALREADY_SENT' };
+  const counted = f.dryRun === false ? (f.sent && f.sent.real) : f.sent;
+  if (counted) return { send: false, reason: 'ALREADY_SENT' };
   if (f.stage && f.stage !== QUARTER_STAGE.DRAFT) return { send: false, reason: 'NOT_DRAFT' };
   if (f.versionNo >= 0) return { send: false, reason: 'HAS_VERSION' };
   return { send: true, reason: 'DUE' };
@@ -242,9 +265,16 @@ function judgePreseasonAutoSend_(f) {
  * @returns {string}
  */
 function describePreseasonStatus_(sent, generateDate, daysBefore) {
-  if (sent) return '季前資料：已寄出（' + sent.date + '，' + (sent.mode === PRESEASON_SEND_MODE.AUTO ? '自動' : '人手') + '）';
+  const modeText = function (m) { return m === PRESEASON_SEND_MODE.AUTO ? '自動' : '人手'; };
+  // 第八十六輪批次 MA 組：有真正寄出 ⇒ 已寄出；只有模擬 ⇒ 模擬寄出（不算已寄），並講明建議幾時正式寄
+  if (sent && sent.real) return '季前資料：已寄出（' + sent.real.date + '，' + modeText(sent.real.mode) + '）';
+  const suggest = generateDate ? shiftDateString_(generateDate, -Math.max(0, Number(daysBefore) || 0)) : '';
+  if (sent) {
+    return '季前資料：模擬寄出（' + sent.date + '，' + modeText(sent.mode) + '）'
+      + (suggest ? '；正式使用時建議 ' + suggest + ' 寄出' : '；這一季沒有生成日期，不會自動寄出');
+  }
   if (!generateDate) return '季前資料：未寄（這一季沒有生成日期，不會自動寄出）';
-  return '季前資料：建議 ' + shiftDateString_(generateDate, -Math.max(0, Number(daysBefore) || 0)) + ' 寄出（未寄）';
+  return '季前資料：建議 ' + suggest + ' 寄出（未寄）';
 }
 
 /**
@@ -312,6 +342,7 @@ function runPreseasonAutoSend_(quarterRow, today, config) {
     generateDate: readPreseasonGenerateDate_(quarterRow, config),
     today: today,
     sent: readPreseasonSentRecord_(quarterId),
+    dryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,
     stage: String(quarterRow[COLUMNS.QUARTERS.STAGE] || QUARTER_STAGE.DRAFT).trim().toUpperCase(),
     versionNo: findLatestVersionNo(quarterId)
   });

@@ -9040,6 +9040,54 @@ const MUTATIONS = [
     find: "        + '之後可以重新生成。人手加入的不能服侍日期、每週標題、合堂主日會保留，修改申報變回未處理；'\n",
     replace: "        + '之後可以重新生成（這一季的不能服侍日期等一併清除）；'\n",
     tests: ["tests/round85_lb_reset_keep_manual.test.js"]
+  },
+  {
+    id: "ma-judge-any-record",
+    why: "真正寄出模式下模擬紀錄也算已寄",
+    file: "src/PreseasonPack.gs",
+    find: "  const counted = f.dryRun === false ? (f.sent && f.sent.real) : f.sent;",
+    replace: "  const counted = f.sent;",
+    tests: ["tests/round86_ma_preseason_sim.test.js"]
+  },
+  {
+    id: "ma-judge-test-real-only",
+    why: "測試模式只認真正紀錄（每日重複模擬）",
+    file: "src/PreseasonPack.gs",
+    find: "  const counted = f.dryRun === false ? (f.sent && f.sent.real) : f.sent;",
+    replace: "  const counted = f.sent && f.sent.real;",
+    tests: ["tests/round86_ma_preseason_sim.test.js"]
+  },
+  {
+    id: "ma-auto-no-dryrun",
+    why: "自動寄出不傳 dryRun 給判斷",
+    file: "src/PreseasonPack.gs",
+    find: "    dryRun: getConfig(CONFIG_KEYS.DRY_RUN, true) !== false,\n    stage:",
+    replace: "    stage:",
+    tests: ["tests/round86_ma_preseason_sim.test.js"]
+  },
+  {
+    id: "ma-flag-dryrun-real",
+    why: "DRY_RUN 紀錄當成真正寄出",
+    file: "src/PreseasonPack.gs",
+    find: "  if (f === 'DRY_RUN') return true;",
+    replace: "  if (f === 'DRY_RUN') return false;",
+    tests: ["tests/round86_ma_preseason_sim.test.js"]
+  },
+  {
+    id: "ma-status-sim-as-sent",
+    why: "模擬紀錄在狀態句寫成已寄出",
+    file: "src/PreseasonPack.gs",
+    find: "  if (sent && sent.real) return '季前資料：已寄出（' + sent.real.date + '，' + modeText(sent.real.mode) + '）';",
+    replace: "  if (sent) return '季前資料：已寄出（' + sent.date + '，' + modeText(sent.mode) + '）';",
+    tests: ["tests/round86_ma_preseason_sim.test.js", "tests/round85_lf_preseason.test.js"]
+  },
+  {
+    id: "ma-preview-old-text",
+    why: "預覽窗不講明是模擬",
+    file: "src/ui/ScriptZone2.html",
+    find: "只有模擬寄出（",
+    replace: "寄過一次（",
+    tests: ["tests/round86_ma_preseason_sim.test.js"]
   }
 ];
 
