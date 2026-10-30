@@ -587,7 +587,7 @@ function readStaffingCheck_(quarterId) {
  * @returns {Object}
  */
 function apiGetStaffingCheck(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetStaffingCheck');
   beginSheetReadMemo_();
   try {
     const id = String(quarterId || '').trim();
@@ -728,7 +728,7 @@ function augmentGapFillsWithStaffingFlow_(context, workingState) {
  * @returns {{note: string}}
  */
 function apiGetStaffingChangeNote(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetStaffingChangeNote');
   const id = String(quarterId || '').trim();
   if (!id) return { note: '' };
   let before = null;

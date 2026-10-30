@@ -41,7 +41,7 @@
  * @returns {Object} 見規格 4.2
  */
 function apiListPeople(keyword) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListPeople');
 
   beginSheetReadMemo_();
   try {
@@ -297,7 +297,7 @@ function apiReissueToken(personId) {
  * @returns {Object}
  */
 function apiListAliases() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListAliases');
   const A = COLUMNS.NAME_ALIAS;
   const nameIndex = buildPersonNameIndex_();
   const aliases = readSheet(SHEETS.NAME_ALIAS)

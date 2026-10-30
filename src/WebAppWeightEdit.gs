@@ -39,7 +39,7 @@ const PERSON_POST_WEIGHT_CHOICES = [
  * @returns {Object} 見規格 4.6
  */
 function apiGetPersonPostWeightMatrix(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetPersonPostWeightMatrix');
 
   beginSheetReadMemo_();
   try {

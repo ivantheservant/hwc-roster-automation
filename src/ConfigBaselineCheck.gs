@@ -142,7 +142,8 @@ function getConfigBaselineSnapshot_() {
       V0_PROTECT: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
       WARN_ON_SEMI_HARD_BREAK: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_ALLOWED_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
-      WEBAPP_ENABLED: { launchTargetValue: 'TRUE', source: '已核實的實際值' }
+      WEBAPP_ENABLED: { launchTargetValue: 'TRUE', source: '已核實的實際值' },
+      WEBAPP_VIEWER_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' }
     },
     quarters: {
       '2026T4': { generateOn: '2026-08-30', officialSendOn: '2026-09-06' },

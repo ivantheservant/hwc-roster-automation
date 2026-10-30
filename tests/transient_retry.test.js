@@ -32,6 +32,9 @@ let calls = 0;
 let failures = [];
 const sandbox = {
   READ_ONLY_APIS: ['apiRead'],
+  // 第八十七輪 NB 組：callServerMutating 先檢查是不是只可查看
+  viewOnly_: false,
+  VIEW_ONLY_TEXT: '你只有查看權限',
   dashboardStale_: false,
   setTimeout: function (cb) { cb(); },
   Promise: Promise,

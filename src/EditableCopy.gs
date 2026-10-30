@@ -280,7 +280,7 @@ function listEmptyVersionFoldersForReset_(quarterId, versionNosToClear, plannedF
  *   editableCopy: {url: string, folderUrl: string, note: string}}}
  */
 function apiGetRecoveryLinks(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetRecoveryLinks');
   const q = String(quarterId || '').trim();
   const versionNo = findLatestVersionNo(q);
   const out = {

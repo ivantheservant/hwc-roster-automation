@@ -39,7 +39,7 @@
  * @returns {Object} {ok, rows:[…], counts, message}
  */
 function apiHwcasPreview() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiHwcasPreview');
 
   const config = readConfig();
   const spreadsheetId = String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim();
@@ -375,7 +375,7 @@ function hwcasReadFailureResult_(err) {
  * @returns {Object}
  */
 function apiHwcasLinkPreview() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiHwcasLinkPreview');
   const config = readConfig();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();
   let hwcas;
@@ -512,7 +512,7 @@ function hwcasLinkSelected_locked_(links) {
  * @returns {Object} {ok, keyword, candidates:[{memberNo, hwcasName, congregation, memberType, emailMasked, hasEmail, lastAttendance, existingPersonId, existingNameTC}]}
  */
 function apiHwcasSearchPeople(keyword) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiHwcasSearchPeople');
   const kw = String(keyword || '').trim();
   const config = readConfig();
   if (!String(config[CONFIG_KEYS.HWCAS_SPREADSHEET_ID] || '').trim()) return hwcasNotConfiguredResult_();

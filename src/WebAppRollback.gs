@@ -57,7 +57,7 @@ const ROLLBACK_SHEETS_HISTORY_WARNING =
  * @returns {{latestVersionNo: number, versions: Object[]}}
  */
 function apiListVersionsForRollback(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListVersionsForRollback');
 
   const V = COLUMNS.ROSTER_VERSIONS;
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
@@ -88,7 +88,7 @@ function apiListVersionsForRollback(quarterId) {
  * @returns {Object} 見規格 5.3
  */
 function apiRollbackPlan(quarterId, targetVersionNo) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiRollbackPlan');
 
   const target = Number(targetVersionNo);
   const currentVersionNo = findLatestVersionNo(quarterId);

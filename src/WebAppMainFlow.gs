@@ -275,7 +275,7 @@ function buildPermanentLinkExplanation_() {
  * @returns {Object} 六步要的資料
  */
 function apiGetMainFlowState(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetMainFlowState');
   beginSheetReadMemo_();
   try {
     const generateTarget = resolveGenerateTargetQuarter_(quarterId);
@@ -385,7 +385,7 @@ function listPeopleNeedingPaper_(quarterId, versionNo) {
  * @returns {Object} {versionNo, noEmail: [], withEmail: [], message}
  */
 function apiGetPaperListState(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetPaperListState');
   beginSheetReadMemo_();
   try {
     const versionNo = findLatestVersionNo(quarterId);

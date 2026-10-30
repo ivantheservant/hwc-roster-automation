@@ -30,7 +30,7 @@
  * @returns {Object} 見規格 4.1
  */
 function apiListUnavailable(quarterId, keyword) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListUnavailable');
 
   beginSheetReadMemo_();
   try {
@@ -189,7 +189,7 @@ function unavailableOverlapsRange_(dateFrom, dateTo, range) {
  * @returns {Object} 見規格 4.1
  */
 function apiPreviewUnavailableImpact(payload) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiPreviewUnavailableImpact');
   const p = payload || {};
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 

@@ -92,7 +92,9 @@ console.log('\n=== 核心不變量二：唔可以有裸露嘅 callServer()（會
 
   // 呢幾個函式本身淨係由 runAction() 內部呼叫，所以入面嘅 callServer 安全。
   const CALLED_ONLY_INSIDE_RUNACTION = [
-    'loadQuarters', 'loadDashboard', 'resendGeneratePdfsThenSend'
+    'loadQuarters', 'loadDashboard', 'resendGeneratePdfsThenSend',
+    // 第八十七輪批次 NB 組：開機時喺 runAction('載入中') 入面叫，而且自己有 try/catch
+    'loadMyPermission_'
   ];
 
   const naked = [];

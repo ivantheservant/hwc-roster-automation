@@ -41,7 +41,7 @@
  * @returns {Object} 見規格 2.1 嘅確認畫面
  */
 function apiGenerateDraftPlan(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGenerateDraftPlan');
 
   const existingVersionNo = findLatestVersionNo(quarterId);
   if (existingVersionNo >= 0) {

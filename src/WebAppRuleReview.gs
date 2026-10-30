@@ -26,7 +26,7 @@ const ANNUAL_TOOL_CONFIRM_TEXT = '確認';
  * @returns {Object}
  */
 function apiAnnualQuartersPlan(year) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiAnnualQuartersPlan');
   try {
     const y = Number(String(year || '').trim());
     if (!y || y < 2000 || y > 2100) {
@@ -124,7 +124,7 @@ function apiAnnualQuartersExecute(year, confirmText) {
  * @returns {Object}
  */
 function apiAnnualCombinedPlan(year) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiAnnualCombinedPlan');
   try {
     const y = Number(String(year || '').trim());
     if (!y || y < 2000 || y > 2100) {
@@ -515,7 +515,7 @@ function apiExportRuleReviewSheet() {
  * @returns {Object}
  */
 function apiListRuleReviewSheets() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListRuleReviewSheets');
   try {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
     const folder = getOrCreateRuleReviewFolder_();
@@ -551,7 +551,7 @@ function apiListRuleReviewSheets() {
  * @returns {Object}
  */
 function apiRuleReviewImportPlan(fileId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiRuleReviewImportPlan');
   try {
     const id = String(fileId || '').trim();
     if (!id) return { ok: false, message: '沒有選要讀哪一份。' };

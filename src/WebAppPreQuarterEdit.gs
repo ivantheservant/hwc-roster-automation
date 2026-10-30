@@ -67,7 +67,7 @@ function isConfirmedCheckboxOn_(row) {
  * @returns {{rows: Object[], posts: Object[], serviceDates: string[]}}
  */
 function apiListSpecialSundays(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListSpecialSundays');
 
   const S = COLUMNS.SPECIAL_SUNDAYS;
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
@@ -291,7 +291,7 @@ function buildServiceDateWarning_(quarterId, serviceDate, timezone) {
  * @returns {Object} 同 `apiListPreacherTranslationPending()`
  */
 function apiWebListPreacherPending(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiWebListPreacherPending');
   return apiListPreacherTranslationPending(quarterId);
 }
 

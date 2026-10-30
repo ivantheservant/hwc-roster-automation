@@ -1,24 +1,71 @@
 /**
  * 追加階段 AV：Web UI 的安全模型，共三層，全部要同時成立才會真正執行任何動作：
  *
- * 1. **`appsscript.json` 的部署權限**（`webapp.access = "MYSELF"`，
- *    `executeAs = "USER_DEPLOYING"`）——這是 Google 平台層級的第一道關卡，
- *    只有部署這個 Web App 的那個 Google 帳號本人才能打開頁面。選 `MYSELF` 而不是
- *    `DOMAIN`（同 domain 已登入者皆可）或 `ANYONE`，是因為現階段 Web UI 只有一個
- *    操作者（幹事本人），沒有必要放寬到整個 domain；而且教會的 Google Workspace
- *    domain 成員不一定人人都應該有權限操作職事表系統。日後如果真的需要讓其他人
- *    （例如另一位幹事）直接使用，屆時應該改成 `DOMAIN` 並同步擴充下面的
- *    `WEBAPP_ALLOWED_EMAILS`，而不是一開始就開放。
+ * 1. **`appsscript.json` 的部署權限**（`webapp.access = "DOMAIN"`，
+ *    `executeAs = "USER_DEPLOYING"`）——這是 Google 平台層級的第一道關卡。
+ *    第八十七輪批次 NC 組（Ivan 決定）：由 `MYSELF` 改為 `DOMAIN`，令教會網域
+ *    內**名單上**的人都可以使用（有些人可以修改，有些人只可以查看）。`DOMAIN` 只代表
+ *    「已登入教會帳戶的人才到達得到這個腳本」，**不代表**他們可以用——真正決定誰可以用的
+ *    是第 3 層名單。義工個人專屬連結是另一個部署（`ANYONE_ANONYMOUS`），由
+ *    `deploy/push_and_deploy.ps1` 臨時改設定另建版本，不受這裏影響。
  * 2. **Config 的 `WEBAPP_ENABLED` 總開關**（預設 FALSE）——即使 Web App 已經
  *    deploy、部署權限也設對了，這一關沒開，`doGet()` 與全部 `api*` 函式一律
  *    拒絕執行。存在的理由：deploy 這個動作本身不代表幹事已經準備好啟用它，
  *    這一關讓「已部署」與「已啟用」分開，幹事要主動多做一步才會真正生效。
- * 3. **`WEBAPP_ALLOWED_EMAILS` 白名單**——即使前兩關都過了，`Session.getActiveUser()`
- *    讀到的呼叫者電郵仍然要在名單內（留空時只允許 `SCRIPT_ACCOUNT_EMAIL`）。
- *    這是防止「部署權限日後被人手改鬆」的第二道獨立防線，不依賴第 1 關繼續生效。
+ * 3. **使用名單**——`Session.getActiveUser()` 讀到的呼叫者電郵要在名單內：
+ *    - `WEBAPP_ALLOWED_EMAILS`：可以修改的人（留空時只允許 `SCRIPT_ACCOUNT_EMAIL`）。
+ *    - `WEBAPP_VIEWER_EMAILS`（第八十七輪批次 NB 組）：只可以查看的人。兩個名單都有 ⇒ 當作可以修改。
+ *    不在任何一個名單 ⇒ 中性頁。這一層不依賴第 1 關繼續生效。
  *
  * 三層獨立生效，不是「隨便一關過了就算」，見 `assertWebAppRequestAllowed_()`。
+ *
+ * ── 第八十七輪批次 NB 組：查看／修改兩種權限 ────────────────────────────
+ * 每一個 `api*` 開頭呼叫 `assertWebAppRequestAllowed_()`：
+ *   - **不傳參數 ⇒ 當作改動**，只有可以修改的人可以用（新加的 api 忘記歸類也不會漏）。
+ *   - 唯讀的 api 傳入**自己的名字**（例如 `assertWebAppRequestAllowed_('apiListQuarters')`），
+ *     而且名字要在 `WEBAPP_READ_ONLY_APIS` 內，只可查看的人才可以用。名字不在清單 ⇒ 照樣當作改動。
+ * 只可查看的人呼叫改動的 api ⇒ 拒絕（「你只有查看權限，不可以改動。」）並寫 AuditLog。
+ * 前端灰色按鈕只是方便，**這裏才是真正的防線**。
  */
+
+/** 第八十七輪批次 NB 組：兩種權限。 */
+const WEBAPP_ROLE = { EDITOR: 'EDITOR', VIEWER: 'VIEWER' };
+
+/** 只可查看的人呼叫改動的 api 時的訊息（前端顯示同一句）。 */
+const WEBAPP_VIEW_ONLY_MESSAGE = '你只有查看權限，不可以改動。';
+
+/**
+ * 第八十七輪批次 NB 組：**伺服器端唯讀 api 清單**——只可查看的人可以呼叫的 api。
+ *
+ * ⚠️ 和前端 `READ_ONLY_APIS`（ui/Script.html）對照：兩份要一致，只有下面 `WEBAPP_READ_ONLY_EXCEPTIONS`
+ * 列明的例外（前端當唯讀、但伺服器端當改動）。測試 `round87_nb_api_permission.test.js` 逐個核對。
+ * 加入之前請確認那個函式真的一格都不寫（包括它呼叫的其他 api）。
+ */
+const WEBAPP_READ_ONLY_APIS = [
+  'apiListQuarters', 'apiGetMainFlowState', 'apiGetSendPlanSummary', 'apiGetSendRecipientPool',
+  'apiGetLastReviewSendOptions', 'apiCheckMyChanges', 'apiGetSuggestionState', 'apiGetPaperListState',
+  'apiGetRecoveryLinks', 'apiCheckImportSheet', 'apiPlanEligibilitySheetApply', 'apiGetDashboardState',
+  'apiGetThemePreference', 'apiGenerateDraftPlan', 'apiSaveAndConfirmPlan', 'apiGetSaveButtonState',
+  'apiQuarterResetPlan', 'apiGetSendCommitteeRecipients', 'apiStep2Preview', 'apiStep4GetPendingWarnings',
+  'apiStep4GetMissingPdfWarnings', 'apiStep4GetSendPreview', 'apiStep5Plan', 'apiListVersionsForRollback',
+  'apiRollbackPlan', 'apiListSpecialSundays', 'apiWebListPreacherPending', 'apiGetPreQuarterChecklist',
+  'apiGetStaffingCheck', 'apiGetStaffingChangeNote', 'apiGetCombinedServices', 'apiPreseasonPreview',
+  'apiListUnavailable', 'apiPreviewUnavailableImpact', 'apiListPeople', 'apiListAliases',
+  'apiGetEligibilityMatrix', 'apiGetPersonPostWeightMatrix', 'apiGetSendAllRecipients',
+  'apiGetSendChangedRecipients', 'apiListRoles', 'apiRolesTermChangePlan', 'apiRoleOverview',
+  'apiListExclusions', 'apiHwcasPreview', 'apiHwcasLinkPreview', 'apiHwcasSearchPeople',
+  'apiListVersionsForZone4', 'apiListPendingBackfillCellsForZone4', 'apiDraftReviewReportForZone4',
+  'apiMakeupSendStages', 'apiMakeupSendPlan', 'apiAnnualQuartersPlan', 'apiAnnualCombinedPlan',
+  'apiListRuleReviewSheets', 'apiRuleReviewImportPlan',
+  // 第八十七輪批次 NB 組：自己的權限；唯讀崗位名單視窗
+  'apiGetMyPermission', 'apiGetEligibilityViewOnly'
+];
+
+/**
+ * 前端當唯讀（不用刷新狀態快取）、但伺服器端當改動的 api，及原因。
+ * - `apiVerifyRosterForZone4`：〔核對職事表〕會寫一張新的 `Verify_` 工作表（經 `apiVerifyRoster()`）。
+ */
+const WEBAPP_READ_ONLY_EXCEPTIONS = ['apiVerifyRosterForZone4'];
 
 /**
  * 檢查 Web UI 總開關（Config 的 `WEBAPP_ENABLED`）。沒開就拋錯。
@@ -31,41 +78,114 @@ function assertWebAppEnabled_() {
 }
 
 /**
- * 檢查呼叫者是否在允許名單內。`WEBAPP_ALLOWED_EMAILS` 留空時，退回只允許
- * `SCRIPT_ACCOUNT_EMAIL` 那一個人——空白絕對不代表「任何人皆可」，兩者都空白時
+ * 讀一個電郵名單（Config LIST），全部小寫、去空白。
+ * @param {string} key CONFIG_KEYS
+ * @returns {string[]}
+ */
+function readWebAppEmailList_(key) {
+  const configured = getConfig(key, []);
+  return (Array.isArray(configured) ? configured : String(configured || '').split(','))
+    .map(function (e) { return String(e).trim().toLowerCase(); })
+    .filter(Boolean);
+}
+
+/**
+ * 第八十七輪批次 NB 組：一個電郵的權限。
+ * 可以修改＝`WEBAPP_ALLOWED_EMAILS`（留空時退回 `SCRIPT_ACCOUNT_EMAIL`）；只可查看＝`WEBAPP_VIEWER_EMAILS`。
+ * 兩個名單都有 ⇒ 可以修改。
+ * @param {string} email 已小寫
+ * @returns {{role: string, allListsEmpty: boolean}} role＝WEBAPP_ROLE 之一，或空字串（不在名單）
+ */
+function resolveWebAppRole_(email) {
+  const explicitList = readWebAppEmailList_(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS);
+  const editors = explicitList.length > 0
+    ? explicitList
+    : [String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '')).trim().toLowerCase()].filter(Boolean);
+  const viewers = readWebAppEmailList_(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS);
+  let role = '';
+  if (email && editors.indexOf(email) !== -1) role = WEBAPP_ROLE.EDITOR;
+  else if (email && viewers.indexOf(email) !== -1) role = WEBAPP_ROLE.VIEWER;
+  return { role: role, allListsEmpty: editors.length === 0 && viewers.length === 0 };
+}
+
+/**
+ * 檢查呼叫者是否在使用名單內（可以修改或只可查看）。`WEBAPP_ALLOWED_EMAILS` 留空時，退回只允許
+ * `SCRIPT_ACCOUNT_EMAIL` 那一個人——空白絕對不代表「任何人皆可」，名單全部空白時
  * 直接拒絕（等同名單是空集合，沒有人在內）。
- * @returns {void}
+ * @returns {string} WEBAPP_ROLE.EDITOR／WEBAPP_ROLE.VIEWER
  */
 function assertApiCallerAuthorized_() {
   const email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
   if (!email) {
     throw new Error('無法識別呼叫者身分（Session.getActiveUser() 讀不到電郵），拒絕執行。');
   }
-
-  const configured = getConfig(CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, []);
-  const explicitList = (Array.isArray(configured) ? configured : [])
-    .map(function (e) { return String(e).trim().toLowerCase(); })
-    .filter(Boolean);
-  const allowList = explicitList.length > 0
-    ? explicitList
-    : [String(getConfig(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '')).trim().toLowerCase()].filter(Boolean);
-
-  if (allowList.length === 0) {
-    throw new Error('Web UI 允許名單是空的（WEBAPP_ALLOWED_EMAILS 與 SCRIPT_ACCOUNT_EMAIL 都未設定），拒絕執行。');
+  const r = resolveWebAppRole_(email);
+  if (r.allListsEmpty) {
+    throw new Error('Web UI 允許名單是空的（WEBAPP_ALLOWED_EMAILS、WEBAPP_VIEWER_EMAILS 與 SCRIPT_ACCOUNT_EMAIL 都未設定），拒絕執行。');
   }
-  if (allowList.indexOf(email) === -1) {
+  if (!r.role) {
     throw new Error('（' + email + '）不在 Web UI 允許名單內，拒絕執行。');
   }
+  return r.role;
 }
 
 /**
  * 合併第 2、3 層檢查，供每一個 `api*` 函式開頭呼叫。第 1 層（部署權限）由
  * Google 平台在請求到達這個腳本之前就把關，程式碼裡沒有東西可以額外檢查。
+ *
+ * 第八十七輪批次 NB 組：**不傳參數 ⇒ 當作改動**，要可以修改的權限。唯讀的 api 傳入自己的名字，
+ * 而且名字在 `WEBAPP_READ_ONLY_APIS` 內，只可查看的人才可以用。
+ * @param {string=} readOnlyApiName 唯讀 api 自己的名字
+ * @returns {string} 呼叫者的權限（WEBAPP_ROLE）
+ */
+function assertWebAppRequestAllowed_(readOnlyApiName) {
+  assertWebAppEnabled_();
+  const role = assertApiCallerAuthorized_();
+  if (role === WEBAPP_ROLE.EDITOR) return role;
+  if (readOnlyApiName && WEBAPP_READ_ONLY_APIS.indexOf(readOnlyApiName) !== -1) return role;
+  denyViewOnlyCaller_(readOnlyApiName);
+  return role;
+}
+
+/**
+ * 只可查看的人呼叫改動的 api：寫 AuditLog，然後拒絕。
+ * @param {string=} apiName 有傳就記下（不傳的是改動的 api）
+ * @returns {void} 一定拋錯
+ */
+function denyViewOnlyCaller_(apiName) {
+  let email = '';
+  try { email = String(Session.getActiveUser().getEmail() || '').trim(); } catch (err) { email = ''; }
+  try {
+    writeAuditLog_({
+      action: 'WEBAPP_VIEW_ONLY_DENIED',
+      targetSheet: '',
+      targetKey: email,
+      newValue: apiName || '',
+      source: 'assertWebAppRequestAllowed_',
+      notes: '只可查看的人嘗試改動，已拒絕'
+    });
+  } catch (err) {
+    log_('WARN', '只可查看的人嘗試改動，AuditLog 寫不到：' + err.message);
+  }
+  throw new Error(WEBAPP_VIEW_ONLY_MESSAGE);
+}
+
+/**
+ * 第八十七輪批次 NB 組：試算表內的側邊欄／對話框呼叫的 `api*`（不經幹事介面）。
+ * 這幾個 api 一樣可以被這個腳本送出的任何網頁用 `google.script.run` 呼叫，
+ * 所以都要檢查：呼叫者要是主試算表的編輯者或擁有人（或者可以修改幹事介面的人）。
+ * 不檢查 `WEBAPP_ENABLED`——試算表內的工具在 Web UI 停用時仍然要用得到。
  * @returns {void}
  */
-function assertWebAppRequestAllowed_() {
-  assertWebAppEnabled_();
-  assertApiCallerAuthorized_();
+function assertSpreadsheetEditorCaller_() {
+  const email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase();
+  if (!email) throw new Error('無法識別呼叫者身分（Session.getActiveUser() 讀不到電郵），拒絕執行。');
+  if (resolveWebAppRole_(email).role === WEBAPP_ROLE.EDITOR) return;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const editors = (ss.getEditors() || []).map(function (u) { return String(u.getEmail() || '').toLowerCase(); });
+  const owner = ss.getOwner();
+  if (owner) editors.push(String(owner.getEmail() || '').toLowerCase());
+  if (editors.indexOf(email) === -1) throw new Error('（' + email + '）不是這份試算表的編輯者，拒絕執行。');
 }
 
 /**
@@ -167,6 +287,15 @@ function includeHtml(fileName) {
 }
 
 /**
+ * 第八十七輪批次 NB 組：供前端呼叫——自己的權限（載入時呼叫一次）。
+ * @returns {{role: string, canModify: boolean}}
+ */
+function apiGetMyPermission() {
+  const role = assertWebAppRequestAllowed_('apiGetMyPermission');
+  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR };
+}
+
+/**
  * 第十一輪批次階段 D：供前端呼叫——讀取幹事本人儲存喺 UserProperties 嘅
  * 深色/淺色偏好。前端預設用瀏覽器 localStorage（同步、免來回伺服器），
  * 只喺 localStorage 讀寫失敗（例如 HtmlService sandbox 擋咗）時先會退回
@@ -174,7 +303,7 @@ function includeHtml(fileName) {
  * @returns {string} 'dark'／'light'／''（未設定過，前端會改跟裝置設定）
  */
 function apiGetThemePreference() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetThemePreference');
   const value = PropertiesService.getUserProperties().getProperty(WEBAPP_THEME_PROPERTY_KEY);
   return (value === 'dark' || value === 'light') ? value : '';
 }
@@ -197,7 +326,7 @@ function apiSetThemePreference(theme) {
  * @returns {Object[]} 每個季度的 {quarterId, status, startDate, endDate, latestVersionNo}
  */
 function apiListQuarters() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListQuarters');
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return readSheet(SHEETS.QUARTERS).map(function (row) {
     const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];

@@ -121,7 +121,11 @@ console.log('\n=== 靜態原始碼稽核：每一個 api* 函式的第一行都�
       let j = i + 1;
       while (j < lines.length && lines[j].trim() === '') j++;
       const firstStatement = lines[j] ? lines[j].trim() : '';
-      if (firstStatement.indexOf('assertWebAppRequestAllowed_()') === -1) {
+      // 第八十七輪批次 NB 組（刻意改動）：唯讀的 api 傳入自己的名字（assertWebAppRequestAllowed_('apiX')），
+      // apiGetMyPermission 用回傳值（const role = …）。歸類的完整核對在 round87_nb_api_permission.test.js。
+      const guarded = firstStatement.indexOf('assertWebAppRequestAllowed_()') !== -1
+        || new RegExp("^(?:const \\w+ = )?assertWebAppRequestAllowed_\\('" + m[1] + "'\\);$").test(firstStatement);
+      if (!guarded) {
         missingGuard.push(fileName + ':' + (i + 1) + ' ' + m[1] + '() → 第一行是「' + firstStatement + '」');
       }
     }

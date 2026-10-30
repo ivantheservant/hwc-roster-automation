@@ -87,7 +87,7 @@ function buildSuggestionSheetName_(quarterId, versionNo) {
  * @returns {Object} 檢查結果
  */
 function apiCheckMyChanges(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiCheckMyChanges');
   beginSheetReadMemo_();
   try {
     const versionNo = findLatestVersionNo(quarterId);
@@ -1354,7 +1354,7 @@ function discardSuggestionSheet_(quarterId, versionNo) {
  * @returns {Object} {hasSuggestion, sheetName, url}
  */
 function apiGetSuggestionState(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSuggestionState');
   const versionNo = findLatestVersionNo(quarterId);
   if (versionNo < 0) return { hasSuggestion: false, sheetName: '', url: '' };
   const sheetName = buildSuggestionSheetName_(quarterId, versionNo);

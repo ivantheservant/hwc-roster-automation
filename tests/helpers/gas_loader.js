@@ -115,6 +115,11 @@ function buildGasStubs_() {
     // ⚠️ 但要測「拿不到的時候會怎樣」的測試，仍然可以自己覆寫
     // `gas.LockService`——那是刻意留的口，
     // `tests/mutation_lock.test.js` 就是這樣做的。
+    // 第八十七輪批次 NB 組：試算表側邊欄的 api（講員／翻譯／獻花、更新說明文字）開頭會叫
+    // `assertSpreadsheetEditorCaller_()`（定義在 WebApp.gs，要讀 Session 和試算表編輯者）。
+    // 沒有載入 WebApp.gs 的測試照舊可以直接呼叫那幾個 api；**載入了 WebApp.gs 就用真的那一支**
+    //（函式宣告會蓋過這個預設）。權限本身由 tests/round87_nb_api_permission.test.js 測。
+    assertSpreadsheetEditorCaller_: function () {},
     LockService: {
       getDocumentLock: function () { return makeAlwaysAvailableLock_(); },
       getScriptLock: function () { return makeAlwaysAvailableLock_(); },

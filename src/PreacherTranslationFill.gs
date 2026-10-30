@@ -100,6 +100,8 @@ function findPreacherTranslationPostIds_() {
  *   `optional: boolean`（獻花為 `true`——留空唔填係正常情況，唔係漏做）
  */
 function apiListPreacherTranslationPending(quarterId) {
+  // 第八十七輪批次 NB 組：試算表側邊欄用——只有試算表編輯者可以呼叫
+  assertSpreadsheetEditorCaller_();
   const ids = findPreacherTranslationPostIds_();
   if (!ids.preacherPostId && !ids.translationPostId && !ids.flowerPostId) {
     throw new Error('Posts 工作表找不到名稱為「講員」「翻譯」或「獻花」的崗位，無法使用這個工具。'
@@ -185,6 +187,7 @@ function apiListPreacherTranslationPending(quarterId) {
 // `apiSavePreacherTranslationEntry_locked_()`。同一時間只可以有一個會改動資料嘅動作在跑，
 // 理由全文喺 `src/MutationLock.gs` 檔頭。
 function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotIndex, name) {
+  assertSpreadsheetEditorCaller_();
   return withMutationLock_('填講員／翻譯／獻花', function () {
     return apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId, slotIndex, name);
   });

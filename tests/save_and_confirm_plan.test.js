@@ -129,7 +129,7 @@ console.log('\n=== 步 1.6：三欄對照 ===');
 console.log('\n=== 結構性要求 ===');
 {
   check('★★★★★ apiSaveAndConfirmPlan 第一行 assertWebAppRequestAllowed_()',
-    /function apiSaveAndConfirmPlan\(quarterId\) \{\s*\n\s*assertWebAppRequestAllowed_\(\);/.test(SRC));
+    /function apiSaveAndConfirmPlan\(quarterId\) \{\s*\n\s*assertWebAppRequestAllowed_\('apiSaveAndConfirmPlan'\);/.test(SRC));
   check('★★★★★ 規則狀態明確傳 GRID_OVERLAY，mode 唔可以省略（第十九輪）',
     /resolveAuthoritativeState_\(\s*\n?\s*context, STATE_SOURCE\.GRID_OVERLAY, 'apiSaveAndConfirmPlan'\)/.test(SRC));
   check('★★★★★ plan 完全冇寫入（冇 write／setValue／advanceQuarterStage_ 之類）',

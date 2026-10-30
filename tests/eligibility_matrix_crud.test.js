@@ -187,7 +187,7 @@ console.log('\n=== E3 結構與畫面文案 ===');
     path.join(__dirname, '..', 'src', 'WebAppEligibility.gs'), 'utf8');
   checkEqual('★★★★★ 每個 api 函式都有 assertWebAppRequestAllowed_()',
     (src.match(/function api\w+\(/g) || []).length,
-    (src.match(/assertWebAppRequestAllowed_\(\);/g) || []).length);
+    (src.match(/assertWebAppRequestAllowed_\((?:'api\w+')?\);/g) || []).length);  // 第八十七輪 NB 組：唯讀的 api 傳入自己的名字
   check('★★★★ 三種改動都有寫 AuditLog',
     /ELIGIBILITY_ADD/.test(src) && /ELIGIBILITY_ENABLE/.test(src)
     && /ELIGIBILITY_DISABLE/.test(src));

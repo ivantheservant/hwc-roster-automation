@@ -153,7 +153,10 @@
     'apiAnnualQuartersPlan',
     'apiAnnualCombinedPlan',
     'apiListRuleReviewSheets',
-    'apiRuleReviewImportPlan'
+    'apiRuleReviewImportPlan',
+    // 第八十七輪批次 NB 組：自己的權限；唯讀崗位名單視窗
+    'apiGetMyPermission',
+    'apiGetEligibilityViewOnly'
   ];
 
   // ── 伺服器呼叫 ───────────────────────────────────────────────
@@ -452,6 +455,8 @@
    * 兩邊都係自動嘅，呼叫端唔使記得任何嘢。
    */
   async function callServerMutating(fnName, ...args) {
+    // 第八十七輪批次 NB 組：只可查看 ⇒ 不送出（伺服器也會拒絕）
+    if (viewOnly_) throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');
     const result = await callServerRaw_(fnName, ...args);
     dashboardStale_ = true;
     // 第八十五輪批次 LD 組：改了會影響人手的資料 ⇒ 重新做人手檢查，下一個完成窗寫一句（不足才寫）
@@ -838,6 +843,140 @@
     }
   }
 
+  /* ══════════════════════════════════════════════════════════════
+   * 第八十七輪批次 NB 組：只可查看的使用者
+   * ══════════════════════════════════════════════════════════════
+   *
+   * 載入時由 `apiGetMyPermission` 取得自己的權限。只可查看的人：頁頂寫「你只有查看權限」；
+   * 會改動資料的按鈕變灰色，滑鼠停留顯示「你只有查看權限」；畫面本身照樣打開、內容照樣顯示。
+   *
+   * ⚠️ 這裏只是方便。**真正的防線在伺服器**（`assertWebAppRequestAllowed_()`）：
+   * 這裏漏了一粒按鈕，伺服器照樣拒絕。
+   *
+   * 哪些按鈕算「會改動」：按鈕文字對 `VIEW_ONLY_BLOCKED_LABELS`（例外 `VIEW_ONLY_ALLOWED_LABELS`）。
+   * 「進階與診斷」「常用設定」那些〔開始〕按鈕按工具名稱判斷（見 `zone4Row()`），
+   * 預設當作改動，只有 `VIEW_ONLY_READ_TOOLS` 列明的唯讀工具可以按。
+   */
+  let viewOnly_ = false;
+  const VIEW_ONLY_TEXT = '你只有查看權限';
+  const VIEW_ONLY_BLOCKED_LABELS = [
+    /^請系統幫我調整/, /^儲存/, /^立即/, /^現在就產生/, /^加入$/, /^選擇其他$/, /^給所有人$/, /^變動的人$/,
+    /^寄/, /^連結勾了的人$/, /^這是新人/, /^解除限制$/, /^繼續/, /^再試/, /^發佈$/, /^確定/,
+    /^用這一版作起點$/, /^查看這一版$/, /^用職事表$/, /^用建議表$/, /^產生/, /^放棄/, /^改為再寄/, /^換屆$/,
+    /^接受/, /^建立/, /^就是這一位/, /^取消這一筆$/, /^生成/, /^重新生成/, /^回退/, /^匯入/, /^套用/,
+    /^我改好了/, /^下載及匯出$/, /^開始調整$/
+  ];
+  /** 文字對上面的規則、但只是打開一個只看的畫面。 */
+  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料'];
+  /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
+  const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結'];
+
+  /** 這粒按鈕的文字是不是會改動資料（只可查看的人要變灰）。 */
+  function isViewOnlyBlockedLabel_(label) {
+    const t = String(label || '').trim();
+    if (VIEW_ONLY_ALLOWED_LABELS.indexOf(t) !== -1) return false;
+    return VIEW_ONLY_BLOCKED_LABELS.some((re) => re.test(t));
+  }
+
+  /** 把一粒按鈕變成「只可查看」：灰色、滑鼠停留講原因、按了也不做任何事。 */
+  function markViewOnlyBlocked_(b) {
+    if (!b) return b;
+    b.viewOnlyBlocked_ = true;
+    b.disabled = true;
+    b.title = VIEW_ONLY_TEXT;
+    if (String(b.className || '').indexOf('view-only-blocked') === -1) {
+      b.className = (String(b.className || '') + ' view-only-blocked').trim();
+    }
+    return b;
+  }
+
+  /** 設定權限，並更新頁頂那一句。 */
+  function setViewOnly_(on) {
+    viewOnly_ = !!on;
+    const banner = el('viewOnlyBanner');
+    if (banner) {
+      banner.textContent = viewOnly_ ? VIEW_ONLY_TEXT + '：可以打開所有畫面，但不可以儲存、生成、寄出或改動任何資料。' : '';
+      banner.hidden = !viewOnly_;
+    }
+  }
+
+  /** 載入時取得自己的權限。讀不到就照可以修改處理（伺服器仍然會擋）。 */
+  async function loadMyPermission_() {
+    try {
+      const r = await callServer('apiGetMyPermission');
+      setViewOnly_(!!(r && r.role === 'VIEWER'));
+    } catch (err) {
+      setViewOnly_(false);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+   * 第八十七輪批次 NA 組：直接開某個畫面的網址（深連結）
+   * ══════════════════════════════════════════════════════════════
+   *
+   * `<幹事介面網址>?view=combined&quarter=2027T1`：照舊先過全部存取檢查，主畫面載入完成後
+   * 選定那一季，然後打開那個畫面（和人手按按鈕打開的完全一樣，同一個函式）。
+   * **只打開畫面，不會自動儲存、寄出或改動任何東西。**
+   * ⚠️ 不可以用 `p`、`q`——那兩個是個人專屬連結的參數。
+   */
+  const DEEP_LINK_PARAMS = { VIEW: 'view', QUARTER: 'quarter' };
+  /** `view` 可用值 → 打開哪一個畫面。日後加畫面只加一行。 */
+  const DEEP_LINK_VIEWS = {
+    combined: () => openCombinedServices(),
+    unavailable: () => openUnavailable(),
+    weights: () => openWeights(),
+    staffing: () => openStaffingCheck(),
+    preseason: () => openPreseasonSend()
+  };
+
+  /** 讀網址參數（`google.script.url`）；讀不到就當沒有。 */
+  function readDeepLinkParams_() {
+    return new Promise((resolve) => {
+      try {
+        if (typeof google === 'undefined' || !google.script || !google.script.url) { resolve({}); return; }
+        google.script.url.getLocation((loc) => resolve((loc && loc.parameter) || {}));
+      } catch (err) {
+        resolve({});
+      }
+    });
+  }
+
+  /**
+   * 網址參數 → `{view, quarter, viewKnown}`。**純函式。** 只讀 `view`、`quarter`（不理 `p`、`q`）。
+   * @param {Object} params `google.script.url.getLocation()` 的 `parameter`
+   */
+  function parseDeepLink_(params) {
+    const p = params || {};
+    const str = (v) => String(v === undefined || v === null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40);
+    const view = str(p[DEEP_LINK_PARAMS.VIEW]).toLowerCase();
+    const quarter = str(p[DEEP_LINK_PARAMS.QUARTER]);
+    return { view: view, quarter: quarter, viewKnown: !view || Object.prototype.hasOwnProperty.call(DEEP_LINK_VIEWS, view) };
+  }
+
+  /**
+   * 主畫面載入完成後：季度找不到／畫面不認得 ⇒ 頁頂寫一句；認得的畫面就打開。
+   * @param {{view: string, quarter: string, viewKnown: boolean}} link
+   * @returns {string[]} 寫在頁頂的句子（測試用）
+   */
+  function applyDeepLink_(link) {
+    const notes = [];
+    if (!link) return notes;
+    if (link.quarter && currentQuarterId !== link.quarter) {
+      notes.push('找不到季度 ' + link.quarter + '，已顯示預設季度。');
+    }
+    if (link.view && !link.viewKnown) {
+      notes.push('網址指定的畫面「' + link.view + '」不認得，沒有打開任何畫面。');
+    }
+    const box = el('deepLinkNotice');
+    if (box) {
+      clear(box);
+      notes.forEach((t) => box.appendChild(make('div', { text: t, className: 'lines' })));
+      box.hidden = notes.length === 0;
+    }
+    if (link.view && link.viewKnown) DEEP_LINK_VIEWS[link.view]();
+    return notes;
+  }
+
   // ── 細小 DOM 工具 ────────────────────────────────────────────
 
   function make(tag, opts, children) {
@@ -855,7 +994,12 @@
   function button(label, onClick, className) {
     const b = make('button', { text: label, className: className || '' });
     b.type = 'button';
-    b.addEventListener('click', onClick);
+    // 第八十七輪批次 NB 組：只可查看 ⇒ 會改動的按鈕變灰、按了不做任何事（之後有人把它設回可按也一樣）
+    b.addEventListener('click', (ev) => {
+      if (b.viewOnlyBlocked_) { setStatus(VIEW_ONLY_TEXT + '，不可以改動。', true); return; }
+      onClick(ev);
+    });
+    if (viewOnly_ && isViewOnlyBlockedLabel_(label)) markViewOnlyBlocked_(b);
     return b;
   }
   function para(text, className) {
@@ -2037,14 +2181,18 @@
 
   // ── 頂部：季度、狀態卡 ───────────────────────────────────────
 
-  async function loadQuarters() {
+  async function loadQuarters(keepQuarterId) {
     // ⚠️ 第七十五輪批次 CB 組：載入時先確保「今日起 N 個月內開始」嘅季度都已建立，
     // 季度選單先會一直有下一季。**做唔到唔可以令成頁載入失敗**——靜靜略過，
     // 進階與診斷〔建立未來季度〕仲可以手動做一次（會講原因）。
-    try {
-      await callServerMutating('apiEnsureFutureQuarters');
-    } catch (err) { /* 見上：唔阻住載入 */ }
-    await fillQuarterSelect_(null);
+    // 第八十七輪批次 NB 組：只可查看的人不做（會建立季度＝改動）
+    if (!viewOnly_) {
+      try {
+        await callServerMutating('apiEnsureFutureQuarters');
+      } catch (err) { /* 見上：唔阻住載入 */ }
+    }
+    // 第八十七輪批次 NA 組：網址指定的季度（找不到就照舊揀第一個）
+    await fillQuarterSelect_(keepQuarterId || null);
   }
 
   /**
@@ -2140,7 +2288,8 @@
     // 後端攞唔到工作表就會回空字串——**噉就唔畫個連結**，
     // 唔可以畫一條開唔到嘅連結出嚟（見 buildGridSheetUrl_() 嘅說明）。
     const linkBox = clear(el('statusLink'));
-    if (v && v.sheetUrl) {
+    // 第八十七輪批次 NB 組：只可查看的人沒有主試算表的存取權 ⇒ 不畫試算表連結（第 2 步改開公開職事表）
+    if (v && v.sheetUrl && !viewOnly_) {
       const a = document.createElement('a');
       a.href = v.sheetUrl;
       a.target = '_blank';

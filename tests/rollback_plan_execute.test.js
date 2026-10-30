@@ -141,7 +141,7 @@ console.log('\n=== E2：打字確認 ＋ 唔信前端 ===');
   check('★★★★ 放行文字唔啱就拋三段式錯誤',
     /!== ROLLBACK_CONFIRM_TEXT\) \{[\s\S]{0,200}?buildThreePartMessage_/.test(execFn));
   check('★★★★★ 兩個 api 第一行都有 assertWebAppRequestAllowed_()',
-    /function apiRollbackPlan\(quarterId, targetVersionNo\) \{\s*\n\s*assertWebAppRequestAllowed_\(\);/.test(SRC)
+    /function apiRollbackPlan\(quarterId, targetVersionNo\) \{\s*\n\s*assertWebAppRequestAllowed_\('apiRollbackPlan'\);/.test(SRC)
     && /function apiRollbackExecute\(quarterId, targetVersionNo, releaseText\) \{\s*\n\s*assertWebAppRequestAllowed_\(\);/.test(SRC));
 }
 

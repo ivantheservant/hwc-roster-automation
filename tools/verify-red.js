@@ -6005,8 +6005,8 @@ const MUTATIONS = [
     id: "cb-no-load-ensure",
     why: "載入幹事介面時唔再自動建立",
     file: "src/ui/Script.html",
-    find: "      await callServerMutating('apiEnsureFutureQuarters');\n    } catch (err) { /* 見上：唔阻住載入 */ }",
-    replace: "    } catch (err) { /* 見上：唔阻住載入 */ }",
+    find: "        await callServerMutating('apiEnsureFutureQuarters');\n      } catch (err) { /* 見上：唔阻住載入 */ }",
+    replace: "      } catch (err) { /* 見上：唔阻住載入 */ }",
     tests: ["tests/round75_cb_quarter_lookahead.test.js"]
   },
   {
@@ -7068,8 +7068,8 @@ const MUTATIONS = [
     id: "eg-ui-no-load-sync",
     why: "幹事介面載入時唔叫出席系統同步",
     file: "src/ui/ScriptBoot.html",
-    find: "  runAction('載入中', async () => { await loadQuarters(); syncHwcasOnLoad(); });",
-    replace: "  runAction('載入中', loadQuarters);",
+    find: "    if (!viewOnly_) syncHwcasOnLoad();\n",
+    replace: "",
     tests: ["tests/round77_eg_hwcas_method_a.test.js"]
   },
   {
@@ -9144,6 +9144,286 @@ const MUTATIONS = [
     find: "st.posts.map((p) => '「' + p.postNameTC + '」').join('、')",
     replace: "st.posts.map((p) => p.postNameTC).join('、')",
     tests: ["tests/round86_mc_quote_post.test.js", "tests/round85_ld_staffing.test.js"]
+  },
+  {
+    id: "na-parse-uses-p",
+    why: "深連結把個人連結的 p 當成 view",
+    file: "src/ui/Script.html",
+    find: "    const view = str(p[DEEP_LINK_PARAMS.VIEW]).toLowerCase();",
+    replace: "    const view = str(p.p || p[DEEP_LINK_PARAMS.VIEW]).toLowerCase();",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "na-no-quarter-notice",
+    why: "季度找不到也不提示",
+    file: "src/ui/Script.html",
+    find: "    if (link.quarter && currentQuarterId !== link.quarter) {",
+    replace: "    if (false) {",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "na-no-view-notice",
+    why: "畫面不認得也不提示",
+    file: "src/ui/Script.html",
+    find: "    if (link.view && !link.viewKnown) {",
+    replace: "    if (false) {",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "na-view-not-opened",
+    why: "深連結不打開畫面",
+    file: "src/ui/Script.html",
+    find: "    if (link.view && link.viewKnown) DEEP_LINK_VIEWS[link.view]();",
+    replace: "",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "na-quarter-not-kept",
+    why: "深連結的季度沒有選定",
+    file: "src/ui/Script.html",
+    find: "    await fillQuarterSelect_(keepQuarterId || null);",
+    replace: "    await fillQuarterSelect_(null);",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "na-boot-no-quarter",
+    why: "開機沒有把季度傳給 loadQuarters",
+    file: "src/ui/ScriptBoot.html",
+    find: "    await loadQuarters(deepLink_.quarter);",
+    replace: "    await loadQuarters();",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "na-wrong-view-fn",
+    why: "合堂主日深連結開錯畫面",
+    file: "src/ui/Script.html",
+    find: "    combined: () => openCombinedServices(),",
+    replace: "    combined: () => openUnavailable(),",
+    tests: ["tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "nb-viewer-can-modify",
+    why: "只可查看的人可以改動",
+    file: "src/WebApp.gs",
+    find: "  denyViewOnlyCaller_(readOnlyApiName);\n  return role;",
+    replace: "  return role;",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-ro-list-ignored",
+    why: "名字不在唯讀清單也放行",
+    file: "src/WebApp.gs",
+    find: "  if (readOnlyApiName && WEBAPP_READ_ONLY_APIS.indexOf(readOnlyApiName) !== -1) return role;",
+    replace: "  if (readOnlyApiName) return role;",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-viewer-wins",
+    why: "兩個名單都有當作只可查看",
+    file: "src/WebApp.gs",
+    find: "  if (email && editors.indexOf(email) !== -1) role = WEBAPP_ROLE.EDITOR;\n  else if (email && viewers.indexOf(email) !== -1) role = WEBAPP_ROLE.VIEWER;",
+    replace: "  if (email && viewers.indexOf(email) !== -1) role = WEBAPP_ROLE.VIEWER;\n  else if (email && editors.indexOf(email) !== -1) role = WEBAPP_ROLE.EDITOR;",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-viewer-list-unread",
+    why: "沒有讀查看名單",
+    file: "src/WebApp.gs",
+    find: "  const viewers = readWebAppEmailList_(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS);",
+    replace: "  const viewers = [];",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-no-audit",
+    why: "拒絕時沒有寫 AuditLog",
+    file: "src/WebApp.gs",
+    find: "      action: 'WEBAPP_VIEW_ONLY_DENIED',",
+    replace: "      action: '',",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-api-no-guard",
+    why: "一個 api 沒有權限檢查",
+    file: "src/WebAppCombined.gs",
+    find: "  assertWebAppRequestAllowed_('apiGetCombinedServices');",
+    replace: "",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-ro-wrong-name",
+    why: "唯讀 api 傳了別人的名字",
+    file: "src/WebAppUnavailable.gs",
+    find: "  assertWebAppRequestAllowed_('apiListUnavailable');",
+    replace: "  assertWebAppRequestAllowed_('apiListPeople');",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-save-as-read",
+    why: "改動的 api 當成唯讀",
+    file: "src/WebAppCombined.gs",
+    find: "function apiSaveCombinedServices(quarterId, items) {\n  assertWebAppRequestAllowed_();",
+    replace: "function apiSaveCombinedServices(quarterId, items) {\n  assertWebAppRequestAllowed_('apiSaveCombinedServices');",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-sheet-tool-open",
+    why: "試算表工具 api 沒有檢查",
+    file: "src/SheetTextUpdate.gs",
+    find: "  assertSpreadsheetEditorCaller_();\n",
+    replace: "",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-sheet-editor-any",
+    why: "非試算表編輯者也放行",
+    file: "src/WebApp.gs",
+    find: "  if (editors.indexOf(email) === -1) throw new Error('（' + email + '）不是這份試算表的編輯者，拒絕執行。');",
+    replace: "",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-perm-api-role",
+    why: "權限 api 一律回可以修改",
+    file: "src/WebApp.gs",
+    find: "  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR };",
+    replace: "  return { role: role, canModify: true };",
+    tests: ["tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "nb-front-mut-sends",
+    why: "只可查看仍然送出改動",
+    file: "src/ui/Script.html",
+    find: "    if (viewOnly_) throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');\n",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-btn-not-grey",
+    why: "會改動的按鈕沒有變灰",
+    file: "src/ui/Script.html",
+    find: "    if (viewOnly_ && isViewOnlyBlockedLabel_(label)) markViewOnlyBlocked_(b);",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-btn-click-runs",
+    why: "灰色按鈕設回可按就照樣做",
+    file: "src/ui/Script.html",
+    find: "      if (b.viewOnlyBlocked_) { setStatus(VIEW_ONLY_TEXT + '，不可以改動。', true); return; }\n",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-allowed-blocked",
+    why: "寄出季前資料預覽也變灰",
+    file: "src/ui/Script.html",
+    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料'];",
+    replace: "  const VIEW_ONLY_ALLOWED_LABELS = [];",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-banner-missing",
+    why: "頁頂沒有寫只有查看權限",
+    file: "src/ui/Script.html",
+    find: "      banner.hidden = !viewOnly_;",
+    replace: "      banner.hidden = true;",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-step-title-back",
+    why: "stepButton 把原因改回原本",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    if (b.viewOnlyBlocked_) markViewOnlyBlocked_(b);\n",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-zone4-all-open",
+    why: "開始按鈕全部可以按",
+    file: "src/ui/ScriptZone4.html",
+    find: "    if (viewOnly_ && VIEW_ONLY_READ_TOOLS.indexOf(name) === -1) markViewOnlyBlocked_(b);",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-settings-sheet-link",
+    why: "只可查看仍畫試算表連結",
+    file: "src/ui/ScriptZone3.html",
+    find: "    if (viewOnly_) return markViewOnlyBlocked_(button(label, () => {}, 'secondary'));\n",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-elig-opens-sheet",
+    why: "只可查看仍開名單工作表",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    if (viewOnly_) { openEligibilityViewOnly(); return; }",
+    replace: "",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-step2-main-sheet",
+    why: "只可查看仍開主試算表",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    if (viewOnly_ && publicLink.hasLink && publicLink.url) {",
+    replace: "    if (false) {",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-boot-ensure-q",
+    why: "只可查看開機仍建立季度",
+    file: "src/ui/Script.html",
+    find: "    if (!viewOnly_) {\n      try {\n        await callServerMutating('apiEnsureFutureQuarters');",
+    replace: "    {\n      try {\n        await callServerMutating('apiEnsureFutureQuarters');",
+    tests: ["tests/round75_cb_quarter_lookahead.test.js"]
+  },
+  {
+    id: "nb-boot-hwcas-sync",
+    why: "只可查看開機仍更新電郵",
+    file: "src/ui/ScriptBoot.html",
+    find: "    if (!viewOnly_) syncHwcasOnLoad();",
+    replace: "    syncHwcasOnLoad();",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-status-sheet-link",
+    why: "只可查看狀態卡仍畫試算表連結",
+    file: "src/ui/Script.html",
+    find: "    if (v && v.sheetUrl && !viewOnly_) {",
+    replace: "    if (v && v.sheetUrl) {",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-elig-no-role",
+    why: "唯讀名單沒有寫現任堂委",
+    file: "src/WebAppEligibility.gs",
+    find: "      return describeEligibilityRoleToken_(code, roles, nameById, todayStr);",
+    replace: "      return code;",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nb-elig-no-excl",
+    why: "唯讀名單沒有註明暫時不做",
+    file: "src/WebAppEligibility.gs",
+    find: "'（暫時不做這個崗位）' : '');",
+    replace: "'' : '');",
+    tests: ["tests/round87_nb_view_only_ui.test.js"]
+  },
+  {
+    id: "nc-access-myself",
+    why: "幹事介面仍是只有我",
+    file: "src/appsscript.json",
+    find: "\"access\": \"DOMAIN\"",
+    replace: "\"access\": \"MYSELF\"",
+    tests: ["tests/round87_nc_domain_access.test.js"]
+  },
+  {
+    id: "nc-precheck-old",
+    why: "上線檢查仍寫 MYSELF",
+    file: "src/PreLaunchChecklist.gs",
+    find: "webapp.access=DOMAIN（",
+    replace: "webapp.access=MYSELF（",
+    tests: ["tests/round87_nc_domain_access.test.js"]
   }
 ];
 

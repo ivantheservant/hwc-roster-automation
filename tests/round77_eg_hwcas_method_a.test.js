@@ -197,7 +197,7 @@ console.log('\n=== EG6：寄出路寄信前同步 ===');
   check('★★★★ 補寄都叫', /syncPeopleFromHwcasBeforeSend_\(\);/.test(code(read('src/WebAppZone4.gs'))));
   check('★★★★★ 三個確認窗都帶 hwcasNotice', (flow.match(/hwcasNotice/g) || []).length >= 3);
   check('★★★★★ 幹事介面載入：主畫面畫好之後先 syncHwcasOnLoad()（唔經 runAction 鎖畫面）',
-    /await loadQuarters\(\); syncHwcasOnLoad\(\);/.test(code(read('src/ui/ScriptBoot.html'))) && /callServerMutating\('apiSyncPeopleFromHwcas', \{ force: true \}\)/.test(code(read('src/ui/ScriptZone3.html'))));
+    /await loadQuarters\(deepLink_\.quarter\);\s*if \(!viewOnly_\) syncHwcasOnLoad\(\);/.test(code(read('src/ui/ScriptBoot.html'))) && /callServerMutating\('apiSyncPeopleFromHwcas', \{ force: true \}\)/.test(code(read('src/ui/ScriptZone3.html'))));
 }
 
 console.log('\n=== EG7：畫面 ===');

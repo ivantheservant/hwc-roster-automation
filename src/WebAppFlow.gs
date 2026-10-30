@@ -185,7 +185,7 @@ function mapPendingPlanForClient_(plan) {
  * @returns {Object} 確認畫面資料
  */
 function apiStep2Preview(quarterId, sendOptions) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiStep2Preview');
   // ⚠️ 第四十七輪批次 B1 組：一定要把 `sendOptions` 傳落去。
   // 唔傳嘅話，事前講嘅收件人數同真正寄嘅唔同——
   // 而現場就係「會寄給這 3 位」對住「模擬 9 封」。
@@ -415,7 +415,7 @@ function apiStep3Release_locked_(quarterId, releaseText) {
  * @returns {Object} 版本號、待處理申報、待補格子
  */
 function apiStep4GetPendingWarnings(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiStep4GetPendingWarnings');
   const warnings = planStep4Warnings_(quarterId);
   return {
     versionNo: warnings.versionNo,
@@ -435,7 +435,7 @@ function apiStep4GetPendingWarnings(quarterId) {
  * @returns {Object} 缺件檢查結果
  */
 function apiStep4GetMissingPdfWarnings(quarterId, versionNo, sendOptions) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiStep4GetMissingPdfWarnings');
   const missingCheck = planStep4MissingPdf_(quarterId, versionNo, sendOptions);
   return {
     applicable: missingCheck.applicable,
@@ -461,7 +461,7 @@ function apiStep4GetMissingPdfWarnings(quarterId, versionNo, sendOptions) {
  * @returns {Object} 收件人數、DRY_RUN
  */
 function apiStep4GetSendPreview(quarterId, versionNo, sendOptions) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiStep4GetSendPreview');
   const preview = planStep4SendPreview_(quarterId, versionNo, sendOptions);
   // 第七十五輪批次 CJ 組
   preview.unreachable = buildUnreachablePeople_(quarterId, versionNo);
@@ -528,7 +528,7 @@ function apiStep4Confirm_locked_(quarterId, sendOptions) {
  * @returns {Object} `mode='HAS_PENDING'` 時附申報清單；否則 `mode='NO_PENDING'`
  */
 function apiStep5Plan(quarterId, sendOptions) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiStep5Plan');
 
   // 第二十三輪批次階段 E5：**瘦身。** 「套用申報」嗰段已經歸咗掣 1
   // （決定 D1：掣 1 一次過處理人手改動＋申報），所以呢度唔再問

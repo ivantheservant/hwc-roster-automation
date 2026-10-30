@@ -289,7 +289,7 @@ function sendKindToStage_(kind) {
  * @returns {Object} 收件人池
  */
 function apiGetSendRecipientPool(quarterId, kind) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSendRecipientPool');
   beginSheetReadMemo_();
   try {
     const snap = buildSendPoolSnapshot_(quarterId, kind);
@@ -423,7 +423,7 @@ function buildSendPoolSnapshot_(quarterId, kind) {
  * @returns {Object} `{ok, versionNo, pickedKeys, items, groups, noEmailCount, noEmailNames, includesFixed}`
  */
 function apiGetSendAllRecipients(quarterId, kind) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSendAllRecipients');
   beginSheetReadMemo_();
   try {
     const snap = buildSendPoolSnapshot_(quarterId, kind);
@@ -476,7 +476,7 @@ function filterReviewScope_(pool) {
 }
 
 function apiGetSendCommitteeRecipients(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSendCommitteeRecipients');
   beginSheetReadMemo_();
   try {
     const snap = buildSendPoolSnapshot_(quarterId, SEND_KIND.REVIEW);
@@ -538,7 +538,7 @@ function apiGetSendCommitteeRecipients(quarterId) {
  * @returns {Object}
  */
 function apiGetSendChangedRecipients(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSendChangedRecipients');
   beginSheetReadMemo_();
   try {
     const sendLog = readSendLogSummaryForDashboard_(quarterId);
@@ -659,7 +659,7 @@ function listChangedPeopleWithoutEmail_(quarterId, plan, people) {
  * @returns {Object} {ok, found, sentAt, versionNo, count, droppedCount, sendOptions}
  */
 function apiGetLastReviewSendOptions(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetLastReviewSendOptions');
   beginSheetReadMemo_();
   try {
     const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
@@ -874,7 +874,7 @@ function buildReviewSentHint_(stage) {
  * @returns {Object} 彈窗要的資料
  */
 function apiGetSendPlanSummary(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSendPlanSummary');
   beginSheetReadMemo_();
   try {
     const state = buildDashboardState_(quarterId);

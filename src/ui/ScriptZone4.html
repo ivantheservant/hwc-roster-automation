@@ -411,7 +411,10 @@
       make('div', { text: name, className: 'act-name' }),
       make('div', { text: desc, className: 'act-desc' })
     ]));
-    box.appendChild(button('開始', onClick, danger ? 'danger' : ''));
+    const b = button('開始', onClick, danger ? 'danger' : '');
+    // 第八十七輪批次 NB 組：只可查看 ⇒ 預設當作改動，只有列明的唯讀工具可以按
+    if (viewOnly_ && VIEW_ONLY_READ_TOOLS.indexOf(name) === -1) markViewOnlyBlocked_(b);
+    box.appendChild(b);
     return box;
   }
 

@@ -146,6 +146,8 @@
    * @returns {Node}
    */
   function settingsSheetLink(label, url, sheetName) {
+    // 第八十七輪批次 NB 組：只可查看的人沒有主試算表的存取權 ⇒ 灰色按鈕
+    if (viewOnly_) return markViewOnlyBlocked_(button(label, () => {}, 'secondary'));
     if (!url) {
       const b = button(label, () => {}, 'secondary');
       b.disabled = true;

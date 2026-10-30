@@ -710,10 +710,17 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.WEBAPP_ALLOWED_EMAILS, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
       defaultValue: '',
-      description: '追加階段 AV：可以使用 Web UI 的電郵白名單（逗號分隔）。留空時只允許'
+      description: '追加階段 AV：可以使用 Web UI 的電郵白名單（逗號分隔）。名單上的人可以修改。留空時只允許'
         + 'SCRIPT_ACCOUNT_EMAIL 那一個人——空白代表「只有預設那一位」，不是「任何人」。'
         + '這是 appsscript.json 部署權限之外的第二道防線，即使部署設定日後被改鬆'
         + '（例如誤設成任何人皆可存取），這一關仍然會擋住不在名單內的人。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.WEBAPP_VIEWER_EMAILS, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
+      defaultValue: '',
+      description: '只可以查看幹事介面的人。名單上的人可以打開所有畫面，但不可以儲存、生成、寄出或改動任何資料。'
+        + '可以修改的人填在 WEBAPP_ALLOWED_EMAILS。',
       editable: 'TRUE'
     },
     // ---- HWCAS（會友系統同步，全部選填——留空只是代表這個同步功能還沒設定）----

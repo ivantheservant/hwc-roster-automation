@@ -361,7 +361,7 @@ function runPreseasonAutoSend_(quarterRow, today, config) {
  * @returns {Object}
  */
 function apiPreseasonPreview(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiPreseasonPreview');
   const id = String(quarterId || '').trim();
   beginSheetReadMemo_();
   try {

@@ -359,7 +359,7 @@ function planEligibilitySheetApply_(quarterId) {
  * @returns {Object} 預覽
  */
 function apiPlanEligibilitySheetApply(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiPlanEligibilitySheetApply');
   beginSheetReadMemo_();
   try {
     return planEligibilitySheetApply_(quarterId);

@@ -100,8 +100,8 @@ console.log('\n=== CB4：三個入口 ===');
   const ui = read('src/ui/Script.html');
   const load = ui.slice(ui.indexOf('async function loadQuarters'), ui.indexOf('async function fillQuarterSelect_'));
   check('★★★★★★ 載入時先叫 apiEnsureFutureQuarters，再讀季度清單',
-    /callServerMutating\('apiEnsureFutureQuarters'\)/.test(load) && /fillQuarterSelect_\(null\)/.test(load));
-  check('★★★★★ 建唔到唔阻住載入（try/catch）', /try \{\s*await callServerMutating\('apiEnsureFutureQuarters'\);\s*\} catch/.test(load));
+    /callServerMutating\('apiEnsureFutureQuarters'\)/.test(load) && /fillQuarterSelect_\(keepQuarterId \|\| null\)/.test(load));  // 第八十七輪 NA 組：網址指定的季度
+  check('★★★★★ 建唔到唔阻住載入（try/catch）', /try \{\s*await callServerMutating\('apiEnsureFutureQuarters'\);\s*\} catch/.test(load) && /if \(!viewOnly_\) \{\s*try \{/.test(load));
   check('★★★★★ 每日自動排程都會做', /ensureLookaheadQuarters_\('dailyAutomationCheck_'\)/.test(read('src/Trigger.gs')));
   const z4 = read('src/ui/ScriptZone4.html');
   check('★★★★★★ 進階與診斷有〔建立未來季度〕', /zone4Row\('建立未來季度'/.test(z4) && /callServerMutating\('apiEnsureFutureQuarters'\)/.test(z4));

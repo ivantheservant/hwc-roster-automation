@@ -237,6 +237,8 @@ function buildSheetTextUpdateDialogHtml_(plan) {
  * @returns {{updated: number, lines: string[]}}
  */
 function apiApplySheetTextUpdate() {
+  // 第八十七輪批次 NB 組：試算表對話框用——只有試算表編輯者可以呼叫
+  assertSpreadsheetEditorCaller_();
   const result = executeSheetTextUpdate_();
   return { updated: result.updated, lines: buildSheetTextUpdateLines_(result.items) };
 }

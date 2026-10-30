@@ -50,7 +50,7 @@ function describeQuarterResetAvailability_(quarterId) {
  *   officialSent: boolean, officialSentWarning: string, lines: string[], nothingToDo: boolean, confirmText: string}}
  */
 function apiQuarterResetPlan(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiQuarterResetPlan');
   const id = String(quarterId || '').trim().toUpperCase();
   const avail = describeQuarterResetAvailability_(id);
   const base = { quarterId: id, quarterLabel: id ? buildQuarterLabel_(id) : '', blocked: avail.blocked,

@@ -103,6 +103,8 @@ gas.buildSeedNote_ = function (r) { return 'seed=' + r.seed; };
 gas.tryPublishPublicRoster_ = function () { return { failed: false, message: '' }; };
 gas.findPublicLinkRow_ = function () { return null; };
 gas.assertWebAppRequestAllowed_ = function () {};
+// 第八十七輪批次 NB 組：試算表側邊欄的 api 會檢查試算表編輯者（權限本身由 round87_nb_api_permission 測）
+gas.assertSpreadsheetEditorCaller_ = function () {};
 // `apiSavePreacherTranslationEntry()` 要嘅兩個 GAS-only 工具。
 gas.nowTimestamp_ = function () { return '2026-08-20 16:48:18'; };
 gas.applyTimestampFormat_ = function () {};

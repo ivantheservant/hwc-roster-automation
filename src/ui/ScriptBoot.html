@@ -58,5 +58,13 @@
   initFontSizePicker();
   initThemeToggle();
   // 第七十七輪批次 EG 組：主畫面畫好之後先由出席系統更新電郵（同一次開介面只做一次；換季度、重新整理唔再做）
-  runAction('載入中', async () => { await loadQuarters(); syncHwcasOnLoad(); });
+  // 第八十七輪批次 NB 組：先取得自己的權限（只可查看 ⇒ 不由出席系統更新電郵）；
+  // NA 組：網址有 view／quarter ⇒ 選定那一季，主畫面載入完成後打開那個畫面
+  let deepLink_ = null;
+  runAction('載入中', async () => {
+    await loadMyPermission_();
+    deepLink_ = parseDeepLink_(await readDeepLinkParams_());
+    await loadQuarters(deepLink_.quarter);
+    if (!viewOnly_) syncHwcasOnLoad();
+  }).then(() => applyDeepLink_(deepLink_));
 </script>

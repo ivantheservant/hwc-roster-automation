@@ -38,7 +38,7 @@
  * @returns {Object} {ok, versions:[{versionNo, label}], message}
  */
 function apiListVersionsForZone4(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListVersionsForZone4');
   const V = COLUMNS.ROSTER_VERSIONS;
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const id = String(quarterId || '').trim();
@@ -147,7 +147,7 @@ function apiVerifyRosterForZone4(quarterId, versionNo) {
  * @returns {Object}
  */
 function apiListPendingBackfillCellsForZone4(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListPendingBackfillCellsForZone4');
   try {
     const id = String(quarterId || '').trim();
     const versionNo = findLatestVersionNo(id);
@@ -248,7 +248,7 @@ function readManualFillSummaryForZone4_(quarterId) {
  * @returns {Object}
  */
 function apiDraftReviewReportForZone4(quarterId, versionNo) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiDraftReviewReportForZone4');
   try {
     const id = String(quarterId || '').trim();
     const no = Number(versionNo);
@@ -378,7 +378,7 @@ function apiGeneratePersonalPdfBatch_locked_(quarterId, versionNo) {
  * @returns {Object}
  */
 function apiMakeupSendStages(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiMakeupSendStages');
   try {
     const id = String(quarterId || '').trim();
     const versionNo = findLatestVersionNo(id);
@@ -414,7 +414,7 @@ function apiMakeupSendStages(quarterId) {
  * @returns {Object}
  */
 function apiMakeupSendPlan(quarterId, stage) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiMakeupSendPlan');
   try {
     const id = String(quarterId || '').trim();
     const versionNo = findLatestVersionNo(id);

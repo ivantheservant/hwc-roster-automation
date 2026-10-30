@@ -1448,6 +1448,8 @@ const CONFIG_KEYS = {
   // SCRIPT_ACCOUNT_EMAIL 那一個人——空白絕不代表「任何人皆可」。
   // 見 WebApp.gs 的 assertApiCallerAuthorized_()。
   WEBAPP_ALLOWED_EMAILS: 'WEBAPP_ALLOWED_EMAILS',
+  // 第八十七輪批次 NB 組：只可以查看幹事介面的人（電郵，逗號分隔；預設空白）。見 WebApp.gs。
+  WEBAPP_VIEWER_EMAILS: 'WEBAPP_VIEWER_EMAILS',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。

@@ -188,7 +188,7 @@ console.log('\n=== E2 結構：AuditLog、只改該欄、Web App 關卡 ===');
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppPeople.gs'), 'utf8');
   checkEqual('★★★★★ 每個 api 函式都有 assertWebAppRequestAllowed_()',
     (src.match(/function api\w+\(/g) || []).length,
-    (src.match(/assertWebAppRequestAllowed_\(\);/g) || []).length);
+    (src.match(/assertWebAppRequestAllowed_\((?:'api\w+')?\);/g) || []).length);  // 第八十七輪 NB 組：唯讀的 api 傳入自己的名字
   ['PERSON_UPDATE', 'PERSON_ADD', 'ALIAS_ADD', 'ALIAS_UPDATE', 'PERSONAL_TOKEN_REISSUE']
     .forEach(function (action) {
       check('★★★★ 有寫 AuditLog：' + action, src.indexOf("action: '" + action + "'") !== -1);

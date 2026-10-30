@@ -623,6 +623,14 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "WEBAPP",
       "note": "上線目標本來就應該係 TRUE（Web UI 要啟用），呢個「程式碼預設值」FALSE 只係初次安裝嘅安全預設，唔係「上線值」——Ivan 已核實現時值 TRUE 正確，維持。"
+    },
+    "WEBAPP_VIEWER_EMAILS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP",
+      "note": "第八十七輪新增：只可以查看幹事介面的人；本文件唔記錄實際電郵名單。"
     }
   },
   "quarters": {

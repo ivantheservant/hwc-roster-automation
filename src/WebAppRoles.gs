@@ -48,7 +48,7 @@ function listRoleChoices_() {
  * @returns {Object} {ok, today, roleChoices, people:[{personId,nameTC,rows:[…]}], posts…}
  */
 function apiListRoles(keyword) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListRoles');
   beginSheetReadMemo_();
   try {
     const R = COLUMNS.ROLES;
@@ -332,7 +332,7 @@ function apiSaveRole(payload) {
  * @returns {Object} {ok, endDate, rows:[…], message}
  */
 function apiRolesTermChangePlan(endDateRaw) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiRolesTermChangePlan');
   const R = COLUMNS.ROLES;
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
 
@@ -492,7 +492,7 @@ function apiRolesTermChangeExecute(endDateRaw, confirmText) {
  * @returns {Object} {ok, rows:[{section,item,value,note}]}
  */
 function apiRoleOverview() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiRoleOverview');
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   try {

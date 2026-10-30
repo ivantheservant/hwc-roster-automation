@@ -287,7 +287,7 @@ console.log('\n=== 結構性要求（靜態檢查正式碼）===');
 {
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppDashboard.gs'), 'utf8');
   check('★★★★★ 第一行有 assertWebAppRequestAllowed_()',
-    /function apiGetDashboardState\(quarterId\) \{\s*\n\s*assertWebAppRequestAllowed_\(\);/.test(src));
+    /function apiGetDashboardState\(quarterId\) \{\s*\n\s*assertWebAppRequestAllowed_\('apiGetDashboardState'\);/.test(src));
   check('★★★★★ 用 readSheet 快取包住，而且有 finally 收尾'
     + '（漏咗 finally 會令之後全部讀取都用緊過時快取）',
     /beginSheetReadMemo_\(\);[\s\S]*?finally \{[\s\S]*?endSheetReadMemo_\(\);/.test(src));

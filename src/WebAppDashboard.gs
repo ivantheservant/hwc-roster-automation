@@ -464,7 +464,7 @@ function computeSaveButton_(s) {
  * @returns {{versionNo: number, save: Object}}
  */
 function apiGetSaveButtonState(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetSaveButtonState');
   const versionNo = findLatestVersionNo(quarterId);
   const versionExists = versionNo >= 0;
   const s = {
@@ -583,7 +583,7 @@ function buildUnsavedBlockHint_(unsaved) {
  * @returns {Object} 見檔頭與規格第二節
  */
 function apiGetDashboardState(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetDashboardState');
 
   // 全程零寫入，所以開 readSheet 快取安全——見 SheetReader.gs 檔頭嘅警告。
   beginSheetReadMemo_();

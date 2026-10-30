@@ -279,7 +279,7 @@ function buildPreQuarterChecklistInputs_(quarterId) {
  * @returns {{undoneItemCount: number, items: Object[], peopleHints: Object[]}}
  */
 function apiGetPreQuarterChecklist(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetPreQuarterChecklist');
 
   const inputs = buildPreQuarterChecklistInputs_(quarterId);
   const checklist = planPreQuarterChecklist_(inputs);

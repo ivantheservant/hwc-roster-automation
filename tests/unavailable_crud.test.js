@@ -190,7 +190,7 @@ console.log('\n=== E1 結構：唔刪行、有 AuditLog、只改該欄 ===');
     !/deleteRow|deleteRows|removeRow/.test(src));
   check('★★★★★ 每個寫入 API 第一行都有 assertWebAppRequestAllowed_()',
     (src.match(/function api\w+\(/g) || []).length
-      === (src.match(/assertWebAppRequestAllowed_\(\);/g) || []).length);
+      === (src.match(/assertWebAppRequestAllowed_\((?:'api\w+')?\);/g) || []).length);  // 第八十七輪 NB 組：唯讀的 api 傳入自己的名字
   check('★★★★★ 寫入之後有寫 AuditLog（新增同更新兩條路都有）',
     /action: 'UNAVAILABLE_ADD'/.test(src) && /action: 'UNAVAILABLE_UPDATE'/.test(src));
   check('★★★★★ 用 writeRowFields_()（只改該欄），**唔係整行覆寫**'

@@ -80,7 +80,7 @@ function listNoAutoAssignPostIds_() {
  * @returns {Object} 見規格 4.4
  */
 function apiGetEligibilityMatrix() {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetEligibilityMatrix');
 
   beginSheetReadMemo_();
   try {
@@ -314,4 +314,62 @@ function apiSaveEligibilityBatch(changes, quarterId) {
   return { ok: true, added: added, removed: removed, skipped: skipped,
     // 第六十七輪批次 AI 組：儲存**之後**先算——要反映改完名單嘅現況
     eligibilityImpact: q ? summariseEligibilityImpact_(q) : null };
+}
+
+/**
+ * 第八十七輪批次 NB 組：只可查看的人按〔開啟名單工作表〕⇒ 不開試算表，改為這個唯讀視窗的資料。
+ * 每個自動排的崗位一段：名字（暫時不做這個崗位的人註明）；「堂委」「執事」寫明今日現任是誰。
+ *
+ * 為甚麼不開試算表：主試算表內有電郵、電話、個人專屬連結 token 等資料，只可查看的人不應該有存取權。
+ * @param {string} quarterId 季度（暫時不做按這一季判斷是否生效）
+ * @returns {{quarterId: string, quarterLabel: string, posts: Object[]}}
+ *   posts＝[{postNameTC, roleTexts: string[], names: string[], excluded: string[]}]
+ */
+function apiGetEligibilityViewOnly(quarterId) {
+  assertWebAppRequestAllowed_('apiGetEligibilityViewOnly');
+  beginSheetReadMemo_();
+  try {
+    const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    return buildEligibilityViewOnly_(String(quarterId || '').trim(), today);
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
+ * 唯讀崗位名單的內容。**只讀。**
+ * @param {string} quarterId 季度 ID
+ * @param {string} todayStr 堂委／執事以這一日的現任為準
+ * @returns {{quarterId: string, quarterLabel: string, posts: Object[]}}
+ */
+function buildEligibilityViewOnly_(quarterId, todayStr) {
+  const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const quarter = quarterId ? findQuarter_(quarterId) : null;
+  const start = quarter ? toDateString(quarter[COLUMNS.QUARTERS.START_DATE], timezone) : '';
+  const end = quarter ? toDateString(quarter[COLUMNS.QUARTERS.END_DATE], timezone) : '';
+  const nameById = readPersonNameIndex_();
+  const eligibility = readEligibility();
+  const roles = readRolesSafe_(timezone);
+  const exclusionsByPost = {};
+  readPersonPostExclusionsSafe_(timezone).forEach(function (e) {
+    if (start && e.effectiveTo && e.effectiveTo < start) return;
+    if (end && e.effectiveFrom && e.effectiveFrom > end) return;
+    (exclusionsByPost[e.postId] = exclusionsByPost[e.postId] || {})[e.personId] = e.reason || '';
+  });
+  const posts = readPostsNormalized().filter(function (p) { return p.autoGenerate; }).map(function (p) {
+    const excluded = exclusionsByPost[p.postId] || {};
+    const ids = ((eligibility.byPost || {})[p.postId] || []).slice();
+    const names = ids.map(function (id) {
+      return (nameById[id] || id) + (Object.prototype.hasOwnProperty.call(excluded, id) ? '（暫時不做這個崗位）' : '');
+    }).sort();
+    const roleTexts = ((eligibility.rolesByPost || {})[p.postId] || []).map(function (code) {
+      return describeEligibilityRoleToken_(code, roles, nameById, todayStr);
+    });
+    const excludedTexts = Object.keys(excluded).map(function (id) {
+      return (nameById[id] || id) + (excluded[id] ? '（原因：' + excluded[id] + '）' : '');
+    }).sort();
+    return { postNameTC: p.postNameTC || p.postId, roleTexts: roleTexts, names: names, excluded: excludedTexts };
+  });
+  return { quarterId: quarterId, quarterLabel: quarterId ? buildQuarterLabel_(quarterId) : '', posts: posts };
 }

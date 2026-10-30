@@ -104,6 +104,8 @@
       b.title = '這個按鈕現在不能按，而系統說不出原因——這是一個程式問題，'
         + '請把這一句連同你剛才做過的事告訴開發者。';
     }
+    // 第八十七輪批次 NB 組：只可查看 ⇒ 原因一律寫「你只有查看權限」（上面的 opts 不可以把它改回可按）
+    if (b.viewOnlyBlocked_) markViewOnlyBlocked_(b);
     return b;
   }
 
@@ -521,7 +523,22 @@
     const suggestion = (flow && flow.suggestion) || {};
 
     let openNode;
-    if (sheetUrl) {
+    // 第八十七輪批次 NB 組：只可查看的人沒有主試算表的存取權 ⇒ 開公開職事表（唯讀連結）
+    const publicLink = (flow && flow.permanentLink) || {};
+    if (viewOnly_ && publicLink.hasLink && publicLink.url) {
+      const open = make('a', { text: '查看／修改職事表', className: 'bigLink', title: '只可查看：打開公開職事表' });
+      open.href = publicLink.url;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.style.fontSize = 'var(--fs-lg)';
+      open.style.padding = '12px 22px';
+      openNode = open;
+    } else if (viewOnly_) {
+      openNode = make('div', {}, [
+        stepButton('查看／修改職事表', () => {}, { disabled: true, title: '這一季還沒有公開職事表' }),
+        make('div', { text: '這一季還沒有公開職事表', className: 'step-why' })
+      ]);
+    } else if (sheetUrl) {
       const open = make('a', { text: '查看／修改職事表', className: 'bigLink' });
       open.href = sheetUrl;
       open.target = '_blank';
@@ -829,6 +846,8 @@
   }
 
   function openEligibilitySheet() {
+    // 第八十七輪批次 NB 組：只可查看 ⇒ 不開試算表，改為唯讀視窗
+    if (viewOnly_) { openEligibilityViewOnly(); return; }
     runAction('開啟名單工作表', async () => {
       const r = await callServerMutating('apiOpenEligibilitySheet');
       const link = make('a', { text: '開啟「' + r.sheetName + '」', className: 'bigLink' });
@@ -843,6 +862,30 @@
         para('改完之後，回來按「儲存並套用名單」。在你按之前，'
           + '真正的名單一格都不會變。', 'muted')
       ], [button('知道了', () => closeModal(), '')]);
+    });
+  }
+
+  /**
+   * 第八十七輪批次 NB 組：「崗位名單（只可查看）」——每個崗位一段，列出名字；
+   * 「堂委」「執事」寫明現任是誰；暫時不做這個崗位的人註明。
+   */
+  function openEligibilityViewOnly() {
+    runAction('讀取崗位名單', async () => {
+      const r = await callServer('apiGetEligibilityViewOnly', currentQuarterId);
+      const nodes = [para('你只有查看權限。要改名單，請找可以修改的同工。', 'muted')];
+      (r.posts || []).forEach((p) => {
+        const box = make('div', { className: 'sec' }, [sectionTitle(p.postNameTC)]);
+        (p.roleTexts || []).forEach((t) => box.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
+        box.appendChild(make('div', {
+          text: (p.names || []).length ? (p.names || []).join('、') : '（名單上沒有人）',
+          className: 'vio-row'
+        }));
+        if ((p.excluded || []).length) {
+          box.appendChild(make('div', { text: '暫時不做這個崗位：' + p.excluded.join('、'), className: 'muted' }));
+        }
+        nodes.push(box);
+      });
+      openModal('崗位名單（只可查看）', nodes, [button('關閉', () => closeModal(), '')]);
     });
   }
 

@@ -110,7 +110,7 @@ function ensureServiceDatesCombinedColumns_(sheet) {
  * @returns {{quarterId: string, quarterLabel: string, kinds: Object[], weeks: Object[], note: string}}
  */
 function apiGetCombinedServices(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiGetCombinedServices');
   const id = String(quarterId || '').trim();
   const timezone = getConfig(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   beginSheetReadMemo_();

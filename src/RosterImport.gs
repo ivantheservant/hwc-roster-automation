@@ -381,7 +381,7 @@ function stripImportPlanForClient_(plan) {
  * @returns {Object}
  */
 function apiCheckImportSheet(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiCheckImportSheet');
   beginSheetReadMemo_();
   try {
     return stripImportPlanForClient_(buildImportPlan_(quarterId));

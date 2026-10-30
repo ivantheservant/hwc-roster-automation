@@ -34,7 +34,7 @@
  * @returns {Object}
  */
 function apiListExclusions(keyword) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiListExclusions');
   beginSheetReadMemo_();
   try {
     const X = COLUMNS.PERSON_POST_EXCLUSIONS;

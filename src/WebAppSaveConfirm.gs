@@ -40,7 +40,7 @@ const SAVE_CONFIRM_RELEASE_TEXT = '確認';
  * @returns {Object} 見規格 2.4；`blocked=true` 時只有 `blockReason` 同 `unresolved` 有意義
  */
 function apiSaveAndConfirmPlan(quarterId) {
-  assertWebAppRequestAllowed_();
+  assertWebAppRequestAllowed_('apiSaveAndConfirmPlan');
   return buildSaveAndConfirmPlan_(quarterId);
 }
 
