@@ -852,6 +852,8 @@ function writeAssignments_(quarterId, versionNo, assignments) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.ROSTER_ASSIGNMENTS);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.ROSTER_ASSIGNMENTS);
   if (assignments.length === 0) return 0;
+  // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：派工每一次寫入（生成、儲存、調整、匯入、重發前套用申報）都清除該季快取
+  clearDashboardCountsCache_(quarterId);
 
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
   const now = nowTimestamp_();

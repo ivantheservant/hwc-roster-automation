@@ -281,6 +281,7 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions, p
   // ⚠️ 第九十一輪批次 RD 組：寄出前公開連結一定要是最新（見 sendStage_()）；呼叫端已經做過就不重做。
   if (publicLinkEnsured !== true) ensurePublicLinkFreshBeforeSend_(quarterId);
   assertNotPreviewMode_('sendResendStage_');
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫 SendLog 時再清一次）
   const startedAt = Date.now();
   const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
 

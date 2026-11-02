@@ -658,6 +658,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "WEBAPP"
     },
+    "WEBAPP_DEFAULT_QUARTER": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP"
+    },
     "WEBAPP_ENABLED": {
       "source": "已核實的實際值",
       "currentValue": "TRUE",

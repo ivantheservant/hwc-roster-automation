@@ -773,6 +773,13 @@ function getConfigKeySeeds_() {
         + '沒有這一行時照 TRUE 處理。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.WEBAPP_DEFAULT_QUARTER, type: CONFIG_TYPES.STR, group: 'WEBAPP',
+      defaultValue: '',
+      description: '幹事介面打開時預設顯示的季度（例如 2027T1）。留空（或者填的季度不存在）＝開始日在今日之後、最早的一季（下一季）；'
+        + '沒有就顯示包含今日的那一季；再沒有就顯示選單第一個。網址有 quarter 時照網址。',
+      editable: 'TRUE'
+    },
     // ---- HWCAS（會友系統同步，全部選填——留空只是代表這個同步功能還沒設定）----
     {
       key: CONFIG_KEYS.HWCAS_SPREADSHEET_ID, type: CONFIG_TYPES.STR, group: 'HWCAS',

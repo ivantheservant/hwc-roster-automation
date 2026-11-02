@@ -11196,6 +11196,278 @@ const MUTATIONS = [
     find: "填了就代表那一日（或所選的崗位）整日不能服侍。',",
     replace: "填了就代表整日不能服侍。',",
     tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "wa-no-cache-use",
+    why: "快取永遠不用（每次重算）",
+    file: "src/WebAppDashboard.gs",
+    find: "        if (parsed && parsed.signature === signature && parsed.official && parsed.resend) {",
+    replace: "        if (false) {",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-ignore-signature",
+    why: "簽名不同也用舊快取",
+    file: "src/WebAppDashboard.gs",
+    find: "        if (parsed && parsed.signature === signature && parsed.official && parsed.resend) {",
+    replace: "        if (parsed && parsed.official && parsed.resend) {",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-cache-failed-result",
+    why: "算不到（回 0）也寫入快取",
+    file: "src/WebAppDashboard.gs",
+    find: "  if (cache && computedOk) {",
+    replace: "  if (cache) {",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-ttl-wrong",
+    why: "快取有效期不是 6 小時",
+    file: "src/SheetReader.gs",
+    find: "const DASHBOARD_COUNTS_CACHE_SECONDS = 21600;",
+    replace: "const DASHBOARD_COUNTS_CACHE_SECONDS = 60;",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-no-version",
+    why: "簽名不包括版本號及建立時間",
+    file: "src/WebAppDashboard.gs",
+    find: "      'v' + versionNo, versionRow ? String(versionRow[V.CREATED_AT]) : '', stage,",
+    replace: "      '', '', stage,",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-no-stage",
+    why: "簽名不包括季度階段",
+    file: "src/WebAppDashboard.gs",
+    find: "      'v' + versionNo, versionRow ? String(versionRow[V.CREATED_AT]) : '', stage,",
+    replace: "      'v' + versionNo, versionRow ? String(versionRow[V.CREATED_AT]) : '', '',",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-no-sendlog",
+    why: "簽名不包括 SendLog",
+    file: "src/WebAppDashboard.gs",
+    find: "      'send' + sendRows.length, last ? String(last[0]) + '@' + String(last[7]) : '', hashDashboardSignatureText_(JSON.stringify(sendRows)),",
+    replace: "      '', '', '',",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-no-assign",
+    why: "簽名不包括派工",
+    file: "src/WebAppDashboard.gs",
+    find: "      'ra' + assignmentRows.length, hashDashboardSignatureText_(JSON.stringify(assignmentRows)),",
+    replace: "      '', '',",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-no-email",
+    why: "簽名不包括電郵",
+    file: "src/WebAppDashboard.gs",
+    find: "      'nm' + emailFlags.length, hashDashboardSignatureText_(emailFlags.join(',')),",
+    replace: "      '', '',",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-no-decisions",
+    why: "簽名不包括 CellDecisions",
+    file: "src/WebAppDashboard.gs",
+    find: "      'cd' + decisions.length, hashDashboardSignatureText_(JSON.stringify(decisions))",
+    replace: "      '', ''",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sig-outside-memo",
+    why: "讀表記憶範圍外也用快取",
+    file: "src/WebAppDashboard.gs",
+    find: "  if (!SHEET_READ_MEMO_ || !Array.isArray(sendRows)) return '';",
+    replace: "  if (!Array.isArray(sendRows)) return '';",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-clear-noop",
+    why: "清除快取甚麼都不做",
+    file: "src/SheetReader.gs",
+    find: "  const id = String(quarterId || '').trim();\n  if (!id) return;\n  try {\n    CacheService.getScriptCache().remove(DASHBOARD_COUNTS_CACHE_PREFIX + id);",
+    replace: "  return;\n  try {\n    CacheService.getScriptCache().remove(DASHBOARD_COUNTS_CACHE_PREFIX + quarterId);",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-send-no-clear",
+    why: "寄出（sendStage_）不清快取",
+    file: "src/Mailer.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫 SendLog 時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sendlog-no-clear",
+    why: "寫 SendLog 不清快取",
+    file: "src/Mailer.gs",
+    find: "  // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：SendLog 每一次寫入（寄出、補寄、重發、匯入時的外部寄出基準）之後都清除該季快取\n  clearDashboardCountsCache_(context && context.quarterId);\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-resend-no-clear",
+    why: "改動後重發不清快取",
+    file: "src/ResendFlow.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫 SendLog 時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-makeup-no-clear",
+    why: "補寄不清快取",
+    file: "src/MakeupSend.gs",
+    find: "  clearDashboardCountsCache_(plan && plan.quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫 SendLog 時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-ext-no-clear",
+    why: "標記外部寄出不清快取",
+    file: "src/RosterImport.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：標記外部寄出（寫 SendLog 時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-import-no-clear",
+    why: "匯入不清快取",
+    file: "src/RosterImport.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫入時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-save-no-clear",
+    why: "儲存不清快取",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫入派工時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-gen-no-clear",
+    why: "生成不清快取",
+    file: "src/MultiRun.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫入派工時再清一次）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-assign-no-clear",
+    why: "寫派工不清快取",
+    file: "src/RosterWriter.gs",
+    find: "  // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：派工每一次寫入（生成、儲存、調整、匯入、重發前套用申報）都清除該季快取\n  clearDashboardCountsCache_(quarterId);\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-reset-no-clear",
+    why: "整季重設不清快取",
+    file: "src/QuarterReset.gs",
+    find: "  clearDashboardCountsCache_(plan && plan.quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：刪完之後清除\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-preacher-no-clear",
+    why: "填講員翻譯不清快取",
+    file: "src/PreacherTranslationFill.gs",
+    find: "  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：可能改派工（狀態卡「第 3、4 步人數」快取）\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-orphan-no-clear",
+    why: "清孤兒版本不清快取",
+    file: "src/OrphanVersions.gs",
+    find: "  fresh.forEach(function (o) { clearDashboardCountsCache_(o.quarterId); });\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wa-sendlogdel-no-clear",
+    why: "刪寄出紀錄不清快取",
+    file: "src/SendLogMaintenance.gs",
+    find: "    if (extractSendLogBatchPrefix_(r[C.SEND_ID]) === prefix) clearDashboardCountsCache_(r[C.QUARTER_ID]);\n",
+    replace: "",
+    tests: ["tests/round96_wa_counts_cache.test.js"]
+  },
+  {
+    id: "wb-stage-direct-read",
+    why: "狀態卡載入時階段仍然直接讀 Quarters",
+    file: "src/QuarterStage.gs",
+    find: "  if (typeof SHEET_READ_MEMO_ !== 'undefined' && SHEET_READ_MEMO_) {\n    const row = readSheet_(SHEETS.QUARTERS)",
+    replace: "  if (false) {\n    const row = readSheet_(SHEETS.QUARTERS)",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wb-stage-no-fallback",
+    why: "記憶內找不到季度不拋錯",
+    file: "src/QuarterStage.gs",
+    find: "    if (row) return row;\n",
+    replace: "    return row || {};\n",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-ignore-config",
+    why: "不理 Config WEBAPP_DEFAULT_QUARTER",
+    file: "src/WebApp.gs",
+    find: "  if (configured && list.some(function (q) { return q.quarterId === configured; })) return configured;\n",
+    replace: "",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-config-not-checked",
+    why: "Config 的季度不存在也照用",
+    file: "src/WebApp.gs",
+    find: "  if (configured && list.some(function (q) { return q.quarterId === configured; })) return configured;",
+    replace: "  if (configured) return configured;",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-next-includes-today",
+    why: "開始日＝今日也當下一季",
+    file: "src/WebApp.gs",
+    find: "  const next = list.filter(function (q) { return q.startDate && q.startDate > todayStr; })",
+    replace: "  const next = list.filter(function (q) { return q.startDate && q.startDate >= todayStr; })",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-no-current-fallback",
+    why: "沒有下一季時不選包含今日的一季",
+    file: "src/WebApp.gs",
+    find: "  if (current) return current.quarterId;\n",
+    replace: "",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-not-flagged",
+    why: "季度清單沒有標預設",
+    file: "src/WebApp.gs",
+    find: "  quarters.forEach(function (q) { if (q.quarterId === defaultId) q.isDefault = true; });\n",
+    replace: "",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-front-first",
+    why: "前端仍然選第一個",
+    file: "src/ui/Script.html",
+    find: "    const fallback = (quarters.filter((q) => q.isDefault)[0] || {}).quarterId || null;",
+    replace: "    const fallback = null;",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "wc-deeplink-ignored",
+    why: "深連結季度不優先",
+    file: "src/ui/Script.html",
+    find: "    renderQuarterOptions_(quarters, keepQuarterId && quarters.some((q) => q.quarterId === keepQuarterId) ? keepQuarterId : fallback);",
+    replace: "    renderQuarterOptions_(quarters, fallback);",
+    tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
   }
 ];
 

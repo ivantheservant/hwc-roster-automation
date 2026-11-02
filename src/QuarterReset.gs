@@ -572,6 +572,7 @@ function executeQuarterReset_(plan) {
     }
   }
 
+  clearDashboardCountsCache_(plan && plan.quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：刪完之後清除
   return result;
 }
 

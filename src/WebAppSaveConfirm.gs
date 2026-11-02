@@ -652,6 +652,7 @@ function apiSaveAndConfirmExecute(quarterId, payload) {
 }
 
 function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫入派工時再清一次）
   const input = payload || {};
   // 第八十三輪批次 JG 組：各階段計時（log ＋ 回傳 `timings`，前端寫入 console）
   const timer = startPhaseTimer_();

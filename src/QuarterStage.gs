@@ -42,10 +42,29 @@ function findQuarterRowInfo_(quarterId) {
  * @returns {string} QUARTER_STAGE 其中一個值
  */
 function getQuarterStage_(quarterId) {
+  const values = readQuarterValuesForStage_(quarterId);
+  const stage = String(values[COLUMNS.QUARTERS.STAGE] || '').trim().toUpperCase();
+  return QUARTER_STAGE_ORDER.indexOf(stage) !== -1 ? stage : QUARTER_STAGE.DRAFT;
+}
+
+/**
+ * 第九十六輪批次 WB 組：讀這一季在 Quarters 的那一行（只讀階段用）。
+ * 在純讀取的 `beginSheetReadMemo_()` 範圍內（例如狀態卡載入：狀態卡本身、寄信 context 的
+ * {CurrentStage}／{NextAction} 都會問階段，`findQuarter_()` 亦已經讀過 Quarters）用同一次 `readSheet_()`，
+ * 不再另外直接讀表；找不到（或者範圍外）照舊用 `findQuarterRowInfo_()`，錯誤訊息和以前一樣。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object} 那一行的值（欄名 → 值）
+ */
+function readQuarterValuesForStage_(quarterId) {
+  if (typeof SHEET_READ_MEMO_ !== 'undefined' && SHEET_READ_MEMO_) {
+    const row = readSheet_(SHEETS.QUARTERS).filter(function (r) {
+      return r[COLUMNS.QUARTERS.QUARTER_ID] === quarterId;
+    })[0];
+    if (row) return row;
+  }
   const info = findQuarterRowInfo_(quarterId);
   if (!info) throw new Error('Quarters 找不到季度: ' + quarterId);
-  const stage = String(info.values[COLUMNS.QUARTERS.STAGE] || '').trim().toUpperCase();
-  return QUARTER_STAGE_ORDER.indexOf(stage) !== -1 ? stage : QUARTER_STAGE.DRAFT;
+  return info.values;
 }
 
 /**

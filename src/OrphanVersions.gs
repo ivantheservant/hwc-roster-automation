@@ -145,6 +145,8 @@ function executeOrphanVersionCleanup_(plan) {
     const key = registeredVersionKey_(record[A.QUARTER_ID], record[A.VERSION_NO]);
     return targets[key] === true && registered[key] !== true;
   }, errors);
+  // 第九十六輪批次 WA 組：刪了哪幾季的派工，就清除那幾季狀態卡「第 3、4 步人數」的快取
+  fresh.forEach(function (o) { clearDashboardCountsCache_(o.quarterId); });
 
   const deletedSheets = [];
   const ss = SpreadsheetApp.getActiveSpreadsheet();

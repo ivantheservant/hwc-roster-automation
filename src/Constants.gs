@@ -1499,6 +1499,8 @@ const CONFIG_KEYS = {
   WEBAPP_VIEWER_EMAILS: 'WEBAPP_VIEWER_EMAILS',
   // 第九十三輪批次 TF 組：幹事介面頁底顯示載入時間（預設 TRUE；程式預設值，不用寫入工作表也生效）
   WEBAPP_SHOW_LOAD_TIMINGS: 'WEBAPP_SHOW_LOAD_TIMINGS',
+  // 第九十六輪批次 WC 組：幹事介面打開時（網址沒有 quarter）預設顯示的季度（預設空白＝下一季；程式預設值，不用寫入工作表）
+  WEBAPP_DEFAULT_QUARTER: 'WEBAPP_DEFAULT_QUARTER',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。

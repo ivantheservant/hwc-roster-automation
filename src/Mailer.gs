@@ -96,6 +96,7 @@ function resolveStageTemplates_(stage) {
  */
 function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured) {
   assertNotPreviewMode_('sendStage_');
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫 SendLog 時再清一次）
   // 追加階段 N：OFFICIAL 永遠不可以由自動排程觸發，結構性防護見 Trigger.gs 的
   // assertOfficialNotFromAutomationTrigger_()——目前 dailyAutomationCheck_() 根本
   // 沒有任何路徑會走到這裡，這一行是防日後不小心改壞的第二道防線。
@@ -1504,6 +1505,8 @@ function writeSendLogRows_(outcomes, context) {
   const targetRow = sheet.getLastRow() + 1;
   sheet.getRange(targetRow, 1, rows.length, headers.length).setValues(rows);
   applyTimestampFormat_(sheet, headers, [C.SENT_AT], targetRow, rows.length);
+  // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：SendLog 每一次寫入（寄出、補寄、重發、匯入時的外部寄出基準）之後都清除該季快取
+  clearDashboardCountsCache_(context && context.quarterId);
   return rows.length;
 }
 

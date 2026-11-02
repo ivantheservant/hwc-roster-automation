@@ -117,6 +117,10 @@ function deleteSendLogBatch_(prefix) {
   const targetRows = data.rows
     .filter(function (r) { return extractSendLogBatchPrefix_(r[C.SEND_ID]) === prefix; })
     .map(function (r) { return r.sheetRow; });
+  // 第九十六輪批次 WA 組：刪了哪幾季的寄出紀錄，就清除那幾季狀態卡「第 3、4 步人數」的快取
+  data.rows.forEach(function (r) {
+    if (extractSendLogBatchPrefix_(r[C.SEND_ID]) === prefix) clearDashboardCountsCache_(r[C.QUARTER_ID]);
+  });
 
   // ⚠️ 第六十五輪批次 AA 組：一段一段刪（同一批次嘅列多數連續）——
   // 唔假設連續，`deleteSheetRowsInRuns_()` 會自己分段、由下往上

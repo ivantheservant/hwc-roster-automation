@@ -40,6 +40,29 @@ function endSheetReadMemo_() {
 }
 
 /**
+ * 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」（正式發出的人數、沒有電郵的人數、改動後重發的人數）的快取。
+ * 鍵＝季度；值裏面存簽名（見 `WebAppDashboard.gs` 的 `buildDashboardCountsSignature_()`），簽名不同就當沒有快取。
+ * 有效期 6 小時。任何寄出、儲存、生成、匯入、重設之後主動清除（`clearDashboardCountsCache_()`），不只靠簽名。
+ */
+const DASHBOARD_COUNTS_CACHE_PREFIX = 'dash_counts_v1_';
+const DASHBOARD_COUNTS_CACHE_SECONDS = 21600;
+
+/**
+ * 清除某一季「第 3、4 步人數」的快取。清除失敗（例如沒有 CacheService）只會令下一次照舊計算，不拋錯。
+ * @param {string} quarterId 季度 ID
+ * @returns {void}
+ */
+function clearDashboardCountsCache_(quarterId) {
+  const id = String(quarterId || '').trim();
+  if (!id) return;
+  try {
+    CacheService.getScriptCache().remove(DASHBOARD_COUNTS_CACHE_PREFIX + id);
+  } catch (err) {
+    // 清不到：簽名仍然會令舊值失效
+  }
+}
+
+/**
  * 第九十五輪批次 VA 組：狀態卡一次載入之內的記憶——fine-tune context（按「季度｜版本號」）及
  * 職事表工作表（`Roster_…`）的 `getRange` 讀取。
  *

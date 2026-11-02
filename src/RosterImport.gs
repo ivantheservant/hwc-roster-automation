@@ -405,6 +405,7 @@ function apiImportRosterExecute(quarterId, payload) {
 }
 
 function apiImportRosterExecute_locked_(quarterId, input) {
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫入時再清一次）
   const plan = buildImportPlan_(quarterId);
   const q = plan.quarterId;
   if (plan.blocked) {
@@ -496,6 +497,7 @@ function apiImportRosterExecute_locked_(quarterId, input) {
  * @returns {number} 寫了幾多行
  */
 function writeExternalSendBaseline_(quarterId, versionNo, assignments) {
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取：標記外部寄出（寫 SendLog 時再清一次）
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const byPerson = groupAssignmentsByPerson_(assignments);
   const peopleById = indexPeopleById_();

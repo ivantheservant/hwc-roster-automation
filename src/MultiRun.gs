@@ -350,6 +350,7 @@ function compareMultiRun_(quarterId, attempts) {
  *   attemptsRun、attemptsPlanned、stoppedByTime、attemptIndex、seed、deviation、protected
  */
 function performRosterGeneration_(quarterId) {
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫入派工時再清一次）
   const genResult = generateBest_(quarterId);
   const previousVersionNo = findLatestVersionNo_(quarterId);
   const versionNo = previousVersionNo + 1;

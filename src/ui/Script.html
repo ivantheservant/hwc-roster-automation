@@ -2414,7 +2414,9 @@
       return;
     }
 
-    renderQuarterOptions_(quarters, keepQuarterId);
+    // 第九十六輪批次 WC 組：沒有指定季度（網址沒有 quarter）⇒ 伺服器標了 isDefault 的那一季（下一季等，見 pickDefaultQuarterId_）
+    const fallback = (quarters.filter((q) => q.isDefault)[0] || {}).quarterId || null;
+    renderQuarterOptions_(quarters, keepQuarterId && quarters.some((q) => q.quarterId === keepQuarterId) ? keepQuarterId : fallback);
     currentQuarterId = el('quarter').value;
     await loadDashboard();
   }

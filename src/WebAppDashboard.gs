@@ -266,9 +266,13 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
   let latestSortKey = null;
   // 第七十輪批次 AU 組：上一批審閱本實際寄給咗幾多位（同一次讀入面順手收集）
   const reviewRows = [];
+  // 第九十六輪批次 WA 組：「第 3、4 步人數」快取的簽名用（同一次讀入面順手收集，不另讀 SendLog）
+  const signatureRows = [];
 
   readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
     if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
+    signatureRows.push([row[C.SEND_ID], row[C.VERSION_NO], row[C.STAGE], row[C.RECIPIENT_TYPE], row[C.PERSON_ID],
+      row[C.ASSIGNMENT_HASH], row[C.STATUS], row[C.SENT_AT]]);
     const stage = String(row[C.STAGE] || '').trim();
     if (stage === MAIL_STAGES.OFFICIAL) hasOfficialRecord = true;
     if (stage === MAIL_STAGES.OFFICIAL || stage === MAIL_STAGES.RESEND
@@ -300,7 +304,8 @@ function readSendLogSummaryForDashboard_(quarterId, timezone) {
     hasOfficialRecord: hasOfficialRecord,
     officialSentOnce: officialSentOnce,
     unsavedRelease: parseUnsavedReleaseNote_(latestOptions),
-    lastReviewBatch: findLastReviewBatch_(reviewRows, quarterId, tz)
+    lastReviewBatch: findLastReviewBatch_(reviewRows, quarterId, tz),
+    signatureRows: signatureRows
   };
 }
 
@@ -675,10 +680,10 @@ function buildDashboardState_(quarterId) {
   timer.mark('寄出紀錄及公開連結');
 
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
-  const officialCounts = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);
-  const resendBreakdown = stage === QUARTER_STAGE.OFFICIAL_SENT
-    ? countDashboardResendBreakdown_(quarterId)
-    : { total: 0, arrangementChanged: 0, notReceived: 0 };
+  // 第九十六輪批次 WA 組：按簽名快取（命中與否只影響速度，結果和照舊計算一樣）
+  const dashboardCounts = readDashboardCountsCached_(quarterId, versionNo, versionExists, stage, sendLog.signatureRows);
+  const officialCounts = dashboardCounts.official;
+  const resendBreakdown = dashboardCounts.resend;
   const changedPersonCount = resendBreakdown.total;
 
   timer.mark('第 3、4 步人數');
@@ -805,7 +810,9 @@ function buildDashboardState_(quarterId) {
       fineTuneContextCount: FINE_TUNE_CONTEXT_STATS_.count,
       fineTuneContextMs: FINE_TUNE_CONTEXT_STATS_.ms,
       // 第九十五輪批次 VA 組：用同一次載入記憶的次數（沒有再建）
-      fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_.reused
+      fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_.reused,
+      // 第九十六輪批次 WA 組：「第 3、4 步人數」快取 HIT／MISS／OFF（OFF＝沒有用快取，照舊計算）
+      countsCache: dashboardCounts.cache
     }
   };
 }
@@ -1095,25 +1102,35 @@ function logDashboardUnsavedDiag_(quarterId, versionNo, state, startedAtMs, skip
 function countDashboardOfficialTargets_(quarterId, versionNo, versionExists) {
   if (!versionExists) return { total: 0, noEmail: 0 };
   try {
-    const A = COLUMNS.ROSTER_ASSIGNMENTS;
-    const peopleById = indexPeopleById_();
-    const seen = {};
-    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
-      if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
-      if (Number(row[A.VERSION_NO]) !== versionNo) return;
-      const personId = String(row[A.PERSON_ID] || '').trim();
-      if (personId) seen[personId] = true;
-    });
-    const ids = Object.keys(seen);
-    const noEmail = ids.filter(function (id) {
-      const p = peopleById[id];
-      return !p || !String(p.email || '').trim();
-    }).length;
-    return { total: ids.length, noEmail: noEmail };
+    return countDashboardOfficialTargetsUnsafe_(quarterId, versionNo);
   } catch (err) {
     log_('WARN', 'countDashboardOfficialTargets_ 失敗：' + err.message);
     return { total: 0, noEmail: 0 };
   }
+}
+
+/**
+ * `countDashboardOfficialTargets_()` 的本體（第九十六輪批次 WA 組分開一層：出錯會拋，快取才分得出「算不到」）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @returns {{total: number, noEmail: number}}
+ */
+function countDashboardOfficialTargetsUnsafe_(quarterId, versionNo) {
+  const A = COLUMNS.ROSTER_ASSIGNMENTS;
+  const peopleById = indexPeopleById_();
+  const seen = {};
+  readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+    if (String(row[A.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (Number(row[A.VERSION_NO]) !== versionNo) return;
+    const personId = String(row[A.PERSON_ID] || '').trim();
+    if (personId) seen[personId] = true;
+  });
+  const ids = Object.keys(seen);
+  const noEmail = ids.filter(function (id) {
+    const p = peopleById[id];
+    return !p || !String(p.email || '').trim();
+  }).length;
+  return { total: ids.length, noEmail: noEmail };
 }
 
 /**
@@ -1153,16 +1170,160 @@ function countDashboardResendBreakdown_(quarterId) {
   // 第六十三輪批次 R 組：除咗總數，仲要分「安排有改動」同「上次冇收到」。
   // 掣亮唔亮仍然睇總數（上次冇收到嘅人一樣可以喺重發揀）；文字只講前者。
   try {
-    const plan = planResendChangedPersons_(quarterId);
-    return {
-      total: plan.changed.length,
-      arrangementChanged: plan.arrangementChangedCount,
-      notReceived: plan.notReceivedCount
-    };
+    return countDashboardResendBreakdownUnsafe_(quarterId);
   } catch (err) {
     log_('WARN', 'countDashboardResendBreakdown_ 失敗：' + err.message);
     return { total: 0, arrangementChanged: 0, notReceived: 0 };
   }
+}
+
+/**
+ * `countDashboardResendBreakdown_()` 的本體（會拋錯）。
+ * @param {string} quarterId 季度 ID
+ * @returns {{total: number, arrangementChanged: number, notReceived: number}}
+ */
+function countDashboardResendBreakdownUnsafe_(quarterId) {
+  const plan = planResendChangedPersons_(quarterId);
+  return {
+    total: plan.changed.length,
+    arrangementChanged: plan.arrangementChangedCount,
+    notReceived: plan.notReceivedCount
+  };
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第九十六輪批次 WA 組：「第 3、4 步人數」按簽名快取
+ * ═════════════════════════════════════════════════════════════════════
+ *
+ * 已正式發出的季度，這兩個數要建寄信 context 並逐人比較 hash（約 16–18 秒）。結果只取決於：
+ *   ・最新版本號及其建立時間、季度階段
+ *   ・SendLog 這一季的行（行數、最後一行的 SendID／SentAt，及每一行的版本、階段、PersonID、Hash、Status、SentAt）
+ *   ・RosterAssignments 這一季的行（全部版本：最新一版決定人數，重發基準版本決定「新加入」）
+ *   ・NameMapping 每個人有沒有電郵（「沒有電郵」人數；上次因沒有電郵略過、現在補上的人）
+ *   ・CellDecisions 這一季的行（題目要求；現時不影響這兩個數，只會令快取多失效）
+ * 這幾張表在狀態卡載入時本來就已經讀過（`beginSheetReadMemo_()` 範圍內），所以算簽名不用再讀表；
+ * 不在那個範圍內（例如其他流程直接叫）⇒ 不用快取，照舊計算。
+ */
+
+/**
+ * 字串雜湊（djb2），只用來比較，不作保密用途。
+ * @param {string} text
+ * @returns {string}
+ */
+function hashDashboardSignatureText_(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return text.length + '-' + h.toString(16);
+}
+
+/**
+ * 「第 3、4 步人數」的簽名。讀不到（或者不在狀態卡載入的讀表記憶範圍內）⇒ 空字串（不用快取）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 最新版本號
+ * @param {string} stage 季度階段
+ * @param {?Array[]} sendRows `readSendLogSummaryForDashboard_()` 同一次讀 SendLog 收集的這一季的行；沒有 ⇒ 不用快取
+ * @returns {string}
+ */
+function buildDashboardCountsSignature_(quarterId, versionNo, stage, sendRows) {
+  if (!SHEET_READ_MEMO_ || !Array.isArray(sendRows)) return '';
+  try {
+    const V = COLUMNS.ROSTER_VERSIONS;
+    const A = COLUMNS.ROSTER_ASSIGNMENTS;
+    const D = COLUMNS.CELL_DECISIONS;
+    const q = String(quarterId || '').trim();
+    const versionRow = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+      return String(r[V.QUARTER_ID] || '').trim() === q && Number(r[V.VERSION_NO]) === versionNo;
+    })[0];
+    const last = sendRows.length > 0 ? sendRows[sendRows.length - 1] : null;
+    const assignmentRows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (r) {
+      return String(r[A.QUARTER_ID] || '').trim() === q;
+    }).map(function (r) {
+      return [r[A.VERSION_NO], r[A.SERVICE_DATE], r[A.POST_ID], r[A.SLOT_INDEX], r[A.PERSON_ID]];
+    });
+    const people = indexPeopleById_();
+    const emailFlags = Object.keys(people).sort().map(function (id) { return id + (people[id].email ? '+' : '-'); });
+    let decisions = [];
+    try {
+      decisions = readSheet_(SHEETS.CELL_DECISIONS).filter(function (r) { return String(r[D.QUARTER_ID] || '').trim() === q; });
+    } catch (err) {
+      decisions = ['（沒有 CellDecisions）'];
+    }
+    return [
+      'v' + versionNo, versionRow ? String(versionRow[V.CREATED_AT]) : '', stage,
+      'send' + sendRows.length, last ? String(last[0]) + '@' + String(last[7]) : '', hashDashboardSignatureText_(JSON.stringify(sendRows)),
+      'ra' + assignmentRows.length, hashDashboardSignatureText_(JSON.stringify(assignmentRows)),
+      'nm' + emailFlags.length, hashDashboardSignatureText_(emailFlags.join(',')),
+      'cd' + decisions.length, hashDashboardSignatureText_(JSON.stringify(decisions))
+    ].join('|');
+  } catch (err) {
+    log_('WARN', 'buildDashboardCountsSignature_ 算不到簽名（照舊計算）：' + err.message);
+    return '';
+  }
+}
+
+/**
+ * 「第 3、4 步人數」：先看快取（簽名相同才用），否則照舊計算；算得到才寫入快取。
+ * 快取讀寫失敗 ⇒ 照舊計算，不拋錯。算不到（出錯）⇒ 和以前一樣回 0 並寫 WARN，**不寫入快取**。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 最新版本號
+ * @param {boolean} versionExists 有沒有版本
+ * @param {string} stage 季度階段
+ * @param {?Array[]} sendRows 見 `buildDashboardCountsSignature_()`
+ * @returns {{official: {total: number, noEmail: number},
+ *   resend: {total: number, arrangementChanged: number, notReceived: number}, cache: string}}
+ */
+function readDashboardCountsCached_(quarterId, versionNo, versionExists, stage, sendRows) {
+  const zeroResend = { total: 0, arrangementChanged: 0, notReceived: 0 };
+  const wantResend = stage === QUARTER_STAGE.OFFICIAL_SENT;
+  if (!versionExists) {
+    return { official: { total: 0, noEmail: 0 }, resend: zeroResend, cache: 'OFF' };
+  }
+  const signature = buildDashboardCountsSignature_(quarterId, versionNo, stage, sendRows);
+  const key = DASHBOARD_COUNTS_CACHE_PREFIX + String(quarterId || '').trim();
+  let cache = null;
+  if (signature) {
+    try { cache = CacheService.getScriptCache(); } catch (err) { cache = null; }
+  }
+  if (cache) {
+    try {
+      const hit = cache.get(key);
+      if (hit) {
+        const parsed = JSON.parse(hit);
+        if (parsed && parsed.signature === signature && parsed.official && parsed.resend) {
+          return { official: parsed.official, resend: parsed.resend, cache: 'HIT' };
+        }
+      }
+    } catch (err) {
+      log_('WARN', 'readDashboardCountsCached_ 讀快取失敗（照舊計算）：' + err.message);
+    }
+  }
+  let official;
+  let resend;
+  let computedOk = true;
+  try {
+    official = countDashboardOfficialTargetsUnsafe_(quarterId, versionNo);
+  } catch (err) {
+    computedOk = false;
+    official = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);
+  }
+  if (wantResend) {
+    try {
+      resend = countDashboardResendBreakdownUnsafe_(quarterId);
+    } catch (err) {
+      computedOk = false;
+      resend = countDashboardResendBreakdown_(quarterId);
+    }
+  } else {
+    resend = zeroResend;
+  }
+  if (cache && computedOk) {
+    try {
+      cache.put(key, JSON.stringify({ signature: signature, official: official, resend: resend }), DASHBOARD_COUNTS_CACHE_SECONDS);
+    } catch (err) {
+      log_('WARN', 'readDashboardCountsCached_ 寫快取失敗：' + err.message);
+    }
+  }
+  return { official: official, resend: resend, cache: cache ? 'MISS' : 'OFF' };
 }
 
 /**

@@ -194,6 +194,7 @@ function apiSavePreacherTranslationEntry(quarterId, serviceDate, postId, slotInd
 }
 
 function apiSavePreacherTranslationEntry_locked_(quarterId, serviceDate, postId, slotIndex, name) {
+  clearDashboardCountsCache_(quarterId);   // 第九十六輪批次 WA 組：可能改派工（狀態卡「第 3、4 步人數」快取）
   const trimmedName = String(name || '').trim();
   if (!trimmedName) throw new Error('姓名不可留空。');
 

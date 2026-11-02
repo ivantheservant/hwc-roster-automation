@@ -425,6 +425,46 @@ function apiListQuarters() {
  */
 function listQuartersForSelect_() {
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const quarters = listQuarterRowsForSelect_(timezone);
+  // 第九十六輪批次 WC 組：打開時（網址沒有 quarter）預設哪一季——標在那一項上（isDefault），選單次序不變
+  const defaultId = pickDefaultQuarterId_(quarters,
+    Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd'),
+    String(getConfig_(CONFIG_KEYS.WEBAPP_DEFAULT_QUARTER, '') || '').trim());
+  quarters.forEach(function (q) { if (q.quarterId === defaultId) q.isDefault = true; });
+  return quarters;
+}
+
+/**
+ * 第九十六輪批次 WC 組：預設季度（純函式）。
+ *   1. Config `WEBAPP_DEFAULT_QUARTER` 有值而且在清單上 ⇒ 它
+ *   2. 開始日在今日之後、最早的一季（下一季）
+ *   3. 包含今日的那一季
+ *   4. 清單第一個
+ * @param {Object[]} quarters `{quarterId, startDate, endDate}`（yyyy-MM-dd）
+ * @param {string} todayStr 今日（yyyy-MM-dd）
+ * @param {string} configured Config 的值
+ * @returns {string} 季度 ID；清單空 ⇒ 空字串
+ */
+function pickDefaultQuarterId_(quarters, todayStr, configured) {
+  const list = quarters || [];
+  if (list.length === 0) return '';
+  if (configured && list.some(function (q) { return q.quarterId === configured; })) return configured;
+  const next = list.filter(function (q) { return q.startDate && q.startDate > todayStr; })
+    .sort(function (a, b) { return a.startDate < b.startDate ? -1 : (a.startDate > b.startDate ? 1 : 0); })[0];
+  if (next) return next.quarterId;
+  const current = list.filter(function (q) {
+    return q.startDate && q.startDate <= todayStr && (!q.endDate || todayStr <= q.endDate);
+  })[0];
+  if (current) return current.quarterId;
+  return list[0].quarterId;
+}
+
+/**
+ * 季度選單每一項（Quarters 的次序）。
+ * @param {string} timezone 時區
+ * @returns {Object[]}
+ */
+function listQuarterRowsForSelect_(timezone) {
   return readSheet_(SHEETS.QUARTERS).map(function (row) {
     const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];
     return {
