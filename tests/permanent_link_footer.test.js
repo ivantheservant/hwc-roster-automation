@@ -110,10 +110,11 @@ console.log('\n=== B：deliverOne_ 真係有叫佢，而且兩邊都叫 ===');
   const body = mailer.slice(mailer.indexOf('function deliverOne_'),
     mailer.indexOf('function sendRealEmail_'));
   check('★★★★★ bodyHtml 有經過信末注入',
-    /const bodyHtml = appendPermanentLinkFooter_\(/.test(body), body.slice(0, 200));
+    // 第九十三輪批次 TE 組（刻意改動）：變數名改為 bodyHtmlBase（之後再加日曆檔提示句）
+    /const bodyHtmlBase = appendPermanentLinkFooter_\(/.test(body), body.slice(0, 200));
   check('★★★★★ bodyPlain 都有'
     + '——只做一邊嘅話，用純文字睇信嗰啲人（好多長者嘅郵件程式）就冇連結',
-    /const bodyPlain = appendPermanentLinkFooter_\(/.test(body), body.slice(0, 200));
+    /const bodyPlainBase = appendPermanentLinkFooter_\(/.test(body), body.slice(0, 200));
   check('★★★★★ 傳入去嘅係**原始範本內文**，唔係套用完嘅'
     + '——套用完之後 `{PublicRosterUrl}` 已經冇咗，就永遠偵測唔到「範本本來有放」，'
     + '結果同一條連結出現兩次',

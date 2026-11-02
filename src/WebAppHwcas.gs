@@ -162,6 +162,11 @@ function buildHwcasPreviewRow_(d, nameIndex) {
     riskLevel = 'HIGH';
     warnings.push('名單上找不到這個名字。可能是新來的，也可能是寫法不同。');
   }
+  if (d.matchType === HWCAS_MATCH.SURNAME_DROPPED) {
+    // 第九十三輪批次 TC 組：只作候選，不可以套用（canApply 要 EXACT／ALIAS）。
+    riskLevel = 'HIGH';
+    warnings.push(HWCAS_SURNAME_DROPPED_NOTE + '。只是候選，不會自動套用——請確認是同一位，再用「出席系統連結」連結會眾編號。');
+  }
   if (d.matchType === HWCAS_MATCH.ALIAS) {
     // 靠別名對上嘅，係人手登記過嘅，但仍然值得指出「唔係逐字一樣」。
     warnings.push('是靠「別名」對上的（兩邊寫法不同）。請確認真的是同一位。');
@@ -315,6 +320,7 @@ function apiHwcasApplySelected(personIds) {
 function describeHwcasSkip_(r) {
   if (r.matchType === HWCAS_MATCH.AMBIGUOUS) return '名單上有多於一位同名的人，系統分不出是哪一位';
   if (r.matchType === HWCAS_MATCH.NONE) return '名單上找不到這個名字';
+  if (r.matchType === HWCAS_MATCH.SURNAME_DROPPED) return HWCAS_SURNAME_DROPPED_NOTE + '，只作候選，不會自動套用';
   if (!r.personId) return '沒有對應的名單編號';
   if (!r.hwcasEmail) return '出席系統那邊沒有電郵';
   if (r.noChange) return '電郵跟現在的一樣，不用改';

@@ -180,6 +180,44 @@ function applyMailRedirect_(plan, redirectTo) {
 }
 
 /**
+ * 第九十三輪批次 TA 組：**整個專案唯一呼叫 `MailApp.sendEmail()` 的地方。**
+ *
+ * 之前轉寄只在 `sendRealEmail_()` 生效，`notifyAdmin_()`（幹事通知）和
+ * 〔寄給自己〕紙本包各自直接寄，測試期間會寄到 `MAIL_REDIRECT_ALL_TO` 以外的地址。
+ * 現在三條路（加上第九十三輪的範本樣本）都經這一支，轉寄在真正寄出前的最後一刻套用，
+ * 新的寄信入口不用記得套用；`tests/round93_ta_mail_gate.test.js` 掃描 `src/`，
+ * `MailApp.sendEmail` 出現在這個函式以外 ⇒ 測試失敗。
+ *
+ * ⚠️ 轉寄設定有錯（例如打錯了一個地址）⇒ `readMailRedirectTarget_()` 拋錯，一封都不寄。
+ *
+ * ⚠️ `bypassRedirectReason` 有值 ＝ 明確不經轉寄（現時只有〔寄出電郵範本樣本〕：
+ * 收件人已經限制在幹事自己的地址）。沒有寫理由就不可以繞過，不是一個預設會被順手關掉的開關。
+ *
+ * @param {{to: string, subject: string, bodyPlain: string, bodyHtml: ?string,
+ *   displayName: ?string, options: ?Object, bypassRedirectReason: ?string}} mail
+ *   `to` 可以是逗號分隔的多個地址；`bodyHtml` 為 null/undefined 時只寄純文字
+ * @returns {{toEmail: string, redirected: boolean, originalEmail: string}}
+ */
+function sendMailThroughGate_(mail) {
+  const bypass = String(mail.bypassRedirectReason || '').trim();
+  const target = bypass ? '' : readMailRedirectTarget_();
+  const hasHtml = mail.bodyHtml !== null && mail.bodyHtml !== undefined;
+  const plan = applyMailRedirect_(
+    {
+      toEmail: mail.to,
+      displayName: mail.displayName,
+      subject: mail.subject,
+      bodyHtml: hasHtml ? mail.bodyHtml : '',
+      bodyPlain: mail.bodyPlain || ''
+    },
+    target);
+  const options = Object.assign({}, mail.options || {});
+  if (hasHtml) options.htmlBody = plan.redirected ? plan.bodyHtml : mail.bodyHtml;
+  MailApp.sendEmail(plan.toEmail, plan.subject, plan.bodyPlain, options);
+  return { toEmail: plan.toEmail, redirected: plan.redirected, originalEmail: plan.originalEmail };
+}
+
+/**
  * 橫幅的 HTML 版。
  * ⚠️ 要轉義——`displayName` 是使用者輸入，不轉義就是一條 XSS 路。
  * @param {string} text 橫幅文字

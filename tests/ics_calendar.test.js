@@ -227,7 +227,8 @@ console.log('\n=== C4：只喺 OFFICIAL／RESEND 兩個階段附上（原始碼�
 console.log('\n=== C5：零派工者唔附 ICS（原始碼靜態檢查）===');
 {
   check('★★ buildIcsAttachmentForPerson_ 明確擋冇任何派工嘅收件人',
-    /if\s*\(\s*!personAssignments\s*\|\|\s*personAssignments\.length === 0\s*\)\s*return null;/.test(icsSource));
+    // 第九十三輪批次 TE 組（刻意改動）：沒有派工「而且沒有取消事件」才不附（只有取消事件的人照樣附）
+    /if\s*\(\s*\(\s*!personAssignments\s*\|\|\s*personAssignments\.length === 0\s*\)\s*&&\s*cancelled\.length === 0\s*\)\s*return null;/.test(icsSource));
   check('★ buildIcsAttachmentForPerson_ 明確擋非 PERSON 收件人（LIST 收件人唔會有個人日曆）',
     /if\s*\(\s*recipient\.type !== RECIPIENT_TYPE\.PERSON\s*\)\s*return null;/.test(icsSource));
 }

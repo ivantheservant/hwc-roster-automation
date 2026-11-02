@@ -685,8 +685,19 @@ function deliverOne_(recipient, template, context, isDryRun) {
     const wantIcs = context.sendDecision
       ? context.sendDecision.includeIcs
       : icsDefaultForStage_(context.stage);
+    // 第九十三輪批次 TE 組：RESEND 時，上一次實際收到的版本有、這一版沒有的崗位格 ⇒ 加「已取消」事件。
+    // 算不到（讀不到 SendLog 等）只警告，仍然附這個人自己的服侍事件。
+    let cancelledCells = [];
+    if (wantIcs && recipient.type === RECIPIENT_TYPE.PERSON && context.stage === MAIL_STAGES.RESEND) {
+      try {
+        cancelledCells = computeCancelledCellsForPerson_(context, recipient.personId, personAssignments);
+      } catch (cancelErr) {
+        log_('WARN', 'ICS 取消事件計算失敗（本封日曆檔不含取消事件）：'
+          + recipient.displayName + '（' + recipient.personId + '）　' + cancelErr.message);
+      }
+    }
     icsAttachment = wantIcs
-      ? buildIcsAttachmentForPerson_(context, recipient, personAssignments)
+      ? buildIcsAttachmentForPerson_(context, recipient, personAssignments, cancelledCells)
       : null;
   } catch (err) {
     log_('WARN', 'ICS 日曆檔產生失敗（不影響本次寄信，本封信不附 ICS）：'
@@ -734,16 +745,20 @@ function deliverOne_(recipient, template, context, isDryRun) {
   }
   // ⚠️ 次序：個人專屬連結**排在永久連結之前**。
   // 對收件人來講，「我自己那幾格」比「全體那一份」有用得多。
-  const bodyHtml = appendPermanentLinkFooter_(
+  const bodyHtmlBase = appendPermanentLinkFooter_(
     appendPersonalLinkFooter_(
       applyPlaceholders_(template.bodyHtml, context.placeholders, recipient, summary),
       personalUrl, true),
     template.bodyHtml, permanentLink, true);
-  const bodyPlain = appendPermanentLinkFooter_(
+  const bodyPlainBase = appendPermanentLinkFooter_(
     appendPersonalLinkFooter_(
       applyPlaceholders_(template.bodyPlain, context.placeholders, recipient, summary),
       personalUrl, false),
     template.bodyPlain, permanentLink, false);
+  // 第九十三輪批次 TE 組：有附日曆檔 ⇒ 內文（程式產生，不改 EmailTemplates 工作表）講明只包括自己的服侍；有取消事件再講。
+  const hasCancelled = !!(icsAttachment && icsAttachment.cancelledCount > 0);
+  const bodyHtml = icsAttachment ? appendIcsNotice_(bodyHtmlBase, hasCancelled, true) : bodyHtmlBase;
+  const bodyPlain = icsAttachment ? appendIcsNotice_(bodyPlainBase, hasCancelled, false) : bodyPlainBase;
 
   if (isDryRun) {
     log_('INFO', '[DRY_RUN] 不寄出 → ' + recipient.email + ' | ' + subject
@@ -766,8 +781,8 @@ function deliverOne_(recipient, template, context, isDryRun) {
 
 /**
  * 真正寄出一封電郵。呼叫前必須已確認 DRY_RUN=FALSE。
- * 本函式是整個專案唯二呼叫 MailApp.sendEmail() 的地方之一（另一個是 notifyAdmin_()，
- * 供只通知幹事的場合使用），且自身再做一次 DRY_RUN 防呆。
+ * 第九十三輪批次 TA 組：真正呼叫 MailApp.sendEmail() 的地方只有 `sendMailThroughGate_()`
+ * （MailRedirect.gs），本函式、notifyAdmin_()、紙本包、範本樣本都經它；本函式自身再做一次 DRY_RUN 防呆。
  * @param {Object} recipient 收件人資料
  * @param {string} subject 已組好的標題
  * @param {string} bodyHtml HTML 內文
@@ -792,23 +807,16 @@ function sendRealEmail_(recipient, subject, bodyHtml, bodyPlain, context, attach
   if (blobs.length > 0) options.attachments = blobs;
 
   // ⚠️ 第四十一輪批次 H 組：**轉寄測試地址喺呢度套用，唔喺上游。**
-  //
-  // 擺喺呢度（真正 MailApp.sendEmail() 之前最後一刻）係刻意嘅：
-  // 上游任何一條新加嘅路都自動受保護，唔使記得。
-  // 擺上游就會變成「有一條路唔記得套用」而真係寄咗俾義工。
-  const redirected = applyMailRedirect_(
-    {
-      toEmail: recipient.email,
-      displayName: recipient.displayName,
-      subject: subject,
-      bodyHtml: bodyHtml,
-      bodyPlain: bodyPlain || ''
-    },
-    readMailRedirectTarget_());
-  if (redirected.redirected) options.htmlBody = redirected.bodyHtml;
-
-  MailApp.sendEmail(redirected.toEmail, redirected.subject, redirected.bodyPlain, options);
-  return redirected;
+  // 第九十三輪批次 TA 組：套用嘅位置搬咗去 `sendMailThroughGate_()`（MailRedirect.gs），
+  // 幹事通知同紙本包都經同一支。
+  return sendMailThroughGate_({
+    to: recipient.email,
+    displayName: recipient.displayName,
+    subject: subject,
+    bodyHtml: bodyHtml,
+    bodyPlain: bodyPlain || '',
+    options: options
+  });
 }
 
 /**
@@ -1499,8 +1507,28 @@ function writeSendLogRows_(outcomes, context) {
   return rows.length;
 }
 
+/** 第九十三輪批次 TB 組：非 null ＝ 正在收集幹事通知（不寄出）。只由 `captureAdminNotifications_()` 設定。 */
+var ADMIN_NOTIFY_CAPTURE_ = null;
+
 /**
- * 統一的「只通知幹事」寄信函式：整個專案唯一呼叫 MailApp.sendEmail() 的兩個地方
+ * 執行 `fn`，期間 `notifyAdmin_()` 只收集不寄出；回傳收集到的 [{subject, body}]。
+ * @param {function(): void} fn
+ * @returns {{subject: string, body: string}[]}
+ */
+function captureAdminNotifications_(fn) {
+  const previous = ADMIN_NOTIFY_CAPTURE_;
+  ADMIN_NOTIFY_CAPTURE_ = [];
+  try {
+    fn();
+    return ADMIN_NOTIFY_CAPTURE_.slice();
+  } finally {
+    ADMIN_NOTIFY_CAPTURE_ = previous;
+  }
+}
+
+/**
+ * 統一的「只通知幹事」寄信函式（第九十三輪批次 TA 組：經 `sendMailThroughGate_()`，
+ * 測試期間轉寄到 MAIL_REDIRECT_ALL_TO）。原本是整個專案呼叫 MailApp.sendEmail() 的兩個地方
  * 之一（另一個是 sendRealEmail_()，供一般收件人使用）。原本只服務「查無電郵名單」
  * 這一種用途（notifyAdminNoEmail_()），追加階段 N 把它一般化，讓「生成初稿完成通知」
  * 與「Stage 停滯提醒」這兩個新的幹事專屬通知（notifyAdminGenerateDone_()／
@@ -1513,6 +1541,12 @@ function writeSendLogRows_(outcomes, context) {
  * @returns {void}
  */
 function notifyAdmin_(subject, body, adminEmail, isDryRun) {
+  // 第九十三輪批次 TB 組：〔寄出電郵範本樣本〕要拿到每一種幹事通知的真實文字——
+  // 在 `captureAdminNotifications_()` 之內，通知只收集、不寄出（也不寫 Logger）。
+  if (ADMIN_NOTIFY_CAPTURE_) {
+    ADMIN_NOTIFY_CAPTURE_.push({ subject: subject, body: body });
+    return;
+  }
   if (!adminEmail) {
     log_('WARN', 'MAIL_ADMIN_NOTIFY 未設定，通知只記錄在 Logger：' + subject);
   }
@@ -1522,7 +1556,19 @@ function notifyAdmin_(subject, body, adminEmail, isDryRun) {
     log_('INFO', '[DRY_RUN] 不寄出管理員通知 → ' + adminEmail + '\n' + subject + '\n' + body);
     return;
   }
-  MailApp.sendEmail(adminEmail, subject, body);
+  // 第九十三輪批次 TA 組：測試期間轉寄到 MAIL_REDIRECT_ALL_TO（主旨及內文加同一個轉寄標示）。
+  // 轉寄設定有錯（readMailRedirectTarget_() 拋錯）⇒ 這一封通知不寄、記 WARN，不令生成、提醒等主流程失敗。
+  try {
+    sendMailThroughGate_({
+      to: adminEmail,
+      displayName: '幹事通知（MAIL_ADMIN_NOTIFY）',
+      subject: subject,
+      bodyHtml: null,
+      bodyPlain: body
+    });
+  } catch (err) {
+    log_('WARN', '幹事通知沒有寄出（' + err.message.split('\n')[0] + '）：' + subject);
+  }
 }
 
 /**

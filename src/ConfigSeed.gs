@@ -388,7 +388,7 @@ function getConfigKeySeeds_() {
       // 第九十輪批次 QC 組：申報截止日＝生成日之前幾日
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, type: CONFIG_TYPES.INT, group: 'MAIL',
       defaultValue: '7',
-      description: '〔寄出申報邀請〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
+      description: '〔邀請義工申報不能服侍的日子〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
       editable: 'TRUE'
     },
     {
@@ -402,7 +402,7 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.DRY_RUN, type: CONFIG_TYPES.BOOL, group: 'SYS',
       defaultValue: 'TRUE',
-      description: '全域測試模式閘門。TRUE 時全專案唯一會呼叫 MailApp.sendEmail 的兩處'
+      description: '全域測試模式閘門。TRUE 時一般收件人及幹事通知的寄出'
         + '都會被攔截，只寫 SendLog、不真正寄出。務必先確認無誤才改成 FALSE。',
       editable: 'TRUE'
     },
@@ -756,6 +756,13 @@ function getConfigKeySeeds_() {
       defaultValue: '',
       description: '只可以查看幹事介面的人。名單上的人可以打開所有畫面，但不可以儲存、生成、寄出或改動任何資料。'
         + '可以修改的人填在 WEBAPP_ALLOWED_EMAILS。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.WEBAPP_SHOW_LOAD_TIMINGS, type: CONFIG_TYPES.BOOL, group: 'WEBAPP',
+      defaultValue: 'TRUE',
+      description: '幹事介面頁底是否顯示「載入 X 秒（權限、季度、狀態卡、主流程、出席系統同步、再載入）」。只是顯示，不影響任何功能；'
+        + '沒有這一行時照 TRUE 處理。',
       editable: 'TRUE'
     },
     // ---- HWCAS（會友系統同步，全部選填——留空只是代表這個同步功能還沒設定）----

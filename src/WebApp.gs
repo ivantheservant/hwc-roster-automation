@@ -52,7 +52,9 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiGetStaffingCheck', 'apiGetStaffingChangeNote', 'apiGetCombinedServices', 'apiPreseasonPreview',
   // 第九十輪批次 QB 組：〔詩班獻詩〕讀取
   'apiGetChoirSinging',
-  // 第九十輪批次 QC 組：〔寄出申報邀請〕預覽
+  // 第九十三輪批次 TB 組：〔寄出電郵範本樣本〕可以收樣本的地址（只讀）
+  'apiGetTemplateSampleOptions',
+  // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕預覽
   'apiUnavailableInvitePreview',
   'apiListUnavailable', 'apiPreviewUnavailableImpact', 'apiListPeople', 'apiListAliases',
   'apiGetEligibilityMatrix', 'apiGetPersonPostWeightMatrix', 'apiGetSendAllRecipients',

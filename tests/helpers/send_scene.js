@@ -6,8 +6,8 @@
 const { buildRound75Scene } = require('./round75_harness.js');
 const { seedSheet } = require('./mock_sheets_realistic.js');
 
-function buildSendScene(selfEmail) {
-  const sc = buildRound75Scene({ extraFiles: ['SendOptions.gs', 'WebAppSendPlan.gs', 'WebAppPeople.gs', 'PersonalLinkInMail.gs'] });
+function buildSendScene(selfEmail, moreFiles) {
+  const sc = buildRound75Scene({ extraFiles: ['SendOptions.gs', 'WebAppSendPlan.gs', 'WebAppPeople.gs', 'PersonalLinkInMail.gs'].concat(moreFiles || []) });
   const gas = sc.gas;
   gas.Session = { getActiveUser: () => ({ getEmail: () => selfEmail }) };
   gas.checkMissingPersonalPdfs_ = () => ({ applicable: false, missing: [], total: 0 });

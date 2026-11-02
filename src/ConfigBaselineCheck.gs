@@ -151,6 +151,7 @@ function getConfigBaselineSnapshot_() {
       WARN_ON_SEMI_HARD_BREAK: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_ALLOWED_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_ENABLED: { launchTargetValue: 'TRUE', source: '已核實的實際值' },
+      WEBAPP_SHOW_LOAD_TIMINGS: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_VIEWER_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' }
     },
     quarters: {

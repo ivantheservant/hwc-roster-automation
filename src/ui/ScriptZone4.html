@@ -48,6 +48,10 @@
         '只看：列出名單上可能有問題的人（例如沒有電郵、沒有任何崗位）。',
         () => openPeopleHints(), false),
       // 第七十七輪批次 EF 組：人員與電郵畫面拿走 ⇒ 出席系統嘅入口搬到呢度
+      // 第九十三輪批次 TB 組：核對電郵範本文字——每一種信寄一封樣本給自己
+      zone4Row('寄出電郵範本樣本',
+        '一次過寄出系統每一種信的樣本到你自己的信箱，用來核對文字。只會寄給你選的那一個地址，不會寄給任何義工。',
+        () => openTemplateSamples(), false),
       zone4Row('出席系統連結',
         '電郵由出席系統按會眾編號讀取。這裏看哪些人還沒有連結（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵，並把未連結的人連結上。',
         () => openHwcasLink(), false)
@@ -602,6 +606,51 @@
           button('完成', () => closeModalAndRefresh(), 'secondary')]
         : [button('完成', () => closeModalAndRefresh(), '')];
       openModal(outcome.kind === 'FAILED' ? outcome.title : '產生完成', outcome.nodes, buttons);
+    });
+  }
+
+  /* ── 寄出電郵範本樣本（第九十三輪批次 TB 組）──────────────────── */
+
+  function openTemplateSamples() {
+    runAction('讀取可以收樣本的地址', async () => {
+      const opts = await callServer('apiGetTemplateSampleOptions');
+      if (!opts.recipients || opts.recipients.length === 0) {
+        openModal('寄出電郵範本樣本', [
+          para('Config 的 MAIL_ADMIN_NOTIFY、WEBAPP_ALLOWED_EMAILS、MAIL_REDIRECT_ALL_TO 都沒有填，沒有可以收樣本的地址。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      const quarterInput = document.createElement('input');
+      quarterInput.type = 'text';
+      quarterInput.value = currentQuarterId || opts.defaultQuarterId;
+      const sel = document.createElement('select');
+      opts.recipients.forEach((e) => {
+        const o = document.createElement('option');
+        o.value = e;
+        o.textContent = e;
+        sel.appendChild(o);
+      });
+      openModal('寄出電郵範本樣本', [
+        para('系統每一種信（電郵範本、幹事通知、季前資料、邀請義工申報不能服侍的日子）各寄一封樣本，主旨前面有「[範本樣本 n/N]」。'),
+        para('用這一季最新版本的真實資料套入；這一季還沒有版本就用示範資料。樣本不附 PDF，日曆檔會附上。'
+          + '測試模式（DRY_RUN）之下也會寄，但只寄給你選的這一個地址。', 'muted'),
+        make('div', { className: 'prop-head' }, [make('span', { text: '季度' }), quarterInput]),
+        make('div', { className: 'prop-head' }, [make('span', { text: '收件電郵' }), sel])
+      ], [
+        button('寄出', () => sendTemplateSamplesNow(quarterInput.value, sel.value), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  function sendTemplateSamplesNow(quarterId, toEmail) {
+    runAction('寄出電郵範本樣本，請稍候', async () => {
+      const r = await callServerMutating('apiSendTemplateSamples', String(quarterId || '').trim(), toEmail);
+      openModal('寄出完成', [
+        make('div', { text: '已寄出 ' + r.sent + ' 封', className: 'ok-head' }),
+        para(r.message || ''),
+        para(r.names.join('、'), 'muted')
+      ], [button('知道了', () => closeModal(), '')]);
     });
   }
 

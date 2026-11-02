@@ -167,14 +167,16 @@ function foldIcsLine_(line) {
  * （對應 C2「DESCRIPTION 寫該日其他資訊」），最後加一句如何申報不能服侍。
  * @param {string} quarterId 季度 ID
  * @param {string[]} otherPostNames 當日其他崗位的中文名稱
+ * @param {number=} versionNo 第九十三輪批次 TE 組：有值 ⇒ 最後加「（第 N 版，以最新一封信為準）」
  * @returns {string} DESCRIPTION 內容（未轉義）
  */
-function buildIcsDescription_(quarterId, otherPostNames) {
+function buildIcsDescription_(quarterId, otherPostNames, versionNo) {
   var lines = [quarterId + ' 職事表'];
   if (otherPostNames.length > 0) {
     lines.push('當日其他崗位：' + otherPostNames.join('、'));
   }
   lines.push('如當日不能服侍，請盡早聯絡幹事安排調動。');
+  if (versionNo !== undefined && versionNo !== null) lines.push('（第 ' + versionNo + ' 版，以最新一封信為準）');
   return lines.join('\n');
 }
 
@@ -192,6 +194,8 @@ function buildIcsDescription_(quarterId, otherPostNames) {
  * @param {string} opts.defaultStartTime 預設崇拜開始時間 "HH:mm"
  * @param {string} opts.defaultEndTime 預設崇拜結束時間 "HH:mm"
  * @param {string} opts.dtstampUtc 本次產生時間，UTC，格式 "yyyyMMdd'T'HHmmss'Z'"
+ * @param {{serviceDate: string, postId: string, slotIndex: number, postNameTC: string}[]=} opts.cancelled
+ *   第九十三輪批次 TE 組：要取消的服侍（同一個 UID、STATUS:CANCELLED）
  * @returns {string} 完整 ICS 內容（CRLF 換行，結尾有 CRLF）
  */
 function buildIcsCalendarText_(opts) {
@@ -211,7 +215,7 @@ function buildIcsCalendarText_(opts) {
     var otherPosts = opts.assignments
       .filter(function (b) { return b.serviceDate === a.serviceDate && b.postId + '|' + b.slotIndex !== a.postId + '|' + a.slotIndex; })
       .map(function (b) { return b.postNameTC; });
-    var description = buildIcsDescription_(opts.quarterId, otherPosts);
+    var description = buildIcsDescription_(opts.quarterId, otherPosts, opts.versionNo);
 
     lines.push('BEGIN:VEVENT');
     lines.push('UID:' + uid);
@@ -221,6 +225,27 @@ function buildIcsCalendarText_(opts) {
     lines.push('DTEND;TZID=Pacific/Auckland:' + dtEnd);
     lines.push('SUMMARY:' + escapeIcsText_(a.postNameTC));
     lines.push('DESCRIPTION:' + escapeIcsText_(description));
+    lines.push('END:VEVENT');
+  });
+
+  // 第九十三輪批次 TE 組：取消事件——上一次實際收到的版本有、這一版沒有的格。
+  // UID 和原事件相同（buildIcsUid_ 不含版本號），SEQUENCE ＝ 這一版版本號（比原事件大），
+  // STATUS:CANCELLED，SUMMARY 前加「已取消：」。日曆仍然是 METHOD:PUBLISH（不是 REQUEST／CANCEL 邀請）。
+  (opts.cancelled || []).forEach(function (c) {
+    var earlyMinutes = (opts.earlyMinutesByPost && opts.earlyMinutesByPost[c.postId]) || 0;
+    var cStart = shiftIcsLocalDateTime_(c.serviceDate, opts.defaultStartTime, earlyMinutes);
+    var cEnd = shiftIcsLocalDateTime_(c.serviceDate, opts.defaultEndTime, 0);
+    var cDescription = [opts.quarterId + ' 職事表', '這個服侍已經取消。',
+      '（第 ' + opts.versionNo + ' 版，以最新一封信為準）'].join('\n');
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:' + buildIcsUid_(opts.quarterId, opts.personId, c.serviceDate, c.postId, c.slotIndex));
+    lines.push('SEQUENCE:' + Math.max(0, Number(opts.versionNo) || 0));
+    lines.push('DTSTAMP:' + opts.dtstampUtc);
+    lines.push('DTSTART;TZID=Pacific/Auckland:' + cStart);
+    lines.push('DTEND;TZID=Pacific/Auckland:' + cEnd);
+    lines.push('SUMMARY:' + escapeIcsText_('已取消：' + c.postNameTC));
+    lines.push('DESCRIPTION:' + escapeIcsText_(cDescription));
+    lines.push('STATUS:CANCELLED');
     lines.push('END:VEVENT');
   });
 
@@ -258,12 +283,16 @@ function buildIcsFileName_(quarterId, versionNo, personName) {
  * @param {Object} context 寄信 context（見 Mailer.gs 的 buildMailContext_()）
  * @param {Object} recipient 收件人資料
  * @param {Object[]} personAssignments 該收件人的派工紀錄（deliverOne_ 已算好）
- * @returns {?{blob: Blob, fileName: string, sizeBytes: number, retries: number}}
+ * @param {Object[]=} cancelledCells 第九十三輪批次 TE 組：要取消的服侍（見 computeCancelledCellsForPerson_()）
+ * @returns {?{blob: Blob, fileName: string, sizeBytes: number, retries: number, cancelledCount: number}}
  */
-function buildIcsAttachmentForPerson_(context, recipient, personAssignments) {
+function buildIcsAttachmentForPerson_(context, recipient, personAssignments, cancelledCells) {
   if (recipient.type !== RECIPIENT_TYPE.PERSON) return null;
   if (context.stage !== MAIL_STAGES.OFFICIAL && context.stage !== MAIL_STAGES.RESEND) return null;
-  if (!personAssignments || personAssignments.length === 0) return null;
+  const cancelled = cancelledCells || [];
+  // 第九十三輪批次 TE 組：這一版沒有任何崗位、但有取消事件的人，照樣附日曆檔（只有取消事件）
+  if ((!personAssignments || personAssignments.length === 0) && cancelled.length === 0) return null;
+  personAssignments = personAssignments || [];
 
   // 第二十三輪批次階段 A2：**唔可以用 `String()`**。試算表把 `10:45` 呢類
   // 「睇落似時間」嘅格自動存成 Date 物件，`String(Date)` 出嚟係成串英文
@@ -288,6 +317,7 @@ function buildIcsAttachmentForPerson_(context, recipient, personAssignments) {
         postNameTC: context.postNames[a.postId] || a.postId
       };
     }),
+    cancelled: cancelled,
     earlyMinutesByPost: readEarlyArrivalMinutesByPost_(),
     defaultStartTime: defaultStart,
     defaultEndTime: defaultEnd,
@@ -296,5 +326,94 @@ function buildIcsAttachmentForPerson_(context, recipient, personAssignments) {
 
   var fileName = buildIcsFileName_(context.quarterId, context.versionNo, recipient.displayName);
   var blob = Utilities.newBlob(icsText, 'text/calendar', fileName);
-  return { blob: blob, fileName: fileName, sizeBytes: blob.getBytes().length, retries: 0 };
+  return { blob: blob, fileName: fileName, sizeBytes: blob.getBytes().length, retries: 0, cancelledCount: cancelled.length };
+}
+
+/**
+ * 第九十三輪批次 TE 組：這個人**上一次實際收到**（SendLog：Stage 是 OFFICIAL／RESEND、Status 是 SENT）的版本號。
+ * 同一季多次收到 ⇒ 取 `SentAt` 最遲那一次（相同時間取版本號較大的）。**只讀。**
+ * `EXTERNAL`（匯入時聲明「已在系統外寄給全體」）不算——那一份日曆不是系統寄出的，UID 未必對得上。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object.<string, number>} {PersonID: 版本號}
+ */
+function readLastReceivedVersionByPerson_(quarterId) {
+  const C = COLUMNS.SEND_LOG;
+  const latest = {};
+  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
+    if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
+    const stage = String(row[C.STAGE] || '').trim();
+    if (stage !== MAIL_STAGES.OFFICIAL && stage !== MAIL_STAGES.RESEND) return;
+    if (String(row[C.STATUS] || '').trim().toUpperCase() !== MAIL_STATUS.SENT) return;
+    const personId = String(row[C.PERSON_ID] || '').trim();
+    const versionNo = Number(row[C.VERSION_NO]);
+    if (!personId || isNaN(versionNo)) return;
+    const at = row[C.SENT_AT] ? new Date(row[C.SENT_AT]).getTime() : 0;
+    const cur = latest[personId];
+    if (!cur || at > cur.at || (at === cur.at && versionNo > cur.versionNo)) latest[personId] = { at: at, versionNo: versionNo };
+  });
+  const result = {};
+  Object.keys(latest).forEach(function (id) { result[id] = latest[id].versionNo; });
+  return result;
+}
+
+/**
+ * 第九十三輪批次 TE 組：RESEND 時，這個人要加「取消事件」的格＝上一次實際收到的版本有、這一版沒有的崗位格。
+ * 找不到上一次收到的版本（從沒有收過／只有 EXTERNAL）⇒ 回空陣列（不加取消事件）。
+ * 資料在同一個 context 內只讀一次（SendLog、各版本派工紀錄）。
+ * @param {Object} context 寄信 context（`stage` 要是 RESEND 才有意義）
+ * @param {string} personId 人員 ID
+ * @param {Object[]} personAssignments 這個人這一版的派工
+ * @returns {{serviceDate: string, postId: string, slotIndex: number, postNameTC: string}[]}
+ */
+function computeCancelledCellsForPerson_(context, personId, personAssignments) {
+  if (context.stage !== MAIL_STAGES.RESEND || !personId) return [];
+  if (!context._lastReceivedByPerson) context._lastReceivedByPerson = readLastReceivedVersionByPerson_(context.quarterId);
+  const prevVersion = context._lastReceivedByPerson[personId];
+  if (prevVersion === undefined || !(prevVersion < context.versionNo)) return [];
+  if (!context._cellsByVersionPerson) {
+    const A = COLUMNS.ROSTER_ASSIGNMENTS;
+    const index = {};
+    readSheet_(SHEETS.ROSTER_ASSIGNMENTS).forEach(function (row) {
+      if (String(row[A.QUARTER_ID] || '').trim() !== context.quarterId) return;
+      const pid = String(row[A.PERSON_ID] || '').trim();
+      if (!pid) return;
+      const key = Number(row[A.VERSION_NO]) + '|' + pid;
+      if (!index[key]) index[key] = [];
+      index[key].push({
+        serviceDate: toDateString_(row[A.SERVICE_DATE], context.timezone),
+        postId: row[A.POST_ID],
+        slotIndex: Number(row[A.SLOT_INDEX])
+      });
+    });
+    context._cellsByVersionPerson = index;
+  }
+  const cellKey = function (c) { return c.serviceDate + '|' + c.postId + '|' + c.slotIndex; };
+  const now = {};
+  (personAssignments || []).forEach(function (a) { now[cellKey(a)] = true; });
+  return (context._cellsByVersionPerson[prevVersion + '|' + personId] || [])
+    .filter(function (c) { return !now[cellKey(c)]; })
+    .map(function (c) {
+      return { serviceDate: c.serviceDate, postId: c.postId, slotIndex: c.slotIndex,
+        postNameTC: (context.postNames || {})[c.postId] || c.postId };
+    });
+}
+
+/** 第九十三輪批次 TE 組：附有日曆檔的信，內文（程式產生，不改 EmailTemplates 工作表）加的句子。 */
+const ICS_NOTICE_BASE = '附件的日曆檔（.ics）只包括你自己的服侍，請以最新一封信的日曆檔為準。';
+const ICS_NOTICE_CANCELLED = '這個日曆檔亦包括已取消的服侍。Apple 日曆和 Outlook 多數會自動刪除；'
+  + 'Google 日曆匯入時未必會刪除，如仍見到舊的服侍事件，請自行刪除。';
+
+/**
+ * 把日曆檔提示句加落信末。
+ * @param {string} text 內文
+ * @param {boolean} hasCancelled 日曆檔有沒有取消事件
+ * @param {boolean} isHtml 是不是 HTML 版
+ * @returns {string}
+ */
+function appendIcsNotice_(text, hasCancelled, isHtml) {
+  const sentences = [ICS_NOTICE_BASE].concat(hasCancelled ? [ICS_NOTICE_CANCELLED] : []);
+  if (!isHtml) return String(text || '') + '\n\n' + sentences.join('\n');
+  return String(text || '') + sentences.map(function (s) {
+    return '<p>' + String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>';
+  }).join('');
 }

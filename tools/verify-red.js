@@ -87,9 +87,10 @@ const MUTATIONS = [
     why: '把真正寄出還原成用返 `recipient.email`'
       + '——整個轉寄機制冇生效，而畫面同 SendLog 都會話成功，'
       + '即係 Ivan 以為安全咁測試緊，實際上信真係寄咗俾義工',
-    file: 'src/Mailer.gs',
-    find: '  MailApp.sendEmail(redirected.toEmail, redirected.subject, redirected.bodyPlain, options);',
-    replace: "  MailApp.sendEmail(recipient.email, redirected.subject, redirected.bodyPlain, options);",
+    // 第九十三輪批次 TA 組：寄出集中到 MailRedirect.gs 的 sendMailThroughGate_()
+    file: 'src/MailRedirect.gs',
+    find: '  MailApp.sendEmail(plan.toEmail, plan.subject, plan.bodyPlain, options);',
+    replace: "  MailApp.sendEmail(mail.to, plan.subject, plan.bodyPlain, options);",
     tests: ['tests/mail_redirect.test.js']
   },
   {
@@ -4857,8 +4858,9 @@ const MUTATIONS = [
     id: 'ah-dashboard-no-warn',
     why: '狀態卡冇空格／已放行資料',
     file: 'src/WebAppDashboard.gs',
-    find: '    sendWarnings: versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)',
-    replace: '    sendWarnings: !versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)',
+    // 第九十三輪批次 TF 組：先算好再放進回傳值
+    find: '  const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)',
+    replace: '  const sendWarnings = !versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)',
     tests: ['tests/hard_release_remembered.test.js']
   },
   {
@@ -4922,8 +4924,9 @@ const MUTATIONS = [
     id: 'ai-dashboard-no-impact',
     why: '狀態卡／第 2 步唔帶受影響格——兩個數字對唔上',
     file: 'src/WebAppDashboard.gs',
-    find: '    eligibilityImpact: versionExists ? summariseEligibilityImpact_(quarterId)',
-    replace: '    eligibilityImpact: !versionExists ? summariseEligibilityImpact_(quarterId)',
+    // 第九十三輪批次 TF 組：先算好再放進回傳值
+    find: '  const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)',
+    replace: '  const eligibilityImpact = !versionExists ? summariseEligibilityImpact_(quarterId)',
     tests: ['tests/eligibility_impact.test.js']
   },
   {
@@ -9032,8 +9035,9 @@ const MUTATIONS = [
     id: "lf-ui-no-button",
     why: "冇寄出季前資料掣",
     file: "src/ui/ScriptZone2.html",
-    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button('寄出申報邀請'",
-    replace: "button('寄出申報邀請'",
+    // 第九十三輪批次 TD 組：〔寄出申報邀請〕改名
+    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button('邀請義工申報不能服侍的日子'",
+    replace: "button('邀請義工申報不能服侍的日子'",
     tests: ["tests/round85_lf_preseason.test.js"]
   },
   {
@@ -9321,8 +9325,9 @@ const MUTATIONS = [
     id: "nb-allowed-blocked",
     why: "寄出季前資料預覽也變灰",
     file: "src/ui/Script.html",
-    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出申報邀請'];",
-    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出申報邀請'];",
+    // 第九十三輪批次 TD 組：〔寄出申報邀請〕改名
+    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請義工申報不能服侍的日子'];",
+    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['邀請義工申報不能服侍的日子'];",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
   {
@@ -9433,8 +9438,9 @@ const MUTATIONS = [
     id: "na-hwcas-closes-modal",
     why: "出席系統更新後關掉深連結視窗",
     file: "src/ui/ScriptZone3.html",
-    find: "      runAction('重新整理', () => loadDashboard({ keepModal: true }));",
-    replace: "      runAction('重新整理', loadDashboard);",
+    // 第九十三輪批次 TF 組：之後接着記「再載入」時間
+    find: "      runAction('重新整理', () => loadDashboard({ keepModal: true })).then(",
+    replace: "      runAction('重新整理', loadDashboard).then(",
     tests: ["tests/round87_na_deep_link.test.js"]
   },
   {
@@ -10460,6 +10466,255 @@ const MUTATIONS = [
     find: "'如果你真的想整份重新排過：' + REDO_QUARTER_HINT_TEXT",
     replace: "'如果你真的想整份重新排過，請去「進階功能」'",
     tests: ["tests/round92_sc_guidance_targets.test.js"]
+  },
+  // ── 第九十三輪批次 ────────────────────────────────────────────
+  {
+    id: "ta-gate-no-redirect",
+    why: "閘門不套用轉寄（所有信都寄給本人）",
+    file: "src/MailRedirect.gs",
+    find: "  const target = bypass ? '' : readMailRedirectTarget_();",
+    replace: "  const target = '';",
+    tests: ["tests/round93_ta_mail_gate.test.js"]
+  },
+  {
+    id: "ta-bypass-blank",
+    why: "理由只是空白也可以繞過轉寄",
+    file: "src/MailRedirect.gs",
+    find: "  const bypass = String(mail.bypassRedirectReason || '').trim();",
+    replace: "  const bypass = mail.bypassRedirectReason ? 'x' : '';",
+    tests: ["tests/round93_ta_mail_gate.test.js"]
+  },
+  {
+    id: "ta-paper-bypass",
+    why: "紙本包繞過轉寄",
+    file: "src/PaperPack.gs",
+    find: "      displayName: '操作者自己（紙本包）',",
+    replace: "      displayName: '操作者自己（紙本包）', bypassRedirectReason: '偷懶',",
+    tests: ["tests/round93_ta_mail_gate.test.js"]
+  },
+  {
+    id: "ta-stray-mailapp",
+    why: "新的寄信入口不經閘門",
+    file: "src/Utils.gs",
+    find: "function log_(level, message) {",
+    replace: "function log_(level, message) {\n  if (message === '__x') MailApp.sendEmail('a@example.invalid', 'x', 'y');",
+    tests: ["tests/round93_ta_mail_gate.test.js", "tests/mail_redirect.test.js"]
+  },
+  {
+    id: "tb-no-recipient-check",
+    why: "範本樣本不驗收件人",
+    file: "src/TemplateSamples.gs",
+    find: "  const to = assertTemplateSampleRecipientAllowed_(toEmail);",
+    replace: "  const to = String(toEmail || '').trim();",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tb-redirect-applies",
+    why: "範本樣本被轉寄（收件人變成轉寄名單）",
+    file: "src/TemplateSamples.gs",
+    find: "      bypassRedirectReason: TEMPLATE_SAMPLE_BYPASS_REASON",
+    replace: "      bypassRedirectReason: ''",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tb-dryrun-blocks",
+    why: "DRY_RUN 為 TRUE 時不寄樣本",
+    file: "src/TemplateSamples.gs",
+    find: "  assertNotPreviewMode_('sendTemplateSamples_');",
+    replace: "  assertNotPreviewMode_('sendTemplateSamples_');\n  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false) throw new Error('DRY_RUN');",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tb-no-box",
+    why: "灰框沒有「這是範本樣本，不是正式通知」",
+    file: "src/TemplateSamples.gs",
+    find: "  const text = '這是範本樣本，不是正式通知。範本：'",
+    replace: "  const text = '範本：'",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tb-missing-kind",
+    why: "少了一種幹事通知（生成完成）",
+    file: "src/TemplateSamples.gs",
+    find: "{ name: '幹事通知：生成完成',",
+    replace: "{ name: '幹事通知：完成',",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tb-no-audit",
+    why: "沒有 AuditLog 紀錄",
+    file: "src/TemplateSamples.gs",
+    find: "const TEMPLATE_SAMPLES_AUDIT_ACTION = 'TEMPLATE_SAMPLES_SENT';",
+    replace: "const TEMPLATE_SAMPLES_AUDIT_ACTION = 'SOMETHING_ELSE';",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tb-no-menu",
+    why: "試算表選單沒有範本樣本",
+    file: "src/Menu.gs",
+    find: "        .addItem('寄出電郵範本樣本', 'runSendTemplateSamples_')",
+    replace: "",
+    tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "tc-len-check",
+    why: "3 個字的名也做「去掉第一個字」",
+    file: "src/HwcasSync.gs",
+    find: "  if (/^[一-鿿]{4}$/.test(name)) {",
+    replace: "  if (/^[一-鿿]{3,4}$/.test(name)) {",
+    tests: ["tests/round93_tc_surname_dropped.test.js"]
+  },
+  {
+    id: "tc-multi-ok",
+    why: "去掉第一個字配到兩個人也算",
+    file: "src/HwcasSync.gs",
+    find: "    if (found.length === 1) {",
+    replace: "    if (found.length >= 1) {",
+    tests: ["tests/round93_tc_surname_dropped.test.js"]
+  },
+  {
+    id: "tc-can-apply",
+    why: "候選可以直接套用",
+    file: "src/WebAppHwcas.gs",
+    find: "  const matchedOk = d.matchType === HWCAS_MATCH.EXACT || d.matchType === HWCAS_MATCH.ALIAS;",
+    replace: "  const matchedOk = d.matchType === HWCAS_MATCH.EXACT || d.matchType === HWCAS_MATCH.ALIAS || d.matchType === HWCAS_MATCH.SURNAME_DROPPED;",
+    tests: ["tests/round93_tc_surname_dropped.test.js"]
+  },
+  {
+    id: "tc-exact-loses",
+    why: "別的欄完全相同也被候選類干擾",
+    file: "src/HwcasSync.gs",
+    find: "  if (hits.some(function (h) { return h.matchType !== HWCAS_MATCH.SURNAME_DROPPED; })) {",
+    replace: "  if (false) {",
+    tests: ["tests/round93_tc_surname_dropped.test.js"]
+  },
+  {
+    id: "tc-ui-note",
+    why: "候選行沒有說明句",
+    file: "src/ui/ScriptZone3.html",
+    find: "      + (c.matchType === 'SURNAME_DROPPED' ? '　⚠ 候選：出席系統的名字去掉第一個字後相同（例如夫姓），請確認是同一位' : '')",
+    replace: "",
+    tests: ["tests/round93_tc_surname_dropped.test.js"]
+  },
+  {
+    id: "td-old-button",
+    why: "按鈕名稱變回〔寄出申報邀請〕",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('邀請義工申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));",
+    replace: "      button('寄出申報邀請', () => openUnavailableInvite(), 'secondary')]));",
+    tests: ["tests/round93_td_invite_rename.test.js"]
+  },
+  {
+    id: "td-no-hint",
+    why: "預覽窗沒有指去範本樣本",
+    file: "src/ui/ScriptZone2.html",
+    find: "        para('想先看看義工會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')",
+    replace: "        para('', 'muted')",
+    tests: ["tests/round93_td_invite_rename.test.js"]
+  },
+  {
+    id: "te-uid-differs",
+    why: "取消事件 UID 和原事件不同",
+    file: "src/IcsExport.gs",
+    find: "    lines.push('UID:' + buildIcsUid_(opts.quarterId, opts.personId, c.serviceDate, c.postId, c.slotIndex));",
+    replace: "    lines.push('UID:' + buildIcsUid_(opts.quarterId, opts.personId, c.serviceDate, c.postId, c.slotIndex) + '-c');",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "te-no-cancel-status",
+    why: "取消事件沒有 STATUS:CANCELLED",
+    file: "src/IcsExport.gs",
+    find: "    lines.push('STATUS:CANCELLED');",
+    replace: "",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "te-method-request",
+    why: "日曆改成 METHOD:REQUEST",
+    file: "src/IcsExport.gs",
+    find: "  lines.push('METHOD:PUBLISH');",
+    replace: "  lines.push('METHOD:REQUEST');",
+    tests: ["tests/round93_te_ics_cancel.test.js", "tests/ics_calendar.test.js"]
+  },
+  {
+    id: "te-no-attach-cancel",
+    why: "沒有崗位但有取消事件的人不附日曆檔",
+    file: "src/IcsExport.gs",
+    find: "personAssignments.length === 0) && cancelled.length === 0) return null;",
+    replace: "personAssignments.length === 0)) return null;",
+    tests: ["tests/round93_te_ics_cancel.test.js", "tests/ics_calendar.test.js"]
+  },
+  {
+    id: "te-first-send-cancel",
+    why: "第一次寄（OFFICIAL）也加取消事件",
+    file: "src/IcsExport.gs",
+    find: "  if (context.stage !== MAIL_STAGES.RESEND || !personId) return [];",
+    replace: "  if (!personId) return [];",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "te-dryrun-counts",
+    why: "DRY_RUN 也算「收到」",
+    file: "src/IcsExport.gs",
+    find: "    if (String(row[C.STATUS] || '').trim().toUpperCase() !== MAIL_STATUS.SENT) return;",
+    replace: "",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "te-notice2-always",
+    why: "沒有取消事件也寫「已取消」那一句",
+    file: "src/Mailer.gs",
+    find: "  const hasCancelled = !!(icsAttachment && icsAttachment.cancelledCount > 0);",
+    replace: "  const hasCancelled = !!icsAttachment;",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "te-no-version-line",
+    why: "VEVENT DESCRIPTION 沒有「第 N 版，以最新一封信為準」",
+    file: "src/IcsExport.gs",
+    find: "  if (versionNo !== undefined && versionNo !== null) lines.push('（第 ' + versionNo + ' 版，以最新一封信為準）');",
+    replace: "",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "te-seq-zero",
+    why: "取消事件 SEQUENCE 不比原事件大",
+    file: "src/IcsExport.gs",
+    find: "    lines.push('SEQUENCE:' + Math.max(0, Number(opts.versionNo) || 0));\n    lines.push('DTSTAMP:' + opts.dtstampUtc);\n    lines.push('DTSTART;TZID=Pacific/Auckland:' + cStart);",
+    replace: "    lines.push('SEQUENCE:0');\n    lines.push('DTSTAMP:' + opts.dtstampUtc);\n    lines.push('DTSTART;TZID=Pacific/Auckland:' + cStart);",
+    tests: ["tests/round93_te_ics_cancel.test.js"]
+  },
+  {
+    id: "tf-no-phases",
+    why: "伺服器沒有分段時間",
+    file: "src/WebAppDashboard.gs",
+    find: "      phases: timer.list(),",
+    replace: "      phases: [],",
+    tests: ["tests/round93_tf_load_timings.test.js"]
+  },
+  {
+    id: "tf-always-show",
+    why: "Config 關掉也顯示載入時間",
+    file: "src/WebAppDashboard.gs",
+    find: "    showLoadTimings: getConfig_(CONFIG_KEYS.WEBAPP_SHOW_LOAD_TIMINGS, true) !== false,",
+    replace: "    showLoadTimings: true,",
+    tests: ["tests/round93_tf_load_timings.test.js"]
+  },
+  {
+    id: "tf-ui-ignores-off",
+    why: "前端不理 showLoadTimings=false",
+    file: "src/ui/Script.html",
+    find: "      const show = !(dashboardState_ && dashboardState_.showLoadTimings === false);",
+    replace: "      const show = true;",
+    tests: ["tests/round93_tf_load_timings.test.js"]
+  },
+  {
+    id: "tf-ctx-no-count",
+    why: "fine-tune context 次數不計",
+    file: "src/FineTune.gs",
+    find: "    FINE_TUNE_CONTEXT_STATS_.count++;",
+    replace: "",
+    tests: ["tests/round93_tf_load_timings.test.js"]
   }
 ];
 

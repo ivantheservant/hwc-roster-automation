@@ -209,7 +209,7 @@ const EMAIL_TEMPLATE_SEEDS = [
     placeholders: '{QuarterLabel},{GenerateDate},{PreseasonContentHtml},{PreseasonContentPlain}',
     attachType: ATTACH_TYPE.NONE
   },
-  // 第九十輪批次 QC 組：〔寄出申報邀請〕（UnavailableInvite.gs；不經 sendStage_()，Stage 欄只作標記）
+  // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕（UnavailableInvite.gs；不經 sendStage_()，Stage 欄只作標記）
   {
     templateId: 'TPL_UNAVAILABLE_INVITE_TC',
     stage: 'UNAVAILABLE_INVITE',

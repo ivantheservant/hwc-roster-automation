@@ -172,21 +172,30 @@ console.log('\n=== H：轉寄要喺最後一刻套用，唔喺上游 ===');
   const bareMailer = mailer.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const body = bareMailer.slice(bareMailer.indexOf('function sendRealEmail_'),
     bareMailer.indexOf('function generateMailAttachment_'));
-  check('★★★★★ `applyMailRedirect_()` 喺 `sendRealEmail_()` 入面',
-    /applyMailRedirect_\(/.test(body), body.slice(0, 300));
-  const redirectAt = body.indexOf('applyMailRedirect_(');
-  const sendAt = body.indexOf('MailApp.sendEmail(');
-  check('★★★★★ 而且喺 `MailApp.sendEmail()` **之前**',
+  // 第九十三輪批次 TA 組：套用轉寄的位置搬咗去 `sendMailThroughGate_()`（MailRedirect.gs）——
+  // `sendRealEmail_()` 經佢寄，幹事通知、紙本包、範本樣本都經佢。
+  check('★★★★★ `sendRealEmail_()` 經 `sendMailThroughGate_()` 寄出（唔再自己叫 MailApp）',
+    /sendMailThroughGate_\(/.test(body) && body.indexOf('MailApp.sendEmail(') === -1, body.slice(0, 300));
+  const redirectSrc = fs.readFileSync(path.join(SRC, 'MailRedirect.gs'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const gateBody = redirectSrc.slice(redirectSrc.indexOf('function sendMailThroughGate_'),
+    redirectSrc.indexOf('function buildRedirectBannerHtml_'));
+  const redirectAt = gateBody.indexOf('applyMailRedirect_(');
+  const sendAt = gateBody.indexOf('MailApp.sendEmail(');
+  check('★★★★★ `applyMailRedirect_()` 喺閘門入面，而且喺 `MailApp.sendEmail()` **之前**',
     redirectAt !== -1 && sendAt !== -1 && redirectAt < sendAt,
     'redirect@' + redirectAt + ' send@' + sendAt);
   check('★★★★★ 真正寄出用嘅係轉寄之後嗰個地址，唔係 `recipient.email`'
     + '——用返原本嗰個就等於整個機制冇生效，而畫面同 log 都會話成功',
-    /MailApp\.sendEmail\(redirected\.toEmail,/.test(body), body.slice(-400));
-  check('★★★★★ 全專案只有兩個 `MailApp.sendEmail\(` 呼叫點'
-    + '（另一個係「只通知幹事」嗰個，唔會寄俾義工）——'
-    + '多一個就代表有一條路繞過咗轉寄',
-    (bareMailer.match(/MailApp\.sendEmail\(/g) || []).length === 2,
-    String((bareMailer.match(/MailApp\.sendEmail\(/g) || []).length));
+    /MailApp\.sendEmail\(plan\.toEmail,/.test(gateBody), gateBody.slice(-400));
+  const allSrc = fs.readdirSync(SRC).filter((f) => /\.gs$/.test(f)).concat(
+    fs.readdirSync(path.join(SRC, 'ui')).filter((f) => /\.gs$/.test(f)).map((f) => 'ui/' + f))
+    .map((f) => fs.readFileSync(path.join(SRC, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    .join('\n');
+  check('★★★★★ 全專案只有一個 `MailApp.sendEmail(` 呼叫點（閘門）——'
+    + '多一個就代表有一條路繞過咗轉寄（詳細掃描見 round93_ta_mail_gate）',
+    (allSrc.match(/MailApp\.sendEmail\(/g) || []).length === 1,
+    String((allSrc.match(/MailApp\.sendEmail\(/g) || []).length));
 }
 
 console.log('\n=== H：SendLog 兩樣都要記 ===');

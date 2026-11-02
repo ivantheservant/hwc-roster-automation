@@ -90,6 +90,8 @@ function onOpen() {
         // 第九十輪批次 QB 組：詩班名單（ShowInRoster=FALSE 的名單組別）
         .addItem('補建 Posts 欄位（是否在職事表顯示）', 'runSeedPostShowInRoster_')
         .addItem('建立詩班名單', 'runCreateChoirGroup_')
+        // 第九十三輪批次 TB 組：每一種信寄一封樣本給自己，核對文字
+        .addItem('寄出電郵範本樣本', 'runSendTemplateSamples_')
         .addItem('補建身分名單工作表', 'runEnsureRoleSheets_')
         .addItem('補建排表偏好工作表', 'runEnsurePersonPostWeightSheet_')
         .addItem('補建 Quarters 欄位', 'runSeedQuartersStage_')

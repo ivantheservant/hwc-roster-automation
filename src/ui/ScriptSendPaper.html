@@ -626,6 +626,11 @@
       text: '附 .ics 日曆檔（iPhone 和 Google 日曆都可以開啟）'
     }));
     icsBox.appendChild(icsRow);
+    // 第九十三輪批次 TE 組：日曆檔的範圍
+    icsBox.appendChild(make('div', {
+      text: '只包括收件人自己的服侍日期及時間；改動後重發時，已取消的服侍亦會包括在內。',
+      className: 'muted'
+    }));
     nodes.push(icsBox);
 
     // ⚠️ 個人版 PDF 同 .ics 都只對「這一季有服侍的人」有意義。

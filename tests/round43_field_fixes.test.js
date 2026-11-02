@@ -727,7 +727,7 @@ console.log('\n=== I：MAIL_REDIRECT_ALL_TO 現況 ===');
     + '——第三十三輪嘅教訓：CONFIG_KEYS 有而 seed 冇，補建功能就永遠建唔出佢',
     /key: CONFIG_KEYS\.MAIL_REDIRECT_ALL_TO/.test(read('src/ConfigSeed.gs')), '');
   check('★★★★★ 3. 真正寄出用嘅係轉寄之後嗰個地址',
-    /MailApp\.sendEmail\(redirected\.toEmail,/.test(read('src/Mailer.gs')), '');
+    /MailApp\.sendEmail\(plan\.toEmail,/.test(read('src/MailRedirect.gs')), '');
   check('★★★★★ 4. 主旨加咗 `[原收件人：XXX]`',
     /'\[原收件人：' \+ who \+ '\] ' \+ plan\.subject/.test(read('src/MailRedirect.gs')), '');
   check('★★★★★ 5. 內文頂有橫幅（HTML 同純文字兩邊都有）',

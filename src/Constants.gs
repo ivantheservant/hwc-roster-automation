@@ -1193,7 +1193,9 @@ const HWCAS_MATCH = {
   ALIAS: 'ALIAS',
   AMBIGUOUS: 'AMBIGUOUS',
   NONE: 'NONE',
-  MISSING_IN_HWCAS: 'MISSING_IN_HWCAS'
+  MISSING_IN_HWCAS: 'MISSING_IN_HWCAS',
+  /** 第九十三輪批次 TC 組：出席系統的名字是 4 個中文字，去掉第一個字（例如夫姓）之後剛好配到一個人。**只作候選。** */
+  SURNAME_DROPPED: 'SURNAME_DROPPED'
 };
 
 /**
@@ -1490,6 +1492,8 @@ const CONFIG_KEYS = {
   WEBAPP_ALLOWED_EMAILS: 'WEBAPP_ALLOWED_EMAILS',
   // 第八十七輪批次 NB 組：只可以查看幹事介面的人（電郵，逗號分隔；預設空白）。見 WebApp.gs。
   WEBAPP_VIEWER_EMAILS: 'WEBAPP_VIEWER_EMAILS',
+  // 第九十三輪批次 TF 組：幹事介面頁底顯示載入時間（預設 TRUE；程式預設值，不用寫入工作表也生效）
+  WEBAPP_SHOW_LOAD_TIMINGS: 'WEBAPP_SHOW_LOAD_TIMINGS',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。

@@ -1,4 +1,20 @@
 /**
+ * 第九十三輪批次 TF 組：計次、計時（只量度，結果同以前一樣）。`apiGetDashboardState()` 載入開始時歸零，
+ * 完成後把「建 fine-tune context 幾次、共幾秒」放入分段時間。
+ */
+var FINE_TUNE_CONTEXT_STATS_ = { count: 0, ms: 0 };
+
+function buildFineTuneContext_(quarterId, versionNo, opts) {
+  const startedAt = Date.now();
+  try {
+    return buildFineTuneContextCore_(quarterId, versionNo, opts);
+  } finally {
+    FINE_TUNE_CONTEXT_STATS_.count++;
+    FINE_TUNE_CONTEXT_STATS_.ms += Date.now() - startedAt;
+  }
+}
+
+/**
  * 讀取 fine-tune 所需的全部資料：原始版本、grid 現況、規則與名單。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
@@ -6,7 +22,7 @@
  *   （`gridValues` 係空物件）。只供**唔會疊加 grid** 嘅唯讀用途（`summariseVersionSendWarnings_()`）。
  * @returns {Object} 供 fine-tune 運算使用的 context
  */
-function buildFineTuneContext_(quarterId, versionNo, opts) {
+function buildFineTuneContextCore_(quarterId, versionNo, opts) {
   const skipGrid = !!(opts && opts.skipGrid);
   const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;

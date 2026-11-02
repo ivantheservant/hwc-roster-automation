@@ -406,11 +406,14 @@ function apiEmailPaperPackToSelf_locked_(quarterId, personIds, extraEmails) {
           + ' 個地址。系統沒有從任何名單找收件人，所以不會有義工意外收到。')
         : '這一封是系統寄給你自己的，沒有任何一位義工會收到。'
     ];
-    MailApp.sendEmail({
+    // 第九十三輪批次 TA 組：測試期間（MAIL_REDIRECT_ALL_TO 有值）一律轉寄；沒有值照舊。DRY_RUN 照舊不理（本函式檔頭說明）。
+    sendMailThroughGate_({
       to: [to].concat(extra).join(','),
+      displayName: '操作者自己（紙本包）',
       subject: '要印紙本的個人職事表：' + quarterLabel + partText,
-      body: lines.join('\n'),
-      attachments: blobs
+      bodyHtml: null,
+      bodyPlain: lines.join('\n'),
+      options: { attachments: blobs }
     });
     sentCount++;
   });

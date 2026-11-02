@@ -600,6 +600,10 @@ function apiGetDashboardState(quarterId) {
  * @returns {Object}
  */
 function buildDashboardState_(quarterId) {
+  // 第九十三輪批次 TF 組：分段計時（只量度，不改任何判斷、次序或結果）
+  const timer = startPhaseTimer_();
+  FINE_TUNE_CONTEXT_STATS_.count = 0;
+  FINE_TUNE_CONTEXT_STATS_.ms = 0;
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stage = getQuarterStage_(quarterId);
   const versionNo = findLatestVersionNo_(quarterId);
@@ -643,6 +647,7 @@ function buildDashboardState_(quarterId) {
 
   // ── 未儲存改動（三者任一，規格 2.2）─────────────────────────
   const unsaved = readDashboardUnsavedState_(quarterId, versionNo);
+  timer.mark('讀工作表（版本、未儲存）');
 
   // ── SendLog（整張表只讀一次，同時算齊三個階段 + 有冇 OFFICIAL 紀錄）──
   const sendLog = readSendLogSummaryForDashboard_(quarterId, timezone);
@@ -663,12 +668,16 @@ function buildDashboardState_(quarterId) {
     log_('WARN', 'apiGetDashboardState：查不到公開連結是不是最新：' + err.message);
   }
 
+  timer.mark('寄出紀錄及公開連結');
+
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
   const officialCounts = countDashboardOfficialTargets_(quarterId, versionNo, versionExists);
   const resendBreakdown = stage === QUARTER_STAGE.OFFICIAL_SENT
     ? countDashboardResendBreakdown_(quarterId)
     : { total: 0, arrangementChanged: 0, notReceived: 0 };
   const changedPersonCount = resendBreakdown.total;
+
+  timer.mark('第 3、4 步人數');
 
   const facts = {
     stage: stage,
@@ -700,6 +709,7 @@ function buildDashboardState_(quarterId) {
     log_('WARN', 'apiGetDashboardState：區二開季前準備算不到：' + err.message);
     preQuarter = { undoneItemCount: -1, items: [], error: err.message };
   }
+  timer.mark('開季前準備');
 
   // 第八十五輪批次 LD 組：人手檢查（以輸入資料簽名快取）。讀不到 ⇒ error，不可以當成「足夠」。
   let staffing = null;
@@ -709,6 +719,7 @@ function buildDashboardState_(quarterId) {
     log_('WARN', 'apiGetDashboardState：人手檢查算不到：' + err.message);
     staffing = { error: err.message, totalBlanks: 0, shortPostCount: 0, posts: [] };
   }
+  timer.mark('人手檢查');
 
   // 第八十五輪批次 LF 組：「這一季還要做的」季前資料那一行
   let preseasonStatus = '';
@@ -727,6 +738,14 @@ function buildDashboardState_(quarterId) {
     log_('WARN', 'apiGetDashboardState：義工申報讀不到：' + err.message);
     pendingSubmissions = -1;
   }
+  timer.mark('季前資料及義工申報');
+
+  // 第九十三輪批次 TF 組：「寄出警告」（空格、放行的違反、名單影響）先算好再量度；都是只讀，結果不變
+  const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
+    : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' };
+  const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)
+    : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
+  timer.mark('寄出警告');
 
   return {
     staffing: staffing,
@@ -767,15 +786,21 @@ function buildDashboardState_(quarterId) {
     preQuarter: preQuarter,
     publicLink: publicLink,
     // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反
-    sendWarnings: versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
-      : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' },
+    sendWarnings: sendWarnings,
     // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
-    eligibilityImpact: versionExists ? summariseEligibilityImpact_(quarterId)
-      : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' },
+    eligibilityImpact: eligibilityImpact,
     // 第七十五輪批次 CA 組：「常用設定」三粒掣喺新分頁直接開嗰張工作表。
     settingsLinks: buildSettingsSheetLinks_(),
     // 第八十二輪批次 IJ 組：常用設定〔整季清走重來〕可唔可以撳（封鎖季度 ⇒ 灰掣＋原因）
-    quarterReset: readQuarterResetAvailabilitySafe_(quarterId)
+    quarterReset: readQuarterResetAvailabilitySafe_(quarterId),
+    // 第九十三輪批次 TF 組：伺服器分段時間（前端寫入 console）。`phases` 是各段毫秒，最後一項「合計」；
+    // `fineTuneContext` 是這一次載入建了幾次 fine-tune context、共幾毫秒（已包含在上面各段之內）。
+    showLoadTimings: getConfig_(CONFIG_KEYS.WEBAPP_SHOW_LOAD_TIMINGS, true) !== false,
+    timings: {
+      phases: timer.list(),
+      fineTuneContextCount: FINE_TUNE_CONTEXT_STATS_.count,
+      fineTuneContextMs: FINE_TUNE_CONTEXT_STATS_.ms
+    }
   };
 }
 

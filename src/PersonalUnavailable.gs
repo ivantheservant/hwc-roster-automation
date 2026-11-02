@@ -538,6 +538,24 @@ function decideUnavailableSubmissions_(submissionIds, decision, decidedBy) {
 }
 
 /**
+ * 第九十三輪批次 TB 組：「義工申報待確認」幹事通知的文字（由 `runUnavailableSubmissionNotify_()` 抽出，
+ * 〔寄出電郵範本樣本〕用示範資料叫同一支，樣本文字不會和正式通知分家）。
+ * @param {string} prefix 主旨前綴
+ * @param {{personName: string, serviceDate: string, reason: string, late: boolean}[]} fresh 新申報
+ * @param {number} pendingCount 全部待確認數
+ * @returns {{subject: string, body: string}}
+ */
+function buildUnavailableSubmissionNotifyText_(prefix, fresh, pendingCount) {
+  const lines = fresh.slice(0, 30).map(function (s) {
+    return '　• ' + s.personName + '　' + s.serviceDate + (s.reason ? '　原因：' + s.reason : '') + (s.late ? '　（截止日之後）' : '');
+  });
+  if (fresh.length > 30) lines.push('　……另有 ' + (fresh.length - 30) + ' 項');
+  const body = '有 ' + fresh.length + ' 項新的義工申報（不能服侍）等候確認（全部待確認：' + pendingCount + ' 項）：\n\n'
+    + lines.join('\n') + '\n\n請打開幹事介面「開季前準備 ▸ 不能服侍的日期」，在最上面逐項〔接受〕或〔不接受〕。';
+  return { subject: prefix + '義工申報不能服侍：' + fresh.length + ' 項等候確認', body: body };
+}
+
+/**
  * 每日檢查：有新的待確認申報 ⇒ 通知幹事一次（同一日最多一封；遵守 DRY_RUN；Config 可關）。
  * 「新」＝提交時間在上一次通知之後。通知紀錄寫 AuditLog（UNAVAILABLE_SUBMISSION_NOTIFIED）。
  * @param {string} today yyyy-MM-dd
@@ -560,13 +578,8 @@ function runUnavailableSubmissionNotify_(today, config, isDryRun) {
   if (fresh.length === 0) return row('SKIP', 'NOTHING_NEW');
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   const adminEmail = String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || '');
-  const lines = fresh.slice(0, 30).map(function (s) {
-    return '　• ' + s.personName + '　' + s.serviceDate + (s.reason ? '　原因：' + s.reason : '') + (s.late ? '　（截止日之後）' : '');
-  });
-  if (fresh.length > 30) lines.push('　……另有 ' + (fresh.length - 30) + ' 項');
-  const body = '有 ' + fresh.length + ' 項新的義工申報（不能服侍）等候確認（全部待確認：' + pending.length + ' 項）：\n\n'
-    + lines.join('\n') + '\n\n請打開幹事介面「開季前準備 ▸ 不能服侍的日期」，在最上面逐項〔接受〕或〔不接受〕。';
-  notifyAdmin_(prefix + '義工申報不能服侍：' + fresh.length + ' 項等候確認', body, adminEmail, isDryRun);
+  const text = buildUnavailableSubmissionNotifyText_(prefix, fresh, pending.length);
+  notifyAdmin_(text.subject, text.body, adminEmail, isDryRun);
   writeAuditLog_({
     action: 'UNAVAILABLE_SUBMISSION_NOTIFIED',
     targetSheet: SHEETS.UNAVAILABLE_SUBMISSIONS,

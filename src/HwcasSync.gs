@@ -241,6 +241,12 @@ function matchAcrossNameColumns_(record, nameColumns, columnHeaders, byName, ali
   if (duplicateNotes.length > 0) {
     return { personId: '', matchType: HWCAS_MATCH.AMBIGUOUS, note: duplicateNotes.join('；') };
   }
+  // 第九十三輪批次 TC 組：別的姓名欄已經完全相同／靠別名配到 ⇒ 去掉第一個字那一類（只作候選）不參與，免得把有把握的配對變成「同名多人」。
+  if (hits.some(function (h) { return h.matchType !== HWCAS_MATCH.SURNAME_DROPPED; })) {
+    for (let i = hits.length - 1; i >= 0; i--) {
+      if (hits[i].matchType === HWCAS_MATCH.SURNAME_DROPPED) hits.splice(i, 1);
+    }
+  }
   if (hits.length === 0) {
     return { personId: '', matchType: HWCAS_MATCH.NONE, note: '' };
   }
@@ -261,7 +267,8 @@ function matchAcrossNameColumns_(record, nameColumns, columnHeaders, byName, ali
 
   // 同一個人：優先採用 EXACT 的那一欄作為說明
   const best = hits.filter(function (h) { return h.matchType === HWCAS_MATCH.EXACT; })[0] || hits[0];
-  const via = best.matchType === HWCAS_MATCH.ALIAS ? '（經 NameAlias 對應）' : '';
+  const via = best.matchType === HWCAS_MATCH.ALIAS ? '（經 NameAlias 對應）'
+    : (best.matchType === HWCAS_MATCH.SURNAME_DROPPED ? '（' + HWCAS_SURNAME_DROPPED_NOTE + '）' : '');
   return {
     personId: best.personId,
     matchType: best.matchType,
@@ -289,9 +296,13 @@ function matchSingleName_(name, byName, aliasMap) {
   return {
     personId: resolved.personId,
     matchType: resolved.matchType,
-    note: resolved.matchType === HWCAS_MATCH.ALIAS ? '經 NameAlias 對應' : ''
+    note: resolved.matchType === HWCAS_MATCH.ALIAS ? '經 NameAlias 對應'
+      : (resolved.matchType === HWCAS_MATCH.SURNAME_DROPPED ? HWCAS_SURNAME_DROPPED_NOTE : '')
   };
 }
+
+/** 第九十三輪批次 TC 組：候選預覽畫面寫的說明。 */
+const HWCAS_SURNAME_DROPPED_NOTE = '出席系統的名字去掉第一個字後相同（例如夫姓）';
 
 /**
  * 用已載入的索引解析單一姓名，等同 normalizeName_() 後再比對，但不重複讀取工作表。
@@ -323,6 +334,21 @@ function resolveNameLocally_(rawName, byName, aliasMap) {
   if (aliasMap[name]) {
     return { personId: aliasMap[name], matchType: HWCAS_MATCH.ALIAS };
   }
+
+  // 第九十三輪批次 TC 組：第三步（只作候選）。出席系統的名字是 4 個中文字（例如冠了夫姓），
+  // 前兩步配不到 ⇒ 去掉第一個字，用剩下 3 個字再配一次（NameTC 及 NameAlias），**剛好一個人**才算。
+  // 配不到或多於一個 ⇒ 照舊當作配不到。3 個字、2 個字及英文名不做這一步。
+  // 職事表格子的配對（Utils.gs resolvePersonId_）不受影響，仍然只做完全相同。
+  if (/^[一-鿿]{4}$/.test(name)) {
+    const shortName = name.slice(1);
+    const ids = {};
+    (byName[shortName] || []).forEach(function (c) { ids[c[COLUMNS.NAME_MAPPING.PERSON_ID]] = true; });
+    if (aliasMap[shortName]) ids[aliasMap[shortName]] = true;
+    const found = Object.keys(ids);
+    if (found.length === 1) {
+      return { personId: found[0], matchType: HWCAS_MATCH.SURNAME_DROPPED };
+    }
+  }
   return null;
 }
 
@@ -347,6 +373,7 @@ function describeNameColumn_(column, columnHeaders) {
 function decideDraftAction_(matchType, existingEmail, hwcasEmail) {
   if (matchType === HWCAS_MATCH.NONE) return '需人手確認：找不到對應的 PersonID';
   if (matchType === HWCAS_MATCH.AMBIGUOUS) return '需人手確認：同名多人';
+  if (matchType === HWCAS_MATCH.SURNAME_DROPPED) return '需人手確認：' + HWCAS_SURNAME_DROPPED_NOTE + '（只作候選）';
   if (!hwcasEmail) return '無需處理：HWCAS 沒有電郵';
   if (!existingEmail) return '建議補上電郵';
   if (existingEmail.toLowerCase() === hwcasEmail.toLowerCase()) return '無需處理：電郵相同';

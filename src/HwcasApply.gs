@@ -183,6 +183,9 @@ function describeSkipReason_(matchType) {
   if (matchType === HWCAS_MATCH.MISSING_IN_HWCAS) {
     return 'MISSING_IN_HWCAS：NameMapping 有此人但 HWCAS 沒有';
   }
+  if (matchType === HWCAS_MATCH.SURNAME_DROPPED) {
+    return 'SURNAME_DROPPED：出席系統的名字去掉第一個字後相同，只作候選，需人手確認';
+  }
   return '配對結果為 ' + (matchType || '（空白）');
 }
 

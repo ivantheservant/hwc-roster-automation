@@ -12,7 +12,7 @@
 //   QC5 個人頁：這一季還沒有職事表 ⇒ token 正確照樣打開（「這一季的職事表還未發出」＋申報一段）；token 錯 ⇒ 中性頁；
 //       頁面嵌入的資料只有這個人自己的、而且 < > & 已轉義
 //   QC6 每日檢查通知幹事：有新的才寄、同一日最多一封、DRY_RUN、Config 可關
-//   QC7 〔寄出申報邀請〕：收件人（自動排的崗位、領詩／司琴、詩班、展開身分；沒有電郵的人列出）；DRY_RUN；
+//   QC7 〔邀請義工申報不能服侍的日子〕：收件人（自動排的崗位、領詩／司琴、詩班、展開身分；沒有電郵的人列出）；DRY_RUN；
 //       模擬和真正寄出分開記；每人自己的連結；AuditLog 不寫連結
 //   QC8 主畫面「義工申報待確認：N 項」、季前資料第四段一句、畫面（只可查看 ⇒ 按鈕灰色）、Config
 // 下面用假 ID（P97xx）、假名、假 token。
@@ -347,7 +347,7 @@ console.log('\n=== QC6：每日檢查通知幹事 ===');
 }
 
 // =====================================================================
-console.log('\n=== QC7：〔寄出申報邀請〕===');
+console.log('\n=== QC7：〔邀請義工申報不能服侍的日子〕===');
 {
   const sc = scene({ roles: [{ PersonID: 'P9706', RoleCode: 'DEACON', EffectiveFrom: '2098-01-01', EffectiveTo: '', Active: true }] });
   const g = sc.gas; const E = sc.C.ELIGIBILITY;
@@ -445,7 +445,7 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   const body = ui.document.getElementById('zone2Body');
   check('★★★★★★ 「這一季還要做的」有「義工申報待確認：3 項」', /義工申報待確認：3 項/.test(body.textContent), body.textContent.slice(0, 600));
   const btns = body.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
-  check('★★★★★ 開季前準備有〔寄出申報邀請〕', btns.indexOf('寄出申報邀請') !== -1, btns.join('、'));
+  check('★★★★★ 開季前準備有〔邀請義工申報不能服侍的日子〕', btns.indexOf('邀請義工申報不能服侍的日子') !== -1, btns.join('、'));
   // 〔不能服侍的日期〕最上面
   const cur = (id, name, source) => ({ unavailableId: id, personId: 'P9701', personName: name, dateFrom: '2099-01-11', dateTo: '2099-01-11',
     appliesTo: 'ALL', postIds: [], reason: '', source: source, status: 'ACTIVE', inQuarter: true });
@@ -470,7 +470,7 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   const vb = ui.document.getElementById('modalBody').flatten().filter((n) => n.tagName === 'BUTTON' && /接受/.test(n.textContent));
   check('★★★★★★ 只可查看：看得到，〔接受〕〔不接受〕〔全部接受〕全部灰色', vb.length === 5 && vb.every((b) => b.disabled === true),
     vb.map((b) => b.textContent + ':' + b.disabled).join(','));
-  check('★★★★ 只可查看：〔寄出申報邀請〕可以打開預覽（不灰）', vm.runInContext("isViewOnlyBlockedLabel_('寄出申報邀請')", ui) === false
+  check('★★★★ 只可查看：〔邀請義工申報不能服侍的日子〕可以打開預覽（不灰）', vm.runInContext("isViewOnlyBlockedLabel_('邀請義工申報不能服侍的日子')", ui) === false
     && vm.runInContext("isViewOnlyBlockedLabel_('寄出')", ui) === true);
   vm.runInContext('setViewOnly_(false);', ui);
   // 〔接受〕經 callServerMutating
