@@ -1004,8 +1004,12 @@
         className: 'ok-line'
       }));
     }
-    nodes.push(make('div', { text: '公開連結已經更新——連結地址不變，'
-      + '收到的人重新開就看到這一版。', className: 'ok-line' }));
+    // 第九十一輪批次 RD 組：完成窗即時出現；公開連結之後在背景更新（約十秒），這一行之後會更新
+    const publishLine = make('div', {
+      text: result.publishPending ? '公開連結更新中……' : '公開連結已經更新——連結地址不變，收到的人重新開就看到這一版。',
+      className: result.publishPending ? 'muted' : 'ok-line'
+    });
+    nodes.push(publishLine);
     if (result.stageAdvanced) {
       nodes.push(make('div', { text: '「寄出」現在可以按了。', className: 'ok-line strong' }));
     }
@@ -1019,6 +1023,37 @@
     const adjustBtn = button('請系統幫我調整', () => { closeModal(); openBuildSuggestion(); }, 'secondary');
     const doneActs = [button('知道了', () => closeModalAndRefresh(), ''), adjustBtn];
     openModal('儲存完成', nodes, doneActs);
+    if (result.publishPending) startPublishAfterSave(currentQuarterId, publishLine);
+  }
+
+  /**
+   * 第九十一輪批次 RD 組：〔儲存〕完成窗出現之後，在背景更新公開連結。
+   * 關閉完成窗不會取消；完成後狀態卡重新整理一次。失敗 ⇒ 那一行寫原因，加〔立即重新發佈〕（共用 republishPublicLinkNow()）。
+   * @param {string} quarterId 儲存那一季（中途轉季度都照樣更新那一季）
+   * @param {Object} line 完成窗「公開連結」那一行
+   * @returns {Promise<void>}
+   */
+  async function startPublishAfterSave(quarterId, line) {
+    publishInFlight_ = true;
+    let res = null;
+    let failure = '';
+    try {
+      res = await callServerMutating('apiPublishPublicRosterAfterSave', quarterId);
+      if (!res || !res.ok) failure = (res && res.message) || '原因不明';
+    } catch (err) {
+      failure = (err && err.message) || '原因不明';
+    }
+    publishInFlight_ = false;
+    if (!failure) {
+      line.textContent = '公開連結已經更新（第 ' + res.versionNo + ' 版）。';
+      line.className = 'ok-line';
+    } else {
+      line.textContent = '公開連結未能更新（' + failure + '）。';
+      line.className = 'err-text';
+      line.appendChild(button('立即重新發佈', () => republishPublicLinkNow(), 'secondary'));
+    }
+    // keepModal：完成窗還開着就不要關掉它（幹事可能還在看改了哪幾格）
+    try { await loadDashboard({ keepModal: true }); } catch (err) { /* 狀態卡下一次載入時再整理 */ }
   }
 
   /* ============================================================

@@ -85,7 +85,16 @@ function resolveStageTemplates_(stage) {
   return { person: findEmailTemplate_(stage), list: null };
 }
 
-function sendStage_(quarterId, versionNo, stage, sendOptions) {
+/**
+ * 寄出某一階段的信（步驟 2、4、選單、彩排都經這裏）。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {string} stage MAIL_STAGES
+ * @param {Object=} sendOptions 幹事喺寄出彈窗揀嘅選項
+ * @param {boolean=} publicLinkEnsured 第九十一輪批次 RD 組：呼叫端已經做過 `ensurePublicLinkFreshBeforeSend_()` ⇒ true
+ * @returns {Object} 寄送結果
+ */
+function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured) {
   assertNotPreviewMode_('sendStage_');
   // 追加階段 N：OFFICIAL 永遠不可以由自動排程觸發，結構性防護見 Trigger.gs 的
   // assertOfficialNotFromAutomationTrigger_()——目前 dailyAutomationCheck_() 根本
@@ -96,6 +105,11 @@ function sendStage_(quarterId, versionNo, stage, sendOptions) {
   const templates = resolveStageTemplates_(stage);
   const template = templates.person;
   if (!template) throw new Error('EmailTemplates 中找不到 Stage=' + stage + ' 的範本（也沒有 OFFICIAL 可退回使用）');
+
+  // ⚠️ 第九十一輪批次 RD 組：〔儲存〕不再即時重新發佈公開連結 ⇒ **寄出前一定要是最新**（信內有公開連結）。
+  // 放在這裏（寄信的必經之路）而不是逐個入口加：選單、補寄、日後新入口都自動受保護。
+  // 呼叫端已經做過（網頁步驟 2／4／5，`publicLinkEnsured === true`）就不重做。
+  if (publicLinkEnsured !== true) ensurePublicLinkFreshBeforeSend_(quarterId);
 
   // 需求 3：附件要存 Shared Drive 時，一開始就驗證資料夾，無效立即中止——
   // 不要讓 58 人的迴圈跑到一半才發現存不了（曾經花 538 秒才報錯）。

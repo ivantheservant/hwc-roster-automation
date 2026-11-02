@@ -35,6 +35,10 @@ const gas = loadGasSource([
   // 第六十六輪批次 AC 組：`apiMakeupGenerateMissingPdfs()` 經 `pdfBatchClientFields_()`（PdfBatch.gs）回傳失敗欄位
   'PdfBatch.gs', 'MakeupSend.gs', 'WebAppZone4.gs'
 ]);
+// 第九十一輪批次 RD 組刻意改動：補寄寄出前要先經 ensurePublicLinkFreshBeforeSend_()（在 WebAppSaveConfirm.gs）。
+// 這個測試不涉及公開連結，用假的代替並記低有沒有叫過。
+const freshCalls = [];
+gas.ensurePublicLinkFreshBeforeSend_ = function (q) { freshCalls.push(q); return { republished: false, freshness: {} }; };
 
 const Q = '2099T4';
 const OFFICIAL = gas.MAIL_STAGES.OFFICIAL;
@@ -147,6 +151,8 @@ console.log('\n=== W：冇缺件就照寄，完成結果帶埋 PDF 缺件數 ===
   const res = gas.apiMakeupSendExecute_locked_(Q, OFFICIAL);
   check('（前置）成功', res.ok === true, JSON.stringify(res).slice(0, 300));
   check('★★★★★ 寄咗', delivered.length > 0, JSON.stringify(delivered));
+  check('★★★★★ 第九十一輪 RD：補寄寄出前經過 ensurePublicLinkFreshBeforeSend_()（信內有公開連結）',
+    freshCalls.indexOf(Q) !== -1, JSON.stringify(freshCalls));
   check('★★★★★★ 回傳 errorPdf／errorPdfMissing（畫面要顯示）',
     'errorPdf' in res && 'errorPdfMissing' in res, JSON.stringify(res));
 }

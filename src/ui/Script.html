@@ -70,6 +70,25 @@
   let dashboardState_ = null;
 
   /**
+   * 第九十一輪批次 RD 組：〔儲存〕之後公開連結正在背景更新（`startPublishAfterSave()`）。
+   * 這段時間狀態卡不顯示「公開連結未更新」的警告，改寫「公開連結更新中」。
+   */
+  let publishInFlight_ = false;
+
+  /**
+   * 第九十一輪批次 RD 組：〔立即重新發佈〕——狀態卡和儲存完成窗共用同一份（不要另寫一份）。
+   * @returns {Promise<void>}
+   */
+  function republishPublicLinkNow() {
+    return runAction('發佈公開連結', async () => {
+      const res = await callServerMutating('apiRepublishPublicLink', currentQuarterId);
+      if (!res.ok) { showErrorModal('重新發佈公開連結', new Error(res.message)); return; }
+      setStatus('公開連結已經更新到第 ' + res.versionNo + ' 版的最新內容。');
+      await loadDashboard();
+    });
+  }
+
+  /**
    * 第九十一輪批次 RA 組：「人手填寫的崗位（講員、翻譯、獻花、領詩、司琴）」——名稱由伺服器按
    * Posts.AutoGenerate=FALSE 組成（`names` 優先，否則用主畫面狀態）；沒有名稱 ⇒「人手填寫的崗位」。
    * @param {string=} names 名稱
@@ -2390,18 +2409,15 @@
 
     const staleBox = clear(el('statusStaleLink'));
     const pl = d.publicLink || {};
-    if (pl.stale) {
+    if (pl.stale && publishInFlight_) {
+      // 第九十一輪批次 RD 組：〔儲存〕之後正在背景更新 ⇒ 不是「未更新」，不用請幹事重新發佈
+      staleBox.appendChild(make('div', { text: '公開連結更新中……', className: 'muted' }));
+      staleBox.hidden = false;
+    } else if (pl.stale) {
       staleBox.appendChild(make('div', {
         text: '公開連結未更新到最新內容。' + (pl.staleMessage || ''), className: 'err-text'
       }));
-      staleBox.appendChild(button('立即重新發佈', () => {
-        runAction('發佈公開連結', async () => {
-          const res = await callServerMutating('apiRepublishPublicLink', currentQuarterId);
-          if (!res.ok) { showErrorModal('重新發佈公開連結', new Error(res.message)); return; }
-          setStatus('公開連結已經更新到第 ' + res.versionNo + ' 版的最新內容。');
-          await loadDashboard();
-        });
-      }, ''));
+      staleBox.appendChild(button('立即重新發佈', () => republishPublicLinkNow(), ''));
       staleBox.hidden = false;
     } else {
       staleBox.hidden = true;

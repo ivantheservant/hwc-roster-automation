@@ -10248,6 +10248,134 @@ const MUTATIONS = [
     find: "  plan.timings = timer.list();",
     replace: "",
     tests: ["tests/round91_rc_re_save.test.js"]
+  },
+  {
+    id: "rd-save-publishes",
+    why: "儲存那一步照舊即時發佈（完成窗要等十秒）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  //     只改〔儲存〕這一條路；生成、接受建議、用舊版本作起點、匯入照舊即時發佈（交接列出秒數）。\n",
+    replace: "  //     只改〔儲存〕這一條路；生成、接受建議、用舊版本作起點、匯入照舊即時發佈（交接列出秒數）。\n  tryPublishPublicRoster_(quarterId);\n",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-pending-false",
+    why: "儲存沒有回傳 publishPending（前端不會在背景更新）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    publishPending: true,",
+    replace: "    publishPending: false,",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-api-no-perm",
+    why: "新 api 沒有權限檢查（只可查看的人都可以發佈）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  assertWebAppRequestAllowed_();\n  return withMutationLock_('更新公開連結'",
+    replace: "  return withMutationLock_('更新公開連結'",
+    tests: ["tests/round91_rd_publish_after_save.test.js", "tests/round87_nb_api_permission.test.js"]
+  },
+  {
+    id: "rd-api-no-lock",
+    why: "新 api 沒有經互斥鎖",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  return withMutationLock_('更新公開連結', function () {",
+    replace: "  return (function (n, f) { return f(); })('更新公開連結', function () {",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-api-fail-ok",
+    why: "發佈失敗都回 ok:true（前端寫已經更新）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  return { ok: !publish.failed, skipped",
+    replace: "  return { ok: true, skipped",
+    tests: ["tests/round91_rd_publish_after_save.test.js", "tests/save_and_confirm_execute.test.js"]
+  },
+  {
+    id: "rd-ui-no-pending-line",
+    why: "完成窗沒有「公開連結更新中……」",
+    file: "src/ui/ScriptZone1.html",
+    find: "      text: result.publishPending ? '公開連結更新中……' :",
+    replace: "      text: result.publishPending ? '' :",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-ui-no-background",
+    why: "完成窗出現之後沒有在背景更新",
+    file: "src/ui/ScriptZone1.html",
+    find: "    if (result.publishPending) startPublishAfterSave(currentQuarterId, publishLine);",
+    replace: "",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-ui-success-text",
+    why: "成功沒有寫第 N 版",
+    file: "src/ui/ScriptZone1.html",
+    find: "'公開連結已經更新（第 ' + res.versionNo + ' 版）。'",
+    replace: "'公開連結已經更新。'",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-ui-fail-no-button",
+    why: "失敗沒有〔立即重新發佈〕",
+    file: "src/ui/ScriptZone1.html",
+    find: "      line.appendChild(button('立即重新發佈', () => republishPublicLinkNow(), 'secondary'));",
+    replace: "",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-ui-close-modal",
+    why: "更新完成時把完成窗關掉",
+    file: "src/ui/ScriptZone1.html",
+    find: "    try { await loadDashboard({ keepModal: true }); } catch (err) {",
+    replace: "    try { await loadDashboard(); } catch (err) {",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-ui-inflight-stays",
+    why: "更新完成後狀態卡一直寫「更新中」",
+    file: "src/ui/ScriptZone1.html",
+    find: "    publishInFlight_ = false;\n    if (!failure) {",
+    replace: "    if (!failure) {",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-card-stale-warn",
+    why: "更新中狀態卡照舊寫「公開連結未更新」",
+    file: "src/ui/Script.html",
+    find: "    if (pl.stale && publishInFlight_) {",
+    replace: "    if (pl.stale && false) {",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-guard-sendstage",
+    why: "選單直接叫 sendStage_ 可以寄出過期連結",
+    file: "src/Mailer.gs",
+    find: "  if (publicLinkEnsured !== true) ensurePublicLinkFreshBeforeSend_(quarterId);\n",
+    replace: "",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-guard-resend",
+    why: "重寄可以寄出過期連結",
+    file: "src/ResendFlow.gs",
+    find: "  if (publicLinkEnsured !== true) ensurePublicLinkFreshBeforeSend_(quarterId);",
+    replace: "",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "rd-guard-makeup",
+    why: "補寄可以寄出過期連結",
+    file: "src/MakeupSend.gs",
+    find: "  ensurePublicLinkFreshBeforeSend_(plan.quarterId);\n",
+    replace: "",
+    tests: ["tests/round91_rd_publish_after_save.test.js", "tests/makeup_pdf_gap.test.js"]
+  },
+  {
+    id: "rd-step2-trust",
+    why: "步驟 2 傳 publicLinkEnsured=true 但自己沒有確保",
+    file: "src/FiveStageCore.gs",
+    find: "  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n  // 第九十一輪批次 RD 組：上一行已經確保最新",
+    replace: "  const fresh = { republished: false, freshness: {} };\n  // 第九十一輪批次 RD 組：上一行已經確保最新",
+    tests: ["tests/round91_rd_publish_after_save.test.js"]
   }
 ];
 

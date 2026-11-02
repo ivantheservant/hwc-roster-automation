@@ -165,8 +165,10 @@ const okResult = { ok: true, versionNo: 3, baseVersionNo: 2, cellCount: 1,
     check('（前置）儲存成第 1 版', r && r.versionNo === 1, JSON.stringify(r).slice(0, 300));
     check('★★★★★ JG6 有分段時間，最後一項「合計」', t.length >= 5 && t[t.length - 1].label === '合計'
       && t.every((x) => typeof x.ms === 'number' && x.ms >= 0), JSON.stringify(t));
-    check('★★★★ JG6 包括「重新檢查」「建立新版本」「重新發佈公開連結」',
-      ['重新檢查', '建立新版本', '重新發佈公開連結'].every((w) => t.some((x) => x.label.indexOf(w) !== -1)), JSON.stringify(t));
+    // 第九十一輪批次 RD 組刻意改動：〔儲存〕不再即時重新發佈公開連結（改由完成窗之後在背景做），所以沒有那一段
+    check('★★★★ JG6 包括「重新檢查」「建立新版本」；沒有「重新發佈公開連結」（RD：改在背景做）',
+      ['重新檢查', '建立新版本'].every((w) => t.some((x) => x.label.indexOf(w) !== -1))
+      && !t.some((x) => x.label.indexOf('重新發佈公開連結') !== -1), JSON.stringify(t));
   }
 })().then(() => {
   console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILURE(S)`);

@@ -249,7 +249,8 @@ function executeStep2_(quarterId, sendOptions) {
   // ⚠️ 第六十三輪批次 A 組：填咗講員而公開連結未跟上 ⇒ 先重發佈。
   // 堂委收到嘅審閱信信末就係嗰條連結。
   const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
-  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);
+  // 第九十一輪批次 RD 組：上一行已經確保最新 ⇒ 告訴 sendStage_() 不用再做一次
+  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions, true);
   result.publicLinkRepublished = fresh.republished;
 
   // 第二十三輪批次階段 E1（決定 D2）：**一律設為 `REVIEW_SENT`，唔係「前進一格」。**
@@ -567,7 +568,7 @@ function executeStep4Send_(quarterId, sendOptions) {
 
   // ⚠️ 第六十三輪批次 A 組：見 `ensurePublicLinkFreshBeforeSend_()`。
   const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
-  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);
+  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions, true);
   result.publicLinkRepublished = fresh.republished;
 
   // 第十九輪批次階段 C2：**寄送結果唔理想就唔前進 Stage。**
@@ -724,7 +725,7 @@ function executeStep5Send_(quarterId, versionNo, changedList, sendOptions) {
   // ⚠️ 第六十三輪批次 A 組：見 `ensurePublicLinkFreshBeforeSend_()`。
   const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
   const result = sendResendStage_(quarterId, versionNo,
-    changedList.map(function (c) { return c.personId; }), sendOptions);
+    changedList.map(function (c) { return c.personId; }), sendOptions, true);
   result.publicLinkRepublished = fresh.republished;
   return result;
 }

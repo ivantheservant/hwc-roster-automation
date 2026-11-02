@@ -270,12 +270,16 @@ function listResendPdfTargetPersonIds_(context, sendOptions, changedPersonIds) {
  * @param {number} versionNo 版本號（套用 Requests 後的新版本）
  * @param {string[]} changedPersonIds 這一輪判定為「有改動」的 PersonID 清單
  *   （來自 computeResendDiff_()，含零派工的被頂走者）
+ * @param {Object=} sendOptions 幹事喺寄出彈窗揀嘅選項
+ * @param {boolean=} publicLinkEnsured 第九十一輪批次 RD 組：呼叫端已經做過 `ensurePublicLinkFreshBeforeSend_()` ⇒ true
  * @returns {{sent: number, dryRun: number, skipped: number, unchanged: number, failed: number,
  *   errorPdf: number, errorPdfMissing: number, isDryRun: boolean, noEmailPeople: string[],
  *   retryCount: number, durationMs: number, changedCount: number, listRecipientCount: number}}
  *   各類結果的統計
  */
-function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions) {
+function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions, publicLinkEnsured) {
+  // ⚠️ 第九十一輪批次 RD 組：寄出前公開連結一定要是最新（見 sendStage_()）；呼叫端已經做過就不重做。
+  if (publicLinkEnsured !== true) ensurePublicLinkFreshBeforeSend_(quarterId);
   assertNotPreviewMode_('sendResendStage_');
   const startedAt = Date.now();
   const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;

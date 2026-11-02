@@ -171,20 +171,16 @@ console.log('\n=== D-2 步 7 失敗【核心】發佈失敗 ≠ 全盤失敗 ===
   check('★★★★★ 發佈失敗時仍然回 ok:true（版本真係儲存咗）'
     + '——當成失敗嘅話，幹事會以為要重做，就會建立第二個內容一樣嘅版本',
     /ok: true,\s*\n\s*versionCreated: true/.test(SRC));
-  check('★★★★★ 回傳 publishFailed 同 publishError 兩個欄位，前端分辨得出',
-    /publishFailed: publish\.failed/.test(SRC) && /publishError: publish\.message/.test(SRC));
-  check('★★★★★ 訊息分開講「版本已儲存好」同「連結未更新」',
-    /已經儲存好了，但公開連結未能更新/.test(SRC));
-  check('★★★★ 訊息提醒「唔好即刻撳寄給堂委，否則佢哋會睇到舊版本」'
-    + '——呢個係最實際嘅後果',
-    /否則他們會看到舊版本/.test(SRC));
-
-  check('★★★★★ 三種結果前端分辨得到：'
-    + '完全成功（ok:true, publishFailed:false）／'
-    + '版本成功但發佈失敗（ok:true, publishFailed:true）／'
-    + '完全失敗（ok:false）',
-    /ok: false/.test(SRC) && /publishFailed: publish\.failed/.test(SRC)
-    && /publishFailed: false/.test(SRC));
+  // 第九十一輪批次 RD 組刻意改動：〔儲存〕不再即時發佈 ⇒ 回傳 publishPending:true，
+  // 發佈失敗改由 apiPublishPublicRosterAfterSave() 回傳 ok:false＋原因，完成窗那一行寫「公開連結未能更新（原因）。」；
+  // 「寄出前一定要最新」由 ensurePublicLinkFreshBeforeSend_() 守住（tests/round91_rd_publish_after_save.test.js）。
+  check('★★★★★ 儲存回傳 publishPending:true（公開連結之後在背景更新），publishFailed 仍然有（前端舊分支不會出錯）',
+    /publishPending: true/.test(SRC) && /publishFailed: false/.test(SRC));
+  const afterSave = SRC.slice(SRC.indexOf('function publishPublicRosterAfterSave_'));
+  check('★★★★★ 背景發佈失敗回傳 ok:false 和原因，前端分辨得出',
+    /ok: !publish\.failed/.test(afterSave) && /message: publish\.message/.test(afterSave));
+  check('★★★★★ 三種結果前端分辨得到：完全成功（ok:true）／版本成功但之後發佈失敗（背景那一支 ok:false）／完全失敗（ok:false）',
+    /ok: false/.test(SRC) && /publishPending: true/.test(SRC));
 }
 
 console.log('\n=== D-3【核心】零改動路徑 ===');

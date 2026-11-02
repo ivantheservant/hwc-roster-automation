@@ -322,6 +322,9 @@ function executeMakeupSend_(plan) {
   const template = findEmailTemplate_(plan.stage);
   if (!template) throw new Error('EmailTemplates 中找不到 Stage=' + plan.stage + ' 的範本');
 
+  // ⚠️ 第九十一輪批次 RD 組：補寄的信同樣有公開連結 ⇒ 寄出前一定要是最新（之前補寄沒有這一道）。
+  ensurePublicLinkFreshBeforeSend_(plan.quarterId);
+
   const attachType = String(template.attachType || ATTACH_TYPE.NONE).toUpperCase();
   if (attachType === ATTACH_TYPE.FULL_PDF || attachType === ATTACH_TYPE.PERSONAL_PDF) {
     resolveMailAttachmentFolder_();

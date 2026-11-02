@@ -609,6 +609,28 @@ function buildSaveConfirmProposals_(context, resolved, allViolations) {
  * 理由的全文在 `src/MutationLock.gs` 檔頭。
  */
 /**
+ * 第九十一輪批次 RD 組：〔儲存〕完成窗出現之後，前端在背景呼叫這一支更新公開連結。**會寫入**（發佈公開檔）。
+ * 已經是最新就略過（`tryPublishPublicRoster_()` 自己判斷）。權限＝可以修改（`assertWebAppRequestAllowed_()` 不帶名字）。
+ * @param {string} quarterId 季度 ID
+ * @returns {{ok: boolean, skipped: boolean, versionNo: number, message: string}}
+ */
+function apiPublishPublicRosterAfterSave(quarterId) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('更新公開連結', function () {
+    return publishPublicRosterAfterSave_(String(quarterId || '').trim());
+  });
+}
+
+function publishPublicRosterAfterSave_(quarterId) {
+  const versionNo = findLatestVersionNo_(quarterId);
+  if (versionNo < 0) {
+    return { ok: false, skipped: false, versionNo: versionNo, message: '這一季還沒有任何版本，沒有東西可以發佈。' };
+  }
+  const publish = tryPublishPublicRoster_(quarterId);
+  return { ok: !publish.failed, skipped: !!publish.skipped, versionNo: versionNo, message: publish.message || '' };
+}
+
+/**
  * 第九十一輪批次 RC 組：儲存時沿用 `buildSaveAndConfirmPlan_()` 那一次的 context；季度或版本號不同 ⇒ 照舊重建。
  * @param {?Object} planContext `out.context`
  * @param {string} quarterId 季度 ID
@@ -845,9 +867,11 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
 
   timer.mark('放行紀錄、進度');
 
-  // ── 7　重新發佈公開連結 ─────────────────────────────────────
-  const publish = tryPublishPublicRoster_(quarterId);
-  timer.mark('重新發佈公開連結');
+  // ── 7　公開連結：第九十一輪批次 RD 組——**不再在這裏重新發佈**（第八十九輪 M17：佔 9–13 秒）。
+  //     回傳 `publishPending: true`：完成窗即時出現，前端之後在背景呼叫 `apiPublishPublicRosterAfterSave()`。
+  //     安全網：寄出前 `sendStage_()`／`sendResendStage_()`／`executeMakeupSend_()` 一定先經
+  //     `ensurePublicLinkFreshBeforeSend_()`（過期就先重新發佈，發佈失敗就一封都不寄）；狀態卡照舊顯示「未更新」。
+  //     只改〔儲存〕這一條路；生成、接受建議、用舊版本作起點、匯入照舊即時發佈（交接列出秒數）。
   const savedChanges = buildSavedChangeRowsForSave_(
     quarterId, plan.baseVersionNo, created.versionNo,
     resolved.changes, savedPostNames, hasRequests).concat(buildWeekTitleChangeRows_(titleChanges));
@@ -887,16 +911,11 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
     needsInputCount: requestResult ? requestResult.needsInputCount : 0,
     releasedViolationCount: plan.violations.kept.length,
     stageAdvanced: stageAdvanced,
-    publishFailed: publish.failed,
-    publishError: publish.message,
-    message: publish.failed
-      ? buildThreePartMessage_(
-        '第 ' + created.versionNo + ' 版已經儲存好了，但公開連結未能更新（' + publish.message + '）。',
-        '職事表已經儲存成第 ' + created.versionNo + ' 版。'
-          + '堂委現在開連結會看到舊內容。沒有寄出任何電郵。',
-        ['去「進階功能 ▸ 重新發佈公開連結」再試一次',
-          '如果連續失敗，先不要按「寄給堂委審閱」，否則他們會看到舊版本'])
-      : ''
+    // 第九十一輪批次 RD 組：公開連結之後在背景更新（apiPublishPublicRosterAfterSave）
+    publishPending: true,
+    publishFailed: false,
+    publishError: '',
+    message: ''
   };
 }
 
