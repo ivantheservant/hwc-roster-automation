@@ -9293,15 +9293,15 @@ const MUTATIONS = [
     id: "nb-perm-api-role",
     why: "權限 api 一律回可以修改",
     file: "src/WebApp.gs",
-    find: "  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR };",
-    replace: "  return { role: role, canModify: true };",
+    find: "  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm:",
+    replace: "  return { role: role, canModify: true, canConfirm:",
     tests: ["tests/round87_nb_api_permission.test.js"]
   },
   {
     id: "nb-front-mut-sends",
     why: "只可查看仍然送出改動",
     file: "src/ui/Script.html",
-    find: "    if (viewOnly_) throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');\n",
+    find: "      throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');\n",
     replace: "",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
@@ -9831,8 +9831,8 @@ const MUTATIONS = [
     id: "qc-past-dates",
     why: "過去的日子都可以申報",
     file: "src/PersonalUnavailable.gs",
-    find: "      .filter(function (d) { return d && d >= todayStr; })\n      .sort()",
-    replace: "      .filter(function (d) { return !!d; })\n      .sort()",
+    find: "    const dates = allDates\n      .filter(function (d) { return d >= todayStr; })",
+    replace: "    const dates = allDates\n      .filter(function (d) { return !!d; })",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
   },
   {
@@ -10007,17 +10007,17 @@ const MUTATIONS = [
     id: "qc-ui-no-subs",
     why: "〔不能服侍的日期〕沒有義工申報一段",
     file: "src/ui/ScriptZone3.html",
-    find: "    nodes.splice(0, 0, unavailableSubmissionsBox(unavailableData.submissions));",
+    find: "    unavailableConfirmInlineNodes_(keyword).reverse().forEach((n) => nodes.splice(0, 0, n));",
     replace: "",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
   },
   {
     id: "qc-ui-viewonly",
-    why: "只可查看的使用者可以按〔不接受〕〔全部接受〕",
-    file: "src/ui/Script.html",
-    find: "    /^不接受$/, /^全部接受$/",
-    replace: "    /^不接受(?=X)/",
-    tests: ["tests/round90_qc_personal_unavailable.test.js"]
+    why: "只可查看的使用者可以按〔不確認〕〔全部確認〕",
+    file: "src/ui/ScriptZone3.html",
+    find: "    const gate = (b) => (canDecide ? b : markViewOnlyBlocked_(b));",
+    replace: "    const gate = (b) => b;",
+    tests: ["tests/round94_ub_confirmer.test.js"]
   },
   {
     id: "qc-pack-no-line",
@@ -10047,16 +10047,16 @@ const MUTATIONS = [
     id: "qc-anchor-not-passed",
     why: "提交時不用連結的季度核對日子",
     file: "src/PersonalUnavailable.gs",
-    find: "    return submitPersonalUnavailable_(person, dates, reason, typeof quarterId === 'string' ? quarterId : '');",
-    replace: "    return submitPersonalUnavailable_(person, dates, reason, '');",
+    find: "    return submitPersonalUnavailable_(person, dates, reason, typeof quarterId === 'string' ? quarterId : '', postIds);",
+    replace: "    return submitPersonalUnavailable_(person, dates, reason, '', postIds);",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
   },
   {
     id: "qc-page-no-quarter",
     why: "個人頁提交時沒有帶連結的季度",
     file: "src/ui/PersonalRoster.html",
-    find: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1]);",
-    replace: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, '', args[0], args[1]);",
+    find: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1], args[2]);",
+    replace: "        if (fnName === 'submit') runner.personalSubmitUnavailable(token, '', args[0], args[1], args[2]);",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
   },
   {
@@ -10715,6 +10715,199 @@ const MUTATIONS = [
     find: "    FINE_TUNE_CONTEXT_STATS_.count++;",
     replace: "",
     tests: ["tests/round93_tf_load_timings.test.js"]
+  },
+  // ── 第九十四輪批次 UA–UD ──
+  {
+    id: "ua-posts-list-manual",
+    why: "崗位清單包括人手填的崗位",
+    file: "src/PersonalUnavailable.gs",
+    find: "    return p.autoGenerate === true || sameDay.indexOf(p.postId) !== -1;",
+    replace: "    return true;",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ua-posts-no-role-check",
+    why: "不按第一個主日的身分展開",
+    file: "src/PersonalUnavailable.gs",
+    find: "    return !eligibilityRoleTokenFailure_(ctx.ruleCtx, p.postId, personId, firstSunday);",
+    replace: "    return true;",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ua-no-subset-check",
+    why: "崗位不是這個人這一季的也收",
+    file: "src/PersonalUnavailable.gs",
+    find: "    if (wantedPosts.some(function (id) { return okPosts.indexOf(id) === -1; })) {",
+    replace: "    if (false) {",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ua-cross-quarter",
+    why: "只限崗位而日子跨兩季照收",
+    file: "src/PersonalUnavailable.gs",
+    find: "    if (Object.keys(qIds).length !== 1) return fail(",
+    replace: "    if (false) return fail(",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ua-postids-not-written",
+    why: "提交不寫 PostIDs",
+    file: "src/PersonalUnavailable.gs",
+    find: "    rec[S.POST_IDS] = wantedPosts.join(',');",
+    replace: "    rec[S.POST_IDS] = '';",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ua-accept-all-posts",
+    why: "確認後 Unavailable 一律全部崗位",
+    file: "src/PersonalUnavailable.gs",
+    find: "      rec[U.APPLIES_TO] = s.postIds.length > 0 ? 'POSTS' : UNAVAILABLE_VALUES.APPLIES_TO_ALL;",
+    replace: "      rec[U.APPLIES_TO] = UNAVAILABLE_VALUES.APPLIES_TO_ALL;",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ua-ui-submit-no-post",
+    why: "沒有選崗位也可以按〔提交〕",
+    file: "src/ui/PersonalRoster.html",
+    find: "          if (onlyPosts() && selectedPosts().length === 0) {",
+    replace: "          if (false) {",
+    tests: ["tests/round94_ua_personal_posts.test.js"]
+  },
+  {
+    id: "ub-confirmer-role",
+    why: "確認者名單不給角色",
+    file: "src/WebApp.gs",
+    find: "  else if (email && confirmers.indexOf(email) !== -1) role = WEBAPP_ROLE.CONFIRMER;",
+    replace: "",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "ub-confirmer-all-apis",
+    why: "確認者可以呼叫任何 api",
+    file: "src/WebApp.gs",
+    find: "  if (role === WEBAPP_ROLE.CONFIRMER) {",
+    replace: "  if (role === WEBAPP_ROLE.CONFIRMER) { return role;",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "ub-viewer-decide",
+    why: "只可查看但不是確認者也可以決定",
+    file: "src/WebApp.gs",
+    find: "UNAVAILABLE_CONFIRMER_APIS.indexOf(readOnlyApiName) !== -1 && isUnavailableConfirmerCaller_()) return role;",
+    replace: "UNAVAILABLE_CONFIRMER_APIS.indexOf(readOnlyApiName) !== -1) return role;",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "ub-no-can-confirm",
+    why: "apiGetMyPermission 不回 canConfirm",
+    file: "src/WebApp.gs",
+    find: "canConfirm: isUnavailableConfirmerCaller_() };",
+    replace: "canConfirm: false };",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "ub-history-no-cap",
+    why: "已處理不限 50 項",
+    file: "src/PersonalUnavailable.gs",
+    find: "    .slice(0, 50)\n",
+    replace: "\n",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "ub-boot-full-ui",
+    why: "只是確認者照樣載入整個介面",
+    file: "src/ui/ScriptBoot.html",
+    find: "    if (myRole_ === 'CONFIRMER') { await renderConfirmerOnly_(); return; }",
+    replace: "",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "ub-ui-viewer-blocked",
+    why: "只可查看＋確認者送不到決定",
+    file: "src/ui/Script.html",
+    find: "    if (viewOnly_ && !(myCanConfirm_ && UNAVAILABLE_CONFIRMER_CALLS.indexOf(fnName) !== -1)) {",
+    replace: "    if (viewOnly_) {",
+    tests: ["tests/round94_ub_confirmer.test.js"]
+  },
+  {
+    id: "uc-no-confirmers",
+    why: "新申報通知不寄確認者",
+    file: "src/PersonalUnavailable.gs",
+    find: "  add(getConfig_(CONFIG_KEYS.UNAVAILABLE_CONFIRMER_EMAILS, []));",
+    replace: "",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "uc-no-dedupe",
+    why: "收件人不去重",
+    file: "src/PersonalUnavailable.gs",
+    find: "      if (v && !seen[v.toLowerCase()]) { seen[v.toLowerCase()] = true; out.push(v); }",
+    replace: "      if (v) { out.push(v); }",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "uc-no-deep-link",
+    why: "通知沒有確認畫面的深連結",
+    file: "src/PersonalUnavailable.gs",
+    find: "  return base + (base.indexOf('?') === -1 ? '?' : '&') + 'view=unavailable-confirm'",
+    replace: "  return base + (base.indexOf('?') === -1 ? '?' : '&') + 'view='",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "uc-no-email-silent",
+    why: "沒有電郵不記 AuditLog",
+    file: "src/PersonalUnavailable.gs",
+    find: "    if (!email) { out.noEmail++; audit('NO_EMAIL', '沒有電郵，沒有通知：' + summary); return; }",
+    replace: "    if (!email) { out.noEmail++; return; }",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "ud-gen-no-autoconfirm",
+    why: "生成前沒有自動確認",
+    file: "src/WebAppGenerate.gs",
+    find: "    autoConfirm = autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);",
+    replace: "    autoConfirm = { confirmed: 0, message: '' };",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "ud-gen-swallow-error",
+    why: "自動確認失敗照樣生成",
+    file: "src/WebAppGenerate.gs",
+    find: "  } catch (err) {\n    return { ok: false, versionCreated: false, message: err.message };\n  }\n\n  let result;",
+    replace: "  } catch (err) {\n    autoConfirm = { confirmed: 0, message: '' };\n  }\n\n  let result;",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "ud-sug-no-autoconfirm",
+    why: "調整前沒有自動確認",
+    file: "src/SuggestionSheet.gs",
+    find: "  autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.SUGGEST);",
+    replace: "",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "ud-trigger-no-confirm",
+    why: "每日自動生成沒有先確認",
+    file: "src/Trigger.gs",
+    find: "          autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);",
+    replace: "",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "ud-range-whole-sheet",
+    why: "自動確認連下一季也確認",
+    file: "src/PersonalUnavailable.gs",
+    find: "      return s.status === UNAVAILABLE_SUBMISSION_STATUS.PENDING && s.serviceDate >= range.start && s.serviceDate <= range.end;",
+    replace: "      return s.status === UNAVAILABLE_SUBMISSION_STATUS.PENDING;",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "ud-gen-window-no-line",
+    why: "生成確認窗沒有待確認那一句",
+    file: "src/ui/ScriptZone1.html",
+    find: "      facts.appendChild(make('div', { text: plan.pendingAutoConfirmText, className: 'warn-head' }));",
+    replace: "",
+    tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
   }
 ];
 

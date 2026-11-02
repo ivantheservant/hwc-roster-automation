@@ -219,6 +219,23 @@ function renderAllSamples() {
     attachment: '無（NONE）'
   });
 
+  // 第九十四輪批次 UC 組（刻意新增）：通知申請人處理結果（每人一封，確認、不確認合併）
+  add({
+    key: 'TPL_UNAVAILABLE_DECIDED_TC',
+    template: byId.TPL_UNAVAILABLE_DECIDED_TC,
+    recipient: RECIPIENTS.person,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月',
+      DecisionHtml: '<p>你申報 2099年1-3月 以下主日不能服侍，已確認了你的申請：</p><ul><li>1 月 4 日（全部崗位）</li></ul>'
+        + '<p>系統排表時會避開這些日子。如需更改，請聯絡幹事。</p>',
+      DecisionPlain: '你申報 2099年1-3月 以下主日不能服侍，已確認了你的申請：\n・1 月 4 日（全部崗位）\n'
+        + '系統排表時會避開這些日子。如需更改，請聯絡幹事。' },
+    purpose: '通知申請人：不能服侍的申報已確認／未能確認',
+    trigger: '確認畫面〔確認申請〕〔不確認〕〔全部確認〕；生成初稿、請系統幫我調整之前的自動確認',
+    audience: '那幾位申請人（按人合併成一封）',
+    attachment: '無（NONE）'
+  });
+
   return samples;
 }
 

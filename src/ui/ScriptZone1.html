@@ -131,8 +131,14 @@
         text: '・' + manualPostsPhrase(plan.manualPostNames) + '不會自動排，要你之後人手填',
         className: 'vio-row'
       }),
-      make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
+      // 第九十四輪批次 UD 組：有待確認的義工申報 ⇒ 開始之後會自動確認並通知申請人（那就不是「不會寄出任何電郵」）
+      plan.pendingAutoConfirmText
+        ? make('div', { text: '・不會寄出職事表；只會通知那幾位申請人（義工申報已確認）', className: 'vio-row' })
+        : make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
     ]);
+    if (plan.pendingAutoConfirmText) {
+      facts.appendChild(make('div', { text: plan.pendingAutoConfirmText, className: 'warn-head' }));
+    }
 
     // 生成係**可逆**嘅：唔會寄信、唔會覆蓋任何嘢（冇版本先撳得到）。
     // 所以唔需要打字確認——打字確認留返俾真正不可逆嘅動作（掣 3／掣 4）。
@@ -185,6 +191,8 @@
         text: '已生成初稿（第 ' + res.versionNo + ' 版）',
         className: 'ok-head'
       }),
+      // 第九十四輪批次 UD 組：生成前自動確認了的義工申報
+      res.autoConfirmMessage ? make('div', { text: res.autoConfirmMessage, className: 'lines' }) : null,
       make('div', {
         text: res.serviceDateCount + ' 個主日、' + res.postCount + ' 個崗位'
           + (res.genuineGapCount > 0 ? '、有 ' + res.genuineGapCount + ' 格未能安排' : ''),

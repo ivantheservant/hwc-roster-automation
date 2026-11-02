@@ -139,8 +139,9 @@ console.log('\n=== QC2：提交 ===');
   const audit = sc.audits('PERSONAL_UNAVAILABLE_SUBMITTED');
   check('★★★★★★ AuditLog 只寫 PersonID，不寫 token', audit.length === 1 && audit[0][sc.C.AUDIT_LOG.TARGET_KEY] === 'P9701'
     && JSON.stringify(sc.audits()).indexOf(tok(1)) === -1, JSON.stringify(audit));
-  check('★★★★★ 回傳最新的頁面資料：兩項「等候幹事確認」，可以撤回',
-    res.view.submissions.length === 2 && res.view.submissions.every((s) => s.statusText === '等候幹事確認' && s.canWithdraw));
+  // 第九十四輪批次（刻意改動）：用字改為「等候確認／已確認了你的申請／未能確認」；已撤回的照樣列出（狀態寫明）；多了 PostIDs 欄
+  check('★★★★★ 回傳最新的頁面資料：兩項「等候確認」，可以撤回',
+    res.view.submissions.length === 2 && res.view.submissions.every((s) => s.statusText === '等候確認' && s.canWithdraw));
   check('★★★★ 那兩日在選擇清單變成「已申報」（不可以再勾）',
     res.view.quarters[0].dates.filter((d) => d.status === 'PENDING').map((d) => d.serviceDate).join() === [T1[1], T1[2]].join());
   const again = g.personalSubmitUnavailable(tok(1), '', [T1[1]], '');
@@ -183,7 +184,7 @@ console.log('\n=== QC2：提交 ===');
   sc3.gas.personalSubmitUnavailable(tok(3), '', [T1[0]], '');
   check('★★★★ 截止日之前提交 ⇒ 不標「截止日之後」', sc3.subs()[0].late === false);
   check('★★★★ UnavailableSubmissions 第 1 行中文標題、第 2 行機器鍵',
-    sc3.ss.getSheetByName('UnavailableSubmissions').getRange(2, 1, 1, 10).getValues()[0].join() === sc3.gas.unavailableSubmissionKeys_().join()
+    sc3.ss.getSheetByName('UnavailableSubmissions').getRange(2, 1, 1, sc3.gas.unavailableSubmissionKeys_().length).getValues()[0].join() === sc3.gas.unavailableSubmissionKeys_().join()
     && sc3.ss.getSheetByName('UnavailableSubmissions').getRange(1, 1).getValue() === '申報編號');
 }
 {
@@ -213,15 +214,17 @@ console.log('\n=== QC3：撤回 ===');
   check('★★★★★★ 不可以撤回別人的（找不到，同一句）', !r1.ok && /找不到/.test(r1.message)
     && sc.subs().filter((s) => s.submissionId === other.submissionId)[0].status === 'PENDING', JSON.stringify(r1));
   const r2 = g.personalWithdrawUnavailable(tok(1), '', mine[0].submissionId);
-  check('★★★★★★ 撤回自己的 ⇒ WITHDRAWN；頁面不再列出', r2.ok && sc.subs().filter((s) => s.submissionId === mine[0].submissionId)[0].status === 'WITHDRAWN'
-    && r2.view.submissions.length === 1, JSON.stringify(r2));
+  // 第九十四輪批次（刻意改動）：用字改為「等候確認／已確認了你的申請／未能確認」；已撤回的照樣列出（狀態寫明）；多了 PostIDs 欄
+  check('★★★★★★ 撤回自己的 ⇒ WITHDRAWN；頁面寫「已撤回」、不可以再撤回', r2.ok && sc.subs().filter((s) => s.submissionId === mine[0].submissionId)[0].status === 'WITHDRAWN'
+    && r2.view.submissions.length === 2 && r2.view.submissions.some((x) => x.status === 'WITHDRAWN' && x.statusText === '已撤回' && !x.canWithdraw), JSON.stringify(r2));
   check('★★★★ AuditLog 撤回（只寫 PersonID）', sc.audits('PERSONAL_UNAVAILABLE_WITHDRAWN').length === 1
     && JSON.stringify(sc.audits()).indexOf(tok(1)) === -1);
   g.decideUnavailableSubmissions_([mine[1].submissionId], 'ACCEPT', 'clerk@example.invalid');
   const r3 = g.personalWithdrawUnavailable(tok(1), '', mine[1].submissionId);
   check('★★★★★★ 已確認的不可以自己取消（「如需取消，請聯絡幹事」）', !r3.ok && /如需取消，請聯絡幹事/.test(r3.message), JSON.stringify(r3));
   const v = g.buildPersonalUnavailableView_('P9701', sc.today, sc.TZ);
-  check('★★★★★ 個人頁：已確認、不可以撤回', v.submissions.length === 1 && v.submissions[0].statusText === '已確認' && !v.submissions[0].canWithdraw);
+  const acc = v.submissions.filter((x) => x.status === 'ACCEPTED');
+  check('★★★★★ 個人頁：已確認了你的申請、不可以撤回', acc.length === 1 && acc[0].statusText === '已確認了你的申請' && !acc[0].canWithdraw, JSON.stringify(v.submissions));
 }
 
 // =====================================================================
@@ -248,7 +251,7 @@ console.log('\n=== QC4：幹事確認 ===');
   const r = g.apiDecideUnavailableSubmissions([ids[1]], 'REJECT');
   check('★★★★★★ 〔不接受〕⇒ REJECTED，不建立 Unavailable', r.rejected === 1 && sc.unav().length === 1
     && sc.subs().filter((s) => s.submissionId === ids[1])[0].status === 'REJECTED');
-  check('★★★★ 個人頁顯示「不接受」', g.buildPersonalUnavailableView_('P9703', sc.today, sc.TZ).submissions[0].statusText === '不接受');
+  check('★★★★ 個人頁顯示「未能確認」', g.buildPersonalUnavailableView_('P9703', sc.today, sc.TZ).submissions[0].statusText === '未能確認');
   const all = g.apiDecideUnavailableSubmissions(ids, 'ACCEPT');
   check('★★★★★ 〔全部接受〕：已處理的略過，只接受剩下的', all.accepted === 1 && all.skipped === 2 && sc.unav().length === 2, JSON.stringify(all));
   check('★★★★ 不認得的決定 ⇒ 拋錯', /不認得/.test(neutralOf(() => g.apiDecideUnavailableSubmissions(ids, 'X'))));
@@ -454,34 +457,41 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
     submissions: { items: [{ submissionId: 'S1', personId: 'P9701', personName: '假甲', serviceDate: '2099-01-11', reason: '出外', late: true },
       { submissionId: 'S2', personId: 'P9703', personName: '假丙', serviceDate: '2099-01-18', reason: '', late: false }], error: '' } };
   vm.runInContext('unavailableData = ' + JSON.stringify(data) + ';', ui);
+  // 第九十四輪批次 UB 組（刻意改動）：最上面改用「義工申報，確認」畫面同一個元件（資料由 apiGetUnavailableConfirmView）
+  const confirmData = { pendingCount: 2, canDecide: true, history: [], pending: [
+    { personId: 'P9701', personName: '假甲', items: [{ submissionId: 'S1', serviceDate: '2099-01-11', postsText: '全部崗位', reason: '出外', submittedAt: '2098-12-10 09:00:00', late: true }] },
+    { personId: 'P9703', personName: '假丙', items: [{ submissionId: 'S2', serviceDate: '2099-01-18', postsText: '讀經', reason: '', submittedAt: '2098-12-10 09:00:00', late: false }] }] };
+  vm.runInContext('unavailableConfirmData_ = ' + JSON.stringify(confirmData) + ';', ui);
   ui.renderUnavailable('');
   const mb = ui.document.getElementById('modalBody');
   const first = mb.children[0];
-  check('★★★★★★ 最上面「義工申報，待確認（2 項）」', first && /^義工申報，待確認（2 項）/.test(first.textContent), first && first.textContent);
+  check('★★★★★★ 最上面「待確認（2 項）」', first && /^待確認（2 項）/.test(first.textContent), first && first.textContent);
   const mbtn = mb.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
-  check('★★★★★ 逐項〔接受〕〔不接受〕＋〔全部接受〕', mbtn.filter((t) => t === '接受').length === 2 && mbtn.filter((t) => t === '不接受').length === 2
-    && mbtn.indexOf('全部接受') !== -1, mbtn.join('、'));
-  check('★★★★ 截止日之後的標出來、原因', /假甲　2099-01-11　（截止日之後）/.test(mb.textContent) && /原因：出外/.test(mb.textContent));
+  check('★★★★★ 逐項〔確認申請〕〔不確認〕＋〔全部確認〕', mbtn.filter((t) => t === '確認申請').length === 2 && mbtn.filter((t) => t === '不確認').length === 2
+    && mbtn.indexOf('全部確認') !== -1, mbtn.join('、'));
+  check('★★★★ 截止日之後的標出來、原因', /假甲/.test(mb.textContent) && /截止日之後/.test(mb.textContent) && /原因：出外/.test(mb.textContent));
   check('★★★★★ 生效清單：接受了的義工申報寫「（來源：個人連結）」；幹事自己加的不寫',
     /假戊　2099-01-11 至 2099-01-11　全部崗位　（來源：個人連結）/.test(mb.textContent) && !/假己[^假]*來源/.test(mb.textContent), mb.textContent.slice(0, 600));
   // 只可查看 ⇒ 看得到，按鈕灰色
   vm.runInContext('setViewOnly_(true);', ui);
+  vm.runInContext('unavailableConfirmData_ = ' + JSON.stringify(Object.assign({}, confirmData, { canDecide: false })) + ';', ui);
   ui.renderUnavailable('');
-  const vb = ui.document.getElementById('modalBody').flatten().filter((n) => n.tagName === 'BUTTON' && /接受/.test(n.textContent));
-  check('★★★★★★ 只可查看：看得到，〔接受〕〔不接受〕〔全部接受〕全部灰色', vb.length === 5 && vb.every((b) => b.disabled === true),
+  const vb = ui.document.getElementById('modalBody').flatten().filter((n) => n.tagName === 'BUTTON' && /確認/.test(n.textContent));
+  check('★★★★★★ 只可查看：看得到，〔確認申請〕〔不確認〕〔全部確認〕全部灰色', vb.length === 5 && vb.every((b) => b.disabled === true),
     vb.map((b) => b.textContent + ':' + b.disabled).join(','));
   check('★★★★ 只可查看：〔邀請義工申報不能服侍的日子〕可以打開預覽（不灰）', vm.runInContext("isViewOnlyBlockedLabel_('邀請義工申報不能服侍的日子')", ui) === false
     && vm.runInContext("isViewOnlyBlockedLabel_('寄出')", ui) === true);
   vm.runInContext('setViewOnly_(false);', ui);
-  // 〔接受〕經 callServerMutating
+  vm.runInContext('unavailableConfirmData_ = ' + JSON.stringify(confirmData) + ';', ui);
+  // 〔全部確認〕經 callServerMutating
   const calls = [];
-  ui.callServerMutating = async (name, ids, decision) => { calls.push([name, ids, decision]); return { message: '已接受 1 項' }; };
-  ui.callServer = async () => data;
+  ui.callServerMutating = async (name, ids, decision) => { calls.push([name, ids, decision]); return { message: '已確認 1 項' }; };
+  ui.callServer = async (name) => (name === 'apiGetUnavailableConfirmView' ? confirmData : data);
   vm.runInContext('runAction = async function (l, fn) { await fn(); };', ui);
   ui.renderUnavailable('');
-  ui.document.getElementById('modalBody').flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === '全部接受')[0].fire('click');
+  ui.document.getElementById('modalBody').flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === '全部確認')[0].fire('click');
   setTimeout(() => {
-    check('★★★★★ 〔全部接受〕送出全部編號（callServerMutating）', calls.length === 1 && calls[0][0] === 'apiDecideUnavailableSubmissions'
+    check('★★★★★ 〔全部確認〕送出全部編號（callServerMutating）', calls.length === 1 && calls[0][0] === 'apiDecideUnavailableSubmissions'
       && calls[0][1].join() === 'S1,S2' && calls[0][2] === 'ACCEPT', JSON.stringify(calls));
     finish();
   }, 0);

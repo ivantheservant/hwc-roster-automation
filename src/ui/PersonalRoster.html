@@ -142,6 +142,26 @@
   .unav .sub-row { padding: 3px 0; }
   .unav .unav-msg { font-weight: 700; margin: 0 0 8px; }
   .unav .unav-msg.err { color: #b42318; }
+  /* 第九十四輪批次 UA 組：逐個主日的方格（手機友善：自動換行、不會橫向捲動；方格最少 44px 高，手指按得到） */
+  .unav .q-block { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 10px; }
+  .unav .month-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; margin: 8px 0; }
+  .unav .month-label { flex: 0 0 3.4em; font-weight: 700; padding-top: 10px; }
+  .unav .tiles { flex: 1 1 180px; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .unav button.tile { min-width: 64px; min-height: 44px; margin: 0; padding: 4px 8px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--fg); line-height: 1.2; }
+  .unav button.tile.on { background: #1a7f37; border-color: #1a7f37; color: #ffffff; font-weight: 700; }
+  .unav button.tile.done { background: var(--skipped); color: var(--muted); cursor: not-allowed; }
+  .unav .tile-note { display: block; font-size: 11px; font-weight: normal; }
+  .unav button.all-month { margin: 0; padding: 4px 8px; font-size: 12px; background: transparent; }
+  .unav .scope label { display: block; padding: 6px 0; }
+  .unav .posts-box { padding-left: 22px; }
+  .unav .posts-box label { display: inline-block; padding: 6px 12px 6px 0; }
+  .unav .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
+  .unav .hint.err { color: #b42318; }
+  .unav table.mine { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 6px; }
+  .unav table.mine th, .unav table.mine td { white-space: normal; word-break: break-word; text-align: left;
+    font-size: 12px; padding: 4px 6px; }
+  .unav button:disabled { opacity: 0.55; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -224,7 +244,7 @@
   </div>
 
   <div class="how-to">
-    <p><strong>如果這一週不能服侍：</strong>還未排表的主日，可以在上面「申報不能服侍的日子」申報，幹事確認後生效；已經排了你的那一週，請直接聯絡幹事安排調動，不要自行更改試算表內容。</p>
+    <p><strong>如果這一週不能服侍：</strong>還未排表的主日，可以在上面「申報不能服侍的日子」申報，幹事或堂委確認後生效；已經排了你的那一週，請直接聯絡幹事安排調動，不要自行更改試算表內容。</p>
   </div>
 
   <p class="updated">最後更新：<?= data.updatedAt ?>（此連結長期有效，之後排表更新會自動反映在這裏）</p>
@@ -260,8 +280,173 @@
             busy = false;
             render(view, (err && err.message) || '未能完成，請稍後再試，或者聯絡幹事。', true);
           });
-        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1]);
+        if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1], args[2]);
         else runner.personalWithdrawUnavailable(token, quarterId, args[0]);
+      }
+
+      var DONE_NOTE = { PENDING: '等候確認', ACCEPTED: '已確認', LISTED: '已在不能服侍名單' };
+
+      // 第九十四輪批次 UA 組：一季一個區塊——主日按月份分行（方格，按一下選取、再按取消；每行「全選這個月」），
+      // 下面揀「全部崗位」或「只限以下崗位」（只列這個人這一季可以服侍的崗位），原因，〔提交〕。
+      function renderQuarter(q, view) {
+        var block = el('div', '', 'q-block');
+        block.appendChild(el('h3', q.label + (q.deadline ? '（請在 ' + q.deadline + ' 之前申報）' : '')));
+        var chosen = {};
+        var tiles = [];
+        var months = [];
+        var byMonth = {};
+        q.dates.forEach(function (d) {
+          var key = d.serviceDate.slice(0, 7);
+          if (!byMonth[key]) { byMonth[key] = []; months.push(key); }
+          byMonth[key].push(d);
+        });
+        function paintTile(t) {
+          var on = !!chosen[t.date];
+          t.btn.className = 'tile' + (on ? ' on' : '');
+          t.btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          t.label.textContent = (on ? '✓ ' : '') + t.text;
+        }
+        months.forEach(function (key) {
+          var rowEl = el('div', '', 'month-row');
+          rowEl.appendChild(el('div', Number(key.slice(5, 7)) + ' 月', 'month-label'));
+          var box = el('div', '', 'tiles');
+          var mine = [];
+          byMonth[key].forEach(function (d) {
+            var btn = el('button', '', 'tile');
+            btn.type = 'button';
+            var text = Number(d.serviceDate.slice(5, 7)) + '/' + Number(d.serviceDate.slice(8, 10));
+            var label = el('span', text);
+            btn.appendChild(label);
+            if (d.status) {
+              btn.className = 'tile done';
+              btn.disabled = true;
+              btn.appendChild(el('span', DONE_NOTE[d.status] || '', 'tile-note'));
+            } else {
+              var t = { date: d.serviceDate, btn: btn, label: label, text: text };
+              btn.addEventListener('click', function () { chosen[t.date] = !chosen[t.date]; paintTile(t); refresh(); });
+              tiles.push(t);
+              mine.push(t);
+              paintTile(t);
+            }
+            box.appendChild(btn);
+          });
+          rowEl.appendChild(box);
+          if (mine.length > 0) {
+            var all = el('button', '全選這個月', 'all-month');
+            all.type = 'button';
+            all.addEventListener('click', function () {
+              var every = mine.every(function (t) { return chosen[t.date]; });
+              mine.forEach(function (t) { chosen[t.date] = !every; paintTile(t); });
+              refresh();
+            });
+            rowEl.appendChild(all);
+          }
+          block.appendChild(rowEl);
+        });
+        if (tiles.length === 0) {
+          block.appendChild(el('p', '這一季可以申報的主日都已經申報了。', 'muted'));
+          return block;
+        }
+        // 這些日子不能服侍：● 全部崗位（預設）○ 只限以下崗位
+        var scope = el('div', '', 'scope');
+        scope.appendChild(el('div', '這些日子不能服侍：'));
+        var name = 'scope-' + q.quarterId;
+        function radio(value, text, checked) {
+          var lab = el('label');
+          var r = document.createElement('input');
+          r.type = 'radio';
+          r.name = name;
+          r.value = value;
+          r.checked = checked;
+          lab.appendChild(r);
+          lab.appendChild(document.createTextNode(' ' + text));
+          scope.appendChild(lab);
+          return r;
+        }
+        var rAll = radio('ALL', '全部崗位', true);
+        var rPosts = (q.posts || []).length > 0 ? radio('POSTS', '只限以下崗位', false) : null;
+        var postsBox = el('div', '', 'posts-box');
+        postsBox.hidden = true;
+        var postChecks = [];
+        (q.posts || []).forEach(function (p) {
+          var lab = el('label');
+          var c = document.createElement('input');
+          c.type = 'checkbox';
+          c.value = p.postId;
+          c.addEventListener('change', refresh);
+          lab.appendChild(c);
+          lab.appendChild(document.createTextNode(' ' + p.postNameTC));
+          postsBox.appendChild(lab);
+          postChecks.push(c);
+        });
+        scope.appendChild(postsBox);
+        rAll.addEventListener('change', refresh);
+        if (rPosts) rPosts.addEventListener('change', refresh);
+        block.appendChild(scope);
+        var reason = document.createElement('input');
+        reason.type = 'text';
+        reason.maxLength = view.maxReason;
+        reason.placeholder = '原因（可以留空，最多 ' + view.maxReason + ' 字）';
+        block.appendChild(reason);
+        var hint = el('p', '', 'hint');
+        block.appendChild(hint);
+        var submit = el('button', '提交');
+        submit.type = 'button';
+        block.appendChild(el('div')).appendChild(submit);
+        function selectedDates() { return tiles.filter(function (t) { return chosen[t.date]; }).map(function (t) { return t.date; }); }
+        function selectedPosts() { return postChecks.filter(function (c) { return c.checked; }).map(function (c) { return c.value; }); }
+        function onlyPosts() { return !!(rPosts && rPosts.checked); }
+        function refresh() {
+          postsBox.hidden = !onlyPosts();
+          var n = selectedDates().length;
+          if (onlyPosts() && selectedPosts().length === 0) {
+            submit.disabled = true;
+            hint.className = 'hint err';
+            hint.textContent = '請最少選一個崗位，或選「全部崗位」';
+          } else {
+            submit.disabled = n === 0;
+            hint.className = 'hint';
+            hint.textContent = n === 0 ? '先按上面的日子選取。' : '已選 ' + n + ' 個日子。';
+          }
+        }
+        submit.addEventListener('click', function () {
+          var dates = selectedDates();
+          if (dates.length === 0) return;
+          if (dates.length > view.maxDates) { hint.className = 'hint err'; hint.textContent = '每次最多可以提交 ' + view.maxDates + ' 個日子，請分開提交。'; return; }
+          var posts = onlyPosts() ? selectedPosts() : [];
+          if (onlyPosts() && posts.length === 0) return;
+          call('submit', [dates, reason.value, posts], view);
+        });
+        refresh();
+        return block;
+      }
+
+      // 頁底「我已申報的日子」：主日、崗位、原因、狀態；等候確認的才可以〔撤回〕
+      function renderMine(view) {
+        body.appendChild(el('h3', '我已申報的日子'));
+        if (view.submissions.length === 0) { body.appendChild(el('p', '還沒有申報。', 'muted')); return; }
+        var table = el('table', '', 'mine');
+        var head = el('tr');
+        ['主日', '崗位', '原因', '狀態'].forEach(function (h) { head.appendChild(el('th', h)); });
+        table.appendChild(head);
+        view.submissions.forEach(function (s) {
+          var tr = el('tr');
+          tr.appendChild(el('td', s.label));
+          tr.appendChild(el('td', s.postsText || '全部崗位'));
+          tr.appendChild(el('td', s.reason || ''));
+          var st = el('td', s.statusText + (s.late ? '（截止日之後）' : ''));
+          if (s.canWithdraw) {
+            var w = el('button', '撤回', 'link');
+            w.type = 'button';
+            w.addEventListener('click', function () { call('withdraw', [s.submissionId], view); });
+            st.appendChild(w);
+          } else if (s.status === 'ACCEPTED') {
+            st.appendChild(el('div', '如需取消，請聯絡幹事', 'muted'));
+          }
+          tr.appendChild(st);
+          table.appendChild(tr);
+        });
+        body.appendChild(table);
       }
 
       function render(view, msg, isErr) {
@@ -271,57 +456,14 @@
           body.appendChild(el('p', boot.error || '暫時未能申報，請聯絡幹事。', 'muted'));
           return;
         }
-        if (view.submissions.length > 0) {
-          body.appendChild(el('h3', '你已提交的申報'));
-          view.submissions.forEach(function (s) {
-            var line = el('div', s.label + '　' + s.statusText + (s.late ? '（截止日之後）' : '')
-              + (s.reason ? '　原因：' + s.reason : ''), 'sub-row');
-            if (s.canWithdraw) {
-              var w = el('button', '撤回', 'link');
-              w.type = 'button';
-              w.addEventListener('click', function () { call('withdraw', [s.submissionId], view); });
-              line.appendChild(w);
-            } else if (s.status === 'ACCEPTED') {
-              line.appendChild(el('span', '　如需取消，請聯絡幹事', 'muted'));
-            }
-            body.appendChild(line);
-          });
-        }
-        var boxes = [];
         if (view.quarters.length === 0) {
           body.appendChild(el('p', '現在沒有可以申報的主日。', 'muted'));
-          return;
+        } else {
+          body.appendChild(el('p', '按一下你不能服侍的主日（再按一下取消），選擇崗位，可以填原因，然後按〔提交〕。幹事或堂委確認之後才會生效。', 'muted'));
+          body.appendChild(el('p', '不同日子不能服侍的崗位不同？請分開兩次提交。', 'muted'));
+          view.quarters.forEach(function (q) { body.appendChild(renderQuarter(q, view)); });
         }
-        body.appendChild(el('p', '勾選你不能服侍的主日，可以填原因，然後按〔提交〕。幹事確認之後才會生效。', 'muted'));
-        view.quarters.forEach(function (q) {
-          body.appendChild(el('h3', q.label + (q.deadline ? '（請在 ' + q.deadline + ' 之前申報）' : '')));
-          q.dates.forEach(function (d) {
-            var label = el('label', '', d.status ? 'off' : '');
-            var box = document.createElement('input');
-            box.type = 'checkbox';
-            box.disabled = !!d.status;
-            label.appendChild(box);
-            var note = d.status === 'PENDING' ? '（已申報，等候幹事確認）'
-              : d.status === 'ACCEPTED' ? '（已確認）' : d.status === 'LISTED' ? '（已在不能服侍名單）' : '';
-            label.appendChild(document.createTextNode(' ' + d.label + note));
-            body.appendChild(label);
-            if (!d.status) boxes.push({ date: d.serviceDate, box: box });
-          });
-        });
-        var reason = document.createElement('input');
-        reason.type = 'text';
-        reason.maxLength = view.maxReason;
-        reason.placeholder = '原因（可以留空，最多 ' + view.maxReason + ' 字）';
-        body.appendChild(reason);
-        var submit = el('button', '提交');
-        submit.type = 'button';
-        submit.addEventListener('click', function () {
-          var dates = boxes.filter(function (b) { return b.box.checked; }).map(function (b) { return b.date; });
-          if (dates.length === 0) { render(view, '請先勾選日子。', true); return; }
-          if (dates.length > view.maxDates) { render(view, '每次最多可以提交 ' + view.maxDates + ' 個日子，請分開提交。', true); return; }
-          call('submit', [dates, reason.value], view);
-        });
-        body.appendChild(el('div')).appendChild(submit);
+        renderMine(view);
       }
 
       render(boot.view, '', false);

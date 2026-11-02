@@ -159,6 +159,8 @@
     'apiGetCombinedServices',
     // 第九十輪批次 QB 組：〔詩班獻詩〕讀取——只讀
     'apiGetChoirSinging',
+    // 第九十四輪批次 UB 組：「義工申報，確認」畫面——只讀
+    'apiGetUnavailableConfirmView',
     // 第九十三輪批次 TB 組：〔寄出電郵範本樣本〕可以收樣本的地址——只讀
     'apiGetTemplateSampleOptions',
     // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕預覽——只讀
@@ -492,7 +494,10 @@
    */
   async function callServerMutating(fnName, ...args) {
     // 第八十七輪批次 NB 組：只可查看 ⇒ 不送出（伺服器也會拒絕）
-    if (viewOnly_) throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');
+    // 第九十四輪批次 UB 組：只可查看、但同時是確認者 ⇒ 確認義工申報那一支照樣可以送出
+    if (viewOnly_ && !(myCanConfirm_ && UNAVAILABLE_CONFIRMER_CALLS.indexOf(fnName) !== -1)) {
+      throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');
+    }
     const result = await callServerRaw_(fnName, ...args);
     dashboardStale_ = true;
     // 第八十五輪批次 LD 組：改了會影響人手的資料 ⇒ 重新做人手檢查，下一個完成窗寫一句（不足才寫）
@@ -506,6 +511,9 @@
     }
     return result;
   }
+
+  /** 第九十四輪批次 UB 組：確認者可以送出的改動（同伺服器 UNAVAILABLE_CONFIRMER_APIS 的決定那一支）。 */
+  const UNAVAILABLE_CONFIRMER_CALLS = ['apiDecideUnavailableSubmissions'];
 
   /** 第八十五輪批次 LD 組：會影響人手檢查的儲存動作（名單、不能服侍、偏好、身分、暫時不做、規則、合堂）。 */
   const STAFFING_AFFECTING_CALLS = ['apiApplyEligibilitySheet', 'apiSaveEligibilityBatch', 'apiSaveUnavailable',
@@ -896,6 +904,9 @@
    * 預設當作改動，只有 `VIEW_ONLY_READ_TOOLS` 列明的唯讀工具可以按。
    */
   let viewOnly_ = false;
+  /** 第九十四輪批次 UB 組：自己的角色（EDITOR／VIEWER／CONFIRMER）、可不可以確認義工申報。 */
+  let myRole_ = '';
+  let myCanConfirm_ = false;
   const VIEW_ONLY_TEXT = '你只有查看權限';
   const VIEW_ONLY_BLOCKED_LABELS = [
     /^請系統幫我調整/, /^儲存/, /^立即/, /^現在就產生/, /^加入$/, /^選擇其他$/, /^給所有人$/, /^變動的人$/,
@@ -945,7 +956,9 @@
     const t0 = Date.now();
     try {
       const r = await callServer('apiGetMyPermission');
-      setViewOnly_(!!(r && r.role === 'VIEWER'));
+      myRole_ = (r && r.role) || '';
+      myCanConfirm_ = !!(r && r.canConfirm);
+      setViewOnly_(myRole_ === 'VIEWER');
     } catch (err) {
       setViewOnly_(false);
     }
@@ -1006,7 +1019,9 @@
     unavailable: () => openUnavailable(),
     weights: () => openWeights(),
     staffing: () => openStaffingCheck(),
-    preseason: () => openPreseasonSend()
+    preseason: () => openPreseasonSend(),
+    // 第九十四輪批次 UB 組：「義工申報，確認」（新申報通知信內的連結）
+    'unavailable-confirm': () => openUnavailableConfirm()
   };
 
   /** 讀網址參數（`google.script.url`）；讀不到就當沒有。 */

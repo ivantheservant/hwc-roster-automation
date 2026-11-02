@@ -63,6 +63,8 @@ function runFourStageStep1_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('生成中，請稍候…', '四階段流程', 300);
+    // 第九十四輪批次 UD 組：同幹事介面〔生成初稿〕一樣，先自動確認該季的義工申報（失敗 ⇒ 下面 catch 顯示錯誤，不生成）
+    autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);
     const result = performRosterGeneration_(quarterId);
 
     // ⚠️ 第五十二輪批次 A 組：造完版本一定要更新公開連結。

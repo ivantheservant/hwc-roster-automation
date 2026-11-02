@@ -122,6 +122,7 @@ function getConfigBaselineSnapshot_() {
       PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: { launchTargetValue: '2', source: '程式碼預設值（試算表現時實際值未核實）' },
       PERSONAL_UNAVAILABLE_DEADLINE_DAYS: { launchTargetValue: '7', source: '程式碼預設值（試算表現時實際值未核實）' },
       PERSONAL_UNAVAILABLE_NOTIFY: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      UNAVAILABLE_CONFIRMER_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROSTER_DRIVE_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第七十輪批次 AW 組新增。上線目標值刻意係空白——網址由管理員貼。
       USER_GUIDE_URL: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },

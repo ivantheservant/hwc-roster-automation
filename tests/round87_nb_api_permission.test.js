@@ -32,6 +32,8 @@ const serverRO = listOf(webApp, /const WEBAPP_READ_ONLY_APIS = \[([\s\S]*?)\];/)
 const exceptions = listOf(webApp, /const WEBAPP_READ_ONLY_EXCEPTIONS = \[([\s\S]*?)\];/);
 const frontRO = listOf(read('src/ui/Script.html'), /const READ_ONLY_APIS = \[([\s\S]*?)\];/);
 const SHEET_TOOLS = ['apiListPreacherTranslationPending', 'apiSavePreacherTranslationEntry', 'apiApplySheetTextUpdate'];
+// 第九十四輪批次 UB 組（刻意改動）：確認者可以呼叫的 api（決定那一支傳自己的名字但不在唯讀清單）
+const confirmerApis = listOf(webApp, /const UNAVAILABLE_CONFIRMER_APIS = \[([\s\S]*?)\];/);
 
 console.log('\n=== NB1：全部 api* 函式逐個歸類 ===');
 const table = [];
@@ -51,8 +53,9 @@ fs.readdirSync(SRC).filter((f) => f.endsWith('.gs')).forEach((file) => {
     if (/^assertWebAppRequestAllowed_\(\);$/.test(first)) kind = '改動';
     else if (ro) {
       if (ro[1] !== name) problems.push(file + ' ' + name + '：傳入的名字是 ' + ro[1]);
-      else if (serverRO.indexOf(name) === -1) problems.push(file + ' ' + name + '：傳了名字但不在 WEBAPP_READ_ONLY_APIS');
-      else kind = '唯讀';
+      else if (serverRO.indexOf(name) !== -1) kind = '唯讀';
+      else if (confirmerApis.indexOf(name) !== -1) kind = '改動（確認者亦可）';
+      else problems.push(file + ' ' + name + '：傳了名字但不在 WEBAPP_READ_ONLY_APIS');
     } else if (/^assertSpreadsheetEditorCaller_\(\);$/.test(first)) {
       if (SHEET_TOOLS.indexOf(name) === -1) problems.push(file + ' ' + name + '：試算表編輯者檢查只限試算表側邊欄用的 api');
       else kind = '試算表側邊欄（改動，試算表編輯者）';
@@ -144,9 +147,10 @@ console.log('\n=== NB5：doGet、apiGetMyPermission ===');
   };
   const v = mk('viewer@example.invalid');
   check('★★★★★★ 只可查看的人：doGet 照樣打開介面', v.s.gas.doGet({ parameter: {} }).kind === 'INDEX');
-  check('★★★★★★ apiGetMyPermission：只可查看', JSON.stringify(v.s.gas.apiGetMyPermission()) === '{"role":"VIEWER","canModify":false}');
+  // 第九十四輪批次 UB 組（刻意改動）：多了 canConfirm
+  check('★★★★★★ apiGetMyPermission：只可查看', JSON.stringify(v.s.gas.apiGetMyPermission()) === '{"role":"VIEWER","canModify":false,"canConfirm":false}', JSON.stringify(v.s.gas.apiGetMyPermission()));
   const e = mk('editor@example.invalid');
-  check('★★★★★ apiGetMyPermission：可以修改', JSON.stringify(e.s.gas.apiGetMyPermission()) === '{"role":"EDITOR","canModify":true}');
+  check('★★★★★ apiGetMyPermission：可以修改', JSON.stringify(e.s.gas.apiGetMyPermission()) === '{"role":"EDITOR","canModify":true,"canConfirm":true}', JSON.stringify(e.s.gas.apiGetMyPermission()));
   const x = mk('stranger@example.invalid');
   const page = x.s.gas.doGet({ parameter: {} });
   check('★★★★★★ 不在名單 ⇒ 中性頁「這個網址只供幹事使用」', /這個網址只供幹事使用/.test(page.html || ''), page.html);

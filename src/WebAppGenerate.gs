@@ -99,6 +99,9 @@ function apiGenerateDraftPlan(quarterId) {
     // 第九十一輪批次 RA 組：生成確認窗「…不會自動排」的崗位名稱（Posts.AutoGenerate=FALSE）
     manualPostNames: describeManualFillPostNames_(context.posts),
     staffing: staffing,
+    // 第九十四輪批次 UD 組：有待確認的義工申報 ⇒ 確認窗加一行（開始之後會自動當作確認）
+    pendingAutoConfirmCount: countPendingSubmissionsForQuarterSafe_(quarterId),
+    pendingAutoConfirmText: describePendingAutoConfirm_(countPendingSubmissionsForQuarterSafe_(quarterId)),
     attemptsPlanned: readMultiRunAttempts_(),
     timeBudgetMinutes: Math.round(MULTIRUN_TIME_BUDGET_MS / 60000)
   };
@@ -149,6 +152,15 @@ function apiGenerateDraftExecute_locked_(quarterId) {
           REDO_QUARTER_HINT_TEXT
         ])
     };
+  }
+
+  // 第九十四輪批次 UD 組：生成前把該季等候確認的義工申報自動確認（建立 Unavailable、通知申請人），然後才讀資料排表。
+  // 失敗 ⇒ 停下來，三段式錯誤（不可以靜靜略過）。
+  let autoConfirm;
+  try {
+    autoConfirm = autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);
+  } catch (err) {
+    return { ok: false, versionCreated: false, message: err.message };
   }
 
   let result;
@@ -238,7 +250,9 @@ function apiGenerateDraftExecute_locked_(quarterId) {
     versionExistsInRegistry: !!versionRow,
     // 階段 A2-1：發佈失敗係**黃色警告**，唔係紅色錯誤——版本真係建立咗。
     publishFailed: publish.failed,
-    publishFailMessage: publish.message
+    publishFailMessage: publish.message,
+    // 第九十四輪批次 UD 組：生成前自動確認了幾多項義工申報（完成窗寫一句）
+    autoConfirmMessage: autoConfirm.message
   };
 }
 

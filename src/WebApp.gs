@@ -26,10 +26,28 @@
  *     而且名字要在 `WEBAPP_READ_ONLY_APIS` 內，只可查看的人才可以用。名字不在清單 ⇒ 照樣當作改動。
  * 只可查看的人呼叫改動的 api ⇒ 拒絕（「你只有查看權限，不可以改動。」）並寫 AuditLog。
  * 前端灰色按鈕只是方便，**這裏才是真正的防線**。
+ *
+ * ── 第九十四輪批次 UB 組：確認者（第三種權限）────────────────────────
+ *   - `UNAVAILABLE_CONFIRMER_EMAILS`：可以確認義工申報（不能服侍）的人。只在這個名單（不在修改、查看名單）⇒
+ *     角色 CONFIRMER：幹事介面只見到「義工申報，確認」畫面；伺服器端**只准**呼叫 `UNAVAILABLE_CONFIRMER_APIS`
+ *     （讀取、決定）及 `WEBAPP_CONFIRMER_SELF_APIS`（自己的權限），其他一律拒絕並寫 AuditLog。
+ *   - 確認者＝這個名單＋可以修改的人。只可查看的人可以看確認畫面（讀取在唯讀清單），但不可以決定——
+ *     除非他同時在確認者名單。
+ *   - 決定那一支（`apiDecideUnavailableSubmissions`）傳入自己的名字，但**不在唯讀清單**：
+ *     只有可以修改的人及確認者可以用。
  */
 
 /** 第八十七輪批次 NB 組：兩種權限。 */
-const WEBAPP_ROLE = { EDITOR: 'EDITOR', VIEWER: 'VIEWER' };
+const WEBAPP_ROLE = { EDITOR: 'EDITOR', VIEWER: 'VIEWER', CONFIRMER: 'CONFIRMER' };
+
+/** 第九十四輪批次 UB 組：確認者可以呼叫的 api（讀取確認畫面、決定）。 */
+const UNAVAILABLE_CONFIRMER_APIS = ['apiGetUnavailableConfirmView', 'apiDecideUnavailableSubmissions'];
+
+/** 第九十四輪批次 UB 組：只是確認者的人另外可以呼叫的（只關乎自己，不讀職事表資料）。 */
+const WEBAPP_CONFIRMER_SELF_APIS = ['apiGetMyPermission'];
+
+/** 確認者呼叫其他 api 時的訊息。 */
+const WEBAPP_CONFIRMER_ONLY_MESSAGE = '你只可以確認義工申報（不能服侍），不可以做其他事。';
 
 /** 只可查看的人呼叫改動的 api 時的訊息（前端顯示同一句）。 */
 const WEBAPP_VIEW_ONLY_MESSAGE = '你只有查看權限，不可以改動。';
@@ -64,7 +82,9 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiMakeupSendStages', 'apiMakeupSendPlan', 'apiAnnualQuartersPlan', 'apiAnnualCombinedPlan',
   'apiListRuleReviewSheets', 'apiRuleReviewImportPlan',
   // 第八十七輪批次 NB 組：自己的權限；唯讀崗位名單視窗
-  'apiGetMyPermission', 'apiGetEligibilityViewOnly'
+  'apiGetMyPermission', 'apiGetEligibilityViewOnly',
+  // 第九十四輪批次 UB 組：「義工申報，確認」畫面（只可查看的人看得到，按鈕灰色）
+  'apiGetUnavailableConfirmView'
 ];
 
 /**
@@ -108,10 +128,14 @@ function resolveWebAppRole_(email) {
     ? explicitList
     : [String(getConfig_(CONFIG_KEYS.SCRIPT_ACCOUNT_EMAIL, '')).trim().toLowerCase()].filter(Boolean);
   const viewers = readWebAppEmailList_(CONFIG_KEYS.WEBAPP_VIEWER_EMAILS);
+  // 第九十四輪批次 UB 組：確認者（次序：可以修改 ＞ 只可查看 ＞ 確認者）
+  const confirmers = readWebAppEmailList_(CONFIG_KEYS.UNAVAILABLE_CONFIRMER_EMAILS);
   let role = '';
   if (email && editors.indexOf(email) !== -1) role = WEBAPP_ROLE.EDITOR;
   else if (email && viewers.indexOf(email) !== -1) role = WEBAPP_ROLE.VIEWER;
-  return { role: role, allListsEmpty: editors.length === 0 && viewers.length === 0 };
+  else if (email && confirmers.indexOf(email) !== -1) role = WEBAPP_ROLE.CONFIRMER;
+  return { role: role, allListsEmpty: editors.length === 0 && viewers.length === 0 && confirmers.length === 0,
+    isConfirmer: !!email && (role === WEBAPP_ROLE.EDITOR || confirmers.indexOf(email) !== -1) };
 }
 
 /**
@@ -148,9 +172,50 @@ function assertWebAppRequestAllowed_(readOnlyApiName) {
   assertWebAppEnabled_();
   const role = assertApiCallerAuthorized_();
   if (role === WEBAPP_ROLE.EDITOR) return role;
+  // 第九十四輪批次 UB 組：只是確認者 ⇒ 只准確認畫面的讀取及決定（及自己的權限）
+  if (role === WEBAPP_ROLE.CONFIRMER) {
+    if (readOnlyApiName && (UNAVAILABLE_CONFIRMER_APIS.indexOf(readOnlyApiName) !== -1
+      || WEBAPP_CONFIRMER_SELF_APIS.indexOf(readOnlyApiName) !== -1)) return role;
+    denyConfirmerOnlyCaller_(readOnlyApiName);
+  }
   if (readOnlyApiName && WEBAPP_READ_ONLY_APIS.indexOf(readOnlyApiName) !== -1) return role;
+  // 只可查看、但同時在確認者名單 ⇒ 可以決定
+  if (readOnlyApiName && UNAVAILABLE_CONFIRMER_APIS.indexOf(readOnlyApiName) !== -1 && isUnavailableConfirmerCaller_()) return role;
   denyViewOnlyCaller_(readOnlyApiName);
   return role;
+}
+
+/**
+ * 第九十四輪批次 UB 組：呼叫者可不可以確認義工申報（可以修改的人，或在 UNAVAILABLE_CONFIRMER_EMAILS）。
+ * @returns {boolean}
+ */
+function isUnavailableConfirmerCaller_() {
+  let email = '';
+  try { email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase(); } catch (err) { email = ''; }
+  return !!email && resolveWebAppRole_(email).isConfirmer;
+}
+
+/**
+ * 只是確認者的人呼叫其他 api：寫 AuditLog，然後拒絕。
+ * @param {string=} apiName
+ * @returns {void} 一定拋錯
+ */
+function denyConfirmerOnlyCaller_(apiName) {
+  let email = '';
+  try { email = String(Session.getActiveUser().getEmail() || '').trim(); } catch (err) { email = ''; }
+  try {
+    writeAuditLog_({
+      action: 'WEBAPP_CONFIRMER_DENIED',
+      targetSheet: '',
+      targetKey: email,
+      newValue: apiName || '',
+      source: 'assertWebAppRequestAllowed_',
+      notes: '只可以確認義工申報的人嘗試呼叫其他功能，已拒絕'
+    });
+  } catch (err) {
+    log_('WARN', '確認者嘗試呼叫其他功能，AuditLog 寫不到：' + err.message);
+  }
+  throw new Error(WEBAPP_CONFIRMER_ONLY_MESSAGE);
 }
 
 /**
@@ -309,7 +374,8 @@ function includeHtml(fileName) {
  */
 function apiGetMyPermission() {
   const role = assertWebAppRequestAllowed_('apiGetMyPermission');
-  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR };
+  // 第九十四輪批次 UB 組：canConfirm＝可以確認義工申報（可以修改的人，或在確認者名單）
+  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm: isUnavailableConfirmerCaller_() };
 }
 
 /**

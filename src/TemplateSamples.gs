@@ -126,8 +126,9 @@ function buildTemplateSampleAdminNotifications_(quarterId, prefix, adminEmail) {
     { name: '幹事通知：義工申報待確認', where: '程式（PersonalUnavailable.gs buildUnavailableSubmissionNotifyText_）',
       run: function () {
         const text = buildUnavailableSubmissionNotifyText_(prefix,
-          [{ personName: '示範甲', serviceDate: '2028-08-06', reason: '出外地', late: false },
-            { personName: '示範乙', serviceDate: '2028-08-13', reason: '', late: true }], 3);
+          [{ personName: '示範甲', serviceDate: '2028-08-06', postsText: '全部崗位', reason: '出外地', late: false },
+            { personName: '示範乙', serviceDate: '2028-08-13', postsText: '讀經、司事', reason: '', late: true }], 3,
+          buildUnavailableConfirmUrl_(quarterId));
         notifyAdmin_(text.subject, text.body, adminEmail, true);
       } }
   ];
@@ -226,6 +227,14 @@ function buildTemplateSamples_(quarterId, toEmail) {
       placeholders = { QuarterLabel: buildQuarterLabel_(quarterId), QuarterID: quarterId,
         GenerateDate: dates.generateDate || '生成日', Deadline: dates.deadline || '生成日之前',
         PersonalLink: buildPersonalRosterUrl_(baseUrl || 'https://example.invalid/exec', token || 'SAMPLE', quarterId) };
+      sampleSummary = '';
+    } else if (t.id === UNAVAILABLE_DECIDED_TEMPLATE_ID) {
+      // 第九十四輪批次 UC 組：通知申請人處理結果——示範一項確認、一項不確認（同一個人合併成一封）
+      const firstDate = (assignments[0] && assignments[0].serviceDate) || '2028-07-02';
+      placeholders = buildUnavailableDecisionPlaceholders_([
+        { serviceDate: firstDate, postsText: UNAVAILABLE_ALL_POSTS_TC, accepted: true },
+        { serviceDate: shiftDateString_(firstDate, 7), postsText: '讀經', accepted: false }
+      ], buildQuarterLabel_(quarterId));
       sampleSummary = '';
     } else if (!isList && attachTypeWantsPersonalLink_(t.template.attachType)) {
       personalUrl = buildPersonalRosterUrl_(baseUrl, token, quarterId);

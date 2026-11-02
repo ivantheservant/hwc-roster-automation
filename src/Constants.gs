@@ -418,7 +418,9 @@ const COLUMNS = {
     DECIDED_BY: 'DecidedBy',
     DECIDED_AT: 'DecidedAt',
     UNAVAILABLE_ID: 'UnavailableID',
-    LATE: 'Late'
+    LATE: 'Late',
+    // 第九十四輪批次 UA 組：只限這些崗位（逗號分隔；空白＝全部崗位）
+    POST_IDS: 'PostIDs'
   },
   RULE_SETTINGS: {
     RULE_ID: 'RuleID',
@@ -1480,6 +1482,9 @@ const CONFIG_KEYS = {
   PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: 'PERSONAL_UNAVAILABLE_QUARTERS_AHEAD',
   PERSONAL_UNAVAILABLE_DEADLINE_DAYS: 'PERSONAL_UNAVAILABLE_DEADLINE_DAYS',
   PERSONAL_UNAVAILABLE_NOTIFY: 'PERSONAL_UNAVAILABLE_NOTIFY',
+  // 第九十四輪批次 UB 組：可以確認義工申報（不能服侍）的人（電郵，逗號分隔；預設空白）。
+  // 確認者＝這個名單＋可以修改的人；只在這個名單的人打開幹事介面只見到確認畫面。見 WebApp.gs。
+  UNAVAILABLE_CONFIRMER_EMAILS: 'UNAVAILABLE_CONFIRMER_EMAILS',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
   WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
   // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，

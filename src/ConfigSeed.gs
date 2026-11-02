@@ -395,7 +395,15 @@ function getConfigKeySeeds_() {
       // 第九十輪批次 QC 組：有新的義工申報 ⇒ 每日檢查通知幹事
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_NOTIFY, type: CONFIG_TYPES.BOOL, group: 'MAIL',
       defaultValue: 'TRUE',
-      description: '有新的義工申報（不能服侍）等候確認時，每日檢查通知幹事（MAIL_ADMIN_NOTIFY）一次，同一日最多一封。TRUE（預設）＝通知；FALSE＝不通知（仍然會在〔不能服侍的日期〕和「這一季還要做的」顯示）。遵守 DRY_RUN。',
+      description: '有新的義工申報（不能服侍）等候確認時，每日檢查通知幹事（MAIL_ADMIN_NOTIFY）及確認者（UNAVAILABLE_CONFIRMER_EMAILS）一次，同一日最多一封。TRUE（預設）＝通知；FALSE＝不通知（仍然會在〔不能服侍的日期〕和「這一季還要做的」顯示）。遵守 DRY_RUN。',
+      editable: 'TRUE'
+    },
+    {
+      // 第九十四輪批次 UB 組：確認義工申報的人
+      key: CONFIG_KEYS.UNAVAILABLE_CONFIRMER_EMAILS, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
+      defaultValue: '',
+      description: '可以確認義工申報（不能服侍）的人（電郵，逗號分隔；預設空白）。可以修改幹事介面的人（WEBAPP_ALLOWED_EMAILS）本來就可以確認；'
+        + '只在這個名單的人打開幹事介面只見到「義工申報，確認」畫面，不可以做其他事。新的申報亦會通知這個名單。',
       editable: 'TRUE'
     },
     // ---- SYS ----

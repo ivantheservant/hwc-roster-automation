@@ -45,7 +45,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   check('★★★★ 控制字元去掉、最多 40 字', r.view === 'combined' && r.quarter.indexOf('\u0000') === -1 && r.quarter.length === 40, JSON.stringify(r));
   const views = Object.keys(vm.runInContext('DEEP_LINK_VIEWS', ui)).sort().join(',');
   // 第九十輪批次 QB 組（刻意改動）：多了 choir（〔詩班獻詩〕）
-  check('★★★★★★ view 可用值：choir、combined、preseason、staffing、unavailable、weights（常數表）', views === 'choir,combined,preseason,staffing,unavailable,weights', views);
+  // 第九十四輪批次 UB 組（刻意改動）：加 unavailable-confirm（義工申報，確認）
+  check('★★★★★★ view 可用值：choir、combined、preseason、staffing、unavailable、unavailable-confirm、weights（常數表）', views === 'choir,combined,preseason,staffing,unavailable,unavailable-confirm,weights', views);
   check('★★★★★ 參數名稱是 view、quarter（不是 p、q）', JSON.stringify(vm.runInContext('DEEP_LINK_PARAMS', ui)) === '{"VIEW":"view","QUARTER":"quarter"}');
 
   console.log('\n=== NA2：主畫面載入完成後 ===');
@@ -99,7 +100,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   console.log('\n=== NA4：開機次序 ===');
   const boot = read('src/ui/ScriptBoot.html');
   check('★★★★★★ 先權限 → 讀網址 → loadQuarters(quarter) → 載入完成後才 applyDeepLink_',
-    /await loadMyPermission_\(\);\s*deepLink_ = parseDeepLink_\(await readDeepLinkParams_\(\)\);\s*await loadQuarters\(deepLink_\.quarter\);[\s\S]*?\}\)\.then\(\(\) => applyDeepLink_\(deepLink_\)\);/.test(boot));
+    // 第九十四輪批次 UB 組（刻意改動）：只是確認者 ⇒ 只顯示確認畫面，不 loadQuarters、不 applyDeepLink_
+    /await loadMyPermission_\(\);\s*deepLink_ = parseDeepLink_\(await readDeepLinkParams_\(\)\);[\s\S]{0,200}?await loadQuarters\(deepLink_\.quarter\);[\s\S]*?\}\)\.then\(\(\) => \{ if \(myRole_ !== 'CONFIRMER'\) applyDeepLink_\(deepLink_\); \}\);/.test(boot));
   const r2 = await ui.readDeepLinkParams_();
   check('★★★★ 讀不到 google.script.url（例如測試環境）⇒ 當沒有參數', JSON.stringify(r2) === '{}');
   ui.google.script.url = { getLocation: (cb) => cb({ parameter: { view: 'combined', quarter: '2027T1', p: 'x' } }) };

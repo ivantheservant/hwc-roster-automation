@@ -148,6 +148,8 @@ function dailyAutomationCheck_() {
 
         const generateJudgment = judgeGenerateAction_(quarterId, schedule.generateDate, today);
         report.push(executeAutomationAction_(generateJudgment, today, function () {
+          // 第九十四輪批次 UD 組：自動生成前一樣先自動確認該季的義工申報；失敗會拋錯 ⇒ 這一次不生成
+          autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);
           const gen = performRosterGeneration_(quarterId);
           notifyAdminGenerateDone_(quarterId, gen, config, isDryRun);
           return '已生成 ' + gen.sheetName + '（試 ' + gen.attemptsRun + ' 次，seed=' + gen.seed + '）；已通知幹事覆核';
