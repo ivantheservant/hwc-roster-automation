@@ -941,8 +941,8 @@ const MUTATIONS = [
       + '——格註會變成「原因：建議改派 試甲」，一句同義反覆；'
       + 'Ivan 明確要求藍色格要講明**為什麼改**',
     file: 'src/SuggestionSheet.gs',
-    find: '      reason: [violation.reason, replacement.reason]\n'
-      + '        .filter(Boolean).join(\'；\') || violation.ruleId',
+    // 第九十一輪 RB：原因改由 joinReasonParts_() 接駁（去掉結尾標點）
+    find: '      reason: joinReasonParts_([violation.reason, replacement.reason]) || violation.ruleId',
     replace: '      reason: replacement.reason || violation.reason || violation.ruleId',
     tests: ['tests/round43_field_fixes.test.js']
   },
@@ -3859,10 +3859,13 @@ const MUTATIONS = [
     why: '寄給堂委審閱之前唔確保公開連結係最新'
       + '——審閱信信末嗰條連結開出嚟，講員一欄全部「待確認」',
     file: 'src/FiveStageCore.gs',
+    // 第九十一輪 RD：呼叫端確保之後傳 publicLinkEnsured=true，sendStage_() 不重做 ⇒ 這一道仍然是唯一防線
     find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
-      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
+      + '  // 第九十一輪批次 RD 組：上一行已經確保最新 ⇒ 告訴 sendStage_() 不用再做一次\n'
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions, true);',
     replace: '  const fresh = { republished: false };\n'
-      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions);',
+      + '  // 第九十一輪批次 RD 組：上一行已經確保最新 ⇒ 告訴 sendStage_() 不用再做一次\n'
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions, true);',
     tests: ['tests/stale_after_fill.test.js']
   },
   {
@@ -3870,9 +3873,9 @@ const MUTATIONS = [
     why: '正式發出之前唔確保公開連結係最新',
     file: 'src/FiveStageCore.gs',
     find: '  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n'
-      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions, true);',
     replace: '  const fresh = { republished: false };\n'
-      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions);',
+      + '  const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions, true);',
     tests: ['tests/stale_after_fill.test.js']
   },
   {
@@ -9037,7 +9040,8 @@ const MUTATIONS = [
     id: "lb-row-old-text",
     why: "整季重設說明仍寫清除不能服侍",
     file: "src/ui/ScriptZone3.html",
-    find: "        + '之後可以重新生成。人手加入的不能服侍日期、每週標題、合堂主日會保留，修改申報變回未處理；'\n",
+    // 第九十一輪 RB：說明多了「詩班獻詩」
+    find: "        + '之後可以重新生成。人手加入的不能服侍日期、每週標題、合堂主日、詩班獻詩會保留，修改申報變回未處理；'\n",
     replace: "        + '之後可以重新生成（這一季的不能服侍日期等一併清除）；'\n",
     tests: ["tests/round85_lb_reset_keep_manual.test.js"]
   },
