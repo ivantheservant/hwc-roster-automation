@@ -64,6 +64,8 @@ function buildGeneratorContext_(quarterId) {
     rules: rules,
     // 第九十輪批次 QA 組：同日不兼任的崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
     sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
+    // 第九十八輪批次 YA 組：開季前預先安排（領詩、司琴）——鍵＝date|postId|slot
+    preAssignments: readPreAssignments_(quarterId, timezone),
     // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行（SEMI_CHOIR_SUNDAY）
     choirGroupPostId: readChoirGroupPostId_(),
     priorWeeks: readPriorWeeks_(quarterStart, carryOverWeeks, timezone),
@@ -394,6 +396,19 @@ function buildRoster_(context) {
           slotIndex: slot
         };
 
+        // 第九十八輪批次 YA 組：開季前預先安排的格直接放入（不設的格——特別主日 SkipPostIDs 等——照舊留空）
+        const preAssigned = findPreAssignedCell_(context, baseRow, skipReason);
+        if (preAssigned) {
+          const preName = preAssigned.personId
+            ? (context.peopleById[preAssigned.personId] ? context.peopleById[preAssigned.personId].nameTC : preAssigned.personId)
+            : preAssigned.freeText;
+          assignments.push(makeAssignment_(baseRow, preAssigned.personId, preName, ASSIGN_SOURCE.PREASSIGNED, []));
+          if (preAssigned.personId) {
+            registerAssigned_(preAssigned.personId, post, serviceDate, weekByPost, weekByPerson, quarterCount, lastServed, postCount);
+          }
+          continue;
+        }
+
         if (skipReason) {
           assignments.push(makeAssignment_(baseRow, '', '', ASSIGN_SOURCE.SKIPPED, [skipReason.ruleId]));
           continue;
@@ -488,7 +503,31 @@ function buildSameDayReservedForWeek_(context, serviceDate, special) {
       if (locked && locked.personId && !out[locked.personId]) out[locked.personId] = postId;
     }
   });
+  // 第九十八輪批次 YA 組：開季前預先安排的領詩、司琴也一樣先保留（這一日不設的崗位不算）
+  const pre = context.preAssignments || {};
+  Object.keys(pre).sort().forEach(function (k) {
+    const c = pre[k];
+    if (c.serviceDate !== serviceDate.serviceDate || !c.personId || ids.indexOf(c.postId) === -1) return;
+    if ((special.skipPostIds || []).indexOf(c.postId) !== -1) return;
+    if (!out[c.personId]) out[c.personId] = c.postId;
+  });
   return out;
+}
+
+/**
+ * 第九十八輪批次 YA 組：這一格的開季前預先安排（可以放入的才回傳）。
+ * 只在「沒有不設原因」或「不設原因只是系統不自動派人（NO_AUTO_GENERATE）」時放入——
+ * 特別主日 SkipPostIDs、每月第一主日限定等結構性不設的格照舊留空。
+ * @param {Object} context 生成器 context
+ * @param {Object} baseRow {serviceDate, postId, slotIndex}
+ * @param {?{ruleId: string}} skipReason getSkipReason_() 的結果
+ * @returns {?{personId: string, freeText: string}}
+ */
+function findPreAssignedCell_(context, baseRow, skipReason) {
+  const pre = (context.preAssignments || {})[cellKey_(baseRow.serviceDate, baseRow.postId, baseRow.slotIndex)];
+  if (!pre || (!pre.personId && !pre.freeText)) return null;
+  if (skipReason && skipReason.ruleId !== RULE_IDS.NO_AUTO_GENERATE) return null;
+  return pre;
 }
 
 /**

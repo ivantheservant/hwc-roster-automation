@@ -356,6 +356,10 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     manualState: resolved.state,
     violations: findStateViolations_(resolved.state, context)
   };
+  // 第九十八輪批次 YA 組：表上和開季前預先安排不同的格 ⇒ 先改成預先安排的人（預先安排空白 ⇒ 不改）；
+  // 這幾格之後當作「保留」，系統改其他格去避開同日兼任
+  const preAssignApplied = applyPreAssignmentsToState_(quarterId, context, analysis.manualState, timezone);
+  if (preAssignApplied.changed.length > 0) analysis.violations = findStateViolations_(analysis.manualState, context);
 
   // ⚠️ 第七十五輪批次 CE 組（Ivan 決定）：**唔可以因為有未決定嘅名而整個拒絕**（現場 image8）。
   // 照樣調整其他格；名字嗰格（臨時幫手或者未決定）系統唔郁，並喺結果列出未決定嗰幾個。
@@ -388,6 +392,7 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   //（包括幹事自己改過而冇勾嘅）照調整。舊嘅「准系統調整我勾了的」（allowedKeys）唔再用。
   const keptKeys = {};
   decisionItems.rules.forEach(function (r) { if (r.checked) keptKeys[r.key] = true; });
+  Object.keys(preAssignApplied.keys).forEach(function (k) { keptKeys[k] = true; });
   const fix = proposeMinimalFixFromState_(context, analysis, manualKeys, allowedKeys, releaseContext, keptKeys);
   const releasedCellKeys = {};
   (fix.untouchedManual || []).forEach(function (u) {
@@ -409,6 +414,10 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
   const blockedKeys = {};
   (fix.untouchedManual || []).forEach(function (u) {
     blockedKeys[u.key] = true;
+    if (preAssignApplied.keys[u.key] && !u.released) {
+      notes[u.key] = '這一格違反了規則（' + u.reason + '），但這是開季前預先安排的——系統不會改動這一格。';
+      return;
+    }
     notes[u.key] = u.released
       ? ('這一格違反了規則（' + u.reason + '），但你已經放行'
         + (u.releasedVersionNo === null || u.releasedVersionNo === undefined ? '' : '（第 ' + u.releasedVersionNo + ' 版）')
@@ -453,6 +462,15 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
         + '。原本是「' + (p.manualName || '（空白）') + '」，改成「'
         + (p.suggestedName || '（空白）') + '」。');
   });
+  // 第九十八輪批次 YA 組：按開季前預先安排改的格（同一套「系統修好的格」列出）
+  preAssignApplied.changed.forEach(function (c) {
+    systemKeys[c.key] = true;
+    if (!blockedKeys[c.key]) {
+      notes[c.key] = '系統按開季前預先安排改了這一格。原本是「' + c.fromName + '」，改成「' + c.toName + '」。';
+    }
+    systemFixes.push({ serviceDate: c.serviceDate, postNameTC: c.postNameTC, slotIndex: c.slotIndex,
+      fromName: c.fromName, toName: c.toName, reason: PREASSIGN_SUGGEST_REASON });
+  });
 
   // ── 第八十二輪批次 IC 組：按排表偏好微調（修好違規、填好空格之後另做一步）──
   const weightKeys = {};
@@ -482,6 +500,7 @@ function buildSuggestionState_(quarterId, start, allowedKeys) {
     reasonByKey[cellKey_(p.serviceDate, p.postId, p.slotIndex)] =
       systemFixReasonText_(p.brokenRuleId, p.kind, p.manualName || '', p.reason || p.brokenRuleId || '');
   });
+  preAssignApplied.changed.forEach(function (c) { reasonByKey[c.key] = PREASSIGN_SUGGEST_REASON; });
   const untouchedByKey = {};
   (fix.untouchedManual || []).forEach(function (u) { untouchedByKey[u.key] = u; });
   const tempHelperKeys = {};

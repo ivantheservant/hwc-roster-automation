@@ -947,6 +947,8 @@ function registerVersion_(quarterId, versionNo, sheetName, basis, parentVersionN
     newValue: basis,
     notes: notes || ''
   });
+  // 第九十八輪批次 YB 組：記下這一版建立時的開季前資料（之後有改動 ⇒ 通知幹事）。失敗不影響建立版本
+  capturePreseasonBaselineSafe_(quarterId, versionNo);
 }
 
 /**

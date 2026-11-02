@@ -755,6 +755,10 @@ function buildDashboardState_(quarterId) {
   const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)
     : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
   timer.mark('寄出警告');
+  // 第九十八輪批次 YA 組：預先安排的領詩／司琴和表上不同；YB 組：最新版本之後開季前資料有改動（都是只讀）
+  const preAssignMismatch = summarisePreAssignMismatch_(quarterId, versionNo);
+  const preseasonChange = describePreseasonChangeForDashboard_(quarterId, versionNo);
+  timer.mark('預先安排及開季前資料改動');
 
   return {
     staffing: staffing,
@@ -798,6 +802,8 @@ function buildDashboardState_(quarterId) {
     sendWarnings: sendWarnings,
     // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
     eligibilityImpact: eligibilityImpact,
+    preAssignMismatch: preAssignMismatch,
+    preseasonChange: preseasonChange,
     // 第七十五輪批次 CA 組：「常用設定」三粒掣喺新分頁直接開嗰張工作表。
     settingsLinks: buildSettingsSheetLinks_(),
     // 第八十二輪批次 IJ 組：常用設定〔整季清走重來〕可唔可以撳（封鎖季度 ⇒ 灰掣＋原因）

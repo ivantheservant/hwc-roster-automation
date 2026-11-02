@@ -130,6 +130,14 @@ function buildTemplateSampleAdminNotifications_(quarterId, prefix, adminEmail) {
             { personName: '示範乙', serviceDate: '2028-08-13', postsText: '讀經、司事', reason: '', late: true }], 3,
           buildUnavailableConfirmUrl_(quarterId));
         notifyAdmin_(text.subject, text.body, adminEmail, true);
+      } },
+    // 第九十八輪批次 YB 組：已有版本之後開季前資料有改動
+    { name: '幹事通知：開季前資料有改動', where: '程式（PreseasonChange.gs buildPreseasonChangeNotifyText_）',
+      run: function () {
+        const text = buildPreseasonChangeNotifyText_(prefix, quarterId, 1,
+          [{ id: 'WEIGHT', label: '排表偏好', count: 2 }, { id: 'PRE', label: '預先安排', count: 1 }],
+          buildPreseasonChangeAdminUrl_(quarterId));
+        notifyAdmin_(text.subject, text.body, adminEmail, true);
       } }
   ];
   return defs.map(function (d) {

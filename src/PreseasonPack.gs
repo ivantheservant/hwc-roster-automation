@@ -55,7 +55,7 @@ function readPreseasonGenerateDate_(quarterRow, config) {
 }
 
 /**
- * 季前資料的內容（六段）。**只讀。**
+ * 季前資料的內容（七段；第九十八輪批次 YA 組加第六段「預先安排的領詩、司琴」）。**只讀。**
  * @param {string} quarterId 目標季度
  * @param {string} todayStr 寄出當日（堂委／執事以這一日的現任為準）
  * @param {string} generateDate 生成日
@@ -158,7 +158,10 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
       ? '：' + choir.ids.map(function (id) { return nameById[id] || id; }).join('、') : '');
   sections.push({ title: '五、合堂主日及詩班獻詩', lines: (s5.length ? s5 : ['沒有']).concat([choirLine]) });
 
-  // ⑥ 人手檢查
+  // ⑥ 第九十八輪批次 YA 組：預先安排的領詩、司琴（每個主日一行）
+  sections.push({ title: '六、預先安排的領詩、司琴', lines: buildPreseasonPreAssignLines_(quarterId, timezone, nameById) });
+
+  // ⑦ 人手檢查
   let s6;
   try {
     const st = computeStaffingCheck_(buildStaffingContext_(quarterId));
@@ -168,7 +171,7 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
   } catch (err) {
     s6 = ['（人手檢查暫時做不到：' + err.message + '）'];
   }
-  sections.push({ title: '六、人手檢查', lines: s6 });
+  sections.push({ title: '七、人手檢查', lines: s6 });
 
   const html = sections.map(function (s) {
     return '<p><b>' + escapePreseasonHtml_(s.title) + '</b></p><ul>'
@@ -179,6 +182,37 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
   }).join('\n\n');
   return { quarterId: quarterId, quarterLabel: buildQuarterLabel_(quarterId), generateDate: generateDate,
     sections: sections, html: html, plain: plain };
+}
+
+/**
+ * 第九十八輪批次 YA 組：季前資料「預先安排的領詩、司琴」——每個有預先安排的主日一行
+ * （「2028-07-02　領詩：甲　司琴：乙」）；沒有 ⇒「沒有」。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @param {Object.<string, string>} nameById PersonID → 名
+ * @returns {string[]}
+ */
+function buildPreseasonPreAssignLines_(quarterId, timezone, nameById) {
+  const pre = readPreAssignmentsSafe_(quarterId, timezone);
+  const posts = readPreAssignPosts_();
+  const byDate = {};
+  Object.keys(pre).forEach(function (k) {
+    const c = pre[k];
+    (byDate[c.serviceDate] = byDate[c.serviceDate] || []).push(c);
+  });
+  const lines = Object.keys(byDate).sort().map(function (d) {
+    const parts = [];
+    posts.forEach(function (p) {
+      byDate[d].filter(function (c) { return c.postId === p.postId; })
+        .sort(function (a, b) { return a.slotIndex - b.slotIndex; })
+        .forEach(function (c) {
+          parts.push((p.postNameTC || p.postId) + (p.slotCount > 1 ? ' ' + c.slotIndex : '') + '：'
+            + (c.personId ? (nameById[c.personId] || c.personId) : c.freeText));
+        });
+    });
+    return d + '　' + parts.join('　');
+  });
+  return lines.length ? lines : ['沒有'];
 }
 
 /**

@@ -49,6 +49,10 @@ const SHEETS = {
   CELL_DECISIONS: 'CellDecisions',
   // 第二十六輪批次階段 C：排表偏好（某人 × 某崗位 → 比平均多／少 N 次）。
   PERSON_POST_WEIGHT: 'PersonPostWeight',
+  // 第九十八輪批次 YA 組：開季前預先安排（領詩、司琴；第一次儲存時自動建立）
+  PRE_ASSIGNMENTS: 'PreAssignments',
+  // 第九十八輪批次 YB 組：開季前資料基準（每個版本建立時的內容摘要；第一次用時自動建立）
+  PRESEASON_BASELINES: 'PreseasonBaselines',
   // 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍（幹事確認後才寫 Unavailable）。第一次提交時自動建立。
   UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions'
 };
@@ -306,6 +310,25 @@ const COLUMNS = {
    * `CellText` 同職事表而家嗰格（正規化後）唔同 ⇒ 失效（換咗人就要重新決定）。
    * 取消勾選 ⇒ `Status=CANCELLED`（唔刪行，留低痕跡）；重設季度測試資料 ⇒ 成季刪走。
    */
+  // 第九十八輪批次 YA 組：開季前預先安排（PreAssign.gs）
+  PRE_ASSIGNMENTS: {
+    QUARTER_ID: 'QuarterID',
+    SERVICE_DATE: 'ServiceDate',
+    POST_ID: 'PostID',
+    SLOT_INDEX: 'SlotIndex',
+    PERSON_ID: 'PersonID',
+    FREE_TEXT: 'FreeText',
+    UPDATED_AT: 'UpdatedAt',
+    UPDATED_BY: 'UpdatedBy'
+  },
+  // 第九十八輪批次 YB 組：開季前資料基準（PreseasonChange.gs）
+  PRESEASON_BASELINES: {
+    QUARTER_ID: 'QuarterID',
+    VERSION_NO: 'VersionNo',
+    CATEGORY: 'Category',
+    DATA: 'Data',
+    CAPTURED_AT: 'CapturedAt'
+  },
   CELL_DECISIONS: {
     DECISION_ID: 'DecisionID',
     QUARTER_ID: 'QuarterID',
@@ -898,7 +921,9 @@ const ASSIGN_SOURCE = {
   SKIPPED: 'SKIPPED',
   LOCKED: 'LOCKED',
   MANUAL: 'MANUAL',
-  FINE_TUNED: 'FINE_TUNED'
+  FINE_TUNED: 'FINE_TUNED',
+  // 第九十八輪批次 YA 組：開季前預先安排（〔預先安排領詩、司琴〕）直接放入的格——人決定的
+  PREASSIGNED: 'PREASSIGNED'
 };
 
 /**
@@ -913,7 +938,7 @@ const ASSIGN_SOURCE = {
  * `AutoGenerate = FALSE` 嘅崗位（講員／翻譯／獻花）本來就係**要人手填**，
  * 人手填咗唔係違反——系統自己排咗先係。
  */
-const HUMAN_ASSIGN_SOURCES = [ASSIGN_SOURCE.MANUAL, ASSIGN_SOURCE.LOCKED];
+const HUMAN_ASSIGN_SOURCES = [ASSIGN_SOURCE.MANUAL, ASSIGN_SOURCE.LOCKED, ASSIGN_SOURCE.PREASSIGNED];
 
 /**
  * Quarters.Stage 欄可能出現的值：四階段流程的狀態機，只能依此順序前進，不可倒退。
@@ -1504,6 +1529,10 @@ const CONFIG_KEYS = {
   WEBAPP_SHOW_LOAD_TIMINGS: 'WEBAPP_SHOW_LOAD_TIMINGS',
   // 第九十六輪批次 WC 組：幹事介面打開時（網址沒有 quarter）預設顯示的季度（預設空白＝下一季；程式預設值，不用寫入工作表）
   WEBAPP_DEFAULT_QUARTER: 'WEBAPP_DEFAULT_QUARTER',
+  // 第九十八輪批次 YA 組：可以開季前預先安排的崗位（預設 WORSHIP,PIANO；程式預設值）
+  PREASSIGN_POST_IDS: 'PREASSIGN_POST_IDS',
+  // 第九十八輪批次 YB 組：已有版本之後開季前資料改動 ⇒ 電郵通知幹事（預設 TRUE；程式預設值）
+  PRESEASON_CHANGE_NOTIFY: 'PRESEASON_CHANGE_NOTIFY',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。

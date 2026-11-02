@@ -353,6 +353,8 @@
               + '　提交：' + (it.submittedAt || '')
           }));
           if (it.late) line.appendChild(make('div', { text: '截止日之後', className: 'err-text' }));
+          // 第九十八輪批次 YA 組：這一日已預先安排他做領詩／司琴
+          if (it.preAssignNote) line.appendChild(make('div', { text: it.preAssignNote, className: 'err-text' }));
           line.appendChild(row([
             gate(button('確認申請', () => decide([it.submissionId], 'ACCEPT', '確認義工申報'), 'link')),
             gate(button('不確認', () => decide([it.submissionId], 'REJECT', '不確認義工申報'), 'link danger'))

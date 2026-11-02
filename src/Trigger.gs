@@ -171,6 +171,16 @@ function dailyAutomationCheck_() {
           log_('WARN', 'dailyAutomationCheck_: 季前資料 ' + quarterId + ' 失敗：' + err.message);
           report.push({ quarterId: quarterId, action: 'PRESEASON', outcome: 'ERROR', detail: err.message });
         }
+
+        // 第九十八輪批次 YB 組：已有版本、未開季 ⇒ 最新版本之後開季前資料有改動就通知幹事（同一批只通知一次）
+        try {
+          const changed = runPreseasonChangeNotify_(quarterId, today, config, isDryRun, 'dailyAutomationCheck_');
+          delete changed.items;
+          report.push(changed);
+        } catch (err) {
+          log_('WARN', 'dailyAutomationCheck_: 開季前資料改動 ' + quarterId + ' 失敗：' + err.message);
+          report.push({ quarterId: quarterId, action: 'PRESEASON_CHANGE', outcome: 'ERROR', detail: err.message });
+        }
       } catch (err) {
         writeAuditLog_({
           action: 'AUTOMATION_QUARTER_JUDGE_ERROR',

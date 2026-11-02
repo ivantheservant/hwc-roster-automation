@@ -86,7 +86,9 @@ const WEBAPP_READ_ONLY_APIS = [
   // 第九十四輪批次 UB 組：「義工申報，確認」畫面（只可查看的人看得到，按鈕灰色）
   'apiGetUnavailableConfirmView',
   // 第九十七輪批次 XA／XB 組：〔補填電郵〕畫面；〔沒有電郵的人：匯出邀請〕畫面（只讀）
-  'apiGetManualEmailView', 'apiGetInvitePaperView'
+  'apiGetManualEmailView', 'apiGetInvitePaperView',
+  // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面（只讀）
+  'apiGetPreAssignView'
 ];
 
 /**

@@ -616,15 +616,31 @@ function buildStaffingContext_(quarterId) {
 function readSameDayFixedCells_(quarterId, ids, timezone) {
   if (!ids || ids.length === 0) return [];
   try {
+    // 第九十八輪批次 YA 組：開季前預先安排——未有版本 ⇒ 只看預先安排；
+    // 有版本 ⇒ 版本＋版本上還沒有的預先安排（這一格版本上同一個人已經在 ⇒ 不重複）
+    const pre = readPreAssignmentsSafe_(quarterId, timezone);
+    const preCells = Object.keys(pre).sort().map(function (k) { return pre[k]; }).filter(function (c) {
+      return c.personId && ids.indexOf(c.postId) !== -1;
+    });
     const versionNo = findLatestVersionNo_(quarterId);
-    if (!(versionNo >= 0)) return [];
+    if (!(versionNo >= 0)) {
+      return preCells.map(function (c) { return { serviceDate: c.serviceDate, postId: c.postId, personId: c.personId }; });
+    }
     const C = COLUMNS.ROSTER_ASSIGNMENTS;
-    return readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
+    const out = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
       return row[C.QUARTER_ID] === quarterId && Number(row[C.VERSION_NO]) === versionNo
         && ids.indexOf(row[C.POST_ID]) !== -1 && row[C.PERSON_ID];
     }).map(function (row) {
       return { serviceDate: toDateString_(row[C.SERVICE_DATE], timezone), postId: row[C.POST_ID], personId: row[C.PERSON_ID] };
     });
+    const have = {};
+    out.forEach(function (f) { have[f.serviceDate + '|' + f.postId + '|' + f.personId] = true; });
+    preCells.forEach(function (c) {
+      if (!have[c.serviceDate + '|' + c.postId + '|' + c.personId]) {
+        out.push({ serviceDate: c.serviceDate, postId: c.postId, personId: c.personId });
+      }
+    });
+    return out;
   } catch (err) {
     log_('WARN', 'readSameDayFixedCells_（' + quarterId + '）讀不到，人手檢查當作未填：' + err.message);
     return [];
@@ -751,7 +767,8 @@ function repairRosterBlanksWithStaffingFlow_(context, result) {
   const cells = result.assignments.map(function (a) {
     return {
       serviceDate: a.serviceDate, postId: a.postId, slotIndex: a.slotIndex, personId: a.personId || '',
-      fixed: a.assignSource === ASSIGN_SOURCE.LOCKED
+      // 第九十八輪批次 YA 組：開季前預先安排的格同鎖定格一樣不改
+      fixed: a.assignSource === ASSIGN_SOURCE.LOCKED || a.assignSource === ASSIGN_SOURCE.PREASSIGNED
     };
   });
   let aug;

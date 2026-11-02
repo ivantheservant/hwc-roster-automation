@@ -6125,8 +6125,8 @@ const MUTATIONS = [
     id: "cd-fill-btn-back",
     why: "開季前準備還原〔填講員／翻譯／獻花〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('詩班獻詩', () => openChoirSinging(), '')\n    ]));",
-    replace: "      button('詩班獻詩', () => openChoirSinging(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
+    find: "      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), '')\n    ]));",
+    replace: "      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
     tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
   },
   {
@@ -9616,8 +9616,8 @@ const MUTATIONS = [
     id: "qa-card-missing",
     why: "狀態卡沒有接上同日兼任",
     file: "src/ui/Script.html",
-    find: "      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay));",
-    replace: ";",
+    find: "      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay))\n",
+    replace: "",
     tests: ["tests/round90_qa_same_day.test.js"]
   },
   {
@@ -11562,8 +11562,8 @@ const MUTATIONS = [
     id: "xa-save-readonly",
     why: "只可查看的人可以儲存補填電郵",
     file: "src/WebApp.gs",
-    find: "  'apiGetManualEmailView', 'apiGetInvitePaperView'\n];",
-    replace: "  'apiGetManualEmailView', 'apiGetInvitePaperView', 'apiSaveManualEmails'\n];",
+    find: "  'apiGetPreAssignView'\n];",
+    replace: "  'apiGetPreAssignView', 'apiSaveManualEmails'\n];",
     tests: ["tests/round97_xa_manual_email.test.js"]
   },
   {
@@ -11669,6 +11669,398 @@ const MUTATIONS = [
     find: "      + (suggest ? '' : '；這一季沒有生成日期，不會自動寄出');",
     replace: "      + (suggest ? '；正式使用時建議 ' + suggest + ' 寄出' : '；這一季沒有生成日期，不會自動寄出');",
     tests: ["tests/round97_xc_xd_hints.test.js"]
+  },
+  {
+    id: "ya-gen-no-place",
+    why: "預先安排的格沒有放入",
+    file: "src/Generator.gs",
+    find: "function findPreAssignedCell_(context, baseRow, skipReason) {\n",
+    replace: "function findPreAssignedCell_(context, baseRow, skipReason) {\n  return null;\n",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-gen-source-auto",
+    why: "預先安排的格當作系統排",
+    file: "src/Generator.gs",
+    find: "makeAssignment_(baseRow, preAssigned.personId, preName, ASSIGN_SOURCE.PREASSIGNED, [])",
+    replace: "makeAssignment_(baseRow, preAssigned.personId, preName, ASSIGN_SOURCE.AUTO, [])",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-gen-skip-special",
+    why: "特別主日不設的格照樣放入",
+    file: "src/Generator.gs",
+    find: "  if (skipReason && skipReason.ruleId !== RULE_IDS.NO_AUTO_GENERATE) return null;\n",
+    replace: "",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-gen-ctx-empty",
+    why: "生成沒有讀預先安排",
+    file: "src/Generator.gs",
+    find: "    preAssignments: readPreAssignments_(quarterId, timezone),",
+    replace: "    preAssignments: {},",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-reserve-none",
+    why: "同日不兼任沒有保留預先安排的人",
+    file: "src/Generator.gs",
+    find: "    if (!out[c.personId]) out[c.personId] = c.postId;\n  });\n  return out;",
+    replace: "  });\n  return out;",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-reserve-skip",
+    why: "不設的崗位照樣保留",
+    file: "src/Generator.gs",
+    find: "    if ((special.skipPostIds || []).indexOf(c.postId) !== -1) return;\n    if (!out[c.personId])",
+    replace: "    if (!out[c.personId])",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-fixed-no-pre",
+    why: "未有版本時人手檢查不讀預先安排",
+    file: "src/StaffingCheck.gs",
+    find: "    if (!(versionNo >= 0)) {\n      return preCells.map(",
+    replace: "    if (!(versionNo >= 0)) {\n      return [].map(",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-fixed-version-only",
+    why: "有版本時不加版本上沒有的預先安排",
+    file: "src/StaffingCheck.gs",
+    find: "    preCells.forEach(function (c) {\n      if (!have[",
+    replace: "    [].forEach(function (c) {\n      if (!have[",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-blocked-combined",
+    why: "合堂主日可以填",
+    file: "src/PreAssign.gs",
+    find: "    if (combinedByDate[serviceDate]) return '合堂';\n",
+    replace: "",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-read-blocked",
+    why: "不設的格仍然算預先安排",
+    file: "src/PreAssign.gs",
+    find: "    if (!serviceDate || blockedOf(serviceDate, postId)) return;",
+    replace: "    if (!serviceDate) return;",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-read-blank",
+    why: "空白的預先安排都算",
+    file: "src/PreAssign.gs",
+    find: "    if (!personId && !freeText) return;\n    const serviceDate",
+    replace: "    const serviceDate",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-save-no-person-chk",
+    why: "名單上沒有的人照樣儲存",
+    file: "src/PreAssign.gs",
+    find: "    if (c.personId && !people[c.personId]) {",
+    replace: "    if (false) {",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-save-blocked-ok",
+    why: "合堂主日照樣儲存",
+    file: "src/PreAssign.gs",
+    find: "    if ((c.personId || c.freeText) && blocked) {",
+    replace: "    if (false && blocked) {",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-mismatch-freetext",
+    why: "其他名字不同不算不同",
+    file: "src/PreAssign.gs",
+    find: "      : (!cur.personId && String(cur.freeText || '').trim() === want.freeText);",
+    replace: "      : true;",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-explain-text",
+    why: "說明句改了",
+    file: "src/PreAssign.gs",
+    find: "const PREASSIGN_EXPLANATION = '這裏填的人會直接放入職事表，",
+    replace: "const PREASSIGN_EXPLANATION = '這裏填的人會放入職事表，",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-dash-text",
+    why: "黃框句改了",
+    file: "src/PreAssign.gs",
+    find: "格和職事表不同，按〔請系統幫我調整〕更新。' };",
+    replace: "格和職事表不同。' };",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-suggest-no-apply",
+    why: "調整不理預先安排",
+    file: "src/SuggestionSheet.gs",
+    find: "  const preAssignApplied = applyPreAssignmentsToState_(quarterId, context, analysis.manualState, timezone);",
+    replace: "  const preAssignApplied = { keys: {}, changed: [] };",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-suggest-reason",
+    why: "建議原因不是依開季前預先安排",
+    file: "src/SuggestionSheet.gs",
+    find: "      fromName: c.fromName, toName: c.toName, reason: PREASSIGN_SUGGEST_REASON });",
+    replace: "      fromName: c.fromName, toName: c.toName, reason: '' });",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-confirm-note",
+    why: "確認畫面沒有預先安排提示",
+    file: "src/PersonalUnavailable.gs",
+    find: "    return posts ? '這一日已預先安排他做' + posts : '';",
+    replace: "    return '';",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-pack-section",
+    why: "季前資料沒有預先安排一段",
+    file: "src/PreseasonPack.gs",
+    find: "  sections.push({ title: '六、預先安排的領詩、司琴', lines: buildPreseasonPreAssignLines_(quarterId, timezone, nameById) });\n",
+    replace: "",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-staffing-call",
+    why: "儲存預先安排不更新人手檢查",
+    file: "src/ui/Script.html",
+    find: "    'apiSavePreAssignments'];",
+    replace: "    'apiSavePreAssignmentsX'];",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-ro-list",
+    why: "讀取畫面不在伺服器唯讀清單",
+    file: "src/WebApp.gs",
+    find: "  'apiGetManualEmailView', 'apiGetInvitePaperView',\n  // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面（只讀）\n  'apiGetPreAssignView'\n];",
+    replace: "  'apiGetManualEmailView', 'apiGetInvitePaperView'\n];",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-deep-link",
+    why: "沒有 view=preassign",
+    file: "src/ui/Script.html",
+    find: "    preassign: () => openPreAssign(),\n",
+    replace: "",
+    tests: ["tests/round98_ya_preassign.test.js","tests/round87_na_deep_link.test.js"]
+  },
+  {
+    id: "ya-dash-ui",
+    why: "狀態卡沒有預先安排黃框",
+    file: "src/ui/Script.html",
+    find: "      .concat(buildPlainWarnNodes(d.preAssignMismatch))\n",
+    replace: "",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-ui-other",
+    why: "其他名字沒有送出",
+    file: "src/ui/ScriptZone2.html",
+    find: "        freeText: select.value === PREASSIGN_OTHER_VALUE ? String(input.value || '').trim() : ''",
+    replace: "        freeText: ''",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-ui-blocked-select",
+    why: "合堂格照樣有下拉",
+    file: "src/ui/ScriptZone2.html",
+    find: "        if (c.blocked) {\n          line.appendChild(make('span', { text: c.blocked, className: 'muted preassign-blocked' }));\n          return;\n        }\n",
+    replace: "",
+    tests: ["tests/round98_ya_preassign.test.js"]
+  },
+  {
+    id: "ya-ui-button",
+    why: "開季前準備沒有按鈕",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('詩班獻詩', () => openChoirSinging(), ''),\n",
+    replace: "      button('詩班獻詩', () => openChoirSinging(), '')\n    ]));\n    body.appendChild(row([\n",
+    tests: ["tests/round98_ya_preassign.test.js","tests/round85_le_combined.test.js"]
+  },
+  {
+    id: "yb-hook",
+    why: "建立版本時沒有記基準",
+    file: "src/RosterWriter.gs",
+    find: "  capturePreseasonBaselineSafe_(quarterId, versionNo);\n}",
+    replace: "}",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-capture-throws",
+    why: "記基準失敗會令建立版本失敗",
+    file: "src/PreseasonChange.gs",
+    find: "function capturePreseasonBaselineSafe_(quarterId, versionNo) {\n  try {",
+    replace: "function capturePreseasonBaselineSafe_(quarterId, versionNo) {\n  readPreseasonSnapshot_(quarterId, 'x');\n  try {",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-diff-changed",
+    why: "內容不同不算改動",
+    file: "src/PreseasonChange.gs",
+    find: "    Object.keys(a).forEach(function (k) { if (b[k] !== a[k]) n++; });",
+    replace: "    Object.keys(a).forEach(function (k) { if (!(k in b)) n++; });",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-diff-added",
+    why: "多了的行不算改動",
+    file: "src/PreseasonChange.gs",
+    find: "    Object.keys(b).forEach(function (k) { if (!(k in a)) n++; });\n",
+    replace: "",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-sig-once",
+    why: "同一批改動重複通知",
+    file: "src/PreseasonChange.gs",
+    find: "  if (sig === base.notifiedSig) return row('SKIP', 'ALREADY_NOTIFIED', items);\n",
+    replace: "",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-sig-not-saved",
+    why: "通知之後沒有記簽名",
+    file: "src/PreseasonChange.gs",
+    find: "  writePreseasonNotifiedSig_(quarterId, sig);\n  const dry",
+    replace: "  const dry",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-started",
+    why: "季度開始之後仍然檢查",
+    file: "src/PreseasonChange.gs",
+    find: "  if (start && today >= start) return",
+    replace: "  if (false) return",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-disabled",
+    why: "Config 關了仍然檢查",
+    file: "src/PreseasonChange.gs",
+    find: "  if (getConfig_(CONFIG_KEYS.PRESEASON_CHANGE_NOTIFY, true) === false) return",
+    replace: "  if (false) return",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-unavail-quarter",
+    why: "不能服侍不分季度",
+    file: "src/PreseasonChange.gs",
+    find: "    return !(to && to < first) && !(from && from > last);",
+    replace: "    return true;",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-elig-cat",
+    why: "名單改動偵測不到",
+    file: "src/PreseasonChange.gs",
+    find: "out.ELIG = buildPreseasonCategoryMap_(readSheet_(SHEETS.ELIGIBILITY).map(",
+    replace: "out.ELIG = buildPreseasonCategoryMap_([].map(",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-pre-cat",
+    why: "預先安排改動偵測不到",
+    file: "src/PreseasonChange.gs",
+    find: "out.PRE = buildPreseasonCategoryMap_(readOptionalSheetRows_(SHEETS.PRE_ASSIGNMENTS).filter(",
+    replace: "out.PRE = buildPreseasonCategoryMap_([].filter(",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-roles-cat",
+    why: "身分改動偵測不到",
+    file: "src/PreseasonChange.gs",
+    find: "out.ROLES = buildPreseasonCategoryMap_(readOptionalSheetRows_(SHEETS.ROLES).map(",
+    replace: "out.ROLES = buildPreseasonCategoryMap_([].map(",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-rules-cat",
+    why: "規則改動偵測不到",
+    file: "src/PreseasonChange.gs",
+    find: "out.RULES = buildPreseasonCategoryMap_(readSheet_(SHEETS.RULE_SETTINGS).map(",
+    replace: "out.RULES = buildPreseasonCategoryMap_([].map(",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-weight-cat",
+    why: "排表偏好改動偵測不到",
+    file: "src/PreseasonChange.gs",
+    find: "out.WEIGHT = buildPreseasonCategoryMap_(readOptionalSheetRows_(SHEETS.PERSON_POST_WEIGHT).map(",
+    replace: "out.WEIGHT = buildPreseasonCategoryMap_([].map(",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-subject",
+    why: "電郵標題改了",
+    file: "src/PreseasonChange.gs",
+    find: "' 職事表：開季前資料在第 ' + versionNo + ' 版之後有改動';",
+    replace: "' 職事表：開季前資料有改動';",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-body-line",
+    why: "每類一行的寫法改了",
+    file: "src/PreseasonChange.gs",
+    find: "map(function (it) { return it.label + '：' + it.count + ' 項'; }).join('\\n')",
+    replace: "map(function (it) { return it.label + ' ' + it.count; }).join('\\n')",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-body-action",
+    why: "內文沒有行動句",
+    file: "src/PreseasonChange.gs",
+    find: "    + '\\n\\n' + PRESEASON_CHANGE_ACTION_TEXT\n",
+    replace: "\n",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-daily",
+    why: "每日檢查沒有這一步",
+    file: "src/Trigger.gs",
+    find: "          const changed = runPreseasonChangeNotify_(quarterId, today, config, isDryRun, 'dailyAutomationCheck_');",
+    replace: "          const changed = { items: [] };",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-dash-started",
+    why: "季度開始之後狀態卡仍然顯示",
+    file: "src/PreseasonChange.gs",
+    find: "    if (!judged.check) return none;\n",
+    replace: "",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-dash-ui",
+    why: "狀態卡沒有改動一句",
+    file: "src/ui/Script.html",
+    find: "      .concat(buildPlainWarnNodes(d.preseasonChange));",
+    replace: "      ;",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-api-lock",
+    why: "立即檢查變成唯讀類",
+    file: "src/PreseasonChange.gs",
+    find: "  assertWebAppRequestAllowed_();\n  return withMutationLock_('檢查開季前資料改動'",
+    replace: "  assertWebAppRequestAllowed_('apiRunPreseasonChangeCheck');\n  return withMutationLock_('檢查開季前資料改動'",
+    tests: ["tests/round98_yb_preseason_change.test.js"]
+  },
+  {
+    id: "yb-template",
+    why: "範本樣本沒有這一封",
+    file: "src/TemplateSamples.gs",
+    find: "    { name: '幹事通知：開季前資料有改動', where:",
+    replace: "    { name: '幹事通知：沒有電郵名單', where:",
+    tests: ["tests/round93_tb_template_samples.test.js"]
   }
 ];
 

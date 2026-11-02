@@ -665,6 +665,20 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "WEBAPP"
     },
+    "PREASSIGN_POST_IDS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "WORSHIP,PIANO",
+      "launchTargetValue": "WORSHIP,PIANO",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP"
+    },
+    "PRESEASON_CHANGE_NOTIFY": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP"
+    },
     "WEBAPP_ENABLED": {
       "source": "已核實的實際值",
       "currentValue": "TRUE",

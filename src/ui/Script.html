@@ -168,6 +168,8 @@
     // 第九十七輪批次 XA／XB 組：〔補填電郵〕畫面；〔沒有電郵的人：匯出邀請〕畫面——只讀
     'apiGetManualEmailView',
     'apiGetInvitePaperView',
+    // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面——只讀
+    'apiGetPreAssignView',
     // 第八十五輪批次 LF 組：〔寄出季前資料〕預覽——只讀
     'apiPreseasonPreview',
     'apiListUnavailable',
@@ -534,7 +536,9 @@
     // 第九十輪批次 QC 組：接受義工申報＝加入不能服侍的日期
     'apiDecideUnavailableSubmissions',
     'apiSavePersonPostWeightBatch', 'apiAddRole', 'apiSaveRole', 'apiRolesTermChangeExecute', 'apiAddExclusion',
-    'apiSaveExclusion', 'apiLiftExclusion', 'apiRuleReviewImportExecute', 'apiSaveCombinedServices'];
+    'apiSaveExclusion', 'apiLiftExclusion', 'apiRuleReviewImportExecute', 'apiSaveCombinedServices',
+    // 第九十八輪批次 YA 組：預先安排的領詩、司琴（同日不兼任會避開他們）
+    'apiSavePreAssignments'];
   /** 下一個彈窗最上面要寫的人手提醒（寫一次就清空）。 */
   let pendingStaffingNote_ = '';
 
@@ -1058,6 +1062,8 @@
     combined: () => openCombinedServices(),
     // 第九十輪批次 QB 組
     choir: () => openChoirSinging(),
+    // 第九十八輪批次 YA 組
+    preassign: () => openPreAssign(),
     unavailable: () => openUnavailable(),
     weights: () => openWeights(),
     staffing: () => openStaffingCheck(),
@@ -1303,6 +1309,17 @@
    * @param {{withButton: boolean}=} opts `withButton` ⇒ 多一粒〔請系統幫我調整〕（結果窗用）
    * @returns {Element[]} 冇嘢要講就係空陣列
    */
+  /**
+   * 第九十八輪批次 YA／YB 組：狀態卡一句黃框（後端已經組好句子：`summarisePreAssignMismatch_()`、
+   * `describePreseasonChangeForDashboard_()`）。沒有 ⇒ 空陣列。
+   * @param {{count: number, text: string}} info
+   * @returns {Element[]}
+   */
+  function buildPlainWarnNodes(info) {
+    if (!info || !(info.count > 0) || !info.text) return [];
+    return [make('div', { className: 'warnbox' }, [make('div', { text: info.text, className: 'warn-head' })])];
+  }
+
   function buildEligibilityImpactNodes(impact, opts) {
     const nodes = [];
     if (!impact) return nodes;
@@ -2560,7 +2577,10 @@
       // 第六十七輪批次 AI 組：名單改了之後有幾多格的人已唔喺名單上
       .concat(buildEligibilityImpactNodes(d.eligibilityImpact))
       // 第九十輪批次 QA 組：同日兼任（領詩／司琴的人當日另有崗位；含未儲存的改動）
-      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay));
+      .concat(buildSameDayNodes(d.unsaved && d.unsaved.sameDay))
+      // 第九十八輪批次 YA 組：預先安排的領詩／司琴和表上不同；YB 組：最新版本之後開季前資料有改動
+      .concat(buildPlainWarnNodes(d.preAssignMismatch))
+      .concat(buildPlainWarnNodes(d.preseasonChange));
     warnNodes.forEach((n) => warnBox.appendChild(n));
     warnBox.hidden = warnNodes.length === 0;
 

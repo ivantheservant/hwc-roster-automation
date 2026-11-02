@@ -882,7 +882,30 @@ function apiGetUnavailableConfirmView(quarterId) {
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const all = readUnavailableSubmissions_(timezone);
   return buildUnavailableConfirmView_(all, buildPersonNameIndex_(), readPostNameIndexForUnavailable_(),
-    role === WEBAPP_ROLE.EDITOR || isUnavailableConfirmerCaller_(), String(quarterId || '').trim());
+    role === WEBAPP_ROLE.EDITOR || isUnavailableConfirmerCaller_(), String(quarterId || '').trim(),
+    buildPreAssignNoteLookup_(all, timezone));
+}
+
+/**
+ * 第九十八輪批次 YA 組：待確認申報那一日，這個人已經預先安排做領詩／司琴 ⇒ 一句提示。
+ * 讀不到預先安排 ⇒ 不提示（不令確認畫面打不開）。
+ * @param {Object[]} all readUnavailableSubmissions_()
+ * @param {string} timezone 時區
+ * @returns {function(string, string): string} (personId, serviceDate) → 提示（沒有 ⇒ 空字串）
+ */
+function buildPreAssignNoteLookup_(all, timezone) {
+  const byQuarter = {};
+  const preOf = function (serviceDate) {
+    let q = '';
+    try { q = quarterIdForDateForUnavailable_(serviceDate, timezone) || ''; } catch (err) { q = ''; }
+    if (!q) return {};
+    if (!byQuarter[q]) byQuarter[q] = readPreAssignmentsSafe_(q, timezone);
+    return byQuarter[q];
+  };
+  return function (personId, serviceDate) {
+    const posts = describePreAssignedPosts_(preOf(serviceDate), personId, serviceDate);
+    return posts ? '這一日已預先安排他做' + posts : '';
+  };
 }
 
 /**
@@ -892,9 +915,10 @@ function apiGetUnavailableConfirmView(quarterId) {
  * @param {Object.<string, string>} postNames PostID → 名
  * @param {boolean} canDecide 這個人可不可以按〔確認申請〕〔不確認〕
  * @param {string} quarterId 深連結的季度
+ * @param {function(string, string): string=} preAssignNoteOf 第九十八輪批次 YA 組：(personId, serviceDate) → 預先安排提示
  * @returns {Object}
  */
-function buildUnavailableConfirmView_(all, names, postNames, canDecide, quarterId) {
+function buildUnavailableConfirmView_(all, names, postNames, canDecide, quarterId, preAssignNoteOf) {
   const pendingItems = all.filter(function (s) { return s.status === UNAVAILABLE_SUBMISSION_STATUS.PENDING; })
     .sort(function (a, b) { return a.serviceDate < b.serviceDate ? -1 : (a.serviceDate > b.serviceDate ? 1 : 0); });
   const groups = [];
@@ -905,7 +929,8 @@ function buildUnavailableConfirmView_(all, names, postNames, canDecide, quarterI
       groups.push(byPerson[s.personId]);
     }
     byPerson[s.personId].items.push({ submissionId: s.submissionId, serviceDate: s.serviceDate,
-      postsText: describeUnavailablePosts_(s.postIds, postNames), reason: s.reason, submittedAt: s.submittedAt, late: s.late });
+      postsText: describeUnavailablePosts_(s.postIds, postNames), reason: s.reason, submittedAt: s.submittedAt, late: s.late,
+      preAssignNote: preAssignNoteOf ? preAssignNoteOf(s.personId, s.serviceDate) : '' });
   });
   const history = all.filter(function (s) {
     return s.status === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED || s.status === UNAVAILABLE_SUBMISSION_STATUS.REJECTED;

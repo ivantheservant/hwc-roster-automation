@@ -52,6 +52,10 @@
       zone4Row('寄出電郵範本樣本',
         '一次過寄出系統每一種信的樣本到你自己的信箱，用來核對文字。只會寄給你選的那一個地址，不會寄給任何義工。',
         () => openTemplateSamples(), false),
+      // 第九十八輪批次 YB 組：立即檢查這一季（同每日檢查同一支；有改動會通知幹事，遵守 DRY_RUN）
+      zone4Row('檢查開季前資料改動',
+        '這一季已有版本之後，名單、偏好、不能服侍、合堂、預先安排、身分、規則等有改動的話，電郵通知幹事。每日自動檢查一次；這裏立即檢查這一季。',
+        () => runPreseasonChangeCheck(), false),
       zone4Row('出席系統連結',
         '電郵由出席系統按會眾編號讀取。這裏看哪些人還沒有連結（會眾編號）、出席系統找不到、編號重複、出席系統沒有電郵，並把未連結的人連結上。',
         () => openHwcasLink(), false)
@@ -409,6 +413,15 @@
   }
 
   /** 區四一行：名、一句說明、右邊一粒掣。 */
+  /** 第九十八輪批次 YB 組：〔檢查開季前資料改動〕〔開始〕。 */
+  function runPreseasonChangeCheck() {
+    runAction('檢查開季前資料改動', async () => {
+      const res = await callServerMutating('apiRunPreseasonChangeCheck', currentQuarterId);
+      openModal('檢查開季前資料改動', [make('div', { text: res.message || '', className: 'ok-line' })],
+        [button('完成', () => closeModalAndRefresh(), '')]);
+    });
+  }
+
   function zone4Row(name, desc, onClick, danger) {
     const box = make('div', { className: 'act' });
     box.appendChild(make('div', { className: 'act-main' }, [

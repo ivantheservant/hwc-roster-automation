@@ -79,7 +79,9 @@
       button('排表偏好', () => openWeights(), ''),
       button('合堂主日', () => openCombinedServices(), ''),
       // 第九十輪批次 QB 組：〔詩班獻詩〕放在〔合堂主日〕旁邊
-      button('詩班獻詩', () => openChoirSinging(), '')
+      button('詩班獻詩', () => openChoirSinging(), ''),
+      // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕放在〔詩班獻詩〕旁邊
+      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), '')
     ]));
     // 第八十五輪批次 LF 組：〔寄出季前資料〕（先預覽內容和收件人，再寄）
     // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕（請義工用個人專屬連結申報不能服侍；先預覽，再寄）
@@ -208,7 +210,90 @@
     });
   }
 
-  /** 第八十五輪批次 LF 組：〔寄出季前資料〕——預覽（六段內容＋收件人＋沒有電郵的人）→〔寄出〕→「模擬／寄出 N 封」。 */
+  /** 第九十八輪批次 YA 組：按鈕文字（測試、指南引用同一句）。 */
+  const PREASSIGN_BUTTON_LABEL = '預先安排領詩、司琴';
+  const PREASSIGN_OTHER_VALUE = '__OTHER__';
+
+  /**
+   * 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕——每個主日一行、每個崗位一欄；
+   * 每格選名單上的人、「其他（自己輸入）」或留空。合堂等不設的格顯示灰色「合堂」，不可以填。
+   */
+  function openPreAssign() {
+    runAction('讀取預先安排', async () => {
+      const data = await callServer('apiGetPreAssignView', currentQuarterId);
+      renderPreAssign_(data);
+    });
+  }
+
+  /** 一格：下拉（空白／名單上的人／其他）＋「其他」時的輸入框。回傳 {node, read}。 */
+  function preAssignCell_(post, cell) {
+    const select = document.createElement('select');
+    select.title = post.postNameTC + (post.slotCount > 1 ? ' ' + cell.slotIndex : '');
+    const add = (value, text) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = text;
+      select.appendChild(opt);
+    };
+    add('', '（空白）');
+    (post.options || []).forEach((o) => add(o.personId, o.nameTC));
+    add(PREASSIGN_OTHER_VALUE, '其他（自己輸入）');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = '名字';
+    input.value = cell.freeText || '';
+    select.value = cell.personId ? cell.personId : (cell.freeText ? PREASSIGN_OTHER_VALUE : '');
+    input.hidden = select.value !== PREASSIGN_OTHER_VALUE;
+    select.addEventListener('change', () => { input.hidden = select.value !== PREASSIGN_OTHER_VALUE; });
+    return {
+      node: make('span', { className: 'preassign-cell' }, [select, input]),
+      read: () => ({
+        personId: select.value === PREASSIGN_OTHER_VALUE ? '' : String(select.value || ''),
+        freeText: select.value === PREASSIGN_OTHER_VALUE ? String(input.value || '').trim() : ''
+      })
+    };
+  }
+
+  function renderPreAssign_(data) {
+    const posts = data.posts || [];
+    const postById = {};
+    posts.forEach((p) => { postById[p.postId] = p; });
+    const readers = [];
+    const list = make('div', { className: 'sec' });
+    (data.weeks || []).forEach((w) => {
+      const line = make('div', { className: 'check-row' }, [make('span', { text: humanDate(w.serviceDate) + '　' })]);
+      (w.cells || []).forEach((c) => {
+        const post = postById[c.postId] || { postNameTC: c.postId, slotCount: 1, options: [] };
+        line.appendChild(make('span', { text: post.postNameTC + (post.slotCount > 1 ? ' ' + c.slotIndex : '') + '：', className: 'muted' }));
+        if (c.blocked) {
+          line.appendChild(make('span', { text: c.blocked, className: 'muted preassign-blocked' }));
+          return;
+        }
+        const cell = preAssignCell_(post, c);
+        readers.push({ serviceDate: w.serviceDate, postId: c.postId, slotIndex: c.slotIndex, read: cell.read });
+        line.appendChild(cell.node);
+      });
+      list.appendChild(line);
+    });
+    const head = [para(data.explanation || '')];
+    if (posts.length === 0) head.push(para('Config PREASSIGN_POST_IDS 沒有任何有效崗位。', 'muted'));
+    openModal(PREASSIGN_BUTTON_LABEL + '：' + (data.quarterLabel || currentQuarterId), head.concat([list]), [
+      button('儲存', () => runAction('儲存預先安排', async () => {
+        const cells = readers.map((r) => Object.assign({ serviceDate: r.serviceDate, postId: r.postId, slotIndex: r.slotIndex }, r.read()));
+        const res = await callServerMutating('apiSavePreAssignments', currentQuarterId, cells);
+        if (!res.ok) {
+          openModal(PREASSIGN_BUTTON_LABEL, [make('div', { text: res.message || '儲存不到。', className: 'err-text' })],
+            [button('完成', () => closeModal(), '')]);
+          return;
+        }
+        openModal(PREASSIGN_BUTTON_LABEL, [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
+          [button('完成', () => closeModalAndRefresh(), '')]);
+      }), ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
+  }
+
+  /** 第八十五輪批次 LF 組：〔寄出季前資料〕——預覽（七段內容＋收件人＋沒有電郵的人）→〔寄出〕→「模擬／寄出 N 封」。 */
   function openPreseasonSend() {
     runAction('讀取季前資料', async () => {
       const p = await callServer('apiPreseasonPreview', currentQuarterId);

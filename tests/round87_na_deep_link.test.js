@@ -46,7 +46,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   const views = Object.keys(vm.runInContext('DEEP_LINK_VIEWS', ui)).sort().join(',');
   // 第九十輪批次 QB 組（刻意改動）：多了 choir（〔詩班獻詩〕）
   // 第九十四輪批次 UB 組（刻意改動）：加 unavailable-confirm（義工申報，確認）
-  check('★★★★★★ view 可用值：choir、combined、preseason、staffing、unavailable、unavailable-confirm、weights（常數表）', views === 'choir,combined,preseason,staffing,unavailable,unavailable-confirm,weights', views);
+  // 第九十八輪批次 YA 組（刻意改動）：加 preassign（〔預先安排領詩、司琴〕）
+  check('★★★★★★ view 可用值：choir、combined、preassign、preseason、staffing、unavailable、unavailable-confirm、weights（常數表）', views === 'choir,combined,preassign,preseason,staffing,unavailable,unavailable-confirm,weights', views);
   check('★★★★★ 參數名稱是 view、quarter（不是 p、q）', JSON.stringify(vm.runInContext('DEEP_LINK_PARAMS', ui)) === '{"VIEW":"view","QUARTER":"quarter"}');
 
   console.log('\n=== NA2：主畫面載入完成後 ===');

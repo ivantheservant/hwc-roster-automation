@@ -166,7 +166,9 @@ function buildGasStubs_() {
 // 否則每一份載 FiveStageCore／WebAppDashboard 嘅測試都要自己記得加。
 // 第八十五輪批次 LC 組：`EligibilityRoles.gs`（崗位名單上的「堂委」「執事」）——readEligibility_()／buildRoleContext_() 都會叫。
 // 第八十五輪批次 LD 組：`StaffingCheck.gs`（人手檢查＋生成後補空格）——buildRoster_() 會叫。
-const ALWAYS_LOADED = ['ArgShape.gs', 'SendWarnings.gs', 'EditableCopy.gs', 'EligibilityRoles.gs', 'StaffingCheck.gs', 'SameDayExclusive.gs', 'ChoirRule.gs', 'PersonalUnavailable.gs', 'ManualPosts.gs', 'MailRedirect.gs'];
+// 第九十八輪批次 YA／YB 組：`PreAssign.gs`（生成、調整、狀態卡讀預先安排）、`PreseasonChange.gs`（registerVersion_() 記基準、狀態卡）。
+const ALWAYS_LOADED = ['ArgShape.gs', 'SendWarnings.gs', 'EditableCopy.gs', 'EligibilityRoles.gs', 'StaffingCheck.gs', 'SameDayExclusive.gs', 'ChoirRule.gs', 'PersonalUnavailable.gs', 'ManualPosts.gs', 'MailRedirect.gs',
+  'PreAssign.gs', 'PreseasonChange.gs'];
 
 function loadGasSource(files, overrides) {
   const requested = files || FILES_FOR_GENERATOR;

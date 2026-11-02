@@ -780,6 +780,20 @@ function getConfigKeySeeds_() {
         + '沒有就顯示包含今日的那一季；再沒有就顯示選單第一個。網址有 quarter 時照網址。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.PREASSIGN_POST_IDS, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
+      defaultValue: 'WORSHIP,PIANO',
+      description: '開季前準備〔預先安排領詩、司琴〕可以預先安排的崗位（PostID，逗號分隔）。'
+        + '填的人生成時直接放入職事表，系統排其他崗位時會避開他們同日的其他崗位。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.PRESEASON_CHANGE_NOTIFY, type: CONFIG_TYPES.BOOL, group: 'WEBAPP',
+      defaultValue: 'TRUE',
+      description: '已有版本、未到季初的季度，開季前資料（名單、偏好、不能服侍、合堂、預先安排、身分、規則等）'
+        + '在最新版本之後有改動時，每日自動檢查寄一封電郵通知幹事。沒有這一行時照 TRUE。',
+      editable: 'TRUE'
+    },
     // ---- HWCAS（會友系統同步，全部選填——留空只是代表這個同步功能還沒設定）----
     {
       key: CONFIG_KEYS.HWCAS_SPREADSHEET_ID, type: CONFIG_TYPES.STR, group: 'HWCAS',
