@@ -229,7 +229,7 @@
           className: 'warn-head'
         }),
         make('div', {
-          text: '在寄給堂委之前，請去「進階功能 ▸ 重新發佈公開連結」再試一次。'
+          text: '在寄給堂委之前，請去「進階與診斷 ▸ 重新發佈公開連結」再試一次。'
             + '沒有公開連結的話，「寄給堂委審閱」會拒絕執行。',
           className: 'lines'
         })
@@ -284,8 +284,7 @@
   const SAVE_BUSY_STEPS = [
     '讀取你在職事表上改過的格',
     '檢查規則（資格、連續兩週、次數上限⋯⋯）',
-    '建立新一版並寫入紀錄',
-    '重新發佈公開連結'
+    '建立新一版並寫入紀錄'
   ];
   /** 掣 1 嘅暫存狀態：由 plan 攞返嚟。（第七十五輪 CG 組：逐格決定改為即時記住喺後端，唔再存喺度。） */
   let savePlan = null;
@@ -846,7 +845,7 @@
     if (keptHard > 0) willDo.push('記錄你勾了保留的 ' + keptHard + ' 格（等於放行，之後整季記住）');
     willDo.push('儲存成第 ' + plan.targetVersionNo + ' 版。第 ' + plan.baseVersionNo
       + ' 版原封不動保留，可以對照');
-    willDo.push('重新發佈公開連結（連結地址不變）');
+    willDo.push('儲存完成後，公開連結會在背景自動更新（連結地址不變）');
     willDo.forEach((t) => box.appendChild(make('div', { text: '・' + t, className: 'vio-row' })));
 
     box.appendChild(sectionTitle('不會做的事：'));

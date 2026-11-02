@@ -519,8 +519,8 @@ console.log('\n=== 甲4：失敗文案要分「一個字都冇寫」同「寫到
   check('★★★★★ 偵測到 grid 工作表已經存在 ⇒ 講「可能只寫入了一部分」',
     partial.message.indexOf('只寫入了一部分') !== -1, partial.message);
   check('★★★★ 而且指出核對同回退嘅路',
-    partial.message.indexOf('檢查各版本派工紀錄') !== -1
-      && partial.message.indexOf('回到上一個版本') !== -1, partial.message);
+    partial.message.indexOf('系統出問題時怎樣做') !== -1
+      && partial.message.indexOf('用這一版作起點') !== -1, partial.message);
   checkEqual('★★★★ partialWrite ＝ true', partial.partialWrite, true);
 }
 

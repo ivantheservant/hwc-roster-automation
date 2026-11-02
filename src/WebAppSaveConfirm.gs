@@ -83,7 +83,7 @@ function buildSaveAndConfirmPlan_(quarterId, timer, out) {
       message: buildThreePartMessage_(
         '這一季還沒有生成過任何版本。',
         '職事表沒有任何改動。',
-        ['等系統在排定日期自動生成初稿', '或者去「進階功能 ▸ 手動生成初稿」自己生成一次'])
+        ['等系統在排定日期自動生成初稿', '或者在主畫面「第 1 步：生成下一季職事表」自己生成一次'])
     });
   }
 
@@ -97,7 +97,7 @@ function buildSaveAndConfirmPlan_(quarterId, timer, out) {
         '找不到「第 ' + versionNo + ' 版」的工作表（' + err.message + '）。',
         '職事表資料本身仍然完整（在系統內部保存着），只是你看的那張表不見了。'
           + '沒有任何改動。',
-        ['去「進階功能 ▸ 回到上一個版本」重新建立一張',
+        ['在主畫面第 2 步的版本清單選一個版本，按〔用這一版作起點〕重新建立一張',
           '如果那張表只是被改了名，把名字改回原本的就可以'])
     });
   }
@@ -1086,8 +1086,8 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
       '儲存到一半失敗了（' + err.message + '）。',
       '第 ' + targetVersionNo + ' 版可能只寫入了一部分。'
         + 'Stage 沒有前進，公開連結沒有更新，沒有寄出任何電郵。',
-      ['去「進階功能 ▸ 檢查各版本派工紀錄」核對第 ' + targetVersionNo + ' 版是否完整',
-        '或者用「進階功能 ▸ 回到上一個版本」退回第 ' + baseVersionNo + ' 版'])
+      ['去「進階與診斷 ▸ 系統出問題時怎樣做」找到最新版，核對第 ' + targetVersionNo + ' 版是否完整',
+        '或者在主畫面第 2 步的版本清單選第 ' + baseVersionNo + ' 版，按〔用這一版作起點〕退回去'])
   };
 }
 

@@ -370,7 +370,7 @@ function assertPublicRosterUrlAvailableForStage_(quarterId, templates, publicRos
     '這一季（' + quarterId + '）還沒有公開連結，但要寄的信裏面有一個放連結的位置。',
     '一封都沒有寄出。如果照樣寄，收信的人會看到「公開版連結：」後面一片空白。',
     [
-      '去「進階功能 ▸ 重新發佈公開連結」發佈一次，然後回來再按',
+      '去「進階與診斷 ▸ 重新發佈公開連結」發佈一次，然後回來再按',
       '或者在試算表選單「準備工作 ▸ 發佈公開職事表」發佈',
       '如果這一封信本來就不應該有連結，請在 EmailTemplates 把 '
         + '{PublicRosterUrl} 這一段刪除'

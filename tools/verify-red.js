@@ -10380,6 +10380,86 @@ const MUTATIONS = [
     find: "  const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);\n  // 第九十一輪批次 RD 組：上一行已經確保最新",
     replace: "  const fresh = { republished: false, freshness: {} };\n  // 第九十一輪批次 RD 組：上一行已經確保最新",
     tests: ["tests/round91_rd_publish_after_save.test.js"]
+  },
+  {
+    id: "sa-confirm-old-text",
+    why: "儲存確認窗又寫「重新發佈公開連結」是儲存時做的事",
+    file: "src/ui/ScriptZone1.html",
+    find: "    willDo.push('儲存完成後，公開連結會在背景自動更新（連結地址不變）');",
+    replace: "    willDo.push('重新發佈公開連結（連結地址不變）');",
+    tests: ["tests/round92_sa_save_wording.test.js"]
+  },
+  {
+    id: "sa-busy-step-back",
+    why: "儲存等候牌又有「重新發佈公開連結」",
+    file: "src/ui/ScriptZone1.html",
+    find: "    '建立新一版並寫入紀錄'\n  ];",
+    replace: "    '建立新一版並寫入紀錄',\n    '重新發佈公開連結'\n  ];",
+    tests: ["tests/round92_sa_save_wording.test.js"]
+  },
+  {
+    id: "sb-old-message",
+    why: "詩班獻詩儲存訊息變回「已儲存 N 週的詩班獻詩設定」",
+    file: "src/WebAppChoir.gs",
+    find: "    message: '已更新 ' + changed + ' 週的設定。'",
+    replace: "    message: '已儲存 ' + changed + ' 週的詩班獻詩設定。'",
+    tests: ["tests/round92_sb_choir_message.test.js"]
+  },
+  {
+    id: "sb-total-from-changed",
+    why: "「共有 M 週」用這次改動的週數，不讀工作表",
+    file: "src/WebAppChoir.gs",
+    find: "    if (String(row[qCol] || '').trim() === quarterId && isTrueValue_(row[col - 1])) total++;",
+    replace: "    total = changed;",
+    tests: ["tests/round92_sb_choir_message.test.js"]
+  },
+  {
+    id: "sb-zero-text",
+    why: "全部取消仍然寫「共有 0 週」",
+    file: "src/WebAppChoir.gs",
+    find: "'現時這一季沒有詩班獻詩的主日。'",
+    replace: "'現時這一季共有 ' + total + ' 週詩班獻詩。'",
+    tests: ["tests/round92_sb_choir_message.test.js"]
+  },
+  {
+    id: "sc-old-zone-name",
+    why: "錯誤訊息又叫人去「進階功能」",
+    file: "src/Mailer.gs",
+    find: "去「進階與診斷 ▸ 重新發佈公開連結」發佈一次",
+    replace: "去「進階功能 ▸ 重新發佈公開連結」發佈一次",
+    tests: ["tests/round92_sc_guidance_targets.test.js"]
+  },
+  {
+    id: "sc-wrong-row-name",
+    why: "指引的行名寫錯（畫面沒有這一行）",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "進階與診斷 ▸ 系統出問題時怎樣做」找到最新版，核對第 ' + targetVersionNo",
+    replace: "進階與診斷 ▸ 系統出問題時怎樣辦」找到最新版，核對第 ' + targetVersionNo",
+    tests: ["tests/round92_sc_guidance_targets.test.js", "tests/save_confirm_requests_applied.test.js"]
+  },
+  {
+    id: "sc-ghost-row",
+    why: "指引又叫人去畫面上沒有的「檢查各版本派工紀錄」",
+    file: "src/WebAppRollback.gs",
+    find: "去「進階與診斷 ▸ 系統出問題時怎樣做」，看公開連結",
+    replace: "去「進階與診斷 ▸ 檢查各版本派工紀錄」，看公開連結",
+    tests: ["tests/round92_sc_guidance_targets.test.js"]
+  },
+  {
+    id: "sc-manual-generate",
+    why: "指引又叫人去「進階功能 ▸ 手動生成初稿」",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "'或者在主畫面「第 1 步：生成下一季職事表」自己生成一次'",
+    replace: "'或者去「進階與診斷 ▸ 手動生成初稿」自己生成一次'",
+    tests: ["tests/round92_sc_guidance_targets.test.js"]
+  },
+  {
+    id: "sc-generate-old-hint",
+    why: "已有版本的生成提示又寫「請去進階功能」",
+    file: "src/WebAppGenerate.gs",
+    find: "'如果你真的想整份重新排過：' + REDO_QUARTER_HINT_TEXT",
+    replace: "'如果你真的想整份重新排過，請去「進階功能」'",
+    tests: ["tests/round92_sc_guidance_targets.test.js"]
   }
 ];
 

@@ -73,7 +73,7 @@ console.log('\n=== A2-1：生成初稿之後順手發佈 ===');
     /res\.publishFailed[\s\S]{0,200}?warnbox/.test(zone1));
   check('★★★★★ 而且明講「寄給堂委之前要先補返」'
     + '——唔講嘅話幹事會直接撳掣 2 而寄出一封冇連結嘅信',
-    zone1.indexOf('在寄給堂委之前，請去「進階功能 ▸ 重新發佈公開連結」再試一次。') !== -1);
+    zone1.indexOf('在寄給堂委之前，請去「進階與診斷 ▸ 重新發佈公開連結」再試一次。') !== -1);
 }
 
 console.log('\n=== A2-2：掣 2 前置檢查 ===');
@@ -82,7 +82,7 @@ console.log('\n=== A2-2：掣 2 前置檢查 ===');
   check('★★★★★ 掣 2 執行前有叫 assertPublicLinkReady_()',
     /assertPublicLinkReady_\(quarterId\)/.test(body));
   check('★★★★★ 前端喺開確認畫面之前就攔住，而且有一粒「立即發佈」'
-    + '——淨係話「去進階功能發佈」嘅話，幹事要行五步先做到佢本來想做嘅事',
+    + '——淨係話「去進階與診斷發佈」嘅話，幹事要行五步先做到佢本來想做嘅事',
     /function renderReviewNeedsPublicLink/.test(zone1)
     && zone1.indexOf('立即發佈') !== -1);
   check('★★★★ 發佈完自動返回掣 2 嘅流程',

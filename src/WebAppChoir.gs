@@ -112,6 +112,18 @@ function saveChoirSinging_(quarterId, items) {
       notes: '開季前準備〔詩班獻詩〕'
     });
   });
-  return { ok: true, changed: changed, message: changed > 0 ? '已儲存 ' + changed + ' 週的詩班獻詩設定。' : '沒有改動。' };
+  if (changed === 0) return { ok: true, changed: 0, message: '沒有改動。' };
+  // 儲存之後該季實際勾選了多少週：由工作表即時重讀，不信前端傳入的數字
+  let total = 0;
+  sheet.getRange(3, 1, sheet.getLastRow() - 2, keys.length).getValues().forEach(function (row) {
+    if (String(row[qCol] || '').trim() === quarterId && isTrueValue_(row[col - 1])) total++;
+  });
+  return {
+    ok: true,
+    changed: changed,
+    singingCount: total,
+    message: '已更新 ' + changed + ' 週的設定。'
+      + (total > 0 ? '現時這一季共有 ' + total + ' 週詩班獻詩。' : '現時這一季沒有詩班獻詩的主日。')
+  };
 }
 

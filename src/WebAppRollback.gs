@@ -109,7 +109,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
     return rollbackBlocked_('TARGET_IS_CURRENT', buildThreePartMessage_(
       '你選的第 ' + target + ' 版就是目前這一版。',
       '職事表沒有任何改動。',
-      ['選一個較早的版本', '如果只是想重新發佈公開連結，用「進階功能 ▸ 重新發佈公開連結」']));
+      ['選一個較早的版本', '如果只是想重新發佈公開連結，用「進階與診斷 ▸ 重新發佈公開連結」']));
   }
 
   // ── 前置檢查一：未儲存改動（規格 5.3 步 1）────────────────────
@@ -139,7 +139,7 @@ function apiRollbackPlan(quarterId, targetVersionNo) {
       '第 ' + target + ' 版在系統內部沒有任何派工紀錄。',
       '職事表沒有任何改動。',
       ['選另一個版本',
-        '去「進階功能 ▸ 檢查各版本派工紀錄」看看這一版是不是曾經被清理過']));
+        '去「進階與診斷 ▸ 系統出問題時怎樣做」，看公開連結或完整版 PDF 上有沒有這一版的內容']));
   }
 
   const postNames = {};
@@ -337,7 +337,7 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
         '回退寫到一半失敗了（' + err.message + '）。',
         '第 ' + newVersionNo + ' 版可能只寫入了一部分。'
           + '這一季的進度沒有改變，公開連結沒有更新，沒有寄出任何電郵。',
-        ['去「進階功能 ▸ 檢查各版本派工紀錄」核對第 ' + newVersionNo + ' 版是否完整',
+        ['去「進階與診斷 ▸ 系統出問題時怎樣做」找到最新版，核對第 ' + newVersionNo + ' 版是否完整',
           '第 ' + plan.currentVersionNo + ' 版與第 ' + target + ' 版都完好無缺，沒有被改動過'])
     };
   }
@@ -365,7 +365,7 @@ function apiRollbackExecute_locked_(quarterId, targetVersionNo, releaseText) {
           + ' 版），但公開連結未能更新（' + publish.message + '）。',
         '職事表已經回到第 ' + target + ' 版的內容。'
           + '堂委現在開連結會看到回退之前的內容。沒有寄出任何電郵。',
-        ['去「進階功能 ▸ 重新發佈公開連結」再試一次'])
+        ['去「進階與診斷 ▸ 重新發佈公開連結」再試一次'])
       : ''
   };
 }
