@@ -2,12 +2,36 @@
  * 第九十三輪批次 TF 組：計次、計時（只量度，結果同以前一樣）。`apiGetDashboardState()` 載入開始時歸零，
  * 完成後把「建 fine-tune context 幾次、共幾秒」放入分段時間。
  */
-var FINE_TUNE_CONTEXT_STATS_ = { count: 0, ms: 0 };
+var FINE_TUNE_CONTEXT_STATS_ = { count: 0, ms: 0, reused: 0 };
 
+/**
+ * 第九十五輪批次 VA 組：狀態卡載入（`beginRequestContextMemo_()` 範圍內）同一季度、同一版本號的 context 只建一次，
+ * 之後交出深複本（`skipGrid` 的呼叫者拿到的複本 `gridValues`／`gridTypeValues` 是空物件，和以前一樣）。
+ * `count` 只計真正建的次數，`reused` 計用記憶的次數。記憶沒有開 ⇒ 每次都建，和以前一樣。
+ * @param {string} quarterId 季度 ID
+ * @param {number} versionNo 版本號
+ * @param {{skipGrid: boolean}=} opts 見 `buildFineTuneContextCore_()`
+ * @returns {Object}
+ */
 function buildFineTuneContext_(quarterId, versionNo, opts) {
+  const memo = REQUEST_CONTEXT_MEMO_;
+  const skipGrid = !!(opts && opts.skipGrid);
+  const memoKey = quarterId + '|' + typeof versionNo + '|' + versionNo;
+  const hit = memo ? memo.contexts[memoKey] : null;
+  if (hit && (skipGrid || !hit.skipGrid)) {
+    FINE_TUNE_CONTEXT_STATS_.reused++;
+    const copy = deepCloneMemoValue_(hit.context);
+    if (skipGrid) {
+      copy.gridValues = {};
+      copy.gridTypeValues = {};
+    }
+    return copy;
+  }
   const startedAt = Date.now();
   try {
-    return buildFineTuneContextCore_(quarterId, versionNo, opts);
+    const context = buildFineTuneContextCore_(quarterId, versionNo, opts);
+    if (memo) memo.contexts[memoKey] = { skipGrid: skipGrid, context: deepCloneMemoValue_(context) };
+    return context;
   } finally {
     FINE_TUNE_CONTEXT_STATS_.count++;
     FINE_TUNE_CONTEXT_STATS_.ms += Date.now() - startedAt;
@@ -109,13 +133,14 @@ function buildFineTuneContextCore_(quarterId, versionNo, opts) {
  */
 function readGridPersonIds_(quarterId, versionNo, timezone) {
   const sheetName = buildRosterSheetName_(quarterId, versionNo);
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) throw new Error('找不到工作表: ' + sheetName);
+  // 第九十五輪批次 VA 組：經同一次載入的記憶讀（狀態卡載入時不重讀；其他流程照舊每次讀）
+  const info = readGridSheetInfo_(sheetName);
+  if (!info.sheet) throw new Error('找不到工作表: ' + sheetName);
 
-  const lastRow = sheet.getLastRow();
-  const lastCol = sheet.getLastColumn();
-  const keys = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-  const values = sheet.getRange(3, 1, Math.max(0, lastRow - 2), lastCol).getValues();
+  const lastRow = info.lastRow;
+  const lastCol = info.lastCol;
+  const keys = readGridRangeValues_(info, sheetName, 2, 1, 1, lastCol)[0];
+  const values = readGridRangeValues_(info, sheetName, 3, 1, Math.max(0, lastRow - 2), lastCol);
 
   const result = {};
   values.forEach(function (row) {

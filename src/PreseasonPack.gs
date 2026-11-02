@@ -119,14 +119,20 @@ function buildPreseasonPack_(quarterId, todayStr, generateDate) {
 
   // ④ 不能服侍的日期（落在這一季、有效的）
   const U = COLUMNS.UNAVAILABLE;
+  // 第九十五輪批次 VE 組：只限某些崗位的一行寫「指定崗位：崗位名稱」（之前沒有寫，看起來像整日不能服侍）
+  const postNameById = readPostNameIndexAll_();
   const s4 = readUnavailable_().filter(isUnavailableRowActive_).map(function (row) {
     const from = toDateString_(row[U.DATE_FROM], timezone);
     const to = toDateString_(row[U.DATE_TO], timezone) || from;
-    return { personId: String(row[U.PERSON_ID] || '').trim(), from: from, to: to, reason: String(row[U.REASON] || '').trim() };
+    const postIds = String(row[U.APPLIES_TO] || UNAVAILABLE_VALUES.APPLIES_TO_ALL).trim() === UNAVAILABLE_VALUES.APPLIES_TO_ALL
+      ? [] : splitList_(row[U.POST_IDS]);
+    return { personId: String(row[U.PERSON_ID] || '').trim(), from: from, to: to, reason: String(row[U.REASON] || '').trim(),
+      postIds: postIds };
   }).filter(function (u) { return u.from && overlaps(u.from, u.to); })
     .sort(function (a, b) { return a.from < b.from ? -1 : (a.from > b.from ? 1 : 0); })
     .map(function (u) {
       return (nameById[u.personId] || u.personId) + '　' + u.from + (u.to !== u.from ? ' 至 ' + u.to : '')
+        + (u.postIds.length > 0 ? '　指定崗位：' + describePostNamesById_(u.postIds, postNameById) : '')
         + (u.reason ? '　原因：' + u.reason : '');
     });
   // 第九十輪批次 QC 組：落在這一季、還沒有確認的義工申報（如有）
@@ -404,6 +410,8 @@ function apiPreseasonPreview(quarterId) {
 function apiPreseasonSend(quarterId) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('寄出季前資料', function () {
+    // 第九十五輪批次 VB 組：打開幹事介面不再一定同步 ⇒ 寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀不到不會令寄出失敗）
+    syncPeopleFromHwcasBeforeSend_();
     return sendPreseasonPack_(String(quarterId || '').trim(), PRESEASON_SEND_MODE.MANUAL);
   });
 }

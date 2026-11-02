@@ -110,7 +110,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   // 部署後核對發現：開機時由出席系統更新電郵（背景）完成後會重讀主畫面——不可以把深連結打開的畫面關掉
   vm.runInContext('__ld = []; loadDashboard = async function (o) { __ld.push(o || null); }; hwcasSyncedOnLoad_ = false;'
     + ' runAction = async function (l, fn) { await fn(); };', ui);
-  ui.callServerMutating = async () => ({ ok: true, updated: 0 });
+  // 第九十五輪批次 VB 組（刻意改動）：沒有更新任何人就不重讀 ⇒ 這裏用「更新了 1 位」
+  ui.callServerMutating = async () => ({ ok: true, updated: 1, emailChanged: 0 });
   ui.syncHwcasOnLoad();
   await tick();
   const ld = vm.runInContext('__ld', ui);

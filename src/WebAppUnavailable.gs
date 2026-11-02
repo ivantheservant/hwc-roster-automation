@@ -56,6 +56,8 @@ function apiListUnavailable(quarterId, keyword) {
       people.push(entry);
     });
 
+    // 第九十五輪批次 VE 組：「指定崗位」寫崗位名稱，不寫編號
+    const postNameById = readPostNameIndexAll_();
     const current = [];
     const past = [];
     // 第三十四輪批次乙3：新增第三組。**唔刪走**——一律停用不刪除。
@@ -78,6 +80,7 @@ function apiListUnavailable(quarterId, keyword) {
         dateTo: dateTo,
         appliesTo: String(row[U.APPLIES_TO] || UNAVAILABLE_VALUES.APPLIES_TO_ALL).trim(),
         postIds: splitList_(row[U.POST_IDS]),
+        postsText: describePostNamesById_(splitList_(row[U.POST_IDS]), postNameById),
         reason: String(row[U.REASON] || '').trim(),
         source: String(row[U.SOURCE] || '').trim(),
         status: String(row[U.STATUS] || '').trim()

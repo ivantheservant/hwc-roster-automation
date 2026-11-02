@@ -58,7 +58,8 @@ console.log('\n=== TF1／TF2／TF3：伺服器 ===');
   const fn = src.slice(src.indexOf('function buildDashboardState_'), src.indexOf('function buildSettingsSheetLinks_'));
   check('★★★★ 計時只加 timer.mark(…)，沒有改判斷：sendWarnings／eligibilityImpact 仍然用同一個函式及條件',
     /const sendWarnings = versionExists \? summariseVersionSendWarnings_\(quarterId, versionNo\)/.test(fn) && /const eligibilityImpact = versionExists \? summariseEligibilityImpact_\(quarterId\)/.test(fn));
-  check('★★★★ FineTune：buildFineTuneContext_ 只是包一層計次，核心不變', /function buildFineTuneContext_\(quarterId, versionNo, opts\) \{[\s\S]{0,200}return buildFineTuneContextCore_\(quarterId, versionNo, opts\);/.test(read('src/FineTune.gs')));
+  // 第九十五輪批次 VA 組：外層多了同一次載入的記憶（見 round95_va_context_memo），核心照舊
+  check('★★★★ FineTune：buildFineTuneContext_ 只是包一層計次（及記憶），核心不變', /function buildFineTuneContext_\(quarterId, versionNo, opts\) \{[\s\S]{0,900}const context = buildFineTuneContextCore_\(quarterId, versionNo, opts\);[\s\S]{0,200}FINE_TUNE_CONTEXT_STATS_\.count\+\+;/.test(read('src/FineTune.gs')));
 }
 
 console.log('\n=== TF4：前端 ===');

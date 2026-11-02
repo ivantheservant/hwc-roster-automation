@@ -34,16 +34,34 @@
    */
   async function getMainFlowState() {
     if (!mainFlowState_ || mainFlowStaleQuarter_ !== currentQuarterId) {
-      mainFlowState_ = await callServer('apiGetMainFlowState', currentQuarterId);
+      // 第九十五輪批次 VD 組：載入時已經和狀態卡同時請求（prefetchMainFlowState_）⇒ 等那一個，不再叫一次
+      const pending = mainFlowPending_ && mainFlowPending_.quarterId === currentQuarterId ? mainFlowPending_.promise : null;
+      mainFlowPending_ = null;
+      mainFlowState_ = await (pending || callServer('apiGetMainFlowState', currentQuarterId));
       mainFlowStaleQuarter_ = currentQuarterId;
     }
     return mainFlowState_;
+  }
+
+  /**
+   * 第九十五輪批次 VD 組：和狀態卡同時請求主流程資料（已有這一季的就不請求）。
+   * 出錯留給 `getMainFlowState()`（畫主流程那一格照舊寫「主流程畫不出來」），這裏不拋。
+   */
+  let mainFlowPending_ = null;
+  function prefetchMainFlowState_() {
+    if (!currentQuarterId) return;
+    if (mainFlowState_ && mainFlowStaleQuarter_ === currentQuarterId) return;
+    if (mainFlowPending_ && mainFlowPending_.quarterId === currentQuarterId) return;
+    const promise = callServer('apiGetMainFlowState', currentQuarterId);
+    promise.catch(() => { /* 見上 */ });
+    mainFlowPending_ = { quarterId: currentQuarterId, promise: promise };
   }
 
   /** 換季度／做完寫入動作之後叫。 */
   function resetMainFlowState() {
     mainFlowState_ = null;
     mainFlowStaleQuarter_ = null;
+    mainFlowPending_ = null;
   }
 
   /**

@@ -715,8 +715,8 @@ const MUTATIONS = [
     why: '拆走「重畫完重新鎖一次」'
       + '——鍵盤嗰一層（Tab ＋ Enter）喺重畫之後就冇咗',
     file: 'src/ui/Script.html',
-    find: '    reapplyBusyLockIfNeeded_();\n  }\n\n  function renderTop(d) {',
-    replace: '  }\n\n  function renderTop(d) {',
+    find: '    // 但鍵盤嗰層要補返。\n    reapplyBusyLockIfNeeded_();\n  }',
+    replace: '    // 但鍵盤嗰層要補返。\n  }',
     tests: ['tests/round43_field_fixes.test.js']
   },
   {
@@ -6011,8 +6011,8 @@ const MUTATIONS = [
     id: "cb-no-load-ensure",
     why: "載入幹事介面時唔再自動建立",
     file: "src/ui/Script.html",
-    find: "        await callServerMutating('apiEnsureFutureQuarters');\n      } catch (err) { /* 見上：唔阻住載入 */ }",
-    replace: "      } catch (err) { /* 見上：唔阻住載入 */ }",
+    find: "    if (!viewOnly_) ensureFutureQuartersInBackground_();\n",
+    replace: "",
     tests: ["tests/round75_cb_quarter_lookahead.test.js"]
   },
   {
@@ -9382,8 +9382,8 @@ const MUTATIONS = [
     id: "nb-boot-ensure-q",
     why: "只可查看開機仍建立季度",
     file: "src/ui/Script.html",
-    find: "    if (!viewOnly_) {\n      try {\n        await callServerMutating('apiEnsureFutureQuarters');",
-    replace: "    {\n      try {\n        await callServerMutating('apiEnsureFutureQuarters');",
+    find: "    if (!viewOnly_) ensureFutureQuartersInBackground_();\n",
+    replace: "    ensureFutureQuartersInBackground_();\n",
     tests: ["tests/round75_cb_quarter_lookahead.test.js"]
   },
   {
@@ -10908,6 +10908,294 @@ const MUTATIONS = [
     find: "      facts.appendChild(make('div', { text: plan.pendingAutoConfirmText, className: 'warn-head' }));",
     replace: "",
     tests: ["tests/round94_uc_ud_notify_autoconfirm.test.js"]
+  },
+  {
+    id: "va-no-memo-begin",
+    why: "狀態卡載入沒有開 context 記憶（建 4 次）",
+    file: "src/WebAppDashboard.gs",
+    find: "  beginRequestContextMemo_();\n  try {\n    return buildDashboardState_(quarterId);",
+    replace: "  try {\n    return buildDashboardState_(quarterId);",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-memo-not-closed",
+    why: "狀態卡載入完不關 context 記憶（跨請求）",
+    file: "src/WebAppDashboard.gs",
+    find: "    endRequestContextMemo_();\n    endSheetReadMemo_();",
+    replace: "    endSheetReadMemo_();",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-memo-no-clone",
+    why: "記憶的 context 直接交出（呼叫者改動會影響下一個）",
+    file: "src/FineTune.gs",
+    find: "    const copy = deepCloneMemoValue_(hit.context);",
+    replace: "    const copy = hit.context;",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-skipgrid-keeps-grid",
+    why: "skipGrid 的呼叫者拿到有 grid 的 context",
+    file: "src/FineTune.gs",
+    find: "      copy.gridValues = {};\n      copy.gridTypeValues = {};\n",
+    replace: "",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-full-from-skipgrid",
+    why: "先建 skipGrid、再要整份時交出沒有 grid 的",
+    file: "src/FineTune.gs",
+    find: "  if (hit && (skipGrid || !hit.skipGrid)) {",
+    replace: "  if (hit) {",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-grid-range-no-memo",
+    why: "職事表工作表範圍每次都重讀",
+    file: "src/SheetReader.gs",
+    find: "  if (!memo) return info.sheet.getRange(row, col, numRows, numCols).getValues();",
+    replace: "  if (true) return info.sheet.getRange(row, col, numRows, numCols).getValues();",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-grid-range-no-copy",
+    why: "記憶的範圍值直接交出（不是新陣列）",
+    file: "src/SheetReader.gs",
+    find: "  return values.map(function (r) { return r.slice(); });\n}",
+    replace: "  return values;\n}",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-staffing-no-memo",
+    why: "人手檢查不用已讀到的資料（再建一次）",
+    file: "src/StaffingCheck.gs",
+    find: "const shared = readMemoQuarterContextParts_(quarterId, timezone) || readStaffingSharedParts_(quarterId, timezone);",
+    replace: "const shared = readStaffingSharedParts_(quarterId, timezone);",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "va-parts-wrong-tz",
+    why: "時區不同也用記憶的部分",
+    file: "src/SheetReader.gs",
+    find: "  if (ctx.timezone !== timezone) return null;\n",
+    replace: "",
+    tests: ["tests/round95_va_context_memo.test.js"]
+  },
+  {
+    id: "vb-load-force",
+    why: "打開時同步仍然 force",
+    file: "src/ui/ScriptZone3.html",
+    find: "callServerMutating('apiSyncPeopleFromHwcas', {}).then((r) => {",
+    replace: "callServerMutating('apiSyncPeopleFromHwcas', { force: true }).then((r) => {",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-reload-always",
+    why: "同步沒有更新任何人也重新載入",
+    file: "src/ui/ScriptZone3.html",
+    find: "      if (!(r.updated > 0)) {\n        patchHwcasSyncLine_(r.dashboardSync);\n        return;\n      }\n",
+    replace: "",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-mainflow-not-reset",
+    why: "電郵有改也不重讀主流程資料",
+    file: "src/ui/ScriptZone3.html",
+    find: "      if (r.emailChanged > 0) resetMainFlowState();\n",
+    replace: "",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-no-syncing-text",
+    why: "同步中頁頂沒有「正在同步出席系統」",
+    file: "src/ui/ScriptZone3.html",
+    find: "    showHwcasSyncing_(true);\n",
+    replace: "",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-busy-text-generic",
+    why: "同步中被鎖拒絕仍然寫「另一個動作仍在進行」",
+    file: "src/MutationLock.gs",
+    find: "    if (typeof isHwcasSyncRunning_ === 'function' && isHwcasSyncRunning_()) {",
+    replace: "    if (false) {",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-marker-not-cleared",
+    why: "同步完成後不清記號",
+    file: "src/WebAppHwcas.gs",
+    find: "    markHwcasSyncRunning_(false);\n",
+    replace: "",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-no-dashboard-sync",
+    why: "同步不回傳狀態卡那一行",
+    file: "src/WebAppHwcas.gs",
+    find: "    r.dashboardSync = describeHwcasSyncForDashboard_();\n",
+    replace: "",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-preseason-no-sync",
+    why: "寄出季前資料之前不同步",
+    file: "src/PreseasonPack.gs",
+    find: "    syncPeopleFromHwcasBeforeSend_();\n    return sendPreseasonPack_",
+    replace: "    return sendPreseasonPack_",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-invite-no-sync",
+    why: "邀請義工申報之前不同步",
+    file: "src/UnavailableInvite.gs",
+    find: "    syncPeopleFromHwcasBeforeSend_();\n    return sendUnavailableInvites_",
+    replace: "    return sendUnavailableInvites_",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-hints-no-sync",
+    why: "名單檢查開始時不同步",
+    file: "src/ui/ScriptZone2.html",
+    find: "        try { await callServerMutating('apiSyncPeopleFromHwcas', {}); } catch (err) { /* 見上 */ }\n",
+    replace: "",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vb-stale-always",
+    why: "背景同步沒有更新也標記狀態過期",
+    file: "src/ui/Script.html",
+    find: "    if (!changed || changed(result)) dashboardStale_ = true;",
+    replace: "    dashboardStale_ = true;",
+    tests: ["tests/round95_vb_hwcas_sync.test.js"]
+  },
+  {
+    id: "vc-list-no-memo",
+    why: "季度清單每季重讀 RosterVersions",
+    file: "src/WebApp.gs",
+    find: "  beginSheetReadMemo_();\n  try {\n    return listQuartersForSelect_();",
+    replace: "  try {\n    return listQuartersForSelect_();",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vc-ensure-always-lock",
+    why: "不欠缺季度也取鎖",
+    file: "src/AnnualQuarters.gs",
+    find: "  if (lookahead.picked.plans.length === 0) {",
+    replace: "  if (false) {",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vc-ensure-skip-missing",
+    why: "欠缺季度也不建立",
+    file: "src/AnnualQuarters.gs",
+    find: "  if (lookahead.picked.plans.length === 0) {",
+    replace: "  if (true) {",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vd-no-prefetch",
+    why: "主流程資料等狀態卡回來才請求",
+    file: "src/ui/Script.html",
+    find: "    if (typeof prefetchMainFlowState_ === 'function') prefetchMainFlowState_();\n",
+    replace: "",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vd-pending-ignored",
+    why: "主流程資料請求兩次（不等同時請求的那一個）",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      mainFlowState_ = await (pending || callServer('apiGetMainFlowState', currentQuarterId));",
+    replace: "      mainFlowState_ = await callServer('apiGetMainFlowState', currentQuarterId);",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vd-pending-wrong-q",
+    why: "換了季度仍然用舊季度的請求",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      const pending = mainFlowPending_ && mainFlowPending_.quarterId === currentQuarterId ? mainFlowPending_.promise : null;",
+    replace: "      const pending = mainFlowPending_ ? mainFlowPending_.promise : null;",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vd-refill-reloads",
+    why: "背景建立季度之後重新載入狀態卡",
+    file: "src/ui/Script.html",
+    find: "      if (r && r.created && r.created.length > 0) return refillQuarterOptions_();",
+    replace: "      if (r && r.created && r.created.length > 0) return fillQuarterSelect_(currentQuarterId);",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vd-server-line-missing",
+    why: "頁底沒有伺服器分段",
+    file: "src/ui/Script.html",
+    find: "      const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_) : '';",
+    replace: "      const serverLine = '';",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "vd-server-line-overwrite",
+    why: "伺服器分段每次載入都覆蓋",
+    file: "src/ui/Script.html",
+    find: "    if (loadServerTimings_) return; // 只記第一次載入\n",
+    replace: "",
+    tests: ["tests/round95_vc_vd_quarters_load.test.js"]
+  },
+  {
+    id: "ve-cancelled-still-ok",
+    why: "幹事取消之後個人頁仍然寫已確認",
+    file: "src/PersonalUnavailable.gs",
+    find: "    if (s.status === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED && s.unavailableId && !activeUnavailableIds[s.unavailableId]) {",
+    replace: "    if (false) {",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "ve-cancel-blocks-date",
+    why: "幹事取消之後那一日不可以再申報",
+    file: "src/PersonalUnavailable.gs",
+    find: "    const st = viewStatusOf(s);\n    if (st === UNAVAILABLE_SUBMISSION_STATUS.PENDING",
+    replace: "    const st = s.status;\n    if (st === UNAVAILABLE_SUBMISSION_STATUS.PENDING",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "ve-list-post-ids",
+    why: "不能服侍清單寫崗位編號",
+    file: "src/WebAppUnavailable.gs",
+    find: "        postsText: describePostNamesById_(splitList_(row[U.POST_IDS]), postNameById),",
+    replace: "        postsText: splitList_(row[U.POST_IDS]).join('、'),",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "ve-row-ids",
+    why: "不能服侍清單那一行用編號",
+    file: "src/ui/ScriptZone3.html",
+    find: "'指定崗位：' + (r.postsText || r.postIds.join('、')))",
+    replace: "'指定崗位：' + r.postIds.join('、'))",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "ve-confirm-ids",
+    why: "新增／修改確認畫面寫崗位編號",
+    file: "src/ui/ScriptZone3.html",
+    find: "    return (postIds || []).map((id) => names[id] || id).join('、');",
+    replace: "    return (postIds || []).join('、');",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "ve-preseason-no-posts",
+    why: "季前資料第四段沒有寫指定崗位",
+    file: "src/PreseasonPack.gs",
+    find: "        + (u.postIds.length > 0 ? '　指定崗位：' + describePostNamesById_(u.postIds, postNameById) : '')\n",
+    replace: "",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
+  },
+  {
+    id: "ve-yellow-old-text",
+    why: "黃框仍然寫「整日不能服侍」舊字眼",
+    file: "src/ui/ScriptZone3.html",
+    find: "填了就代表那一日（或所選的崗位）整日不能服侍。',",
+    replace: "填了就代表整日不能服侍。',",
+    tests: ["tests/round95_ve_unavailable_observations.test.js"]
   }
 ];
 

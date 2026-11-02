@@ -201,7 +201,7 @@
       // 規格 4.1：呢句一定要有。唔講嘅話幹事會以為填個時間就得。
       make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '系統沒有「上半場不在」這種概念。填了就代表整日不能服侍。',
+          text: '系統沒有「上半場不在」這種概念。填了就代表那一日（或所選的崗位）整日不能服侍。',
           className: 'warn-head'
         })
       ]),
@@ -425,7 +425,8 @@
     const box = make('div', { className: 'prop' });
     box.appendChild(make('div', {
       text: r.personName + '　' + r.dateFrom + ' 至 ' + r.dateTo
-        + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + r.postIds.join('、'))
+        // 第九十五輪批次 VE 組：寫崗位名稱（伺服器 postsText；找不到崗位才是編號）
+        + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + (r.postsText || r.postIds.join('、')))
         + (o.cancelled ? '　（已取消）' : '')
         // 第九十輪批次 QC 組：義工在個人專屬連結申報、幹事接受的那幾筆，講明來源
         + (r.source === 'PERSONAL_LINK' ? '　（來源：個人連結）' : ''),
@@ -649,13 +650,20 @@
     }
   }
 
+  /** 第九十五輪批次 VE 組：崗位名稱（多個用「、」；找不到崗位才用編號）。 */
+  function unavailablePostNames_(postIds) {
+    const names = {};
+    ((unavailableData && unavailableData.posts) || []).forEach((p) => { names[p.postId] = p.postNameTC; });
+    return (postIds || []).map((id) => names[id] || id).join('、');
+  }
+
   function confirmSaveUnavailable(payload, preview, personName) {
     const bodyNodes = [
       para('會改動 1 行。'),
       make('div', { className: 'sec' }, [
         make('div', { text: personName + '　' + preview.dateFrom + ' 至 ' + preview.dateTo, className: 'vio-row' }),
         make('div', {
-          text: payload.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + payload.postIds.join('、'),
+          text: payload.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + unavailablePostNames_(payload.postIds),
           className: 'vio-row'
         }),
         make('div', {
@@ -1958,23 +1966,42 @@
   /**
    * 幹事介面載入時叫一次：由出席系統按會眾編號更新電郵。
    * ⚠️ 唔經 `runAction()`（唔鎖畫面、唔拖慢主畫面）；任何失敗都唔可以令主畫面出事。
+   * 第九十五輪批次 VB 組：
+   *   ・不再 `force`——照伺服器的最短間隔（10 分鐘內同步過就略過）
+   *   ・進行期間頁頂細字「正在同步出席系統……」，介面不鎖
+   *   ・沒有更新任何人 ⇒ 不重新載入，只換狀態卡「電郵已由出席系統更新（時間）」／「讀不到…」那一行
+   *   ・有更新 ⇒ 只重新載入狀態卡；主流程第 5 步（沒有電郵、要印紙本的人數）讀 NameMapping 的電郵，
+   *     所以電郵有改（`emailChanged > 0`）才連主流程資料一起重讀
    */
   function syncHwcasOnLoad() {
     if (hwcasSyncedOnLoad_) return;
     hwcasSyncedOnLoad_ = true;
     const tSync = Date.now();
-    callServerMutating('apiSyncPeopleFromHwcas', { force: true }).then((r) => {
+    showHwcasSyncing_(true);
+    callServerMutating('apiSyncPeopleFromHwcas', {}).then((r) => {
+      showHwcasSyncing_(false);
       markLoadTiming_('hwcasSync', Date.now() - tSync);
       if (!r || r.skipped === 'locked') return;
       if (r.ok && r.updated > 0) setStatus('電郵已由出席系統更新：' + r.updated + ' 位。');
       else if (r.ok === false && r.notice) setStatus(r.notice, true);
-      // 狀態卡要顯示「已更新（時間）」／「讀不到…」⇒ 重讀一次主畫面
+      if (!(r.updated > 0)) {
+        patchHwcasSyncLine_(r.dashboardSync);
+        return;
+      }
+      if (r.emailChanged > 0) resetMainFlowState();
       // 第八十七輪批次 NA 組（部署後核對發現）：保留已開的視窗——深連結打開的畫面（或者幹事
       // 已經打開的畫面）不可以被這一次背景更新關掉
       const tReload = Date.now();
       runAction('重新整理', () => loadDashboard({ keepModal: true })).then(() => markLoadTiming_('reload', Date.now() - tReload));
-    }).catch(() => { /* 讀唔到出席系統唔可以令主畫面出事 */ });
+    }).catch(() => { showHwcasSyncing_(false); /* 讀唔到出席系統唔可以令主畫面出事 */ });
   }
+
+  /** 第九十五輪批次 VB 組：頁頂細字「正在同步出席系統……」。 */
+  function showHwcasSyncing_(on) {
+    const node = el('hwcasSyncing');
+    if (node) node.hidden = !on;
+  }
+
 
   function openHwcasLink() {
     runAction('讀取出席系統連結', async () => {

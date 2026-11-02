@@ -40,6 +40,116 @@ function endSheetReadMemo_() {
 }
 
 /**
+ * 第九十五輪批次 VA 組：狀態卡一次載入之內的記憶——fine-tune context（按「季度｜版本號」）及
+ * 職事表工作表（`Roster_…`）的 `getRange` 讀取。
+ *
+ * 只由 `apiGetDashboardState()` 開（全程零寫入，而且已經在 `beginSheetReadMemo_()` 範圍內），
+ * 一定要在 `finally` 裏 `endRequestContextMemo_()`。不是跨請求的全域記憶：每次載入都重新讀。
+ * 其他流程（有寫入的、或者寫入之後再讀的）不開，所以行為和以前完全一樣。
+ */
+let REQUEST_CONTEXT_MEMO_ = null;
+
+/** @returns {void} */
+function beginRequestContextMemo_() {
+  REQUEST_CONTEXT_MEMO_ = { contexts: {}, sheets: {}, ranges: {} };
+}
+
+/** @returns {void} */
+function endRequestContextMemo_() {
+  REQUEST_CONTEXT_MEMO_ = null;
+}
+
+/**
+ * 深複本（純物件、陣列、Date）。記憶裏的東西每次交出去都是新的一份，
+ * 呼叫者就地改動（例如 `planApplyRequests_()` 改 `context.unavailable`）不會影響下一個呼叫者。
+ * @param {*} value 任何值
+ * @returns {*}
+ */
+function deepCloneMemoValue_(value) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Object.prototype.toString.call(value) === '[object Date]') return new Date(value.getTime());
+  if (Array.isArray(value)) return value.map(deepCloneMemoValue_);
+  const copy = {};
+  Object.keys(value).forEach(function (k) { copy[k] = deepCloneMemoValue_(value[k]); });
+  return copy;
+}
+
+/**
+ * 第九十五輪批次 VA 組：同一次載入已經建好的 context（任何版本）裏，和季度有關、和版本無關的部分
+ * （崗位、名單、身分、暫時不做、主日、特別主日、不能服侍、規則）。人手檢查用來算簽名，不用再建一次。
+ * 記憶沒有開、這一季沒有建過、或者時區不同 ⇒ null（呼叫者照舊自己讀）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 呼叫者用的時區
+ * @returns {?Object} 深複本
+ */
+function readMemoQuarterContextParts_(quarterId, timezone) {
+  const memo = REQUEST_CONTEXT_MEMO_;
+  if (!memo) return null;
+  const key = Object.keys(memo.contexts).filter(function (k) { return k.indexOf(quarterId + '|') === 0; })[0];
+  if (!key) return null;
+  const ctx = memo.contexts[key].context;
+  if (ctx.timezone !== timezone) return null;
+  return deepCloneMemoValue_({
+    serviceDates: ctx.serviceDates,
+    posts: ctx.posts,
+    eligibility: ctx.eligibility,
+    roles: ctx.roles,
+    personPostExclusions: ctx.personPostExclusions,
+    unavailable: ctx.unavailable,
+    specialByDate: ctx.specialByDate,
+    rules: ctx.rules,
+    sameDayExclusivePostIds: ctx.sameDayExclusivePostIds
+  });
+}
+
+/**
+ * 職事表工作表及其大小（記憶開着時同一次載入只問一次）。
+ * @param {string} sheetName 工作表名
+ * @returns {{sheet: ?Object, lastRow: number, lastCol: number}} 找不到工作表 ⇒ sheet 是 null
+ */
+function readGridSheetInfo_(sheetName) {
+  const memo = REQUEST_CONTEXT_MEMO_;
+  if (memo && Object.prototype.hasOwnProperty.call(memo.sheets, sheetName)) return memo.sheets[sheetName];
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const info = sheet
+    ? { sheet: sheet, lastRow: sheet.getLastRow(), lastCol: sheet.getLastColumn() }
+    : { sheet: null, lastRow: 0, lastCol: 0 };
+  if (memo) memo.sheets[sheetName] = info;
+  return info;
+}
+
+/**
+ * 職事表工作表一個範圍的值。記憶開着時：同一範圍只讀一次；已經讀過同一起點、同一行數而欄數更多的範圍，
+ * 就從那一份取頭幾欄。每次交出新的二維陣列。
+ * @param {{sheet: Object}} info `readGridSheetInfo_()` 的結果
+ * @param {string} sheetName 工作表名
+ * @param {number} row 起始行
+ * @param {number} col 起始欄
+ * @param {number} numRows 行數
+ * @param {number} numCols 欄數
+ * @returns {Array<Array<*>>}
+ */
+function readGridRangeValues_(info, sheetName, row, col, numRows, numCols) {
+  const memo = REQUEST_CONTEXT_MEMO_;
+  if (!memo) return info.sheet.getRange(row, col, numRows, numCols).getValues();
+  const prefix = sheetName + '|' + row + '|' + col + '|' + numRows + '|';
+  let values = memo.ranges[prefix + numCols];
+  if (!values) {
+    Object.keys(memo.ranges).forEach(function (k) {
+      if (values || k.indexOf(prefix) !== 0) return;
+      if (Number(k.slice(prefix.length)) >= numCols) {
+        values = memo.ranges[k].map(function (r) { return r.slice(0, numCols); });
+      }
+    });
+  }
+  if (!values) {
+    values = info.sheet.getRange(row, col, numRows, numCols).getValues();
+    memo.ranges[prefix + numCols] = values;
+  }
+  return values.map(function (r) { return r.slice(); });
+}
+
+/**
  * 第二十四輪批次階段 A1：由快取攞資料嗰陣**回傳淺複本**，唔回傳快取本身。
  *
  * ─────────────────────────────────────────────────────────────────────
@@ -234,6 +344,26 @@ function readEligibility_() {
     rolesByPost: rolesByPost,
     historicalCountAll: historicalCountAll
   };
+}
+
+/**
+ * 第九十五輪批次 VE 組：崗位 ID → 中文名（包括名單組別）。列出 `Unavailable` 的地方用來寫崗位名稱。
+ * @returns {Object.<string, string>}
+ */
+function readPostNameIndexAll_() {
+  const out = {};
+  readPostsNormalized_({ includeGroups: true }).forEach(function (p) { out[p.postId] = p.postNameTC || p.postId; });
+  return out;
+}
+
+/**
+ * 第九十五輪批次 VE 組：崗位名稱（多個用「、」）；找不到崗位才用編號。
+ * @param {string[]} postIds 崗位 ID
+ * @param {Object.<string, string>} nameById `readPostNameIndexAll_()` 的結果
+ * @returns {string}
+ */
+function describePostNamesById_(postIds, nameById) {
+  return (postIds || []).map(function (id) { return (nameById || {})[id] || id; }).join('、');
 }
 
 /**
@@ -645,14 +775,15 @@ function readGridTypeColumn_(sheetName, timezone) {
  * @returns {Object.<string, string>}
  */
 function readGridTypeColumnUnsafe_(sheetName, timezone) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) throw new Error('找不到工作表: ' + sheetName);
-  const lastRow = sheet.getLastRow();
+  // 第九十五輪批次 VA 組：經同一次載入的記憶讀（狀態卡載入時不重讀；其他流程照舊每次讀）
+  const info = readGridSheetInfo_(sheetName);
+  if (!info.sheet) throw new Error('找不到工作表: ' + sheetName);
+  const lastRow = info.lastRow;
   if (lastRow < 3) return {};
-  const keys = sheet.getRange(2, 1, 1, WEEK_TITLE_GRID_COLUMN).getValues()[0];
+  const keys = readGridRangeValues_(info, sheetName, 2, 1, 1, WEEK_TITLE_GRID_COLUMN)[0];
   // ⚠️ 用第 2 行機器鍵確認第 3 欄真係「類型」，唔係靠位置估。
   if (String(keys[WEEK_TITLE_GRID_COLUMN - 1] || '').trim() !== GRID_KEYS.TYPE) return {};
-  const values = sheet.getRange(3, 1, lastRow - 2, WEEK_TITLE_GRID_COLUMN).getValues();
+  const values = readGridRangeValues_(info, sheetName, 3, 1, lastRow - 2, WEEK_TITLE_GRID_COLUMN);
   const out = {};
   values.forEach(function (row) {
     const d = toDateString_(row[0], timezone);
@@ -868,13 +999,15 @@ function isGridCellFilledByPerson_(value) {
  */
 function readGridFilledManualCells_(quarterId, versionNo, postIds, timezone) {
   const out = {};
-  const gridSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(buildRosterSheetName_(quarterId, versionNo));
-  if (!gridSheet) return out;
-  const lastRow = gridSheet.getLastRow();
-  const lastCol = gridSheet.getLastColumn();
+  // 第九十五輪批次 VA 組：經同一次載入的記憶讀（和 fine-tune context 讀同一個範圍）
+  const sheetName = buildRosterSheetName_(quarterId, versionNo);
+  const info = readGridSheetInfo_(sheetName);
+  if (!info.sheet) return out;
+  const lastRow = info.lastRow;
+  const lastCol = info.lastCol;
   if (lastRow < 3 || lastCol < 1) return out;
-  const keys = gridSheet.getRange(2, 1, 1, lastCol).getValues()[0];
-  const body = gridSheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  const keys = readGridRangeValues_(info, sheetName, 2, 1, 1, lastCol)[0];
+  const body = readGridRangeValues_(info, sheetName, 3, 1, lastRow - 2, lastCol);
   body.forEach(function (row) {
     const date = toDateString_(row[0], timezone);
     if (!date) return;
@@ -1380,6 +1513,38 @@ const HWCAS_SYNC_LAST_TEXT_KEY = 'HWCAS_SYNC_LAST_TEXT';
 const HWCAS_SYNC_LAST_ERROR_KEY = 'HWCAS_SYNC_LAST_ERROR';
 /** 寄出之前：10 分鐘內已更新過就略過。 */
 const HWCAS_SYNC_MIN_INTERVAL_MS = 10 * 60 * 1000;
+
+/**
+ * 第九十五輪批次 VB 組：打開幹事介面時的同步正在進行（拿着 DocumentLock）。這段時間按改動按鈕被鎖拒絕，
+ * `withMutationLock_()` 講這一句，而不是「另一個動作仍在進行」。記號放 CacheService（兩分鐘自動過期，
+ * 同步中途出錯也不會一直留着）。
+ */
+const HWCAS_SYNC_RUNNING_CACHE_KEY = 'HWCAS_SYNC_RUNNING';
+const HWCAS_SYNC_RUNNING_TTL_SECONDS = 120;
+const HWCAS_SYNC_BUSY_TEXT = '出席系統正在同步（約十秒），請稍後再按。';
+
+/**
+ * @param {boolean} running 開始（true）／完成（false）
+ * @returns {void}
+ */
+function markHwcasSyncRunning_(running) {
+  try {
+    const cache = CacheService.getScriptCache();
+    if (running) cache.put(HWCAS_SYNC_RUNNING_CACHE_KEY, String(Date.now()), HWCAS_SYNC_RUNNING_TTL_SECONDS);
+    else cache.remove(HWCAS_SYNC_RUNNING_CACHE_KEY);
+  } catch (err) {
+    // 記號寫不到只會令訊息變回「另一個動作仍在進行」，不影響同步
+  }
+}
+
+/** @returns {boolean} 打開幹事介面時的同步是不是正在進行 */
+function isHwcasSyncRunning_() {
+  try {
+    return !!CacheService.getScriptCache().get(HWCAS_SYNC_RUNNING_CACHE_KEY);
+  } catch (err) {
+    return false;
+  }
+}
 
 /**
  * 會眾編號嘅比對鍵：去前綴單引號、去空白；全數字就補足 5 位（出席系統有時係數字 1234，名單係 '01234）。

@@ -586,10 +586,13 @@ function apiGetDashboardState(quarterId) {
   assertWebAppRequestAllowed_('apiGetDashboardState');
 
   // 全程零寫入，所以開 readSheet_ 快取安全——見 SheetReader.gs 檔頭嘅警告。
+  // 第九十五輪批次 VA 組：同一次載入內 fine-tune context 及職事表工作表也只讀一次（不跨請求）
   beginSheetReadMemo_();
+  beginRequestContextMemo_();
   try {
     return buildDashboardState_(quarterId);
   } finally {
+    endRequestContextMemo_();
     endSheetReadMemo_();
   }
 }
@@ -604,6 +607,7 @@ function buildDashboardState_(quarterId) {
   const timer = startPhaseTimer_();
   FINE_TUNE_CONTEXT_STATS_.count = 0;
   FINE_TUNE_CONTEXT_STATS_.ms = 0;
+  FINE_TUNE_CONTEXT_STATS_.reused = 0;
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stage = getQuarterStage_(quarterId);
   const versionNo = findLatestVersionNo_(quarterId);
@@ -799,7 +803,9 @@ function buildDashboardState_(quarterId) {
     timings: {
       phases: timer.list(),
       fineTuneContextCount: FINE_TUNE_CONTEXT_STATS_.count,
-      fineTuneContextMs: FINE_TUNE_CONTEXT_STATS_.ms
+      fineTuneContextMs: FINE_TUNE_CONTEXT_STATS_.ms,
+      // 第九十五輪批次 VA 組：用同一次載入記憶的次數（沒有再建）
+      fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_.reused
     }
   };
 }

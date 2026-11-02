@@ -90,6 +90,10 @@ function withMutationLock_(actionName, fn) {
   }
 
   if (!got) {
+    // 第九十五輪批次 VB 組：拿着鎖的是打開幹事介面時的出席系統同步 ⇒ 只改這一種情況的字眼
+    if (typeof isHwcasSyncRunning_ === 'function' && isHwcasSyncRunning_()) {
+      throw new Error(HWCAS_SYNC_BUSY_TEXT);
+    }
     throw new Error(buildThreePartMessage_(
       '另一個動作仍在進行，所以「' + actionName + '」沒有開始。',
       '甚麼都沒有改動。上一個動作仍在進行，它會自行完成。',

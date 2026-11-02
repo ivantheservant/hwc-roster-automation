@@ -446,15 +446,10 @@ function readQuarterLookaheadMonths_() {
  * @returns {{months: number, horizon: string, created: string[], serviceDatesWritten: number}}
  */
 function ensureLookaheadQuarters_(source) {
-  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
-  const months = readQuarterLookaheadMonths_();
-  const startMonths = readQuarterTermStartMonths_();
-  const dateSettings = readQuarterDateSettings_();
-  const existing = readExistingQuarterAndServiceDateIds_();
-  const picked = selectLookaheadQuarterPlans_(today, months, function (year) {
-    return planAnnualQuarters_(year, startMonths, existing.quarterIds, existing.serviceDateIds, dateSettings);
-  });
+  const lookahead = planLookaheadQuarters_();
+  const today = lookahead.today;
+  const months = lookahead.months;
+  const picked = lookahead.picked;
 
   const created = [];
   let serviceDatesWritten = 0;
@@ -478,17 +473,48 @@ function ensureLookaheadQuarters_(source) {
 }
 
 /**
+ * 第九十五輪批次 VC 組：唯讀計算「今日起 N 個月內開始、但還沒有建立」的季度（不取鎖、不寫入）。
+ * @returns {{today: string, months: number, picked: {horizon: string, plans: Object[]}}}
+ */
+function planLookaheadQuarters_() {
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+  const months = readQuarterLookaheadMonths_();
+  const startMonths = readQuarterTermStartMonths_();
+  const dateSettings = readQuarterDateSettings_();
+  const existing = readExistingQuarterAndServiceDateIds_();
+  const picked = selectLookaheadQuarterPlans_(today, months, function (year) {
+    return planAnnualQuarters_(year, startMonths, existing.quarterIds, existing.serviceDateIds, dateSettings);
+  });
+  return { today: today, months: months, picked: picked };
+}
+
+/**
+ * `apiEnsureFutureQuarters()` 的訊息（建立了／不需要再建）。
+ * @param {Object} r `ensureLookaheadQuarters_()` 的結果
+ * @returns {Object} 同一個物件，加上 `message`
+ */
+function withEnsureQuartersMessage_(r) {
+  r.message = r.created.length > 0
+    ? ('已建立 ' + r.created.length + ' 個季度：' + r.created.map(buildQuarterLabel_).join('、')
+      + '。季度選單已經可以選。')
+    : ('今日起 ' + r.months + ' 個月內（至 ' + r.horizon + '）開始的季度都已經建立好，不需要再建。');
+  return r;
+}
+
+/**
  * 幹事介面：載入時（靜靜做）以及進階與診斷〔建立未來季度〕（顯示結果）。
+ * 第九十五輪批次 VC 組：先**不取鎖**唯讀檢查；沒有欠缺的季度 ⇒ 直接回傳（不取 DocumentLock、不寫 AuditLog），
+ * 回傳值和以前一樣。欠缺才取鎖建立（取鎖後 `ensureLookaheadQuarters_()` 會再檢查一次）。
  * @returns {{months: number, horizon: string, created: string[], serviceDatesWritten: number, message: string}}
  */
 function apiEnsureFutureQuarters() {
   assertWebAppRequestAllowed_();
+  const lookahead = planLookaheadQuarters_();
+  if (lookahead.picked.plans.length === 0) {
+    return withEnsureQuartersMessage_({ months: lookahead.months, horizon: lookahead.picked.horizon, created: [], serviceDatesWritten: 0 });
+  }
   return withMutationLock_('建立未來季度', function () {
-    const r = ensureLookaheadQuarters_('apiEnsureFutureQuarters');
-    r.message = r.created.length > 0
-      ? ('已建立 ' + r.created.length + ' 個季度：' + r.created.map(buildQuarterLabel_).join('、')
-        + '。季度選單已經可以選。')
-      : ('今日起 ' + r.months + ' 個月內（至 ' + r.horizon + '）開始的季度都已經建立好，不需要再建。');
-    return r;
+    return withEnsureQuartersMessage_(ensureLookaheadQuarters_('apiEnsureFutureQuarters'));
   });
 }

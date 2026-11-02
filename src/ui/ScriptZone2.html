@@ -351,6 +351,11 @@
 
   function openPeopleHints() {
     runAction('讀取名單檢查', async () => {
+      // 第九十五輪批次 VB 組：打開幹事介面不再一定同步 ⇒ 名單檢查（電郵）開始時先由出席系統更新一次
+      //（10 分鐘內同步過就略過；只可查看的人不做；讀不到出席系統不阻住名單檢查）
+      if (!viewOnly_) {
+        try { await callServerMutating('apiSyncPeopleFromHwcas', {}); } catch (err) { /* 見上 */ }
+      }
       const data = await callServer('apiGetPreQuarterChecklist', currentQuarterId);
       const hints = data.peopleHints || [];
 

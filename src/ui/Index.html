@@ -49,6 +49,8 @@
   </header>
 
   <div class="status" id="status"></div>
+  <!-- 第九十五輪批次 VB 組：打開幹事介面時的出席系統同步在背景進行（介面不鎖） -->
+  <div class="muted" id="hwcasSyncing" hidden>正在同步出席系統……</div>
   <!-- 第八十七輪批次 NB 組：只可查看的人在頁頂見到這一句 -->
   <div class="warnbox" id="viewOnlyBanner" hidden></div>
   <!-- 第八十七輪批次 NA 組：網址指定的季度找不到／畫面不認得 -->
@@ -154,7 +156,8 @@
   </section>
 
   <!-- 第九十三輪批次 TF 組：載入時間（細字；Config WEBAPP_SHOW_LOAD_TIMINGS 控制，預設顯示） -->
-  <div class="muted" id="loadTimings" hidden></div>
+  <!-- 第九十五輪批次 VD 組：第二行是伺服器分段（pre-line 令兩行分開） -->
+  <div class="muted" id="loadTimings" style="white-space: pre-line;" hidden></div>
 
   <!-- 共用彈窗容器：一個動作只有一個確認畫面（規格 1.4） -->
   <div class="modal-backdrop" id="modalBackdrop" hidden>

@@ -101,12 +101,15 @@ console.log('\n=== CB4：三個入口 ===');
   const load = ui.slice(ui.indexOf('async function loadQuarters'), ui.indexOf('async function fillQuarterSelect_'));
   check('★★★★★★ 載入時先叫 apiEnsureFutureQuarters，再讀季度清單',
     /callServerMutating\('apiEnsureFutureQuarters'\)/.test(load) && /fillQuarterSelect_\(keepQuarterId \|\| null\)/.test(load));  // 第八十七輪 NA 組：網址指定的季度
-  check('★★★★★ 建唔到唔阻住載入（try/catch）', /try \{\s*await callServerMutating\('apiEnsureFutureQuarters'\);\s*\} catch/.test(load) && /if \(!viewOnly_\) \{\s*try \{/.test(load));
+  // 第九十五輪批次 VC／VD 組（刻意改動）：改在背景做（不 await），失敗由 .catch 接住
+  check('★★★★★ 建唔到唔阻住載入（背景、.catch）', /if \(!viewOnly_\) ensureFutureQuartersInBackground_\(\);/.test(load)
+    && /callServerMutating\('apiEnsureFutureQuarters'\)\.then\([\s\S]*?\}\)\.catch\(/.test(load));
   check('★★★★★ 每日自動排程都會做', /ensureLookaheadQuarters_\('dailyAutomationCheck_'\)/.test(read('src/Trigger.gs')));
   const z4 = read('src/ui/ScriptZone4.html');
   check('★★★★★★ 進階與診斷有〔建立未來季度〕', /zone4Row\('建立未來季度'/.test(z4) && /callServerMutating\('apiEnsureFutureQuarters'\)/.test(z4));
   check('★★★★ 建咗之後重填季度選單但保留而家揀緊嗰季', /fillQuarterSelect_\(currentQuarterId\)/.test(z4));
-  check('★★★★ apiEnsureFutureQuarters 有鎖', /function apiEnsureFutureQuarters\(\) \{\s*assertWebAppRequestAllowed_\(\);\s*return withMutationLock_\(/.test(read('src/AnnualQuarters.gs')));
+  // 第九十五輪批次 VC 組（刻意改動）：先唯讀檢查，欠缺才取鎖
+  check('★★★★ apiEnsureFutureQuarters 建立時有鎖', /function apiEnsureFutureQuarters\(\) \{\s*assertWebAppRequestAllowed_\(\);[\s\S]{0,400}return withMutationLock_\('建立未來季度'/.test(read('src/AnnualQuarters.gs')));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

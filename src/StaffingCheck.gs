@@ -544,16 +544,38 @@ function augmentAssignmentsWithStaffingFlow_(ctx, cells) {
 // ─────────────────────────────────────────────────────────────────────
 
 /**
+ * 第九十五輪批次 VA 組：人手檢查和 fine-tune context 共用的部分（和 `readMemoQuarterContextParts_()` 同一個形狀）。
+ * @param {string} quarterId 季度 ID
+ * @param {string} timezone 時區
+ * @returns {Object}
+ */
+function readStaffingSharedParts_(quarterId, timezone) {
+  const posts = readPostsNormalized_();
+  const eligibility = readEligibility_();
+  const roleContext = buildRoleContext_(eligibility, posts, timezone);
+  eligibility.byPost = roleContext.eligibleByPost;
+  return {
+    serviceDates: readServiceDatesNormalized_(quarterId, timezone),
+    posts: posts,
+    eligibility: eligibility,
+    roles: roleContext.roles,
+    personPostExclusions: roleContext.exclusions,
+    unavailable: readUnavailableNormalized_(timezone),
+    specialByDate: buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone),
+    rules: readRules_(),
+    sameDayExclusivePostIds: readSameDayExclusivePostIds_()
+  };
+}
+
+/**
  * 人手檢查需要的資料（和生成器同一批讀取函式，不另寫一套）。
  * @param {string} quarterId 季度 ID
  * @returns {Object} 規則 context
  */
 function buildStaffingContext_(quarterId) {
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const posts = readPostsNormalized_();
-  const eligibility = readEligibility_();
-  const roleContext = buildRoleContext_(eligibility, posts, timezone);
-  eligibility.byPost = roleContext.eligibleByPost;
+  // 第九十五輪批次 VA 組：狀態卡載入時，這一季的崗位、名單、身分等已經在 fine-tune context 建好，直接用（結果一樣）
+  const shared = readMemoQuarterContextParts_(quarterId, timezone) || readStaffingSharedParts_(quarterId, timezone);
   const peopleById = {};
   readPeople_().forEach(function (row) {
     if (!isTrueValue_(row[COLUMNS.NAME_MAPPING.ACTIVE])) return;
@@ -565,18 +587,18 @@ function buildStaffingContext_(quarterId) {
     };
   });
   const config = readConfig_();
-  const sameDayIds = readSameDayExclusivePostIds_();
+  const sameDayIds = shared.sameDayExclusivePostIds;
   return {
     quarterId: quarterId,
-    serviceDates: readServiceDatesNormalized_(quarterId, timezone),
-    posts: posts,
-    eligibility: eligibility,
-    roles: roleContext.roles,
-    personPostExclusions: roleContext.exclusions,
+    serviceDates: shared.serviceDates,
+    posts: shared.posts,
+    eligibility: shared.eligibility,
+    roles: shared.roles,
+    personPostExclusions: shared.personPostExclusions,
     peopleById: peopleById,
-    unavailable: readUnavailableNormalized_(timezone),
-    specialByDate: buildSpecialSundayByDate_(readSpecialSundays_(quarterId), timezone),
-    rules: readRules_(),
+    unavailable: shared.unavailable,
+    specialByDate: shared.specialByDate,
+    rules: shared.rules,
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || DEFAULTS.MAX_PER_QUARTER,
     // 第九十輪批次 QA 組：同日不兼任——最新一版已填的領詩／司琴，那個人當日不再計入其他崗位的人手
     sameDayExclusivePostIds: sameDayIds,

@@ -410,6 +410,20 @@ function apiSetThemePreference(theme) {
  */
 function apiListQuarters() {
   assertWebAppRequestAllowed_('apiListQuarters');
+  // 第九十五輪批次 VC 組：每一季的 findLatestVersionNo_() 都讀 RosterVersions——純讀取，開 readSheet_ 快取，整張表只讀一次
+  beginSheetReadMemo_();
+  try {
+    return listQuartersForSelect_();
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
+ * `apiListQuarters()` 的本體（純讀取）。
+ * @returns {Object[]}
+ */
+function listQuartersForSelect_() {
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   return readSheet_(SHEETS.QUARTERS).map(function (row) {
     const quarterId = row[COLUMNS.QUARTERS.QUARTER_ID];

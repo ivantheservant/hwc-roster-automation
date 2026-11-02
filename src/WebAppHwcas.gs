@@ -334,8 +334,11 @@ function describeHwcasSkip_(r) {
 /**
  * 幹事介面載入時叫一次（前端畫好主畫面之後先叫，唔拖慢主畫面）。**會寫入 NameMapping。**
  * 拿唔到鎖（另一個動作在跑）⇒ 略過今次，唔等、唔報錯。讀唔到出席系統 ⇒ `ok=false`＋一句，唔拋。
- * @param {{force: boolean}=} options `force=true`＝唔理 10 分鐘限制（載入時用）
- * @returns {Object}
+ * 第九十五輪批次 VB 組：載入時不再 `force`（照 `HWCAS_SYNC_MIN_INTERVAL_MS`，10 分鐘內同步過就略過）；
+ * 回傳 `dashboardSync`（狀態卡那一行）——前端沒有更新任何人就只換那一行，不重新載入狀態卡。
+ * 同步期間放記號（`markHwcasSyncRunning_()`），按改動按鈕被鎖拒絕時講「出席系統正在同步」。
+ * @param {{force: boolean}=} options `force=true`＝唔理 10 分鐘限制
+ * @returns {Object} {ok, skipped, updated, emailChanged, …, notice, dashboardSync}
  */
 function apiSyncPeopleFromHwcas(options) {
   assertWebAppRequestAllowed_();
@@ -347,9 +350,13 @@ function apiSyncPeopleFromHwcas(options) {
   } catch (err) {
     return { ok: true, skipped: 'locked', updated: 0, notice: '' };
   }
+  markHwcasSyncRunning_(true);
   try {
-    return runHwcasSyncSafely_({ force: o.force === true });
+    const r = runHwcasSyncSafely_({ force: o.force === true });
+    r.dashboardSync = describeHwcasSyncForDashboard_();
+    return r;
   } finally {
+    markHwcasSyncRunning_(false);
     try { lock.releaseLock(); } catch (err) { /* 放鎖失敗唔可以蓋過結果 */ }
   }
 }

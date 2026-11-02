@@ -50,6 +50,13 @@ const UNAVAILABLE_SUBMISSION_STATUS_TC = {
   WITHDRAWN: '已撤回'
 };
 
+/**
+ * 第九十五輪批次 VE 組：已確認、但由這一項建立的 `Unavailable` 已被幹事取消（Status 不是 ACTIVE，或者那一行已經不在）。
+ * 只是個人頁顯示用的狀態（工作表的 Status 仍然是 ACCEPTED）；那一日可以再申報。不寄信。
+ */
+const UNAVAILABLE_SUBMISSION_VIEW_CANCELLED = 'CANCELLED';
+const UNAVAILABLE_SUBMISSION_VIEW_CANCELLED_TC = '幹事已取消';
+
 /** 第九十四輪批次 UD 組：自動確認時寫入 DecidedBy 的字眼。 */
 const UNAVAILABLE_AUTO_CONFIRM_BY = {
   GENERATE: '系統自動（生成初稿）',
@@ -277,10 +284,22 @@ function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuart
   const U = COLUMNS.UNAVAILABLE;
   const quarters = listPersonalUnavailableQuarters_(todayStr, timezone, anchorQuarterId);
   const mine = readUnavailableSubmissions_(timezone).filter(function (s) { return s.personId === personId; });
+  // 第九十五輪批次 VE 組：已確認的申報，連結的 Unavailable 已被取消（或已不在）⇒「幹事已取消」，那一日可以再申報
+  const activeUnavailableIds = {};
+  readUnavailable_().forEach(function (r) {
+    if (isUnavailableRowActive_(r)) activeUnavailableIds[String(r[U.UNAVAILABLE_ID] || '').trim()] = true;
+  });
+  const viewStatusOf = function (s) {
+    if (s.status === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED && s.unavailableId && !activeUnavailableIds[s.unavailableId]) {
+      return UNAVAILABLE_SUBMISSION_VIEW_CANCELLED;
+    }
+    return s.status;
+  };
   const byDate = {};
   mine.forEach(function (s) {
-    if (s.status === UNAVAILABLE_SUBMISSION_STATUS.PENDING || s.status === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED) {
-      byDate[s.serviceDate] = s.status;
+    const st = viewStatusOf(s);
+    if (st === UNAVAILABLE_SUBMISSION_STATUS.PENDING || st === UNAVAILABLE_SUBMISSION_STATUS.ACCEPTED) {
+      byDate[s.serviceDate] = st;
     }
   });
   // 已經在不能服侍名單（任何來源、生效中）的日子不用再申報
@@ -317,6 +336,7 @@ function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuart
     .filter(function (s) { return s.serviceDate >= todayStr; })
     .sort(function (a, b) { return a.serviceDate < b.serviceDate ? -1 : (a.serviceDate > b.serviceDate ? 1 : 0); })
     .map(function (s) {
+      const st = viewStatusOf(s);
       return {
         submissionId: s.submissionId,
         serviceDate: s.serviceDate,
@@ -324,8 +344,9 @@ function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuart
         reason: s.reason,
         postIds: s.postIds,
         postsText: describeUnavailablePosts_(s.postIds, postNames),
-        status: s.status,
-        statusText: UNAVAILABLE_SUBMISSION_STATUS_TC[s.status] || s.status,
+        status: st,
+        statusText: st === UNAVAILABLE_SUBMISSION_VIEW_CANCELLED ? UNAVAILABLE_SUBMISSION_VIEW_CANCELLED_TC
+          : (UNAVAILABLE_SUBMISSION_STATUS_TC[s.status] || s.status),
         canWithdraw: s.status === UNAVAILABLE_SUBMISSION_STATUS.PENDING,
         late: s.late
       };

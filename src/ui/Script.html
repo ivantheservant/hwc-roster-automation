@@ -499,7 +499,9 @@
       throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');
     }
     const result = await callServerRaw_(fnName, ...args);
-    dashboardStale_ = true;
+    // 第九十五輪批次 VB／VC 組：背景的出席系統同步、建立未來季度，沒有改到任何東西就不標記過期（不會引起多一次載入）
+    const changed = STALE_ONLY_IF_CHANGED_CALLS[fnName];
+    if (!changed || changed(result)) dashboardStale_ = true;
     // 第八十五輪批次 LD 組：改了會影響人手的資料 ⇒ 重新做人手檢查，下一個完成窗寫一句（不足才寫）
     if (STAFFING_AFFECTING_CALLS.indexOf(fnName) !== -1 && currentQuarterId) {
       try {
@@ -511,6 +513,15 @@
     }
     return result;
   }
+
+  /**
+   * 第九十五輪批次 VB／VC 組：這幾支只在「真的改了」時才標記狀態過期。
+   * 出席系統同步：更新了任何人（`updated > 0`）；建立未來季度：建立了季度。
+   */
+  const STALE_ONLY_IF_CHANGED_CALLS = {
+    apiSyncPeopleFromHwcas: (r) => !!(r && r.updated > 0),
+    apiEnsureFutureQuarters: (r) => !!(r && r.created && r.created.length > 0)
+  };
 
   /** 第九十四輪批次 UB 組：確認者可以送出的改動（同伺服器 UNAVAILABLE_CONFIRMER_APIS 的決定那一支）。 */
   const UNAVAILABLE_CONFIRMER_CALLS = ['apiDecideUnavailableSubmissions'];
@@ -997,8 +1008,36 @@
       console.log('[載入時間] ' + line);
       const box = el('loadTimings');
       const show = !(dashboardState_ && dashboardState_.showLoadTimings === false);
-      if (box) { box.hidden = !show; box.textContent = show ? line : ''; }
+      const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_) : '';
+      if (box) { box.hidden = !show; box.textContent = show ? (line + (serverLine ? '\n' + serverLine : '')) : ''; }
     } catch (err) { /* 計時絕不可以令載入出事 */ }
+  }
+
+  /**
+   * 第九十五輪批次 VD 組：頁底第二行「伺服器：讀工作表 a、fine-tune context N 次 b、寄出警告 c、人手檢查 d（合計 e）」。
+   * 和頁底第一行一樣只記第一次載入。
+   */
+  let loadServerTimings_ = null;
+  const SERVER_TIMING_LABELS = [['讀工作表（版本、未儲存）', '讀工作表'], ['寄出警告', '寄出警告'], ['人手檢查', '人手檢查']];
+  /** 純函式。 */
+  function buildServerTimingsLine_(st) {
+    const ms = {};
+    (st.phases || []).forEach((p) => { ms[p.label] = p.ms; });
+    const parts = [];
+    SERVER_TIMING_LABELS.forEach((l, i) => {
+      if (ms[l[0]] !== undefined) parts.push(l[1] + ' ' + loadTimingSecondsText_(ms[l[0]]));
+      if (i === 0) {
+        parts.push('fine-tune context ' + (Number(st.fineTuneContextCount) || 0) + ' 次 '
+          + loadTimingSecondsText_(st.fineTuneContextMs || 0));
+      }
+    });
+    const total = ms['合計'] !== undefined ? '（合計 ' + loadTimingSecondsText_(ms['合計']) + '）' : '';
+    return '伺服器：' + parts.join('、') + total;
+  }
+  function markServerLoadTimings_(st) {
+    if (loadServerTimings_) return; // 只記第一次載入
+    loadServerTimings_ = st;
+    renderLoadTimings_();
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -2311,15 +2350,52 @@
     // 季度選單先會一直有下一季。**做唔到唔可以令成頁載入失敗**——靜靜略過，
     // 進階與診斷〔建立未來季度〕仲可以手動做一次（會講原因）。
     // 第八十七輪批次 NB 組：只可查看的人不做（會建立季度＝改動）
-    const tEnsure = Date.now();
-    if (!viewOnly_) {
-      try {
-        await callServerMutating('apiEnsureFutureQuarters');
-      } catch (err) { /* 見上：唔阻住載入 */ }
-      markLoadTiming_('ensureQuarters', Date.now() - tEnsure);
-    }
+    // 第九十五輪批次 VC／VD 組：改在背景做，季度清單不用等它（伺服器先唯讀檢查，不欠缺就不取鎖）
+    if (!viewOnly_) ensureFutureQuartersInBackground_();
     // 第八十七輪批次 NA 組：網址指定的季度（找不到就照舊揀第一個）
     await fillQuarterSelect_(keepQuarterId || null);
+  }
+
+  /**
+   * 第九十五輪批次 VC／VD 組：背景建立未來季度。真的建立了 ⇒ 只重填季度選單（保留現在的季度，不重新載入狀態卡）。
+   * 失敗不阻住載入（進階與診斷〔建立未來季度〕仍然可以手動做一次，會講原因）。
+   */
+  function ensureFutureQuartersInBackground_() {
+    const tEnsure = Date.now();
+    callServerMutating('apiEnsureFutureQuarters').then((r) => {
+      markLoadTiming_('ensureQuarters', Date.now() - tEnsure);
+      if (r && r.created && r.created.length > 0) return refillQuarterOptions_();
+      return null;
+    }).catch(() => { /* 見上：唔阻住載入 */ });
+  }
+
+  /** 重讀季度清單，只重填選單（保留現在的季度）。 */
+  async function refillQuarterOptions_() {
+    // 本來一個季度都沒有（新系統）⇒ 照舊整個填一次並載入狀態卡
+    if (!currentQuarterId) return runAction('載入季度', () => fillQuarterSelect_(null));
+    const quarters = await callServer('apiListQuarters');
+    if (!quarters || quarters.length === 0) return;
+    renderQuarterOptions_(quarters, currentQuarterId);
+  }
+
+  /**
+   * 季度選單的選項。
+   * @param {Object[]} quarters `apiListQuarters` 的結果
+   * @param {?string} keepQuarterId 想保留嘅季度
+   */
+  function renderQuarterOptions_(quarters, keepQuarterId) {
+    const select = clear(el('quarter'));
+    quarters.forEach((q) => {
+      const option = document.createElement('option');
+      option.value = q.quarterId;
+      // 規格 1.1：寫人話，唔寫 2026T4
+      option.textContent = (q.label || q.quarterId)
+        + (q.startDate ? '（' + q.startDate + ' 開始）' : '');
+      select.appendChild(option);
+    });
+    if (keepQuarterId && quarters.some((q) => q.quarterId === keepQuarterId)) {
+      select.value = keepQuarterId;
+    }
   }
 
   /**
@@ -2330,28 +2406,16 @@
     const tList = Date.now();
     const quarters = await callServer('apiListQuarters');
     markLoadTiming_('quarterList', Date.now() - tList);
-    const select = clear(el('quarter'));
-
     if (!quarters || quarters.length === 0) {
+      clear(el('quarter'));
       el('statusCard').hidden = true;
       setStatus('Quarters 工作表沒有任何季度資料。請先在試算表建立季度，'
         + '或用選單「準備工作 ▸ 新增季度」。', true);
       return;
     }
 
-    quarters.forEach((q) => {
-      const option = document.createElement('option');
-      option.value = q.quarterId;
-      // 規格 1.1：寫人話，唔寫 2026T4
-      option.textContent = (q.label || q.quarterId)
-        + (q.startDate ? '（' + q.startDate + ' 開始）' : '');
-      select.appendChild(option);
-    });
-
-    if (keepQuarterId && quarters.some((q) => q.quarterId === keepQuarterId)) {
-      select.value = keepQuarterId;
-    }
-    currentQuarterId = select.value;
+    renderQuarterOptions_(quarters, keepQuarterId);
+    currentQuarterId = el('quarter').value;
     await loadDashboard();
   }
 
@@ -2367,6 +2431,9 @@
     if (!currentQuarterId) return;
     if (!(opts && opts.keepModal)) closeModal();
     const tLoad = Date.now();
+    // 第九十五輪批次 VD 組：主流程的資料（apiGetMainFlowState）和狀態卡同時請求——兩者都是唯讀，
+    // 主流程的伺服器資料只看季度，不依賴狀態卡的回傳值。畫面仍然按原次序畫（先狀態卡、後主流程）。
+    if (typeof prefetchMainFlowState_ === 'function') prefetchMainFlowState_();
     dashboardState_ = await callServer('apiGetDashboardState', currentQuarterId);
     dashboardStale_ = false;
     renderTop(dashboardState_);
@@ -2377,6 +2444,8 @@
       if (st) {
         console.log('[載入時間：伺服器] ' + (st.phases || []).map((p) => p.label + ' ' + loadTimingSecondsText_(p.ms) + 's').join('；')
           + '；fine-tune context ' + st.fineTuneContextCount + ' 次、共 ' + loadTimingSecondsText_(st.fineTuneContextMs) + 's');
+        // 第九十五輪批次 VD 組：頁底細字也寫主要幾段（不用開 console）
+        markServerLoadTimings_(st);
       }
     } catch (err) { /* 計時不可以令載入出事 */ }
     // ⚠️ 第三十九輪批次 A 組：主流程要行喺最前——佢係幹事九成時間睇嘅嘢。
@@ -2413,6 +2482,18 @@
     //
     // CSS 嗰層唔怕重畫（`body.is-busy` 自動蓋住新節點），
     // 但鍵盤嗰層要補返。
+    reapplyBusyLockIfNeeded_();
+  }
+
+  /**
+   * 第九十五輪批次 VB 組：同步沒有更新任何人 ⇒ 只換狀態卡出席系統那一行（不重新載入）。
+   * 放在這裏：狀態快取只在 Script.html 讀寫（見 dashboard_refresh_after_mutation 測試）。
+   * @param {?Object} sync 伺服器 `describeHwcasSyncForDashboard_()` 的結果
+   */
+  function patchHwcasSyncLine_(sync) {
+    if (!sync || !dashboardState_) return;
+    dashboardState_.hwcasSync = sync;
+    renderTop(dashboardState_);
     reapplyBusyLockIfNeeded_();
   }
 

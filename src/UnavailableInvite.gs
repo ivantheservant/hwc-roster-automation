@@ -137,6 +137,8 @@ function apiUnavailableInvitePreview(quarterId) {
 function apiUnavailableInviteSend(quarterId) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('邀請義工申報不能服侍的日子', function () {
+    // 第九十五輪批次 VB 組：打開幹事介面不再一定同步 ⇒ 寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀不到不會令寄出失敗）
+    syncPeopleFromHwcasBeforeSend_();
     return sendUnavailableInvites_(String(quarterId || '').trim());
   });
 }
