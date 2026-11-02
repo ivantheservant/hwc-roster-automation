@@ -416,7 +416,7 @@ function buildVersionAuthorResolver_() {
   }
   try {
     const N = COLUMNS.NAME_MAPPING;
-    readSheet_(SHEETS.NAME_MAPPING).forEach(function (r) { add(r[N.EMAIL], r[N.NAME_TC]); });
+    readSheet_(SHEETS.NAME_MAPPING).forEach(function (r) { add(effectivePersonEmail_(r), r[N.NAME_TC]); });   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
   } catch (err) {
     log_('WARN', 'buildVersionAuthorResolver_ 讀不到 NameMapping：' + err.message);
   }

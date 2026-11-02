@@ -40,6 +40,21 @@ function endSheetReadMemo_() {
 }
 
 /**
+ * 第九十七輪批次 XA 組：**一個人實際用來寄信的電郵**＝`NameMapping.Email`（出席系統）有值就用它，
+ * 否則用 `ManualEmail`（幹事在〔補填電郵〕填的）。所有讀個人電郵的地方都要經這裏
+ * （出席系統同步、連結本身除外——它們只管 `Email` 欄，永遠不碰 `ManualEmail`）。
+ * @param {Object} row NameMapping 的一行（readSheet_／readPeople_ 的結果）
+ * @returns {string} 電郵；兩欄都沒有 ⇒ 空字串
+ */
+function effectivePersonEmail_(row) {
+  if (!row) return '';
+  const M = COLUMNS.NAME_MAPPING;
+  const hwcas = String(row[M.EMAIL] === null || row[M.EMAIL] === undefined ? '' : row[M.EMAIL]).trim();
+  if (hwcas) return hwcas;
+  return String(row[M.MANUAL_EMAIL] === null || row[M.MANUAL_EMAIL] === undefined ? '' : row[M.MANUAL_EMAIL]).trim();
+}
+
+/**
  * 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」（正式發出的人數、沒有電郵的人數、改動後重發的人數）的快取。
  * 鍵＝季度；值裏面存簽名（見 `WebAppDashboard.gs` 的 `buildDashboardCountsSignature_()`），簽名不同就當沒有快取。
  * 有效期 6 小時。任何寄出、儲存、生成、匯入、重設之後主動清除（`clearDashboardCountsCache_()`），不只靠簽名。
@@ -1477,7 +1492,7 @@ function splitVersionPeopleForNotice_(quarterId, versionNo) {
   readPeople_().forEach(function (row) {
     const id = String(row[N.PERSON_ID] || '').trim();
     if (!id) return;
-    emailById[id] = String(row[N.EMAIL] || '').trim();
+    emailById[id] = effectivePersonEmail_(row);   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
     nameById[id] = String(row[N.NAME_TC] || '').trim();
   });
   const autoByPost = {};
@@ -1680,7 +1695,7 @@ function countPeopleEmailGaps_() {
   let unlinked = 0;
   try {
     readPeople_().forEach(function (row) {
-      if (!String(row[M.EMAIL] || '').trim()) noEmail++;
+      if (!effectivePersonEmail_(row)) noEmail++;   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
       if (!memberNoKey_(row[M.MEMBER_NO])) unlinked++;
     });
   } catch (err) {

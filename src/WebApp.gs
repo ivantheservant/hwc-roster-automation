@@ -84,7 +84,9 @@ const WEBAPP_READ_ONLY_APIS = [
   // 第八十七輪批次 NB 組：自己的權限；唯讀崗位名單視窗
   'apiGetMyPermission', 'apiGetEligibilityViewOnly',
   // 第九十四輪批次 UB 組：「義工申報，確認」畫面（只可查看的人看得到，按鈕灰色）
-  'apiGetUnavailableConfirmView'
+  'apiGetUnavailableConfirmView',
+  // 第九十七輪批次 XA／XB 組：〔補填電郵〕畫面；〔沒有電郵的人：匯出邀請〕畫面（只讀）
+  'apiGetManualEmailView', 'apiGetInvitePaperView'
 ];
 
 /**

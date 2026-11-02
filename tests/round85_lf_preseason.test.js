@@ -119,8 +119,9 @@ console.log('\n=== LF4：DRY_RUN、只寫 AuditLog、只寄一次 ===');
   const auto = g.runPreseasonAutoSend_(qrow, '2098-12-10', g.readConfig_());
   check('★★★★★★ 人手寄過 ⇒ 自動不再寄', auto.outcome === 'SKIP' && auto.detail === 'ALREADY_SENT', JSON.stringify(auto));
   // 第八十六輪批次 MA 組（刻意改動）：測試模式只留下模擬紀錄 ⇒ 寫「模擬寄出」，不算已寄出
-  check('★★★★★ 「這一季還要做的」：模擬寄出（2098-12-10，人手）；正式使用時建議 2098-12-06 寄出',
-    g.readPreseasonStatusText_(sc.Q) === '季前資料：模擬寄出（2098-12-10，人手）；正式使用時建議 2098-12-06 寄出', g.readPreseasonStatusText_(sc.Q));
+  // 第九十七輪批次 XD 組（刻意改動）：不再寫「；正式使用時建議 … 寄出」
+  check('★★★★★ 「這一季還要做的」：模擬寄出（2098-12-10，人手）',
+    g.readPreseasonStatusText_(sc.Q) === '季前資料：模擬寄出（2098-12-10，人手）', g.readPreseasonStatusText_(sc.Q));
   const sc2 = scene();
   check('★★★★★ 未寄：建議 2098-12-06 寄出', sc2.gas.readPreseasonStatusText_(sc2.Q) === '季前資料：建議 2098-12-06 寄出（未寄）');
   const auto2 = sc2.gas.runPreseasonAutoSend_(sc2.gas.readSheet_(sc2.S.QUARTERS)[0], '2098-12-10', sc2.gas.readConfig_());

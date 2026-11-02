@@ -65,6 +65,7 @@ const SAFE_DOMAIN_PATTERNS = [
   /^raw\.githubusercontent\.com$/i,
   /^schema\.org$/i,
   /^www\.w3\.org$/i,
+  /^schemas\.openxmlformats\.org$/i, // 第九十七輪批次 XB 組：Office Open XML（.docx）標準命名空間
 ];
 
 /**

@@ -4883,8 +4883,9 @@ const MUTATIONS = [
     id: 'ah-review-box-no-call',
     why: '寄審閱確認框唔叫共用函式——三個框各自一套',
     file: 'src/ui/ScriptZone1.html',
-    find: "      if (preview.contents) nodes.push(sendContentsBox(preview.contents));\n      // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）\n      buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));",
-    replace: '      if (preview.contents) nodes.push(sendContentsBox(preview.contents));',
+    // 第九十七輪批次 XC 組：兩行之間多了審閱版日曆檔一句，find 改為對準那一行本身
+    find: "      nodes.push(para(REVIEW_NO_ICS_TEXT, 'muted'));\n      // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）\n      buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));",
+    replace: "      nodes.push(para(REVIEW_NO_ICS_TEXT, 'muted'));",
     tests: ['tests/hard_release_remembered.test.js']
   },
   {
@@ -11468,6 +11469,206 @@ const MUTATIONS = [
     find: "    renderQuarterOptions_(quarters, keepQuarterId && quarters.some((q) => q.quarterId === keepQuarterId) ? keepQuarterId : fallback);",
     replace: "    renderQuarterOptions_(quarters, fallback);",
     tests: ["tests/round96_wb_wc_reads_default_quarter.test.js"]
+  },
+  {
+    id: "xa-manual-over-hwcas",
+    why: "補填的電郵蓋過出席系統的",
+    file: "src/SheetReader.gs",
+    find: "  if (hwcas) return hwcas;\n",
+    replace: "",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-ignore-manual",
+    why: "實際電郵不看補填的",
+    file: "src/SheetReader.gs",
+    find: "  return String(row[M.MANUAL_EMAIL] === null || row[M.MANUAL_EMAIL] === undefined ? '' : row[M.MANUAL_EMAIL]).trim();\n}\n\n/**\n * 第九十六輪批次 WA 組",
+    replace: "  return '';\n}\n\n/**\n * 第九十六輪批次 WA 組",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-mailer-raw-email",
+    why: "寄信 context 只讀出席系統的 Email",
+    file: "src/Mailer.gs",
+    find: "      email: effectivePersonEmail_(row),   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）",
+    replace: "      email: String(row[COLUMNS.NAME_MAPPING.EMAIL] || '').trim(),",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-invite-raw-email",
+    why: "申報邀請只讀出席系統的 Email",
+    file: "src/UnavailableInvite.gs",
+    find: "    const email = effectivePersonEmail_(row);   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）",
+    replace: "    const email = String(row[M.EMAIL] || '').trim();",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-notice-raw-email",
+    why: "沒有電郵名單只讀出席系統的 Email",
+    file: "src/SheetReader.gs",
+    find: "    emailById[id] = effectivePersonEmail_(row);   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）",
+    replace: "    emailById[id] = String(row[N.EMAIL] || '').trim();",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-gaps-raw-email",
+    why: "狀態卡收不到電郵人數只讀出席系統的",
+    file: "src/SheetReader.gs",
+    find: "      if (!effectivePersonEmail_(row)) noEmail++;   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）",
+    replace: "      if (!String(row[M.EMAIL] || '').trim()) noEmail++;",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-view-lists-all",
+    why: "補填電郵列出已有電郵的人",
+    file: "src/ManualEmail.gs",
+    find: "      if (!candidates[personId] || effectivePersonEmail_(row)) return;",
+    replace: "      if (!candidates[personId]) return;",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-view-no-superseded",
+    why: "出席系統已有電郵也不寫明",
+    file: "src/ManualEmail.gs",
+    find: "        const superseded = effectivePersonEmail_(row) !== manual;",
+    replace: "        const superseded = false;",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-save-no-format",
+    why: "補填電郵不檢查格式",
+    file: "src/ManualEmail.gs",
+    find: "  const bad = list.filter(function (e) { return e.email && !isPlausibleEmail_(e.email); });",
+    replace: "  const bad = [];",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-save-writes-email",
+    why: "補填電郵寫入 Email 欄",
+    file: "src/ManualEmail.gs",
+    find: "    updates[M.MANUAL_EMAIL] = e.email;",
+    replace: "    updates[M.EMAIL] = e.email;",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-audit-unmasked",
+    why: "AuditLog 寫完整電郵",
+    file: "src/ManualEmail.gs",
+    find: "      newValue: M.MANUAL_EMAIL + '=' + (maskEmailForPreview_(e.email) || '（空白）'),",
+    replace: "      newValue: M.MANUAL_EMAIL + '=' + (e.email || '（空白）'),",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-save-readonly",
+    why: "只可查看的人可以儲存補填電郵",
+    file: "src/WebApp.gs",
+    find: "  'apiGetManualEmailView', 'apiGetInvitePaperView'\n];",
+    replace: "  'apiGetManualEmailView', 'apiGetInvitePaperView', 'apiSaveManualEmails'\n];",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xa-hwcas-writes-manual",
+    why: "出席系統同步清走補填電郵",
+    file: "src/HwcasSync.gs",
+    find: "      updates[M.EMAIL] = h.email;\n",
+    replace: "      updates[M.EMAIL] = h.email;\n      updates[M.MANUAL_EMAIL] = '';\n",
+    tests: ["tests/round97_xa_manual_email.test.js"]
+  },
+  {
+    id: "xb-lists-with-email",
+    why: "匯出邀請列出有電郵的人",
+    file: "src/InvitePaper.gs",
+    find: "  return buildUnavailableInviteRecipients_(today).noEmailPeople || [];",
+    replace: "  const w = buildUnavailableInviteRecipients_(today);\n  return (w.noEmailPeople || []).concat(w.recipients);",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-view-leaks-token",
+    why: "匯出邀請畫面回傳 token",
+    file: "src/InvitePaper.gs",
+    find: "        return { personId: p.personId, displayName: p.displayName, hasLink: !!p.token };",
+    replace: "        return { personId: p.personId, displayName: p.displayName, hasLink: !!p.token, token: p.token };",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-no-link-in-doc",
+    why: "Word 檔沒有可以按的個人連結",
+    file: "src/InvitePaper.gs",
+    find: "    body.push(linkPara('個人專屬連結：', p.link));\n",
+    replace: "",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-no-page-break",
+    why: "Word 檔不分頁",
+    file: "src/InvitePaper.gs",
+    find: "    if (i > 0) body.push(para('<w:r><w:br w:type=\"page\"/></w:r>'));\n",
+    replace: "",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-self-not-only",
+    why: "寄給自己也寄給別人",
+    file: "src/InvitePaper.gs",
+    find: "      to: self,\n      displayName: '操作者自己（申報邀請）',",
+    replace: "      to: [self, 'other@example.invalid'].join(','),\n      displayName: '操作者自己（申報邀請）',",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-audit-token",
+    why: "AuditLog 寫入連結及 token",
+    file: "src/InvitePaper.gs",
+    find: "    writeInvitePaperAudit_(id, 'DOCX', people.length);",
+    replace: "    writeInvitePaperAudit_(id, 'DOCX|' + people.map(function (p) { return p.token; }).join(','), people.length);",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-pick-any",
+    why: "匯出邀請可以選名單以外的人",
+    file: "src/InvitePaper.gs",
+    find: "  const bad = wanted.filter(function (id) { return !byId[id] || !byId[id].token; });",
+    replace: "  const bad = [];",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-not-quarter-folder",
+    why: "Word 檔不存入該季資料夾",
+    file: "src/InvitePaper.gs",
+    find: "  const folder = getOrCreateQuarterPdfFolder_(quarterId);",
+    replace: "  const folder = resolveMailAttachmentFolder_();",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xb-front-unchecked",
+    why: "匯出邀請預設不勾選",
+    file: "src/ui/ScriptZone2.html",
+    find: "      cb.checked = !!p.hasLink;",
+    replace: "      cb.checked = false;",
+    tests: ["tests/round97_xb_invite_paper.test.js"]
+  },
+  {
+    id: "xc-review-no-line",
+    why: "審閱確認窗沒有日曆檔一句",
+    file: "src/ui/ScriptZone1.html",
+    find: "      nodes.push(para(REVIEW_NO_ICS_TEXT, 'muted'));\n",
+    replace: "",
+    tests: ["tests/round97_xc_xd_hints.test.js"]
+  },
+  {
+    id: "xc-ics-all-modes",
+    why: "日曆檔定稿提示在所有模式都出現",
+    file: "src/ui/ScriptSendPaper.html",
+    find: "    if (sendMode_ === 'ALL' || sendMode_ === 'CHANGED') {\n      icsBox.appendChild(make('div', { text: ICS_FINAL_ONLY_TEXT",
+    replace: "    if (true) {\n      icsBox.appendChild(make('div', { text: ICS_FINAL_ONLY_TEXT",
+    tests: ["tests/round97_xc_xd_hints.test.js"]
+  },
+  {
+    id: "xd-suggest-back",
+    why: "模擬寄出仍然寫正式使用時建議",
+    file: "src/PreseasonPack.gs",
+    find: "      + (suggest ? '' : '；這一季沒有生成日期，不會自動寄出');",
+    replace: "      + (suggest ? '；正式使用時建議 ' + suggest + ' 寄出' : '；這一季沒有生成日期，不會自動寄出');",
+    tests: ["tests/round97_xc_xd_hints.test.js"]
   }
 ];
 

@@ -1149,6 +1149,9 @@
     return '上次在 ' + last + ' 寄過。';
   }
 
+  /** 第九十七輪批次 XC 組：〔寄給堂委／執事〕（審閱）確認窗的一句。 */
+  const REVIEW_NO_ICS_TEXT = '審閱版不附日曆檔；正式發出（定稿）時，每人才會收到自己的日曆檔。';
+
   function openReview(sendOptions, meta) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
@@ -1194,6 +1197,8 @@
       ];
       // 第六十三輪批次 T 組：講明附件同日曆檔（同寄信嗰刻同一個解析）
       if (preview.contents) nodes.push(sendContentsBox(preview.contents));
+      // 第九十七輪批次 XC 組：審閱版不附日曆檔（只是提示，不改行為）
+      nodes.push(para(REVIEW_NO_ICS_TEXT, 'muted'));
       // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
       buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
       // 第七十五輪批次 CJ 組

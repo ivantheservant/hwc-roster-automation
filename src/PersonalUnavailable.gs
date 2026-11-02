@@ -756,7 +756,7 @@ function notifyUnavailableDecisions_(decided, names, postNames) {
   const emailById = {};
   readPeople_().forEach(function (row) {
     const id = String(row[M.PERSON_ID] || '').trim();
-    if (id) emailById[id] = String(row[M.EMAIL] || '').trim();
+    if (id) emailById[id] = effectivePersonEmail_(row);   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
   });
   const quarterRows = readSheet_(SHEETS.QUARTERS).map(function (r) {
     return { quarterId: String(r[COLUMNS.QUARTERS.QUARTER_ID] || '').trim(),

@@ -24,10 +24,40 @@ function unavailableInviteTemplateDefault_() {
 /**
  * 收件人（這一季事奉人員表上的人）。**只讀。**
  * @param {string} todayStr 今日（「堂委」「執事」以這一日的現任為準）
- * @returns {{recipients: Object[], noEmail: string[], noLink: string[]}}
+ * @returns {{recipients: Object[], noEmail: string[], noLink: string[], noEmailPeople: Object[]}}
  *   recipients：{personId, displayName, email, token}（token 只留在伺服器端，預覽不回傳）
+ *   noEmailPeople：沒有實際電郵的人 {personId, displayName, token}（第九十七輪批次 XB 組；token 同樣只留在伺服器端）
  */
 function buildUnavailableInviteRecipients_(todayStr) {
+  const wanted = listUnavailableInviteCandidateIds_(todayStr);
+  const M = COLUMNS.NAME_MAPPING;
+  const recipients = [];
+  const noEmail = [];
+  const noLink = [];
+  // 第九十七輪批次 XB 組：沒有電郵的人（連 PersonID 及 token，只留在伺服器端）——〔沒有電郵的人：匯出邀請〕用
+  const noEmailPeople = [];
+  readPeople_().forEach(function (row) {
+    const id = String(row[M.PERSON_ID] || '').trim();
+    if (!id || !wanted[id]) return;
+    const name = String(row[M.NAME_TC] || '').trim() || id;
+    const email = effectivePersonEmail_(row);   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
+    const token = String(row[M.PERSONAL_LINK_TOKEN] || '').trim();
+    if (!email) { noEmail.push(name); noEmailPeople.push({ personId: id, displayName: name, token: token }); return; }
+    if (!token) { noLink.push(name); return; }
+    recipients.push({ personId: id, displayName: name, email: email, token: token });
+  });
+  recipients.sort(function (a, b) { return a.displayName < b.displayName ? -1 : (a.displayName > b.displayName ? 1 : 0); });
+  noEmailPeople.sort(function (a, b) { return a.displayName < b.displayName ? -1 : (a.displayName > b.displayName ? 1 : 0); });
+  return { recipients: recipients, noEmail: noEmail.sort(), noLink: noLink.sort(), noEmailPeople: noEmailPeople };
+}
+
+/**
+ * 申報邀請的對象（PersonID → true）：自動排的崗位（「堂委」「執事」按這一日的現任展開）＋同日不兼任的崗位＋詩班名單。
+ * 第九十七輪批次 XA 組由 `buildUnavailableInviteRecipients_()` 抽出，〔補填電郵〕用同一份名單。**只讀。**
+ * @param {string} todayStr 今日
+ * @returns {Object.<string, boolean>}
+ */
+function listUnavailableInviteCandidateIds_(todayStr) {
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const posts = readPostsNormalized_({ includeGroups: true });
   const sameDay = readSameDayExclusivePostIds_();
@@ -46,22 +76,7 @@ function buildUnavailableInviteRecipients_(todayStr) {
       if (!eligibilityRoleTokenFailure_(ctx, postId, id, todayStr)) wanted[id] = true;
     });
   });
-  const M = COLUMNS.NAME_MAPPING;
-  const recipients = [];
-  const noEmail = [];
-  const noLink = [];
-  readPeople_().forEach(function (row) {
-    const id = String(row[M.PERSON_ID] || '').trim();
-    if (!id || !wanted[id]) return;
-    const name = String(row[M.NAME_TC] || '').trim() || id;
-    const email = String(row[M.EMAIL] || '').trim();
-    const token = String(row[M.PERSONAL_LINK_TOKEN] || '').trim();
-    if (!email) { noEmail.push(name); return; }
-    if (!token) { noLink.push(name); return; }
-    recipients.push({ personId: id, displayName: name, email: email, token: token });
-  });
-  recipients.sort(function (a, b) { return a.displayName < b.displayName ? -1 : (a.displayName > b.displayName ? 1 : 0); });
-  return { recipients: recipients, noEmail: noEmail.sort(), noLink: noLink.sort() };
+  return wanted;
 }
 
 /**

@@ -63,7 +63,7 @@ function apiListPeople(keyword) {
       const nameEN = String(row[M.NAME_EN] || '').trim();
       if (!matchesPeopleSearch_(keyword, [nameTC, nameEN, personId])) return;
 
-      const email = String(row[M.EMAIL] || '').trim();
+      const email = effectivePersonEmail_(row);   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
       people.push({
         personId: personId,
         nameTC: nameTC,

@@ -257,7 +257,10 @@ const COLUMNS = {
     NOTES: 'Notes',
     SYNCED_AT: 'SyncedAt',
     // 第十一輪批次階段 B：個人專屬連結用嘅 token。見 WebAppPersonalLink.gs 檔頭說明。
-    PERSONAL_LINK_TOKEN: 'PersonalLinkToken'
+    PERSONAL_LINK_TOKEN: 'PersonalLinkToken',
+    // 第九十七輪批次 XA 組：幹事補填的電郵（只供職事表寄信用；出席系統同步、連結永遠不讀不寫這一欄）。
+    // 第一次儲存〔補填電郵〕時自動補欄（ManualEmail.gs）。實際電郵見 SheetReader.gs 的 effectivePersonEmail_()。
+    MANUAL_EMAIL: 'ManualEmail'
   },
   NAME_ALIAS: {
     ALIAS_ID: 'AliasID',

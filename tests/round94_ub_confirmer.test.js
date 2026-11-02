@@ -69,7 +69,7 @@ console.log('\n=== UB1：權限 ===');
   const webApp = read('src/WebApp.gs');
   check('★★★★★ 清單：UNAVAILABLE_CONFIRMER_APIS 只有讀取及決定兩個；讀取在唯讀清單、決定不在',
     /const UNAVAILABLE_CONFIRMER_APIS = \['apiGetUnavailableConfirmView', 'apiDecideUnavailableSubmissions'\];/.test(webApp)
-    && /'apiGetUnavailableConfirmView'\n\];/.test(webApp) && !/WEBAPP_READ_ONLY_APIS = \[[\s\S]*?'apiDecideUnavailableSubmissions'[\s\S]*?\];/.test(webApp));
+    && /WEBAPP_READ_ONLY_APIS = \[[\s\S]*?'apiGetUnavailableConfirmView'[\s\S]*?\];/.test(webApp) && !/WEBAPP_READ_ONLY_APIS = \[[\s\S]*?'apiDecideUnavailableSubmissions'[\s\S]*?\];/.test(webApp));
   const pu = read('src/PersonalUnavailable.gs');
   check('★★★★★ 兩支 api 第一句都是 assertWebAppRequestAllowed_(\'自己的名字\')',
     /function apiDecideUnavailableSubmissions\(submissionIds, decision\) \{\s*assertWebAppRequestAllowed_\('apiDecideUnavailableSubmissions'\);/.test(pu)

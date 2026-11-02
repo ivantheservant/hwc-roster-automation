@@ -192,7 +192,7 @@ function buildPreseasonRecipients_(todayStr) {
   const people = {};
   readPeople_().forEach(function (row) {
     const id = String(row[M.PERSON_ID] || '').trim();
-    if (id) people[id] = { label: String(row[M.NAME_TC] || '').trim() || id, email: String(row[M.EMAIL] || '').trim() };
+    if (id) people[id] = { label: String(row[M.NAME_TC] || '').trim() || id, email: effectivePersonEmail_(row) };   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
   });
   const roles = readRolesSafe_(timezone);
   const seen = {};
@@ -292,8 +292,9 @@ function describePreseasonStatus_(sent, generateDate, daysBefore) {
   if (sent && sent.real) return '季前資料：已寄出（' + sent.real.date + '，' + modeText(sent.real.mode) + '）';
   const suggest = generateDate ? shiftDateString_(generateDate, -Math.max(0, Number(daysBefore) || 0)) : '';
   if (sent) {
+    // 第九十七輪批次 XD 組（Ivan 要求）：模擬寄出那一行不再寫「；正式使用時建議 … 寄出」
     return '季前資料：模擬寄出（' + sent.date + '，' + modeText(sent.mode) + '）'
-      + (suggest ? '；正式使用時建議 ' + suggest + ' 寄出' : '；這一季沒有生成日期，不會自動寄出');
+      + (suggest ? '' : '；這一季沒有生成日期，不會自動寄出');
   }
   if (!generateDate) return '季前資料：未寄（這一季沒有生成日期，不會自動寄出）';
   return '季前資料：建議 ' + suggest + ' 寄出（未寄）';

@@ -83,6 +83,34 @@ function getOrCreateRosterSubfolder_(quarterId, versionNo) {
 }
 
 /**
+ * 第九十七輪批次 XB 組：攞（冇就建）某一季嘅資料夾（`RosterPDF/2027T1`，版本資料夾嘅上一層）。
+ * 同 `getOrCreateRosterSubfolder_()` 一樣用鎖包住「查有冇 → 冇就建」，亦驗一次喺 Shared Drive 入面。
+ * @param {string} quarterId 季度 ID
+ * @returns {Folder}
+ */
+function getOrCreateQuarterPdfFolder_(quarterId) {
+  const root = resolveMailAttachmentFolder_();
+  const quarterName = String(quarterId || '').trim();
+  if (!quarterName) throw new Error('getOrCreateQuarterPdfFolder_ 需要 quarterId。');
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(PDF_FOLDER_LOCK_WAIT_MS);
+  } catch (err) {
+    throw new Error('現在有另一個動作正在建立 PDF 資料夾，請等一分鐘再試一次。'
+      + '（如果一直失敗，代表上一個動作可能未正常結束。）');
+  }
+  try {
+    const quarterFolder = findOrCreateChildFolder_(root, quarterName);
+    if (isPersonalMyDriveFolder_(quarterFolder)) {
+      throw new Error('PDF 季度資料夾「' + quarterName + '」不在 Shared Drive 裏面。請檢查有沒有人手動搬過資料夾。');
+    }
+    return quarterFolder;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
  * 喺一個資料夾下面搵（冇就建）指定名嘅子資料夾。
  *
  * ⚠️ 呢個函式**唔自己攞鎖**——一定要由已經攞咗鎖嘅呼叫端叫

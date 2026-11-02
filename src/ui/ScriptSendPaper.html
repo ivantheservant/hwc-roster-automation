@@ -360,6 +360,9 @@
     });
   }
 
+  /** 第九十七輪批次 XC 組：〔給所有人〕〔變動的人〕「附 .ics 日曆檔」旁的說明。 */
+  const ICS_FINAL_ONLY_TEXT = '只在定稿寄出時附上；請確認這一版是最後定稿。';
+
   /**
    * 第八十二輪批次 IG 組：〔寄給堂委／執事〕——堂委＋執事＋IT＋幹事＋固定收件人＋你自己，後端算；
    * 寄出窗只顯示摘要，冇〔選擇收件人〕。
@@ -631,6 +634,10 @@
       text: '只包括收件人自己的服侍日期及時間；改動後重發時，已取消的服侍亦會包括在內。',
       className: 'muted'
     }));
+    // 第九十七輪批次 XC 組：〔給所有人〕〔變動的人〕——日曆檔只在定稿寄出時附上（只是提示，不改行為）
+    if (sendMode_ === 'ALL' || sendMode_ === 'CHANGED') {
+      icsBox.appendChild(make('div', { text: ICS_FINAL_ONLY_TEXT, className: 'muted' }));
+    }
     nodes.push(icsBox);
 
     // ⚠️ 個人版 PDF 同 .ics 都只對「這一季有服侍的人」有意義。

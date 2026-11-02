@@ -107,8 +107,9 @@ console.log('\n=== MA3：狀態句 ===');
   const sc = scene(); const g = sc.gas;
   check('★★★★★ 未寄：建議 2098-12-06 寄出（未寄）', g.readPreseasonStatusText_(sc.Q) === '季前資料：建議 2098-12-06 寄出（未寄）');
   audit(g, sc, 'MANUAL|2098-12-08|DRY_RUN', '模擬 4 封');
-  check('★★★★★★ 只有模擬 ⇒ 模擬寄出（日期，人手）；正式使用時建議 2098-12-06 寄出',
-    g.readPreseasonStatusText_(sc.Q) === '季前資料：模擬寄出（2098-12-08，人手）；正式使用時建議 2098-12-06 寄出', g.readPreseasonStatusText_(sc.Q));
+  // 第九十七輪批次 XD 組（刻意改動）：不再寫「；正式使用時建議 … 寄出」
+  check('★★★★★★ 只有模擬 ⇒ 模擬寄出（日期，人手）',
+    g.readPreseasonStatusText_(sc.Q) === '季前資料：模擬寄出（2098-12-08，人手）', g.readPreseasonStatusText_(sc.Q));
   audit(g, sc, 'AUTO|2098-12-09|SENT', '寄出 4 封');
   check('★★★★★★ 有真正寄出 ⇒ 已寄出（日期，自動）', g.readPreseasonStatusText_(sc.Q) === '季前資料：已寄出（2098-12-09，自動）', g.readPreseasonStatusText_(sc.Q));
   const d = g.describePreseasonStatus_({ date: '2098-12-08', mode: 'AUTO', simulated: true, real: null }, '', 14);

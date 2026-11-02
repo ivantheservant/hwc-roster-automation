@@ -124,6 +124,7 @@ function buildDeclaredIdentifierAllowlist(files) {
 const SAFE_LONG_TOKEN_PATTERNS = [
   /^\d{4}T\d-v\d+(-[A-Z]+)*-\d{14}$/, // 例：2026T4-v9-OFFICIAL-20260813171850
   /^\d{4}T\d-P\d+-\d{4}-\d{2}-\d{2}-[A-Z]+-\d+$/, // ICS UID（buildIcsUid_ 組法）例：2027T1-P010-2027-01-10-CHAIR-1
+  /^openxmlformats-officedocument$/, // 第九十七輪批次 XB 組：Office Open XML（.docx）標準 MIME／命名空間的一段
 ];
 
 function isDeclaredOrSafe(token, allowlist) {
