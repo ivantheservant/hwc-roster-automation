@@ -148,24 +148,37 @@ function upsertCellDecisions_(quarterId, items, timezone) {
 function apiSetCellDecisions(quarterId, items) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('記住你的決定', function () {
-    const q = String(quarterId || '').trim();
-    if (!q) throw new Error('無法記錄這一項決定：沒有季度。請按「重新整理」再試。');
-    const list = (Array.isArray(items) ? items : []).map(normalizeCellDecisionItem_);
-    if (list.length === 0) return { ok: true, written: 0 };
-    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-    const written = upsertCellDecisions_(q, list, timezone);
-    writeAuditLog_({
-      action: 'CELL_DECISIONS_SET',
-      targetSheet: SHEETS.CELL_DECISIONS,
-      targetKey: q,
-      newValue: list.map(function (it) {
-        return it.key + ' ' + it.kind + (it.checked ? '＝勾' : '＝取消') + (it.cellText ? '（' + it.cellText + '）' : '');
-      }).join('；'),
-      source: 'apiSetCellDecisions',
-      notes: '幹事逐格決定（保留我的安排／這一季臨時幫手）'
-    });
-    return { ok: true, written: written };
+    return { ok: true, written: recordCellDecisions_(quarterId, items, 'apiSetCellDecisions') };
   });
+}
+
+/**
+ * 第一百零四輪批次 PA 組：記錄一批逐格決定（正規化 → 寫入 → AuditLog）。**呼叫者要已經拿着鎖。**
+ * `apiSetCellDecisions()`（〔檢查我的改動〕即時記住）同〔儲存〕確認窗（`apiSaveAndConfirmExecute()`
+ * 連同儲存請求一次過送嚟）共用呢一支，唔會有兩套寫法。
+ * @param {string} quarterId 季度 ID
+ * @param {Object[]} items 每項 {serviceDate, postId, slotIndex, kind, cellText, ruleId, checked}
+ * @param {string} source AuditLog 來源
+ * @returns {number} 寫咗幾多行
+ */
+function recordCellDecisions_(quarterId, items, source) {
+  const q = String(quarterId || '').trim();
+  if (!q) throw new Error('無法記錄這一項決定：沒有季度。請按「重新整理」再試。');
+  const list = (Array.isArray(items) ? items : []).map(normalizeCellDecisionItem_);
+  if (list.length === 0) return 0;
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const written = upsertCellDecisions_(q, list, timezone);
+  writeAuditLog_({
+    action: 'CELL_DECISIONS_SET',
+    targetSheet: SHEETS.CELL_DECISIONS,
+    targetKey: q,
+    newValue: list.map(function (it) {
+      return it.key + ' ' + it.kind + (it.checked ? '＝勾' : '＝取消') + (it.cellText ? '（' + it.cellText + '）' : '');
+    }).join('；'),
+    source: source,
+    notes: '幹事逐格決定（保留我的安排／這一季臨時幫手）'
+  });
+  return written;
 }
 
 /**

@@ -6189,8 +6189,9 @@ const MUTATIONS = [
     id: "cf-check-all-no-ask",
     why: "〔全部勾選〕唔先問一句",
     file: "src/ui/Script.html",
-    find: "      nodes.push(row([button('全部勾選', () => { confirmBox.hidden = false; }, 'secondary')]));",
-    replace: "      nodes.push(row([button('全部勾選', () => { boxes.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; }); changed(); }, 'secondary')]));",
+    // 第一百零四輪批次 PA 組：〔全部勾選〕改為頂部、底部兩粒（buildCheckAll），find 跟住改
+    find: "        } else {\n          confirmBox.hidden = false;\n        }",
+    replace: "        } else {\n          setMany(boxes.filter((b) => !b.cb.checked), true);\n        }",
     tests: ["tests/round75_cfg_ui.test.js"]
   },
   {
@@ -7574,9 +7575,10 @@ const MUTATIONS = [
     id: "ia-no-queue",
     why: "唔排隊，連續勾會互相撞",
     file: "src/ui/Script.html",
-    find: "    const run = decisionQueue_.then(() => writeDecisionsWithRetry(payloads, onWaiting));",
-    replace: "    const run = writeDecisionsWithRetry(payloads, onWaiting);",
-    tests: ["tests/round82_ia_decision_retry.test.js"]
+    // 第一百零四輪批次 PA 組：排緊隊嘅合併成一批（decisionPending_），排隊本身仍然靠 decisionQueue_
+    find: "    decisionQueue_ = decisionQueue_.then(async () => {",
+    replace: "    decisionQueue_ = Promise.resolve().then(async () => {",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
   },
   {
     id: "ia-no-revert",
@@ -13081,6 +13083,86 @@ const MUTATIONS = [
     find: "const ROSTER_OUTPUT_COUNTS_FONT_SIZE = 14;",
     replace: "const ROSTER_OUTPUT_COUNTS_FONT_SIZE = 11;",
     tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "pa-no-send-decisions",
+    why: "〔儲存〕冇連同確認窗的決定一次過送",
+    file: "src/ui/ScriptZone1.html",
+    find: "        cellDecisions: cellDecisions || []",
+    replace: "        cellDecisions: []",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-not-deferred",
+    why: "確認窗照舊每勾一格即時寫（會排長隊、撞鎖）",
+    file: "src/ui/ScriptZone1.html",
+    find: "        deferred: true,\n",
+    replace: "        deferred: false,\n",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-backend-no-record",
+    why: "後端冇喺同一個鎖之內先記錄決定",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "    recordCellDecisions_(quarterId, input.cellDecisions, 'apiSaveAndConfirmExecute');",
+    replace: "    void input.cellDecisions;",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-deferred-sends",
+    why: "deferred 都照樣即時呼叫伺服器",
+    file: "src/ui/Script.html",
+    find: "        if (deferred) { note.textContent = ''; return; }",
+    replace: "        if (false) { note.textContent = ''; return; }",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-no-coalesce",
+    why: "排緊隊的決定冇合併，連續勾 40 格叫 40 次",
+    file: "src/ui/Script.html",
+    find: "      const batch = decisionPending_;\n      decisionPending_ = [];",
+    replace: "      const batch = decisionPending_.splice(0, 1);",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-no-top-check-all",
+    why: "〔全部勾選〕只喺清單最底",
+    file: "src/ui/Script.html",
+    find: "      buildCheckAll().reverse().forEach((n) => nodes.unshift(n));\n",
+    replace: "",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-no-uncheck-all",
+    why: "全部已勾都唔可以〔全部取消〕",
+    file: "src/ui/Script.html",
+    find: "        if (boxes.every((b) => b.cb.checked)) {\n          confirmBox.hidden = true;",
+    replace: "        if (false) {\n          confirmBox.hidden = true;",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-no-saved-note",
+    why: "記住之後冇講「已記錄」",
+    file: "src/ui/Script.html",
+    find: "          note.textContent = '　已記錄';",
+    replace: "          note.textContent = '';",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-esc-closes-select",
+    why: "下拉選單按 Esc 連整個窗一齊關",
+    file: "src/ui/Script.html",
+    find: "    if (tag === 'SELECT' || tag === 'TEXTAREA') return false;",
+    replace: "    if (tag === 'TEXTAREA') return false;",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-boot-esc-raw",
+    why: "Esc 處理冇經 escClosesModal()",
+    file: "src/ui/ScriptBoot.html",
+    find: "if (e.key === 'Escape' && modalOpen && escClosesModal(e)) closeModal();",
+    replace: "if (e.key === 'Escape' && modalOpen) closeModal();",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
   }
 ];
 

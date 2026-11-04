@@ -595,7 +595,8 @@ function buildSaveConfirmProposals_(context, resolved, allViolations) {
  * `writeAssignments_()` → `registerVersion_()` → 前進 Stage → 發佈公開連結。
  *
  * @param {string} quarterId 季度 ID
- * @param {Object} payload `{decisions, confirmedRequestRows, releaseText}`
+ * @param {Object} payload `{decisions, confirmedRequestRows, releaseText, cellDecisions}`
+ *   cellDecisions：第一百零四輪批次 PA 組——確認窗內勾選／取消的逐格決定（同 `apiSetCellDecisions()` 同一個形狀）
  * @returns {Object} 三種結果可以分辨：完全成功／版本成功但發佈失敗／完全失敗
  */
 /**
@@ -656,6 +657,14 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   const input = payload || {};
   // 第八十三輪批次 JG 組：各階段計時（log ＋ 回傳 `timings`，前端寫入 console）
   const timer = startPhaseTimer_();
+
+  // ── 0　第一百零四輪批次 PA 組：確認窗嘅逐格決定（保留我的安排／這一季臨時幫手）連同儲存請求一次過送嚟，
+  //       喺**同一個鎖之內**先記錄、再重新 plan——唔再靠每勾一格即時寫（連續快速勾會排長隊，
+  //       幹事撳〔儲存〕嗰陣大部分仲未寫入，就會被當成「未決定」；儲存期間嘅勾選亦會撞鎖）。
+  if (Array.isArray(input.cellDecisions) && input.cellDecisions.length > 0) {
+    recordCellDecisions_(quarterId, input.cellDecisions, 'apiSaveAndConfirmExecute');
+    timer.mark('記錄逐格決定');
+  }
 
   // ── 1　後端重新讀 Stage 同最新版本號，唔信前端 ────────────────
   // ── 2　重新跑一次 plan，比對前端送嚟嘅決定係咪仲對應同一批格 ──

@@ -488,6 +488,23 @@
     }
   }
 
+  /**
+   * 第一百零四輪批次 PA 組：Esc 應唔應該關閉彈窗。焦點喺下拉選單、輸入框、多行輸入框 ⇒ 唔關
+   * （Esc 只係收起那個下拉；之前會連整個確認窗一齊關，幹事要由頭再做）。勾選框、按鈕照舊關窗。
+   * @param {KeyboardEvent} e
+   * @returns {boolean}
+   */
+  function escClosesModal(e) {
+    const t = e && e.target;
+    const tag = t && t.tagName ? String(t.tagName).toUpperCase() : '';
+    if (tag === 'SELECT' || tag === 'TEXTAREA') return false;
+    if (tag === 'INPUT') {
+      const type = String(t.type || 'text').toLowerCase();
+      return ['checkbox', 'radio', 'button', 'submit', 'reset'].indexOf(type) !== -1;
+    }
+    return true;
+  }
+
   /** 唯讀呼叫。唔喺白名單就即刻拒絕——呢個係一個程式錯誤，唔係使用者錯。 */
   function callServer(fnName, ...args) {
     if (READ_ONLY_APIS.indexOf(fnName) === -1) {
@@ -2174,14 +2191,48 @@
   }
 
   /**
-   * 即時記住一批決定（排隊：上一批寫完先寫下一批）。
+   * 第一百零四輪批次 PA 組：排緊隊、未送出嘅決定（同一格後勾嘅蓋過先勾嘅）。
+   * 上一批寫緊嗰陣再勾嘅格**合併成下一批一次過送**——連續快速勾 40 格最多兩、三次呼叫，
+   * 唔會再排 40 個逐個等（每個幾秒），令「記錄中……」停好耐。
+   */
+  let decisionPending_ = [];   // [{payload, resolvers: [function(Object)]}]
+
+  /** 一項決定嘅唯一鍵（同一格同一種決定）。 */
+  function decisionPayloadKey(p) {
+    return [p.serviceDate, p.postId, p.slotIndex, p.kind, p.ruleId || ''].join('§');
+  }
+
+  /** 把一項決定放入下一批；同一格已經排緊 ⇒ 用新嘅蓋過，兩邊都等同一個結果。 */
+  function enqueueDecision(payload) {
+    return new Promise((resolve) => {
+      const key = decisionPayloadKey(payload);
+      const same = decisionPending_.filter((x) => decisionPayloadKey(x.payload) === key)[0];
+      if (same) {
+        same.payload = payload;
+        same.resolvers.push(resolve);
+      } else {
+        decisionPending_.push({ payload: payload, resolvers: [resolve] });
+      }
+    });
+  }
+
+  /**
+   * 即時記住一批決定（排隊：上一批寫完先寫下一批；排緊隊嘅會合併成一批）。
    * @param {Object[]} payloads `decisionPayload()` 嘅結果
    * @param {function()=} onWaiting 撞鎖等候中
    * @returns {Promise<boolean>} 記唔記得到
    */
   function persistDecisions(payloads, onWaiting) {
-    const run = decisionQueue_.then(() => writeDecisionsWithRetry(payloads, onWaiting));
-    decisionQueue_ = run.then(() => null, () => null);
+    const waits = payloads.map(enqueueDecision);
+    decisionQueue_ = decisionQueue_.then(async () => {
+      const batch = decisionPending_;
+      decisionPending_ = [];
+      if (batch.length === 0) return;   // 已經畀上一批合併送咗
+      const r = await writeDecisionsWithRetry(batch.map((x) => x.payload), onWaiting)
+        .catch((err) => ({ ok: false, err: err }));
+      batch.forEach((x) => x.resolvers.forEach((res) => res(r)));
+    }).then(() => null, () => null);
+    const run = Promise.all(waits).then((rs) => rs.filter((r) => !r.ok)[0] || { ok: true, err: null });
     return run.then((r) => {
       if (r.ok) return true;
       setStatus('記不住你的選擇：' + (r.err && r.err.message ? r.err.message : String(r.err))
@@ -2206,7 +2257,11 @@
     const state = {};   // key§kind → checked
     const boxes = [];   // {item, cb}
     const sk = (it) => it.key + '§' + it.kind + '§' + (it.ruleId || '');
-    const changed = () => { if (opts.onChanged) opts.onChanged(); };
+    // 第一百零四輪批次 PA 組：deferred ⇒ 勾選唔即時寫，由呼叫者（〔儲存〕確認窗）用 pendingPayloads() 連同儲存送出
+    const deferred = !!opts.deferred;
+    const toggles = [];   // 頂部、底部兩粒〔全部勾選〕／〔全部取消〕
+    const refreshToggles = () => toggles.forEach((t) => t());
+    const changed = () => { refreshToggles(); if (opts.onChanged) opts.onChanged(); };
 
     const checkLine = (it, labelText) => {
       const line = make('label', { className: 'check-row' });
@@ -2220,12 +2275,16 @@
         const want = cb.checked;
         state[sk(it)] = want;
         changed();
+        // 第一百零四輪批次 PA 組：〔儲存〕確認窗（deferred）——勾選只改畫面，按〔儲存〕先連同儲存一次過送
+        if (deferred) { note.textContent = ''; return; }
         note.textContent = '　記錄中……';
         note.className = 'decision-note';
         const ok = await persistDecisions([decisionPayload(it, want)],
           () => { note.textContent = '　記錄中……（另一個動作正在進行，系統會自動再試）'; });
+        if (cb.checked !== want) return;   // 等緊嗰陣又改咗——由後嗰次講結果
         if (ok) {
-          note.textContent = '';
+          note.textContent = '　已記錄';
+          note.className = 'decision-note muted';
         } else {
           cb.checked = !want; state[sk(it)] = !want; changed();
           note.textContent = '　這一格未能記錄，請再勾一次';
@@ -2306,7 +2365,27 @@
     }
 
     // 〔全部勾選〕：先彈一句確認（喺彈窗入面，唔會蓋走呢個畫面）
-    if (boxes.length > 0) {
+    // 第一百零四輪批次 PA 組：清單**最頂**再放一粒（底部嗰粒保留）；全部已勾 ⇒ 兩粒都變〔全部取消〕（唔使確認）
+    /** 一次過設定一批格；即時模式就送出（失敗還原），deferred 只改畫面。 */
+    const setMany = async (list, want) => {
+      list.forEach((b) => {
+        b.cb.checked = want; state[sk(b.item)] = want;
+        b.note.textContent = deferred ? '' : '　記錄中……';
+        b.note.className = 'decision-note';
+      });
+      changed();
+      if (deferred || list.length === 0) return;
+      const ok = await persistDecisions(list.map((b) => decisionPayload(b.item, want)));
+      list.forEach((b) => {
+        b.note.textContent = ok ? '　已記錄' : '　這一格未能記錄，請再勾一次';
+        b.note.className = ok ? 'decision-note muted' : 'decision-note err-text';
+      });
+      if (!ok) {
+        list.forEach((b) => { b.cb.checked = !want; state[sk(b.item)] = !want; });
+        changed();
+      }
+    };
+    const buildCheckAll = () => {
       const confirmBox = make('div', { className: 'warnbox' });
       confirmBox.hidden = true;
       confirmBox.appendChild(make('div', {
@@ -2315,24 +2394,32 @@
       confirmBox.appendChild(row([
         button('確定', async () => {
           confirmBox.hidden = true;
-          const todo = boxes.filter((b) => !b.cb.checked);
-          todo.forEach((b) => { b.cb.checked = true; state[sk(b.item)] = true; b.note.textContent = '　記錄中……'; });
-          changed();
-          const ok = await persistDecisions(todo.map((b) => decisionPayload(b.item, true)));
-          todo.forEach((b) => { b.note.textContent = ok ? '' : '　這一格未能記錄，請再勾一次'; });
-          if (!ok) {
-            todo.forEach((b) => { b.cb.checked = false; state[sk(b.item)] = false; });
-            changed();
-          }
+          await setMany(boxes.filter((b) => !b.cb.checked), true);
         }, ''),
         button('取消', () => { confirmBox.hidden = true; }, 'secondary')
       ]));
-      nodes.push(row([button('全部勾選', () => { confirmBox.hidden = false; }, 'secondary')]));
-      nodes.push(confirmBox);
+      const allBtn = button('全部勾選', () => {
+        if (boxes.every((b) => b.cb.checked)) {
+          confirmBox.hidden = true;
+          setMany(boxes.slice(), false);
+        } else {
+          confirmBox.hidden = false;
+        }
+      }, 'secondary');
+      toggles.push(() => { allBtn.textContent = boxes.every((b) => b.cb.checked) ? '全部取消' : '全部勾選'; });
+      return [row([allBtn]), confirmBox];
+    };
+    if (boxes.length > 0) {
+      buildCheckAll().reverse().forEach((n) => nodes.unshift(n));
+      buildCheckAll().forEach((n) => nodes.push(n));
+      refreshToggles();
     }
 
     return {
       nodes: nodes,
+      /** 第一百零四輪批次 PA 組：同打開時唔同嘅決定（deferred 用：連同〔儲存〕一次過送）。 */
+      pendingPayloads: () => boxes.filter((b) => !!b.cb.checked !== !!b.item.checked)
+        .map((b) => decisionPayload(b.item, b.cb.checked)),
       allDecided: () => names.every((u) => state[sk(u)] === true)
         && rules.every((v) => !v.mustFollow || v.released || state[sk(v)] === true)
     };

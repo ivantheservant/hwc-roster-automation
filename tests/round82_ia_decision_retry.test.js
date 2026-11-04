@@ -5,7 +5,8 @@
 //
 //   IA1　撞鎖兩次再成功 ⇒ 自動再試、記住；狀態寫「記住中……」，完成後清走
 //   IA2　一直撞鎖 ⇒ 試到上限（約 30 秒）就停；勾選框還原成未勾；嗰一行寫「這一格未記住，請再勾一次」
-//   IA3　連續快速勾三格 ⇒ 排隊逐個寫（同一時間只有一個呼叫），三格都記住
+//   IA3　連續快速勾三格 ⇒ 排隊（同一時間只有一個呼叫），三格都記住
+//        （第一百零四輪批次 PA 組刻意改動：排緊隊嘅合併成一批送，唔再逐格一次呼叫）
 //   IA4　唔係撞鎖嘅錯誤 ⇒ 唔等、即刻還原
 
 const { loadUiScripts } = require('./helpers/ui_loader.js');
@@ -103,10 +104,10 @@ function linesOf(sections) {
     const ps = cbs.map((cb) => { cb.checked = true; return cb.fire('change'); });
     await Promise.all(ps); await flush();
     check('★★★★★★ 同一時間只有一個呼叫（排隊）', log.maxActive === 1, log.maxActive);
-    const keys = log.calls.map((c) => c.payloads[0].serviceDate);
-    check('★★★★★★ 三格都寫入（第一格撞鎖再試一次）', ['2099-01-01', '2099-01-02', '2099-01-03'].every((d) => keys.indexOf(d) !== -1)
-      && log.calls.length === 4, JSON.stringify(keys));
-    check('★★★★★ 次序：第一格寫完先到第二、三格', keys.join(',') === '2099-01-01,2099-01-01,2099-01-02,2099-01-03', keys.join(','));
+    const last = log.calls[log.calls.length - 1].payloads.map((p) => p.serviceDate);
+    check('★★★★★★ 三格合併成一批寫入（撞鎖再試一次 ⇒ 一共 2 次呼叫）', ['2099-01-01', '2099-01-02', '2099-01-03'].every((d) => last.indexOf(d) !== -1)
+      && log.calls.length === 2, JSON.stringify(log.calls.map((c) => c.payloads.length)));
+    check('★★★★★ 兩次呼叫都係同一批三格', log.calls.every((c) => c.payloads.length === 3), JSON.stringify(log.calls.map((c) => c.payloads.length)));
     check('★★★★★ 三格保持已勾', cbs.every((cb) => cb.checked === true));
   }
 

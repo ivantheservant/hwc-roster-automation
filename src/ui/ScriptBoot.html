@@ -51,8 +51,9 @@
   el('modalBackdrop').addEventListener('click', (e) => {
     if (e.target === el('modalBackdrop')) closeModal();
   });
+  // 第一百零四輪批次 PA 組：喺下拉選單或輸入框按 Esc ⇒ 只關閉那個下拉（瀏覽器自己處理），唔關閉整個窗
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modalOpen) closeModal();
+    if (e.key === 'Escape' && modalOpen && escClosesModal(e)) closeModal();
   });
 
   initFontSizePicker();
