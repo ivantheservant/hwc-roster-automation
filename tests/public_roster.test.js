@@ -311,18 +311,22 @@ console.log('\n=== A3【核心】檔案 ID 一定要保留，唔可以刪檔重�
 
 console.log('\n=== A3：覆寫內容唔可以刪除／重建檔案本身 ===');
 {
+  // 第一百零二輪批次 OA 組（刻意改動）：寫入交俾共用輸出版面 writeRosterOutputToSpreadsheet_()（RosterOutput.gs）。
   const start = publicRosterSource.indexOf('function writePublicRosterContent_');
   const end = publicRosterSource.indexOf('\n}', start);
   const body = publicRosterSource.slice(start, end);
+  const outSrc = fs.readFileSync(path.join(SRC, 'RosterOutput.gs'), 'utf8');
+  const wsStart = outSrc.indexOf('function writeRosterOutputToSpreadsheet_');
+  const wsBody = outSrc.slice(wsStart, outSrc.indexOf('\n}', wsStart));
 
   check('★★ 只完全還原並清空既有分頁內容（resetSheetToBlankSlate_），'
     + '冇任何刪除整個檔案嘅呼叫（第十三輪批次改用共用還原 helper，唔再係直接 .clear()）',
-    body.indexOf('resetSheetToBlankSlate_(sheet)') !== -1
-      && body.indexOf('DriveApp.getFileById') === -1
-      && body.indexOf('setTrashed') === -1);
-  check('★ 有處理「幹事手動加咗第二張分頁」嘅情況（刪走多餘分頁，確保連結'
-    + '打開永遠淨係一張乾淨嘅職事表）',
-    body.indexOf('deleteSheet') !== -1);
+    /writeRosterOutputToSpreadsheet_\(spreadsheet, content\)/.test(body)
+      && wsBody.indexOf('resetSheetToBlankSlate_(rosterSheet)') !== -1
+      && (body + wsBody).indexOf('DriveApp.getFileById') === -1
+      && (body + wsBody).indexOf('setTrashed') === -1);
+  check('★ 有處理「幹事手動加咗第二張分頁」嘅情況（刪走「職事表」「服侍次數」以外嘅分頁）',
+    wsBody.indexOf('deleteSheet') !== -1);
 }
 
 console.log('\n=== A2：內容建構函式唔可以直接接觸敏感欄位 ===');
@@ -344,35 +348,31 @@ console.log('\n=== A2：內容建構函式唔可以直接接觸敏感欄位 ==='
       '公開檔案內容組建函式唔應該直接接觸呢個欄位／功能');
   });
 
-  check('★ 回傳嘅內容只有職事表格（轉置後嘅 dateColumns/monthGroups/postRows）、圖例、更新時間',
-    /dateColumns:\s*transposed\.dateColumns/.test(body)
-      && /monthGroups:\s*transposed\.monthGroups/.test(body)
-      && /postRows:\s*transposed\.postRows/.test(body)
-      && /legendRows:/.test(body)
-      && /updatedAt:\s*nowTimestamp_\(\)/.test(body));
+  // 第一百零二輪批次 OA 組（刻意改動）：內容＝共用輸出版面（沒有圖例；內容本身由
+  // tests/round102_oa_roster_output.test.js 逐格驗：沒有狀態字、沒有 PersonID）
+  check('★ 回傳嘅內容係共用輸出版面（buildRosterOutputForVersion_），另加發佈時間',
+    /buildRosterOutputForVersion_\(quarterId, versionNo\)/.test(body)
+      && /publishedAt = nowTimestamp_\(\)/.test(body) && !/legendRows/.test(body));
 }
 
-console.log('\n=== A2／A3：寫入公開試算表時凍結首欄／首 3 行、日期欄有固定夠闊嘅欄闊（姓名唔會被截斷）===');
+console.log('\n=== A2／A3：寫入公開試算表時凍結首 3 行、日期欄有固定夠闊嘅欄闊（姓名唔會被截斷）===');
 {
-  const start = publicRosterSource.indexOf('function writePublicRosterContent_');
-  const end = publicRosterSource.indexOf('\nfunction publishPublicRoster_', start);
-  const body = publicRosterSource.slice(start, end);
-
-  check('★★ 凍結首欄（崗位），橫向捲動時崗位名稱一直睇得到', /setFrozenColumns\(1\)/.test(body));
-  check('★★ 凍結首 3 行（標題／月份／日期），縱向捲動時日期標題一直睇得到', /setFrozenRows\(3\)/.test(body));
-  check('★★ 月份標題有 merge 橫跨該月嘅日期欄', /content\.monthGroups\.forEach/.test(body) && /\.merge\(\)/.test(body));
-  check('★★ 多 slot 崗位嘅名稱欄有垂直 merge', /pr\.slotCount > 1/.test(body) && /getRange\(dataStartRow \+ i, 1, pr\.slotCount, 1\)\.merge\(\)/.test(body));
-
+  const outSrc = fs.readFileSync(path.join(SRC, 'RosterOutput.gs'), 'utf8');
+  // 第一百零二輪批次 OA 組（刻意改動）：崗位欄**不凍結**——凍結欄會截斷 A1 標題向右溢出的文字
+  //（「粵語堂 2028 年 7-9 月職事表」）。
+  check('★★ 凍結首 3 行（標題／月份／日期），崗位欄不凍結', /frozenRows: 3, frozenColumns: 0/.test(outSrc));
+  check('★★ 月份標題有 merge 橫跨該月嘅日期欄', /merges\.push\(\{ row: 2, col: col, numRows: 1, numCols: g\.span \}\)/.test(outSrc));
+  check('★★ 多 slot 崗位嘅名稱欄有垂直 merge', /merges\.push\(\{ row: r - slotCount, col: 1, numRows: slotCount, numCols: 1 \}\)/.test(outSrc));
   check('★★★ 日期欄用固定欄闊（唔淨係 autoResizeColumns），確保換版本／換人都唔會截斷姓名',
-    /setColumnWidth\(c, PUBLIC_ROSTER_DATE_COLUMN_WIDTH\)/.test(body));
+    /columnWidths\.push\(ROSTER_OUTPUT_DATE_COL_WIDTH\)/.test(outSrc) && /sheet\.setColumnWidth\(i \+ 1, w\)/.test(outSrc));
 }
 
 console.log('\n=== A2：日期欄固定欄闊要夠容納 6 字中文姓名 ===');
 {
-  // 粗略估算：Google 試算表預設字型一個中文字約 13-15px，6 字加少少邊界
-  // 至少要 110px 先夠，呢度用 120 做保守下限（實際設定係 130）。
-  check('★★ PUBLIC_ROSTER_DATE_COLUMN_WIDTH 至少 120px（容得下 6 字中文姓名，例如「黃余麗貞師母」）',
-    gas.PUBLIC_ROSTER_DATE_COLUMN_WIDTH >= 120, '實際值：' + gas.PUBLIC_ROSTER_DATE_COLUMN_WIDTH);
+  // 第一百零二輪：內容 11pt（一個中文字約 15px），6 字＋邊界約 96px。
+  const g2 = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'RosterOutput.gs']);
+  check('★★ ROSTER_OUTPUT_DATE_COL_WIDTH 至少 100px（容得下 6 字中文姓名，例如「黃余麗貞師母」）',
+    g2.ROSTER_OUTPUT_DATE_COL_WIDTH >= 100, '實際值：' + g2.ROSTER_OUTPUT_DATE_COL_WIDTH);
 }
 
 console.log('\n=== A4：範本 placeholder 一致性（同 A4 相關的 4 個範本）===');

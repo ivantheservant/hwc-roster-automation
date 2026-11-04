@@ -12,19 +12,24 @@ function exportRosterPdf_(quarterId, versionNo) {
 
 /**
  * 產生整季完整版職事表 PDF 的 blob，不寫入 Drive。
+ *
+ * 第一百零二輪批次 OB 組：**改用共用輸出版面**（`RosterOutput.gs`），不再由 `Roster_*`
+ * 工作表匯出——那張是幹事的工作區（有「待確認」「—」、圖例、PersonID 統計），
+ * 寄出的版本要和以前人手做的一樣。第 1 頁職事表、第 2 頁本季服侍次數。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
- * @returns {{blob: Blob, fileName: string}} PDF 內容與檔名
+ * @returns {{blob: Blob, fileName: string, retries: number}} PDF 內容與檔名
  */
 function buildFullRosterPdfBlob_(quarterId, versionNo) {
-  const sheetName = buildRosterSheetName_(quarterId, versionNo);
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) throw new Error('找不到工作表: ' + sheetName);
-
   const fileName = buildAttachmentName_(quarterId, versionNo, GRID_LABELS.FULL_VERSION);
-  // 第四十一輪批次 F 組：只印職事表本身（見 `resolveRosterOnlyExportOpts_()`）。
-  const exported = exportSheetAsPdfBlob_(sheet, fileName, resolveRosterOnlyExportOpts_(sheet));
-  return { blob: exported.blob, fileName: fileName, retries: exported.retries };
+  // 整季版不標示任何人（沒有傳 opts ＝ 不標示）
+  const ctx = openRosterOutputPdfContext_(quarterId, versionNo);
+  try {
+    const exported = exportRosterOutputPdfBlob_(ctx, fileName);
+    return { blob: exported.blob, fileName: fileName, retries: exported.retries };
+  } finally {
+    ctx.close();
+  }
 }
 
 /**
@@ -45,26 +50,22 @@ function exportPersonalPdf_(quarterId, versionNo, personId) {
 }
 
 /**
- * 產生個人版職事表 PDF 的 blob，不寫入 Drive：先複製一份 grid 工作表，
- * 把該人的格加上底色，匯出後刪除暫存工作表。是否加底色由 Config 的
- * ATTACH_HIGHLIGHT_PERSONAL 決定。供 exportPersonalPdf_()（選單）與
- * generateMailAttachment_()（電郵附件）共用，避免重複實作 highlight／匯出邏輯。
+ * 產生個人版職事表 PDF 的 blob，不寫入 Drive。
+ *
+ * 第一百零二輪批次 OB 組：**改用共用輸出版面**（`RosterOutput.gs`）——和整季版同一個版面，
+ * 只是那個人的格改用粗體、深紅字、粗框（`ROSTER_OUTPUT_HIGHLIGHT_STYLE`）。
+ * 是否標示仍然由 Config 的 `ATTACH_HIGHLIGHT_PERSONAL` 決定。
+ * 格的位置由 `RosterAssignments`（這一版的 PersonID）定位；臨時幫手（`NAME:名字`）按名字。
+ *
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
- * @param {string} personId 對象的 PersonID
- * @param {Object[]=} versionAssignments 選填，已篩到這個 quarterId／versionNo 的
- *   RosterAssignments 原始列，原封不動轉傳給 locatePersonCells_()。批次產生多人 PDF
- *   時（見 PdfBatch.gs 的 generatePersonalPdfBatch_()）由外層讀一次、所有人共用，
- *   避免每人各自重讀一次整份 RosterAssignments。不傳時完全比照原本行為。
+ * @param {string} personId 對象的 PersonID（或臨時幫手 `NAME:名字`）
+ * @param {Object[]=} versionAssignments 舊參數（批次呼叫端仍然會傳），新版面不需要
+ * @param {Object=} renderContext `openPersonalPdfRenderContext_()` 的結果；不傳就自己開一個、用完即關
  * @returns {{blob: Blob, fileName: string, highlighted: number, personName: string,
- *   retries: number, highlightMs: number, exportMs: number}} PDF 內容與相關資訊，
- *   highlightMs／exportMs 分開量度「定位＋複製工作表＋上色＋flush」與「呼叫匯出」各花多少時間
+ *   retries: number, highlightMs: number, exportMs: number}}
  */
 function buildPersonalPdfBlob_(quarterId, versionNo, personId, versionAssignments, renderContext) {
-  // 沒有傳入共用 context 時（例如選單「匯出 PDF」單獨匯出一人），自己開一個、
-  // 用完即關，行為與階段 B 之前完全一致。批次產生多人時由呼叫端開一次共用，
-  // 避免每人各自複製與刪除一次工作表——那是實測最慢的一步，見
-  // openPersonalPdfRenderContext_() 的說明。
   const ownContext = !renderContext;
   const ctx = renderContext || openPersonalPdfRenderContext_(quarterId, versionNo);
 
@@ -73,41 +74,23 @@ function buildPersonalPdfBlob_(quarterId, versionNo, personId, versionAssignment
     const fileName = buildAttachmentName_(quarterId, versionNo, personName);
 
     const highlightStart = Date.now();
-
-    // 上色前先確認找得到格子，同時直接沿用這次定位的結果去上色，不必再定位第二次
-    // （原本這裡只做存在性檢查，實際上色時 highlightPersonCells_() 內部會重新呼叫
-    // 一次 locatePersonCells_()，等於同一個人定位兩次；在複製出來的 tempSheet 上定位
-    // 跟在原本的 sheet 上定位結果一致，因為 copyTo() 是當下內容的完整快照，而兩次定位
-    // 之間完全沒有任何程式碼寫入過原本的 sheet，所以在複製前先定位、把結果沿用到
-    // 複製後的 tempSheet，跟原本「複製後才定位」是等價的）
-    let located = null;
-    if (ctx.wantHighlight) {
-      located = locatePersonCells_(
-        ctx.sourceSheet, quarterId, versionNo, personId, versionAssignments, ctx.gridIndex);
-      if (located.matched.length === 0) {
-        throw new Error(
-          '在 ' + ctx.sheetName + ' 中找不到 ' + personName + '（' + personId + '）的任何一格。\n'
-            + '已掃描 ' + located.scanned + ' 格資料。\n'
-            + '請確認該人在這一版有被派工；可執行 debugPersonalHighlight_() 查看詳情。'
-        );
-      }
-    }
-
     let marked = 0;
     if (ctx.wantHighlight) {
-      marked = applyPersonHighlightToContext_(ctx, located.matched);
+      const cells = locateRosterOutputPersonCells_(ctx.model, personId);
+      if (cells.length === 0) {
+        throw new Error(
+          '在 ' + quarterId + ' v' + versionNo + ' 中找不到 ' + personName + '（' + personId + '）的任何一格。\n'
+            + '請確認該人在這一版有被派工。'
+        );
+      }
+      marked = applyRosterOutputHighlight_(ctx, cells);
     }
-    // 匯出走 UrlFetchApp 讀伺服器上的檔案，必須先把待寫入的格式提交，
-    // 否則匯出的會是未上色的版本（這是先前 highlight 完全沒生效的原因）
+    // 匯出走 UrlFetchApp 讀伺服器上的檔案，必須先把待寫入的格式提交，否則匯出的會是未標示的版本
     SpreadsheetApp.flush();
     const highlightMs = Date.now() - highlightStart;
 
     const exportStart = Date.now();
-    // 第四十一輪批次 F 組：個人版都一樣只印職事表本身。
-    // ⚠️ 用 `ctx.rosterOnlyOpts`（開 context 那一次算好），
-    // 不是每個人各自再掃一次第一欄——幾十個人就是幾十次讀表，
-    // 而那條路本來就已經接近執行上限。
-    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName, ctx.rosterOnlyOpts);
+    const exported = exportRosterOutputPdfBlob_(ctx, fileName);
     const exportMs = Date.now() - exportStart;
 
     return {
@@ -120,113 +103,17 @@ function buildPersonalPdfBlob_(quarterId, versionNo, personId, versionAssignment
 }
 
 /**
- * 階段 B 新增：開一個可以連續產生多人個人 PDF 的「渲染 context」。
+ * 開一個可以連續產生多人個人 PDF 的「渲染 context」（批次產生時整批只開一次）。
  *
- * 效能分析（階段 B）：實測 58 人約 15 分鐘、每人約 4 秒花在「highlight」這一段，
- * 而真正匯出只需約 0.8 秒。逐行追查後，慢的並不是 Ivan 提示的三個方向：
- * - `highlightPersonCells_()` 本來就已經是 `setBackgrounds()`／`setFontWeights()`
- *   批次寫入，不是逐格 `setBackground()`
- * - `locatePersonCells_()` 的 RosterAssignments 重讀，追加階段 E 已經用
- *   `versionAssignments` 解決
- * - `SpreadsheetApp.flush()` 每人一次是必需的（不 flush 匯出到的會是未上色的版本）
- *
- * 真正的瓶頸是**每個人都複製一次整張工作表再刪除一次**（`sheet.copyTo()` ＋
- * `ss.deleteSheet()`），加上每人各自把整個資料區的底色與字重**讀出來再寫回去**
- * （`getBackgrounds()`／`getFontWeights()`／`setBackgrounds()`／`setFontWeights()`
- * 各一次，13×24 = 312 格）。`copyTo()` 要複製全部值、格式、批註、欄寬，是 Sheets
- * 最慢的操作之一，58 人就是 58 次複製 ＋ 58 次刪除。
- *
- * 這個 context 把「複製工作表、隱藏機器鍵行、讀取格線索引、讀取底色與字重基準」
- * 全部改成**整批只做一次**，之後每個人只需要：寫底色、寫字重、flush、匯出。
- * 每人的寫入一律由「基準 ＋ 這個人的格」重新組成，所以上一個人的 highlight 會
- * 自動被覆蓋掉，不需要額外的還原步驟。
- *
- * 視覺效果完全不變：底色仍然是 `GRID_COLORS.PERSONAL_HIGHLIGHT`、字重仍然是 bold、
- * 其他格仍然保留原有底色（因為基準就是複製出來那一刻的實際底色）。
- *
+ * 第一百零二輪批次 OB 組：改用共用輸出版面——版面只寫一次（暫存試算表），
+ * 之後每個人只改那個人的格的字型及框線、flush、匯出。用完必須 `close()`（暫存檔移到垃圾桶）。
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
- * @returns {Object} context，用完必須呼叫 close() 刪除暫存工作表
+ * @returns {Object} context
  */
 function openPersonalPdfRenderContext_(quarterId, versionNo) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetName = buildRosterSheetName_(quarterId, versionNo);
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) throw new Error('找不到工作表: ' + sheetName);
-
   const wantHighlight = getConfig_(CONFIG_KEYS.ATTACH_HIGHLIGHT_PERSONAL, false) === true;
-  const gridIndex = wantHighlight ? buildGridIndex_(sheet) : null;
-
-  const tempSheet = sheet.copyTo(ss).setName(SHEET_PREFIXES.TEMP_PDF + 'batch_' + Date.now());
-  tempSheet.hideRows(2);
-
-  let dataRange = null;
-  let baseBackgrounds = null;
-  let baseWeights = null;
-  if (wantHighlight) {
-    const lastRow = tempSheet.getLastRow();
-    const lastCol = tempSheet.getLastColumn();
-    if (lastRow >= 3 && lastCol >= 1) {
-      dataRange = tempSheet.getRange(3, 1, lastRow - 2, lastCol);
-      baseBackgrounds = dataRange.getBackgrounds();
-      baseWeights = dataRange.getFontWeights();
-    }
-  }
-
-  return {
-    quarterId: quarterId,
-    versionNo: versionNo,
-    sheetName: sheetName,
-    sourceSheet: sheet,
-    tempSheet: tempSheet,
-    wantHighlight: wantHighlight,
-    gridIndex: gridIndex,
-    // 第四十一輪批次 F 組：整批只算一次，之後每個人共用。
-    rosterOnlyOpts: resolveRosterOnlyExportOpts_(tempSheet),
-    dataRange: dataRange,
-    baseBackgrounds: baseBackgrounds,
-    baseWeights: baseWeights,
-    close: function () {
-      try {
-        ss.deleteSheet(tempSheet);
-      } catch (err) {
-        log_('WARN', 'openPersonalPdfRenderContext_.close 刪除暫存工作表失敗：' + err.message);
-      }
-    }
-  };
-}
-
-/**
- * 階段 B 新增：把某一個人的格子套用到 context 的暫存工作表上。
- *
- * 每次都由「基準底色／字重」重新組成整個資料區再寫回去——所以上一個人的 highlight
- * 會被這一次覆蓋掉，不需要額外的還原步驟，也不會出現「上一個人的顏色殘留在這個人的
- * PDF 上」這種錯誤。基準本身是複製工作表那一刻的實際格式，所以其他格（例如灰色的
- * 待確認格）一律原樣保留，視覺效果與階段 B 之前完全一致。
- *
- * @param {Object} ctx openPersonalPdfRenderContext_() 的結果
- * @param {Object[]} matched locatePersonCells_() 回傳的 matched 陣列
- * @returns {number} 已標示的格數
- */
-function applyPersonHighlightToContext_(ctx, matched) {
-  if (!ctx.dataRange || matched.length === 0) return 0;
-
-  const backgrounds = ctx.baseBackgrounds.map(function (row) { return row.slice(); });
-  const weights = ctx.baseWeights.map(function (row) { return row.slice(); });
-
-  let applied = 0;
-  matched.forEach(function (cell) {
-    const r = cell.row - 3;
-    const c = cell.column - 1;
-    if (r < 0 || r >= backgrounds.length || c < 0 || c >= backgrounds[r].length) return;
-    backgrounds[r][c] = GRID_COLORS.PERSONAL_HIGHLIGHT;
-    weights[r][c] = 'bold';
-    applied++;
-  });
-
-  ctx.dataRange.setBackgrounds(backgrounds);
-  ctx.dataRange.setFontWeights(weights);
-  return applied;
+  return openRosterOutputPdfContext_(quarterId, versionNo, { wantHighlight: wantHighlight });
 }
 
 /**

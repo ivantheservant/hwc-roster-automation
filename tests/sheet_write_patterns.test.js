@@ -44,16 +44,23 @@ console.log('\n=== B【核心】全專案 .merge() 只出現喺 PublicRoster.gs�
 {
   const gsFiles = fs.readdirSync(SRC).filter(function (f) { return f.endsWith('.gs'); });
   const filesUsingMerge = gsFiles.filter(function (f) { return readSrc(f).indexOf('.merge()') !== -1; });
-  check('★★★ 全專案得 PublicRoster.gs 一個檔案用到 .merge()（風險集中喺單一位置，容易審核）',
-    filesUsingMerge.length === 1 && filesUsingMerge[0] === 'PublicRoster.gs',
+  // 第一百零二輪批次 OA 組（刻意改動）：合併搬去共用輸出版面 RosterOutput.gs（公開檔、PDF 共用），
+  // PublicRoster.gs 只係叫佢。仍然係全專案得一個檔案用到 .merge()。
+  check('★★★ 全專案得 RosterOutput.gs 一個檔案用到 .merge()（風險集中喺單一位置，容易審核）',
+    filesUsingMerge.length === 1 && filesUsingMerge[0] === 'RosterOutput.gs',
     '實際用到 .merge() 嘅檔案：' + filesUsingMerge.join('、'));
 
   const publicRosterSource = readSrc('PublicRoster.gs');
   const writeStart = publicRosterSource.indexOf('function writePublicRosterContent_');
   const writeEnd = publicRosterSource.indexOf('\nfunction ', writeStart + 1);
   const writeBody = publicRosterSource.slice(writeStart, writeEnd);
-  check('★★★ writePublicRosterContent_() 第一步就係 resetSheetToBlankSlate_()',
-    /resetSheetToBlankSlate_\(sheet\)/.test(writeBody));
+  const outSrc = readSrc('RosterOutput.gs');
+  const wsStart = outSrc.indexOf('function writeRosterOutputToSpreadsheet_');
+  const wsBody = outSrc.slice(wsStart, outSrc.indexOf('\nfunction ', wsStart + 1));
+  check('★★★ writePublicRosterContent_() 交俾 writeRosterOutputToSpreadsheet_()，而嗰支寫每張表之前都先 resetSheetToBlankSlate_()',
+    /writeRosterOutputToSpreadsheet_\(spreadsheet, content\)/.test(writeBody)
+      && /resetSheetToBlankSlate_\(rosterSheet\);\s*writeRosterOutputSheet_\(rosterSheet/.test(wsBody)
+      && /resetSheetToBlankSlate_\(countsSheet\);\s*writeRosterOutputSheet_\(countsSheet/.test(wsBody));
 
   const clearStart = publicRosterSource.indexOf('function clearPublicRosterOnQuarterReset_');
   const clearEnd = publicRosterSource.indexOf('\nfunction ', clearStart + 1);

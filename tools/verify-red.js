@@ -424,11 +424,11 @@ const MUTATIONS = [
   },
   {
     id: 'pdf-personal-not-cut',
-    why: '把個人版 PDF 還原成唔截'
-      + '——整季版冇圖例而個人版有，幹事會以為系統壞咗',
+    why: '個人版 PDF 不經共用版面（和整季版不同）'
+      + '——第一百零二輪：舊 find 已過期（不再由 Roster_* 工作表截住匯出），對準新位置，原意「兩條路一致」不變',
     file: 'src/PdfExport.gs',
-    find: '    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName, ctx.rosterOnlyOpts);',
-    replace: '    const exported = exportSheetAsPdfBlob_(ctx.tempSheet, fileName);',
+    find: '  return openRosterOutputPdfContext_(quarterId, versionNo, { wantHighlight: wantHighlight });',
+    replace: '  return openRosterOutputPdfContext_(quarterId, versionNo);',
     tests: ['tests/pdf_roster_only_and_widths.test.js']
   },
   {
@@ -12776,6 +12776,247 @@ const MUTATIONS = [
     find: "  .cell .status { font-size: 15px; margin-left: 6px; }",
     replace: "  .cell .status { font-size: 11px; margin-left: 6px; }",
     tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  // 第一百零二輪批次 OA／OB／OC 組：寄出／公開職事表共用版面
+  {
+    id: "oa-missing-not-yellow",
+    why: "未有人的格不是黃色",
+    file: "src/RosterOutput.gs",
+    find: "        bgs[ri][ci] = cell.kind === ROSTER_OUTPUT_CELL_KIND.MISSING\n          ? ROSTER_OUTPUT_MISSING_FILL : ROSTER_OUTPUT_MONTH_PALETTE[dc.paletteIndex].cell;",
+    replace: "        bgs[ri][ci] = ROSTER_OUTPUT_MONTH_PALETTE[dc.paletteIndex].cell;",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-pending-blank",
+    why: "講員未填（待確認）變成空白而不是黃色",
+    file: "src/RosterOutput.gs",
+    find: "    if (v === POST_EMPTY_DISPLAY.BLANK || v === POST_EMPTY_DISPLAY.NA) return { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '' };\n    return { kind: ROSTER_OUTPUT_CELL_KIND.MISSING, text: '' };",
+    replace: "    return { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '' };",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-blank-yellow",
+    why: "獻花／翻譯（BLANK）空白格變成黃色",
+    file: "src/RosterOutput.gs",
+    find: "    if (v === POST_EMPTY_DISPLAY.BLANK || v === POST_EMPTY_DISPLAY.NA) return { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '' };\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-na-dash",
+    why: "聖餐襄禮非首主日又寫「—」",
+    file: "src/RosterOutput.gs",
+    find: "  if (cls === GRID_CELL_CLASS.STRUCTURAL_NA) return { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '' };",
+    replace: "  if (cls === GRID_CELL_CLASS.STRUCTURAL_NA) return { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '—' };",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-owner-dropped",
+    why: "合堂由英語堂負責的格變成空白",
+    file: "src/RosterOutput.gs",
+    find: "    return owner ? { kind: ROSTER_OUTPUT_CELL_KIND.OWNER, text: owner } : { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '' };",
+    replace: "    return { kind: ROSTER_OUTPUT_CELL_KIND.BLANK, text: '' };",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-palette-by-month",
+    why: "顏色按月份而不是按季內第幾個月",
+    file: "src/RosterOutput.gs",
+    find: "paletteIndex: monthGroups.length % ROSTER_OUTPUT_MONTH_PALETTE.length };",
+    replace: "paletteIndex: (month - 1) % ROSTER_OUTPUT_MONTH_PALETTE.length };",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-order-ignored",
+    why: "不理 OutputOrder，用 DisplayOrder",
+    file: "src/RosterOutput.gs",
+    find: "    if (raw !== '' && raw !== null && raw !== undefined && !isNaN(Number(raw))) return Number(raw);",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-blank-order-zero",
+    why: "OutputOrder 留空當 0（排第一）而不是用 DisplayOrder",
+    file: "src/RosterOutput.gs",
+    find: "    return Number(post.displayOrder) || 0;\n  }\n  const idx",
+    replace: "    return 0;\n  }\n  const idx",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-seed-order-swap",
+    why: "種子次序錯（講員、翻譯對調）",
+    file: "src/RosterOutput.gs",
+    find: "  '主席', '報告', '講員', '翻譯', '讀經',",
+    replace: "  '主席', '報告', '翻譯', '講員', '讀經',",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-special-no-label",
+    why: "特別主日沒有括號標題",
+    file: "src/RosterOutput.gs",
+    find: "      label: String(Number(String(d).split('-')[2])) + (special ? '\\n(' + special + ')' : ''),",
+    replace: "      label: String(Number(String(d).split('-')[2])),",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-no-month-merge",
+    why: "月份沒有合併",
+    file: "src/RosterOutput.gs",
+    find: "    if (g.span > 1) merges.push({ row: 2, col: col, numRows: 1, numCols: g.span });\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-no-slot-merge",
+    why: "多人崗位名稱沒有合併",
+    file: "src/RosterOutput.gs",
+    find: "    if (slotCount > 1) merges.push({ row: r - slotCount, col: 1, numRows: slotCount, numCols: 1 });\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-no-footer",
+    why: "沒有頁腳",
+    file: "src/RosterOutput.gs",
+    find: "  values[footerRow - 1][0] = String(input.footerText || '');\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-counts-tc-first",
+    why: "服侍次數先列中文名",
+    file: "src/RosterOutput.gs",
+    find: "  return withEn.concat(tcOnly);",
+    replace: "  return tcOnly.concat(withEn);",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-counts-row-major",
+    why: "服侍次數橫排而不是直排",
+    file: "src/RosterOutput.gs",
+    find: "    values[i % perCol][Math.floor(i / perCol)] = formatServiceCountLine_(e);",
+    replace: "    values[Math.floor(i / 3)][i % 3] = formatServiceCountLine_(e);",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-counts-case",
+    why: "英文名排序分大小寫",
+    file: "src/RosterOutput.gs",
+    find: "    return cmp(String(a.nameEN).trim().toLowerCase(), String(b.nameEN).trim().toLowerCase()) || cmp(a.nameTC, b.nameTC);",
+    replace: "    return cmp(String(a.nameEN).trim(), String(b.nameEN).trim()) || cmp(a.nameTC, b.nameTC);",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-counts-temp",
+    why: "臨時幫手（沒有 PersonID）都計次數",
+    file: "src/RosterOutput.gs",
+    find: "    const id = String(a.personId || '').trim();\n    if (!id) return;\n",
+    replace: "    const id = String(a.personId || '').trim() || String(a.personName || '');\n    if (!id) return;\n",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-counts-ignored",
+    why: "ROSTER_OUTPUT_SHOW_COUNTS 關掉仍然有次數頁",
+    file: "src/RosterOutput.gs",
+    find: "  if (input.showCounts !== false) {",
+    replace: "  if (true) {",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-hl-no-reset",
+    why: "個人 highlight 上一個人的格不還原",
+    file: "src/RosterOutput.gs",
+    find: "    prev.setFontWeight('normal').setFontColor('#000000');\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-hl-default-yellow",
+    why: "個人 highlight 預設用黃色底",
+    file: "src/Constants.gs",
+    find: "  ROSTER_OUTPUT_HIGHLIGHT_STYLE: 'BOLD,#C00000,BORDER',\n",
+    replace: "  ROSTER_OUTPUT_HIGHLIGHT_STYLE: 'BOLD,BG:#FFFF00',\n",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-freeze-col",
+    why: "凍結崗位欄（標題被截斷）",
+    file: "src/RosterOutput.gs",
+    find: "    frozenRows: 3, frozenColumns: 0,",
+    replace: "    frozenRows: 3, frozenColumns: 1,",
+    tests: ["tests/round102_oa_roster_output.test.js","tests/public_roster_write.test.js"]
+  },
+  {
+    id: "oa-pdf-gid",
+    why: "PDF 只匯出第一張（沒有服侍次數頁）",
+    file: "src/RosterOutput.gs",
+    find: "    'format=pdf', 'size=A4', 'portrait=false', 'fitw=true',",
+    replace: "    'format=pdf', 'gid=0', 'size=A4', 'portrait=false', 'fitw=true',",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-seed-overwrite",
+    why: "補建 OutputOrder 覆寫幹事改過的次序",
+    file: "src/RosterOutput.gs",
+    find: "  if (anyFilled) return { needed: false, columnExists: true, fills: [] };\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "ob-full-old-grid",
+    why: "整季 PDF 仍然由 Roster_* 工作表匯出",
+    file: "src/PdfExport.gs",
+    find: "    const exported = exportRosterOutputPdfBlob_(ctx, fileName);\n    return { blob: exported.blob, fileName: fileName, retries: exported.retries };",
+    replace: "    const exported = exportSheetAsPdfBlob_(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(buildRosterSheetName_(quarterId, versionNo)), fileName);\n    return { blob: exported.blob, fileName: fileName, retries: exported.retries };",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "ob-public-old",
+    why: "公開檔不經共用版面寫入",
+    file: "src/PublicRoster.gs",
+    find: "  writeRosterOutputToSpreadsheet_(spreadsheet, content);\n}",
+    replace: "  spreadsheet.getSheets()[0].getRange(1, 1).setValue(content.title);\n}",
+    tests: ["tests/public_roster_write.test.js","tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "ob-seed-not-called",
+    why: "〔補建設定及範本〕沒有補 OutputOrder",
+    file: "src/AdminTools.gs",
+    find: "    const no = o.needed ? seedPostOutputOrder_(o) : 0;",
+    replace: "    const no = 0;",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oc-no-status-check",
+    why: "自我檢查不查狀態字",
+    file: "src/PdfContentSelfCheck.gs",
+    find: "      if (words.some(function (w) { return v.indexOf(w) !== -1; }) || ids.indexOf(v.trim()) !== -1) badText.push(",
+    replace: "      if (false) badText.push(",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oc-no-yellow-check",
+    why: "自我檢查不查黃色",
+    file: "src/PdfContentSelfCheck.gs",
+    find: "      if (isMissing !== isYellow || (isMissing && String(sm.values[r - 1][c - 1] || '') !== '')) yellow.push(",
+    replace: "      if (false) yellow.push(",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oc-no-order-check",
+    why: "自我檢查不查崗位次序",
+    file: "src/PdfContentSelfCheck.gs",
+    find: "  add('崗位次序跟 OutputOrder', model.postOrder.join(',') === order,",
+    replace: "  add('崗位次序跟 OutputOrder', true,",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oc-no-hl-check",
+    why: "自我檢查不查 highlight 格數",
+    file: "src/PdfContentSelfCheck.gs",
+    find: "      cells.length === expect.samplePersonCellCount && wrong.length === 0,",
+    replace: "      wrong.length === 0,",
+    tests: ["tests/round102_oa_roster_output.test.js"]
   }
 ];
 

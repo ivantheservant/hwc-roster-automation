@@ -316,6 +316,34 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "PUBLIC"
     },
+    "ROSTER_OUTPUT_TITLE_PATTERN": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "粵語堂 {Year} 年 {StartMonth}-{EndMonth} 月職事表",
+      "launchTargetValue": "粵語堂 {Year} 年 {StartMonth}-{EndMonth} 月職事表",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
+    "ROSTER_OUTPUT_FOOTER_TC": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "* 若有任何疑問，請與{ContactName}聯絡。",
+      "launchTargetValue": "* 若有任何疑問，請與{ContactName}聯絡。",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
+    "ROSTER_OUTPUT_SHOW_COUNTS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
+    "ROSTER_OUTPUT_HIGHLIGHT_STYLE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "BOLD,#C00000,BORDER",
+      "launchTargetValue": "BOLD,#C00000,BORDER",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PUBLIC"
+    },
     "PUBLIC_ROSTER_FILE_NAME_PATTERN": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "{QuarterID} 粵語堂職事表（公開版）",

@@ -74,6 +74,24 @@ class MockRange {
   setHorizontalAlignment(v) { this._forEachCell(function (r, c, s) { s._setFormat(r, c, 'halign', v); }); return this; }
   setNumberFormat(v) { this._forEachCell(function (r, c, s) { s._setFormat(r, c, 'numberFormat', v); }); return this; }
   clearDataValidations() { return this; }
+  // 第一百零二輪批次 OA 組：共用輸出版面（RosterOutput.gs）用到的批次格式
+  _setMatrix(key, values) {
+    for (let r = 0; r < values.length; r++) {
+      for (let c = 0; c < values[r].length; c++) this.sheet._setFormat(this.row + r, this.col + c, key, values[r][c]);
+    }
+    return this;
+  }
+  setFontWeights(v) { return this._setMatrix('fontWeight', v); }
+  setFontSizes(v) { return this._setMatrix('fontSize', v); }
+  setFontColors(v) { return this._setMatrix('fontColor', v); }
+  setHorizontalAlignments(v) { return this._setMatrix('halign', v); }
+  setFontFamily(v) { this._forEachCell(function (r, c, s) { s._setFormat(r, c, 'fontFamily', v); }); return this; }
+  setFontColor(v) { this._forEachCell(function (r, c, s) { s._setFormat(r, c, 'fontColor', v); }); return this; }
+  setBorder(top, left, bottom, right, vertical, horizontal, color, style) {
+    this._forEachCell(function (r, c, s) { s._setFormat(r, c, 'border', { color: color, style: style }); });
+    return this;
+  }
+  setRichTextValue(v) { this.sheet._setCell(this.row, this.col, v && v.text !== undefined ? v.text : v); this.sheet._setFormat(this.row, this.col, 'rich', v); return this; }
 
   _forEachCell(fn) {
     const sheet = this.sheet;
@@ -146,6 +164,9 @@ class MockSheet {
 
   getName() { return this._name; }
   setName(n) { this._name = n; return this; }
+  /** 第一百零二輪：有內容的最後一行／欄（readSheet_() 用）。 */
+  getLastRow() { let m = 0; Object.keys(this._values).forEach((k) => { if (this._values[k] !== '') m = Math.max(m, Number(k.split(',')[0])); }); return m; }
+  getLastColumn() { let m = 0; Object.keys(this._values).forEach((k) => { if (this._values[k] !== '') m = Math.max(m, Number(k.split(',')[1])); }); return m; }
   getMaxRows() { return this._maxRows; }
   getMaxColumns() { return this._maxCols; }
 
@@ -154,6 +175,23 @@ class MockSheet {
     numCols = numCols || 1;
     this._checkBounds(row + numRows - 1, col + numCols - 1);
     return new MockRange(this, row, col, numRows, numCols);
+  }
+
+  /** 第一百零二輪：A1 寫法的單格清單（只支援 "B5" 這種單格）。 */
+  getRangeList(a1s) {
+    const sheet = this;
+    const ranges = a1s.map(function (a1) {
+      const m = /^([A-Z]+)(\d+)$/.exec(a1);
+      let col = 0;
+      for (const ch of m[1]) col = col * 26 + (ch.charCodeAt(0) - 64);
+      return sheet.getRange(Number(m[2]), col);
+    });
+    const list = {};
+    ['setFontWeight', 'setFontColor', 'setBorder', 'setBackground'].forEach(function (fn) {
+      list[fn] = function () { const args = arguments; ranges.forEach(function (r) { r[fn].apply(r, args); }); return list; };
+    });
+    list.getRanges = function () { return ranges; };
+    return list;
   }
 
   _checkBounds(maxRow, maxCol) {

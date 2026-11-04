@@ -194,70 +194,22 @@ function applyPublicRosterFileNamePattern_(pattern, quarterId) {
 }
 
 /**
- * 組出公開試算表要寫入的內容。**這是全個功能唯一決定「公開檔案入面有咩」
- * 的地方**——刻意寫成一個唔碰 `SpreadsheetApp`／`DriveApp` 的純函式（只用
- * `readSheet_()`／`getConfig_()` 呢類讀取），方便用真正嘅原始碼直接測試
- * 「絕對唔會漏咗啲乜嘢出去」。
+ * 組出公開試算表要寫入的內容。
  *
- * 第十二輪批次階段 A：版面由「日期做列、崗位做欄」改為「崗位做列、日期做欄」
- * ——對照教會現行人手職事表嘅方向，亦解決咗實測發現嘅兩個問題：欄數唔再
- * 隨崗位／slot 數量增加（固定喺「幾多週 + 1」），姓名亦唔會再因為欄闊唔夠
- * 而被截斷。轉置本身由純函式 `transposeRosterForPublicView_()`
- * （`RosterWriter.gs`）負責，呢度淨係準備佢要嘅三樣輸入。
- *
- * 底色刻意**唔沿用** grid 工作表原本嘅底色邏輯（`applyCellMarks_()`）——
- * 嗰個邏輯會將「有人但觸發規則警告」嘅格畫成黃色、`FORCED`（已淘汰嘅舊值，
- * 現在生成器唔會再產生，但長表可能有歷史資料）畫成橙色，兩者都係**診斷
- * 用途**，唔應該出現喺對外公開嘅版本。公開版本只用五種語意分類本身嘅
- * 顏色（已排定＝白、其餘四種留空類別），跟 `docs/幹事操作說明.md`「職事表上
- * 嘅空格分四種」嗰段講嘅完全一致——事奉人員睇到嘅同幹事睇到嘅係同一套語言，
- * 唔會多一種佢哋唔識嘅顏色。
+ * 第一百零二輪批次 OA 組：**改用共用輸出版面**（`RosterOutput.gs` 的 `buildRosterOutputForVersion_()`）——
+ * 公開連結、整季 PDF、個人 PDF、紙本全部同一個版面（樣本：以前人手做的職事表）。
+ * 不再有圖例、狀態字（「待確認」「—」「特殊主日」）、PersonID；未有人的格是黃色。
+ * 第二張工作表「服侍次數」（`ROSTER_OUTPUT_SHOW_COUNTS`）。
  *
  * @param {string} quarterId 季度 ID
  * @param {number} versionNo 版本號
- * @returns {{quarterId: string, versionNo: number, dateColumns: Object[],
- *   monthGroups: Object[], postRows: Object[], gapColor: string,
- *   legendRows: Array[], footerNote: string, updatedAt: string}}
+ * @returns {Object} `buildRosterOutputModel_()` 的結果，另加 `versionNo`、`publishedAt`
  */
 function buildPublicRosterContent_(quarterId, versionNo) {
-  const assignments = readVersionAssignmentsForGrid_(quarterId, versionNo);
-  if (assignments.length === 0) {
-    throw new Error('找不到 ' + quarterId + ' v' + versionNo + ' 的派工紀錄，無法發佈。');
-  }
-  const layout = buildGridLayout_(quarterId, assignments);
-  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
-  const posts = readPostsNormalized_();
-  // 第七十五輪批次 CC 組：日期下面嗰行標題＝特別主日名稱（如開住）再由每週標題蓋過
-  const specialTitleByDate = buildDisplayTitleIndex_(quarterId, timezone);
-  // 第十三輪批次階段 A4：日期格式可以喺 Config 調，見
-  // transposeRosterForPublicView_() 的 displayOptions 說明。
-  const displayOptions = {
-    dateFormatPattern: String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
-  };
-  const transposed = transposeRosterForPublicView_(layout, posts, specialTitleByDate, displayOptions);
-
-  const gapColor = getConfig_(CONFIG_KEYS.GRID_PENDING_FILL_COLOR, DEFAULTS.GRID_PENDING_FILL_COLOR);
-  const showLegend = getConfig_(CONFIG_KEYS.GRID_SHOW_LEGEND, DEFAULTS.GRID_SHOW_LEGEND) === true;
-  const footerNote = String(getConfig_(CONFIG_KEYS.GRID_FOOTER_NOTE, DEFAULTS.GRID_FOOTER_NOTE) || '');
-  // 第十四輪批次階段 A：BLANK 崗位（獻花／翻譯）嘅說明改成圖例入面加一行，
-  // 唔再逐格重複寫，見 buildBlankRowLegendEntry_() 檔頭說明。
-  const blankNote = String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_BLANK_NOTE, DEFAULTS.PUBLIC_ROSTER_BLANK_NOTE) || '');
-  const blankLegendEntry = buildBlankRowLegendEntry_(blankNote, transposed.blankPendingCount);
-  const legendRows = showLegend
-    ? buildLegendRows_(layout).concat(blankLegendEntry ? [blankLegendEntry] : [])
-    : [];
-
-  return {
-    quarterId: quarterId,
-    versionNo: versionNo,
-    dateColumns: transposed.dateColumns,
-    monthGroups: transposed.monthGroups,
-    postRows: transposed.postRows,
-    gapColor: gapColor,
-    legendRows: legendRows,
-    footerNote: footerNote,
-    updatedAt: nowTimestamp_()
-  };
+  const model = buildRosterOutputForVersion_(quarterId, versionNo);
+  model.versionNo = versionNo;
+  model.publishedAt = nowTimestamp_();
+  return model;
 }
 
 /**
@@ -291,151 +243,19 @@ function resolveOrCreatePublicSpreadsheet_(quarterId, existingFileId) {
 }
 
 /**
- * 第十二輪批次階段 A：日期欄嘅固定欄闊（pixels）。中文姓名最長 6 個字
- * （例如「黃余麗貞師母」），刻意用一個固定寬度而唔淨係靠
- * `autoResizeColumns()`——auto resize 只會夠闊去容納「呢一版本」實際出現嘅
- * 姓名，下一版換咗一個較長名就可能又被截斷；固定夠闊嘅寬度一次過解決。
- */
-const PUBLIC_ROSTER_DATE_COLUMN_WIDTH = 130;
-
-/** 崗位標題欄嘅固定欄闊（pixels）——崗位名通常 2-4 字，唔需要好似日期欄咁闊。 */
-const PUBLIC_ROSTER_POST_COLUMN_WIDTH = 100;
-
-/**
  * 把 `buildPublicRosterContent_()` 的內容寫入公開試算表。清空重寫，
- * 唔會刪除／重建檔案本身，亦唔會動分享設定（分享設定只喺建立新檔時設一次，
- * 見 `resolveOrCreatePublicSpreadsheet_()`——每次發佈都重新檢查一次分享設定
- * 反而有風險，萬一幹事手動放寬過設定，系統唔應該喺佢唔知情下改返窄）。
+ * 唔會刪除／重建檔案本身（一季一條固定連結）。
  *
- * 第十二輪批次階段 A：版面改為「崗位做列（第 1 欄，凍結）、日期做欄（凍結
- * 首 3 行：標題／月份／日期）」，對照教會現行人手職事表嘅方向。多 slot
- * 崗位（司事、司數、聖餐襄禮）嘅崗位名稱欄垂直合併，日期欄按月分組、
- * 月份標題橫跨該月嘅日期欄。
- *
- * 第十三輪批次階段 A1／A2／A3／A5【bug 修正】：實測連續兩次重新發佈都
- * 拋錯（「You can't merge frozen and non-frozen rows」／「Sorry, you
- * can't freeze columns which contain only part of a merged cell」），
- * 兩個問題共同根源見 `resetSheetToBlankSlate_()`（`Utils.gs`）嘅檔頭
- * 說明。修正做法：
- * 1. **重寫前一定先 `resetSheetToBlankSlate_()`**——完全解除舊有合併／
- *    凍結／格式／多餘欄列，唔再假設「呢張表係第一次寫」；
- * 2. **標題列（第 1 行）完全唔再合併**——原本橫跨全部欄嘅合併正正就係
- *    A2 嘅根源：只凍結第 1 欄，一個橫跨全部欄嘅合併格必然一半喺凍結
- *    範圍、一半唔喺，結構性違反「凍結唔可以切開合併格」。改為單一
- *    儲存格（A1）唔合併，因為第 1 行其餘儲存格本身冇內容，Google 試算表
- *    對長文字嘅預設行為就係向右溢出顯示，視覺效果同合併一樣，但完全
- *    冇合併／凍結衝突嘅風險；
- * 3. **嚴格次序：先寫內容 → 先合併 → 最後先至凍結**——凍結一定要排喺
- *    合併之後，等呢次即將建立嘅全部合併格都已經到位，凍結範圍先可以
- *    一次過對照埋去；欄闊獨立於合併／凍結，跟返做「內容穩定之後」嘅
- *    收尾步驟，唔會再因為之前某一步拋錯而完全冇執行到（A3 嘅根源）；
- * 4. **`ensureSheetDimensions_()` 明確擴到啱好嘅尺寸**——`resetSheetToBlankSlate_()`
- *    會將工作表縮到 1x1，唔會再有上一版面留低嘅多餘欄／列（A5）。
+ * 第一百零二輪批次 OA 組：版面由共用輸出版面決定（`writeRosterOutputToSpreadsheet_()`）：
+ * 第一張「職事表」、第二張「服侍次數」（開關關掉就只有一張），其他工作表一律刪走。
+ * 第十三輪批次的教訓照舊：重寫前先 `resetSheetToBlankSlate_()`，合併一定排喺凍結之前。
  *
  * @param {Spreadsheet} spreadsheet 目標公開試算表
  * @param {Object} content `buildPublicRosterContent_()` 的結果
  * @returns {void}
  */
 function writePublicRosterContent_(spreadsheet, content) {
-  const sheet = spreadsheet.getSheets()[0];
-
-  const dateCols = content.dateColumns;
-  const colCount = 1 + dateCols.length; // 第 1 欄崗位 + 每個日期一欄
-  const postRows = content.postRows;
-  const dataStartRow = 4;
-  const legendTitleRow = dataStartRow + postRows.length + 1;
-  const legendDataRow = legendTitleRow + 1;
-  const footerRow = legendDataRow + content.legendRows.length;
-  const totalRows = Math.max(dataStartRow + postRows.length, footerRow) + 1; // +1 少少緩衝
-
-  // ---- 第 0 步：完全還原（見檔頭說明）----
-  resetSheetToBlankSlate_(sheet);
-  ensureSheetDimensions_(sheet, totalRows, colCount);
-  sheet.setName(GRID_LABELS.FULL_VERSION);
-
-  // ---- 第 1 步：寫內容（完全未合併、未凍結）----
-  sheet.getRange(1, 1).setValue(
-    content.quarterId + ' 職事表　更新時間：' + content.updatedAt
-  ).setFontWeight('bold');
-
-  sheet.getRange(2, 1).setValue(GRID_LABELS.POST_COLUMN)
-    .setFontWeight('bold').setBackground(GRID_COLORS.HEADER)
-    .setVerticalAlignment('middle').setHorizontalAlignment('center');
-
-  let col = 2;
-  content.monthGroups.forEach(function (g) {
-    sheet.getRange(2, col).setValue(g.label).setFontWeight('bold')
-      .setBackground(GRID_COLORS.HEADER).setHorizontalAlignment('center');
-    col += g.span;
-  });
-
-  const dateHeaderRow = dateCols.map(function (dc) {
-    return dc.specialTitle ? (dc.dayLabel + '\n' + dc.specialTitle) : dc.dayLabel;
-  });
-  sheet.getRange(3, 2, 1, dateCols.length).setValues([dateHeaderRow])
-    .setFontWeight('bold').setBackground(GRID_COLORS.HEADER).setWrap(true)
-    .setHorizontalAlignment('center');
-
-  if (postRows.length > 0) {
-    const dataValues = postRows.map(function (pr) {
-      return [pr.isFirstSlot ? pr.postNameTC : ''].concat(
-        pr.cells.map(function (c) { return c.text; }));
-    });
-    sheet.getRange(dataStartRow, 1, dataValues.length, colCount).setValues(dataValues);
-
-    // 底色：第 1 欄（崗位名）一律唔上色，日期欄跟 resolveGridCellBackground_()。
-    const backgrounds = postRows.map(function (pr) {
-      return [null].concat(pr.cells.map(function (c) {
-        return resolveGridCellBackground_(c.cellClass, content.gapColor);
-      }));
-    });
-    sheet.getRange(dataStartRow, 1, backgrounds.length, colCount).setBackgrounds(backgrounds);
-  }
-
-  if (content.legendRows.length > 0) {
-    sheet.getRange(legendTitleRow, 1).setValue(GRID_LABELS.LEGEND_TITLE).setFontWeight('bold')
-      .setBackground(GRID_COLORS.STATS_HEADER);
-    sheet.getRange(legendDataRow, 1, content.legendRows.length, 3).setValues(content.legendRows);
-  }
-  if (content.footerNote) {
-    sheet.getRange(footerRow, 1).setValue(content.footerNote).setFontStyle('italic');
-  }
-
-  // ---- 第 2 步：合併（一定要等內容寫晒、位置穩定之後先做）----
-  // 第 1 行（標題）刻意唔合併——見檔頭 A2 說明。
-  sheet.getRange(2, 1, 2, 1).merge()
-    .setVerticalAlignment('middle').setHorizontalAlignment('center');
-  col = 2;
-  content.monthGroups.forEach(function (g) {
-    if (g.span > 1) sheet.getRange(2, col, 1, g.span).merge();
-    col += g.span;
-  });
-  postRows.forEach(function (pr, i) {
-    if (pr.isFirstSlot && pr.slotCount > 1) {
-      sheet.getRange(dataStartRow + i, 1, pr.slotCount, 1).merge()
-        .setVerticalAlignment('middle');
-    }
-  });
-
-  // ---- 第 3 步：欄闊／列高（獨立於合併／凍結，跟返內容一齊收尾）----
-  sheet.setColumnWidth(1, PUBLIC_ROSTER_POST_COLUMN_WIDTH);
-  for (let c = 2; c <= colCount; c++) {
-    sheet.setColumnWidth(c, PUBLIC_ROSTER_DATE_COLUMN_WIDTH);
-  }
-  sheet.setRowHeight(3, 36); // 日期列容得下「日期＋特別主日」兩行
-
-  // ---- 第 4 步：凍結（一定要排喺最後——呢個時候全部合併已經到位，
-  // 凍結首欄／首 3 行唔會切開任何合併格：崗位欄合併／崗位名稱合併
-  // 全部喺欄 1 之內；月份合併全部喺欄 2 起、列 2；標題列完全冇合併）----
-  sheet.setFrozenRows(3);
-  sheet.setFrozenColumns(1);
-
-  // 一開始 SpreadsheetApp.create() 只會有一張分頁，但如果係「重開已存在嘅
-  // 檔案再覆寫」，理論上唔應該有其他分頁（呢個功能自己唔會加第二張），
-  // 但為咗保險（例如幹事手動加咗一張），刪走除咗第一張以外嘅所有分頁，
-  // 確保連結打開嘅永遠淨係一張、乾淨嘅職事表。
-  const extraSheets = spreadsheet.getSheets().slice(1);
-  extraSheets.forEach(function (s) { spreadsheet.deleteSheet(s); });
+  writeRosterOutputToSpreadsheet_(spreadsheet, content);
 }
 
 /**
@@ -482,7 +302,9 @@ function clearPublicRosterOnQuarterReset_(quarterId) {
   // 合併／凍結狀態衝突。
   const sheet = spreadsheet.getSheets()[0];
   resetSheetToBlankSlate_(sheet);
-  sheet.setName(GRID_LABELS.FULL_VERSION);
+  sheet.setName(ROSTER_OUTPUT_SHEET_NAMES.ROSTER);
+  // 第一百零二輪批次 OA 組：「服侍次數」那一張一併刪走（只留一句「已重設」）
+  spreadsheet.getSheets().slice(1).forEach(function (s) { spreadsheet.deleteSheet(s); });
   sheet.getRange(1, 1).setValue(
     quarterId + ' 職事表已重設，尚未重新發佈——如有疑問請聯絡幹事查詢最新安排。'
   ).setFontWeight('bold');
@@ -531,11 +353,11 @@ function publishPublicRoster_(quarterId) {
     const fields = {};
     fields[C.FILE_ID] = fileId;
     fields[C.FILE_URL] = fileUrl;
-    fields[C.LAST_PUBLISHED_AT] = content.updatedAt;
+    fields[C.LAST_PUBLISHED_AT] = content.publishedAt;
     fields[C.LAST_PUBLISHED_VERSION] = versionNo;
     fields[C.SHARING_ACCESS] = sharing.access;
     fields[C.SHARING_PERMISSION] = sharing.permission;
-    fields[C.CREATED_AT] = (existing && existing.createdAt) || content.updatedAt;
+    fields[C.CREATED_AT] = (existing && existing.createdAt) || content.publishedAt;
     return fields;
   })());
 
@@ -663,7 +485,7 @@ function runPublishPublicRoster_() {
   const confirmLines = existing && existing.fileId
     ? ['將覆寫既有的公開檔案（連結不變）：', '　' + (existing.fileUrl || existing.fileId), '']
     : ['這一季還沒有公開檔案，將建立一個新的：', ''];
-  confirmLines.push('公開檔案只會包含：職事表格本身、圖例、更新時間。');
+  confirmLines.push('公開檔案只會包含：職事表格本身、更新日期、本季服侍次數。');
   confirmLines.push('不會包含電郵、PersonID、規則警告標示或任何診斷資訊。');
   confirmLines.push('');
   confirmLines.push('確定要發佈嗎？');

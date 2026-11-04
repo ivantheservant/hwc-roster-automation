@@ -246,7 +246,10 @@ function apiPlanSeedConfigAndTemplates() {
   assertWebAppRequestAllowed_('apiPlanSeedConfigAndTemplates');
   const c = planConfigKeySeed_();
   const t = planEmailTemplateSeed_();
+  // 第一百零二輪批次 OA 組：Posts.OutputOrder（寄出／公開職事表的崗位次序）
+  const o = planPostOutputOrderSeed_();
   return {
+    postsOutputOrder: o.needed ? o.fills.map(function (f) { return f.postNameTC + '＝' + (f.value === '' ? '（留空＝用 DisplayOrder）' : f.value); }) : [],
     configMissing: c.missing.map(function (s) { return { key: s.key, defaultValue: String(s.defaultValue || ''), group: s.group }; }),
     templatesMissing: t.missing.map(function (s) { return s.templateId; })
   };
@@ -260,12 +263,18 @@ function apiSeedConfigAndTemplates() {
     const t = planEmailTemplateSeed_();
     const nc = c.missing.length ? seedConfigKeys_(c.missing) : 0;
     const nt = t.missing.length ? seedEmailTemplates_(t.missing) : 0;
+    // 第一百零二輪批次 OA 組：Posts.OutputOrder 欄（只在欄不存在或整欄空白時補）
+    const o = planPostOutputOrderSeed_();
+    const no = o.needed ? seedPostOutputOrder_(o) : 0;
     if (nc > 0) reloadConfigCache_();
     writeAuditLog_({ action: 'CONFIG_TEMPLATES_SEEDED', targetSheet: SHEETS.CONFIG, targetKey: '',
-      newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個', source: 'apiSeedConfigAndTemplates',
+      newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個' + (o.needed ? '、Posts.OutputOrder ' + no + ' 行' : ''), source: 'apiSeedConfigAndTemplates',
       notes: c.missing.map(function (s) { return s.key; }).concat(t.missing.map(function (s) { return s.templateId; })).join(',') });
     return { ok: true, configAdded: c.missing.map(function (s) { return s.key; }), templatesAdded: t.missing.map(function (s) { return s.templateId; }),
-      message: (nc + nt) > 0 ? '已補建 Config ' + nc + ' 行、電郵範本 ' + nt + ' 個（數值是預設值）。' : '全部已經齊全，不需要補建。' };
+      postsOutputOrderSeeded: o.needed ? no : 0,
+      message: (nc + nt) > 0 || o.needed
+        ? '已補建 Config ' + nc + ' 行、電郵範本 ' + nt + ' 個（數值是預設值）' + (o.needed ? '；Posts 的 OutputOrder 欄填了 ' + no + ' 行（寄出／公開職事表的崗位次序）' : '') + '。'
+        : '全部已經齊全，不需要補建。' };
   });
 }
 

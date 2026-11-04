@@ -328,31 +328,9 @@ console.log('\n=== 一致性：分類統計同表面顯示唔可以各講各話 
     summary.genuineGapCells.length, 2);
 }
 
-console.log('\n=== A4：版面可讀性——13 週要放得落一頁 A4 橫向 ===');
-{
-  // 真實規模：16 個崗位，其中司事／司數各 2 個位 → 18 個崗位欄。
-  const REAL_SLOT_COLUMNS = 18;
-  const est = gas.estimatePdfColumnWidth_(REAL_SLOT_COLUMNS);
-  console.log('      ' + REAL_SLOT_COLUMNS + ' 個崗位欄 → 每欄約 '
-    + est.estimatedInchesPerColumn + ' 吋（' + (est.estimatedInchesPerColumn * 25.4).toFixed(1) + ' mm）');
-
-  check('★ 真實規模（18 個崗位欄）唔會被判定為過窄',
-    !est.likelyCramped,
-    '每欄 ' + est.estimatedInchesPerColumn + ' 吋，門檻 0.45 吋');
-
-  // 三個中文字喺 10pt（Google Sheets 預設）大約需要 0.42 吋
-  const THREE_CHAR_NAME_INCHES_AT_10PT = 3 * 10 / 72;
-  check('★★ 三個字嘅中文姓名喺 10pt 之下放得落一欄（唔會逐個字斷行）',
-    est.estimatedInchesPerColumn >= THREE_CHAR_NAME_INCHES_AT_10PT,
-    '每欄 ' + est.estimatedInchesPerColumn + ' 吋 vs 三字姓名需要 '
-      + THREE_CHAR_NAME_INCHES_AT_10PT.toFixed(2) + ' 吋');
-
-  // 欄數再多就會開始出事，記低個臨界點供日後新增崗位時參考
-  const cramped = gas.estimatePdfColumnWidth_(22);
-  check('★ 22 個崗位欄會被判定為過窄（日後加崗位要留意呢個臨界點）',
-    cramped.likelyCramped,
-    '如果呢項失敗，代表門檻改咗，docs 入面嘅版面結論要重新核實');
-}
+// 第一百零二輪批次 OA 組（刻意改動）：「A4：版面可讀性」原本估算 `Roster_*` 工作表（日期做列）匯出 PDF 的欄闊
+// （`estimatePdfColumnWidth_()`）。寄出／公開的職事表已經改用共用輸出版面（崗位做列、每個主日一欄，
+// 見 `tests/round102_oa_roster_output.test.js`），`Roster_*` 工作表不再匯出，那個估算函式已刪除。
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

@@ -86,7 +86,12 @@
         () => openPersonalPdf(), false),
       zone4Row('補寄未收到的人',
         '上次寄到一半中斷的話，用這個只寄給還沒收到的人。',
-        () => openMakeupSend(), false)
+        () => openMakeupSend(), false),
+      // 第一百零二輪批次 OC 組：寄出／公開職事表共用版面的自我檢查＋樣本 PDF（不寄出）
+      zone4Row('核對寄出版面',
+        '檢查最新一版寄出及公開的職事表（沒有狀態字、月份顏色、崗位次序、未有人的格是黃色、個人標示），'
+          + '並產生一份整季 PDF 及一份個人 PDF 到 Drive「版面樣本」資料夾。不會寄出，不會改動任何工作表。',
+        () => openRosterOutputSample(), false)
     ]));
 
     body.appendChild(make('div', { className: 'sec' }, [
@@ -568,6 +573,27 @@
         renderReportSections('草稿覆核報告：第 ' + versionNo + ' 版', res);
       })
     });
+  }
+
+  /* ── 核對寄出版面（第一百零二輪批次 OC 組） ───────────────────── */
+
+  function openRosterOutputSample() {
+    openModal('核對寄出版面', [
+      para('用最新一版檢查寄出及公開的職事表版面，並產生一份整季 PDF 及一份個人 PDF（這一版服侍最多的人）到 Drive「版面樣本」資料夾。'),
+      para('不會寄出、不會發佈公開連結、不會改動任何工作表。', 'muted')
+    ], [
+      button('開始', () => runAction('核對寄出版面，請稍候', async () => {
+        const r = await callServerMutating('apiRosterOutputSample', currentQuarterId);
+        const nodes = [make('div', { text: r.title + '　' + r.updatedText, className: 'prop-head' })];
+        r.items.forEach((i) => nodes.push(make('div', { text: (i.ok ? '✔ ' : '✘ ') + i.label + (i.ok || !i.detail ? '' : '：' + i.detail), className: i.ok ? 'ok-line' : 'err-text' })));
+        const link = (text, url) => { const x = make('a', { text: text, className: 'sheetlink' }); x.href = url; x.target = '_blank'; x.rel = 'noopener'; return x; };
+        r.files.forEach((f) => nodes.push(make('div', {}, [link(f.label + '：' + f.name, f.url),
+          make('span', { text: '（' + Math.round(f.ms / 1000) + ' 秒）', className: 'muted' })])));
+        nodes.push(make('div', {}, [link('開啟「版面樣本」資料夾', r.folderUrl)]));
+        openModal('核對寄出版面：' + r.quarterId + ' 第 ' + r.versionNo + ' 版', nodes, [button('知道了', () => closeModal(), '')]);
+      }), ''),
+      button('取消', () => closeModal(), 'secondary')
+    ]);
   }
 
   /* ── 匯出職事表 PDF ─────────────────────────────────────── */

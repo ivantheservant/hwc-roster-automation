@@ -159,18 +159,17 @@ console.log('\n=== F【核心】匯出網址嘅範圍參數 ===');
     /\]\.concat\(rangeParams\)\.join\('&'\)/.test(body), '');
 }
 
-console.log('\n=== F【核心】兩條 PDF 路都要有，而且讀同一個判斷 ===');
+console.log('\n=== F【核心】兩條 PDF 路用同一個版面（第一百零二輪改）===');
 {
-  // ⚠️ 各自讀一次 Config 嘅話，日後有人只改咗其中一條，就會出現
-  // 「個人版冇圖例而整季版有」，而幹事會以為系統壞咗。
-  check('★★★★★ 整季版有',
-    /exportSheetAsPdfBlob_\(sheet, fileName, resolveRosterOnlyExportOpts_\(sheet\)\)/
-      .test(pdfBare), '');
-  check('★★★★★ 個人版有',
-    /exportSheetAsPdfBlob_\(ctx\.tempSheet, fileName, ctx\.rosterOnlyOpts\)/.test(pdfBare), '');
-  check('★★★★★ 而且個人版係喺開 context 嗰陣算一次，唔係逐個人掃一次第一欄'
-    + '——幾十位收件人就係幾十次讀表，而嗰條路本來已經接近執行上限',
-    /rosterOnlyOpts: resolveRosterOnlyExportOpts_\(tempSheet\)/.test(pdfBare), '');
+  // 第一百零二輪批次 OB 組（刻意改動）：整季版、個人版都改用共用輸出版面（RosterOutput.gs），
+  // 不再由 Roster_* 工作表匯出——新版面本身沒有圖例、沒有統計，所以不用「截住」。
+  // 原意（兩條路一致）照守：兩條都經 openRosterOutputPdfContext_()＋exportRosterOutputPdfBlob_()。
+  check('★★★★★ 整季版用共用版面',
+    /openRosterOutputPdfContext_\(quarterId, versionNo/.test(pdfBare) && /exportRosterOutputPdfBlob_\(ctx, fileName\)/.test(pdfBare), '');
+  check('★★★★★ 個人版用同一個 context（開 context 嗰陣寫一次版面，唔係逐個人重寫）',
+    /return openRosterOutputPdfContext_\(quarterId, versionNo, \{ wantHighlight: wantHighlight \}\);/.test(pdfBare), '');
+  check('★★★★★ 送出路徑不再由 Roster_* 工作表匯出',
+    (pdfBare.match(/exportSheetAsPdfBlob_\(ctx\.tempSheet|exportSheetAsPdfBlob_\(sheet, fileName, resolveRosterOnlyExportOpts_/g) || []).length === 0, '');
   checkEqual('★★★★★ 只有一個地方讀呢個 Config key',
     (pdfBare.match(/CONFIG_KEYS\.PDF_ROSTER_ONLY/g) || []).length, 1);
 }

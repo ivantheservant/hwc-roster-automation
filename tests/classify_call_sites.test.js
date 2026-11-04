@@ -54,6 +54,9 @@ console.log('\n=== E 組：呼叫點清單（加咗新嘅一定要更新呢一�
 const KNOWN_CALL_SITES = {
   'DraftReviewReport.gs': 1,   // 初稿檢視報告嘅圖例計數
   'Generator.gs': 1,           // 生成完成畫面嘅統計
+  // 第一百零二輪批次 OA 組：寄出／公開職事表共用版面（classifyRosterOutputCell_()）。
+  // 輸入來自 readVersionAssignmentsForGrid_()——即下面第一個轉換，已經驗過帶 personName。
+  'RosterOutput.gs': 1,
   'RosterWriter.gs': 3,        // grid 文字、grid 底色、renderExpectedGridText_()
   // 第三十八輪批次 G 組新增嘅唯讀清點工具。佢有傳 personName——
   // 落面「逐個轉換」嗰一節會逐個字驗。

@@ -665,6 +665,31 @@ function getConfigKeySeeds_() {
         + '低於這個比例就標為偏低。0.5＝合資格的人整季有一半以上從未被派到就提示。',
       editable: 'TRUE'
     },
+    // ---- 第一百零二輪批次 OA 組：寄出／公開職事表共用版面 ----
+    {
+      key: CONFIG_KEYS.ROSTER_OUTPUT_TITLE_PATTERN, type: CONFIG_TYPES.STR, group: 'PUBLIC',
+      defaultValue: '粵語堂 {Year} 年 {StartMonth}-{EndMonth} 月職事表',
+      description: '寄出／公開職事表（公開連結、整季 PDF、個人 PDF、紙本）的標題，支援 {Year}、{StartMonth}、{EndMonth}、{QuarterID}。第一個空格前的字（「粵語堂」）用較粗的字型。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ROSTER_OUTPUT_FOOTER_TC, type: CONFIG_TYPES.STR, group: 'PUBLIC',
+      defaultValue: '* 若有任何疑問，請與{ContactName}聯絡。',
+      description: '寄出／公開職事表表格下面的一行，{ContactName}＝ROSTER_CONTACT_TC。留空＝不寫這一行。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ROSTER_OUTPUT_SHOW_COUNTS, type: CONFIG_TYPES.BOOL, group: 'PUBLIC',
+      defaultValue: 'TRUE',
+      description: '寄出／公開職事表要不要有第 2 頁「本季服侍次數」（公開連結檔是第二張工作表「服侍次數」）。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ROSTER_OUTPUT_HIGHLIGHT_STYLE, type: CONFIG_TYPES.STR, group: 'PUBLIC',
+      defaultValue: 'BOLD,#C00000,BORDER',
+      description: '個人 PDF 標示那個人的格的方法（逗號分隔）：BOLD＝粗體、#RRGGBB＝字色、BORDER＝粗框、BG:#RRGGBB＝底色。不建議用黃色底（黃色代表「未有人」）。',
+      editable: 'TRUE'
+    },
     // ---- PUBLIC（第十一輪批次階段 A：一季一條固定連結）----
     {
       key: CONFIG_KEYS.PUBLIC_ROSTER_FILE_NAME_PATTERN, type: CONFIG_TYPES.STR, group: 'PUBLIC',

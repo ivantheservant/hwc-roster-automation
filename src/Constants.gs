@@ -240,7 +240,9 @@ const COLUMNS = {
     MAX_PER_PERSON_PER_QUARTER: 'MaxPerPersonPerQuarter',
     // 第九十輪批次 QB 組：是否在職事表顯示。留空或 TRUE＝顯示（職事表崗位）；FALSE＝只作名單組別（例如詩班），
     // 只出現在「崗位名單」工作表，不是職事表崗位（見 readPosts_()）。
-    SHOW_IN_ROSTER: 'ShowInRoster'
+    SHOW_IN_ROSTER: 'ShowInRoster',
+    // 第一百零二輪批次 OA 組：寄出／公開職事表的崗位次序（數字；留空＝用 DisplayOrder）。只影響輸出，不影響幹事的 Roster_* 工作表。
+    OUTPUT_ORDER: 'OutputOrder'
   },
   NAME_MAPPING: {
     PERSON_ID: 'PersonID',
@@ -1543,6 +1545,11 @@ const CONFIG_KEYS = {
   ADMIN_NOTIFY_NO_EMAIL: 'ADMIN_NOTIFY_NO_EMAIL',
   // 第一百零一輪批次 ZB 組：電郵範本 {ContactName}（有修改要聯絡的人的稱呼；預設「幹事」）
   ROSTER_CONTACT_TC: 'ROSTER_CONTACT_TC',
+  // 第一百零二輪批次 OA 組：寄出／公開職事表共用版面（RosterOutput.gs）
+  ROSTER_OUTPUT_TITLE_PATTERN: 'ROSTER_OUTPUT_TITLE_PATTERN',
+  ROSTER_OUTPUT_FOOTER_TC: 'ROSTER_OUTPUT_FOOTER_TC',
+  ROSTER_OUTPUT_SHOW_COUNTS: 'ROSTER_OUTPUT_SHOW_COUNTS',
+  ROSTER_OUTPUT_HIGHLIGHT_STYLE: 'ROSTER_OUTPUT_HIGHLIGHT_STYLE',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。
@@ -1944,6 +1951,11 @@ const DEFAULTS = {
   SCORE_TIE_EPSILON: 0,
   // 第十一輪批次階段 A：公開試算表檔案的預設命名樣板。
   PUBLIC_ROSTER_FILE_NAME_PATTERN: '{QuarterID} 粵語堂職事表（公開版）',
+  // 第一百零二輪批次 OA 組：寄出／公開職事表共用版面（RosterOutput.gs）
+  ROSTER_OUTPUT_TITLE_PATTERN: '粵語堂 {Year} 年 {StartMonth}-{EndMonth} 月職事表',
+  ROSTER_OUTPUT_FOOTER_TC: '* 若有任何疑問，請與{ContactName}聯絡。',
+  ROSTER_OUTPUT_SHOW_COUNTS: true,
+  ROSTER_OUTPUT_HIGHLIGHT_STYLE: 'BOLD,#C00000,BORDER',
   // 第十一輪批次階段 C：預設崇拜時間 10:45–12:00（Ivan 已確認）。
   ICS_SERVICE_START_TIME: '10:45',
   ICS_SERVICE_END_TIME: '12:00',
