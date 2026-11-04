@@ -12509,6 +12509,182 @@ const MUTATIONS = [
     find: "const PRESEASON_NOT_INCLUDED_TEXT = '不包括申報不能服侍日子的連結（那是〔寄出／匯出申報不能服侍日子連結〕）。';",
     replace: "const PRESEASON_NOT_INCLUDED_TEXT = '';",
     tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "zd-tt-one-quarter",
+    why: "時間表只列一季",
+    file: "src/AdminTools.gs",
+    find: "  }).slice(0, 2);",
+    replace: "  }).slice(0, 1);",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-tt-preseason-on",
+    why: "季前資料開關寫死「開」",
+    file: "src/AdminTools.gs",
+    find: "          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人', onOff: onOff(preseasonOn) },",
+    replace: "          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人', onOff: onOff(true) },",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-last-run-none",
+    why: "每日檢查沒有記下執行時間",
+    file: "src/Trigger.gs",
+    find: "    recordAutomationLastRun_(report.every(function (r) { return !/ERROR/.test(String((r && r.outcome) || '')); }), summariseAutomationReport_(report));\n",
+    replace: "",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-install-noop",
+    why: "〔安裝自動排程〕沒有建觸發器",
+    file: "src/AdminTools.gs",
+    find: "    const r = installAutomationTrigger_();",
+    replace: "    const r = { hour: 9 };",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-reviewed-none",
+    why: "〔我已核對時間表〕沒有記錄",
+    file: "src/AdminTools.gs",
+    find: "  writeAuditLog_({ action: AUTOMATION_SCHEDULE_REVIEWED_ACTION,",
+    replace: "  writeAuditLog_({ action: 'X_' + AUTOMATION_SCHEDULE_REVIEWED_ACTION,",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-menu-path-back",
+    why: "介面又指去試算表選單",
+    file: "src/ui/ScriptRollback.html",
+    find: "請在「進階與診斷」按〔重新發佈公開連結〕再試一次。",
+    replace: "請用試算表選單「準備工作 ▸ 發佈公開職事表」再試一次。",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-next-action-menu",
+    why: "{NextAction} 又寫選單路徑",
+    file: "src/Constants.gs",
+    find: "STAGE_NEXT_ACTION[QUARTER_STAGE.DRAFT] = '在幹事介面第 3 步按〔寄給堂委／執事〕';",
+    replace: "STAGE_NEXT_ACTION[QUARTER_STAGE.DRAFT] = '四階段流程 ▸ 步驟 2：寄給堂委審閱';",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-viewer-strip-off",
+    why: "只可查看的人仍然收到主試算表網址",
+    file: "src/AdminTools.gs",
+    find: "  return role === 'VIEWER' ? stripMainSpreadsheetUrlsForViewer_(state) : state;",
+    replace: "  return state;",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-strip-nested",
+    why: "巢狀的主試算表網址沒有清走",
+    file: "src/AdminTools.gs",
+    find: "    if (Array.isArray(v)) return v.map(walk);",
+    replace: "    if (Array.isArray(v)) return v;",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-viewer-elig-btn",
+    why: "只可查看的人仍見〔開啟事奉人員名單〕",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "        acts: [stepButton('查看事奉人員名單', () => openEligibilityViewOnly())]",
+    replace: "        acts: [stepButton('開啟事奉人員名單', openEligibilitySheet)]",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-viewer-sheet-links",
+    why: "只可查看的人仍見試算表連結",
+    file: "src/ui/ScriptZone3.html",
+    find: "    if (!viewOnly_) {\n      body.appendChild(row([\n        settingsSheetLink('身分（堂委／執事）'",
+    replace: "    if (true) {\n      body.appendChild(row([\n        settingsSheetLink('身分（堂委／執事）'",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-reissue-noconfirm",
+    why: "重新產生個人連結不用強確認",
+    file: "src/AdminTools.gs",
+    find: "  if (String(typed || '').trim() !== REISSUE_LINK_CONFIRM_TEXT) {",
+    replace: "  if (false) {",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-golive-no-check",
+    why: "上線不做全面體檢",
+    file: "src/AdminTools.gs",
+    find: "    if (!readiness.ok) {\n      throw new Error(buildThreePartMessage_('全面體檢找到 '",
+    replace: "    if (false) {\n      throw new Error(buildThreePartMessage_('全面體檢找到 '",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-golive-order",
+    why: "上線先改 DRY_RUN 再清前綴",
+    file: "src/AdminTools.gs",
+    find: "    const done = [];\n    const before = assessGoLiveState_();",
+    replace: "    const done = [];\n    setConfigValue_(CONFIG_KEYS.DRY_RUN, 'FALSE', 'apiGoLiveExecute');\n    const before = assessGoLiveState_();",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-rollback-order",
+    why: "回退先改前綴",
+    file: "src/AdminTools.gs",
+    find: "    const r1 = setConfigValue_(CONFIG_KEYS.DRY_RUN, 'TRUE', 'apiGoLiveRollback');",
+    replace: "    setConfigValue_(CONFIG_KEYS.MAIL_SUBJECT_PREFIX, GO_LIVE_TEST_SUBJECT_PREFIX, 'apiGoLiveRollback');\n    const r1 = setConfigValue_(CONFIG_KEYS.DRY_RUN, 'TRUE', 'apiGoLiveRollback');",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-perm-self-remove",
+    why: "可以把自己從可以修改移走",
+    file: "src/AdminTools.gs",
+    find: "  if (!me || next.editors.indexOf(me) === -1) {",
+    replace: "  if (false) {",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-perm-email-check",
+    why: "使用權限不驗證電郵",
+    file: "src/AdminTools.gs",
+    find: "  if (bad.length > 0) throw new Error('這幾個電郵格式不對：' + bad.join('、') + '。沒有改動任何東西。');",
+    replace: "",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-perm-viewer-read",
+    why: "只可查看的人看到使用權限",
+    file: "src/AdminTools.gs",
+    find: "  if (role !== 'EDITOR') throw new Error",
+    replace: "  if (false) throw new Error",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-perm-write-all",
+    why: "沒有改的也寫",
+    file: "src/AdminTools.gs",
+    find: "      if (a === b) return;",
+    replace: "",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zd-excl-partial",
+    why: "多選崗位不先驗證全部",
+    file: "src/WebAppExclusions.gs",
+    find: "  if (postIds.length === 0) return { ok: false, message: '請最少選一個崗位。', exclusionIds: [] };",
+    replace: "  if (postIds.length === 0) return { ok: false, message: '請最少選一個崗位。', exclusionIds: [] };\n  postIds.length = 1;",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zg-trigger-always-ok",
+    why: "上線前檢查「自動排程已安裝」永遠 ✔",
+    file: "src/PreLaunchWeb.gs",
+    find: "  add('自動排程已安裝', triggers.length > 0,",
+    replace: "  add('自動排程已安裝', true,",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zg-reviewed-missing",
+    why: "上線前檢查少了「時間表已看過」",
+    file: "src/PreLaunchWeb.gs",
+    find: "  add('自動寄信時間表已看過', !!reviewed,",
+    replace: "  if (false) add('自動寄信時間表已看過', !!reviewed,",
+    tests: ["tests/round101_zd_admin_tools.test.js"]
   }
 ];
 

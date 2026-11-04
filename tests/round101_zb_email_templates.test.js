@@ -268,7 +268,7 @@ console.log('\n=== ZB6：〔更新電郵範本到最新版〕===');
     && pv.samples.every((x) => x.hasSpreadsheetId === false && x.hasOldWord === false && x.hasSheetLink === false), JSON.stringify(pv.samples.filter((x) => x.hasSpreadsheetId || x.hasOldWord || x.hasSheetLink).map((x) => x.name)));
   // 入口及權限
   const z4 = read('src/ui/ScriptZone4.html');
-  check('★★★★★ 進階與診斷「電郵範本」：〔預覽電郵範本〕〔更新電郵範本到最新版〕〔寄出電郵範本樣本〕', /sectionTitle\('電郵範本'\),\s*zone4Row\('預覽電郵範本'[\s\S]{0,400}zone4Row\('更新電郵範本到最新版'[\s\S]{0,400}zone4Row\('寄出電郵範本樣本'/.test(z4));
+  check('★★★★★ 進階與診斷「設定及電郵範本」：〔補建設定及範本〕旁邊〔預覽電郵範本〕〔更新電郵範本到最新版〕〔寄出電郵範本樣本〕', /sectionTitle\('設定及電郵範本'\),[\s\S]{0,300}zone4Row\('補建設定及範本'[\s\S]{0,300}zone4Row\('預覽電郵範本'[\s\S]{0,400}zone4Row\('更新電郵範本到最新版'[\s\S]{0,400}zone4Row\('寄出電郵範本樣本'/.test(z4));
   const web = read('src/WebApp.gs');
   const upd = read('src/EmailTemplateUpdate.gs');
   check('★★★★★ 比對、預覽是唯讀 api（伺服器及前端兩邊登記）；套用是改動 api（鎖）', /'apiPlanEmailTemplateUpdate', 'apiPreviewTemplateSamples'/.test(web)

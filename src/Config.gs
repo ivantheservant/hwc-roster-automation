@@ -383,11 +383,11 @@ function describeConfigValueOrigin_(key, source) {
   }
   if (source === CONFIG_VALUE_SOURCES.ERROR) {
     return '程式內建預設值——Config「' + key + '」那一格的型別認不出來，'
-      + '所以系統沒有採用它（詳情見「維護 ▸ 🩺 全面體檢 ▸ Config 值型別檢查」）';
+      + '所以系統沒有採用它（詳情請通知管理員用全面體檢查看）';
   }
   // MISSING：⚠️ 這一句就是整組要修的那一句。
   return '程式內建預設值——「' + key + '」這個 Key 還沒有加進 Config 工作表，'
-    + '所以你在那裏找不到它。想改這個值，先執行「維護 ▸ 補建 Config 參數」';
+    + '所以你在那裏找不到它。想改這個值，先在幹事介面「進階與診斷」按〔補建設定及範本〕';
 }
 
 /**

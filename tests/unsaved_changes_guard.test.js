@@ -108,7 +108,8 @@ console.log('\n=== E3【核心】掣 3 防重複第二層：SendLog 有 OFFICIAL
     // 第三十三輪批次階段 D1：訊息改成引用 Menu.gs 嘅真正項目名
     //（「⚠️ 清除一批 SendLog 記錄」），唔再自己作一個「清除一批寄出記錄」。
     // 幹事照住原本嗰句去維護子選單搵，係搵唔到嗰個名嘅。
-    /清除一批 SendLog 記錄/.test(fnBody));
+    // 第一百零一輪批次 ZD-3（刻意改動）：不再指去試算表選單，改為請管理員清除
+    /清除那些寄出紀錄/.test(fnBody));
 
   const flow = fs.readFileSync(path.join(__dirname, '..', 'src', 'WebAppFlow.gs'), 'utf8');
   const step4 = flow.slice(flow.indexOf('function apiStep4Confirm('), flow.indexOf('function apiStep4Confirm(') + 900);

@@ -329,7 +329,7 @@ function writeAnnualCombinedSundays_(plan) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.SPECIAL_SUNDAYS);
   if (!sheet) {
     throw new Error('找不到工作表: ' + SHEETS.SPECIAL_SUNDAYS
-      + '。請先執行「維護 ▸ 補建 SpecialSundays 工作表」。');
+      + '。請通知管理員處理（補建 SpecialSundays 工作表）。');
   }
 
   const C = COLUMNS.SPECIAL_SUNDAYS;
@@ -375,7 +375,7 @@ function writeAnnualCombinedSundays_(plan) {
           '「' + SHEETS.SPECIAL_SUNDAYS + '」這一張工作表沒有「' + key + '」這一欄，'
             + '所以這一次要寫進去的內容寫不了。',
           '甚麼都沒有寫入——這一次的年度合堂建議整批停下來了。',
-          ['去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄',
+          ['請通知管理員處理（補建 SpecialSundays 缺欄）',
             '補完之後再按一次這個工具',
             '⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料']));
       }

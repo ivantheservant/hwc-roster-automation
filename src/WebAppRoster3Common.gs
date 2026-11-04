@@ -40,7 +40,7 @@ function openSheetForEdit_(sheetName) {
       '甚麼都沒有改動。',
       [
         '檢查試算表下面的分頁有沒有被改名或者刪掉',
-        '如果是新環境，先執行選單的「維護 ▸ 全新環境自我檢查」'
+        '如果是新環境，請通知管理員處理（全新環境自我檢查）'
       ]));
   }
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];

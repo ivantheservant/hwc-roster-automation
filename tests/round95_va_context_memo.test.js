@@ -237,7 +237,7 @@ console.log('\n=== VA6：人手檢查 ===');
 console.log('\n=== 靜態 ===');
 {
   const dash = read('src/WebAppDashboard.gs');
-  check('★★★★ apiGetDashboardState 在 finally 關記憶', /beginRequestContextMemo_\(\);\s*try \{\s*return buildDashboardState_\(quarterId\);\s*\} finally \{\s*endRequestContextMemo_\(\);/.test(dash));
+  check('★★★★ apiGetDashboardState 在 finally 關記憶', /beginRequestContextMemo_\(\);\s*try \{\s*(?:\/\/[^\n]*\n\s*)?return (?:viewerSafeState_\(role, )?buildDashboardState_\(quarterId\)\)?;\s*\} finally \{\s*endRequestContextMemo_\(\);/.test(dash));
   check('★★★★ timings 有 fineTuneContextReused', /fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_\.reused/.test(dash));
   const others = fs.readdirSync(path.join(ROOT, 'src')).filter((f) => /\.gs$/.test(f) && f !== 'SheetReader.gs' && f !== 'WebAppDashboard.gs')
     .filter((f) => /^\s*beginRequestContextMemo_\(\);/m.test(read('src/' + f)));

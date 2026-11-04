@@ -34,10 +34,19 @@
     // 「Active 改成 FALSE」嗰句唔再適用。`NameMapping` 嘅 MaxPerQuarter／Active 由管理員直接喺試算表改。
     body.appendChild(para('人員和電郵由出席系統讀取，這裏不用改。'
       + '身分和固定收件人在試算表那一張工作表改（會在新分頁打開）。'));
+    // 第一百零一輪批次 ZD-4：只可查看的人不顯示任何打開主試算表的按鈕或連結
+    if (!viewOnly_) {
+      body.appendChild(row([
+        settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),
+        settingsSheetLink('固定收件人／管理員電郵', links.recipients, 'EmailRecipients')
+      ]));
+    }
+    // 第一百零一輪批次 ZD 組：〔使用權限〕（只限可以修改的人）、〔暫時不做某崗位〕重新加入介面
     body.appendChild(row([
-      settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),
-      settingsSheetLink('固定收件人／管理員電郵', links.recipients, 'EmailRecipients')
+      button('使用權限', () => openPermissions(), viewOnly_ ? 'secondary' : ''),
+      button('暫時不做某崗位', () => openExclusions(''), 'secondary')
     ]));
+    if (viewOnly_) body.lastChild.firstChild.disabled = true;
     // 第八十二輪批次 II 組（Ivan 決定）：〔重新生成初稿（覆蓋式）〕拿走——整季重來用〔整季清走重來〕（IJ 組）
     // 第八十二輪批次 IJ 組：〔整季清走重來〕（紅色危險掣）；受保護季度 ⇒ 灰掣＋原因
     const reset = (d && d.quarterReset) || { blocked: true, reason: '暫時無法確定這一季可不可以重設。按「重新整理」再試。' };
@@ -146,8 +155,8 @@
    * @returns {Node}
    */
   function settingsSheetLink(label, url, sheetName) {
-    // 第八十七輪批次 NB 組：只可查看的人沒有主試算表的存取權 ⇒ 灰色按鈕
-    if (viewOnly_) return markViewOnlyBlocked_(button(label, () => {}, 'secondary'));
+    // 第八十七輪批次 NB 組／第一百零一輪批次 ZD-4：只可查看的人 ⇒ 不顯示（renderZone3 已不加入）；萬一叫到亦不畫連結
+    if (viewOnly_) return null;
     if (!url) {
       const b = button(label, () => {}, 'secondary');
       b.disabled = true;
@@ -1276,7 +1285,7 @@
           className: 'vio-head'
         }),
         make('div', {
-          text: '請先用試算表選單「維護 ▸ 補建身分名單工作表」。'
+          text: '請通知管理員處理（補建身分名單工作表）。'
             + '在建立之前，「報告限堂委」「當值堂委限堂委或執事」這兩條規則不會生效。',
           className: 'vio-row'
         })
@@ -1672,7 +1681,7 @@
           className: 'vio-head'
         }),
         make('div', {
-          text: '請先用試算表選單「維護 ▸ 補建身分名單工作表」（它會一併建立這一張）。',
+          text: '請通知管理員處理（補建身分名單工作表，會一併建立這一張）。',
           className: 'vio-row'
         })
       ]));
@@ -1882,13 +1891,21 @@
       personSel.appendChild(o);
     });
 
-    const postSel = document.createElement('select');
+    // 第一百零一輪批次 ZD 組：崗位可多選（每個崗位一行）
+    const postBoxes = [];
+    const postList = make('div', { className: 'excl-posts' });
     exclusionData.posts.forEach((p) => {
-      const o = document.createElement('option');
-      o.value = p.postId;
-      o.textContent = p.postNameTC;
-      postSel.appendChild(o);
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'excl-post';
+      cb.value = p.postId;
+      postBoxes.push({ cb: cb, name: p.postNameTC });
+      const line = make('label', { className: 'check-row' });
+      line.appendChild(cb);
+      line.appendChild(make('span', { text: p.postNameTC }));
+      postList.appendChild(line);
     });
+    const allPosts = button('全選崗位', () => postBoxes.forEach((x) => { x.cb.checked = true; }), 'link');
 
     const reasonInput = textField('', '原因（必填，例如：膝傷，暫時不能站）');
     const fromInput = dateInput('');
@@ -1900,9 +1917,9 @@
         make('div', { text: '暫時不做 = 這個人做得到，但這一段時間不排他。', className: 'warn-head' })
       ]),
       make('div', { className: 'prop-head' }, [
-        make('span', { text: '誰' }), personSel,
-        make('span', { text: '崗位' }), postSel
+        make('span', { text: '誰' }), personSel
       ]),
+      make('div', { className: 'sec' }, [sectionTitle('崗位（可多選）'), postList, row([allPosts])]),
       make('div', { className: 'prop-head' }, [
         make('span', { text: '原因' }), reasonInput
       ]),
@@ -1917,20 +1934,21 @@
     ], [
       button('加入', () => {
         const name = personSel.options[personSel.selectedIndex].textContent;
-        const post = postSel.options[postSel.selectedIndex].textContent;
+        const picked = postBoxes.filter((x) => x.cb.checked);
+        if (picked.length === 0) { showErrorModal('暫時不做某崗位', new Error('請最少選一個崗位。')); return; }
         openConfirm({
           title: '確定要加入嗎',
           bodyNodes: [
-            para('會加入 1 行：這一段時間不排 ' + name + ' 做「' + post + '」。'),
+            para('會加入 ' + picked.length + ' 行：這一段時間不排 ' + name + ' 做「' + picked.map((x) => x.name).join('、') + '」。'),
             para('生效日：' + (fromInput.value.trim() || '（留空＝即時生效）')
               + '　解除日：' + (toInput.value.trim() || '（留空＝暫時無限期）')),
             para('已經生成的職事表不會自己改。要按「儲存」系統才會重新檢查。', 'muted')
           ],
           confirmLabel: '確定加入',
           onConfirm: () => runAction('加入中', async () => {
-            const res = await callServerMutating('apiAddExclusion', {
+            const res = await callServerMutating('apiAddExclusions', {
               personId: personSel.value,
-              postId: postSel.value,
+              postIds: picked.map((x) => x.cb.value),
               reason: reasonInput.value.trim(),
               effectiveFrom: fromInput.value.trim(),
               effectiveTo: toInput.value.trim()

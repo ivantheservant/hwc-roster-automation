@@ -793,7 +793,7 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
       + '⚠️ 這一步不能繼續——照樣寄出的話，這 ' + missingCount
       + ' 位事奉人員會一個都收不到通知，\n'
       + '而 Stage 會前進到 OFFICIAL_SENT，令步驟 4 無法重新執行。\n\n'
-      + '請先執行「準備工作 ▸ 產生個人 PDF」，補齊之後再回來。\n\n'
+      + '請先在幹事介面「進階與診斷」按〔產生個人 PDF〕，補齊之後再回來。\n\n'
       + '（如果你確定這一季本來就不需要個人 PDF 附件，'
       + '請改 Email 範本的 AttachType，不要用放行的方式繞過。'
       + '要調整容許比例的話，改 Config 的 '
@@ -844,13 +844,13 @@ function evaluateStep4SendOutcome_(sendResult) {
     breakdown: breakdown,
     message: '⚠️ 有 ' + unhandled + ' 位事奉人員未收到通知（' + parts.join('、') + '）。\n\n'
       + 'Stage 維持在 REQUESTS_APPLIED，沒有前進到 OFFICIAL_SENT——\n'
-      + '所以你補救之後可以再執行一次「步驟 4：正式發出」。\n\n'
+      + '所以你補救之後可以再執行一次正式發出（第 3 步〔給所有人〕）。\n\n'
       + '建議做法：\n'
       + (errorPdfMissing + errorPdf > 0
-        ? '　1. 執行「準備工作 ▸ 產生個人 PDF」補齊缺的檔案\n　2. 再執行一次「步驟 4：正式發出」\n'
-        : '　1. 再執行一次「步驟 4：正式發出」\n')
+        ? '　1. 在「進階與診斷」按〔產生個人 PDF〕補齊缺的檔案\n　2. 再執行一次正式發出（第 3 步〔給所有人〕）\n'
+        : '　1. 再執行一次正式發出（第 3 步〔給所有人〕）\n')
       + '\n只想補寄未成功那幾位、不想全部再寄一次的話，\n'
-      + '用「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」先看清楚名單。\n'
+      + '用「進階與診斷」〔補寄未收到的人〕先看清楚名單。\n'
       + '（查無電郵的事奉人員不算未處理——那是已知而且沒有辦法解決的情況，'
       + '不會因此卡住流程。）'
   };

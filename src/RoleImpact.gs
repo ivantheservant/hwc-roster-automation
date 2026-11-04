@@ -245,7 +245,7 @@ function collectRoleImpact_(quarterId) {
   const serviceDates = readServiceDatesNormalized_(quarterId, timezone);
   if (serviceDates.length === 0) {
     throw new Error('找不到 ' + quarterId + ' 的主日資料（ServiceDates）。'
-      + '請先用「準備工作 ▸ ⚠️ 新增季度」或「⚠️ 產生下一年度四個季度」建立這一季。');
+      + '請先在幹事介面「進階與診斷」按〔建立未來季度〕建立這一季。');
   }
 
   const posts = readPostsNormalized_();

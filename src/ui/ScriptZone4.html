@@ -59,7 +59,11 @@
 
     // 第一百零一輪批次 ZB 組：電郵範本三個工具放在一起
     body.appendChild(make('div', { className: 'sec' }, [
-      sectionTitle('電郵範本'),
+      sectionTitle('設定及電郵範本'),
+      // 第一百零一輪批次 ZD 組：合併選單「補建 Config 參數」「補齊 Email 範本」
+      zone4Row('補建設定及範本',
+        '補上 Config 缺少的設定行及缺少的電郵範本（只新增，不改任何現有的行；新設定是預設值）。',
+        () => openSeedConfigAndTemplates(), false),
       zone4Row('預覽電郵範本',
         '在畫面上看系統每一種信的內容（和〔寄出電郵範本樣本〕同一份），不會寄出。',
         () => openTemplatePreview(), false),
@@ -119,10 +123,21 @@
         () => openRecoveryHelp(), false)
     ]));
 
-    body.appendChild(make('p', {
-      text: '其餘工具（體檢、上線前檢查、匯出關鍵狀態等）請用試算表上方的選單。',
-      className: 'muted'
-    }));
+    // 第一百零一輪批次 ZD 組：由試算表選單搬入（自動排程、上線前檢查、個人專屬連結、上線切換）
+    body.appendChild(make('div', { className: 'sec' }, [
+      sectionTitle('自動排程及上線'),
+      zone4Row('自動排程狀態',
+        '觸發器有沒有安裝、上次執行時間及結果，以及未來兩季的自動寄信時間表（每一項寫明會寄給誰、現時開／關）。',
+        () => openAutomationStatus(), false),
+      zone4Row('安裝自動排程', '安裝每日自動檢查（每日一次）。', () => installAutomationNow(), false),
+      zone4Row('移除自動排程', '移除每日自動檢查，之後系統不會自己執行任何動作。', () => removeAutomationNow(), true),
+      zone4Row('上線前檢查', '逐項顯示 ✔／✘ 及去哪裏改。只看，不改。', () => openPreLaunchCheck(), false),
+      zone4Row('個人專屬連結',
+        '〔補發個人專屬連結〕給新人；〔重新產生某人的個人連結〕（外洩時用，舊連結即時失效）。',
+        () => openPersonalLinkTools(), false),
+      zone4Row('上線切換', '由測試模式切換到真正寄信（先做全面體檢，要逐字輸入確認）。只限可以修改的人。', () => openGoLive(false), true),
+      zone4Row('回到測試模式', '立即停止真正寄信，主旨放回測試前綴（要逐字輸入確認）。只限可以修改的人。', () => openGoLive(true), false)
+    ]));
   }
 
   /**

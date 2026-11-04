@@ -133,7 +133,7 @@ console.log('\n=== B2【核心】畫面嗰句要跟住來源改 ===');
   check('★★★★★★ 而且要講明「你喺嗰度搵唔到佢」',
     /還沒有加進 Config 工作表/.test(missing) && /找不到/.test(missing), missing);
   check('★★★★★★ 同埋要講返點樣補',
-    /補建 Config 參數/.test(missing), missing);
+    /補建 Config 參數|〔補建設定及範本〕/.test(missing), missing);   // 第一百零一輪 ZD-3：介面路徑
 
   const dflt = gas.describeConfigValueOrigin_(KEY, 'DEFAULT');
   check('★★★★★★ `DEFAULT` 同 `MISSING` **講法要唔同**'

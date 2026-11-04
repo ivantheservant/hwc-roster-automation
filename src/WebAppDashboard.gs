@@ -588,14 +588,15 @@ function buildUnsavedBlockHint_(unsaved) {
  * @returns {Object} 見檔頭與規格第二節
  */
 function apiGetDashboardState(quarterId) {
-  assertWebAppRequestAllowed_('apiGetDashboardState');
+  const role = assertWebAppRequestAllowed_('apiGetDashboardState');
 
   // 全程零寫入，所以開 readSheet_ 快取安全——見 SheetReader.gs 檔頭嘅警告。
   // 第九十五輪批次 VA 組：同一次載入內 fine-tune context 及職事表工作表也只讀一次（不跨請求）
   beginSheetReadMemo_();
   beginRequestContextMemo_();
   try {
-    return buildDashboardState_(quarterId);
+    // 第一百零一輪批次 ZD-4：只可查看的人 ⇒ 不送任何主試算表網址
+    return viewerSafeState_(role, buildDashboardState_(quarterId));
   } finally {
     endRequestContextMemo_();
     endSheetReadMemo_();

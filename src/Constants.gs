@@ -1962,9 +1962,10 @@ const DEFAULTS = {
  * 不需要在這裡有對應項。
  */
 const STAGE_NEXT_ACTION = {};
-STAGE_NEXT_ACTION[QUARTER_STAGE.DRAFT] = '四階段流程 ▸ 步驟 2：寄給堂委審閱';
-STAGE_NEXT_ACTION[QUARTER_STAGE.REVIEW_SENT] = '四階段流程 ▸ 步驟 3：套用修改申報';
-STAGE_NEXT_ACTION[QUARTER_STAGE.REQUESTS_APPLIED] = '四階段流程 ▸ 步驟 4：正式發出';
+// 第一百零一輪批次 ZD-3：寫幹事介面的做法（不再寫試算表選單的路徑）
+STAGE_NEXT_ACTION[QUARTER_STAGE.DRAFT] = '在幹事介面第 3 步按〔寄給堂委／執事〕';
+STAGE_NEXT_ACTION[QUARTER_STAGE.REVIEW_SENT] = '在幹事介面第 2 步按〔請系統幫我調整〕（會一併套用修改申報），檢查後按〔儲存〕';
+STAGE_NEXT_ACTION[QUARTER_STAGE.REQUESTS_APPLIED] = '在幹事介面第 3 步按〔給所有人〕（正式發出）';
 
 /** CacheService 的最大 TTL（秒），Config 的 SYS_CONFIG_CACHE_SECONDS 不可超過這個上限。 */
 const CACHE_MAX_TTL_SECONDS = 21600;

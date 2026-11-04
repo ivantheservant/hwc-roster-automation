@@ -104,7 +104,7 @@ function planNewQuarterWizard_(year, term, customStartDate) {
   const quarterId = year + 'T' + term;
   if (findQuarterRowInfo_(quarterId)) {
     throw new Error('Quarters 已經有 ' + quarterId + ' 這一季，為免覆寫既有資料，本工具拒絕執行。'
-      + '如果要重新計算日期，請用「準備工作 ▸ ⚠️ 計算季度日期」；如果要清掉重來，'
+      + '如果要重新計算日期，請通知管理員；如果要清掉重來，'
       + '請自行到 Quarters／ServiceDates 工作表人手刪除對應的列（本工具不會幫你刪）。');
   }
   if (readServiceDates_(quarterId).length > 0) {

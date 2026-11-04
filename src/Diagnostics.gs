@@ -581,7 +581,7 @@ function collectKeyStateRows_() {
     try {
       requests = readSheet_(SHEETS.REQUESTS);
     } catch (err) {
-      rows.push(diagRow_('Requests', '（工作表不存在）', '', '請先執行「維護 ▸ 建立 Requests 工作表」'));
+      rows.push(diagRow_('Requests', '（工作表不存在）', '', '請通知管理員處理（建立 Requests 工作表）'));
       return;
     }
 
@@ -715,7 +715,7 @@ function collectKeyStateRows_() {
     if (!exists) {
       rows.push(diagRow_('PersonPostWeight', '（工作表尚未建立）', '',
         '這是可選的表。未建立時排表結果與加入這個機制之前一模一樣。'
-        + '要用的話：選單「維護 ▸ 補建排表偏好工作表」。'));
+        + '要用的話：請通知管理員處理（補建排表偏好工作表）。'));
       return;
     }
 

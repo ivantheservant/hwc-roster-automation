@@ -374,7 +374,6 @@ function assertPublicRosterUrlAvailableForStage_(quarterId, templates, publicRos
     '一封都沒有寄出。如果照樣寄，收信的人會看到「公開版連結：」後面一片空白。',
     [
       '去「進階與診斷 ▸ 重新發佈公開連結」發佈一次，然後回來再按',
-      '或者在試算表選單「準備工作 ▸ 發佈公開職事表」發佈',
       '如果這一封信本來就不應該有連結，請在 EmailTemplates 把 '
         + '{PublicRosterUrl} 這一段刪除'
     ]));
@@ -1435,7 +1434,7 @@ function assertSendLogRedirectColumnsReady_(headers) {
     log_('WARN', 'SendLog 沒有 ' + missing.join('／')
       + ' 這幾欄。轉寄測試地址目前沒有生效，所以每一封的收件人'
       + '與實際寄去的地址是同一個，可以查回。'
-      + '想補齊，去選單「維護 ▸ ⚠️ 補建 SendLog 缺欄」。');
+      + '想補齊，請通知管理員處理（補建 SendLog 缺欄）。');
     return;
   }
 
@@ -1453,7 +1452,7 @@ function assertSendLogRedirectColumnsReady_(headers) {
       + '記不到每一封原本要寄給誰。',
     '一封都沒有寄出。這樣寄出去之後，SendLog 每一行的收件人'
       + '都會是同一個轉寄地址，查不到誰收到甚麼。',
-    ['先去選單「維護 ▸ ⚠️ 補建 SendLog 缺欄」補上這一欄，再回來寄',
+    ['先請通知管理員處理（補建 SendLog 缺欄），再回來寄',
       '那一支只會在最後加欄，不會重排、不會改動任何既有資料',
       '如果你其實不想用轉寄，去 Config 把 '
         + CONFIG_KEYS.MAIL_REDIRECT_ALL_TO + ' 清空']));
@@ -1719,7 +1718,8 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   const adminEmail = String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || '');
   const nextAction = STAGE_NEXT_ACTION[judgment.stage];
-  const nextActionText = nextAction ? '「職事表系統 → ' + nextAction + '」' : '登入試算表查看目前狀態';
+  // 第一百零一輪批次 ZD-3：寫幹事介面的做法
+  const nextActionText = nextAction ? nextAction : '打開幹事介面查看目前狀態';
 
   const reasonLines = [];
   // 第二十五輪批次階段 A2：自動生成已經關閉，所以「到期咗仲未生成」

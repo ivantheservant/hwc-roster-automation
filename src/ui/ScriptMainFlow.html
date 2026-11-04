@@ -852,6 +852,15 @@
    */
 
   function renderStepEligibility() {
+    // 第一百零一輪批次 ZD-4：只可查看的人 ⇒ 沒有任何打開主試算表的按鈕：只有〔查看事奉人員名單〕（唯讀視窗），沒有〔儲存並套用名單〕
+    if (viewOnly_) {
+      return stepCard({
+        num: 0,
+        title: '更改各崗位的事奉人員名單',
+        note: '你只有查看權限：按〔查看事奉人員名單〕看每個崗位的名單。',
+        acts: [stepButton('查看事奉人員名單', () => openEligibilityViewOnly())]
+      });
+    }
     return stepCard({
       num: 0,
       title: '更改各崗位的事奉人員名單',

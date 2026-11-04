@@ -271,4 +271,256 @@
 
   /** 舊入口〔沒有電郵的人：匯出邀請〕（深連結、舊按鈕）⇒ 轉到合併後的窗。 */
   function openInvitePaper() { openUnavailableInvite(); }
+
+  /* ============================================================
+   * 第一百零一輪批次 ZD 組：由試算表選單搬入的功能
+   * ============================================================ */
+
+  /** 一行「標籤：內容」。 */
+  function z5Line(label, value, cls) {
+    return make('div', { text: label + '：' + value, className: cls || 'vio-row' });
+  }
+
+  /* ---------- 自動排程 ---------- */
+
+  function openAutomationStatus() {
+    runAction('讀取自動排程狀態', async () => {
+      const s = await callServer('apiGetAutomationStatus');
+      const nodes = [
+        z5Line('觸發器', s.installed ? ('已安裝（每日約 ' + s.hour + ':00 執行一次檢查）') : '未安裝（系統不會自己執行任何動作）', s.installed ? 'ok-line' : 'err-text'),
+        z5Line('上次執行', s.lastRun ? (s.lastRun.at + '　' + (s.lastRun.ok ? '✔ ' : '✘ ') + s.lastRun.summary) : '還沒有紀錄'),
+        z5Line('測試模式（DRY_RUN）', s.dryRun ? '開（不會真正寄信）' : '關（會真正寄信）')
+      ];
+      if (s.triggerError) nodes.push(make('div', { text: '讀不到觸發器：' + s.triggerError, className: 'err-text' }));
+      nodes.push(sectionTitle('自動寄信時間表（未來兩季）'));
+      (s.timetable || []).forEach((q) => {
+        const box = make('div', { className: 'sec' }, [make('div', { text: q.quarterLabel + '（' + q.quarterId + '）', className: 'prop-head' })]);
+        const table = make('table', { className: 'mine z5-table' });
+        const head = make('tr');
+        ['項目', '日期', '會寄給誰', '現時開／關'].forEach((h) => head.appendChild(make('th', { text: h })));
+        table.appendChild(head);
+        q.items.forEach((it) => {
+          const tr = make('tr');
+          [it.label, it.date, it.who, it.onOff].forEach((v) => tr.appendChild(make('td', { text: v })));
+          table.appendChild(tr);
+        });
+        box.appendChild(table);
+        nodes.push(box);
+      });
+      if ((s.timetable || []).length === 0) nodes.push(para('沒有未來的季度。', 'muted'));
+      const daily = make('div', { className: 'sec' }, [sectionTitle('每日檢查還會做')]);
+      (s.daily || []).forEach((d) => daily.appendChild(z5Line(d.label, d.who + '（現時' + d.onOff + '）')));
+      nodes.push(daily);
+      nodes.push(z5Line('時間表核對', s.reviewedAt ? ('已核對（' + s.reviewedAt + '）') : '還沒有核對', s.reviewedAt ? 'ok-line' : 'muted'));
+      openModal('自動排程狀態', nodes, [
+        button('我已核對時間表', () => runAction('記下核對日期', async () => {
+          const r = await callServerMutating('apiMarkAutomationScheduleReviewed');
+          setStatus(r.message);
+          openAutomationStatus();
+        }), ''),
+        button('關閉', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  function installAutomationNow() {
+    openConfirm({
+      title: '安裝自動排程',
+      bodyNodes: [para('安裝之後，系統每日會自己檢查一次：按時間表自動寄季前資料、自動生成（如開了）、通知幹事。正式發出永遠要幹事親自按。'),
+        para('按〔自動排程狀態〕可以看到每一項的日期、會寄給誰及現時開／關。', 'muted')],
+      confirmLabel: '確定安裝',
+      onConfirm: () => runAction('安裝自動排程', async () => {
+        const r = await callServerMutating('apiInstallAutomation');
+        openModal('安裝自動排程', [make('div', { text: r.message, className: 'ok-line' })], [button('知道了', () => closeModal(), '')]);
+      })
+    });
+  }
+
+  function removeAutomationNow() {
+    openConfirm({
+      title: '移除自動排程',
+      bodyNodes: [para('移除之後，系統不會再自己執行任何動作（不會自動寄季前資料、不會通知幹事）。')],
+      confirmLabel: '確定移除',
+      danger: true,
+      onConfirm: () => runAction('移除自動排程', async () => {
+        const r = await callServerMutating('apiRemoveAutomation');
+        openModal('移除自動排程', [make('div', { text: r.message, className: 'ok-line' })], [button('知道了', () => closeModal(), '')]);
+      })
+    });
+  }
+
+  /* ---------- ZG〔上線前檢查〕 ---------- */
+
+  function openPreLaunchCheck() {
+    runAction('上線前檢查', async () => {
+      const r = await callServer('apiGetPreLaunchCheck');
+      const nodes = [make('div', { text: r.okCount + ' / ' + r.total + ' 項已完成', className: r.okCount === r.total ? 'ok-line strong' : 'warnbox' })];
+      const table = make('table', { className: 'mine z5-table' });
+      const head = make('tr');
+      ['', '項目', '現時', '去哪裏改'].forEach((h) => head.appendChild(make('th', { text: h })));
+      table.appendChild(head);
+      r.items.forEach((it) => {
+        const tr = make('tr');
+        [it.ok ? '✔' : '✘', it.label, it.value, it.where].forEach((v) => tr.appendChild(make('td', { text: v })));
+        table.appendChild(tr);
+      });
+      nodes.push(table);
+      nodes.push(para('這裏只看，不會改動任何東西。', 'muted'));
+      openModal('上線前檢查', nodes, [button('關閉', () => closeModal(), '')]);
+    });
+  }
+
+  /* ---------- 個人專屬連結 ---------- */
+
+  function openPersonalLinkTools() {
+    runAction('讀取個人專屬連結', async () => {
+      const d = await callServer('apiGetPersonalLinkTools');
+      const nodes = [];
+      const seed = make('div', { className: 'sec' }, [sectionTitle('補發個人專屬連結（新人）')]);
+      seed.appendChild(para(d.missing.length ? ('還沒有個人專屬連結：' + d.missing.map((p) => p.nameTC).join('、'))
+        : '每一位都已經有個人專屬連結。', d.missing.length ? '' : 'muted'));
+      if (d.missing.length) {
+        seed.appendChild(row([button('補發個人專屬連結', () => runAction('補發個人專屬連結', async () => {
+          const r = await callServerMutating('apiSeedPersonalLinkTokens');
+          setStatus(r.message);
+          openPersonalLinkTools();
+        }), '')]));
+      }
+      nodes.push(seed);
+      const re = make('div', { className: 'sec' }, [sectionTitle('重新產生某人的個人連結（外洩時用）')]);
+      re.appendChild(para('舊連結會即時失效，之後要把新連結交給他本人。', 'muted'));
+      const sel = document.createElement('select');
+      d.people.forEach((p) => {
+        const o = document.createElement('option');
+        o.value = p.personId;
+        o.textContent = p.nameTC + (p.hasLink ? '' : '（還沒有連結）');
+        sel.appendChild(o);
+      });
+      re.appendChild(make('div', { className: 'prop-head' }, [make('span', { text: '誰' }), sel]));
+      re.appendChild(row([button('重新產生某人的個人連結', () => {
+        const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '';
+        openConfirm({
+          title: '重新產生 ' + name + ' 的個人連結',
+          bodyNodes: [para('舊連結會即時失效（他手上舊電郵內的連結會打不開）。'), para('只在連結外洩時才用。', 'muted')],
+          requireTyping: true,
+          typingPhrase: d.confirmText,
+          confirmLabel: '確定重新產生',
+          danger: true,
+          onConfirm: (typed) => runAction('重新產生個人連結', async () => {
+            const r = await callServerMutating('apiReissuePersonalLinkToken', sel.value, typed, currentQuarterId);
+            const done = [make('div', { text: r.message, className: 'ok-line' })];
+            if (r.newUrl) done.push(make('div', { text: r.newUrl, className: 'z5-text' }));
+            openModal('重新產生某人的個人連結', done, [button('知道了', () => closeModal(), '')]);
+          })
+        });
+      }, 'danger')]));
+      nodes.push(re);
+      openModal('個人專屬連結', nodes, [button('關閉', () => closeModal(), 'secondary')]);
+    });
+  }
+
+  /* ---------- 補建設定及範本 ---------- */
+
+  function openSeedConfigAndTemplates() {
+    runAction('檢查設定及範本', async () => {
+      const p = await callServer('apiPlanSeedConfigAndTemplates');
+      const total = p.configMissing.length + p.templatesMissing.length;
+      const nodes = [para('只新增缺少的設定行及電郵範本，不會改動任何現有的行。新加的設定是預設值。')];
+      nodes.push(audienceListBox('缺少的設定（' + p.configMissing.length + ' 行）',
+        p.configMissing.map((c) => c.key + '＝' + (c.defaultValue || '（空白）')), '沒有。'));
+      nodes.push(audienceListBox('缺少的電郵範本（' + p.templatesMissing.length + ' 個）', p.templatesMissing, '沒有。'));
+      openModal('補建設定及範本', nodes, total === 0 ? [button('知道了', () => closeModal(), '')] : [
+        button('補建', () => runAction('補建設定及範本', async () => {
+          const r = await callServerMutating('apiSeedConfigAndTemplates');
+          openModal('補建設定及範本', [make('div', { text: r.message, className: 'ok-line' }),
+            para((r.configAdded || []).concat(r.templatesAdded || []).join('、'), 'muted')], [button('知道了', () => closeModal(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /* ---------- 上線切換／回到測試模式（只限可以修改的人） ---------- */
+
+  function openGoLive(rollback) {
+    runAction('讀取上線狀態', async () => {
+      const p = await callServer('apiGoLivePlan', currentQuarterId);
+      const nodes = [z5Line('現時', p.state.description, 'prop-head')];
+      if (!rollback) {
+        if (p.readinessError) nodes.push(make('div', { text: '全面體檢失敗：' + p.readinessError, className: 'err-text' }));
+        else if (p.readiness && !p.readiness.ok) {
+          const box = make('div', { className: 'vio vio-hard' }, [make('div', { text: '全面體檢有 ' + p.readiness.mustCount + ' 項「必須處理」，不可以上線：', className: 'vio-head' })]);
+          p.readiness.mustItems.forEach((i) => box.appendChild(make('div', { text: '・' + i.section + '：' + i.label + '——' + i.summary, className: 'vio-row' })));
+          nodes.push(box);
+        } else if (p.readiness) {
+          nodes.push(make('div', { text: '全面體檢：沒有「必須處理」項目（建議處理 ' + p.readiness.shouldCount + ' 項）。', className: 'ok-line' }));
+        }
+        nodes.push(para('上線會：清空主旨前綴，然後把 DRY_RUN 改為 FALSE（風險最高的一步排最後）。之後寄出的信會真正寄出。', 'strong'));
+      } else {
+        nodes.push(para('回到測試模式會：先把 DRY_RUN 改為 TRUE（立即停止真正寄信），再放回主旨前綴「' + p.testPrefix + '」。已經寄出的信收不回來。', 'strong'));
+      }
+      const blocked = !rollback && (!p.readiness || !p.readiness.ok);
+      const go = button(rollback ? '回到測試模式' : '上線切換', () => openConfirm({
+        title: rollback ? '回到測試模式' : '上線切換',
+        bodyNodes: [para(rollback ? '確定要回到測試模式嗎？' : '確定要上線嗎？上線之後，系統會真正寄出電郵。')],
+        requireTyping: true,
+        typingPhrase: rollback ? p.rollbackConfirmText : p.confirmText,
+        confirmLabel: rollback ? '確定回到測試模式' : '確定上線',
+        danger: !rollback,
+        onConfirm: (typed) => runAction(rollback ? '回到測試模式' : '上線切換', async () => {
+          const r = rollback ? await callServerMutating('apiGoLiveRollback', typed) : await callServerMutating('apiGoLiveExecute', currentQuarterId, typed);
+          openModal(rollback ? '回到測試模式' : '上線切換', [make('div', { text: r.message, className: 'ok-line' }),
+            para((r.done || []).join('；'), 'muted')], [button('完成', () => refreshLikeButton(), '')]);
+        })
+      }), rollback ? '' : 'danger');
+      if (blocked) { go.disabled = true; go.title = '全面體檢有「必須處理」項目'; }
+      openModal(rollback ? '回到測試模式' : '上線切換', nodes, [go, button('取消', () => closeModal(), 'secondary')]);
+    });
+  }
+
+  /* ---------- 〔使用權限〕 ---------- */
+
+  function openPermissions() {
+    runAction('讀取使用權限', async () => {
+      const p = await callServer('apiGetPermissions');
+      const fields = {};
+      const nodes = [para('每行一個電郵。改完按〔儲存〕；每一項改動都會記錄。不可以把自己從「可以修改」移走。', 'muted')];
+      const area = (key, title, list) => {
+        const ta = document.createElement('textarea');
+        ta.className = 'perm-' + key;
+        ta.rows = Math.max(2, list.length + 1);
+        ta.value = list.join('\n');
+        fields[key] = ta;
+        nodes.push(make('div', { className: 'sec' }, [sectionTitle(title), make('div', { text: p.text[key], className: 'muted' }), ta]));
+      };
+      area('editors', '可以修改的人（WEBAPP_ALLOWED_EMAILS）', p.editors);
+      area('viewers', '只可查看的人（WEBAPP_VIEWER_EMAILS）', p.viewers);
+      area('confirmers', '確認申報的人（UNAVAILABLE_CONFIRMER_EMAILS）', p.confirmers);
+      area('adminNotify', '幹事通知電郵（MAIL_ADMIN_NOTIFY）', p.adminNotify);
+      const rolloutSel = document.createElement('select');
+      [['LEADERS', '只開放給堂委、執事及幹事（第一階段）'], ['ALL', '全部事奉人員']].forEach(([v, t]) => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = t; o.selected = p.rollout === v;
+        rolloutSel.appendChild(o);
+      });
+      nodes.push(make('div', { className: 'sec' }, [sectionTitle('開放範圍（ROLLOUT_AUDIENCE）'), make('div', { text: p.text.rollout, className: 'muted' }), rolloutSel]));
+      const roles = make('div', { className: 'sec' }, [sectionTitle('現任堂委、執事（只看）')]);
+      roles.appendChild(z5Line('堂委（' + p.committee.length + ' 位）', p.committee.join('、') || '沒有'));
+      roles.appendChild(z5Line('執事（' + p.deacon.length + ' 位）', p.deacon.join('、') || '沒有'));
+      roles.appendChild(row([button('身分設定', () => openRoles(''), 'secondary')]));
+      nodes.push(roles);
+      const lines = (ta) => ta.value.split(/[\n,，;；\s]+/).map((s) => s.trim()).filter(Boolean);
+      openModal('使用權限', nodes, [
+        button('儲存', () => runAction('儲存使用權限', async () => {
+          const r = await callServerMutating('apiSavePermissions', {
+            editors: lines(fields.editors), viewers: lines(fields.viewers), confirmers: lines(fields.confirmers),
+            adminNotify: lines(fields.adminNotify), rollout: rolloutSel.value
+          });
+          openModal('使用權限', [make('div', { text: r.message, className: 'ok-line' }), para((r.changes || []).join('\n'), 'lines')],
+            [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
 </script>

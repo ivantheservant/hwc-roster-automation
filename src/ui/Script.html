@@ -175,6 +175,13 @@
     'apiPreviewTemplateSamples',
     // 第一百零一輪批次 ZC-3／ZE-1：〔寄出／匯出申報不能服侍日子連結〕窗的內容——只讀
     'apiUnavailableLinkPreview',
+    // 第一百零一輪批次 ZD／ZG 組——只讀
+    'apiGetAutomationStatus',
+    'apiGetPersonalLinkTools',
+    'apiPlanSeedConfigAndTemplates',
+    'apiGoLivePlan',
+    'apiGetPermissions',
+    'apiGetPreLaunchCheck',
     // 第八十五輪批次 LF 組：〔寄出季前資料〕預覽——只讀
     'apiPreseasonPreview',
     'apiListUnavailable',
@@ -540,7 +547,7 @@
   const STAFFING_AFFECTING_CALLS = ['apiApplyEligibilitySheet', 'apiSaveEligibilityBatch', 'apiSaveUnavailable',
     // 第九十輪批次 QC 組：接受事奉人員申報＝加入不能服侍的日期
     'apiDecideUnavailableSubmissions',
-    'apiSavePersonPostWeightBatch', 'apiAddRole', 'apiSaveRole', 'apiRolesTermChangeExecute', 'apiAddExclusion',
+    'apiSavePersonPostWeightBatch', 'apiAddRole', 'apiSaveRole', 'apiRolesTermChangeExecute', 'apiAddExclusion', 'apiAddExclusions',
     'apiSaveExclusion', 'apiLiftExclusion', 'apiRuleReviewImportExecute', 'apiSaveCombinedServices',
     // 第九十八輪批次 YA 組：預先安排的領詩、司琴（同日不兼任會避開他們）
     'apiSavePreAssignments'];
@@ -944,8 +951,8 @@
   const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結'];
   /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
   const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結',
-    // 第一百零一輪批次 ZB 組：只讀
-    '預覽電郵範本'];
+    // 第一百零一輪批次 ZB／ZD／ZG 組：只讀
+    '預覽電郵範本', '自動排程狀態', '上線前檢查'];
 
   /** 這粒按鈕的文字是不是會改動資料（只可查看的人要變灰）。 */
   function isViewOnlyBlockedLabel_(label) {
@@ -2451,7 +2458,7 @@
       clear(el('quarter'));
       el('statusCard').hidden = true;
       setStatus('Quarters 工作表沒有任何季度資料。請先在試算表建立季度，'
-        + '或用選單「準備工作 ▸ 新增季度」。', true);
+        + '或在「進階與診斷」按〔建立未來季度〕。', true);
       return;
     }
 

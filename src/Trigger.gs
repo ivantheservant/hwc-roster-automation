@@ -204,7 +204,12 @@ function dailyAutomationCheck_() {
       report.push({ quarterId: '', action: 'UNAVAILABLE_SUBMISSIONS', outcome: 'ERROR', detail: err.message });
     }
 
+    // 第一百零一輪批次 ZD 組：記下最近一次執行時間及結果（〔自動排程狀態〕顯示）
+    recordAutomationLastRun_(report.every(function (r) { return !/ERROR/.test(String((r && r.outcome) || '')); }), summariseAutomationReport_(report));
     return report;
+  } catch (err) {
+    recordAutomationLastRun_(false, '執行失敗：' + err.message);
+    throw err;
   } finally {
     AUTOMATION_TRIGGER_CONTEXT_ACTIVE = false;
   }

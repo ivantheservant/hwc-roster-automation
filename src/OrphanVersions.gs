@@ -101,7 +101,7 @@ function classifyOrphanVersionsHealth_(orphans) {
     orphans.length === 0
       ? '沒有發現問題。'
       : '這些版本寫了一半（派工紀錄或工作表寫了，但沒有登記）。日後這一季再建立新版本時，'
-        + '會因為工作表名稱重複而失敗。可以用「維護 ▸ ⚠️ 清理未登記的孤兒版本」清除——'
+        + '會因為工作表名稱重複而失敗。請通知管理員清理未登記的孤兒版本——'
         + '它只刪這些未登記的資料，已登記的版本一律不會改動。',
     orphans.map(describeOrphanVersion_));
 }

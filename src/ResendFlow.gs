@@ -286,9 +286,9 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions, p
   const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
 
   const personTemplate = findEmailTemplateById_('TPL_RESEND_TC');
-  if (!personTemplate) throw new Error('EmailTemplates 找不到 TPL_RESEND_TC，請先執行「維護 ▸ 補齊 Email 範本」');
+  if (!personTemplate) throw new Error('EmailTemplates 找不到 TPL_RESEND_TC，請先在幹事介面「進階與診斷」按〔補建設定及範本〕');
   const listTemplate = findEmailTemplateById_('TPL_RESEND_LIST_TC');
-  if (!listTemplate) throw new Error('EmailTemplates 找不到 TPL_RESEND_LIST_TC，請先執行「維護 ▸ 補齊 Email 範本」');
+  if (!listTemplate) throw new Error('EmailTemplates 找不到 TPL_RESEND_LIST_TC，請先在幹事介面「進階與診斷」按〔補建設定及範本〕');
 
   // 需求 3：附件要存 Shared Drive 時，一開始就驗證資料夾，無效立即中止——
   // 跟 sendStage_() 同一個把關理由，這裡兩個範本都需要附件（PERSONAL_PDF／FULL_PDF）。

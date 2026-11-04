@@ -453,7 +453,7 @@ function writeHwcasDraftSheet_(draft, source) {
       .join('　');
 
   sheet.getRange(1, 1).setValue(
-    '此表為 HWCAS 配對初稿，需人手核對後才用選單「套用 HWCAS 初稿」寫入 NameMapping。'
+    '此表為 HWCAS 配對初稿，需人手核對後，由管理員套用寫入 NameMapping。'
       + '　讀取的欄位：' + columnNote
       + '　│　欄位對應（Config 的 HWCAS_COL_*）：' + mappingNote
   );

@@ -357,7 +357,7 @@ function apiRolesTermChangePlan(endDateRaw) {
       ok: false,
       message: buildThreePartMessage_(
         '找不到身分名單（' + SHEETS.ROLES + '）。', '甚麼都沒有改動。',
-        ['先執行選單的「維護 ▸ 補建身分名單工作表」'])
+        ['請通知管理員處理（補建身分名單工作表）'])
     };
   }
 
@@ -516,7 +516,7 @@ function apiRoleOverview() {
         '讀不到身分總覽（' + err.message + '）。',
         '甚麼都沒有改動。上面的名單仍然可以用。',
         ['重新整理這一頁再試一次',
-          '如果一直失敗，用選單的「查看（唯讀，只寫 Diagnostics）▸ 身分名單概況（唯讀）」看同樣的內容'])
+          '如果一直失敗，請通知管理員處理'])
     };
   }
 }

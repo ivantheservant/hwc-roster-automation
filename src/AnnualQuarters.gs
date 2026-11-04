@@ -279,7 +279,7 @@ function buildAnnualQuartersPreview_(year, plans, startMonths) {
     lines.push('　 原因是 Config 的 ' + CONFIG_KEYS.LEAD_DAYS_GENERATE + ' 或 '
       + CONFIG_KEYS.LEAD_DAYS_OFFICIAL + ' 還沒有填。');
     lines.push('　 那兩格會留空。填好 Config 之後，執行');
-    lines.push('　 「準備工作 ▸ ⚠️ 計算季度日期」就可以補上。');
+    lines.push('　 請通知管理員重新計算季度日期，就可以補上。');
   } else {
     lines.push('生成日期與正式發出日期會一併寫入，不用再另外執行「計算季度日期」。');
   }

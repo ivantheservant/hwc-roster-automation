@@ -92,7 +92,11 @@ const WEBAPP_READ_ONLY_APIS = [
   // 第一百零一輪批次 ZB 組：〔更新電郵範本到最新版〕比對、〔預覽電郵範本〕（只讀）
   'apiPlanEmailTemplateUpdate', 'apiPreviewTemplateSamples',
   // 第一百零一輪批次 ZC-3／ZE-1：〔寄出／匯出申報不能服侍日子連結〕窗的內容（只讀）
-  'apiUnavailableLinkPreview'
+  'apiUnavailableLinkPreview',
+  // 第一百零一輪批次 ZD／ZG 組：自動排程狀態、個人連結工具、補建設定及範本比對、上線切換現況、使用權限、上線前檢查（只讀；
+  // 使用權限、上線切換在函式內再限可以修改的人）
+  'apiGetAutomationStatus', 'apiGetPersonalLinkTools', 'apiPlanSeedConfigAndTemplates', 'apiGoLivePlan', 'apiGetPermissions',
+  'apiGetPreLaunchCheck'
 ];
 
 /**

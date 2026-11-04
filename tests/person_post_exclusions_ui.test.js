@@ -130,7 +130,8 @@ console.log('\n=== D 四條區三規矩 ===');
     && /newValue: describeFields_\(newValues, FIELDS\)/.test(save));
   check('★★★★ 新增亦寫 AuditLog', /action: 'EXCLUSION_ADD'/.test(add));
   check('★★★★★ 前端每個寫入前面都有確認畫面',
-    (zone3.match(/openConfirm\(\{[\s\S]{0,600}?callServerMutating\('apiAddExclusion'/g) || []).length === 1
+    // 第一百零一輪批次 ZD 組：新增改為 apiAddExclusions（崗位可多選）
+    (zone3.match(/openConfirm\(\{[\s\S]{0,600}?callServerMutating\('apiAddExclusions'/g) || []).length === 1
     && (zone3.match(/openConfirm\(\{[\s\S]{0,900}?callServerMutating\('apiSaveExclusion'/g) || []).length === 1
     && (zone3.match(/openConfirm\(\{[\s\S]{0,600}?callServerMutating\('apiLiftExclusion'/g) || []).length === 1);
 }
@@ -150,7 +151,7 @@ console.log('\n=== D 呼叫層：讀寫分流 ===');
   const readOnly = (listMatch[1].match(/'([A-Za-z0-9_]+)'/g) || []).map((s) => s.replace(/'/g, ''));
   check('★★★★ apiListExclusions 喺唯讀白名單',
     readOnly.indexOf('apiListExclusions') !== -1);
-  ['apiSaveExclusion', 'apiAddExclusion', 'apiLiftExclusion'].forEach((n) => {
+  ['apiSaveExclusion', 'apiAddExclusions', 'apiLiftExclusion'].forEach((n) => {   // 第一百零一輪 ZD：apiAddExclusions
     check('★★★★★ ' + n + ' 唔喺白名單，而且用 callServerMutating()',
       readOnly.indexOf(n) === -1 && zone3.indexOf("callServerMutating('" + n + "'") !== -1);
   });
@@ -160,8 +161,9 @@ console.log('\n=== D 區三頁尾嗰句「下一輪會搬上來」要拆走 ==='
 {
   // ⚠️ 第七十五輪批次 CA 組（Ivan 決定）：〔暫時不做某崗位〕入口拿走；
   // `PersonPostExclusions` 資料照留、排表照守，畫面本身（openExclusions）冇刪。
-  check('★★★★ 區三已經冇「暫時不做某崗位」呢粒掣（第七十五輪 CA 組）',
-    !/button\('暫時不做某崗位'/.test(zone3) && /function openExclusions\(/.test(zone3));
+  // 第一百零一輪批次 ZD 組（刻意改動）：Ivan 要求〔暫時不做某崗位〕重新加入介面（常用設定）
+  check('★★★★ 常用設定有〔暫時不做某崗位〕（第一百零一輪 ZD 組重新加入）',
+    /button\('暫時不做某崗位', \(\) => openExclusions\(''\)/.test(zone3) && /function openExclusions\(/.test(zone3));
   check('★★★★★ 而且冇咗「下一輪／下一個階段會搬上來」嗰句'
     + '——兩個畫面都做完咗，留住嗰句會令幹事去選單搵一個已經喺呢度嘅功能',
     !/下一輪會搬上來/.test(zone3) && !/下一個階段會搬上來/.test(zone3));

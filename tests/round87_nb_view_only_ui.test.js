@@ -68,7 +68,8 @@ const tick = async () => { for (let i = 0; i < 10; i++) await new Promise((r) =>
   check('★★★★★ 列出待補格子、草稿覆核報告、名單檢查、出席系統連結 ⇒ 可以按', ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結']
     .every((n) => row(n).disabled === false));
   const link = ui.settingsSheetLink('身分（堂委／執事）', 'https://example.invalid/sheet', 'Roles');
-  check('★★★★★ 常用設定〔身分（堂委／執事）〕不畫試算表連結，改為灰色按鈕', link.tagName === 'BUTTON' && link.disabled === true && link.title === '你只有查看權限');
+  // 第一百零一輪批次 ZD-4（刻意改動）：只可查看的人不顯示任何打開主試算表的按鈕或連結（連灰色按鈕都不畫）
+  check('★★★★★ 常用設定〔身分（堂委／執事）〕只可查看 ⇒ 不顯示', link === null);
 
   console.log('\n=== NB9：不送出改動、開機、狀態卡 ===');
   let err = null;

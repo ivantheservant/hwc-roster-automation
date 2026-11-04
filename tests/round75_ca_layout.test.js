@@ -69,7 +69,8 @@ console.log('\n=== CA①：「名單維護」整區冇咗，換成「常用設�
   check('★★★★★ 常用設定有〔匯出規則審閱表〕〔整季清走重來〕兩項、冇〔重新生成初稿（覆蓋式）〕',
     /匯出規則審閱表/.test(body.textContent) && /整季重設/.test(body.textContent)
       && !/重新生成初稿（覆蓋式）/.test(body.textContent), body.textContent.slice(0, 300));
-  ['崗位資格', '暫時不做某崗位', '不能服侍的日期', '排表偏好'].forEach((t) => {
+  // 第一百零一輪批次 ZD 組（刻意改動）：〔暫時不做某崗位〕重新加入常用設定（Ivan 要求）
+  ['崗位資格', '不能服侍的日期', '排表偏好'].forEach((t) => {
     check('★★★★★ 常用設定冇〔' + t + '〕', all.indexOf(t) === -1 && body.textContent.indexOf('〔' + t) === -1, JSON.stringify(all));
   });
   // 搵唔到工作表 ⇒ 灰掣＋原因，唔畫一條去錯地方嘅連結

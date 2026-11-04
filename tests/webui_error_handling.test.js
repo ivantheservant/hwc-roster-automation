@@ -130,7 +130,7 @@ console.log('\n=== 核心不變量三：冇季度時要講嘢，唔可以靜靜�
   check('★★★★★ loadQuarters() 有處理「一個季度都冇」嘅情況',
     /if \(!quarters \|\| quarters\.length === 0\)/.test(body));
   check('★★★★★ 而且會顯示說明文字（唔係靜靜留白，令人以為壞咗）',
-    /setStatus\(/.test(body) && /新增季度/.test(body));
+    /setStatus\(/.test(body) && /新增季度|建立未來季度/.test(body));   // 第一百零一輪 ZD-3：介面路徑
 }
 
 console.log('\n=== 核心不變量四：「上次寄到一半」嘅警告，掣 2 同掣 3 都要有 ===');

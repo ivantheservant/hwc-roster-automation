@@ -95,7 +95,7 @@ function assessGoLiveState_() {
  * @param {string} source 寫入 AuditLog 嘅來源函式名
  * @returns {{key: string, oldValue: string, newValue: string}} 改動前後嘅值
  */
-function setConfigValue_(key, value, source) {
+function setConfigValue_(key, value, source, auditAction) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.CONFIG);
   if (!sheet) throw new Error('找不到工作表: ' + SHEETS.CONFIG);
 
@@ -119,7 +119,7 @@ function setConfigValue_(key, value, source) {
   }
   if (targetRow === -1) {
     throw new Error('Config 工作表沒有 ' + key + ' 這一行。'
-      + '請先執行「維護 ▸ 補建 Config 參數」，上線切換不會自動新增設定行。');
+      + '請先在幹事介面「進階與診斷」按〔補建設定及範本〕，上線切換不會自動新增設定行。');
   }
 
   const oldValue = String(sheet.getRange(targetRow, valueCol).getValue() || '');
@@ -132,13 +132,13 @@ function setConfigValue_(key, value, source) {
   reloadConfigCache_();
 
   writeAuditLog_({
-    action: '上線切換：改 Config',
+    action: auditAction || '上線切換：改 Config',
     targetSheet: SHEETS.CONFIG,
     targetKey: key,
     oldValue: oldValue,
     newValue: String(value),
     source: source,
-    notes: '由上線切換嚮導改動，改完已清 Config 快取'
+    notes: (auditAction ? '由幹事介面改動' : '由上線切換嚮導改動') + '，改完已清 Config 快取'
   });
 
   return { key: key, oldValue: oldValue, newValue: String(value) };

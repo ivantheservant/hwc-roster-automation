@@ -387,3 +387,33 @@ function apiLiftExclusion(exclusionId, liftDateRaw) {
 
   return { ok: true, exclusionId: id, effectiveTo: parsed.dateStr };
 }
+
+/**
+ * 第一百零一輪批次 ZD 組：〔暫時不做某崗位〕新增——崗位可多選（每個崗位一行，同一個人、原因、生效日、解除日）。
+ * 先逐個崗位驗證，全部合格才寫（不會只寫了一半）。解除日可留空＝直至另行通知。
+ * @param {{personId: string, postIds: string[], reason: string, effectiveFrom: string, effectiveTo: string}} payload
+ * @returns {{ok: boolean, message: string, exclusionIds: string[]}}
+ */
+function apiAddExclusions(payload) {
+  assertWebAppRequestAllowed_();
+  const p = payload || {};
+  const postIds = (Array.isArray(p.postIds) ? p.postIds : []).map(function (x) { return String(x || '').trim(); })
+    .filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+  if (postIds.length === 0) return { ok: false, message: '請最少選一個崗位。', exclusionIds: [] };
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  for (let i = 0; i < postIds.length; i++) {
+    const check = validateExclusionInput_(Object.assign({}, p, { postId: postIds[i] }), timezone);
+    if (!check.ok) return { ok: false, message: check.message, exclusionIds: [] };
+  }
+  return withMutationLock_('暫時不做某崗位', function () {
+    const ids = [];
+    let name = '';
+    postIds.forEach(function (postId) {
+      const r = apiAddExclusion(Object.assign({}, p, { postId: postId }));
+      if (!r.ok) throw new Error(r.message);
+      ids.push(r.exclusionId);
+      name = r.nameTC;
+    });
+    return { ok: true, exclusionIds: ids, message: '已加入 ' + ids.length + ' 行（' + name + '）。' };
+  });
+}
