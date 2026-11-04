@@ -35,30 +35,43 @@
 
   * { box-sizing: border-box; }
 
+  /* 第一百零一輪批次 ZF 組：很多長者使用 ⇒ 正文預設約 20px（「大」），可切換「特大」（24px）。
+     其餘字號一律用 em 跟着正文放大；職事表表格至少 16px（0.8em）。 */
+  :root { --fs: 20px; }
+  :root[data-font="xl"] { --fs: 24px; }
+
   body {
     margin: 0;
     padding: 16px;
     font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
+    font-size: var(--fs);
     background: var(--bg);
     color: var(--fg);
     line-height: 1.6;
+    overflow-wrap: anywhere;
   }
 
   .toolbar {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
     margin-bottom: 14px;
   }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .subtitle { color: var(--muted); font-size: 13px; margin: 0; }
+  .toolbar .title-block { flex: 1 1 260px; min-width: 0; }
+  .toolbar .tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* 頁頂「某某 專屬連結」：獨立一行大標題，人名粗體，約 32px */
+  h1.person-title { font-size: 1.6em; line-height: 1.25; margin: 0 0 6px; font-weight: 400; }
+  h1.person-title strong { font-weight: 800; }
+  .subtitle { color: var(--muted); font-size: 0.9em; margin: 0; }
 
-  button.theme-toggle {
+  button.theme-toggle, button.font-toggle {
     font: inherit;
-    font-size: 13px;
-    padding: 6px 12px;
-    border-radius: 6px;
+    font-size: 0.85em;
+    min-height: 48px;
+    padding: 8px 14px;
+    border-radius: 8px;
     border: 1px solid var(--border);
     background: transparent;
     color: var(--fg);
@@ -72,20 +85,22 @@
     padding: 12px 14px;
     margin-bottom: 16px;
   }
-  .schedule h2 { font-size: 14px; margin: 0 0 8px; }
-  .schedule ul { margin: 0; padding-left: 18px; font-size: 13px; }
-  .schedule p { margin: 0; font-size: 13px; color: var(--muted); }
+  .schedule h2 { font-size: 1.2em; margin: 0 0 8px; }
+  .schedule ul { margin: 0; padding-left: 1.2em; font-size: 1em; }
+  .schedule p { margin: 0; font-size: 1em; color: var(--muted); }
 
-  .scroll { overflow-x: auto; margin-bottom: 14px; }
-  table { border-collapse: collapse; font-size: 12px; }
+  /* 手機上表格在自己的框內左右捲動，整頁不會左右捲動 */
+  .scroll { overflow-x: auto; max-width: 100%; margin-bottom: 14px; }
+  table { border-collapse: collapse; font-size: 0.8em; }
   th, td {
     border: 1px solid var(--border);
-    padding: 4px 7px;
+    padding: 6px 9px;
     text-align: center;
     white-space: nowrap;
+    overflow-wrap: normal;
   }
   thead th { background: var(--header); position: sticky; top: 0; z-index: 1; }
-  .special-note { display: block; font-size: 10px; color: var(--muted); font-weight: normal; }
+  .special-note { display: block; font-size: 1em; color: var(--muted); font-weight: normal; }
   /* 第十二輪批次階段 A5：崗位在左（第一欄）、日期在頂，橫向捲動時第一欄
      （崗位名稱）用 sticky 定位保持喺畫面左邊，事奉人員用手機睇 13 週嘅表都
      唔會捲走咗先前對照緊嘅崗位。左上角個 <th>（崗位標題）要同時 sticky
@@ -106,71 +121,76 @@
     font-weight: 700;
   }
 
-  .legend { font-size: 12px; margin-bottom: 14px; }
+  .legend { font-size: 1em; margin-bottom: 14px; max-width: 100%; overflow-x: auto; }
   .legend table { width: auto; }
 
-  .footer-note { font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 14px; }
+  .footer-note { font-size: 0.85em; color: var(--muted); font-style: italic; margin-bottom: 14px; }
 
   .how-to {
     border-top: 1px solid var(--border);
     padding-top: 12px;
-    font-size: 12px;
+    font-size: 0.9em;
     color: var(--muted);
   }
   .how-to strong { color: var(--fg); }
 
-  .updated { font-size: 12px; color: var(--muted); margin-top: 16px; }
+  .updated { font-size: 0.85em; color: var(--muted); margin-top: 16px; }
 
-  /* 第九十輪批次 QC 組：申報不能服侍的日子 */
+  /* 第九十輪批次 QC 組：申報不能服侍的日子（第一百零一輪批次 ZF 組：全部放大，按鈕最少 48px 高） */
   .unav {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 12px 14px;
     margin-bottom: 16px;
-    font-size: 13px;
+    font-size: 1em;
   }
-  .unav h2 { font-size: 14px; margin: 0 0 8px; }
-  .unav h3 { font-size: 13px; margin: 12px 0 4px; }
+  .unav h2 { font-size: 1.2em; margin: 0 0 8px; }
+  .unav h3 { font-size: 1.05em; margin: 12px 0 4px; }
   .unav .muted { color: var(--muted); }
-  .unav label { display: block; padding: 4px 0; }
+  .unav label { display: block; padding: 6px 0; }
   .unav label.off { color: var(--muted); }
-  .unav input[type="text"] { font: inherit; width: 100%; max-width: 420px; padding: 6px 8px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--bg); color: var(--fg); }
-  .unav button { font: inherit; padding: 6px 14px; margin-top: 8px; border-radius: 6px; border: 1px solid var(--border);
+  .unav input[type="radio"], .unav input[type="checkbox"] { width: 1.3em; height: 1.3em; vertical-align: middle; margin-right: 6px; }
+  .unav input[type="text"] { font: inherit; width: 100%; max-width: 520px; min-height: 48px; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--bg); color: var(--fg); }
+  .unav button { font: inherit; min-height: 48px; padding: 8px 20px; margin-top: 8px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--header); color: var(--fg); cursor: pointer; }
-  .unav button.link { background: transparent; border: none; padding: 0 0 0 8px; margin: 0; text-decoration: underline; }
+  .unav button.link { background: transparent; border: none; min-height: 0; padding: 0 0 0 8px; margin: 0; text-decoration: underline; }
   .unav .sub-row { padding: 3px 0; }
   .unav .unav-msg { font-weight: 700; margin: 0 0 8px; }
   .unav .unav-msg.err { color: #b42318; }
-  /* 第九十四輪批次 UA 組：逐個主日的方格（手機友善：自動換行、不會橫向捲動；方格最少 44px 高，手指按得到） */
+  .unav .closed-note { font-weight: 700; margin: 4px 0; }
+  /* 第九十四輪批次 UA 組：逐個主日的方格（手機友善：自動換行、不會橫向捲動；方格最少 52px 高，手指按得到） */
   .unav .q-block { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 10px; }
-  .unav .month-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; margin: 8px 0; }
-  .unav .month-label { flex: 0 0 3.4em; font-weight: 700; padding-top: 10px; }
-  .unav .tiles { flex: 1 1 180px; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-  .unav button.tile { min-width: 64px; min-height: 44px; margin: 0; padding: 4px 8px; border-radius: 8px;
+  .unav .month-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 10px 0; }
+  .unav .month-label { flex: 0 0 3.4em; font-weight: 700; padding-top: 12px; }
+  .unav .tiles { flex: 1 1 180px; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .unav button.tile { min-width: 76px; min-height: 52px; margin: 0; padding: 6px 10px; border-radius: 8px;
     border: 1px solid var(--border); background: var(--bg); color: var(--fg); line-height: 1.2; }
   .unav button.tile.on { background: #1a7f37; border-color: #1a7f37; color: #ffffff; font-weight: 700; }
   .unav button.tile.done { background: var(--skipped); color: var(--muted); cursor: not-allowed; }
-  .unav .tile-note { display: block; font-size: 11px; font-weight: normal; }
-  .unav button.all-month { margin: 0; padding: 4px 8px; font-size: 12px; background: transparent; }
-  .unav .scope label { display: block; padding: 6px 0; }
-  .unav .posts-box { padding-left: 22px; }
-  .unav .posts-box label { display: inline-block; padding: 6px 12px 6px 0; }
-  .unav .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
+  .unav .tile-note { display: block; font-size: 0.75em; font-weight: normal; }
+  .unav button.all-month { margin: 0; min-height: 48px; padding: 8px 14px; font-size: 0.9em; background: transparent; }
+  .unav .scope label { display: block; padding: 8px 0; }
+  .unav .posts-box { padding-left: 1.4em; }
+  .unav .posts-box label { display: inline-block; padding: 8px 14px 8px 0; }
+  .unav .hint { color: var(--muted); font-size: 0.9em; margin: 6px 0; }
   .unav .hint.err { color: #b42318; }
   .unav table.mine { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 6px; }
   .unav table.mine th, .unav table.mine td { white-space: normal; word-break: break-word; text-align: left;
-    font-size: 12px; padding: 4px 6px; }
+    font-size: 0.85em; padding: 6px 8px; }
   .unav button:disabled { opacity: 0.55; cursor: not-allowed; }
 </style>
 </head>
 <body>
   <div class="toolbar">
-    <div>
-      <h1><?= data.quarterId ?> 職事表</h1>
-      <p class="subtitle"><?= data.personName ?> 專屬連結——這條連結不會改變，之後排表有任何更新，重新打開就會看到最新內容。</p>
+    <div class="title-block">
+      <h1 class="person-title"><strong><?= data.personName ?></strong> 專屬連結</h1>
+      <p class="subtitle"><?= data.quarterId ?> 職事表——這條連結不會改變，之後排表有任何更新，重新打開就會看到最新內容。</p>
     </div>
-    <button class="theme-toggle" id="themeToggleBtn" type="button">🌙 深色</button>
+    <div class="tools">
+      <button class="font-toggle" id="fontToggleBtn" type="button">字體：大</button>
+      <button class="theme-toggle" id="themeToggleBtn" type="button">🌙 深色</button>
+    </div>
   </div>
 
   <? if (data.noRoster) { ?>
@@ -508,6 +528,25 @@
         var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         applyTheme(next);
         try { window.localStorage.setItem(STORAGE_KEY, next); } catch (err) { /* 靜靜失敗 */ }
+      });
+    })();
+
+    // 第一百零一輪批次 ZF 組：〔字體：大／特大〕切換。記在 localStorage（讀寫都包 try/catch）；讀不到就用「大」。
+    (function () {
+      var FONT_KEY = 'hwcRosterFont';
+      var btn = document.getElementById('fontToggleBtn');
+      var root = document.documentElement;
+      function applyFont(size) {
+        if (size === 'xl') { root.setAttribute('data-font', 'xl'); btn.textContent = '字體：特大'; }
+        else { root.removeAttribute('data-font'); btn.textContent = '字體：大'; }
+      }
+      var stored = null;
+      try { stored = window.localStorage.getItem(FONT_KEY); } catch (err) { stored = null; }
+      applyFont(stored === 'xl' ? 'xl' : 'large');
+      btn.addEventListener('click', function () {
+        var next = root.getAttribute('data-font') === 'xl' ? 'large' : 'xl';
+        applyFont(next);
+        try { window.localStorage.setItem(FONT_KEY, next); } catch (err) { /* 靜靜失敗 */ }
       });
     })();
   </script>

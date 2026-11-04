@@ -1,24 +1,25 @@
 <style>
-  body { font-family: Arial, sans-serif; font-size: 13px; color: #202124; padding: 4px 8px 16px; }
-  h2 { font-size: 15px; margin: 8px 0 4px; }
-  .hint { color: #555; font-size: 12px; margin-bottom: 10px; line-height: 1.5; }
+  /* 第一百零一輪批次 ZF 組：字體放大（最小 15px；原本最小 11px） */
+  body { font-family: Arial, sans-serif; font-size: 16px; color: #202124; padding: 4px 8px 16px; }
+  h2 { font-size: 19px; margin: 8px 0 4px; }
+  .hint { color: #555; font-size: 15px; margin-bottom: 10px; line-height: 1.5; }
   .warn { background: #FFF2CC; border: 1px solid #E8C61A; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; }
   .toolbar { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .toolbar button { padding: 4px 10px; cursor: pointer; }
+  .toolbar button { font-size: 16px; padding: 8px 12px; cursor: pointer; }
   #bulkSaveBtn { font-weight: bold; }
-  #bulkStatus { font-size: 12px; color: #555; }
+  #bulkStatus { font-size: 15px; color: #555; }
   .cell { border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
   .cell.optional { border-style: dashed; background: #fafafa; }
   .cell .label { font-weight: bold; margin-bottom: 4px; }
   .cell .optional-badge {
-    font-weight: normal; font-size: 11px; color: #886400; background: #FFF2CC;
+    font-weight: normal; font-size: 15px; color: #886400; background: #FFF2CC;
     border-radius: 8px; padding: 1px 6px; margin-left: 6px;
   }
-  .cell input[type=text] { width: 100%; box-sizing: border-box; padding: 4px; margin-bottom: 4px; }
-  .cell .save-btn { padding: 4px 10px; cursor: pointer; }
-  .cell .status { font-size: 11px; margin-left: 6px; }
+  .cell input[type=text] { width: 100%; box-sizing: border-box; font-size: 16px; padding: 6px; margin-bottom: 4px; }
+  .cell .save-btn { font-size: 16px; padding: 8px 12px; cursor: pointer; }
+  .cell .status { font-size: 15px; margin-left: 6px; }
   .empty { color: #555; padding: 12px 0; }
-  #refreshBtn { padding: 4px 10px; cursor: pointer; }
+  #refreshBtn { font-size: 16px; padding: 8px 12px; cursor: pointer; }
   .error { color: #c00; white-space: pre-wrap; }
 </style>
 <body>

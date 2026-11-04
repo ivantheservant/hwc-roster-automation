@@ -425,7 +425,7 @@ function renderPersonalRosterError_() {
     '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">'
       + '<style>body{font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;'
       + 'padding:40px 20px;text-align:center;color:#1f2328;}'
-      + 'p{font-size:15px;line-height:1.6;max-width:360px;margin:0 auto;}</style></head>'
+      + 'p{font-size:20px;line-height:1.6;max-width:420px;margin:0 auto;}</style></head>'
       + '<body><p>' + PERSONAL_LINK_INVALID_MESSAGE + '</p></body></html>'
   ).setTitle('粵語堂職事表');
 }

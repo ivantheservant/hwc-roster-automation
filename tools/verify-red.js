@@ -12685,6 +12685,86 @@ const MUTATIONS = [
     find: "  add('自動寄信時間表已看過', !!reviewed,",
     replace: "  if (false) add('自動寄信時間表已看過', !!reviewed,",
     tests: ["tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "zf-base-small",
+    why: "個人連結頁正文仍是小字",
+    file: "src/ui/PersonalRoster.html",
+    find: "  :root { --fs: 20px; }",
+    replace: "  :root { --fs: 13px; }",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-title-small",
+    why: "標題人名沒有放大",
+    file: "src/ui/PersonalRoster.html",
+    find: "  h1.person-title { font-size: 1.6em;",
+    replace: "  h1.person-title { font-size: 0.9em;",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-title-inline",
+    why: "人名和說明擠在同一行",
+    file: "src/ui/PersonalRoster.html",
+    find: "      <h1 class=\"person-title\"><strong><?= data.personName ?></strong> 專屬連結</h1>",
+    replace: "      <h1 class=\"person-title\"><?= data.personName ?> 專屬連結</h1>",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-table-small",
+    why: "職事表表格太小",
+    file: "src/ui/PersonalRoster.html",
+    find: "  table { border-collapse: collapse; font-size: 0.8em; }",
+    replace: "  table { border-collapse: collapse; font-size: 0.6em; }",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-button-short",
+    why: "〔提交〕按鈕太矮",
+    file: "src/ui/PersonalRoster.html",
+    find: "  .unav button { font: inherit; min-height: 48px;",
+    replace: "  .unav button { font: inherit; min-height: 30px;",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-scroll-page",
+    why: "表格不在自己的框內捲動",
+    file: "src/ui/PersonalRoster.html",
+    find: "  .scroll { overflow-x: auto; max-width: 100%;",
+    replace: "  .scroll { overflow-x: visible; max-width: none;",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-toggle-default",
+    why: "讀不到記錄時不是「大」",
+    file: "src/ui/PersonalRoster.html",
+    find: "      applyFont(stored === 'xl' ? 'xl' : 'large');",
+    replace: "      applyFont(stored === 'large' ? 'large' : 'xl');",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-toggle-notry",
+    why: "讀 localStorage 沒有 try/catch",
+    file: "src/ui/PersonalRoster.html",
+    find: "      try { stored = window.localStorage.getItem(FONT_KEY); } catch (err) { stored = null; }",
+    replace: "      stored = window.localStorage.getItem(FONT_KEY);",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-admin-key",
+    why: "幹事介面仍讀舊的「標準」記錄",
+    file: "src/ui/Script.html",
+    find: "  const FONT_SIZE_STORAGE_KEY = 'hwcRosterFontSize101';",
+    replace: "  const FONT_SIZE_STORAGE_KEY = 'hwcRosterFontSize';",
+    tests: ["tests/round101_zf_fonts.test.js"]
+  },
+  {
+    id: "zf-sidebar-small",
+    why: "試算表側欄仍有 11px 字",
+    file: "src/ui/PreacherFillSidebar.html",
+    find: "  .cell .status { font-size: 15px; margin-left: 6px; }",
+    replace: "  .cell .status { font-size: 11px; margin-left: 6px; }",
+    tests: ["tests/round101_zf_fonts.test.js"]
   }
 ];
 

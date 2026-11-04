@@ -128,12 +128,13 @@ test('IE6 沒有記錄 ⇒ 預設「大」；記錄了「特大」⇒ 用特大�
   assert.strictEqual(r.attrs['data-font'], 'large');
   assert.strictEqual(r.sb.document.getElementById('fontSizeSelect').value, 'large');
 
-  store.hwcRosterFontSize = 'xlarge';
+  // 第一百零一輪批次 ZF 組（刻意改動）：記錄鍵改為 hwcRosterFontSize101（之前選了「標準」的回到預設「大」）
+  store.hwcRosterFontSize101 = 'xlarge';
   r = loadWithStorage(mem);
   r.sb.initFontSizePicker();
   assert.strictEqual(r.attrs['data-font'], 'xlarge');
 
-  store.hwcRosterFontSize = 'huge';
+  store.hwcRosterFontSize101 = 'huge';
   r = loadWithStorage(mem);
   r.sb.initFontSizePicker();
   assert.strictEqual(r.attrs['data-font'], 'large');
@@ -148,11 +149,11 @@ test('IE7 轉級即時生效並記住；localStorage 讀寫都出錯也不爆', 
   sel.value = 'xlarge';
   sel.fire('change');
   assert.strictEqual(r.attrs['data-font'], 'xlarge');
-  assert.strictEqual(store.hwcRosterFontSize, 'xlarge');
+  assert.strictEqual(store.hwcRosterFontSize101, 'xlarge');
   sel.value = 'standard';
   sel.fire('change');
   assert.strictEqual(r.attrs['data-font'], 'standard');
-  assert.strictEqual(store.hwcRosterFontSize, 'standard');
+  assert.strictEqual(store.hwcRosterFontSize101, 'standard');
 
   const broken = {
     getItem: () => { throw new Error('SecurityError'); },

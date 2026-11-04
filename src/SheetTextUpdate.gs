@@ -216,7 +216,7 @@ function buildSheetTextUpdateDialogHtml_(plan) {
   const head = plan.willUpdate > 0
     ? '以下 ' + plan.items.length + ' 格之中，' + plan.willUpdate + ' 格會改為新內容。按〔更新〕才會寫入。'
     : '以下 ' + plan.items.length + ' 格都不需要改動。';
-  return '<div style="font-family:sans-serif;font-size:14px">'
+  return '<div style="font-family:sans-serif;font-size:16px">'
     + '<p>' + esc(head) + '</p><ol id="list">' + rows + '</ol>'
     + '<p id="msg"></p>'
     + (plan.willUpdate > 0 ? '<button id="go" onclick="go()">更新</button> ' : '')

@@ -197,8 +197,9 @@ console.log('\n=== B3【核心】唯讀頁面完全冇任何 google.script.run �
   check('★ 完全冇會改動資料嘅 HTML 元素（input[type=text/submit]、button 只有主題切換）',
     !/<input/i.test(personalRosterHtml));
   const buttonCount = (personalRosterHtml.match(/<button/gi) || []).length;
-  checkEqual('★★ 頁面上唯一嘅按鈕係深色／淺色切換（純前端 CSS，唔改任何資料）',
-    buttonCount, 1);
+  // 第一百零一輪批次 ZF 組（刻意改動）：多了〔字體：大／特大〕切換（同樣純前端，唔改任何資料）
+  checkEqual('★★ 頁面上嘅按鈕只有深色／淺色切換及字體切換（純前端 CSS，唔改任何資料）',
+    buttonCount, 2);
 }
 
 console.log('\n=== B4：頁面內容涵蓋規格要求嘅五項 ===');

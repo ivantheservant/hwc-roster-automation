@@ -147,7 +147,8 @@ console.log('\n=== UA6：個人頁 ===');
   check('★★★★★★ 手機寬度：申報區的 CSS 沒有 white-space: nowrap', unavRules.every((r) => !/white-space:\s*nowrap/.test(r)), unavRules.filter((r) => /nowrap/.test(r)).join('}'));
   const fixed = unavRules.filter((r) => /(?:^|[^-])width:\s*(\d+)px/.test(r) && Number(r.match(/(?:^|[^-])width:\s*(\d+)px/)[1]) > 340);
   check('★★★★★★ 手機寬度：申報區沒有大過 340px 的固定闊度（390px 手機不會橫向捲動）', fixed.length === 0, fixed.join('}'));
-  check('★★★★★ 方格自動換行（flex-wrap）、最少 44px 高', /\.unav \.tiles \{[^}]*flex-wrap: wrap/.test(css) && /\.unav button\.tile \{[^}]*min-height: 44px/.test(css));
+  // 第一百零一輪批次 ZF 組（刻意改動）：方格放大到最少 52px 高
+  check('★★★★★ 方格自動換行（flex-wrap）、最少 44px 高', /\.unav \.tiles \{[^}]*flex-wrap: wrap/.test(css) && /\.unav button\.tile \{[^}]*min-height: (4[4-9]|5\d)px/.test(css));
   check('★★★★★ 「我已申報的日子」表格會換行（white-space: normal、table-layout: fixed、width 100%）',
     /\.unav table\.mine th, \.unav table\.mine td \{[^}]*white-space: normal/.test(css) && /\.unav table\.mine \{[^}]*table-layout: fixed/.test(css));
   check('★★★★★ 每月一行、「全選這個月」、選取時有 ✓', /'全選這個月'/.test(html) && /'✓ '/.test(html) && /' 月', 'month-label'/.test(html));
