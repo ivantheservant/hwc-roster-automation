@@ -1237,7 +1237,7 @@ const MUTATIONS = [
       + '——工具會報「已經標咗未確認」，而張表上面係空白。'
       + '報告講一件事、資料係另一件事，係最難查嗰種錯',
     file: 'src/AnnualCombined.gs',
-    find: '      if (col <= 0) {\n        throw new Error(buildThreePartMessage_(\n          \'「\' + SHEETS.SPECIAL_SUNDAYS + \'」這一張工作表沒有「\' + key + \'」這一欄，\'\n            + \'所以這一次要寫進去的內容寫不了。\',\n          \'甚麼都沒有寫入——這一次的年度合堂建議整批停下來了。\',\n          [\'去選單「維護 ▸ ⚠️ 補建 SpecialSundays 缺欄」補上這一欄\',\n            \'補完之後再按一次這個工具\',\n            \'⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料\']));\n      }\n',
+    find: '      if (col <= 0) {\n        throw new Error(buildThreePartMessage_(\n          \'「\' + SHEETS.SPECIAL_SUNDAYS + \'」這一張工作表沒有「\' + key + \'」這一欄，\'\n            + \'所以這一次要寫進去的內容寫不了。\',\n          \'甚麼都沒有寫入——這一次的年度合堂建議整批停下來了。\',\n          [\'請通知管理員處理（補建 SpecialSundays 缺欄）\',\n            \'補完之後再按一次這個工具\',\n            \'⚠️ 那一支工具只會在最後加欄，不會重排、不會改動任何既有資料\']));\n      }\n',
     replace: '      if (col <= 0) return;\n',
     tests: ['tests/special_sundays_schema.test.js']
   },
@@ -6954,9 +6954,10 @@ const MUTATIONS = [
   {
     id: "ef-people-link-back",
     why: "〔人員與電郵〕又出返嚟",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/ui/ScriptZone3.html",
-    find: "    body.appendChild(row([\n      settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),",
-    replace: "    body.appendChild(row([\n      settingsSheetLink('人員與電郵', links.people, 'NameMapping'),\n      settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),",
+    find: "      body.appendChild(row([\n        settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),",
+    replace: "      body.appendChild(row([\n        settingsSheetLink('人員與電郵', links.people, 'NameMapping'),\n        settingsSheetLink('身分（堂委／執事）', links.roles, 'Roles'),",
     tests: ["tests/round77_ef_settings_zone.test.js"]
   },
   {
@@ -9035,10 +9036,10 @@ const MUTATIONS = [
   {
     id: "lf-ui-no-button",
     why: "冇寄出季前資料掣",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/ui/ScriptZone2.html",
-    // 第九十三輪批次 TD 組：〔寄出申報邀請〕改名
-    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button('邀請事奉人員申報不能服侍的日子'",
-    replace: "button('邀請事奉人員申報不能服侍的日子'",
+    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button(UNAVAILABLE_LINK_BUTTON_LABEL",
+    replace: "button(UNAVAILABLE_LINK_BUTTON_LABEL",
     tests: ["tests/round85_lf_preseason.test.js"]
   },
   {
@@ -9093,7 +9094,8 @@ const MUTATIONS = [
   {
     id: "ma-preview-old-text",
     why: "預覽窗不講明是模擬",
-    file: "src/ui/ScriptZone2.html",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
+    file: "src/ui/ScriptZone5.html",
     find: "只有模擬寄出（",
     replace: "寄過一次（",
     tests: ["tests/round86_ma_preseason_sim.test.js"]
@@ -9325,10 +9327,10 @@ const MUTATIONS = [
   {
     id: "nb-allowed-blocked",
     why: "寄出季前資料預覽也變灰",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/ui/Script.html",
-    // 第九十三輪批次 TD 組：〔寄出申報邀請〕改名
-    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請事奉人員申報不能服侍的日子'];",
-    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['邀請事奉人員申報不能服侍的日子'];",
+    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結'];",
+    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出／匯出申報不能服侍日子連結'];",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
   {
@@ -9358,8 +9360,9 @@ const MUTATIONS = [
   {
     id: "nb-settings-sheet-link",
     why: "只可查看仍畫試算表連結",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/ui/ScriptZone3.html",
-    find: "    if (viewOnly_) return markViewOnlyBlocked_(button(label, () => {}, 'secondary'));\n",
+    find: "    if (viewOnly_) return null;\n",
     replace: "",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
@@ -10600,17 +10603,19 @@ const MUTATIONS = [
   {
     id: "td-old-button",
     why: "按鈕名稱變回〔寄出申報邀請〕",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/ui/ScriptZone2.html",
-    find: "      button('邀請事奉人員申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));",
-    replace: "      button('寄出申報邀請', () => openUnavailableInvite(), 'secondary')]));",
+    find: "  const UNAVAILABLE_LINK_BUTTON_LABEL = '寄出／匯出申報不能服侍日子連結';",
+    replace: "  const UNAVAILABLE_LINK_BUTTON_LABEL = '寄出申報邀請';",
     tests: ["tests/round93_td_invite_rename.test.js"]
   },
   {
     id: "td-no-hint",
     why: "預覽窗沒有指去範本樣本",
-    file: "src/ui/ScriptZone2.html",
-    find: "        para('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')",
-    replace: "        para('', 'muted')",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
+    file: "src/ui/ScriptZone5.html",
+    find: "        para('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 預覽電郵範本」。', 'muted'),",
+    replace: "        para('', 'muted'),",
     tests: ["tests/round93_td_invite_rename.test.js"]
   },
   {
@@ -10913,9 +10918,10 @@ const MUTATIONS = [
   {
     id: "va-no-memo-begin",
     why: "狀態卡載入沒有開 context 記憶（建 4 次）",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/WebAppDashboard.gs",
-    find: "  beginRequestContextMemo_();\n  try {\n    return buildDashboardState_(quarterId);",
-    replace: "  try {\n    return buildDashboardState_(quarterId);",
+    find: "  beginRequestContextMemo_();\n  try {\n    // 第一百零一輪批次 ZD-4：只可查看的人 ⇒ 不送任何主試算表網址\n    return viewerSafeState_(role, buildDashboardState_(quarterId));",
+    replace: "  try {\n    // 第一百零一輪批次 ZD-4：只可查看的人 ⇒ 不送任何主試算表網址\n    return viewerSafeState_(role, buildDashboardState_(quarterId));",
     tests: ["tests/round95_va_context_memo.test.js"]
   },
   {
@@ -11041,17 +11047,19 @@ const MUTATIONS = [
   {
     id: "vb-preseason-no-sync",
     why: "寄出季前資料之前不同步",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/PreseasonPack.gs",
-    find: "    syncPeopleFromHwcasBeforeSend_();\n    return sendPreseasonPack_",
-    replace: "    return sendPreseasonPack_",
+    find: "    syncPeopleFromHwcasBeforeSend_();\n    // 第一百零一輪批次 ZE-1：勾選由 sendPreseasonPack_() 解析",
+    replace: "    // 第一百零一輪批次 ZE-1：勾選由 sendPreseasonPack_() 解析",
     tests: ["tests/round95_vb_hwcas_sync.test.js"]
   },
   {
     id: "vb-invite-no-sync",
     why: "邀請事奉人員申報之前不同步",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/UnavailableInvite.gs",
-    find: "    syncPeopleFromHwcasBeforeSend_();\n    return sendUnavailableInvites_",
-    replace: "    return sendUnavailableInvites_",
+    find: "    syncPeopleFromHwcasBeforeSend_();\n    // 第一百零一輪批次 ZE-2：舊入口不傳收件人",
+    replace: "    // 第一百零一輪批次 ZE-2：舊入口不傳收件人",
     tests: ["tests/round95_vb_hwcas_sync.test.js"]
   },
   {
@@ -11561,9 +11569,10 @@ const MUTATIONS = [
   {
     id: "xa-save-readonly",
     why: "只可查看的人可以儲存補填電郵",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/WebApp.gs",
-    find: "  'apiGetPreAssignView'\n];",
-    replace: "  'apiGetPreAssignView', 'apiSaveManualEmails'\n];",
+    find: "  'apiGetPreAssignView',\n  // 第一百零一輪批次 ZB 組",
+    replace: "  'apiGetPreAssignView', 'apiSaveManualEmails',\n  // 第一百零一輪批次 ZB 組",
     tests: ["tests/round97_xa_manual_email.test.js"]
   },
   {
@@ -11640,10 +11649,11 @@ const MUTATIONS = [
   },
   {
     id: "xb-front-unchecked",
-    why: "匯出邀請預設不勾選",
-    file: "src/ui/ScriptZone2.html",
-    find: "      cb.checked = !!p.hasLink;",
-    replace: "      cb.checked = false;",
+    why: "舊入口〔沒有電郵的人：匯出邀請〕不再轉到合併後的窗",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
+    file: "src/ui/ScriptZone5.html",
+    find: "  function openInvitePaper() { openUnavailableInvite(); }",
+    replace: "  function openInvitePaper() { }",
     tests: ["tests/round97_xb_invite_paper.test.js"]
   },
   {
@@ -11841,9 +11851,10 @@ const MUTATIONS = [
   {
     id: "ya-ro-list",
     why: "讀取畫面不在伺服器唯讀清單",
+    // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/WebApp.gs",
-    find: "  'apiGetManualEmailView', 'apiGetInvitePaperView',\n  // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面（只讀）\n  'apiGetPreAssignView'\n];",
-    replace: "  'apiGetManualEmailView', 'apiGetInvitePaperView'\n];",
+    find: "  'apiGetManualEmailView', 'apiGetInvitePaperView',\n  // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面（只讀）\n  'apiGetPreAssignView',\n",
+    replace: "  'apiGetManualEmailView', 'apiGetInvitePaperView',\n",
     tests: ["tests/round98_ya_preassign.test.js"]
   },
   {
