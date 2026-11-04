@@ -211,6 +211,23 @@ check('★★★ 「粵語堂」rich text：Noto Serif TC 粗體', richCalls.som
 gas.writeRosterOutputToSpreadsheet_(ss, off);
 eq('★★★★ 重新發佈而次數頁關掉 ⇒ 刪走「服侍次數」', ss.getSheets().map((s) => s.getName()), ['職事表']);
 
+console.log('\n=== 寫入：GAS 每次回新的 Sheet 物件（第一百零二輪部署實測撞到「You can\'t remove all the sheets」）===');
+{
+  // 季度重設之後的公開檔：只有一張（舊名「完整版」，內容「已重設」）
+  const fresh = new MockSpreadsheet({ freshWrappers: true });
+  fresh.getSheets()[0].setName('完整版');
+  let err = null;
+  try { gas.writeRosterOutputToSpreadsheet_(fresh, model); } catch (e) { err = e; }
+  check('★★★★★ 只有一張工作表的檔案寫入不拋錯（不會把全部工作表刪走）', err === null, err && err.message);
+  eq('★★★★★ 寫完是「職事表」「服侍次數」兩張', fresh.getSheets().map((s) => s.getName()), ['職事表', '服侍次數']);
+  let err2 = null;
+  try { gas.writeRosterOutputToSpreadsheet_(fresh, model); } catch (e) { err2 = e; }
+  check('★★★★★ 重新發佈（已有兩張）不拋錯，仍然兩張', err2 === null && fresh.getSheets().length === 2, err2 && err2.message);
+  fresh.insertSheet('幹事手動加的');
+  gas.writeRosterOutputToSpreadsheet_(fresh, off);
+  eq('★★★★ 次數頁關掉 ⇒ 只剩「職事表」（多餘工作表刪走）', fresh.getSheets().map((s) => s.getName()), ['職事表']);
+}
+
 console.log('\n=== 個人 highlight 寫入（上一個人的格還原）===');
 const ctx = { rosterSheet: ws, model: model, highlightStyle: gas.parseRosterOutputHighlightStyle_('BOLD,#C00000,BORDER'), highlighted: [] };
 gas.writeRosterOutputToSpreadsheet_(ss, model);
@@ -281,7 +298,8 @@ const adm = src('AdminTools.gs');
 check('★★★★ 〔補建設定及範本〕比對列出 OutputOrder、執行時補建', /postsOutputOrder:/.test(body(adm, 'apiPlanSeedConfigAndTemplates'))
   && /o\.needed \? seedPostOutputOrder_\(o\) : 0/.test(body(adm, 'apiSeedConfigAndTemplates')));
 const pc = src('PdfContentSelfCheck.gs');
-check('★★★★ 〔核對寄出版面〕不寄出、不發佈：只有存檔到「版面樣本」', !/sendMail|publishPublicRoster_|MailApp|GmailApp/.test(body(pc, 'apiRosterOutputSample'))
+check('★★★★ 〔核對寄出版面〕不寄出、不發佈、不寫任何工作表（連 AuditLog 都不寫）：只有存檔到「版面樣本」',
+  !/sendMail|publishPublicRoster_|MailApp|GmailApp|writeAuditLog_|setValue|appendRow/.test(body(pc, 'apiRosterOutputSample'))
   && /getOrCreateRosterOutputSampleFolder_\(\)/.test(body(pc, 'apiRosterOutputSample')));
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAIL`);

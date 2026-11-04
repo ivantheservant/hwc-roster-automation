@@ -13017,6 +13017,22 @@ const MUTATIONS = [
     find: "      cells.length === expect.samplePersonCellCount && wrong.length === 0,",
     replace: "      wrong.length === 0,",
     tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oc-sample-writes-sheet",
+    why: "〔核對寄出版面〕寫 AuditLog（真實季度只准讀，不可以寫任何工作表）",
+    file: "src/PdfContentSelfCheck.gs",
+    find: "    // ⚠️ 刻意不寫 AuditLog：這個工具用於真實季度（例如 2026T3 只准讀）時，不可以寫入任何工作表。\n",
+    replace: "    writeAuditLog_({ action: 'ROSTER_OUTPUT_SAMPLE', targetKey: q });\n",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-sheet-identity",
+    why: "用 !== 比較 GAS 工作表（每次都是新物件）⇒ 公開檔全部工作表被刪、發佈失敗（第一百零二輪部署實測）",
+    file: "src/RosterOutput.gs",
+    find: "    if (keepIds.indexOf(s.getSheetId()) === -1) spreadsheet.deleteSheet(s);",
+    replace: "    if (s !== rosterSheet && s !== countsSheet) spreadsheet.deleteSheet(s);",
+    tests: ["tests/round102_oa_roster_output.test.js"]
   }
 ];
 

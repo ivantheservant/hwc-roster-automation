@@ -146,9 +146,7 @@ function apiRosterOutputSample(quarterId) {
         ctx.close();
       }
     }
-    writeAuditLog_({ action: 'ROSTER_OUTPUT_SAMPLE', targetSheet: '', targetKey: q + ' v' + versionNo,
-      newValue: files.map(function (f) { return f.name; }).join('、'), source: 'apiRosterOutputSample',
-      notes: '版面樣本（不寄出）；自我檢查 ' + (report.ok ? '全部通過' : '有問題') });
+    // ⚠️ 刻意不寫 AuditLog：這個工具用於真實季度（例如 2026T3 只准讀）時，不可以寫入任何工作表。
     return {
       quarterId: q, versionNo: versionNo, ok: report.ok, items: report.items, files: files,
       folderUrl: folder.getUrl(), elapsedMs: Date.now() - started,

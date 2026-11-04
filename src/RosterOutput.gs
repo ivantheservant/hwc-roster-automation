@@ -583,24 +583,29 @@ function applyRosterOutputTitleRichText_(range, rich) {
  * @returns {{rosterSheet: Sheet, countsSheet: ?Sheet}}
  */
 function writeRosterOutputToSpreadsheet_(spreadsheet, model) {
+  // ⚠️ 用 getSheetId() 比較：GAS 每次 getSheets()／getSheetByName() 都回一個**新的** Sheet 物件，
+  // 用 === / !== 比較永遠不相等——第一次部署實測撞到「You can't remove all the sheets in a document」。
   const existing = spreadsheet.getSheets();
   const rosterSheet = existing[0];
+  const rosterId = rosterSheet.getSheetId();
   const countsName = model.sheets[1] ? model.sheets[1].name : '';
   const keepCounts = countsName ? spreadsheet.getSheetByName(countsName) : null;
+  const keepCountsId = (keepCounts && keepCounts.getSheetId() !== rosterId) ? keepCounts.getSheetId() : null;
   // 第一張以外、名字會撞的（例如幹事手動加了一張「職事表」）先刪走，改名時才不會撞名
   existing.slice(1).forEach(function (s) {
-    if (s !== keepCounts && s.getName() === model.sheets[0].name) spreadsheet.deleteSheet(s);
+    if (s.getSheetId() !== keepCountsId && s.getName() === model.sheets[0].name) spreadsheet.deleteSheet(s);
   });
   resetSheetToBlankSlate_(rosterSheet);
   writeRosterOutputSheet_(rosterSheet, model.sheets[0]);
   let countsSheet = null;
   if (model.sheets[1]) {
-    countsSheet = (keepCounts && keepCounts !== rosterSheet) ? keepCounts : spreadsheet.insertSheet(countsName);
+    countsSheet = keepCountsId !== null ? keepCounts : spreadsheet.insertSheet(countsName);
     resetSheetToBlankSlate_(countsSheet);
     writeRosterOutputSheet_(countsSheet, model.sheets[1]);
   }
+  const keepIds = [rosterId].concat(countsSheet ? [countsSheet.getSheetId()] : []);
   spreadsheet.getSheets().forEach(function (s) {
-    if (s !== rosterSheet && s !== countsSheet) spreadsheet.deleteSheet(s);
+    if (keepIds.indexOf(s.getSheetId()) === -1) spreadsheet.deleteSheet(s);
   });
   return { rosterSheet: rosterSheet, countsSheet: countsSheet };
 }

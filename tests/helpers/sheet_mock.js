@@ -149,6 +149,8 @@ class MockRange {
 class MockSheet {
   constructor(name) {
     this._name = name;
+    MockSheet._nextId = (MockSheet._nextId || 0) + 1;
+    this._sheetId = MockSheet._nextId;
     this._maxRows = 1000;
     this._maxCols = 26;
     this._values = {};
@@ -163,6 +165,7 @@ class MockSheet {
   }
 
   getName() { return this._name; }
+  getSheetId() { return this._sheetId; }
   setName(n) { this._name = n; return this; }
   /** 第一百零二輪：有內容的最後一行／欄（readSheet_() 用）。 */
   getLastRow() { let m = 0; Object.keys(this._values).forEach((k) => { if (this._values[k] !== '') m = Math.max(m, Number(k.split(',')[0])); }); return m; }
@@ -253,13 +256,26 @@ class MockSheet {
 }
 
 class MockSpreadsheet {
-  constructor() {
+  constructor(opts) {
     this._sheets = [new MockSheet('Sheet1')];
+    this._freshWrappers = !!(opts && opts.freshWrappers);
   }
-  getSheets() { return this._sheets; }
-  getSheetByName(name) { return this._sheets.find(function (s) { return s.getName() === name; }) || null; }
-  insertSheet(name) { const s = new MockSheet(name); this._sheets.push(s); return s; }
-  deleteSheet(sheet) { this._sheets = this._sheets.filter(function (s) { return s !== sheet; }); }
+  // 第一百零二輪：`{ freshWrappers: true }` ⇒ 每次 getSheets()／getSheetByName()／insertSheet() 都回**新的**物件
+  // （真 GAS 就是這樣；用 === 比較工作表永遠不相等——第一百零二輪部署實測撞到）。
+  _wrap(s) {
+    if (!s || !this._freshWrappers) return s;
+    return new Proxy(s, { get: function (target, prop) { const v = target[prop]; return typeof v === 'function' ? v.bind(target) : v; } });
+  }
+  _unwrap(s) { return this._sheets.find(function (x) { return x.getSheetId() === s.getSheetId(); }); }
+  getSheets() { return this._freshWrappers ? this._sheets.map((s) => this._wrap(s)) : this._sheets; }
+  getSheetByName(name) { return this._wrap(this._sheets.find(function (s) { return s.getName() === name; }) || null); }
+  insertSheet(name) { const s = new MockSheet(name); this._sheets.push(s); return this._wrap(s); }
+  deleteSheet(sheet) {
+    // 真 GAS：刪走最後一張會拋錯
+    const target = this._unwrap(sheet);
+    if (this._sheets.length <= 1 && target) throw new Error("You can't remove all the sheets in a document.");
+    this._sheets = this._sheets.filter(function (s) { return s !== target; });
+  }
   getId() { return 'mock-spreadsheet-id'; }
   getUrl() { return 'https://example.invalid/mock-spreadsheet'; }
 }
