@@ -260,7 +260,8 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
  * @returns {string} 兩句人話
  */
 function buildPermanentLinkExplanation_() {
-  return '這是唯一一條連結。它永遠指向你最近一次「儲存我的修改」的版本。'
+  // 第一百零四輪批次 PD 組：按鈕名稱是〔儲存〕（部署之後核對時發現這一句沒有「按」字，第一次掃描漏了）
+  return '這是唯一一條連結。它永遠指向你最近一次按〔儲存〕的版本。'
     + '內容改了之後不用換連結，收到的人重新開就看到新版。';
 }
 

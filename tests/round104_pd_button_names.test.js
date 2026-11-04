@@ -62,6 +62,20 @@ files.forEach((f) => {
 });
 check('★★★★★★ 使用者看得到的字串沒有叫人按舊名稱的按鈕', hits.length === 0, hits.join('\n      '));
 
+// 「儲存我的修改」不論前面有沒有「按」字，使用者看得到的字串都不可以再出現（部署之後核對時找到永久連結說明那一句）
+const anyOld = [];
+files.forEach((f) => {
+  fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+    const s = line.trim();
+    if (s.startsWith('//') || s.startsWith('*') || s.startsWith('/*')) return;
+    if (/Style\.html$/.test(f)) return;   // Style.html 只有 CSS 及註解
+    const code = line.indexOf('//') >= 0 ? line.slice(0, line.indexOf('//')) : line;
+    if (/儲存我的修改/.test(code)) anyOld.push(path.basename(f) + ':' + (i + 1) + '  ' + s.slice(0, 80));
+  });
+});
+check('★★★★★★ 任何使用者看得到的字串都沒有「儲存我的修改」', anyOld.length === 0, anyOld.join('\n      '));
+check('★★★★★ 永久連結說明：最近一次按〔儲存〕的版本', /它永遠指向你最近一次按〔儲存〕的版本/.test(read('WebAppMainFlow.gs')));
+
 console.log('\n=== PD2：逐處核對 ===');
 check('★★★★★★ 系統調整的提示：按第 2 步的〔儲存〕（不是「儲存我的修改」）',
   /'或者按第 2 步的〔儲存〕，確認窗內有〔立即加入這個人〕'/.test(read('SuggestionSheet.gs')));

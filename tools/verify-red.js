@@ -13284,6 +13284,14 @@ const MUTATIONS = [
     find: "    const saveBtn = button('儲存', () => executeSaveAndConfirm(takeDeferredDecisions_()), '');",
     replace: "    const saveBtn = button('儲存', () => executeSaveAndConfirm(decisions ? decisions.pendingPayloads() : []), '');",
     tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pd-permalink-old-name",
+    why: "永久連結說明仍然寫「儲存我的修改」",
+    file: "src/WebAppMainFlow.gs",
+    find: "它永遠指向你最近一次按〔儲存〕的版本。'",
+    replace: "它永遠指向你最近一次「儲存我的修改」的版本。'",
+    tests: ["tests/round104_pd_button_names.test.js"]
   }
 ];
 
