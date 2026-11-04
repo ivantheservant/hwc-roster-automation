@@ -21,7 +21,7 @@
 const FRESH_ENV_REQUIRED_SHEETS = [
   { sheet: SHEETS.CONFIG, note: '系統參數設定（需要人手／「補建 Config 參數」建立內容）' },
   { sheet: SHEETS.POSTS, note: '崗位清單（需要人手建立內容）' },
-  { sheet: SHEETS.NAME_MAPPING, note: '義工名冊（需要人手建立內容）' },
+  { sheet: SHEETS.NAME_MAPPING, note: '事奉人員名冊（需要人手建立內容）' },
   { sheet: SHEETS.NAME_ALIAS, note: '姓名別名對照（選填，需要時人手建立內容）' },
   { sheet: SHEETS.ELIGIBILITY, note: '合資格對照（需要人手建立內容）' },
   { sheet: SHEETS.SERVICE_DATES, note: '每季主日日期（由「新增季度」精靈自動產生）' },

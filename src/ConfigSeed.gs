@@ -60,7 +60,7 @@ function getConfigKeySeeds_() {
       defaultValue: DEFAULTS.GRID_NOT_APPLICABLE_LABEL,
       description: '職事表 grid 中「結構性不適用」的格子（目前只有非首主日的聖餐襄禮，'
         + '見 STRUCTURAL_NA_RULE_IDS）顯示的文字；也是 Posts.EmptyDisplay=NA 的顯示文字。'
-        + '避免義工誤會自己可能被派到。只影響日後新生成的版本。',
+        + '避免事奉人員誤會自己可能被派到。只影響日後新生成的版本。',
       editable: 'TRUE'
     },
     {
@@ -179,7 +179,7 @@ function getConfigKeySeeds_() {
       description: '第十九輪批次新增。步驟 4「正式發出」容許的個人 PDF 缺件比例上限'
         + '（0–1，預設 0.2）。缺件人數 ÷ 應收人數超過這個比例就直接中止，'
         + '不會再提供「現在繼續」的選擇。實測背景：曾經在 57／57 人全部缺件的情況下'
-        + '仍然可以按「繼續」，結果全體義工一個都沒有收到，而 Stage 已經前進到'
+        + '仍然可以按「繼續」，結果全體事奉人員一個都沒有收到，而 Stage 已經前進到'
         + ' OFFICIAL_SENT，令步驟 4 無法重新執行。',
       editable: 'TRUE'
     },
@@ -381,29 +381,29 @@ function getConfigKeySeeds_() {
       // 第九十輪批次 QC 組：個人專屬連結可以申報多少季
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_QUARTERS_AHEAD, type: CONFIG_TYPES.INT, group: 'SYS',
       defaultValue: '2',
-      description: '義工在個人專屬連結申報不能服侍時，可以選哪些主日：未完結的季度之中最近的幾季（預設 2＝這一季和下一季）。過去的日子不可以選。',
+      description: '事奉人員在個人專屬連結申報不能服侍時，可以選哪些主日：未完結的季度之中最近的幾季（預設 2＝這一季和下一季）。過去的日子不可以選。',
       editable: 'TRUE'
     },
     {
       // 第九十輪批次 QC 組：申報截止日＝生成日之前幾日
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, type: CONFIG_TYPES.INT, group: 'MAIL',
       defaultValue: '7',
-      description: '〔邀請義工申報不能服侍的日子〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
+      description: '〔邀請事奉人員申報不能服侍的日子〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
       editable: 'TRUE'
     },
     {
-      // 第九十輪批次 QC 組：有新的義工申報 ⇒ 每日檢查通知幹事
+      // 第九十輪批次 QC 組：有新的事奉人員申報 ⇒ 每日檢查通知幹事
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_NOTIFY, type: CONFIG_TYPES.BOOL, group: 'MAIL',
       defaultValue: 'TRUE',
-      description: '有新的義工申報（不能服侍）等候確認時，每日檢查通知幹事（MAIL_ADMIN_NOTIFY）及確認者（UNAVAILABLE_CONFIRMER_EMAILS）一次，同一日最多一封。TRUE（預設）＝通知；FALSE＝不通知（仍然會在〔不能服侍的日期〕和「這一季還要做的」顯示）。遵守 DRY_RUN。',
+      description: '有新的事奉人員申報（不能服侍）等候確認時，每日檢查通知幹事（MAIL_ADMIN_NOTIFY）及確認者（UNAVAILABLE_CONFIRMER_EMAILS）一次，同一日最多一封。TRUE（預設）＝通知；FALSE＝不通知（仍然會在〔不能服侍的日期〕和「這一季還要做的」顯示）。遵守 DRY_RUN。',
       editable: 'TRUE'
     },
     {
-      // 第九十四輪批次 UB 組：確認義工申報的人
+      // 第九十四輪批次 UB 組：確認事奉人員申報的人
       key: CONFIG_KEYS.UNAVAILABLE_CONFIRMER_EMAILS, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
       defaultValue: '',
-      description: '可以確認義工申報（不能服侍）的人（電郵，逗號分隔；預設空白）。可以修改幹事介面的人（WEBAPP_ALLOWED_EMAILS）本來就可以確認；'
-        + '只在這個名單的人打開幹事介面只見到「義工申報，確認」畫面，不可以做其他事。新的申報亦會通知這個名單。',
+      description: '可以確認事奉人員申報（不能服侍）的人（電郵，逗號分隔；預設空白）。可以修改幹事介面的人（WEBAPP_ALLOWED_EMAILS）本來就可以確認；'
+        + '只在這個名單的人打開幹事介面只見到「事奉人員申報，確認」畫面，不可以做其他事。新的申報亦會通知這個名單。',
       editable: 'TRUE'
     },
     // ---- SYS ----
@@ -510,7 +510,7 @@ function getConfigKeySeeds_() {
       description: '「死線接近」維度的門檻：距離正式發出日期（Quarters.OfficialSendOn，'
         + '缺省時退回 LEAD_DAYS_OFFICIAL 從 StartDate 推算）少於幾天、而 Stage 仍未到'
         + 'OFFICIAL_SENT，不論目前是哪個 Stage 都開始每日提醒幹事。這是系統範圍需求'
-        + '第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象只有幹事，不寄給義工，'
+        + '第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象只有幹事，不寄給事奉人員，'
         + '見 docs/系統範圍稽核.md。',
       editable: 'TRUE'
     },
@@ -689,13 +689,13 @@ function getConfigKeySeeds_() {
     {
       key: CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, type: CONFIG_TYPES.STR, group: 'WEBAPP',
       defaultValue: '',
-      description: '義工個人專屬連結那一個部署的 /exec 網址。部署完之後貼一次。留空的話，寄出的信不會有個人專屬連結（幹事只會收到一個「有 N 位沒有個人連結」的提示）。不靠程式自己去問，是因為這個專案有兩個部署，程式問到的可能是另一個。',
+      description: '事奉人員個人專屬連結那一個部署的 /exec 網址。部署完之後貼一次。留空的話，寄出的信不會有個人專屬連結（幹事只會收到一個「有 N 位沒有個人連結」的提示）。不靠程式自己去問，是因為這個專案有兩個部署，程式問到的可能是另一個。',
       editable: 'TRUE'
     },
     {
       key: CONFIG_KEYS.MAIL_REDIRECT_ALL_TO, type: CONFIG_TYPES.STR, group: 'MAIL',
       defaultValue: '',
-      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不論 DRY_RUN 是甚麼。要填多於一個地址（例如你和另一位同工一併查看）就用逗號、分號、頓號或者換行分開，例如「a@example.invalid, b@example.invalid」。每一個地址都要是正確格式，有一個打錯就整批不寄——不會「先寄可以寄的那幾個」。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封寄到義工手上。留空＝正常寄給收件人本人。',
+      description: '【測試用，上線前一定要清空】填一個電郵地址，之後每一封信都會改寄到那個地址，不論 DRY_RUN 是甚麼。要填多於一個地址（例如你和另一位同工一併查看）就用逗號、分號、頓號或者換行分開，例如「a@example.invalid, b@example.invalid」。每一個地址都要是正確格式，有一個打錯就整批不寄——不會「先寄可以寄的那幾個」。主旨會加上「[原收件人：XXX]」，內文頂部會有一段紅色橫幅。用途：把 DRY_RUN 改成 FALSE 之後真正走完整條寄信路（真的產生附件、真的收到信），而不會有任何一封寄到事奉人員手上。留空＝正常寄給收件人本人。',
       editable: 'TRUE'
     },
     // ---- ICS（第十一輪批次階段 C：日曆檔）----
@@ -792,6 +792,13 @@ function getConfigKeySeeds_() {
       defaultValue: 'TRUE',
       description: '已有版本、未到季初的季度，開季前資料（名單、偏好、不能服侍、合堂、預先安排、身分、規則等）'
         + '在最新版本之後有改動時，每日自動檢查寄一封電郵通知幹事。沒有這一行時照 TRUE。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.NAME_HONORIFIC_SUFFIXES, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
+      defaultValue: '姊妹,弟兄,傳道,牧師,師母,執事,長老',
+      description: '人手貼名字（儲存並套用名單、匯入、名字配對）時，名字找不到就去掉結尾的這些尊稱再找一次（逗號分隔）。'
+        + '名單上本身包含尊稱的名字照舊以完全相同優先。沒有這一行時用預設值。',
       editable: 'TRUE'
     },
     // ---- HWCAS（會友系統同步，全部選填——留空只是代表這個同步功能還沒設定）----

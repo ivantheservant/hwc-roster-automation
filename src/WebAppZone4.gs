@@ -435,7 +435,7 @@ function apiMakeupSendPlan(quarterId, stage) {
           nameTC: r.displayName || r.personId || r.email,
           hasEmail: !!String(r.email || '').trim(),
           // `EmailRecipients` 嘅名單收件人（例如辦公室、系統管理）——
-          // 唔標明嘅話，幹事會以為係兩個唔認得嘅義工
+          // 唔標明嘅話，幹事會以為係兩個唔認得嘅事奉人員
           isListRecipient: r.type === RECIPIENT_TYPE.LIST,
           lastStatus: r.lastStatus,
           reason: r.reason

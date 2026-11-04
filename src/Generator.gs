@@ -100,7 +100,7 @@ function buildGeneratorContext_(quarterId) {
  * 為每個人計算本季的「應有次數」配額，按其歷史服侍次數佔全體的比例分配。
  *
  * 取代「每人上限 = 全體平均」的做法：歷史分佈是右偏的，大部分人每季只服侍 1–3 次，
- * 另有一小群核心義工做到 7–8 次。用單一平均值當上限會把核心義工壓在平均線附近。
+ * 另有一小群核心事奉人員做到 7–8 次。用單一平均值當上限會把核心事奉人員壓在平均線附近。
  *
  * 配額 = (該人全崗位 HistoricalCount 總和 / 全體總和) × 本季可派格數 × 配額倍率
  * 四捨五入後，最少 1 次，最多不超過該人的 MaxPerQuarter（個人值或 Config 預設）。
@@ -712,7 +712,7 @@ function pickPerson_(state) {
 
   // 選人分數要真正參與計分，而不是只做同分時的決勝。
   // 否則 SOFT_QUARTER_DISTRIBUTION 一旦扣分，任何選人偏好都會被壓過，
-  // 令服侍次數卡在 3-5 次，永遠達不到歷史上核心義工 8 次的水平。
+  // 令服侍次數卡在 3-5 次，永遠達不到歷史上核心事奉人員 8 次的水平。
   scored.forEach(function (c) {
     c.score = c.penalty - c.bonus - (c.selectionScore * state.context.scoreWeights.selectionWeight);
   });
@@ -870,7 +870,7 @@ function pickEpsilonWinner_(finalists, strategy, epsilon) {
  * 計算每位候選人的選人分數，分數越高越優先。
  * 由兩個正規化為 0–1 的分項按 Config 的 SELECTION_WEIGHT_HISTORICAL 加權合併：
  * 歷史服侍次數（Eligibility.HistoricalCount）與距上次服侍的天數。
- * 權重 0 等同純粹「最久沒服侍者優先」，權重 1 則強烈偏好歷史次數高的核心義工。
+ * 權重 0 等同純粹「最久沒服侍者優先」，權重 1 則強烈偏好歷史次數高的核心事奉人員。
  * @param {Object[]} scored 候選人評分結果陣列，會就地補上 selectionScore
  * @param {number} historicalWeight 歷史次數的加權比重（0 至 1）
  * @returns {void}
@@ -1237,7 +1237,7 @@ function evaluateViolations_(personId, state) {
 /**
  * 評估 SOFT_PERSONAL_QUOTA：以該人自己的配額（按歷史比例分配）判斷是否已排太多。
  *
- * 未達配額時完全不扣分，讓核心義工能自然做到 7–8 次；
+ * 未達配額時完全不扣分，讓核心事奉人員能自然做到 7–8 次；
  * 超出配額後按超出幅度遞增扣分，避免一個人無限制地被連續選中。
  *
  * @param {string} personId 候選人的 PersonID

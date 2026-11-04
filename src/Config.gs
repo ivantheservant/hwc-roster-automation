@@ -212,7 +212,7 @@ function convertConfigValue_(rawValue, type, key) {
       // ⚠️ 舊寫法係 `str.toUpperCase() === 'TRUE'`，即係**任何認唔出嘅嘢
       // 都靜靜變 `false`**。而 `DRY_RUN` 就係 BOOL——嗰一格一旦被
       // 試算表轉成日期／數字，`DRY_RUN` 靜靜變 `false`
-      // ＝ 真係寄信俾全體義工。呢個係成套系統最貴嘅一個靜默失敗。
+      // ＝ 真係寄信俾全體事奉人員。呢個係成套系統最貴嘅一個靜默失敗。
       fail('BOOL 只認得 TRUE 或 FALSE（大小寫不限）');
       return false;   // 到不了這裡；只為讓靜態檢查看得出每條路都有回傳值
     }

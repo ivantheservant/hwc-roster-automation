@@ -759,7 +759,7 @@ function apiStep5SendConfirm(quarterId, releaseText, sendOptions) {
 function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
   assertWebAppRequestAllowed_();
   // 第二十三輪批次階段 E2（決定 D5）：掣 4 一樣唔可以喺有未儲存改動嘅
-  // 情況下寄——否則義工會收到一封「最新安排」，但實際上仲有嘢未儲存。
+  // 情況下寄——否則事奉人員會收到一封「最新安排」，但實際上仲有嘢未儲存。
   const guard = assertNoUnsavedChanges_(quarterId, '改動後重發',
     resolveAllowUnsavedFlag_(sendOptions));
   logSendWithUnsavedRelease_(quarterId, '改動後重發', guard);

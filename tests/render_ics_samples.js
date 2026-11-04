@@ -166,7 +166,7 @@ lines.push('  ' + uidsV7[0]);
 lines.push('  ' + seqV7[0]);
 lines.push('```');
 lines.push('');
-lines.push('`UID` 完全一致（義工嘅日曆 App 會**更新**呢個事件，唔會當成新事件、');
+lines.push('`UID` 完全一致（事奉人員嘅日曆 App 會**更新**呢個事件，唔會當成新事件、');
 lines.push('唔會重複），`SEQUENCE` 由 5 變 7（日曆 App 據此知道呢個係較新版本）。');
 lines.push('');
 lines.push('### VTIMEZONE 分析（E4：夏令時間轉換）');

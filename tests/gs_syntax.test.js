@@ -166,7 +166,7 @@ console.log('\n=== 第二十四輪紅線（第二十五輪改寫）：ui/*.html 
   check('★★★ 搵到一批 ui/*.html（防止路徑寫錯令測試變成空跑）',
     htmlFiles.length >= 3, '只搵到 ' + htmlFiles.length + ' 個');
 
-  // PersonalRoster.html 係真正嘅資料樣板（義工個人專屬連結頁面），
+  // PersonalRoster.html 係真正嘅資料樣板（事奉人員個人專屬連結頁面），
   // 大量合法 scriptlet（迴圈、if、輸出欄位），唔喺呢條紅線範圍內。
   const REAL_TEMPLATE_FILES = ['PersonalRoster.html'];
 

@@ -1,4 +1,4 @@
-// 第九十四輪批次 UB 組：確認者名單及「義工申報，確認」畫面。
+// 第九十四輪批次 UB 組：確認者名單及「事奉人員申報，確認」畫面。
 // 執行方式：node tests/round94_ub_confirmer.test.js
 //
 //   UB1 權限：只在 UNAVAILABLE_CONFIRMER_EMAILS 的人 ⇒ CONFIRMER，只准呼叫確認畫面的讀取及決定（及自己的權限），
@@ -51,8 +51,8 @@ console.log('\n=== UB1：權限 ===');
     && c.gas.assertWebAppRequestAllowed_('apiDecideUnavailableSubmissions') === 'CONFIRMER');
   check('★★★★★ 確認者：自己的權限 ⇒ 可以', c.gas.assertWebAppRequestAllowed_('apiGetMyPermission') === 'CONFIRMER');
   const msgs = ['apiListQuarters', 'apiGetDashboardState', 'apiListUnavailable', ''].map((n) => throwsMsg(() => c.gas.assertWebAppRequestAllowed_(n || undefined)));
-  check('★★★★★★ 確認者：其他（唯讀、改動、沒有名字）一律拒絕「你只可以確認義工申報（不能服侍），不可以做其他事。」',
-    msgs.every((m) => m === '你只可以確認義工申報（不能服侍），不可以做其他事。'), JSON.stringify(msgs));
+  check('★★★★★★ 確認者：其他（唯讀、改動、沒有名字）一律拒絕「你只可以確認事奉人員申報（不能服侍），不可以做其他事。」',
+    msgs.every((m) => m === '你只可以確認事奉人員申報（不能服侍），不可以做其他事。'), JSON.stringify(msgs));
   check('★★★★★ 拒絕時寫 AuditLog（WEBAPP_CONFIRMER_DENIED）', c.audits.length === 4 && c.audits.every((a) => a.action === 'WEBAPP_CONFIRMER_DENIED'), JSON.stringify(c.audits));
   const v = sandbox('viewer@example.invalid');
   check('★★★★★★ 只可查看：看得到確認畫面（讀取在唯讀清單）', v.gas.assertWebAppRequestAllowed_('apiGetUnavailableConfirmView') === 'VIEWER');

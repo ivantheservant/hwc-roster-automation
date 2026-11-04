@@ -23,7 +23,7 @@
  *
  * ── 寄給自己 ──────────────────────────────────────────────────────
  * 收件人永遠是正在操作的人自己（`Session.getActiveUser()`），不接受參數。和紙本包（PaperPack.gs）同一個理由：
- * DRY_RUN 要守住的是「不會有義工收到一封他不預期的信」，寄給自己不違反這一點，所以 DRY_RUN 時照樣寄出；
+ * DRY_RUN 要守住的是「不會有事奉人員收到一封他不預期的信」，寄給自己不違反這一點，所以 DRY_RUN 時照樣寄出；
  * 仍然經寄信閘門（測試期間 MAIL_REDIRECT_ALL_TO 有值就轉寄）。
  *
  * ── 紀錄 ──────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ function buildInvitePaperPages_(quarterId, people) {
   const config = readConfig_();
   const baseUrl = String(config[CONFIG_KEYS.WEBAPP_VOLUNTEER_URL] || '').trim();
   if (!baseUrl) {
-    throw new Error(buildThreePartMessage_('還沒有設定義工個人連結的網址（Config WEBAPP_VOLUNTEER_URL）。',
+    throw new Error(buildThreePartMessage_('還沒有設定事奉人員個人連結的網址（Config WEBAPP_VOLUNTEER_URL）。',
       '甚麼都沒有產生。', ['請管理員先在 Config 填上個人連結部署的 /exec 網址']));
   }
   const dates = readUnavailableInviteDates_(quarterId);
@@ -258,7 +258,7 @@ function apiEmailInvitePaperToSelf(quarterId, personIds) {
         '',
         people.map(function (p) { return '　・' + p.displayName; }).join('\n'),
         '',
-        '這一封是系統寄給你自己的，沒有任何一位義工會收到。'].join('\n'),
+        '這一封是系統寄給你自己的，沒有任何一位事奉人員會收到。'].join('\n'),
       options: { attachments: [made.blob] }
     });
     writeInvitePaperAudit_(id, 'EMAIL_SELF', people.length);

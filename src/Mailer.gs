@@ -57,7 +57,7 @@ function countAlreadySentForStage_(quarterId, versionNo, stage) {
  * 決定某個寄送階段要用哪些範本：PERSON 收件人一個、LIST 收件人一個。
  *
  * 第九輪批次階段 C 新增。背景是實測會發生、但一直沒有人讀信所以沒發現的問題：
- * 步驟 4「正式發出」同時寄給義工（PERSON）與堂委／辦公室名單（LIST），
+ * 步驟 4「正式發出」同時寄給事奉人員（PERSON）與堂委／辦公室名單（LIST），
  * 修正前兩者共用 `TPL_OFFICIAL_TC`，令 LIST 收件人收到一封稱呼自己
  * 「弟兄／姊妹」、服侍安排一片空白、又聲稱附了個人 PDF（實際沒有附）的信。
  * 完整分析見 `docs/電郵範本樣本.md`。
@@ -164,14 +164,14 @@ function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured)
   // 即係自動排程／補寄／彩排嗰幾條路一個字都冇變。
   //
   // 點解唔可以繼續淨用 `listRecipients_(stage, …)`：篩選係喺一個池入面做嘅。
-  // 池仍然係「REVIEW 只有堂委地址」嘅話，幹事勾一個義工，
-  // 嗰個義工根本唔喺池入面 ⇒ 勾咗都唔會收到，而畫面會話「已選 12 位」。
+  // 池仍然係「REVIEW 只有堂委地址」嘅話，幹事勾一個事奉人員，
+  // 嗰個事奉人員根本唔喺池入面 ⇒ 勾咗都唔會收到，而畫面會話「已選 12 位」。
   filterRecipientsByScope_(
     resolveSendRecipientPool_(stage, context, context.sendDecision),
     context.sendDecision)
     .forEach(function (recipient) {
     // 第九輪批次階段 C：LIST 收件人（堂委／教會辦公室名單）與 PERSON 收件人
-    // （逐一義工）用不同範本，見 resolveStageTemplates_() 的說明。
+    // （逐一事奉人員）用不同範本，見 resolveStageTemplates_() 的說明。
     const chosen = (recipient.type === RECIPIENT_TYPE.LIST && templates.list)
       ? templates.list : template;
     outcomes.push(deliverOne_(recipient, chosen, context, isDryRun));
@@ -218,7 +218,7 @@ function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured)
     noEmailPeople: noEmailPeople,
     retryCount: retryCount,
     // 第四十一輪批次 E 組：有幾多位攞唔到個人專屬連結（冇 token，
-    // 或者 Config 冇填義工部署嘅網址）。**一定要報出去**——
+    // 或者 Config 冇填事奉人員部署嘅網址）。**一定要報出去**——
     // 靜靜略過嘅話，嗰幾位收到嘅信會比其他人少一段，而冇人知道。
     noPersonalLinkCount: context._noPersonalLinkCount || 0,
     durationMs: Date.now() - startedAt
@@ -532,7 +532,7 @@ function listRecipients_(stage, context) {
  *
  * 2026-08-21 實測核對過七個範本的 `Placeholders` 欄：
  * **一個都沒有用 `{PublicRosterUrl}`。** 有幾個用 `{SpreadsheetUrl}`，
- * 但那是幹事用的試算表連結，不是給義工看的公開連結，兩樣不可以混淆。
+ * 但那是幹事用的試算表連結，不是給事奉人員看的公開連結，兩樣不可以混淆。
  *
  * 即是說「範本會放連結」這個假設，由頭到尾都不成立。
  * 靠人去七張範本逐一補，補漏一張就是一批人收不到連結，而且沒有任何訊號。
@@ -878,7 +878,7 @@ function generateMailAttachment_(template, context, recipient) {
  * 找不到檔案、或找到但大小小於 Config 的 PDF_MIN_SIZE_BYTES（追加階段 AG：
  * 0 bytes 或明顯過小的檔案一律當缺件，不會當成正常附件寄出——查證抓到過
  * 這種情況：「產生個人 PDF」把一個內容空白的檔案誤判成功存檔，此處原本沒有
- * 再檢查一次，DRY_RUN=FALSE 時義工會收到一個打不開的附件，系統卻顯示一切正常）
+ * 再檢查一次，DRY_RUN=FALSE 時事奉人員會收到一個打不開的附件，系統卻顯示一切正常）
  * 都拋出的例外會標記 err.missing=true，deliverOne_ 據此記為
  * MAIL_STATUS.ERROR_PDF_MISSING（而非產生失敗的 ERROR_PDF），
  * ErrorMessage 明確提示要先執行「產生個人 PDF」。
@@ -1591,7 +1591,7 @@ function notifyAdminNoEmail_(noEmailPeople, context, isDryRun) {
 }
 
 /**
- * 追加階段 N：自動排程自動生成初稿完成後，通知幹事去覆核，不寄給堂委、不寄給義工
+ * 追加階段 N：自動排程自動生成初稿完成後，通知幹事去覆核，不寄給堂委、不寄給事奉人員
  * ——寄給堂委審閱是步驟 2 的責任，要幹事看過初稿、決定沒問題了才手動執行。
  * @param {string} quarterId 季度 ID
  * @param {Object} genResult performRosterGeneration_() 的結果，至少含 sheetName
@@ -1605,7 +1605,7 @@ function notifyAdminGenerateDone_(quarterId, genResult, config, isDryRun) {
   const subject = prefix + quarterId + ' 初稿已生成，請覆核';
   const body = quarterId + ' 的職事表初稿已由自動排程生成（' + genResult.sheetName + '）。\n\n'
     + '請登入試算表覆核內容，確認沒問題後執行「職事表系統 → 四階段流程 → 步驟 2：寄給堂委審閱」。\n\n'
-    + '（本通知只寄給你，不會寄給堂委或義工——寄給堂委審閱是步驟 2 的責任，需要你先看過初稿再決定。）';
+    + '（本通知只寄給你，不會寄給堂委或事奉人員——寄給堂委審閱是步驟 2 的責任，需要你先看過初稿再決定。）';
   notifyAdmin_(subject, body, adminEmail, isDryRun);
 }
 
@@ -1613,7 +1613,7 @@ function notifyAdminGenerateDone_(quarterId, genResult, config, isDryRun) {
  * 第三輪批次下一輪（新一批階段 B）：Stage 停留在 DRAFT／REVIEW_SENT／
  * REQUESTS_APPLIED 三者之一太久（停滯時間）、或距離正式發出日期太近（死線
  * 接近）時提醒幹事，兩個原因可以同時成立、但只會寄這一封信。只寄給幹事，
- * 不寄給堂委或義工——義工收到的第一封信永遠是「步驟 4：正式發出」那一封，
+ * 不寄給堂委或事奉人員——事奉人員收到的第一封信永遠是「步驟 4：正式發出」那一封，
  * 這一點不會因為 REMIND 擴大範圍而改變。
  * @param {string} quarterId 季度 ID
  * @param {Object} judgment judgeRemindAction_() 的結果（outcome=WOULD_RUN 時呼叫），
@@ -1681,7 +1681,7 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
     + countText + '\n\n'
     + nextStepText + '\n'
     + buildAdminConsoleLinkText_() + '\n\n'
-    + '（本通知只寄給你，不會寄給堂委或義工——義工收到的第一封信永遠是'
+    + '（本通知只寄給你，不會寄給堂委或事奉人員——事奉人員收到的第一封信永遠是'
     + '「步驟 4：正式發出」那一封。）';
   notifyAdmin_(subject, body, adminEmail, isDryRun);
 }
@@ -1694,7 +1694,7 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
  * ─────────────────────────────────────────────────────────────────────
  *
  * ⚠️ 幹事介面嘅網址**程式自己攞唔到可靠嘅值**：呢個專案有兩個部署
- * （義工個人連結、幹事介面），`ScriptApp.getService().getUrl()` 只會回
+ * （事奉人員個人連結、幹事介面），`ScriptApp.getService().getUrl()` 只會回
  * 其中一個，而且喺 trigger 執行環境回嘅可能係 head 部署。
  *
  * 上一輪嘅結論係「噉就唔附連結」——理由成立，但**對一個唔識電腦嘅幹事

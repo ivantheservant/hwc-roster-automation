@@ -5,7 +5,7 @@
  * sendStage_() 與 findEmailTemplate_() 全部以 MAIL_STAGES 的值比對 Stage 欄，
  * 若這裡寫成 "REMINDER" 會導致 REMIND 階段永遠找不到範本。
  *
- * 內容為書面語繁體中文、教會幹事對義工通知的語氣，之後可直接在 EmailTemplates
+ * 內容為書面語繁體中文、教會幹事對事奉人員通知的語氣，之後可直接在 EmailTemplates
  * 工作表修改文字，不需要改程式碼。
  *
  * 這份清單本身就是選單「補齊 Email 範本」（見 planEmailTemplateSeed_()／
@@ -24,19 +24,19 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，敬請協助覆核。</p>'
       + '<p>試算表連結：{SpreadsheetUrl}</p>'
       + '<p>完整版職事表已附於本郵件，方便離線查看。</p>'
-      + '<p>本表計劃於 {OfficialSendDate} 正式發給各位義工，敬請於該日之前回覆意見。</p>'
+      + '<p>本表計劃於 {OfficialSendDate} 正式發給各位事奉人員，敬請於該日之前回覆意見。</p>'
       + '<p>如需要修改（例如有人不能服侍、或需要指定某人服侍），請直接回覆本郵件說明，'
       + '由幹事統一處理，請勿直接修改試算表上的儲存格，以便追蹤所有改動。</p>'
-      + '<p>現階段各位義工尚未收到任何通知，本次只在堂委及幹事之間傳閱。</p>'
+      + '<p>現階段各位事奉人員尚未收到任何通知，本次只在堂委及幹事之間傳閱。</p>'
       + '<p>如有查詢，請直接回覆本郵件。</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，敬請協助覆核。\n\n'
       + '試算表連結：{SpreadsheetUrl}\n\n'
       + '完整版職事表已附於本郵件，方便離線查看。\n\n'
-      + '本表計劃於 {OfficialSendDate} 正式發給各位義工，敬請於該日之前回覆意見。\n\n'
+      + '本表計劃於 {OfficialSendDate} 正式發給各位事奉人員，敬請於該日之前回覆意見。\n\n'
       + '如需要修改（例如有人不能服侍、或需要指定某人服侍），請直接回覆本郵件說明，'
       + '由幹事統一處理，請勿直接修改試算表上的儲存格，以便追蹤所有改動。\n\n'
-      + '現階段各位義工尚未收到任何通知，本次只在堂委及幹事之間傳閱。\n\n'
+      + '現階段各位事奉人員尚未收到任何通知，本次只在堂委及幹事之間傳閱。\n\n'
       + '如有查詢，請直接回覆本郵件。',
     placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate},{SpreadsheetUrl}',
     attachType: ATTACH_TYPE.FULL_PDF
@@ -104,7 +104,7 @@ const EMAIL_TEMPLATE_SEEDS = [
   {
     // 第九輪批次階段 C 新增，修正一個實測會發生、但一直沒有人發現的內容問題。
     //
-    // 問題：步驟 4「正式發出」同時有兩種收件人——每一位有服侍的義工（PERSON）
+    // 問題：步驟 4「正式發出」同時有兩種收件人——每一位有服侍的事奉人員（PERSON）
     // 與 EmailRecipients 中 Stage 欄含 OFFICIAL 的名單（LIST，例如堂委、教會
     // 辦公室；2027T1 實測就有 2 位）。修正前兩者共用 TPL_OFFICIAL_TC，於是
     // LIST 收件人收到的是一封：
@@ -125,7 +125,7 @@ const EMAIL_TEMPLATE_SEEDS = [
     subject: '{QuarterID} 粵語堂職事表已正式發出——完整版隨郵附上',
     bodyHtml: '<p>各位堂委、幹事：</p>'
       + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
-      + '並已於今日分別發送給本季各位有服侍的義工，每位收到的是自己那一份個人職事表。</p>'
+      + '並已於今日分別發送給本季各位有服侍的事奉人員，每位收到的是自己那一份個人職事表。</p>'
       + '<p>完整版職事表已作為附件，方便各位存檔及查閱。</p>'
       + '<p>公開版連結（同一條連結，之後排表有改動也是這一條）：'
       + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
@@ -134,7 +134,7 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>試算表連結：{SpreadsheetUrl}</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
-      + '並已於今日分別發送給本季各位有服侍的義工，每位收到的是自己那一份個人職事表。\n\n'
+      + '並已於今日分別發送給本季各位有服侍的事奉人員，每位收到的是自己那一份個人職事表。\n\n'
       + '完整版職事表已作為附件，方便各位存檔及查閱。\n\n'
       + '公開版連結（同一條連結，之後排表有改動也是這一條）：{PublicRosterUrl}\n\n'
       + '如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
@@ -167,7 +167,7 @@ const EMAIL_TEMPLATE_SEEDS = [
   },
   {
     // 步驟 5「改動後重發」用的 LIST 摘要範本：跟 TPL_RESEND_TC 同一個 Stage=RESEND，
-    // 但收件人是 EmailRecipients（LIST，例如堂委／幹事），不是逐一義工——寄送時由
+    // 但收件人是 EmailRecipients（LIST，例如堂委／幹事），不是逐一事奉人員——寄送時由
     // ResendFlow.gs 的 sendResendStage_() 用 findEmailTemplateById_() 直接指定要
     // 用哪一個範本，不經過 Stage 判斷，見 Mailer.gs 的 findEmailTemplate_() 檔頭註解。
     templateId: 'TPL_RESEND_LIST_TC',
@@ -209,7 +209,7 @@ const EMAIL_TEMPLATE_SEEDS = [
     placeholders: '{QuarterLabel},{GenerateDate},{PreseasonContentHtml},{PreseasonContentPlain}',
     attachType: ATTACH_TYPE.NONE
   },
-  // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕（UnavailableInvite.gs；不經 sendStage_()，Stage 欄只作標記）
+  // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕（UnavailableInvite.gs；不經 sendStage_()，Stage 欄只作標記）
   {
     templateId: 'TPL_UNAVAILABLE_INVITE_TC',
     stage: 'UNAVAILABLE_INVITE',

@@ -86,7 +86,7 @@ const MUTATIONS = [
     id: 'redirect-uses-new-to',
     why: '把真正寄出還原成用返 `recipient.email`'
       + '——整個轉寄機制冇生效，而畫面同 SendLog 都會話成功，'
-      + '即係 Ivan 以為安全咁測試緊，實際上信真係寄咗俾義工',
+      + '即係 Ivan 以為安全咁測試緊，實際上信真係寄咗俾事奉人員',
     // 第九十三輪批次 TA 組：寄出集中到 MailRedirect.gs 的 sendMailThroughGate_()
     file: 'src/MailRedirect.gs',
     find: '  MailApp.sendEmail(plan.toEmail, plan.subject, plan.bodyPlain, options);',
@@ -96,12 +96,12 @@ const MUTATIONS = [
   {
     id: 'redirect-bad-throws',
     why: '把「轉寄地址填錯」還原成當成冇設定'
-      + '——喺應該轉寄嘅時候真係寄咗俾義工',
+      + '——喺應該轉寄嘅時候真係寄咗俾事奉人員',
     file: 'src/MailRedirect.gs',
     // ⚠️ 第四十四輪批次 E 組改寫咗 `readMailRedirectTarget_()`（支援多個地址），
     // 舊嗰行 `if (!isPlausibleEmail_(value))` 唔再存在。呢一條守嘅嘢冇變：
     // 「Config 填咗一個算唔出任何地址嘅值」**唔可以**當成冇設定——
-    // 當成冇設定就會喺應該轉寄嘅時候真係寄咗俾義工。
+    // 當成冇設定就會喺應該轉寄嘅時候真係寄咗俾事奉人員。
     find: '  if (parsed.targets.length === 0) {',
     replace: '  if (false) {',
     tests: ['tests/mail_redirect.test.js']
@@ -748,7 +748,7 @@ const MUTATIONS = [
     id: 'health-redirect-yellow',
     why: '把全面體檢嗰項轉寄地址還原成黃色（建議處理）'
       + '——留住一個轉寄地址上線，系統會報告「已寄出 51 封」'
-      + '而全體義工一封都收唔到',
+      + '而全體事奉人員一封都收唔到',
     file: 'src/FullHealthCheck.gs',
     find: "  'MAIL_REDIRECT_ALL_TO'\n];",
     replace: '];',
@@ -1018,8 +1018,8 @@ const MUTATIONS = [
   {
     id: 'send-pool-stage-bound',
     why: '把收件人池還原成「按階段出名單」'
-      + '——即係第四十一同四十三輪做錯咗嘅方向：幹事喺 REVIEW 勾一個義工，'
-      + '嗰個義工根本唔喺池入面，勾咗都唔會收到，而畫面會話「已選 12 位」',
+      + '——即係第四十一同四十三輪做錯咗嘅方向：幹事喺 REVIEW 勾一個事奉人員，'
+      + '嗰個事奉人員根本唔喺池入面，勾咗都唔會收到，而畫面會話「已選 12 位」',
     file: 'src/SendRecipients.gs',
     find: '  if (decision && decision.recipientScope === SEND_RECIPIENT_SCOPE.PICK) {',
     replace: '  if (false) {',
@@ -1661,7 +1661,7 @@ const MUTATIONS = [
     id: 'st-skip-dryrun-gate',
     why: '拆走自測機嘅 `DRY_RUN` 閘'
       + '——自測機會走完整個寄送流程，'
-      + 'DRY_RUN=FALSE 嗰陣嗰啲信會真係寄出去畀全體義工',
+      + 'DRY_RUN=FALSE 嗰陣嗰啲信會真係寄出去畀全體事奉人員',
     file: 'src/SelfTestRunner.gs',
     find: '  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) !== true) {',
     replace: '  if (getConfig_(CONFIG_KEYS.DRY_RUN, true) === false) {',
@@ -4742,7 +4742,7 @@ const MUTATIONS = [
   // ── 第六十七輪批次 AK 組：未獲授權頁面只講中性句子 ────────────
   {
     id: 'ak-disabled-old-text',
-    why: '停用頁又提 Config／WEBAPP_ENABLED——義工見到內部設定名稱',
+    why: '停用頁又提 Config／WEBAPP_ENABLED——事奉人員見到內部設定名稱',
     file: 'src/WebApp.gs',
     find: '    return renderWebAppDisabledPage_();',
     replace: "    return HtmlService.createHtmlOutput('<p>請在 Config 工作表把 WEBAPP_ENABLED 設為 TRUE</p>').setTitle('x');",
@@ -4824,7 +4824,7 @@ const MUTATIONS = [
   // ── 第六十七輪批次 AH 組：寄出前講空格 ──────────────────────────
   {
     id: 'ah-blank-not-counted',
-    why: '寄出前唔數空格——義工收到有空格嘅表而幹事冇被提醒',
+    why: '寄出前唔數空格——事奉人員收到有空格嘅表而幹事冇被提醒',
     file: 'src/SendWarnings.gs',
     find: '    const blanks = listGenuineBlankCells_(state, context).map(function (b) {',
     replace: '    const blanks = [].map(function (b) {',
@@ -5351,7 +5351,7 @@ const MUTATIONS = [
   },
   {
     id: 'av-note-has-code',
-    why: '批註又寫返規則代號（會印到義工 PDF 腳註）',
+    why: '批註又寫返規則代號（會印到事奉人員 PDF 腳註）',
     file: 'src/RosterWriter.gs',
     find: '      notes[r][c] = cellWarnings.map(function (w) {\n        return w.reason;',
     replace: '      notes[r][c] = cellWarnings.map(function (w) {\n        return w.ruleId + \': \' + w.reason;',
@@ -9037,8 +9037,8 @@ const MUTATIONS = [
     why: "冇寄出季前資料掣",
     file: "src/ui/ScriptZone2.html",
     // 第九十三輪批次 TD 組：〔寄出申報邀請〕改名
-    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button('邀請義工申報不能服侍的日子'",
-    replace: "button('邀請義工申報不能服侍的日子'",
+    find: "button('寄出季前資料', () => openPreseasonSend(), 'secondary'),\n      button('邀請事奉人員申報不能服侍的日子'",
+    replace: "button('邀請事奉人員申報不能服侍的日子'",
     tests: ["tests/round85_lf_preseason.test.js"]
   },
   {
@@ -9327,8 +9327,8 @@ const MUTATIONS = [
     why: "寄出季前資料預覽也變灰",
     file: "src/ui/Script.html",
     // 第九十三輪批次 TD 組：〔寄出申報邀請〕改名
-    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請義工申報不能服侍的日子'];",
-    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['邀請義工申報不能服侍的日子'];",
+    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請事奉人員申報不能服侍的日子'];",
+    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['邀請事奉人員申報不能服侍的日子'];",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
   {
@@ -9910,7 +9910,7 @@ const MUTATIONS = [
   },
   {
     id: "qc-json-unescaped",
-    why: "頁面嵌入的 JSON 不轉義 <（義工的原因可以跳出 script）",
+    why: "頁面嵌入的 JSON 不轉義 <（事奉人員的原因可以跳出 script）",
     file: "src/PersonalUnavailable.gs",
     find: "  return JSON.stringify(obj === undefined ? null : obj)\n    .replace(/</g, '\\\\u003c')",
     replace: "  return JSON.stringify(obj === undefined ? null : obj)",
@@ -10006,7 +10006,7 @@ const MUTATIONS = [
   },
   {
     id: "qc-ui-no-subs",
-    why: "〔不能服侍的日期〕沒有義工申報一段",
+    why: "〔不能服侍的日期〕沒有事奉人員申報一段",
     file: "src/ui/ScriptZone3.html",
     find: "    unavailableConfirmInlineNodes_(keyword).reverse().forEach((n) => nodes.splice(0, 0, n));",
     replace: "",
@@ -10022,15 +10022,15 @@ const MUTATIONS = [
   },
   {
     id: "qc-pack-no-line",
-    why: "季前資料沒有「另有 N 項義工申報待確認」",
+    why: "季前資料沒有「另有 N 項事奉人員申報待確認」",
     file: "src/PreseasonPack.gs",
-    find: "    .concat(pendingInQuarter > 0 ? ['另有 ' + pendingInQuarter + ' 項義工申報待確認'] : []) });",
+    find: "    .concat(pendingInQuarter > 0 ? ['另有 ' + pendingInQuarter + ' 項事奉人員申報待確認'] : []) });",
     replace: " });",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
   },
   {
     id: "qc-zone2-no-line",
-    why: "「這一季還要做的」沒有義工申報待確認",
+    why: "「這一季還要做的」沒有事奉人員申報待確認",
     file: "src/ui/ScriptZone2.html",
     find: "    if (d && typeof d.pendingSubmissions === 'number') {",
     replace: "    if (false) {",
@@ -10038,7 +10038,7 @@ const MUTATIONS = [
   },
   {
     id: "qc-anchor-ignored",
-    why: "不理連結的季度，只列今日最近的兩季（邀請較後的季度時義工找不到那一季）",
+    why: "不理連結的季度，只列今日最近的兩季（邀請較後的季度時事奉人員找不到那一季）",
     file: "src/PersonalUnavailable.gs",
     find: "  const from = Math.max(0, open.map(function (q) { return q.quarterId; }).indexOf(anchor));",
     replace: "  const from = 0;",
@@ -10062,7 +10062,7 @@ const MUTATIONS = [
   },
   {
     id: "qc-ui-no-source",
-    why: "生效清單沒有講明是義工在個人連結申報的",
+    why: "生效清單沒有講明是事奉人員在個人連結申報的",
     file: "src/ui/ScriptZone3.html",
     find: "        + (r.source === 'PERSONAL_LINK' ? '　（來源：個人連結）' : ''),",
     replace: "        + '',",
@@ -10601,7 +10601,7 @@ const MUTATIONS = [
     id: "td-old-button",
     why: "按鈕名稱變回〔寄出申報邀請〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('邀請義工申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));",
+    find: "      button('邀請事奉人員申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));",
     replace: "      button('寄出申報邀請', () => openUnavailableInvite(), 'secondary')]));",
     tests: ["tests/round93_td_invite_rename.test.js"]
   },
@@ -10609,7 +10609,7 @@ const MUTATIONS = [
     id: "td-no-hint",
     why: "預覽窗沒有指去範本樣本",
     file: "src/ui/ScriptZone2.html",
-    find: "        para('想先看看義工會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')",
+    find: "        para('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')",
     replace: "        para('', 'muted')",
     tests: ["tests/round93_td_invite_rename.test.js"]
   },
@@ -11048,7 +11048,7 @@ const MUTATIONS = [
   },
   {
     id: "vb-invite-no-sync",
-    why: "邀請義工申報之前不同步",
+    why: "邀請事奉人員申報之前不同步",
     file: "src/UnavailableInvite.gs",
     find: "    syncPeopleFromHwcasBeforeSend_();\n    return sendUnavailableInvites_",
     replace: "    return sendUnavailableInvites_",
@@ -12061,6 +12061,94 @@ const MUTATIONS = [
     find: "    { name: '幹事通知：開季前資料有改動', where:",
     replace: "    { name: '幹事通知：沒有電郵名單', where:",
     tests: ["tests/round93_tb_template_samples.test.js"]
+  },
+  {
+    id: "za-yigong-ui",
+    why: "介面仍然寫「義工」",
+    file: "src/ui/ScriptZone3.html",
+    find: "沒有等候確認的事奉人員申報。",
+    replace: "沒有等候確認的義工申報。",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-yigong-seed",
+    why: "電郵範本仍然寫「義工」",
+    file: "src/EmailTemplateSeed.gs",
+    find: "現階段各位事奉人員尚未收到任何通知，本次只在堂委及幹事之間傳閱。</p>",
+    replace: "現階段各位義工尚未收到任何通知，本次只在堂委及幹事之間傳閱。</p>",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-concept-back",
+    why: "「系統沒有…概念」一句放回黃框",
+    file: "src/ui/ScriptZone3.html",
+    find: "text: '填了就代表那一日（或所選的崗位）整日不能服侍。'",
+    replace: "text: '系統沒有「上半場不在」這種概念。填了就代表那一日（或所選的崗位）整日不能服侍。'",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-concept-rr",
+    why: "規則審閱「系統沒有…概念」一句放回",
+    file: "src/RuleReview.gs",
+    find: "那幾日就完全不會排他。'",
+    replace: "那幾日就完全不會排他。系統沒有「上半場不在」這種概念，填了就是整日。'",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-none",
+    why: "找不到時沒有去尊稱再找",
+    file: "src/Utils.gs",
+    find: "  const stripped = stripNameHonorific_(text, readNameHonorificSuffixes_());\n  if (!stripped) return null;",
+    replace: "  const stripped = null;\n  if (!stripped) return null;",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-first",
+    why: "去尊稱比完全相同優先",
+    file: "src/Utils.gs",
+    find: "  const exact = resolvePersonId_(text);\n  if (exact) return { personId: exact, base: '', suffix: '' };\n  const stripped = stripNameHonorific_(text, readNameHonorificSuffixes_());\n  if (!stripped) return null;",
+    replace: "  const stripped = stripNameHonorific_(text, readNameHonorificSuffixes_());\n  if (!stripped) { const exact = resolvePersonId_(text); return exact ? { personId: exact, base: '', suffix: '' } : null; }",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-config",
+    why: "尊稱不讀 Config",
+    file: "src/Utils.gs",
+    find: "  const raw = getConfig_(CONFIG_KEYS.NAME_HONORIFIC_SUFFIXES, DEFAULT_NAME_HONORIFIC_SUFFIXES);",
+    replace: "  const raw = DEFAULT_NAME_HONORIFIC_SUFFIXES;",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-elig",
+    why: "儲存並套用名單不用去尊稱配對",
+    file: "src/EligibilitySheetEditor.gs",
+    find: "      const lenient = resolvePersonIdLenient_(text);",
+    replace: "      const lenient = resolvePersonId_(text) ? { personId: resolvePersonId_(text), suffix: '' } : null;",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-note",
+    why: "預覽沒有列出去尊稱配對的名字",
+    file: "src/EligibilitySheetEditor.gs",
+    find: "    honorificMatches: honorificMatches,\n    // 有認不出",
+    replace: "    honorificMatches: [],\n    // 有認不出",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-ui",
+    why: "確認窗沒有顯示去尊稱的名字",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "    const honorBox = honorificMatchBox(plan.honorificMatches);",
+    replace: "    const honorBox = null;",
+    tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "za-honor-import",
+    why: "匯入不用去尊稱配對",
+    file: "src/RosterImport.gs",
+    find: "      const lenient = resolvePersonIdLenient_(typed);",
+    replace: "      const lenient = resolvePersonId_(typed) ? { personId: resolvePersonId_(typed), suffix: '' } : null;",
+    tests: ["tests/round101_za_wording.test.js"]
   }
 ];
 
@@ -12196,9 +12284,12 @@ console.log('=== C 組：逐條防線特登整壞，要求佢變紅 ===\n');
 // ⚠️ 用 `for` 唔用 `forEach`——還原失敗嗰陣要**即刻停低成支工具**，
 // 而 `forEach` 停唔到。繼續跑落去嘅話，下一條突變會喺一個
 // 已經改壞咗嘅檔案上面再改一次，越搞越亂。
+// 第一百零一輪批次：環境變數 VERIFY_RED_ONLY（逗號分隔的 id 前綴）⇒ 只跑那幾條（開發時用；推送閘一律跑全套）
+const ONLY_PREFIXES = String(process.env.VERIFY_RED_ONLY || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
 for (let mi = 0; mi < MUTATIONS.length; mi++) {
   if (restoreFailure) break;
   const m = MUTATIONS[mi];
+  if (ONLY_PREFIXES.length > 0 && !ONLY_PREFIXES.some(function (p) { return m.id.indexOf(p) === 0; })) continue;
   const abs = path.join(ROOT, m.file);
 
   // ⚠️ `raw` 係還原用（一個字都唔差）；`before` 係比對同突變用

@@ -41,8 +41,8 @@ const PUBLIC_ALLOWLIST = {
 };
 
 const GUARD = /^(?:const \w+ = )?(?:assertWebAppRequestAllowed_\((?:'api\w+')?\)|assertSpreadsheetEditorCaller_\(\));$/;
-// 第九十輪批次 QC 組：個人連結公開函式（義工的個人專屬連結頁用 google.script.run 呼叫；那個部署是任何人都打得開）。
-// 理由：義工沒有教會帳戶，不可以經幹事介面的權限檢查；所以每個函式第一句一定用 token 認人，只寫這個人自己的申報。
+// 第九十輪批次 QC 組：個人連結公開函式（事奉人員的個人專屬連結頁用 google.script.run 呼叫；那個部署是任何人都打得開）。
+// 理由：事奉人員沒有教會帳戶，不可以經幹事介面的權限檢查；所以每個函式第一句一定用 token 認人，只寫這個人自己的申報。
 const PERSONAL_GUARD = /^const person = assertPersonalLinkCaller_\(token\);$/;
 const personalSrc = read('src/PersonalUnavailable.gs');
 const PERSONAL_APIS = ((personalSrc.match(/const PERSONAL_LINK_PUBLIC_APIS = \[([^\]]*)\];/) || ['', ''])[1].match(/'([^']+)'/g) || [])

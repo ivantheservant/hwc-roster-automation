@@ -104,7 +104,7 @@ function freshSandbox(opts) {
   gas.countDistinctPosts_ = function () { return 8; };
   gas.log_ = function () {};
   gas.readSheet_ = function () { return []; };
-  // 第九十四輪批次 UD 組（刻意改動）：生成前會自動確認義工申報——這份測試只驗「造完版本跟住發佈」，自動確認另有 round94_ud 測試
+  // 第九十四輪批次 UD 組（刻意改動）：生成前會自動確認事奉人員申報——這份測試只驗「造完版本跟住發佈」，自動確認另有 round94_ud 測試
   gas.autoConfirmPendingSubmissionsForQuarter_ = function () { return { confirmed: 0, message: '' }; };
   gas.SpreadsheetApp = {
     getActiveSpreadsheet: function () {

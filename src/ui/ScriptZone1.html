@@ -131,9 +131,9 @@
         text: '・' + manualPostsPhrase(plan.manualPostNames) + '不會自動排，要你之後人手填',
         className: 'vio-row'
       }),
-      // 第九十四輪批次 UD 組：有待確認的義工申報 ⇒ 開始之後會自動確認並通知申請人（那就不是「不會寄出任何電郵」）
+      // 第九十四輪批次 UD 組：有待確認的事奉人員申報 ⇒ 開始之後會自動確認並通知申請人（那就不是「不會寄出任何電郵」）
       plan.pendingAutoConfirmText
-        ? make('div', { text: '・不會寄出職事表；只會通知那幾位申請人（義工申報已確認）', className: 'vio-row' })
+        ? make('div', { text: '・不會寄出職事表；只會通知那幾位申請人（事奉人員申報已確認）', className: 'vio-row' })
         : make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
     ]);
     if (plan.pendingAutoConfirmText) {
@@ -191,7 +191,7 @@
         text: '已生成初稿（第 ' + res.versionNo + ' 版）',
         className: 'ok-head'
       }),
-      // 第九十四輪批次 UD 組：生成前自動確認了的義工申報
+      // 第九十四輪批次 UD 組：生成前自動確認了的事奉人員申報
       res.autoConfirmMessage ? make('div', { text: res.autoConfirmMessage, className: 'lines' }) : null,
       make('div', {
         text: res.serviceDateCount + ' 個主日、' + res.postCount + ' 個崗位'
@@ -1584,7 +1584,7 @@
           }));
         }
         box.appendChild(make('div', {
-          text: '這些不會阻擋你發出，但義工收到的表會有空格。',
+          text: '這些不會阻擋你發出，但事奉人員收到的表會有空格。',
           className: 'err-text'
         }));
         nodes.push(box);

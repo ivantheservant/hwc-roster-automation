@@ -53,7 +53,7 @@ const SHEETS = {
   PRE_ASSIGNMENTS: 'PreAssignments',
   // 第九十八輪批次 YB 組：開季前資料基準（每個版本建立時的內容摘要；第一次用時自動建立）
   PRESEASON_BASELINES: 'PreseasonBaselines',
-  // 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍（幹事確認後才寫 Unavailable）。第一次提交時自動建立。
+  // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍（幹事確認後才寫 Unavailable）。第一次提交時自動建立。
   UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions'
 };
 
@@ -433,7 +433,7 @@ const COLUMNS = {
     CREATED_AT: 'CreatedAt',
     CREATED_BY: 'CreatedBy'
   },
-  // 第九十輪批次 QC 組：義工申報（見 PersonalUnavailable.gs）
+  // 第九十輪批次 QC 組：事奉人員申報（見 PersonalUnavailable.gs）
   UNAVAILABLE_SUBMISSIONS: {
     SUBMISSION_ID: 'SubmissionID',
     PERSON_ID: 'PersonID',
@@ -1007,8 +1007,8 @@ const HISTORICAL_BASELINE = {
  * 歷史上每季服侍次數的實際分佈：{次數: 人數}，合計 62 人、平均 3.3、最高 8。
  *
  * 注意這個分佈明顯右偏，不是集中在平均值附近：
- * 大部分人每季只服侍 1–3 次，另有一小群核心義工做到 7–8 次。
- * 所以「每人上限 = 全體平均」的做法會同時壓住核心義工的次數與兼任比例。
+ * 大部分人每季只服侍 1–3 次，另有一小群核心事奉人員做到 7–8 次。
+ * 所以「每人上限 = 全體平均」的做法會同時壓住核心事奉人員的次數與兼任比例。
  */
 const HISTORICAL_BASELINE_DISTRIBUTION = {
   1: 17, 2: 11, 3: 14, 4: 7, 5: 2, 6: 1, 7: 3, 8: 7
@@ -1296,7 +1296,7 @@ const CONFIG_KEYS = {
   // （缺省時退回 Config 的 LEAD_DAYS_OFFICIAL 從 StartDate 推算）少於這個天數、
   // 而 Stage 仍未到 OFFICIAL_SENT，不論目前是哪個 Stage 都會觸發提醒——這是
   // 系統範圍需求第 3 項「季初前 4 週 +2 日寄提醒」的現代版本，對象改成只提醒
-  // 幹事（不是義工），見 docs/系統範圍稽核.md。
+  // 幹事（不是事奉人員），見 docs/系統範圍稽核.md。
   REMIND_DEADLINE_DAYS: 'REMIND_DEADLINE_DAYS',
   // 第二十五輪批次階段 A：到期自動生成初稿嘅總開關，預設 FALSE（關）。
   //
@@ -1316,13 +1316,13 @@ const CONFIG_KEYS = {
   // 第二十五輪批次階段 D：幹事介面嘅網址，供提醒信附連結用。
   //
   // 點解要一個 Config key 而唔係喺程式碼度問：呢個專案有兩個部署
-  // （義工個人連結、幹事介面），`ScriptApp.getService().getUrl()` 只會回
+  // （事奉人員個人連結、幹事介面），`ScriptApp.getService().getUrl()` 只會回
   // 其中一個，而且喺 trigger 執行環境回嘅可能係 head 部署。
   // **一條打唔開嘅連結對一個唔識電腦嘅人比冇連結更差**——佢會以為系統壞咗。
   //
   // 所以唔靠估：由管理員部署完之後貼一次。留空就唔附連結（只附試算表）。
   WEBAPP_STEWARD_URL: 'WEBAPP_STEWARD_URL',
-  // 第四十一輪批次 E 組：**義工**部署嘅 `/exec` 網址（個人專屬連結用）。
+  // 第四十一輪批次 E 組：**事奉人員**部署嘅 `/exec` 網址（個人專屬連結用）。
   //
   // 同上面嗰個一樣，唔靠 `ScriptApp.getService().getUrl()` 去估——
   // 呢個專案有兩個部署，嗰個函式只會回其中一個，而喺 trigger 環境
@@ -1473,7 +1473,7 @@ const CONFIG_KEYS = {
   //
   // ⚠️ 刻意做成「匯出的時候截住」而不是「不寫入 grid」：
   // 那兩段在**試算表上**是有用的（幹事自己核對格數、核對誰做得多），
-  // 只是印出來給義工的那一份不需要。不寫入的話，
+  // 只是印出來給事奉人員的那一份不需要。不寫入的話，
   // 他連自己想看的時候都看不到，那是拿走一個他現在有的東西。
   PDF_ROSTER_ONLY: 'PDF_ROSTER_ONLY',
   // 階段 A 新增：特別主日（SpecialSundays.SkipPostIDs）跳過的格子專用標籤，
@@ -1506,11 +1506,11 @@ const CONFIG_KEYS = {
   SAME_DAY_EXCLUSIVE_POST_IDS: 'SAME_DAY_EXCLUSIVE_POST_IDS',
   // 第九十輪批次 QB 組：詩班名單用哪一個 Posts 行（PostID，預設 CHOIR）
   CHOIR_GROUP_POST_ID: 'CHOIR_GROUP_POST_ID',
-  // 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍
+  // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍
   PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: 'PERSONAL_UNAVAILABLE_QUARTERS_AHEAD',
   PERSONAL_UNAVAILABLE_DEADLINE_DAYS: 'PERSONAL_UNAVAILABLE_DEADLINE_DAYS',
   PERSONAL_UNAVAILABLE_NOTIFY: 'PERSONAL_UNAVAILABLE_NOTIFY',
-  // 第九十四輪批次 UB 組：可以確認義工申報（不能服侍）的人（電郵，逗號分隔；預設空白）。
+  // 第九十四輪批次 UB 組：可以確認事奉人員申報（不能服侍）的人（電郵，逗號分隔；預設空白）。
   // 確認者＝這個名單＋可以修改的人；只在這個名單的人打開幹事介面只見到確認畫面。見 WebApp.gs。
   UNAVAILABLE_CONFIRMER_EMAILS: 'UNAVAILABLE_CONFIRMER_EMAILS',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
@@ -1533,6 +1533,8 @@ const CONFIG_KEYS = {
   PREASSIGN_POST_IDS: 'PREASSIGN_POST_IDS',
   // 第九十八輪批次 YB 組：已有版本之後開季前資料改動 ⇒ 電郵通知幹事（預設 TRUE；程式預設值）
   PRESEASON_CHANGE_NOTIFY: 'PRESEASON_CHANGE_NOTIFY',
+  // 第一百零一輪批次 ZA-3：人手貼名字時可以去掉的結尾尊稱（預設 姊妹,弟兄,傳道,牧師,師母,執事,長老；程式預設值）
+  NAME_HONORIFIC_SUFFIXES: 'NAME_HONORIFIC_SUFFIXES',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。
@@ -1558,7 +1560,7 @@ const CONFIG_KEYS = {
   // 第十三輪批次階段 A6：公開/個人頁面嗰啲 Posts.EmptyDisplay=BLANK 嘅崗位
   // （例如獻花、翻譯——刻意留空、唔想每格都顯示「（待填）」），喺幹事介面
   // 留白冇問題（幹事知道呢啲係人手安排），但對外公開嘅版面成行留白冇任何
-  // 說明，義工會誤以為漏咗嘢。呢個 Key 提供一句通用嘅說明文字，喺公開/
+  // 說明，事奉人員會誤以為漏咗嘢。呢個 Key 提供一句通用嘅說明文字，喺公開/
   // 個人頁面代替空白（幹事介面完全唔受影響，仍然顯示空白）。
   PUBLIC_ROSTER_BLANK_NOTE: 'PUBLIC_ROSTER_BLANK_NOTE',
   // 第十一輪批次階段 C：ICS 日曆事件的預設崇拜時間（HH:mm，24 小時制，
@@ -1569,7 +1571,7 @@ const CONFIG_KEYS = {
   // 有值嗰陣，每一封信嘅收件人一律改成嗰個地址，**唔理 DRY_RUN 係咩**。
   // 於是 `DRY_RUN = FALSE` ＋ 呢個設定，就可以走完整條寄信路
   //（真係產生附件、真係經過 MailApp、真係收到信），
-  // 而**冇任何一封會去到義工手上**。
+  // 而**冇任何一封會去到事奉人員手上**。
   //
   // ⚠️ 佢最壞嘅失敗方式唔係「轉寄唔到」，係**唔記得閂**——
   // 上線之後幹事撳「正式發出」，全體一封都收唔到，
@@ -1814,7 +1816,7 @@ const DEFAULTS = {
   MULTIRUN_ATTEMPTS: 20,
   // 第九輪批次階段 C：由 'dd/MM' 改為 'M月d日'。
   // 'dd/MM' 對習慣 MM/dd 的讀者有月日歧義——「03/04」究竟是 3 月 4 日還是
-  // 4 月 3 日分不出。而義工就是靠個人信裡這一行去記自己邊個禮拜要返，記錯
+  // 4 月 3 日分不出。而事奉人員就是靠個人信裡這一行去記自己邊個禮拜要返，記錯
   // 日期的代價很實際（當日冇人到位）。'M月d日' 對中文讀者完全沒有歧義，
   // 也不受地區慣例影響。CJK 字元在 SimpleDateFormat 屬於字面字元，
   // 不是格式符號（只有 ASCII 字母才是），所以「月」「日」會原樣輸出。
@@ -1917,7 +1919,7 @@ const DEFAULTS = {
    * 幹事為咗一個人卡住成季，跟住就會想辦法繞過個關卡。關卡越嚴，
    * 被繞過嘅機會越大。
    *
-   * 點解唔係更寬鬆：實測嗰次係 57 / 57（100%）——即係全體義工一個都
+   * 點解唔係更寬鬆：實測嗰次係 57 / 57（100%）——即係全體事奉人員一個都
    * 收唔到，而 Stage 照樣鎖死。任何一個合理門檻都攔得住呢種情況，
    * 0.2 只係一個保守嘅起點，有需要可以喺 Config 調。
    */

@@ -17,9 +17,9 @@
     --highlight-fg: #3e2c00;
   }
   /* 第十一輪批次階段 D3：呢個頁面預設淺色，唔跟裝置嘅深色模式自動切換
-     ——義工多數用手機睇，淺色較適合閱讀，亦較接近印出嚟嘅職事表。
+     ——事奉人員多數用手機睇，淺色較適合閱讀，亦較接近印出嚟嘅職事表。
      只有幹事介面（ui/Style.html）先會跟裝置嘅深色模式設定自動切換，
-     呢度一定要義工自己撳掣先會轉深色。 */
+     呢度一定要事奉人員自己撳掣先會轉深色。 */
   :root[data-theme="dark"] {
     --bg: #16181d;
     --fg: #e6edf3;
@@ -87,7 +87,7 @@
   thead th { background: var(--header); position: sticky; top: 0; z-index: 1; }
   .special-note { display: block; font-size: 10px; color: var(--muted); font-weight: normal; }
   /* 第十二輪批次階段 A5：崗位在左（第一欄）、日期在頂，橫向捲動時第一欄
-     （崗位名稱）用 sticky 定位保持喺畫面左邊，義工用手機睇 13 週嘅表都
+     （崗位名稱）用 sticky 定位保持喺畫面左邊，事奉人員用手機睇 13 週嘅表都
      唔會捲走咗先前對照緊嘅崗位。左上角個 <th>（崗位標題）要同時 sticky
      top＋left、z-index 要比其他 sticky 都高，先唔會俾兩邊嘅 sticky 元素
      蓋過。 */

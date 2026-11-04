@@ -9,13 +9,13 @@
 //   1. 未產生個人 PDF 就行步驟 4 ⇒ 警告「57 / 57 人缺個人 PDF」，
 //      但畀咗「現在繼續」呢個選擇
 //   2. 撳繼續 ⇒ 收件人 59、模擬 2、PDF 缺件 57、失敗 0
-//      —— 57 位義工一個都冇通知到
+//      —— 57 位事奉人員一個都冇通知到
 //   3. **Stage 照樣前進到 OFFICIAL_SENT**
 //   4. 補齊 PDF 想重跑步驟 4 ⇒ 「需要 Stage 為 REQUESTS_APPLIED」，拒絕
 //   5. 摘要嗰行「失敗：0」令人以為一切正常
 //
 // 換咗 DRY_RUN=FALSE，呢個就係「系統話已正式發出、Stage 已鎖定，
-// 但全體義工一個都冇收到」。
+// 但全體事奉人員一個都冇收到」。
 
 const { loadGasSource } = require('./helpers/gas_loader.js');
 
@@ -49,7 +49,7 @@ console.log('\n=== C1【核心】全部缺件（57 / 57）一定要擋 ===');
 {
   const gate = gas.evaluateStep4MissingPdfGate_(missingResult(57, 57), LIMIT);
   check('★★★★★ blocked = true——實測嗰次係 57/57 都可以撳「繼續」，'
-    + '結果全體義工冇收到而 Stage 照樣鎖死', gate.blocked === true);
+    + '結果全體事奉人員冇收到而 Stage 照樣鎖死', gate.blocked === true);
   checkEqual('★★★★ 比例算啱', gate.ratio, 1);
   check('★★★★ 訊息講得出實際數字', gate.message.indexOf('57 / 57') !== -1, gate.message);
   check('★★★★ 訊息講得出後果（收唔到＋Stage 會鎖死）',
@@ -116,7 +116,7 @@ console.log('\n=== C2【核心】三種情境嘅 Stage 前進判斷 ===');
     failed: 0, errorPdf: 0, errorPdfMissing: 0, isDryRun: false
   });
   check('★★★★★ 只有「查無電郵」⇒ ok = true，**照樣前進**'
-    + '——本季有 7 位義工本來就冇電郵，已知而且無解，'
+    + '——本季有 7 位事奉人員本來就冇電郵，已知而且無解，'
     + '唔應該因為呢個卡住成季', noEmailOnly.ok === true);
   checkEqual('★★★★ 查無電郵唔計入未處理', noEmailOnly.unhandledCount, 0);
 }
@@ -145,9 +145,9 @@ console.log('\n=== C4【核心】摘要要講得出真相 ===');
     sent: 0, dryRun: 2, skipped: 0, unchanged: 0,
     failed: 0, errorPdf: 0, errorPdfMissing: 57, isDryRun: true
   });
-  check('★★★★★ 結論句直接講「57 位義工未收到通知」'
+  check('★★★★★ 結論句直接講「57 位事奉人員未收到通知」'
     + '——之前得四行數字，「失敗：0」讀落似乎冇事',
-    sentence.indexOf('57 位義工未收到通知') !== -1, sentence);
+    sentence.indexOf('57 位事奉人員未收到通知') !== -1, sentence);
   check('★★★★ 有警告符號，唔會混入一般資訊',
     sentence.indexOf('⚠️') !== -1, sentence);
 

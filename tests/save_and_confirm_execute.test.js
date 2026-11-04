@@ -129,7 +129,7 @@ console.log('\n=== D-2 步 5 失敗【核心】唔前進 Stage、唔發佈公開
   check('★★★★★ 寫入失敗嘅 catch 入面完全冇 advanceQuarterStage_',
     untilReturn.indexOf('advanceQuarterStage_') === -1);
   check('★★★★★ 寫入失敗嘅 catch 入面完全冇發佈公開連結'
-    + '——半套資料唔應該一路推落去令堂委／義工睇到',
+    + '——半套資料唔應該一路推落去令堂委／事奉人員睇到',
     untilReturn.indexOf('tryPublishPublicRoster_') === -1
     && untilReturn.indexOf('publishPublicRoster_') === -1);
   // ⚠️ 第三十四輪批次甲4：文案由 catch 區塊搬咗入

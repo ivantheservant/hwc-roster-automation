@@ -16,7 +16,7 @@
  *   ・〔請系統幫我調整〕：表上該格和預先安排不同 ⇒ 建議改為預先安排的人（「依開季前預先安排」）；
  *     預先安排是空白 ⇒ 不改（SuggestionSheet.gs）
  *   ・狀態卡黃框：表上有格和預先安排不同
- *   ・人手檢查（`readSameDayFixedCells_()`）、義工申報確認畫面、季前資料
+ *   ・人手檢查（`readSameDayFixedCells_()`）、事奉人員申報確認畫面、季前資料
  */
 
 const PREASSIGN_EXPLANATION = '這裏填的人會直接放入職事表，系統排其他崗位時會避開他們同日的其他崗位。'
@@ -323,7 +323,7 @@ function summarisePreAssignMismatch_(quarterId, versionNo) {
 }
 
 /**
- * 某人某日的預先安排（崗位名稱，「、」分隔；沒有 ⇒ 空字串）。義工申報確認畫面用。
+ * 某人某日的預先安排（崗位名稱，「、」分隔；沒有 ⇒ 空字串）。事奉人員申報確認畫面用。
  * @param {Object.<string, Object>} pre `readPreAssignments_()` 的結果
  * @param {string} personId 人
  * @param {string} serviceDate 日期

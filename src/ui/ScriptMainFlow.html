@@ -964,6 +964,8 @@
       });
       nodes.push(box);
     }
+    const honorBox = honorificMatchBox(plan.honorificMatches);
+    if (honorBox) nodes.push(honorBox);
 
     // ── 逐項勾選 ────────────────────────────────────────────
     //

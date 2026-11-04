@@ -510,7 +510,7 @@ function planStep4SendPreview_(quarterId, versionNo, sendOptions) {
     context, MAIL_STAGES.OFFICIAL, sendOptions);
 
   // ⚠️ 第六十三輪批次 F 組：揀中人數 ＜ 應收人數 ⇒ 要講明寄出之後會點。
-  // 「應收」＝ 幹事**冇揀人**嗰陣會寄、而且有電郵嘅義工。用同一個解析器
+  // 「應收」＝ 幹事**冇揀人**嗰陣會寄、而且有電郵嘅事奉人員。用同一個解析器
   //（`resolveActualRecipientsFromContext_()`，唔傳選項）計——唔自己叫
   // `listRecipients_()`，順手數一次就係多一個分岔點。
   const expected = {};
@@ -575,7 +575,7 @@ function executeStep4Send_(quarterId, sendOptions) {
   //
   // 修正之前呢度係無條件前進。實測後果：57 / 57 人因為缺 PDF 而冇收到，
   // Stage 照樣去咗 OFFICIAL_SENT，跟住想重跑步驟 4 就被 Stage 檢查拒絕
-  // ——即係「系統話已正式發出、Stage 鎖死，但全體義工冇收到」，
+  // ——即係「系統話已正式發出、Stage 鎖死，但全體事奉人員冇收到」，
   // 而且冇任何合法補救途徑，最後係靠步驟 5 嘅副作用救返。
   //
   // 劃線準則見 `evaluateStep4SendOutcome_()`：查無電郵唔算未處理
@@ -737,10 +737,10 @@ function executeStep5Send_(quarterId, versionNo, changedList, sendOptions) {
  *   1. 未產生個人 PDF 就行步驟 4，系統警告「57 / 57 人缺個人 PDF」，
  *      但**畀咗「現在繼續」呢個選擇**
  *   2. 撳「繼續」⇒ 收件人 59、模擬 2、PDF 缺件 57、失敗 0
- *      —— 57 位義工一個都冇通知到
+ *      —— 57 位事奉人員一個都冇通知到
  *   3. **但 Stage 照樣前進到 OFFICIAL_SENT**
  *   4. 補齊 PDF 之後想重跑步驟 4 ⇒ 「需要 Stage 為 REQUESTS_APPLIED」，拒絕
- *   5. 結果變成：系統話「已正式發出」、Stage 已鎖死，但全體義工冇收到，
+ *   5. 結果變成：系統話「已正式發出」、Stage 已鎖死，但全體事奉人員冇收到，
  *      而摘要嗰行「失敗：0」令人以為一切正常
  *
  * 換咗 DRY_RUN=FALSE 嘅真實運作，呢個就係一次靜靜噉失敗嘅正式發出。
@@ -791,7 +791,7 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
       + '（' + (ratio * 100).toFixed(1) + '%），超過容許上限 '
       + (limit * 100).toFixed(0) + '%。\n\n'
       + '⚠️ 這一步不能繼續——照樣寄出的話，這 ' + missingCount
-      + ' 位義工會一個都收不到通知，\n'
+      + ' 位事奉人員會一個都收不到通知，\n'
       + '而 Stage 會前進到 OFFICIAL_SENT，令步驟 4 無法重新執行。\n\n'
       + '請先執行「準備工作 ▸ 產生個人 PDF」，補齊之後再回來。\n\n'
       + '（如果你確定這一季本來就不需要個人 PDF 附件，'
@@ -810,7 +810,7 @@ function evaluateStep4MissingPdfGate_(missingResult, maxRatio) {
  * |---|---|---|
  * | `SENT` | ✅ | 真係寄咗 |
  * | `DRY_RUN` | ✅ | 演習模式下嘅正常結果 |
- * | `SKIPPED_NO_EMAIL` | ✅ | **已知而且無解**——本季有 7 位義工本來就冇電郵，唔應該因為呢個卡住成季 |
+ * | `SKIPPED_NO_EMAIL` | ✅ | **已知而且無解**——本季有 7 位事奉人員本來就冇電郵，唔應該因為呢個卡住成季 |
  * | `SKIPPED_UNCHANGED` | ✅ | 冇改動、唔使再寄 |
  * | `FAILED` | ❌ | 寄送失敗，有得補救 |
  * | `ERROR_PDF` | ❌ | PDF 產生失敗，有得補救 |
@@ -842,7 +842,7 @@ function evaluateStep4SendOutcome_(sendResult) {
     ok: false,
     unhandledCount: unhandled,
     breakdown: breakdown,
-    message: '⚠️ 有 ' + unhandled + ' 位義工未收到通知（' + parts.join('、') + '）。\n\n'
+    message: '⚠️ 有 ' + unhandled + ' 位事奉人員未收到通知（' + parts.join('、') + '）。\n\n'
       + 'Stage 維持在 REQUESTS_APPLIED，沒有前進到 OFFICIAL_SENT——\n'
       + '所以你補救之後可以再執行一次「步驟 4：正式發出」。\n\n'
       + '建議做法：\n'
@@ -851,7 +851,7 @@ function evaluateStep4SendOutcome_(sendResult) {
         : '　1. 再執行一次「步驟 4：正式發出」\n')
       + '\n只想補寄未成功那幾位、不想全部再寄一次的話，\n'
       + '用「四階段流程 ▸ 補寄未收到的人（唯讀預覽）」先看清楚名單。\n'
-      + '（查無電郵的義工不算未處理——那是已知而且沒有辦法解決的情況，'
+      + '（查無電郵的事奉人員不算未處理——那是已知而且沒有辦法解決的情況，'
       + '不會因此卡住流程。）'
   };
 }
@@ -861,7 +861,7 @@ function evaluateStep4SendOutcome_(sendResult) {
  *
  * 點解要有呢句：實測見到嘅摘要係
  * 「寄出 0　模擬 2　失敗 0　PDF 缺件 57」——每個數字都啱，
- * 但**讀落去似乎冇事**（「失敗：0」）。57 位義工冇收到通知呢件事，
+ * 但**讀落去似乎冇事**（「失敗：0」）。57 位事奉人員冇收到通知呢件事，
  * 要人自己由四個數字入面推出嚟。數字唔會講故事，結論句要自己講。
  *
  * @param {Object} sendResult `sendStage_()` 嘅結果
@@ -873,14 +873,14 @@ function buildStep4OutcomeSentence_(sendResult, reach) {
   const noEmail = Number(sendResult.skipped || 0);
 
   if (outcome.ok) {
-    return '✅ 結論：' + reached + ' 位義工已'
+    return '✅ 結論：' + reached + ' 位事奉人員已'
       + (sendResult.isDryRun ? '模擬通知（DRY_RUN，沒有真正寄出）' : '收到通知')
       + (noEmail > 0 ? '；另有 ' + noEmail + ' 位查無電郵，本來就寄不到' : '')
       + '，沒有任何一位是因為系統出錯而漏掉。'
       + describeOfficialShortfall_(reach);
   }
 
-  return '⚠️ 結論：' + outcome.unhandledCount + ' 位義工未收到通知。'
+  return '⚠️ 結論：' + outcome.unhandledCount + ' 位事奉人員未收到通知。'
     + (reached > 0 ? '（已' + (sendResult.isDryRun ? '模擬' : '') + '通知 ' + reached + ' 位' : '（')
     + (noEmail > 0 ? '；另有 ' + noEmail + ' 位查無電郵，本來就寄不到' : '')
     + '）';

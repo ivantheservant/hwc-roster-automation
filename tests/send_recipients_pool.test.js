@@ -215,7 +215,7 @@ console.log('\n=== A4【核心】Stage 冇拆走，只係唔再決定收件人 =
     gas.MAIL_STAGES.REVIEW, context, decisionPick);
   check('★★★★★★ 幹事自己勾（`PICK`）⇒ **全池**，就算階段係 REVIEW'
     + '——池仍然係「REVIEW 只有堂委地址」嘅話，'
-    + '佢勾一個義工，嗰個義工根本唔喺池入面 ⇒ 勾咗都唔會收到，'
+    + '佢勾一個事奉人員，嗰個事奉人員根本唔喺池入面 ⇒ 勾咗都唔會收到，'
     + '而畫面會話「已選 12 位」',
     pickPool.length >= 5
     && pickPool.some(function (r) { return r.personId === 'P9001'; }),

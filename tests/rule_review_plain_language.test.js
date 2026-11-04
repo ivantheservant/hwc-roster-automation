@@ -201,13 +201,13 @@ console.log('\n=== B4【核心】五條軟規則各有具體選項 ===');
     ruleRow(ID.PERSONAL_QUOTA, 'SOFT', 1), gas.RULE_LEVELS.SOFT, 13, CTX);
   check('★★★★★ 每人配額嗰條有規格指定嗰句備註'
     + '——唔講後果嘅話，堂委會以為「人人平均」係比較公平',
-    quota.note === '改成人人平均會令核心義工大幅減少、少見的人大幅增加。');
+    quota.note === '改成人人平均會令核心事奉人員大幅減少、少見的人大幅增加。');
 
   const built = gas.buildRuleReviewSheetRows_(
     [ruleRow(ID.PERSONAL_QUOTA, 'SOFT', 1)], 13, CTX);
   check('★★★★ 而且備註真係出現喺表上（第三欄）',
     // 第八十四輪批次 KF 組：前面多咗「一定要遵守」兩條，用規則名搵返嗰一行
-    (built.rows.filter((r) => r[1] === gas.ruleReviewPlainEntry_(ID.PERSONAL_QUOTA).text)[0] || [])[2].indexOf('改成人人平均會令核心義工大幅減少') !== -1,
+    (built.rows.filter((r) => r[1] === gas.ruleReviewPlainEntry_(ID.PERSONAL_QUOTA).text)[0] || [])[2].indexOf('改成人人平均會令核心事奉人員大幅減少') !== -1,
     JSON.stringify(built.rows));
 }
 

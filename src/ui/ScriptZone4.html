@@ -50,7 +50,7 @@
       // 第七十七輪批次 EF 組：人員與電郵畫面拿走 ⇒ 出席系統嘅入口搬到呢度
       // 第九十三輪批次 TB 組：核對電郵範本文字——每一種信寄一封樣本給自己
       zone4Row('寄出電郵範本樣本',
-        '一次過寄出系統每一種信的樣本到你自己的信箱，用來核對文字。只會寄給你選的那一個地址，不會寄給任何義工。',
+        '一次過寄出系統每一種信的樣本到你自己的信箱，用來核對文字。只會寄給你選的那一個地址，不會寄給任何事奉人員。',
         () => openTemplateSamples(), false),
       // 第九十八輪批次 YB 組：立即檢查這一季（同每日檢查同一支；有改動會通知幹事，遵守 DRY_RUN）
       zone4Row('檢查開季前資料改動',
@@ -172,6 +172,8 @@
       + (plan.hasVersion
         ? '這一季現時最新是第 ' + plan.latestVersionNo + ' 版；匯入會建立第 ' + plan.versionNoToCreate + ' 版，舊版本全部保留。'
         : '這一季還沒有任何版本；匯入會建立第 0 版。')));
+    const honorBox = honorificMatchBox(plan.honorificMatches);
+    if (honorBox) nodes.push(honorBox);
 
     if (plan.unresolved.length > 0) {
       const box = make('div', { className: 'sec sec-warn' }, [
@@ -358,7 +360,7 @@
       nodes.push(make('div', { className: 'sec' }, [
         sectionTitle('怎樣手動繼續'),
         make('div', { text: '1. 開「可編輯副本」最新一份（沒有的話，用公開連結試算表「檔案 ▸ 建立副本」）。', className: 'lines' }),
-        make('div', { text: '2. 在副本上直接改格子，改完自己寄給義工或印出來。系統裏的版本不會跟着變。', className: 'lines' }),
+        make('div', { text: '2. 在副本上直接改格子，改完自己寄給事奉人員或印出來。系統裏的版本不會跟着變。', className: 'lines' }),
         make('div', { text: '3. 系統回復之後，用「進階與診斷 ▸ 匯入人手編好的職事表」把副本讀回系統，之後照常用介面。', className: 'lines' }),
         // 第七十輪批次 AW 組：幹事打唔開 repo，唔再叫佢睇 docs/…。
         // 有 USER_GUIDE_URL ⇒ 連結；冇 ⇒ 指南章名。
@@ -644,7 +646,7 @@
         sel.appendChild(o);
       });
       openModal('寄出電郵範本樣本', [
-        para('系統每一種信（電郵範本、幹事通知、季前資料、邀請義工申報不能服侍的日子）各寄一封樣本，主旨前面有「[範本樣本 n/N]」。'),
+        para('系統每一種信（電郵範本、幹事通知、季前資料、邀請事奉人員申報不能服侍的日子）各寄一封樣本，主旨前面有「[範本樣本 n/N]」。'),
         para('用這一季最新版本的真實資料套入；這一季還沒有版本就用示範資料。樣本不附 PDF，日曆檔會附上。'
           + '測試模式（DRY_RUN）之下也會寄，但只寄給你選的這一個地址。', 'muted'),
         make('div', { className: 'prop-head' }, [make('span', { text: '季度' }), quarterInput]),

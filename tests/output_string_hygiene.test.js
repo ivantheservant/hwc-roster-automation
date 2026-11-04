@@ -137,7 +137,7 @@ console.log('\n=== E【核心】「清 Status 重新提交」係錯嘅講法 ===
 console.log('\n=== D：Config 說明同電郵範本種子都係輸出，一樣要乾淨 ===');
 {
   // Config 嘅 description 會寫入試算表畀幹事睇；
-  // 電郵範本種子會寄出去畀義工睇。兩者都係「輸出」。
+  // 電郵範本種子會寄出去畀事奉人員睇。兩者都係「輸出」。
   checkEqual('★★★★ ConfigSeed.gs 冇 `**`', scanStringLiterals('ConfigSeed.gs', '**'), []);
   checkEqual('★★★★ EmailTemplateSeed.gs 冇 `**`',
     scanStringLiterals('EmailTemplateSeed.gs', '**'), []);

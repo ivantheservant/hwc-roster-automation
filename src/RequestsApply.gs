@@ -592,7 +592,7 @@ function applyRequests_(plan, confirmedSheetRows, basis, versionNote, gridOverri
 
     // 規格 1.4：同一格幹事已經親手改咗 ⇒ **grid 贏**，呢筆申報唔套用。
     // ⚠️ 但一定要記低，唔可以靜靜咁唔理——幹事要知道佢親手改嗰下
-    // 蓋過咗一筆義工提交嘅申報，否則嗰位義工嘅要求就無聲無息消失咗。
+    // 蓋過咗一筆事奉人員提交嘅申報，否則嗰位事奉人員嘅要求就無聲無息消失咗。
     if (gridOverriddenSet[r.sheetRow]) {
       outcomes.push({
         sheetRow: r.sheetRow,

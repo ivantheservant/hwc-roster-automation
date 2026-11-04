@@ -123,7 +123,7 @@ console.log('\n=== Q2：預覽畫面講明寄第幾版、附甚麼、名單收�
     res.attachType === 'PERSONAL_PDF' && /PDF/.test(res.attachLabel), JSON.stringify(res.attachLabel));
   const office = res.people.filter(function (p) { return p.nameTC === '教會辦公室'; })[0];
   check('★★★★★ 名單收件人標明', office && office.isListRecipient === true, JSON.stringify(res.people));
-  check('★★★★ 義工就唔係名單收件人',
+  check('★★★★ 事奉人員就唔係名單收件人',
     res.people.filter(function (p) { return p.nameTC === '假乙'; })[0].isListRecipient === false);
   check('★★★★★ 冇電郵嘅另外列出（唔係淨係一個數字）',
     res.cannotSend.length === 1 && res.cannotSend[0].nameTC === '假丙', JSON.stringify(res.cannotSend));

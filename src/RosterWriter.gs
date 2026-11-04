@@ -237,7 +237,7 @@ function readGridCellLabels_() {
  * 第十四輪批次階段 D：`SPECIAL_SKIP` 優先用 `specialSkipText`（來自
  * `SpecialSundays.ExternalOwner`，例如「英語堂」「華語堂」）——對照教會
  * 現行人手職事表嘅做法，被跳過嘅格子直接寫邊個單位負責，比一句通用嘅
- * 「特殊主日」更有用（義工一睇就知道唔使自己搵人、亦知道去邊度問）。
+ * 「特殊主日」更有用（事奉人員一睇就知道唔使自己搵人、亦知道去邊度問）。
  * `ExternalOwner` 冇填（幹事未填、或者呢個特別主日根本冇外部單位負責，
  * 例如純粹減少崗位、唔係轉俾另一堂）就退回原本嘅通用文字，行為同加呢個
  * 功能之前一致，唔強制要求填。
@@ -286,7 +286,7 @@ function buildSpecialSundayTitleIndex_(quarterId, timezone) {
  * `SpecialSundaysSeed.gs`），但之前全專案完全冇任何程式碼讀取——被跳過嘅
  * 格子一律顯示同一句通用文字（`GRID_SPECIAL_SKIP_LABEL`，預設「特殊主日」），
  * 完全冧唔到係邊個單位接手。對照教會現行人手職事表嘅做法，合堂週被跳過嘅
- * 格子會直接寫「英語堂」／「華語堂」（邊個單位負責），呢個資訊對義工嚟講
+ * 格子會直接寫「英語堂」／「華語堂」（邊個單位負責），呢個資訊對事奉人員嚟講
  * 比一句「特殊主日」更有用（唔使自己估、亦知道有疑問去邊度問）。
  *
  * 只取 `Active=TRUE` 嘅行；`ExternalOwner` 空白就唔加入索引（呼叫端
@@ -492,7 +492,7 @@ function applyCellMarks_(sheet, layout, warningIndex) {
     // 正常留空的格即使有 ruleFlags 也不加，避免 PDF 產生大量註腳。
     if (cellWarnings && cellWarnings.length > 0) {
       // 第七十輪批次 AV 組：批註只寫中文原因，**不寫規則代號**——
-      // 內部代號（SEMI_NO_CONSECUTIVE 之類）曾經印到義工收到嘅 PDF 腳註上。
+      // 內部代號（SEMI_NO_CONSECUTIVE 之類）曾經印到事奉人員收到嘅 PDF 腳註上。
       notes[r][c] = cellWarnings.map(function (w) {
         return w.reason;
       }).join('\n');
@@ -638,7 +638,7 @@ function buildMonthGroups_(dateColumns) {
  * 第十三輪批次階段 A6【bug 修正，第十四輪批次階段 A 再修正】：
  * `Posts.EmptyDisplay=BLANK` 嘅崗位（例如獻花、翻譯——刻意留空、幹事
  * 介面唔想每格都顯示「（待填）」）喺幹事介面留白冇問題，但對外公開嘅
- * 版面成行留白冇任何說明，義工會誤以為漏咗嘢。
+ * 版面成行留白冇任何說明，事奉人員會誤以為漏咗嘢。
  *
  * 第十三輪批次原本嘅做法係逐格代入 `displayOptions.blankNote` 呢句
  * 說明文字——**實測發現呢個做法本身有問題**：一行通常有 13 個日期欄，

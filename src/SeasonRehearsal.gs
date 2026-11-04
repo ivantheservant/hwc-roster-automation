@@ -94,7 +94,7 @@ function evaluateSeasonRehearsalGuards_(input) {
   // 「查不到」同「查到係 TRUE」係兩件事，而估錯嗰邊嘅代價係真係寄信。
   if (opts.isDryRun !== true) {
     reasons.push('DRY_RUN 不是 TRUE。這個工具會走完整個寄送流程，'
-      + 'DRY_RUN=FALSE 時那些信會真的寄出去給全體義工。'
+      + 'DRY_RUN=FALSE 時那些信會真的寄出去給全體事奉人員。'
       + '請先在 Config 把 DRY_RUN 設成 TRUE。');
   }
 
@@ -1019,7 +1019,7 @@ function runSeasonRehearsal_() {
     + '・建立 2 個新版本（生成初稿一個、套用申報一個）\n'
     // ⚠️ 第三十一輪批次階段 B1：新增「步驟 3.5 產生個人 PDF」。
     // 冇呢一步，步驟 4 一定會被缺件保護擋住，寄送路徑永遠測唔到。
-    + '・為全體義工產生個人 PDF（每人一份，約 58 份）\n'
+    + '・為全體事奉人員產生個人 PDF（每人一份，約 58 份）\n'
     // ⚠️ 唔可以講到似乎一次就產生得晒。實測 58 人要分 3 批、共 552 秒，
     // 而單次 Apps Script 執行上限係 6 分鐘——所以演練只會盡力產生，
     // 時間到就停手，報告會寫明差幾多。講明咗，步驟 4 被擋就唔會

@@ -9,7 +9,7 @@
 //   YA5 人手檢查 readSameDayFixedCells_：未有版本 ⇒ 讀預先安排；有版本 ⇒ 版本＋版本上還沒有的預先安排
 //   YA6 生成之後再改：狀態卡黃框；〔請系統幫我調整〕建議改成預先安排的人（「依開季前預先安排」），改其他格避開
 //       同日兼任；預先安排空白 ⇒ 不改有人的格；〔儲存〕不會自動改格
-//   YA7 義工申報確認畫面：「這一日已預先安排他做領詩」
+//   YA7 事奉人員申報確認畫面：「這一日已預先安排他做領詩」
 //   YA8 季前資料：第五段之後「六、預先安排的領詩、司琴」
 //   YA9 週報系統說明有新工作表、新 AssignSource、view=preassign
 //   YA10 前端：按鈕在〔詩班獻詩〕旁邊；畫面下拉有「其他（自己輸入）」；〔儲存〕送出每一格
@@ -235,7 +235,7 @@ console.log('\n=== YA6：生成之後再改 ===');
   check('★★★★★ 〔儲存〕（WebAppSaveConfirm.gs）不會讀預先安排去改格', !/PreAssign|preAssign/.test(read('src/WebAppSaveConfirm.gs')));
 }
 
-console.log('\n=== YA7：義工申報確認畫面 ===');
+console.log('\n=== YA7：事奉人員申報確認畫面 ===');
 {
   const sc = scene();
   const g = sc.gas;

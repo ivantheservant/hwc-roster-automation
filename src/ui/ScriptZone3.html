@@ -201,14 +201,14 @@
       // 規格 4.1：呢句一定要有。唔講嘅話幹事會以為填個時間就得。
       make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '系統沒有「上半場不在」這種概念。填了就代表那一日（或所選的崗位）整日不能服侍。',
+          text: '填了就代表那一日（或所選的崗位）整日不能服侍。',
           className: 'warn-head'
         })
       ]),
       peopleSearchBox(keyword, (k) => openUnavailable(k, true))
     ];
-    // 第九十輪批次 QC 組：最上面「義工申報，待確認（N 項）」
-    // 第九十四輪批次 UB 組：改用「義工申報，確認」畫面同一個元件（待確認；已處理的另開）
+    // 第九十輪批次 QC 組：最上面「事奉人員申報，待確認（N 項）」
+    // 第九十四輪批次 UB 組：改用「事奉人員申報，確認」畫面同一個元件（待確認；已處理的另開）
     unavailableConfirmInlineNodes_(keyword).reverse().forEach((n) => nodes.splice(0, 0, n));
 
     nodes.push(row([button('＋ 新增一筆', () => openUnavailableEditor(null), '')], 'row-right'));
@@ -292,7 +292,7 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-   * 第九十四輪批次 UB 組：「義工申報，確認」畫面
+   * 第九十四輪批次 UB 組：「事奉人員申報，確認」畫面
    * ══════════════════════════════════════════════════════════════
    * 三個地方用同一個元件 `buildUnavailableConfirmNodes()`：
    *   ・深連結 `?view=unavailable-confirm&quarter=…`（新申報通知信內的連結）⇒ `openUnavailableConfirm()`
@@ -333,17 +333,17 @@
     const nodes = [];
     const pendBox = make('div', { className: 'sec' }, [sectionTitle('待確認（' + (d.pendingCount || 0) + ' 項）')]);
     if (d.error) {
-      pendBox.appendChild(make('div', { text: '暫時讀不到義工申報（' + d.error + '）', className: 'err-text' }));
+      pendBox.appendChild(make('div', { text: '暫時讀不到事奉人員申報（' + d.error + '）', className: 'err-text' }));
       nodes.push(pendBox);
       return nodes;
     }
     const groups = d.pending || [];
     if (groups.length === 0) {
-      pendBox.appendChild(make('div', { text: '沒有等候確認的義工申報。', className: 'muted' }));
+      pendBox.appendChild(make('div', { text: '沒有等候確認的事奉人員申報。', className: 'muted' }));
     } else {
       const allIds = [];
       groups.forEach((g) => g.items.forEach((it) => allIds.push(it.submissionId)));
-      pendBox.appendChild(row([gate(button('全部確認', () => decide(allIds, 'ACCEPT', '全部確認義工申報'), ''))], 'row-right'));
+      pendBox.appendChild(row([gate(button('全部確認', () => decide(allIds, 'ACCEPT', '全部確認事奉人員申報'), ''))], 'row-right'));
       groups.forEach((g) => {
         const box = make('div', { className: 'prop' }, [make('div', { text: g.personName, className: 'prop-head' })]);
         g.items.forEach((it) => {
@@ -356,8 +356,8 @@
           // 第九十八輪批次 YA 組：這一日已預先安排他做領詩／司琴
           if (it.preAssignNote) line.appendChild(make('div', { text: it.preAssignNote, className: 'err-text' }));
           line.appendChild(row([
-            gate(button('確認申請', () => decide([it.submissionId], 'ACCEPT', '確認義工申報'), 'link')),
-            gate(button('不確認', () => decide([it.submissionId], 'REJECT', '不確認義工申報'), 'link danger'))
+            gate(button('確認申請', () => decide([it.submissionId], 'ACCEPT', '確認事奉人員申報'), 'link')),
+            gate(button('不確認', () => decide([it.submissionId], 'REJECT', '不確認事奉人員申報'), 'link danger'))
           ], 'row-right'));
           box.appendChild(line);
         });
@@ -382,14 +382,14 @@
 
   /** 深連結／〔已處理的申報〕：彈窗版。 */
   function openUnavailableConfirm() {
-    runAction('讀取義工申報', async () => {
+    runAction('讀取事奉人員申報', async () => {
       await loadUnavailableConfirmData_();
       renderUnavailableConfirmModal_();
     });
   }
 
   function renderUnavailableConfirmModal_() {
-    openModal('義工申報，確認', buildUnavailableConfirmNodes(unavailableConfirmData_, async () => {
+    openModal('事奉人員申報，確認', buildUnavailableConfirmNodes(unavailableConfirmData_, async () => {
       await loadUnavailableConfirmData_();
       renderUnavailableConfirmModal_();
     }), [button('關閉', () => closeModalAndRefresh(), '')]);
@@ -406,7 +406,7 @@
     return nodes;
   }
 
-  /** 只是確認者的人：只顯示「義工申報，確認」，其他區全部收起，不載入其他資料。 */
+  /** 只是確認者的人：只顯示「事奉人員申報，確認」，其他區全部收起，不載入其他資料。 */
   async function renderConfirmerOnly_() {
     ['statusCard', 'zone1', 'zone2', 'zone3', 'zone4', 'mainFlow', 'quarter', 'btnRefresh'].forEach((id) => {
       const n = el(id);
@@ -416,8 +416,8 @@
     if (section) section.hidden = false;
     await loadUnavailableConfirmData_();
     const body = clear(el('confirmOnlyBody'));
-    body.appendChild(make('div', { text: '義工申報，確認', className: 'sec-title' }));
-    body.appendChild(para('你可以在這裏確認義工申報不能服侍的日子。這個畫面只有這一項功能。', 'muted'));
+    body.appendChild(make('div', { text: '事奉人員申報，確認', className: 'sec-title' }));
+    body.appendChild(para('你可以在這裏確認事奉人員申報不能服侍的日子。這個畫面只有這一項功能。', 'muted'));
     buildUnavailableConfirmNodes(unavailableConfirmData_, () => renderConfirmerOnly_()).forEach((n) => body.appendChild(n));
     body.appendChild(row([button('重新整理', () => runAction('重新整理', () => renderConfirmerOnly_()), 'secondary')], 'row-right'));
   }
@@ -430,7 +430,7 @@
         // 第九十五輪批次 VE 組：寫崗位名稱（伺服器 postsText；找不到崗位才是編號）
         + '　' + (r.appliesTo === 'ALL' ? '全部崗位' : '指定崗位：' + (r.postsText || r.postIds.join('、')))
         + (o.cancelled ? '　（已取消）' : '')
-        // 第九十輪批次 QC 組：義工在個人專屬連結申報、幹事接受的那幾筆，講明來源
+        // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報、幹事接受的那幾筆，講明來源
         + (r.source === 'PERSONAL_LINK' ? '　（來源：個人連結）' : ''),
       className: 'prop-head'
     }));
@@ -445,7 +445,7 @@
     // ——後端有能力，介面上到唔到。對比「暫時不做某崗位」有〔解除限制〕、
     // 「身分」有換屆同生效至，只有呢一頁漏咗。
     //
-    // 實務上好重要：不能服侍日期係義工最常反口嘅嘢，幹事本來只能開試算表
+    // 實務上好重要：不能服侍日期係事奉人員最常反口嘅嘢，幹事本來只能開試算表
     // 自己改 `Status`。
     // ─────────────────────────────────────────────────────────────
     if (!o.cancelled) {

@@ -6,7 +6,7 @@
  * ── 每一封信 ─────────────────────────────────────────────────────
  *   ・`EmailTemplates` 工作表每一行（沒有的範本用程式內的預設種子，並註明）：用這一季最新版本的真實資料
  *     （第一位有崗位的人）套入；這一季沒有版本 ⇒ 示範資料，內文最上面寫明。
- *   ・寫死在程式內的幹事通知：沒有電郵名單、生成完成、階段提醒（四種原因）、義工申報待確認。
+ *   ・寫死在程式內的幹事通知：沒有電郵名單、生成完成、階段提醒（四種原因）、事奉人員申報待確認。
  *     用示範資料叫**同一批函式**（`captureAdminNotifications_()` 收集而不寄出），樣本文字不會和正式通知分家。
  *   ・季前資料用 `TPL_PRESEASON_TC` 那一封樣本（內容＝`buildPreseasonPack_()` 的完整內容）。
  *   ・不附 PDF（內文最上面寫「正式信會附：……」）；有日曆檔的信附上該人的 .ics 樣本。
@@ -15,7 +15,7 @@
  * ── 收件人及 DRY_RUN（和〔寄給自己〕紙本包同一類例外）────────────────
  *   收件電郵必須是 `MAIL_ADMIN_NOTIFY`、`WEBAPP_ALLOWED_EMAILS`、`MAIL_REDIRECT_ALL_TO` 之中的一個，否則拒絕。
  *   樣本**不經轉寄**，`DRY_RUN` 為 TRUE 時也寄——理由：收件人已經限制在幹事自己的地址，
- *   沒有任何一位義工可能收到；而這個工具的用途正是在測試期間看文字。
+ *   沒有任何一位事奉人員可能收到；而這個工具的用途正是在測試期間看文字。
  *   經 `sendMailThroughGate_()`（TA 組：全專案唯一的寄信呼叫點）並寫明 `bypassRedirectReason`。
  *
  * ── 紀錄 ─────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ function buildTemplateSampleAdminNotifications_(quarterId, prefix, adminEmail) {
     { name: '幹事通知：階段提醒（特殊主日日期未確認）', where: '程式（Mailer.gs notifyAdminStageReminder_）',
       run: reminder(withReasons(['UNCONFIRMED_SPECIAL'], { daysUntilGenerate: 9,
         unconfirmedSpecials: [{ serviceDate: '2028-08-13', title: '示範特殊主日' }] })) },
-    { name: '幹事通知：義工申報待確認', where: '程式（PersonalUnavailable.gs buildUnavailableSubmissionNotifyText_）',
+    { name: '幹事通知：事奉人員申報待確認', where: '程式（PersonalUnavailable.gs buildUnavailableSubmissionNotifyText_）',
       run: function () {
         const text = buildUnavailableSubmissionNotifyText_(prefix,
           [{ personName: '示範甲', serviceDate: '2028-08-06', postsText: '全部崗位', reason: '出外地', late: false },

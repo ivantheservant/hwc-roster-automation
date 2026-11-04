@@ -51,7 +51,7 @@
  * 唔可以出現「規則檢查睇到新人名、但 `RosterAssignments` 仲係舊人名」
  * 呢個中間狀態——全專案有 26 個地方讀 `RosterAssignments`（個人 PDF、
  * AssignmentSummary、AssignmentHash、公開職事表、ICS……），留低唔一致
- * 嘅話，幹事見到嘅同義工收到嘅會唔同，比原本個 bug 更嚴重。
+ * 嘅話，幹事見到嘅同事奉人員收到嘅會唔同，比原本個 bug 更嚴重。
  * 見 `materialiseManualEdits_()`。
  *
  * ─────────────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ function resolveAuthoritativeState_(context, mode, callerName) {
  *
  * 兩個方向都有代價。**唔寫返**會令 grid 同 `RosterAssignments` 長期
  * 唔一致，而全專案有 26 個地方讀後者（個人 PDF、AssignmentSummary、
- * AssignmentHash、公開職事表、ICS……），即係「幹事見到改咗、義工收到
+ * AssignmentHash、公開職事表、ICS……），即係「幹事見到改咗、事奉人員收到
  * 嘅仲係舊人名」——比原本個 bug 更嚴重、而且更難察覺。
  *
  * **寫返**嘅代價係「人手改動繞過版本機制、審計軌跡會斷」。但呢個代價
@@ -272,7 +272,7 @@ function materialiseManualEdits_(context, changes, state, source, opts) {
       // 「系統排唔到」。呢個係本專案 bug class 第 2 條（缺失被當成正常值）
       // 同第 5 條（冇分開「系統要排」同「不自動排」）。
       //
-      // ⚠️ 呢份 PDF 係寄俾每一位義工嘅附件。上線之後全體會收到一份寫住
+      // ⚠️ 呢份 PDF 係寄俾每一位事奉人員嘅附件。上線之後全體會收到一份寫住
       // 「系統有 79 格排唔到」嘅職事表，而事實係零格排唔到。
       //
       // 規則同 `applyRequests_()`（RequestsApply.gs 第 445 行）一致——
@@ -403,7 +403,7 @@ function runMaterialiseManualEdits_() {
       + '帶入 ' + result.cellCount + ' 格人手改動。\n'
       + '原版本 v' + versionNo + ' 保持不變。\n\n'
       + '如果這一季已經正式發出過，記得執行「步驟 5：改動後重發」'
-      + '通知受影響的義工。', ui.ButtonSet.OK);
+      + '通知受影響的事奉人員。', ui.ButtonSet.OK);
 }
 
 /**

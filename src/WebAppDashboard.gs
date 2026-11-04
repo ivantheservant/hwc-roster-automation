@@ -739,15 +739,15 @@ function buildDashboardState_(quarterId) {
     preseasonStatus = '季前資料：暫時查不到（' + err.message + '）';
   }
 
-  // 第九十輪批次 QC 組：「這一季還要做的」義工申報待確認（全部待確認的，不分季度）。讀不到 ⇒ -1，前端照實講
+  // 第九十輪批次 QC 組：「這一季還要做的」事奉人員申報待確認（全部待確認的，不分季度）。讀不到 ⇒ -1，前端照實講
   let pendingSubmissions = 0;
   try {
     pendingSubmissions = countPendingUnavailableSubmissions_(null);
   } catch (err) {
-    log_('WARN', 'apiGetDashboardState：義工申報讀不到：' + err.message);
+    log_('WARN', 'apiGetDashboardState：事奉人員申報讀不到：' + err.message);
     pendingSubmissions = -1;
   }
-  timer.mark('季前資料及義工申報');
+  timer.mark('季前資料及事奉人員申報');
 
   // 第九十三輪批次 TF 組：「寄出警告」（空格、放行的違反、名單影響）先算好再量度；都是只讀，結果不變
   const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)

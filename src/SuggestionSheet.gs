@@ -162,7 +162,7 @@ function apiCheckMyChanges(quarterId) {
       violations: violations,
       blanks: blanks,
       undecidedCount: undecidedCount,
-      // 第九十四輪批次 UD 組：調整確認窗那一句（有待確認的義工申報才有）
+      // 第九十四輪批次 UD 組：調整確認窗那一句（有待確認的事奉人員申報才有）
       pendingAutoConfirmText: describePendingAutoConfirm_(countPendingSubmissionsForQuarterSafe_(quarterId)),
       // 第八十二輪批次 IB 組：「這一次會處理」（同結果窗同一支）
       willHandle: buildAdjustWillHandle_(quarterId, context, analysis, context.timezone),
@@ -820,7 +820,7 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
       '這一季還沒有生成過任何版本。', '甚麼都沒有改動。', ['先在第 1 步生成職事表']));
   }
 
-  // 第九十四輪批次 UD 組：調整前把該季等候確認的義工申報自動確認，然後才讀資料。失敗會拋三段式錯誤（停下）。
+  // 第九十四輪批次 UD 組：調整前把該季等候確認的事奉人員申報自動確認，然後才讀資料。失敗會拋三段式錯誤（停下）。
   autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.SUGGEST);
 
   const start = suggestionStep_('判斷這一次的起點是哪一張表', function () {

@@ -1,7 +1,7 @@
-// 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍。
+// 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍。
 // 執行方式：node tests/round90_qc_personal_unavailable.test.js
 //
-// Ivan 2026-10-30 決定：義工在自己的個人專屬連結勾選不能服侍的主日，幹事確認後才生效（取代共用試算表）。
+// Ivan 2026-10-30 決定：事奉人員在自己的個人專屬連結勾選不能服侍的主日，幹事確認後才生效（取代共用試算表）。
 //
 //   QC1 token：錯、格式不對、停用 ⇒ 中性錯誤，甚麼都沒有寫；AuditLog 不寫 token
 //   QC2 提交：只寫自己的行；日期範圍（未完結的最近 N 季）；過去的日子；每次最多 20 個；每人每日最多 10 次；
@@ -12,9 +12,9 @@
 //   QC5 個人頁：這一季還沒有職事表 ⇒ token 正確照樣打開（「這一季的職事表還未發出」＋申報一段）；token 錯 ⇒ 中性頁；
 //       頁面嵌入的資料只有這個人自己的、而且 < > & 已轉義
 //   QC6 每日檢查通知幹事：有新的才寄、同一日最多一封、DRY_RUN、Config 可關
-//   QC7 〔邀請義工申報不能服侍的日子〕：收件人（自動排的崗位、領詩／司琴、詩班、展開身分；沒有電郵的人列出）；DRY_RUN；
+//   QC7 〔邀請事奉人員申報不能服侍的日子〕：收件人（自動排的崗位、領詩／司琴、詩班、展開身分；沒有電郵的人列出）；DRY_RUN；
 //       模擬和真正寄出分開記；每人自己的連結；AuditLog 不寫連結
-//   QC8 主畫面「義工申報待確認：N 項」、季前資料第四段一句、畫面（只可查看 ⇒ 按鈕灰色）、Config
+//   QC8 主畫面「事奉人員申報待確認：N 項」、季前資料第四段一句、畫面（只可查看 ⇒ 按鈕灰色）、Config
 // 下面用假 ID（P97xx）、假名、假 token。
 
 const fs = require('fs');
@@ -188,7 +188,7 @@ console.log('\n=== QC2：提交 ===');
     && sc3.ss.getSheetByName('UnavailableSubmissions').getRange(1, 1).getValue() === '申報編號');
 }
 {
-  // 第九十輪回歸 V3 修正：由連結的季度（q）開始列出——邀請較後的季度時，義工要找得到那一季
+  // 第九十輪回歸 V3 修正：由連結的季度（q）開始列出——邀請較後的季度時，事奉人員要找得到那一季
   const sc = scene();
   const g = sc.gas;
   const ids = (q) => g.buildPersonalUnavailableView_('P9701', sc.today, sc.TZ, q).quarters.map((x) => x.quarterId).join();
@@ -236,7 +236,7 @@ console.log('\n=== QC4：幹事確認 ===');
   g.personalSubmitUnavailable(tok(3), '', [T1[2]], '');
   g.personalSubmitUnavailable(tok(4), '', [T1[3]], '');
   const list = g.apiListUnavailable(sc.Q, '');
-  check('★★★★★★ 〔不能服侍的日期〕有「義工申報，待確認」三項（名字、日期、原因、截止日之後）',
+  check('★★★★★★ 〔不能服侍的日期〕有「事奉人員申報，待確認」三項（名字、日期、原因、截止日之後）',
     list.submissions.items.length === 3 && list.submissions.items[0].personName === sc.PEOPLE.P9701
     && list.submissions.items[0].reason === '出外' && list.submissions.items[0].late === true, JSON.stringify(list.submissions));
   const ids = list.submissions.items.map((i) => i.submissionId);
@@ -350,7 +350,7 @@ console.log('\n=== QC6：每日檢查通知幹事 ===');
 }
 
 // =====================================================================
-console.log('\n=== QC7：〔邀請義工申報不能服侍的日子〕===');
+console.log('\n=== QC7：〔邀請事奉人員申報不能服侍的日子〕===');
 {
   const sc = scene({ roles: [{ PersonID: 'P9706', RoleCode: 'DEACON', EffectiveFrom: '2098-01-01', EffectiveTo: '', Active: true }] });
   const g = sc.gas; const E = sc.C.ELIGIBILITY;
@@ -430,7 +430,7 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   seedSheet(sc.ss, sc.S.PERSON_POST_WEIGHT, ['W'], Object.keys(W).map((k) => W[k]), []);
   g.computeAutomationSchedule_ = function () { return { generateDate: '2098-12-20', officialDate: '' }; };
   const pack = g.buildPreseasonPack_(sc.Q, sc.today, '2098-12-20');
-  check('★★★★★★ 季前資料第四段之後一句「另有 1 項義工申報待確認」', pack.sections[3].lines.indexOf('另有 1 項義工申報待確認') !== -1,
+  check('★★★★★★ 季前資料第四段之後一句「另有 1 項事奉人員申報待確認」', pack.sections[3].lines.indexOf('另有 1 項事奉人員申報待確認') !== -1,
     JSON.stringify(pack.sections[3].lines));
   check('★★★★ 主畫面帶 pendingSubmissions', /pendingSubmissions: pendingSubmissions/.test(read('src/WebAppDashboard.gs')));
   check('★★★★ Config：三個 key 有登記（預設 2、7、TRUE）', g.CONFIG_KEYS.PERSONAL_UNAVAILABLE_QUARTERS_AHEAD && g.CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS
@@ -446,9 +446,9 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   vm.runInContext("currentQuarterId = '2099T1';", ui);
   ui.renderZone2Body({ preQuarter: { undoneItemCount: 0, items: [] }, staffing: { totalBlanks: 0, shortPostCount: 0, posts: [] }, pendingSubmissions: 3 });
   const body = ui.document.getElementById('zone2Body');
-  check('★★★★★★ 「這一季還要做的」有「義工申報待確認：3 項」', /義工申報待確認：3 項/.test(body.textContent), body.textContent.slice(0, 600));
+  check('★★★★★★ 「這一季還要做的」有「事奉人員申報待確認：3 項」', /事奉人員申報待確認：3 項/.test(body.textContent), body.textContent.slice(0, 600));
   const btns = body.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
-  check('★★★★★ 開季前準備有〔邀請義工申報不能服侍的日子〕', btns.indexOf('邀請義工申報不能服侍的日子') !== -1, btns.join('、'));
+  check('★★★★★ 開季前準備有〔邀請事奉人員申報不能服侍的日子〕', btns.indexOf('邀請事奉人員申報不能服侍的日子') !== -1, btns.join('、'));
   // 〔不能服侍的日期〕最上面
   const cur = (id, name, source) => ({ unavailableId: id, personId: 'P9701', personName: name, dateFrom: '2099-01-11', dateTo: '2099-01-11',
     appliesTo: 'ALL', postIds: [], reason: '', source: source, status: 'ACTIVE', inQuarter: true });
@@ -457,7 +457,7 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
     submissions: { items: [{ submissionId: 'S1', personId: 'P9701', personName: '假甲', serviceDate: '2099-01-11', reason: '出外', late: true },
       { submissionId: 'S2', personId: 'P9703', personName: '假丙', serviceDate: '2099-01-18', reason: '', late: false }], error: '' } };
   vm.runInContext('unavailableData = ' + JSON.stringify(data) + ';', ui);
-  // 第九十四輪批次 UB 組（刻意改動）：最上面改用「義工申報，確認」畫面同一個元件（資料由 apiGetUnavailableConfirmView）
+  // 第九十四輪批次 UB 組（刻意改動）：最上面改用「事奉人員申報，確認」畫面同一個元件（資料由 apiGetUnavailableConfirmView）
   const confirmData = { pendingCount: 2, canDecide: true, history: [], pending: [
     { personId: 'P9701', personName: '假甲', items: [{ submissionId: 'S1', serviceDate: '2099-01-11', postsText: '全部崗位', reason: '出外', submittedAt: '2098-12-10 09:00:00', late: true }] },
     { personId: 'P9703', personName: '假丙', items: [{ submissionId: 'S2', serviceDate: '2099-01-18', postsText: '讀經', reason: '', submittedAt: '2098-12-10 09:00:00', late: false }] }] };
@@ -470,7 +470,7 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   check('★★★★★ 逐項〔確認申請〕〔不確認〕＋〔全部確認〕', mbtn.filter((t) => t === '確認申請').length === 2 && mbtn.filter((t) => t === '不確認').length === 2
     && mbtn.indexOf('全部確認') !== -1, mbtn.join('、'));
   check('★★★★ 截止日之後的標出來、原因', /假甲/.test(mb.textContent) && /截止日之後/.test(mb.textContent) && /原因：出外/.test(mb.textContent));
-  check('★★★★★ 生效清單：接受了的義工申報寫「（來源：個人連結）」；幹事自己加的不寫',
+  check('★★★★★ 生效清單：接受了的事奉人員申報寫「（來源：個人連結）」；幹事自己加的不寫',
     /假戊　2099-01-11 至 2099-01-11　全部崗位　（來源：個人連結）/.test(mb.textContent) && !/假己[^假]*來源/.test(mb.textContent), mb.textContent.slice(0, 600));
   // 只可查看 ⇒ 看得到，按鈕灰色
   vm.runInContext('setViewOnly_(true);', ui);
@@ -479,7 +479,7 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   const vb = ui.document.getElementById('modalBody').flatten().filter((n) => n.tagName === 'BUTTON' && /確認/.test(n.textContent));
   check('★★★★★★ 只可查看：看得到，〔確認申請〕〔不確認〕〔全部確認〕全部灰色', vb.length === 5 && vb.every((b) => b.disabled === true),
     vb.map((b) => b.textContent + ':' + b.disabled).join(','));
-  check('★★★★ 只可查看：〔邀請義工申報不能服侍的日子〕可以打開預覽（不灰）', vm.runInContext("isViewOnlyBlockedLabel_('邀請義工申報不能服侍的日子')", ui) === false
+  check('★★★★ 只可查看：〔邀請事奉人員申報不能服侍的日子〕可以打開預覽（不灰）', vm.runInContext("isViewOnlyBlockedLabel_('邀請事奉人員申報不能服侍的日子')", ui) === false
     && vm.runInContext("isViewOnlyBlockedLabel_('寄出')", ui) === true);
   vm.runInContext('setViewOnly_(false);', ui);
   vm.runInContext('unavailableConfirmData_ = ' + JSON.stringify(confirmData) + ';', ui);

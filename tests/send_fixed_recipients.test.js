@@ -180,7 +180,7 @@ console.log('\n=== AT4 補寄「還沒有收到」：正式發出有寄 ⇒ 不�
   checkEqual('★★★★★★ 正式發出（含預設組）之後，補寄「還沒有收到」為空',
     missingNames(withFixed), []);
 
-  // 幹事取消了這一組：SendLog 只有義工
+  // 幹事取消了這一組：SendLog 只有事奉人員
   setup([logRow('a@example.invalid', 'P9001'), logRow('b@example.invalid', 'P9002')]);
   const without = gas.planMakeupSend_(Q, 3, gas.MAIL_STAGES.OFFICIAL);
   checkEqual('★★★★★★ 幹事取消了這一組 ⇒ 照舊列出（這是真實的未收到）',

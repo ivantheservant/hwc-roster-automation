@@ -6,7 +6,7 @@
  *    第八十七輪批次 NC 組（Ivan 決定）：由 `MYSELF` 改為 `DOMAIN`，令教會網域
  *    內**名單上**的人都可以使用（有些人可以修改，有些人只可以查看）。`DOMAIN` 只代表
  *    「已登入教會帳戶的人才到達得到這個腳本」，**不代表**他們可以用——真正決定誰可以用的
- *    是第 3 層名單。義工個人專屬連結是另一個部署（`ANYONE_ANONYMOUS`），由
+ *    是第 3 層名單。事奉人員個人專屬連結是另一個部署（`ANYONE_ANONYMOUS`），由
  *    `deploy/push_and_deploy.ps1` 臨時改設定另建版本，不受這裏影響。
  * 2. **Config 的 `WEBAPP_ENABLED` 總開關**（預設 FALSE）——即使 Web App 已經
  *    deploy、部署權限也設對了，這一關沒開，`doGet()` 與全部 `api*` 函式一律
@@ -28,8 +28,8 @@
  * 前端灰色按鈕只是方便，**這裏才是真正的防線**。
  *
  * ── 第九十四輪批次 UB 組：確認者（第三種權限）────────────────────────
- *   - `UNAVAILABLE_CONFIRMER_EMAILS`：可以確認義工申報（不能服侍）的人。只在這個名單（不在修改、查看名單）⇒
- *     角色 CONFIRMER：幹事介面只見到「義工申報，確認」畫面；伺服器端**只准**呼叫 `UNAVAILABLE_CONFIRMER_APIS`
+ *   - `UNAVAILABLE_CONFIRMER_EMAILS`：可以確認事奉人員申報（不能服侍）的人。只在這個名單（不在修改、查看名單）⇒
+ *     角色 CONFIRMER：幹事介面只見到「事奉人員申報，確認」畫面；伺服器端**只准**呼叫 `UNAVAILABLE_CONFIRMER_APIS`
  *     （讀取、決定）及 `WEBAPP_CONFIRMER_SELF_APIS`（自己的權限），其他一律拒絕並寫 AuditLog。
  *   - 確認者＝這個名單＋可以修改的人。只可查看的人可以看確認畫面（讀取在唯讀清單），但不可以決定——
  *     除非他同時在確認者名單。
@@ -47,7 +47,7 @@ const UNAVAILABLE_CONFIRMER_APIS = ['apiGetUnavailableConfirmView', 'apiDecideUn
 const WEBAPP_CONFIRMER_SELF_APIS = ['apiGetMyPermission'];
 
 /** 確認者呼叫其他 api 時的訊息。 */
-const WEBAPP_CONFIRMER_ONLY_MESSAGE = '你只可以確認義工申報（不能服侍），不可以做其他事。';
+const WEBAPP_CONFIRMER_ONLY_MESSAGE = '你只可以確認事奉人員申報（不能服侍），不可以做其他事。';
 
 /** 只可查看的人呼叫改動的 api 時的訊息（前端顯示同一句）。 */
 const WEBAPP_VIEW_ONLY_MESSAGE = '你只有查看權限，不可以改動。';
@@ -72,7 +72,7 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiGetChoirSinging',
   // 第九十三輪批次 TB 組：〔寄出電郵範本樣本〕可以收樣本的地址（只讀）
   'apiGetTemplateSampleOptions',
-  // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕預覽
+  // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕預覽
   'apiUnavailableInvitePreview',
   'apiListUnavailable', 'apiPreviewUnavailableImpact', 'apiListPeople', 'apiListAliases',
   'apiGetEligibilityMatrix', 'apiGetPersonPostWeightMatrix', 'apiGetSendAllRecipients',
@@ -83,7 +83,7 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiListRuleReviewSheets', 'apiRuleReviewImportPlan',
   // 第八十七輪批次 NB 組：自己的權限；唯讀崗位名單視窗
   'apiGetMyPermission', 'apiGetEligibilityViewOnly',
-  // 第九十四輪批次 UB 組：「義工申報，確認」畫面（只可查看的人看得到，按鈕灰色）
+  // 第九十四輪批次 UB 組：「事奉人員申報，確認」畫面（只可查看的人看得到，按鈕灰色）
   'apiGetUnavailableConfirmView',
   // 第九十七輪批次 XA／XB 組：〔補填電郵〕畫面；〔沒有電郵的人：匯出邀請〕畫面（只讀）
   'apiGetManualEmailView', 'apiGetInvitePaperView',
@@ -190,7 +190,7 @@ function assertWebAppRequestAllowed_(readOnlyApiName) {
 }
 
 /**
- * 第九十四輪批次 UB 組：呼叫者可不可以確認義工申報（可以修改的人，或在 UNAVAILABLE_CONFIRMER_EMAILS）。
+ * 第九十四輪批次 UB 組：呼叫者可不可以確認事奉人員申報（可以修改的人，或在 UNAVAILABLE_CONFIRMER_EMAILS）。
  * @returns {boolean}
  */
 function isUnavailableConfirmerCaller_() {
@@ -214,7 +214,7 @@ function denyConfirmerOnlyCaller_(apiName) {
       targetKey: email,
       newValue: apiName || '',
       source: 'assertWebAppRequestAllowed_',
-      notes: '只可以確認義工申報的人嘗試呼叫其他功能，已拒絕'
+      notes: '只可以確認事奉人員申報的人嘗試呼叫其他功能，已拒絕'
     });
   } catch (err) {
     log_('WARN', '確認者嘗試呼叫其他功能，AuditLog 寫不到：' + err.message);
@@ -267,10 +267,10 @@ function assertSpreadsheetEditorCaller_() {
  * Web App 的進入點，回傳操作介面頁面。
  *
  * ⚠️ 第十一輪批次階段 B：**呢個函式而家由兩個唔同 access 設定嘅部署共用**
- * ——幹事介面本身嘅部署（`access=MYSELF`）同義工用嘅「個人專屬連結」部署
+ * ——幹事介面本身嘅部署（`access=MYSELF`）同事奉人員用嘅「個人專屬連結」部署
  * （`access=ANYONE`，見 `WebAppPersonalLink.gs` 檔頭說明）。**必須假設呼叫者
  * 未經任何權限檢查**，第一件事就要判斷「呢個係咪個人連結請求」，係嘅話
- * 完全唔行下面幹事介面嗰三層防護（義工冇 Google 身分可以過白名單），
+ * 完全唔行下面幹事介面嗰三層防護（事奉人員冇 Google 身分可以過白名單），
  * 唔係先至行返原本嘅邏輯。呢個分流一定要排喺最頭，唔可以有任何共用邏輯
  * 排喺分流之前。
  *
@@ -297,7 +297,7 @@ function doGet(e) {
   // ⚠️ 第六十七輪批次 AK 組：呢兩個頁面**對外**只可以講中性句子。
   //
   // 現場（2026-10-21 無痕視窗開個人連結基底、冇參數）：見到「……在 Config 工作表的
-  // WEBAPP_ALLOWED_EMAILS 加入你的電郵」。義工刪走網址參數就會見到，而且叫佢搵人把自己
+  // WEBAPP_ALLOWED_EMAILS 加入你的電郵」。事奉人員刪走網址參數就會見到，而且叫佢搵人把自己
   // 加入白名單係錯嘅指示。詳細原因照舊寫入執行記錄（`log_()`），畫面唔提任何工作表、
   // Config 鍵或部署設定——見 `renderWebAppDisabledPage_()`／`renderWebAppForbiddenPage_()`。
   try {
@@ -333,7 +333,7 @@ function renderWebAppDisabledPage_() {
 /**
  * 第六十七輪批次 AK 組：呼叫者不在允許名單時對外顯示嘅頁。
  *
- * - 義工（多數係刪走咗網址參數先會見到）⇒ 叫佢用電郵內嘅個人專屬連結。
+ * - 事奉人員（多數係刪走咗網址參數先會見到）⇒ 叫佢用電郵內嘅個人專屬連結。
  * - 已登入但用錯帳戶嘅幹事 ⇒ 多一句「（目前登入：<電郵>）」方便自己發現；
  *   **仍然唔提 Config**。讀唔到電郵就唔出呢一句。
  * @returns {HtmlOutput}
@@ -347,7 +347,7 @@ function renderWebAppForbiddenPage_() {
   }
   const escaped = email.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return HtmlService.createHtmlOutput(
-    '<p>這個網址只供幹事使用。如果你是義工，請用電郵內的個人專屬連結。</p>'
+    '<p>這個網址只供幹事使用。如果你是事奉人員，請用電郵內的個人專屬連結。</p>'
       + (escaped ? '<p>（目前登入：' + escaped + '）</p>' : '')
   ).setTitle('粵語堂職事表系統');
 }
@@ -378,7 +378,7 @@ function includeHtml(fileName) {
  */
 function apiGetMyPermission() {
   const role = assertWebAppRequestAllowed_('apiGetMyPermission');
-  // 第九十四輪批次 UB 組：canConfirm＝可以確認義工申報（可以修改的人，或在確認者名單）
+  // 第九十四輪批次 UB 組：canConfirm＝可以確認事奉人員申報（可以修改的人，或在確認者名單）
   return { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm: isUnavailableConfirmerCaller_() };
 }
 

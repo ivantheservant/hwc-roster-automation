@@ -54,7 +54,7 @@ console.log('\n=== D2 閘 1：DRY_RUN 一定要 TRUE ===');
   check('★★★★★ DRY_RUN=FALSE ⇒ 擋住', off.blocked === true);
   check('★★★★★ 而且講明後果：嗰啲信會真係寄出去'
     + '——「DRY_RUN 唔係 TRUE」本身唔係一個理由',
-    off.reasons.join('').indexOf('會真的寄出去給全體義工') !== -1,
+    off.reasons.join('').indexOf('會真的寄出去給全體事奉人員') !== -1,
     off.reasons.join('\n'));
 
   check('★★★★★ **`undefined` 唔算通過**（讀唔到 Config）'

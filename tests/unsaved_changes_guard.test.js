@@ -95,7 +95,7 @@ console.log('\n=== E3【核心】掣 3 防重複第二層：SendLog 有 OFFICIAL
 
   check('★★★★★ **不論版本**——冇按 VersionNo 篩選'
     + '（按版本判斷嘅話，建多一個版本就可以再「正式發出」一次，'
-    + '全體義工會收到第二封「正式」通知）',
+    + '全體事奉人員會收到第二封「正式」通知）',
     fnBody.indexOf('VERSION_NO') === -1);
   check('★★★★★ **不論 DRY_RUN**——冇按 Status／DryRun 篩選'
     + '（DRY_RUN 紀錄代表呢個動作已經行過一次，應該提出嚟俾人知）',

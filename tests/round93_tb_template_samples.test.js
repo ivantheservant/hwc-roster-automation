@@ -80,7 +80,7 @@ console.log('\n=== TB2／TB3／TB4：內容、DRY_RUN、紀錄（這一季有版
   const mails = s.log.sent;
   const subjects = mails.map((m) => m[1]);
   const TEMPLATES = ['TPL_REVIEW_TC', 'TPL_REMIND_TC', 'TPL_OFFICIAL_TC', 'TPL_OFFICIAL_LIST_TC', 'TPL_RESEND_TC', 'TPL_RESEND_LIST_TC', 'TPL_PRESEASON_TC', 'TPL_UNAVAILABLE_INVITE_TC', 'TPL_UNAVAILABLE_DECIDED_TC']; // 第九十四輪批次 UC 組（刻意改動）：多一個範本
-  const ADMIN_KINDS = ['沒有電郵名單', '生成完成', '還沒有生成初稿', '停在同一階段太久', '接近正式發出日期', '特殊主日日期未確認', '義工申報待確認', '開季前資料有改動'];
+  const ADMIN_KINDS = ['沒有電郵名單', '生成完成', '還沒有生成初稿', '停在同一階段太久', '接近正式發出日期', '特殊主日日期未確認', '事奉人員申報待確認', '開季前資料有改動'];
   check('★★★★★★ 一共 17 封：9 個範本＋8 種幹事通知（第九十八輪批次 YB 組刻意加「開季前資料有改動」）', r.sent === 17 && mails.length === 17, r.sent + '／' + mails.length);
   check('★★★★★★ 每一封只寄給你選的那一個地址（沒有第二個收件人、沒有轉寄）', mails.every((m) => m[0] === ADMIN), JSON.stringify(mails.map((m) => m[0])));
   check('★★★★★★ DRY_RUN＝TRUE 也寄（樣本例外）；MAIL_REDIRECT_ALL_TO 有值也不轉寄', s.cfg.DRY_RUN === true && mails.length === 17 && mails.every((m) => m[1].indexOf('[原收件人') === -1));

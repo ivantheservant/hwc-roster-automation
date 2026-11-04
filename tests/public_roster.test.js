@@ -274,7 +274,7 @@ console.log('\n=== A5【核心】分享設定判斷——一定要「任何人�
 
   const wrongPermission = gas.evaluatePublicLinkSharing_('ANYONE_WITH_LINK', 'EDIT');
   check('★★★ 任何人都可以編輯（EDIT）判定為唔 ok——呢個係最嚴重嘅設定錯誤，'
-    + '義工隨時可以改動職事表內容',
+    + '事奉人員隨時可以改動職事表內容',
     wrongPermission.ok === false);
   check('★ 訊息明確講出「任何人拿到連結都可以直接改動」',
     /任何人拿到連結都可以直接改動/.test(wrongPermission.message));
@@ -284,7 +284,7 @@ console.log('\n=== A5【核心】分享設定判斷——一定要「任何人�
 
   const domain = gas.evaluatePublicLinkSharing_('DOMAIN_WITH_LINK', 'VIEW');
   check('★ 只限同 domain（教會 Workspace 域）睇到都算唔符合預期——'
-    + '義工唔一定用返教會電郵開連結，要係任何人都睇到',
+    + '事奉人員唔一定用返教會電郵開連結，要係任何人都睇到',
     domain.ok === false);
 }
 

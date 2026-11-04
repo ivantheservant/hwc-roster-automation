@@ -439,7 +439,7 @@ function ruleReviewPlainEntry_(ruleId) {
   };
   table[RULE_IDS.UNAVAILABLE] = {
     text: '已申報不能服侍的日子不會被排',
-    what: '有人告訴我們某幾日不在，那幾日就完全不會排他。系統沒有「上半場不在」這種概念，填了就是整日。'
+    what: '有人告訴我們某幾日不在，那幾日就完全不會排他。'
   };
   table[RULE_IDS.COMMUNION_FIRST_SUNDAY] = {
     text: '聖餐襄禮只在每月第一個主日',
@@ -589,7 +589,7 @@ function ruleReviewPlainEntry_(ruleId) {
     what: '有些人一向做得多、有些人一向做得少。系統按各人以往的比例分配，而不是人人一樣多。',
     current: onOff('按各人一向的服侍量分配'),
     choices: onOffChoices('按各人一向的量'),
-    note: '改成人人平均會令核心義工大幅減少、少見的人大幅增加。'
+    note: '改成人人平均會令核心事奉人員大幅減少、少見的人大幅增加。'
   };
   table[RULE_IDS.ROLE_POST_FOCUS] = {
     text: '堂委盡量集中在指定的幾個崗位',

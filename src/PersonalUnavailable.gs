@@ -1,14 +1,14 @@
 /**
- * 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍（取代共用試算表）。
+ * 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍（取代共用試算表）。
  *
- * Ivan 2026-10-30 決定：義工在自己的個人專屬連結（`?p=<token>&q=<季度>`）勾選不能服侍的主日，
+ * Ivan 2026-10-30 決定：事奉人員在自己的個人專屬連結（`?p=<token>&q=<季度>`）勾選不能服侍的主日，
  * 幹事在〔不能服侍的日期〕確認之後才生效。
  *
  * ── 資料 ─────────────────────────────────────────────────────────
  *   新工作表 `UnavailableSubmissions`（第 1 行中文標題、第 2 行機器鍵；第一次提交時自動建立）：
  *   SubmissionID、PersonID、ServiceDate、Reason、SubmittedAt、Status（PENDING／ACCEPTED／REJECTED／WITHDRAWN）、
  *   DecidedBy、DecidedAt、UnavailableID、Late。
- *   **義工提交不會直接寫 `Unavailable`**——幹事〔接受〕之後才建立 `Unavailable` 行（Source=PERSONAL_LINK）。
+ *   **事奉人員提交不會直接寫 `Unavailable`**——幹事〔接受〕之後才建立 `Unavailable` 行（Source=PERSONAL_LINK）。
  *   已生成的季度，之後就走現有「之後才申報不能服侍」那一套提醒（按 Unavailable.CreatedAt 判斷）。
  *
  * ── 安全（個人連結部署是 access=ANYONE）────────────────────────────
@@ -25,7 +25,7 @@
  *   UA：申報可以選「只限以下崗位」（`UnavailableSubmissions.PostIDs`，空白＝全部崗位）。崗位清單由伺服器按這個人
  *       這一季可以服侍的崗位計算（`listPersonQuarterPosts_()`），提交時重新計算並核對是子集。確認後建立的
  *       `Unavailable`：有 PostIDs ⇒ AppliesTo＝POSTS＋PostIDs；空白 ⇒ 照舊 ALL。
- *   UB：確認者（`UNAVAILABLE_CONFIRMER_EMAILS`＋可以修改的人）用「義工申報，確認」畫面（`apiGetUnavailableConfirmView`）。
+ *   UB：確認者（`UNAVAILABLE_CONFIRMER_EMAILS`＋可以修改的人）用「事奉人員申報，確認」畫面（`apiGetUnavailableConfirmView`）。
  *   UC：每次決定之後按人合併通知申請人（範本 TPL_UNAVAILABLE_DECIDED_TC；經 sendRealEmail_，DRY_RUN、轉寄照舊）。
  *   UD：〔生成初稿〕〔請系統幫我調整〕執行前把該季等候確認的申報自動確認（`autoConfirmPendingSubmissionsForQuarter_()`）。
  *   用字：對申請人一律「確認了你的申請」「未能確認你的申請」；按鈕〔確認申請〕〔不確認〕〔全部確認〕。
@@ -144,7 +144,7 @@ function readUnavailableSubmissions_(timezone) {
 
 /**
  * 原因：去掉 HTML、合併空白、最多 100 字。**純函式。**
- * @param {*} raw 義工輸入
+ * @param {*} raw 事奉人員輸入
  * @returns {string}
  */
 function sanitizePersonalUnavailableReason_(raw) {
@@ -177,8 +177,8 @@ function assertPersonalLinkCaller_(token) {
 
 /**
  * 可以申報的季度：未完結（EndDate ≥ 今日）的季度之中，按開始日排，取 N 季（Config，預設 2）。
- * 第九十輪回歸 V3 修正：由連結的季度（`q`，例如邀請信的那一季）開始——否則邀請義工申報較後的季度時，
- * 頁面只列出今日最近的兩季，義工找不到要申報的那一季。`q` 已完結或不存在 ⇒ 由最近的未完結季度開始。
+ * 第九十輪回歸 V3 修正：由連結的季度（`q`，例如邀請信的那一季）開始——否則邀請事奉人員申報較後的季度時，
+ * 頁面只列出今日最近的兩季，事奉人員找不到要申報的那一季。`q` 已完結或不存在 ⇒ 由最近的未完結季度開始。
  * @param {string} todayStr 今日
  * @param {string} timezone 時區
  * @param {string=} anchorQuarterId 連結的季度（`q`）
@@ -356,7 +356,7 @@ function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuart
 }
 
 /**
- * 嵌入 `<script>` 的 JSON：`<`、`>`、`&`、U+2028／2029 一律轉義（原因是義工自己輸入的字）。
+ * 嵌入 `<script>` 的 JSON：`<`、`>`、`&`、U+2028／2029 一律轉義（原因是事奉人員自己輸入的字）。
  * @param {*} obj 資料
  * @returns {string}
  */
@@ -607,7 +607,7 @@ function countPendingUnavailableSubmissions_(range) {
  */
 function apiDecideUnavailableSubmissions(submissionIds, decision) {
   assertWebAppRequestAllowed_('apiDecideUnavailableSubmissions');
-  return withMutationLock_('處理義工申報', function () {
+  return withMutationLock_('處理事奉人員申報', function () {
     return decideUnavailableSubmissions_(submissionIds, decision, Session.getActiveUser().getEmail());
   });
 }
@@ -822,7 +822,7 @@ function autoConfirmPendingSubmissionsForQuarter_(quarterId, decidedBy) {
       return s.status === UNAVAILABLE_SUBMISSION_STATUS.PENDING && s.serviceDate >= range.start && s.serviceDate <= range.end;
     }).map(function (s) { return s.submissionId; });
   } catch (err) {
-    throw new Error(buildThreePartMessage_('讀不到義工申報（' + err.message + '），未能自動確認。',
+    throw new Error(buildThreePartMessage_('讀不到事奉人員申報（' + err.message + '），未能自動確認。',
       '沒有開始，甚麼都沒有改動。', ['稍後再按一次', '如果一直失敗，先在「不能服侍的日期」最上面人手確認或不確認']));
   }
   if (ids.length === 0) return { confirmed: 0, message: '' };
@@ -830,11 +830,11 @@ function autoConfirmPendingSubmissionsForQuarter_(quarterId, decidedBy) {
   try {
     r = decideUnavailableSubmissions_(ids, 'ACCEPT', decidedBy);
   } catch (err) {
-    throw new Error(buildThreePartMessage_('自動確認義工申報時出錯（' + err.message + '）。',
+    throw new Error(buildThreePartMessage_('自動確認事奉人員申報時出錯（' + err.message + '）。',
       '沒有開始排表。部分申報可能已經確認（見「不能服侍的日期」最上面）。',
       ['稍後再按一次（已確認的不會重複）', '或者先在「不能服侍的日期」最上面人手確認或不確認，再按一次']));
   }
-  return { confirmed: r.accepted, message: r.accepted > 0 ? '已自動確認 ' + r.accepted + ' 項義工申報，並通知申請人。' : '' };
+  return { confirmed: r.accepted, message: r.accepted > 0 ? '已自動確認 ' + r.accepted + ' 項事奉人員申報，並通知申請人。' : '' };
 }
 
 /**
@@ -868,11 +868,11 @@ function countPendingSubmissionsForQuarterSafe_(quarterId) {
 
 /** 確認窗那一句（有待確認時才有）。 */
 function describePendingAutoConfirm_(count) {
-  return count > 0 ? '還有 ' + count + ' 項義工申報未確認，開始之後會自動當作確認，並通知申請人。' : '';
+  return count > 0 ? '還有 ' + count + ' 項事奉人員申報未確認，開始之後會自動當作確認，並通知申請人。' : '';
 }
 
 /**
- * 第九十四輪批次 UB 組：供前端呼叫——「義工申報，確認」畫面。**只讀。**
+ * 第九十四輪批次 UB 組：供前端呼叫——「事奉人員申報，確認」畫面。**只讀。**
  * 可以修改的人、只可查看的人（按鈕灰色）、確認者都可以呼叫（見 WebApp.gs）。
  * @param {string=} quarterId 深連結的季度（只用來寫標題；待確認一律列出全部）
  * @returns {{pending: Object[], pendingCount: number, history: Object[], canDecide: boolean, quarterLabel: string}}
@@ -947,7 +947,7 @@ function buildUnavailableConfirmView_(all, names, postNames, canDecide, quarterI
 }
 
 /**
- * 第九十三輪批次 TB 組：「義工申報待確認」幹事通知的文字（由 `runUnavailableSubmissionNotify_()` 抽出，
+ * 第九十三輪批次 TB 組：「事奉人員申報待確認」幹事通知的文字（由 `runUnavailableSubmissionNotify_()` 抽出，
  * 〔寄出電郵範本樣本〕用示範資料叫同一支，樣本文字不會和正式通知分家）。
  * @param {string} prefix 主旨前綴
  * @param {{personName: string, serviceDate: string, reason: string, late: boolean}[]} fresh 新申報
@@ -961,13 +961,13 @@ function buildUnavailableSubmissionNotifyText_(prefix, fresh, pendingCount, conf
       + (s.reason ? '　原因：' + s.reason : '') + (s.late ? '　（截止日之後）' : '');
   });
   if (fresh.length > 30) lines.push('　……另有 ' + (fresh.length - 30) + ' 項');
-  const body = '有 ' + fresh.length + ' 項新的義工申報（不能服侍）等候確認（全部待確認：' + pendingCount + ' 項）：\n\n'
+  const body = '有 ' + fresh.length + ' 項新的事奉人員申報（不能服侍）等候確認（全部待確認：' + pendingCount + ' 項）：\n\n'
     + lines.join('\n') + '\n\n'
     + (confirmUrl
       ? '請打開確認畫面，逐項〔確認申請〕或〔不確認〕：\n' + confirmUrl
       : '請打開幹事介面「開季前準備 ▸ 不能服侍的日期」，在最上面逐項〔確認申請〕或〔不確認〕。')
     + '\n\n（未確認的申報會在生成初稿或「請系統幫我調整」之前自動當作確認。）';
-  return { subject: prefix + '義工申報不能服侍：' + fresh.length + ' 項等候確認', body: body };
+  return { subject: prefix + '事奉人員申報不能服侍：' + fresh.length + ' 項等候確認', body: body };
 }
 
 /**
@@ -1005,7 +1005,7 @@ function runUnavailableSubmissionNotify_(today, config, isDryRun) {
     source: 'dailyAutomationCheck_',
     notes: '新申報 ' + fresh.length + ' 項；全部待確認 ' + pending.length + ' 項；收件人 ' + recipients.length + ' 個'
   });
-  return row('SENT', (isDryRun ? '模擬' : '') + '通知幹事：' + fresh.length + ' 項新的義工申報');
+  return row('SENT', (isDryRun ? '模擬' : '') + '通知幹事：' + fresh.length + ' 項新的事奉人員申報');
 }
 
 /**

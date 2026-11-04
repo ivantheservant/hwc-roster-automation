@@ -1,5 +1,5 @@
 /**
- * 第九十輪批次 QC 組：開季前準備〔邀請義工申報不能服侍的日子〕——請義工用自己的個人專屬連結申報不能服侍。
+ * 第九十輪批次 QC 組：開季前準備〔邀請事奉人員申報不能服侍的日子〕——請事奉人員用自己的個人專屬連結申報不能服侍。
  *
  * ── 收件人 ───────────────────────────────────────────────────────
  * 這一季事奉人員表上的人：自動排的崗位（「堂委」「執事」按今日現任展開）＋ `SAME_DAY_EXCLUSIVE_POST_IDS`
@@ -113,7 +113,7 @@ function readUnavailableInviteRecord_(quarterId) {
 }
 
 /**
- * 供前端呼叫：〔邀請義工申報不能服侍的日子〕預覽（人數、沒有電郵的人）。**純讀取。**
+ * 供前端呼叫：〔邀請事奉人員申報不能服侍的日子〕預覽（人數、沒有電郵的人）。**純讀取。**
  * @param {string} quarterId 季度 ID
  * @returns {Object}
  */
@@ -151,7 +151,7 @@ function apiUnavailableInvitePreview(quarterId) {
  */
 function apiUnavailableInviteSend(quarterId) {
   assertWebAppRequestAllowed_();
-  return withMutationLock_('邀請義工申報不能服侍的日子', function () {
+  return withMutationLock_('邀請事奉人員申報不能服侍的日子', function () {
     // 第九十五輪批次 VB 組：打開幹事介面不再一定同步 ⇒ 寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀不到不會令寄出失敗）
     syncPeopleFromHwcasBeforeSend_();
     return sendUnavailableInvites_(String(quarterId || '').trim());
@@ -169,7 +169,7 @@ function sendUnavailableInvites_(quarterId) {
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const baseUrl = String(config[CONFIG_KEYS.WEBAPP_VOLUNTEER_URL] || '').trim();
   if (!baseUrl) {
-    throw new Error(buildThreePartMessage_('還沒有設定義工個人連結的網址（Config WEBAPP_VOLUNTEER_URL）。',
+    throw new Error(buildThreePartMessage_('還沒有設定事奉人員個人連結的網址（Config WEBAPP_VOLUNTEER_URL）。',
       '一封都沒有寄出。', ['請管理員先在 Config 填上個人連結部署的 /exec 網址']));
   }
   const who = buildUnavailableInviteRecipients_(today);

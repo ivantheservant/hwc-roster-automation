@@ -242,6 +242,9 @@ function planEligibilitySheetApply_(quarterId) {
   const current = readEligibility_();
   const unresolved = [];
   const wanted = {};   // postId -> {personId: true}
+  // 第一百零一輪批次 ZA-3：去掉結尾尊稱才配對到的名字（確認窗逐個寫明「『某某姊妹』當作『某某』」）
+  const honorificMatches = [];
+  const honorificSeen = {};
 
   postIds.forEach(function (postId, c) {
     if (!postId) return;
@@ -261,7 +264,13 @@ function planEligibilitySheetApply_(quarterId) {
       // 第八十五輪批次 LC 組：「堂委」「執事」（ROLE_LABELS_TC 的標籤）不是「認不出的名字」
       const roleCode = resolveEligibilityRoleLabel_(text);
       if (roleCode) { wanted[postId][eligibilityRoleTokenOf_(roleCode)] = true; return; }
-      const personId = resolvePersonId_(text);
+      const lenient = resolvePersonIdLenient_(text);
+      const personId = lenient ? lenient.personId : null;
+      if (lenient && lenient.suffix && !honorificSeen[text]) {
+        honorificSeen[text] = true;
+        honorificMatches.push({ text: text, base: lenient.base, personId: personId,
+          note: describeHonorificMatch_(text, lenient.base) });
+      }
       if (!personId) {
         unresolved.push({
           // ⚠️ `postNameTC` 一定要帶出去：畫面上那一粒〔這是新人，一併加入〕
@@ -349,6 +358,7 @@ function planEligibilitySheetApply_(quarterId) {
     added: added.sort(byName),
     removed: removed.sort(byName),
     unresolved: unresolved,
+    honorificMatches: honorificMatches,
     // 有認不出的名字就**不准套用**，理由見檔頭。
     blocked: unresolved.length > 0,
     postCount: Object.keys(wanted).length

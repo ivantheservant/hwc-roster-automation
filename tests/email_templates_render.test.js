@@ -139,9 +139,9 @@ function renderAllSamples() {
     template: byId.TPL_OFFICIAL_TC,
     recipient: RECIPIENTS.person,
     summary: SAMPLE_SUMMARY,
-    purpose: '步驟 4：正式發出，通知每一位有服侍的義工',
+    purpose: '步驟 4：正式發出，通知每一位有服侍的事奉人員',
     trigger: '幹事手動執行「四階段流程 ▸ 步驟 4：正式發出」',
-    audience: '本季有被派工的每一位義工（PERSON 收件人）',
+    audience: '本季有被派工的每一位事奉人員（PERSON 收件人）',
     attachment: '該人的個人版職事表 PDF（PERSONAL_PDF）'
   });
 
@@ -161,9 +161,9 @@ function renderAllSamples() {
     template: byId.TPL_RESEND_TC,
     recipient: RECIPIENTS.person,
     summary: SAMPLE_SUMMARY,
-    purpose: '步驟 5：改動後重發，只通知安排真的有改動的義工',
+    purpose: '步驟 5：改動後重發，只通知安排真的有改動的事奉人員',
     trigger: '幹事手動執行「四階段流程 ▸ 步驟 5：改動後重發」',
-    audience: '這一版跟上次寄出時內容不同的義工（PERSON 收件人）',
+    audience: '這一版跟上次寄出時內容不同的事奉人員（PERSON 收件人）',
     attachment: '該人最新版的個人職事表 PDF（PERSONAL_PDF）'
   });
 
@@ -174,7 +174,7 @@ function renderAllSamples() {
     summary: NO_ASSIGNMENT_SUMMARY,
     purpose: '步驟 5：通知「本來有服侍、改動後變成整季零服侍」的人',
     trigger: '同上；這種人的派工被別人頂走，一格都不剩',
-    audience: '被頂走、這一版零派工的義工',
+    audience: '被頂走、這一版零派工的事奉人員',
     attachment: '無（零派工的人不會有個人 PDF，系統會自動略過附件）'
   });
 
@@ -213,8 +213,8 @@ function renderAllSamples() {
     summary: '',
     extraPlaceholders: { QuarterLabel: '2099年1-3月', GenerateDate: '2098-12-01', Deadline: '2098-11-24',
       PersonalLink: 'https://example.invalid/exec?p=TOKEN&q=2099T1' },
-    purpose: '請義工用自己的個人專屬連結申報不能服侍的主日',
-    trigger: '開季前準備〔邀請義工申報不能服侍的日子〕（先預覽，再寄）',
+    purpose: '請事奉人員用自己的個人專屬連結申報不能服侍的主日',
+    trigger: '開季前準備〔邀請事奉人員申報不能服侍的日子〕（先預覽，再寄）',
     audience: '這一季事奉人員表上（自動排的崗位、領詩／司琴、詩班名單）有電郵、有個人連結的人',
     attachment: '無（NONE）'
   });
@@ -322,14 +322,14 @@ console.log('\n=== C3：OFFICIAL 個人信必須說明「不能服侍要點做�
   check('★★ OFFICIAL 個人信有交代未能出席時的處理方法',
     /未能出席|不能服侍|未能服侍/.test(official.rendered.bodyPlain)
       && /聯絡幹事|回覆本郵件|通知幹事/.test(official.rendered.bodyPlain),
-    '義工收到通知之後最常問的就是「我做唔到嗰日點算」，信入面一定要答到');
+    '事奉人員收到通知之後最常問的就是「我做唔到嗰日點算」，信入面一定要答到');
 }
 
 console.log('\n=== C3：日期格式對紐西蘭讀者不可有歧義 ===');
 {
   // MAIL_SUMMARY_DATE_FORMAT 決定個人信裡「10/04 主席」那一段的日期寫法。
   // dd/MM 對習慣 MM/dd 的讀者來說，03/04 究竟是 3 月 4 日還是 4 月 3 日分不出，
-  // 而職事表寄出後義工是靠這一行去記自己邊個禮拜要返——記錯日期的代價很實際。
+  // 而職事表寄出後事奉人員是靠這一行去記自己邊個禮拜要返——記錯日期的代價很實際。
   const format = String(gas.DEFAULTS.MAIL_SUMMARY_DATE_FORMAT);
   check('★★ 個人信的日期格式不是純數字的 dd/MM 或 MM/dd（會有月日歧義）',
     !/^d{1,2}\/M{1,2}$/.test(format) && !/^M{1,2}\/d{1,2}$/.test(format),

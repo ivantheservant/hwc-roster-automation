@@ -275,6 +275,8 @@ function buildImportPlan_(quarterId) {
   });
 
   const unresolved = [];
+  const honorificMatches = [];   // 第一百零一輪批次 ZA-3
+  const honorificSeen = {};
   const ignoredNa = [];
   const freeText = [];
   const state = [];
@@ -308,7 +310,13 @@ function buildImportPlan_(quarterId) {
       }
 
       filledCount++;
-      const personId = resolvePersonId_(typed) || '';
+      // 第一百零一輪批次 ZA-3：完全相同 → 別名 → 去掉結尾尊稱
+      const lenient = resolvePersonIdLenient_(typed);
+      const personId = lenient ? lenient.personId : '';
+      if (lenient && lenient.suffix && !honorificSeen[typed]) {
+        honorificSeen[typed] = true;
+        honorificMatches.push({ text: typed, base: lenient.base, personId: personId, note: describeHonorificMatch_(typed, lenient.base) });
+      }
       if (!personId) {
         if (r.post.autoGenerate === false) {
           // 客席講員唔喺名單係正常嘅（同填講員工具嘅規則）。
@@ -341,6 +349,7 @@ function buildImportPlan_(quarterId) {
     filledCount: filledCount,
     cellCount: state.length,
     unresolved: unresolved,
+    honorificMatches: honorificMatches,
     blocked: unresolved.length > 0,
     ignoredNa: ignoredNa,
     freeText: freeText,

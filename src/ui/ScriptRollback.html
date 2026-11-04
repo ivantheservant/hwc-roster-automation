@@ -240,7 +240,7 @@
   /** 規格「與 Stage 的互動」表。`OFFICIAL_SENT` 嗰句最重要。 */
   function rollbackStageNote(plan) {
     if (plan.stage === 'OFFICIAL_SENT') {
-      return '⚠️ 這一季已經正式發出過了。義工手上那份 PDF 和信件是回退之前的內容。'
+      return '⚠️ 這一季已經正式發出過了。事奉人員手上那份 PDF 和信件是回退之前的內容。'
         + '回退之後要按「改動後重發」，受影響的人才會知道。'
         + '這次回退會影響 ' + plan.outdatedPersonCount + ' 個人的安排。';
     }

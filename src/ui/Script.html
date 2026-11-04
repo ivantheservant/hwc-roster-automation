@@ -159,11 +159,11 @@
     'apiGetCombinedServices',
     // 第九十輪批次 QB 組：〔詩班獻詩〕讀取——只讀
     'apiGetChoirSinging',
-    // 第九十四輪批次 UB 組：「義工申報，確認」畫面——只讀
+    // 第九十四輪批次 UB 組：「事奉人員申報，確認」畫面——只讀
     'apiGetUnavailableConfirmView',
     // 第九十三輪批次 TB 組：〔寄出電郵範本樣本〕可以收樣本的地址——只讀
     'apiGetTemplateSampleOptions',
-    // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕預覽——只讀
+    // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕預覽——只讀
     'apiUnavailableInvitePreview',
     // 第九十七輪批次 XA／XB 組：〔補填電郵〕畫面；〔沒有電郵的人：匯出邀請〕畫面——只讀
     'apiGetManualEmailView',
@@ -499,7 +499,7 @@
    */
   async function callServerMutating(fnName, ...args) {
     // 第八十七輪批次 NB 組：只可查看 ⇒ 不送出（伺服器也會拒絕）
-    // 第九十四輪批次 UB 組：只可查看、但同時是確認者 ⇒ 確認義工申報那一支照樣可以送出
+    // 第九十四輪批次 UB 組：只可查看、但同時是確認者 ⇒ 確認事奉人員申報那一支照樣可以送出
     if (viewOnly_ && !(myCanConfirm_ && UNAVAILABLE_CONFIRMER_CALLS.indexOf(fnName) !== -1)) {
       throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');
     }
@@ -533,7 +533,7 @@
 
   /** 第八十五輪批次 LD 組：會影響人手檢查的儲存動作（名單、不能服侍、偏好、身分、暫時不做、規則、合堂）。 */
   const STAFFING_AFFECTING_CALLS = ['apiApplyEligibilitySheet', 'apiSaveEligibilityBatch', 'apiSaveUnavailable',
-    // 第九十輪批次 QC 組：接受義工申報＝加入不能服侍的日期
+    // 第九十輪批次 QC 組：接受事奉人員申報＝加入不能服侍的日期
     'apiDecideUnavailableSubmissions',
     'apiSavePersonPostWeightBatch', 'apiAddRole', 'apiSaveRole', 'apiRolesTermChangeExecute', 'apiAddExclusion',
     'apiSaveExclusion', 'apiLiftExclusion', 'apiRuleReviewImportExecute', 'apiSaveCombinedServices',
@@ -922,7 +922,7 @@
    * 預設當作改動，只有 `VIEW_ONLY_READ_TOOLS` 列明的唯讀工具可以按。
    */
   let viewOnly_ = false;
-  /** 第九十四輪批次 UB 組：自己的角色（EDITOR／VIEWER／CONFIRMER）、可不可以確認義工申報。 */
+  /** 第九十四輪批次 UB 組：自己的角色（EDITOR／VIEWER／CONFIRMER）、可不可以確認事奉人員申報。 */
   let myRole_ = '';
   let myCanConfirm_ = false;
   const VIEW_ONLY_TEXT = '你只有查看權限';
@@ -932,11 +932,11 @@
     /^用這一版作起點$/, /^查看這一版$/, /^用職事表$/, /^用建議表$/, /^產生/, /^放棄/, /^改為再寄/, /^換屆$/,
     /^接受/, /^建立/, /^就是這一位/, /^取消這一筆$/, /^生成/, /^重新生成/, /^回退/, /^匯入/, /^套用/,
     /^我改好了/, /^下載及匯出$/, /^開始調整$/,
-    // 第九十輪批次 QC 組：義工申報〔不接受〕〔全部接受〕（〔接受〕已由 /^接受/ 涵蓋）
+    // 第九十輪批次 QC 組：事奉人員申報〔不接受〕〔全部接受〕（〔接受〕已由 /^接受/ 涵蓋）
     /^不接受$/, /^全部接受$/
   ];
   /** 文字對上面的規則、但只是打開一個只看的畫面。 */
-  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請義工申報不能服侍的日子'];
+  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請事奉人員申報不能服侍的日子'];
   /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
   const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結'];
 
@@ -1068,7 +1068,7 @@
     weights: () => openWeights(),
     staffing: () => openStaffingCheck(),
     preseason: () => openPreseasonSend(),
-    // 第九十四輪批次 UB 組：「義工申報，確認」（新申報通知信內的連結）
+    // 第九十四輪批次 UB 組：「事奉人員申報，確認」（新申報通知信內的連結）
     'unavailable-confirm': () => openUnavailableConfirm()
   };
 
@@ -1149,6 +1149,17 @@
     return make('p', { text: text, className: className || 'lines' });
   }
   function sectionTitle(text) { return make('div', { text: text, className: 'sec-title' }); }
+
+  /** 第一百零一輪批次 ZA-3：去掉結尾尊稱才配對到的名字，確認窗逐個寫明「『某某姊妹』當作『某某』」。沒有 ⇒ null。 */
+  function honorificMatchBox(list) {
+    if (!list || list.length === 0) return null;
+    const box = make('div', { className: 'sec' }, [
+      sectionTitle('這 ' + list.length + ' 個名字去掉尊稱之後才找到'),
+      make('div', { text: '下面每一個都會當作名單上的那一位。不對的話，回去把那個名字改好再按一次。', className: 'muted' })
+    ]);
+    list.forEach((m) => box.appendChild(make('div', { text: m.note, className: 'ok-line' })));
+    return box;
+  }
 
   /**
    * ⚠️ 第六十七輪批次 AG／AH 組：寄出前嘅兩個警告——**三個寄出確認框（寄審閱、正式發出、

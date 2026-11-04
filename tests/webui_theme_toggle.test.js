@@ -155,11 +155,11 @@ console.log('\n=== D4【核心】深色色盤兩處都要有，而且要一致 =
     mismatched.length === 0, mismatched.join('、'));
 }
 
-console.log('\n=== 個人連結頁面（義工睇嘅）刻意唔跟裝置深色 ===');
+console.log('\n=== 個人連結頁面（事奉人員睇嘅）刻意唔跟裝置深色 ===');
 {
   const personal = fs.readFileSync(path.join(UI, 'PersonalRoster.html'), 'utf8');
   check('★★★★ 個人連結頁面冇 @media (prefers-color-scheme: dark)'
-    + '——義工多數用手機睇，淺色較接近印出嚟嘅職事表',
+    + '——事奉人員多數用手機睇，淺色較接近印出嚟嘅職事表',
     personal.indexOf('@media (prefers-color-scheme: dark)') === -1);
   check('★★★ 但仍然支援手動 data-theme="dark"',
     /:root\[data-theme="dark"\]/.test(personal));

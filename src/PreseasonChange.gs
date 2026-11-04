@@ -111,7 +111,7 @@ function readPreseasonSnapshot_(quarterId, timezone) {
     return [t(r[D.SERVICE_DATE]), kind ? join([kind, t(r[D.COMBINED_NAME])]) : ''];
   }));
 
-  // 不能服侍（已確認的義工申報會寫成 Unavailable 的一行）：只看和這一季主日重疊的
+  // 不能服侍（已確認的事奉人員申報會寫成 Unavailable 的一行）：只看和這一季主日重疊的
   const U = COLUMNS.UNAVAILABLE;
   const first = dates[0] || '';
   const last = dates[dates.length - 1] || '';

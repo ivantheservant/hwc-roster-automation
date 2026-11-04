@@ -11,7 +11,7 @@
 //              ⇒ 即係「你喺 Config 改嗰個數字完全冇生效」，而畫面上冇任何提示
 //   BOOL      ⇒ 長字串 `.toUpperCase() !== 'TRUE'` ⇒ `false`
 //              ⇒ **而 `DRY_RUN` 就係 BOOL。**嗰格一旦被試算表轉成非文字，
-//                 `DRY_RUN` 靜靜變 `false` ＝ 真係寄信俾全體義工。
+//                 `DRY_RUN` 靜靜變 `false` ＝ 真係寄信俾全體事奉人員。
 //
 // ⚠️ 而呢一份**每一段都由 `getConfig_()` 呢個真入口叫落去**。
 // 第三十一輪階段 A 就係被呢一點燒過：測試直接餵純函式，
@@ -152,7 +152,7 @@ console.log('\n=== A2【核心】DRY_RUN 要有專屬嗰一句 ===');
   const gas = makeGas([['DRY_RUN', 'BOOL', SHEETS_DATE]]);
   const msg = threw(function () { gas.getConfig_('DRY_RUN', true); }) || '';
   check('★★★★★ **明講呢個參數控制會唔會真正寄出電郵**'
-    + '——舊行為係靜靜變 false，即係真係寄咗俾全體義工',
+    + '——舊行為係靜靜變 false，即係真係寄咗俾全體事奉人員',
     msg.indexOf('真正寄出電郵') !== -1, msg);
   check('★★★★★ 而且明講確認之前任何寄送動作都會被擋',
     msg.indexOf('任何寄送動作都會被擋住') !== -1, msg);

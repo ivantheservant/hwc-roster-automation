@@ -45,7 +45,7 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   check('★★★★ 控制字元去掉、最多 40 字', r.view === 'combined' && r.quarter.indexOf('\u0000') === -1 && r.quarter.length === 40, JSON.stringify(r));
   const views = Object.keys(vm.runInContext('DEEP_LINK_VIEWS', ui)).sort().join(',');
   // 第九十輪批次 QB 組（刻意改動）：多了 choir（〔詩班獻詩〕）
-  // 第九十四輪批次 UB 組（刻意改動）：加 unavailable-confirm（義工申報，確認）
+  // 第九十四輪批次 UB 組（刻意改動）：加 unavailable-confirm（事奉人員申報，確認）
   // 第九十八輪批次 YA 組（刻意改動）：加 preassign（〔預先安排領詩、司琴〕）
   check('★★★★★★ view 可用值：choir、combined、preassign、preseason、staffing、unavailable、unavailable-confirm、weights（常數表）', views === 'choir,combined,preassign,preseason,staffing,unavailable,unavailable-confirm,weights', views);
   check('★★★★★ 參數名稱是 view、quarter（不是 p、q）', JSON.stringify(vm.runInContext('DEEP_LINK_PARAMS', ui)) === '{"VIEW":"view","QUARTER":"quarter"}');

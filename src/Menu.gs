@@ -367,7 +367,7 @@ function runCheckConfigRowCount_() {
  *
  * 存在的理由：寄送（`buildMailContext_`）與步驟 3（`buildFineTuneContext_`）都是靠
  * 「QuarterID＋VersionNo」在 RosterAssignments 找資料，某個版本在這張表沒有資料時，
- * 寄送會找不到義工收件人、步驟 3 會直接拋錯。人手在試算表上數行數很容易只讀到
+ * 寄送會找不到事奉人員收件人、步驟 3 會直接拋錯。人手在試算表上數行數很容易只讀到
  * 最前面一部分（例如只看到第一個版本的 175 行，就以為全表只有 175 行），
  * 用這個工具由程式完整掃一次，數字才可靠。
  * @returns {void}
@@ -2560,7 +2560,7 @@ function runSeedEmailTemplates_() {
   plan.missing.forEach(function (t) {
     lines.push('　' + t.templateId + '　Stage=' + t.stage + '　AttachType=' + t.attachType);
   });
-  lines.push('', '內容為書面語繁體中文範本（教會幹事對義工的通知語氣），');
+  lines.push('', '內容為書面語繁體中文範本（教會幹事對事奉人員的通知語氣），');
   lines.push('之後可以直接在 EmailTemplates 修改文字。已存在的範本不會被覆寫。');
   lines.push('', '確定要新增嗎？');
 
@@ -2661,7 +2661,7 @@ function runInstallAutomation_() {
     '每天會檢查全部季度，只做兩件事：',
     '　1. 到達 GenerateOn 日期、Stage 仍是 DRAFT、且未有已生成版本 → 自動生成初稿，'
       + '只通知幹事（' + (adminEmail || '⚠ MAIL_ADMIN_NOTIFY 未設定，不會有人收到') + '）覆核，'
-      + '不寄給堂委或義工',
+      + '不寄給堂委或事奉人員',
     '　2. Stage 停留在 REVIEW_SENT（已寄審閱、未套用申報）超過 ' + stuckDays + ' 天未前進 → '
       + '每日提醒幹事一次，最多提醒 ' + stuckMaxCount + ' 次',
     '正式發出（OFFICIAL）永遠不會由這裏觸發，一律要你在「步驟 4」手動執行。',

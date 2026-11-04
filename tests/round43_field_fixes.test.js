@@ -659,7 +659,7 @@ console.log('\n=== E／F：收件人選擇同自行輸入電郵 ===');
     /if \(seen\[key\]\) return;/.test(
       opts.slice(opts.indexOf('function appendExtraEmailRecipients_'))), '');
   check('★★★★★ 紙本嗰邊：**仍然完全唔會讀任何收件人名單**'
-    + '——嗰個「結構上不可能寄俾義工」嘅保證冇鬆開',
+    + '——嗰個「結構上不可能寄俾事奉人員」嘅保證冇鬆開',
     !/readPeople_\(\)|EMAIL_RECIPIENTS/.test(
       bare(read('src/PaperPack.gs')).slice(
         bare(read('src/PaperPack.gs')).indexOf('function apiEmailPaperPackToSelf'))), '');
@@ -741,7 +741,7 @@ console.log('\n=== I：MAIL_REDIRECT_ALL_TO 現況 ===');
     /INTENDED_EMAIL: 'IntendedEmail'/.test(read('src/Constants.gs'))
       && /record\[C\.DELIVERED_TO\] = /.test(read('src/Mailer.gs')), '');
   check('★★★★★★ 8. 全面體檢入面係**紅色（必須處理）**，唔係黃色'
-    + '——留住一個轉寄地址上線，系統會報告「已寄出 51 封」而全體義工'
+    + '——留住一個轉寄地址上線，系統會報告「已寄出 51 封」而全體事奉人員'
     + '一封都收唔到；「睇落完全成功而實際上全錯」正正要用紅色擋',
     /HEALTH_PRELAUNCH_MUST_LABEL_SUBSTRINGS = \[[\s\S]{0,600}'MAIL_REDIRECT_ALL_TO'/
       .test(read('src/FullHealthCheck.gs')), '');

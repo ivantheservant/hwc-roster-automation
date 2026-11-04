@@ -1,6 +1,6 @@
 /**
  * 第十一輪批次階段 C：ICS 日曆檔（.ics）。步驟4正式發出／步驟5重發時，
- * 隨個人 PDF 一併附上，讓義工可以直接加入 iPhone/Google 日曆。
+ * 隨個人 PDF 一併附上，讓事奉人員可以直接加入 iPhone/Google 日曆。
  *
  * 架構：本檔案分兩層——
  * 1. 純函式（buildIcsCalendarText_ 及其輔助函式）：完全不呼叫任何 GAS API，
@@ -10,7 +10,7 @@
  *
  * 關鍵設計决定（對應 C1-C6 需求）：
  * - UID 刻意不含 VersionNo，確保同一人同一日同一崗位跨版本 UID 相同——
- *   義工的日曆 App 收到「同 UID、新 SEQUENCE」的事件時會更新既有事件，
+ *   事奉人員的日曆 App 收到「同 UID、新 SEQUENCE」的事件時會更新既有事件，
  *   不會重複新增一個看起來一樣的事件。
  * - SEQUENCE 直接用 versionNo：同一個 UID 只會隨版本號遞增出現（版本號本身
  *   單調遞增），完全符合 RFC 5545「SEQUENCE 遞增代表這是較新版本」的語意，
@@ -78,7 +78,7 @@ function shiftIcsLocalDateTime_(dateStr, timeStr, minutesEarlier) {
   // 然後 `new Date(NaN)` 一路計到最尾，輸出 `NaNNaNNaNTNaNNaN00`
   // ——**壞值一路無聲無息流到寄出嘅附件入面**，冇任何一步擋過。
   // 呼叫端應該用 normalizeTimeOfDay_() 先正規化；呢度係最後一道防線，
-  // 寧可拋錯令寄送中止，都好過寄一份時間係 NaN 嘅月曆俾義工。
+  // 寧可拋錯令寄送中止，都好過寄一份時間係 NaN 嘅月曆俾事奉人員。
   if (dateParts.length !== 3 || dateParts.some(isNaN)) {
     throw new Error('ICS 日期格式不正確：「' + dateStr + '」，預期 yyyy-MM-dd。');
   }

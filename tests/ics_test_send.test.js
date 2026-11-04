@@ -112,7 +112,7 @@ console.log('\n=== 【核心】收件人電郵一定換成測試地址，不是�
 
   check('★★★★ sendRealEmail_ 只被呼叫一次（只寄一封）', calls.sendRealEmail.length === 1);
   const sent = calls.sendRealEmail[0];
-  check('★★★★ 實際收件人電郵是測試地址，不是 realvolunteer@x.com（不可以寄給義工本人）',
+  check('★★★★ 實際收件人電郵是測試地址，不是 realvolunteer@x.com（不可以寄給事奉人員本人）',
     sent.recipient.email === 'myaddress-test@x.com', 'got=' + sent.recipient.email);
   check('★★ recipient.personId 仍然是 P001（下游附件產生要靠呢個搵返真實派工資料）',
     sent.recipient.personId === 'P001');

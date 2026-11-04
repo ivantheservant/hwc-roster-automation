@@ -1,5 +1,5 @@
 /**
- * 「個人專屬連結」：每位義工收到一條專屬連結，打開係完整職事表，自己嘅
+ * 「個人專屬連結」：每位事奉人員收到一條專屬連結，打開係完整職事表，自己嘅
  * 名字用底色標示；同樣係一季一條、永遠最新（因為讀嘅係即時資料，唔係
  * 快照）。
  *
@@ -7,7 +7,7 @@
  *
  * 現有 Web App（`WebApp.gs` 嘅 `doGet()`）係幹事操作介面，部署權限係
  * `access=DOMAIN`（第八十七輪起；之前係 `MYSELF`）——要登入教會帳戶，而且要喺使用名單上先用得到。
- * 義工唔一定有教會帳戶，所以個人連結需要一個**唔同嘅部署**，`access=ANYONE`。
+ * 事奉人員唔一定有教會帳戶，所以個人連結需要一個**唔同嘅部署**，`access=ANYONE`。
  *
  * 同一個 script project 可以有多個部署，各自嘅 access 獨立設定，但**全部
  * 部署共用同一份程式碼、同一個 `doGet()` 入口**。即係話：`access=ANYONE`
@@ -22,7 +22,7 @@
  *
  * ## 安全模型（同幹事介面完全唔同一套）
  *
- * 幹事介面靠 `Session.getActiveUser().getEmail()` 讀身分，義工連結**冇身分
+ * 幹事介面靠 `Session.getActiveUser().getEmail()` 讀身分，事奉人員連結**冇身分
  * 可讀**（ANYONE 部署，訪客好可能連 Google 都未登入）——安全性完全靠
  * `token` 本身唔可猜（32 字元隨機十六進位，122 bit 隨機性，見
  * `generatePersonalLinkToken_()`）。所以：
@@ -247,7 +247,7 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
   // 第七十五輪批次 CC 組：日期下面嗰行標題＝特別主日名稱（如開住）再由每週標題蓋過
   const specialTitleByDate = buildDisplayTitleIndex_(quarterId, timezone);
   // 第十三輪批次階段 A4：日期格式同 PublicRoster.gs 嘅
-  // buildPublicRosterContent_() 共用同一套 Config Key，義工喺公開連結／
+  // buildPublicRosterContent_() 共用同一套 Config Key，事奉人員喺公開連結／
   // 個人連結見到嘅係同一套顯示邏輯。
   const displayOptions = {
     dateFormatPattern: String(getConfig_(CONFIG_KEYS.PUBLIC_ROSTER_DATE_FORMAT, DEFAULTS.PUBLIC_ROSTER_DATE_FORMAT))
@@ -309,7 +309,7 @@ function buildPersonalRosterPageData_(quarterId, personId, personNameTC) {
  * `doGet()` 帶 `p` 參數時嘅唯讀渲染入口，見 `WebApp.gs` 嘅 `doGet()` 分流。
  *
  * ⚠️ **完全唔行 `assertWebAppRequestAllowed_()`**——嗰個係幹事介面專用嘅
- * 三層防護（部署權限＋`WEBAPP_ENABLED`＋電郵白名單），義工冇 Google 身分可以
+ * 三層防護（部署權限＋`WEBAPP_ENABLED`＋電郵白名單），事奉人員冇 Google 身分可以
  * 過白名單。呢度改用完全唔同嘅一套：token 本身就係授權憑證。
  * 但**仍然尊重 `WEBAPP_ENABLED` 總開關**——如果幹事整個 Web UI 都未啟用，
  * 個人連結都唔應該生效，見下面第一個檢查。

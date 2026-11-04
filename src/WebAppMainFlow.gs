@@ -49,7 +49,7 @@ const GENERATE_TARGET_WARN_PAST = 'PAST';
  * 原本的規則只看「有沒有生成過」，完全沒有看「到了生成日期沒有」。
  *
  * ⚠️ 這個仍然是**警告，不是阻擋**。提早生成不會出錯，
- * 只是之後義工的情況可能會變、到時要重新生成。擋住他不是我們的位置。
+ * 只是之後事奉人員的情況可能會變、到時要重新生成。擋住他不是我們的位置。
  */
 const GENERATE_TARGET_WARN_TOO_EARLY = 'TOO_EARLY';
 
@@ -213,7 +213,7 @@ function resolveGenerateTargetQuarter_(selectedQuarterId) {
       '「' + buildQuarterLabel_(target.quarterId) + '」的生成日期是 '
         + target.generateOn + '，還有 ' + daysUntil + ' 天。',
       '還沒有生成，所以現在甚麼都沒有改動。',
-      ['提早生成不會出錯，但之後義工的情況可能會變，到時要重新生成',
+      ['提早生成不會出錯，但之後事奉人員的情況可能會變，到時要重新生成',
         '如果你只是想試一試，用一個測試季度，不要用這一季']);
   } else if (target.startDate && target.startDate <= today) {
     warn = GENERATE_TARGET_WARN_STARTED;

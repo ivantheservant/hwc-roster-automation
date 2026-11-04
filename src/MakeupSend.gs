@@ -299,7 +299,7 @@ function executeMakeupSend_(plan) {
   assertNotPreviewMode_('executeMakeupSend_');
   clearDashboardCountsCache_(plan && plan.quarterId);   // 第九十六輪批次 WA 組：狀態卡「第 3、4 步人數」快取（寫 SendLog 時再清一次）
   // 沿用 sendStage_() 的結構性防護：OFFICIAL 永遠不可以由自動排程觸發，
-  // 補寄工具同樣要受這道防線約束（它也會真正寄信給全體義工）。
+  // 補寄工具同樣要受這道防線約束（它也會真正寄信給全體事奉人員）。
   if (plan.stage === MAIL_STAGES.OFFICIAL) assertOfficialNotFromAutomationTrigger_(plan.quarterId);
 
   if (plan.needsResend.length === 0) {

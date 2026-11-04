@@ -7,7 +7,7 @@
  * 呢個檔案提供一個獨立、範圍收得好窄嘅測試工具：用某個真實在職人員本季**真實**
  * 派工資料，組出同「步驟 4：正式發出」一模一樣嘅信件內容（個人 highlight PDF
  * ＋ICS 附件），但只寄去一個由操作者當場輸入嘅測試電郵地址——**絕對唔會寄去
- * 任何義工自己嘅電郵**，亦唔會影響任何人之後真正嘅寄送判斷。
+ * 任何事奉人員自己嘅電郵**，亦唔會影響任何人之後真正嘅寄送判斷。
  *
  * ## 點解要獨立一個函式，唔重用 sendStage_()
  * `sendStage_()`（`Mailer.gs`）一定會寄畀 `listRecipients_()` 傳返嘅全部
@@ -25,7 +25,7 @@
  * `sendRealEmail_()`（全專案淨係兩個會真正呼叫 `MailApp.sendEmail()` 嘅函式
  * 之一）本身有一重防呆：Config 嘅 `DRY_RUN` 唔係 `FALSE` 就拒絕寄出。
  * 呢個檔案**刻意唔繞過呢重防呆**——`DRY_RUN` 係全專案防止「唔小心真係寄咗畀
- * 成班義工」嘅唯一總開關，如果為咗呢個測試工具開一個特例令佢喺 `DRY_RUN=TRUE`
+ * 成班事奉人員」嘅唯一總開關，如果為咗呢個測試工具開一個特例令佢喺 `DRY_RUN=TRUE`
  * 都可以寄出，就會喺呢個總開關度開一個缺口，日後任何人（包括未來嘅自己）都
  * 可能誤用呢個缺口去繞過正常防呆，風險遠大過「測試呢一封信要記得手動去 Config
  * 將 DRY_RUN 暫時改做 FALSE、用完改返 TRUE」呢個額外步驟。所以：**用呢個工具
@@ -135,7 +135,7 @@ function runSendIcsTestEmail_() {
         + '否則沒辦法在 iPhone 上實際打開驗證）。\n\n'
         + '請先到 Config 工作表，把 DRY_RUN 暫時改為 FALSE，再重新執行這個選單項目。\n\n'
         + '⚠️ 提醒：DRY_RUN=FALSE 期間，如果執行「步驟 4：正式發出」或'
-        + '「測試工具 ▸ 寄送（測試模式）」，會真正寄信給全部義工，測試完這個工具之後'
+        + '「測試工具 ▸ 寄送（測試模式）」，會真正寄信給全部事奉人員，測試完這個工具之後'
         + '記得把 DRY_RUN 改回 TRUE（除非正準備正式發出）。',
       ui.ButtonSet.OK);
     return;
@@ -157,7 +157,7 @@ function runSendIcsTestEmail_() {
 
   const emailResponse = ui.prompt(title,
     '請輸入這封測試信要寄去的電郵地址（建議填你自己的地址，方便用 iPhone 打開驗證；'
-      + '這封信只會寄去這一個地址，不會寄給任何義工）：',
+      + '這封信只會寄去這一個地址，不會寄給任何事奉人員）：',
     ui.ButtonSet.OK_CANCEL);
   if (emailResponse.getSelectedButton() !== ui.Button.OK) return;
   const testEmail = emailResponse.getResponseText().trim();
@@ -171,7 +171,7 @@ function runSendIcsTestEmail_() {
       + '　季度：' + target.quarterId + '　版本：v' + target.versionNo + '\n'
       + '　資料來源：PersonID=' + personId + '（信件內容會是這個人本季真實的服侍安排）\n'
       + '　實際寄去：' + testEmail + '\n'
-      + '　不會寄給任何義工。\n\n'
+      + '　不會寄給任何事奉人員。\n\n'
       + '確定要繼續嗎？',
     ui.ButtonSet.YES_NO);
   if (confirm !== ui.Button.YES) return;

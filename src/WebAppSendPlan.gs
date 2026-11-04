@@ -151,7 +151,7 @@ function buildSendRecipientSentence_(kind, buttons) {
   const b = buttons || {};
   if (kind === SEND_KIND.REVIEW) {
     const n = (b.review && b.review.recipientCount) || 0;
-    return '寄給堂委名單上的 ' + n + ' 位。義工一封都不會收到。';
+    return '寄給堂委名單上的 ' + n + ' 位。事奉人員一封都不會收到。';
   }
   if (kind === SEND_KIND.OFFICIAL) {
     const n = (b.official && b.official.targetPersonCount) || 0;

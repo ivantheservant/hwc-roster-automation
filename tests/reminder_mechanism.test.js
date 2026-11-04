@@ -129,8 +129,8 @@ function executeRemind_(db, judgment, today, isDryRun, adminEmail) {
   const sentReal = !isDryRun && !!adminEmail;
   db.auditLog.push({ action: judgment.action, targetKey: judgment.targetKey, newValue: today, notes: judgment.reasons.join('+') });
   // 「只寄給幹事」的驗證重點：這裡的收件人清單只可能是 [adminEmail]，不會有任何
-  // 來自 EmailRecipients／RosterAssignments 的義工／堂委地址混進來——移植版本
-  // 刻意不去讀那兩張表，結構上就不可能出現義工電郵，跟正式碼的
+  // 來自 EmailRecipients／RosterAssignments 的事奉人員／堂委地址混進來——移植版本
+  // 刻意不去讀那兩張表，結構上就不可能出現事奉人員電郵，跟正式碼的
   // notifyAdminStageReminder_() 只呼叫 notifyAdmin_(subject, body, adminEmail, ...)
   // 是同一個道理。
   return { ran: true, sentReal: sentReal, recipients: adminEmail ? [adminEmail] : [] };
@@ -259,7 +259,7 @@ console.log('\n=== 提醒次數上限：每個「季度＋Stage」各自獨立�
   check('★ 今天已經提醒過 → SKIPPED_DONE', j3.outcome, 'SKIPPED_DONE');
 }
 
-console.log('\n=== 一律只寄給幹事，絕不寄給義工 ===');
+console.log('\n=== 一律只寄給幹事，絕不寄給事奉人員 ===');
 {
   const today = '2027-02-01';
   const db = makeDb();
@@ -270,7 +270,7 @@ console.log('\n=== 一律只寄給幹事，絕不寄給義工 ===');
   const result = executeRemind_(db, j, today, false, ADMIN_EMAIL);
   check('★ 收件人清單只有幹事一人', result.recipients, [ADMIN_EMAIL]);
   VOLUNTEER_EMAILS.forEach(function (v) {
-    check('★ 義工電郵（' + v + '）絕不在收件人清單內', result.recipients.indexOf(v), -1);
+    check('★ 事奉人員電郵（' + v + '）絕不在收件人清單內', result.recipients.indexOf(v), -1);
   });
 }
 

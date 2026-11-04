@@ -92,7 +92,7 @@ function previewEmailTemplate_(quarterId, versionNo, stage) {
     // 收件人、之後才加 PERSON 收件人，所以 OFFICIAL／RESEND 這種個人化階段永遠會
     // 揀到名單上的第一個 LIST 收件人（例如「教會辦公室」）——那個收件人沒有 PersonID、
     // 沒有服侍安排，預覽出來的 {PersonName}／{AssignmentSummary} 全部是空的或原文，
-    // 完全看不出真正寄給義工的信會長成什麼樣，失去預覽的意義。
+    // 完全看不出真正寄給事奉人員的信會長成什麼樣，失去預覽的意義。
     let recipient = null;
     let notice = '';
 
@@ -104,11 +104,11 @@ function previewEmailTemplate_(quarterId, versionNo, stage) {
       if (withAssignments.length > 0) {
         recipient = withAssignments[0];
       } else {
-        // 明確講清楚，不要靜靜揀個 LIST 收件人頂上，令人以為預覽結果就是義工會收到的樣子
+        // 明確講清楚，不要靜靜揀個 LIST 收件人頂上，令人以為預覽結果就是事奉人員會收到的樣子
         notice = '此版本沒有任何有服侍安排的收件人。'
           + '這是個人化範本（會因收件人而不同），但 ' + quarterId + ' v' + versionNo
           + ' 在 RosterAssignments 找不到任何派工紀錄，所以沒有 PERSON 收件人可以預覽。'
-          + '下面顯示的是未代入個人資料的範本原文，不代表義工實際會收到的內容。';
+          + '下面顯示的是未代入個人資料的範本原文，不代表事奉人員實際會收到的內容。';
       }
     }
 

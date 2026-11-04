@@ -305,7 +305,7 @@ function isPostShownInRoster_(row) {
 }
 
 /**
- * 讀取 NameMapping 工作表（會友/義工名冊），只回傳 Active=TRUE 的人。
+ * 讀取 NameMapping 工作表（會友/事奉人員名冊），只回傳 Active=TRUE 的人。
  * @returns {Object[]} 人員物件陣列
  */
 function readPeople_() {

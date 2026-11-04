@@ -1,9 +1,9 @@
 // 第六十七輪批次 AK 組：未獲授權的訪客唔可以見到內部設定名稱。
 // 執行方式：node tests/webapp_neutral_pages.test.js
 //
-// 現場（2026-10-21 無痕視窗開義工個人連結基底、冇參數）：「你沒有權限使用這個頁面。
+// 現場（2026-10-21 無痕視窗開事奉人員個人連結基底、冇參數）：「你沒有權限使用這個頁面。
 // 如果你認為這是錯誤，請聯絡系統管理員，在 Config 工作表的 WEBAPP_ALLOWED_EMAILS 加入你的電郵。」
-// 義工刪走網址參數就會見到，而且叫佢搵人把自己加入白名單係錯嘅指示。
+// 事奉人員刪走網址參數就會見到，而且叫佢搵人把自己加入白名單係錯嘅指示。
 //
 // 呢一份**真嘅執行** `doGet()`（WebApp.gs），HtmlService／Session 換假。
 
@@ -54,12 +54,12 @@ console.log('\n=== AK【核心】停用頁：中性句子 ===');
   check('★★★ 標題冇「（已停用）」之類洩露狀態嘅字', !/停用|無權限/.test(out.title), out.title);
 }
 
-console.log('\n=== AK【核心】無權限頁：叫義工用個人專屬連結 ===');
+console.log('\n=== AK【核心】無權限頁：叫事奉人員用個人專屬連結 ===');
 {
   const s = sandbox({ enabled: true, email: 'wrong@example.invalid' });
   const out = s.gas.doGet({ parameter: {} });
   check('★★★★★★ 唔提 Config／WEBAPP_／白名單', !FORBIDDEN.test(out.html), out.html);
-  check('★★★★★ 講「這個網址只供幹事使用。如果你是義工，請用電郵內的個人專屬連結。」',
+  check('★★★★★ 講「這個網址只供幹事使用。如果你是事奉人員，請用電郵內的個人專屬連結。」',
     /這個網址只供幹事使用/.test(out.html) && /個人專屬連結/.test(out.html), out.html);
   check('★★★★ 已登入 ⇒ 多一句「（目前登入：<電郵>）」', /（目前登入：wrong@example\.invalid）/.test(out.html), out.html);
   check('★★★★ 詳細原因寫入執行記錄', s.logs.some(function (l) { return /允許名單/.test(l); }), s.logs.join('|'));

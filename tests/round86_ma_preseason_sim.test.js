@@ -122,7 +122,7 @@ console.log('\n=== MA4：預覽窗 ===');
   audit(g, sc, 'MANUAL|2098-12-08|DRY_RUN', '模擬 4 封');
   const p = g.apiPreseasonPreview(sc.Q);
   check('★★★★★ 預覽回傳 sentRecord：simulated、real＝null', p.sentRecord && p.sentRecord.real === null && p.sentRecord.simulated === true, JSON.stringify(p.sentRecord));
-  // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕視窗亦有同樣字眼 ⇒ 只看 openPreseasonSend() 那一段
+  // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕視窗亦有同樣字眼 ⇒ 只看 openPreseasonSend() 那一段
   const z2all = fs.readFileSync('src/ui/ScriptZone2.html', 'utf8');
   const z2from = z2all.indexOf('function openPreseasonSend()');
   const z2 = z2all.slice(z2from, z2all.indexOf('\n  function ', z2from + 10));

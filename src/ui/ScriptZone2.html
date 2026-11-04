@@ -84,9 +84,9 @@
       button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), '')
     ]));
     // 第八十五輪批次 LF 組：〔寄出季前資料〕（先預覽內容和收件人，再寄）
-    // 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕（請義工用個人專屬連結申報不能服侍；先預覽，再寄）
+    // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕（請事奉人員用個人專屬連結申報不能服侍；先預覽，再寄）
     body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary'),
-      button('邀請義工申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));
+      button('邀請事奉人員申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));
     // 第九十七輪批次 XA／XB 組：〔補填電郵〕（不寫回出席系統）；〔沒有電郵的人：匯出邀請〕（Word 檔或寄給自己）
     body.appendChild(row([button('補填電郵', () => openManualEmails(), 'secondary'),
       button(INVITE_PAPER_BUTTON_LABEL, () => openInvitePaper(), 'secondary')]));
@@ -107,12 +107,12 @@
       summary.appendChild(make('div', { text: (/已寄出/.test(d.preseasonStatus) ? '✅ ' : '⬜ ') + d.preseasonStatus,
         className: /已寄出/.test(d.preseasonStatus) ? 'vio-row muted' : 'vio-row' }));
     }
-    // 第九十輪批次 QC 組：義工在個人專屬連結的申報，等候幹事確認
+    // 第九十輪批次 QC 組：事奉人員在個人專屬連結的申報，等候幹事確認
     if (d && typeof d.pendingSubmissions === 'number') {
       const n = d.pendingSubmissions;
       summary.appendChild(make('div', {
-        text: n < 0 ? '⬜ 義工申報待確認：暫時查不到' : (n > 0 ? '⬜ 義工申報待確認：' + n + ' 項——在〔不能服侍的日期〕最上面處理'
-          : '✅ 義工申報待確認：0 項'),
+        text: n < 0 ? '⬜ 事奉人員申報待確認：暫時查不到' : (n > 0 ? '⬜ 事奉人員申報待確認：' + n + ' 項——在〔不能服侍的日期〕最上面處理'
+          : '✅ 事奉人員申報待確認：0 項'),
         className: n === 0 ? 'vio-row muted' : 'vio-row'
       }));
     }
@@ -333,14 +333,14 @@
   }
 
   /**
-   * 第九十輪批次 QC 組：〔邀請義工申報不能服侍的日子〕——先預覽（人數、截止日、沒有電郵的人），再〔寄出〕。
+   * 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕——先預覽（人數、截止日、沒有電郵的人），再〔寄出〕。
    */
   function openUnavailableInvite() {
     runAction('讀取邀請內容', async () => {
       const p = await callServer('apiUnavailableInvitePreview', currentQuarterId);
       const nodes = [
         para('寄信給本季可能被安排的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。', 'muted'),
-        para('想先看看義工會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')
+        para('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')
       ];
       nodes.push(make('div', { className: 'sec' }, [
         sectionTitle('截止日'),
@@ -358,16 +358,16 @@
         who.appendChild(make('div', { text: '沒有個人專屬連結，不會寄（先按「維護 ▸ 補發個人專屬連結 token」）：' + p.noLink.join('、'), className: 'err-text' }));
       }
       nodes.push(who);
-      if (p.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定義工個人連結的網址，寄不出。請管理員先設定。', className: 'err-text' }));
+      if (p.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定事奉人員個人連結的網址，寄不出。請管理員先設定。', className: 'err-text' }));
       if (p.sentRecord) {
         const sr = p.sentRecord;
         nodes.push(para(sr.real ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次；再寄會再收到一封。'
           : '這一季在 ' + sr.date + ' 只有模擬寄出，沒有真正寄出過；模擬不算已寄出。', 'muted'));
       }
-      openModal('邀請義工申報不能服侍的日子：' + (p.quarterLabel || currentQuarterId), nodes, [
-        button('寄出', () => runAction('邀請義工申報不能服侍的日子', async () => {
+      openModal('邀請事奉人員申報不能服侍的日子：' + (p.quarterLabel || currentQuarterId), nodes, [
+        button('寄出', () => runAction('邀請事奉人員申報不能服侍的日子', async () => {
           const r = await callServerMutating('apiUnavailableInviteSend', currentQuarterId);
-          openModal('邀請義工申報不能服侍的日子', [make('div', {
+          openModal('邀請事奉人員申報不能服侍的日子', [make('div', {
             text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
               : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
             className: 'ok-line'
@@ -485,7 +485,7 @@
       ]));
     }
     nodes.push(list);
-    if (d.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定義工個人連結的網址，產生不到。請管理員先設定。', className: 'err-text' }));
+    if (d.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定事奉人員個人連結的網址，產生不到。請管理員先設定。', className: 'err-text' }));
     openModal(INVITE_PAPER_BUTTON_LABEL + '：' + (d.quarterLabel || currentQuarterId), nodes, [
       button('產生 docx', () => runInvitePaper_('apiExportInvitePaperDocx'), ''),
       button('寄給自己', () => runInvitePaper_('apiEmailInvitePaperToSelf'), 'secondary'),

@@ -64,7 +64,7 @@
   runAction('載入中', async () => {
     await loadMyPermission_();
     deepLink_ = parseDeepLink_(await readDeepLinkParams_());
-    // 第九十四輪批次 UB 組：只是確認者 ⇒ 只顯示「義工申報，確認」，不載入其他資料
+    // 第九十四輪批次 UB 組：只是確認者 ⇒ 只顯示「事奉人員申報，確認」，不載入其他資料
     if (myRole_ === 'CONFIRMER') { await renderConfirmerOnly_(); return; }
     await loadQuarters(deepLink_.quarter);
     if (!viewOnly_) syncHwcasOnLoad();

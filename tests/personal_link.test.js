@@ -155,7 +155,7 @@ console.log('\n=== B2／B3：個人連結渲染路徑完全唔行幹事介面嗰
   const body = personalLinkSource.slice(start, end);
 
   check('★★★ renderPersonalRosterPage_() 完全冇呼叫 assertApiCallerAuthorized_()'
-    + '（義工冇 email 白名單身分可以核對）',
+    + '（事奉人員冇 email 白名單身分可以核對）',
     body.indexOf('assertApiCallerAuthorized_') === -1);
   check('★ 但仍然尊重 WEBAPP_ENABLED 總開關（幹事可以一鍵停用成個 Web UI，包括呢頁）',
     body.indexOf('assertWebAppEnabled_()') !== -1);

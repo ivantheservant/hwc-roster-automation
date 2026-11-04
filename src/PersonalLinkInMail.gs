@@ -38,7 +38,7 @@
  * ⚠️ 一條打不開的連結，對一個不熟電腦的人來說比沒有連結更差——
  * 他會以為系統壞了，然後打電話問。所以沒有把握就不附。
  *
- * @param {string} baseUrl 義工部署的 `/exec` 網址（Config）
+ * @param {string} baseUrl 事奉人員部署的 `/exec` 網址（Config）
  * @param {string} token 那個人的 `PersonalLinkToken`
  * @param {string} quarterId 季度 ID
  * @returns {string} 網址；缺任何一樣就回空字串

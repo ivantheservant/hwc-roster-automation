@@ -109,15 +109,15 @@ console.log('\n=== UD1／UD3：生成前自動確認 ===');
   g.personalSubmitUnavailable(tok(1), '', [T1[0]], '', ['READ']);
   g.personalSubmitUnavailable(tok(2), '', [T2[0]], '', []);   // 下一季：不會被自動確認
   const plan = g.apiGenerateDraftPlan(sc.Q);
-  check('★★★★★★ 生成確認窗：「還有 1 項義工申報未確認，開始之後會自動當作確認，並通知申請人。」（只計這一季）',
-    plan.pendingAutoConfirmText === '還有 1 項義工申報未確認，開始之後會自動當作確認，並通知申請人。' && plan.pendingAutoConfirmCount === 1, JSON.stringify(plan.pendingAutoConfirmText));
+  check('★★★★★★ 生成確認窗：「還有 1 項事奉人員申報未確認，開始之後會自動當作確認，並通知申請人。」（只計這一季）',
+    plan.pendingAutoConfirmText === '還有 1 項事奉人員申報未確認，開始之後會自動當作確認，並通知申請人。' && plan.pendingAutoConfirmCount === 1, JSON.stringify(plan.pendingAutoConfirmText));
   const res = g.apiGenerateDraftExecute(sc.Q);
   const mine = sc.subs().filter((s) => s.personId === 'P9701')[0];
   check('★★★★★★ 生成之後：那一項變「已確認」，DecidedBy＝系統自動（生成初稿）', res.ok && mine.status === 'ACCEPTED' && mine.decidedBy === '系統自動（生成初稿）', JSON.stringify(mine));
   check('★★★★★ 下一季的申報不會被自動確認', sc.subs().filter((s) => s.personId === 'P9702')[0].status === 'PENDING');
   check('★★★★★ 建立了 Unavailable（只限讀經）', sc.unav().some((r) => r.PersonID === 'P9701' && r.AppliesTo === 'POSTS' && String(r.PostIDs) === 'READ'));
   check('★★★★★ 通知申請人（DRY_RUN 下為模擬，AuditLog 有紀錄）', sc.audits('UNAVAILABLE_DECISION_NOTIFIED').some((a) => a.TargetKey === 'P9701'));
-  check('★★★★ 完成窗有一句「已自動確認 1 項義工申報，並通知申請人。」', res.autoConfirmMessage === '已自動確認 1 項義工申報，並通知申請人。', res.autoConfirmMessage);
+  check('★★★★ 完成窗有一句「已自動確認 1 項事奉人員申報，並通知申請人。」', res.autoConfirmMessage === '已自動確認 1 項事奉人員申報，並通知申請人。', res.autoConfirmMessage);
   const A = sc.C.ROSTER_ASSIGNMENTS;
   check('★★★★★★ 排表時已經避開：P9701 在 ' + T1[0] + ' 沒有被排讀經', !g.readSheet_(sc.S.ROSTER_ASSIGNMENTS)
     .some((r) => g.toDateString_(r[A.SERVICE_DATE], sc.TZ) === T1[0] && r[A.POST_ID] === 'READ' && r[A.PERSON_ID] === 'P9701'));
@@ -132,7 +132,7 @@ console.log('\n=== UD1／UD3：生成前自動確認 ===');
   const realOpen = g.openSheetForEdit_;
   g.openSheetForEdit_ = function (name) { if (name === sc.S.UNAVAILABLE) throw new Error('寫入失敗（測試）'); return realOpen(name); };
   const res = g.apiGenerateDraftExecute(sc.Q);
-  check('★★★★★★ 自動確認失敗 ⇒ 停下，三段式錯誤，沒有生成任何版本', res.ok === false && res.versionCreated === false && /自動確認義工申報時出錯/.test(res.message)
+  check('★★★★★★ 自動確認失敗 ⇒ 停下，三段式錯誤，沒有生成任何版本', res.ok === false && res.versionCreated === false && /自動確認事奉人員申報時出錯/.test(res.message)
     && /沒有開始排表/.test(res.message) && g.findLatestVersionNo_(sc.Q) < 0, JSON.stringify(res).slice(0, 400));
   check('★★★★ 申報仍然等候確認（沒有靜靜略過）', sc.subs()[0].status === 'PENDING');
   g.openSheetForEdit_ = realOpen;
@@ -148,7 +148,7 @@ console.log('\n=== UD2：請系統幫我調整前自動確認；儲存不會 ===
   try { g.apiSaveAndConfirmExecute(sc.Q, {}); } catch (e) { /* 沒有改動也可以 */ }
   check('★★★★★★ 〔儲存〕不會自動確認', sc.subs().filter((s) => s.personId === 'P9703')[0].status === 'PENDING');
   const pre = g.apiCheckMyChanges(sc.Q);
-  check('★★★★★ 調整確認窗（〔檢查我的改動〕資料）有那一句', pre.pendingAutoConfirmText === '還有 1 項義工申報未確認，開始之後會自動當作確認，並通知申請人。', pre.pendingAutoConfirmText);
+  check('★★★★★ 調整確認窗（〔檢查我的改動〕資料）有那一句', pre.pendingAutoConfirmText === '還有 1 項事奉人員申報未確認，開始之後會自動當作確認，並通知申請人。', pre.pendingAutoConfirmText);
   try { g.apiBuildSuggestion(sc.Q, 'GRID', []); } catch (e) { /* 只看自動確認 */ }
   const s3 = sc.subs().filter((s) => s.personId === 'P9703')[0];
   check('★★★★★★ 〔請系統幫我調整〕之後：DecidedBy＝系統自動（請系統幫我調整）', s3.status === 'ACCEPTED' && s3.decidedBy === '系統自動（請系統幫我調整）', JSON.stringify(s3));

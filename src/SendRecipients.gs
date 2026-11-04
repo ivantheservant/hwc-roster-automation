@@ -317,8 +317,8 @@ function listSendPoolRecipients_(context) {
  * `listRecipients_()`——即係自動排程、補寄、彩排嗰幾條路完全冇變。
  *
  * 點解要噉分：`filterRecipientsByScope_()` 係喺一個**池**入面篩。
- * 池仍然係 `listRecipients_(stage, …)` 嘅話，幹事喺 REVIEW 揀一個義工，
- * 嗰個義工根本唔喺池入面，於是勾咗都唔會收到——而畫面會話「已選 12 位」。
+ * 池仍然係 `listRecipients_(stage, …)` 嘅話，幹事喺 REVIEW 揀一個事奉人員，
+ * 嗰個事奉人員根本唔喺池入面，於是勾咗都唔會收到——而畫面會話「已選 12 位」。
  * 呢個就係「畫面講一件事、系統做另一件事」。
  *
  * @param {string} stage MAIL_STAGES 之一

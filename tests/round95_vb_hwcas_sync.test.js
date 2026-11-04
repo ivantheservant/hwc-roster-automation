@@ -6,7 +6,7 @@
 //   VB3 只有有更新時才重新載入狀態卡；電郵有改才連主流程資料一起重讀；沒有更新 ⇒ 只換狀態卡那一行
 //   VB4 同步在背景：頁頂細字「正在同步出席系統……」，介面不鎖；完成後收起
 //   VB5 同步中按改動按鈕被鎖拒絕 ⇒「出席系統正在同步（約十秒），請稍後再按。」（只改這一種情況）
-//   VB6 依賴「打開時一定同步」的地方改為動作開始時同步：〔名單檢查〕、〔寄出季前資料〕、〔邀請義工申報〕
+//   VB6 依賴「打開時一定同步」的地方改為動作開始時同步：〔名單檢查〕、〔寄出季前資料〕、〔邀請事奉人員申報〕
 //   VB7 背景同步沒有更新任何人 ⇒ 不標記狀態過期（不會引起多一次載入）
 // 用假資料。
 
@@ -126,7 +126,7 @@ console.log('\n=== VB6：動作開始時同步 ===');
   g.apiPreseasonSend('2099T1');
   g.apiUnavailableInviteSend('2099T1');
   check('★★★★★★ VB6〔寄出季前資料〕先同步（在鎖內）再寄', order.slice(0, 2).join(',') === 'sync:1,preseason', order.join(','));
-  check('★★★★★★ VB6〔邀請義工申報〕先同步（在鎖內）再寄', order.slice(2, 4).join(',') === 'sync:1,invite', order.join(','));
+  check('★★★★★★ VB6〔邀請事奉人員申報〕先同步（在鎖內）再寄', order.slice(2, 4).join(',') === 'sync:1,invite', order.join(','));
   const z2 = code(read('src/ui/ScriptZone2.html'));
   const hints = z2.slice(z2.indexOf('function openPeopleHints'), z2.indexOf("callServer('apiGetPreQuarterChecklist'", z2.indexOf('function openPeopleHints')));
   check('★★★★★★ VB6〔名單檢查〕開始時先同步（不 force；只可查看的人不做；失敗不阻住）',

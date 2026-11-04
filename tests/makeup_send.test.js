@@ -86,7 +86,7 @@ function planMakeupSend_(recipients, sendLogRows, quarterId, versionNo, stage) {
 const names = function (list) { return list.map(function (r) { return r.personId || r.email; }).sort(); };
 
 // ---------------------------------------------------------------------------
-// 假資料：6 位有派工的義工 + 1 位 LIST 收件人
+// 假資料：6 位有派工的事奉人員 + 1 位 LIST 收件人
 // ---------------------------------------------------------------------------
 function buildRecipients() {
   return [

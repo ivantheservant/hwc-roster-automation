@@ -32,7 +32,7 @@ const MANUAL_DEPLOYMENT_ACCESS_CHECK_ = {
   checkedOnDate: '2026-08-17',
   checkedBy: 'Ivan（Apps Script 編輯器逐個部署核實）',
   deployments: [
-    { purpose: '義工個人專屬連結', deployLabel: 'Untitled', version: 'Version 4',
+    { purpose: '事奉人員個人專屬連結', deployLabel: 'Untitled', version: 'Version 4',
       executeAs: 'Me', whoHasAccess: 'Anyone' },
     // 第八十七輪批次 NC 組：幹事介面改為 DOMAIN（由部署腳本按 appsscript.json 設定），待人手在「管理部署」核實
     { purpose: '幹事介面', deployLabel: '2026-08-17 第二十一輪…', version: 'Version 4',
@@ -120,7 +120,7 @@ function buildPreLaunchChecklist_(quarterId) {
   //
   // ⚠️ 這一項比 DRY_RUN 更危險，因為它**看起來一切正常**：
   // 幹事撳「正式發出」，系統報告「已寄出 51 封」、SendLog 全部成功，
-  // 而全體義工一封都收不到——五十一封全部去了同一個測試信箱。
+  // 而全體事奉人員一封都收不到——五十一封全部去了同一個測試信箱。
   //
   // 所以它不是「請你留意」，是**必須處理**。
   // ⚠️ 第四十四輪批次 E 組：可以有多過一個地址。逐個列出來——
@@ -149,7 +149,7 @@ function buildPreLaunchChecklist_(quarterId) {
     redirectReadError
       ? '這個設定填了一個不像電郵地址的值。寄信會整批失敗，一封都寄不出。去 Config 改正，或者清空。'
       : (redirectTo
-        ? '⚠️ 現在每一封信都會改寄到 ' + redirectTo + '，收件人本人一封都收不到。這個是測試用的設定，上線前一定要把它清空——不清空的話，幹事按「正式發出」之後系統會報告「已寄出」而全體義工其實一封都沒有收到。'
+        ? '⚠️ 現在每一封信都會改寄到 ' + redirectTo + '，收件人本人一封都收不到。這個是測試用的設定，上線前一定要把它清空——不清空的話，幹事按「正式發出」之後系統會報告「已寄出」而全體事奉人員其實一封都沒有收到。'
         : '沒有設定轉寄，信件會正常寄給收件人本人。這是正確的。')
   ));
 
@@ -185,7 +185,7 @@ function buildPreLaunchChecklist_(quarterId) {
   //       部署當日設定嘅存取權，同（a）可以完全唔一致。
   //
   // 第二十一輪試過將（a）當成（b）嘅實際防護嚟報「已就緒」，
-  // 結果誤導：義工用嘅公開連結部署實際係 access=Anyone，同
+  // 結果誤導：事奉人員用嘅公開連結部署實際係 access=Anyone，同
   // appsscript.json 寫嘅 MYSELF 完全唔同。（a）淨係新部署嘅預設值，
   // 唔可以當成現存部署嘅真實防護嚟判斷「已就緒」。
   //

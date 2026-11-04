@@ -118,7 +118,7 @@ function getConfigBaselineSnapshot_() {
       SAME_DAY_EXCLUSIVE_POST_IDS: { launchTargetValue: 'WORSHIP,PIANO', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行
       CHOIR_GROUP_POST_ID: { launchTargetValue: 'CHOIR', source: '程式碼預設值（試算表現時實際值未核實）' },
-      // 第九十輪批次 QC 組：義工在個人專屬連結申報不能服侍
+      // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍
       PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: { launchTargetValue: '2', source: '程式碼預設值（試算表現時實際值未核實）' },
       PERSONAL_UNAVAILABLE_DEADLINE_DAYS: { launchTargetValue: '7', source: '程式碼預設值（試算表現時實際值未核實）' },
       PERSONAL_UNAVAILABLE_NOTIFY: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
@@ -156,6 +156,7 @@ function getConfigBaselineSnapshot_() {
       WEBAPP_DEFAULT_QUARTER: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       PREASSIGN_POST_IDS: { launchTargetValue: 'WORSHIP,PIANO', source: '程式碼預設值（試算表現時實際值未核實）' },
       PRESEASON_CHANGE_NOTIFY: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      NAME_HONORIFIC_SUFFIXES: { launchTargetValue: '姊妹,弟兄,傳道,牧師,師母,執事,長老', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_VIEWER_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' }
     },
     quarters: {

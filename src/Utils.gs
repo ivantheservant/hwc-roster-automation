@@ -37,6 +37,66 @@ function resolvePersonId_(name) {
   return aliasMap[name] || null;
 }
 
+/** 第一百零一輪批次 ZA-3：尊稱預設值（Config `NAME_HONORIFIC_SUFFIXES` 沒有設定時用）。 */
+const DEFAULT_NAME_HONORIFIC_SUFFIXES = '姊妹,弟兄,傳道,牧師,師母,執事,長老';
+
+/**
+ * 第一百零一輪批次 ZA-3：讀尊稱清單（Config `NAME_HONORIFIC_SUFFIXES`），長的排先。
+ * @returns {string[]}
+ */
+function readNameHonorificSuffixes_() {
+  const raw = getConfig_(CONFIG_KEYS.NAME_HONORIFIC_SUFFIXES, DEFAULT_NAME_HONORIFIC_SUFFIXES);
+  const list = (Array.isArray(raw) ? raw : String(raw || '').split(/[,，、;\s]+/))
+    .map(function (s) { return String(s || '').trim(); })
+    .filter(function (s, i, a) { return s && a.indexOf(s) === i; });
+  return list.sort(function (a, b) { return b.length - a.length; });
+}
+
+/**
+ * 第一百零一輪批次 ZA-3：去掉名字結尾的尊稱。去掉之後沒有字剩 ⇒ 不去。純函式。
+ * @param {string} name
+ * @param {string[]} suffixes 尊稱（長的排先）
+ * @returns {?{base: string, suffix: string}} 沒有尊稱 ⇒ null
+ */
+function stripNameHonorific_(name, suffixes) {
+  const text = String(name || '').trim();
+  for (let i = 0; i < (suffixes || []).length; i++) {
+    const s = suffixes[i];
+    if (s && text.length > s.length && text.slice(-s.length) === s) {
+      return { base: text.slice(0, -s.length).trim(), suffix: s };
+    }
+  }
+  return null;
+}
+
+/**
+ * 第一百零一輪批次 ZA-3：「人手貼名字」入口用的配對（儲存並套用名單、匯入、名字配對）。
+ * 先照舊（完全相同 → 別名）；都找不到，才去掉結尾尊稱再找一次。
+ * 名單上本身包含尊稱的名字（例如以「師母」結尾）因為完全相同優先，不受影響。
+ * @param {string} name
+ * @returns {?{personId: string, base: string, suffix: string}} base／suffix 只在去了尊稱才有值
+ */
+function resolvePersonIdLenient_(name) {
+  const text = String(name || '').trim();
+  if (!text) return null;
+  const exact = resolvePersonId_(text);
+  if (exact) return { personId: exact, base: '', suffix: '' };
+  const stripped = stripNameHonorific_(text, readNameHonorificSuffixes_());
+  if (!stripped) return null;
+  const pid = resolvePersonId_(stripped.base);
+  return pid ? { personId: pid, base: stripped.base, suffix: stripped.suffix } : null;
+}
+
+/**
+ * 第一百零一輪批次 ZA-3：確認窗用的一句「『某某姊妹』當作『某某』」。
+ * @param {string} text 原文
+ * @param {string} base 去了尊稱的名字
+ * @returns {string}
+ */
+function describeHonorificMatch_(text, base) {
+  return '『' + text + '』當作『' + base + '』';
+}
+
 /**
  * 第十五輪批次新增：把幹事喺 `ui.prompt()` 輸入嘅識別字串（QuarterID、
  * PersonID 等）正規化，防止「睇落一模一樣、但 `===` 比對唔到」呢類隱形
@@ -298,7 +358,7 @@ function displayCellValue_(value, fallback) {
  * 靜靜回一個「睇落合理」嘅值，正正就係本專案已經燒過幾次嘅同一個
  * bug class：**把「認唔到」當成「冇事」**（第十八輪 `context.roles || []`、
  * 第二十輪 grid placeholder、第二十二輪 `displayCellValue_`）。
- * 時間錯咗，義工會喺錯嘅鐘數返到教會——呢個代價唔可以無聲無息。
+ * 時間錯咗，事奉人員會喺錯嘅鐘數返到教會——呢個代價唔可以無聲無息。
  *
  * 空白（`null`／`undefined`／空字串）先至係合法嘅「冇設定」，回 `fallback`。
  *
@@ -363,7 +423,7 @@ function normalizeTimeOfDay_(value, fallback, timezone) {
   //   `'1045'`  → 1045-01-01（當成年份）  ⇒ 會變成 `00:00`
   //   `'10:75'` → 1974-12-31（當成年份 ＋ 亂七八糟）⇒ 會變成一個亂數時間
   // 三個都係「認唔出被當成一個有意義嘅值」嗰個 bug class，
-  // 而且後果係義工喺錯嘅鐘數返到教會。加咗秒之後三個都會落去拋錯。
+  // 而且後果係事奉人員喺錯嘅鐘數返到教會。加咗秒之後三個都會落去拋錯。
   if (/\d{1,2}:\d{2}:\d{2}/.test(text)) {
     const parsed = new Date(text);
     if (!isNaN(parsed.getTime())) {

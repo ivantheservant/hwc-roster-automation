@@ -1,10 +1,10 @@
-// 第七十輪批次 AV 組：內部規則代號不印到義工收到的 PDF，也不直接顯示給幹事。
+// 第七十輪批次 AV 組：內部規則代號不印到事奉人員收到的 PDF，也不直接顯示給幹事。
 // 執行方式：node tests/no_rule_code_on_screen.test.js
 //
 // 現場（2026-10-21 截圖 s44）：個人 PDF 第 3 頁腳註寫「[1] SEMI_NO_CONSECUTIVE: 上一週同崗位已是此人」。
 // 來源：`RosterWriter.gs` 把 `w.ruleId + ': ' + w.reason` 寫成工作表批註，PDF 匯出時批註變成腳註。
 //
-// 做法：一、批註只寫中文原因；二、PDF 匯出網址不印批註（三種義工 PDF 都經 `exportSheetAsPdfBlob_()`）；
+// 做法：一、批註只寫中文原因；二、PDF 匯出網址不印批註（三種事奉人員 PDF 都經 `exportSheetAsPdfBlob_()`）；
 //       三、畫面上直接顯示規則代號的地方改成中文說明（只改顯示文字，不改資料）。
 
 const fs = require('fs');
@@ -58,7 +58,7 @@ console.log('\n=== AV1 批註只寫中文原因 ===');
 }
 
 // =====================================================================
-console.log('\n=== AV2 義工 PDF 的匯出網址不印批註 ===');
+console.log('\n=== AV2 事奉人員 PDF 的匯出網址不印批註 ===');
 {
   let url = null;
   gas.getConfig_ = function (_k, d) { return d; };

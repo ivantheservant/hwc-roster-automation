@@ -204,7 +204,7 @@ lines.push('# 個人連結頁面樣本（實際渲染結果）');
 lines.push('');
 lines.push('呢份文件係**用虛構資料實際渲染出嚟嘅個人專屬連結頁面**，唔係樣板');
 lines.push('原始碼。目的係喺 Ivan 新增 `access=ANYONE` 部署、正式開放俾冇');
-lines.push('Google 帳戶嘅義工存取之前，先有人逐份讀過實際輸出——呢個係整個');
+lines.push('Google 帳戶嘅事奉人員存取之前，先有人逐份讀過實際輸出——呢個係整個');
 lines.push('專案第一次開放俾非白名單人士嘅入口，開放之前必須有人讀過。');
 lines.push('');
 lines.push('產生方式：`node tests/render_personal_roster_samples.js`。頁面內容');
@@ -242,7 +242,7 @@ lines.push('   （`src/ui/PersonalRoster.html`）搜尋唔到呢個字串，四�
 lines.push('   渲染輸出一樣搜尋唔到。');
 lines.push('5. **匿名訪客呼叫任何 `api*` 函式一律被拒絕**——`renderPersonalRosterPage_()`');
 lines.push('   完全唔呼叫任何 `api*` 函式，個人連結呢條路徑本身唔經過');
-lines.push('   `assertApiCallerAuthorized_()`（義工冇 Google 身分），呢個');
+lines.push('   `assertApiCallerAuthorized_()`（事奉人員冇 Google 身分），呢個');
 lines.push('   係刻意嘅設計（見 `WebAppPersonalLink.gs` 檔頭），唔係漏做');
 lines.push('   ——安全性完全靠 token 本身唔可猜。呢一項嘅獨立驗證見');
 lines.push('   `tests/webapp_access_guard.test.js`（鎖住全部 `api*` 函式');

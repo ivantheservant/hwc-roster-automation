@@ -22,7 +22,7 @@
  *
  * 1. GENERATE：季度到達 GenerateOn 日期、Stage 仍是 DRAFT、且未有任何已生成版本時，
  *    自動生成一份初稿，並且只通知幹事（Config 的 MAIL_ADMIN_NOTIFY）「初稿已生成，
- *    請登入覆核後執行步驟 2」，不寄給堂委、不寄給義工——寄給堂委審閱是步驟 2 的責任，
+ *    請登入覆核後執行步驟 2」，不寄給堂委、不寄給事奉人員——寄給堂委審閱是步驟 2 的責任，
  *    要幹事看過初稿、決定沒問題了才手動執行。
  * 2. REMIND（第三輪批次下一輪的新一批階段 B 擴大範圍）：舊版只在 Stage 卡在
  *    REVIEW_SENT 太久時提醒，DRAFT（幹事還沒撳步驟 2）與 REQUESTS_APPLIED
@@ -40,7 +40,7 @@
  *    次），一律只寄給幹事（同樣只寄給幹事），詳細判斷見 judgeRemindAction_()。
  *
  * OFFICIAL（正式發出）永遠不會由這裡觸發——四階段流程的步驟 4 一定要幹事在
- * 選單或 Web UI 手動執行，因為那是真正寄給全部義工、不可逆的動作。
+ * 選單或 Web UI 手動執行，因為那是真正寄給全部事奉人員、不可逆的動作。
  * Mailer.gs 的 sendStage_() 有一道結構性防護（assertOfficialNotFromAutomationTrigger_()）：
  * 只要偵測到目前是在這個函式的執行期間（AUTOMATION_TRIGGER_CONTEXT_ACTIVE），
  * OFFICIAL 階段一律直接拒絕並記入 AuditLog，即使日後不小心在這裡加了一行呼叫
@@ -148,7 +148,7 @@ function dailyAutomationCheck_() {
 
         const generateJudgment = judgeGenerateAction_(quarterId, schedule.generateDate, today);
         report.push(executeAutomationAction_(generateJudgment, today, function () {
-          // 第九十四輪批次 UD 組：自動生成前一樣先自動確認該季的義工申報；失敗會拋錯 ⇒ 這一次不生成
+          // 第九十四輪批次 UD 組：自動生成前一樣先自動確認該季的事奉人員申報；失敗會拋錯 ⇒ 這一次不生成
           autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);
           const gen = performRosterGeneration_(quarterId);
           notifyAdminGenerateDone_(quarterId, gen, config, isDryRun);
@@ -195,11 +195,11 @@ function dailyAutomationCheck_() {
       }
     });
 
-    // 第九十輪批次 QC 組：有新的義工申報 ⇒ 通知幹事一次（同一日最多一封）。出錯不影響上面各季。
+    // 第九十輪批次 QC 組：有新的事奉人員申報 ⇒ 通知幹事一次（同一日最多一封）。出錯不影響上面各季。
     try {
       report.push(runUnavailableSubmissionNotify_(today, config, isDryRun));
     } catch (err) {
-      log_('WARN', 'dailyAutomationCheck_: 義工申報通知失敗：' + err.message);
+      log_('WARN', 'dailyAutomationCheck_: 事奉人員申報通知失敗：' + err.message);
       report.push({ quarterId: '', action: 'UNAVAILABLE_SUBMISSIONS', outcome: 'ERROR', detail: err.message });
     }
 
@@ -491,7 +491,7 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   // 點解要併入呢個既有機制而唔係另建一套（任務明確要求）：呢度已經有齊
   // 「每個季度＋Stage 各自計提醒次數」「今日提醒過就唔會再提」「上限
   // REMIND_STUCK_MAX_COUNT 次」「一律經 notifyAdmin_() 寄、絕對唔會誤寄畀
-  // 義工」全部保護。另開一套等於要重新實作呢四樣嘢，而且會變成同一日
+  // 事奉人員」全部保護。另開一套等於要重新實作呢四樣嘢，而且會變成同一日
   // 幹事收到兩封唔同嘅提醒信。
   //
   // 觸發時機用**生成日期**（generateDate）而唔係正式發出日期：五月嗰次

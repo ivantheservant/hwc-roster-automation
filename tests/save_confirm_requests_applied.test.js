@@ -427,7 +427,7 @@ console.log('\n=== 甲2：1 格人手改動 ＋ 1 筆申報（同一格）⇒ gr
   checkEqual('★★★★★ **grid 贏**（規格 1.4：幹事親手改嗰個係最新真相）',
     whoIsOn(3, DATES[1], 'CHAIR'), gridWants);
 
-  // ⚠️ 被蓋過嗰筆申報唔可以靜靜消失——義工提交咗嘢，佢要喺 Requests
+  // ⚠️ 被蓋過嗰筆申報唔可以靜靜消失——事奉人員提交咗嘢，佢要喺 Requests
   // 見得到「點解冇跟到」。
   const R = gas.COLUMNS.REQUESTS;
   const overridden = readRequests().find(function (r) { return r.__sheetRow === overriddenRow; })
@@ -439,7 +439,7 @@ console.log('\n=== 甲2：1 格人手改動 ＋ 1 筆申報（同一格）⇒ gr
     check('★★★★★ 被 grid 蓋過嗰筆申報有 RequestID（已處理，唔會永遠掛住）',
       String(overridden[R.REQUEST_ID] || '').trim() !== '', JSON.stringify(overridden));
     check('★★★★★ 而且處理結果明講「以你改的為準，這一筆沒有套用」'
-      + '——義工提交咗嘢，唔可以無聲無息消失',
+      + '——事奉人員提交咗嘢，唔可以無聲無息消失',
       String(overridden[R.RESULT_NOTE] || '').indexOf('以你改的為準') !== -1,
       String(overridden[R.RESULT_NOTE] || '') + ' / ' + String(overridden[R.STATUS] || ''));
   }

@@ -702,7 +702,7 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   //        但**申報完全冇被套用**：`Requests` 嘅 RequestID／Status 仍然空白，
   //        AuditLog 冇任何申報紀錄，而版本備註同確認畫面都寫住「申報 1 筆」。
   //        `plan.requests.apply` 喺整個執行階段**淨係被用嚟砌嗰句備註**。
-  //        ⚠️ 靜默失敗——幹事會以為義工嘅申報已經處理好。
+  //        ⚠️ 靜默失敗——幹事會以為事奉人員嘅申報已經處理好。
   //
   //   甲3　因此形成死鎖：掣 3 嘅閘門（正確地）擋住未處理申報，
   //        但撳掣 1 永遠處理唔完，幹事喺介面上無路可走。
@@ -1077,7 +1077,7 @@ function buildSaveConfirmFailureResult_(quarterId, baseVersionNo, err) {
 
   // 規格步 1.8：**最危險嘅一種。** 版本可能只寫咗一部分。
   // ⚠️ 一定要 **唔前進 Stage、唔發佈公開連結**——半套資料唔應該
-  // 一路推落去令堂委／義工睇到。
+  // 一路推落去令堂委／事奉人員睇到。
   return {
     ok: false,
     versionCreated: false,

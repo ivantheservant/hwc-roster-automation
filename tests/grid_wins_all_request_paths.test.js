@@ -7,7 +7,7 @@
 //
 // 規格 1.4：同一格幹事已經喺職事表上親手改咗 ⇒ **以幹事改嗰個為準**，
 // 嗰筆申報唔套用，但**一定要記低**（Requests 嘅處理結果欄要講得出），
-// 否則嗰位義工提交嘅要求就無聲無息消失咗。
+// 否則嗰位事奉人員提交嘅要求就無聲無息消失咗。
 //
 // 第三十四輪喺掣 1「儲存並確認」實作咗呢一條。但實作方式係
 // **由呼叫端傳一個列號清單入 `applyRequests_()`**，而全系統有三條路
@@ -246,7 +246,7 @@ console.log('\n=== F 組【核心】步驟 3 嗰條路：grid 贏，而且申報
   const req = requestRowsFor(Q).filter(function (r) { return gas.toDateString_(r[R.SERVICE_DATE], TZ) === DATES[2] && r[R.POST_NAME] === '主席'; })[0];
   checkEqual('★★★★★ 而嗰筆申報唔可以就噉消失——Status 要寫得出佢冇被套用',
     String(req[R.STATUS]), gas.REQUEST_STATUS.REJECTED);
-  check('★★★★★ 而且處理結果欄講得出**點解**（義工提交嘅要求唔可以無聲無息消失）',
+  check('★★★★★ 而且處理結果欄講得出**點解**（事奉人員提交嘅要求唔可以無聲無息消失）',
     String(req[R.RESULT_NOTE] || '').indexOf('親手改過') !== -1,
     '處理結果 = ' + JSON.stringify(String(req[R.RESULT_NOTE] || '')));
 }

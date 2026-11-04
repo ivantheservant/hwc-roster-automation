@@ -1,4 +1,4 @@
-// 第九十四輪批次：義工申報不能服侍的測試場景（由 round90_qc_personal_unavailable 的場景抽出，給 round94_* 用）。
+// 第九十四輪批次：事奉人員申報不能服侍的測試場景（由 round90_qc_personal_unavailable 的場景抽出，給 round94_* 用）。
 //
 // 2099T1（四個主日）＋ 2099T2（兩個）＋ 2099T3（一個）；今日固定（預設 2098-12-10）；
 // NameMapping 有 PersonalLinkToken（P9701–P9707 各自一個）；生成日＝開始日前 21 日 ⇒ T1 截止日 2098-12-04。

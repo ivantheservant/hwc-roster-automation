@@ -25,7 +25,7 @@
 const STEP3_HARD_VIOLATION_CONSEQUENCE =
   '繼續下去不會立即寄出任何電郵——步驟 3 只是把這一版定案。\n'
   + '但 Stage 會前進到 REQUESTS_APPLIED，「步驟 4：正式發出」就會解鎖，\n'
-  + '屆時這些違反規則的安排會原封不動寄給各位義工。\n\n'
+  + '屆時這些違反規則的安排會原封不動寄給各位事奉人員。\n\n'
   + '建議先取消，到新版本的工作表直接改那幾格的姓名，再執行一次本步驟。\n'
   + '系統會讀到你在工作表上的改動、重新檢查規則，並在你確認之後把改動\n'
   + '寫成一個新版本（原版本保持不變、可以對照）。\n'
@@ -63,7 +63,7 @@ function runFourStageStep1_() {
 
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('生成中，請稍候…', '四階段流程', 300);
-    // 第九十四輪批次 UD 組：同幹事介面〔生成初稿〕一樣，先自動確認該季的義工申報（失敗 ⇒ 下面 catch 顯示錯誤，不生成）
+    // 第九十四輪批次 UD 組：同幹事介面〔生成初稿〕一樣，先自動確認該季的事奉人員申報（失敗 ⇒ 下面 catch 顯示錯誤，不生成）
     autoConfirmPendingSubmissionsForQuarter_(quarterId, UNAVAILABLE_AUTO_CONFIRM_BY.GENERATE);
     const result = performRosterGeneration_(quarterId);
 
@@ -551,7 +551,7 @@ function runFourStageStep4_locked_() {
 
       // 第十九輪批次階段 C1：缺件比例過高就**唔畀揀繼續**。
       // 之前呢度一律係 YES_NO，於是 57 / 57 全部缺件都可以撳「繼續」，
-      // 結果全體義工冇收到而 Stage 照樣鎖死。
+      // 結果全體事奉人員冇收到而 Stage 照樣鎖死。
       if (missingCheck.gate && missingCheck.gate.blocked) {
         ui.alert('步驟 4：正式發出（已中止）',
           names.join('\n') + extra + '\n\n' + missingCheck.gate.message,
@@ -615,7 +615,7 @@ function runFourStageStep4_locked_() {
         + '失敗：' + result.failed + '　PDF失敗：' + result.errorPdf + '　PDF缺件：' + result.errorPdfMissing + '\n\n'
         // C4：數字唔會自己講故事。之前呢度得四行數字，「失敗：0」
         // 讀落去似乎冇事，但同一屏其實寫住「PDF缺件：57」——
-        // 即係 57 位義工冇收到。結論句要自己講出嚟。
+        // 即係 57 位事奉人員冇收到。結論句要自己講出嚟。
         + result.outcomeSentence + '\n\n'
         + (result.advanced
           ? 'Stage 已前進到 OFFICIAL_SENT。'
