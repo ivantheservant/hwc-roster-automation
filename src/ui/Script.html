@@ -1787,6 +1787,7 @@
    * @param {Node[]} actionNodes 底部掣
    */
   function openModal(title, bodyNodes, actionNodes) {
+    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();
     el('modalTitle').textContent = title;
     const body = clear(el('modalBody'));
     // 第八十五輪批次 LD 組：剛才的儲存令人手不足 ⇒ 完成窗最上面寫一句
@@ -1814,6 +1815,7 @@
   }
 
   function closeModal() {
+    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();   // 測試只載入部分函式時冇呢支
     el('modalBackdrop').hidden = true;
     clear(el('modalBody'));
     clear(el('modalActions'));
@@ -2188,6 +2190,27 @@
         await waitMs(DECISION_RETRY_MS);
       }
     }
+  }
+
+  /**
+   * 第一百零四輪批次 PA 組：〔儲存〕確認窗（deferred）嘅勾選只喺畫面；按〔儲存〕連同儲存送出。
+   * 但幹事亦可以**唔儲存就離開**呢個窗（〔加入名單〕、〔請系統幫我調整〕、〔返回修改〕、Esc）——
+   * 以前每勾一格即時記住，離開都唔會唔見；而家要喺離開嗰陣先寫入，否則勾咗嘅格會靜靜唔見。
+   * 確認窗打開之後登記 `deferredDecisionSource_`（回傳未送出嘅決定）；換窗／關窗時寫入一次。
+   */
+  let deferredDecisionSource_ = null;
+
+  /** 拎走未送出嘅決定（之後唔會再寫）。〔儲存〕用：連同儲存請求送。 */
+  function takeDeferredDecisions_() {
+    const source = deferredDecisionSource_;
+    deferredDecisionSource_ = null;
+    return source ? (source() || []) : [];
+  }
+
+  /** 唔儲存就離開確認窗：未送出嘅決定即時寫入（排隊、合併）。冇就乜都唔做。 */
+  function flushDeferredDecisions_() {
+    const payloads = takeDeferredDecisions_();
+    return payloads.length > 0 ? persistDecisions(payloads) : Promise.resolve(true);
   }
 
   /**

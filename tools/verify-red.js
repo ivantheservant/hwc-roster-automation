@@ -13252,6 +13252,38 @@ const MUTATIONS = [
     find: "  return withMutationLock_('儲存', function () {\n    return apiSaveAndConfirmExecute_locked_",
     replace: "  return withMutationLock_('儲存我的修改', function () {\n    return apiSaveAndConfirmExecute_locked_",
     tests: ["tests/round104_pd_button_names.test.js"]
+  },
+  {
+    id: "pa-close-no-flush",
+    why: "唔儲存就關確認窗，勾咗的格靜靜唔見",
+    file: "src/ui/Script.html",
+    find: "    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();   // 測試只載入部分函式時冇呢支\n    el('modalBackdrop').hidden = true;",
+    replace: "    el('modalBackdrop').hidden = true;",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-no-deferred-source",
+    why: "確認窗冇登記未送出的決定",
+    file: "src/ui/ScriptZone1.html",
+    find: "    if (decisions) deferredDecisionSource_ = () => decisions.pendingPayloads();\n",
+    replace: "",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-fixit-no-await",
+    why: "〔請系統幫我調整〕唔等勾選寫入就開調整",
+    file: "src/ui/ScriptZone1.html",
+    find: "      await flushDeferredDecisions_();\n      closeModal();\n      openBuildSuggestion();",
+    replace: "      closeModal();\n      openBuildSuggestion();",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pa-save-double-send",
+    why: "〔儲存〕之後關窗又再寫一次決定",
+    file: "src/ui/ScriptZone1.html",
+    find: "    const saveBtn = button('儲存', () => executeSaveAndConfirm(takeDeferredDecisions_()), '');",
+    replace: "    const saveBtn = button('儲存', () => executeSaveAndConfirm(decisions ? decisions.pendingPayloads() : []), '');",
+    tests: ["tests/round104_pa_decisions_save.test.js"]
   }
 ];
 

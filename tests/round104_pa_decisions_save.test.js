@@ -196,6 +196,50 @@ function savePlan(rules, names) {
       && t2.every((b) => b.textContent === '全部勾選'));
   }
 
+  console.log('\n=== PA9：唔儲存就離開確認窗 ⇒ 勾咗嘅格照樣記住 ===');
+  {
+    // 〔返回修改〕
+    const { ui, log } = newUi();
+    ui.renderSaveMain(JSON.parse(JSON.stringify(savePlan(RULES40.slice(0, 5), [NAME]))));
+    const body = ui.document.getElementById('modalBody');
+    const actions = ui.document.getElementById('modalActions');
+    const cbs = inputsOf(body);
+    [0, 1, 2].forEach((i) => { cbs[i].checked = true; cbs[i].fire('change'); });
+    check('（前置）勾選時冇即時呼叫', log.calls.length === 0);
+    btn(actions, '返回修改').fire('click');
+    await tick();
+    const sets = log.calls.filter((c) => c.name === 'apiSetCellDecisions');
+    check('★★★★★★ 〔返回修改〕⇒ 未送出嘅 3 格一次過寫入', sets.length === 1 && sets[0].payload.length === 3
+      && sets[0].payload.every((x) => x.checked === true), JSON.stringify(log.calls.map((c) => [c.name, (c.payload || []).length])));
+
+    // 〔請系統幫我調整〕：先寫入，之後先開調整
+    const { ui: u2, log: l2 } = newUi();
+    let opened = null;
+    u2.openBuildSuggestion = () => { opened = l2.calls.length; };
+    const plan2 = savePlan(RULES40.slice(0, 5), []);
+    u2.renderSaveMain(JSON.parse(JSON.stringify(plan2)));
+    const b2 = u2.document.getElementById('modalBody');
+    inputsOf(b2).slice(0, 2).forEach((c) => { c.checked = true; c.fire('change'); });
+    btn(u2.document.getElementById('modalActions'), '請系統幫我調整').fire('click');
+    await tick();
+    const s2 = l2.calls.filter((c) => c.name === 'apiSetCellDecisions');
+    check('★★★★★★ 〔請系統幫我調整〕⇒ 先寫入 2 格，寫完先開調整', s2.length === 1 && s2[0].payload.length === 2 && opened === 1,
+      JSON.stringify([s2.length, opened]));
+
+    // 〔儲存〕：連同儲存送，離開時唔會再寫一次
+    const { ui: u3, log: l3 } = newUi();
+    u3.renderSaveMain(JSON.parse(JSON.stringify(savePlan(RULES40.slice(0, 2), []))));
+    const b3 = u3.document.getElementById('modalBody');
+    inputsOf(b3).forEach((c) => { c.checked = true; c.fire('change'); });
+    btn(u3.document.getElementById('modalActions'), '儲存').fire('click');
+    await tick();
+    check('★★★★★ 〔儲存〕之後冇再另外寫一次決定', l3.calls.length === 1 && l3.calls[0].name === 'apiSaveAndConfirmExecute',
+      JSON.stringify(l3.calls.map((c) => c.name)));
+    u3.closeModal();
+    await tick();
+    check('★★★★ 之後關窗都唔會再寫', l3.calls.length === 1);
+  }
+
   console.log('\n=== PA6：〔檢查我的改動〕即時記住，快速勾 40 格 ===');
   {
     const { ui, log } = newUi();

@@ -426,7 +426,7 @@ console.log('\n=== 儲存：一切正常就唔好彈窗 ===');
   // 第七十五輪批次 CG 組：確認畫面掣改為〔儲存〕（全部決定咗先撳得）＋〔返回修改〕
   check('★★★★★ 有嘢要佢決定嗰陣，掣係〔儲存〕同〔返回修改〕',
     // 第一百零四輪批次 PA 組：〔儲存〕連同確認窗內的逐格決定一次過送
-    /const saveBtn = button\('儲存', \(\) => executeSaveAndConfirm\(decisions \? decisions\.pendingPayloads\(\) : \[\]\), ''\);/.test(zone1)
+    /const saveBtn = button\('儲存', \(\) => executeSaveAndConfirm\(takeDeferredDecisions_\(\)\), ''\);/.test(zone1)
     && /button\('返回修改', \(\) => closeModal\(\), 'secondary'\)/.test(zone1));
 }
 

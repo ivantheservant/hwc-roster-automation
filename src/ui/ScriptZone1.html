@@ -690,7 +690,7 @@
     }
 
     // 4　未決定的「一定要遵守」違反、未決定的名：同〔檢查我的改動〕同一個元件，全部勾了先可以儲存
-    const saveBtn = button('儲存', () => executeSaveAndConfirm(decisions ? decisions.pendingPayloads() : []), '');
+    const saveBtn = button('儲存', () => executeSaveAndConfirm(takeDeferredDecisions_()), '');
     const pending = (plan.decisionItems && (plan.decisionItems.names.length + plan.decisionItems.rules.length)) || 0;
     let decisions = null;
     if (pending > 0) {
@@ -753,6 +753,9 @@
     openModal('會儲存成第 ' + plan.targetVersionNo + ' 版', nodes, [saveBtn]
       .concat(buildFixItActions(plan))
       .concat([button('返回修改', () => closeModal(), 'secondary')]));
+    // 第一百零四輪批次 PA 組：窗打開之後先登記（openModal 本身會寫入上一個窗未送出嘅決定）——
+    // 唔儲存就離開（〔加入名單〕、〔請系統幫我調整〕、〔返回修改〕、Esc）時，勾咗嘅格照樣記住。
+    if (decisions) deferredDecisionSource_ = () => decisions.pendingPayloads();
   }
 
   /**
@@ -821,7 +824,9 @@
     const hasViolation = ((plan.violations || {}).real || []).length > 0
       || ((plan.violations || {}).semiHard || []).length > 0;
     if (!hasBlank && !hasViolation) return [];
-    return [button('請系統幫我調整', () => {
+    return [button('請系統幫我調整', async () => {
+      // 第一百零四輪批次 PA 組：先等確認窗內未送出嘅勾選寫入——調整要跳過「保留我的安排」嘅格
+      await flushDeferredDecisions_();
       closeModal();
       openBuildSuggestion();
     }, 'secondary')];
