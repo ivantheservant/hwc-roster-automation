@@ -13073,6 +13073,14 @@ const MUTATIONS = [
     find: "  return base.slice(-suffix.length) === suffix ? base : base + suffix;",
     replace: "  return base;",
     tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-counts-small-font",
+    why: "服侍次數頁字太細（和樣本第 2 頁對照實測）",
+    file: "src/RosterOutput.gs",
+    find: "const ROSTER_OUTPUT_COUNTS_FONT_SIZE = 14;",
+    replace: "const ROSTER_OUTPUT_COUNTS_FONT_SIZE = 11;",
+    tests: ["tests/round102_oa_roster_output.test.js"]
   }
 ];
 

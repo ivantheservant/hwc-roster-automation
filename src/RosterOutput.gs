@@ -54,6 +54,7 @@ const ROSTER_OUTPUT_SEED_POST_ORDER = [
 
 /** 欄闊（px）：崗位欄、每個主日一欄；服侍次數頁三欄合共等於職事表闊度（兩頁縮放一樣）。 */
 const ROSTER_OUTPUT_POST_COL_WIDTH = 82;
+const ROSTER_OUTPUT_COUNTS_FONT_SIZE = 14;   // 服侍次數頁字號（樣本第 2 頁比職事表大）
 const ROSTER_OUTPUT_DATE_COL_WIDTH = 104;   // 11pt 一個中文字約 15px：6 字的姓名（例如四字姓氏加「師母」）＋邊界
 
 /** 格的種類。 */
@@ -426,14 +427,14 @@ function buildServiceCountSheetModel_(entries, totalWidth) {
     values[i % perCol][Math.floor(i / perCol)] = formatServiceCountLine_(e);
   });
   const rowHeights = {};
-  for (let r = 1; r <= numRows; r++) rowHeights[r] = 24;
+  for (let r = 1; r <= numRows; r++) rowHeights[r] = 30;   // 第一百零二輪和樣本對照：次數頁字要大（樣本第 2 頁）
   const w = Math.max(200, Math.floor((Number(totalWidth) || 900) / 3));
   return {
     name: ROSTER_OUTPUT_SHEET_NAMES.COUNTS, numRows: numRows, numCols: numCols,
     values: values,
     backgrounds: makeOutputMatrix_(numRows, numCols, null),
     fontWeights: makeOutputMatrix_(numRows, numCols, 'normal'),
-    fontSizes: makeOutputMatrix_(numRows, numCols, 11),
+    fontSizes: makeOutputMatrix_(numRows, numCols, ROSTER_OUTPUT_COUNTS_FONT_SIZE),
     fontColors: makeOutputMatrix_(numRows, numCols, '#000000'),
     horizontalAlignments: makeOutputMatrix_(numRows, numCols, 'left'),
     wrapRange: null, borderRange: null, merges: [],

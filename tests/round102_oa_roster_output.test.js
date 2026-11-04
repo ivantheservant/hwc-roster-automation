@@ -198,6 +198,7 @@ check('★★★★★ 次數包括聖餐襄禮、獻花（王美美＝司事 1�
 check('★★★★ 臨時幫手、外請講員沒有 PersonID ⇒ 不計', !lines.some((l) => /臨時甲|黃牧師/.test(l)));
 eq('★★★★ 直排：第 1 欄排完再到第 2 欄（6 人 ⇒ 每欄 2 行）', cs.values, [[lines[0], lines[2], lines[4]], [lines[1], lines[3], lines[5]]]);
 check('★★★ 沒有標題列、沒有 PersonID', !/P00\d|姓名|次數/.test(JSON.stringify(cs.values).replace(/\(\d+\)/g, '')));
+check('★★★ 次數頁字號比職事表大（樣本第 2 頁）', cs.fontSizes[0][0] >= 13 && cs.fontSizes[0][0] > sm.fontSizes[3][1], String(cs.fontSizes[0][0]));
 const off = gas.buildRosterOutputModel_(Object.assign({}, baseInput, { showCounts: false }));
 eq('★★★★★ ROSTER_OUTPUT_SHOW_COUNTS=FALSE ⇒ 只有一張', off.sheets.length, 1);
 eq('★★★ 兩頁總闊度一樣（縮放一樣）', cs.columnWidths.reduce((a, b) => a + b, 0) <= sm.columnWidths.reduce((a, b) => a + b, 0) && cs.columnWidths.reduce((a, b) => a + b, 0) >= sm.columnWidths.reduce((a, b) => a + b, 0) - 3, true);
