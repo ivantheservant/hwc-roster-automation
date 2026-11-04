@@ -106,8 +106,11 @@ console.log('\n=== A7【核心】首次發佈：逐格核對最終輸出（唔�
     sheet.getColumnWidth(2) === gas.ROSTER_OUTPUT_DATE_COL_WIDTH && sheet.getColumnWidth(3) === gas.ROSTER_OUTPUT_DATE_COL_WIDTH);
   check('★ 崗位欄（第 1 欄）欄闊係 ROSTER_OUTPUT_POST_COL_WIDTH', sheet.getColumnWidth(1) === gas.ROSTER_OUTPUT_POST_COL_WIDTH);
 
-  check('★★ A1 標題完全冇合併（第十三輪批次階段 A2 修正：唔再橫跨全部欄）',
-    !sheet._merges.some(function (m) { return m.row === 1; }));
+  // 第一百零二輪（刻意改動）：第十三輪唔合併標題，係因為當時凍結咗第 1 欄（合併會跨凍結分界）。
+  // 而家崗位欄唔凍結，而 /preview 唔俾文字溢出（標題被截斷），所以標題改為合併；mock 照樣會捉跨凍結分界嘅合併。
+  check('★★ A1 標題合併喺第 1 行之內（3 欄樣本：標題 2 欄＋更新日期 1 欄），冇跨凍結分界',
+    sheet._merges.some(function (m) { return m.row === 1 && m.col === 1 && m.numRows === 1 && m.numCols === 2; })
+      && sheet.getRange(1, 3, 1, 1).getValue() === '更新日期：01/01/2099');
   check('★ 「1 月」月份標題冇合併（呢個樣本入面 1 月得返 1 個日期，span=1）',
     !sheet._merges.some(function (m) { return m.row === 2 && m.col === 2 && m.numCols > 1; }));
   check('★★ 司事 slot1/slot2（A5:A6）有垂直合併', sheet._merges.some(function (m) {

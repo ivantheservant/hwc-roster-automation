@@ -305,8 +305,17 @@ function buildRosterOutputModel_(input) {
   const title = buildRosterOutputTitle_(input.titlePattern, dates, input.quarterId);
   const updatedText = '更新日期：' + String(input.updatedDate || '');
   values[0][0] = title; weights[0][0] = 'bold'; sizes[0][0] = 20; hAligns[0][0] = 'left';
-  if (numCols > 1) { values[0][numCols - 1] = updatedText; sizes[0][numCols - 1] = 10; hAligns[0][numCols - 1] = 'right'; }
-  rowHeights[1] = 40;
+  // 第一百零二輪部署實測：公開連結 `/preview` 不讓文字溢出到隔壁格（標題被截成「…7-9 月職」），
+  // 所以標題、更新日期、頁腳都用合併格。崗位欄不凍結，第 1 行又在凍結的頂 3 行之內，合併不會跨凍結分界。
+  const dateSpan = numCols >= 5 ? 3 : (numCols > 1 ? 1 : 0);
+  const titleSpan = numCols - dateSpan;
+  if (titleSpan > 1) merges.push({ row: 1, col: 1, numRows: 1, numCols: titleSpan });
+  if (dateSpan > 0) {
+    const dc0 = titleSpan; // 0-based：更新日期合併格的第一格
+    values[0][dc0] = updatedText; sizes[0][dc0] = 10; hAligns[0][dc0] = 'right';
+    if (dateSpan > 1) merges.push({ row: 1, col: dc0 + 1, numRows: 1, numCols: dateSpan });
+  }
+  rowHeights[1] = 50;
 
   // 第 2 行：左上角灰、月份合併
   bgs[1][0] = ROSTER_OUTPUT_POST_COLORS.corner;
@@ -318,7 +327,7 @@ function buildRosterOutputModel_(input) {
     if (g.span > 1) merges.push({ row: 2, col: col, numRows: 1, numCols: g.span });
     col += g.span;
   });
-  rowHeights[2] = 22;
+  rowHeights[2] = 26;
 
   // 第 3 行：「崗位」＋日子
   values[2][0] = GRID_LABELS.POST_COLUMN; bgs[2][0] = ROSTER_OUTPUT_POST_COLORS.header; weights[2][0] = 'bold'; sizes[2][0] = 14;
@@ -329,7 +338,7 @@ function buildRosterOutputModel_(input) {
     weights[2][i + 1] = 'bold';
     if (dc.special) { anySpecial = true; sizes[2][i + 1] = 10; }
   });
-  rowHeights[3] = anySpecial ? 40 : 26;
+  rowHeights[3] = anySpecial ? 48 : 34;
 
   // 第 4 行起：崗位
   let r = dataStartRow;
@@ -359,7 +368,7 @@ function buildRosterOutputModel_(input) {
           else if (cell.text) (nameCells[cell.text] = nameCells[cell.text] || []).push({ row: r, col: ci + 1 });
         }
       });
-      rowHeights[r] = multiLine ? 38 : 24;
+      rowHeights[r] = multiLine ? 46 : 32;   // 第一百零二輪部署實測：24px 只佔半頁，樣本的表佔滿大半頁
       r++;
     }
     if (slotCount > 1) merges.push({ row: r - slotCount, col: 1, numRows: slotCount, numCols: 1 });
@@ -368,7 +377,8 @@ function buildRosterOutputModel_(input) {
   // 頁腳
   values[footerRow - 1][0] = String(input.footerText || '');
   sizes[footerRow - 1][0] = 10; hAligns[footerRow - 1][0] = 'left';
-  rowHeights[footerRow] = 24;
+  if (numCols > 1) merges.push({ row: footerRow, col: 1, numRows: 1, numCols: numCols });
+  rowHeights[footerRow] = 28;
 
   const columnWidths = [ROSTER_OUTPUT_POST_COL_WIDTH];
   for (let i = 0; i < nDates; i++) columnWidths.push(ROSTER_OUTPUT_DATE_COL_WIDTH);

@@ -13033,6 +13033,30 @@ const MUTATIONS = [
     find: "    if (keepIds.indexOf(s.getSheetId()) === -1) spreadsheet.deleteSheet(s);",
     replace: "    if (s !== rosterSheet && s !== countsSheet) spreadsheet.deleteSheet(s);",
     tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-title-no-merge",
+    why: "標題不合併 ⇒ 公開連結 /preview 截斷標題（第一百零二輪部署實測）",
+    file: "src/RosterOutput.gs",
+    find: "  if (titleSpan > 1) merges.push({ row: 1, col: 1, numRows: 1, numCols: titleSpan });\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js", "tests/public_roster_write.test.js"]
+  },
+  {
+    id: "oa-footer-no-merge",
+    why: "頁腳不合併 ⇒ 公開連結 /preview 截斷頁腳（第一百零二輪部署實測）",
+    file: "src/RosterOutput.gs",
+    find: "  if (numCols > 1) merges.push({ row: footerRow, col: 1, numRows: 1, numCols: numCols });\n",
+    replace: "",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-short-rows",
+    why: "內容列太矮（24px）⇒ 表只佔半頁（第一百零二輪部署實測）",
+    file: "src/RosterOutput.gs",
+    find: "      rowHeights[r] = multiLine ? 46 : 32;",
+    replace: "      rowHeights[r] = multiLine ? 38 : 24;",
+    tests: ["tests/round102_oa_roster_output.test.js"]
   }
 ];
 

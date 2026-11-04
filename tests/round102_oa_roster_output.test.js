@@ -111,7 +111,11 @@ const bg = (r, c) => sm.backgrounds[r - 1][c - 1];
 
 console.log('\n=== OA2 標題列 ===');
 eq('★★★★★ 標題「粵語堂 2028 年 10-12 月職事表」', v(1, 1), '粵語堂 2028 年 10-12 月職事表');
-eq('★★★★ 右邊「更新日期：dd/MM/yyyy」（最後一欄、靠右）', [v(1, sm.numCols), sm.horizontalAlignments[0][sm.numCols - 1]], ['更新日期：18/06/2028', 'right']);
+eq('★★★★ 右邊「更新日期：dd/MM/yyyy」（最後 3 欄合併、靠右）', [v(1, sm.numCols - 2), sm.horizontalAlignments[0][sm.numCols - 3]], ['更新日期：18/06/2028', 'right']);
+// 第一百零二輪部署實測：公開連結 /preview 不讓文字溢出 ⇒ 標題、更新日期、頁腳都要合併格
+eq('★★★★★ 標題合併（第 1 欄至倒數第 4 欄）、更新日期合併（最後 3 欄）、頁腳合併（整行）',
+  sm.merges.filter((m) => m.row === 1 || m.row === sm.numRows).map((m) => [m.row, m.col, m.numCols]),
+  [[1, 1, sm.numCols - 3], [1, sm.numCols - 2, 3], [sm.numRows, 1, sm.numCols]]);
 check('★★★ 標題粗體、大字；「粵語堂」另用較粗字型（rich text 前綴 3 字）', sm.fontWeights[0][0] === 'bold' && sm.fontSizes[0][0] >= 18 && sm.titleRich && sm.titleRich.prefixLength === 3);
 eq('★★★ 更新日期：yyyy-MM-dd HH:mm:ss ⇒ dd/MM/yyyy', gas.formatOutputUpdatedDate_('2026-06-18 10:03:00'), '18/06/2026');
 
@@ -135,7 +139,7 @@ eq('★★★ 崗位名稱 #D9D9D9、粗體', [bg(4, 1), sm.fontWeights[3][0]], 
 console.log('\n=== OA5 崗位次序（OutputOrder；留空用 DisplayOrder）、多人崗位合併 ===');
 eq('★★★★★ 次序跟 OutputOrder，司琴 OutputOrder 留空 ⇒ 用 DisplayOrder 85（排在司事 80 之後）', model.postOrder, ['CHAIR', 'PREACHER', 'TRANSLATE', 'USHER', 'PIANO', 'FLOWER', 'COMMUNION']);
 const rowOf = (name) => sm.values.findIndex((r) => r[0] === name) + 1;
-eq('★★★★ 多人崗位：司事 2 行、聖餐襄禮 4 行，崗位名稱合併', sm.merges.filter((m) => m.col === 1).map((m) => [v(m.row, 1), m.numRows]), [['司事', 2], ['聖餐襄禮', 4]]);
+eq('★★★★ 多人崗位：司事 2 行、聖餐襄禮 4 行，崗位名稱合併', sm.merges.filter((m) => m.col === 1 && m.numRows > 1).map((m) => [v(m.row, 1), m.numRows]), [['司事', 2], ['聖餐襄禮', 4]]);
 const noCol = gas.sortPostsForOutput_(posts.map((p) => Object.assign({}, p, { outputOrder: '' })), false).map((p) => p.postNameTC);
 eq('★★★★ 還未有 OutputOrder 欄 ⇒ 用樣本種子次序（主席、講員、翻譯、司琴、司事、獻花、聖餐襄禮）', noCol, ['主席', '講員', '翻譯', '司琴', '司事', '獻花', '聖餐襄禮']);
 eq('★★★ 種子次序比對不理空格（「PPT 控制」＝「PPT控制」）', gas.resolveOutputPostSortKey_({ postNameTC: 'PPT 控制', displayOrder: 99 }, false), 10);
@@ -151,6 +155,7 @@ eq('★★★★★ 講員未填（待確認）⇒ 空白＋黃色', [v(preRow, 
 const trRow = rowOf('翻譯');
 eq('★★★★ 翻譯可以兩行', v(trRow, 3), '甲(粵>華)\n乙(粵>英)');
 check('★★★ 兩行的列較高', sm.rowHeights[trRow] > sm.rowHeights[chairRow]);
+check('★★★★ 內容列至少 30px（部署實測：24px 的表只佔半頁 A4，樣本佔滿大半頁）', sm.rowHeights[chairRow] >= 30, String(sm.rowHeights[chairRow]));
 eq('★★★★★ 翻譯（EmptyDisplay=BLANK）空白 ⇒ 只有月份底色，不是黃色', [v(trRow, 2), bg(trRow, 2)], ['', '#E2EFD9']);
 const flRow = rowOf('獻花');
 eq('★★★★ 獻花空白 ⇒ 月份底色', [v(flRow, 3), bg(flRow, 3)], ['', '#E2EFD9']);
