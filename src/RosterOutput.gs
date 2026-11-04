@@ -54,7 +54,7 @@ const ROSTER_OUTPUT_SEED_POST_ORDER = [
 
 /** 欄闊（px）：崗位欄、每個主日一欄；服侍次數頁三欄合共等於職事表闊度（兩頁縮放一樣）。 */
 const ROSTER_OUTPUT_POST_COL_WIDTH = 82;
-const ROSTER_OUTPUT_DATE_COL_WIDTH = 104;   // 11pt 一個中文字約 15px：6 字（例如「黃余麗貞師母」）＋邊界
+const ROSTER_OUTPUT_DATE_COL_WIDTH = 104;   // 11pt 一個中文字約 15px：6 字的姓名（例如四字姓氏加「師母」）＋邊界
 
 /** 格的種類。 */
 const ROSTER_OUTPUT_CELL_KIND = {

@@ -371,7 +371,7 @@ console.log('\n=== A2：日期欄固定欄闊要夠容納 6 字中文姓名 ==='
 {
   // 第一百零二輪：內容 11pt（一個中文字約 15px），6 字＋邊界約 96px。
   const g2 = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'RosterOutput.gs']);
-  check('★★ ROSTER_OUTPUT_DATE_COL_WIDTH 至少 100px（容得下 6 字中文姓名，例如「黃余麗貞師母」）',
+  check('★★ ROSTER_OUTPUT_DATE_COL_WIDTH 至少 100px（容得下 6 字中文姓名，例如四字姓名加「師母」）',
     g2.ROSTER_OUTPUT_DATE_COL_WIDTH >= 100, '實際值：' + g2.ROSTER_OUTPUT_DATE_COL_WIDTH);
 }
 
