@@ -314,7 +314,7 @@ function judgeGenerateAction_(quarterId, targetDate, today) {
     return Object.assign({}, base, {
       outcome: 'SKIPPED_MANUAL_MODE',
       detail: '自動生成已關閉（Config 的 TRIGGER_AUTO_GENERATE＝FALSE），'
-        + '改為提醒幹事自己生成——初稿一律由幹事在網頁上按「生成初稿」'
+        + '改為提醒幹事自己生成——初稿一律由幹事在幹事介面第 1 步按生成職事表的按鈕'
     });
   }
 
@@ -672,7 +672,7 @@ function buildAutomationCheckReport_() {
   lines.push('自動生成初稿（TRIGGER_AUTO_GENERATE）：'
     + (autoGenerateOn
       ? 'TRUE（開啟——到期會自動生成，只通知幹事）'
-      : 'FALSE（關閉——系統不會自己生成任何初稿，一律要幹事在幹事介面按「生成初稿」）'));
+      : 'FALSE（關閉——系統不會自己生成任何初稿，一律要幹事在幹事介面第 1 步按生成職事表的按鈕）'));
   lines.push('');
   lines.push(autoGenerateOn
     ? '自動排程只做兩件事：到期自動生成初稿（只通知幹事）、'

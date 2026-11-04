@@ -203,7 +203,7 @@ console.log('\n=== F【核心】補寄：先預覽後執行，而且後端自己
     /const plan = planMakeupSend_\(id, versionNo, String\(stage \|\| ''\)\.trim\(\)\);/.test(exec));
   check('★★★★★ 全部人都收到咗就唔會扮成功，而且指返掣 4',
     exec.indexOf('這一次所有人都已經收到了。') !== -1
-    && exec.indexOf('請用區一的「改動後重發」') !== -1);
+    && exec.indexOf('請用第 3 步的〔變動的人〕') !== -1);   // 第一百零四輪批次 PD 組（刻意改動）
   check('★★★★★ 前端一定要先睇預覽先撳得到執行',
     /button\('先看預覽'/.test(zone4)
     && /callServer\('apiMakeupSendPlan'/.test(zone4));

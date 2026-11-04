@@ -225,7 +225,7 @@ function assertNeverOfficiallySent_(quarterId) {
       + (lastSentAt ? '，最後一次是 ' + lastSentAt : '') + '）。',
     '沒有寄出任何電郵，職事表沒有任何改動。',
     [
-      '如果之後有改動要通知事奉人員，用「改動後重發」——只會寄給安排真的改過的人',
+      '如果之後有改動要通知事奉人員，用第 3 步的〔變動的人〕——只會寄給安排真的改過的人',
       '如果你認為這是誤判（例如之前只是測試模式試行），'
         + '要先請管理員清除那些寄出紀錄，這個按鈕才會重新亮起'
     ]
@@ -323,7 +323,7 @@ function apiRepublishPublicLink(quarterId) {
       message: buildThreePartMessage_(
         '這一季還沒有任何版本，沒有東西可以發佈。',
         '甚麼都沒有改動。',
-        ['先按「生成初稿」'])
+        ['先在第 1 步按生成職事表的按鈕'])
     };
   }
   try {

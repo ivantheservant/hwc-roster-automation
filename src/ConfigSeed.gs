@@ -388,7 +388,7 @@ function getConfigKeySeeds_() {
       // 第九十輪批次 QC 組：申報截止日＝生成日之前幾日
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, type: CONFIG_TYPES.INT, group: 'MAIL',
       defaultValue: '7',
-      description: '〔邀請事奉人員申報不能服侍的日子〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
+      description: '〔寄出／匯出申報不能服侍日子連結〕信內寫的截止日＝那一季的生成日之前幾日（預設 7）。截止日之後提交的申報照樣收，標「截止日之後」。',
       editable: 'TRUE'
     },
     {

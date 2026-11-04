@@ -13212,6 +13212,46 @@ const MUTATIONS = [
     find: "const PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX = 900;",
     replace: "const PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX = 200;",
     tests: ["tests/round104_pc_reset_note.test.js"]
+  },
+  {
+    id: "pd-suggest-old-name",
+    why: "系統調整提示仍然叫人按「儲存我的修改」",
+    file: "src/SuggestionSheet.gs",
+    find: "'或者按第 2 步的〔儲存〕，確認窗內有〔立即加入這個人〕'",
+    replace: "'或者按「儲存我的修改」，那裏有〔立即加入這個人〕'",
+    tests: ["tests/round104_pd_button_names.test.js"]
+  },
+  {
+    id: "pd-rollback-old-name",
+    why: "回到上一個版本仍然叫人按「儲存我的修改」",
+    file: "src/ui/ScriptRollback.html",
+    find: "先按第 2 步的〔儲存〕，再回來按這個按鈕。",
+    replace: "先按「儲存我的修改」，再回來按這個按鈕。",
+    tests: ["tests/round104_pd_button_names.test.js"]
+  },
+  {
+    id: "pd-resend-old-name",
+    why: "回退之後仍然叫人按「改動後重發」",
+    file: "src/ui/ScriptRollback.html",
+    find: "'記得在第 3 步按〔變動的人〕通知他們。'",
+    replace: "'記得按「改動後重發」通知他們。'",
+    tests: ["tests/round104_pd_button_names.test.js"]
+  },
+  {
+    id: "pd-dash-old-name",
+    why: "狀態卡仍然叫人按「生成初稿」",
+    file: "src/WebAppDashboard.gs",
+    find: "'還未生成初稿。按下面第 1 步的生成按鈕。'",
+    replace: "'還未生成初稿。按下面的「生成初稿」。'",
+    tests: ["tests/round104_pd_button_names.test.js"]
+  },
+  {
+    id: "pd-lock-old-name",
+    why: "〔儲存〕的鎖名稱仍然是「儲存我的修改」",
+    file: "src/WebAppSaveConfirm.gs",
+    find: "  return withMutationLock_('儲存', function () {\n    return apiSaveAndConfirmExecute_locked_",
+    replace: "  return withMutationLock_('儲存我的修改', function () {\n    return apiSaveAndConfirmExecute_locked_",
+    tests: ["tests/round104_pd_button_names.test.js"]
   }
 ];
 

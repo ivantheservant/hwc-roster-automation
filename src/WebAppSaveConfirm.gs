@@ -647,7 +647,8 @@ function reuseSaveConfirmContext_(planContext, quarterId, baseVersionNo) {
 
 function apiSaveAndConfirmExecute(quarterId, payload) {
   assertWebAppRequestAllowed_();
-  return withMutationLock_('儲存我的修改', function () {
+  // 第一百零四輪批次 PD 組：鎖的名稱會出現在「另一個動作仍在進行，所以「…」沒有開始」——用按鈕本身的名稱
+  return withMutationLock_('儲存', function () {
     return apiSaveAndConfirmExecute_locked_(quarterId, payload);
   });
 }

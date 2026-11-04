@@ -242,7 +242,7 @@ function apiEmailInvitePaperToSelf(quarterId, personIds) {
     const self = String(Session.getActiveUser().getEmail() || '').trim();
     if (!self) {
       throw new Error(buildThreePartMessage_('查不到你自己的電郵地址。', '一封都沒有寄出。',
-        ['重新載入這一頁再試一次', '或者改用〔產生 docx〕，從連結下載']));
+        ['重新載入這一頁再試一次', '或者改用〔寄出／匯出申報不能服侍日子連結〕，在完成窗的連結下載 Word 檔']));
     }
     const people = pickInvitePaperPeople_(personIds);
     const made = createInvitePaperDocx_(id, people);

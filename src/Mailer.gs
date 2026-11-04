@@ -1755,7 +1755,7 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   // 而是去撳「生成初稿」。照用 STAGE_NEXT_ACTION 會叫幹事去做一件他做不到的事
   // （沒有版本，那些掣全部是灰的）。
   const nextStepText = notGenerated
-    ? '請開啟幹事介面，按〔生成初稿〕。系統不會自行生成——一定要由你按。'
+    ? '請開啟幹事介面，在第 1 步按生成職事表的按鈕。系統不會自行生成——一定要由你按。'
     : '下一步請執行' + nextActionText + '。';
 
   const countText = notGenerated

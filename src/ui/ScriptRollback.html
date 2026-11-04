@@ -35,7 +35,7 @@
       if (count === 0) {
         openModal('回到上一個版本', [
           para('這一季還沒有生成初稿。'),
-          para('先在上面按「生成初稿」，之後才會有版本可以回去。', 'muted')
+          para('先在上面第 1 步按生成職事表的按鈕，之後才會有版本可以回去。', 'muted')
         ], [button('知道了', () => closeModal(), '')]);
         return;
       }
@@ -115,7 +115,7 @@
           make('div', { className: 'warnbox' }, [
             make('div', {
               text: '⚠ 你現在在職事表上改了而還未儲存的東西，會不見了。'
-                + '如果那些改動要保留，先按「儲存我的修改」，再回來按這個按鈕。',
+                + '如果那些改動要保留，先按第 2 步的〔儲存〕，再回來按這個按鈕。',
               className: 'lines'
             })
           ])
@@ -241,7 +241,7 @@
   function rollbackStageNote(plan) {
     if (plan.stage === 'OFFICIAL_SENT') {
       return '⚠️ 這一季已經正式發出過了。事奉人員手上那份 PDF 和信件是回退之前的內容。'
-        + '回退之後要按「改動後重發」，受影響的人才會知道。'
+        + '回退之後要在第 3 步按〔變動的人〕，受影響的人才會知道。'
         + '這次回退會影響 ' + plan.outdatedPersonCount + ' 個人的安排。';
     }
     if (plan.stage === 'REVIEW_SENT' || plan.stage === 'REQUESTS_APPLIED') {
@@ -284,7 +284,7 @@
     ];
     if (r.stage === 'OFFICIAL_SENT' && r.outdatedPersonCount > 0) {
       lines.push('⚠️ 有 ' + r.outdatedPersonCount + ' 個人手上那份是舊的。'
-        + '記得按「改動後重發」通知他們。');
+        + '記得在第 3 步按〔變動的人〕通知他們。');
     }
     openModal('回退完成', lines.map((t) => make('div', { text: t, className: 'ok-line' })),
       [button('完成', () => closeModalAndRefresh(), '')]);

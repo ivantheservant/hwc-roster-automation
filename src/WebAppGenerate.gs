@@ -52,7 +52,7 @@ function apiGenerateDraftPlan(quarterId) {
       message: buildThreePartMessage_(
         '這一季已經有第 ' + existingVersionNo + ' 版了。',
         '沒有生成任何東西，職事表完全沒有改動。'
-          + '「生成初稿」只用在完全沒有版本的時候，所以它不會重複生成。',
+          + '第 1 步的生成只用在完全沒有版本的時候，所以它不會重複生成。',
         [
           '如果你想改動內容，請在試算表直接改格子，改完按「儲存」',
           '如果你真的想整份重新排過：' + REDO_QUARTER_HINT_TEXT,

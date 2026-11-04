@@ -55,10 +55,10 @@ console.log('\n=== 規格 1.2【核心】狀態卡文字，逐個 Stage ===');
   checkEqual('★★★★★ DRAFT 無版本 ⇒ 說建議幾時生成，而且要叫佢自己按掣'
     + '（唔可以再講「系統會自動生成」——自動生成已經關咗）',
     gas.buildDashboardStatusText_(S.DRAFT, false, '11月27日'),
-    '還未生成初稿。建議在 11月27日 之後生成，按下面的「生成初稿」。');
+    '還未生成初稿。建議在 11月27日 之後生成，按下面第 1 步的生成按鈕。');   // 第一百零四輪批次 PD 組（刻意改動）
   checkEqual('★★★★ DRAFT 無版本、又冇生成日期 ⇒ 唔可以硬砌一個日期出嚟',
     gas.buildDashboardStatusText_(S.DRAFT, false, ''),
-    '還未生成初稿。按下面的「生成初稿」。');
+    '還未生成初稿。按下面第 1 步的生成按鈕。');
   check('★★★★★ 全部狀態卡文案都唔可以再出現「自動生成」'
     + '——系統唔會自己動任何嘢，講咗就係講一件唔會發生嘅事',
     [gas.buildDashboardStatusText_(S.DRAFT, false, '11月27日'),
@@ -131,9 +131,9 @@ console.log('\n=== 規格 2.3 掣 3 動態文字 ===');
   checkEqual('★★★★★ 有人沒有電郵 ⇒ 要說出實際會收到嘅人數（57 − 7 = 50）',
     t({ officialNoEmailCount: 7 }),
     '會寄給表上 57 個人中的 50 人；另外 7 人沒有電郵，會略過。');
-  checkEqual('★★★★★ 已發出過 ⇒ 指去「改動後重發」',
+  checkEqual('★★★★★ 已發出過 ⇒ 指去第 3 步的〔變動的人〕（第一百零四輪批次 PD 組刻意改動）',
     t({ hasOfficialRecord: true, lastSentAt: { REVIEW: null, OFFICIAL: '12月4日 11:20', RESEND: null } }),
-    '已在 12月4日 11:20 正式發出過。之後有改動請用「改動後重發」。');
+    '已在 12月4日 11:20 正式發出過。之後有改動請用第 3 步的〔變動的人〕。');
 }
 
 console.log('\n=== 規格 2.3 掣 4 動態文字 ===');

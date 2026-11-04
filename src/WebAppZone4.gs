@@ -557,7 +557,7 @@ function apiMakeupSendExecute_locked_(quarterId, stage) {
         ok: false,
         message: buildThreePartMessage_(
           '這一次所有人都已經收到了。', '沒有寄出任何電郵。',
-          ['如果內容改過而想重發，請用區一的「改動後重發」'])
+          ['如果內容改過而想重發，請用第 3 步的〔變動的人〕'])
       };
     }
     const result = executeMakeupSend_(plan);

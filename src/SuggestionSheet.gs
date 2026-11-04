@@ -854,7 +854,7 @@ function apiBuildSuggestion_locked_(quarterId, startFrom, allowKeys) {
         built.message,
         '甚麼都沒有改動，也沒有建立建議表。',
         ['先在職事表把那幾格的名字改成正確的寫法',
-          '或者按「儲存我的修改」，那裏有〔立即加入這個人〕'])
+          '或者按第 2 步的〔儲存〕，確認窗內有〔立即加入這個人〕'])
     };
   }
 

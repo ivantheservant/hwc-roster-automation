@@ -83,8 +83,8 @@ function buildDashboardStatusBase_(stage, versionExists, generateOnText, extras)
   }
   if (stage === QUARTER_STAGE.DRAFT && !versionExists) {
     return generateOnText
-      ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，按下面的「生成初稿」。'
-      : '還未生成初稿。按下面的「生成初稿」。';
+      ? '還未生成初稿。建議在 ' + generateOnText + ' 之後生成，按下面第 1 步的生成按鈕。'
+      : '還未生成初稿。按下面第 1 步的生成按鈕。';
   }
   // 第八十二輪批次 IG 組：寄審閱本變成可選（〔寄給堂委／執事〕），唔再係正式發出之前一定要行嘅一步
   if (stage === QUARTER_STAGE.DRAFT) return '初稿已生成，未正式發出給全體。';
@@ -539,7 +539,7 @@ function buildOfficialButtonText_(s) {
   if (!s.versionExists) return '還未生成初稿，未知會寄給哪幾位。';
   if (s.hasOfficialRecord) {
     const last = s.lastSentAt[MAIL_STAGES.OFFICIAL];
-    return '已在 ' + (last || '之前') + ' 正式發出過。之後有改動請用「改動後重發」。';
+    return '已在 ' + (last || '之前') + ' 正式發出過。之後有改動請用第 3 步的〔變動的人〕。';
   }
   if (s.officialNoEmailCount > 0) {
     return '會寄給表上 ' + s.officialTargetCount + ' 個人中的 '
