@@ -149,28 +149,37 @@ gas.writeToPossiblyProtectedGridSheet_ = function (sheet, fn) { fn(); return fal
 
 
 // =====================================================================
-console.log('\n=== 前置：生成，填一格獻花，再扮成「系統自己排咗」（製造一個真違反）===');
+// 第一百零四輪批次 PB 組（刻意改動）：舊 fixture 把上一版的獻花格改成 AUTO 來製造「不由系統排」違反——
+// PB 組之後，上一版原封不動帶過來的格不再報這一條。改為把第一週主席那位從主席名單移走（Eligibility，
+// 幹事的資料，不是系統寫的欄位）⇒「不在這個崗位的名單上」，同樣是一定要遵守的真違反。
+console.log('\n=== 前置：生成，填一格獻花，再把主席那位移出主席名單（製造真違反）===');
 check('（前置）生成成功', gas.apiGenerateDraftExecute(Q) !== undefined);
 gas.apiSavePreacherTranslationEntry(Q, DATES[0], 'FLOWER', 1, PEOPLE.P9701);
+let CHAIR_PID = '';
 (function () {
-  const sheet = ss.getSheetByName(S.ROSTER_ASSIGNMENTS);
+  const ra = gas.readSheet_(S.ROSTER_ASSIGNMENTS).filter(function (r) {
+    return r[A.POST_ID] === 'CHAIR' && gas.toDateString_(r[A.SERVICE_DATE], TZ) === DATES[0] && r[A.PERSON_ID];
+  });
+  CHAIR_PID = ra.length ? ra[ra.length - 1][A.PERSON_ID] : '';
+  const sheet = ss.getSheetByName(S.ELIGIBILITY);
   const headers = sheet.getRange(2, 1, 1, sheet.getLastColumn()).getValues()[0];
   const col = function (k) { return headers.indexOf(k) + 1; };
   for (let r = 3; r <= sheet.getLastRow(); r++) {
-    if (String(sheet.getRange(r, col(A.POST_ID)).getValue()) !== 'FLOWER') continue;
-    if (gas.toDateString_(sheet.getRange(r, col(A.SERVICE_DATE)).getValue(), TZ) !== DATES[0]) continue;
-    sheet.getRange(r, col(A.ASSIGN_SOURCE)).setValue('AUTO');
+    if (String(sheet.getRange(r, col(C.ELIGIBILITY.POST_ID)).getValue()) !== 'CHAIR') continue;
+    if (String(sheet.getRange(r, col(C.ELIGIBILITY.PERSON_ID)).getValue()) !== CHAIR_PID) continue;
+    sheet.getRange(r, col(C.ELIGIBILITY.ACTIVE)).setValue(false);
   }
 })();
+check('（前置）第一週主席有人', !!CHAIR_PID);
 
 console.log('\n=== L【核心】儲存確認畫面嘅違規有中文崗位名同人名 ===');
 {
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  const v = plan.violations.real[0];
-  check('（前置）有一項真違反', plan.violations.real.length === 1, JSON.stringify(plan.violations.real));
-  check('★★★★★★ 有中文崗位名（獻花），唔係 FLOWER'
-    + '——現場：「檢查我的改動」係中文，「儲存及寄出」就變英文', v && v.postNameTC === '獻花', JSON.stringify(v));
-  check('★★★★★ 有人名', v && v.personName === PEOPLE.P9701, JSON.stringify(v));
+  const v = plan.violations.real.filter(function (x) { return x.serviceDate === DATES[0]; })[0];
+  check('（前置）有真違反（第一週主席不在名單）', plan.violations.real.length >= 1 && !!v, JSON.stringify(plan.violations.real));
+  check('★★★★★★ 有中文崗位名（主席），唔係 CHAIR'
+    + '——現場：「檢查我的改動」係中文，「儲存及寄出」就變英文', v && v.postNameTC === '主席', JSON.stringify(v));
+  check('★★★★★ 有人名', v && v.personName === PEOPLE[CHAIR_PID], JSON.stringify(v));
   const all = [].concat(plan.violations.real, plan.violations.released,
     plan.violations.structural, plan.violations.semiHard);
   check('★★★★★ 每一項違規都有 postNameTC', all.every(function (x) { return !!x.postNameTC; }));

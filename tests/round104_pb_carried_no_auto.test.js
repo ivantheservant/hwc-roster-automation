@@ -59,6 +59,7 @@ console.log('\n=== PB2：系統今次試放 ===');
 {
   const v = noAuto(gas.substituteCell_(base, wKey, other));
   check('★★★★★★ FINE_TUNED 換人 ⇒ 照報', v.length === 1 && v[0].postId === 'WORSHIP' && v[0].personId === other, JSON.stringify(v));
+  // FIXTURE-OK: 模擬系統今次試放同一個人（FINE_TUNED），真入口 substituteCell_ 只會換人，所以要手砌
   const same = base.map((s) => (gas.cellKey_(s.serviceDate, s.postId, s.slotIndex) === wKey
     ? Object.assign({}, s, { assignSource: gas.ASSIGN_SOURCE.FINE_TUNED }) : s));
   check('★★★★★ FINE_TUNED（即使同一個人）⇒ 照報（唔當帶過來）', noAuto(same).length === 1);
@@ -66,6 +67,7 @@ console.log('\n=== PB2：系統今次試放 ===');
 
 console.log('\n=== PB3：換咗人、來源唔係人手 ===');
 {
+  // FIXTURE-OK: 模擬「換咗人但來源唔係人手」（例如生成器錯誤排咗），真入口唔會產生，要手砌
   const changed = base.map((s) => (gas.cellKey_(s.serviceDate, s.postId, s.slotIndex) === wKey
     ? Object.assign({}, s, { personId: other, assignSource: 'AUTO' }) : s));
   check('★★★★★★ 同上一版唔同嘅人 ⇒ 照報', noAuto(changed).length === 1, JSON.stringify(noAuto(changed)));
@@ -73,6 +75,7 @@ console.log('\n=== PB3：換咗人、來源唔係人手 ===');
 
 console.log('\n=== PB4：幹事人手換人 ===');
 {
+  // FIXTURE-OK: 同 GRID_OVERLAY 人手改動嘅形狀一樣（isManual=true、冇 assignSource）
   const manual = base.map((s) => (gas.cellKey_(s.serviceDate, s.postId, s.slotIndex) === wKey
     ? Object.assign({}, s, { personId: other, assignSource: null, isManual: true }) : s));
   check('★★★★★ 人手 ⇒ 唔報', noAuto(manual).length === 0);
@@ -96,6 +99,7 @@ console.log('\n=== PB6：其他規則照舊 ===');
   check('（前置）CHAIR 係自動崗位', eligPost && eligPost.autoGenerate === true);
   const cCell = base.filter((s) => s.postId === 'CHAIR' && s.personId)[0];
   const cKey = gas.cellKey_(cCell.serviceDate, cCell.postId, cCell.slotIndex);
+  // FIXTURE-OK: 同 GRID_OVERLAY 人手改動嘅形狀一樣（填咗一個唔喺名單上嘅人）
   const bad = base.map((s) => (gas.cellKey_(s.serviceDate, s.postId, s.slotIndex) === cKey
     ? Object.assign({}, s, { personId: 'P9799', isManual: true, assignSource: null }) : s));
   const elig = gas.findStateViolations_(bad, ctx).filter((v) => v.ruleId === gas.RULE_IDS.ELIGIBILITY);
