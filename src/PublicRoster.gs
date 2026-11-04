@@ -283,6 +283,9 @@ function writePublicRosterContent_(spreadsheet, content) {
  * @returns {boolean} 是否有實際清空（呢一季從未發佈過公開職事表、或者
  *   已知嘅檔案打唔開時回傳 `false`，唔算錯誤）
  */
+/** 第一百零四輪批次 PC 組：重設之後「已重設」那一格的闊度（px）；A4 橫向一頁之內，整句一行放得下。 */
+const PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX = 900;
+
 function clearPublicRosterOnQuarterReset_(quarterId) {
   const link = findPublicLinkRow_(quarterId);
   if (!link || !link.fileId) return false;
@@ -307,7 +310,10 @@ function clearPublicRosterOnQuarterReset_(quarterId) {
   spreadsheet.getSheets().slice(1).forEach(function (s) { spreadsheet.deleteSheet(s); });
   sheet.getRange(1, 1).setValue(
     quarterId + ' 職事表已重設，尚未重新發佈——如有疑問請聯絡幹事查詢最新安排。'
-  ).setFontWeight('bold');
+  ).setFontWeight('bold').setWrap(true);
+  // 第一百零四輪批次 PC 組：公開連結 `/preview` 不讓文字溢出到旁邊的格——重設之後只剩一欄，
+  // 而那一欄沿用職事表崗位欄的闊度（82px），句子被截斷。⇒ 加闊這一欄並自動換行，令整句看得到。
+  sheet.setColumnWidth(1, PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX);
 
   writeAuditLog_({
     action: '季度重設：清空公開職事表',

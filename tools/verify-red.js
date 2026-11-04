@@ -13188,6 +13188,30 @@ const MUTATIONS = [
     find: "  return String(original.personId || '') === String(cell.personId);",
     replace: "  return true;",
     tests: ["tests/round104_pb_carried_no_auto.test.js"]
+  },
+  {
+    id: "pc-reset-note-narrow",
+    why: "重設之後第一欄仍然是崗位欄的闊度，/preview 截斷句子",
+    file: "src/PublicRoster.gs",
+    find: "  sheet.setColumnWidth(1, PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX);\n",
+    replace: "",
+    tests: ["tests/round104_pc_reset_note.test.js"]
+  },
+  {
+    id: "pc-reset-note-no-wrap",
+    why: "「已重設」那一格不換行",
+    file: "src/PublicRoster.gs",
+    find: "  ).setFontWeight('bold').setWrap(true);",
+    replace: "  ).setFontWeight('bold');",
+    tests: ["tests/round104_pc_reset_note.test.js"]
+  },
+  {
+    id: "pc-reset-note-too-small",
+    why: "加闊得不夠，整句放不下",
+    file: "src/PublicRoster.gs",
+    find: "const PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX = 900;",
+    replace: "const PUBLIC_ROSTER_RESET_NOTE_WIDTH_PX = 200;",
+    tests: ["tests/round104_pc_reset_note.test.js"]
   }
 ];
 
