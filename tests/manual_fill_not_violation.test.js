@@ -261,12 +261,14 @@ console.log('\n=== K 對照組：系統自己排咗 ⇒ 照樣報 ===');
   check('（前置）把獻花嗰格嘅來源改成 AUTO', setFlowerSource(0, DATES[0], 'AUTO'));
   const ctx2 = gas.buildFineTuneContext_(Q, 0);
   const rec2 = gas.resolveAuthoritativeState_(ctx2, gas.STATE_SOURCE.VERSION_OF_RECORD, 'k').state;
-  check('★★★★★★ 生成器錯誤地 AUTO 排咗獻花 ⇒ **照樣報**',
-    noAutoOf(gas.findStateViolations_(rec2, ctx2)).length === 1);
+  // 第一百零四輪批次 PB 組（刻意改動）：已經喺上一版、原封不動帶過來嘅 AUTO 格唔再喺儲存／檢查時報
+  //（崗位後來先改做人手，舊版本由系統排嘅格唔係「這一次系統排」）；系統今次試放（FINE_TUNED）、換咗人
+  // 嘅格照報（上面兩條）；「核對職事表」照報（下面）。
+  check('★★★★★★ 上一版已經有嘅 AUTO 獻花 ⇒ 儲存／檢查唔再報（PB 組）',
+    noAutoOf(gas.findStateViolations_(rec2, ctx2)).length === 0, JSON.stringify(noAutoOf(gas.findStateViolations_(rec2, ctx2))));
   const plan = gas.apiSaveAndConfirmPlan(Q);
-  // 第七十五輪批次 CF／CG 組：打字放行換成逐格勾選（needsDecision）
-  check('★★★★★ 而且儲存確認要決定（勾「保留我的安排」＝放行）', plan.needsDecision === true
-    && noAutoOf(plan.violations.real).length === 1, JSON.stringify(plan.violations.real).slice(0, 300));
+  check('★★★★★ 而且儲存確認唔使逐格放行', noAutoOf((plan.violations || {}).real || []).length === 0,
+    JSON.stringify((plan.violations || {}).real || []).slice(0, 300));
   const verify = gas.checkHardRuleViolations_(gas.buildVerifyContext_(Q, 0));
   const g = verify.groups.filter(function (x) { return /AutoGenerate=FALSE/.test(x.label); })[0];
   check('★★★★★ 「核對職事表」都報', g && g.items.length === 1, JSON.stringify(g));

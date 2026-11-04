@@ -3657,8 +3657,9 @@ const MUTATIONS = [
     why: '`findStateViolations_()` 唔叫共用判斷，自己寫返「冇 AutoGenerate 就報」'
       + '——儲存、套用申報、提案、回退四條路全部打回原形',
     file: 'src/FineTune.gs',
-    find: '        && isNoAutoGenerateViolation_(post, sourceOf(cell))) {',
-    replace: '        && post && !post.autoGenerate) {',
+    // 第一百零四輪批次 PB 組：條件多咗一行（帶過來嘅格唔報），find 跟住改
+    find: '        && isNoAutoGenerateViolation_(post, sourceOf(cell))\n        && !isCarriedOverFromBase_',
+    replace: '        && post && !post.autoGenerate\n        && !isCarriedOverFromBase_',
     tests: ['tests/manual_fill_not_violation.test.js']
   },
   {
@@ -13163,6 +13164,30 @@ const MUTATIONS = [
     find: "if (e.key === 'Escape' && modalOpen && escClosesModal(e)) closeModal();",
     replace: "if (e.key === 'Escape' && modalOpen) closeModal();",
     tests: ["tests/round104_pa_decisions_save.test.js"]
+  },
+  {
+    id: "pb-carried-reported",
+    why: "上一版帶過來的系統格照樣報「不由系統排」",
+    file: "src/FineTune.gs",
+    find: "        && isNoAutoGenerateViolation_(post, sourceOf(cell))\n        && !isCarriedOverFromBase_(cell, originalOf(cell))) {",
+    replace: "        && isNoAutoGenerateViolation_(post, sourceOf(cell))) {",
+    tests: ["tests/round104_pb_carried_no_auto.test.js"]
+  },
+  {
+    id: "pb-fine-tuned-carried",
+    why: "系統今次試放的格當成帶過來",
+    file: "src/FineTune.gs",
+    find: "  if (cell.assignSource === ASSIGN_SOURCE.FINE_TUNED) return false;\n",
+    replace: "",
+    tests: ["tests/round104_pb_carried_no_auto.test.js"]
+  },
+  {
+    id: "pb-any-person-carried",
+    why: "換了人都當成帶過來",
+    file: "src/FineTune.gs",
+    find: "  return String(original.personId || '') === String(cell.personId);",
+    replace: "  return true;",
+    tests: ["tests/round104_pb_carried_no_auto.test.js"]
   }
 ];
 

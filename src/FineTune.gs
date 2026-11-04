@@ -405,6 +405,27 @@ function originalFreeText_(a) {
 }
 
 /**
+ * 第一百零四輪批次 PB 組：呢一格係咪**由上一版原封不動帶過來**（上一版已經有、同一個人、今次唔係系統試放）。
+ *
+ * 現場（週報測試季度）：領詩、司琴以前 `AutoGenerate=TRUE`，舊版本嗰啲格係系統排（`AssignSource=AUTO`）；
+ * 第九十八輪起兩個崗位改做人手（`AutoGenerate=FALSE`）⇒ 之後每次儲存都報「這個崗位不由系統排，要你自己填」
+ * （`HARD_NO_AUTO_PREACHER`），幹事要逐格放行。
+ *
+ * 原則：**系統喺這一次生成或調整中新放入嘅人**仍然要報（fine-tune 唔可以自己為人手崗位揀人）——
+ * 試放嘅格 `assignSource = FINE_TUNED`（`substituteCell_()`），換咗人嘅格同上一版唔同，兩種都唔算「帶過來」。
+ * 只用喺 `NO_AUTO_GENERATE` 呢一條；其他規則照舊查。
+ *
+ * @param {Object} cell 派工狀態一格
+ * @param {?Object} original 上一版同一格（`context.original`）；冇 ⇒ null
+ * @returns {boolean}
+ */
+function isCarriedOverFromBase_(cell, original) {
+  if (!cell || !original || !cell.personId) return false;
+  if (cell.assignSource === ASSIGN_SOURCE.FINE_TUNED) return false;
+  return String(original.personId || '') === String(cell.personId);
+}
+
+/**
  * 檢查一份派工狀態違反了哪些規則。只檢查 RuleSettings 中 Enabled=TRUE 的規則，
  * 且只回報 HARD 與 SEMI_HARD 級別（SOFT 屬於偏好，不算「被破壞」）。
  * @param {Object[]} state 派工狀態陣列
@@ -444,9 +465,8 @@ function findStateViolations_(state, context) {
   //   3. 同上一版**同一個人** ⇒ 搬上一版嘅來源
   //   4. 其餘 ⇒ 唔知（`isNoAutoGenerateViolation_()` 當系統排，即舊行為）
   let originalByKey = null;
-  const sourceOf = function (cell) {
-    if (cell.assignSource) return cell.assignSource;
-    if (cell.isManual) return ASSIGN_SOURCE.MANUAL;
+  // 上一版（context.original）同一格；冇上一版 ⇒ null
+  const originalOf = function (cell) {
     if (!Array.isArray(context.original)) return null;
     if (!originalByKey) {
       originalByKey = {};
@@ -454,7 +474,13 @@ function findStateViolations_(state, context) {
         originalByKey[cellKey_(a.serviceDate, a.postId, a.slotIndex)] = a;
       });
     }
-    const o = originalByKey[cellKey_(cell.serviceDate, cell.postId, cell.slotIndex)];
+    return originalByKey[cellKey_(cell.serviceDate, cell.postId, cell.slotIndex)] || null;
+  };
+  const sourceOf = function (cell) {
+    if (cell.assignSource) return cell.assignSource;
+    if (cell.isManual) return ASSIGN_SOURCE.MANUAL;
+    if (!Array.isArray(context.original)) return null;
+    const o = originalOf(cell);
     // ⚠️ 換咗人就唔可以搬上一版嘅來源——上一版係人手填，唔等於今次都係
     if (o && o.personId === cell.personId) return o.assignSource || null;
     return null;
@@ -512,8 +538,11 @@ function findStateViolations_(state, context) {
     }
     // ⚠️ 第六十三輪批次 K 組：人手填嘅講員／翻譯／獻花**唔係**違反。
     // 判斷只有一份——見 `isNoAutoGenerateViolation_()`（Generator.gs）。
+    // 第一百零四輪批次 PB 組：由上一版原封不動帶過來嘅格（見 `isCarriedOverFromBase_()`）唔報——
+    // 崗位後來先改做人手（AutoGenerate=FALSE），舊版本由系統排嘅格唔係「這一次系統排」。
     if (isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)
-        && isNoAutoGenerateViolation_(post, sourceOf(cell))) {
+        && isNoAutoGenerateViolation_(post, sourceOf(cell))
+        && !isCarriedOverFromBase_(cell, originalOf(cell))) {
       add(cell, RULE_IDS.NO_AUTO_GENERATE, 'AutoGenerate=FALSE 的崗位被派人');
     }
 
