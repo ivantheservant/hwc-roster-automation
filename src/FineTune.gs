@@ -405,18 +405,18 @@ function originalFreeText_(a) {
 }
 
 /**
- * 第一百零四輪批次 PB 組：呢一格係咪**由上一版原封不動帶過來**（上一版已經有、同一個人、今次唔係系統試放）。
+ * 第一百零四輪批次 PB 組：這一格是否**由上一版原封不動帶過來**（上一版已經有、同一個人、今次不是系統試放）。
  *
- * 現場（週報測試季度）：領詩、司琴以前 `AutoGenerate=TRUE`，舊版本嗰啲格係系統排（`AssignSource=AUTO`）；
- * 第九十八輪起兩個崗位改做人手（`AutoGenerate=FALSE`）⇒ 之後每次儲存都報「這個崗位不由系統排，要你自己填」
+ * 現場（週報測試季度）：領詩、司琴以前 `AutoGenerate=TRUE`，舊版本那些格是系統排（`AssignSource=AUTO`）；
+ * 第九十八輪起兩個崗位改為人手（`AutoGenerate=FALSE`）⇒ 之後每次儲存都報「這個崗位不由系統排，要你自己填」
  * （`HARD_NO_AUTO_PREACHER`），幹事要逐格放行。
  *
- * 原則：**系統喺這一次生成或調整中新放入嘅人**仍然要報（fine-tune 唔可以自己為人手崗位揀人）——
- * 試放嘅格 `assignSource = FINE_TUNED`（`substituteCell_()`），換咗人嘅格同上一版唔同，兩種都唔算「帶過來」。
- * 只用喺 `NO_AUTO_GENERATE` 呢一條；其他規則照舊查。
+ * 原則：**系統在這一次生成或調整中新放入的人**仍然要報（fine-tune 不可以自己為人手崗位選人）——
+ * 試放的格 `assignSource = FINE_TUNED`（`substituteCell_()`），換了人的格同上一版不同，兩種都不算「帶過來」。
+ * 只用在 `NO_AUTO_GENERATE` 這一條；其他規則照舊查。
  *
  * @param {Object} cell 派工狀態一格
- * @param {?Object} original 上一版同一格（`context.original`）；冇 ⇒ null
+ * @param {?Object} original 上一版同一格（`context.original`）；沒有 ⇒ null
  * @returns {boolean}
  */
 function isCarriedOverFromBase_(cell, original) {
@@ -465,7 +465,7 @@ function findStateViolations_(state, context) {
   //   3. 同上一版**同一個人** ⇒ 搬上一版嘅來源
   //   4. 其餘 ⇒ 唔知（`isNoAutoGenerateViolation_()` 當系統排，即舊行為）
   let originalByKey = null;
-  // 上一版（context.original）同一格；冇上一版 ⇒ null
+  // 上一版（context.original）同一格；沒有上一版 ⇒ null
   const originalOf = function (cell) {
     if (!Array.isArray(context.original)) return null;
     if (!originalByKey) {
@@ -538,8 +538,8 @@ function findStateViolations_(state, context) {
     }
     // ⚠️ 第六十三輪批次 K 組：人手填嘅講員／翻譯／獻花**唔係**違反。
     // 判斷只有一份——見 `isNoAutoGenerateViolation_()`（Generator.gs）。
-    // 第一百零四輪批次 PB 組：由上一版原封不動帶過來嘅格（見 `isCarriedOverFromBase_()`）唔報——
-    // 崗位後來先改做人手（AutoGenerate=FALSE），舊版本由系統排嘅格唔係「這一次系統排」。
+    // 第一百零四輪批次 PB 組：由上一版原封不動帶過來的格（見 `isCarriedOverFromBase_()`）不報——
+    // 崗位後來才改為人手（AutoGenerate=FALSE），舊版本由系統排的格不是「這一次系統排」。
     if (isRuleEnabled_(rules, RULE_IDS.NO_AUTO_GENERATE)
         && isNoAutoGenerateViolation_(post, sourceOf(cell))
         && !isCarriedOverFromBase_(cell, originalOf(cell))) {

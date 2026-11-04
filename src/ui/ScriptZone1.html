@@ -698,7 +698,7 @@
         text: '下面幾項要先決定，全部勾了才可以儲存；改錯了就按〔返回修改〕。',
         className: 'warn-head'
       }));
-      // 第一百零四輪批次 PA 組：deferred——勾選唔即時寫，〔儲存〕連同儲存請求一次過送（同一個鎖之內先記錄再儲存）
+      // 第一百零四輪批次 PA 組：deferred——勾選不即時寫，〔儲存〕連同儲存請求一次過送（同一個鎖之內先記錄再儲存）
       decisions = buildDecisionSections(plan.decisionItems, {
         deferred: true,
         onChanged: () => { saveBtn.disabled = !decisions.allDecided(); },
@@ -753,8 +753,8 @@
     openModal('會儲存成第 ' + plan.targetVersionNo + ' 版', nodes, [saveBtn]
       .concat(buildFixItActions(plan))
       .concat([button('返回修改', () => closeModal(), 'secondary')]));
-    // 第一百零四輪批次 PA 組：窗打開之後先登記（openModal 本身會寫入上一個窗未送出嘅決定）——
-    // 唔儲存就離開（〔加入名單〕、〔請系統幫我調整〕、〔返回修改〕、Esc）時，勾咗嘅格照樣記住。
+    // 第一百零四輪批次 PA 組：窗打開之後先登記（openModal 本身會寫入上一個窗未送出的決定）——
+    // 不儲存就離開（〔加入名單〕、〔請系統幫我調整〕、〔返回修改〕、Esc）時，勾了的格照樣記住。
     if (decisions) deferredDecisionSource_ = () => decisions.pendingPayloads();
   }
 
@@ -825,7 +825,7 @@
       || ((plan.violations || {}).semiHard || []).length > 0;
     if (!hasBlank && !hasViolation) return [];
     return [button('請系統幫我調整', async () => {
-      // 第一百零四輪批次 PA 組：先等確認窗內未送出嘅勾選寫入——調整要跳過「保留我的安排」嘅格
+      // 第一百零四輪批次 PA 組：先等確認窗內未送出的勾選寫入——調整要跳過「保留我的安排」的格
       await flushDeferredDecisions_();
       closeModal();
       openBuildSuggestion();
@@ -900,7 +900,7 @@
    * 唔再送「用我改的／改回原本」，亦唔再要打字放行。
    */
   /**
-   * @param {Object[]=} cellDecisions 第一百零四輪批次 PA 組：確認窗內勾選／取消嘅逐格決定，連同儲存一次過送
+   * @param {Object[]=} cellDecisions 第一百零四輪批次 PA 組：確認窗內勾選／取消的逐格決定，連同儲存一次過送
    */
   function executeSaveAndConfirm(cellDecisions) {
     const confirmedRequestRows = Array.prototype.slice

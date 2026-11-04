@@ -177,8 +177,8 @@ console.log('\n=== L【核心】儲存確認畫面嘅違規有中文崗位名同
   const plan = gas.apiSaveAndConfirmPlan(Q);
   const v = plan.violations.real.filter(function (x) { return x.serviceDate === DATES[0]; })[0];
   check('（前置）有真違反（第一週主席不在名單）', plan.violations.real.length >= 1 && !!v, JSON.stringify(plan.violations.real));
-  check('★★★★★★ 有中文崗位名（主席），唔係 CHAIR'
-    + '——現場：「檢查我的改動」係中文，「儲存及寄出」就變英文', v && v.postNameTC === '主席', JSON.stringify(v));
+  check('★★★★★★ 有中文崗位名（主席），不是 CHAIR'
+    + '——現場：「檢查我的改動」是中文，「儲存及寄出」就變英文', v && v.postNameTC === '主席', JSON.stringify(v));
   check('★★★★★ 有人名', v && v.personName === PEOPLE[CHAIR_PID], JSON.stringify(v));
   const all = [].concat(plan.violations.real, plan.violations.released,
     plan.violations.structural, plan.violations.semiHard);

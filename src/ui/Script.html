@@ -489,8 +489,8 @@
   }
 
   /**
-   * 第一百零四輪批次 PA 組：Esc 應唔應該關閉彈窗。焦點喺下拉選單、輸入框、多行輸入框 ⇒ 唔關
-   * （Esc 只係收起那個下拉；之前會連整個確認窗一齊關，幹事要由頭再做）。勾選框、按鈕照舊關窗。
+   * 第一百零四輪批次 PA 組：Esc 應不應該關閉彈窗。焦點在下拉選單、輸入框、多行輸入框 ⇒ 不關
+   * （Esc 只是收起那個下拉；之前會連整個確認窗一起關，幹事要由頭再做）。勾選框、按鈕照舊關窗。
    * @param {KeyboardEvent} e
    * @returns {boolean}
    */
@@ -1815,7 +1815,7 @@
   }
 
   function closeModal() {
-    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();   // 測試只載入部分函式時冇呢支
+    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();   // 測試只載入部分函式時沒有這一支
     el('modalBackdrop').hidden = true;
     clear(el('modalBody'));
     clear(el('modalActions'));
@@ -2193,39 +2193,39 @@
   }
 
   /**
-   * 第一百零四輪批次 PA 組：〔儲存〕確認窗（deferred）嘅勾選只喺畫面；按〔儲存〕連同儲存送出。
-   * 但幹事亦可以**唔儲存就離開**呢個窗（〔加入名單〕、〔請系統幫我調整〕、〔返回修改〕、Esc）——
-   * 以前每勾一格即時記住，離開都唔會唔見；而家要喺離開嗰陣先寫入，否則勾咗嘅格會靜靜唔見。
-   * 確認窗打開之後登記 `deferredDecisionSource_`（回傳未送出嘅決定）；換窗／關窗時寫入一次。
+   * 第一百零四輪批次 PA 組：〔儲存〕確認窗（deferred）的勾選只在畫面；按〔儲存〕連同儲存送出。
+   * 但幹事亦可以**不儲存就離開**這個窗（〔加入名單〕、〔請系統幫我調整〕、〔返回修改〕、Esc）——
+   * 以前每勾一格即時記住，離開都不會不見；現在要在離開的時候先寫入，否則勾了的格會靜靜不見。
+   * 確認窗打開之後登記 `deferredDecisionSource_`（回傳未送出的決定）；換窗／關窗時寫入一次。
    */
   let deferredDecisionSource_ = null;
 
-  /** 拎走未送出嘅決定（之後唔會再寫）。〔儲存〕用：連同儲存請求送。 */
+  /** 取走未送出的決定（之後不會再寫）。〔儲存〕用：連同儲存請求送。 */
   function takeDeferredDecisions_() {
     const source = deferredDecisionSource_;
     deferredDecisionSource_ = null;
     return source ? (source() || []) : [];
   }
 
-  /** 唔儲存就離開確認窗：未送出嘅決定即時寫入（排隊、合併）。冇就乜都唔做。 */
+  /** 不儲存就離開確認窗：未送出的決定即時寫入（排隊、合併）。沒有就甚麼都不做。 */
   function flushDeferredDecisions_() {
     const payloads = takeDeferredDecisions_();
     return payloads.length > 0 ? persistDecisions(payloads) : Promise.resolve(true);
   }
 
   /**
-   * 第一百零四輪批次 PA 組：排緊隊、未送出嘅決定（同一格後勾嘅蓋過先勾嘅）。
-   * 上一批寫緊嗰陣再勾嘅格**合併成下一批一次過送**——連續快速勾 40 格最多兩、三次呼叫，
-   * 唔會再排 40 個逐個等（每個幾秒），令「記錄中……」停好耐。
+   * 第一百零四輪批次 PA 組：正在排隊、未送出的決定（同一格後勾的蓋過先勾的）。
+   * 上一批正在寫入時再勾的格**合併成下一批一次過送**——連續快速勾 40 格最多兩、三次呼叫，
+   * 不會再排 40 個逐個等（每個幾秒），令「記錄中……」停很久。
    */
   let decisionPending_ = [];   // [{payload, resolvers: [function(Object)]}]
 
-  /** 一項決定嘅唯一鍵（同一格同一種決定）。 */
+  /** 一項決定的唯一鍵（同一格同一種決定）。 */
   function decisionPayloadKey(p) {
     return [p.serviceDate, p.postId, p.slotIndex, p.kind, p.ruleId || ''].join('§');
   }
 
-  /** 把一項決定放入下一批；同一格已經排緊 ⇒ 用新嘅蓋過，兩邊都等同一個結果。 */
+  /** 把一項決定放入下一批；同一格已經在排隊 ⇒ 用新的蓋過，兩邊都等同一個結果。 */
   function enqueueDecision(payload) {
     return new Promise((resolve) => {
       const key = decisionPayloadKey(payload);
@@ -2240,7 +2240,7 @@
   }
 
   /**
-   * 即時記住一批決定（排隊：上一批寫完先寫下一批；排緊隊嘅會合併成一批）。
+   * 即時記住一批決定（排隊：上一批寫完先寫下一批；正在排隊的會合併成一批）。
    * @param {Object[]} payloads `decisionPayload()` 嘅結果
    * @param {function()=} onWaiting 撞鎖等候中
    * @returns {Promise<boolean>} 記唔記得到
@@ -2250,7 +2250,7 @@
     decisionQueue_ = decisionQueue_.then(async () => {
       const batch = decisionPending_;
       decisionPending_ = [];
-      if (batch.length === 0) return;   // 已經畀上一批合併送咗
+      if (batch.length === 0) return;   // 已經被上一批合併送出
       const r = await writeDecisionsWithRetry(batch.map((x) => x.payload), onWaiting)
         .catch((err) => ({ ok: false, err: err }));
       batch.forEach((x) => x.resolvers.forEach((res) => res(r)));
@@ -2280,9 +2280,9 @@
     const state = {};   // key§kind → checked
     const boxes = [];   // {item, cb}
     const sk = (it) => it.key + '§' + it.kind + '§' + (it.ruleId || '');
-    // 第一百零四輪批次 PA 組：deferred ⇒ 勾選唔即時寫，由呼叫者（〔儲存〕確認窗）用 pendingPayloads() 連同儲存送出
+    // 第一百零四輪批次 PA 組：deferred ⇒ 勾選不即時寫，由呼叫者（〔儲存〕確認窗）用 pendingPayloads() 連同儲存送出
     const deferred = !!opts.deferred;
-    const toggles = [];   // 頂部、底部兩粒〔全部勾選〕／〔全部取消〕
+    const toggles = [];   // 頂部、底部兩個〔全部勾選〕／〔全部取消〕
     const refreshToggles = () => toggles.forEach((t) => t());
     const changed = () => { refreshToggles(); if (opts.onChanged) opts.onChanged(); };
 
@@ -2304,7 +2304,7 @@
         note.className = 'decision-note';
         const ok = await persistDecisions([decisionPayload(it, want)],
           () => { note.textContent = '　記錄中……（另一個動作正在進行，系統會自動再試）'; });
-        if (cb.checked !== want) return;   // 等緊嗰陣又改咗——由後嗰次講結果
+        if (cb.checked !== want) return;   // 等候期間又改了——由最後一次的結果決定
         if (ok) {
           note.textContent = '　已記錄';
           note.className = 'decision-note muted';
@@ -2388,7 +2388,7 @@
     }
 
     // 〔全部勾選〕：先彈一句確認（喺彈窗入面，唔會蓋走呢個畫面）
-    // 第一百零四輪批次 PA 組：清單**最頂**再放一粒（底部嗰粒保留）；全部已勾 ⇒ 兩粒都變〔全部取消〕（唔使確認）
+    // 第一百零四輪批次 PA 組：清單**最頂**再放一個（底部那個保留）；全部已勾 ⇒ 兩個都變〔全部取消〕（不用確認）
     /** 一次過設定一批格；即時模式就送出（失敗還原），deferred 只改畫面。 */
     const setMany = async (list, want) => {
       list.forEach((b) => {
@@ -2440,7 +2440,7 @@
 
     return {
       nodes: nodes,
-      /** 第一百零四輪批次 PA 組：同打開時唔同嘅決定（deferred 用：連同〔儲存〕一次過送）。 */
+      /** 第一百零四輪批次 PA 組：同打開時不同的決定（deferred 用：連同〔儲存〕一次過送）。 */
       pendingPayloads: () => boxes.filter((b) => !!b.cb.checked !== !!b.item.checked)
         .map((b) => decisionPayload(b.item, b.cb.checked)),
       allDecided: () => names.every((u) => state[sk(u)] === true)

@@ -659,9 +659,9 @@ function apiSaveAndConfirmExecute_locked_(quarterId, payload) {
   // 第八十三輪批次 JG 組：各階段計時（log ＋ 回傳 `timings`，前端寫入 console）
   const timer = startPhaseTimer_();
 
-  // ── 0　第一百零四輪批次 PA 組：確認窗嘅逐格決定（保留我的安排／這一季臨時幫手）連同儲存請求一次過送嚟，
-  //       喺**同一個鎖之內**先記錄、再重新 plan——唔再靠每勾一格即時寫（連續快速勾會排長隊，
-  //       幹事撳〔儲存〕嗰陣大部分仲未寫入，就會被當成「未決定」；儲存期間嘅勾選亦會撞鎖）。
+  // ── 0　第一百零四輪批次 PA 組：確認窗的逐格決定（保留我的安排／這一季臨時幫手）連同儲存請求一次過送來，
+  //       在**同一個鎖之內**先記錄、再重新 plan——不再靠每勾一格即時寫（連續快速勾會排長隊，
+  //       幹事按〔儲存〕的時候大部分還未寫入，就會被當成「未決定」；儲存期間的勾選亦會撞鎖）。
   if (Array.isArray(input.cellDecisions) && input.cellDecisions.length > 0) {
     recordCellDecisions_(quarterId, input.cellDecisions, 'apiSaveAndConfirmExecute');
     timer.mark('記錄逐格決定');

@@ -3657,7 +3657,7 @@ const MUTATIONS = [
     why: '`findStateViolations_()` 唔叫共用判斷，自己寫返「冇 AutoGenerate 就報」'
       + '——儲存、套用申報、提案、回退四條路全部打回原形',
     file: 'src/FineTune.gs',
-    // 第一百零四輪批次 PB 組：條件多咗一行（帶過來嘅格唔報），find 跟住改
+    // 第一百零四輪批次 PB 組：條件多了一行（帶過來的格不報），find 跟着改
     find: '        && isNoAutoGenerateViolation_(post, sourceOf(cell))\n        && !isCarriedOverFromBase_',
     replace: '        && post && !post.autoGenerate\n        && !isCarriedOverFromBase_',
     tests: ['tests/manual_fill_not_violation.test.js']
@@ -6190,7 +6190,7 @@ const MUTATIONS = [
     id: "cf-check-all-no-ask",
     why: "〔全部勾選〕唔先問一句",
     file: "src/ui/Script.html",
-    // 第一百零四輪批次 PA 組：〔全部勾選〕改為頂部、底部兩粒（buildCheckAll），find 跟住改
+    // 第一百零四輪批次 PA 組：〔全部勾選〕改為頂部、底部兩個（buildCheckAll），find 跟着改
     find: "        } else {\n          confirmBox.hidden = false;\n        }",
     replace: "        } else {\n          setMany(boxes.filter((b) => !b.cb.checked), true);\n        }",
     tests: ["tests/round75_cfg_ui.test.js"]
@@ -7576,7 +7576,7 @@ const MUTATIONS = [
     id: "ia-no-queue",
     why: "唔排隊，連續勾會互相撞",
     file: "src/ui/Script.html",
-    // 第一百零四輪批次 PA 組：排緊隊嘅合併成一批（decisionPending_），排隊本身仍然靠 decisionQueue_
+    // 第一百零四輪批次 PA 組：正在排隊的合併成一批（decisionPending_），排隊本身仍然靠 decisionQueue_
     find: "    decisionQueue_ = decisionQueue_.then(async () => {",
     replace: "    decisionQueue_ = Promise.resolve().then(async () => {",
     tests: ["tests/round104_pa_decisions_save.test.js"]
@@ -13087,7 +13087,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-no-send-decisions",
-    why: "〔儲存〕冇連同確認窗的決定一次過送",
+    why: "〔儲存〕沒有連同確認窗的決定一次過送",
     file: "src/ui/ScriptZone1.html",
     find: "        cellDecisions: cellDecisions || []",
     replace: "        cellDecisions: []",
@@ -13103,7 +13103,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-backend-no-record",
-    why: "後端冇喺同一個鎖之內先記錄決定",
+    why: "後端沒有在同一個鎖之內先記錄決定",
     file: "src/WebAppSaveConfirm.gs",
     find: "    recordCellDecisions_(quarterId, input.cellDecisions, 'apiSaveAndConfirmExecute');",
     replace: "    void input.cellDecisions;",
@@ -13119,7 +13119,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-no-coalesce",
-    why: "排緊隊的決定冇合併，連續勾 40 格叫 40 次",
+    why: "正在排隊的決定沒有合併，連續勾 40 格叫 40 次",
     file: "src/ui/Script.html",
     find: "      const batch = decisionPending_;\n      decisionPending_ = [];",
     replace: "      const batch = decisionPending_.splice(0, 1);",
@@ -13127,7 +13127,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-no-top-check-all",
-    why: "〔全部勾選〕只喺清單最底",
+    why: "〔全部勾選〕只在清單最底",
     file: "src/ui/Script.html",
     find: "      buildCheckAll().reverse().forEach((n) => nodes.unshift(n));\n",
     replace: "",
@@ -13135,7 +13135,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-no-uncheck-all",
-    why: "全部已勾都唔可以〔全部取消〕",
+    why: "全部已勾都不可以〔全部取消〕",
     file: "src/ui/Script.html",
     find: "        if (boxes.every((b) => b.cb.checked)) {\n          confirmBox.hidden = true;",
     replace: "        if (false) {\n          confirmBox.hidden = true;",
@@ -13143,7 +13143,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-no-saved-note",
-    why: "記住之後冇講「已記錄」",
+    why: "記住之後沒有說「已記錄」",
     file: "src/ui/Script.html",
     find: "          note.textContent = '　已記錄';",
     replace: "          note.textContent = '';",
@@ -13151,7 +13151,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-esc-closes-select",
-    why: "下拉選單按 Esc 連整個窗一齊關",
+    why: "下拉選單按 Esc 連整個窗一起關",
     file: "src/ui/Script.html",
     find: "    if (tag === 'SELECT' || tag === 'TEXTAREA') return false;",
     replace: "    if (tag === 'TEXTAREA') return false;",
@@ -13159,7 +13159,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-boot-esc-raw",
-    why: "Esc 處理冇經 escClosesModal()",
+    why: "Esc 處理沒有經 escClosesModal()",
     file: "src/ui/ScriptBoot.html",
     find: "if (e.key === 'Escape' && modalOpen && escClosesModal(e)) closeModal();",
     replace: "if (e.key === 'Escape' && modalOpen) closeModal();",
@@ -13255,15 +13255,15 @@ const MUTATIONS = [
   },
   {
     id: "pa-close-no-flush",
-    why: "唔儲存就關確認窗，勾咗的格靜靜唔見",
+    why: "不儲存就關確認窗，勾了的格靜靜不見",
     file: "src/ui/Script.html",
-    find: "    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();   // 測試只載入部分函式時冇呢支\n    el('modalBackdrop').hidden = true;",
+    find: "    if (typeof flushDeferredDecisions_ === 'function') flushDeferredDecisions_();   // 測試只載入部分函式時沒有這一支\n    el('modalBackdrop').hidden = true;",
     replace: "    el('modalBackdrop').hidden = true;",
     tests: ["tests/round104_pa_decisions_save.test.js"]
   },
   {
     id: "pa-no-deferred-source",
-    why: "確認窗冇登記未送出的決定",
+    why: "確認窗沒有登記未送出的決定",
     file: "src/ui/ScriptZone1.html",
     find: "    if (decisions) deferredDecisionSource_ = () => decisions.pendingPayloads();\n",
     replace: "",
@@ -13271,7 +13271,7 @@ const MUTATIONS = [
   },
   {
     id: "pa-fixit-no-await",
-    why: "〔請系統幫我調整〕唔等勾選寫入就開調整",
+    why: "〔請系統幫我調整〕不等勾選寫入就開調整",
     file: "src/ui/ScriptZone1.html",
     find: "      await flushDeferredDecisions_();\n      closeModal();\n      openBuildSuggestion();",
     replace: "      closeModal();\n      openBuildSuggestion();",

@@ -155,11 +155,11 @@ function apiSetCellDecisions(quarterId, items) {
 /**
  * 第一百零四輪批次 PA 組：記錄一批逐格決定（正規化 → 寫入 → AuditLog）。**呼叫者要已經拿着鎖。**
  * `apiSetCellDecisions()`（〔檢查我的改動〕即時記住）同〔儲存〕確認窗（`apiSaveAndConfirmExecute()`
- * 連同儲存請求一次過送嚟）共用呢一支，唔會有兩套寫法。
+ * 連同儲存請求一次過送來）共用這一支，不會有兩套寫法。
  * @param {string} quarterId 季度 ID
  * @param {Object[]} items 每項 {serviceDate, postId, slotIndex, kind, cellText, ruleId, checked}
  * @param {string} source AuditLog 來源
- * @returns {number} 寫咗幾多行
+ * @returns {number} 寫了多少行
  */
 function recordCellDecisions_(quarterId, items, source) {
   const q = String(quarterId || '').trim();

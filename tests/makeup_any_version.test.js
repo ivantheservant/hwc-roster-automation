@@ -78,7 +78,7 @@ console.log('\n=== Q1【核心】收過第 2 版，存咗第 3 版之後唔可�
   check('★★★★★ 而係「已收」', keysOf(plan.alreadySent).indexOf('P9201') !== -1);
   const a = plan.alreadySent.filter(function (r) { return r.personId === 'P9201'; })[0];
   // 第一百零四輪批次 PD 組（刻意改動）：不存在的按鈕名稱改為現時按鈕
-  check('★★★★★ 講明收過邊一版，同埋之後嘅改動要用第 3 步的〔變動的人〕',
+  check('★★★★★ 說明收過哪一版，以及之後的改動要用第 3 步的〔變動的人〕',
     a && a.receivedVersionNo === 2 && /第 2 版/.test(a.reason) && /第 3 步的〔變動的人〕/.test(a.reason),
     JSON.stringify(a));
   check('★★★★★ 從來未收過嘅（P9202、辦公室）仍然要補寄',
