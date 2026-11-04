@@ -127,6 +127,17 @@ eq('★★★★ 左上角灰 #A6A6A6、「崗位」#BFBFBF', [bg(2, 1), v(3, 1)
 eq('★★★★★ 日子列只寫日子數字', [v(3, 2), v(3, 3), v(3, 6)], ['1', '8', '29']);
 eq('★★★★★ 特別主日：數字下面加括號標題', v(3, 10), '26\n(宣教月合堂)');
 
+console.log('\n=== OA3 特別主日標籤來源：每週標題／合堂名稱／合堂種類（樣本「30 (宣教月合堂)」「5(浸禮合堂)」「24(堂慶合堂)」）===');
+eq('★★★★★ 合堂：名稱＋合堂（宣教月 ⇒ 宣教月合堂）', gas.buildCombinedOutputLabel_('合堂', '宣教月'), '宣教月合堂');
+eq('★★★★★ 合堂沒有名稱：種類＋合堂（浸禮 ⇒ 浸禮合堂、堂慶 ⇒ 堂慶合堂）', [gas.buildCombinedOutputLabel_('浸禮', ''), gas.buildCombinedOutputLabel_('堂慶', '')], ['浸禮合堂', '堂慶合堂']);
+eq('★★★ 已經以「合堂」結尾不重複', [gas.buildCombinedOutputLabel_('合堂', ''), gas.buildCombinedOutputLabel_('合堂', '聯合合堂')], ['合堂', '聯合合堂']);
+eq('★★★★ 次序：每週標題 ＞ 合堂 ＞ 特別主日名稱',
+  gas.mergeOutputDateTitles_({ a: '特別', b: '特別', c: '特別' }, { b: '宣教月合堂', c: '浸禮合堂' }, { c: '幹事寫的' }),
+  { a: '特別', b: '宣教月合堂', c: '幹事寫的' });
+check('★★★★ 版面真的用這個索引（不是只讀特別主日／每週標題）',
+  /specialTitleByDate: buildOutputDateTitleIndex_\(quarterId, timezone\)/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'RosterOutput.gs'), 'utf8'))
+    && /readCombinedServices_\(quarterId, timezone\)/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'RosterOutput.gs'), 'utf8')));
+
 console.log('\n=== OA4 顏色（按季內第幾個月）===');
 eq('★★★★★ 第 1 個月：月份 #A8D08D、日子 #C5E0B3、內容 #E2EFD9', [bg(2, 2), bg(3, 2), bg(4, 2)], ['#A8D08D', '#C5E0B3', '#E2EFD9']);
 eq('★★★★★ 第 2 個月：#F4B083／#F7CAAC／#FBE4D5', [bg(2, 7), bg(3, 7), bg(4, 7)], ['#F4B083', '#F7CAAC', '#FBE4D5']);

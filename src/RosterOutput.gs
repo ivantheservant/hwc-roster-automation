@@ -453,6 +453,53 @@ function locateRosterOutputPersonCells_(model, personKey) {
   return (model.personCells[String(personKey || '').trim()] || []).slice();
 }
 
+/**
+ * 合堂主日在日子下面的括號標題：名稱（沒有就用種類）＋「合堂」。
+ * 例：宣教月＋合堂 ⇒「宣教月合堂」；浸禮（沒有名稱）⇒「浸禮合堂」；只有「合堂」⇒「合堂」。
+ * @param {string} kindLabel 合堂種類的中文（Config COMBINED_SERVICE_KINDS）
+ * @param {string} name `ServiceDates.CombinedName`
+ * @returns {string}
+ */
+function buildCombinedOutputLabel_(kindLabel, name) {
+  const base = String(name || '').trim() || String(kindLabel || '').trim();
+  if (!base) return '';
+  const suffix = '合堂';
+  return base.slice(-suffix.length) === suffix ? base : base + suffix;
+}
+
+/**
+ * 日子下面括號標題的合併次序（純函式）：特別主日名稱 ← 合堂名稱 ← 每週標題（ServiceDates.Title，幹事親手寫的最優先）。
+ * @param {Object.<string, string>} specialTitles
+ * @param {Object.<string, string>} combinedLabels
+ * @param {Object.<string, string>} weekTitles
+ * @returns {Object.<string, string>}
+ */
+function mergeOutputDateTitles_(specialTitles, combinedLabels, weekTitles) {
+  const out = Object.assign({}, specialTitles || {});
+  [combinedLabels || {}, weekTitles || {}].forEach(function (src) {
+    Object.keys(src).forEach(function (d) { if (String(src[d] || '').trim()) out[d] = String(src[d]).trim(); });
+  });
+  return out;
+}
+
+/**
+ * 寄出／公開職事表日子下面的括號標題（ServiceDates.Title／CombinedName／CombinedKind，以及特別主日名稱）。
+ * 第一百零二輪部署實測：樣本 2026T3 的「30 (宣教月合堂)」來自〔合堂主日〕設定，`buildDisplayTitleIndex_()` 沒有讀合堂。
+ * @param {string} quarterId
+ * @param {string} timezone
+ * @returns {Object.<string, string>}
+ */
+function buildOutputDateTitleIndex_(quarterId, timezone) {
+  const combined = {};
+  readCombinedServices_(quarterId, timezone).forEach(function (c) {
+    if (c.kind && c.serviceDate) {
+      const label = buildCombinedOutputLabel_(c.kindLabel, c.name);
+      if (label) combined[c.serviceDate] = label;
+    }
+  });
+  return mergeOutputDateTitles_(buildSpecialSundayTitleIndex_(quarterId, timezone), combined, buildWeekTitleIndex_(quarterId, timezone));
+}
+
 /* ═════════════════════════ 讀資料（GAS） ═════════════════════════ */
 
 /**
@@ -512,7 +559,7 @@ function buildRosterOutputForVersion_(quarterId, versionNo) {
   return buildRosterOutputModel_({
     quarterId: quarterId,
     serviceDates: serviceDates,
-    specialTitleByDate: buildDisplayTitleIndex_(quarterId, timezone),
+    specialTitleByDate: buildOutputDateTitleIndex_(quarterId, timezone),
     externalOwnerByDate: buildSpecialSundayExternalOwnerIndex_(quarterId, timezone),
     posts: postInfo.posts,
     hasOutputOrderColumn: postInfo.hasOutputOrderColumn,

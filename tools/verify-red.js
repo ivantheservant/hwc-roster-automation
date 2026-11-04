@@ -13057,6 +13057,22 @@ const MUTATIONS = [
     find: "      rowHeights[r] = multiLine ? 46 : 32;",
     replace: "      rowHeights[r] = multiLine ? 38 : 24;",
     tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-no-combined-label",
+    why: "合堂主日沒有「(宣教月合堂)」標籤（第一百零二輪和樣本對照實測）",
+    file: "src/RosterOutput.gs",
+    find: "    specialTitleByDate: buildOutputDateTitleIndex_(quarterId, timezone),",
+    replace: "    specialTitleByDate: buildDisplayTitleIndex_(quarterId, timezone),",
+    tests: ["tests/round102_oa_roster_output.test.js"]
+  },
+  {
+    id: "oa-combined-suffix",
+    why: "合堂標籤沒有加「合堂」（浸禮 ⇒ 應該是「浸禮合堂」）",
+    file: "src/RosterOutput.gs",
+    find: "  return base.slice(-suffix.length) === suffix ? base : base + suffix;",
+    replace: "  return base;",
+    tests: ["tests/round102_oa_roster_output.test.js"]
   }
 ];
 
