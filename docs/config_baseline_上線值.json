@@ -679,6 +679,34 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "WEBAPP"
     },
+    "ROSTER_CONTACT_TC": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "幹事",
+      "launchTargetValue": "幹事",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "ADMIN_NOTIFY_NO_EMAIL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "ADMIN_NOTIFY_STAGE_REMINDERS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "ROLLOUT_AUDIENCE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "LEADERS",
+      "launchTargetValue": "LEADERS",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP"
+    },
     "NAME_HONORIFIC_SUFFIXES": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "姊妹,弟兄,傳道,牧師,師母,執事,長老",

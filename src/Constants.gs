@@ -1535,6 +1535,14 @@ const CONFIG_KEYS = {
   PRESEASON_CHANGE_NOTIFY: 'PRESEASON_CHANGE_NOTIFY',
   // 第一百零一輪批次 ZA-3：人手貼名字時可以去掉的結尾尊稱（預設 姊妹,弟兄,傳道,牧師,師母,執事,長老；程式預設值）
   NAME_HONORIFIC_SUFFIXES: 'NAME_HONORIFIC_SUFFIXES',
+  // 第一百零一輪批次 ZE 組：第一階段開放範圍（LEADERS＝只開放給堂委、執事及幹事；ALL＝全部事奉人員）
+  ROLLOUT_AUDIENCE: 'ROLLOUT_AUDIENCE',
+  // 第一百零一輪批次 ZB 組：幹事通知「階段提醒」四種開關（預設 FALSE；關掉時只寫 AuditLog）
+  ADMIN_NOTIFY_STAGE_REMINDERS: 'ADMIN_NOTIFY_STAGE_REMINDERS',
+  // 第一百零一輪批次 ZB 組：幹事通知「沒有電郵名單」開關（預設 FALSE；關掉時只寫 AuditLog）
+  ADMIN_NOTIFY_NO_EMAIL: 'ADMIN_NOTIFY_NO_EMAIL',
+  // 第一百零一輪批次 ZB 組：電郵範本 {ContactName}（有修改要聯絡的人的稱呼；預設「幹事」）
+  ROSTER_CONTACT_TC: 'ROSTER_CONTACT_TC',
   // 第九輪批次階段 A：軟規則實測量度工具的三個判斷門檻（見 SoftRuleMetrics.gs）。
   // 刻意做成可配置而不是寫死——不同季度的人手鬆緊差很遠，「差多少才算偏離」
   // 本來就應該由幹事按實際情況調整。

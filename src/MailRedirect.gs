@@ -198,7 +198,75 @@ function applyMailRedirect_(plan, redirectTo) {
  *   `to` 可以是逗號分隔的多個地址；`bodyHtml` 為 null/undefined 時只寄純文字
  * @returns {{toEmail: string, redirected: boolean, originalEmail: string}}
  */
+/**
+ * 第一百零一輪批次 ZB 組：主試算表（及出席系統試算表）的 ID 在任何情況下都不可以出現在寄出的電郵。
+ * 這是最後防線：主旨、內文（HTML 及純文字）、附件名稱任何一處有 ⇒ 不寄、寫 AuditLog、拋錯。
+ * @returns {string[]} 要擋的 ID（長度至少 20 個字元才算，避免誤擋）
+ */
+function readBlockedSpreadsheetIds_() {
+  const ids = [];
+  const add = function (v) {
+    const s = String(v || '').trim();
+    if (s.length >= 20 && ids.indexOf(s) === -1) ids.push(s);
+  };
+  try { add(getConfig_(CONFIG_KEYS.ROSTER_SPREADSHEET_ID, '')); } catch (err) { /* 讀不到 Config 就靠下面那一個 */ }
+  try { add(getConfig_(CONFIG_KEYS.HWCAS_SPREADSHEET_ID, '')); } catch (err) { /* 同上 */ }
+  try { add(SpreadsheetApp.getActiveSpreadsheet().getId()); } catch (err) { /* 沒有試算表（例如測試）就略過 */ }
+  return ids;
+}
+
+/**
+ * 第一百零一輪批次 ZB 組：信件任何一處有主試算表 ID ⇒ 回傳那一處的名稱；沒有 ⇒ 空字串。純函式。
+ * @param {{subject: string, bodyPlain: string, bodyHtml: ?string, attachmentNames: string[]}} parts
+ * @param {string[]} ids
+ * @returns {string}
+ */
+function findSpreadsheetIdLeak_(parts, ids) {
+  const fields = [['主旨', parts.subject], ['純文字內文', parts.bodyPlain], ['HTML 內文', parts.bodyHtml]]
+    .concat((parts.attachmentNames || []).map(function (n) { return ['附件名稱', n]; }));
+  for (let i = 0; i < fields.length; i++) {
+    const text = String(fields[i][1] === null || fields[i][1] === undefined ? '' : fields[i][1]);
+    for (let j = 0; j < ids.length; j++) {
+      if (ids[j] && text.indexOf(ids[j]) !== -1) return fields[i][0];
+    }
+  }
+  return '';
+}
+
+/**
+ * 第一百零一輪批次 ZB 組：寄信之前檢查有沒有主試算表 ID。有 ⇒ 寫 AuditLog（不寫 ID 本身）並拋錯。
+ * @param {Object} mail sendMailThroughGate_ 的參數
+ * @returns {void}
+ */
+function assertNoSpreadsheetIdInMail_(mail) {
+  const attachmentNames = [];
+  ((mail.options && mail.options.attachments) || []).forEach(function (b) {
+    try { attachmentNames.push(String(b && b.getName ? b.getName() : (b && b.name) || '')); } catch (err) { /* 讀不到名稱就略過 */ }
+  });
+  const ids = readBlockedSpreadsheetIds_();
+  const where = findSpreadsheetIdLeak_({ subject: mail.subject, bodyPlain: mail.bodyPlain, bodyHtml: mail.bodyHtml,
+    attachmentNames: attachmentNames }, ids);
+  if (!where) return;
+  // AuditLog 不可以寫 ID 本身（主旨可能就有）⇒ 隱去
+  let subject = String(mail.subject || '').slice(0, 120);
+  ids.forEach(function (id) { subject = subject.split(id).join('（已隱去）'); });
+  try {
+    writeAuditLog_({
+      action: 'MAIL_BLOCKED_SPREADSHEET_ID', targetSheet: '', targetKey: String(mail.to || ''),
+      newValue: where, source: 'sendMailThroughGate_',
+      notes: '信件的' + where + '有主試算表的網址或 ID，沒有寄出。主旨：' + subject.slice(0, 80)
+    });
+  } catch (err) {
+    log_('WARN', '擋住了有主試算表 ID 的信，但 AuditLog 寫不到：' + err.message);
+  }
+  throw new Error(buildThreePartMessage_(
+    '這封信的' + where + '有主試算表的網址或 ID。',
+    '這封信沒有寄出（主試算表在任何情況下都不可以寄給任何人）。',
+    ['檢查電郵範本（進階與診斷〔更新電郵範本到最新版〕），把試算表連結刪除，然後再試一次']));
+}
+
 function sendMailThroughGate_(mail) {
+  assertNoSpreadsheetIdInMail_(mail);
   const bypass = String(mail.bypassRedirectReason || '').trim();
   const target = bypass ? '' : readMailRedirectTarget_();
   const hasHtml = mail.bodyHtml !== null && mail.bodyHtml !== undefined;

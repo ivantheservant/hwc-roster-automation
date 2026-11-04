@@ -121,6 +121,18 @@ function renderAllSamples() {
     attachment: '完整版職事表 PDF（FULL_PDF）'
   });
 
+  // 第一百零一輪批次 ZB 組（刻意新增）：試算表上一直有的 TPL_GENERATE_TC 補入種子
+  add({
+    key: 'TPL_GENERATE_TC',
+    template: byId.TPL_GENERATE_TC,
+    recipient: RECIPIENTS.list,
+    summary: '',
+    purpose: '初稿已生成，請堂委、幹事預覽',
+    trigger: '只有「測試工具 ▸ 寄送（測試模式）」手動指定 Stage=GENERATE 才會用到',
+    audience: 'EmailRecipients 中 Stage 欄含 GENERATE 的收件人',
+    attachment: '完整版職事表 PDF（FULL_PDF）'
+  });
+
   add({
     key: 'TPL_REMIND_TC',
     template: byId.TPL_REMIND_TC,
@@ -321,7 +333,7 @@ console.log('\n=== C3：OFFICIAL 個人信必須說明「不能服侍要點做�
   const official = samples.filter(function (s) { return s.key === 'TPL_OFFICIAL_TC@PERSON'; })[0];
   check('★★ OFFICIAL 個人信有交代未能出席時的處理方法',
     /未能出席|不能服侍|未能服侍/.test(official.rendered.bodyPlain)
-      && /聯絡幹事|回覆本郵件|通知幹事/.test(official.rendered.bodyPlain),
+      && /聯絡幹事|回覆本郵件|通知幹事|與.{1,12}聯絡/.test(official.rendered.bodyPlain),   // 第一百零一輪 ZB：{ContactName}
     '事奉人員收到通知之後最常問的就是「我做唔到嗰日點算」，信入面一定要答到');
 }
 

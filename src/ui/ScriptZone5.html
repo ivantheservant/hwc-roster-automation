@@ -1,0 +1,105 @@
+<script>
+  /* ============================================================
+   * 第一百零一輪批次：由試算表選單搬入幹事介面的功能及新功能
+   *   ZB-12〔更新電郵範本到最新版〕、〔預覽電郵範本〕
+   * ============================================================ */
+
+  /** 一段可以捲動的原文（範本內容）。 */
+  function z5TextBox(text) {
+    return make('div', { text: String(text || '（空白）'), className: 'z5-text' });
+  }
+
+  /* ---------- ZB-12〔更新電郵範本到最新版〕 ---------- */
+
+  let tplUpdateSkip_ = {};
+
+  function openEmailTemplateUpdate() {
+    runAction('比對電郵範本', async () => {
+      const plan = await callServer('apiPlanEmailTemplateUpdate');
+      tplUpdateSkip_ = {};
+      const todo = plan.items.filter((x) => x.status !== 'SAME');
+      const same = plan.items.length - todo.length;
+      if (todo.length === 0) {
+        openModal('更新電郵範本到最新版', [
+          make('div', { text: '沒有差異', className: 'ok-head' }),
+          para('試算表上 ' + plan.items.length + ' 個範本全部已經是最新版。')
+        ], [button('知道了', () => closeModal(), '')]);
+        return;
+      }
+      const nodes = [
+        para('下面 ' + todo.length + ' 個範本和最新版不同' + (same ? ('（另外 ' + same + ' 個已經是最新版）') : '') + '。'
+          + '勾選要更新的範本，按〔確認更新〕：系統會先把舊內容整行備份到「EmailTemplates_Backup」工作表（加時間），再覆寫主旨及內文。'),
+        para('附件類型（AttachType）和是否啟用（Active）不會改。', 'muted')
+      ];
+      todo.forEach((x) => {
+        const box = make('div', { className: 'sec' });
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = true;
+        cb.addEventListener('change', () => { tplUpdateSkip_[x.templateId] = !cb.checked; });
+        const head = make('label', { className: 'check-row' });
+        head.appendChild(cb);
+        head.appendChild(make('span', { text: x.templateId + (x.status === 'MISSING' ? '（工作表沒有這一行，會新增）' : ''), className: 'strong' }));
+        box.appendChild(head);
+        x.diffs.forEach((d) => {
+          box.appendChild(make('div', { text: d.label, className: 'prop-head' }));
+          if (x.status !== 'MISSING') {
+            box.appendChild(make('div', { text: '現時：', className: 'muted' }));
+            box.appendChild(z5TextBox(d.current));
+          }
+          box.appendChild(make('div', { text: '最新版：', className: 'muted' }));
+          box.appendChild(z5TextBox(d.latest));
+        });
+        nodes.push(box);
+      });
+      openModal('更新電郵範本到最新版', nodes, [
+        button('確認更新', () => applyEmailTemplateUpdateNow(todo.map((x) => x.templateId).filter((id) => tplUpdateSkip_[id] !== true)), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  function applyEmailTemplateUpdateNow(ids) {
+    if (!ids || ids.length === 0) {
+      openModal('更新電郵範本到最新版', [para('一個都沒有勾選，沒有改動。')], [button('知道了', () => closeModal(), '')]);
+      return;
+    }
+    runAction('更新電郵範本', async () => {
+      const r = await callServerMutating('apiApplyEmailTemplateUpdate', ids);
+      openModal('更新電郵範本到最新版', [
+        make('div', { text: '已完成', className: 'ok-head' }),
+        para(r.message || ''),
+        para((r.updated || []).concat(r.added || []).join('、'), 'muted')
+      ], [button('知道了', () => closeModal(), '')]);
+    });
+  }
+
+  /* ---------- 〔預覽電郵範本〕（不寄） ---------- */
+
+  function openTemplatePreview() {
+    runAction('產生電郵範本預覽', async () => {
+      const r = await callServer('apiPreviewTemplateSamples', currentQuarterId);
+      const nodes = [
+        para('這是〔寄出電郵範本樣本〕會寄出的同一份內容，只在這裏顯示，不會寄出。'
+          + (r.hasVersion ? ('用 ' + currentQuarterId + ' 第 ' + r.versionNo + ' 版的資料。') : '這一季還沒有版本，用示範資料。')),
+        para('每一封都檢查了：有沒有主試算表的網址或 ID、有沒有舊用字、有沒有「試算表連結」。', 'muted')
+      ];
+      const bad = r.samples.filter((s) => s.hasSpreadsheetId || s.hasOldWord || s.hasSheetLink).length;
+      nodes.push(make('div', { text: bad === 0 ? ('✔ ' + r.samples.length + ' 封全部沒有問題') : ('✘ ' + bad + ' 封有問題（見下面）'),
+        className: bad === 0 ? 'ok-line strong' : 'warnbox' }));
+      r.samples.forEach((s) => {
+        const flags = [];
+        flags.push(s.hasSpreadsheetId ? '✘ 有主試算表 ID' : '✔ 沒有主試算表 ID');
+        flags.push(s.hasOldWord ? '✘ 有舊用字' : '✔ 沒有舊用字');
+        flags.push(s.hasSheetLink ? '✘ 有「試算表連結」' : '✔ 沒有「試算表連結」');
+        const box = make('details', { className: 'sec' });
+        box.appendChild(make('summary', { text: s.title }));
+        box.appendChild(make('div', { text: flags.join('　'), className: 'muted' }));
+        box.appendChild(make('div', { text: '主旨：' + s.subject, className: 'prop-head' }));
+        box.appendChild(z5TextBox(s.bodyPlain));
+        nodes.push(box);
+      });
+      openModal('預覽電郵範本（' + currentQuarterId + '）', nodes, [button('關閉', () => closeModal(), '')]);
+    });
+  }
+</script>

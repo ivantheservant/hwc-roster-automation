@@ -79,13 +79,13 @@ console.log('\n=== TB2／TB3／TB4：內容、DRY_RUN、紀錄（這一季有版
   const r = g.sendTemplateSamples_(sc.Q, ADMIN);
   const mails = s.log.sent;
   const subjects = mails.map((m) => m[1]);
-  const TEMPLATES = ['TPL_REVIEW_TC', 'TPL_REMIND_TC', 'TPL_OFFICIAL_TC', 'TPL_OFFICIAL_LIST_TC', 'TPL_RESEND_TC', 'TPL_RESEND_LIST_TC', 'TPL_PRESEASON_TC', 'TPL_UNAVAILABLE_INVITE_TC', 'TPL_UNAVAILABLE_DECIDED_TC']; // 第九十四輪批次 UC 組（刻意改動）：多一個範本
+  const TEMPLATES = ['TPL_GENERATE_TC', 'TPL_REVIEW_TC', 'TPL_REMIND_TC', 'TPL_OFFICIAL_TC', 'TPL_OFFICIAL_LIST_TC', 'TPL_RESEND_TC', 'TPL_RESEND_LIST_TC', 'TPL_PRESEASON_TC', 'TPL_UNAVAILABLE_INVITE_TC', 'TPL_UNAVAILABLE_DECIDED_TC']; // 第九十四輪批次 UC 組（刻意改動）：多一個範本
   const ADMIN_KINDS = ['沒有電郵名單', '生成完成', '還沒有生成初稿', '停在同一階段太久', '接近正式發出日期', '特殊主日日期未確認', '事奉人員申報待確認', '開季前資料有改動'];
-  check('★★★★★★ 一共 17 封：9 個範本＋8 種幹事通知（第九十八輪批次 YB 組刻意加「開季前資料有改動」）', r.sent === 17 && mails.length === 17, r.sent + '／' + mails.length);
+  check('★★★★★★ 一共 18 封：10 個範本＋8 種幹事通知（第一百零一輪 ZB 組刻意加 TPL_GENERATE_TC 種子）', r.sent === 18 && mails.length === 18, r.sent + '／' + mails.length);
   check('★★★★★★ 每一封只寄給你選的那一個地址（沒有第二個收件人、沒有轉寄）', mails.every((m) => m[0] === ADMIN), JSON.stringify(mails.map((m) => m[0])));
-  check('★★★★★★ DRY_RUN＝TRUE 也寄（樣本例外）；MAIL_REDIRECT_ALL_TO 有值也不轉寄', s.cfg.DRY_RUN === true && mails.length === 17 && mails.every((m) => m[1].indexOf('[原收件人') === -1));
-  check('★★★★★ 主旨前面：[範本樣本 n/N] 名稱｜…（編號 1 至 17）',
-    subjects.every((t, i) => t.indexOf('[範本樣本 ' + (i + 1) + '/17] ') === 0), JSON.stringify(subjects));
+  check('★★★★★★ DRY_RUN＝TRUE 也寄（樣本例外）；MAIL_REDIRECT_ALL_TO 有值也不轉寄', s.cfg.DRY_RUN === true && mails.length === 18 && mails.every((m) => m[1].indexOf('[原收件人') === -1));
+  check('★★★★★ 主旨前面：[範本樣本 n/N] 名稱｜…（編號 1 至 18）',
+    subjects.every((t, i) => t.indexOf('[範本樣本 ' + (i + 1) + '/18] ') === 0), JSON.stringify(subjects));
   TEMPLATES.forEach((id) => {
     check('★★★★★ 有「' + id + '」', subjects.some((t) => t.indexOf('] ' + id + '｜') !== -1), JSON.stringify(subjects));
   });
@@ -111,7 +111,7 @@ console.log('\n=== TB2／TB3／TB4：內容、DRY_RUN、紀錄（這一季有版
   check('★★★★★ 申報邀請的個人連結有代入', /Deadline|截止|申報/.test(body('TPL_UNAVAILABLE_INVITE_TC')[2]) && !/\{PersonalLink\}/.test(body('TPL_UNAVAILABLE_INVITE_TC')[2]));
 
   const audit = g.readSheet_(sc.S.AUDIT_LOG).filter((row) => row[sc.C.AUDIT_LOG.ACTION] === 'TEMPLATE_SAMPLES_SENT');
-  check('★★★★★★ AuditLog 一筆 TEMPLATE_SAMPLES_SENT（收件人、季度、封數）', audit.length === 1 && /寄出 17 封/.test(audit[0][sc.C.AUDIT_LOG.NEW_VALUE])
+  check('★★★★★★ AuditLog 一筆 TEMPLATE_SAMPLES_SENT（收件人、季度、封數）', audit.length === 1 && /寄出 18 封/.test(audit[0][sc.C.AUDIT_LOG.NEW_VALUE])
     && audit[0][sc.C.AUDIT_LOG.TARGET_KEY] === sc.Q && String(audit[0][sc.C.AUDIT_LOG.NOTES]).indexOf(ADMIN) !== -1, JSON.stringify(audit));
   check('★★★★★★ 不寫 SendLog', g.readSheet_(sc.S.SEND_LOG).length === sendLogBefore);
   check('★★★★★★ 不改任何階段', g.getQuarterStage_(sc.Q) === stageBefore);
@@ -124,7 +124,7 @@ console.log('\n=== TB5：沒有版本 ⇒ 示範資料；入口及權限 ===');
   g.findLatestVersionNo_ = function () { return -1; };
   const r = g.sendTemplateSamples_(sc.Q, EDITOR);
   const mails = s.log.sent;
-  check('★★★★★ 沒有版本也寄得出 17 封，每一封收件人是你選的地址', r.sent === 17 && mails.every((m) => m[0] === EDITOR) && r.hasVersion === false);
+  check('★★★★★ 沒有版本也寄得出 18 封，每一封收件人是你選的地址', r.sent === 18 && mails.every((m) => m[0] === EDITOR) && r.hasVersion === false);
   check('★★★★★ 範本信內文最上面寫明「這一季還沒有版本，下面是示範資料。」', mails.slice(0, 8).every((m) => m[2].indexOf('這一季還沒有版本，下面是示範資料。') !== -1));
   check('★★★★ 訊息講明是示範資料', /示範資料/.test(r.message));
 

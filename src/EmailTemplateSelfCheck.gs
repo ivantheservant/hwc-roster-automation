@@ -51,7 +51,10 @@ function buildDemoMailPlaceholders_() {
     StartDate: '2099-01-03',
     EndDate: '2099-03-28',
     OfficialSendDate: '2099-01-01',
-    SpreadsheetUrl: 'https://example.invalid/demo-spreadsheet',
+    // 第一百零一輪批次 ZB 組：{SpreadsheetUrl} 已刪除；新 {VersionLabel}、{ContactName}
+    VersionLabel: '2099T1v0',
+    ContactName: '幹事',
+    PublicRosterUrl: 'https://example.invalid/demo-preview',
     ChangedPeopleSummary: '（示範）陳大文：2099-01-03 主席；（示範）李小明：2099-01-10 讀經'
   };
 }

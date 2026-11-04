@@ -88,7 +88,9 @@ const WEBAPP_READ_ONLY_APIS = [
   // 第九十七輪批次 XA／XB 組：〔補填電郵〕畫面；〔沒有電郵的人：匯出邀請〕畫面（只讀）
   'apiGetManualEmailView', 'apiGetInvitePaperView',
   // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面（只讀）
-  'apiGetPreAssignView'
+  'apiGetPreAssignView',
+  // 第一百零一輪批次 ZB 組：〔更新電郵範本到最新版〕比對、〔預覽電郵範本〕（只讀）
+  'apiPlanEmailTemplateUpdate', 'apiPreviewTemplateSamples'
 ];
 
 /**

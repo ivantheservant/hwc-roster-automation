@@ -387,12 +387,15 @@ console.log('\n=== A4：範本 placeholder 一致性（同 A4 相關的 4 個範
     const nextIdx = seedSource.indexOf("templateId: '", idx + 1);
     const block = seedSource.slice(idx, nextIdx === -1 ? seedSource.length : nextIdx);
 
-    check('★★ ' + id + ' 的 bodyHtml／bodyPlain 都有 {PublicRosterUrl}',
-      /bodyHtml:[\s\S]*?\{PublicRosterUrl\}/.test(block)
-        && /bodyPlain:[\s\S]*?\{PublicRosterUrl\}/.test(block));
-    check('★ ' + id + ' 的 placeholders 清單有登記 {PublicRosterUrl}'
-      + '（否則「電郵範本自我檢查」會誤判成範本用咗一個未登記的變數）',
-      /placeholders:[^\n]*\{PublicRosterUrl\}/.test(block));
+    // 第一百零一輪批次 ZB 組（刻意改動）：以試算表上的範本為底本，這四個範本不再自己放公開連結，
+    // 一律由系統在信末加「{QuarterID} 職事表預覽…」（appendPermanentLinkFooter_，每封信最多一次）。
+    // 所以這裏改為核對：範本有放就 HTML、純文字、placeholders 三處一致；沒有放就三處都沒有。
+    const inHtml = /bodyHtml:[\s\S]*?\{PublicRosterUrl\}[\s\S]*?bodyPlain:/.test(block);
+    const inPlain = /bodyPlain:[\s\S]*?\{PublicRosterUrl\}/.test(block);
+    const inList = /placeholders:[^\n]*\{PublicRosterUrl\}/.test(block);
+    check('★★ ' + id + ' 的 {PublicRosterUrl}：HTML、純文字、placeholders 三處一致（沒有就由信末加）',
+      inHtml === inPlain && inPlain === inList);
+    check('★★ ' + id + ' 沒有 {SpreadsheetUrl}（主試算表不可以寄給任何人）', block.indexOf('{SpreadsheetUrl}') === -1);
   });
 }
 

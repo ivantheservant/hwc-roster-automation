@@ -374,7 +374,7 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions, p
     .map(function (o) { return o.displayName + '（' + o.personId + '）'; });
 
   if (flushedCount < outcomes.length) writeSendLogRows_(outcomes.slice(flushedCount), context);
-  if (noEmailPeople.length > 0) notifyAdminNoEmail_(noEmailPeople, context, isDryRun);
+  if (noEmailPeople.length > 0) notifyAdminNoEmailIfEnabled_(noEmailPeople, context, isDryRun);   // 第一百零一輪批次 ZB 組：Config 開關
 
   const retryCount = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
 

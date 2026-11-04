@@ -157,9 +157,10 @@ function dailyAutomationCheck_() {
 
         const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
         report.push(executeAutomationAction_(remindJudgment, today, function () {
-          notifyAdminStageReminder_(quarterId, remindJudgment, config, isDryRun);
+          // 第一百零一輪批次 ZB 組：Config ADMIN_NOTIFY_STAGE_REMINDERS（預設 FALSE）關掉 ⇒ 不寄，只寫 AuditLog
+          const sent = notifyAdminStageReminderIfEnabled_(quarterId, remindJudgment, config, isDryRun);
           return '第 ' + (remindJudgment.reminderCount + 1) + ' / ' + remindJudgment.maxCount
-            + ' 次提醒幹事：' + quarterId + ' 停留在 ' + remindJudgment.stage
+            + (sent ? ' 次提醒幹事：' : ' 次階段提醒（Config 關掉，沒有寄出）：') + quarterId + ' 停留在 ' + remindJudgment.stage
             + '（' + remindJudgment.reasons.join('＋') + '）';
         }));
 

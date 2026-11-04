@@ -801,6 +801,30 @@ function getConfigKeySeeds_() {
         + '名單上本身包含尊稱的名字照舊以完全相同優先。沒有這一行時用預設值。',
       editable: 'TRUE'
     },
+    {
+      key: CONFIG_KEYS.ROSTER_CONTACT_TC, type: CONFIG_TYPES.STR, group: 'MAIL',
+      defaultValue: '幹事',
+      description: '電郵範本的 {ContactName}：有修改要聯絡的人的稱呼（例如「某某幹事」）。留空＝「幹事」。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ADMIN_NOTIFY_NO_EMAIL, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: 'FALSE',
+      description: '寄出之後有人沒有電郵時，寄一封「沒有電郵名單」通知給幹事（MAIL_ADMIN_NOTIFY）。FALSE（預設）＝不寄，只寫 AuditLog。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: 'FALSE',
+      description: '每日檢查發現季度停在同一階段太久、還沒有生成初稿、特殊主日日期未確認或接近正式發出日期時，寄「階段提醒」給幹事。FALSE（預設）＝不寄，只寫 AuditLog。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.ROLLOUT_AUDIENCE, type: CONFIG_TYPES.ENUM, group: 'WEBAPP',
+      defaultValue: 'LEADERS',
+      description: '第一階段開放範圍：LEADERS（預設）＝申報不能服侍的日子及申報連結只開放給現任堂委、執事及幹事；ALL＝全部事奉人員。',
+      editable: 'TRUE'
+    },
     // ---- HWCAS（會友系統同步，全部選填——留空只是代表這個同步功能還沒設定）----
     {
       key: CONFIG_KEYS.HWCAS_SPREADSHEET_ID, type: CONFIG_TYPES.STR, group: 'HWCAS',

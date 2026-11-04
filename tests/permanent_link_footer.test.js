@@ -48,7 +48,8 @@ console.log('\n=== B【核心】情況一：範本冇 placeholder ⇒ 要加 ===
     plain.indexOf(URL) !== -1, plain);
   check('★★★★★ 而且用一句人話講明佢係「固定連結、更新後打開就係最新版」'
     + '——唔講嘅話佢會以為係嗰一次嘅快照，改咗之後唔會再開',
-    plain.indexOf('固定連結') !== -1 && plain.indexOf('最新版') !== -1, plain);
+    // 第一百零一輪批次 ZB 組（刻意改動）：「這一季職事表的固定連結」改為「{QuarterID} 職事表預覽（只供查看…）」
+    plain.indexOf('職事表預覽') !== -1 && plain.indexOf('只供查看') !== -1 && plain.indexOf('最新版') !== -1, plain);
   check('★★★★ 原本嘅內文一個字都冇少', plain.indexOf(tpl) === 0, plain);
 
   const html = gas.appendPermanentLinkFooter_(tpl, tpl, URL, true);
@@ -84,7 +85,7 @@ console.log('\n=== B【核心】情況三：冇公開連結 ⇒ 整段略過 ===
       plain, tpl);
     check('★★★★★ 而且冇出現「固定連結」四個字'
       + '（出現咗就代表加咗一段後面係空白嘅嘢）',
-      plain.indexOf('固定連結') === -1, plain);
+      plain.indexOf('職事表預覽') === -1, plain);
     check('★★★★★ 亦都冇出現 undefined／null 呢啲字'
       + '——呢個係本專案一直喺度殺嗰個「缺失被當成正常值」',
       plain.indexOf('undefined') === -1 && plain.indexOf('null') === -1, plain);
@@ -118,8 +119,8 @@ console.log('\n=== B：deliverOne_ 真係有叫佢，而且兩邊都叫 ===');
   check('★★★★★ 傳入去嘅係**原始範本內文**，唔係套用完嘅'
     + '——套用完之後 `{PublicRosterUrl}` 已經冇咗，就永遠偵測唔到「範本本來有放」，'
     + '結果同一條連結出現兩次',
-    /template\.bodyHtml, permanentLink, true\)/.test(body)
-    && /template\.bodyPlain, permanentLink, false\)/.test(body), body.slice(0, 400));
+    /template\.bodyHtml, permanentLink, true, context\.quarterId\)/.test(body)
+    && /template\.bodyPlain, permanentLink, false, context\.quarterId\)/.test(body), body.slice(0, 400));
 }
 
 console.log('\n=== B：呢個係硬要求，唔係一個選項 ===');

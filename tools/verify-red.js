@@ -12149,6 +12149,206 @@ const MUTATIONS = [
     find: "      const lenient = resolvePersonIdLenient_(typed);",
     replace: "      const lenient = resolvePersonId_(typed) ? { personId: resolvePersonId_(typed), suffix: '' } : null;",
     tests: ["tests/round101_za_wording.test.js"]
+  },
+  {
+    id: "zb-gate-off",
+    why: "寄信閘門沒有檢查主試算表 ID",
+    file: "src/MailRedirect.gs",
+    find: "function sendMailThroughGate_(mail) {\n  assertNoSpreadsheetIdInMail_(mail);",
+    replace: "function sendMailThroughGate_(mail) {",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-gate-attach",
+    why: "附件名稱不檢查",
+    file: "src/MailRedirect.gs",
+    find: "    .concat((parts.attachmentNames || []).map(function (n) { return ['附件名稱', n]; }));",
+    replace: "    .concat([]);",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-gate-html",
+    why: "HTML 內文不檢查",
+    file: "src/MailRedirect.gs",
+    find: "['純文字內文', parts.bodyPlain], ['HTML 內文', parts.bodyHtml]]",
+    replace: "['純文字內文', parts.bodyPlain]]",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-gate-audit-id",
+    why: "AuditLog 寫了 ID 本身",
+    file: "src/MailRedirect.gs",
+    find: "  ids.forEach(function (id) { subject = subject.split(id).join('（已隱去）'); });",
+    replace: "",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-sheet-url-back",
+    why: "寄信 context 又放主試算表網址",
+    file: "src/Mailer.gs",
+    find: "      VersionLabel: quarterId + 'v' + versionNo,",
+    replace: "      SpreadsheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(),\n      VersionLabel: quarterId + 'v' + versionNo,",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-remind-sheet-url",
+    why: "提醒信尾又附主試算表網址",
+    file: "src/Mailer.gs",
+    find: "  // 第一百零一輪批次 ZB 組：主試算表的網址在任何情況下都不可以寄出（包括幹事通知）⇒ 不再附「職事表試算表：」一行。\n  return lines.join('\\n');",
+    replace: "  lines.push('職事表試算表：' + SpreadsheetApp.getActiveSpreadsheet().getUrl());\n  return lines.join('\\n');",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-seed-sheet-url",
+    why: "審閱範本又有試算表連結",
+    file: "src/EmailTemplateSeed.gs",
+    find: "      + '<p>完整版職事表已附於本郵件，方便離線查看。</p>'",
+    replace: "      + '<p>試算表連結：{SpreadsheetUrl}</p><p>完整版職事表已附於本郵件，方便離線查看。</p>'",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-contact-cfg",
+    why: "{ContactName} 不讀 Config",
+    file: "src/RolloutAudience.gs",
+    find: "  const v = String(getConfig_(CONFIG_KEYS.ROSTER_CONTACT_TC, '幹事') || '').trim();",
+    replace: "  const v = '幹事';",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-preview-label",
+    why: "公開連結那一行仍是「固定連結」",
+    file: "src/Mailer.gs",
+    find: "  return (q ? q + ' ' : '') + '職事表預覽';",
+    replace: "  return '這一季職事表的固定連結';",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-preview-twice",
+    why: "範本有公開連結也再加一次",
+    file: "src/Mailer.gs",
+    find: "  if (String(templateSource || '').indexOf('{PublicRosterUrl}') !== -1) return text;\n  return String(text || '')\n    + (isHtml ? buildPermanentLinkFooterHtml_(link, quarterId)",
+    replace: "  return String(text || '')\n    + (isHtml ? buildPermanentLinkFooterHtml_(link, quarterId)",
+    tests: ["tests/round101_zb_email_templates.test.js","tests/permanent_link_footer.test.js"]
+  },
+  {
+    id: "zb-personal-viewonly",
+    why: "第一階段非領袖仍寫可以申報",
+    file: "src/PersonalLinkInMail.gs",
+    find: "  return '\\n\\n' + (canDeclare === false ? PERSONAL_LINK_LINE_VIEW_ONLY : PERSONAL_LINK_LINE_DECLARE)",
+    replace: "  return '\\n\\n' + (PERSONAL_LINK_LINE_DECLARE)",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-leader-all",
+    why: "LEADERS 時人人都當作可以申報",
+    file: "src/RolloutAudience.gs",
+    find: "    return context._rolloutLookup.isLeader(personId);",
+    replace: "    return true;",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-deliver-candeclare",
+    why: "正式寄信沒有傳 canDeclare",
+    file: "src/Mailer.gs",
+    find: "      personalUrl, false, canDeclare),\n    template.bodyPlain, permanentLink, false, context.quarterId);",
+    replace: "      personalUrl, false),\n    template.bodyPlain, permanentLink, false, context.quarterId);",
+    tests: ["tests/round101_zb_email_templates.test.js","tests/personal_link_in_mail.test.js"]
+  },
+  {
+    id: "zb-gen-login",
+    why: "GENERATE 範本仍叫人登入試算表",
+    file: "src/EmailTemplateSeed.gs",
+    find: "      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，請按以下連結預覽。</p>'",
+    replace: "      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，請登入試算表覆核。</p>'",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-official-subject",
+    why: "OFFICIAL 主旨沒有「定稿」",
+    file: "src/EmailTemplateSeed.gs",
+    find: "    subject: '{QuarterID} 粵語堂主日職事表（定稿）',",
+    replace: "    subject: '{QuarterID} 粵語堂主日職事表',",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-resend-version",
+    why: "改動重發主旨沒有版本",
+    file: "src/EmailTemplateSeed.gs",
+    find: "    subject: '{QuarterID} 粵語堂職事表已改動重發（{VersionLabel}）——本輪異動摘要',",
+    replace: "    subject: '{QuarterID} 粵語堂職事表已改動重發——本輪異動摘要',",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-invite-howto",
+    why: "邀請「怎樣申報」和頁面不一致",
+    file: "src/EmailTemplateSeed.gs",
+    find: "  + '選擇「全部崗位」或「只限以下崗位」，可以填原因，然後按〔提交〕。'",
+    replace: "  + '選擇「全部崗位」或「只限某些崗位」，可以填原因，然後按〔送出〕。'",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-gen-done-menu",
+    why: "生成完成通知仍是試算表選單做法",
+    file: "src/Mailer.gs",
+    find: "    + GENERATE_DONE_STEPS_TEXT + '\\n\\n'",
+    replace: "    + '請登入試算表覆核內容，確認沒問題後執行「職事表系統 → 四階段流程 → 步驟 2：寄給堂委審閱」。\\n\\n'",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-noemail-default",
+    why: "沒有電郵名單通知預設寄出",
+    file: "src/Mailer.gs",
+    find: "  if (getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_NO_EMAIL, false) === true) {",
+    replace: "  if (getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_NO_EMAIL, true) !== false) {",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-stage-default",
+    why: "階段提醒預設寄出",
+    file: "src/Mailer.gs",
+    find: "  if (getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS, false) === true) {",
+    replace: "  if (true) {",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-trigger-ungated",
+    why: "每日檢查直接寄階段提醒",
+    file: "src/Trigger.gs",
+    find: "          const sent = notifyAdminStageReminderIfEnabled_(quarterId, remindJudgment, config, isDryRun);",
+    replace: "          notifyAdminStageReminder_(quarterId, remindJudgment, config, isDryRun); const sent = true;",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-upd-no-backup",
+    why: "更新範本之前沒有備份",
+    file: "src/EmailTemplateUpdate.gs",
+    find: "    backup.getRange(backup.getLastRow() + 1, 1, bRows.length, bKeys.length).setValues(bRows);",
+    replace: "",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-upd-ignore-pick",
+    why: "沒有勾的範本也更新",
+    file: "src/EmailTemplateUpdate.gs",
+    find: "  const pick = plan.items.filter(function (x) { return wanted[x.templateId] && x.status !== 'SAME'; });",
+    replace: "  const pick = plan.items.filter(function (x) { return x.status !== 'SAME'; });",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-upd-rowno",
+    why: "用 readSheet_ 行號（空白行之後寫錯行）",
+    file: "src/EmailTemplateUpdate.gs",
+    find: "      if (id && !byId[id]) byId[id] = { row: row, rowNo: i + 3 };",
+    replace: "      if (id && !byId[id]) byId[id] = { row: row, rowNo: Object.keys(byId).length + 3 };",
+    tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zb-preview-sends",
+    why: "預覽範本會寄信",
+    file: "src/TemplateSamples.gs",
+    find: "  const built = buildTemplateSamples_(q, 'preview@example.invalid');",
+    replace: "  sendTemplateSamples_(q, 'admin@example.invalid');\n  const built = buildTemplateSamples_(q, 'preview@example.invalid');",
+    tests: ["tests/round101_zb_email_templates.test.js"]
   }
 ];
 

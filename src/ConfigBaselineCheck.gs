@@ -156,6 +156,10 @@ function getConfigBaselineSnapshot_() {
       WEBAPP_DEFAULT_QUARTER: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       PREASSIGN_POST_IDS: { launchTargetValue: 'WORSHIP,PIANO', source: '程式碼預設值（試算表現時實際值未核實）' },
       PRESEASON_CHANGE_NOTIFY: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      ROSTER_CONTACT_TC: { launchTargetValue: '幹事', source: '程式碼預設值（試算表現時實際值未核實）' },
+      ADMIN_NOTIFY_NO_EMAIL: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      ADMIN_NOTIFY_STAGE_REMINDERS: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      ROLLOUT_AUDIENCE: { launchTargetValue: 'LEADERS', source: '程式碼預設值（試算表現時實際值未核實）' },
       NAME_HONORIFIC_SUFFIXES: { launchTargetValue: '姊妹,弟兄,傳道,牧師,師母,執事,長老', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_VIEWER_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' }
     },

@@ -186,7 +186,7 @@ function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured)
     .map(function (o) { return o.displayName + '（' + o.personId + '）'; });
 
   if (flushedCount < outcomes.length) writeSendLogRows_(outcomes.slice(flushedCount), context);
-  if (noEmailPeople.length > 0) notifyAdminNoEmail_(noEmailPeople, context, isDryRun);
+  if (noEmailPeople.length > 0) notifyAdminNoEmailIfEnabled_(noEmailPeople, context, isDryRun);   // 第一百零一輪批次 ZB 組：Config 開關
 
   const retryCount = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
 
@@ -281,7 +281,9 @@ function buildMailContext_(quarterId, versionNo, stage) {
       StartDate: toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone),
       EndDate: toDateString_(quarter[COLUMNS.QUARTERS.END_DATE], timezone),
       OfficialSendDate: toDateString_(quarter[COLUMNS.QUARTERS.OFFICIAL_SEND_ON], timezone),
-      SpreadsheetUrl: SpreadsheetApp.getActiveSpreadsheet().getUrl(),
+      // 第一百零一輪批次 ZB 組：主試算表的網址在任何情況下都不可以寄出 ⇒ 不再有 {SpreadsheetUrl}。
+      VersionLabel: quarterId + 'v' + versionNo,
+      ContactName: readRosterContactName_(),
       // 第三輪批次下一輪（新一批階段 B）新增：目前的四階段流程 Stage 與建議下一步，
       // 供 docs/系統範圍稽核.md 建議的新 TPL_REMIND_TC 範本使用。用 try/catch
       // 包住——buildMailContext_() 本來就會在 GENERATE／OFFICIAL 等各種階段被呼叫，
@@ -543,8 +545,21 @@ function listRecipients_(stage, context) {
  * @param {string} url 那條公開連結
  * @returns {string} 純文字版的信末段落
  */
-function buildPermanentLinkFooterPlain_(url) {
-  return '\n\n這一季職事表的固定連結（內容更新後打開就是最新版）：\n' + url;
+function buildPermanentLinkFooterPlain_(url, quarterId) {
+  return '\n\n' + buildPublicPreviewLabel_(quarterId) + PUBLIC_PREVIEW_NOTE + '：\n' + url;
+}
+
+/** 第一百零一輪批次 ZB 組：公開連結那一行的說明（公開檔是「知道連結的人可以查看」、網址用 /preview，只可查看）。 */
+const PUBLIC_PREVIEW_NOTE = '（只供查看，不能修改；內容更新後打開就是最新版）';
+
+/**
+ * 第一百零一輪批次 ZB 組：公開連結那一行的名稱「{QuarterID} 職事表預覽」（取代「這一季職事表的固定連結」）。
+ * @param {string=} quarterId
+ * @returns {string}
+ */
+function buildPublicPreviewLabel_(quarterId) {
+  const q = String(quarterId || '').trim();
+  return (q ? q + ' ' : '') + '職事表預覽';
 }
 
 /**
@@ -555,11 +570,11 @@ function buildPermanentLinkFooterPlain_(url) {
  * @param {string} url 那條公開連結
  * @returns {string} HTML 版的信末段落
  */
-function buildPermanentLinkFooterHtml_(url) {
+function buildPermanentLinkFooterHtml_(url, quarterId) {
   const safe = String(url)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-  return '<hr><p>這一季職事表的固定連結（內容更新後打開就是最新版）：<br>'
+  return '<hr><p><strong>' + buildPublicPreviewLabel_(quarterId) + '</strong>' + PUBLIC_PREVIEW_NOTE + '：<br>'
     + '<a href="' + safe + '">' + safe + '</a></p>';
 }
 
@@ -580,13 +595,13 @@ function buildPermanentLinkFooterHtml_(url) {
  * @param {boolean} isHtml 是不是 HTML 版
  * @returns {string} 加完（或者原封不動）的內文
  */
-function appendPermanentLinkFooter_(text, templateSource, url, isHtml) {
+function appendPermanentLinkFooter_(text, templateSource, url, isHtml, quarterId) {
   const link = String(url || '').trim();
   if (!link) return text;
   // 範本自己有放 ⇒ `applyPlaceholders_()` 已經換好，不要再加一次。
   if (String(templateSource || '').indexOf('{PublicRosterUrl}') !== -1) return text;
   return String(text || '')
-    + (isHtml ? buildPermanentLinkFooterHtml_(link) : buildPermanentLinkFooterPlain_(link));
+    + (isHtml ? buildPermanentLinkFooterHtml_(link, quarterId) : buildPermanentLinkFooterPlain_(link, quarterId));
 }
 
 /**
@@ -744,18 +759,21 @@ function deliverOne_(recipient, template, context, isDryRun) {
       context._noPersonalLinkCount = (context._noPersonalLinkCount || 0) + 1;
     }
   }
+  // 第一百零一輪批次 ZB 組：第一階段（ROLLOUT_AUDIENCE=LEADERS）不是堂委／執事／幹事 ⇒
+  // 個人連結那一行只寫「你的職事表預覽（只供查看）」，不提申報。
+  const canDeclare = !personalUrl || isMailDeclareAllowed_(context, recipient.personId);
   // ⚠️ 次序：個人專屬連結**排在永久連結之前**。
   // 對收件人來講，「我自己那幾格」比「全體那一份」有用得多。
   const bodyHtmlBase = appendPermanentLinkFooter_(
     appendPersonalLinkFooter_(
       applyPlaceholders_(template.bodyHtml, context.placeholders, recipient, summary),
-      personalUrl, true),
-    template.bodyHtml, permanentLink, true);
+      personalUrl, true, canDeclare),
+    template.bodyHtml, permanentLink, true, context.quarterId);
   const bodyPlainBase = appendPermanentLinkFooter_(
     appendPersonalLinkFooter_(
       applyPlaceholders_(template.bodyPlain, context.placeholders, recipient, summary),
-      personalUrl, false),
-    template.bodyPlain, permanentLink, false);
+      personalUrl, false, canDeclare),
+    template.bodyPlain, permanentLink, false, context.quarterId);
   // 第九十三輪批次 TE 組：有附日曆檔 ⇒ 內文（程式產生，不改 EmailTemplates 工作表）講明只包括自己的服侍；有取消事件再講。
   const hasCancelled = !!(icsAttachment && icsAttachment.cancelledCount > 0);
   const bodyHtml = icsAttachment ? appendIcsNotice_(bodyHtmlBase, hasCancelled, true) : bodyHtmlBase;
@@ -1362,6 +1380,12 @@ function applyPlaceholders_(text, placeholders, recipient, summary) {
       ? '' : placeholders[key];
     result = result.split('{' + key + '}').join(value);
   });
+  // 第一百零一輪批次 ZB 組：placeholders 沒有 ContactName ⇒ 讀 Config ROSTER_CONTACT_TC（讀不到 ⇒「幹事」）
+  if (result.indexOf('{ContactName}') !== -1) {
+    let contact = '幹事';
+    try { contact = readRosterContactName_(); } catch (err) { contact = '幹事'; }
+    result = result.split('{ContactName}').join(contact);
+  }
   result = result.split('{PersonName}').join(recipient.displayName || '');
   result = result.split('{AssignmentSummary}').join(summary || '');
   result = result.replace(/\{[A-Za-z][A-Za-z0-9]*\}/g, '');
@@ -1584,15 +1608,76 @@ function notifyAdmin_(subject, body, adminEmail, isDryRun) {
 function notifyAdminNoEmail_(noEmailPeople, context, isDryRun) {
   const subject = context.subjectPrefix + context.quarterId + ' 職事表：'
     + noEmailPeople.length + ' 人查無電郵';
-  const body = '以下人員在 NameMapping 沒有電郵地址，未能收到職事表通知：\n\n'
+  const body = '以下人員沒有電郵地址，未能收到職事表通知：\n\n'
     + noEmailPeople.join('\n')
-    + '\n\n請補上電郵後再執行 RESEND。';
+    + '\n\n請在出席系統補上電郵（或在幹事介面「進階與診斷」〔出席系統連結〕補填），之後在第 3 步〔選擇其他〕寄給他們，或在第 4 步印紙本。';
   notifyAdmin_(subject, body, context.adminEmail, isDryRun);
 }
 
 /**
- * 追加階段 N：自動排程自動生成初稿完成後，通知幹事去覆核，不寄給堂委、不寄給事奉人員
- * ——寄給堂委審閱是步驟 2 的責任，要幹事看過初稿、決定沒問題了才手動執行。
+ * 第一百零一輪批次 ZB 組：幹事通知「沒有電郵名單」開關（Config ADMIN_NOTIFY_NO_EMAIL，預設 FALSE＝暫時不用）。
+ * 關掉時不寄，只寫 AuditLog（ADMIN_NOTIFY_SKIPPED）。範本樣本直接叫 notifyAdminNoEmail_()，不受影響。
+ * @param {string[]} noEmailPeople
+ * @param {Object} context
+ * @param {boolean} isDryRun
+ * @returns {boolean} 有沒有寄（或模擬寄）
+ */
+function notifyAdminNoEmailIfEnabled_(noEmailPeople, context, isDryRun) {
+  if (getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_NO_EMAIL, false) === true) {
+    notifyAdminNoEmail_(noEmailPeople, context, isDryRun);
+    return true;
+  }
+  writeAdminNotifySkipped_('沒有電郵名單', context.quarterId, 'ADMIN_NOTIFY_NO_EMAIL',
+    noEmailPeople.length + ' 人沒有電郵');
+  return false;
+}
+
+/**
+ * 第一百零一輪批次 ZB 組：幹事通知「階段提醒」開關（Config ADMIN_NOTIFY_STAGE_REMINDERS，預設 FALSE＝暫時不用）。
+ * @param {string} quarterId
+ * @param {Object} judgment
+ * @param {Object} config
+ * @param {boolean} isDryRun
+ * @returns {boolean} 有沒有寄（或模擬寄）
+ */
+function notifyAdminStageReminderIfEnabled_(quarterId, judgment, config, isDryRun) {
+  if (getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS, false) === true) {
+    notifyAdminStageReminder_(quarterId, judgment, config, isDryRun);
+    return true;
+  }
+  writeAdminNotifySkipped_('階段提醒', quarterId, 'ADMIN_NOTIFY_STAGE_REMINDERS',
+    String(judgment.stage || '') + '（' + (judgment.reasons || []).join('＋') + '）');
+  return false;
+}
+
+/**
+ * 幹事通知關掉了 ⇒ 只寫 AuditLog。
+ * @param {string} kind 通知名稱
+ * @param {string} quarterId
+ * @param {string} configKey
+ * @param {string} detail
+ * @returns {void}
+ */
+function writeAdminNotifySkipped_(kind, quarterId, configKey, detail) {
+  try {
+    writeAuditLog_({
+      action: 'ADMIN_NOTIFY_SKIPPED', targetSheet: '', targetKey: String(quarterId || ''),
+      newValue: kind, source: 'notifyAdmin',
+      notes: '幹事通知「' + kind + '」沒有寄出（Config ' + configKey + ' 不是 TRUE）：' + detail
+    });
+  } catch (err) {
+    log_('WARN', '幹事通知「' + kind + '」關掉了，AuditLog 寫不到：' + err.message);
+  }
+}
+
+/** 第一百零一輪批次 ZB 組：生成完成通知內的幹事介面做法（按鈕名稱照 ScriptMainFlow.html 第 2、3 步）。 */
+const GENERATE_DONE_STEPS_TEXT = '然後：\n'
+  + '1. 在「第 2 步 查看／修改職事表」按〔查看／修改職事表〕覆核初稿（要改就改，改完按〔儲存〕）；\n'
+  + '2. 確認沒問題後，在「第 3 步 寄出」按〔寄給堂委／執事〕。';
+
+/**
+ * 追加階段 N：自動排程自動生成初稿完成後，通知幹事去覆核，不寄給堂委、不寄給事奉人員。
+ * 第一百零一輪批次 ZB 組：只在自動生成開着時用；做法改為幹事介面（深連結、選季度、畫面上的按鈕名稱）。
  * @param {string} quarterId 季度 ID
  * @param {Object} genResult performRosterGeneration_() 的結果，至少含 sheetName
  * @param {Object} config readConfig_() 的結果
@@ -1603,9 +1688,16 @@ function notifyAdminGenerateDone_(quarterId, genResult, config, isDryRun) {
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   const adminEmail = String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || '');
   const subject = prefix + quarterId + ' 初稿已生成，請覆核';
+  let label = quarterId;
+  try { label = buildQuarterLabel_(quarterId); } catch (err) { label = quarterId; }
+  let url = '';
+  try { url = buildPreseasonChangeAdminUrl_(quarterId); } catch (err) { url = ''; }
   const body = quarterId + ' 的職事表初稿已由自動排程生成（' + genResult.sheetName + '）。\n\n'
-    + '請登入試算表覆核內容，確認沒問題後執行「職事表系統 → 四階段流程 → 步驟 2：寄給堂委審閱」。\n\n'
-    + '（本通知只寄給你，不會寄給堂委或事奉人員——寄給堂委審閱是步驟 2 的責任，需要你先看過初稿再決定。）';
+    + (url
+      ? '請按以下連結打開幹事介面（會直接選好「' + label + '」；如沒有，在頂部的季度選單選「' + label + '」）：\n' + url + '\n\n'
+      : '請打開幹事介面，在頂部的季度選單選「' + label + '」。\n\n')
+    + GENERATE_DONE_STEPS_TEXT + '\n\n'
+    + '（本通知只寄給你，不會寄給堂委或事奉人員。）';
   notifyAdmin_(subject, body, adminEmail, isDryRun);
 }
 
@@ -1718,14 +1810,7 @@ function buildAdminConsoleLinkText_() {
       + '（管理員把網址填入 Config 的 WEBAPP_STEWARD_URL 之後，這裏就會直接附上連結。）');
   }
 
-  let sheetUrl = '';
-  try {
-    sheetUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
-  } catch (err) {
-    log_('WARN', 'buildAdminConsoleLinkText_ 取不到試算表網址：' + err.message);
-  }
-  if (sheetUrl) lines.push('職事表試算表：' + sheetUrl);
-
+  // 第一百零一輪批次 ZB 組：主試算表的網址在任何情況下都不可以寄出（包括幹事通知）⇒ 不再附「職事表試算表：」一行。
   return lines.join('\n');
 }
 

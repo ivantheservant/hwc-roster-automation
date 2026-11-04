@@ -14,7 +14,95 @@
  * 只要把新的一項加進這裡，「補齊 Email 範本」自動就會認得，不需要另外建立新選單。
  * TPL_REVIEW_TC（四階段流程「步驟 2：寄給堂委審閱」用）就是照這個方式加進來的。
  */
+/**
+ * 第一百零一輪批次 ZB 組：〔邀請〕信「怎樣申報」一段——要和個人連結頁（PersonalRoster.html）**完全一致**：
+ * 區塊名稱、按鈕名稱、確認後顯示的字。tests/round101_zb_email_templates.test.js 檢查每個「」〔〕名稱都在頁面出現
+ * （狀態欄的字由 PersonalUnavailable.gs UNAVAILABLE_SUBMISSION_STATUS_TC 提供），日後改頁面會提醒要改這一段。
+ */
+const UNAVAILABLE_INVITE_HOW_TO_TEXT = '怎樣申報：打開連結，在「申報不能服侍的日子」按一下你不能服侍的主日（再按一下取消），'
+  + '選擇「全部崗位」或「只限以下崗位」，可以填原因，然後按〔提交〕。'
+  + '幹事或堂委確認之後，頁面下面「我已申報的日子」的狀態會顯示「已確認了你的申請」。'
+  + '截止日之後仍然可以申報，但未必來得及安排。';
+
 const EMAIL_TEMPLATE_SEEDS = [
+  // ═════════════════════════════════════════════════════════════════════
+  // 第一百零一輪批次 ZB 組：照 Ivan 逐項改（以試算表上原有的文字為底本）。
+  //   ・主試算表的網址或 ID 在任何情況下都不可以出現在寄出的電郵：{SpreadsheetUrl} 全部刪除
+  //   ・公開連結那一行一律寫「{QuarterID} 職事表預覽（只供查看，不能修改；內容更新後打開就是最新版）：<連結>」；
+  //     範本沒有寫 ⇒ 系統在信末加（Mailer.gs appendPermanentLinkFooter_()），每封信最多一次
+  //   ・{ContactName}＝Config ROSTER_CONTACT_TC；{VersionLabel}＝例如 2028T3v1
+  //   ・試算表上現有的行不會自動跟着改：幹事介面「進階與診斷」〔更新電郵範本到最新版〕（EmailTemplateUpdate.gs）
+  // ═════════════════════════════════════════════════════════════════════
+  {
+    // 第一百零一輪批次 ZB 組：試算表上一直有這一行（測試工具「寄送（測試模式）」Stage=GENERATE 用），種子補回。
+    templateId: 'TPL_GENERATE_TC',
+    stage: MAIL_STAGES.GENERATE,
+    lang: 'TC',
+    subject: '{QuarterID} 粵語堂職事表（初稿，請覆核）',
+    bodyHtml: '<p>各位堂委、幹事：</p>'
+      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，請按以下連結預覽。</p>'
+      + '<p><strong>{QuarterID} 職事表預覽</strong>（只供查看，不能修改；內容更新後打開就是最新版）：'
+      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
+      + '<p>正式發出日期：{OfficialSendDate}</p>'
+      + '<p>如需修改，請與{ContactName}聯絡，由幹事統一修改；任何人都不可以直接修改試算表。</p>',
+    bodyPlain: '各位堂委、幹事：\n\n'
+      + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，請按以下連結預覽。\n\n'
+      + '{QuarterID} 職事表預覽（只供查看，不能修改；內容更新後打開就是最新版）：{PublicRosterUrl}\n\n'
+      + '正式發出日期：{OfficialSendDate}\n\n'
+      + '如需修改，請與{ContactName}聯絡，由幹事統一修改；任何人都不可以直接修改試算表。',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate},{PublicRosterUrl},{ContactName}',
+    attachType: ATTACH_TYPE.FULL_PDF
+  },
+  {
+    // ⚠️ 這個範本只有測試工具「寄送（測試模式）」指定 Stage=REMIND 才會用到；自動排程的「階段提醒」
+    // 不經這個範本（Trigger.gs judgeRemindAction_() → Mailer.gs notifyAdminStageReminder_()）。
+    templateId: 'TPL_REMIND_TC',
+    stage: MAIL_STAGES.REMIND,
+    lang: 'TC',
+    subject: '提醒：{QuarterID} 職事表將於 {OfficialSendDate} 正式發出',
+    bodyHtml: '<p>各位堂委、幹事：</p>'
+      + '<p>{QuarterID} 職事表將於 {OfficialSendDate} 正式發給各位事奉人員。如需修改，請於該日之前與{ContactName}聯絡。</p>'
+      + '<p><strong>{QuarterID} 職事表預覽</strong>（只供查看，不能修改；內容更新後打開就是最新版）：'
+      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>',
+    bodyPlain: '各位堂委、幹事：\n\n'
+      + '{QuarterID} 職事表將於 {OfficialSendDate} 正式發給各位事奉人員。如需修改，請於該日之前與{ContactName}聯絡。\n\n'
+      + '{QuarterID} 職事表預覽（只供查看，不能修改；內容更新後打開就是最新版）：{PublicRosterUrl}',
+    placeholders: '{QuarterID},{OfficialSendDate},{PublicRosterUrl},{ContactName}',
+    attachType: ATTACH_TYPE.NONE
+  },
+  {
+    templateId: 'TPL_OFFICIAL_TC',
+    stage: MAIL_STAGES.OFFICIAL,
+    lang: 'TC',
+    subject: '{QuarterID} 粵語堂主日職事表（定稿）',
+    // 個人專屬連結、職事表預覽兩行由系統在信末加（PersonalLinkInMail.gs、Mailer.gs）。
+    bodyHtml: '<p>親愛的 {PersonName}：</p>'
+      + '<p>{QuarterID} 的主日職事表已定稿，你的服侍安排如下：</p>'
+      + '<p>{AssignmentSummary}</p>'
+      + '<p>附件是完整職事表，你的名字已加了標示。如未能出席，或有任何疑問，請與{ContactName}聯絡。</p>',
+    bodyPlain: '親愛的 {PersonName}：\n\n'
+      + '{QuarterID} 的主日職事表已定稿，你的服侍安排如下：\n\n'
+      + '{AssignmentSummary}\n\n'
+      + '附件是完整職事表，你的名字已加了標示。如未能出席，或有任何疑問，請與{ContactName}聯絡。',
+    placeholders: '{PersonName},{QuarterID},{AssignmentSummary},{ContactName}',
+    attachType: ATTACH_TYPE.PERSONAL_PDF
+  },
+  {
+    templateId: 'TPL_RESEND_TC',
+    stage: MAIL_STAGES.RESEND,
+    lang: 'TC',
+    subject: '更新：{QuarterID} 粵語堂主日職事表',
+    bodyHtml: '<p>親愛的 {PersonName}：</p>'
+      + '<p>{QuarterID} 職事表有更新，你的服侍安排如下：</p>'
+      + '<p>{AssignmentSummary}</p>'
+      + '<p>請以此電郵為準。</p>',
+    bodyPlain: '親愛的 {PersonName}：\n\n'
+      + '{QuarterID} 職事表有更新，你的服侍安排如下：\n\n'
+      + '{AssignmentSummary}\n\n'
+      + '請以此電郵為準。',
+    placeholders: '{PersonName},{QuarterID},{AssignmentSummary}',
+    attachType: ATTACH_TYPE.PERSONAL_PDF
+  },
   {
     templateId: 'TPL_REVIEW_TC',
     stage: MAIL_STAGES.REVIEW,
@@ -22,103 +110,44 @@ const EMAIL_TEMPLATE_SEEDS = [
     subject: '{QuarterID} 粵語堂職事表初稿——請於 {OfficialSendDate} 正式發出前覆核',
     bodyHtml: '<p>各位堂委、幹事：</p>'
       + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，敬請協助覆核。</p>'
-      + '<p>試算表連結：{SpreadsheetUrl}</p>'
       + '<p>完整版職事表已附於本郵件，方便離線查看。</p>'
       + '<p>本表計劃於 {OfficialSendDate} 正式發給各位事奉人員，敬請於該日之前回覆意見。</p>'
-      + '<p>如需要修改（例如有人不能服侍、或需要指定某人服侍），請直接回覆本郵件說明，'
-      + '由幹事統一處理，請勿直接修改試算表上的儲存格，以便追蹤所有改動。</p>'
+      + '<p>如需要修改（例如有人不能服侍、或需要指定某人服侍），請直接回覆本郵件說明，由幹事統一處理。</p>'
       + '<p>現階段各位事奉人員尚未收到任何通知，本次只在堂委及幹事之間傳閱。</p>'
       + '<p>如有查詢，請直接回覆本郵件。</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表初稿已生成，敬請協助覆核。\n\n'
-      + '試算表連結：{SpreadsheetUrl}\n\n'
       + '完整版職事表已附於本郵件，方便離線查看。\n\n'
       + '本表計劃於 {OfficialSendDate} 正式發給各位事奉人員，敬請於該日之前回覆意見。\n\n'
-      + '如需要修改（例如有人不能服侍、或需要指定某人服侍），請直接回覆本郵件說明，'
-      + '由幹事統一處理，請勿直接修改試算表上的儲存格，以便追蹤所有改動。\n\n'
+      + '如需要修改（例如有人不能服侍、或需要指定某人服侍），請直接回覆本郵件說明，由幹事統一處理。\n\n'
       + '現階段各位事奉人員尚未收到任何通知，本次只在堂委及幹事之間傳閱。\n\n'
       + '如有查詢，請直接回覆本郵件。',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate},{SpreadsheetUrl}',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate}',
     attachType: ATTACH_TYPE.FULL_PDF
   },
   {
-    // 第三輪批次下一輪（新一批階段 B）改寫：舊文字假設「已經上載初稿，等審閱」
-    // 這個單一情境（對應舊版 REMIND 只顧 REVIEW_SENT 一種停滯）。REMIND 現在
-    // 涵蓋 DRAFT／REVIEW_SENT／REQUESTS_APPLIED 三種情境，這裡改成不預設是
-    // 哪一種，改用 {CurrentStage}／{NextAction} 兩個新 placeholder 讓內容
-    // 自動對應目前實際狀態。
-    //
-    // ⚠️ 這個範本目前只有兩種情況會真正用到：(1) 幹事自己用「測試工具 ▸ 寄送
-    // （測試模式）」手動指定 Stage=REMIND 測試；(2) 日後如果有程式碼改成透過
-    // sendStage_() 寄送 REMIND（目前沒有）。**自動排程實際寄出的「Stage 停滯
-    // ／死線接近」提醒，完全不經過這個範本**——那是 Trigger.gs 的
-    // judgeRemindAction_() 直接呼叫 Mailer.gs 的 notifyAdminStageReminder_()，
-    // 訊息文字在程式碼裡直接組出，不讀 EmailTemplates。保留、更新這個範本
-    // 是為了「測試工具 ▸ 寄送（測試模式）」這個既有的人手測試功能，不是自動
-    // 提醒機制本身的一部分，見 docs/系統範圍稽核.md 的詳細說明。
-    templateId: 'TPL_REMIND_TC',
-    stage: MAIL_STAGES.REMIND,
+    // 步驟 5「改動後重發」用的 LIST 摘要範本：跟 TPL_RESEND_TC 同一個 Stage=RESEND，
+    // 但收件人是 EmailRecipients（LIST，例如堂委／幹事）——寄送時由 ResendFlow.gs 的
+    // sendResendStage_() 用 findEmailTemplateById_() 直接指定。
+    templateId: 'TPL_RESEND_LIST_TC',
+    stage: MAIL_STAGES.RESEND,
     lang: 'TC',
-    subject: '{QuarterID} 粵語堂職事表提醒——目前狀態：{CurrentStage}',
+    subject: '{QuarterID} 粵語堂職事表已改動重發（{VersionLabel}）——本輪異動摘要',
     bodyHtml: '<p>各位堂委、幹事：</p>'
-      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表目前狀態：{CurrentStage}，現提醒各位跟進。</p>'
-      + '<p>下一步：{NextAction}</p>'
-      + '<p>職事表計劃於 {OfficialSendDate} 正式發送給各服侍人員，請在此之前完成所需的步驟。</p>'
-      + '<p>試算表連結：{SpreadsheetUrl}</p>'
-      + '<p>如有查詢，請直接回覆本郵件。</p>',
+      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動已重新發出（版本 {VersionLabel}），'
+      + '本輪有異動的人員及其最新安排如下：</p>'
+      + '<p>{ChangedPeopleSummary}</p>'
+      + '<p>完整版職事表已作為附件。如有查詢，請直接回覆本郵件。</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
-      + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表目前狀態：{CurrentStage}，現提醒各位跟進。\n\n'
-      + '下一步：{NextAction}\n\n'
-      + '職事表計劃於 {OfficialSendDate} 正式發送給各服侍人員，請在此之前完成所需的步驟。\n\n'
-      + '試算表連結：{SpreadsheetUrl}\n\n'
-      + '如有查詢，請直接回覆本郵件。',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{OfficialSendDate},{SpreadsheetUrl},{CurrentStage},{NextAction}',
-    attachType: ATTACH_TYPE.NONE
+      + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動已重新發出（版本 {VersionLabel}），'
+      + '本輪有異動的人員及其最新安排如下：\n\n'
+      + '{ChangedPeopleSummary}\n\n'
+      + '完整版職事表已作為附件。如有查詢，請直接回覆本郵件。',
+    placeholders: '{QuarterID},{StartDate},{EndDate},{VersionLabel},{ChangedPeopleSummary}',
+    attachType: ATTACH_TYPE.FULL_PDF
   },
   {
-    templateId: 'TPL_OFFICIAL_TC',
-    stage: MAIL_STAGES.OFFICIAL,
-    lang: 'TC',
-    subject: '{QuarterID} 粵語堂職事表——敬請留意閣下的服侍安排',
-    bodyHtml: '<p>{PersonName} 弟兄／姊妹：</p>'
-      + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經確定，閣下本季的服侍安排如下：</p>'
-      + '<p>{AssignmentSummary}</p>'
-      + '<p>個人版職事表已作為附件，敬請查收並預留時間。如因特殊情況未能出席，請盡早聯絡幹事安排調動。</p>'
-      // 第十一輪批次階段 A：一季一條固定連結。呢一段刻意用 try/catch 包住
-      // 產生（見 Mailer.gs 的 resolvePublicRosterUrlForPlaceholder_()），
-      // 未發佈過公開職事表時 {PublicRosterUrl} 會被 applyPlaceholders_() 清走，
-      // 呢句本身唔會露出未代入嘅花括號，但會變成「完整職事表：」後面直接
-      // 空白——呢句本身係選擇性嘅裝飾句，唔係必要資訊，可以接受。
-      + '<p>如想隨時查看完整版職事表（同一條連結，之後排表有改動也是這一條）：'
-      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
-      + '<p>多謝配搭服侍！</p>',
-    bodyPlain: '{PersonName} 弟兄／姊妹：\n\n'
-      + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經確定，閣下本季的服侍安排如下：\n\n'
-      + '{AssignmentSummary}\n\n'
-      + '個人版職事表已作為附件，敬請查收並預留時間。如因特殊情況未能出席，請盡早聯絡幹事安排調動。\n\n'
-      + '如想隨時查看完整版職事表（同一條連結，之後排表有改動也是這一條）：{PublicRosterUrl}\n\n'
-      + '多謝配搭服侍！',
-    placeholders: '{PersonName},{QuarterID},{StartDate},{EndDate},{AssignmentSummary},{SpreadsheetUrl},{PublicRosterUrl}',
-    attachType: ATTACH_TYPE.PERSONAL_PDF
-  },
-  {
-    // 第九輪批次階段 C 新增，修正一個實測會發生、但一直沒有人發現的內容問題。
-    //
-    // 問題：步驟 4「正式發出」同時有兩種收件人——每一位有服侍的事奉人員（PERSON）
-    // 與 EmailRecipients 中 Stage 欄含 OFFICIAL 的名單（LIST，例如堂委、教會
-    // 辦公室；2027T1 實測就有 2 位）。修正前兩者共用 TPL_OFFICIAL_TC，於是
-    // LIST 收件人收到的是一封：
-    //   - 稱呼自己「XXX 弟兄／姊妹」（LIST 是一份名單，不是一個人）；
-    //   - 「閣下本季的服侍安排如下：」後面**完全空白**（LIST 收件人沒有
-    //     personId，buildAssignmentSummary_() 回傳空字串，而 deliverOne_()
-    //     的「本季您暫時沒有任何服侍安排」替代句只對 PERSON 收件人生效）；
-    //   - 聲稱「個人版職事表已作為附件」，但 generateMailAttachment_() 對
-    //     PERSONAL_PDF ＋ 非 PERSON 收件人一律回傳 null，**實際上沒有附件**。
-    // 三個問題疊在一起，就是一封讀起來明顯壞掉、而且講了兩句不實內容的信。
-    //
-    // 修正方式沿用步驟 5 已經驗證過的同一套做法（TPL_RESEND_LIST_TC）：
-    // LIST 收件人用自己的範本，附完整版 PDF。sendStage_() 依收件人類型選範本，
-    // 見 Mailer.gs。
+    // 步驟 4「正式發出」的 LIST 收件人（堂委、教會辦公室等）用的範本，附完整版 PDF。
     templateId: 'TPL_OFFICIAL_LIST_TC',
     stage: MAIL_STAGES.OFFICIAL,
     lang: 'TC',
@@ -127,69 +156,13 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
       + '並已於今日分別發送給本季各位有服侍的事奉人員，每位收到的是自己那一份個人職事表。</p>'
       + '<p>完整版職事表已作為附件，方便各位存檔及查閱。</p>'
-      + '<p>公開版連結（同一條連結，之後排表有改動也是這一條）：'
-      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
-      + '<p>如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
-      + '由幹事統一處理後再重新發出，請勿直接修改試算表上的儲存格，以便追蹤所有改動。</p>'
-      + '<p>試算表連結：{SpreadsheetUrl}</p>',
+      + '<p>如發現任何需要調動的地方，請直接回覆本郵件通知幹事，由幹事統一處理後再重新發出。</p>',
     bodyPlain: '各位堂委、幹事：\n\n'
       + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表已經定稿，'
       + '並已於今日分別發送給本季各位有服侍的事奉人員，每位收到的是自己那一份個人職事表。\n\n'
       + '完整版職事表已作為附件，方便各位存檔及查閱。\n\n'
-      + '公開版連結（同一條連結，之後排表有改動也是這一條）：{PublicRosterUrl}\n\n'
-      + '如發現任何需要調動的地方，請直接回覆本郵件通知幹事，'
-      + '由幹事統一處理後再重新發出，請勿直接修改試算表上的儲存格，以便追蹤所有改動。\n\n'
-      + '試算表連結：{SpreadsheetUrl}',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{SpreadsheetUrl},{PublicRosterUrl}',
-    attachType: ATTACH_TYPE.FULL_PDF
-  },
-  {
-    templateId: 'TPL_RESEND_TC',
-    stage: MAIL_STAGES.RESEND,
-    lang: 'TC',
-    subject: '{QuarterID} 粵語堂職事表更新——敬請留意最新安排',
-    bodyHtml: '<p>{PersonName} 弟兄／姊妹：</p>'
-      + '<p>平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動有所更新，'
-      + '閣下本季最新的服侍安排如下：</p>'
-      + '<p>{AssignmentSummary}</p>'
-      + '<p>最新版個人職事表已作為附件，敬請以此為準。如有疑問，請直接回覆本郵件或聯絡幹事。</p>'
-      + '<p>如想隨時查看完整版職事表（同一條連結，之後排表有改動也是這一條）：'
-      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
-      + '<p>多謝配搭服侍！</p>',
-    bodyPlain: '{PersonName} 弟兄／姊妹：\n\n'
-      + '平安！{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動有所更新，閣下本季最新的服侍安排如下：\n\n'
-      + '{AssignmentSummary}\n\n'
-      + '最新版個人職事表已作為附件，敬請以此為準。如有疑問，請直接回覆本郵件或聯絡幹事。\n\n'
-      + '如想隨時查看完整版職事表（同一條連結，之後排表有改動也是這一條）：{PublicRosterUrl}\n\n'
-      + '多謝配搭服侍！',
-    placeholders: '{PersonName},{QuarterID},{StartDate},{EndDate},{AssignmentSummary},{SpreadsheetUrl},{PublicRosterUrl}',
-    attachType: ATTACH_TYPE.PERSONAL_PDF
-  },
-  {
-    // 步驟 5「改動後重發」用的 LIST 摘要範本：跟 TPL_RESEND_TC 同一個 Stage=RESEND，
-    // 但收件人是 EmailRecipients（LIST，例如堂委／幹事），不是逐一事奉人員——寄送時由
-    // ResendFlow.gs 的 sendResendStage_() 用 findEmailTemplateById_() 直接指定要
-    // 用哪一個範本，不經過 Stage 判斷，見 Mailer.gs 的 findEmailTemplate_() 檔頭註解。
-    templateId: 'TPL_RESEND_LIST_TC',
-    stage: MAIL_STAGES.RESEND,
-    lang: 'TC',
-    subject: '{QuarterID} 粵語堂職事表已改動重發——本輪異動摘要',
-    bodyHtml: '<p>各位堂委、幹事：</p>'
-      + '<p>{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動已重新發出，'
-      + '本輪有異動的人員及其最新安排如下：</p>'
-      + '<p>{ChangedPeopleSummary}</p>'
-      + '<p>完整版職事表已作為附件。</p>'
-      + '<p>公開版連結（同一條連結，之後排表有改動也是這一條）：'
-      + '<a href="{PublicRosterUrl}">{PublicRosterUrl}</a></p>'
-      + '<p>如有查詢，請直接回覆本郵件。</p>',
-    bodyPlain: '各位堂委、幹事：\n\n'
-      + '{QuarterID}（{StartDate} 至 {EndDate}）的職事表因人手調動已重新發出，'
-      + '本輪有異動的人員及其最新安排如下：\n\n'
-      + '{ChangedPeopleSummary}\n\n'
-      + '完整版職事表已作為附件。\n\n'
-      + '公開版連結（同一條連結，之後排表有改動也是這一條）：{PublicRosterUrl}\n\n'
-      + '如有查詢，請直接回覆本郵件。',
-    placeholders: '{QuarterID},{StartDate},{EndDate},{ChangedPeopleSummary},{SpreadsheetUrl},{PublicRosterUrl}',
+      + '如發現任何需要調動的地方，請直接回覆本郵件通知幹事，由幹事統一處理後再重新發出。',
+    placeholders: '{QuarterID},{StartDate},{EndDate}',
     attachType: ATTACH_TYPE.FULL_PDF
   },
   // 第八十五輪批次 LF 組：季前資料（PreseasonPack.gs；不經 sendStage_()，Stage 欄只作標記）
@@ -219,15 +192,13 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '<p>平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，'
       + '請在 {Deadline} 之前用你的個人專屬連結申報：</p>'
       + '<p><a href="{PersonalLink}">{PersonalLink}</a></p>'
-      + '<p>怎樣申報：打開連結，在「申報不能服侍的日子」按一下不能服侍的主日，選擇全部崗位或只限某些崗位（可以填原因），然後按〔提交〕。'
-      + '幹事或堂委確認之後，頁面會顯示「已確認了你的申請」。截止日之後仍然可以申報，但未必來得及安排。</p>'
+      + '<p>' + UNAVAILABLE_INVITE_HOW_TO_TEXT + '</p>'
       + '<p>這條連結只供你本人使用，請不要轉發。</p>',
     bodyPlain: '{PersonName}：\n\n'
       + '平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，'
       + '請在 {Deadline} 之前用你的個人專屬連結申報：\n\n'
       + '{PersonalLink}\n\n'
-      + '怎樣申報：打開連結，在「申報不能服侍的日子」按一下不能服侍的主日，選擇全部崗位或只限某些崗位（可以填原因），然後按〔提交〕。'
-      + '幹事或堂委確認之後，頁面會顯示「已確認了你的申請」。截止日之後仍然可以申報，但未必來得及安排。\n\n'
+      + UNAVAILABLE_INVITE_HOW_TO_TEXT + '\n\n'
       + '這條連結只供你本人使用，請不要轉發。',
     placeholders: '{QuarterLabel},{GenerateDate},{Deadline},{PersonalLink}',
     attachType: ATTACH_TYPE.NONE

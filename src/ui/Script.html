@@ -170,6 +170,9 @@
     'apiGetInvitePaperView',
     // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面——只讀
     'apiGetPreAssignView',
+    // 第一百零一輪批次 ZB 組：〔更新電郵範本到最新版〕比對、〔預覽電郵範本〕——只讀
+    'apiPlanEmailTemplateUpdate',
+    'apiPreviewTemplateSamples',
     // 第八十五輪批次 LF 組：〔寄出季前資料〕預覽——只讀
     'apiPreseasonPreview',
     'apiListUnavailable',
@@ -938,7 +941,9 @@
   /** 文字對上面的規則、但只是打開一個只看的畫面。 */
   const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請事奉人員申報不能服侍的日子'];
   /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
-  const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結'];
+  const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結',
+    // 第一百零一輪批次 ZB 組：只讀
+    '預覽電郵範本'];
 
   /** 這粒按鈕的文字是不是會改動資料（只可查看的人要變灰）。 */
   function isViewOnlyBlockedLabel_(label) {

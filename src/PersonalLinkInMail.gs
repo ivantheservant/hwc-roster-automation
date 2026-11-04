@@ -93,25 +93,35 @@ function describeAttachOption_(attachType) {
   return '';
 }
 
+/** 第一百零一輪批次 ZB 組：個人專屬連結那一行的文字（取代「你自己那一份（打開只看到你有份服侍的日子）」）。 */
+const PERSONAL_LINK_LINE_DECLARE = '你的職事表預覽，亦可以在此申報你哪些日子不能事奉';
+/** 第一階段（ROLLOUT_AUDIENCE=LEADERS）收件人不是堂委／執事／幹事時用。 */
+const PERSONAL_LINK_LINE_VIEW_ONLY = '你的職事表預覽（只供查看）';
+
 /**
  * 個人專屬連結那一段（純文字版）。
  * @param {string} url 網址
+ * @param {boolean=} canDeclare false ⇒ 只寫「只供查看」（預設 true）
  * @returns {string} 段落
  */
-function buildPersonalLinkFooterPlain_(url) {
-  return '\n\n你自己那一份（打開只看到你有份服侍的日子）：\n' + url;
+function buildPersonalLinkFooterPlain_(url, canDeclare) {
+  return '\n\n' + (canDeclare === false ? PERSONAL_LINK_LINE_VIEW_ONLY : PERSONAL_LINK_LINE_DECLARE) + '：\n' + url;
 }
 
 /**
  * 同上，HTML 版。⚠️ 網址要轉義——它來自資料，理論上可以含 `&`。
  * @param {string} url 網址
+ * @param {boolean=} canDeclare
  * @returns {string} HTML
  */
-function buildPersonalLinkFooterHtml_(url) {
+function buildPersonalLinkFooterHtml_(url, canDeclare) {
   const safe = String(url)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-  return '<p>你自己那一份（打開只看到你有份服侍的日子）：<br>'
+  const label = canDeclare === false
+    ? '<strong>你的職事表預覽</strong>（只供查看）'
+    : '<strong>你的職事表預覽</strong>，亦可以在此申報你哪些日子不能事奉';
+  return '<p>' + label + '：<br>'
     + '<a href="' + safe + '">' + safe + '</a></p>';
 }
 
@@ -126,13 +136,14 @@ function buildPersonalLinkFooterHtml_(url) {
  * @param {string} text 已經套用完 placeholder 的內文
  * @param {string} url 個人專屬連結（拿不到時傳空字串）
  * @param {boolean} isHtml 是不是 HTML 版
+ * @param {boolean=} canDeclare 第一百零一輪批次 ZB 組：false ⇒「只供查看」（預設 true）
  * @returns {string} 加完（或者原封不動）的內文
  */
-function appendPersonalLinkFooter_(text, url, isHtml) {
+function appendPersonalLinkFooter_(text, url, isHtml, canDeclare) {
   const link = String(url || '').trim();
   if (!link) return text;
   return String(text || '')
-    + (isHtml ? buildPersonalLinkFooterHtml_(link) : buildPersonalLinkFooterPlain_(link));
+    + (isHtml ? buildPersonalLinkFooterHtml_(link, canDeclare) : buildPersonalLinkFooterPlain_(link, canDeclare));
 }
 
 /**

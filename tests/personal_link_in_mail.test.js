@@ -109,7 +109,8 @@ console.log('\n=== E【核心】攞唔到連結 ⇒ 整段略過，唔可以出�
   const withLink = gas.appendPersonalLinkFooter_(body, BASE + '?p=T&q=Q', false);
   check('★★★★★ 有連結 ⇒ 加，而且講明「打開只看到你有份服侍的日子」'
     + '——唔講嘅話佢唔知同永久連結有咩分別',
-    withLink.indexOf('你自己那一份') !== -1 && withLink.indexOf('?p=T&q=Q') !== -1,
+    // 第一百零一輪批次 ZB 組（刻意改動）：「你自己那一份」改為「你的職事表預覽，亦可以在此申報…」
+    withLink.indexOf('你的職事表預覽，亦可以在此申報你哪些日子不能事奉') !== -1 && withLink.indexOf('?p=T&q=Q') !== -1,
     withLink);
 
   const html = gas.appendPersonalLinkFooter_(body, BASE + '?p=T&q=Q', true);
@@ -134,8 +135,9 @@ console.log('\n=== E：接上寄信路徑 ===');
     /const decidedAttach = context\.sendDecision/.test(bare), bare.slice(0, 600));
   check('★★★★★ 兩邊內文都有加（HTML 同純文字）'
     + '——只做一邊嘅話，用純文字睇信嗰啲人就冇連結',
-    /appendPersonalLinkFooter_\([\s\S]{0,200}personalUrl, true\)/.test(bare)
-    && /appendPersonalLinkFooter_\([\s\S]{0,200}personalUrl, false\)/.test(bare),
+    // 第一百零一輪批次 ZB 組：多了第四個參數 canDeclare（第一階段只供查看）
+    /appendPersonalLinkFooter_\([\s\S]{0,200}personalUrl, true, canDeclare\)/.test(bare)
+    && /appendPersonalLinkFooter_\([\s\S]{0,200}personalUrl, false, canDeclare\)/.test(bare),
     bare.slice(0, 900));
   check('★★★★★ 個人連結排喺永久連結**之前**'
     + '（對收件人嚟講「我自己嗰幾格」比「全體嗰一份」有用得多）',

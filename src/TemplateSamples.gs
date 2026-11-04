@@ -258,12 +258,14 @@ function buildTemplateSamples_(quarterId, toEmail) {
     }
     const permanentLink = (placeholders || {}).PublicRosterUrl || '';
     const hasCancelled = !!(ics && ics.cancelledCount > 0);
+    // 第一百零一輪批次 ZB 組：和正式寄信同一支判斷（第一階段不是堂委／執事／幹事 ⇒ 只供查看）
+    const canDeclare = !personalUrl || isMailDeclareAllowed_(ctx, personId);
     let html = appendPermanentLinkFooter_(appendPersonalLinkFooter_(
-      applyPlaceholders_(t.template.bodyHtml, placeholders, recipient, sampleSummary), personalUrl, true),
-      t.template.bodyHtml, permanentLink, true);
+      applyPlaceholders_(t.template.bodyHtml, placeholders, recipient, sampleSummary), personalUrl, true, canDeclare),
+      t.template.bodyHtml, permanentLink, true, quarterId);
     let plain = appendPermanentLinkFooter_(appendPersonalLinkFooter_(
-      applyPlaceholders_(t.template.bodyPlain, placeholders, recipient, sampleSummary), personalUrl, false),
-      t.template.bodyPlain, permanentLink, false);
+      applyPlaceholders_(t.template.bodyPlain, placeholders, recipient, sampleSummary), personalUrl, false, canDeclare),
+      t.template.bodyPlain, permanentLink, false, quarterId);
     if (ics) {
       html = appendIcsNotice_(html, hasCancelled, true);
       plain = appendIcsNotice_(plain, hasCancelled, false);
@@ -393,4 +395,31 @@ function runSendTemplateSamples_() {
   } catch (err) {
     ui.alert(title, '沒有寄出：\n\n' + err.message, ui.ButtonSet.OK);
   }
+}
+
+/**
+ * 第一百零一輪批次 ZB 組：〔預覽電郵範本〕——和〔寄出電郵範本樣本〕同一份內容，但**不寄**，只在畫面顯示。**只讀。**
+ * 每一封同時檢查：有沒有主試算表 ID、有沒有「義工」、有沒有「試算表連結」（部署後核對用）。
+ * @param {string} quarterId 季度 ID
+ * @returns {{samples: Object[], hasVersion: boolean, versionNo: number}}
+ */
+function apiPreviewTemplateSamples(quarterId) {
+  assertWebAppRequestAllowed_('apiPreviewTemplateSamples');
+  const q = String(quarterId || '').trim() || '2028T3';
+  const built = buildTemplateSamples_(q, 'preview@example.invalid');
+  const ids = readBlockedSpreadsheetIds_();
+  const total = built.samples.length;
+  return {
+    hasVersion: built.hasVersion, versionNo: built.versionNo,
+    samples: built.samples.map(function (s, i) {
+      const text = [s.subject, s.bodyPlain, s.bodyHtml || ''].join('\n');
+      return {
+        title: buildTemplateSampleSubject_(i + 1, total, s.name, s.subject),
+        name: s.name, subject: s.subject, bodyPlain: s.bodyPlain,
+        hasSpreadsheetId: findSpreadsheetIdLeak_({ subject: s.subject, bodyPlain: s.bodyPlain, bodyHtml: s.bodyHtml }, ids) !== '',
+        hasOldWord: text.indexOf(['義', '工'].join('')) !== -1,   // 舊用字（分開兩個字寫，免得用字掃描當作介面文字）
+        hasSheetLink: text.indexOf('試算表連結') !== -1
+      };
+    })
+  };
 }
