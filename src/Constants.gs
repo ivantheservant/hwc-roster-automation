@@ -391,7 +391,7 @@ const COLUMNS = {
     // 名稱＝自行輸入（例如「宣教月」）。空白＝不是合堂。不影響職事表和生成，只給週報系統讀。
     COMBINED_KIND: 'CombinedKind',
     COMBINED_NAME: 'CombinedName',
-    // 第九十輪批次 QB 組：詩班獻詩（開季前準備〔詩班獻詩〕）。TRUE＝這個主日詩班獻詩；空白＝不是。週報系統讀取。
+    // 第九十輪批次 QB 組：詩班獻詩（開季前準備〔詩班獻詩日期〕）。TRUE＝這個主日詩班獻詩；空白＝不是。週報系統讀取。
     CHOIR_SINGING: 'ChoirSinging'
   },
   SPECIAL_SUNDAYS: {

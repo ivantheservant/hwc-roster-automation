@@ -1,11 +1,11 @@
-// 第九十輪批次 QB 組：詩班名單、〔詩班獻詩〕、規則 SEMI_CHOIR_SUNDAY。
+// 第九十輪批次 QB 組：詩班名單、〔詩班獻詩日期〕、規則 SEMI_CHOIR_SUNDAY。
 // 執行方式：node tests/round90_qb_choir.test.js
 //
 // 音樂部意見（Ivan 2026-10-30 決定）：詩班獻詩的主日，詩班員盡量不另派崗位；詩班名單用事奉人員表維護。
 //
 //   QB1 Posts：ShowInRoster=FALSE 的行（詩班）不是職事表崗位——readPosts_ 每個讀取點都不見；
 //       只有「崗位名單」工作表見到；選單工具補建欄位、建立詩班名單（已有就不加）；自我檢查照樣通過
-//   QB2 〔詩班獻詩〕：讀取、儲存（自動加欄、AuditLog、重新開啟仍在、沒有改動＝0）
+//   QB2 〔詩班獻詩日期〕：讀取、儲存（自動加欄、AuditLog、重新開啟仍在、沒有改動＝0）
 //   QB3 規則：詩班獻詩的主日，詩班名單上的人擔任任何崗位 ⇒ SEMI_HARD 提醒；其他主日不提醒；可關；
 //       「堂委」「執事」按當日身分展開；人手填的格照樣提醒（系統不改）；人手檢查不計
 //   QB4 生成：避開詩班員；找不到其他人才排並提醒
@@ -128,7 +128,7 @@ console.log('\n=== QB1：Posts 讀取點 ===');
 }
 
 // =====================================================================
-console.log('\n=== QB2：〔詩班獻詩〕儲存 ===');
+console.log('\n=== QB2：〔詩班獻詩日期〕儲存 ===');
 {
   const sc = scene();
   const g = sc.gas; const D = sc.DATES; const S = sc.S; const C = sc.C;
@@ -300,7 +300,7 @@ console.log('\n=== QB7：畫面、清單、文件 ===');
   const body = ui.document.getElementById('zone2Body');
   const rowBtns = body.flatten().filter((n) => /\brow\b/.test(n.className || ''))
     .map((r) => r.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent)).filter((l) => l.indexOf('合堂主日') !== -1)[0];
-  check('★★★★★★ 〔詩班獻詩〕在〔合堂主日〕旁邊', rowBtns && rowBtns.indexOf('詩班獻詩') === rowBtns.indexOf('合堂主日') + 1, JSON.stringify(rowBtns));
+  check('★★★★★★ 〔詩班獻詩日期〕在〔合堂主日〕旁邊', rowBtns && rowBtns.indexOf('詩班獻詩日期') === rowBtns.indexOf('合堂主日') + 1, JSON.stringify(rowBtns));
   const saved = [];
   ui.callServer = async function (name) {
     if (name === 'apiGetChoirSinging') {
@@ -316,7 +316,7 @@ console.log('\n=== QB7：畫面、清單、文件 ===');
     const title = ui.document.getElementById('modalTitle').textContent;
     const mb = ui.document.getElementById('modalBody');
     const boxes = mb.flatten().filter((n) => n.tagName === 'INPUT' && n.type === 'checkbox');
-    check('★★★★★ 視窗標題「詩班獻詩：2028年7-9月」', title === '詩班獻詩：2028年7-9月', title);
+    check('★★★★★ 視窗標題「詩班獻詩日期：2028年7-9月」（第一百零一輪 ZC-2 改名）', title === '詩班獻詩日期：2028年7-9月', title);
     check('★★★★★ 每個主日一個勾選格（第 2 週已勾）', boxes.length === 2 && boxes[0].checked === false && boxes[1].checked === true);
     check('★★★★ 說明句、詩班人數', /勾選詩班獻詩的主日/.test(mb.textContent) && /詩班名單：3 人/.test(mb.textContent), mb.textContent);
     boxes[0].checked = true;

@@ -340,14 +340,15 @@ function describePreseasonStatus_(sent, generateDate, daysBefore) {
  * @param {string} mode PRESEASON_SEND_MODE
  * @returns {{dryRun: boolean, sent: number, simulated: number, failed: Object[], recipients: Object[], noEmail: string[]}}
  */
-function sendPreseasonPack_(quarterId, mode) {
+function sendPreseasonPack_(quarterId, mode, selection) {
   const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
   const quarterRow = findQuarter_(quarterId);
   const generateDate = quarterRow ? readPreseasonGenerateDate_(quarterRow, config) : '';
   const pack = buildPreseasonPack_(quarterId, today, generateDate);
-  const who = buildPreseasonRecipients_(today);
+  // 第一百零一輪批次 ZE-1：人手寄出用幹事選的收件人；自動寄出照舊（堂委＋執事＋幹事＋額外收件人）
+  const who = (mode === PRESEASON_SEND_MODE.MANUAL && selection) ? preseasonRecipientsFromSelection_(selection, today) : buildPreseasonRecipients_(today);
   const tpl = findEmailTemplateById_(PRESEASON_TEMPLATE_ID) || preseasonTemplateDefault_();
   const placeholders = { QuarterLabel: pack.quarterLabel, QuarterID: quarterId, GenerateDate: generateDate || '生成日',
     PreseasonContentHtml: pack.html, PreseasonContentPlain: pack.plain };
@@ -417,7 +418,7 @@ function runPreseasonAutoSend_(quarterRow, today, config) {
  * @param {string} quarterId 季度 ID
  * @returns {Object}
  */
-function apiPreseasonPreview(quarterId) {
+function apiPreseasonPreview(quarterId, selection) {
   assertWebAppRequestAllowed_('apiPreseasonPreview');
   const id = String(quarterId || '').trim();
   beginSheetReadMemo_();
@@ -428,8 +429,11 @@ function apiPreseasonPreview(quarterId) {
     const row = findQuarter_(id);
     const generateDate = row ? readPreseasonGenerateDate_(row, config) : '';
     const pack = buildPreseasonPack_(id, today, generateDate);
-    const who = buildPreseasonRecipients_(today);
+    // 第一百零一輪批次 ZE-1／ZE-3：收件人選擇；窗頂列出「這封信會寄出」的內容（照 pack.sections，不多寫不少寫）
+    const who = preseasonRecipientsFromSelection_(selection || null, today);
     return { quarterId: id, quarterLabel: pack.quarterLabel, generateDate: generateDate, sections: pack.sections,
+      contentsLine: buildPreseasonContentsLine_(pack.sections), notIncludedLine: PRESEASON_NOT_INCLUDED_TEXT,
+      audience: buildAudienceOptions_(AUDIENCE_PURPOSE.PRESEASON, today), selection: who.selection,
       recipients: who.recipients, noEmail: who.noEmail, dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
       sentRecord: readPreseasonSentRecord_(id) };
   } finally {
@@ -442,12 +446,13 @@ function apiPreseasonPreview(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {Object} sendPreseasonPack_() 的結果
  */
-function apiPreseasonSend(quarterId) {
+function apiPreseasonSend(quarterId, selection) {
   assertWebAppRequestAllowed_();
   return withMutationLock_('寄出季前資料', function () {
     // 第九十五輪批次 VB 組：打開幹事介面不再一定同步 ⇒ 寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀不到不會令寄出失敗）
     syncPeopleFromHwcasBeforeSend_();
-    return sendPreseasonPack_(String(quarterId || '').trim(), PRESEASON_SEND_MODE.MANUAL);
+    // 第一百零一輪批次 ZE-1：勾選由 sendPreseasonPack_() 解析（第一階段違規會拋錯，一封都不寄）；不傳 ⇒ 預設（堂委＋執事＋幹事）
+    return sendPreseasonPack_(String(quarterId || '').trim(), PRESEASON_SEND_MODE.MANUAL, selection || null);
   });
 }
 
@@ -462,4 +467,36 @@ function readPreseasonStatusText_(quarterId) {
   const generateDate = row ? readPreseasonGenerateDate_(row, config) : '';
   return describePreseasonStatus_(readPreseasonSentRecord_(quarterId), generateDate,
     Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)));
+}
+
+/** 第一百零一輪批次 ZE-3：〔寄出季前資料〕窗頂一句：不包括申報連結。 */
+const PRESEASON_NOT_INCLUDED_TEXT = '不包括申報不能服侍日子的連結（那是〔寄出／匯出申報不能服侍日子連結〕）。';
+
+/**
+ * 第一百零一輪批次 ZE-3：「這封信會寄出：①… ②…」——照季前資料實際的段落標題（去掉「一、」等編號），不多寫不少寫。
+ * @param {Object[]} sections buildPreseasonPack_().sections
+ * @returns {string}
+ */
+function buildPreseasonContentsLine_(sections) {
+  const marks = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+  const items = (sections || []).map(function (s, i) {
+    const title = String((s && s.title) || '').replace(/^[一二三四五六七八九十]+、/, '').replace(/（[^）]*）$/, '');
+    return (marks[i] || '(' + (i + 1) + ')') + title;
+  });
+  return '這封信會寄出：' + items.join(' ');
+}
+
+/**
+ * 第一百零一輪批次 ZE-1：由勾選得到季前資料的收件人（形狀和 buildPreseasonRecipients_() 一樣）。
+ * @param {?Object} selection 不傳 ⇒ 預設（堂委＋執事＋幹事）
+ * @param {string} todayStr
+ * @returns {{recipients: Object[], noEmail: string[], selection: Object}}
+ */
+function preseasonRecipientsFromSelection_(selection, todayStr) {
+  const r = resolveAudienceSelection_(AUDIENCE_PURPOSE.PRESEASON, selection, todayStr);
+  return {
+    recipients: r.people.concat(r.extra).map(function (p) { return { email: p.email, displayName: p.displayName, why: p.why }; }),
+    noEmail: r.noEmail.map(function (p) { return p.displayName; }),
+    selection: r.selection
+  };
 }

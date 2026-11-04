@@ -857,7 +857,7 @@
       title: '更改各崗位的事奉人員名單',
       note: '開一張工作表，一個崗位一欄。在裏面自由增刪改，改完回來按「儲存並套用名單」。',
       acts: [
-        stepButton('開啟名單工作表', openEligibilitySheet),
+        stepButton('開啟事奉人員名單', openEligibilitySheet),
         stepButton('儲存並套用名單', openApplyEligibilitySheet, { className: 'secondary' })
       ]
     });
@@ -866,7 +866,7 @@
   function openEligibilitySheet() {
     // 第八十七輪批次 NB 組：只可查看 ⇒ 不開試算表，改為唯讀視窗
     if (viewOnly_) { openEligibilityViewOnly(); return; }
-    runAction('開啟名單工作表', async () => {
+    runAction('開啟事奉人員名單', async () => {
       const r = await callServerMutating('apiOpenEligibilitySheet');
       const link = make('a', { text: '開啟「' + r.sheetName + '」', className: 'bigLink' });
       link.href = r.url;

@@ -21,7 +21,9 @@ function buildUnavailableScene(opts) {
     config: Object.assign({
       WEBAPP_ENABLED: ['TRUE', 'BOOL'], LEAD_DAYS_GENERATE: ['-21', 'INT'],
       WEBAPP_VOLUNTEER_URL: ['https://example.invalid/vol/exec', 'STR'],
-      MAIL_ADMIN_NOTIFY: ['clerk@example.invalid', 'STR']
+      MAIL_ADMIN_NOTIFY: ['clerk@example.invalid', 'STR'],
+      // 第一百零一輪批次 ZE-2：這批測試測的是申報本身（第一百零一輪之前人人可以申報）⇒ 開放範圍設為 ALL；第一階段另有 round101_ze 測試
+      ROLLOUT_AUDIENCE: ['ALL', 'ENUM']
     }, opts.config || {})
   });
   const g = sc.gas; const C = sc.C; const S = sc.S;

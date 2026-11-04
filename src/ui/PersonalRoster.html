@@ -244,7 +244,7 @@
   </div>
 
   <div class="how-to">
-    <p><strong>如果這一週不能服侍：</strong>還未排表的主日，可以在上面「申報不能服侍的日子」申報，幹事或堂委確認後生效；已經排了你的那一週，請直接聯絡幹事安排調動，不要自行更改試算表內容。</p>
+    <p><strong>如果這一週不能服侍：</strong><span id="howToDeclare">還未排表的主日，可以在上面「申報不能服侍的日子」申報，幹事或堂委確認後生效；已經排了你的那一週，請直接聯絡幹事安排調動，不要自行更改試算表內容。</span></p>
   </div>
 
   <p class="updated">最後更新：<?= data.updatedAt ?>（此連結長期有效，之後排表更新會自動反映在這裏）</p>
@@ -274,6 +274,7 @@
         var runner = google.script.run
           .withSuccessHandler(function (res) {
             busy = false;
+            if (res && res.closed) { renderClosed(res.message); return; }   // 第一百零一輪批次 ZE-2
             render((res && res.view) || view, (res && res.message) || '', !(res && res.ok));
           })
           .withFailureHandler(function (err) {
@@ -466,7 +467,16 @@
         renderMine(view);
       }
 
-      render(boot.view, '', false);
+      // 第一百零一輪批次 ZE-2：第一階段只開放給堂委、執事及幹事——其他人只看到一句，下面的提示一併改寫
+      function renderClosed(text) {
+        body.innerHTML = '';
+        body.appendChild(el('p', text || boot.closedText || '', 'closed-note'));
+        var how = document.getElementById('howToDeclare');
+        if (how) how.textContent = '已經排了你的那一週，如不能服侍，請直接聯絡幹事安排調動。';
+      }
+
+      if (boot.closed) renderClosed(boot.closedText);
+      else render(boot.view, '', false);
     })();
 
     // 第十一輪批次階段 D：只用 localStorage，完全冇任何伺服器端腳本呼叫

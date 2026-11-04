@@ -102,4 +102,173 @@
       openModal('預覽電郵範本（' + currentQuarterId + '）', nodes, [button('關閉', () => closeModal(), '')]);
     });
   }
+
+  /* ============================================================
+   * 第一百零一輪批次 ZE-1：收件人選擇（共用元件）
+   *   用於〔寄出季前資料〕及〔寄出／匯出申報不能服侍日子連結〕。
+   *   sel＝{groups, personIds, emails}；按〔更新收件人名單〕由伺服器重新列出全部收件人（同一份判斷）。
+   * ============================================================ */
+
+  function renderAudiencePicker(opts, sel, onRefresh) {
+    const box = make('div', { className: 'sec' }, [sectionTitle('① 寄給誰')]);
+    const groupIds = sel.groups || (sel.groups = []);
+    (opts.groups || []).forEach((g) => {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'aud-group';
+      cb.checked = groupIds.indexOf(g.id) !== -1 && g.allowed;
+      cb.disabled = !g.allowed;
+      cb.addEventListener('change', () => {
+        const i = groupIds.indexOf(g.id);
+        if (cb.checked && i === -1) groupIds.push(g.id);
+        if (!cb.checked && i !== -1) groupIds.splice(i, 1);
+      });
+      const line = make('label', { className: 'check-row' + (g.allowed ? '' : ' disabled') });
+      line.appendChild(cb);
+      line.appendChild(make('span', { text: g.label }));
+      if (g.note) line.appendChild(make('span', { text: '　' + g.note, className: 'muted' }));
+      box.appendChild(line);
+    });
+    // 指定的人（可多選）
+    const picked = sel.personIds || (sel.personIds = []);
+    const pickBox = make('details', { className: 'aud-pick' });
+    pickBox.open = picked.length > 0;
+    pickBox.appendChild(make('summary', { text: '指定的人（從名單選，可多選；已選 ' + picked.length + ' 位）' }));
+    if (opts.leadersOnly) pickBox.appendChild(make('div', { text: '不是堂委、執事或幹事的人不可以選：' + opts.leadersOnlyNote, className: 'muted' }));
+    (opts.people || []).forEach((p) => {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'aud-person';
+      cb.checked = picked.indexOf(p.personId) !== -1 && p.allowed;
+      cb.disabled = !p.allowed;
+      cb.addEventListener('change', () => {
+        const i = picked.indexOf(p.personId);
+        if (cb.checked && i === -1) picked.push(p.personId);
+        if (!cb.checked && i !== -1) picked.splice(i, 1);
+      });
+      const line = make('label', { className: 'check-row' + (p.allowed ? '' : ' disabled') });
+      line.appendChild(cb);
+      line.appendChild(make('span', { text: p.name + (p.hasEmail ? '' : '（沒有電郵）') }));
+      pickBox.appendChild(line);
+    });
+    box.appendChild(pickBox);
+    if (opts.allowEmails) {
+      const ta = document.createElement('textarea');
+      ta.className = 'aud-emails';
+      ta.rows = 2;
+      ta.placeholder = '另外輸入電郵（可以留空；多個用逗號分開）';
+      ta.value = (sel.emails || []).join(', ');
+      ta.addEventListener('input', () => { sel.emails = ta.value.split(/[,，;；\s]+/).map((x) => x.trim()).filter(Boolean); });
+      box.appendChild(ta);
+    }
+    box.appendChild(row([button('更新收件人名單', () => onRefresh(sel), 'secondary')]));
+    return box;
+  }
+
+  /** 季前資料、申報連結共用：② 列出收件人。 */
+  function audienceListBox(title, names, emptyText) {
+    const box = make('div', { className: 'sec' }, [sectionTitle(title)]);
+    box.appendChild(make('div', { text: names.length ? names.join('、') : emptyText, className: names.length ? 'vio-row' : 'muted' }));
+    return box;
+  }
+
+  /* ---------- 〔寄出季前資料〕 ---------- */
+
+  function openPreseasonSend(sel) {
+    runAction('讀取季前資料', async () => {
+      const p = await callServer('apiPreseasonPreview', currentQuarterId, sel || null);
+      const s = p.selection || { groups: [], personIds: [], emails: [] };
+      const nodes = [
+        // 第一百零一輪批次 ZE-3：窗最上面講明會寄出甚麼、不包括甚麼
+        make('div', { className: 'warnbox' }, [
+          make('div', { text: p.contentsLine || '', className: 'warn-head' }),
+          make('div', { text: p.notIncludedLine || '' })
+        ]),
+        para(p.generateDate ? ('生成日是 ' + humanDate(p.generateDate) + '。') : '這一季沒有生成日期。', 'muted')
+      ];
+      nodes.push(renderAudiencePicker(p.audience, s, (next) => openPreseasonSend(next)));
+      nodes.push(audienceListBox('② 收件人（' + (p.recipients || []).length + ' 位；同一地址只收一封）',
+        (p.recipients || []).map((r) => r.displayName + '（' + r.why + '）'), '一位都沒有。'));
+      if ((p.noEmail || []).length > 0) nodes.push(make('div', { text: '沒有電郵，收不到：' + p.noEmail.join('、'), className: 'err-text' }));
+      (p.sections || []).forEach((sec) => {
+        const box = make('details', { className: 'sec' });
+        box.appendChild(make('summary', { text: sec.title }));
+        (sec.lines || []).forEach((l) => box.appendChild(make('div', { text: '・' + l, className: 'vio-row' })));
+        nodes.push(box);
+      });
+      if (p.sentRecord) {
+        const sr = p.sentRecord;
+        const modeOf = (m) => (m === 'AUTO' ? '自動' : '人手');
+        nodes.push(para(sr.real
+          ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次（' + modeOf(sr.real.mode) + '）；再寄會再收到一封。'
+          : '這一季在 ' + sr.date + ' 只有模擬寄出（' + modeOf(sr.mode) + '），沒有真正寄出過；模擬不算已寄出。', 'muted'));
+      }
+      openModal('寄出季前資料：' + (p.quarterLabel || currentQuarterId), nodes, [
+        button('寄出', () => runAction('寄出季前資料', async () => {
+          const r = await callServerMutating('apiPreseasonSend', currentQuarterId, s);
+          openModal('寄出季前資料', [make('div', {
+            text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
+              : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
+            className: 'ok-line'
+          })], [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /* ---------- ZC-3〔寄出／匯出申報不能服侍日子連結〕 ---------- */
+
+  // 按鈕名稱 UNAVAILABLE_LINK_BUTTON_LABEL 在 ScriptZone2.html（開季前準備那一行用；同一個全域只可以宣告一次）
+
+  function openUnavailableInvite(sel) {
+    runAction('讀取申報連結', async () => {
+      const p = await callServer('apiUnavailableLinkPreview', currentQuarterId, sel || null);
+      const s = p.selection || { groups: [], personIds: [], emails: [] };
+      const nodes = [
+        para('寄信給選了的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。'
+          + '沒有電郵的人，同時產生一份 Word 檔（每人一頁），讓你印出交給他們。', 'muted'),
+        para('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 預覽電郵範本」。', 'muted'),
+        make('div', { className: 'sec' }, [sectionTitle('截止日'),
+          make('div', { text: p.deadline ? humanDate(p.deadline) + '（生成日 ' + humanDate(p.generateDate) + ' 之前）'
+            : '這一季沒有生成日期，信內會寫「生成日之前」。', className: 'vio-row' })])
+      ];
+      nodes.push(renderAudiencePicker(p.audience, s, (next) => openUnavailableInvite(next)));
+      nodes.push(audienceListBox('② 會收到電郵（' + (p.recipientNames || []).length + ' 位）', p.recipientNames || [], '一位都沒有。'));
+      nodes.push(audienceListBox('沒有電郵，會產生 Word 檔（' + (p.noEmail || []).length + ' 位）', p.noEmail || [], '沒有。'));
+      if ((p.noLink || []).length > 0) {
+        nodes.push(make('div', { text: '沒有個人專屬連結，不會寄、亦不會產生（先在「進階與診斷」〔補發個人專屬連結〕）：'
+          + p.noLink.join('、'), className: 'err-text' }));
+      }
+      if (p.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定事奉人員個人連結的網址，寄不出。請管理員先設定。', className: 'err-text' }));
+      if (p.sentRecord) {
+        const sr = p.sentRecord;
+        nodes.push(para(sr.real ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次；再寄會再收到一封。'
+          : '這一季在 ' + sr.date + ' 只有模擬寄出，沒有真正寄出過；模擬不算已寄出。', 'muted'));
+      }
+      openModal(UNAVAILABLE_LINK_BUTTON_LABEL + '：' + (p.quarterLabel || currentQuarterId), nodes, [
+        button('寄出及匯出', () => runAction(UNAVAILABLE_LINK_BUTTON_LABEL, async () => {
+          const r = await callServerMutating('apiUnavailableLinkSendAndExport', currentQuarterId, s);
+          const done = [make('div', {
+            text: r.dryRun ? ('電郵：模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
+              : ('電郵：寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
+            className: 'ok-line'
+          })];
+          if (r.paper && r.paper.fileUrl) {
+            done.push(make('div', { text: 'Word 檔：' + r.paper.count + ' 位沒有電郵的人（每人一頁），存在這一季的 PDF 資料夾。', className: 'ok-line' }));
+            const link = make('a', { text: '開啟／下載 Word 檔' + (r.paper.fileName ? '（' + r.paper.fileName + '）' : ''), className: 'bigLink' });
+            link.href = r.paper.fileUrl;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            done.push(link);
+          }
+          openModal(UNAVAILABLE_LINK_BUTTON_LABEL, done, [button('完成', () => closeModalAndRefresh(), '')]);
+        }), ''),
+        button('取消', () => closeModal(), 'secondary')
+      ]);
+    });
+  }
+
+  /** 舊入口〔沒有電郵的人：匯出邀請〕（深連結、舊按鈕）⇒ 轉到合併後的窗。 */
+  function openInvitePaper() { openUnavailableInvite(); }
 </script>

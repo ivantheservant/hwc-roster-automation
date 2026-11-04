@@ -78,18 +78,18 @@
       button('不能服侍的日期', () => openUnavailable(), ''),
       button('排表偏好', () => openWeights(), ''),
       button('合堂主日', () => openCombinedServices(), ''),
-      // 第九十輪批次 QB 組：〔詩班獻詩〕放在〔合堂主日〕旁邊
-      button('詩班獻詩', () => openChoirSinging(), ''),
-      // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕放在〔詩班獻詩〕旁邊
+      // 第九十輪批次 QB 組：〔詩班獻詩日期〕放在〔合堂主日〕旁邊
+      button('詩班獻詩日期', () => openChoirSinging(), ''),
+      // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕放在〔詩班獻詩日期〕旁邊
       button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), '')
     ]));
     // 第八十五輪批次 LF 組：〔寄出季前資料〕（先預覽內容和收件人，再寄）
     // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕（請事奉人員用個人專屬連結申報不能服侍；先預覽，再寄）
+    // 第一百零一輪批次 ZC-3：〔邀請…〕＋〔沒有電郵的人：匯出邀請〕合併為〔寄出／匯出申報不能服侍日子連結〕（同一個窗：選收件人、列出名單、一個確認）
     body.appendChild(row([button('寄出季前資料', () => openPreseasonSend(), 'secondary'),
-      button('邀請事奉人員申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));
-    // 第九十七輪批次 XA／XB 組：〔補填電郵〕（不寫回出席系統）；〔沒有電郵的人：匯出邀請〕（Word 檔或寄給自己）
-    body.appendChild(row([button('補填電郵', () => openManualEmails(), 'secondary'),
-      button(INVITE_PAPER_BUTTON_LABEL, () => openInvitePaper(), 'secondary')]));
+      button(UNAVAILABLE_LINK_BUTTON_LABEL, () => openUnavailableInvite(), 'secondary')]));
+    // 第九十七輪批次 XA 組：〔補填電郵〕（不寫回出席系統）
+    body.appendChild(row([button('補填電郵', () => openManualEmails(), 'secondary')]));
 
     // 第八十五輪批次 LD 組：人手檢查——有問題才顯示「人手不足：N 個崗位」及〔人手檢查〕
     const st = d && d.staffing;
@@ -177,7 +177,7 @@
   }
 
   /**
-   * 第九十輪批次 QB 組：〔詩班獻詩〕——這一季每個主日一行，勾選「詩班獻詩」→〔儲存〕。
+   * 第九十輪批次 QB 組：〔詩班獻詩日期〕——這一季每個主日一行，勾選「詩班獻詩」→〔儲存〕。
    * 那幾個主日，詩班名單上的人盡量不擔任其他崗位（SEMI_CHOIR_SUNDAY）；亦傳給週報系統。
    */
   function openChoirSinging() {
@@ -194,15 +194,15 @@
       });
       const head = [para(data.note || '')];
       if (data.choirCount === 0) {
-        head.push(para('詩班名單現時是空的——在「開季前準備 ▸ 開啟名單工作表」的「詩班」一欄填。', 'muted'));
+        head.push(para('詩班名單現時是空的——在「開季前準備 ▸ 開啟事奉人員名單」的「詩班」一欄填。', 'muted'));
       } else if (data.choirCount > 0) {
         head.push(para('詩班名單：' + data.choirCount + ' 人。', 'muted'));
       }
-      openModal('詩班獻詩：' + (data.quarterLabel || currentQuarterId), head.concat([list]), [
+      openModal('詩班獻詩日期：' + (data.quarterLabel || currentQuarterId), head.concat([list]), [
         button('儲存', () => runAction('儲存詩班獻詩', async () => {
           const items = rows.map((r) => ({ serviceDate: r.serviceDate, singing: !!r.box.checked }));
           const res = await callServerMutating('apiSaveChoirSinging', currentQuarterId, items);
-          openModal('詩班獻詩', [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
+          openModal('詩班獻詩日期', [make('div', { text: res.message || '已儲存。', className: 'ok-line' })],
             [button('完成', () => closeModalAndRefresh(), '')]);
         }), ''),
         button('取消', () => closeModal(), 'secondary')
@@ -293,90 +293,10 @@
     ]);
   }
 
-  /** 第八十五輪批次 LF 組：〔寄出季前資料〕——預覽（七段內容＋收件人＋沒有電郵的人）→〔寄出〕→「模擬／寄出 N 封」。 */
-  function openPreseasonSend() {
-    runAction('讀取季前資料', async () => {
-      const p = await callServer('apiPreseasonPreview', currentQuarterId);
-      const nodes = [para('會寄給寄出當日的現任堂委、執事和幹事'
-        + (p.generateDate ? '；生成日是 ' + humanDate(p.generateDate) + '。' : '。'), 'muted')];
-      (p.sections || []).forEach((s) => {
-        const box = make('div', { className: 'sec' }, [sectionTitle(s.title)]);
-        (s.lines || []).forEach((l) => box.appendChild(make('div', { text: '・' + l, className: 'vio-row' })));
-        nodes.push(box);
-      });
-      const who = make('div', { className: 'sec' }, [sectionTitle('收件人（' + (p.recipients || []).length + ' 位）')]);
-      (p.recipients || []).forEach((r) => who.appendChild(make('div', { text: '・' + r.displayName + '（' + r.why + '）', className: 'vio-row' })));
-      if ((p.noEmail || []).length > 0) {
-        who.appendChild(make('div', { text: '沒有電郵，收不到：' + p.noEmail.join('、'), className: 'err-text' }));
-      }
-      nodes.push(who);
-      // 第八十六輪批次 MA 組：講明之前是模擬還是真正寄出（模擬不算已寄出）
-      if (p.sentRecord) {
-        const sr = p.sentRecord;
-        const modeOf = (m) => (m === 'AUTO' ? '自動' : '人手');
-        nodes.push(para(sr.real
-          ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次（' + modeOf(sr.real.mode) + '）；再寄會再收到一封。'
-          : '這一季在 ' + sr.date + ' 只有模擬寄出（' + modeOf(sr.mode) + '），沒有真正寄出過；模擬不算已寄出。', 'muted'));
-      }
-      openModal('寄出季前資料：' + (p.quarterLabel || currentQuarterId), nodes, [
-        button('寄出', () => runAction('寄出季前資料', async () => {
-          const r = await callServerMutating('apiPreseasonSend', currentQuarterId);
-          openModal('寄出季前資料', [make('div', {
-            text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
-              : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
-            className: 'ok-line'
-          })], [button('完成', () => closeModalAndRefresh(), '')]);
-        }), ''),
-        button('取消', () => closeModal(), 'secondary')
-      ]);
-    });
-  }
+  /** 第一百零一輪批次 ZC-3：合併後的按鈕名稱（和伺服器端 UnavailableInvite.gs 同一句）。 */
+  const UNAVAILABLE_LINK_BUTTON_LABEL = '寄出／匯出申報不能服侍日子連結';
 
-  /**
-   * 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕——先預覽（人數、截止日、沒有電郵的人），再〔寄出〕。
-   */
-  function openUnavailableInvite() {
-    runAction('讀取邀請內容', async () => {
-      const p = await callServer('apiUnavailableInvitePreview', currentQuarterId);
-      const nodes = [
-        para('寄信給本季可能被安排的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。', 'muted'),
-        para('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。', 'muted')
-      ];
-      nodes.push(make('div', { className: 'sec' }, [
-        sectionTitle('截止日'),
-        make('div', { text: p.deadline ? humanDate(p.deadline) + '（生成日 ' + humanDate(p.generateDate) + ' 之前）'
-          : '這一季沒有生成日期，信內會寫「生成日之前」。', className: 'vio-row' })
-      ]));
-      const who = make('div', { className: 'sec' }, [sectionTitle('收件人：' + p.recipientCount + ' 位')]);
-      if ((p.recipientNames || []).length > 0) who.appendChild(make('div', { text: p.recipientNames.join('、'), className: 'vio-row muted' }));
-      if ((p.noEmail || []).length > 0) {
-        who.appendChild(make('div', { text: '沒有電郵（請幹事代為輸入）：' + p.noEmail.join('、'), className: 'err-text' }));
-        // 第九十七輪批次 XB 組：那一行旁邊——沒有電郵的人可以印出邀請（或寄給自己）
-        who.appendChild(row([button(INVITE_PAPER_BUTTON_LABEL, () => openInvitePaper(), 'secondary')]));
-      }
-      if ((p.noLink || []).length > 0) {
-        who.appendChild(make('div', { text: '沒有個人專屬連結，不會寄（先按「維護 ▸ 補發個人專屬連結 token」）：' + p.noLink.join('、'), className: 'err-text' }));
-      }
-      nodes.push(who);
-      if (p.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定事奉人員個人連結的網址，寄不出。請管理員先設定。', className: 'err-text' }));
-      if (p.sentRecord) {
-        const sr = p.sentRecord;
-        nodes.push(para(sr.real ? '這一季已經在 ' + sr.real.date + ' 真正寄出過一次；再寄會再收到一封。'
-          : '這一季在 ' + sr.date + ' 只有模擬寄出，沒有真正寄出過；模擬不算已寄出。', 'muted'));
-      }
-      openModal('邀請事奉人員申報不能服侍的日子：' + (p.quarterLabel || currentQuarterId), nodes, [
-        button('寄出', () => runAction('邀請事奉人員申報不能服侍的日子', async () => {
-          const r = await callServerMutating('apiUnavailableInviteSend', currentQuarterId);
-          openModal('邀請事奉人員申報不能服侍的日子', [make('div', {
-            text: r.dryRun ? ('模擬 ' + r.simulated + ' 封（測試模式，沒有真正寄出）')
-              : ('寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
-            className: 'ok-line'
-          })], [button('完成', () => closeModalAndRefresh(), '')]);
-        }), ''),
-        button('取消', () => closeModal(), 'secondary')
-      ]);
-    });
-  }
+  // 第一百零一輪批次 ZE／ZC-3：〔寄出季前資料〕〔寄出／匯出申報不能服侍日子連結〕（合併了〔沒有電郵的人：匯出邀請〕）搬到 ScriptZone5.html。
 
   /* ============================================================
    * 第九十七輪批次 XA 組：〔補填電郵〕——幹事補填電郵（寫 NameMapping.ManualEmail，不寫回出席系統）
@@ -441,79 +361,6 @@
       manualEmailData_ = r.view;
       renderManualEmails_();
       setStatus(r.message);
-    });
-  }
-
-  /* ============================================================
-   * 第九十七輪批次 XB 組：〔沒有電郵的人：匯出邀請〕——Word 檔（每人一頁）或寄給自己
-   * ============================================================ */
-
-  const INVITE_PAPER_BUTTON_LABEL = '沒有電郵的人：匯出邀請';
-  let invitePaperData_ = null;
-  /** 畫面上的勾選格（{cb, personId}）。 */
-  let invitePaperChecks_ = [];
-
-  function openInvitePaper() {
-    runAction('讀取沒有電郵的人', async () => {
-      invitePaperData_ = await callServer('apiGetInvitePaperView', currentQuarterId);
-      renderInvitePaper_();
-    });
-  }
-
-  function renderInvitePaper_() {
-    const d = invitePaperData_ || { people: [] };
-    invitePaperChecks_ = [];
-    const nodes = [para('這一季申報邀請的對象之中，沒有電郵的人。勾選要匯出的人：', 'muted'), para(d.hint || '', 'muted')];
-    const list = make('div', { className: 'sec' }, [sectionTitle('沒有電郵：' + d.people.length + ' 位')]);
-    if (d.people.length === 0) list.appendChild(para('這一季申報邀請的對象全部都有電郵。', 'muted'));
-    d.people.forEach((p) => {
-      const label = make('label', { className: 'check-row' });
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.className = 'invite-paper-cb';
-      invitePaperChecks_.push({ cb: cb, personId: p.personId });
-      cb.checked = !!p.hasLink;   // 預設全部勾選（沒有個人連結的不可以選）
-      cb.disabled = !p.hasLink;
-      label.appendChild(cb);
-      label.appendChild(make('span', { text: p.displayName + (p.hasLink ? '' : '（沒有個人專屬連結，先補發 token）') }));
-      list.appendChild(label);
-    });
-    if (d.people.length > 0) {
-      list.appendChild(row([
-        button('全選', () => setInvitePaperChecks_(true), 'link'),
-        button('全部不選', () => setInvitePaperChecks_(false), 'link')
-      ]));
-    }
-    nodes.push(list);
-    if (d.baseUrlMissing) nodes.push(make('div', { text: '還沒有設定事奉人員個人連結的網址，產生不到。請管理員先設定。', className: 'err-text' }));
-    openModal(INVITE_PAPER_BUTTON_LABEL + '：' + (d.quarterLabel || currentQuarterId), nodes, [
-      button('產生 docx', () => runInvitePaper_('apiExportInvitePaperDocx'), ''),
-      button('寄給自己', () => runInvitePaper_('apiEmailInvitePaperToSelf'), 'secondary'),
-      button('關閉', () => closeModal(), 'secondary')
-    ]);
-  }
-
-  function setInvitePaperChecks_(on) {
-    invitePaperChecks_.forEach((x) => { if (!x.cb.disabled) x.cb.checked = on; });
-  }
-
-  function selectedInvitePaperIds_() {
-    return invitePaperChecks_.filter((x) => x.cb.checked && !x.cb.disabled).map((x) => x.personId);
-  }
-
-  function runInvitePaper_(apiName) {
-    const ids = selectedInvitePaperIds_();
-    runAction(apiName === 'apiExportInvitePaperDocx' ? '產生 Word 檔' : '寄給自己', async () => {
-      const r = await callServerMutating(apiName, currentQuarterId, ids);
-      const nodes = [make('div', { text: r.message, className: 'ok-line strong' })];
-      if (r.fileUrl) {
-        const link = make('a', { text: '開啟／下載 Word 檔' + (r.fileName ? '（' + r.fileName + '）' : ''), className: 'bigLink' });
-        link.href = r.fileUrl;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        nodes.push(link);
-      }
-      openModal(INVITE_PAPER_BUTTON_LABEL, nodes, [button('知道了', () => closeModal(), '')]);
     });
   }
 

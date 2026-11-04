@@ -157,7 +157,7 @@
     'apiGetStaffingChangeNote',
     // 第八十五輪批次 LE 組：〔合堂主日〕讀取——只讀
     'apiGetCombinedServices',
-    // 第九十輪批次 QB 組：〔詩班獻詩〕讀取——只讀
+    // 第九十輪批次 QB 組：〔詩班獻詩日期〕讀取——只讀
     'apiGetChoirSinging',
     // 第九十四輪批次 UB 組：「事奉人員申報，確認」畫面——只讀
     'apiGetUnavailableConfirmView',
@@ -173,6 +173,8 @@
     // 第一百零一輪批次 ZB 組：〔更新電郵範本到最新版〕比對、〔預覽電郵範本〕——只讀
     'apiPlanEmailTemplateUpdate',
     'apiPreviewTemplateSamples',
+    // 第一百零一輪批次 ZC-3／ZE-1：〔寄出／匯出申報不能服侍日子連結〕窗的內容——只讀
+    'apiUnavailableLinkPreview',
     // 第八十五輪批次 LF 組：〔寄出季前資料〕預覽——只讀
     'apiPreseasonPreview',
     'apiListUnavailable',
@@ -939,7 +941,7 @@
     /^不接受$/, /^全部接受$/
   ];
   /** 文字對上面的規則、但只是打開一個只看的畫面。 */
-  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '邀請事奉人員申報不能服侍的日子'];
+  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結'];
   /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
   const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結',
     // 第一百零一輪批次 ZB 組：只讀
@@ -1073,6 +1075,9 @@
     weights: () => openWeights(),
     staffing: () => openStaffingCheck(),
     preseason: () => openPreseasonSend(),
+    // 第一百零一輪批次 ZC-3：舊的申報邀請、匯出邀請 ⇒ 合併後的〔寄出／匯出申報不能服侍日子連結〕
+    invite: () => openUnavailableInvite(),
+    invitepaper: () => openUnavailableInvite(),
     // 第九十四輪批次 UB 組：「事奉人員申報，確認」（新申報通知信內的連結）
     'unavailable-confirm': () => openUnavailableConfirm()
   };

@@ -9758,9 +9758,9 @@ const MUTATIONS = [
   },
   {
     id: "qb-ui-no-button",
-    why: "開季前準備沒有〔詩班獻詩〕",
+    why: "開季前準備沒有〔詩班獻詩日期〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('詩班獻詩', () => openChoirSinging(), '')",
+    find: "      button('詩班獻詩日期', () => openChoirSinging(), '')",
     replace: "      null",
     tests: ["tests/round90_qb_choir.test.js"]
   },
@@ -11882,8 +11882,8 @@ const MUTATIONS = [
     id: "ya-ui-button",
     why: "開季前準備沒有按鈕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button('詩班獻詩', () => openChoirSinging(), ''),\n",
-    replace: "      button('詩班獻詩', () => openChoirSinging(), '')\n    ]));\n    body.appendChild(row([\n",
+    find: "      button('詩班獻詩日期', () => openChoirSinging(), ''),\n",
+    replace: "      button('詩班獻詩日期', () => openChoirSinging(), '')\n    ]));\n    body.appendChild(row([\n",
     tests: ["tests/round98_ya_preassign.test.js","tests/round85_le_combined.test.js"]
   },
   {
@@ -12349,6 +12349,166 @@ const MUTATIONS = [
     find: "  const built = buildTemplateSamples_(q, 'preview@example.invalid');",
     replace: "  sendTemplateSamples_(q, 'admin@example.invalid');\n  const built = buildTemplateSamples_(q, 'preview@example.invalid');",
     tests: ["tests/round101_zb_email_templates.test.js"]
+  },
+  {
+    id: "zc-elig-old-name",
+    why: "按鈕仍是〔開啟名單工作表〕",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "stepButton('開啟事奉人員名單', openEligibilitySheet)",
+    replace: "stepButton('開啟名單工作表', openEligibilitySheet)",
+    tests: ["tests/round101_zc_buttons.test.js"]
+  },
+  {
+    id: "zc-elig-err-old",
+    why: "錯誤指引仍是舊名",
+    file: "src/EligibilitySheetEditor.gs",
+    find: "      ['先按「開啟事奉人員名單」，改完再回來按這個按鈕']));",
+    replace: "      ['先按「開啟名單工作表」，改完再回來按這個按鈕']));",
+    tests: ["tests/round101_zc_buttons.test.js"]
+  },
+  {
+    id: "zc-choir-old-name",
+    why: "按鈕仍是〔詩班獻詩〕",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button('詩班獻詩日期', () => openChoirSinging(), ''),",
+    replace: "      button('詩班獻詩', () => openChoirSinging(), ''),",
+    tests: ["tests/round101_zc_buttons.test.js"]
+  },
+  {
+    id: "zc-old-invite-btn",
+    why: "舊〔邀請…〕按鈕仍在",
+    file: "src/ui/ScriptZone2.html",
+    find: "      button(UNAVAILABLE_LINK_BUTTON_LABEL, () => openUnavailableInvite(), 'secondary')]));",
+    replace: "      button('邀請事奉人員申報不能服侍的日子', () => openUnavailableInvite(), 'secondary')]));",
+    tests: ["tests/round101_zc_buttons.test.js","tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-all-allowed",
+    why: "第一階段「全部事奉人員」仍可選",
+    file: "src/SendAudience.gs",
+    find: "    { id: AUDIENCE_GROUP.ALL, label: '全部事奉人員（' + g.all.length + ' 位）', allowed: !leadersOnly,",
+    replace: "    { id: AUDIENCE_GROUP.ALL, label: '全部事奉人員（' + g.all.length + ' 位）', allowed: true,",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-server-all",
+    why: "伺服器端不擋「全部事奉人員」",
+    file: "src/SendAudience.gs",
+    find: "  if (leadersOnly && groups.indexOf(AUDIENCE_GROUP.ALL) !== -1) {",
+    replace: "  if (false) {",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-server-pick",
+    why: "伺服器端不擋非領袖的指定的人",
+    file: "src/SendAudience.gs",
+    find: "  const notLeader = pickIds.filter(function (id) { return leadersOnly && !g.lookup.isLeader(id); });",
+    replace: "  const notLeader = [];",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-pick-allowed",
+    why: "指定的人非領袖仍可選",
+    file: "src/SendAudience.gs",
+    find: "    const allowed = !leadersOnly || g.lookup.isLeader(id);",
+    replace: "    const allowed = true;",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-dedupe-email",
+    why: "季前資料同一地址收兩封",
+    file: "src/SendAudience.gs",
+    find: "    if (seenEmail[k]) { if (seenEmail[k].why.indexOf(why) === -1) seenEmail[k].why += '、' + why; return; }",
+    replace: "    if (false) { return; }",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-default-invite",
+    why: "申報連結預設不按開放範圍",
+    file: "src/SendAudience.gs",
+    find: "  if (purpose === AUDIENCE_PURPOSE.INVITE && rollout === ROLLOUT_AUDIENCE.ALL) return [AUDIENCE_GROUP.ALL];",
+    replace: "  if (purpose === AUDIENCE_PURPOSE.INVITE) return [AUDIENCE_GROUP.ALL];",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-rollout-default",
+    why: "開放範圍預設 ALL",
+    file: "src/RolloutAudience.gs",
+    find: "  return v === ROLLOUT_AUDIENCE.ALL ? ROLLOUT_AUDIENCE.ALL : ROLLOUT_AUDIENCE.LEADERS;",
+    replace: "  return v === ROLLOUT_AUDIENCE.LEADERS ? ROLLOUT_AUDIENCE.LEADERS : ROLLOUT_AUDIENCE.ALL;",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-admin-email",
+    why: "幹事（MAIL_ADMIN_NOTIFY）不算領袖",
+    file: "src/RolloutAudience.gs",
+    find: "      if (email && adminEmails.indexOf(email) !== -1) push(admin, String(row[COLUMNS.NAME_MAPPING.PERSON_ID] || '').trim());",
+    replace: "",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-page-open",
+    why: "個人連結頁非領袖仍可申報",
+    file: "src/WebAppPersonalLink.gs",
+    find: "    if (!isPersonalDeclareAllowed_(personId, now.timezone, now.today)) {",
+    replace: "    if (false) {",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-submit-open",
+    why: "提交申報伺服器端沒有把關",
+    file: "src/PersonalUnavailable.gs",
+    find: "  if (!isPersonalDeclareAllowed_(person.personId, now.timezone, now.today)) {\n    return { ok: false, message: fillContactName_(ROLLOUT_DECLARE_CLOSED_TEXT), added: 0, view: null, closed: true };",
+    replace: "  if (false) {\n    return { ok: false, message: fillContactName_(ROLLOUT_DECLARE_CLOSED_TEXT), added: 0, view: null, closed: true };",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-page-closed-ui",
+    why: "頁面沒有顯示「暫時未開放」",
+    file: "src/ui/PersonalRoster.html",
+    find: "      if (boot.closed) renderClosed(boot.closedText);\n      else render(boot.view, '', false);",
+    replace: "      render(boot.view, '', false);",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-old-invite-all",
+    why: "舊邀請入口不按開放範圍",
+    file: "src/UnavailableInvite.gs",
+    find: "  const who = resolvedWho || resolveInviteAudience_(null, today);",
+    replace: "  const who = resolvedWho || buildUnavailableInviteRecipients_(today);",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-no-paper",
+    why: "合併窗沒有同時產生 Word 檔",
+    file: "src/UnavailableInvite.gs",
+    find: "    if (who.noEmailPeople.length > 0) {\n      const made = createInvitePaperDocx_(id, who.noEmailPeople);",
+    replace: "    if (false) {\n      const made = createInvitePaperDocx_(id, who.noEmailPeople);",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-preseason-sel",
+    why: "季前資料人手寄出不理勾選",
+    file: "src/PreseasonPack.gs",
+    find: "  const who = (mode === PRESEASON_SEND_MODE.MANUAL && selection) ? preseasonRecipientsFromSelection_(selection, today) : buildPreseasonRecipients_(today);",
+    replace: "  const who = buildPreseasonRecipients_(today);",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-contents-line",
+    why: "季前資料窗頂內容寫死（多寫）",
+    file: "src/PreseasonPack.gs",
+    find: "  return '這封信會寄出：' + items.join(' ');",
+    replace: "  return '這封信會寄出：' + items.join(' ') + ' ⑧申報連結';",
+    tests: ["tests/round101_ze_audience.test.js"]
+  },
+  {
+    id: "ze-not-included",
+    why: "沒有寫「不包括申報連結」",
+    file: "src/PreseasonPack.gs",
+    find: "const PRESEASON_NOT_INCLUDED_TEXT = '不包括申報不能服侍日子的連結（那是〔寄出／匯出申報不能服侍日子連結〕）。';",
+    replace: "const PRESEASON_NOT_INCLUDED_TEXT = '';",
+    tests: ["tests/round101_ze_audience.test.js"]
   }
 ];
 

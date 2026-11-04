@@ -4,7 +4,7 @@
 //   NB7　頁頂「你只有查看權限」；會改動的按鈕變灰、滑鼠停留「你只有查看權限」、按了不做任何事；只看的按鈕照樣可以按
 //   NB8　〔開始〕按鈕：預設當作改動，只有列明的唯讀工具可以按；常用設定那兩條試算表連結變灰
 //   NB9　callServerMutating 不送出；開機不建立季度、不由出席系統更新電郵；狀態卡不畫試算表連結
-//   NB10　〔開啟名單工作表〕⇒ 唯讀視窗「崗位名單（只可查看）」；可以修改的人照舊開試算表
+//   NB10　〔開啟事奉人員名單〕⇒ 唯讀視窗「崗位名單（只可查看）」；可以修改的人照舊開試算表
 //   NB11　〔查看／修改職事表〕⇒ 公開職事表；沒有公開連結 ⇒「這一季還沒有公開職事表」
 //   NB12　唯讀崗位名單的內容：每個崗位一段；「堂委」寫明現任；暫時不做的人註明
 // 下面用假資料（P97xx、example.invalid），不涉及真實姓名。
@@ -55,7 +55,7 @@ const tick = async () => { for (let i = 0; i < 10; i++) await new Promise((r) =>
   check('★★★★★ 設回可按再按 ⇒ 仍然不做，狀態列寫「你只有查看權限，不可以改動。」', clicked === 0
     && /你只有查看權限，不可以改動。/.test(ui.document.getElementById('status').textContent));
   const allowed = ['寄出季前資料', '不能服侍的日期', '排表偏好', '合堂主日', '人手檢查', '關閉', '取消', '知道了', '檢查我的改動',
-    '開啟名單工作表', '查看／修改職事表', '複製連結', '全部列出', '出席系統連結', '加入名單', '修改'];
+    '開啟事奉人員名單', '查看／修改職事表', '複製連結', '全部列出', '出席系統連結', '加入名單', '修改'];
   const badAllowed = allowed.filter((t) => { const b = ui.button(t, () => { clicked++; }, ''); b.fire('click'); return b.disabled; });
   check('★★★★★★ 只看的按鈕照樣可以按（打開畫面、內容照樣顯示）', badAllowed.length === 0 && clicked === allowed.length, badAllowed.join('、'));
   const sb = ui.stepButton('請系統幫我調整', () => {}, { title: '原本的原因', disabled: false });
@@ -94,7 +94,7 @@ const tick = async () => { for (let i = 0; i < 10; i++) await new Promise((r) =>
   await ui.loadMyPermission_();
   check('★★★★★ apiGetMyPermission＝只可查看 ⇒ 只可查看', vm.runInContext('viewOnly_', ui) === true);
 
-  console.log('\n=== NB10：〔開啟名單工作表〕 ===');
+  console.log('\n=== NB10：〔開啟事奉人員名單〕 ===');
   const sent = [];
   ui.callServer = async (name, q) => {
     sent.push(name);

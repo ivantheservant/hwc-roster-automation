@@ -17,7 +17,8 @@ function check(label, condition, extra) {
 }
 const ROOT = path.join(__dirname, '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
-const NEW = '邀請事奉人員申報不能服侍的日子';
+// 第一百零一輪批次 ZC-3（刻意改動）：〔邀請事奉人員申報不能服侍的日子〕＋〔沒有電郵的人：匯出邀請〕合併為一個按鈕
+const NEW = '寄出／匯出申報不能服侍日子連結';
 const OLD = '寄出申報邀請';
 function stripComments(t) {
   return t.replace(/<!--[\s\S]*?-->/g, (b) => b.replace(/[^\n]/g, ' ')).replace(/\/\*[\s\S]*?\*\//g, (b) => b.replace(/[^\n]/g, ' ')).replace(/^(\s*)\/\/.*$/gm, '$1');
@@ -26,8 +27,11 @@ function stripComments(t) {
 console.log('\n=== TD1：新名 ===');
 {
   const z2 = read('src/ui/ScriptZone2.html');
-  check('★★★★★★ 開季前準備的按鈕是〔' + NEW + '〕', z2.indexOf("button('" + NEW + "', () => openUnavailableInvite()") !== -1);
-  check('★★★★★ 預覽窗標題、完成窗標題、寄出動作文字都用新名', z2.indexOf("openModal('" + NEW + "：'") !== -1 && z2.indexOf("runAction('" + NEW + "'") !== -1 && z2.indexOf("openModal('" + NEW + "', [make") !== -1);
+  const z5 = read('src/ui/ScriptZone5.html');
+  check('★★★★★★ 開季前準備的按鈕是〔' + NEW + '〕', z2.indexOf("button(UNAVAILABLE_LINK_BUTTON_LABEL, () => openUnavailableInvite()") !== -1
+    && z2.indexOf("const UNAVAILABLE_LINK_BUTTON_LABEL = '" + NEW + "';") !== -1);
+  check('★★★★★ 視窗標題、完成窗標題、寄出動作文字都用新名', z5.indexOf("openModal(UNAVAILABLE_LINK_BUTTON_LABEL + '：'") !== -1
+    && z5.indexOf("runAction(UNAVAILABLE_LINK_BUTTON_LABEL,") !== -1 && z5.indexOf("openModal(UNAVAILABLE_LINK_BUTTON_LABEL, done") !== -1);
   check('★★★★ 只可查看的人仍然可以打開預覽（放行名單用新名）', read('src/ui/Script.html').indexOf("['寄出季前資料', '" + NEW + "']") !== -1);
   const hits = [];
   ['src', 'src/ui'].forEach((dir) => {
@@ -44,12 +48,13 @@ console.log('\n=== TD1：新名 ===');
 
 console.log('\n=== TD2：預覽窗句子 ===');
 {
-  const z2 = read('src/ui/ScriptZone2.html');
-  check('★★★★★★ 說明句：「寄信給本季可能被安排的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。」',
-    z2.indexOf('寄信給本季可能被安排的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。') !== -1);
-  check('★★★★★★ 預覽窗有一句：「想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。」',
-    z2.indexOf('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 寄出電郵範本樣本」寄一封給自己。') !== -1);
-  check('★★★★ 那一行真的在「進階與診斷」', /zone4Row\('寄出電郵範本樣本'/.test(read('src/ui/ScriptZone4.html')));
+  // 第一百零一輪批次 ZC-3（刻意改動）：合併後的窗在 ScriptZone5.html
+  const z5 = read('src/ui/ScriptZone5.html');
+  check('★★★★★★ 說明句：「寄信給選了的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。」',
+    z5.indexOf('寄信給選了的人，請他們用自己的個人專屬連結，申報這一季哪些主日不能服侍。') !== -1);
+  check('★★★★★★ 預覽窗有一句：「想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 預覽電郵範本」。」',
+    z5.indexOf('想先看看事奉人員會見到甚麼，可以用「進階與診斷 ▸ 預覽電郵範本」。') !== -1);
+  check('★★★★ 那一行真的在「進階與診斷」', /zone4Row\('預覽電郵範本'/.test(read('src/ui/ScriptZone4.html')));
 }
 
 console.log('\n=== TD3：指南（檔案存在才檢查）===');

@@ -402,6 +402,11 @@ function buildPersonalRosterPendingData_(quarterId, personNameTC) {
 function buildPersonalUnavailableBoot_(personId, token, quarterId) {
   try {
     const now = personalUnavailableToday_();
+    // 第一百零一輪批次 ZE-2：第一階段（ROLLOUT_AUDIENCE=LEADERS）不是堂委／執事／幹事 ⇒ 申報區只寫一句「暫時未開放」
+    if (!isPersonalDeclareAllowed_(personId, now.timezone, now.today)) {
+      return { token: token, quarterId: quarterId, view: null, error: '', closed: true,
+        closedText: fillContactName_(ROLLOUT_DECLARE_CLOSED_TEXT) };
+    }
     return { token: token, quarterId: quarterId,
       view: buildPersonalUnavailableView_(personId, now.today, now.timezone, quarterId), error: '' };
   } catch (err) {

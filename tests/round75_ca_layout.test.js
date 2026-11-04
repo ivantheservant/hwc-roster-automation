@@ -2,7 +2,7 @@
 // 執行方式：node tests/round75_ca_layout.test.js
 //
 // 新主畫面（摘要）：
-//   開季前準備：〔開啟名單工作表〕〔儲存並套用名單〕→〔不能服侍的日期〕→「這一季還要做的」
+//   開季前準備：〔開啟事奉人員名單〕〔儲存並套用名單〕→〔不能服侍的日期〕→「這一季還要做的」
 //   主流程第 2 步：多咗〔排表偏好〕（第七十七輪批次 EA 組：再搬去開季前準備）
 //   常用設定（取代「名單維護」）：〔人員與電郵〕〔身分（堂委／執事）〕〔固定收件人／管理員電郵〕
 //     （新分頁開工作表）＋〔匯出規則審閱表〕〔重新生成初稿（覆蓋式）〕
@@ -84,12 +84,12 @@ console.log('\n=== CA②：開季前準備：名單 → 不能服侍的日期 �
   ui.renderZone2Body(dash);
   const body = ui.document.getElementById('zone2Body');
   const btns = buttonTexts(body);
-  check('★★★★★ 有〔開啟名單工作表〕〔儲存並套用名單〕', btns.indexOf('開啟名單工作表') !== -1 && btns.indexOf('儲存並套用名單') !== -1, JSON.stringify(btns));
+  check('★★★★★ 有〔開啟事奉人員名單〕〔儲存並套用名單〕', btns.indexOf('開啟事奉人員名單') !== -1 && btns.indexOf('儲存並套用名單') !== -1, JSON.stringify(btns));
   check('★★★★★★ 有〔不能服侍的日期〕', btns.indexOf('不能服侍的日期') !== -1, JSON.stringify(btns));
   check('★★★★★ 冇〔名單檢查〕（搬咗去進階與診斷）', btns.indexOf('名單檢查') === -1, JSON.stringify(btns));
   const t = body.textContent;
   check('★★★★ 次序：名單工作表 → 不能服侍的日期 → 「這一季還要做的」',
-    t.indexOf('開啟名單工作表') < t.indexOf('不能服侍的日期') && t.indexOf('不能服侍的日期') < t.indexOf('這一季還要做的'), t.slice(0, 300));
+    t.indexOf('開啟事奉人員名單') < t.indexOf('不能服侍的日期') && t.indexOf('不能服侍的日期') < t.indexOf('這一季還要做的'), t.slice(0, 300));
 }
 
 console.log('\n=== CA③：〔排表偏好〕喺開季前準備（第七十七輪批次 EA 組：由第 2 步搬過去）===');

@@ -44,10 +44,11 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   r = parse({ view: 'combined\n', quarter: '2027T1\u0000<b>' + 'x'.repeat(80) });
   check('★★★★ 控制字元去掉、最多 40 字', r.view === 'combined' && r.quarter.indexOf('\u0000') === -1 && r.quarter.length === 40, JSON.stringify(r));
   const views = Object.keys(vm.runInContext('DEEP_LINK_VIEWS', ui)).sort().join(',');
-  // 第九十輪批次 QB 組（刻意改動）：多了 choir（〔詩班獻詩〕）
+  // 第九十輪批次 QB 組（刻意改動）：多了 choir（〔詩班獻詩日期〕）
   // 第九十四輪批次 UB 組（刻意改動）：加 unavailable-confirm（事奉人員申報，確認）
   // 第九十八輪批次 YA 組（刻意改動）：加 preassign（〔預先安排領詩、司琴〕）
-  check('★★★★★★ view 可用值：choir、combined、preassign、preseason、staffing、unavailable、unavailable-confirm、weights（常數表）', views === 'choir,combined,preassign,preseason,staffing,unavailable,unavailable-confirm,weights', views);
+  // 第一百零一輪批次 ZC-3（刻意改動）：多了 invite、invitepaper（舊的申報邀請、匯出邀請 ⇒ 合併後的窗）
+  check('★★★★★★ view 可用值：choir、combined、invite、invitepaper、preassign、preseason、staffing、unavailable、unavailable-confirm、weights（常數表）', views === 'choir,combined,invite,invitepaper,preassign,preseason,staffing,unavailable,unavailable-confirm,weights', views);
   check('★★★★★ 參數名稱是 view、quarter（不是 p、q）', JSON.stringify(vm.runInContext('DEEP_LINK_PARAMS', ui)) === '{"VIEW":"view","QUARTER":"quarter"}');
 
   console.log('\n=== NA2：主畫面載入完成後 ===');
@@ -96,7 +97,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
     && /preseason: \(\) => openPreseasonSend\(\)/.test(script)
     && /button\('合堂主日', \(\) => openCombinedServices\(\)/.test(zone2) && /button\('寄出季前資料', \(\) => openPreseasonSend\(\)/.test(zone2));
   check('★★★★★ 〔寄出季前資料〕深連結只打開預覽（openPreseasonSend 只呼叫 apiPreseasonPreview，寄出要再按〔寄出〕）',
-    /function openPreseasonSend\(\) \{\s*runAction\('讀取季前資料', async \(\) => \{\s*const p = await callServer\('apiPreseasonPreview'/.test(zone2));
+    // 第一百零一輪批次 ZE 組（刻意改動）：視窗搬到 ScriptZone5.html，多了收件人選擇（sel）
+    /function openPreseasonSend\(sel\) \{\s*runAction\('讀取季前資料', async \(\) => \{\s*const p = await callServer\('apiPreseasonPreview', currentQuarterId, sel \|\| null\)/.test(read('src/ui/ScriptZone5.html')));
 
   console.log('\n=== NA4：開機次序 ===');
   const boot = read('src/ui/ScriptBoot.html');

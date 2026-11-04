@@ -123,8 +123,9 @@ console.log('\n=== MA4：預覽窗 ===');
   const p = g.apiPreseasonPreview(sc.Q);
   check('★★★★★ 預覽回傳 sentRecord：simulated、real＝null', p.sentRecord && p.sentRecord.real === null && p.sentRecord.simulated === true, JSON.stringify(p.sentRecord));
   // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕視窗亦有同樣字眼 ⇒ 只看 openPreseasonSend() 那一段
-  const z2all = fs.readFileSync('src/ui/ScriptZone2.html', 'utf8');
-  const z2from = z2all.indexOf('function openPreseasonSend()');
+  // 第一百零一輪批次 ZE 組（刻意改動）：〔寄出季前資料〕視窗搬到 ScriptZone5.html，函式多了 sel 參數
+  const z2all = fs.readFileSync('src/ui/ScriptZone5.html', 'utf8');
+  const z2from = z2all.indexOf('function openPreseasonSend(sel)');
   const z2 = z2all.slice(z2from, z2all.indexOf('\n  function ', z2from + 10));
   check('★★★★★★ 預覽窗：只有模擬 ⇒ 「只有模擬寄出…模擬不算已寄出」；有真正 ⇒ 「真正寄出過一次」',
     /只有模擬寄出/.test(z2) && /模擬不算已寄出/.test(z2) && /真正寄出過一次/.test(z2));

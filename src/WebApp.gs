@@ -68,7 +68,7 @@ const WEBAPP_READ_ONLY_APIS = [
   'apiStep4GetMissingPdfWarnings', 'apiStep4GetSendPreview', 'apiStep5Plan', 'apiListVersionsForRollback',
   'apiRollbackPlan', 'apiListSpecialSundays', 'apiWebListPreacherPending', 'apiGetPreQuarterChecklist',
   'apiGetStaffingCheck', 'apiGetStaffingChangeNote', 'apiGetCombinedServices', 'apiPreseasonPreview',
-  // 第九十輪批次 QB 組：〔詩班獻詩〕讀取
+  // 第九十輪批次 QB 組：〔詩班獻詩日期〕讀取
   'apiGetChoirSinging',
   // 第九十三輪批次 TB 組：〔寄出電郵範本樣本〕可以收樣本的地址（只讀）
   'apiGetTemplateSampleOptions',
@@ -90,7 +90,9 @@ const WEBAPP_READ_ONLY_APIS = [
   // 第九十八輪批次 YA 組：〔預先安排領詩、司琴〕畫面（只讀）
   'apiGetPreAssignView',
   // 第一百零一輪批次 ZB 組：〔更新電郵範本到最新版〕比對、〔預覽電郵範本〕（只讀）
-  'apiPlanEmailTemplateUpdate', 'apiPreviewTemplateSamples'
+  'apiPlanEmailTemplateUpdate', 'apiPreviewTemplateSamples',
+  // 第一百零一輪批次 ZC-3／ZE-1：〔寄出／匯出申報不能服侍日子連結〕窗的內容（只讀）
+  'apiUnavailableLinkPreview'
 ];
 
 /**

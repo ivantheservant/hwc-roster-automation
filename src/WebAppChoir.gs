@@ -1,5 +1,5 @@
 /**
- * 第九十輪批次 QB 組：詩班獻詩（開季前準備〔合堂主日〕旁邊的〔詩班獻詩〕）。
+ * 第九十輪批次 QB 組：詩班獻詩（開季前準備〔合堂主日〕旁邊的〔詩班獻詩日期〕）。
  *
  * 音樂部意見（Ivan 2026-10-30 決定）：詩班獻詩的主日，詩班員盡量不另派崗位；詩班名單用事奉人員表維護。
  *
@@ -39,7 +39,7 @@ function ensureServiceDatesChoirColumn_(sheet) {
 }
 
 /**
- * 供前端呼叫：〔詩班獻詩〕視窗的資料。**純讀取。**
+ * 供前端呼叫：〔詩班獻詩日期〕視窗的資料。**純讀取。**
  * @param {string} quarterId 季度 ID
  * @returns {{quarterId: string, quarterLabel: string, weeks: Object[], note: string, choirCount: ?number}}
  */
@@ -109,7 +109,7 @@ function saveChoirSinging_(quarterId, items) {
       oldValue: was ? '詩班獻詩' : '（不是）',
       newValue: wanted[d] ? '詩班獻詩' : '（不是）',
       source: 'apiSaveChoirSinging',
-      notes: '開季前準備〔詩班獻詩〕'
+      notes: '開季前準備〔詩班獻詩日期〕'
     });
   });
   if (changed === 0) return { ok: true, changed: 0, message: '沒有改動。' };

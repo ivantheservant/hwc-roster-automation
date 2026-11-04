@@ -133,32 +133,14 @@ console.log('\n=== XB6：只可以選名單上的人 ===');
   check('★★★★ 沒有產生任何檔', sc.created.length === 0);
 }
 
-console.log('\n=== XB2：前端 ===');
+console.log('\n=== XB2：前端（第一百零一輪批次 ZC-3 刻意改動：合併為〔寄出／匯出申報不能服侍日子連結〕）===');
 {
-  const ui = loadUiScripts(['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.html', 'ScriptZone4.html',
-    'ScriptMainFlow.html', 'ScriptSendPaper.html', 'ScriptSuggestion.html', 'ScriptRollback.html']);
-  let modal = null;
-  ui.openModal = (title, nodes, actions) => { modal = { title: title, nodes: nodes, actions: actions }; };
-  vm.runInContext('invitePaperData_ = { quarterLabel: "Q", hint: "也可以先用〔補填電郵〕補上電郵，再用電郵寄出。", people: ['
-    + '{ personId: "P1", displayName: "甲", hasLink: true }, { personId: "P2", displayName: "乙", hasLink: true }, { personId: "P3", displayName: "丙", hasLink: false }] };', ui);
-  ui.renderInvitePaper_();
-  const text = modal.nodes.map((n) => n.textContent).join('\n');
-  const cbs = [];
-  const walk = (n) => { if (n.tagName === 'INPUT' && n.type === 'checkbox') cbs.push(n); (n.children || n.childNodes || []).forEach ? Array.from(n.children || []).forEach(walk) : null; };
-  modal.nodes.forEach(walk);
-  check('★★★★★★ 預設全部勾選（沒有個人連結的不可以選）', cbs.length === 3 && cbs[0].checked && cbs[1].checked && !cbs[2].checked && cbs[2].disabled, cbs.map((c) => c.checked + '/' + c.disabled).join(','));
-  check('★★★★★ 提示句', text.indexOf('也可以先用〔補填電郵〕補上電郵，再用電郵寄出。') !== -1);
-  check('★★★★★ 預設選了的人＝有個人連結的全部', ui.selectedInvitePaperIds_().join(',') === 'P1,P2');
-  ui.setInvitePaperChecks_(false);
-  check('★★★★★ 〔全部不選〕', ui.selectedInvitePaperIds_().length === 0);
-  ui.setInvitePaperChecks_(true);
-  check('★★★★★ 〔全選〕（沒有個人連結的仍然不選）', ui.selectedInvitePaperIds_().join(',') === 'P1,P2' && !cbs[2].checked);
-  check('★★★★★ 兩個出口〔產生 docx〕〔寄給自己〕', modal.actions.map((b) => b.textContent).join(',').indexOf('產生 docx,寄給自己') !== -1);
   const z2 = read('src/ui/ScriptZone2.html');
-  check('★★★★★ 〔全選〕〔全部不選〕', /button\('全選', \(\) => setInvitePaperChecks_\(true\)/.test(z2) && /button\('全部不選', \(\) => setInvitePaperChecks_\(false\)/.test(z2));
-  check('★★★★★ 預覽窗「沒有電郵」那一行旁有按鈕；開季前準備亦有', /沒有電郵（請幹事代為輸入）：[\s\S]{0,300}button\(INVITE_PAPER_BUTTON_LABEL, \(\) => openInvitePaper\(\)/.test(z2)
-    && /button\('補填電郵', \(\) => openManualEmails\(\), 'secondary'\),\s*button\(INVITE_PAPER_BUTTON_LABEL, \(\) => openInvitePaper\(\)/.test(z2)
-    && /const INVITE_PAPER_BUTTON_LABEL = '沒有電郵的人：匯出邀請';/.test(z2));
+  const z5 = read('src/ui/ScriptZone5.html');
+  check('★★★★★ 開季前準備不再有獨立的〔沒有電郵的人：匯出邀請〕，只有〔補填電郵〕', z2.indexOf('INVITE_PAPER_BUTTON_LABEL') === -1
+    && /body\.appendChild\(row\(\[button\('補填電郵', \(\) => openManualEmails\(\), 'secondary'\)\]\)\);/.test(z2));
+  check('★★★★★ 舊入口 openInvitePaper ⇒ 合併後的窗', /function openInvitePaper\(\) \{ openUnavailableInvite\(\); \}/.test(z5));
+  check('★★★★★ 合併後的窗：沒有電郵的人同時產生 Word 檔（同一支 createInvitePaperDocx_）', /createInvitePaperDocx_\(id, who\.noEmailPeople\)/.test(read('src/UnavailableInvite.gs')));
   const webApp = read('src/WebApp.gs');
   const roList = (webApp.match(/const WEBAPP_READ_ONLY_APIS = \[([\s\S]*?)\];/) || ['', ''])[1];
   check('★★★★★ 權限：畫面讀取在唯讀清單；匯出、寄給自己不是', /'apiGetInvitePaperView'/.test(roList)

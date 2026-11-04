@@ -52,7 +52,9 @@ function scene(opts) {
     config: Object.assign({
       WEBAPP_ENABLED: ['TRUE', 'BOOL'], LEAD_DAYS_GENERATE: ['-21', 'INT'],
       WEBAPP_VOLUNTEER_URL: ['https://example.invalid/vol/exec', 'STR'],
-      MAIL_ADMIN_NOTIFY: ['clerk@example.invalid', 'STR']
+      MAIL_ADMIN_NOTIFY: ['clerk@example.invalid', 'STR'],
+      // 第一百零一輪批次 ZE-2：這裏測申報本身 ⇒ 開放範圍 ALL（第一階段另有 round101_ze 測試）
+      ROLLOUT_AUDIENCE: ['ALL', 'ENUM']
     }, opts.config || {})
   });
   const g = sc.gas; const C = sc.C; const S = sc.S;
@@ -448,7 +450,8 @@ console.log('\n=== QC8：主畫面、季前資料、畫面、Config ===');
   const body = ui.document.getElementById('zone2Body');
   check('★★★★★★ 「這一季還要做的」有「事奉人員申報待確認：3 項」', /事奉人員申報待確認：3 項/.test(body.textContent), body.textContent.slice(0, 600));
   const btns = body.flatten().filter((n) => n.tagName === 'BUTTON').map((n) => n.textContent);
-  check('★★★★★ 開季前準備有〔邀請事奉人員申報不能服侍的日子〕', btns.indexOf('邀請事奉人員申報不能服侍的日子') !== -1, btns.join('、'));
+  // 第一百零一輪批次 ZC-3（刻意改動）：〔邀請…〕和〔沒有電郵的人：匯出邀請〕合併為〔寄出／匯出申報不能服侍日子連結〕
+  check('★★★★★ 開季前準備有〔寄出／匯出申報不能服侍日子連結〕', btns.indexOf('寄出／匯出申報不能服侍日子連結') !== -1 && btns.indexOf('邀請事奉人員申報不能服侍的日子') === -1, btns.join('、'));
   // 〔不能服侍的日期〕最上面
   const cur = (id, name, source) => ({ unavailableId: id, personId: 'P9701', personName: name, dateFrom: '2099-01-11', dateTo: '2099-01-11',
     appliesTo: 'ALL', postIds: [], reason: '', source: source, status: 'ACTIVE', inQuarter: true });

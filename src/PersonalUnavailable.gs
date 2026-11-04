@@ -414,6 +414,10 @@ function submitPersonalUnavailable_(person, dates, reason, anchorQuarterId, post
     return { ok: false, message: message, added: 0,
       view: buildPersonalUnavailableView_(person.personId, now.today, now.timezone, anchorQuarterId) };
   };
+  // 第一百零一輪批次 ZE-2：伺服器端把關——第一階段只開放給堂委、執事及幹事（不只靠頁面）
+  if (!isPersonalDeclareAllowed_(person.personId, now.timezone, now.today)) {
+    return { ok: false, message: fillContactName_(ROLLOUT_DECLARE_CLOSED_TEXT), added: 0, view: null, closed: true };
+  }
   if (!Array.isArray(dates) || dates.length === 0) return fail('請先勾選日子。');
   const wanted = [];
   dates.forEach(function (d) {

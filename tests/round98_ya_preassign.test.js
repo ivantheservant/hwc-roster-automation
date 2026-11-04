@@ -12,7 +12,7 @@
 //   YA7 事奉人員申報確認畫面：「這一日已預先安排他做領詩」
 //   YA8 季前資料：第五段之後「六、預先安排的領詩、司琴」
 //   YA9 週報系統說明有新工作表、新 AssignSource、view=preassign
-//   YA10 前端：按鈕在〔詩班獻詩〕旁邊；畫面下拉有「其他（自己輸入）」；〔儲存〕送出每一格
+//   YA10 前端：按鈕在〔詩班獻詩日期〕旁邊；畫面下拉有「其他（自己輸入）」；〔儲存〕送出每一格
 // 用假資料（P97xx、假名、example.invalid）。
 
 const fs = require('fs');
@@ -275,7 +275,7 @@ console.log('\n=== YA10：前端 ===');
 {
   const ui = loadUiScripts(['Script.html', 'ScriptZone2.html']);
   const z2 = read('src/ui/ScriptZone2.html');
-  check('★★★★★ 〔預先安排領詩、司琴〕在〔詩班獻詩〕旁邊', /button\('詩班獻詩', \(\) => openChoirSinging\(\), ''\),\n[^\n]*\n\s*button\(PREASSIGN_BUTTON_LABEL, \(\) => openPreAssign\(\), ''\)/.test(z2)
+  check('★★★★★ 〔預先安排領詩、司琴〕在〔詩班獻詩日期〕旁邊', /button\('詩班獻詩日期', \(\) => openChoirSinging\(\), ''\),\n[^\n]*\n\s*button\(PREASSIGN_BUTTON_LABEL, \(\) => openPreAssign\(\), ''\)/.test(z2)
     && vm.runInContext('PREASSIGN_BUTTON_LABEL', ui) === '預先安排領詩、司琴');
   check('★★★★★ 深連結 view=preassign', typeof vm.runInContext('DEEP_LINK_VIEWS', ui).preassign === 'function');
   const data = { quarterId: '2099T1', quarterLabel: '2099 第一季', explanation: EXPLANATION,

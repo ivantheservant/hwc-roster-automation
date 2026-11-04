@@ -154,6 +154,7 @@ function apiUnavailableInviteSend(quarterId) {
   return withMutationLock_('邀請事奉人員申報不能服侍的日子', function () {
     // 第九十五輪批次 VB 組：打開幹事介面不再一定同步 ⇒ 寄之前由出席系統更新電郵（10 分鐘內已更新就略過；讀不到不會令寄出失敗）
     syncPeopleFromHwcasBeforeSend_();
+    // 第一百零一輪批次 ZE-2：舊入口不傳收件人 ⇒ sendUnavailableInvites_() 按開放範圍的預設（第一階段只寄給堂委、執事、幹事）
     return sendUnavailableInvites_(String(quarterId || '').trim());
   });
 }
@@ -163,7 +164,7 @@ function apiUnavailableInviteSend(quarterId) {
  * @param {string} quarterId 季度 ID
  * @returns {{dryRun: boolean, sent: number, simulated: number, failed: Object[], noEmail: string[], noLink: string[]}}
  */
-function sendUnavailableInvites_(quarterId) {
+function sendUnavailableInvites_(quarterId, resolvedWho) {
   const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
@@ -172,7 +173,8 @@ function sendUnavailableInvites_(quarterId) {
     throw new Error(buildThreePartMessage_('還沒有設定事奉人員個人連結的網址（Config WEBAPP_VOLUNTEER_URL）。',
       '一封都沒有寄出。', ['請管理員先在 Config 填上個人連結部署的 /exec 網址']));
   }
-  const who = buildUnavailableInviteRecipients_(today);
+  // 第一百零一輪批次 ZE-1／ZE-2：合併窗傳入已選好的收件人；不傳 ⇒ 按開放範圍的預設（伺服器端把關：第一階段只寄給堂委、執事、幹事）
+  const who = resolvedWho || resolveInviteAudience_(null, today);
   const dates = readUnavailableInviteDates_(quarterId);
   const tpl = findEmailTemplateById_(UNAVAILABLE_INVITE_TEMPLATE_ID) || unavailableInviteTemplateDefault_();
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
@@ -211,4 +213,101 @@ function sendUnavailableInvites_(quarterId) {
       + (who.noLink.length ? '；沒有個人連結：' + who.noLink.join('、') : '')
   });
   return { dryRun: dryRun, sent: sent, simulated: simulated, failed: failed, noEmail: who.noEmail, noLink: who.noLink };
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+ * 第一百零一輪批次 ZC-3／ZE-1：〔寄出／匯出申報不能服侍日子連結〕
+ *   〔邀請事奉人員申報不能服侍的日子〕＋〔沒有電郵的人：匯出邀請〕合併為一個窗：
+ *   ①選收件人（SendAudience.gs）；②列出會收到電郵的人及沒有電郵的人；
+ *   ③一個確認：有電郵的寄信，沒有電郵的同時產生 Word 檔（InvitePaper.gs 同一支）並給下載連結。
+ * ═════════════════════════════════════════════════════════════════════ */
+
+/** 合併後的按鈕名稱（ScriptZone2.html 用同一句）。 */
+const UNAVAILABLE_LINK_BUTTON_LABEL = '寄出／匯出申報不能服侍日子連結';
+
+/**
+ * 勾選 ⇒ 申報連結的收件人（有電郵、有個人連結的人）、沒有電郵的人（含 token，只留在伺服器端）、沒有個人連結的人。
+ * @param {?Object} selection 不傳 ⇒ 按開放範圍的預設
+ * @param {string} todayStr
+ * @returns {{recipients: Object[], noEmail: string[], noLink: string[], noEmailPeople: Object[], selection: Object}}
+ */
+function resolveInviteAudience_(selection, todayStr) {
+  const r = resolveAudienceSelection_(AUDIENCE_PURPOSE.INVITE, selection, todayStr);
+  const M = COLUMNS.NAME_MAPPING;
+  const tokenById = {};
+  readPeople_().forEach(function (row) {
+    const id = String(row[M.PERSON_ID] || '').trim();
+    if (id) tokenById[id] = String(row[M.PERSONAL_LINK_TOKEN] || '').trim();
+  });
+  const recipients = [];
+  const noLink = [];
+  r.people.forEach(function (p) {
+    const token = tokenById[p.personId] || '';
+    if (!token) { noLink.push(p.displayName); return; }
+    recipients.push({ personId: p.personId, displayName: p.displayName, email: p.email, token: token });
+  });
+  const noEmailPeople = r.noEmail.map(function (p) { return { personId: p.personId, displayName: p.displayName, token: tokenById[p.personId] || '' }; });
+  return {
+    recipients: recipients,
+    noEmail: noEmailPeople.map(function (p) { return p.displayName; }),
+    noLink: noLink.concat(noEmailPeople.filter(function (p) { return !p.token; }).map(function (p) { return p.displayName; })),
+    noEmailPeople: noEmailPeople.filter(function (p) { return !!p.token; }),
+    selection: r.selection
+  };
+}
+
+/**
+ * 供前端呼叫：合併窗的內容（收件人選項、會收到電郵的人、沒有電郵的人）。**純讀取。**
+ * @param {string} quarterId
+ * @param {?Object} selection
+ * @returns {Object}
+ */
+function apiUnavailableLinkPreview(quarterId, selection) {
+  assertWebAppRequestAllowed_('apiUnavailableLinkPreview');
+  const id = String(quarterId || '').trim();
+  beginSheetReadMemo_();
+  try {
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    const who = resolveInviteAudience_(selection || null, today);
+    const dates = readUnavailableInviteDates_(id);
+    return {
+      quarterId: id, quarterLabel: buildQuarterLabel_(id), generateDate: dates.generateDate, deadline: dates.deadline,
+      audience: buildAudienceOptions_(AUDIENCE_PURPOSE.INVITE, today), selection: who.selection,
+      recipientNames: who.recipients.map(function (r) { return r.displayName; }),
+      noEmail: who.noEmailPeople.map(function (p) { return p.displayName; }),
+      noLink: who.noLink,
+      baseUrlMissing: !String(getConfig_(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),
+      dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
+      sentRecord: readUnavailableInviteRecord_(id)
+    };
+  } finally {
+    endSheetReadMemo_();
+  }
+}
+
+/**
+ * 供前端呼叫：一個確認——有電郵的寄信，沒有電郵的同時產生 Word 檔。
+ * @param {string} quarterId
+ * @param {?Object} selection
+ * @returns {Object} {dryRun, sent, simulated, failed, noLink, paper: ?{count, fileUrl, fileName}}
+ */
+function apiUnavailableLinkSendAndExport(quarterId, selection) {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_(UNAVAILABLE_LINK_BUTTON_LABEL, function () {
+    syncPeopleFromHwcasBeforeSend_();
+    const id = String(quarterId || '').trim();
+    const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+    const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
+    const who = resolveInviteAudience_(selection || null, today);   // 第一階段違規 ⇒ 拋錯（伺服器端把關）
+    const r = sendUnavailableInvites_(id, who);
+    let paper = null;
+    if (who.noEmailPeople.length > 0) {
+      const made = createInvitePaperDocx_(id, who.noEmailPeople);
+      writeInvitePaperAudit_(id, 'DOCX', who.noEmailPeople.length);
+      paper = { count: who.noEmailPeople.length, fileUrl: made.fileUrl, fileName: made.fileName,
+        names: who.noEmailPeople.map(function (p) { return p.displayName; }) };
+    }
+    return Object.assign({}, r, { paper: paper });
+  });
 }

@@ -505,7 +505,7 @@ function ruleReviewPlainEntry_(ruleId) {
   // 第九十輪批次 QB 組：詩班獻詩——準硬規則，預設開啟（`RULE_DEFAULT_ENABLED`），列在「盡量遵守」
   table[RULE_IDS.CHOIR_SUNDAY] = {
     text: '詩班獻詩的主日，詩班員盡量不擔任其他崗位',
-    what: '開季前準備〔詩班獻詩〕勾了的主日，詩班名單上的人盡量不排其他崗位；找不到其他人才會排，並提醒。'
+    what: '開季前準備〔詩班獻詩日期〕勾了的主日，詩班名單上的人盡量不排其他崗位；找不到其他人才會排，並提醒。'
       + '詩班名單在「崗位名單」工作表的「詩班」一欄（可以寫名字，亦可以寫「堂委」「執事」）。',
     current: function (rule) {
       return isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED]) ? '有生效' : '已關掉';

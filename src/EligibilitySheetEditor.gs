@@ -215,7 +215,7 @@ function planEligibilitySheetApply_(quarterId) {
     throw new Error(buildThreePartMessage_(
       '找不到「' + ELIGIBILITY_SHEET_NAME + '」這一張工作表。',
       '名單沒有任何改動。',
-      ['先按「開啟名單工作表」，改完再回來按這個按鈕']));
+      ['先按「開啟事奉人員名單」，改完再回來按這個按鈕']));
   }
 
   const lastRow = sheet.getLastRow();
@@ -224,7 +224,7 @@ function planEligibilitySheetApply_(quarterId) {
     throw new Error(buildThreePartMessage_(
       '「' + ELIGIBILITY_SHEET_NAME + '」是空的。',
       '名單沒有任何改動。',
-      ['先按「開啟名單工作表」重新展開一次']));
+      ['先按「開啟事奉人員名單」重新展開一次']));
   }
 
   const postIds = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(function (v) {

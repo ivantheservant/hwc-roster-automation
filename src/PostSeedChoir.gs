@@ -5,7 +5,7 @@
  *   維護 ▸ 建立詩班名單：Posts 加一行（PostID＝Config CHOIR_GROUP_POST_ID，預設 CHOIR；中文「詩班」；
  *     AutoGenerate=FALSE、ShowInRoster=FALSE、Active=TRUE）；已有就不加。
  *
- * 名單本身在「開季前準備 ▸ 開啟名單工作表」那一張表填（可以寫名字，亦可以寫「堂委」「執事」）。
+ * 名單本身在「開季前準備 ▸ 開啟事奉人員名單」那一張表填（可以寫名字，亦可以寫「堂委」「執事」）。
  */
 
 /**
@@ -127,7 +127,7 @@ function runCreateChoirGroup_() {
     const choirPostId = readChoirGroupPostId_();
     const row = buildChoirGroupPostRow_(keys, readSheet_(SHEETS.POSTS), choirPostId);
     if (!row) {
-      ui.alert(title, 'Posts 已經有 ' + choirPostId + ' 這一行，沒有做任何改動。\n\n名單在「開季前準備 ▸ 開啟名單工作表」填。',
+      ui.alert(title, 'Posts 已經有 ' + choirPostId + ' 這一行，沒有做任何改動。\n\n名單在「開季前準備 ▸ 開啟事奉人員名單」填。',
         ui.ButtonSet.OK);
       return;
     }
@@ -142,7 +142,7 @@ function runCreateChoirGroup_() {
       newValue: '詩班（ShowInRoster=FALSE、AutoGenerate=FALSE、Active=TRUE）',
       source: 'runCreateChoirGroup_'
     });
-    ui.alert(title, '已加入 ' + choirPostId + '（詩班）。\n\n名單在「開季前準備 ▸ 開啟名單工作表」的「詩班」一欄填'
+    ui.alert(title, '已加入 ' + choirPostId + '（詩班）。\n\n名單在「開季前準備 ▸ 開啟事奉人員名單」的「詩班」一欄填'
       + '（可以寫名字，亦可以寫「堂委」「執事」）。', ui.ButtonSet.OK);
   } catch (err) {
     log_('ERROR', 'runCreateChoirGroup_ 失敗: ' + err.message);
