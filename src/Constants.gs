@@ -56,7 +56,11 @@ const SHEETS = {
   // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍（幹事確認後才寫 Unavailable）。第一次提交時自動建立。
   UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions',
   // 第一百零五輪批次 RB 組：事奉人員在個人專屬連結按〔我這一季沒有不能服侍的日子〕（一人一季一行；第一次使用時自動建立）
-  UNAVAILABLE_REPLIES: 'UnavailableReplies'
+  UNAVAILABLE_REPLIES: 'UnavailableReplies',
+  // 第一百零五輪批次 RD 組：影音組合（每月一起服侍一次；組合週以外不做這組的崗位）——第一次使用時自動建立
+  POST_TEAMS: 'PostTeams',
+  // 第一百零五輪批次 RD 組：協唱（某人領詩的主日，他的協唱不擔任其他崗位）——協唱不在職事表顯示
+  WORSHIP_BACKING_SINGERS: 'WorshipBackingSingers'
 };
 
 /**
@@ -441,6 +445,24 @@ const COLUMNS = {
     CREATED_BY: 'CreatedBy'
   },
   // 第九十輪批次 QC 組：事奉人員申報（見 PersonalUnavailable.gs）
+  // 第一百零五輪批次 RD 組
+  POST_TEAMS: {
+    TEAM_ID: 'TeamID',
+    PERSON_ID: 'PersonID',
+    POST_IDS: 'PostIDs',
+    PER_MONTH: 'PerMonth',
+    OUTSIDE_TEAM_LEVEL: 'OutsideTeamLevel',
+    NOTES: 'Notes',
+    ACTIVE: 'Active'
+  },
+  WORSHIP_BACKING_SINGERS: {
+    LEADER_PERSON_ID: 'LeaderPersonID',
+    SINGER_PERSON_ID: 'SingerPersonID',
+    SINGER_NAME: 'SingerName',
+    LEVEL: 'Level',
+    NOTES: 'Notes',
+    ACTIVE: 'Active'
+  },
   // 第一百零五輪批次 RB 組
   UNAVAILABLE_REPLIES: {
     REPLY_ID: 'ReplyID',
@@ -749,7 +771,17 @@ const RULE_IDS = {
   MAX_PER_QUARTER: 'SOFT_MAX_PER_QUARTER',
   LOAD_BALANCE: 'SOFT_LOAD_BALANCE',
   QUARTER_DISTRIBUTION: 'SOFT_QUARTER_DISTRIBUTION',
-  PERSONAL_QUOTA: 'SOFT_PERSONAL_QUOTA'
+  PERSONAL_QUOTA: 'SOFT_PERSONAL_QUOTA',
+  // 第一百零五輪批次 RD 組：影音組合（PostTeams）——組合週以外做這組的崗位（每人 OutsideTeamLevel：HARD／SOFT）
+  TEAM_OUTSIDE_HARD: 'HARD_POST_TEAM_OUTSIDE',
+  TEAM_OUTSIDE_SOFT: 'SEMI_POST_TEAM_OUTSIDE',
+  // 組合週：這組的崗位由組合成員做（生成時；組合成員做不到才排其他人並提醒）
+  TEAM_WEEK: 'SEMI_POST_TEAM_WEEK',
+  // 組合週：可以交給另一位的那一個崗位（例如音響）——人手足夠就交給名單上另一位，不夠才由組合成員兼任
+  TEAM_HANDOFF: 'SEMI_POST_TEAM_HANDOFF',
+  // 第一百零五輪批次 RD 組：協唱（WorshipBackingSingers）——領詩那一日，協唱不擔任其他崗位（Level：HARD／SOFT）
+  BACKING_SINGER_HARD: 'HARD_BACKING_SINGER',
+  BACKING_SINGER_SOFT: 'SEMI_BACKING_SINGER'
 };
 
 /**
@@ -864,7 +896,14 @@ const RULE_DEFAULT_LEVELS = {
   // 第九十輪批次 QA 組：同日不兼任（領詩、司琴）
   [RULE_IDS.SAME_DAY_EXCLUSIVE]: RULE_LEVELS.HARD,
   // 第九十輪批次 QB 組：詩班獻詩（準硬規則：避開，找不到其他人才排並提醒）
-  [RULE_IDS.CHOIR_SUNDAY]: RULE_LEVELS.SEMI_HARD
+  [RULE_IDS.CHOIR_SUNDAY]: RULE_LEVELS.SEMI_HARD,
+  // 第一百零五輪批次 RD 組：影音組合、協唱（沒有填 PostTeams／WorshipBackingSingers ⇒ 完全沒有影響）
+  [RULE_IDS.TEAM_OUTSIDE_HARD]: RULE_LEVELS.HARD,
+  [RULE_IDS.TEAM_OUTSIDE_SOFT]: RULE_LEVELS.SEMI_HARD,
+  [RULE_IDS.TEAM_WEEK]: RULE_LEVELS.SEMI_HARD,
+  [RULE_IDS.TEAM_HANDOFF]: RULE_LEVELS.SEMI_HARD,
+  [RULE_IDS.BACKING_SINGER_HARD]: RULE_LEVELS.HARD,
+  [RULE_IDS.BACKING_SINGER_SOFT]: RULE_LEVELS.SEMI_HARD
 };
 
 /**
@@ -881,7 +920,14 @@ const RULE_DEFAULT_ENABLED = {
   // 第九十輪批次 QA 組：同日不兼任——預設開啟；RuleSettings 有行就照該行
   [RULE_IDS.SAME_DAY_EXCLUSIVE]: true,
   // 第九十輪批次 QB 組：詩班獻詩——預設開啟；沒有勾任何主日／詩班名單空白 ⇒ 完全沒有影響
-  [RULE_IDS.CHOIR_SUNDAY]: true
+  [RULE_IDS.CHOIR_SUNDAY]: true,
+  // 第一百零五輪批次 RD 組：預設開啟；開關其實在資料（PostTeams、WorshipBackingSingers 沒有填 ⇒ 沒有影響）
+  [RULE_IDS.TEAM_OUTSIDE_HARD]: true,
+  [RULE_IDS.TEAM_OUTSIDE_SOFT]: true,
+  [RULE_IDS.TEAM_WEEK]: true,
+  [RULE_IDS.TEAM_HANDOFF]: true,
+  [RULE_IDS.BACKING_SINGER_HARD]: true,
+  [RULE_IDS.BACKING_SINGER_SOFT]: true
 };
 
 /**
@@ -1522,6 +1568,9 @@ const CONFIG_KEYS = {
   SAME_DAY_EXCLUSIVE_POST_IDS: 'SAME_DAY_EXCLUSIVE_POST_IDS',
   // 第九十輪批次 QB 組：詩班名單用哪一個 Posts 行（PostID，預設 CHOIR）
   CHOIR_GROUP_POST_ID: 'CHOIR_GROUP_POST_ID',
+  // 第一百零五輪批次 RD 組：詩班獻詩日的例外、協唱
+  CHOIR_SUNDAY_ALLOWED: 'CHOIR_SUNDAY_ALLOWED',
+  WORSHIP_LEADER_POST_ID: 'WORSHIP_LEADER_POST_ID',
   // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍
   PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: 'PERSONAL_UNAVAILABLE_QUARTERS_AHEAD',
   PERSONAL_UNAVAILABLE_DEADLINE_DAYS: 'PERSONAL_UNAVAILABLE_DEADLINE_DAYS',

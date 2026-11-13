@@ -9702,7 +9702,7 @@ const MUTATIONS = [
     id: "qb-fsv-missing",
     why: "findStateViolations_ 不查詩班——檢查我的改動、人手填的格都不提醒",
     file: "src/FineTune.gs",
-    find: "    if (isChoirSundayConflict_(context, cell.personId, !!(dateInfo[cell.serviceDate] || {}).choirSinging, cell.serviceDate)) {",
+    find: "    if (isChoirSundayConflict_(context, cell.personId, !!(dateInfo[cell.serviceDate] || {}).choirSinging, cell.serviceDate, cell.postId)) {",
     replace: "    if (false) {",
     tests: ["tests/round90_qb_choir.test.js"]
   },
@@ -9710,7 +9710,7 @@ const MUTATIONS = [
     id: "qb-gen-missing",
     why: "生成不避開詩班員",
     file: "src/Generator.gs",
-    find: "  if (isChoirSundayConflict_(state.context, personId, !!state.serviceDate.choirSinging, state.serviceDate.serviceDate)) {",
+    find: "  if (isChoirSundayConflict_(state.context, personId, !!state.serviceDate.choirSinging, state.serviceDate.serviceDate, post.postId)) {",
     replace: "  if (false) {",
     tests: ["tests/round90_qb_choir.test.js"]
   },
@@ -13566,6 +13566,198 @@ const MUTATIONS = [
     find: "    daysBefore: preseasonDaysBeforeFor_(quarterId),",
     replace: "    daysBefore: Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)),",
     tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rd-outside-ignored",
+    why: "組合週以外成員照樣做組合崗位",
+    file: "src/PostTeams.gs",
+    find: "        if (!onTeamDate) {\n          const id = member.level",
+    replace: "        if (false) {\n          const id = member.level",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-outside-level-soft",
+    why: "HARD 成員當成 SOFT：組合週以外仍然會被排",
+    file: "src/PostTeams.gs",
+    find: "          const id = member.level === POST_TEAM_LEVELS.HARD ? RULE_IDS.TEAM_OUTSIDE_HARD : RULE_IDS.TEAM_OUTSIDE_SOFT;",
+    replace: "          const id = RULE_IDS.TEAM_OUTSIDE_SOFT;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-handoff-none",
+    why: "組合週人手足夠時音響也不交給另一位",
+    file: "src/PostTeams.gs",
+    find: "        } else if (post.postId === plan.handoff[team.teamId] && isRuleEnabledAllowingDefault_(rules, RULE_IDS.TEAM_HANDOFF)) {",
+    replace: "        } else if (false) {",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-team-week-none",
+    why: "組合週其他人可以隨便做組合崗位",
+    file: "src/PostTeams.gs",
+    find: "        if (holder && (state.weekByPost[post.postId] || []).indexOf(holder.personId) === -1) {",
+    replace: "        if (false) {",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-plan-unavail",
+    why: "組合週選了成員申報不能服侍的日子",
+    file: "src/PostTeams.gs",
+    find: "          if (isPersonUnavailable_(m.personId, d, postId, context.unavailable || [])) return false;",
+    replace: "",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-plan-per-month",
+    why: "每月組合週多過 PerMonth",
+    file: "src/PostTeams.gs",
+    find: "      for (let n = 0; n < team.perMonth; n++) {",
+    replace: "      for (let n = 0; n < team.perMonth + 1; n++) {",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-plan-reserved",
+    why: "組合週選了成員預先安排了領詩的日子",
+    file: "src/PostTeams.gs",
+    find: "        if (reserved) return false;",
+    replace: "",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-singer-ignored",
+    why: "協唱在領詩的日子照樣被排",
+    file: "src/PostTeams.gs",
+    find: "      const entry = backingSingerEntryFor_(ctx, personId, leaders);",
+    replace: "      const entry = null;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-singer-reverse",
+    why: "先排了協唱再排領詩不算違反",
+    file: "src/PostTeams.gs",
+    find: "        if ((state.weekByPerson[e.singerId] || []).length === 0) return;",
+    replace: "        return;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-singer-level-soft",
+    why: "HARD 協唱當成 SOFT：沒有人時仍然排他",
+    file: "src/PostTeams.gs",
+    find: "        const id = entry.level === POST_TEAM_LEVELS.HARD ? RULE_IDS.BACKING_SINGER_HARD : RULE_IDS.BACKING_SINGER_SOFT;",
+    replace: "        const id = RULE_IDS.BACKING_SINGER_SOFT;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-choir-allowed-off",
+    why: "詩班獻詩日的例外沒有作用",
+    file: "src/ChoirRule.gs",
+    find: "  if (postId && ctx.choirSundayAllowed && ctx.choirSundayAllowed[personId + ':' + postId]) return false;",
+    replace: "",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-choir-allowed-any",
+    why: "例外變成所有崗位都不受限制",
+    file: "src/ChoirRule.gs",
+    find: "  if (postId && ctx.choirSundayAllowed && ctx.choirSundayAllowed[personId + ':' + postId]) return false;",
+    replace: "  if (postId && ctx.choirSundayAllowed && Object.keys(ctx.choirSundayAllowed).some(function (k) { return k.indexOf(personId + ':') === 0; })) return false;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-check-together-some",
+    why: "只要一位成員在就當組合週",
+    file: "src/PostTeams.gs",
+    find: "      if (team.members.every(holds)) return;   // 組合週",
+    replace: "      if (team.members.some(holds)) return;   // 組合週",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-check-singer-off",
+    why: "儲存檢查不查協唱",
+    file: "src/PostTeams.gs",
+    find: "        (byDatePerson[d + '|' + e.singerId] || []).forEach(function (c) {",
+    replace: "        [].forEach(function (c) {",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-finetune-missing",
+    why: "儲存、調整不檢查組合／協唱",
+    file: "src/FineTune.gs",
+    find: "  findTeamAndSingerConflicts_(state, context).forEach(function (x) { add(x.cell, x.ruleId, x.reason); });",
+    replace: "",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-verify-soft-in",
+    why: "核對職事表把「盡量」的也當成一定要遵守",
+    file: "src/Verify.gs",
+    find: "    if (RULE_DEFAULT_LEVELS[x.ruleId] !== RULE_LEVELS.HARD) return;",
+    replace: "",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-repair-guard-off",
+    why: "補空格可以令組合／協唱違規變多",
+    file: "src/StaffingCheck.gs",
+    find: "  if (!teamAndSingerNotWorse_(context, cells, next)) {",
+    replace: "  if (false) {",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-gen-not-called",
+    why: "生成器不檢查組合／協唱",
+    file: "src/Generator.gs",
+    find: "  evaluateTeamAndSingerViolations_(personId, state).forEach(function (v) { violations.push(v); });",
+    replace: "",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-gen-no-plan",
+    why: "生成器沒有組合週計劃",
+    file: "src/Generator.gs",
+    find: "          random: random,\n          teamPlan: teamPlan\n",
+    replace: "          random: random,\n          teamPlan: null\n",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-normalize-all-hard",
+    why: "OutsideTeamLevel=SOFT 讀成 HARD",
+    file: "src/PostTeams.gs",
+    find: "    const level = String(r[T.OUTSIDE_TEAM_LEVEL] || '').trim().toUpperCase() === POST_TEAM_LEVELS.SOFT ? POST_TEAM_LEVELS.SOFT : POST_TEAM_LEVELS.HARD;",
+    replace: "    const level = POST_TEAM_LEVELS.HARD;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-active-blank-off",
+    why: "Active 空白當成停用",
+    file: "src/PostTeams.gs",
+    find: "  if (value === '' || value === null || value === undefined) return true;",
+    replace: "  if (value === '' || value === null || value === undefined) return false;",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-seed-no-sheets",
+    why: "〔補建設定及範本〕沒有建立 PostTeams／WorshipBackingSingers",
+    file: "src/AdminTools.gs",
+    find: "    const sheetsCreated = ensureRuleDataSheets_();",
+    replace: "    const sheetsCreated = [];",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-review-max-hard",
+    why: "規則審閱表把每季上限寫成一定要遵守",
+    file: "src/RuleReview.gs",
+    find: "        : '到了這個數目之後，系統盡量不再排他；人手不足、有需要時可以超過（不是一定要遵守的規則）。')",
+    replace: "        : '超過這個數目之後，系統就不會再排他。')",
+    tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rd-handoff-needs-three",
+    why: "兼兩個崗位的成員沒有可以交出去的崗位",
+    file: "src/PostTeams.gs",
+    find: "    if (own.length >= 2) {",
+    replace: "    if (own.length >= 3) {",
+    tests: ["tests/round105_rd_team_rules.test.js"]
   }
 ];
 

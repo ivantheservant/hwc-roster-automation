@@ -51,6 +51,9 @@ function buildGeneratorContext_(quarterId) {
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   eligibility.byPost = roleContext.eligibleByPost;
 
+  // 第一百零五輪批次 RD 組：影音組合、協唱、詩班獻詩日的例外（PostTeams.gs）
+  const extras = readRuleExtrasContext_();
+
   return {
     quarterId: quarterId,
     serviceDates: serviceDates,
@@ -59,6 +62,10 @@ function buildGeneratorContext_(quarterId) {
     roles: roleContext.roles,
     personPostExclusions: roleContext.exclusions,
     peopleById: peopleById,
+    teams: extras.teams,
+    backingSingers: extras.backingSingers,
+    worshipPostId: extras.worshipPostId,
+    choirSundayAllowed: extras.choirSundayAllowed,
     unavailable: unavailable,
     specialByDate: specialByDate,
     rules: rules,
@@ -360,6 +367,9 @@ function buildRoster_(context) {
     ? context.priorWeeks[context.priorWeeks.length - 1]
     : {};
 
+  // 第一百零五輪批次 RD 組：先為每個影音組合選定組合週（沒有填 PostTeams ⇒ 空計劃，排表結果不變）
+  const teamPlan = planTeamWeeks_(context);
+
   // 各條比例型 SOFT 規則的達成率追蹤
   // dualQualified / dualAssigned 供 SOFT_CHAIR_PREFER_DUAL 使用
   const ratioState = {
@@ -444,7 +454,8 @@ function buildRoster_(context) {
           postCount: postCount,
           lastServed: lastServed,
           ratioState: ratioState,
-          random: random
+          random: random,
+          teamPlan: teamPlan
         });
 
         if (!outcome.personId) {
@@ -478,7 +489,7 @@ function buildRoster_(context) {
   }
 
   // 第八十五輪批次 LD 組：貪心法之後補空格——留空數不可以多過人手檢查的最少留空數
-  const result = { assignments: assignments, warnings: warnings };
+  const result = { assignments: assignments, warnings: warnings, teamPlan: teamPlan };
   result.blankRepair = repairRosterBlanksWithStaffingFlow_(context, result);
   return result;
 }
@@ -1139,7 +1150,7 @@ function evaluateViolations_(personId, state) {
   }
 
   // 第九十輪批次 QB 組：詩班獻詩的主日，詩班名單上的人盡量不排（準硬規則：扣分，找不到其他人才排並提醒）
-  if (isChoirSundayConflict_(state.context, personId, !!state.serviceDate.choirSinging, state.serviceDate.serviceDate)) {
+  if (isChoirSundayConflict_(state.context, personId, !!state.serviceDate.choirSinging, state.serviceDate.serviceDate, post.postId)) {
     const choirPerson = state.context.peopleById[personId];
     violations.push(makeViolation_(rules, RULE_IDS.CHOIR_SUNDAY,
       buildChoirSundayReason_(choirPerson ? choirPerson.nameTC : personId, state.serviceDate.serviceDate)));
@@ -1161,6 +1172,9 @@ function evaluateViolations_(personId, state) {
         person ? person.nameTC : personId, state.serviceDate.serviceDate, already, post.postNameTC)));
     }
   }
+
+  // 第一百零五輪批次 RD 組：影音組合、協唱（PostTeams.gs）
+  evaluateTeamAndSingerViolations_(personId, state).forEach(function (v) { violations.push(v); });
 
   if (isRuleEnabled_(rules, RULE_IDS.MUTEX_GROUP) && post.mutexGroup) {
     const postsThisWeek = state.weekByPerson[personId] || [];

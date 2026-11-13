@@ -44,6 +44,13 @@ function describeRuleForCommittee_(ruleId) {
   map[RULE_IDS.POST_MAX_PER_PERSON] = '某些崗位每人每季最多做幾次';
   map[RULE_IDS.SAME_DAY_EXCLUSIVE] = '擔任領詩、司琴等崗位的人，同一個主日不再擔任其他崗位';
   map[RULE_IDS.CHOIR_SUNDAY] = '詩班獻詩的主日，詩班員盡量不擔任其他崗位';
+  // 第一百零五輪批次 RD 組
+  map[RULE_IDS.TEAM_OUTSIDE_HARD] = '影音組合成員在組合週以外不做組合的崗位';
+  map[RULE_IDS.TEAM_OUTSIDE_SOFT] = '影音組合成員在組合週以外盡量不做組合的崗位';
+  map[RULE_IDS.TEAM_WEEK] = '影音組合週，組合的崗位由組合成員做';
+  map[RULE_IDS.TEAM_HANDOFF] = '影音組合週，人手足夠時其中一個崗位交給另一位';
+  map[RULE_IDS.BACKING_SINGER_HARD] = '協唱在他的領詩領詩的主日不擔任其他崗位';
+  map[RULE_IDS.BACKING_SINGER_SOFT] = '協唱在他的領詩領詩的主日盡量不擔任其他崗位';
   map[RULE_IDS.ROLE_POST_FOCUS] = '堂委盡量集中在指定的幾個崗位，避免負擔過重';
   return map[ruleId] || '規則檢查';
 }

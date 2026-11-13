@@ -428,7 +428,10 @@
       // 第一百零五輪批次 RH 組：PersonID 統一為四位數字
       const pidRenames = p.personIdRenames || [];
       const pidSkipped = p.personIdSkipped || [];
+      // 第一百零五輪批次 RD 組：排表規則資料的工作表（PostTeams、WorshipBackingSingers）
+      const sheetsMissing = p.sheetsMissing || [];
       const total = p.configMissing.length + p.templatesMissing.length + outOrder.length + pidRenames.length;
+      const totalAll = total + sheetsMissing.length;
       const nodes = [para('只新增缺少的設定行及電郵範本，不會改動任何現有的行。新加的設定是預設值。')];
       nodes.push(audienceListBox('缺少的設定（' + p.configMissing.length + ' 行）',
         p.configMissing.map((c) => c.key + '＝' + (c.defaultValue || '（空白）')), '沒有。'));
@@ -437,7 +440,8 @@
       if (outOrder.length) nodes.push(audienceListBox('寄出／公開職事表的崗位次序（Posts 的 OutputOrder 欄，會新增並填好）', outOrder, ''));
       if (pidRenames.length) nodes.push(audienceListBox('PersonID 統一為四位數字（名單及所有引用它的工作表；職事表版本等歷史紀錄不改）', pidRenames, ''));
       if (pidSkipped.length) nodes.push(audienceListBox('PersonID 不改（請自行決定）', pidSkipped, ''));
-      openModal('補建設定及範本', nodes, total === 0 ? [button('知道了', () => closeModal(), '')] : [
+      if (sheetsMissing.length) nodes.push(audienceListBox('會建立的工作表（只有標題，之後自行填寫）', sheetsMissing, ''));
+      openModal('補建設定及範本', nodes, totalAll === 0 ? [button('知道了', () => closeModal(), '')] : [
         button('補建', () => runAction('補建設定及範本', async () => {
           const r = await callServerMutating('apiSeedConfigAndTemplates');
           openModal('補建設定及範本', [make('div', { text: r.message, className: 'ok-line' }),

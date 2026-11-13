@@ -477,6 +477,20 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "SYS"
     },
+    "CHOIR_SUNDAY_ALLOWED": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
+    "WORSHIP_LEADER_POST_ID": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "WORSHIP",
+      "launchTargetValue": "WORSHIP",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYS"
+    },
     "PERSONAL_UNAVAILABLE_QUARTERS_AHEAD": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "2",

@@ -494,7 +494,9 @@ function ruleReviewPlainEntry_(ruleId) {
   // 第九十輪批次 QA 組：同日不兼任——預設開啟（`RULE_DEFAULT_ENABLED`），現時設定列出崗位（Config SAME_DAY_EXCLUSIVE_POST_IDS）
   table[RULE_IDS.SAME_DAY_EXCLUSIVE] = {
     text: '擔任領詩、司琴等崗位的人，同一個主日不再擔任其他崗位',
-    what: '某人某個主日做了這些崗位（由幹事照音樂部名單在職事表填），那一日就不可以再做任何其他崗位。'
+    // 第一百零五輪批次 RD 組：寫明「領詩不做主席」就是這一條
+    what: '某人某個主日做了這些崗位（由幹事照音樂部名單在職事表填），那一日就不可以再做任何其他崗位'
+      + '（例如領詩那一日不做主席）。'
       + '填了之後有衝突，系統會提醒；〔請系統幫我調整〕會保留領詩／司琴那一格，改另一個崗位。',
     current: function (rule, ctx) {
       if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
@@ -506,9 +508,66 @@ function ruleReviewPlainEntry_(ruleId) {
   table[RULE_IDS.CHOIR_SUNDAY] = {
     text: '詩班獻詩的主日，詩班員盡量不擔任其他崗位',
     what: '開季前準備〔詩班獻詩日期〕勾了的主日，詩班名單上的人盡量不排其他崗位；找不到其他人才會排，並提醒。'
-      + '詩班名單在「崗位名單」工作表的「詩班」一欄（可以寫名字，亦可以寫「堂委」「執事」）。',
+      + '詩班名單在「崗位名單」工作表的「詩班」一欄（可以寫名字，亦可以寫「堂委」「執事」）。'
+      // 第一百零五輪批次 RD 組：例外（Config CHOIR_SUNDAY_ALLOWED）
+      + '個別人做個別崗位可以列為例外（Config CHOIR_SUNDAY_ALLOWED，例如某位詩班員在獻詩日可以做主席）：'
+      + '例外的人可以排，但系統不會特別安排。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      const n = ctx && typeof ctx.choirAllowedCount === 'number' ? ctx.choirAllowedCount : 0;
+      return '有生效' + (n > 0 ? '（例外 ' + n + ' 項）' : '（沒有例外）');
+    }
+  };
+  // 第一百零五輪批次 RD 組：影音組合（PostTeams）——每位成員自己的「組合週以外」級別：HARD 一條、SOFT 一條
+  table[RULE_IDS.TEAM_OUTSIDE_HARD] = {
+    text: '影音組合每月一起服侍；組合週以外，組合成員不做組合的崗位',
+    what: '「PostTeams」工作表列出的組合（例如音響、錄影、PPT 由固定幾位一起做），每月一起服侍 PerMonth 次（預設一次），'
+      + '系統先選好組合週，那幾個主日這些崗位由組合成員做；同一人可以同日兼兩個崗位（例如音響＋錄影）。'
+      + '組合週以外，「一定不做」的成員不會被排到組合的崗位。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      return (ctx && ctx.teamSummary) || '有生效，但現時沒有填組合（PostTeams）';
+    }
+  };
+  table[RULE_IDS.TEAM_OUTSIDE_SOFT] = {
+    text: '影音組合：組合週以外，「盡量避免」的成員盡量不做組合的崗位',
+    what: '組合成員設定為「盡量避免」（OutsideTeamLevel＝SOFT）的，組合週以外盡量不排他做組合的崗位；人手不足才排，並提醒。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      return (ctx && ctx.teamSummary) || '有生效，但現時沒有填組合（PostTeams）';
+    }
+  };
+  table[RULE_IDS.TEAM_WEEK] = {
+    text: '影音組合週，組合的崗位由組合成員做',
+    what: '組合週那一日，組合的崗位先排組合成員；組合成員做不到（例如申報了不能服侍）才排名單上其他人，並提醒。',
     current: function (rule) {
       return isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED]) ? '有生效' : '已關掉';
+    }
+  };
+  table[RULE_IDS.TEAM_HANDOFF] = {
+    text: '影音組合週，人手足夠時其中一個崗位交給另一位',
+    what: '組合成員要兼兩個崗位的話（例如音響＋錄影），人手足夠時排崗位次序最前的那一個（例如音響）交給名單上另一位，'
+      + '組合成員保留其餘崗位；人手不夠就全部由組合成員做。',
+    current: function (rule) {
+      return isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED]) ? '有生效' : '已關掉';
+    }
+  };
+  // 第一百零五輪批次 RD 組：協唱（WorshipBackingSingers）
+  table[RULE_IDS.BACKING_SINGER_HARD] = {
+    text: '某位領詩的協唱，在他領詩的主日不擔任其他崗位',
+    what: '「WorshipBackingSingers」工作表列出每位領詩的協唱。那位領詩那一日領詩（預先安排或職事表），'
+      + '級別「一定」的協唱那一日不會被排其他崗位。協唱不會在職事表或任何名單上顯示。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      return (ctx && ctx.singerSummary) || '有生效，但現時沒有填協唱（WorshipBackingSingers）';
+    }
+  };
+  table[RULE_IDS.BACKING_SINGER_SOFT] = {
+    text: '某位領詩的協唱，在他領詩的主日盡量不擔任其他崗位',
+    what: '級別「盡量」（Level＝SOFT）的協唱，那位領詩領詩的主日盡量不排其他崗位；人手不足才排，並提醒。',
+    current: function (rule, ctx) {
+      if (!isTrueValue_(rule[COLUMNS.RULE_SETTINGS.ENABLED])) return '已關掉';
+      return (ctx && ctx.singerSummary) || '有生效，但現時沒有填協唱（WorshipBackingSingers）';
     }
   };
   table[RULE_IDS.PERSON_POST_EXCLUDED] = {
@@ -538,7 +597,14 @@ function ruleReviewPlainEntry_(ruleId) {
   // ── 目標值（軟規則）────────────────────────────────────────
   table[RULE_IDS.MAX_PER_QUARTER] = {
     text: '每個人一季最多服侍多少次',
-    what: '超過這個數目之後，系統就不會再排他。個別人士可以在名單上單獨設定自己的上限。',
+    // 第一百零五輪批次 RD 組：按這一條實際的級別寫（「盡量遵守」⇒ 有需要可以超過）
+    what: function (rule) {
+      const level = String(rule[COLUMNS.RULE_SETTINGS.LEVEL] || RULE_LEVELS.SOFT).trim().toUpperCase();
+      return (level === RULE_LEVELS.HARD
+        ? '超過這個數目之後，系統就不會再排他。'
+        : '到了這個數目之後，系統盡量不再排他；人手不足、有需要時可以超過（不是一定要遵守的規則）。')
+        + '個別人士可以在名單上單獨設定自己的上限。';
+    },
     current: function (rule) {
       const v = Number(rule[COLUMNS.RULE_SETTINGS.TARGET_VALUE]);
       return isNaN(v) ? '（沒有設定）' : ('每人每季最多 ' + v + ' 次');
@@ -629,7 +695,9 @@ function ruleReviewPlainEntry_(ruleId) {
   };
   table[RULE_IDS.CHAIR_EQ_ANNOUNCE] = {
     text: '主席和報告盡量由同一位擔任',
-    what: '同一個主日的主席和報告由同一個人做，會少一個人要早到。',
+    // 第一百零五輪批次 RD 組：報告由堂委、執事擔任（崗位的身分要求），不需要當日做主席
+    what: '同一個主日的主席和報告由同一個人做，會少一個人要早到。這只是偏好：報告由堂委或執事擔任，'
+      + '不需要當日做主席。',
     unit: 'PER_SUNDAY'
   };
   table[RULE_IDS.CHAIR_PREFER_DUAL] = {

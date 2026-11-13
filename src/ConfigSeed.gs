@@ -378,6 +378,20 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百零五輪批次 RD 組：詩班獻詩日的例外、協唱
+      key: CONFIG_KEYS.CHOIR_SUNDAY_ALLOWED, type: CONFIG_TYPES.LIST, group: 'SYS',
+      defaultValue: "",
+      description: "詩班獻詩主日的例外（逗號分隔，每項「PersonID:PostID」，例如 P0001:CHAIR）：列出的人做列出的崗位，不受「詩班獻詩的主日，詩班員盡量不擔任其他崗位」限制——可以排，但不會特別安排（不加分也不扣分）。預設空白。",
+      editable: 'TRUE'
+    },
+    {
+      // 第一百零五輪批次 RD 組：詩班獻詩日的例外、協唱
+      key: CONFIG_KEYS.WORSHIP_LEADER_POST_ID, type: CONFIG_TYPES.STR, group: 'SYS',
+      defaultValue: "WORSHIP",
+      description: "「協唱」規則用哪一個崗位判斷當日的領詩（PostID，預設 WORSHIP）。協唱名單在 WorshipBackingSingers 工作表。",
+      editable: 'TRUE'
+    },
+    {
       // 第九十輪批次 QC 組：個人專屬連結可以申報多少季
       key: CONFIG_KEYS.PERSONAL_UNAVAILABLE_QUARTERS_AHEAD, type: CONFIG_TYPES.INT, group: 'SYS',
       defaultValue: '2',

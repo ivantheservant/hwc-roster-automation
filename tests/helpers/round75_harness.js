@@ -14,7 +14,7 @@ const { RealisticMockSpreadsheet, seedSheet, appendRows } = require('./mock_shee
 const BASE_FILES = [
   'Constants.gs', 'MutationLock.gs', 'Utils.gs', 'SheetReader.gs', 'Config.gs',
   'QuarterStage.gs', 'Roles.gs', 'RoleImpact.gs', 'PersonPostWeight.gs',
-  'HardViolationClass.gs', 'Generator.gs', 'FineTune.gs', 'StateSource.gs',
+  'HardViolationClass.gs', 'Generator.gs', 'PostTeams.gs', 'FineTune.gs', 'StateSource.gs',
   'Debug.gs', 'Tune.gs', 'Verify.gs', 'SoftRuleMetrics.gs',
   'EmailRecipientsSeed.gs', 'TemplatePreview.gs', 'RequestsSheet.gs',
   'RosterWriter.gs', 'MultiRun.gs', 'RequestsApply.gs', 'FourStageFlow.gs',

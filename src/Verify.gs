@@ -48,6 +48,7 @@ function buildVerifyContext_(quarterId, versionNo) {
   const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   eligibility.byPost = roleContext.eligibleByPost;
+  const extras = readRuleExtrasContext_();
 
   return {
     quarterId: quarterId,
@@ -61,7 +62,16 @@ function buildVerifyContext_(quarterId, versionNo) {
     unavailable: readUnavailableNormalized_(timezone),
     rules: readRules_(),
     // 第九十輪批次 QA 組：同日不兼任的崗位
-    sameDayExclusivePostIds: readSameDayExclusivePostIds_()
+    sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
+    // 第一百零五輪批次 RD 組：影音組合、協唱
+    teams: extras.teams,
+    backingSingers: extras.backingSingers,
+    worshipPostId: extras.worshipPostId,
+    // 違規句子用的人名（取自這一版的格）
+    peopleById: assignments.reduce(function (m, a) {
+      if (a.personId && !m[a.personId]) m[a.personId] = { nameTC: a.personName || a.personId };
+      return m;
+    }, {})
   };
 }
 
@@ -596,6 +606,13 @@ function checkHardRuleViolations_(context) {
       });
   }
 
+  // 第一百零五輪批次 RD 組：影音組合（組合週以外，HARD 的成員）、協唱（HARD）
+  const teamSingerHits = [];
+  findTeamAndSingerConflicts_(context.assignments, context).forEach(function (x) {
+    if (RULE_DEFAULT_LEVELS[x.ruleId] !== RULE_LEVELS.HARD) return;
+    teamSingerHits.push(mk(x.cell, x.ruleId, x.reason));
+  });
+
   const groups = [
     { label: '不在這個崗位的名單上', items: notEligible },
     { label: '違反 Unavailable', items: unavailableHits },
@@ -605,7 +622,8 @@ function checkHardRuleViolations_(context) {
     { label: '違反身分限制（規則 1／2：報告限堂委、當值堂委限堂委或執事）', items: roleViolations },
     { label: '違反個人崗位限制（規則 3）', items: exclusionViolations },
     { label: '超過每人每季崗位上限', items: postMaxHits },
-    { label: '同日兼任（擔任領詩、司琴等同日不兼任崗位的人當日另有崗位）', items: sameDayHits }
+    { label: '同日兼任（擔任領詩、司琴等同日不兼任崗位的人當日另有崗位）', items: sameDayHits },
+    { label: '影音組合在組合週以外做組合崗位／協唱在領詩那一日有其他崗位', items: teamSingerHits }
   ];
   const total = groups.reduce(function (sum, g) { return sum + g.items.length; }, 0);
   // `all` 係全部項目攤平——分類函式要一次過睇晒，唔應該逐 group 各自分類

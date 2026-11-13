@@ -18,10 +18,12 @@ function readChoirGroupPostId_() {
  * @param {string} personId 人
  * @param {boolean} choirSinging 那一日是不是詩班獻詩
  * @param {string} dateStr 主日
+ * @param {string=} postId 第一百零五輪批次 RD 組：正在排／檢查的崗位——Config CHOIR_SUNDAY_ALLOWED 列了「PersonID:PostID」⇒ 不受限制
  * @returns {boolean}
  */
-function isChoirSundayConflict_(ctx, personId, choirSinging, dateStr) {
+function isChoirSundayConflict_(ctx, personId, choirSinging, dateStr, postId) {
   if (!choirSinging || !personId || !ctx) return false;
+  if (postId && ctx.choirSundayAllowed && ctx.choirSundayAllowed[personId + ':' + postId]) return false;
   const choirId = ctx.choirGroupPostId;
   if (!choirId) return false;
   if (!isRuleEnabledAllowingDefault_(ctx.rules || {}, RULE_IDS.CHOIR_SUNDAY)) return false;

@@ -122,6 +122,9 @@ function getConfigBaselineSnapshot_() {
       SAME_DAY_EXCLUSIVE_POST_IDS: { launchTargetValue: 'WORSHIP,PIANO', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行
       CHOIR_GROUP_POST_ID: { launchTargetValue: 'CHOIR', source: '程式碼預設值（試算表現時實際值未核實）' },
+      // 第一百零五輪批次 RD 組：詩班獻詩日的例外、協唱
+      CHOIR_SUNDAY_ALLOWED: { launchTargetValue: "", source: '程式碼預設值（試算表現時實際值未核實）' },
+      WORSHIP_LEADER_POST_ID: { launchTargetValue: "WORSHIP", source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍
       PERSONAL_UNAVAILABLE_QUARTERS_AHEAD: { launchTargetValue: '2', source: '程式碼預設值（試算表現時實際值未核實）' },
       PERSONAL_UNAVAILABLE_DEADLINE_DAYS: { launchTargetValue: '7', source: '程式碼預設值（試算表現時實際值未核實）' },

@@ -264,7 +264,11 @@ function apiPlanSeedConfigAndTemplates() {
   const o = planPostOutputOrderSeed_();
   // 第一百零五輪批次 RH 組：PersonID 統一為四位數字（P90 → P0090）
   const pid = planPersonIdNormalize_();
+  // 第一百零五輪批次 RD 組：排表規則資料的工作表（PostTeams、WorshipBackingSingers）未建立的
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetsMissing = [SHEETS.POST_TEAMS, SHEETS.WORSHIP_BACKING_SINGERS].filter(function (n) { return !ss.getSheetByName(n); });
   return {
+    sheetsMissing: sheetsMissing,
     personIdRenames: pid.renames.map(function (r) { return r.nameTC + '：' + r.fromId + ' → ' + r.toId + '（' + r.cells.length + ' 格）'; }),
     personIdSkipped: pid.skipped.map(function (s) { return s.nameTC + '：' + s.fromId + ' 不改——' + s.reason; }),
     postsOutputOrder: o.needed ? o.fills.map(function (f) { return f.postNameTC + '＝' + (f.value === '' ? '（留空＝用 DisplayOrder）' : f.value); }) : [],
@@ -287,16 +291,21 @@ function apiSeedConfigAndTemplates() {
     // 第一百零五輪批次 RH 組：PersonID 統一為四位數字（可重複執行；歷史紀錄用過的不改）
     const pid = planPersonIdNormalize_();
     const npid = pid.renames.length ? applyPersonIdNormalize_(pid) : 0;
+    // 第一百零五輪批次 RD 組：建立 PostTeams、WorshipBackingSingers（已有就只核對標題，不改內容）
+    const sheetsCreated = ensureRuleDataSheets_();
     if (nc > 0) reloadConfigCache_();
     writeAuditLog_({ action: 'CONFIG_TEMPLATES_SEEDED', targetSheet: SHEETS.CONFIG, targetKey: '',
-      newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個' + (o.needed ? '、Posts.OutputOrder ' + no + ' 行' : ''), source: 'apiSeedConfigAndTemplates',
+      newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個' + (o.needed ? '、Posts.OutputOrder ' + no + ' 行' : '')
+        + (sheetsCreated.length ? '、新工作表 ' + sheetsCreated.join(',') : ''), source: 'apiSeedConfigAndTemplates',
       notes: c.missing.map(function (s) { return s.key; }).concat(t.missing.map(function (s) { return s.templateId; })).join(',') });
     return { ok: true, configAdded: c.missing.map(function (s) { return s.key; }), templatesAdded: t.missing.map(function (s) { return s.templateId; }),
       postsOutputOrderSeeded: o.needed ? no : 0,
+      sheetsCreated: sheetsCreated,
       personIdRenamed: pid.renames.map(function (r) { return r.fromId + '→' + r.toId; }), personIdCells: npid,
       personIdSkipped: pid.skipped.map(function (s) { return s.nameTC + '：' + s.fromId + ' 不改——' + s.reason; }),
-      message: (nc + nt) > 0 || o.needed || npid > 0
+      message: (nc + nt) > 0 || o.needed || npid > 0 || sheetsCreated.length > 0
         ? '已補建 Config ' + nc + ' 行、電郵範本 ' + nt + ' 個（數值是預設值）' + (o.needed ? '；Posts 的 OutputOrder 欄填了 ' + no + ' 行（寄出／公開職事表的崗位次序）' : '')
+          + (sheetsCreated.length ? '；建立了工作表 ' + sheetsCreated.join('、') + '（只有標題，請自行填寫）' : '')
           + (npid > 0 ? '；PersonID 統一為四位數字：' + pid.renames.map(function (r) { return r.fromId + ' → ' + r.toId; }).join('、') + '（' + npid + ' 格）' : '') + '。'
         : '全部已經齊全，不需要補建。' };
   });

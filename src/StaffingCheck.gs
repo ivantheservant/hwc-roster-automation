@@ -798,6 +798,11 @@ function repairRosterBlanksWithStaffingFlow_(context, result) {
     log_('WARN', 'repairRosterBlanksWithStaffingFlow_：補空格會令同日兼任，照舊用貪心法結果');
     return { before: aug.blanksBefore, after: aug.blanksBefore, changed: 0 };
   }
+  // 第一百零五輪批次 RD 組：補空格不可以令影音組合、協唱的違規變多
+  if (!teamAndSingerNotWorse_(context, cells, next)) {
+    log_('WARN', 'repairRosterBlanksWithStaffingFlow_：補空格會令組合／協唱違規，照舊用貪心法結果');
+    return { before: aug.blanksBefore, after: aug.blanksBefore, changed: 0 };
+  }
   const filledKeys = {};
   aug.changes.forEach(function (ch) {
     const i = byKey[ch.serviceDate + '|' + ch.postId + '|' + ch.slotIndex];

@@ -329,10 +329,26 @@ function buildRuleReviewContext_() {
   // 第九十一輪批次 RA 組：人手填寫的崗位（Posts.AutoGenerate=FALSE）
   const manualPostNames = readManualFillPostNamesSafe_();
 
+  // 第一百零五輪批次 RD 組：影音組合、協唱、詩班獻詩日例外（只寫數目，不寫名字）
+  let teamSummary = '';
+  let singerSummary = '';
+  let choirAllowedCount = 0;
+  try {
+    const extras = readRuleExtrasContext_();
+    teamSummary = describeTeamsForReview_(extras.teams, readPostsNormalized_());
+    singerSummary = describeSingersForReview_(extras.backingSingers);
+    choirAllowedCount = Object.keys(extras.choirSundayAllowed).length;
+  } catch (err) {
+    log_('WARN', '規則審閱表讀不到組合／協唱：' + err.message);
+  }
+
   return {
     exclusionCurrentCount: exclusionCurrentCount,
     sameDayExclusiveLabel: sameDayExclusiveLabel,
     manualPostNames: manualPostNames,
+    teamSummary: teamSummary,
+    singerSummary: singerSummary,
+    choirAllowedCount: choirAllowedCount,
     eligibilityRolePosts: eligibilityRolePosts,
     postMaxPosts: postMaxPosts,
     // ⚠️ `members` 係 `{postId, postNameTC, active}`；`postNames` 仍然

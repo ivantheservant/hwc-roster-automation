@@ -86,6 +86,7 @@ function buildFineTuneContextCore_(quarterId, versionNo, opts) {
   const eligibility = readEligibility_();
   const roleContext = buildRoleContext_(eligibility, posts, timezone);
   eligibility.byPost = roleContext.eligibleByPost;
+  const extras = readRuleExtrasContext_();
 
   return {
     quarterId: quarterId,
@@ -113,6 +114,11 @@ function buildFineTuneContextCore_(quarterId, versionNo, opts) {
     sameDayExclusivePostIds: readSameDayExclusivePostIds_(),
     // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行（SEMI_CHOIR_SUNDAY）
     choirGroupPostId: readChoirGroupPostId_(),
+    // 第一百零五輪批次 RD 組：影音組合、協唱、詩班獻詩日的例外（同生成器一樣，PostTeams.gs）
+    teams: extras.teams,
+    backingSingers: extras.backingSingers,
+    worshipPostId: extras.worshipPostId,
+    choirSundayAllowed: extras.choirSundayAllowed,
     maxMoves: Number(config[CONFIG_KEYS.FINETUNE_MAX_MOVES]) || DEFAULTS.FINETUNE_MAX_MOVES,
     maxPerQuarterDefault: Number(config[CONFIG_KEYS.DEFAULT_MAX_PER_QUARTER]) || 8,
     // 預設 TRUE（維持原行為：SEMI_HARD 違反一律回報）。讀一次存進 context，
@@ -557,7 +563,7 @@ function findStateViolations_(state, context) {
       add(cell, RULE_IDS.UNAVAILABLE, '該日已表明不能服侍');
     }
     // 第九十輪批次 QB 組：詩班獻詩的主日，詩班名單上的人盡量不擔任崗位（準硬規則）
-    if (isChoirSundayConflict_(context, cell.personId, !!(dateInfo[cell.serviceDate] || {}).choirSinging, cell.serviceDate)) {
+    if (isChoirSundayConflict_(context, cell.personId, !!(dateInfo[cell.serviceDate] || {}).choirSinging, cell.serviceDate, cell.postId)) {
       const choirPerson = (context.peopleById || {})[cell.personId];
       add(cell, RULE_IDS.CHOIR_SUNDAY, buildChoirSundayReason_(choirPerson ? choirPerson.nameTC : cell.personId, cell.serviceDate));
     }
@@ -643,6 +649,9 @@ function findStateViolations_(state, context) {
         anchorPost ? anchorPost.postNameTC : x.anchor.postId, cellPost ? cellPost.postNameTC : x.cell.postId));
     });
   }
+
+  // 第一百零五輪批次 RD 組：影音組合（組合週以外）、協唱。context 沒有 teams／backingSingers（自組的 context）⇒ 不檢查。
+  findTeamAndSingerConflicts_(state, context).forEach(function (x) { add(x.cell, x.ruleId, x.reason); });
 
   // 次數上限每人只回報一次，掛在該人最後一個主日的格上。
   // 若放在逐格迴圈內，一個做了 9 次的人會產生 9 項違規，把提案清單淹沒。
