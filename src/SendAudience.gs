@@ -25,7 +25,8 @@ function readAudiencePeople_() {
   readPeople_().forEach(function (row) {
     const id = String(row[M.PERSON_ID] || '').trim();
     if (!id) return;
-    out[id] = { personId: id, name: String(row[M.NAME_TC] || '').trim() || id, email: String(effectivePersonEmail_(row) || '').trim() };
+    out[id] = { personId: id, name: String(row[M.NAME_TC] || '').trim() || id, email: String(effectivePersonEmail_(row) || '').trim(),
+      preferred: usesPreferredEmail_(row) };   // 第一百零五輪批次 RA 組：用指定寄信電郵
   });
   return out;
 }
@@ -140,7 +141,7 @@ function resolveAudienceSelection_(purpose, selection, todayStr) {
     // 申報連結是每人一條 ⇒ 按人（同一個地址的兩個人各收自己那一封）；季前資料按地址（同一地址只收一封）
     const k = purpose === AUDIENCE_PURPOSE.INVITE ? ('id:' + id) : p.email.toLowerCase();
     if (seenEmail[k]) { seenEmail[k].why += '、' + why; return; }
-    seenEmail[k] = { personId: id, displayName: p.name, email: p.email, why: why };
+    seenEmail[k] = { personId: id, displayName: p.name, email: p.email, why: why, preferred: !!p.preferred };
     if (purpose !== AUDIENCE_PURPOSE.INVITE) seenEmail[p.email.toLowerCase()] = seenEmail[k];
     out.push(seenEmail[k]);
   });

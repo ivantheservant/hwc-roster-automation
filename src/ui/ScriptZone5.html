@@ -188,7 +188,7 @@
       ];
       nodes.push(renderAudiencePicker(p.audience, s, (next) => openPreseasonSend(next)));
       nodes.push(audienceListBox('② 收件人（' + (p.recipients || []).length + ' 位；同一地址只收一封）',
-        (p.recipients || []).map((r) => r.displayName + '（' + r.why + '）'), '一位都沒有。'));
+        (p.recipients || []).map((r) => r.displayName + '（' + r.why + (r.preferred ? '；指定寄信電郵' : '') + '）'), '一位都沒有。'));
       if ((p.noEmail || []).length > 0) nodes.push(make('div', { text: '沒有電郵，收不到：' + p.noEmail.join('、'), className: 'err-text' }));
       (p.sections || []).forEach((sec) => {
         const box = make('details', { className: 'sec' });

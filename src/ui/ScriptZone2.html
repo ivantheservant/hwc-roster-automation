@@ -313,8 +313,8 @@
     });
   }
 
-  /** 一行：姓名、崗位摘要、輸入框（已補填的再加一句說明）。 */
-  function manualEmailRow_(p, value) {
+  /** 一行：姓名、崗位摘要、輸入框（已補填的再加一句說明）。kind：'PREFERRED'＝指定寄信電郵（第一百零五輪批次 RA 組） */
+  function manualEmailRow_(p, value, kind) {
     const box = make('div', { className: 'prop' });
     box.appendChild(make('div', { text: p.nameTC + (p.posts ? '　' + p.posts : ''), className: 'prop-head' }));
     if (p.why) box.appendChild(make('div', { text: '（' + p.why + '）', className: 'muted' }));
@@ -324,9 +324,33 @@
     input.className = 'manual-email-input';
     input.value = value || '';
     input.placeholder = '電郵';
-    manualEmailInputs_.push({ input: input, personId: p.personId, original: value || '' });
+    manualEmailInputs_.push({ input: input, personId: p.personId, original: value || '', kind: kind || '' });
     box.appendChild(input);
     return box;
+  }
+
+  /** 第一百零五輪批次 RA 組：「加一位」——選人＋輸入指定寄信電郵。 */
+  let preferredEmailAdd_ = null;
+  function preferredEmailAddRow_(d) {
+    const already = {};
+    (d.preferred || []).forEach((p) => { already[p.personId] = true; });
+    const select = document.createElement('select');
+    const first = document.createElement('option');
+    first.value = '';
+    first.textContent = '（選一位）';
+    select.appendChild(first);
+    (d.people || []).filter((p) => !already[p.personId]).forEach((p) => {
+      const o = document.createElement('option');
+      o.value = p.personId;
+      o.textContent = p.nameTC;
+      select.appendChild(o);
+    });
+    const input = document.createElement('input');
+    input.type = 'email';
+    input.className = 'manual-email-input';
+    input.placeholder = '指定寄信電郵';
+    preferredEmailAdd_ = { select: select, input: input };
+    return make('div', { className: 'prop' }, [make('div', { text: '加一位', className: 'prop-head' }), select, input]);
   }
 
   function renderManualEmails_() {
@@ -340,6 +364,15 @@
     const filledBox = make('div', { className: 'sec' }, [sectionTitle('已補填：' + d.filled.length + ' 位（清空那一格再儲存＝清除）')]);
     d.filled.forEach((p) => filledBox.appendChild(manualEmailRow_(p, p.manualEmail)));
     nodes.push(filledBox);
+    // 第一百零五輪批次 RA 組：指定寄信電郵（優先）——可以設定、修改、清除
+    const preferred = d.preferred || [];
+    const prefBox = make('div', { className: 'sec' }, [
+      sectionTitle('指定寄信電郵（優先）：' + preferred.length + ' 位（清空那一格再儲存＝清除）'),
+      para(d.preferredExplanation || '', 'muted')
+    ]);
+    preferred.forEach((p) => prefBox.appendChild(manualEmailRow_(p, p.preferredEmail, 'PREFERRED')));
+    prefBox.appendChild(preferredEmailAddRow_(d));
+    nodes.push(prefBox);
     openModal('補填電郵：' + (d.quarterLabel || currentQuarterId), nodes, [
       button('儲存', () => saveManualEmails_(), ''),
       button('關閉', () => closeModalAndRefresh(), 'secondary')
@@ -348,9 +381,15 @@
 
   /** 改了的格（和原本不同的）。 */
   function collectManualEmailEdits_() {
-    return manualEmailInputs_
+    const out = manualEmailInputs_
       .filter((x) => String(x.input.value || '').trim() !== String(x.original || '').trim())
-      .map((x) => ({ personId: x.personId, email: String(x.input.value || '').trim() }));
+      .map((x) => ({ personId: x.personId, email: String(x.input.value || '').trim(), kind: x.kind || '' }));
+    // 第一百零五輪批次 RA 組：「加一位」
+    const add = preferredEmailAdd_;
+    if (add && add.select.value && String(add.input.value || '').trim()) {
+      out.push({ personId: add.select.value, email: String(add.input.value || '').trim(), kind: 'PREFERRED' });
+    }
+    return out;
   }
 
   function saveManualEmails_() {

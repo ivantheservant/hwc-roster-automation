@@ -266,7 +266,10 @@ const COLUMNS = {
     PERSONAL_LINK_TOKEN: 'PersonalLinkToken',
     // 第九十七輪批次 XA 組：幹事補填的電郵（只供職事表寄信用；出席系統同步、連結永遠不讀不寫這一欄）。
     // 第一次儲存〔補填電郵〕時自動補欄（ManualEmail.gs）。實際電郵見 SheetReader.gs 的 effectivePersonEmail_()。
-    MANUAL_EMAIL: 'ManualEmail'
+    MANUAL_EMAIL: 'ManualEmail',
+    // 第一百零五輪批次 RA 組：指定寄信電郵（例如堂委、執事的教會電郵）。有值就**優先**用它寄信，
+    // 其次出席系統的 Email，最後 ManualEmail。出席系統同步永遠不讀不寫這一欄；第一次設定時自動補欄。
+    PREFERRED_EMAIL: 'PreferredEmail'
   },
   NAME_ALIAS: {
     ALIAS_ID: 'AliasID',

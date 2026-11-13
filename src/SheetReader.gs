@@ -49,9 +49,49 @@ function endSheetReadMemo_() {
 function effectivePersonEmail_(row) {
   if (!row) return '';
   const M = COLUMNS.NAME_MAPPING;
+  // 第一百零五輪批次 RA 組：指定寄信電郵（PreferredEmail）有值就優先
+  const preferred = preferredPersonEmail_(row);
+  if (preferred) return preferred;
   const hwcas = String(row[M.EMAIL] === null || row[M.EMAIL] === undefined ? '' : row[M.EMAIL]).trim();
   if (hwcas) return hwcas;
   return String(row[M.MANUAL_EMAIL] === null || row[M.MANUAL_EMAIL] === undefined ? '' : row[M.MANUAL_EMAIL]).trim();
+}
+
+/** 第一百零五輪批次 RA 組：收件人名字後面的標記（用指定寄信電郵的人）。 */
+const PREFERRED_EMAIL_MARK = '（指定寄信電郵）';
+
+/**
+ * 第一百零五輪批次 RA 組：這一行的指定寄信電郵（`NameMapping.PreferredEmail`）；沒有這一欄或空白 ⇒ 空字串。
+ * @param {Object} row NameMapping 的一行
+ * @returns {string}
+ */
+function preferredPersonEmail_(row) {
+  if (!row) return '';
+  const v = row[COLUMNS.NAME_MAPPING.PREFERRED_EMAIL];
+  return String(v === null || v === undefined ? '' : v).trim();
+}
+
+/**
+ * 第一百零五輪批次 RA 組：實際寄信用的是指定寄信電郵嗎（畫面上收件人旁邊寫「指定寄信電郵」）。
+ * @param {Object} row NameMapping 的一行
+ * @returns {boolean}
+ */
+function usesPreferredEmail_(row) {
+  return !!preferredPersonEmail_(row);
+}
+
+/**
+ * 第一百零五輪批次 RA 組：用指定寄信電郵的人（PersonID → true）。收件人名單加標記用。**只讀。**
+ * @returns {Object.<string, boolean>}
+ */
+function readPreferredEmailPersonIds_() {
+  const out = {};
+  const M = COLUMNS.NAME_MAPPING;
+  readPeople_().forEach(function (row) {
+    const id = String(row[M.PERSON_ID] || '').trim();
+    if (id && usesPreferredEmail_(row)) out[id] = true;
+  });
+  return out;
 }
 
 /**

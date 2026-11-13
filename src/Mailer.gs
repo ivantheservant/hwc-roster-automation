@@ -441,6 +441,7 @@ function indexPeopleById_() {
       personId: personId,
       nameTC: row[COLUMNS.NAME_MAPPING.NAME_TC],
       email: effectivePersonEmail_(row),   // 第九十七輪批次 XA 組：實際電郵（出席系統的 Email，沒有才用幹事補填的 ManualEmail）
+      emailPreferred: usesPreferredEmail_(row),   // 第一百零五輪批次 RA 組：用的是指定寄信電郵
       maxPerQuarter: (rawMax === '' || rawMax === null || rawMax === undefined) ? null : Number(rawMax)
     };
   });

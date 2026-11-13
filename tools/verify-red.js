@@ -11493,8 +11493,9 @@ const MUTATIONS = [
     id: "xa-ignore-manual",
     why: "實際電郵不看補填的",
     file: "src/SheetReader.gs",
-    find: "  return String(row[M.MANUAL_EMAIL] === null || row[M.MANUAL_EMAIL] === undefined ? '' : row[M.MANUAL_EMAIL]).trim();\n}\n\n/**\n * 第九十六輪批次 WA 組",
-    replace: "  return '';\n}\n\n/**\n * 第九十六輪批次 WA 組",
+    // 第一百零五輪批次 RA 組：effectivePersonEmail_() 後面多了 PreferredEmail 的說明，find 跟着改
+    find: "  return String(row[M.MANUAL_EMAIL] === null || row[M.MANUAL_EMAIL] === undefined ? '' : row[M.MANUAL_EMAIL]).trim();\n}\n\n/** 第一百零五輪批次 RA 組：收件人名字後面的標記",
+    replace: "  return '';\n}\n\n/** 第一百零五輪批次 RA 組：收件人名字後面的標記",
     tests: ["tests/round97_xa_manual_email.test.js"]
   },
   {
@@ -11557,16 +11558,17 @@ const MUTATIONS = [
     id: "xa-save-writes-email",
     why: "補填電郵寫入 Email 欄",
     file: "src/ManualEmail.gs",
-    find: "    updates[M.MANUAL_EMAIL] = e.email;",
-    replace: "    updates[M.EMAIL] = e.email;",
+    // 第一百零五輪批次 RA 組：寫入的欄改為按 kind 選（column），find 跟着改
+    find: "    const column = e.preferred ? M.PREFERRED_EMAIL : M.MANUAL_EMAIL;",
+    replace: "    const column = e.preferred ? M.PREFERRED_EMAIL : M.EMAIL;",
     tests: ["tests/round97_xa_manual_email.test.js"]
   },
   {
     id: "xa-audit-unmasked",
     why: "AuditLog 寫完整電郵",
     file: "src/ManualEmail.gs",
-    find: "      newValue: M.MANUAL_EMAIL + '=' + (maskEmailForPreview_(e.email) || '（空白）'),",
-    replace: "      newValue: M.MANUAL_EMAIL + '=' + (e.email || '（空白）'),",
+    find: "      newValue: column + '=' + (maskEmailForPreview_(e.email) || '（空白）'),",
+    replace: "      newValue: column + '=' + (e.email || '（空白）'),",
     tests: ["tests/round97_xa_manual_email.test.js"]
   },
   {
@@ -13292,6 +13294,54 @@ const MUTATIONS = [
     find: "它永遠指向你最近一次按〔儲存〕的版本。'",
     replace: "它永遠指向你最近一次「儲存我的修改」的版本。'",
     tests: ["tests/round104_pd_button_names.test.js"]
+  },
+  {
+    id: "ra-preferred-not-first",
+    why: "指定寄信電郵沒有優先",
+    file: "src/SheetReader.gs",
+    find: "  const preferred = preferredPersonEmail_(row);\n  if (preferred) return preferred;\n",
+    replace: "",
+    tests: ["tests/round105_ra_preferred_email.test.js"]
+  },
+  {
+    id: "ra-save-wrong-column",
+    why: "指定寄信電郵寫錯欄（寫到補填）",
+    file: "src/ManualEmail.gs",
+    find: "    const column = e.preferred ? M.PREFERRED_EMAIL : M.MANUAL_EMAIL;",
+    replace: "    const column = M.MANUAL_EMAIL;",
+    tests: ["tests/round105_ra_preferred_email.test.js"]
+  },
+  {
+    id: "ra-audit-wrong-action",
+    why: "指定寄信電郵的 AuditLog 動作不對",
+    file: "src/ManualEmail.gs",
+    find: "      action: e.preferred ? PREFERRED_EMAIL_AUDIT_ACTION : MANUAL_EMAIL_AUDIT_ACTION,",
+    replace: "      action: MANUAL_EMAIL_AUDIT_ACTION,",
+    tests: ["tests/round105_ra_preferred_email.test.js"]
+  },
+  {
+    id: "ra-view-no-preferred",
+    why: "畫面沒有列出已設定的指定寄信電郵",
+    file: "src/ManualEmail.gs",
+    find: "        preferredList.push({ personId: personId, nameTC: nameTC, preferredEmail: preferred, posts: posts[personId] || '' });",
+    replace: "        void preferred;",
+    tests: ["tests/round105_ra_preferred_email.test.js"]
+  },
+  {
+    id: "ra-ui-no-add-row",
+    why: "「加一位」沒有送出",
+    file: "src/ui/ScriptZone2.html",
+    find: "      out.push({ personId: add.select.value, email: String(add.input.value || '').trim(), kind: 'PREFERRED' });",
+    replace: "      void add;",
+    tests: ["tests/round105_ra_preferred_email.test.js"]
+  },
+  {
+    id: "ra-audience-no-flag",
+    why: "季前資料／申報連結收件人沒有指定電郵標記",
+    file: "src/SendAudience.gs",
+    find: "      preferred: usesPreferredEmail_(row) };",
+    replace: "      preferred: false };",
+    tests: ["tests/round105_ra_preferred_email.test.js"]
   }
 ];
 

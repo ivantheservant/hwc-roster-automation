@@ -982,6 +982,7 @@
         : (c.noAssignmentThisVersion ? '（這一版沒有任何安排）'
           : ('（這一季 ' + c.cellCount + ' 格）')))
         + describeRoleTags(c.roles)
+        + (c.emailPreferred ? '　指定寄信電郵' : '')   // 第一百零五輪批次 RA 組
         // B2：勾咗「只寄有改動」之後，逐個要講明**改咗乜**。
         + ((c.changeNotes && c.changeNotes.length > 0)
           ? ('　改動：' + c.changeNotes.join('、')) : ''),

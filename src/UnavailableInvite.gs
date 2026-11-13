@@ -132,7 +132,7 @@ function apiUnavailableInvitePreview(quarterId) {
       generateDate: dates.generateDate,
       deadline: dates.deadline,
       recipientCount: who.recipients.length,
-      recipientNames: who.recipients.map(function (r) { return r.displayName; }),
+      recipientNames: who.recipients.map(function (r) { return r.displayName + (r.preferred ? PREFERRED_EMAIL_MARK : ''); }),   // 第一百零五輪批次 RA 組
       noEmail: who.noEmail,
       noLink: who.noLink,
       baseUrlMissing: !String(getConfig_(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),
@@ -244,7 +244,7 @@ function resolveInviteAudience_(selection, todayStr) {
   r.people.forEach(function (p) {
     const token = tokenById[p.personId] || '';
     if (!token) { noLink.push(p.displayName); return; }
-    recipients.push({ personId: p.personId, displayName: p.displayName, email: p.email, token: token });
+    recipients.push({ personId: p.personId, displayName: p.displayName, email: p.email, token: token, preferred: !!p.preferred });
   });
   const noEmailPeople = r.noEmail.map(function (p) { return { personId: p.personId, displayName: p.displayName, token: tokenById[p.personId] || '' }; });
   return {
@@ -274,7 +274,7 @@ function apiUnavailableLinkPreview(quarterId, selection) {
     return {
       quarterId: id, quarterLabel: buildQuarterLabel_(id), generateDate: dates.generateDate, deadline: dates.deadline,
       audience: buildAudienceOptions_(AUDIENCE_PURPOSE.INVITE, today), selection: who.selection,
-      recipientNames: who.recipients.map(function (r) { return r.displayName; }),
+      recipientNames: who.recipients.map(function (r) { return r.displayName + (r.preferred ? PREFERRED_EMAIL_MARK : ''); }),   // 第一百零五輪批次 RA 組
       noEmail: who.noEmailPeople.map(function (p) { return p.displayName; }),
       noLink: who.noLink,
       baseUrlMissing: !String(getConfig_(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),

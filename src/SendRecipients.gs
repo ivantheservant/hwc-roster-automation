@@ -113,6 +113,7 @@ function buildSendRecipientPool_(context, timezone) {
       sendAs: SEND_AS.TO,
       cellCount: (context.assignmentsByPerson[personId] || []).length,
       hasEmail: !!email,
+      emailPreferred: !!(person && person.emailPreferred),   // 第一百零五輪批次 RA 組
       selectable: !!email,
       roles: rolesByPerson[personId] || [],
       sources: [SEND_SOURCE.ROSTER]
@@ -133,6 +134,7 @@ function buildSendRecipientPool_(context, timezone) {
       sendAs: SEND_AS.TO,
       cellCount: (context.assignmentsByPerson[personId] || []).length,
       hasEmail: !!email,
+      emailPreferred: !!person.emailPreferred,   // 第一百零五輪批次 RA 組
       selectable: !!email,
       roles: rolesByPerson[personId],
       sources: []
