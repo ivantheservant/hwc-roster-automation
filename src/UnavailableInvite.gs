@@ -87,8 +87,8 @@ function listUnavailableInviteCandidateIds_(todayStr) {
 function readUnavailableInviteDates_(quarterId) {
   const row = findQuarter_(quarterId);
   const generateDate = row ? readPreseasonGenerateDate_(row, readConfig_()) : '';
-  const days = Math.max(0, Number(getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, 7)) || 0);
-  return { generateDate: generateDate, deadline: generateDate ? shiftDateString_(generateDate, -days) : '' };
+  // 第一百零五輪批次 RB 組：截止日統一由 unavailableDeadlineFor_() 計（時間表季度＝生成日；之前的季度照舊）
+  return { generateDate: generateDate, deadline: unavailableDeadlineFor_(quarterId, generateDate) };
 }
 
 /**
@@ -162,9 +162,13 @@ function apiUnavailableInviteSend(quarterId) {
 /**
  * 寄出申報邀請。**會寄信**（DRY_RUN 時只模擬）＋寫 AuditLog。
  * @param {string} quarterId 季度 ID
+ * @param {?Object=} resolvedWho 已選好的收件人；不傳 ⇒ 按開放範圍的預設
+ * @param {?Object=} opts 第一百零五輪批次 RB 組：{mode: 'AUTO'|'MANUAL', source, templateId, auditAction, noteLabel}
+ *   ——時間表自動化（申報連結、截止日前提醒）用同一支寄
  * @returns {{dryRun: boolean, sent: number, simulated: number, failed: Object[], noEmail: string[], noLink: string[]}}
  */
-function sendUnavailableInvites_(quarterId, resolvedWho) {
+function sendUnavailableInvites_(quarterId, resolvedWho, opts) {
+  const o = opts || {};
   const config = readConfig_();
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
@@ -176,7 +180,9 @@ function sendUnavailableInvites_(quarterId, resolvedWho) {
   // 第一百零一輪批次 ZE-1／ZE-2：合併窗傳入已選好的收件人；不傳 ⇒ 按開放範圍的預設（伺服器端把關：第一階段只寄給堂委、執事、幹事）
   const who = resolvedWho || resolveInviteAudience_(null, today);
   const dates = readUnavailableInviteDates_(quarterId);
-  const tpl = findEmailTemplateById_(UNAVAILABLE_INVITE_TEMPLATE_ID) || unavailableInviteTemplateDefault_();
+  const templateId = o.templateId || UNAVAILABLE_INVITE_TEMPLATE_ID;
+  const tpl = findEmailTemplateById_(templateId)
+    || EMAIL_TEMPLATE_SEEDS.filter(function (t) { return t.templateId === templateId; })[0] || unavailableInviteTemplateDefault_();
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   const dryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const context = { senderName: String(config[CONFIG_KEYS.MAIL_SENDER_NAME] || ''), replyTo: String(config[CONFIG_KEYS.MAIL_REPLY_TO] || '') };
@@ -201,13 +207,13 @@ function sendUnavailableInvites_(quarterId, resolvedWho) {
     }
   });
   writeAuditLog_({
-    action: UNAVAILABLE_INVITE_AUDIT_ACTION,
+    action: o.auditAction || UNAVAILABLE_INVITE_AUDIT_ACTION,
     targetSheet: SHEETS.QUARTERS,
     targetKey: quarterId,
     oldValue: '',
-    newValue: 'MANUAL|' + today + '|' + (dryRun ? 'DRY_RUN' : 'SENT'),
-    source: 'apiUnavailableInviteSend',
-    notes: (dryRun ? '模擬 ' + simulated : '寄出 ' + sent) + ' 封申報邀請（截止日 ' + (dates.deadline || '未定') + '）'
+    newValue: (o.mode === 'AUTO' ? 'AUTO' : 'MANUAL') + '|' + today + '|' + (dryRun ? 'DRY_RUN' : 'SENT'),
+    source: o.source || 'apiUnavailableInviteSend',
+    notes: (dryRun ? '模擬 ' + simulated : '寄出 ' + sent) + ' 封' + (o.noteLabel || '申報邀請') + '（截止日 ' + (dates.deadline || '未定') + '）'
       + (failed.length ? '；失敗 ' + failed.length + ' 封：' + failed.map(function (f) { return f.name; }).join('、') : '')
       + (who.noEmail.length ? '；沒有電郵：' + who.noEmail.join('、') : '')
       + (who.noLink.length ? '；沒有個人連結：' + who.noLink.join('、') : '')

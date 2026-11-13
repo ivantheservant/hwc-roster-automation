@@ -264,7 +264,7 @@ console.log('\n=== QB5：整季重設 ===');
 // =====================================================================
 console.log('\n=== QB6：季前資料 ===');
 {
-  const sc = scene({ extraFiles: ['PreseasonPack.gs', 'EmailTemplateSeed.gs', 'WebAppPeople.gs'],
+  const sc = scene({ extraFiles: ['PreseasonPack.gs', 'UnavailableSchedule.gs', 'EmailTemplateSeed.gs', 'WebAppPeople.gs'],
     choir: ['P9704', 'ROLE:DEACON'],
     roles: [{ PersonID: 'P9702', RoleCode: 'DEACON', EffectiveFrom: '2098-01-01', EffectiveTo: '', Active: true }] });
   const g = sc.gas; const D = sc.DATES;

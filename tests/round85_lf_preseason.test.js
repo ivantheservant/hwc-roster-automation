@@ -23,7 +23,7 @@ function check(label, condition, extra) {
 }
 
 function scene(config) {
-  const sc = buildRound75Scene({ extraFiles: ['WebAppCombined.gs', 'PreseasonPack.gs', 'EmailTemplateSeed.gs', 'WebAppPeople.gs'],
+  const sc = buildRound75Scene({ extraFiles: ['WebAppCombined.gs', 'PreseasonPack.gs', 'UnavailableSchedule.gs', 'EmailTemplateSeed.gs', 'WebAppPeople.gs'],
     config: Object.assign({ MAIL_ADMIN_NOTIFY: ['clerk@example.invalid', 'STR'],
       PRESEASON_EXTRA_RECIPIENTS: ['extra@example.invalid、p9701@example.invalid', 'STR'] }, config || {}) });
   const g = sc.gas; const C = sc.C; const S = sc.S; const D = sc.DATES;
@@ -93,8 +93,9 @@ console.log('\n=== LF2：內容六段 ===');
   check('★★★★★ ⑥ 預先安排的領詩、司琴（沒有）', t(5) === '沒有', t(5));
   check('★★★★★ ⑦ 人手檢查（人手足夠）', t(6) === '人手足夠', t(6));
   const tpl = sc.gas.preseasonTemplateDefault_();
-  check('★★★★★ 範本結尾「如需更改，請在 {GenerateDate} 之前通知幹事」；可以在 EmailTemplates 改（有種子）',
-    /如需更改，請在 \{GenerateDate\} 之前通知幹事。/.test(tpl.bodyHtml) && tpl.templateId === 'TPL_PRESEASON_TC');
+  // 第一百零五輪批次 RB 組（刻意改）：確認期限改用 {ListConfirmBy}，聯絡人用 {ContactName}
+  check('★★★★★ 範本結尾「如需更改，請在 {ListConfirmBy} 之前通知{ContactName}」；可以在 EmailTemplates 改（有種子）',
+    /如需更改，請在 \{ListConfirmBy\} 之前通知\{ContactName\}。/.test(tpl.bodyHtml) && tpl.templateId === 'TPL_PRESEASON_TC');
 }
 
 console.log('\n=== LF3：收件人 ===');
@@ -139,7 +140,8 @@ console.log('\n=== LF5：真正寄出（轉寄、主旨前綴）===');
   const r = sc.gas.sendPreseasonPack_(sc.Q, 'MANUAL');
   check('★★★★★ 寄出 4 封', r.dryRun === false && r.sent === 4, JSON.stringify(r));
   check('★★★★★★ 轉寄測試地址生效（全部寄去測試地址）', sent.length === 4 && sent.every((m) => m.to === 'tester@example.invalid'), JSON.stringify(sent));
-  check('★★★★★ 主旨有測試前綴和季度名稱', sent.every((m) => m.subject.indexOf('[測試]') !== -1 && /季前資料/.test(m.subject)), JSON.stringify(sent[0]));
+  check('★★★★★ 主旨有測試前綴和季度名稱', sent.every((m) => m.subject.indexOf('[測試]') !== -1 && /2099年1-3月/.test(m.subject)
+    && /請在 \d{4}-\d{2}-\d{2} 之前確認事奉人員表/.test(m.subject)), JSON.stringify(sent[0]));   // 第一百零五輪批次 RB 組：新主旨
 }
 
 console.log('\n=== LF6：畫面 ===');

@@ -189,8 +189,9 @@ console.log('\n=== B3【核心】唯讀頁面完全冇任何 google.script.run �
   // 伺服器端第一句用 token 認人——見 round88_pd_public_globals 的 PD5）。其餘仍然完全唯讀。
   const runCalls = personalRosterHtml.match(/google\.script\.run/g) || [];
   const calledFns = (personalRosterHtml.match(/runner\.(\w+)\(/g) || []).map((s) => s.slice(7, -1)).sort();
-  check('★★★ ui/PersonalRoster.html 只有申報一段用 google.script.run，而且只呼叫兩個個人連結公開函式',
-    runCalls.length === 1 && calledFns.join(',') === 'personalSubmitUnavailable,personalWithdrawUnavailable',
+  // 第一百零五輪批次 RB 組（刻意加）：〔我這一季沒有不能服侍的日子〕呼叫 personalReplyNoUnavailable（同樣帶 token）
+  check('★★★ ui/PersonalRoster.html 只有申報一段用 google.script.run，而且只呼叫三個個人連結公開函式',
+    runCalls.length === 1 && calledFns.join(',') === 'personalReplyNoUnavailable,personalSubmitUnavailable,personalWithdrawUnavailable',
     runCalls.length + '｜' + calledFns.join(','));
   check('★ 完全冇 <form>（冇任何送出資料嘅路徑）',
     !/<form[\s>]/i.test(personalRosterHtml));

@@ -45,7 +45,7 @@ console.log('\n=== XC2：〔給所有人〕〔變動的人〕日曆檔說明 ===
 
 console.log('\n=== XD1：季前資料那一行 ===');
 {
-  const g = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'PreseasonPack.gs']);
+  const g = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'PreseasonPack.gs', 'UnavailableSchedule.gs']);
   g.Utilities = { formatDate: (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC' }).format(d) };
   const MANUAL = g.PRESEASON_SEND_MODE.MANUAL;
   check('★★★★★★ 只有模擬寄出 ⇒「季前資料：模擬寄出（日期，人手）」，沒有「正式使用時建議」',

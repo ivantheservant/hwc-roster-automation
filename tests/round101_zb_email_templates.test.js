@@ -29,7 +29,7 @@ const PREVIEW_LINE = '職事表預覽（只供查看，不能修改；內容更�
 
 function scene(opts) {
   opts = opts || {};
-  const sc = buildSendScene('editor@example.invalid', ['TemplateSamples.gs', 'IcsExport.gs', 'PreseasonPack.gs', 'UnavailableInvite.gs',
+  const sc = buildSendScene('editor@example.invalid', ['TemplateSamples.gs', 'UnavailableSchedule.gs', 'IcsExport.gs', 'PreseasonPack.gs', 'UnavailableInvite.gs',
     'PersonalUnavailable.gs', 'EmailTemplateSeed.gs', 'EmailTemplateUpdate.gs', 'ChoirRule.gs', 'ResendFlow.gs', 'Trigger.gs']);
   const g = sc.gas; const C = sc.C;
   const T = C.EMAIL_TEMPLATES;

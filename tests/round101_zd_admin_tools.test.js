@@ -35,7 +35,7 @@ function scene(opts) {
   opts = opts || {};
   const sc = buildRound75Scene({ extraFiles: ['AdminTools.gs', 'PersonIdFormat.gs', 'PreLaunchWeb.gs', 'GoLiveWizard.gs', 'ConfigSeed.gs', 'EmailTemplateSeed.gs',
     'EmailTemplateUpdate.gs', 'WebAppPersonalLink.gs', 'PersonalLinkInMail.gs', 'WebApp.gs', 'WebAppExclusions.gs', 'WebAppRoster3Common.gs',
-    'PreseasonPack.gs', 'PersonalUnavailable.gs', 'UnavailableInvite.gs', 'SendAudience.gs', 'RolloutAudience.gs', 'PreseasonChange.gs', 'SeasonRehearsal.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs', 'SelfTestRunner.gs'] });
+    'PreseasonPack.gs', 'UnavailableSchedule.gs', 'PersonalUnavailable.gs', 'UnavailableInvite.gs', 'SendAudience.gs', 'RolloutAudience.gs', 'PreseasonChange.gs', 'SeasonRehearsal.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs', 'SelfTestRunner.gs'] });
   const g = sc.gas;
   g.Session = { getActiveUser: () => ({ getEmail: () => opts.self || SELF }) };
   g.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }), getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
@@ -92,8 +92,9 @@ console.log('\n=== ZD2：自動排程 ===');
   const tt = g.buildAutomationTimetable_('2099-01-15');
   check('★★★★★★ 未來兩季（開始日在今日之後、最早的兩季）', tt.map((q) => q.quarterId).join() === '2099T2,2099T3', JSON.stringify(tt.map((q) => q.quarterId)));
   const labels = tt[0].items.map((i) => i.label);
-  check('★★★★★★ 每季五項：申報截止日、季前資料自動寄出日、自動生成日、提醒、正式發出日（人手）',
-    labels.join('／') === '申報截止日／季前資料自動寄出日／自動生成日／提醒（接近正式發出日）／正式發出日（人手）', labels.join('／'));
+  // 第一百零五輪批次 RB 組（刻意改）：加申報時間表三項，按時間先後排
+  check('★★★★★★ 每季八項：季前資料、申報連結、截止日前提醒、申報截止日、申報期完結通知、自動生成日、提醒、正式發出日（人手）',
+    labels.join('／') === '季前資料自動寄出日／申報連結自動寄出日／截止日前提醒／申報截止日／申報期完結通知／自動生成日／提醒（接近正式發出日）／正式發出日（人手）', labels.join('／'));
   const it = (l) => tt[0].items.filter((i) => i.label === l)[0];
   check('★★★★★ 每一項寫明「會寄給誰」及「現時開／關」', tt[0].items.every((i) => i.who && i.onOff));
   check('★★★★★ 自動生成日＝GenerateOn；正式發出日＝OfficialSendOn（人手）', it('自動生成日').date === '2099-03-01' && it('正式發出日（人手）').date === '2099-03-15' && it('正式發出日（人手）').onOff === '人手');
@@ -276,7 +277,8 @@ console.log('\n=== ZG：上線前檢查 ===');
   ['自動排程已安裝', '自動寄信時間表已看過', '季前資料自動寄出（PRESEASON_AUTO_SEND）已決定', '自動生成（TRIGGER_AUTO_GENERATE）已決定',
     '幹事通知「沒有電郵名單」（ADMIN_NOTIFY_NO_EMAIL）已決定', '幹事通知「階段提醒」（ADMIN_NOTIFY_STAGE_REMINDERS）已決定', '開放範圍（ROLLOUT_AUDIENCE）已決定',
     '有修改要聯絡的人（ROSTER_CONTACT_TC）已填', '測試轉寄（MAIL_REDIRECT_ALL_TO）已清空', '已離開測試模式（DRY_RUN=FALSE）', '電郵範本是最新版',
-    '沒有不能服侍的測試行（UnavailableSubmissions／Unavailable）', '沒有排表偏好的測試行（PersonPostWeight）', '沒有 Eligibility 舊 REQUEST 行'].forEach((l) => {
+    '沒有不能服侍的測試行（UnavailableSubmissions／Unavailable）', '沒有排表偏好的測試行（PersonPostWeight）', '沒有 Eligibility 舊 REQUEST 行',
+    '申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開'].forEach((l) => {   // 第一百零五輪批次 RB 組刻意加
     check('★★★★ 有一項「' + l + '」', labels.indexOf(l) !== -1);
   });
   check('★★★★★★ 每一項都有 ✔／✘、現時、去哪裏改（幹事介面位置）', r.items.every((i) => typeof i.ok === 'boolean' && i.value && i.where) && r.total === r.items.length);

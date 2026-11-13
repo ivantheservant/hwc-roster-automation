@@ -209,10 +209,11 @@ function renderAllSamples() {
     recipient: RECIPIENTS.list,
     summary: '',
     extraPlaceholders: { QuarterLabel: '2099年1-3月', GenerateDate: '2098-12-01',
+      ListConfirmBy: '2098-11-17', InviteDate: '2098-11-17', ContactName: '幹事',   // 第一百零五輪批次 RB 組
       PreseasonContentHtml: '<p><b>一、事奉人員表</b></p><ul><li>讀經（5 人）：…</li></ul>',
       PreseasonContentPlain: '一、事奉人員表\n・讀經（5 人）：…' },
-    purpose: '季前資料：生成日之前寄給堂委、執事、幹事核對',
-    trigger: '每日檢查在生成日之前 PRESEASON_DAYS_BEFORE 日自動寄；或者開季前準備〔寄出季前資料〕',
+    purpose: '季前資料（請確認事奉人員表）：生成日之前寄給堂委、執事、幹事核對',
+    trigger: '每日檢查在生成日之前 PRESEASON_DAYS_BEFORE 日自動寄（申報時間表自動化開着 ⇒ 生成日前 21 日）；或者開季前準備〔寄出季前資料〕',
     audience: '寄出當日的現任堂委、執事、MAIL_ADMIN_NOTIFY、PRESEASON_EXTRA_RECIPIENTS',
     attachment: '無（NONE）'
   });
@@ -228,6 +229,32 @@ function renderAllSamples() {
     purpose: '請事奉人員用自己的個人專屬連結申報不能服侍的主日',
     trigger: '開季前準備〔邀請事奉人員申報不能服侍的日子〕（先預覽，再寄）',
     audience: '這一季事奉人員表上（自動排的崗位、領詩／司琴、詩班名單）有電郵、有個人連結的人',
+    attachment: '無（NONE）'
+  });
+
+  // 第一百零五輪批次 RB 組（刻意新增）：截止日前提醒、申報期已完結
+  add({
+    key: 'TPL_UNAVAILABLE_REMIND_TC',
+    template: byId.TPL_UNAVAILABLE_REMIND_TC,
+    recipient: RECIPIENTS.person,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', QuarterID: '2099T1', Deadline: '2098-12-01', ContactName: '幹事',
+      PersonalLink: 'https://example.invalid/exec?p=TOKEN&q=2099T1' },
+    purpose: '截止日前提醒還沒有回覆的事奉人員申報不能服侍的主日',
+    trigger: '申報時間表自動化（UNAVAILABLE_INVITE_AUTO）：每日檢查在截止日之前 UNAVAILABLE_REMIND_DAYS_BEFORE_DEADLINE 日自動寄一次',
+    audience: '收到申報連結、但還沒有申報、也沒有按〔我這一季沒有不能服侍的日子〕的人',
+    attachment: '無（NONE）'
+  });
+  add({
+    key: 'TPL_UNAVAILABLE_WINDOW_CLOSED_TC',
+    template: byId.TPL_UNAVAILABLE_WINDOW_CLOSED_TC,
+    recipient: RECIPIENTS.list,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', QuarterID: '2099T1', Deadline: '2098-12-01', PendingCount: '3',
+      ContactName: '幹事', ConfirmUrl: 'https://example.invalid/exec?quarter=2099T1&view=unavailableConfirm' },
+    purpose: '申報期完結：告訴幹事、堂委有多少份申報待確認，附確認畫面連結',
+    trigger: '申報時間表自動化（UNAVAILABLE_INVITE_AUTO）：每日檢查在截止日（生成日）自動寄一次',
+    audience: 'MAIL_ADMIN_NOTIFY 及寄出當日的現任堂委',
     attachment: '無（NONE）'
   });
 

@@ -79,7 +79,7 @@ function buildAutomationTimetable_(todayStr) {
   }).slice(0, 2);
   const onOff = function (b) { return b ? '開' : '關'; };
   const preseasonOn = getConfig_(CONFIG_KEYS.PRESEASON_AUTO_SEND, true) !== false;
-  const daysBefore = Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14));
+  const autoOn = isUnavailableInviteAutoOn_();   // 第一百零五輪批次 RB 組
   const generateOn = getConfig_(CONFIG_KEYS.TRIGGER_AUTO_GENERATE, DEFAULTS.TRIGGER_AUTO_GENERATE) === true;
   const reminderOn = getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS, false) === true;
   const deadlineDays = Number(getConfig_(CONFIG_KEYS.REMIND_DEADLINE_DAYS, 7));
@@ -90,12 +90,24 @@ function buildAutomationTimetable_(todayStr) {
     const officialDate = toDateString_(row[Q.OFFICIAL_SEND_ON], timezone) || schedule.officialDate || '';
     let deadline = '';
     try { deadline = readUnavailableInviteDates_(quarterId).deadline || ''; } catch (err) { deadline = ''; }
+    // 第一百零五輪批次 RB 組：申報時間表（G−21／G−14／G−3／G）。時間表季度以外（例如 2027T1）寫明照舊人手。
+    const daysBefore = preseasonDaysBeforeFor_(quarterId);
+    const scheduleQuarter = isUnavailableScheduleQuarter_(quarterId);
+    const s = computeUnavailableSchedule_(generateDate);
+    const scheduleOnOff = scheduleQuarter ? onOff(autoOn) : '人手（這一季不用申報時間表）';
+    const orTbd = function (d) { return d || '（未定）'; };
     return {
       quarterId: quarterId, quarterLabel: buildQuarterLabel_(quarterId),
       items: [
-        { label: '申報截止日', date: deadline || '（未定）', who: '不寄信（寫在申報連結的信及個人連結頁上）', onOff: '—' },
         { label: '季前資料自動寄出日', date: generateDate && !isNaN(daysBefore) ? shiftDateString_(generateDate, -daysBefore) : '（未定）',
-          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人', onOff: onOff(preseasonOn) },
+          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人（主旨：請確認事奉人員表）', onOff: onOff(preseasonOn) },
+        { label: '申報連結自動寄出日', date: orTbd(s.inviteDate),
+          who: '事奉人員表上有電郵、有個人連結的人（按申報開放範圍）；人手可按〔寄出／匯出申報不能服侍日子連結〕', onOff: scheduleOnOff },
+        { label: '截止日前提醒', date: orTbd(s.remindDate),
+          who: '收到申報連結、但還沒有申報、也沒有按〔' + UNAVAILABLE_NONE_BUTTON_LABEL + '〕的人', onOff: scheduleOnOff },
+        { label: '申報截止日', date: deadline || '（未定）', who: '不寄信（寫在申報連結的信及個人連結頁上）', onOff: '—' },
+        { label: '申報期完結通知', date: orTbd(s.deadline),
+          who: '幹事（MAIL_ADMIN_NOTIFY）及現任堂委：共有多少份申報待確認，附確認畫面連結', onOff: scheduleOnOff },
         { label: '自動生成日', date: generateDate || '（未定）', who: '只通知幹事（MAIL_ADMIN_NOTIFY）', onOff: onOff(generateOn) },
         { label: '提醒（接近正式發出日）', date: officialDate && !isNaN(deadlineDays) ? shiftDateString_(officialDate, -deadlineDays) : '（未定）',
           who: '只寄幹事（MAIL_ADMIN_NOTIFY）；堂委不會收到自動提醒', onOff: onOff(reminderOn) },
@@ -112,7 +124,9 @@ function buildAutomationTimetable_(todayStr) {
  */
 function buildAutomationDailyItems_() {
   return [
-    { label: '有新的事奉人員申報（不能服侍）', who: '幹事（MAIL_ADMIN_NOTIFY）及確認者（UNAVAILABLE_CONFIRMER_EMAILS），同一日最多一封',
+    { label: '有新的事奉人員申報（不能服侍）', who: '幹事（MAIL_ADMIN_NOTIFY）及確認者（UNAVAILABLE_CONFIRMER_EMAILS），同一日最多一封'
+        + (isUnavailableInviteAutoOn_() && getConfig_(CONFIG_KEYS.UNAVAILABLE_QUIET_DURING_WINDOW, true) !== false
+          ? '；申報期內（截止日之前）不逐次通知，截止日寄一次「申報期已完結」' : ''),
       onOff: getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_NOTIFY, true) !== false ? '開' : '關' },
     { label: '已有版本之後開季前資料有改動', who: '幹事（MAIL_ADMIN_NOTIFY）',
       onOff: getConfig_(CONFIG_KEYS.PRESEASON_CHANGE_NOTIFY, true) !== false ? '開' : '關' }

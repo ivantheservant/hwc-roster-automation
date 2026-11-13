@@ -114,7 +114,7 @@ console.log('\n=== VB5：同步中按改動按鈕 ===');
 
 console.log('\n=== VB6：動作開始時同步 ===');
 {
-  const g = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'MutationLock.gs', 'PreseasonPack.gs', 'UnavailableInvite.gs']);
+  const g = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'MutationLock.gs', 'PreseasonPack.gs', 'UnavailableSchedule.gs', 'UnavailableInvite.gs']);
   g.log_ = function () {};
   g.assertWebAppRequestAllowed_ = function () {};
   let held = 0;

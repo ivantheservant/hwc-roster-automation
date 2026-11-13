@@ -173,6 +173,14 @@ function dailyAutomationCheck_() {
           report.push({ quarterId: quarterId, action: 'PRESEASON', outcome: 'ERROR', detail: err.message });
         }
 
+        // 第一百零五輪批次 RB 組：申報時間表（申報連結 G−14、提醒 G−3、申報期完結 G）。出錯只影響這一項。
+        try {
+          runUnavailableScheduleSteps_(row, today, config, isDryRun).forEach(function (r) { report.push(r); });
+        } catch (err) {
+          log_('WARN', 'dailyAutomationCheck_: 申報時間表 ' + quarterId + ' 失敗：' + err.message);
+          report.push({ quarterId: quarterId, action: 'UNAVAILABLE_SCHEDULE', outcome: 'ERROR', detail: err.message });
+        }
+
         // 第九十八輪批次 YB 組：已有版本、未開季 ⇒ 最新版本之後開季前資料有改動就通知幹事（同一批只通知一次）
         try {
           const changed = runPreseasonChangeNotify_(quarterId, today, config, isDryRun, 'dailyAutomationCheck_');

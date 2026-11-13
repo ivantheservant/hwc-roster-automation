@@ -227,14 +227,19 @@ function buildTemplateSamples_(quarterId, toEmail) {
       const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
       const generateDate = readPreseasonGenerateDate_(quarter, config);
       pack = buildPreseasonPack_(quarterId, today, generateDate);
-      placeholders = { QuarterLabel: pack.quarterLabel, QuarterID: quarterId, GenerateDate: generateDate || '生成日',
-        PreseasonContentHtml: pack.html, PreseasonContentPlain: pack.plain };
+      placeholders = buildPreseasonPlaceholders_(quarterId, pack, generateDate);   // 第一百零五輪批次 RB 組
       sampleSummary = '';
-    } else if (t.id === UNAVAILABLE_INVITE_TEMPLATE_ID) {
+    } else if (t.id === UNAVAILABLE_INVITE_TEMPLATE_ID || t.id === UNAVAILABLE_REMIND_TEMPLATE_ID) {
+      // 第一百零五輪批次 RB 組：截止日前提醒用同一組佔位符
       const dates = readUnavailableInviteDates_(quarterId);
       placeholders = { QuarterLabel: buildQuarterLabel_(quarterId), QuarterID: quarterId,
         GenerateDate: dates.generateDate || '生成日', Deadline: dates.deadline || '生成日之前',
         PersonalLink: buildPersonalRosterUrl_(baseUrl || 'https://example.invalid/exec', token || 'SAMPLE', quarterId) };
+      sampleSummary = '';
+    } else if (t.id === UNAVAILABLE_WINDOW_CLOSED_TEMPLATE_ID) {
+      // 第一百零五輪批次 RB 組：申報期已完結（示範：用這一季真實的待確認數目）
+      const dates = readUnavailableInviteDates_(quarterId);
+      placeholders = buildUnavailableWindowClosedPlaceholders_(quarterId, dates.deadline, countPendingSubmissionsForQuarterSafe_(quarterId));
       sampleSummary = '';
     } else if (t.id === UNAVAILABLE_DECIDED_TEMPLATE_ID) {
       // 第九十四輪批次 UC 組：通知申請人處理結果——示範一項確認、一項不確認（同一個人合併成一封）

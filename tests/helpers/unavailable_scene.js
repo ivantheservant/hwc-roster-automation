@@ -15,7 +15,7 @@ const T3 = ['2099-07-05'];
 function buildUnavailableScene(opts) {
   opts = opts || {};
   const sc = buildRound75Scene({
-    extraFiles: ['WebAppPersonalLink.gs', 'PersonalUnavailable.gs', 'UnavailableInvite.gs', 'WebAppUnavailable.gs',
+    extraFiles: ['WebAppPersonalLink.gs', 'PersonalUnavailable.gs', 'UnavailableSchedule.gs', 'UnavailableInvite.gs', 'WebAppUnavailable.gs',
       'WebAppRoster3Common.gs', 'EmailTemplateSeed.gs', 'PreseasonPack.gs', 'WebAppCombined.gs', 'WebAppPeople.gs',
       'PersonalLinkInMail.gs', 'PostSeedChoir.gs', 'WebAppChoir.gs', 'CellDecisions.gs', 'WebApp.gs'].concat(opts.extraFiles || []),
     config: Object.assign({

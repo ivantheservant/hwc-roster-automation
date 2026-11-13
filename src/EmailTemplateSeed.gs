@@ -170,16 +170,19 @@ const EMAIL_TEMPLATE_SEEDS = [
     templateId: 'TPL_PRESEASON_TC',
     stage: 'PRESEASON',
     lang: 'TC',
-    subject: '{QuarterLabel} 職事表季前資料——如需更改請於 {GenerateDate} 之前通知幹事',
+    // 第一百零五輪批次 RB 組：即「請確認事奉人員表」（時間表 G−21）——主旨及第一段寫明確認期限、申報連結寄出日
+    subject: '{QuarterLabel} 職事表：請在 {ListConfirmBy} 之前確認事奉人員表，申報連結將於 {InviteDate} 寄給事奉人員',
     bodyHtml: '<p>各位堂委、執事、幹事：</p>'
-      + '<p>平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。以下是生成時會用到的資料，請核對：</p>'
+      + '<p>平安！請在 {ListConfirmBy} 之前確認以下的事奉人員表及排表資料。申報不能服侍日子的連結將於 {InviteDate} 寄給事奉人員，'
+      + '{QuarterLabel}的職事表將於 {GenerateDate} 生成。</p>'
       + '{PreseasonContentHtml}'
-      + '<p>如需更改，請在 {GenerateDate} 之前通知幹事。</p>',
+      + '<p>如需更改，請在 {ListConfirmBy} 之前通知{ContactName}。</p>',
     bodyPlain: '各位堂委、執事、幹事：\n\n'
-      + '平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。以下是生成時會用到的資料，請核對：\n\n'
+      + '平安！請在 {ListConfirmBy} 之前確認以下的事奉人員表及排表資料。申報不能服侍日子的連結將於 {InviteDate} 寄給事奉人員，'
+      + '{QuarterLabel}的職事表將於 {GenerateDate} 生成。\n\n'
       + '{PreseasonContentPlain}\n\n'
-      + '如需更改，請在 {GenerateDate} 之前通知幹事。',
-    placeholders: '{QuarterLabel},{GenerateDate},{PreseasonContentHtml},{PreseasonContentPlain}',
+      + '如需更改，請在 {ListConfirmBy} 之前通知{ContactName}。',
+    placeholders: '{QuarterLabel},{GenerateDate},{ListConfirmBy},{InviteDate},{ContactName},{PreseasonContentHtml},{PreseasonContentPlain}',
     attachType: ATTACH_TYPE.NONE
   },
   // 第九十輪批次 QC 組：〔邀請事奉人員申報不能服侍的日子〕（UnavailableInvite.gs；不經 sendStage_()，Stage 欄只作標記）
@@ -188,19 +191,60 @@ const EMAIL_TEMPLATE_SEEDS = [
     stage: 'UNAVAILABLE_INVITE',
     lang: 'TC',
     subject: '{QuarterLabel} 職事表：請在 {Deadline} 之前申報不能服侍的主日',
+    // 第一百零五輪批次 RB 組：寫明兩星期內（截止日之前）完成；沒有不能服侍的日子亦請按頁面上的按鈕
     bodyHtml: '<p>{PersonName}：</p>'
       + '<p>平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，'
-      + '請在 {Deadline} 之前用你的個人專屬連結申報：</p>'
+      + '請在兩星期內（{Deadline} 之前）用你的個人專屬連結申報：</p>'
       + '<p><a href="{PersonalLink}">{PersonalLink}</a></p>'
       + '<p>' + UNAVAILABLE_INVITE_HOW_TO_TEXT + '</p>'
+      + '<p>如果這一季沒有不能服侍的日子，請在同一頁按〔我這一季沒有不能服侍的日子〕，讓我們知道你已經回覆。</p>'
       + '<p>這條連結只供你本人使用，請不要轉發。</p>',
     bodyPlain: '{PersonName}：\n\n'
       + '平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，'
-      + '請在 {Deadline} 之前用你的個人專屬連結申報：\n\n'
+      + '請在兩星期內（{Deadline} 之前）用你的個人專屬連結申報：\n\n'
       + '{PersonalLink}\n\n'
       + UNAVAILABLE_INVITE_HOW_TO_TEXT + '\n\n'
+      + '如果這一季沒有不能服侍的日子，請在同一頁按〔我這一季沒有不能服侍的日子〕，讓我們知道你已經回覆。\n\n'
       + '這條連結只供你本人使用，請不要轉發。',
     placeholders: '{QuarterLabel},{GenerateDate},{Deadline},{PersonalLink}',
+    attachType: ATTACH_TYPE.NONE
+  },
+  // 第一百零五輪批次 RB 組：截止日前提醒（G−3；只寄給收到邀請而未有任何回覆的人；UnavailableSchedule.gs）
+  {
+    templateId: 'TPL_UNAVAILABLE_REMIND_TC',
+    stage: 'UNAVAILABLE_REMIND',
+    lang: 'TC',
+    subject: '{QuarterLabel} 職事表：提醒——請在 {Deadline} 之前申報不能服侍的主日',
+    bodyHtml: '<p>{PersonName}：</p>'
+      + '<p>平安！提醒你：{QuarterLabel}（{QuarterID}）不能服侍的主日，請在 {Deadline} 之前用你的個人專屬連結申報。'
+      + '我們還未收到你的回覆。</p>'
+      + '<p><a href="{PersonalLink}">{PersonalLink}</a></p>'
+      + '<p>如果這一季沒有不能服侍的日子，請在同一頁按〔我這一季沒有不能服侍的日子〕。如有查詢，請聯絡{ContactName}。</p>'
+      + '<p>這條連結只供你本人使用，請不要轉發。</p>',
+    bodyPlain: '{PersonName}：\n\n'
+      + '平安！提醒你：{QuarterLabel}（{QuarterID}）不能服侍的主日，請在 {Deadline} 之前用你的個人專屬連結申報。'
+      + '我們還未收到你的回覆。\n\n'
+      + '{PersonalLink}\n\n'
+      + '如果這一季沒有不能服侍的日子，請在同一頁按〔我這一季沒有不能服侍的日子〕。如有查詢，請聯絡{ContactName}。\n\n'
+      + '這條連結只供你本人使用，請不要轉發。',
+    placeholders: '{QuarterLabel},{QuarterID},{Deadline},{PersonalLink},{ContactName}',
+    attachType: ATTACH_TYPE.NONE
+  },
+  // 第一百零五輪批次 RB 組：申報期已完結（G；幹事＋堂委；UnavailableSchedule.gs）
+  {
+    templateId: 'TPL_UNAVAILABLE_WINDOW_CLOSED_TC',
+    stage: 'UNAVAILABLE_WINDOW_CLOSED',
+    lang: 'TC',
+    subject: '{QuarterLabel} 申報期已完結：共 {PendingCount} 份申報待確認',
+    bodyHtml: '<p>各位幹事、堂委：</p>'
+      + '<p>平安！{QuarterLabel}（{QuarterID}）申報不能服侍日子的期限（{Deadline}）已經完結，共 {PendingCount} 份申報待確認。</p>'
+      + '<p>請確認申報，然後生成職事表：<br>{ConfirmUrl}</p>'
+      + '<p>如有查詢，請聯絡{ContactName}。</p>',
+    bodyPlain: '各位幹事、堂委：\n\n'
+      + '平安！{QuarterLabel}（{QuarterID}）申報不能服侍日子的期限（{Deadline}）已經完結，共 {PendingCount} 份申報待確認。\n\n'
+      + '請確認申報，然後生成職事表：\n{ConfirmUrl}\n\n'
+      + '如有查詢，請聯絡{ContactName}。',
+    placeholders: '{QuarterLabel},{QuarterID},{Deadline},{PendingCount},{ConfirmUrl},{ContactName}',
     attachType: ATTACH_TYPE.NONE
   },
   // 第九十四輪批次 UC 組：通知申請人處理結果（PersonalUnavailable.gs notifyUnavailableDecisions_；不經 sendStage_()，Stage 欄只作標記）。

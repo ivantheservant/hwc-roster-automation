@@ -89,8 +89,10 @@ check('★★★★★★ 白名單只有 4 個，每個都寫明理由', Object
   && Object.keys(PUBLIC_ALLOWLIST).every((k) => PUBLIC_ALLOWLIST[k].length > 10));
 
 console.log('\n=== PD5：個人連結公開函式（第九十輪批次 QC 組）===');
-check('★★★★★★ 只有兩個：personalSubmitUnavailable、personalWithdrawUnavailable（加名要寫理由並改這裏）',
-  PERSONAL_APIS.slice().sort().join(',') === 'personalSubmitUnavailable,personalWithdrawUnavailable', PERSONAL_APIS.join(','));
+// 第一百零五輪批次 RB 組（刻意加）：personalReplyNoUnavailable——事奉人員按〔我這一季沒有不能服侍的日子〕／取消，
+// 只寫自己的回覆行（UnavailableReplies），用來在截止日前提醒時排除已回覆的人
+check('★★★★★★ 只有三個：personalSubmitUnavailable、personalWithdrawUnavailable、personalReplyNoUnavailable（加名要寫理由並改這裏）',
+  PERSONAL_APIS.slice().sort().join(',') === 'personalReplyNoUnavailable,personalSubmitUnavailable,personalWithdrawUnavailable', PERSONAL_APIS.join(','));
 check('★★★★★ 清單上每一個都真的存在（而且只在 PersonalUnavailable.gs）',
   personalFound.slice().sort().join(',') === PERSONAL_APIS.slice().sort().join(',')
   && PERSONAL_APIS.every((n) => topFns[n] === 'PersonalUnavailable.gs'), personalFound.join(','));
@@ -98,14 +100,14 @@ check('★★★★★ 清單上每一個都真的存在（而且只在 Personal
   const page = read('src/ui/PersonalRoster.html');
   const called = (page.match(/\.(\w+)\(token/g) || []).map((s) => s.slice(1, -6));
   const runs = (page.match(/google\.script\.run/g) || []).length;
-  check('★★★★★★ 個人頁只呼叫這兩個函式（每次都帶 token）', runs === 1 && called.slice().sort().join(',') === PERSONAL_APIS.slice().sort().join(','),
+  check('★★★★★★ 個人頁只呼叫這三個函式（每次都帶 token）', runs === 1 && called.slice().sort().join(',') === PERSONAL_APIS.slice().sort().join(','),
     runs + '｜' + called.join(','));
   const staffUi = fs.readdirSync(path.join(SRC, 'ui')).filter((f) => f !== 'PersonalRoster.html')
     .map((f) => fs.readFileSync(path.join(SRC, 'ui', f), 'utf8')).join('\n');
   check('★★★★ 幹事介面不呼叫個人連結公開函式', PERSONAL_APIS.every((n) => staffUi.indexOf(n) === -1));
 }
 {
-  const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebAppPersonalLink.gs', 'PersonalUnavailable.gs']);
+  const gas = loadGasSource(['Constants.gs', 'Utils.gs', 'SheetReader.gs', 'WebAppPersonalLink.gs', 'PersonalUnavailable.gs', 'UnavailableSchedule.gs']);
   let enabled = true;
   let lookups = 0;
   const writes = [];

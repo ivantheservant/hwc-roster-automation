@@ -399,6 +399,48 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+      key: CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: "FALSE",
+      description: "申報不能服侍日子的時間表自動化：TRUE＝每日檢查按時間表自動寄「請確認事奉人員表」（生成日前 LIST_CONFIRM_DAYS_BEFORE_INVITE＋UNAVAILABLE_INVITE_DAYS_BEFORE_GENERATE 日）、申報連結（生成日前 UNAVAILABLE_INVITE_DAYS_BEFORE_GENERATE 日）、提醒未回覆的人（生成日前 UNAVAILABLE_REMIND_DAYS_BEFORE_DEADLINE 日）、申報期完結通知（生成日＝截止日）；FALSE（預設）＝不自動寄，全部照舊人手。只用於 UNAVAILABLE_INVITE_AUTO_FROM_QUARTER 及之後的季度。遵守 DRY_RUN 和轉寄測試地址。上線時才開。",
+      editable: 'TRUE'
+    },
+    {
+      // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+      key: CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO_FROM_QUARTER, type: CONFIG_TYPES.STR, group: 'MAIL',
+      defaultValue: "2027T2",
+      description: "申報時間表由哪一季開始用（QuarterID，預設 2027T2）。之前的季度（例如 2027T1）照舊人手：截止日、季前資料日期都照舊計，也不會自動寄任何申報信。",
+      editable: 'TRUE'
+    },
+    {
+      // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+      key: CONFIG_KEYS.UNAVAILABLE_INVITE_DAYS_BEFORE_GENERATE, type: CONFIG_TYPES.INT, group: 'MAIL',
+      defaultValue: "14",
+      description: "申報連結在生成日之前幾日寄出（預設 14）。信內寫「請在兩星期內（截止日之前）完成」，截止日＝生成日。",
+      editable: 'TRUE'
+    },
+    {
+      // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+      key: CONFIG_KEYS.LIST_CONFIRM_DAYS_BEFORE_INVITE, type: CONFIG_TYPES.INT, group: 'MAIL',
+      defaultValue: "7",
+      description: "「請確認事奉人員表」（季前資料）在申報連結之前幾日寄出（預設 7；即生成日前 21 日）。時間表自動化開着時，季前資料的日子用這個，不用 PRESEASON_DAYS_BEFORE。",
+      editable: 'TRUE'
+    },
+    {
+      // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+      key: CONFIG_KEYS.UNAVAILABLE_REMIND_DAYS_BEFORE_DEADLINE, type: CONFIG_TYPES.INT, group: 'MAIL',
+      defaultValue: "3",
+      description: "截止日（生成日）之前幾日提醒一次（預設 3）：只寄給收到申報連結、但還沒有任何回覆（沒有申報、也沒有按〔我這一季沒有不能服侍的日子〕）的人。",
+      editable: 'TRUE'
+    },
+    {
+      // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+      key: CONFIG_KEYS.UNAVAILABLE_QUIET_DURING_WINDOW, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: "TRUE",
+      description: "申報期內（寄申報連結到截止日）新的申報不逐次通知幹事、堂委，截止日一次過寄「申報期已完結」通知（TRUE，預設）；FALSE＝照舊逐次通知。只在時間表自動化開着時生效。",
+      editable: 'TRUE'
+    },
+    {
       // 第九十四輪批次 UB 組：確認事奉人員申報的人
       key: CONFIG_KEYS.UNAVAILABLE_CONFIRMER_EMAILS, type: CONFIG_TYPES.LIST, group: 'WEBAPP',
       defaultValue: '',

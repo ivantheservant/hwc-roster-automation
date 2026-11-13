@@ -33,7 +33,8 @@
 
 /** 個人連結頁可以呼叫的公開函式（不以 _ 結尾）。加名之前要寫明理由，並更新 round88_pd_public_globals。 */
 // 第九十四輪批次 UA 組：崗位清單隨頁面資料一併送出（伺服器端計算），不另加公開函式。
-const PERSONAL_LINK_PUBLIC_APIS = ['personalSubmitUnavailable', 'personalWithdrawUnavailable'];
+// 第一百零五輪批次 RB 組：加〔我這一季沒有不能服侍的日子〕（personalReplyNoUnavailable，UnavailableSchedule.gs）
+const PERSONAL_LINK_PUBLIC_APIS = ['personalSubmitUnavailable', 'personalWithdrawUnavailable', 'personalReplyNoUnavailable'];
 
 const UNAVAILABLE_SUBMISSION_STATUS = {
   PENDING: 'PENDING',
@@ -187,7 +188,6 @@ function assertPersonalLinkCaller_(token) {
 function listPersonalUnavailableQuarters_(todayStr, timezone, anchorQuarterId) {
   const Q = COLUMNS.QUARTERS;
   const ahead = Math.max(1, Number(getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_QUARTERS_AHEAD, 2)) || 2);
-  const deadlineDays = Math.max(0, Number(getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_DEADLINE_DAYS, 7)) || 0);
   const config = readConfig_();
   const open = readSheet_(SHEETS.QUARTERS)
     .map(function (r) {
@@ -197,7 +197,8 @@ function listPersonalUnavailableQuarters_(todayStr, timezone, anchorQuarterId) {
         startDate: toDateString_(r[Q.START_DATE], timezone),
         endDate: toDateString_(r[Q.END_DATE], timezone),
         generateDate: generateDate,
-        deadline: generateDate ? shiftDateString_(generateDate, -deadlineDays) : ''
+        // 第一百零五輪批次 RB 組：截止日統一由 unavailableDeadlineFor_() 計
+        deadline: unavailableDeadlineFor_(String(r[Q.QUARTER_ID] || '').trim(), generateDate)
       };
     })
     .filter(function (q) { return q.quarterId && q.endDate && q.endDate >= todayStr; })
@@ -313,6 +314,8 @@ function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuart
   const isListed = function (d) { return listed.some(function (u) { return u.all && u.from <= d && d <= u.to; }); };
   const dateRows = readSheet_(SHEETS.SERVICE_DATES);
   const postsCtx = quarters.length > 0 ? buildPersonQuarterPostsContext_(timezone) : null;
+  // 第一百零五輪批次 RB 組：這個人已回覆「這一季沒有不能服侍的日子」的季度
+  const noneReplies = readUnavailableNoneReplies_();
   const out = quarters.map(function (q) {
     const allDates = dateRows
       .filter(function (r) { return String(r[D.QUARTER_ID] || '').trim() === q.quarterId; })
@@ -328,7 +331,8 @@ function buildPersonalUnavailableView_(personId, todayStr, timezone, anchorQuart
       });
     // 第九十四輪批次 UA 組：「只限以下崗位」可以選的崗位（這個人這一季可以服侍的）
     return { quarterId: q.quarterId, label: q.label, deadline: q.deadline, dates: dates,
-      posts: listPersonQuarterPosts_(personId, firstSunday, postsCtx) };
+      posts: listPersonQuarterPosts_(personId, firstSunday, postsCtx),
+      noneReplied: !!(noneReplies[q.quarterId] && noneReplies[q.quarterId][personId]) };
   }).filter(function (q) { return q.dates.length > 0; });
   const postNames = readPostNameIndexForUnavailable_();
   const submissions = mine
@@ -517,6 +521,27 @@ function personalWithdrawUnavailable(token, quarterId, submissionId) {
   }
   try {
     return withdrawPersonalUnavailable_(person, submissionId, typeof quarterId === 'string' ? quarterId : '');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 第一百零五輪批次 RB 組：個人連結公開函式〔我這一季沒有不能服侍的日子〕／取消（實際內容在 UnavailableSchedule.gs）。
+ * @param {string} token 個人連結 token
+ * @param {string} anchorQuarterId 連結的季度
+ * @param {string} quarterId 回覆的季度
+ * @param {boolean} none true＝沒有；false＝取消
+ * @returns {{ok: boolean, message: string, view: Object}}
+ */
+function personalReplyNoUnavailable(token, anchorQuarterId, quarterId, none) {
+  const person = assertPersonalLinkCaller_(token);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return { ok: false, message: '系統繁忙，請稍後再試。' };
+  }
+  try {
+    return replyNoUnavailable_(person, anchorQuarterId, quarterId, none);
   } finally {
     lock.releaseLock();
   }
@@ -885,9 +910,17 @@ function apiGetUnavailableConfirmView(quarterId) {
   const role = assertWebAppRequestAllowed_('apiGetUnavailableConfirmView');
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const all = readUnavailableSubmissions_(timezone);
-  return buildUnavailableConfirmView_(all, buildPersonNameIndex_(), readPostNameIndexForUnavailable_(),
+  const names = buildPersonNameIndex_();
+  const view = buildUnavailableConfirmView_(all, names, readPostNameIndexForUnavailable_(),
     role === WEBAPP_ROLE.EDITOR || isUnavailableConfirmerCaller_(), String(quarterId || '').trim(),
     buildPreAssignNoteLookup_(all, timezone));
+  // 第一百零五輪批次 RB 組：已回覆「這一季沒有不能服侍的日子」的人（未生成的季度；讀不到 ⇒ 不列，不影響確認）
+  try {
+    view.noneReplies = listUnavailableNoneReplyGroups_(readUnavailableNoneReplies_(), names);
+  } catch (err) {
+    view.noneReplies = [];
+  }
+  return view;
 }
 
 /**
@@ -993,7 +1026,21 @@ function runUnavailableSubmissionNotify_(today, config, isDryRun) {
   if (lastAt && lastAt.slice(0, 10) === today) return row('SKIP', 'ALREADY_TODAY');
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const pending = readPendingUnavailableSubmissions_(timezone);
-  const fresh = pending.filter(function (s) { return !lastAt || s.submittedAt > lastAt; });
+  // 第一百零五輪批次 RB 組：申報期內（時間表季度、截止日之前提交）不逐次通知——截止日的「申報期已完結」一次過交代
+  const config2 = readConfig_();
+  const quarterOf = {};
+  const generateOf = {};
+  const quiet = function (s) {
+    const q = quarterOf[s.serviceDate] !== undefined ? quarterOf[s.serviceDate]
+      : (quarterOf[s.serviceDate] = quarterIdForDateForUnavailable_(s.serviceDate, timezone));
+    if (!q) return false;
+    if (generateOf[q] === undefined) {
+      const qr = findQuarter_(q);
+      generateOf[q] = qr ? readPreseasonGenerateDate_(qr, config2) : '';
+    }
+    return isUnavailableSubmissionQuiet_(q, s.submittedDay || String(s.submittedAt || '').slice(0, 10), generateOf[q]);
+  };
+  const fresh = pending.filter(function (s) { return (!lastAt || s.submittedAt > lastAt) && !quiet(s); });
   if (fresh.length === 0) return row('SKIP', 'NOTHING_NEW');
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   // 第九十四輪批次 UC 組：收件人＝MAIL_ADMIN_NOTIFY＋UNAVAILABLE_CONFIRMER_EMAILS（去重）；信內有確認畫面的深連結

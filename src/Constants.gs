@@ -54,7 +54,9 @@ const SHEETS = {
   // 第九十八輪批次 YB 組：開季前資料基準（每個版本建立時的內容摘要；第一次用時自動建立）
   PRESEASON_BASELINES: 'PreseasonBaselines',
   // 第九十輪批次 QC 組：事奉人員在個人專屬連結申報不能服侍（幹事確認後才寫 Unavailable）。第一次提交時自動建立。
-  UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions'
+  UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions',
+  // 第一百零五輪批次 RB 組：事奉人員在個人專屬連結按〔我這一季沒有不能服侍的日子〕（一人一季一行；第一次使用時自動建立）
+  UNAVAILABLE_REPLIES: 'UnavailableReplies'
 };
 
 /**
@@ -439,6 +441,15 @@ const COLUMNS = {
     CREATED_BY: 'CreatedBy'
   },
   // 第九十輪批次 QC 組：事奉人員申報（見 PersonalUnavailable.gs）
+  // 第一百零五輪批次 RB 組
+  UNAVAILABLE_REPLIES: {
+    REPLY_ID: 'ReplyID',
+    PERSON_ID: 'PersonID',
+    QUARTER_ID: 'QuarterID',
+    REPLY: 'Reply',
+    REPLIED_AT: 'RepliedAt',
+    STATUS: 'Status'
+  },
   UNAVAILABLE_SUBMISSIONS: {
     SUBMISSION_ID: 'SubmissionID',
     PERSON_ID: 'PersonID',
@@ -1518,6 +1529,13 @@ const CONFIG_KEYS = {
   // 第九十四輪批次 UB 組：可以確認事奉人員申報（不能服侍）的人（電郵，逗號分隔；預設空白）。
   // 確認者＝這個名單＋可以修改的人；只在這個名單的人打開幹事介面只見到確認畫面。見 WebApp.gs。
   UNAVAILABLE_CONFIRMER_EMAILS: 'UNAVAILABLE_CONFIRMER_EMAILS',
+  // 第一百零五輪批次 RB 組：申報不能服侍日子的時間表自動化
+  UNAVAILABLE_INVITE_AUTO: 'UNAVAILABLE_INVITE_AUTO',
+  UNAVAILABLE_INVITE_AUTO_FROM_QUARTER: 'UNAVAILABLE_INVITE_AUTO_FROM_QUARTER',
+  UNAVAILABLE_INVITE_DAYS_BEFORE_GENERATE: 'UNAVAILABLE_INVITE_DAYS_BEFORE_GENERATE',
+  LIST_CONFIRM_DAYS_BEFORE_INVITE: 'LIST_CONFIRM_DAYS_BEFORE_INVITE',
+  UNAVAILABLE_REMIND_DAYS_BEFORE_DEADLINE: 'UNAVAILABLE_REMIND_DAYS_BEFORE_DEADLINE',
+  UNAVAILABLE_QUIET_DURING_WINDOW: 'UNAVAILABLE_QUIET_DURING_WINDOW',
   FINETUNE_MAX_MOVES: 'FINETUNE_MAX_MOVES',
   WARN_ON_SEMI_HARD_BREAK: 'WARN_ON_SEMI_HARD_BREAK',
   // 追加階段 AV：Web UI 的總開關。預設 FALSE——即使已經 deploy 成 Web App，

@@ -498,6 +498,48 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "MAIL"
     },
+    "UNAVAILABLE_INVITE_AUTO": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": true,
+      "group": "MAIL"
+    },
+    "UNAVAILABLE_INVITE_AUTO_FROM_QUARTER": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "2027T2",
+      "launchTargetValue": "2027T2",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "UNAVAILABLE_INVITE_DAYS_BEFORE_GENERATE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "14",
+      "launchTargetValue": "14",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "LIST_CONFIRM_DAYS_BEFORE_INVITE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "7",
+      "launchTargetValue": "7",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "UNAVAILABLE_REMIND_DAYS_BEFORE_DEADLINE": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "3",
+      "launchTargetValue": "3",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
+    "UNAVAILABLE_QUIET_DURING_WINDOW": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
+    },
     "ROSTER_DRIVE_FOLDER_ID": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "",

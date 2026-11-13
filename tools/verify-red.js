@@ -12538,8 +12538,8 @@ const MUTATIONS = [
     id: "zd-tt-preseason-on",
     why: "季前資料開關寫死「開」",
     file: "src/AdminTools.gs",
-    find: "          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人', onOff: onOff(preseasonOn) },",
-    replace: "          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人', onOff: onOff(true) },",
+    find: "          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人（主旨：請確認事奉人員表）', onOff: onOff(preseasonOn) },",
+    replace: "          who: '現任堂委、執事、幹事（MAIL_ADMIN_NOTIFY）及額外收件人（主旨：請確認事奉人員表）', onOff: onOff(true) },",
     tests: ["tests/round101_zd_admin_tools.test.js"]
   },
   {
@@ -13422,6 +13422,150 @@ const MUTATIONS = [
     find: "  if (s.indexOf(',') === -1 && s.indexOf('，') === -1) return value;",
     replace: "  return value;",
     tests: ["tests/round105_rh_person_id.test.js"]
+  },
+  {
+    id: "rb-auto-default-on",
+    why: "Config 未有 UNAVAILABLE_INVITE_AUTO 時當作開：上線前就會自動寄申報信",
+    file: "src/UnavailableSchedule.gs",
+    find: "return getConfig_(CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO, false) === true;",
+    replace: "return getConfig_(CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO, true) !== false;",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-from-quarter-ignored",
+    why: "不理會開始季度：2027T1 也會自動寄",
+    file: "src/UnavailableSchedule.gs",
+    find: "  return !from || id >= from;",
+    replace: "  return true;",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-invite-days-off",
+    why: "申報連結的日子算錯（生成日前 7 日）",
+    file: "src/UnavailableSchedule.gs",
+    find: "    inviteDate: g ? shiftDateString_(g, -inviteDays) : '',",
+    replace: "    inviteDate: g ? shiftDateString_(g, -listConfirmDays) : '',",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-deadline-old",
+    why: "時間表季度的截止日仍然用生成日前 7 日",
+    file: "src/UnavailableSchedule.gs",
+    find: "  if (isUnavailableScheduleActive_(quarterId)) return generateDate;",
+    replace: "  if (false) return generateDate;",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-invite-repeats",
+    why: "申報連結每日重複寄",
+    file: "src/UnavailableSchedule.gs",
+    find: "  if (today >= s.inviteDate && today < s.deadline && !invited) {",
+    replace: "  if (today >= s.inviteDate && today < s.deadline) {",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-remind-all",
+    why: "提醒寄給所有人（包括已申報、已按「沒有」的人）",
+    file: "src/UnavailableSchedule.gs",
+    find: "  return (recipients || []).filter(function (r) { return !replied[r.personId]; });",
+    replace: "  return (recipients || []).slice();",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-none-ignored",
+    why: "按了「沒有」的人仍然收到提醒",
+    file: "src/UnavailableSchedule.gs",
+    find: "  Object.keys(noneReplies || {}).forEach(function (id) { replied[id] = true; });",
+    replace: "",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-closed-repeats",
+    why: "申報期已完結通知每日重複寄",
+    file: "src/UnavailableSchedule.gs",
+    find: "  if (invitedNow && today >= s.deadline && !hasUnavailableScheduleRecord_(UNAVAILABLE_WINDOW_CLOSED_AUDIT_ACTION, quarterId)) {",
+    replace: "  if (invitedNow && today >= s.deadline) {",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-dry-run-counts-live",
+    why: "模擬過（DRY_RUN）的步驟上線之後當作已寄，永遠不會真正寄出",
+    file: "src/UnavailableSchedule.gs",
+    find: "    return dryNow && parts[0] === 'AUTO' && outcome === 'DRY_RUN';",
+    replace: "    return parts[0] === 'AUTO' && outcome === 'DRY_RUN';",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-has-version-ignored",
+    why: "已有版本仍然寄申報信",
+    file: "src/UnavailableSchedule.gs",
+    find: "  if (findLatestVersionNo_(quarterId) >= 0) return [row('UNAVAILABLE_SCHEDULE', 'SKIP', 'HAS_VERSION')];",
+    replace: "",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-quiet-after-deadline",
+    why: "截止日之後的申報也不逐次通知",
+    file: "src/UnavailableSchedule.gs",
+    find: "  return String(submittedDay || '') < generateDate;",
+    replace: "  return String(submittedDay || '') <= '9999';",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-none-other-quarter",
+    why: "可以回覆頁面上沒有的季度",
+    file: "src/UnavailableSchedule.gs",
+    find: "  if (!q || open.indexOf(q) === -1) return { ok: false, message: '這一季已經不可以回覆。', view: view() };",
+    replace: "",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-none-cannot-undo",
+    why: "〔取消〕沒有作用",
+    file: "src/ui/PersonalRoster.html",
+    find: "undo.addEventListener('click', function () { call('none', [q.quarterId, false], view); });",
+    replace: "undo.addEventListener('click', function () { call('none', [q.quarterId, true], view); });",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-trigger-not-called",
+    why: "每日檢查沒有呼叫申報時間表",
+    file: "src/Trigger.gs",
+    find: "          runUnavailableScheduleSteps_(row, today, config, isDryRun).forEach(function (r) { report.push(r); });",
+    replace: "          [].forEach(function (r) { report.push(r); });",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-prelaunch-missing",
+    why: "上線前檢查沒有 UNAVAILABLE_INVITE_AUTO 一項",
+    file: "src/PreLaunchWeb.gs",
+    find: "  add('申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開', autoInvite,",
+    replace: "  add('（略）', autoInvite,",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js","tests/round101_zd_admin_tools.test.js"]
+  },
+  {
+    id: "rb-timetable-no-remind",
+    why: "時間表沒有截止日前提醒的日子",
+    file: "src/AdminTools.gs",
+    find: "        { label: '截止日前提醒', date: orTbd(s.remindDate),",
+    replace: "        { label: '截止日前提醒', date: orTbd(''),",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-confirm-none-hidden",
+    why: "確認畫面沒有列出回覆「沒有」的人",
+    file: "src/PersonalUnavailable.gs",
+    find: "    view.noneReplies = listUnavailableNoneReplyGroups_(readUnavailableNoneReplies_(), names);",
+    replace: "    view.noneReplies = [];",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
+  },
+  {
+    id: "rb-preseason-days-old",
+    why: "時間表開着時季前資料仍然在生成日前 14 日寄",
+    file: "src/PreseasonPack.gs",
+    find: "    daysBefore: preseasonDaysBeforeFor_(quarterId),",
+    replace: "    daysBefore: Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)),",
+    tests: ["tests/round105_rb_unavailable_schedule.test.js"]
   }
 ];
 

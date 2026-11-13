@@ -49,6 +49,11 @@ function buildPreLaunchWebItems_() {
     '現時：' + onOff(CONFIG_KEYS.ADMIN_NOTIFY_NO_EMAIL, false), '進階與診斷〔補建設定及範本〕補上之後，在 Config 工作表改');
   add('幹事通知「階段提醒」（ADMIN_NOTIFY_STAGE_REMINDERS）已決定', has(CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS),
     '現時：' + onOff(CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS, false), '進階與診斷〔補建設定及範本〕補上之後，在 Config 工作表改');
+  // 第一百零五輪批次 RB 組：申報時間表自動化（上線值 TRUE；由 UNAVAILABLE_INVITE_AUTO_FROM_QUARTER 那一季開始）
+  const autoInvite = isUnavailableInviteAutoOn_();
+  add('申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開', autoInvite,
+    '現時：' + (autoInvite ? '開' : '關') + '（由 ' + String(getConfig_(CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO_FROM_QUARTER, '2027T2') || '') + ' 開始）',
+    'Config 工作表 UNAVAILABLE_INVITE_AUTO（〔自動排程狀態〕時間表顯示申報連結、提醒、申報期完結的日子及開／關）');
   const rollout = readRolloutAudience_();
   add('開放範圍（ROLLOUT_AUDIENCE）已決定', has(CONFIG_KEYS.ROLLOUT_AUDIENCE),
     '現時：' + (rollout === ROLLOUT_AUDIENCE.ALL ? '全部事奉人員' : '只開放給堂委、執事及幹事（第一階段）'), '常用設定〔使用權限〕');

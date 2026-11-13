@@ -20,7 +20,7 @@ function check(label, condition, extra) {
 }
 
 function scene(config) {
-  const sc = buildRound75Scene({ extraFiles: ['WebAppCombined.gs', 'PreseasonPack.gs', 'EmailTemplateSeed.gs', 'WebAppPeople.gs'],
+  const sc = buildRound75Scene({ extraFiles: ['WebAppCombined.gs', 'PreseasonPack.gs', 'UnavailableSchedule.gs', 'EmailTemplateSeed.gs', 'WebAppPeople.gs'],
     config: Object.assign({ MAIL_ADMIN_NOTIFY: ['clerk@example.invalid', 'STR'],
       PRESEASON_EXTRA_RECIPIENTS: ['extra@example.invalid、p9701@example.invalid', 'STR'] }, config || {}) });
   const g = sc.gas; const C = sc.C; const S = sc.S; const D = sc.DATES;

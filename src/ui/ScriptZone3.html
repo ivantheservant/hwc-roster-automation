@@ -375,6 +375,14 @@
     }
     if (!canDecide) pendBox.appendChild(make('div', { text: VIEW_ONLY_TEXT + '：可以看，但不可以確認。', className: 'muted' }));
     nodes.push(pendBox);
+    // 第一百零五輪批次 RB 組：事奉人員按了〔我這一季沒有不能服侍的日子〕（不用確認，只供參考）
+    (d.noneReplies || []).forEach((g) => {
+      nodes.push(make('div', { className: 'sec' }, [
+        sectionTitle(g.quarterId + ' 已回覆「這一季沒有不能服侍的日子」（' + g.names.length + ' 人）'),
+        make('div', { text: g.names.join('、') }),
+        make('div', { text: '不用確認；截止日之前的提醒不會寄給他們。', className: 'muted' })
+      ]));
+    });
     if (o.withHistory !== false) {
       const hist = d.history || [];
       const hBox = make('div', { className: 'sec' }, [sectionTitle('已處理（最近 ' + hist.length + ' 項）')]);

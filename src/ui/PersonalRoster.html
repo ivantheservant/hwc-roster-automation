@@ -161,6 +161,9 @@
   .unav .closed-note { font-weight: 700; margin: 4px 0; }
   /* 第九十四輪批次 UA 組：逐個主日的方格（手機友善：自動換行、不會橫向捲動；方格最少 52px 高，手指按得到） */
   .unav .q-block { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 10px; }
+  /* 第一百零五輪批次 RB 組：〔我這一季沒有不能服侍的日子〕 */
+  .unav .none-reply { margin: 6px 0 10px; }
+  .unav button.none-btn { margin: 0; min-height: 48px; padding: 8px 14px; }
   .unav .month-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 10px 0; }
   .unav .month-label { flex: 0 0 3.4em; font-weight: 700; padding-top: 12px; }
   .unav .tiles { flex: 1 1 180px; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
@@ -257,7 +260,8 @@
   <? } ?>
   <? } ?>
 
-  <!-- 第九十輪批次 QC 組：申報不能服侍的日子（只可以呼叫 personalSubmitUnavailable／personalWithdrawUnavailable） -->
+  <!-- 第九十輪批次 QC 組：申報不能服侍的日子（只可以呼叫 personalSubmitUnavailable／personalWithdrawUnavailable；
+       第一百零五輪批次 RB 組加 personalReplyNoUnavailable） -->
   <div class="unav" id="unavSection">
     <h2>申報不能服侍的日子</h2>
     <div id="unavBody"><p class="muted">載入中……</p></div>
@@ -302,6 +306,7 @@
             render(view, (err && err.message) || '未能完成，請稍後再試，或者聯絡幹事。', true);
           });
         if (fnName === 'submit') runner.personalSubmitUnavailable(token, quarterId, args[0], args[1], args[2]);
+        else if (fnName === 'none') runner.personalReplyNoUnavailable(token, quarterId, args[0], args[1]);
         else runner.personalWithdrawUnavailable(token, quarterId, args[0]);
       }
 
@@ -309,9 +314,28 @@
 
       // 第九十四輪批次 UA 組：一季一個區塊——主日按月份分行（方格，按一下選取、再按取消；每行「全選這個月」），
       // 下面揀「全部崗位」或「只限以下崗位」（只列這個人這一季可以服侍的崗位），原因，〔提交〕。
+      // 第一百零五輪批次 RB 組：〔我這一季沒有不能服侍的日子〕——按了顯示「你已回覆」，可以〔取消〕改回
+      function renderNoneReply(q, view, block) {
+        var box = el('div', '', 'none-reply');
+        if (q.noneReplied) {
+          box.appendChild(el('span', '你已回覆：這一季沒有不能服侍的日子。'));
+          var undo = el('button', '取消', 'link');
+          undo.type = 'button';
+          undo.addEventListener('click', function () { call('none', [q.quarterId, false], view); });
+          box.appendChild(undo);
+        } else {
+          var none = el('button', '我這一季沒有不能服侍的日子', 'none-btn');
+          none.type = 'button';
+          none.addEventListener('click', function () { call('none', [q.quarterId, true], view); });
+          box.appendChild(none);
+        }
+        block.appendChild(box);
+      }
+
       function renderQuarter(q, view) {
         var block = el('div', '', 'q-block');
         block.appendChild(el('h3', q.label + (q.deadline ? '（請在 ' + q.deadline + ' 之前申報）' : '')));
+        renderNoneReply(q, view, block);
         var chosen = {};
         var tiles = [];
         var months = [];

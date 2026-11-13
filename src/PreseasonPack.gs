@@ -350,8 +350,7 @@ function sendPreseasonPack_(quarterId, mode, selection) {
   // 第一百零一輪批次 ZE-1：人手寄出用幹事選的收件人；自動寄出照舊（堂委＋執事＋幹事＋額外收件人）
   const who = (mode === PRESEASON_SEND_MODE.MANUAL && selection) ? preseasonRecipientsFromSelection_(selection, today) : buildPreseasonRecipients_(today);
   const tpl = findEmailTemplateById_(PRESEASON_TEMPLATE_ID) || preseasonTemplateDefault_();
-  const placeholders = { QuarterLabel: pack.quarterLabel, QuarterID: quarterId, GenerateDate: generateDate || '生成日',
-    PreseasonContentHtml: pack.html, PreseasonContentPlain: pack.plain };
+  const placeholders = buildPreseasonPlaceholders_(quarterId, pack, generateDate);
   const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
   const dryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
   const context = { senderName: String(config[CONFIG_KEYS.MAIL_SENDER_NAME] || ''), replyTo: String(config[CONFIG_KEYS.MAIL_REPLY_TO] || '') };
@@ -386,6 +385,22 @@ function sendPreseasonPack_(quarterId, mode, selection) {
 }
 
 /**
+ * 第一百零五輪批次 RB 組：季前資料（請確認事奉人員表）的佔位符——{InviteDate}＝申報連結寄出日（G−14）；
+ * {ListConfirmBy}＝確認期限：按時間表運作的季度＝申報連結寄出日，否則（自動化關着）照舊＝生成日。範本樣本共用。
+ * @param {string} quarterId
+ * @param {Object} pack buildPreseasonPack_()
+ * @param {string} generateDate
+ * @returns {Object}
+ */
+function buildPreseasonPlaceholders_(quarterId, pack, generateDate) {
+  const s = computeUnavailableSchedule_(generateDate);
+  const confirmBy = isUnavailableScheduleActive_(quarterId) ? s.inviteDate : String(generateDate || '');
+  return { QuarterLabel: pack.quarterLabel, QuarterID: quarterId, GenerateDate: generateDate || '生成日',
+    ListConfirmBy: confirmBy || '申報連結寄出之前', InviteDate: s.inviteDate || '生成日之前兩星期',
+    PreseasonContentHtml: pack.html, PreseasonContentPlain: pack.plain };
+}
+
+/**
  * 每日檢查呼叫：到了時間就自動寄一次。
  * @param {Object} quarterRow Quarters 一行
  * @param {string} today yyyy-MM-dd
@@ -396,7 +411,8 @@ function runPreseasonAutoSend_(quarterRow, today, config) {
   const quarterId = String(quarterRow[COLUMNS.QUARTERS.QUARTER_ID] || '').trim();
   const judgment = judgePreseasonAutoSend_({
     enabled: getConfig_(CONFIG_KEYS.PRESEASON_AUTO_SEND, true) !== false,
-    daysBefore: Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)),
+    // 第一百零五輪批次 RB 組：時間表自動化開着 ⇒ G−21（7＋14）；否則照舊 PRESEASON_DAYS_BEFORE
+    daysBefore: preseasonDaysBeforeFor_(quarterId),
     generateDate: readPreseasonGenerateDate_(quarterRow, config),
     today: today,
     sent: readPreseasonSentRecord_(quarterId),
@@ -466,7 +482,7 @@ function readPreseasonStatusText_(quarterId) {
   const row = findQuarter_(quarterId);
   const generateDate = row ? readPreseasonGenerateDate_(row, config) : '';
   return describePreseasonStatus_(readPreseasonSentRecord_(quarterId), generateDate,
-    Number(getConfig_(CONFIG_KEYS.PRESEASON_DAYS_BEFORE, 14)));
+    preseasonDaysBeforeFor_(quarterId));
 }
 
 /** 第一百零一輪批次 ZE-3：〔寄出季前資料〕窗頂一句：不包括申報連結。 */

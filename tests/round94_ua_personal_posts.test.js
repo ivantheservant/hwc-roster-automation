@@ -130,7 +130,8 @@ console.log('\n=== UA5：原有限制照舊 ===');
 {
   const sc = buildUnavailableScene();
   const g = sc.gas;
-  check('★★★★★★ 個人連結公開函式仍然只有提交、撤回', JSON.stringify(g.PERSONAL_LINK_PUBLIC_APIS) === '["personalSubmitUnavailable","personalWithdrawUnavailable"]');
+  // 第一百零五輪批次 RB 組（刻意加）：〔我這一季沒有不能服侍的日子〕
+  check('★★★★★★ 個人連結公開函式只有提交、撤回、回覆「沒有」', JSON.stringify(g.PERSONAL_LINK_PUBLIC_APIS) === '["personalSubmitUnavailable","personalWithdrawUnavailable","personalReplyNoUnavailable"]');
   const src = read('src/PersonalUnavailable.gs');
   check('★★★★★ 提交函式第一句仍然是 assertPersonalLinkCaller_(token)', /function personalSubmitUnavailable\(token, quarterId, dates, reason, postIds\) \{\s*const person = assertPersonalLinkCaller_\(token\);/.test(src));
   const many = [];
@@ -158,8 +159,9 @@ console.log('\n=== UA6：個人頁 ===');
   check('★★★★★ 「不同日子不能服侍的崗位不同？請分開兩次提交。」', html.indexOf('不同日子不能服侍的崗位不同？請分開兩次提交。') !== -1);
   check('★★★★★ 「我已申報的日子」表：主日、崗位、原因、狀態；已確認寫「如需取消，請聯絡幹事」', /\['主日', '崗位', '原因', '狀態'\]/.test(html) && /如需取消，請聯絡幹事/.test(html));
   check('★★★★★ 說明句「幹事或堂委確認」', /幹事或堂委確認之後才會生效/.test(html) && /幹事或堂委確認後生效/.test(html));
-  check('★★★★ 只呼叫兩個公開函式（提交送崗位）', /runner\.personalSubmitUnavailable\(token, quarterId, args\[0\], args\[1\], args\[2\]\)/.test(html)
-    && (html.match(/runner\.\w+\(/g) || []).every((m) => /personalSubmitUnavailable|personalWithdrawUnavailable/.test(m)));
+  // 第一百零五輪批次 RB 組（刻意加）：personalReplyNoUnavailable
+  check('★★★★ 只呼叫三個公開函式（提交送崗位）', /runner\.personalSubmitUnavailable\(token, quarterId, args\[0\], args\[1\], args\[2\]\)/.test(html)
+    && (html.match(/runner\.\w+\(/g) || []).every((m) => /personalSubmitUnavailable|personalWithdrawUnavailable|personalReplyNoUnavailable/.test(m)));
   check('★★★★ 介面不用「接受」「拒絕」「批准」', !/接受|拒絕|批准|approved/i.test(html.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\/.*$/gm, '')));
 }
 
