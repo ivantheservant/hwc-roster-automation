@@ -13758,6 +13758,46 @@ const MUTATIONS = [
     find: "    if (own.length >= 2) {",
     replace: "    if (own.length >= 3) {",
     tests: ["tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rg-teams-always-ok",
+    why: "上線前檢查：組合未填也當已填",
+    file: "src/PreLaunchWeb.gs",
+    find: "  add('影音組合（PostTeams）已填', nTeams > 0,",
+    replace: "  add('影音組合（PostTeams）已填', true,",
+    tests: ["tests/round105_rg_prelaunch.test.js"]
+  },
+  {
+    id: "rg-singers-missing",
+    why: "上線前檢查沒有協唱一項",
+    file: "src/PreLaunchWeb.gs",
+    find: "  add('協唱（WorshipBackingSingers）已填', nSingers > 0,",
+    replace: "  add('（略）', nSingers > 0,",
+    tests: ["tests/round105_rg_prelaunch.test.js"]
+  },
+  {
+    id: "rg-preferred-zero",
+    why: "指定寄信電郵人數永遠寫 0",
+    file: "src/PreLaunchWeb.gs",
+    find: "  try { nPreferred = Object.keys(readPreferredEmailPersonIds_()).length; } catch (err) { nPreferred = -1; }",
+    replace: "  nPreferred = 0;",
+    tests: ["tests/round105_rg_prelaunch.test.js"]
+  },
+  {
+    id: "rg-plan-no-sheets",
+    why: "〔補建設定及範本〕比對沒有列出未建立的工作表",
+    file: "src/AdminTools.gs",
+    find: "    sheetsMissing: sheetsMissing,",
+    replace: "    sheetsMissing: [],",
+    tests: ["tests/round105_rg_prelaunch.test.js","tests/round105_rd_team_rules.test.js"]
+  },
+  {
+    id: "rg-ensure-overwrites",
+    why: "再補建一次會清掉已填的內容",
+    file: "src/PostTeams.gs",
+    find: "  if (!sheet) { sheet = ss.insertSheet(name); created = true; }",
+    replace: "  if (sheet) { ss.deleteSheet(sheet); sheet = null; }\n  if (!sheet) { sheet = ss.insertSheet(name); created = true; }",
+    tests: ["tests/round105_rg_prelaunch.test.js"]
   }
 ];
 

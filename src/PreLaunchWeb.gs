@@ -54,6 +54,20 @@ function buildPreLaunchWebItems_() {
   add('申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開', autoInvite,
     '現時：' + (autoInvite ? '開' : '關') + '（由 ' + String(getConfig_(CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO_FROM_QUARTER, '2027T2') || '') + ' 開始）',
     'Config 工作表 UNAVAILABLE_INVITE_AUTO（〔自動排程狀態〕時間表顯示申報連結、提醒、申報期完結的日子及開／關）');
+  // 第一百零五輪批次 RG 組：影音組合、協唱已填；指定寄信電郵人數（只供核對，0 亦可以是正常）
+  let extras = null;
+  try { extras = readRuleExtrasContext_(); } catch (err) { extras = null; }
+  const nTeams = extras ? extras.teams.list.length : -1;
+  const nTeamMembers = extras ? extras.teams.list.reduce(function (s, t) { return s + t.members.length; }, 0) : 0;
+  add('影音組合（PostTeams）已填', nTeams > 0, nTeams < 0 ? '讀不到' : (nTeams === 0 ? '沒有（工作表未建立或未填）' : nTeams + ' 組、' + nTeamMembers + ' 人'),
+    'PostTeams 工作表（未建立 ⇒ 進階與診斷〔補建設定及範本〕）');
+  const nSingers = extras ? extras.backingSingers.length : -1;
+  add('協唱（WorshipBackingSingers）已填', nSingers > 0, nSingers < 0 ? '讀不到' : (nSingers === 0 ? '沒有（工作表未建立或未填）' : nSingers + ' 位協唱'),
+    'WorshipBackingSingers 工作表（未建立 ⇒ 進階與診斷〔補建設定及範本〕）');
+  let nPreferred = -1;
+  try { nPreferred = Object.keys(readPreferredEmailPersonIds_()).length; } catch (err) { nPreferred = -1; }
+  add('指定寄信電郵（PreferredEmail）已填人數', nPreferred > 0, nPreferred < 0 ? '讀不到' : nPreferred + ' 人',
+    '常用設定〔補填電郵〕的「指定寄信電郵（優先）」');
   const rollout = readRolloutAudience_();
   add('開放範圍（ROLLOUT_AUDIENCE）已決定', has(CONFIG_KEYS.ROLLOUT_AUDIENCE),
     '現時：' + (rollout === ROLLOUT_AUDIENCE.ALL ? '全部事奉人員' : '只開放給堂委、執事及幹事（第一階段）'), '常用設定〔使用權限〕');

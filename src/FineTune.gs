@@ -406,7 +406,7 @@ function buildGridOverlayState_(context) {
 /**
  * 第一百零五輪批次 RE 組：工作表上填了字、但上一版（`context.original`）沒有那一格的格。
  * 只收已知崗位、已知日子、序號不超過現時 `SlotCount` 的格；當作「上一版是空白」交給同一套疊加邏輯。
- * @param {Object} context fine-tune 嘅資料集（要有 `original`、`gridValues`、`gridRender`）
+ * @param {Object} context fine-tune 的資料集（要有 `original`、`gridValues`、`gridRender`）
  * @returns {Object[]} 形狀同 `context.original` 一項（personId、personName 空白）
  */
 function listGridOnlyFilledCells_(context) {

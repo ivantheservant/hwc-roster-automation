@@ -278,7 +278,8 @@ console.log('\n=== ZG：上線前檢查 ===');
     '幹事通知「沒有電郵名單」（ADMIN_NOTIFY_NO_EMAIL）已決定', '幹事通知「階段提醒」（ADMIN_NOTIFY_STAGE_REMINDERS）已決定', '開放範圍（ROLLOUT_AUDIENCE）已決定',
     '有修改要聯絡的人（ROSTER_CONTACT_TC）已填', '測試轉寄（MAIL_REDIRECT_ALL_TO）已清空', '已離開測試模式（DRY_RUN=FALSE）', '電郵範本是最新版',
     '沒有不能服侍的測試行（UnavailableSubmissions／Unavailable）', '沒有排表偏好的測試行（PersonPostWeight）', '沒有 Eligibility 舊 REQUEST 行',
-    '申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開'].forEach((l) => {   // 第一百零五輪批次 RB 組刻意加
+    '申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開',   // 第一百零五輪批次 RB 組刻意加
+    '影音組合（PostTeams）已填', '協唱（WorshipBackingSingers）已填', '指定寄信電郵（PreferredEmail）已填人數'].forEach((l) => {   // RG 組刻意加
     check('★★★★ 有一項「' + l + '」', labels.indexOf(l) !== -1);
   });
   check('★★★★★★ 每一項都有 ✔／✘、現時、去哪裏改（幹事介面位置）', r.items.every((i) => typeof i.ok === 'boolean' && i.value && i.where) && r.total === r.items.length);
