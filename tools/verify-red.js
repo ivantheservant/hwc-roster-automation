@@ -13390,6 +13390,38 @@ const MUTATIONS = [
     find: "      || !slotCountByPostId[parts[1]] || !(slotIndex >= 1 && slotIndex <= slotCountByPostId[parts[1]])) return;",
     replace: "      || !slotCountByPostId[parts[1]]) return;",
     tests: ["tests/round105_re_slot_count.test.js"]
+  },
+  {
+    id: "rh-alloc-no-pad",
+    why: "新 PersonID 沒有補零（P90）",
+    file: "src/WebAppPeople.gs",
+    find: "  return formatPersonIdNumber_(candidate);\n}",
+    replace: "  return 'P' + candidate;\n}",
+    tests: ["tests/round105_rh_person_id.test.js"]
+  },
+  {
+    id: "rh-history-changed",
+    why: "歷史紀錄用過的 PersonID 照樣改",
+    file: "src/PersonIdFormat.gs",
+    find: "          (isHistory ? byFrom[s.fromId].history : byFrom[s.fromId].cells).push(cell);",
+    replace: "          byFrom[s.fromId].cells.push(cell);",
+    tests: ["tests/round105_rh_person_id.test.js"]
+  },
+  {
+    id: "rh-seed-no-apply",
+    why: "〔補建設定及範本〕沒有執行 PersonID 修正",
+    file: "src/AdminTools.gs",
+    find: "    const npid = pid.renames.length ? applyPersonIdNormalize_(pid) : 0;",
+    replace: "    const npid = 0;",
+    tests: ["tests/round105_rh_person_id.test.js"]
+  },
+  {
+    id: "rh-list-not-split",
+    why: "逗號清單內的 PersonID 沒有換",
+    file: "src/PersonIdFormat.gs",
+    find: "  if (s.indexOf(',') === -1 && s.indexOf('，') === -1) return value;",
+    replace: "  return value;",
+    tests: ["tests/round105_rh_person_id.test.js"]
   }
 ];
 

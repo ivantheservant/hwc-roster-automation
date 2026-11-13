@@ -425,13 +425,18 @@
     runAction('檢查設定及範本', async () => {
       const p = await callServer('apiPlanSeedConfigAndTemplates');
       const outOrder = p.postsOutputOrder || [];
-      const total = p.configMissing.length + p.templatesMissing.length + outOrder.length;
+      // 第一百零五輪批次 RH 組：PersonID 統一為四位數字
+      const pidRenames = p.personIdRenames || [];
+      const pidSkipped = p.personIdSkipped || [];
+      const total = p.configMissing.length + p.templatesMissing.length + outOrder.length + pidRenames.length;
       const nodes = [para('只新增缺少的設定行及電郵範本，不會改動任何現有的行。新加的設定是預設值。')];
       nodes.push(audienceListBox('缺少的設定（' + p.configMissing.length + ' 行）',
         p.configMissing.map((c) => c.key + '＝' + (c.defaultValue || '（空白）')), '沒有。'));
       nodes.push(audienceListBox('缺少的電郵範本（' + p.templatesMissing.length + ' 個）', p.templatesMissing, '沒有。'));
       // 第一百零二輪批次 OA 組：Posts.OutputOrder（寄出／公開職事表的崗位次序）
       if (outOrder.length) nodes.push(audienceListBox('寄出／公開職事表的崗位次序（Posts 的 OutputOrder 欄，會新增並填好）', outOrder, ''));
+      if (pidRenames.length) nodes.push(audienceListBox('PersonID 統一為四位數字（名單及所有引用它的工作表；職事表版本等歷史紀錄不改）', pidRenames, ''));
+      if (pidSkipped.length) nodes.push(audienceListBox('PersonID 不改（請自行決定）', pidSkipped, ''));
       openModal('補建設定及範本', nodes, total === 0 ? [button('知道了', () => closeModal(), '')] : [
         button('補建', () => runAction('補建設定及範本', async () => {
           const r = await callServerMutating('apiSeedConfigAndTemplates');

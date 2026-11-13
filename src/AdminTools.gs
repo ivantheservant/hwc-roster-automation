@@ -248,7 +248,11 @@ function apiPlanSeedConfigAndTemplates() {
   const t = planEmailTemplateSeed_();
   // 第一百零二輪批次 OA 組：Posts.OutputOrder（寄出／公開職事表的崗位次序）
   const o = planPostOutputOrderSeed_();
+  // 第一百零五輪批次 RH 組：PersonID 統一為四位數字（P90 → P0090）
+  const pid = planPersonIdNormalize_();
   return {
+    personIdRenames: pid.renames.map(function (r) { return r.nameTC + '：' + r.fromId + ' → ' + r.toId + '（' + r.cells.length + ' 格）'; }),
+    personIdSkipped: pid.skipped.map(function (s) { return s.nameTC + '：' + s.fromId + ' 不改——' + s.reason; }),
     postsOutputOrder: o.needed ? o.fills.map(function (f) { return f.postNameTC + '＝' + (f.value === '' ? '（留空＝用 DisplayOrder）' : f.value); }) : [],
     configMissing: c.missing.map(function (s) { return { key: s.key, defaultValue: String(s.defaultValue || ''), group: s.group }; }),
     templatesMissing: t.missing.map(function (s) { return s.templateId; })
@@ -266,14 +270,20 @@ function apiSeedConfigAndTemplates() {
     // 第一百零二輪批次 OA 組：Posts.OutputOrder 欄（只在欄不存在或整欄空白時補）
     const o = planPostOutputOrderSeed_();
     const no = o.needed ? seedPostOutputOrder_(o) : 0;
+    // 第一百零五輪批次 RH 組：PersonID 統一為四位數字（可重複執行；歷史紀錄用過的不改）
+    const pid = planPersonIdNormalize_();
+    const npid = pid.renames.length ? applyPersonIdNormalize_(pid) : 0;
     if (nc > 0) reloadConfigCache_();
     writeAuditLog_({ action: 'CONFIG_TEMPLATES_SEEDED', targetSheet: SHEETS.CONFIG, targetKey: '',
       newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個' + (o.needed ? '、Posts.OutputOrder ' + no + ' 行' : ''), source: 'apiSeedConfigAndTemplates',
       notes: c.missing.map(function (s) { return s.key; }).concat(t.missing.map(function (s) { return s.templateId; })).join(',') });
     return { ok: true, configAdded: c.missing.map(function (s) { return s.key; }), templatesAdded: t.missing.map(function (s) { return s.templateId; }),
       postsOutputOrderSeeded: o.needed ? no : 0,
-      message: (nc + nt) > 0 || o.needed
-        ? '已補建 Config ' + nc + ' 行、電郵範本 ' + nt + ' 個（數值是預設值）' + (o.needed ? '；Posts 的 OutputOrder 欄填了 ' + no + ' 行（寄出／公開職事表的崗位次序）' : '') + '。'
+      personIdRenamed: pid.renames.map(function (r) { return r.fromId + '→' + r.toId; }), personIdCells: npid,
+      personIdSkipped: pid.skipped.map(function (s) { return s.nameTC + '：' + s.fromId + ' 不改——' + s.reason; }),
+      message: (nc + nt) > 0 || o.needed || npid > 0
+        ? '已補建 Config ' + nc + ' 行、電郵範本 ' + nt + ' 個（數值是預設值）' + (o.needed ? '；Posts 的 OutputOrder 欄填了 ' + no + ' 行（寄出／公開職事表的崗位次序）' : '')
+          + (npid > 0 ? '；PersonID 統一為四位數字：' + pid.renames.map(function (r) { return r.fromId + ' → ' + r.toId; }).join('、') + '（' + npid + ' 格）' : '') + '。'
         : '全部已經齊全，不需要補建。' };
   });
 }

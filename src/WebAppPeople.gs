@@ -475,6 +475,7 @@ function allocatePersonId_(existingIds) {
   });
   let candidate = maxNo + 1;
   // 防守：萬一有人手加咗一個唔跟格式但撞號嘅 ID。
-  while (existingIds['P' + candidate]) candidate++;
-  return 'P' + candidate;
+  // 第一百零五輪批次 RH 組：統一為 P＋四位數字（P0090）；新舊兩種寫法都當已用
+  while (existingIds[formatPersonIdNumber_(candidate)] || existingIds['P' + candidate]) candidate++;
+  return formatPersonIdNumber_(candidate);
 }

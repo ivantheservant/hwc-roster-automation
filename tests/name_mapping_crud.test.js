@@ -17,7 +17,7 @@ const { loadGasSource } = require('./helpers/gas_loader.js');
 
 const gas = loadGasSource([
   'Constants.gs', 'Utils.gs', 'SheetReader.gs', 'QuarterStage.gs',
-  'WebAppGuards.gs', 'WebAppRoster3Common.gs', 'WebAppPeople.gs'
+  'WebAppGuards.gs', 'WebAppRoster3Common.gs', 'WebAppPeople.gs', 'PersonIdFormat.gs'
 ]);
 
 let fail = 0;
@@ -102,10 +102,11 @@ console.log('\n=== E2【核心】撞名只警告，唔阻擋 ===');
 
 console.log('\n=== E2 PersonID 編號規則 ===');
 {
-  checkEqual('★★★★ 由最大號 +1', gas.allocatePersonId_({ P1: true, P7: true }), 'P8');
-  checkEqual('★★★★ 空名單由 P1 開始', gas.allocatePersonId_({}), 'P1');
+  // 第一百零五輪批次 RH 組（刻意改動）：新編號統一為 P＋四位數字
+  checkEqual('★★★★ 由最大號 +1', gas.allocatePersonId_({ P1: true, P7: true }), 'P0008');
+  checkEqual('★★★★ 空名單由 P0001 開始', gas.allocatePersonId_({}), 'P0001');
   check('★★★★★ 唔會撞到已存在嘅 ID（就算有人手加咗唔跟格式嘅）',
-    ['P3', 'P4'].indexOf(gas.allocatePersonId_({ P1: true, P2: true, P3: true })) !== -1);
+    gas.allocatePersonId_({ P1: true, P2: true, P3: true }) === 'P0004');
 }
 
 console.log('\n=== E2【核心】Active=FALSE 唔係刪行 ===');

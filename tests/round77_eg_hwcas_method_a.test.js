@@ -33,7 +33,7 @@ const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
 
 // ── 場景：擬真試算表 ＋ 一個假嘅出席系統試算表 ─────────────────────
 const sc = buildRound75Scene({
-  extraFiles: ['HwcasSync.gs', 'HwcasApply.gs', 'WebAppHwcas.gs', 'WebAppPeople.gs', 'WebAppRoster3Common.gs',
+  extraFiles: ['HwcasSync.gs', 'HwcasApply.gs', 'WebAppHwcas.gs', 'WebAppPeople.gs', 'PersonIdFormat.gs', 'WebAppRoster3Common.gs',
     'WebAppEligibility.gs', 'PersonalLinkInMail.gs', 'SendOptions.gs', 'WebAppSendPlan.gs'],
   config: {
     HWCAS_SPREADSHEET_ID: ['HWCAS1', 'STR'], HWCAS_MEMBERS_SHEET: ['Members', 'STR'],
