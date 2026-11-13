@@ -13366,6 +13366,30 @@ const MUTATIONS = [
     find: "  viewers: '只可查看：打開幹事介面看狀態、職事表預覽及事奉人員申報（〔不能服侍的日期〕最上面的確認畫面），所有會改動的按鈕（包括〔確認申請〕〔不確認〕）都是灰色，看不到任何打開主試算表的按鈕或連結。',",
     replace: "  viewers: '只可查看：打開幹事介面看狀態及職事表預覽，所有會改動的按鈕都是灰色，看不到任何打開主試算表的按鈕或連結。',",
     tests: ["tests/round105_rc_viewer_confirm.test.js"]
+  },
+  {
+    id: "re-grid-only-ignored",
+    why: "舊版本新的一格填了名字被靜靜忽略",
+    file: "src/FineTune.gs",
+    find: "  const manualState = context.original.concat(extraCells).map(function (a) {",
+    replace: "  const manualState = context.original.map(function (a) {",
+    tests: ["tests/round105_re_slot_count.test.js"]
+  },
+  {
+    id: "re-extra-blank-added",
+    why: "新的一格空白都加入（多出空格）",
+    file: "src/FineTune.gs",
+    find: "    if (normalizeOverlayCellText_(context.gridValues[key], context.gridRender.labels) === '') return;\n",
+    replace: "",
+    tests: ["tests/round105_re_slot_count.test.js"]
+  },
+  {
+    id: "re-extra-beyond-slot",
+    why: "序號超過 SlotCount 的格都加入",
+    file: "src/FineTune.gs",
+    find: "      || !slotCountByPostId[parts[1]] || !(slotIndex >= 1 && slotIndex <= slotCountByPostId[parts[1]])) return;",
+    replace: "      || !slotCountByPostId[parts[1]]) return;",
+    tests: ["tests/round105_re_slot_count.test.js"]
   }
 ];
 

@@ -271,7 +271,11 @@ function buildGridOverlayState_(context) {
   const changes = [];
   const unresolved = [];
 
-  const manualState = context.original.map(function (a) {
+  // 第一百零五輪批次 RE 組：工作表上有、上一版沒有的格（例如聖餐襄禮由 4 位改為 5 位之後，舊版本只有 4 格，
+  // 新寫的工作表有第 5 欄）——**只要填了字**就照樣當人手改動處理，不可以靜靜忽略。空白的不加（不會多出空格）。
+  const extraCells = listGridOnlyFilledCells_(context);
+
+  const manualState = context.original.concat(extraCells).map(function (a) {
     const key = a.serviceDate + '|' + a.postId + '|' + a.slotIndex;
     const gridText = context.gridValues[key];
     const base = {
@@ -391,6 +395,33 @@ function buildGridOverlayState_(context) {
   });
 
   return { changes: changes, unresolved: unresolved, manualState: manualState };
+}
+
+/**
+ * 第一百零五輪批次 RE 組：工作表上填了字、但上一版（`context.original`）沒有那一格的格。
+ * 只收已知崗位、已知日子、序號不超過現時 `SlotCount` 的格；當作「上一版是空白」交給同一套疊加邏輯。
+ * @param {Object} context fine-tune 嘅資料集（要有 `original`、`gridValues`、`gridRender`）
+ * @returns {Object[]} 形狀同 `context.original` 一項（personId、personName 空白）
+ */
+function listGridOnlyFilledCells_(context) {
+  const known = {};
+  (context.original || []).forEach(function (a) { known[a.serviceDate + '|' + a.postId + '|' + a.slotIndex] = true; });
+  const dateIdByDate = {};
+  (context.serviceDates || []).forEach(function (d) { dateIdByDate[d.serviceDate] = d.serviceDateId; });
+  const slotCountByPostId = {};
+  (context.posts || []).forEach(function (p) { slotCountByPostId[p.postId] = Number(p.slotCount) || 1; });
+  const out = [];
+  Object.keys(context.gridValues || {}).forEach(function (key) {
+    if (known[key]) return;
+    const parts = key.split('|');
+    const slotIndex = Number(parts[2]);
+    if (parts.length !== 3 || !Object.prototype.hasOwnProperty.call(dateIdByDate, parts[0])
+      || !slotCountByPostId[parts[1]] || !(slotIndex >= 1 && slotIndex <= slotCountByPostId[parts[1]])) return;
+    if (normalizeOverlayCellText_(context.gridValues[key], context.gridRender.labels) === '') return;
+    out.push({ serviceDateId: dateIdByDate[parts[0]], serviceDate: parts[0], postId: parts[1], slotIndex: slotIndex,
+      personId: '', personName: '', assignSource: '', ruleFlags: [] });
+  });
+  return out;
 }
 
 /**
