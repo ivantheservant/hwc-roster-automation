@@ -13798,6 +13798,54 @@ const MUTATIONS = [
     find: "  if (!sheet) { sheet = ss.insertSheet(name); created = true; }",
     replace: "  if (sheet) { ss.deleteSheet(sheet); sheet = null; }\n  if (!sheet) { sheet = ss.insertSheet(name); created = true; }",
     tests: ["tests/round105_rg_prelaunch.test.js"]
+  },
+  {
+    id: "qb-fresh-hardcoded",
+    why: "說明又寫死「報告限堂委、當值堂委限堂委或執事」",
+    file: "src/FreshEnvironmentCheck.gs",
+    find: "教會規則 1／2（崗位的身分要求，例如報告、當值堂委）不會生效",
+    replace: "教會規則 1／2（報告限堂委、當值堂委限堂委或執事）不會生效",
+    tests: ["tests/round108_qb_role_wording.test.js"]
+  },
+  {
+    id: "qb-verify-hardcoded",
+    why: "核對報告組名又寫死舊身分組合",
+    file: "src/Verify.gs",
+    find: "違反身分限制（崗位的身分要求 RequiredRoles）",
+    replace: "違反身分限制（規則 1／2：報告限堂委、當值堂委限堂委或執事）",
+    tests: ["tests/round108_qb_role_wording.test.js"]
+  },
+  {
+    id: "qb-zone3-hardcoded",
+    why: "沒有身分名單的提示又寫死舊規則",
+    file: "src/ui/ScriptZone3.html",
+    find: "各崗位的身分要求（Posts 工作表的 RequiredRoles，例如報告、當值堂委）不會生效。",
+    replace: "「報告限堂委」「當值堂委限堂委或執事」這兩條規則不會生效。",
+    tests: ["tests/round108_qb_role_wording.test.js"]
+  },
+  {
+    id: "qb-postseed-hardcoded",
+    why: "補建 Posts 欄位說明又寫死哪個崗位填甚麼",
+    file: "src/PostSeed.gs",
+    find: "        + '　有身分要求的崗位（例如報告、當值堂委）→ 按教會現時的規定填所需身分代號（'",
+    replace: "        + '　當值堂委 → COMMITTEE,DEACON（堂委或執事）\n'\n        + '　報告 → 按教會現時的規定填所需身分代號（'",
+    tests: ["tests/round108_qb_role_wording.test.js"]
+  },
+  {
+    id: "qb-roles-seed-hardcoded",
+    why: "補建身分名單說明又寫死哪個崗位填甚麼",
+    file: "src/Roles.gs",
+    find: "為有身分要求的崗位（例如報告、當值堂委）填所需身分代號，",
+    replace: "為「報告」填 COMMITTEE、當值堂委 → COMMITTEE,DEACON（堂委或執事），",
+    tests: ["tests/round108_qb_role_wording.test.js"]
+  },
+  {
+    id: "qb-rulereview-hardcoded",
+    why: "規則審閱表又寫死「報告由堂委或執事擔任」",
+    file: "src/RuleReview.gs",
+    find: "報告由符合崗位身分要求的人擔任，",
+    replace: "報告由堂委或執事擔任，",
+    tests: ["tests/round108_qb_role_wording.test.js"]
   }
 ];
 

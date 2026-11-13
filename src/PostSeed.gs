@@ -222,8 +222,8 @@ function runSeedPostRequiredRoles_() {
         'Posts 工作表已經有 ' + COLUMNS.POSTS.REQUIRED_ROLES + ' 欄（第 '
           + plan.columnIndex + ' 欄），沒有做任何改動。\n\n'
           + '要設定身分要求，請直接在該欄填入身分代號：\n'
-          + '　報告 → ' + ROLE_CODES.COMMITTEE + '\n'
-          + '　當值堂委 → ' + ROLE_CODES.COMMITTEE + ',' + ROLE_CODES.DEACON + '\n'
+          + '　有身分要求的崗位（例如報告、當值堂委）→ 填所需身分代號（' + ROLE_CODES.COMMITTEE + '＝堂委、' + ROLE_CODES.DEACON
+          + '＝執事；多個用逗號分隔，任一符合即可）\n'
           + '　其餘崗位 → 留空（＝沒有身分要求）',
         ui.ButtonSet.OK);
       return;
@@ -236,8 +236,8 @@ function runSeedPostRequiredRoles_() {
         + '　 「哪個崗位需要哪個身分」是教會的規定，系統不會替你猜，\n'
         + '　 填錯的話那個崗位會直接排不到人。\n\n'
         + '新增之後請自己填：\n'
-        + '　報告 → ' + ROLE_CODES.COMMITTEE + '（堂委）\n'
-        + '　當值堂委 → ' + ROLE_CODES.COMMITTEE + ',' + ROLE_CODES.DEACON + '（堂委或執事）\n'
+        + '　有身分要求的崗位（例如報告、當值堂委）→ 按教會現時的規定填所需身分代號（' + ROLE_CODES.COMMITTEE + '＝堂委、'
+        + ROLE_CODES.DEACON + '＝執事；多個用逗號分隔，任一符合即可）\n'
         + '　其餘崗位 → 留空\n\n'
         + '確定要新增嗎？',
       ui.ButtonSet.YES_NO);

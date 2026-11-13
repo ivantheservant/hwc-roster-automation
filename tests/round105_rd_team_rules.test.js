@@ -254,7 +254,8 @@ console.log('\n=== RD7：規則審閱表、Config、補建；RF ===');
   check('★★★★★ 每季上限 8 次是「盡量遵守」：寫明有需要可以超過', mr && /人手不足、有需要時可以超過/.test(mr[2]) && mr[3] === '每人每季最多 8 次', JSON.stringify(mr));
   const cr = gas.buildRuleReviewSheetRows_([{ [R.RULE_ID]: 'SOFT_CHAIR_EQ_ANNOUNCE', [R.LEVEL]: 'SOFT', [R.ENABLED]: true, [R.TARGET_VALUE]: 0.63 }], 13, {})
     .rows.filter((r) => r[1] === '主席和報告盡量由同一位擔任')[0];
-  check('★★★★★ 報告由堂委或執事擔任，不需要當日做主席', cr && /報告由堂委或執事擔任，\s*不需要當日做主席/.test(cr[2].replace(/\n/g, '')), JSON.stringify(cr));
+  // 第一百零八輪 QB 組：不寫死身分組合，改為「符合崗位身分要求的人」
+  check('★★★★★ 報告由符合崗位身分要求的人擔任，不需要當日做主席', cr && /報告由符合崗位身分要求的人擔任，\s*不需要當日做主席/.test(cr[2].replace(/\n/g, '')), JSON.stringify(cr));
   check('★★★★ 草稿覆核報告有新規則的人話', gas.describeRuleForCommittee_(ID.TEAM_OUTSIDE_HARD) !== '規則檢查' && gas.describeRuleForCommittee_(ID.BACKING_SINGER_SOFT) !== '規則檢查');
   check('★★★★★ 新規則預設開啟、級別（HARD／準硬）', [ID.TEAM_OUTSIDE_HARD, ID.BACKING_SINGER_HARD].every((id) => gas.RULE_DEFAULT_LEVELS[id] === 'HARD' && gas.RULE_DEFAULT_ENABLED[id] === true)
     && [ID.TEAM_OUTSIDE_SOFT, ID.TEAM_WEEK, ID.TEAM_HANDOFF, ID.BACKING_SINGER_SOFT].every((id) => gas.RULE_DEFAULT_LEVELS[id] === 'SEMI_HARD'));

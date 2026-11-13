@@ -619,7 +619,7 @@ function checkHardRuleViolations_(context) {
     { label: '同週 DistinctWithinPost 重複', items: duplicates },
     { label: '第一主日限定崗位出現在其他週', items: notFirstSunday },
     { label: 'AutoGenerate=FALSE 崗位被派人', items: autoGenerateHits },
-    { label: '違反身分限制（規則 1／2：報告限堂委、當值堂委限堂委或執事）', items: roleViolations },
+    { label: '違反身分限制（崗位的身分要求 RequiredRoles）', items: roleViolations },
     { label: '違反個人崗位限制（規則 3）', items: exclusionViolations },
     { label: '超過每人每季崗位上限', items: postMaxHits },
     { label: '同日兼任（擔任領詩、司琴等同日不兼任崗位的人當日另有崗位）', items: sameDayHits },

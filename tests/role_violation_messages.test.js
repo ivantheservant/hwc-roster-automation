@@ -177,8 +177,9 @@ console.log('\n=== D2【核心】地方三：核對職事表（checkHardRuleViol
 
   check('★★★★★ 核對報告有「違反身分限制」呢一組', !!roleGroup,
     JSON.stringify(result.groups.map((g) => g.label)));
-  check('★★★★ 而且組名講得出係規則 1／2',
-    roleGroup && roleGroup.label.indexOf('規則 1') !== -1, roleGroup && roleGroup.label);
+  // 第一百零八輪 QB 組：組名不寫死身分組合，改為「崗位的身分要求 RequiredRoles」
+  check('★★★★ 而且組名講得出係崗位的身分要求（不寫死堂委／執事）',
+    roleGroup && roleGroup.label.indexOf('RequiredRoles') !== -1 && roleGroup.label.indexOf('限堂委') === -1, roleGroup && roleGroup.label);
   // 第二十一輪批次階段 A：`items` 由「一句字串」改成**結構化物件**
   // （要用明確 key 做放行比對），顯示字串搬咗去 `.text`。
   check('★★★★★ 明細帶咗共用訊息（三要素齊）',

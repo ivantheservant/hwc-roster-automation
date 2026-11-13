@@ -44,7 +44,7 @@ const FRESH_ENV_REQUIRED_SHEETS = [
   {
     sheet: SHEETS.ROLES,
     note: '身分名單／堂委執事（「補建身分名單工作表」建立，之後人手填名單）'
-      + '——缺少時不會出錯，但教會規則 1／2（報告限堂委、當值堂委限堂委或執事）不會生效'
+      + '——缺少時不會出錯，但教會規則 1／2（崗位的身分要求，例如報告、當值堂委）不會生效'
   },
   {
     sheet: SHEETS.PERSON_POST_EXCLUSIONS,
