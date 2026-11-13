@@ -13342,6 +13342,30 @@ const MUTATIONS = [
     find: "      preferred: usesPreferredEmail_(row) };",
     replace: "      preferred: false };",
     tests: ["tests/round105_ra_preferred_email.test.js"]
+  },
+  {
+    id: "rc-viewer-can-decide",
+    why: "只可查看的人的確認按鈕不是灰色",
+    file: "src/ui/ScriptZone3.html",
+    find: "    const canDecide = !!d.canDecide;",
+    replace: "    const canDecide = true;",
+    tests: ["tests/round105_rc_viewer_confirm.test.js"]
+  },
+  {
+    id: "rc-editor-not-confirmer",
+    why: "可以修改的人（辦公室帳戶）不算確認者",
+    file: "src/WebApp.gs",
+    find: "    isConfirmer: !!email && (role === WEBAPP_ROLE.EDITOR || confirmers.indexOf(email) !== -1) };",
+    replace: "    isConfirmer: !!email && confirmers.indexOf(email) !== -1 };",
+    tests: ["tests/round105_rc_viewer_confirm.test.js"]
+  },
+  {
+    id: "rc-viewer-text-old",
+    why: "〔使用權限〕說明句沒有寫只可查看的人看得到申報",
+    file: "src/AdminTools.gs",
+    find: "  viewers: '只可查看：打開幹事介面看狀態、職事表預覽及事奉人員申報（〔不能服侍的日期〕最上面的確認畫面），所有會改動的按鈕（包括〔確認申請〕〔不確認〕）都是灰色，看不到任何打開主試算表的按鈕或連結。',",
+    replace: "  viewers: '只可查看：打開幹事介面看狀態及職事表預覽，所有會改動的按鈕都是灰色，看不到任何打開主試算表的按鈕或連結。',",
+    tests: ["tests/round105_rc_viewer_confirm.test.js"]
   }
 ];
 
