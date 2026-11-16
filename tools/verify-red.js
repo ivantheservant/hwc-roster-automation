@@ -9966,8 +9966,8 @@ const MUTATIONS = [
     id: "qc-invite-dryrun",
     why: "DRY_RUN 照樣寄申報邀請",
     file: "src/UnavailableInvite.gs",
-    find: "    if (dryRun) { simulated++; return; }",
-    replace: "    if (dryRun) { simulated++; }",
+    find: "    if (dryRun) { simulated++; logOne(r.personId, 'DRY_RUN'); return; }",
+    replace: "    if (dryRun) { simulated++; logOne(r.personId, 'DRY_RUN'); }",
     tests: ["tests/round90_qc_personal_unavailable.test.js"]
   },
   {
@@ -13459,8 +13459,8 @@ const MUTATIONS = [
     id: "rb-invite-repeats",
     why: "申報連結每日重複寄",
     file: "src/UnavailableSchedule.gs",
-    find: "  if (today >= s.inviteDate && today < s.deadline && !invited) {",
-    replace: "  if (today >= s.inviteDate && today < s.deadline) {",
+    find: "audience.recipients.filter(function (r) { return !inv.received[r.personId]; })",
+    replace: "audience.recipients.slice()",
     tests: ["tests/round105_rb_unavailable_schedule.test.js"]
   },
   {
