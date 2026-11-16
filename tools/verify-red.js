@@ -14086,6 +14086,22 @@ const MUTATIONS = [
     find: "    record[P.FREE_TEXT] = sheetSafeText_(freeText);",
     replace: "    record[P.FREE_TEXT] = freeText;",
     tests: ["tests/round109_sc_formula_text.test.js"]
+  },
+  {
+    id: "sa-resume-still-blocked",
+    why: "續寄正式發出仍然被「已經正式發出過」擋住",
+    file: "src/WebAppFlow.gs",
+    find: "  if (!isResumingSendBatch_(quarterId, MAIL_STAGES.OFFICIAL, sendOptions)) assertNeverOfficiallySent_(quarterId);",
+    replace: "  assertNeverOfficiallySent_(quarterId);",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-resume-any-id",
+    why: "任何批次鍵都當作續寄（可以略過防重複發出）",
+    file: "src/SendBatch.gs",
+    find: "  return !!(p && p.id === resumeId && p.quarterId === quarterId && p.stage === stage);",
+    replace: "  return !!resumeId;",
+    tests: ["tests/round109_sa_send_budget.test.js"]
   }
 ];
 

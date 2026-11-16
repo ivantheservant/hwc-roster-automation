@@ -190,5 +190,28 @@ console.log('\n=== SA6 來源核對：三條路徑、菜單、補寄、介面 ==
   check('★★★★ 補寄：時間預算用完再呼叫同一支', /while \(r && r\.ok && r\.incomplete\)/.test(script));
 }
 
+console.log('\n=== SA9 續寄正式發出：第一段的 SendLog 不可以令續寄被當作「已經正式發出過」（部署後實測撞到）===');
+{
+  setup(3);
+  const rec = { id: 'SB-RESUME-1', kind: gas.SEND_BATCH_KIND.STAGE, quarterId: Q, versionNo: version, stage: gas.MAIL_STAGES.OFFICIAL,
+    recipientKeys: [], total: 3, segments: [], startedAtMs: Date.now(), sendOptions: {} };
+  gas.writePendingSendBatch_(rec);
+  const row = {}; row[C.QUARTER_ID] = Q; row[C.STAGE] = gas.MAIL_STAGES.OFFICIAL; row[C.SEND_BATCH_ID] = rec.id; row[C.SENT_AT] = 'x';
+  LOG.push(row);
+  let threw = '';
+  try { gas.assertNeverOfficiallySent_(Q); } catch (e) { threw = e.message; }
+  check('★★★★ 前提：第一段已寫 OFFICIAL 紀錄 ⇒ 舊檢查會擋', /已經正式發出過了/.test(threw));
+  check('★★★★★★ 同一批、同一季、正式發出 ⇒ 認得是續寄', gas.isResumingSendBatch_(Q, gas.MAIL_STAGES.OFFICIAL, { resumeBatchId: rec.id }) === true);
+  check('★★★★★★ 批次鍵不同、季度不同、階段不同、沒有批次鍵 ⇒ 不算續寄（照舊擋）',
+    gas.isResumingSendBatch_(Q, gas.MAIL_STAGES.OFFICIAL, { resumeBatchId: 'SB-OTHER' }) === false
+    && gas.isResumingSendBatch_('2028T2', gas.MAIL_STAGES.OFFICIAL, { resumeBatchId: rec.id }) === false
+    && gas.isResumingSendBatch_(Q, gas.MAIL_STAGES.REVIEW, { resumeBatchId: rec.id }) === false
+    && gas.isResumingSendBatch_(Q, gas.MAIL_STAGES.OFFICIAL, {}) === false);
+  gas.clearPendingSendBatch_();
+  check('★★★★★ 這一批已完成（沒有未完成紀錄）⇒ 不算續寄', gas.isResumingSendBatch_(Q, gas.MAIL_STAGES.OFFICIAL, { resumeBatchId: rec.id }) === false);
+  check('★★★★★★ 正式發出入口：只有續寄才略過「已經正式發出過」檢查',
+    /if \(!isResumingSendBatch_\(quarterId, MAIL_STAGES\.OFFICIAL, sendOptions\)\) assertNeverOfficiallySent_\(quarterId\);/.test(read('src/WebAppFlow.gs')));
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

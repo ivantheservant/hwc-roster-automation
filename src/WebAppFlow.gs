@@ -494,7 +494,9 @@ function apiStep4Confirm_locked_(quarterId, sendOptions) {
   //
   // ⚠️ 次序：先查「已經發出過未」再查「有冇未儲存改動」——
   // 已經發出過係更根本嘅阻擋理由，先講嗰個對幹事更有用。
-  assertNeverOfficiallySent_(quarterId);
+  // 第一百零九輪批次 SA 組：續寄同一批正式發出（第一段已經過這一關）⇒ 不再擋；
+  // 否則第一段寫入的 SendLog 會令續寄被當作「已經正式發出過」（部署後實測撞到）。
+  if (!isResumingSendBatch_(quarterId, MAIL_STAGES.OFFICIAL, sendOptions)) assertNeverOfficiallySent_(quarterId);
   const guard = assertNoUnsavedChanges_(quarterId, '正式發出給全體',
     resolveAllowUnsavedFlag_(sendOptions));
   logSendWithUnsavedRelease_(quarterId, '正式發出給全體', guard);

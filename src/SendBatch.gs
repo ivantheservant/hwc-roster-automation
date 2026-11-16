@@ -341,6 +341,21 @@ function describePendingSendBatch_(quarterId) {
 }
 
 /**
+ * 這一次呼叫是不是續寄現時未完成的那一批（同一個批次鍵、同一季、同一個階段）。
+ * 用來略過只應該在第一段把關的檢查（例如「這一季已經正式發出過」）。
+ * @param {string} quarterId
+ * @param {string} stage MAIL_STAGES
+ * @param {Object=} sendOptions
+ * @returns {boolean}
+ */
+function isResumingSendBatch_(quarterId, stage, sendOptions) {
+  const resumeId = sendOptions && sendOptions.resumeBatchId ? String(sendOptions.resumeBatchId) : '';
+  if (!resumeId) return false;
+  const p = readPendingSendBatch_();
+  return !!(p && p.id === resumeId && p.quarterId === quarterId && p.stage === stage);
+}
+
+/**
  * 供前端呼叫：接着寄出餘下的人。按批次紀錄找回原本的寄出動作，用同一個入口（同一套把關）續寄。
  * 不另外拿鎖：下面各入口自己拿。
  * @param {string} batchId
