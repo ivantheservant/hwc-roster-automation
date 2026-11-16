@@ -57,6 +57,8 @@ const SHEETS = {
   UNAVAILABLE_SUBMISSIONS: 'UnavailableSubmissions',
   // 第一百零五輪批次 RB 組：事奉人員在個人專屬連結按〔我這一季沒有不能服侍的日子〕（一人一季一行；第一次使用時自動建立）
   UNAVAILABLE_REPLIES: 'UnavailableReplies',
+  // 第一百零九輪批次 SD 組：誰收過這一季的申報連結／提醒（只記 PersonID、季度、日期、人手／自動、結果，不記電郵）
+  UNAVAILABLE_INVITE_LOG: 'UnavailableInviteLog',
   // 第一百零五輪批次 RD 組：影音組合（每月一起服侍一次；組合週以外不做這組的崗位）——第一次使用時自動建立
   POST_TEAMS: 'PostTeams',
   // 第一百零五輪批次 RD 組：協唱（某人領詩的主日，他的協唱不擔任其他崗位）——協唱不在職事表顯示
@@ -462,6 +464,15 @@ const COLUMNS = {
     LEVEL: 'Level',
     NOTES: 'Notes',
     ACTIVE: 'Active'
+  },
+  // 第一百零九輪批次 SD 組
+  UNAVAILABLE_INVITE_LOG: {
+    QUARTER_ID: 'QuarterID',
+    PERSON_ID: 'PersonID',
+    SENT_DATE: 'SentDate',
+    KIND: 'Kind',
+    MODE: 'Mode',
+    RESULT: 'Result'
   },
   // 第一百零五輪批次 RB 組
   UNAVAILABLE_REPLIES: {

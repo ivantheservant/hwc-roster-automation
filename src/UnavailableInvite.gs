@@ -16,6 +16,90 @@
 const UNAVAILABLE_INVITE_TEMPLATE_ID = 'TPL_UNAVAILABLE_INVITE_TC';
 const UNAVAILABLE_INVITE_AUDIT_ACTION = 'UNAVAILABLE_INVITE_SENT';
 
+/* ═════════════════════════════════════════════════════════════════════
+ * 第一百零九輪批次 SD 組：逐人記錄誰收過這一季的申報連結（UnavailableInviteLog）
+ *   之前 AuditLog 一律寫「SENT」——幹事人手只寄兩三個人、甚至全部寄失敗，自動的 G−14 邀請整季都不會寄，
+ *   而 G−3 提醒卻寄給沒有收過邀請的人。現在：
+ *   ・每一次寄申報連結／提醒，逐人記一行（PersonID、季度、日期、INVITE／REMIND、MANUAL／AUTO、SENT／DRY_RUN／FAILED）
+ *   ・G−14 自動邀請＝預設收件人減去已經收過的人；一個都不用寄才算做過
+ *   ・全部失敗不算做過：翌日再試（同一日不重試），最多 3 日；第一次失敗通知幹事一次；部分失敗翌日只補失敗的人
+ *   ・G−3 提醒只寄給真正收過邀請而仍未回覆的人
+ *   ・舊紀錄相容：這一季只有 AuditLog、沒有逐人紀錄（第一百零九輪之前的測試季度）⇒ 照舊當作做過
+ * ═════════════════════════════════════════════════════════════════════ */
+
+const UNAVAILABLE_INVITE_LOG_TITLES_TC = ['季度', 'PersonID', '日期', '種類（INVITE＝申報連結　REMIND＝提醒）', '人手／自動', '結果'];
+const UNAVAILABLE_INVITE_RETRY_DAYS = 3;
+const UNAVAILABLE_INVITE_FAIL_NOTIFY_ACTION = 'UNAVAILABLE_INVITE_FAIL_NOTIFIED';
+
+/** @returns {string[]} 第 2 行機器鍵 */
+function unavailableInviteLogKeys_() {
+  const L = COLUMNS.UNAVAILABLE_INVITE_LOG;
+  return [L.QUARTER_ID, L.PERSON_ID, L.SENT_DATE, L.KIND, L.MODE, L.RESULT];
+}
+
+/** 第一次使用時建立（〔補建設定及範本〕亦會建立）。@returns {{sheet: Object, created: boolean}} */
+function ensureUnavailableInviteLogSheet_() {
+  return ensureKeyedSheet_(SHEETS.UNAVAILABLE_INVITE_LOG, UNAVAILABLE_INVITE_LOG_TITLES_TC, unavailableInviteLogKeys_());
+}
+
+/**
+ * 逐人加紀錄。寫不到只寫 log（不可以令已經寄出的信變成「失敗」）。
+ * @param {Object[]} rows [{quarterId, personId, date, kind, mode, result}]
+ * @returns {void}
+ */
+function appendUnavailableInviteLog_(rows) {
+  if (!rows || rows.length === 0) return;
+  try {
+    const sheet = ensureUnavailableInviteLogSheet_().sheet;
+    const values = rows.map(function (r) { return [r.quarterId, r.personId, r.date, r.kind, r.mode, r.result]; });
+    sheet.getRange(Math.max(sheet.getLastRow(), 2) + 1, 1, values.length, values[0].length).setValues(values);
+  } catch (err) {
+    log_('WARN', '申報連結逐人紀錄寫不到：' + err.message);
+  }
+}
+
+/**
+ * 這一季的逐人紀錄。工作表未建立 ⇒ 空。
+ * @param {string} quarterId
+ * @returns {Object[]} [{personId, date, kind, mode, result}]
+ */
+function readUnavailableInviteLog_(quarterId) {
+  const L = COLUMNS.UNAVAILABLE_INVITE_LOG;
+  if (!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.UNAVAILABLE_INVITE_LOG)) return [];
+  return readSheet_(SHEETS.UNAVAILABLE_INVITE_LOG).filter(function (r) {
+    return String(r[L.QUARTER_ID] || '').trim() === quarterId;
+  }).map(function (r) {
+    const d = r[L.SENT_DATE];
+    return { personId: String(r[L.PERSON_ID] || '').trim(),
+      date: d && typeof d.getTime === 'function' ? toDateString_(d, DEFAULTS.TIMEZONE) : String(d || '').slice(0, 10),
+      kind: String(r[L.KIND] || '').toUpperCase(), mode: String(r[L.MODE] || '').toUpperCase(), result: String(r[L.RESULT] || '').toUpperCase() };
+  });
+}
+
+/**
+ * 整理逐人紀錄。**純函式。** DRY_RUN 的模擬紀錄只在仍然是 DRY_RUN 時算收過（上線之後會真正寄一次）。
+ * @param {Object[]} rows readUnavailableInviteLog_()
+ * @param {string} kind INVITE／REMIND
+ * @param {boolean} dryNow 現在是不是 DRY_RUN
+ * @param {string} today yyyy-MM-dd
+ * @returns {{received: Object.<string, boolean>, receivedCount: number, autoFailDays: string[], triedAutoToday: boolean, hasRows: boolean}}
+ */
+function summariseUnavailableInviteLog_(rows, kind, dryNow, today) {
+  const received = {};
+  const failDays = {};
+  let triedToday = false;
+  let has = false;
+  (rows || []).forEach(function (r) {
+    if (r.kind !== kind) return;
+    has = true;
+    if (r.result === 'SENT' || (dryNow && r.result === 'DRY_RUN')) received[r.personId] = true;
+    if (r.mode === 'AUTO' && r.result === 'FAILED') failDays[r.date] = true;
+    if (r.mode === 'AUTO' && r.date === today) triedToday = true;
+  });
+  return { received: received, receivedCount: Object.keys(received).length,
+    autoFailDays: Object.keys(failDays).sort(), triedAutoToday: triedToday, hasRows: has };
+}
+
 /** 預設範本（EmailTemplates 沒有這一行時用；「補齊 Email 範本」會加入）。 */
 function unavailableInviteTemplateDefault_() {
   return EMAIL_TEMPLATE_SEEDS.filter(function (t) { return t.templateId === UNAVAILABLE_INVITE_TEMPLATE_ID; })[0];
@@ -189,6 +273,11 @@ function sendUnavailableInvites_(quarterId, resolvedWho, opts) {
   let sent = 0;
   let simulated = 0;
   const failed = [];
+  // 第一百零九輪批次 SD 組：逐人紀錄
+  const logRows = [];
+  const kind = o.auditAction === UNAVAILABLE_REMIND_AUDIT_ACTION ? 'REMIND' : 'INVITE';
+  const mode = o.mode === 'AUTO' ? 'AUTO' : 'MANUAL';
+  const logOne = function (personId, result) { logRows.push({ quarterId: quarterId, personId: personId, date: today, kind: kind, mode: mode, result: result }); };
   who.recipients.forEach(function (r) {
     const placeholders = {
       QuarterLabel: buildQuarterLabel_(quarterId), QuarterID: quarterId,
@@ -198,20 +287,24 @@ function sendUnavailableInvites_(quarterId, resolvedWho, opts) {
     const subject = prefix + applyPlaceholders_(tpl.subject, placeholders, r, '');
     const html = applyPlaceholders_(tpl.bodyHtml, placeholders, r, '');
     const plain = applyPlaceholders_(tpl.bodyPlain, placeholders, r, '');
-    if (dryRun) { simulated++; return; }
+    if (dryRun) { simulated++; logOne(r.personId, 'DRY_RUN'); return; }
     try {
       sendRealEmail_({ email: r.email, displayName: r.displayName }, subject, html, plain, context, null, null);
       sent++;
+      logOne(r.personId, 'SENT');
     } catch (err) {
       failed.push({ name: r.displayName, error: err.message });
+      logOne(r.personId, 'FAILED');
     }
   });
+  appendUnavailableInviteLog_(logRows);
   writeAuditLog_({
     action: o.auditAction || UNAVAILABLE_INVITE_AUDIT_ACTION,
     targetSheet: SHEETS.QUARTERS,
     targetKey: quarterId,
     oldValue: '',
-    newValue: (o.mode === 'AUTO' ? 'AUTO' : 'MANUAL') + '|' + today + '|' + (dryRun ? 'DRY_RUN' : 'SENT'),
+    // 第一百零九輪批次 SD 組：一封都寄不出 ⇒ FAILED（不算做過）
+    newValue: mode + '|' + today + '|' + (dryRun ? 'DRY_RUN' : (sent > 0 ? 'SENT' : 'FAILED')),
     source: o.source || 'apiUnavailableInviteSend',
     notes: (dryRun ? '模擬 ' + simulated : '寄出 ' + sent) + ' 封' + (o.noteLabel || '申報邀請') + '（截止日 ' + (dates.deadline || '未定') + '）'
       + (failed.length ? '；失敗 ' + failed.length + ' 封：' + failed.map(function (f) { return f.name; }).join('、') : '')

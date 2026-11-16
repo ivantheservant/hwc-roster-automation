@@ -59,12 +59,13 @@ console.log('\n=== RG2：〔補建設定及範本〕建立工作表 ===');
   const sc = scene();
   const g = sc.gas;
   const plan = g.apiPlanSeedConfigAndTemplates();
-  check('★★★★★★ 比對列出未建立的 PostTeams、WorshipBackingSingers', plan.sheetsMissing.join() === 'PostTeams,WorshipBackingSingers', JSON.stringify(plan.sheetsMissing));
+  check('★★★★★★ 比對列出未建立的 PostTeams、WorshipBackingSingers', plan.sheetsMissing.join() === 'PostTeams,WorshipBackingSingers,UnavailableInviteLog', JSON.stringify(plan.sheetsMissing));
   const created = g.ensureRuleDataSheets_();
   check('★★★★★★ 建立兩張工作表，第 2 行是欄名', created.join() === 'PostTeams,WorshipBackingSingers'
     && sc.ss.getSheetByName('PostTeams').getRange(2, 1, 1, 7).getValues()[0].join() === 'TeamID,PersonID,PostIDs,PerMonth,OutsideTeamLevel,Notes,Active'
     && sc.ss.getSheetByName('WorshipBackingSingers').getRange(2, 1, 1, 6).getValues()[0].join() === 'LeaderPersonID,SingerPersonID,SingerName,Level,Notes,Active');
   sc.ss.getSheetByName('PostTeams').getRange(3, 1, 1, 3).setValues([['AV', 'P9701', 'SOUND']]);
+  g.ensureUnavailableInviteLogSheet_();   // 第一百零九輪批次 SD 組：〔補建設定及範本〕亦建立申報連結逐人紀錄
   check('★★★★★ 再執行一次：不再建立、不改內容（可重複執行）', g.ensureRuleDataSheets_().length === 0
     && sc.ss.getSheetByName('PostTeams').getRange(3, 1, 1, 3).getValues()[0].join() === 'AV,P9701,SOUND'
     && g.apiPlanSeedConfigAndTemplates().sheetsMissing.length === 0);

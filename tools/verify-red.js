@@ -13966,6 +13966,78 @@ const MUTATIONS = [
     find: "    if (d && d.priorWeeksNote) summary.appendChild(",
     replace: "    if (false) summary.appendChild(",
     tests: ["tests/round109_sb_prior_weeks.test.js"]
+  },
+  {
+    id: "sd-no-subtract",
+    why: "G−14 自動邀請不減去已經收過的人",
+    file: "src/UnavailableSchedule.gs",
+    find: "audience.recipients.filter(function (r) { return !inv.received[r.personId]; })",
+    replace: "audience.recipients.slice()",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-fail-as-sent",
+    why: "全部寄不出仍然寫 SENT（當作做過）",
+    file: "src/UnavailableInvite.gs",
+    find: "(dryRun ? 'DRY_RUN' : (sent > 0 ? 'SENT' : 'FAILED'))",
+    replace: "(dryRun ? 'DRY_RUN' : 'SENT')",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-no-retry-limit",
+    why: "寄不出時無限次重試",
+    file: "src/UnavailableSchedule.gs",
+    find: "  const retryLimit = inv.autoFailDays.length >= UNAVAILABLE_INVITE_RETRY_DAYS;",
+    replace: "  const retryLimit = false;",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-retry-same-day",
+    why: "同一日重複再試",
+    file: "src/UnavailableSchedule.gs",
+    find: " && !retryLimit && !inv.triedAutoToday) {",
+    replace: " && !retryLimit) {",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-no-fail-notify",
+    why: "寄不出時沒有通知幹事",
+    file: "src/UnavailableSchedule.gs",
+    find: "    if (!r.dryRun && r.failed.length > 0) notifyUnavailableInviteFailureOnce_(",
+    replace: "    if (false) notifyUnavailableInviteFailureOnce_(",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-remind-all",
+    why: "G−3 提醒寄給沒有收過邀請的人",
+    file: "src/UnavailableSchedule.gs",
+    find: "  if (receivedById) who.recipients = who.recipients.filter(",
+    replace: "  if (false) who.recipients = who.recipients.filter(",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-dry-counts-live",
+    why: "上線後仍把 DRY_RUN 模擬當作收過",
+    file: "src/UnavailableInvite.gs",
+    find: "    if (r.result === 'SENT' || (dryNow && r.result === 'DRY_RUN')) received[r.personId] = true;",
+    replace: "    if (r.result === 'SENT' || r.result === 'DRY_RUN') received[r.personId] = true;",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-no-legacy",
+    why: "舊紀錄（只有 AuditLog）被當作未寄，重寄",
+    file: "src/UnavailableSchedule.gs",
+    find: "  const legacyDone = !inv.hasRows && hasUnavailableScheduleRecord_(",
+    replace: "  const legacyDone = false && hasUnavailableScheduleRecord_(",
+    tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sd-no-log-write",
+    why: "沒有寫逐人紀錄",
+    file: "src/UnavailableInvite.gs",
+    find: "  appendUnavailableInviteLog_(logRows);\n",
+    replace: "",
+    tests: ["tests/round109_sd_invite_log.test.js"]
   }
 ];
 

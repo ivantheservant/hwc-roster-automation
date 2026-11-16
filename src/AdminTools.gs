@@ -266,7 +266,7 @@ function apiPlanSeedConfigAndTemplates() {
   const pid = planPersonIdNormalize_();
   // 第一百零五輪批次 RD 組：排表規則資料的工作表（PostTeams、WorshipBackingSingers）未建立的
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetsMissing = [SHEETS.POST_TEAMS, SHEETS.WORSHIP_BACKING_SINGERS].filter(function (n) { return !ss.getSheetByName(n); });
+  const sheetsMissing = [SHEETS.POST_TEAMS, SHEETS.WORSHIP_BACKING_SINGERS, SHEETS.UNAVAILABLE_INVITE_LOG].filter(function (n) { return !ss.getSheetByName(n); });
   return {
     sheetsMissing: sheetsMissing,
     personIdRenames: pid.renames.map(function (r) { return r.nameTC + '：' + r.fromId + ' → ' + r.toId + '（' + r.cells.length + ' 格）'; }),
@@ -293,6 +293,8 @@ function apiSeedConfigAndTemplates() {
     const npid = pid.renames.length ? applyPersonIdNormalize_(pid) : 0;
     // 第一百零五輪批次 RD 組：建立 PostTeams、WorshipBackingSingers（已有就只核對標題，不改內容）
     const sheetsCreated = ensureRuleDataSheets_();
+    // 第一百零九輪批次 SD 組：申報連結逐人紀錄
+    if (ensureUnavailableInviteLogSheet_().created) sheetsCreated.push(SHEETS.UNAVAILABLE_INVITE_LOG);
     if (nc > 0) reloadConfigCache_();
     writeAuditLog_({ action: 'CONFIG_TEMPLATES_SEEDED', targetSheet: SHEETS.CONFIG, targetKey: '',
       newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個' + (o.needed ? '、Posts.OutputOrder ' + no + ' 行' : '')

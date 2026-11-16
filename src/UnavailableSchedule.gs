@@ -305,20 +305,34 @@ function runUnavailableScheduleSteps_(quarterRow, today, config, isDryRun) {
   if (findLatestVersionNo_(quarterId) >= 0) return [row('UNAVAILABLE_SCHEDULE', 'SKIP', 'HAS_VERSION')];
   const s = computeUnavailableSchedule_(generateDate);
   const out = [];
-  const invited = hasUnavailableScheduleRecord_(UNAVAILABLE_INVITE_AUDIT_ACTION, quarterId);
+  // 第一百零九輪批次 SD 組：按逐人紀錄判斷「誰收過」；舊季度只有 AuditLog、沒有逐人紀錄 ⇒ 照舊當作做過
+  const dryNow = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
+  const inv = summariseUnavailableInviteLog_(readUnavailableInviteLog_(quarterId), 'INVITE', dryNow, today);
+  const legacyDone = !inv.hasRows && hasUnavailableScheduleRecord_(UNAVAILABLE_INVITE_AUDIT_ACTION, quarterId);
+  const inWindow = today >= s.inviteDate && today < s.deadline;
+  const audience = legacyDone || !inWindow ? null : resolveInviteAudience_(null, today);
+  const toInvite = audience ? audience.recipients.filter(function (r) { return !inv.received[r.personId]; }) : [];
+  let invitedNow = legacyDone || inv.receivedCount > 0;
 
-  // G−14：申報連結
-  if (today >= s.inviteDate && today < s.deadline && !invited) {
-    const r = sendUnavailableInvites_(quarterId, null, { mode: 'AUTO', source: 'dailyAutomationCheck_' });
-    out.push(row('UNAVAILABLE_INVITE', 'SENT', (r.dryRun ? '模擬 ' + r.simulated : '寄出 ' + r.sent) + ' 封申報連結（截止日 ' + s.deadline + '）'));
+  // G−14：申報連結（只寄給未收過的人；全部失敗翌日再試，最多 UNAVAILABLE_INVITE_RETRY_DAYS 日）
+  const retryLimit = inv.autoFailDays.length >= UNAVAILABLE_INVITE_RETRY_DAYS;
+  if (inWindow && toInvite.length > 0 && !retryLimit && !inv.triedAutoToday) {
+    const r = sendUnavailableInvites_(quarterId, { recipients: toInvite, noEmail: audience.noEmail, noLink: audience.noLink },
+      { mode: 'AUTO', source: 'dailyAutomationCheck_' });
+    if (r.dryRun ? r.simulated > 0 : r.sent > 0) invitedNow = true;
+    if (!r.dryRun && r.failed.length > 0) notifyUnavailableInviteFailureOnce_(quarterId, r, config, isDryRun);
+    out.push(row('UNAVAILABLE_INVITE', !r.dryRun && r.sent === 0 ? 'FAILED' : 'SENT',
+      (r.dryRun ? '模擬 ' + r.simulated : '寄出 ' + r.sent) + ' 封申報連結（未收過的 ' + toInvite.length + ' 位'
+        + (r.failed.length ? '；失敗 ' + r.failed.length + ' 位，翌日再試' : '') + '；截止日 ' + s.deadline + '）'));
   } else {
-    out.push(row('UNAVAILABLE_INVITE', 'SKIP', invited ? 'ALREADY_DONE' : (today < s.inviteDate ? 'NOT_DUE' : 'WINDOW_PASSED')));
+    out.push(row('UNAVAILABLE_INVITE', 'SKIP', legacyDone || (inWindow && toInvite.length === 0 && inv.receivedCount > 0) ? 'ALREADY_DONE'
+      : (today < s.inviteDate ? 'NOT_DUE' : (today >= s.deadline ? 'WINDOW_PASSED'
+        : (retryLimit ? 'RETRY_LIMIT' : (inv.triedAutoToday ? 'TRIED_TODAY' : 'NO_RECIPIENT'))))));
   }
-  const invitedNow = invited || out[0].outcome === 'SENT';
 
   // G−3：提醒未回覆的人
   if (invitedNow && today >= s.remindDate && today < s.deadline && !hasUnavailableScheduleRecord_(UNAVAILABLE_REMIND_AUDIT_ACTION, quarterId)) {
-    const r = sendUnavailableReminders_(quarterId, quarterRow, today, config);
+    const r = sendUnavailableReminders_(quarterId, quarterRow, today, config, legacyDone ? null : inv.received);
     out.push(row('UNAVAILABLE_REMIND', 'SENT', (r.dryRun ? '模擬 ' + r.simulated : '寄出 ' + r.sent) + ' 封提醒（未回覆 ' + r.unreplied + ' 位）'));
   } else {
     out.push(row('UNAVAILABLE_REMIND', 'SKIP', !invitedNow ? 'NOT_INVITED' : (today < s.remindDate ? 'NOT_DUE' : 'DONE_OR_PASSED')));
@@ -335,12 +349,38 @@ function runUnavailableScheduleSteps_(quarterRow, today, config, isDryRun) {
 }
 
 /**
+ * 第一百零九輪批次 SD 組：自動申報連結有寄不出的 ⇒ 第一次就通知幹事（MAIL_ADMIN_NOTIFY）一次，經寄信閘門（notifyAdmin_）。
+ * @param {string} quarterId
+ * @param {Object} result sendUnavailableInvites_() 的結果
+ * @param {Object} config readConfig_()
+ * @param {boolean} isDryRun
+ * @returns {void}
+ */
+function notifyUnavailableInviteFailureOnce_(quarterId, result, config, isDryRun) {
+  const A = COLUMNS.AUDIT_LOG;
+  const done = readSheet_(SHEETS.AUDIT_LOG).some(function (row) {
+    return row[A.ACTION] === UNAVAILABLE_INVITE_FAIL_NOTIFY_ACTION && String(row[A.TARGET_KEY] || '').trim() === quarterId;
+  });
+  if (done) return;
+  const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
+  notifyAdmin_(prefix + buildQuarterLabel_(quarterId) + ' 申報連結有 ' + result.failed.length + ' 封寄不出',
+    '自動寄出申報不能服侍日子連結時，有 ' + result.failed.length + ' 封寄不出（成功 ' + result.sent + ' 封）。\n'
+      + '系統會在翌日只補寄未收到的人（最多 ' + UNAVAILABLE_INVITE_RETRY_DAYS + ' 日）。如果一直寄不出，請核對這些人的電郵地址，'
+      + '或者用〔寄出／匯出申報不能服侍日子連結〕。',
+    String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || ''), isDryRun);
+  writeAuditLog_({ action: UNAVAILABLE_INVITE_FAIL_NOTIFY_ACTION, targetSheet: SHEETS.QUARTERS, targetKey: quarterId,
+    oldValue: '', newValue: '失敗 ' + result.failed.length + ' 封', source: 'dailyAutomationCheck_', notes: '' });
+}
+
+/**
  * G−3 提醒：只寄給收到邀請（開放範圍的預設收件人）而未有任何回覆的人。**會寄信**（DRY_RUN 只模擬）＋AuditLog。
  * @returns {{dryRun: boolean, sent: number, simulated: number, unreplied: number}}
  */
-function sendUnavailableReminders_(quarterId, quarterRow, today, config) {
+function sendUnavailableReminders_(quarterId, quarterRow, today, config, receivedById) {
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
   const who = resolveInviteAudience_(null, today);
+  // 第一百零九輪批次 SD 組：只提醒真正收過邀請的人（舊季度沒有逐人紀錄 ⇒ receivedById 為 null，照舊）
+  if (receivedById) who.recipients = who.recipients.filter(function (r) { return !!receivedById[r.personId]; });
   const start = toDateString_(quarterRow[COLUMNS.QUARTERS.START_DATE], timezone);
   const end = toDateString_(quarterRow[COLUMNS.QUARTERS.END_DATE], timezone);
   const unreplied = pickUnrepliedInvitees_(who.recipients, readUnavailableSubmissions_(timezone), start, end,
