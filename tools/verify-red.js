@@ -13934,6 +13934,38 @@ const MUTATIONS = [
     find: "    if (shouldStopForSendBudget_(startedAt, loopStartedAt, outcomes.length, Date.now(), budgetMs)) break;",
     replace: "",
     tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sb-no-gap-filter",
+    why: "不核對是否緊接這一季（隔季的主日當上一週）",
+    file: "src/Generator.gs",
+    find: "    return gap > 0 && gap <= maxGap;",
+    replace: "    return gap > 0;",
+    tests: ["tests/round109_sb_prior_weeks.test.js"]
+  },
+  {
+    id: "sb-no-note",
+    why: "資料不足時沒有提示",
+    file: "src/Generator.gs",
+    find: "  if (!info || !(info.carryOverWeeks > 0) || !info.short) return '';",
+    replace: "  return '';",
+    tests: ["tests/round109_sb_prior_weeks.test.js"]
+  },
+  {
+    id: "sb-ctx-old-func",
+    why: "生成 context 不用新的基準函式",
+    file: "src/Generator.gs",
+    find: "    priorWeeks: priorInfo.weeks,\n",
+    replace: "    priorWeeks: readPriorWeeks_(quarterStart, carryOverWeeks, timezone),\n",
+    tests: ["tests/round109_sb_prior_weeks.test.js"]
+  },
+  {
+    id: "sb-no-dash-note",
+    why: "「這一季還要做的」沒有提示",
+    file: "src/ui/ScriptZone2.html",
+    find: "    if (d && d.priorWeeksNote) summary.appendChild(",
+    replace: "    if (false) summary.appendChild(",
+    tests: ["tests/round109_sb_prior_weeks.test.js"]
   }
 ];
 

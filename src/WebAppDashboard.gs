@@ -765,6 +765,8 @@ function buildDashboardState_(quarterId) {
     staffing: staffing,
     preseasonStatus: preseasonStatus,
     pendingSubmissions: pendingSubmissions,
+    // 第一百零九輪批次 SB 組：還未生成時，系統內找不到緊接的上一季職事表 ⇒「這一季還要做的」一句
+    priorWeeksNote: versionExists ? '' : computePriorWeeksNoteForQuarter_(quarterId),
     // 第九十一輪批次 RA 組：畫面上「人手填寫的崗位（…）」的名稱（Posts.AutoGenerate=FALSE）
     manualPostNames: readManualFillPostNamesSafe_(),
     quarterId: quarterId,

@@ -36,6 +36,8 @@ function buildGeneratorContext_(quarterId) {
 
   const carryOverWeeks = Number(config[CONFIG_KEYS.CARRY_OVER_WEEKS]) || 0;
   const quarterStart = toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone);
+  const priorInfo = readPriorWeeksInfo_(quarterStart, carryOverWeeks, timezone,
+    serviceDates.length > 0 ? serviceDates[0].serviceDate : quarterStart);
 
   const rules = readRules_();
   const eligibility = readEligibility_();
@@ -75,7 +77,9 @@ function buildGeneratorContext_(quarterId) {
     preAssignments: readPreAssignments_(quarterId, timezone),
     // 第九十輪批次 QB 組：詩班名單用 Posts 哪一行（SEMI_CHOIR_SUNDAY）
     choirGroupPostId: readChoirGroupPostId_(),
-    priorWeeks: readPriorWeeks_(quarterStart, carryOverWeeks, timezone),
+    // 第一百零九輪批次 SB 組：只用緊接這一季第一個主日的上一季主日（見 readPriorWeeksInfo_()）
+    priorWeeks: priorInfo.weeks,
+    priorWeeksNote: describePriorWeeksGap_(priorInfo),
     existingAssignments: readQuarterAssignments_(quarterId, timezone),
     quotaByPerson: computePersonQuotas_(eligibility, peopleById, serviceDates, posts, rules, maxPerQuarterDefault),
     maxPerQuarterDefault: maxPerQuarterDefault,
@@ -246,8 +250,29 @@ function findQuarter_(quarterId) {
  * @param {string} timezone 時區
  * @returns {Array<Object.<string, string[]>>} 由舊到新排列，每個元素為 {postId: [personId...]}
  */
-function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
+function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone, firstServiceDate) {
   if (carryOverWeeks <= 0) return [];
+  return readPriorWeeksInfo_(quarterStartDate, carryOverWeeks, timezone, firstServiceDate).weeks;
+}
+
+/**
+ * 第一百零九輪批次 SB 組：跨季「上一週」基準——**只用緊接這一季的主日。**
+ *
+ * 之前取「季度開始日之前、有登記版本」的全部主日，排序後取最後 N 個，沒有核對是否緊接這一季。
+ * 上一季不在系統（例如人手排而未匯入）⇒ 會靜靜用更早的主日當「上一週」：應該擋的連續兩週擋不到，
+ * 不相關的人反而受影響。現在只接受距離這一季第一個主日不超過 `CARRY_OVER_WEEKS × 7 ＋ 6` 日的主日
+ * （某一週因合堂而沒有資料屬正常，所以用日數判斷，不要求逐週連續）。
+ * 〔生成〕、〔請系統幫我調整〕、儲存檢查都經 `buildGeneratorContext_()` 用這一支。
+ *
+ * @param {string} quarterStartDate 季度開始日 yyyy-MM-dd
+ * @param {number} carryOverWeeks CARRY_OVER_WEEKS
+ * @param {string} timezone 時區
+ * @param {string=} firstServiceDate 這一季第一個主日（缺 ⇒ 用季度開始日）
+ * @returns {{weeks: Array<Object.<string, string[]>>, dates: string[], latestDate: string, carryOverWeeks: number, short: boolean}}
+ */
+function readPriorWeeksInfo_(quarterStartDate, carryOverWeeks, timezone, firstServiceDate) {
+  const empty = { weeks: [], dates: [], latestDate: '', carryOverWeeks: carryOverWeeks, short: carryOverWeeks > 0 };
+  if (!(carryOverWeeks > 0)) return { weeks: [], dates: [], latestDate: '', carryOverWeeks: 0, short: false };
 
   // ⚠️⚠️ 第六十三輪批次 I 組：**只用 `RosterVersions` 有登記嘅版本。**
   //
@@ -264,7 +289,7 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
     return registered[registeredVersionKey_(
       row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID], row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO])] === true;
   });
-  if (rows.length === 0) return [];
+  if (rows.length === 0) return empty;
 
   // 每個主日只保留最大版本號的紀錄
   const maxVersionByDate = {};
@@ -289,7 +314,51 @@ function readPriorWeeks_(quarterStartDate, carryOverWeeks, timezone) {
   });
 
   const sortedDates = Object.keys(byDate).sort();
-  return sortedDates.slice(-carryOverWeeks).map(function (d) { return byDate[d]; });
+  const anchor = firstServiceDate || quarterStartDate;
+  const maxGap = carryOverWeeks * 7 + 6;
+  const near = sortedDates.filter(function (d) {
+    const gap = daysBetween_(d, anchor);
+    return gap > 0 && gap <= maxGap;
+  });
+  const used = near.slice(-carryOverWeeks);
+  return {
+    weeks: used.map(function (d) { return byDate[d]; }), dates: used,
+    latestDate: sortedDates.length ? sortedDates[sortedDates.length - 1] : '',
+    carryOverWeeks: carryOverWeeks, short: used.length < carryOverWeeks
+  };
+}
+
+/**
+ * 第一百零九輪批次 SB 組：上一季資料不足時的提示（生成確認窗、完成窗、「這一季還要做的」同一句）。**純函式。**
+ * @param {{carryOverWeeks: number, short: boolean, latestDate: string}} info readPriorWeeksInfo_() 的結果
+ * @returns {string} 不用提示 ⇒ 空字串
+ */
+function describePriorWeeksGap_(info) {
+  if (!info || !(info.carryOverWeeks > 0) || !info.short) return '';
+  return '系統內找不到上一季最後 ' + info.carryOverWeeks + ' 週的職事表'
+    + (info.latestDate ? '（最近一個有資料的主日是 ' + info.latestDate + '）' : '（系統內沒有更早的職事表）')
+    + '。這一季頭一兩週不會核對『同一崗位連續兩週』。如果上一季是人手排的，請先匯入。';
+}
+
+/**
+ * 第一百零九輪批次 SB 組：某一季的提示（不用建立整個生成 context）。讀不到 ⇒ 空字串（提示不可以變成阻擋）。
+ * @param {string} quarterId
+ * @returns {string}
+ */
+function computePriorWeeksNoteForQuarter_(quarterId) {
+  try {
+    const config = readConfig_();
+    const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
+    const quarter = findQuarter_(quarterId);
+    if (!quarter) return '';
+    const quarterStart = toDateString_(quarter[COLUMNS.QUARTERS.START_DATE], timezone);
+    const dates = readServiceDatesNormalized_(quarterId, timezone);
+    return describePriorWeeksGap_(readPriorWeeksInfo_(quarterStart, Number(config[CONFIG_KEYS.CARRY_OVER_WEEKS]) || 0, timezone,
+      dates.length > 0 ? dates[0].serviceDate : quarterStart));
+  } catch (err) {
+    log_('WARN', '算不到上一季資料提示：' + err.message);
+    return '';
+  }
 }
 
 /**

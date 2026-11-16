@@ -136,6 +136,8 @@
         ? make('div', { text: '・不會寄出職事表；只會通知那幾位申請人（事奉人員申報已確認）', className: 'vio-row' })
         : make('div', { text: '・不會寄出任何電郵', className: 'vio-row' })
     ]);
+    // 第一百零九輪批次 SB 組：上一季資料不足（不擋生成）
+    if (plan.priorWeeksNote) facts.appendChild(make('div', { text: plan.priorWeeksNote, className: 'warn-head' }));
     if (plan.pendingAutoConfirmText) {
       facts.appendChild(make('div', { text: plan.pendingAutoConfirmText, className: 'warn-head' }));
     }
@@ -193,6 +195,8 @@
       }),
       // 第九十四輪批次 UD 組：生成前自動確認了的事奉人員申報
       res.autoConfirmMessage ? make('div', { text: res.autoConfirmMessage, className: 'lines' }) : null,
+      // 第一百零九輪批次 SB 組
+      res.priorWeeksNote ? make('div', { text: res.priorWeeksNote, className: 'warn-head' }) : null,
       make('div', {
         text: res.serviceDateCount + ' 個主日、' + res.postCount + ' 個崗位'
           + (res.genuineGapCount > 0 ? '、有 ' + res.genuineGapCount + ' 格未能安排' : ''),
