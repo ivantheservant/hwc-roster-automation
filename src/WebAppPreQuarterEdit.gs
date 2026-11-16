@@ -147,7 +147,7 @@ function apiSaveSpecialSunday(payload) {
   const updates = {};
   updates[S.SERVICE_DATE] = String(p.serviceDate || '');
   updates[S.TYPE] = String(p.type || '');
-  updates[S.TITLE] = String(p.title || '');
+  updates[S.TITLE] = sheetSafeText_(String(p.title || ''));   // 第一百零九輪批次 SC 組：不可以變成公式
   updates[S.SKIP_POST_IDS] = (p.skipPostIds || []).join(',');
   updates[S.TRANSLATION_REQUIRED] = p.translationRequired ? BOOLEAN_TEXT.TRUE : BOOLEAN_TEXT.FALSE;
   // ⚠️ 方向：勾咗＝空白，未勾＝FALSE。見檔頭。
@@ -197,7 +197,7 @@ function apiAddSpecialSunday(payload) {
   updates[S.QUARTER_ID] = quarterId;
   updates[S.SERVICE_DATE] = String(p.serviceDate || '');
   updates[S.TYPE] = String(p.type || '');
-  updates[S.TITLE] = String(p.title || '');
+  updates[S.TITLE] = sheetSafeText_(String(p.title || ''));   // 第一百零九輪批次 SC 組：不可以變成公式
   updates[S.SKIP_POST_IDS] = (p.skipPostIds || []).join(',');
   updates[S.TRANSLATION_REQUIRED] = p.translationRequired ? BOOLEAN_TEXT.TRUE : BOOLEAN_TEXT.FALSE;
   updates[S.CONFIRMED] = toConfirmedCellValue_(p.confirmedChecked === true);

@@ -950,7 +950,7 @@ function writeWeekTitles_(quarterId, titleChanges, timezone, source) {
     if (!change) return;
     const defaultText = describeServiceType_(row[tCol], specialTitles[d]);
     const newTitle = (change.toTitle === '' || change.toTitle === defaultText) ? '' : change.toTitle;
-    sheet.getRange(i + 3, titleCol).setValue(newTitle);
+    sheet.getRange(i + 3, titleCol).setValue(sheetSafeText_(newTitle));   // 第一百零九輪批次 SC 組：不可以變成公式
     written++;
     writeAuditLog_({
       action: 'WEEK_TITLE_CHANGED',

@@ -676,7 +676,7 @@ function apiSavePersonPostWeightBatch(changes, options) {
     record[W.PERSON_ID] = a.personId;
     record[W.POST_ID] = a.postId;
     record[W.ADJUST] = a.adjust;
-    record[W.REASON] = a.reason;
+    record[W.REASON] = sheetSafeText_(a.reason);   // 第一百零九輪批次 SC 組：不可以變成公式
     record[W.EFFECTIVE_FROM] = a.effectiveFrom;
     record[W.EFFECTIVE_TO] = a.effectiveTo;
     record[W.ACTIVE] = BOOLEAN_TEXT.TRUE;

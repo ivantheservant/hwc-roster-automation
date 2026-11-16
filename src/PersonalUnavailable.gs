@@ -485,7 +485,7 @@ function submitPersonalUnavailable_(person, dates, reason, anchorQuarterId, post
     rec[S.SUBMISSION_ID] = idBase + '-' + (i + 1);
     rec[S.PERSON_ID] = person.personId;
     rec[S.SERVICE_DATE] = d;
-    rec[S.REASON] = cleanReason;
+    rec[S.REASON] = sheetSafeText_(cleanReason);   // 第一百零九輪批次 SC 組：不可以變成公式
     rec[S.SUBMITTED_AT] = stamp;
     rec[S.STATUS] = UNAVAILABLE_SUBMISSION_STATUS.PENDING;
     rec[S.LATE] = late;
@@ -685,7 +685,7 @@ function decideUnavailableSubmissions_(submissionIds, decision, decidedBy) {
       // 第九十四輪批次 UA 組：只限某些崗位 ⇒ 用現有「只限某些崗位」的值（POSTS）＋PostIDs
       rec[U.APPLIES_TO] = s.postIds.length > 0 ? 'POSTS' : UNAVAILABLE_VALUES.APPLIES_TO_ALL;
       rec[U.POST_IDS] = s.postIds.join(',');
-      rec[U.REASON] = s.reason;
+      rec[U.REASON] = sheetSafeText_(s.reason);   // 第一百零九輪批次 SC 組
       rec[U.SOURCE] = UNAVAILABLE_SOURCE_PERSONAL_LINK;
       rec[U.STATUS] = UNAVAILABLE_VALUES.STATUS_ACTIVE;
       rec[U.CREATED_AT] = stamp;

@@ -152,7 +152,7 @@ console.log('\n=== EG3：出席系統連結 ===');
   check('★★★★★ 二、找不到編號：P9703；三、重複：00006；四、出席系統沒有電郵：P9705',
     p.notFound.length === 1 && p.notFound[0].personId === 'P9703' && p.duplicates.length === 1 && p.noEmailInHwcas.length === 1 && p.noEmailInHwcas[0].personId === 'P9705', JSON.stringify(p.counts));
   const r = gas.apiHwcasLinkSelected([{ personId: 'P9704', memberNo: '00009' }]);
-  check('★★★★★★ 連結：只寫 MemberNo，名字不變，之後即時更新電郵', r.ok && r.linked.length === 1 && rowOf('P9704')[M.MEMBER_NO] === "'00009"
+  check('★★★★★★ 連結：只寫 MemberNo，名字不變，之後即時更新電郵', r.ok && r.linked.length === 1 && rowOf('P9704')[M.MEMBER_NO] === '00009'
     && rowOf('P9704')[M.NAME_TC] === NAME('P9704') && rowOf('P9704')[M.EMAIL] === 'p9704-h@example.invalid' && r.sync && r.sync.ok, JSON.stringify([r, rowOf('P9704')]));
   const bad = gas.apiHwcasLinkSelected([{ personId: 'P9703', memberNo: '00001' }]);
   check('★★★★★ 編號已經係另一位嘅 ⇒ 略過並講明', bad.ok && bad.linked.length === 0 && bad.skipped.length === 1 && /已經/.test(bad.skipped[0].reason), JSON.stringify(bad));
@@ -172,7 +172,7 @@ console.log('\n=== EG4：加入名單（喺出席系統揀人）===');
 
   const added = gas.apiAddPersonFromHwcas({ nameTC: '新來的人（表上寫法）', memberNo: '00008', postId: 'CHAIR', alsoEligible: true });
   check('★★★★★★ 揀一位 ⇒ 新行：NameTC＝職事表寫法、MemberNo、電郵由出席系統來（HWCAS）', added.ok && rowOf(added.personId)
-    && rowOf(added.personId)[M.NAME_TC] === '新來的人（表上寫法）' && rowOf(added.personId)[M.MEMBER_NO] === "'00008"
+    && rowOf(added.personId)[M.NAME_TC] === '新來的人（表上寫法）' && rowOf(added.personId)[M.MEMBER_NO] === '00008'
     && rowOf(added.personId)[M.EMAIL] === 'newcomer@example.invalid' && rowOf(added.personId)[M.EMAIL_SOURCE] === 'HWCAS', JSON.stringify([added, rowOf(added.personId)]));
   check('★★★★★ 順帶加入崗位名單', added.eligibilityAdded === 1, JSON.stringify(added));
   const dup = gas.apiAddPersonFromHwcas({ nameTC: '假甲另一個寫法', memberNo: '00001', postId: 'CHAIR' });

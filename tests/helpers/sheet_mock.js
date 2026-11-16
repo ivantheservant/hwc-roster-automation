@@ -204,7 +204,11 @@ class MockSheet {
     }
   }
 
-  _setCell(r, c, v) { this._values[r + ',' + c] = v; }
+  _setCell(r, c, v) {
+    // 第一百零九輪批次 SC 組：真實試算表把最前的單引號當作「純文字」記號，不存入儲存格
+    if (typeof v === 'string' && v.charAt(0) === "'") v = v.slice(1);
+    this._values[r + ',' + c] = v;
+  }
   _getCell(r, c) { const v = this._values[r + ',' + c]; return v === undefined ? '' : v; }
   _setFormat(r, c, key, v) {
     const k = r + ',' + c;

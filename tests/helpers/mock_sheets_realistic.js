@@ -250,6 +250,8 @@ class RealisticMockSheet {
   }
 
   _setCell(r, c, v) {
+    // 第一百零九輪批次 SC 組：真實試算表把最前的單引號當作「純文字」記號，不存入儲存格
+    if (typeof v === 'string' && v.charAt(0) === "'") v = v.slice(1);
     // ⚠️ 呢一步就係整個 mock 嘅重點：模擬 Google 試算表寫入時嘅自動正規化。
     // 見 `looksLikeSheetsAutoDate_()` 嘅收窄準則。
     const auto = looksLikeSheetsAutoDate_(v);

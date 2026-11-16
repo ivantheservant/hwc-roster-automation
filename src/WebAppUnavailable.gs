@@ -342,7 +342,7 @@ function apiSaveUnavailable(payload) {
   newValues[U.DATE_TO] = to.dateStr;
   newValues[U.APPLIES_TO] = appliesTo;
   newValues[U.POST_IDS] = postIds.join(',');
-  newValues[U.REASON] = String(p.reason || '').trim();
+  newValues[U.REASON] = sheetSafeText_(String(p.reason || '').trim());   // 第一百零九輪批次 SC 組：不可以變成公式
   newValues[U.STATUS] = p.active === false
     ? UNAVAILABLE_VALUES.STATUS_CANCELLED
     : UNAVAILABLE_VALUES.STATUS_ACTIVE;

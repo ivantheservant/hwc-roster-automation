@@ -731,10 +731,11 @@ function writeAuditLog_(entry) {
   record[C.ACTION] = entry.action || '';
   record[C.TARGET_SHEET] = entry.targetSheet || '';
   record[C.TARGET_KEY] = entry.targetKey || '';
-  record[C.OLD_VALUE] = entry.oldValue || '';
-  record[C.NEW_VALUE] = entry.newValue || '';
+  // 第一百零九輪批次 SC 組：舊值、新值、備註可能含外來或幹事輸入的文字，不可以變成公式
+  record[C.OLD_VALUE] = sheetSafeText_(entry.oldValue || '');
+  record[C.NEW_VALUE] = sheetSafeText_(entry.newValue || '');
   record[C.SOURCE] = entry.source || '';
-  record[C.NOTES] = entry.notes || '';
+  record[C.NOTES] = sheetSafeText_(entry.notes || '');
 
   const row = headers.map(function (h) { return record[h] === undefined ? '' : record[h]; });
   const targetRow = sheet.getLastRow() + 1;
@@ -1145,4 +1146,17 @@ function resendHasExplicitRecipients_(sendOptions) {
   const o = sendOptions || {};
   if (String(o.sendMode || '').toUpperCase() === SEND_MODE.ALL) return true;
   return (o.pickedKeys || []).some(function (k) { return String(k || '').trim() !== ''; });
+}
+
+/**
+ * 第一百零九輪批次 SC 組：外來或幹事輸入的自由文字寫入試算表之前用。
+ * 去掉前置空白、Tab、換行之後以 =、+、-、@ 開頭 ⇒ 在最前加一個單引號（'），試算表一定當作純文字；
+ * 單引號不會存入儲存格，getValues() 讀回來與原文一樣。其他值（數字、日期、布林、普通文字）原樣傳回。**純函式。**
+ * @param {*} value
+ * @returns {*}
+ */
+function sheetSafeText_(value) {
+  if (typeof value !== 'string') return value;
+  const first = value.trimStart().charAt(0);
+  return first !== '' && '=+-@'.indexOf(first) !== -1 ? "'" + value : value;
 }

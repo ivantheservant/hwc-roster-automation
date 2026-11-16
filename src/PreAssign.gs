@@ -250,7 +250,7 @@ function savePreAssignments_locked_(quarterId, cells) {
     record[P.POST_ID] = c.postId;
     record[P.SLOT_INDEX] = c.slotIndex;
     record[P.PERSON_ID] = c.personId;
-    record[P.FREE_TEXT] = freeText;
+    record[P.FREE_TEXT] = sheetSafeText_(freeText);   // 第一百零九輪批次 SC 組：不可以變成公式
     record[P.UPDATED_AT] = now;
     record[P.UPDATED_BY] = actor;
     if (old) {

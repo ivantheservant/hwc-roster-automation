@@ -226,11 +226,11 @@ function apiAddExclusion(payload) {
   record[X.EXCLUSION_ID] = exclusionId;
   record[X.PERSON_ID] = v.personId;
   record[X.POST_ID] = v.postId;
-  record[X.REASON] = v.reason;
+  record[X.REASON] = sheetSafeText_(v.reason);   // 第一百零九輪批次 SC 組：不可以變成公式
   record[X.EFFECTIVE_FROM] = v.effectiveFrom;
   record[X.EFFECTIVE_TO] = v.effectiveTo;
   record[X.ACTIVE] = true;
-  record[X.NOTES] = String(p.notes || '').trim();
+  record[X.NOTES] = sheetSafeText_(String(p.notes || '').trim());
 
   appendRowFields_(opened.sheet, opened.headers, record);
   const nameIndex = buildPersonNameIndex_();
@@ -288,11 +288,11 @@ function apiSaveExclusion(payload) {
   const newValues = {};
   newValues[X.PERSON_ID] = v.personId;
   newValues[X.POST_ID] = v.postId;
-  newValues[X.REASON] = v.reason;
+  newValues[X.REASON] = sheetSafeText_(v.reason);   // 第一百零九輪批次 SC 組：不可以變成公式
   newValues[X.EFFECTIVE_FROM] = v.effectiveFrom;
   newValues[X.EFFECTIVE_TO] = v.effectiveTo;
   newValues[X.ACTIVE] = p.active !== false;
-  newValues[X.NOTES] = String(p.notes || '').trim();
+  newValues[X.NOTES] = sheetSafeText_(String(p.notes || '').trim());
 
   writeRowFields_(opened.sheet, opened.headers, found.sheetRow, newValues);
   writeZone3Audit_({

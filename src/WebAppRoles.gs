@@ -235,7 +235,7 @@ function apiAddRole(payload) {
   record[R.EFFECTIVE_FROM] = v.effectiveFrom;
   record[R.EFFECTIVE_TO] = v.effectiveTo;
   record[R.ACTIVE] = true;
-  record[R.NOTES] = String(p.notes || '').trim();
+  record[R.NOTES] = sheetSafeText_(String(p.notes || '').trim());   // 第一百零九輪批次 SC 組：不可以變成公式
 
   appendRowFields_(opened.sheet, opened.headers, record);
   const nameIndex = buildPersonNameIndex_();
@@ -304,7 +304,7 @@ function apiSaveRole(payload) {
   newValues[R.EFFECTIVE_FROM] = v.effectiveFrom;
   newValues[R.EFFECTIVE_TO] = v.effectiveTo;
   newValues[R.ACTIVE] = p.active !== false;
-  newValues[R.NOTES] = String(p.notes || '').trim();
+  newValues[R.NOTES] = sheetSafeText_(String(p.notes || '').trim());   // 第一百零九輪批次 SC 組：不可以變成公式
 
   writeRowFields_(opened.sheet, opened.headers, found.sheetRow, newValues);
   writeZone3Audit_({

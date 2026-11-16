@@ -14038,6 +14038,54 @@ const MUTATIONS = [
     find: "  appendUnavailableInviteLog_(logRows);\n",
     replace: "",
     tests: ["tests/round109_sd_invite_log.test.js"]
+  },
+  {
+    id: "sc-no-prefix",
+    why: "以 = 開頭的文字照原樣寫入（變成公式）",
+    file: "src/Utils.gs",
+    find: "  return first !== '' && '=+-@'.indexOf(first) !== -1 ? \"'\" + value : value;",
+    replace: "  return value;",
+    tests: ["tests/round109_sc_formula_text.test.js"]
+  },
+  {
+    id: "sc-no-leading-space",
+    why: "前面有空白或換行就不處理",
+    file: "src/Utils.gs",
+    find: "  const first = value.trimStart().charAt(0);",
+    replace: "  const first = value.charAt(0);",
+    tests: ["tests/round109_sc_formula_text.test.js"]
+  },
+  {
+    id: "sc-submit-raw",
+    why: "個人連結提交的原因沒有經過共用函式",
+    file: "src/PersonalUnavailable.gs",
+    find: "    rec[S.REASON] = sheetSafeText_(cleanReason);",
+    replace: "    rec[S.REASON] = cleanReason;",
+    tests: ["tests/round109_sc_formula_text.test.js"]
+  },
+  {
+    id: "sc-copy-raw",
+    why: "抄到 Unavailable 的原因沒有經過共用函式",
+    file: "src/PersonalUnavailable.gs",
+    find: "      rec[U.REASON] = sheetSafeText_(s.reason);",
+    replace: "      rec[U.REASON] = s.reason;",
+    tests: ["tests/round109_sc_formula_text.test.js"]
+  },
+  {
+    id: "sc-audit-raw",
+    why: "AuditLog 備註沒有經過共用函式",
+    file: "src/Utils.gs",
+    find: "  record[C.NOTES] = sheetSafeText_(entry.notes || '');",
+    replace: "  record[C.NOTES] = entry.notes || '';",
+    tests: ["tests/round109_sc_formula_text.test.js"]
+  },
+  {
+    id: "sc-preassign-raw",
+    why: "「其他（自己輸入）」名字沒有經過共用函式",
+    file: "src/PreAssign.gs",
+    find: "    record[P.FREE_TEXT] = sheetSafeText_(freeText);",
+    replace: "    record[P.FREE_TEXT] = freeText;",
+    tests: ["tests/round109_sc_formula_text.test.js"]
   }
 ];
 
