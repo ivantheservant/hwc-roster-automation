@@ -252,6 +252,8 @@ function executeStep2_(quarterId, sendOptions) {
   // 第九十一輪批次 RD 組：上一行已經確保最新 ⇒ 告訴 sendStage_() 不用再做一次
   const result = sendStage_(quarterId, versionNo, MAIL_STAGES.REVIEW, sendOptions, true);
   result.publicLinkRepublished = fresh.republished;
+  // 第一百零九輪批次 SA 組：未寄完 ⇒ 不改 Stage，由幹事介面接着寄
+  if (result.incomplete) return result;
 
   // 第二十三輪批次階段 E1（決定 D2）：**一律設為 `REVIEW_SENT`，唔係「前進一格」。**
   // 由 `REQUESTS_APPLIED` 撳掣 2 係第二輪審閱，Stage 要退回 `REVIEW_SENT`
@@ -570,6 +572,8 @@ function executeStep4Send_(quarterId, sendOptions) {
   const fresh = ensurePublicLinkFreshBeforeSend_(quarterId);
   const result = sendStage_(quarterId, versionNo, MAIL_STAGES.OFFICIAL, sendOptions, true);
   result.publicLinkRepublished = fresh.republished;
+  // 第一百零九輪批次 SA 組：未寄完 ⇒ 不推進 Stage、不做副本；全部寄完那一段才做
+  if (result.incomplete) return result;
 
   // 第十九輪批次階段 C2：**寄送結果唔理想就唔前進 Stage。**
   //

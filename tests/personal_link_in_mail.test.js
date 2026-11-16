@@ -147,7 +147,8 @@ console.log('\n=== E：接上寄信路徑 ===');
     /_noPersonalLinkCount = \(context\._noPersonalLinkCount \|\| 0\) \+ 1/.test(bare), '');
   check('★★★★★ 而且 `sendStage_()` 會把個數字報返出去'
     + '——靜靜略過嘅話，嗰幾位收到嘅信會比其他人少一段而冇人知',
-    /noPersonalLinkCount: context\._noPersonalLinkCount \|\| 0/.test(mailer), '');
+    // 第一百零九輪批次 SA 組：分段寄出 ⇒ 每一段記下 context._noPersonalLinkCount，完成時各段加起來報出去
+    /noPersonalLink: context\._noPersonalLinkCount \|\| 0/.test(mailer) && /noPersonalLinkCount: segments\.reduce/.test(mailer), '');
 }
 
 console.log('\n=== E：token 對照表一次過讀好 ===');

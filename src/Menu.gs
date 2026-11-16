@@ -1416,6 +1416,8 @@ function runSendStage_() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('處理中，請稍候…', '職事表系統', 60);
     const result = sendStage_(target.quarterId, target.versionNo, stage);
+    // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 不可以靜靜停，講明餘下幾位、去哪裏接着寄
+    if (result.incomplete) { ui.alert('寄送（測試模式）（未寄完）', describeIncompleteSendForMenu_(result), ui.ButtonSet.OK); return; }
 
     const durationSec = result.durationMs / 1000;
     const lines = [

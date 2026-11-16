@@ -609,7 +609,10 @@ const COLUMNS = {
     // 第四十一輪批次 H 組：轉寄測試地址生效嗰陣，**兩樣都要記**。
     // 只記其中一樣嘅話，日後查「嗰個人到底收唔收到」係查唔到嘅。
     INTENDED_EMAIL: 'IntendedEmail',
-    DELIVERED_TO: 'DeliveredTo'
+    DELIVERED_TO: 'DeliveredTo',
+    // 第一百零九輪批次 SA 組：同一次寄出（可能分幾段寄完）的批次鍵；續寄時用它找出這一批已處理的人。
+    // 舊行留空；缺欄時第一次分段寄出自動補欄（只在最後加欄）。
+    SEND_BATCH_ID: 'SendBatchID'
   },
   FINE_TUNE_PROPOSALS: {
     PROPOSAL_ID: 'ProposalID',
@@ -1509,6 +1512,8 @@ const CONFIG_KEYS = {
   // 階段 G 新增：sendStage_()／sendResendStage_() 每處理幾個收件人就把 SendLog
   // 寫入一次，縮小 Apps Script 逾時時遺失紀錄的範圍，見 Mailer.gs 的說明。
   SEND_LOG_FLUSH_BATCH_SIZE: 'SEND_LOG_FLUSH_BATCH_SIZE',
+  // 第一百零九輪批次 SA 組：寄出路徑每一段的時間預算（毫秒）；超過就停，寫好 SendLog，由幹事介面接着寄（見 SendBatch.gs）
+  SEND_TIME_BUDGET_MS: 'SEND_TIME_BUDGET_MS',
   PDF_REGENERATE_IF_EXISTS: 'PDF_REGENERATE_IF_EXISTS',
   GRID_NOT_APPLICABLE_LABEL: 'GRID_NOT_APPLICABLE_LABEL',
   GRID_PENDING_LABEL: 'GRID_PENDING_LABEL',
@@ -1953,6 +1958,7 @@ const DEFAULTS = {
   PDF_EXPORT_PACING_MS: 1500,
   PDF_BATCH_SIZE: 25,
   SEND_LOG_FLUSH_BATCH_SIZE: 15,
+  SEND_TIME_BUDGET_MS: 240000,
   GRID_NOT_APPLICABLE_LABEL: '—',
   GRID_PENDING_LABEL: GRID_LABELS.PENDING,
   GRID_SPECIAL_SKIP_LABEL: '特殊主日',

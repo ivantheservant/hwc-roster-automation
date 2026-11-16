@@ -282,7 +282,9 @@ function apiStep2Confirm_locked_(quarterId, sendOptions) {
   syncPeopleFromHwcasBeforeSend_();
   // 第二十六輪批次階段 A2-2：冇公開連結就唔好寄。見 assertPublicLinkReady_()。
   assertPublicLinkReady_(quarterId);
+  setSendBatchEntry_('apiStep2Confirm');   // 第一百零九輪批次 SA 組
   const result = executeStep2_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
+  if (result.incomplete) return result;   // 未寄完：幹事介面接着寄（〔繼續寄出〕）
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, failed: result.failed, errorPdf: result.errorPdf,
@@ -498,7 +500,9 @@ function apiStep4Confirm_locked_(quarterId, sendOptions) {
   logSendWithUnsavedRelease_(quarterId, '正式發出給全體', guard);
   // 第七十七輪批次 EG 組：寄之前由出席系統更新電郵
   syncPeopleFromHwcasBeforeSend_();
+  setSendBatchEntry_('apiStep4Confirm');   // 第一百零九輪批次 SA 組
   const result = executeStep4Send_(quarterId, withUnsavedReleaseNote_(sendOptions, guard));
+  if (result.incomplete) return result;   // 未寄完：不推進 Stage，幹事介面接着寄
   return {
     isDryRun: result.isDryRun, sent: result.sent, dryRun: result.dryRun,
     skipped: result.skipped, unchanged: result.unchanged,
@@ -789,8 +793,10 @@ function apiStep5SendConfirm_locked_(quarterId, releaseText, sendOptions) {
   const zeroAssignmentPeople = listZeroAssignmentResendTargets_(
     changed.changedList, targetIds, changed.context);
 
+  setSendBatchEntry_('apiStep5SendConfirm', { releaseText: releaseText || '' });   // 第一百零九輪批次 SA 組
   const sendResult = executeStep5Send_(quarterId, changed.versionNo, changed.changedList,
     withUnsavedReleaseNote_(sendOptions, guard));
+  if (sendResult.incomplete) return sendResult;
   return {
     blocked: false,
     isDryRun: sendResult.isDryRun, sent: sendResult.sent, dryRun: sendResult.dryRun,

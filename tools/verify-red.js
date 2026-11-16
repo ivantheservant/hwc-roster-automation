@@ -13846,6 +13846,94 @@ const MUTATIONS = [
     find: "報告由符合崗位身分要求的人擔任，",
     replace: "報告由堂委或執事擔任，",
     tests: ["tests/round108_qb_role_wording.test.js"]
+  },
+  {
+    id: "sa-no-budget-stop",
+    why: "寄出沒有時間預算（一直寄到超時）",
+    file: "src/SendBatch.gs",
+    find: "  return elapsed + avg > budgetMs;",
+    replace: "  return false;",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-resume-resends-all",
+    why: "續寄重新寄給這一批已寄的人",
+    file: "src/Mailer.gs",
+    find: "  const todo = allRecipients.filter(function (r) { return !batch.processed[sendRecipientKey_(r)]; });",
+    replace: "  const todo = allRecipients.slice();",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-stage-adv-early",
+    why: "正式發出未寄完就推進 Stage",
+    file: "src/FiveStageCore.gs",
+    find: "  // 第一百零九輪批次 SA 組：未寄完 ⇒ 不推進 Stage、不做副本；全部寄完那一段才做\n  if (result.incomplete) return result;\n",
+    replace: "",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-no-version-check",
+    why: "續寄時版本變了照寄",
+    file: "src/SendBatch.gs",
+    find: "    if (Number(p.versionNo) !== Number(versionNo)) {",
+    replace: "    if (false) {",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-no-list-check",
+    why: "續寄時名單變了照寄",
+    file: "src/SendBatch.gs",
+    find: "    if (!cmp.same) {",
+    replace: "    if (false) {",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-no-pending-block",
+    why: "未寄完期間可以另開一批（重複寄）",
+    file: "src/SendBatch.gs",
+    find: "  if (existing) {",
+    replace: "  if (false) {",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-never-incomplete",
+    why: "到了預算停下來卻當作寄完（寫 AuditLog、推進 Stage）",
+    file: "src/Mailer.gs",
+    find: "  if (remaining > 0) return buildIncompleteSendResult_(batch, outcomes.length, remaining, isDryRun, startedAt);",
+    replace: "",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-makeup-not-seen",
+    why: "中途補寄過的人，續寄時再寄一次",
+    file: "src/SendBatch.gs",
+    find: "    if (!isNaN(at) && at >= Number(record.startedAtMs || 0) - 60000) out[key] = true;",
+    replace: "",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-trigger-resume",
+    why: "續寄可以由自動排程觸發",
+    file: "src/SendBatch.gs",
+    find: "    if (typeof AUTOMATION_TRIGGER_CONTEXT_ACTIVE !== 'undefined' && AUTOMATION_TRIGGER_CONTEXT_ACTIVE) {",
+    replace: "    if (false) {",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-ui-no-continue",
+    why: "介面收到未寄完不接着寄",
+    file: "src/ui/Script.html",
+    find: "    while (r && r.incomplete && r.batchId) {",
+    replace: "    while (false) {",
+    tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "sa-resend-no-budget",
+    why: "變動的人沒有時間預算",
+    file: "src/ResendFlow.gs",
+    find: "    if (shouldStopForSendBudget_(startedAt, loopStartedAt, outcomes.length, Date.now(), budgetMs)) break;",
+    replace: "",
+    tests: ["tests/round109_sa_send_budget.test.js"]
   }
 ];
 

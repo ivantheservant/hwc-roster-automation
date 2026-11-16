@@ -1248,7 +1248,7 @@
         bodyNodes: nodes,
         confirmLabel: '確定寄出',
         onConfirm: () => runAction('寄送中，請稍候', async () => {
-          const r = await callServerMutating('apiStep2Confirm', currentQuarterId, sendOpts);
+          const r = await callSendUntilDone('apiStep2Confirm', currentQuarterId, sendOpts);
           await renderReviewDone(r);
         })
       });
@@ -1679,7 +1679,7 @@
         confirmLabel: '確定發出',
         danger: true,
         onConfirm: (typed) => runAction('寄送中，請稍候', async () => {
-          const r = await callServerMutating('apiStep4Confirm', currentQuarterId, sendOpts);
+          const r = await callSendUntilDone('apiStep4Confirm', currentQuarterId, sendOpts);
           renderOfficialDone(r);
         })
       });
@@ -2045,7 +2045,7 @@
       return;
     }
 
-    const result = await callServerMutating('apiStep5SendConfirm', currentQuarterId, releaseText, sendOpts);
+    const result = await callSendUntilDone('apiStep5SendConfirm', currentQuarterId, releaseText, sendOpts);
     // 第七十三輪批次 BA 組：防衛（伺服器不會再因硬規則違反回 `blocked`）
     if (result.blocked) {
       showErrorModal('改動後重發', new Error('系統沒有執行這一步，尚未寄出任何電郵。請重新整理再試一次。'));

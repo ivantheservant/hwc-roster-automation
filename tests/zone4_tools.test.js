@@ -241,7 +241,9 @@ console.log('\n=== F 呼叫層：讀寫分流 ===');
     'apiMakeupSendExecute', 'apiRepublishPublicLink'].forEach(function (n) {
     check('★★★★★ ' + n + ' 唔喺白名單，而且用 callServerMutating()',
       readOnly.indexOf(n) === -1
-      && zone4.indexOf("callServerMutating('" + n + "'") !== -1);
+      // 第一百零九輪批次 SA 組：補寄經 callMakeupUntilDone()（內部用 callServerMutating，時間預算用完會再呼叫）
+      && (zone4.indexOf("callServerMutating('" + n + "'") !== -1
+        || (n === 'apiMakeupSendExecute' && /callMakeupUntilDone\(/.test(zone4))));
   });
 }
 

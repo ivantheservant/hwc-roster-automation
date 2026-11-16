@@ -355,13 +355,19 @@ function executeMakeupSend_(plan) {
   const flushBatchSize = Number(getConfig_(CONFIG_KEYS.SEND_LOG_FLUSH_BATCH_SIZE, DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE))
     || DEFAULTS.SEND_LOG_FLUSH_BATCH_SIZE;
   let flushedCount = 0;
-  targets.forEach(function (recipient) {
-    outcomes.push(deliverOne_(recipient, template, context, isDryRun));
+  // 第一百零九輪批次 SA 組：時間預算。補寄每次都按 SendLog 重新計算誰未收到，
+  // 所以停下來之後再按一次（幹事介面會自動再呼叫）只會寄給餘下的人，不用批次紀錄。
+  const budgetMs = sendTimeBudgetMs_();
+  const segStartedAt = Date.now();
+  for (let i = 0; i < targets.length; i++) {
+    if (shouldStopForSendBudget_(segStartedAt, segStartedAt, outcomes.length, Date.now(), budgetMs)) break;
+    outcomes.push(deliverOne_(targets[i], template, context, isDryRun));
     if (outcomes.length - flushedCount >= flushBatchSize) {
       writeSendLogRows_(outcomes.slice(flushedCount), context);
       flushedCount = outcomes.length;
     }
-  });
+  }
+  const makeupRemaining = targets.length - outcomes.length;
   if (flushedCount < outcomes.length) writeSendLogRows_(outcomes.slice(flushedCount), context);
 
   writeAuditLog_({
@@ -377,6 +383,7 @@ function executeMakeupSend_(plan) {
       + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
       + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
       + '；Stage 完全沒有改動'
+      + (makeupRemaining > 0 ? '；時間預算已用完，還有 ' + makeupRemaining + ' 位未寄（再按一次只寄餘下的人）' : '')
   });
 
   return {
@@ -387,7 +394,9 @@ function executeMakeupSend_(plan) {
     errorPdf: countStatus_(outcomes, MAIL_STATUS.ERROR_PDF),
     errorPdfMissing: countStatus_(outcomes, MAIL_STATUS.ERROR_PDF_MISSING),
     isDryRun: isDryRun,
-    attempted: outcomes.length
+    attempted: outcomes.length,
+    remaining: makeupRemaining,
+    incomplete: makeupRemaining > 0
   };
 }
 

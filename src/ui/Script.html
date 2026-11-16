@@ -549,6 +549,36 @@
   }
 
   /**
+   * 第一百零九輪批次 SA 組：寄出（審閱本、給所有人、變動的人）未寄完 ⇒ 自動接着寄，直至寄完。
+   * 每一段由伺服器按時間預算停下；等候牌寫「已處理 30／58 位，繼續寄出……」。不用再打字確認。
+   * 回傳最後一段（全部寄完那一段）的結果，數字是各段合計。
+   */
+  async function callSendUntilDone(fnName, ...args) {
+    let r = await callServerMutating(fnName, ...args);
+    while (r && r.incomplete && r.batchId) {
+      busyShow('繼續寄出', r.message || ('已處理 ' + r.processedTotal + '／' + r.total + ' 位，繼續寄出……'));
+      r = await callServerMutating('apiContinueSendBatch', r.batchId);
+    }
+    return r;
+  }
+
+  /** 第一百零九輪批次 SA 組：補寄沒有批次紀錄——時間預算用完就用同一支再呼叫（只寄餘下的人），合計各段人數。 */
+  async function callMakeupUntilDone(...args) {
+    let r = await callServerMutating('apiMakeupSendExecute', ...args);
+    const sum = { sent: 0, dryRun: 0, skipped: 0, failed: 0, errorPdf: 0, errorPdfMissing: 0, attempted: 0 };
+    const add = (x) => Object.keys(sum).forEach((k) => { sum[k] += Number((x && x[k]) || 0); });
+    add(r);
+    while (r && r.ok && r.incomplete) {
+      busyShow('繼續補寄', '已處理 ' + sum.attempted + ' 位，還有 ' + r.remaining + ' 位，繼續寄出……');
+      const next = await callServerMutating('apiMakeupSendExecute', ...args);
+      if (!next || !next.ok) break;
+      add(next);
+      r = next;
+    }
+    return r && r.ok ? Object.assign({}, r, sum, { incomplete: false }) : r;
+  }
+
+  /**
    * 第九十五輪批次 VB／VC 組：這幾支只在「真的改了」時才標記狀態過期。
    * 出席系統同步：更新了任何人（`updated > 0`）；建立未來季度：建立了季度。
    */
@@ -2657,6 +2687,39 @@
     reapplyBusyLockIfNeeded_();
   }
 
+  /**
+   * 第一百零九輪批次 SA 組：狀態卡的「上一次寄出未完成」。容器第一次用時建立（放在狀態文字下面）。
+   * @param {?Object} pb 伺服器 `describePendingSendBatch_()` 的結果
+   */
+  function renderPendingSendBatch_(pb) {
+    let box = el('statusSendBatch');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'statusSendBatch';
+      el('statusText').insertAdjacentElement('afterend', box);
+    }
+    clear(box);
+    if (!pb) { box.hidden = true; return; }
+    box.hidden = false;
+    box.appendChild(make('div', {
+      text: '上一次寄出未完成：還有 ' + pb.remaining + ' 位未寄（' + pb.quarterId + ' 第 ' + pb.versionNo + ' 版）。'
+        + '未寄完之前，第 3 步不可以另開一批寄出（否則會重複寄）。',
+      className: 'vio-row'
+    }));
+    box.appendChild(row([
+      button('繼續寄出', () => runAction('繼續寄出', async () => {
+        const r = await callSendUntilDone('apiContinueSendBatch', pb.batchId);
+        openModal('繼續寄出：完成', [para('已寄完餘下的人。'
+          + '　寄出 ' + (r.sent || 0) + '　模擬 ' + (r.dryRun || 0) + '　查無電郵 ' + (r.skipped || 0) + '　失敗 ' + (r.failed || 0)
+          + '（各段合計）')], [button('知道了', () => closeModalAndRefresh(), '')]);
+      }), ''),
+      button('不再繼續這一批', () => runAction('不再繼續這一批寄出', async () => {
+        const r = await callServerMutating('apiAbandonSendBatch', pb.batchId);
+        setStatus(r.message || '', !r.ok);
+      }), 'secondary')
+    ]));
+  }
+
   function renderTop(d) {
     el('statusCard').hidden = false;
     el('statusText').textContent = d.statusText || '';
@@ -2686,6 +2749,9 @@
     } else {
       linkBox.hidden = true;
     }
+
+    // 第一百零九輪批次 SA 組：上一次寄出未完成 ⇒「上一次寄出未完成：還有 N 位未寄」＋〔繼續寄出〕
+    renderPendingSendBatch_(d.pendingSendBatch);
 
     // 第七十七輪批次 EG 組：電郵由出席系統讀取——一行細字講幾時更新過；有人收唔到電郵就指去「出席系統連結」
     const hwcasBox = clear(el('statusHwcas'));

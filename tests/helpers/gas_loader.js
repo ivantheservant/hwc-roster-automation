@@ -169,7 +169,7 @@ function buildGasStubs_() {
 // 第九十八輪批次 YA／YB 組：`PreAssign.gs`（生成、調整、狀態卡讀預先安排）、`PreseasonChange.gs`（registerVersion_() 記基準、狀態卡）。
 const ALWAYS_LOADED = ['ArgShape.gs', 'SendWarnings.gs', 'EditableCopy.gs', 'EligibilityRoles.gs', 'StaffingCheck.gs', 'SameDayExclusive.gs', 'ChoirRule.gs', 'PostTeams.gs', 'PersonalUnavailable.gs', 'UnavailableSchedule.gs', 'ManualPosts.gs', 'MailRedirect.gs',
   'PreAssign.gs', 'PreseasonChange.gs', 'RolloutAudience.gs', 'SendAudience.gs', 'UnavailableInvite.gs', 'AdminTools.gs',
-  'RosterOutput.gs'];   // 第一百零二輪批次 OA 組：AdminTools.gs〔補建設定及範本〕會叫 planPostOutputOrderSeed_()   // 第一百零一輪批次 ZB／ZE 組：RolloutAudience.gs（寄信、個人連結頁都會叫）
+  'RosterOutput.gs', 'SendBatch.gs'];   // 第一百零九輪批次 SA 組：寄出路徑都會叫 SendBatch.gs   // 第一百零二輪批次 OA 組：AdminTools.gs〔補建設定及範本〕會叫 planPostOutputOrderSeed_()   // 第一百零一輪批次 ZB／ZE 組：RolloutAudience.gs（寄信、個人連結頁都會叫）
 
 function loadGasSource(files, overrides) {
   const requested = files || FILES_FOR_GENERATOR;

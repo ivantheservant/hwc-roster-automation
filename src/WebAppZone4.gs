@@ -572,7 +572,10 @@ function apiMakeupSendExecute_locked_(quarterId, stage) {
       // 49 位因為冇 PDF 而冇寄出，完成窗淨係出綠色。
       errorPdf: result.errorPdf,
       errorPdfMissing: result.errorPdfMissing,
-      attempted: result.attempted
+      attempted: result.attempted,
+      // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 幹事介面再呼叫一次（只寄餘下的人）
+      incomplete: !!result.incomplete,
+      remaining: result.remaining || 0
     };
   } catch (err) {
     // 第六十五輪批次 W 組：缺 PDF 被擋——訊息本身已經係三段式，唔好再包一層

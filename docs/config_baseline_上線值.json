@@ -649,6 +649,13 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "PDF_BATCH"
     },
+    "SEND_TIME_BUDGET_MS": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "240000",
+      "launchTargetValue": "240000",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "PDF_BATCH"
+    },
     "SEND_WEEKDAY_GUARD": {
       "source": "已核實的實際值",
       "currentValue": "NONE",

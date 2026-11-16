@@ -931,7 +931,7 @@
       ]),
       confirmLabel: '確定補寄',
       onConfirm: () => runAction('寄送中，請稍候', async () => {
-        const res = await callServerMutating('apiMakeupSendExecute', currentQuarterId, stage);
+        const res = await callMakeupUntilDone(currentQuarterId, stage);
         // 第六十五輪批次 W 組：後端都擋（預覽之後先至有人個 PDF 唔見咗／過期）
         if (!res.ok && res.pdfGapBlocked && res.pdfGaps) {
           openMakeupPdfGapBlock(stage, res.pdfGaps, plan.versionNo);

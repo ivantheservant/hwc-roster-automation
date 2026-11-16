@@ -795,6 +795,8 @@ function buildDashboardState_(quarterId) {
     // **唔可以靜靜生效**——佢最壞嘅失敗方式係「唔記得閂」，
     // 而嗰陣所有畫面同報告都會話一切正常。
     mailRedirectBadge: buildMailRedirectBadgeText_(),
+    // 第一百零九輪批次 SA 組：上一次寄出未寄完（狀態卡〔繼續寄出〕）
+    pendingSendBatch: (function () { try { return describePendingSendBatch_(quarterId); } catch (err) { return null; } })(),
     unsaved: unsaved,
     buttons: computeDashboardButtons_(facts),
     preQuarter: preQuarter,

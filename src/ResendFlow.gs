@@ -342,17 +342,15 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions, p
   const targetPersonIds = resolveResendTargetPersonIds_(
     context, decision, changedPersonIds, false);
 
-  targetPersonIds.slice().sort().forEach(function (personId) {
+  const personRecipients = targetPersonIds.slice().sort().map(function (personId) {
     const person = context.peopleById[personId];
-    const recipient = {
+    return {
       type: RECIPIENT_TYPE.PERSON,
       personId: personId,
       email: person ? person.email : '',
       displayName: person ? person.nameTC : personId,
       sendAs: SEND_AS.TO
     };
-    outcomes.push(deliverOne_(recipient, personTemplate, context, isDryRun));
-    maybeFlush_();
   });
 
   // ⚠️ 第四十六輪批次 A 組：`LIST` 嗰邊個池一樣要跟幹事嘅選擇。
@@ -364,45 +362,63 @@ function sendResendStage_(quarterId, versionNo, changedPersonIds, sendOptions, p
     resolveSendRecipientPool_(MAIL_STAGES.RESEND, context, decision)
       .filter(function (r) { return r.type === RECIPIENT_TYPE.LIST; }),
     decision);
-  listRecipients.forEach(function (recipient) {
-    outcomes.push(deliverOne_(recipient, listTemplate, context, isDryRun));
+
+  // 第一百零九輪批次 SA 組：時間預算及續寄（見 SendBatch.gs）。
+  // 續寄時，第一段已寄的人的 hash 已經更新，不會再出現在「有改動」名單——用「已處理」扣除後比較。
+  const allRecipients = personRecipients.concat(listRecipients);
+  const batch = beginSendBatch_(SEND_BATCH_KIND.RESEND, quarterId, versionNo, MAIL_STAGES.RESEND, allRecipients, sendOptions);
+  context.sendBatchId = batch.id;
+  const todo = allRecipients.filter(function (r) { return !batch.processed[sendRecipientKey_(r)]; });
+  const budgetMs = sendTimeBudgetMs_();
+  const loopStartedAt = Date.now();
+  for (let i = 0; i < todo.length; i++) {
+    if (shouldStopForSendBudget_(startedAt, loopStartedAt, outcomes.length, Date.now(), budgetMs)) break;
+    const r = todo[i];
+    outcomes.push(deliverOne_(r, r.type === RECIPIENT_TYPE.LIST ? listTemplate : personTemplate, context, isDryRun));
     maybeFlush_();
-  });
-
-  const noEmailPeople = outcomes
-    .filter(function (o) { return o.status === MAIL_STATUS.SKIPPED_NO_EMAIL; })
-    .map(function (o) { return o.displayName + '（' + o.personId + '）'; });
-
+  }
   if (flushedCount < outcomes.length) writeSendLogRows_(outcomes.slice(flushedCount), context);
+
+  const segRetries = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
+  const remaining = todo.length - outcomes.length;
+  const segments = finishSendSegment_(batch, { count: outcomes.length, ms: Date.now() - startedAt, retries: segRetries }, remaining);
+  if (remaining > 0) return buildIncompleteSendResult_(batch, outcomes.length, remaining, isDryRun, startedAt);
+
+  const sum = summariseSendBatchFromLog_(batch.id);
+  const n = function (st) { return sum.byStatus[st] || 0; };
+  const noEmailPeople = sum.noEmailPeople;
   if (noEmailPeople.length > 0) notifyAdminNoEmailIfEnabled_(noEmailPeople, context, isDryRun);   // 第一百零一輪批次 ZB 組：Config 開關
 
-  const retryCount = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
+  const retryCount = segments.reduce(function (s2, g) { return s2 + (g.retries || 0); }, 0);
 
   // 階段 F 新增：跟 sendStage_() 同一套批次記錄方式。
   writeAuditLog_({
     action: '寄送批次',
     targetSheet: SHEETS.SEND_LOG,
-    targetKey: 'SEND-' + compactTimestamp_(),
-    newValue: 'Stage=' + MAIL_STAGES.RESEND + '　收件人=' + outcomes.length
+    targetKey: batch.id,
+    newValue: 'Stage=' + MAIL_STAGES.RESEND + '　收件人=' + sum.total
       + '　模式=' + (isDryRun ? 'DRY_RUN（模擬）' : '正式寄出'),
     source: 'sendResendStage_',
-    notes: '成功=' + countStatus_(outcomes, MAIL_STATUS.SENT) + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
-      + '　查無電郵=' + countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
+    notes: '成功=' + n(MAIL_STATUS.SENT) + '　模擬=' + n(MAIL_STATUS.DRY_RUN)
+      + '　查無電郵=' + n(MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + n(MAIL_STATUS.FAILED)
       // 第四十輪批次 A 組：今次用咗咩選項（同 sendStage_() 一致）。
       + '　' + describeSendDecision_(context.sendDecision)
+      + '　' + describeSendSegments_(segments)
   });
 
   return {
-    sent: countStatus_(outcomes, MAIL_STATUS.SENT),
-    dryRun: countStatus_(outcomes, MAIL_STATUS.DRY_RUN),
-    skipped: countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL),
-    unchanged: countStatus_(outcomes, MAIL_STATUS.SKIPPED_UNCHANGED),
-    failed: countStatus_(outcomes, MAIL_STATUS.FAILED),
-    errorPdf: countStatus_(outcomes, MAIL_STATUS.ERROR_PDF),
-    errorPdfMissing: countStatus_(outcomes, MAIL_STATUS.ERROR_PDF_MISSING),
+    sent: n(MAIL_STATUS.SENT),
+    dryRun: n(MAIL_STATUS.DRY_RUN),
+    skipped: n(MAIL_STATUS.SKIPPED_NO_EMAIL),
+    unchanged: n(MAIL_STATUS.SKIPPED_UNCHANGED),
+    failed: n(MAIL_STATUS.FAILED),
+    errorPdf: n(MAIL_STATUS.ERROR_PDF),
+    errorPdfMissing: n(MAIL_STATUS.ERROR_PDF_MISSING),
     isDryRun: isDryRun,
     noEmailPeople: noEmailPeople,
     retryCount: retryCount,
+    batchId: batch.id,
+    segments: segments,
     durationMs: Date.now() - startedAt,
     changedCount: changedPersonIds.length,
     listRecipientCount: listRecipients.length

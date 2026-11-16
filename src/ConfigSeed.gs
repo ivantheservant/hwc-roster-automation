@@ -48,6 +48,15 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百零九輪批次 SA 組
+      key: CONFIG_KEYS.SEND_TIME_BUDGET_MS, type: CONFIG_TYPES.INT, group: 'PDF_BATCH',
+      defaultValue: String(DEFAULTS.SEND_TIME_BUDGET_MS),
+      description: '寄出（〔寄給堂委／執事〕〔給所有人〕〔變動的人〕〔補寄未收到的人〕）每一段最多用多少毫秒。'
+        + '時間快到就停下來，把已處理的寫入 SendLog，幹事介面會自動接着寄餘下的人（不會重複寄）。'
+        + 'Apps Script 每次最多 6 分鐘，預設 240000（4 分鐘），一般不用改。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, type: CONFIG_TYPES.BOOL, group: 'PDF_BATCH',
       defaultValue: 'FALSE',
       description: '「產生個人 PDF」是否強制重新產生已存在的同版本 PDF。'

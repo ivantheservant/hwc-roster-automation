@@ -464,6 +464,8 @@ function executeSeasonRehearsal_(quarterId) {
       const plan = planStep2_(quarterId);
       const sendLogBefore = countRehearsalSendLogRows_(quarterId);
       const result = executeStep2_(quarterId);
+      // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 這一步當失敗，講明去哪裏接着寄
+      if (result && result.incomplete) throw new Error(describeIncompleteSendForMenu_(result));
       return {
         recipientCount: plan.recipientCount,
         isDryRun: plan.isDryRun,
@@ -547,6 +549,8 @@ function executeSeasonRehearsal_(quarterId) {
       const preview = planStep4SendPreview_(quarterId, warn.versionNo);
       const sendLogBefore = countRehearsalSendLogRows_(quarterId);
       const result = executeStep4Send_(quarterId);
+      // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 這一步當失敗，講明去哪裏接着寄
+      if (result && result.incomplete) throw new Error(describeIncompleteSendForMenu_(result));
       return {
         versionNo: warn.versionNo,
         pendingCells: warn.pendingCells.length,

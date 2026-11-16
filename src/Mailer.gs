@@ -166,10 +166,18 @@ function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured)
   // 點解唔可以繼續淨用 `listRecipients_(stage, …)`：篩選係喺一個池入面做嘅。
   // 池仍然係「REVIEW 只有堂委地址」嘅話，幹事勾一個事奉人員，
   // 嗰個事奉人員根本唔喺池入面 ⇒ 勾咗都唔會收到，而畫面會話「已選 12 位」。
-  filterRecipientsByScope_(
+  const allRecipients = filterRecipientsByScope_(
     resolveSendRecipientPool_(stage, context, context.sendDecision),
-    context.sendDecision)
-    .forEach(function (recipient) {
+    context.sendDecision);
+  // 第一百零九輪批次 SA 組：時間預算及續寄（見 SendBatch.gs）。續寄只處理這一批還沒有紀錄的人。
+  const batch = beginSendBatch_(SEND_BATCH_KIND.STAGE, quarterId, versionNo, stage, allRecipients, sendOptions);
+  context.sendBatchId = batch.id;
+  const todo = allRecipients.filter(function (r) { return !batch.processed[sendRecipientKey_(r)]; });
+  const budgetMs = sendTimeBudgetMs_();
+  const loopStartedAt = Date.now();
+  for (let i = 0; i < todo.length; i++) {
+    if (shouldStopForSendBudget_(startedAt, loopStartedAt, outcomes.length, Date.now(), budgetMs)) break;
+    const recipient = todo[i];
     // 第九輪批次階段 C：LIST 收件人（堂委／教會辦公室名單）與 PERSON 收件人
     // （逐一事奉人員）用不同範本，見 resolveStageTemplates_() 的說明。
     const chosen = (recipient.type === RECIPIENT_TYPE.LIST && templates.list)
@@ -179,48 +187,59 @@ function sendStage_(quarterId, versionNo, stage, sendOptions, publicLinkEnsured)
       writeSendLogRows_(outcomes.slice(flushedCount), context);
       flushedCount = outcomes.length;
     }
-  });
-
-  const noEmailPeople = outcomes
-    .filter(function (o) { return o.status === MAIL_STATUS.SKIPPED_NO_EMAIL; })
-    .map(function (o) { return o.displayName + '（' + o.personId + '）'; });
-
+  }
   if (flushedCount < outcomes.length) writeSendLogRows_(outcomes.slice(flushedCount), context);
+
+  const segRetries = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
+  const remaining = todo.length - outcomes.length;
+  const segments = finishSendSegment_(batch,
+    { count: outcomes.length, ms: Date.now() - startedAt, retries: segRetries, noPersonalLink: context._noPersonalLinkCount || 0 },
+    remaining);
+  // 未寄完：不寫「寄送批次」、不通知、不推進 Stage（呼叫端見 incomplete 就停）
+  if (remaining > 0) return buildIncompleteSendResult_(batch, outcomes.length, remaining, isDryRun, startedAt);
+
+  // 全部寄完：數字一律用這一批在 SendLog 的合計（各段加起來）
+  const sum = summariseSendBatchFromLog_(batch.id);
+  const n = function (st) { return sum.byStatus[st] || 0; };
+  const noEmailPeople = sum.noEmailPeople;
   if (noEmailPeople.length > 0) notifyAdminNoEmailIfEnabled_(noEmailPeople, context, isDryRun);   // 第一百零一輪批次 ZB 組：Config 開關
 
-  const retryCount = outcomes.reduce(function (sum, o) { return sum + (o.retries || 0); }, 0);
+  const retryCount = segments.reduce(function (s2, g) { return s2 + (g.retries || 0); }, 0);
 
   // 階段 F 新增：每次寄送批次記一筆 AuditLog（批次 ID、收件人數、模式）。
-  // SendLog 本身沒有 BatchID 欄，這裡的批次 ID 只用於 AuditLog，不寫回 SendLog。
+  // 第一百零九輪批次 SA 組：批次 ID 同時寫入 SendLog 的 SendBatchID；寫明分了幾段、每段人數及秒數。
   writeAuditLog_({
     action: '寄送批次',
     targetSheet: SHEETS.SEND_LOG,
-    targetKey: 'SEND-' + compactTimestamp_(),
-    newValue: 'Stage=' + stage + '　收件人=' + outcomes.length
+    targetKey: batch.id,
+    newValue: 'Stage=' + stage + '　收件人=' + sum.total
       + '　模式=' + (isDryRun ? 'DRY_RUN（模擬）' : '正式寄出'),
     source: 'sendStage_',
-    notes: '成功=' + countStatus_(outcomes, MAIL_STATUS.SENT) + '　模擬=' + countStatus_(outcomes, MAIL_STATUS.DRY_RUN)
-      + '　查無電郵=' + countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + countStatus_(outcomes, MAIL_STATUS.FAILED)
+    notes: '成功=' + n(MAIL_STATUS.SENT) + '　模擬=' + n(MAIL_STATUS.DRY_RUN)
+      + '　查無電郵=' + n(MAIL_STATUS.SKIPPED_NO_EMAIL) + '　失敗=' + n(MAIL_STATUS.FAILED)
       // 第四十輪批次 A 組：今次用咗咩選項。SendLog 嗰欄可能唔存在，
       // 但呢度一定寫得入——唔記低就查唔到「點解嗰次冇附件」。
       + '　' + describeSendDecision_(context.sendDecision)
+      + '　' + describeSendSegments_(segments)
   });
 
   return {
-    sent: countStatus_(outcomes, MAIL_STATUS.SENT),
-    dryRun: countStatus_(outcomes, MAIL_STATUS.DRY_RUN),
-    skipped: countStatus_(outcomes, MAIL_STATUS.SKIPPED_NO_EMAIL),
-    unchanged: countStatus_(outcomes, MAIL_STATUS.SKIPPED_UNCHANGED),
-    failed: countStatus_(outcomes, MAIL_STATUS.FAILED),
-    errorPdf: countStatus_(outcomes, MAIL_STATUS.ERROR_PDF),
-    errorPdfMissing: countStatus_(outcomes, MAIL_STATUS.ERROR_PDF_MISSING),
+    sent: n(MAIL_STATUS.SENT),
+    dryRun: n(MAIL_STATUS.DRY_RUN),
+    skipped: n(MAIL_STATUS.SKIPPED_NO_EMAIL),
+    unchanged: n(MAIL_STATUS.SKIPPED_UNCHANGED),
+    failed: n(MAIL_STATUS.FAILED),
+    errorPdf: n(MAIL_STATUS.ERROR_PDF),
+    errorPdfMissing: n(MAIL_STATUS.ERROR_PDF_MISSING),
     isDryRun: isDryRun,
     noEmailPeople: noEmailPeople,
     retryCount: retryCount,
     // 第四十一輪批次 E 組：有幾多位攞唔到個人專屬連結（冇 token，
     // 或者 Config 冇填事奉人員部署嘅網址）。**一定要報出去**——
     // 靜靜略過嘅話，嗰幾位收到嘅信會比其他人少一段，而冇人知道。
-    noPersonalLinkCount: context._noPersonalLinkCount || 0,
+    noPersonalLinkCount: segments.reduce(function (s2, g) { return s2 + (g.noPersonalLink || 0); }, 0),
+    batchId: batch.id,
+    segments: segments,
     durationMs: Date.now() - startedAt
   };
 }
@@ -1523,6 +1542,8 @@ function writeSendLogRows_(outcomes, context) {
     // 日後查「嗰個人到底收唔收到」就查唔到。
     record[C.INTENDED_EMAIL] = o.intendedEmail === undefined ? o.email : o.intendedEmail;
     record[C.DELIVERED_TO] = o.deliveredTo === undefined ? o.email : o.deliveredTo;
+    // 第一百零九輪批次 SA 組：同一次寄出（可能分幾段）的批次鍵
+    record[C.SEND_BATCH_ID] = (context && context.sendBatchId) || '';
     return headers.map(function (h) { return record[h] === undefined ? '' : record[h]; });
   });
 

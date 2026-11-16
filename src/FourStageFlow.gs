@@ -161,6 +161,8 @@ function runFourStageStep2_locked_() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('處理中，請稍候…', '四階段流程', 60);
     const result = executeStep2_(quarterId);
+    // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 不可以靜靜停，講明餘下幾位、去哪裏接着寄
+    if (result.incomplete) { ui.alert('步驟 2：寄給堂委審閱（未寄完）', describeIncompleteSendForMenu_(result), ui.ButtonSet.OK); return; }
 
     ui.alert(
       '步驟 2：寄給堂委審閱（完成）',
@@ -606,6 +608,8 @@ function runFourStageStep4_locked_() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('寄送中，請稍候…', '四階段流程', 60);
     const result = executeStep4Send_(quarterId);
+    // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 不可以靜靜停，講明餘下幾位、去哪裏接着寄
+    if (result.incomplete) { ui.alert('步驟 4：正式發出（未寄完）', describeIncompleteSendForMenu_(result), ui.ButtonSet.OK); return; }
 
     ui.alert(
       result.advanced ? '步驟 4：正式發出（完成）' : '步驟 4：正式發出（未完成）',
@@ -906,6 +910,8 @@ function runFourStageStep5_locked_() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('寄送中，請稍候…', '步驟 5：改動後重發', 60);
     const sendResult = executeStep5Send_(quarterId, versionNo, changedList);
+    // 第一百零九輪批次 SA 組：時間預算用完 ⇒ 不可以靜靜停，講明餘下幾位、去哪裏接着寄
+    if (sendResult.incomplete) { ui.alert('步驟 5：改動後重發（未寄完）', describeIncompleteSendForMenu_(sendResult), ui.ButtonSet.OK); return; }
 
     ui.alert(
       '步驟 5：改動後重發（完成）',

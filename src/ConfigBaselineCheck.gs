@@ -153,6 +153,7 @@ function getConfigBaselineSnapshot_() {
       SELF_TEST_QUARTER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       SEND_HOUR_LOCAL: { launchTargetValue: '9', source: '已核實的實際值' },
       SEND_LOG_FLUSH_BATCH_SIZE: { launchTargetValue: '15', source: '已核實的實際值' },
+      SEND_TIME_BUDGET_MS: { launchTargetValue: '240000', source: '程式碼預設值（試算表現時實際值未核實）' },
       SEND_WEEKDAY_GUARD: { launchTargetValue: 'NONE', source: '已核實的實際值' },
       SOFT_METRIC_COUNT_TOLERANCE_RATIO: { launchTargetValue: '0.2', source: '程式碼預設值（試算表現時實際值未核實）' },
       SOFT_METRIC_POST_USAGE_MIN_RATIO: { launchTargetValue: '0.5', source: '程式碼預設值（試算表現時實際值未核實）' },
