@@ -14182,6 +14182,102 @@ const MUTATIONS = [
     find: "      text: text + '。收件人本人不會收到；每封信的主旨開頭會寫明原收件人。',",
     replace: "      text: text,",
     tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "se-skip-inactive-person",
+    why: "名單上已停用的人當作沒有問題",
+    file: "src/RuleExtrasCheck.gs",
+    find: "    if (!people[id].active) { add(",
+    replace: "    if (false) { add(",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-no-elig-check",
+    why: "不核對成員是否在該崗位的事奉人員名單",
+    file: "src/RuleExtrasCheck.gs",
+    find: "    if (eligible[personId + ':' + postId]) return true;",
+    replace: "    return true;",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-no-post-check",
+    why: "崗位不存在也當作沒有問題",
+    file: "src/RuleExtrasCheck.gs",
+    find: "    if (!posts[id]) { add(source, row, field, RULE_EXTRAS_ISSUE.POST_MISSING",
+    replace: "    if (false) { add(source, row, field, RULE_EXTRAS_ISSUE.POST_MISSING",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-permonth-any",
+    why: "每月幾次任何值都接受",
+    file: "src/RuleExtrasCheck.gs",
+    find: "      if (!(Math.floor(n) === n && n >= 1)) add(",
+    replace: "      if (false) add(",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-choir-no-format",
+    why: "詩班獻詩日例外格式錯也不報",
+    file: "src/RuleExtrasCheck.gs",
+    find: "    if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {",
+    replace: "    if (false) {",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-line-uses-id",
+    why: "畫面寫 PersonID 而不是名字",
+    file: "src/RuleExtrasCheck.gs",
+    find: "  const nameOf = function (id) { return (people[id] && people[id].name) || id; };",
+    replace: "  const nameOf = function (id) { return id; };",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-no-missing-detail",
+    why: "找不到組合週不記原因",
+    file: "src/PostTeams.gs",
+    find: "          plan.missingDetail[team.teamId].push({ month: m, reasons: reasons });",
+    replace: "",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-reason-unav-as-other",
+    why: "不能服侍歸錯類",
+    file: "src/PostTeams.gs",
+    find: "{ why = 'UNAVAILABLE'; return false; }",
+    replace: "{ why = 'OTHER'; return false; }",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-no-gap-in-result",
+    why: "完成窗沒有找不到組合週的提示",
+    file: "src/WebAppGenerate.gs",
+    find: "    teamWeekGaps: result.teamWeekGaps || []",
+    replace: "    teamWeekGaps: []",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-prelaunch-old-label",
+    why: "上線前檢查只看已填，不看有沒有問題",
+    file: "src/PreLaunchWeb.gs",
+    find: "  add('影音組合（PostTeams）已填而且沒有問題', nTeams > 0 && !!check && teamIssues === 0,",
+    replace: "  add('影音組合（PostTeams）已填', nTeams > 0,",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-preseason-no-teams",
+    why: "開季前改動偵測沒有影音組合",
+    file: "src/PreseasonChange.gs",
+    find: "  { id: 'TEAMS', label: '影音組合' },\n",
+    replace: "",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "se-preseason-old-base",
+    why: "舊基準沒有新類別也當作全部改動（部署後誤報）",
+    file: "src/PreseasonChange.gs",
+    find: "    if (PRESEASON_LATER_CATEGORY_IDS.indexOf(c.id) !== -1 && base && !(c.id in base)) return;",
+    replace: "",
+    tests: ["tests/round111_se_rule_extras_check.test.js"]
   }
 ];
 

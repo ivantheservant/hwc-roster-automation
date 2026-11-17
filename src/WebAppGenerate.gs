@@ -104,6 +104,8 @@ function apiGenerateDraftPlan(quarterId) {
     pendingAutoConfirmText: describePendingAutoConfirm_(countPendingSubmissionsForQuarterSafe_(quarterId)),
     // 第一百零九輪批次 SB 組：系統內找不到緊接的上一季職事表 ⇒ 提示（不擋生成）
     priorWeeksNote: computePriorWeeksNoteForQuarter_(quarterId),
+    // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題（不擋生成）
+    ruleExtrasNote: (typeof checkRuleExtrasData_ === 'function' ? describeRuleExtrasCheckNote_(checkRuleExtrasData_()) : ''),
     attemptsPlanned: readMultiRunAttempts_(),
     timeBudgetMinutes: Math.round(MULTIRUN_TIME_BUDGET_MS / 60000)
   };
@@ -256,7 +258,9 @@ function apiGenerateDraftExecute_locked_(quarterId) {
     // 第九十四輪批次 UD 組：生成前自動確認了幾多項事奉人員申報（完成窗寫一句）
     autoConfirmMessage: autoConfirm.message,
     // 第一百零九輪批次 SB 組
-    priorWeeksNote: computePriorWeeksNoteForQuarter_(quarterId)
+    priorWeeksNote: computePriorWeeksNoteForQuarter_(quarterId),
+    // 第一百一十一輪批次 SE 組：找不到組合週的月份
+    teamWeekGaps: result.teamWeekGaps || []
   };
 }
 

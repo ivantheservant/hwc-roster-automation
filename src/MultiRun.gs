@@ -114,6 +114,8 @@ function generateBest_(quarterId, attempts) {
     stoppedByTime: stoppedByTime,
     stoppedBySeedInert: stoppedBySeedInert,
     deviation: best.deviation,
+    // 第一百一十一輪批次 SE 組：找不到組合週的月份（完成窗、狀態卡）
+    teamWeekGaps: typeof describeTeamWeekGaps_ === 'function' ? describeTeamWeekGaps_(best.roster.teamPlan) : [],
     hardViolations: best.hardViolations,
     histogramText: best.histogramText,
     chiSquare: best.chiSquare,
@@ -391,6 +393,9 @@ function performRosterGeneration_(quarterId) {
     );
   }
 
+  // 第一百一十一輪批次 SE 組：狀態卡用（同一季再生成會覆蓋）
+  if (typeof saveTeamWeekGaps_ === 'function') saveTeamWeekGaps_(quarterId, genResult.teamWeekGaps || []);
+
   const assigned = genResult.assignments.filter(function (a) { return !!a.personId; }).length;
   const blankBreakdown = summariseBlankAssignments_(genResult.assignments);
 
@@ -424,6 +429,7 @@ function performRosterGeneration_(quarterId) {
     attemptIndex: genResult.attemptIndex,
     seed: genResult.seed,
     deviation: genResult.deviation,
-    protected: shouldProtect
+    protected: shouldProtect,
+    teamWeekGaps: genResult.teamWeekGaps || []
   };
 }

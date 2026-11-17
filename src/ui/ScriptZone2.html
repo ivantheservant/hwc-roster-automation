@@ -118,6 +118,8 @@
     }
     // 第一百零九輪批次 SB 組：系統內找不到緊接的上一季職事表
     if (d && d.priorWeeksNote) summary.appendChild(make('div', { text: '⬜ ' + d.priorWeeksNote, className: 'vio-row' }));
+    // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題
+    if (d && d.ruleExtrasNote) summary.appendChild(make('div', { text: '⬜ ' + d.ruleExtrasNote, className: 'vio-row' }));
     // 第八十五輪批次 LD 組：沒有問題就寫「人手檢查：足夠」；讀不到就照實講
     if (st && st.error) {
       summary.appendChild(make('div', { text: '⬜ 人手檢查：暫時查不到（' + st.error + '）', className: 'vio-row' }));

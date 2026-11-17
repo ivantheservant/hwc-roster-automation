@@ -271,7 +271,9 @@ console.log('\n=== RD7：規則審閱表、Config、補建；RF ===');
   // RF：協唱名單只在 PostTeams.gs 讀（加上 Constants 定義、補建工作表），任何輸出、名單都不讀
   const readers = fs.readdirSync(path.join(ROOT, 'src')).filter((f) => f.endsWith('.gs'))
     .filter((f) => /SHEETS\.WORSHIP_BACKING_SINGERS/.test(read('src/' + f)));
-  check('★★★★★★ RF：WorshipBackingSingers 只在 PostTeams.gs（規則）及 AdminTools.gs（補建工作表）出現', readers.sort().join() === 'AdminTools.gs,PostTeams.gs', readers.join());
+  // 第一百一十一輪批次 SE 組（刻意改動）：資料核對（RuleExtrasCheck.gs）及開季前資料改動偵測（PreseasonChange.gs）亦讀這一張
+  check('★★★★★★ RF：WorshipBackingSingers 只在 PostTeams.gs（規則）、AdminTools.gs（補建工作表）、RuleExtrasCheck.gs（核對）、PreseasonChange.gs（改動偵測）出現',
+    readers.sort().join() === 'AdminTools.gs,PostTeams.gs,PreseasonChange.gs,RuleExtrasCheck.gs', readers.join());
   check('★★★★★ RF：協唱只用來避開排表——審閱表摘要只寫數目，不寫名字', gas.describeSingersForReview_(SINGERS) === '有生效：2 位領詩、3 位協唱（一定 2、盡量 1）'
     && gas.describeSingersForReview_(SINGERS).indexOf('假') === -1);
 }

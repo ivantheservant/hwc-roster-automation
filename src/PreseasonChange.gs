@@ -26,8 +26,14 @@ const PRESEASON_CHANGE_CATEGORIES = [
   { id: 'COMBINED', label: '合堂' },
   { id: 'PRE', label: '預先安排' },
   { id: 'ROLES', label: '身分（堂委／執事）' },
-  { id: 'RULES', label: '規則設定' }
+  { id: 'RULES', label: '規則設定' },
+  // 第一百一十一輪批次 SE 組（第一百零五輪 RD 組的三份資料）
+  { id: 'TEAMS', label: '影音組合' },
+  { id: 'SINGERS', label: '協唱' },
+  { id: 'CHOIR_ALLOWED', label: '詩班獻詩日例外' }
 ];
+/** 第一百一十一輪批次 SE 組：後來才加的類別——舊基準沒有這一類 ⇒ 不比較（否則全部當作改動）。 */
+const PRESEASON_LATER_CATEGORY_IDS = ['TEAMS', 'SINGERS', 'CHOIR_ALLOWED'];
 const PRESEASON_NOTIFIED_CATEGORY = 'NOTIFIED';
 const PRESEASON_CHANGE_AUDIT_ACTION = 'PRESEASON_CHANGE_NOTIFIED';
 const PRESEASON_CHANGE_ACTION_TEXT = '請打開幹事介面，按〔請系統幫我調整〕，檢查後〔儲存〕成新一版，改動才會生效。';
@@ -144,6 +150,21 @@ function readPreseasonSnapshot_(quarterId, timezone) {
     return [t(r[S.RULE_ID]), join([t(r[S.LEVEL]), b(r[S.ENABLED]), t(r[S.SCOPE_POST_IDS]), t(r[S.TARGET_VALUE]),
       t(r[S.TOLERANCE]), t(r[S.PARAM_JSON]), t(r[S.ON_VIOLATION]), t(r[S.PRIORITY])])];
   }));
+
+  // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外
+  const PT = COLUMNS.POST_TEAMS;
+  out.TEAMS = buildPreseasonCategoryMap_(readOptionalSheetRows_(SHEETS.POST_TEAMS).map(function (r) {
+    return [join([t(r[PT.TEAM_ID]), t(r[PT.PERSON_ID])]),
+      join([t(r[PT.POST_IDS]), t(r[PT.PER_MONTH]), t(r[PT.OUTSIDE_TEAM_LEVEL]).toUpperCase(), isRuleDataRowActive_(r[PT.ACTIVE]) ? 'T' : 'F'])];
+  }));
+  const WB = COLUMNS.WORSHIP_BACKING_SINGERS;
+  out.SINGERS = buildPreseasonCategoryMap_(readOptionalSheetRows_(SHEETS.WORSHIP_BACKING_SINGERS).map(function (r) {
+    return [join([t(r[WB.LEADER_PERSON_ID]), t(r[WB.SINGER_PERSON_ID]) || t(r[WB.SINGER_NAME])]),
+      join([t(r[WB.LEVEL]).toUpperCase(), isRuleDataRowActive_(r[WB.ACTIVE]) ? 'T' : 'F'])];
+  }));
+  out.CHOIR_ALLOWED = buildPreseasonCategoryMap_(Object.keys(parseChoirSundayAllowed_(getConfig_(CONFIG_KEYS.CHOIR_SUNDAY_ALLOWED, ''))).map(function (k) {
+    return [k, 'T'];
+  }));
   return out;
 }
 
@@ -175,6 +196,8 @@ function diffPreseasonSnapshots_(base, cur) {
     let n = 0;
     Object.keys(a).forEach(function (k) { if (b[k] !== a[k]) n++; });
     Object.keys(b).forEach(function (k) { if (!(k in a)) n++; });
+    // 第一百一十一輪批次 SE 組：舊基準沒有這一類（新加的類別）⇒ 不比較，否則會當作全部是改動
+    if (PRESEASON_LATER_CATEGORY_IDS.indexOf(c.id) !== -1 && base && !(c.id in base)) return;
     if (n > 0) out.push({ id: c.id, label: c.label, count: n });
   });
   return out;

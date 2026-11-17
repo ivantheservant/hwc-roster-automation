@@ -262,7 +262,8 @@ function backingSingerEntryFor_(ctx, personId, leaders) {
  * @returns {{byTeam: Object.<string, string[]>, handoff: Object.<string, string>, missing: Object.<string, string[]>}}
  */
 function planTeamWeeks_(context) {
-  const plan = { byTeam: {}, handoff: {}, missing: {} };
+  // 第一百一十一輪批次 SE 組：missingDetail＝找不到組合週的月份及原因類別（describeTeamWeekGaps_() 用）
+  const plan = { byTeam: {}, handoff: {}, missing: {}, missingDetail: {} };
   const teams = (context.teams && context.teams.list) || [];
   if (teams.length === 0) return plan;
   const rules = context.rules || {};
@@ -278,6 +279,7 @@ function planTeamWeeks_(context) {
   teams.forEach(function (team) {
     plan.byTeam[team.teamId] = [];
     plan.missing[team.teamId] = [];
+    plan.missingDetail[team.teamId] = [];
     const members = team.members.map(function (m) {
       return { personId: m.personId, level: m.level,
         postIds: m.postIds.filter(function (id) { return !!findPost_(context.posts, id); }) };
@@ -285,29 +287,34 @@ function planTeamWeeks_(context) {
     if (members.length === 0) return;
     plan.handoff[team.teamId] = teamHandoffPostId_({ members: members }, context.posts);
     const random = makeSeededRandom_(((context.randomSeed || 0) + stringSeed_(team.teamId)) >>> 0);
-    const valid = function (sd) {
+    // 第一百一十一輪批次 SE 組：回傳這一日不可以做組合週的原因類別（TEAM_WEEK_BLOCK_LABELS 的鍵）；可以 ⇒ ''
+    const blockReason = function (sd) {
       const d = sd.serviceDate;
       const special = (context.specialByDate || {})[d] || { skipPostIds: [], lockPostIds: [] };
       const leaders = preassignedLeadersOn_(context, d);
-      return members.every(function (m) {
+      let why = '';
+      members.every(function (m) {
         const hard = backingSingerEntryFor_(context, m.personId, leaders);
-        if (hard && hard.level === POST_TEAM_LEVELS.HARD) return false;
+        if (hard && hard.level === POST_TEAM_LEVELS.HARD) { why = 'BACKING'; return false; }
         // 預先安排了同日不兼任崗位（領詩、司琴）而那不是他的組合崗位 ⇒ 這一日不可以
         const reserved = Object.keys(pre).some(function (k) {
           const c = pre[k];
           return c.serviceDate === d && c.personId === m.personId && exclusive.indexOf(c.postId) !== -1 && m.postIds.indexOf(c.postId) === -1;
         });
-        if (reserved) return false;
+        if (reserved) { why = 'PREASSIGNED'; return false; }
         return m.postIds.every(function (postId) {
           const post = findPost_(context.posts, postId);
-          if (getSkipReason_(post, sd, { skipPostIds: special.skipPostIds || [], lockPostIds: special.lockPostIds || [] }, rules)) return false;
-          if ((special.lockPostIds || []).indexOf(postId) !== -1) return false;
-          if (isPersonUnavailable_(m.personId, d, postId, context.unavailable || [])) return false;
+          if (getSkipReason_(post, sd, { skipPostIds: special.skipPostIds || [], lockPostIds: special.lockPostIds || [] }, rules)) { why = 'COMBINED'; return false; }
+          if ((special.lockPostIds || []).indexOf(postId) !== -1) { why = 'COMBINED'; return false; }
+          if (isPersonUnavailable_(m.personId, d, postId, context.unavailable || [])) { why = 'UNAVAILABLE'; return false; }
           const preCell = pre[cellKey_(d, postId, 1)];
-          return !(preCell && (preCell.personId || preCell.freeText) && preCell.personId !== m.personId);
+          if (preCell && (preCell.personId || preCell.freeText) && preCell.personId !== m.personId) { why = 'OTHER'; return false; }
+          return true;
         });
       });
+      return why;
     };
+    const valid = function (sd) { return blockReason(sd) === ''; };
     const cost = function (sd, chosen) {
       const d = sd.serviceDate;
       let c = 0;
@@ -325,7 +332,16 @@ function planTeamWeeks_(context) {
     months.forEach(function (m) {
       let cands = byMonth[m].filter(valid);
       for (let n = 0; n < team.perMonth; n++) {
-        if (cands.length === 0) { plan.missing[team.teamId].push(m); break; }
+        if (cands.length === 0) {
+          plan.missing[team.teamId].push(m);
+          const reasons = {};
+          byMonth[m].forEach(function (sd) {
+            const r = blockReason(sd);
+            if (r) reasons[r] = (reasons[r] || 0) + 1;
+          });
+          plan.missingDetail[team.teamId].push({ month: m, reasons: reasons });
+          break;
+        }
         const chosen = plan.byTeam[team.teamId];
         const scored = cands.map(function (sd) { return { sd: sd, cost: cost(sd, chosen) }; });
         const best = Math.min.apply(null, scored.map(function (x) { return x.cost; }));

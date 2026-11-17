@@ -138,6 +138,8 @@
     ]);
     // 第一百零九輪批次 SB 組：上一季資料不足（不擋生成）
     if (plan.priorWeeksNote) facts.appendChild(make('div', { text: plan.priorWeeksNote, className: 'warn-head' }));
+    // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題（不擋生成）
+    if (plan.ruleExtrasNote) facts.appendChild(make('div', { text: plan.ruleExtrasNote, className: 'warn-head' }));
     if (plan.pendingAutoConfirmText) {
       facts.appendChild(make('div', { text: plan.pendingAutoConfirmText, className: 'warn-head' }));
     }
@@ -197,6 +199,8 @@
       res.autoConfirmMessage ? make('div', { text: res.autoConfirmMessage, className: 'lines' }) : null,
       // 第一百零九輪批次 SB 組
       res.priorWeeksNote ? make('div', { text: res.priorWeeksNote, className: 'warn-head' }) : null,
+      // 第一百一十一輪批次 SE 組：找不到組合週的月份
+      ...(res.teamWeekGaps || []).map((t) => make('div', { text: t, className: 'warn-head' })),
       make('div', {
         text: res.serviceDateCount + ' 個主日、' + res.postCount + ' 個崗位'
           + (res.genuineGapCount > 0 ? '、有 ' + res.genuineGapCount + ' 格未能安排' : ''),

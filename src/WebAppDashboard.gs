@@ -767,6 +767,10 @@ function buildDashboardState_(quarterId) {
     pendingSubmissions: pendingSubmissions,
     // 第一百零九輪批次 SB 組：還未生成時，系統內找不到緊接的上一季職事表 ⇒「這一季還要做的」一句
     priorWeeksNote: versionExists ? '' : computePriorWeeksNoteForQuarter_(quarterId),
+    // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題；最近一次生成找不到組合週的月份
+    // （typeof：本機測試只載入部分檔案；Apps Script 一定有）
+    ruleExtrasNote: (typeof checkRuleExtrasData_ === 'function' ? describeRuleExtrasCheckNote_(checkRuleExtrasData_()) : ''),
+    teamWeekGaps: versionExists && typeof readTeamWeekGaps_ === 'function' ? readTeamWeekGaps_(quarterId) : [],
     // 第九十一輪批次 RA 組：畫面上「人手填寫的崗位（…）」的名稱（Posts.AutoGenerate=FALSE）
     manualPostNames: readManualFillPostNamesSafe_(),
     quarterId: quarterId,

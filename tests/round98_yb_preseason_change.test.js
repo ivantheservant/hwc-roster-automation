@@ -64,8 +64,10 @@ console.log('\n=== YB1：純函式 ===');
   const d = g.diffPreseasonSnapshots_(base, cur);
   check('★★★★★★ 內容不同、少了、多了各算 1 項；沒有改動的類別不列；次序固定',
     JSON.stringify(d) === JSON.stringify([{ id: 'WEIGHT', label: '排表偏好', count: 3 }, { id: 'ROLES', label: '身分（堂委／執事）', count: 1 }]), JSON.stringify(d));
-  check('★★★★★ 九類、名稱', g.PRESEASON_CHANGE_CATEGORIES.map((c) => c.label).join('／')
-    === '名單／暫時不做／排表偏好／不能服侍／詩班獻詩／合堂／預先安排／身分（堂委／執事）／規則設定');
+  // 第一百一十一輪批次 SE 組（刻意改動）：加影音組合、協唱、詩班獻詩日例外三類 ⇒ 十二類
+  check('★★★★★ 十二類、名稱', g.PRESEASON_CHANGE_CATEGORIES.map((c) => c.label).join('／')
+    === '名單／暫時不做／排表偏好／不能服侍／詩班獻詩／合堂／預先安排／身分（堂委／執事）／規則設定／影音組合／協唱／詩班獻詩日例外');
+  check('★★★★★★ SE：舊基準沒有新加的三類 ⇒ 不當作改動', g.diffPreseasonSnapshots_({ WEIGHT: {} }, { WEIGHT: {}, TEAMS: { a: '1' }, SINGERS: { b: '1' } }).length === 0);
   const t = g.buildPreseasonChangeNotifyText_('[測試] ', '2099T1', 2,
     [{ id: 'WEIGHT', label: '排表偏好', count: 2 }, { id: 'PRE', label: '預先安排', count: 1 }], 'https://example.invalid/admin/exec?quarter=2099T1');
   check('★★★★★★ 標題「{季度} 職事表：開季前資料在第 N 版之後有改動」', t.subject === '[測試] 2099T1 職事表：開季前資料在第 2 版之後有改動', t.subject);
@@ -83,7 +85,7 @@ console.log('\n=== YB2：建立版本時記下基準 ===');
   g.apiGenerateDraftExecute(sc.Q);
   const rows = sc.baseRows();
   const B = sc.C.PRESEASON_BASELINES;
-  check('★★★★★★ 建立第 0 版時自動建立 PreseasonBaselines，九類＋通知簽名一共 10 行', rows.length === 10
+  check('★★★★★★ 建立第 0 版時自動建立 PreseasonBaselines，十二類＋通知簽名一共 13 行（第一百一十一輪 SE 組刻意由 10 改為 13）', rows.length === 13
     && rows.every((r) => r[B.QUARTER_ID] === sc.Q && Number(r[B.VERSION_NO]) === 0), JSON.stringify(rows.map((r) => r[B.CATEGORY])));
   const sh = sc.ss.getSheetByName(sc.S.PRESEASON_BASELINES);
   check('★★★★★ 第 1 行中文標題、第 2 行機器鍵', sh.getRange(1, 1).getValue() === '季度'
@@ -192,7 +194,7 @@ console.log('\n=== YB5：不檢查的情況；基準補記、換新 ===');
   const sh = sc.ss.getSheetByName(sc.S.PRESEASON_BASELINES);
   sh.deleteRows(3, sh.getLastRow() - 2);
   const cap = sc.run();
-  check('★★★★★★ 沒有基準（部署前已有的版本）⇒ 補記，這一次不通知', cap.outcome === 'SKIP' && cap.detail === 'BASELINE_CAPTURED' && sc.baseRows().length === 10,
+  check('★★★★★★ 沒有基準（部署前已有的版本）⇒ 補記，這一次不通知', cap.outcome === 'SKIP' && cap.detail === 'BASELINE_CAPTURED' && sc.baseRows().length === 13,
     JSON.stringify(cap));
   check('★★★★★ 補記之後沒有改動', sc.run().detail === 'NO_CHANGE');
   setField(sc, sc.S.RULE_SETTINGS, sc.C.RULE_SETTINGS.RULE_ID, 'SEMI_NO_CONSECUTIVE', sc.C.RULE_SETTINGS.ENABLED, false);

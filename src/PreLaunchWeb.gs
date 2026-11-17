@@ -59,11 +59,27 @@ function buildPreLaunchWebItems_() {
   try { extras = readRuleExtrasContext_(); } catch (err) { extras = null; }
   const nTeams = extras ? extras.teams.list.length : -1;
   const nTeamMembers = extras ? extras.teams.list.reduce(function (s, t) { return s + t.members.length; }, 0) : 0;
-  add('影音組合（PostTeams）已填', nTeams > 0, nTeams < 0 ? '讀不到' : (nTeams === 0 ? '沒有（工作表未建立或未填）' : nTeams + ' 組、' + nTeamMembers + ' 人'),
+  // 第一百一十一輪批次 SE 組：由「已填」改為「已填而且沒有問題」，有問題逐行列出（RuleExtrasCheck.gs）
+  const check = typeof checkRuleExtrasData_ === 'function' ? checkRuleExtrasData_() : null;
+  const issuesOf = function (source) { return check ? check.issues.filter(function (i) { return i.source === source; }) : []; };
+  const issueText = function (source) { return issuesOf(source).map(describeRuleExtrasIssue_).join('；'); };
+  const teamIssues = issuesOf('PostTeams').length;
+  add('影音組合（PostTeams）已填而且沒有問題', nTeams > 0 && !!check && teamIssues === 0,
+    nTeams < 0 || !check ? '讀不到' : (nTeams === 0 ? '沒有（工作表未建立或未填）'
+      : nTeams + ' 組、' + nTeamMembers + ' 人' + (teamIssues ? '；有 ' + teamIssues + ' 項問題：' + issueText('PostTeams') : '；沒有問題')),
     'PostTeams 工作表（未建立 ⇒ 進階與診斷〔補建設定及範本〕）');
   const nSingers = extras ? extras.backingSingers.length : -1;
-  add('協唱（WorshipBackingSingers）已填', nSingers > 0, nSingers < 0 ? '讀不到' : (nSingers === 0 ? '沒有（工作表未建立或未填）' : nSingers + ' 位協唱'),
+  const singerIssues = issuesOf('WorshipBackingSingers').length;
+  add('協唱（WorshipBackingSingers）已填而且沒有問題', nSingers > 0 && !!check && singerIssues === 0,
+    nSingers < 0 || !check ? '讀不到' : (nSingers === 0 ? '沒有（工作表未建立或未填）'
+      : nSingers + ' 位協唱' + (singerIssues ? '；有 ' + singerIssues + ' 項問題：' + issueText('WorshipBackingSingers') : '；沒有問題')),
     'WorshipBackingSingers 工作表（未建立 ⇒ 進階與診斷〔補建設定及範本〕）');
+  const choirIssues = issuesOf('CHOIR_SUNDAY_ALLOWED').length;
+  const nChoir = check ? check.counts.choirEntries : -1;
+  add('詩班獻詩日例外（CHOIR_SUNDAY_ALLOWED）沒有問題', !!check && choirIssues === 0,
+    !check ? '讀不到' : (nChoir === 0 ? '沒有例外（不用填）'
+      : nChoir + ' 項' + (choirIssues ? '；有 ' + choirIssues + ' 項問題：' + issueText('CHOIR_SUNDAY_ALLOWED') : '；沒有問題')),
+    'Config 工作表 CHOIR_SUNDAY_ALLOWED（格式「PersonID:PostID」，逗號分隔）');
   let nPreferred = -1;
   try { nPreferred = Object.keys(readPreferredEmailPersonIds_()).length; } catch (err) { nPreferred = -1; }
   add('指定寄信電郵（PreferredEmail）已填人數', nPreferred > 0, nPreferred < 0 ? '讀不到' : nPreferred + ' 人',

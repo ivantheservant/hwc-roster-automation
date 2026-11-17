@@ -2720,9 +2720,28 @@
     ]));
   }
 
+  /**
+   * 第一百一十一輪批次 SE 組：狀態卡「影音組合：X 月找不到全組都可以服侍的主日」。
+   * @param {string[]} lines
+   * @returns {void}
+   */
+  function renderTeamWeekGaps_(lines) {
+    let box = document.getElementById('teamWeekGaps');
+    if (!box) {
+      box = make('div', { className: 'warn-head' });
+      box.id = 'teamWeekGaps';
+      el('statusText').insertAdjacentElement('afterend', box);
+    }
+    box.textContent = '';
+    lines.forEach((t) => box.appendChild(make('div', { text: t })));
+    box.hidden = lines.length === 0;
+  }
+
   function renderTop(d) {
     el('statusCard').hidden = false;
     el('statusText').textContent = d.statusText || '';
+    // 第一百一十一輪批次 SE 組：最近一次生成找不到組合週的月份（狀態卡）
+    renderTeamWeekGaps_(d.teamWeekGaps || []);
 
     const v = d.latestVersion;
     el('statusVersion').textContent = v

@@ -20,7 +20,7 @@ function scene() {
   const sc = buildRound75Scene({ extraFiles: ['AdminTools.gs', 'PersonIdFormat.gs', 'PreLaunchWeb.gs', 'GoLiveWizard.gs', 'ConfigSeed.gs', 'EmailTemplateSeed.gs',
     'EmailTemplateUpdate.gs', 'WebAppPersonalLink.gs', 'PersonalLinkInMail.gs', 'WebApp.gs', 'WebAppExclusions.gs', 'WebAppRoster3Common.gs',
     'PreseasonPack.gs', 'UnavailableSchedule.gs', 'PersonalUnavailable.gs', 'UnavailableInvite.gs', 'SendAudience.gs', 'RolloutAudience.gs', 'PreseasonChange.gs',
-    'SeasonRehearsal.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'ManualEmail.gs'] });
+    'SeasonRehearsal.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'ManualEmail.gs', 'RuleExtrasCheck.gs'] });
   const g = sc.gas;
   g.Session = { getActiveUser: () => ({ getEmail: () => 'editor@example.invalid' }) };
   g.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }), getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
@@ -35,19 +35,23 @@ console.log('\n=== RG1：上線前檢查 ===');
   const sc = scene();
   const g = sc.gas;
   let r = g.apiGetPreLaunchCheck();
-  check('★★★★★★ 三項新項目都在，未填 ⇒ ✘ 並寫明去哪裏', ['影音組合（PostTeams）已填', '協唱（WorshipBackingSingers）已填', '指定寄信電郵（PreferredEmail）已填人數']
+  check('★★★★★★ 三項新項目都在，未填 ⇒ ✘ 並寫明去哪裏', ['影音組合（PostTeams）已填而且沒有問題', '協唱（WorshipBackingSingers）已填而且沒有問題', '指定寄信電郵（PreferredEmail）已填人數']
     .every((l) => item(r, l) && item(r, l).ok === false && item(r, l).where), JSON.stringify(r.items.slice(-8)));
-  check('★★★★★ 工作表未建立 ⇒ 寫「沒有（工作表未建立或未填）」', /工作表未建立或未填/.test(item(r, '影音組合（PostTeams）已填').value));
+  check('★★★★★ 工作表未建立 ⇒ 寫「沒有（工作表未建立或未填）」', /工作表未建立或未填/.test(item(r, '影音組合（PostTeams）已填而且沒有問題').value));
   const titles = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
   seedSheet(sc.ss, 'PostTeams', titles, g.postTeamsKeys_(), [
     { TeamID: 'AV', PersonID: 'P9701', PostIDs: 'SOUND,VIDEO', PerMonth: 1, OutsideTeamLevel: 'HARD', Notes: '', Active: true },
     { TeamID: 'AV', PersonID: 'P9702', PostIDs: 'PPT', PerMonth: 1, OutsideTeamLevel: 'SOFT', Notes: '', Active: true }]);
   seedSheet(sc.ss, 'WorshipBackingSingers', titles.slice(0, 6), g.worshipBackingSingersKeys_(), [
     { LeaderPersonID: 'P9703', SingerPersonID: 'P9704', SingerName: '', Level: 'HARD', Notes: '', Active: true }]);
+  // 第一百一十一輪批次 SE 組（刻意改動）：「已填」改為「已填而且沒有問題」——這裏只測行數，核對結果另有 round111_se 測試
+  const realCheck = g.checkRuleExtrasData_;
+  g.checkRuleExtrasData_ = () => ({ ok: true, counts: { teamRows: 2, singerRows: 1, choirEntries: 0 }, issues: [], lines: [] });
   r = g.apiGetPreLaunchCheck();
-  check('★★★★★★ 填了 ⇒ ✔，寫組數、人數', item(r, '影音組合（PostTeams）已填').ok && item(r, '影音組合（PostTeams）已填').value === '1 組、2 人'
-    && item(r, '協唱（WorshipBackingSingers）已填').ok && item(r, '協唱（WorshipBackingSingers）已填').value === '1 位協唱',
-  JSON.stringify([item(r, '影音組合（PostTeams）已填'), item(r, '協唱（WorshipBackingSingers）已填')]));
+  g.checkRuleExtrasData_ = realCheck;
+  check('★★★★★★ 填了 ⇒ ✔，寫組數、人數', item(r, '影音組合（PostTeams）已填而且沒有問題').ok && item(r, '影音組合（PostTeams）已填而且沒有問題').value === '1 組、2 人；沒有問題'
+    && item(r, '協唱（WorshipBackingSingers）已填而且沒有問題').ok && item(r, '協唱（WorshipBackingSingers）已填而且沒有問題').value === '1 位協唱；沒有問題',
+  JSON.stringify([item(r, '影音組合（PostTeams）已填而且沒有問題'), item(r, '協唱（WorshipBackingSingers）已填而且沒有問題')]));
   check('★★★★★ 上線前檢查不寫名字（只寫數目）', JSON.stringify(r).indexOf('P9701') === -1);
   g.readPreferredEmailPersonIds_ = () => ({ P9701: true, P9702: true });
   r = g.apiGetPreLaunchCheck();
