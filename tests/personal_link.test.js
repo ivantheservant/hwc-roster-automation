@@ -199,8 +199,9 @@ console.log('\n=== B3【核心】唯讀頁面完全冇任何 google.script.run �
     !/<input/i.test(personalRosterHtml));
   const buttonCount = (personalRosterHtml.match(/<button/gi) || []).length;
   // 第一百零一輪批次 ZF 組（刻意改動）：多了〔字體：大／特大〕切換（同樣純前端，唔改任何資料）
-  checkEqual('★★ 頁面上嘅按鈕只有深色／淺色切換及字體切換（純前端 CSS，唔改任何資料）',
-    buttonCount, 2);
+  // 第一百一十二輪批次 UA 組（刻意改動）：多了頁頂〔申報不能服侍的日子〕（只做頁內捲動，唔改任何資料）
+  checkEqual('★★ 頁面上嘅按鈕只有深色／淺色切換、字體切換及頁頂捲動按鈕（純前端，唔改任何資料）',
+    buttonCount, 3);
 }
 
 console.log('\n=== B4：頁面內容涵蓋規格要求嘅五項 ===');

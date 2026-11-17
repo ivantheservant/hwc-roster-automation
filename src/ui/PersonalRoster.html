@@ -182,6 +182,12 @@
   .unav table.mine th, .unav table.mine td { white-space: normal; word-break: break-word; text-align: left;
     font-size: 0.85em; padding: 6px 8px; }
   .unav button:disabled { opacity: 0.55; cursor: not-allowed; }
+  /* 第一百一十二輪批次 UA 組：頁頂〔申報不能服侍的日子〕按鈕（只在可以申報時顯示）；未有版本 ⇒ 申報區排在職事表位置之前 */
+  .main-col { display: flex; flex-direction: column; }
+  .main-col.no-roster #unavSection { order: -1; }
+  button.go-declare { font: inherit; min-height: 48px; padding: 8px 18px; margin: 0 0 14px; border-radius: 8px; border: 1px solid #1a7f37;
+    background: #1a7f37; color: #ffffff; font-weight: 700; cursor: pointer; }
+  button.go-declare[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -195,7 +201,9 @@
       <button class="theme-toggle" id="themeToggleBtn" type="button">🌙 深色</button>
     </div>
   </div>
+  <button class="go-declare" id="goDeclareBtn" type="button" hidden>申報不能服侍的日子</button>
 
+  <div class="main-col<?= data.noRoster ? ' no-roster' : '' ?>" id="mainCol">
   <? if (data.noRoster) { ?>
   <div class="schedule">
     <h2>你的服侍安排</h2>
@@ -266,6 +274,7 @@
     <h2>申報不能服侍的日子</h2>
     <div id="unavBody"><p class="muted">載入中……</p></div>
   </div>
+  </div>
 
   <div class="how-to">
     <p><strong>如果這一週不能服侍：</strong><span id="howToDeclare">還未排表的主日，可以在上面「申報不能服侍的日子」申報，幹事或堂委確認後生效；已經排了你的那一週，請直接聯絡幹事安排調動，不要自行更改試算表內容。</span></p>
@@ -283,6 +292,7 @@
       var quarterId = boot.quarterId || '';
       var body = document.getElementById('unavBody');
       var busy = false;
+      var userActed = false;   // 第一百一十二輪批次 UA 組：做過動作之後，結果訊息要捲到看得到的位置
 
       function el(tag, text, cls) {
         var n = document.createElement(tag);
@@ -294,6 +304,7 @@
       function call(fnName, args, view) {
         if (busy) return;
         busy = true;
+        userActed = true;
         render(view, '處理中……', false);
         var runner = google.script.run
           .withSuccessHandler(function (res) {
@@ -494,9 +505,18 @@
         body.appendChild(table);
       }
 
+      function scrollToNode(node) {
+        if (!userActed || !node || typeof node.scrollIntoView !== 'function') return;
+        try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (err) { /* 靜靜失敗 */ }
+      }
+
       function render(view, msg, isErr) {
         body.innerHTML = '';
-        if (msg) body.appendChild(el('p', msg, 'unav-msg' + (isErr ? ' err' : '')));
+        if (msg) {
+          var msgEl = el('p', msg, 'unav-msg' + (isErr ? ' err' : ''));
+          body.appendChild(msgEl);
+          scrollToNode(msgEl);
+        }
         if (!view) {
           body.appendChild(el('p', boot.error || '暫時未能申報，請聯絡幹事。', 'muted'));
           return;
@@ -521,6 +541,19 @@
 
       if (boot.closed) renderClosed(boot.closedText);
       else render(boot.view, '', false);
+
+      // 第一百一十二輪批次 UA 組：頁頂〔申報不能服侍的日子〕——是否顯示由伺服器判斷（boot.canDeclare）；
+      // 只做頁內捲動（不改網址、不重新載入頁面）
+      var goBtn = document.getElementById('goDeclareBtn');
+      if (goBtn && boot.canDeclare) {
+        goBtn.hidden = false;
+        goBtn.addEventListener('click', function () {
+          var sec = document.getElementById('unavSection');
+          if (sec && typeof sec.scrollIntoView === 'function') {
+            try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) { sec.scrollIntoView(); }
+          }
+        });
+      }
     })();
 
     // 第十一輪批次階段 D：只用 localStorage，完全冇任何伺服器端腳本呼叫

@@ -444,12 +444,22 @@ function buildPersonalUnavailableBoot_(personId, token, quarterId) {
       return { token: token, quarterId: quarterId, view: null, error: '', closed: true,
         closedText: fillContactName_(ROLLOUT_DECLARE_CLOSED_TEXT) };
     }
-    return { token: token, quarterId: quarterId,
-      view: buildPersonalUnavailableView_(personId, now.today, now.timezone, quarterId), error: '' };
+    const view = buildPersonalUnavailableView_(personId, now.today, now.timezone, quarterId);
+    return { token: token, quarterId: quarterId, view: view, error: '', canDeclare: personalCanDeclareFromView_(view) };
   } catch (err) {
     log_('WARN', '個人頁申報一段讀不到（' + personId + '）：' + err.message);
     return { token: token, quarterId: quarterId, view: null, error: '暫時未能申報，請聯絡幹事。' };
   }
+}
+
+/**
+ * 第一百一十二輪批次 UA 組：頁頂〔申報不能服侍的日子〕按鈕要不要顯示——由伺服器判斷，頁面只照做。
+ * 這個人可以申報（分階段開放及截止日已經在 `buildPersonalUnavailableView_()` 之前判斷）、而且有主日可以申報 ⇒ true。
+ * @param {?Object} view `buildPersonalUnavailableView_()` 的結果
+ * @returns {boolean}
+ */
+function personalCanDeclareFromView_(view) {
+  return !!(view && view.quarters && view.quarters.length > 0);
 }
 
 /**
