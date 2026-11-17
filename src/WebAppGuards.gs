@@ -208,16 +208,9 @@ function assertNoUnsavedChanges_(quarterId, actionName, allowUnsaved) {
  * @throws {Error} 已經有 OFFICIAL 紀錄時拋三段式訊息
  */
 function assertNeverOfficiallySent_(quarterId) {
-  const C = COLUMNS.SEND_LOG;
-  let lastSentAt = '';
-  let count = 0;
-  readSheet_(SHEETS.SEND_LOG).forEach(function (row) {
-    if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
-    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;
-    count++;
-    const sentAt = String(row[C.SENT_AT] || '');
-    if (sentAt && sentAt > lastSentAt) lastSentAt = sentAt;
-  });
+  const info = summariseOfficialSendLogRows_(quarterId);
+  const count = info.count;
+  const lastSentAt = info.lastSentAt;
   if (count === 0) return;
 
   throw new Error(buildThreePartMessage_(
@@ -230,6 +223,35 @@ function assertNeverOfficiallySent_(quarterId) {
         + '要先請管理員清除那些寄出紀錄，這個按鈕才會重新亮起'
     ]
   ));
+}
+
+/**
+ * 這一季 SendLog 的 OFFICIAL 紀錄（任何狀態）。〔給所有人〕的把關及第一百一十輪批次 TB-2 組
+ * 〔不再繼續這一批〕之後的進度判斷用同一個數。
+ * @param {string} quarterId
+ * @param {Object[]=} rows SendLog 各行（測試可以傳入）
+ * @returns {{count: number, lastSentAt: string}}
+ */
+function summariseOfficialSendLogRows_(quarterId, rows) {
+  const C = COLUMNS.SEND_LOG;
+  let lastSentAt = '';
+  let count = 0;
+  (rows || readSheet_(SHEETS.SEND_LOG)).forEach(function (row) {
+    if (String(row[C.QUARTER_ID] || '').trim() !== quarterId) return;
+    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;
+    count++;
+    const sentAt = String(row[C.SENT_AT] || '');
+    if (sentAt && sentAt > lastSentAt) lastSentAt = sentAt;
+  });
+  return { count: count, lastSentAt: lastSentAt };
+}
+
+/**
+ * @param {string} quarterId
+ * @returns {number} 這一季 SendLog 的 OFFICIAL 紀錄數
+ */
+function countOfficialSendLogRows_(quarterId) {
+  return summariseOfficialSendLogRows_(quarterId).count;
 }
 
 /**

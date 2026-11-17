@@ -390,11 +390,61 @@ function apiAbandonSendBatch(batchId) {
     if (!p || p.id !== String(batchId || '')) return { ok: false, message: '找不到這一批未完成的寄出（可能已經寄完）。' };
     const info = describePendingSendBatch_(p.quarterId) || { remaining: 0 };
     clearPendingSendBatch_();
+    // 第一百一十輪批次 TB-2 組：已經寄出過的部分是事實 ⇒ 進度要和狀態卡、寄出把關一致
+    const plan = planStageAfterAbandonedBatch_(p, getQuarterStage_(p.quarterId),
+      countOfficialSendLogRows_(p.quarterId), Math.max(0, Number(p.total || 0) - info.remaining));
+    if (plan.newStage === QUARTER_STAGE.OFFICIAL_SENT) advanceQuarterStage_(p.quarterId, plan.newStage);
+    else if (plan.newStage) setQuarterStage_(p.quarterId, plan.newStage, plan.reason);
     writeAuditLog_({
       action: 'SEND_BATCH_ABANDONED', targetSheet: SHEETS.SEND_LOG, targetKey: p.id,
       oldValue: p.quarterId + ' 第 ' + p.versionNo + ' 版 ' + p.stage + '：共 ' + p.total + ' 位',
-      newValue: '放棄餘下 ' + info.remaining + ' 位', source: 'apiAbandonSendBatch'
+      newValue: plan.auditText.replace('{N}', String(info.remaining)), source: 'apiAbandonSendBatch'
     });
-    return { ok: true, message: '已放棄這一批餘下的 ' + info.remaining + ' 位。需要的話，用〔補寄未收到的人〕寄給未收到的人。' };
+    return { ok: true, stageChangedTo: plan.newStage || '',
+      message: plan.message.replace(/\{N\}/g, String(info.remaining)) };
   });
+}
+
+/**
+ * 第一百一十輪批次 TB-2 組：放棄一批之後，季度進度（`Quarters.Stage`）要怎樣。**純函式。**
+ *
+ * 狀態卡及〔給所有人〕的把關（`assertNeverOfficiallySent_()`）都是「SendLog 有任何 OFFICIAL 紀錄
+ * ＝已經正式發出過」。正式發出寄到一半就放棄，以前 Stage 停在正式發出之前，結果：
+ * 狀態卡說已經正式發出、〔給所有人〕被擋，但〔變動的人〕又要 Stage＝OFFICIAL_SENT 才可以用。
+ * 所以用**同一個數**判斷：這一季有 OFFICIAL 紀錄 ⇒ Stage 推進到 OFFICIAL_SENT；
+ * 一筆都沒有 ⇒ Stage 不變，之後可以再按〔給所有人〕（把關見 0 筆不會擋）。
+ * 審閱本寄出一部分就放棄 ⇒ 照全部寄完時的做法設為 REVIEW_SENT（已正式發出就不退回）。
+ * 改動後重發本來就在 OFFICIAL_SENT ⇒ 不用改。
+ *
+ * @param {Object} record 批次紀錄（kind、stage、quarterId）
+ * @param {string} currentStage 現時 Stage
+ * @param {number} officialRows 這一季 SendLog 的 OFFICIAL 紀錄數（和把關同一個數）
+ * @param {number} processedCount 這一批已處理人數
+ * @returns {{newStage: string, reason: string, auditText: string, message: string}}
+ */
+function planStageAfterAbandonedBatch_(record, currentStage, officialRows, processedCount) {
+  const rest = '餘下 {N} 位請用「進階與診斷 ▸ 補寄未收到的人」寄出（只會寄給還沒有收到的人）。';
+  const out = { newStage: '', reason: '', auditText: '放棄餘下 {N} 位', message: '已放棄這一批餘下的 {N} 位。' + rest };
+  if (!record || record.kind !== SEND_BATCH_KIND.STAGE) return out;
+  if (record.stage === MAIL_STAGES.OFFICIAL) {
+    if (!(officialRows > 0)) {
+      out.auditText = '一位都未寄出就放棄（餘下 {N} 位）；進度不變';
+      out.message = '已放棄這一批。一位都還沒有寄出，這一季的進度沒有改變，可以再按第 3 步〔給所有人〕。';
+      return out;
+    }
+    out.auditText = '部分寄出後放棄，餘下 {N} 位請用〔補寄未收到的人〕';
+    out.message = '已放棄這一批餘下的 {N} 位。已經寄出的部分是正式發出，所以這一季的進度改為「已正式發出」。' + rest;
+    if (currentStage !== QUARTER_STAGE.OFFICIAL_SENT) {
+      out.newStage = QUARTER_STAGE.OFFICIAL_SENT;
+      out.reason = '正式發出部分寄出後放棄';
+    }
+    return out;
+  }
+  if (record.stage === MAIL_STAGES.REVIEW && processedCount > 0 && currentStage !== QUARTER_STAGE.OFFICIAL_SENT
+    && currentStage !== QUARTER_STAGE.REVIEW_SENT) {
+    out.newStage = QUARTER_STAGE.REVIEW_SENT;
+    out.reason = '審閱本部分寄出後放棄';
+    out.auditText = '部分寄出後放棄，餘下 {N} 位請用〔補寄未收到的人〕';
+  }
+  return out;
 }

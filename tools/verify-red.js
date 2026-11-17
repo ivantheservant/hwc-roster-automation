@@ -14102,6 +14102,70 @@ const MUTATIONS = [
     find: "  return !!(p && p.id === resumeId && p.quarterId === quarterId && p.stage === stage);",
     replace: "  return !!resumeId;",
     tests: ["tests/round109_sa_send_budget.test.js"]
+  },
+  {
+    id: "tb1-mark-any-override",
+    why: "只要明確傳入就寫「幹事改過」（值等於預設也寫）",
+    file: "src/SendOptions.gs",
+    find: "    attachType: !!ov.attachType && decision.attachType !== def.attachType,",
+    replace: "    attachType: !!ov.attachType,",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb1-ics-any-override",
+    why: "日曆檔只要明確傳入就寫「幹事改過」",
+    file: "src/SendOptions.gs",
+    find: "    includeIcs: !!ov.includeIcs && decision.includeIcs !== def.includeIcs",
+    replace: "    includeIcs: !!ov.includeIcs",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb1-no-button-scope",
+    why: "〔給所有人〕等按鈕的收件範圍不寫按鈕名稱",
+    file: "src/SendOptions.gs",
+    find: "  }[decision.sendMode || ''];",
+    replace: "  }['none'];",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb2-no-advance",
+    why: "部分寄出後放棄仍然不推進 Stage",
+    file: "src/SendBatch.gs",
+    find: "    if (plan.newStage === QUARTER_STAGE.OFFICIAL_SENT) advanceQuarterStage_(p.quarterId, plan.newStage);",
+    replace: "    if (false) advanceQuarterStage_(p.quarterId, plan.newStage);",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb2-advance-on-zero",
+    why: "一位都未寄出就放棄也推進 Stage（之後〔給所有人〕不能再按，卻沒有人收到）",
+    file: "src/SendBatch.gs",
+    find: "    if (!(officialRows > 0)) {",
+    replace: "    if (false) {",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb2-review-no-stage",
+    why: "審閱本部分寄出後放棄不設 REVIEW_SENT",
+    file: "src/SendBatch.gs",
+    find: "  if (record.stage === MAIL_STAGES.REVIEW && processedCount > 0 && currentStage !== QUARTER_STAGE.OFFICIAL_SENT",
+    replace: "  if (false && record.stage === MAIL_STAGES.REVIEW && processedCount > 0 && currentStage !== QUARTER_STAGE.OFFICIAL_SENT",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb2-audit-old-text",
+    why: "AuditLog 照舊只寫「放棄餘下 N 位」，不講部分寄出",
+    file: "src/SendBatch.gs",
+    find: "    out.auditText = '部分寄出後放棄，餘下 {N} 位請用〔補寄未收到的人〕';\n    out.message",
+    replace: "    out.message",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb2-guard-count-off",
+    why: "把關數錯（只數 SENT），和放棄時的判斷不一致",
+    file: "src/WebAppGuards.gs",
+    find: "    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;\n    count++;",
+    replace: "    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;\n    if (String(row[C.STATUS] || '') !== 'SENT') return;\n    count++;",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
   }
 ];
 

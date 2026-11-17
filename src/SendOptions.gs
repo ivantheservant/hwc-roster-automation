@@ -293,28 +293,59 @@ function appendExtraEmailRecipients_(recipients, decision) {
  * ⚠️ 一定要記低。唔記低嘅話，日後查「點解嗰次冇附件」係查唔到嘅——
  * `EmailTemplates` 嗰一欄係當時嘅值，而幹事可能今次覆寫過。
  *
+ * 第一百一十輪批次 TB-1 組：「（幹事改過）」只在**值和預設不同**時才寫。
+ * 幹事介面的寄出窗每次都把收件範圍、附件、日曆檔明確傳入（值就是預設），
+ * 以前只看「有沒有傳入」，所以每一次寄出（包括續寄）都寫成「幹事改過」。
+ * 〔給所有人〕〔變動的人〕〔寄給堂委／執事〕的名單由後端計算，收件範圍寫按鈕名稱，不標「改過」。
+ *
  * @param {Object} decision `resolveSendOptions_()` 嘅結果
  * @returns {string} 一句
  */
 function describeSendDecision_(decision) {
   if (!decision) return '';
-  const scopeText = {
-    ALL: '全部應收的人',
-    CHANGED_ONLY: '只寄安排有改動的',
-    PICK: '自己選擇（' + decision.pickedCount + ' 位）'
-  }[decision.recipientScope] || decision.recipientScope;
+  const buttonScopeText = {
+    ALL: '給所有人',
+    CHANGED: '變動的人',
+    COMMITTEE: '寄給堂委／執事'
+  }[decision.sendMode || ''];
+  const scopeText = buttonScopeText
+    ? buttonScopeText + '（' + decision.pickedCount + ' 位）'
+    : ({
+      ALL: '全部應收的人',
+      CHANGED_ONLY: '只寄安排有改動的',
+      PICK: '自己選擇（' + decision.pickedCount + ' 位）'
+    }[decision.recipientScope] || decision.recipientScope);
   const attachText = {
     NONE: '不附',
     PERSONAL_PDF: '個人版 PDF',
     FULL_PDF: '整季 PDF'
   }[decision.attachType] || decision.attachType;
   const mark = function (on) { return on ? '（幹事改過）' : ''; };
-  const base = '收件範圍=' + scopeText + mark(decision.overridden.scope)
-    + '　附件=' + attachText + mark(decision.overridden.attachType)
-    + '　日曆檔=' + (decision.includeIcs ? '有' : '沒有') + mark(decision.overridden.includeIcs);
+  const ov = decision.overridden || {};
+  const def = decision.defaults || {};
+  const changed = sendDecisionChangedFromDefault_(ov, def, decision, !!buttonScopeText);
+  const base = '收件範圍=' + scopeText + mark(changed.scope)
+    + '　附件=' + attachText + mark(changed.attachType)
+    + '　日曆檔=' + (decision.includeIcs ? '有' : '沒有') + mark(changed.includeIcs);
   // 第四十八輪批次 A4 組第 2 點。
   const rel = decision.unsavedRelease;
   if (!rel) return base;
   return base + '　⚠️ 未儲存改動下放行：寄出第 ' + rel.versionNo + ' 版，'
     + '當時表上有 ' + rel.gridChangeCount + ' 格未儲存';
+}
+
+/**
+ * 第一百一十輪批次 TB-1 組：哪幾項是幹事真的改了（明確傳入**而且**和預設不同）。**純函式。**
+ * @param {Object} ov `decision.overridden`
+ * @param {Object} def `decision.defaults`
+ * @param {Object} decision `resolveSendOptions_()` 的結果
+ * @param {boolean} buttonScope 收件名單由按鈕（後端）決定
+ * @returns {{scope: boolean, attachType: boolean, includeIcs: boolean}}
+ */
+function sendDecisionChangedFromDefault_(ov, def, decision, buttonScope) {
+  return {
+    scope: !buttonScope && !!ov.scope && decision.recipientScope !== def.scope,
+    attachType: !!ov.attachType && decision.attachType !== def.attachType,
+    includeIcs: !!ov.includeIcs && decision.includeIcs !== def.includeIcs
+  };
 }
