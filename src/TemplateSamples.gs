@@ -223,6 +223,7 @@ function buildTemplateSamples_(quarterId, toEmail) {
     let ics = null;
     let sampleSummary = isList ? '' : summary;
     let pack = null;
+    let msgPlain = null;
     if (t.id === PRESEASON_TEMPLATE_ID) {
       const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
       const generateDate = readPreseasonGenerateDate_(quarter, config);
@@ -248,6 +249,13 @@ function buildTemplateSamples_(quarterId, toEmail) {
         { serviceDate: firstDate, postsText: UNAVAILABLE_ALL_POSTS_TC, accepted: true },
         { serviceDate: shiftDateString_(firstDate, 7), postsText: '讀經', accepted: false }
       ], buildQuarterLabel_(quarterId));
+      sampleSummary = '';
+    } else if (isPersonalLinkMessageTemplateId_(t.id)) {
+      // 第一百一十二輪批次 UC 組：〔複製訊息〕的兩個範本——不是電郵，用真正〔複製訊息〕同一支砌文字的函式（renderPersonalLinkMessageText_）
+      const dates = readUnavailableInviteDates_(quarterId);
+      msgPlain = renderPersonalLinkMessageText_(t.template, { name: personName, quarterId: quarterId, quarterLabel: buildQuarterLabel_(quarterId),
+        link: buildPersonalRosterUrl_(baseUrl || 'https://example.invalid/exec', token || 'SAMPLE', quarterId),
+        generateDate: dates.generateDate, deadline: dates.deadline });
       sampleSummary = '';
     } else if (!isList && attachTypeWantsPersonalLink_(t.template.attachType)) {
       personalUrl = buildPersonalRosterUrl_(baseUrl, token, quarterId);
@@ -275,8 +283,14 @@ function buildTemplateSamples_(quarterId, toEmail) {
       html = appendIcsNotice_(html, hasCancelled, true);
       plain = appendIcsNotice_(plain, hasCancelled, false);
     }
+    if (msgPlain !== null) {
+      // 訊息不附任何頁尾（沒有永久連結頁尾、沒有個人連結頁尾）
+      plain = msgPlain;
+      html = '<pre style="white-space:pre-wrap;font-family:inherit;">' + escapePreseasonHtml_(msgPlain) + '</pre>';
+    }
     const box = buildTemplateSampleBox_(t.id, t.where, [
       demoNote,
+      msgPlain !== null ? '這一段不是電郵：幹事在「沒有電郵的人」旁按〔複製訊息〕，貼到 WhatsApp 或短訊。' : '',
       t.inactive ? '這個範本在工作表上 Active 不是 TRUE，正式寄信不會用它。' : '',
       describeSampleAttachments_(t.template.attachType, !!ics)
     ]);

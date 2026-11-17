@@ -1625,7 +1625,7 @@
       // 第六十七輪批次 AG／AH 組：空格同已放行（三個確認框同一支）
       buildSendWarningNodes(preview.sendWarnings).forEach((n) => nodes.push(n));
       // 第七十五輪批次 CJ 組
-      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));
+      buildUnreachableNodes(preview.unreachable, { messagePurpose: 'OFFICIAL' }).forEach((n) => nodes.push(n));
       // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）
       if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));
 
@@ -1730,7 +1730,7 @@
       nodes.push(make('div', { text: r.outcomeSentence, className: 'ok-line strong' }));
     }
     // 第七十五輪批次 CJ 組：完成窗同樣列出
-    buildUnreachableNodes(r.unreachable).forEach((n) => nodes.push(n));
+    buildUnreachableNodes(r.unreachable, { messagePurpose: 'OFFICIAL' }).forEach((n) => nodes.push(n));
     // 第六十三輪批次 A 組
     if (r.publicLinkRepublished) {
       nodes.push(make('div', { text: '寄出之前，系統已經自動把公開連結更新到最新內容。', className: 'ok-line' }));

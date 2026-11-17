@@ -857,7 +857,10 @@ function buildUnreachablePeople_(quarterId, versionNo) {
     if (isNaN(v) || v < 0) return out;
     // 第七十六輪批次 DC 組：同第 4 步紙本名單同一份（`splitVersionPeopleForNotice_()`），人數一定一樣
     const split = splitVersionPeopleForNotice_(quarterId, v);
-    out.people = split.noEmail.map(function (p) { return { name: p.nameTC, reason: '沒有電郵' }; })
+    // 第一百一十二輪批次 UC 組：沒有電郵的人帶 personId 及〔複製訊息〕狀態（copyState，伺服器判斷；不帶連結或 token）；臨時幫手沒有
+    const noEmailPeople = split.noEmail.map(function (p) { return { name: p.nameTC, reason: '沒有電郵', personId: p.personId }; });
+    if (typeof attachPersonalLinkMessageState_ === 'function') attachPersonalLinkMessageState_(noEmailPeople);
+    out.people = noEmailPeople
       .concat(split.tempHelpers.map(function (t) { return { name: t.nameTC, reason: '臨時幫手' }; }));
     out.externalNameCount = split.externalNameCount;
   } catch (err) {

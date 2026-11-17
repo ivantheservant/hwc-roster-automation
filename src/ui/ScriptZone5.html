@@ -236,6 +236,12 @@
       nodes.push(renderAudiencePicker(p.audience, s, (next) => openUnavailableInvite(next)));
       nodes.push(audienceListBox('② 會收到電郵（' + (p.recipientNames || []).length + ' 位）', p.recipientNames || [], '一位都沒有。'));
       nodes.push(audienceListBox('沒有電郵，會產生 Word 檔（' + (p.noEmail || []).length + ' 位）', p.noEmail || [], '沒有。'));
+      // 第一百一十二輪批次 UC 組：沒有電郵的人逐位〔複製訊息〕（申報用的訊息；貼到 WhatsApp 或短訊）
+      if ((p.noEmailPeople || []).length > 0) {
+        const copyBox = make('div', { className: 'sec' }, [sectionTitle('沒有電郵的人：複製訊息（貼到 WhatsApp 或短訊）')]);
+        p.noEmailPeople.forEach((n) => copyBox.appendChild(buildNoEmailPersonRow(n, 'DECLARE', '')));
+        nodes.push(copyBox);
+      }
       if ((p.noLink || []).length > 0) {
         nodes.push(make('div', { text: '沒有個人專屬連結，不會寄、亦不會產生（先在「進階與診斷」〔補發個人專屬連結〕）：'
           + p.noLink.join('、'), className: 'err-text' }));
@@ -254,6 +260,11 @@
               : ('電郵：寄出 ' + r.sent + ' 封' + ((r.failed || []).length ? '，' + r.failed.length + ' 封失敗' : '')),
             className: 'ok-line'
           })];
+          if (r.paper && (r.paper.people || []).length > 0) {
+            const copyBox = make('div', { className: 'sec' }, [sectionTitle('沒有電郵的人：複製訊息（貼到 WhatsApp 或短訊）')]);
+            r.paper.people.forEach((n) => copyBox.appendChild(buildNoEmailPersonRow(n, 'DECLARE', '')));
+            done.push(copyBox);
+          }
           if (r.paper && r.paper.fileUrl) {
             done.push(make('div', { text: 'Word 檔：' + r.paper.count + ' 位沒有電郵的人（每人一頁），存在這一季的 PDF 資料夾。', className: 'ok-line' }));
             const link = make('a', { text: '開啟／下載 Word 檔' + (r.paper.fileName ? '（' + r.paper.fileName + '）' : ''), className: 'bigLink' });

@@ -584,7 +584,9 @@
    */
   const STALE_ONLY_IF_CHANGED_CALLS = {
     apiSyncPeopleFromHwcas: (r) => !!(r && r.updated > 0),
-    apiEnsureFutureQuarters: (r) => !!(r && r.created && r.created.length > 0)
+    apiEnsureFutureQuarters: (r) => !!(r && r.created && r.created.length > 0),
+    // 第一百一十二輪批次 UC 組：取得訊息只寫 AuditLog，不改畫面上的任何資料
+    apiGetPersonalLinkMessage: () => false
   };
 
   /** 第九十四輪批次 UB 組：確認者可以送出的改動（同伺服器 UNAVAILABLE_CONFIRMER_APIS 的決定那一支）。 */
@@ -992,7 +994,9 @@
     /^接受/, /^建立/, /^就是這一位/, /^取消這一筆$/, /^生成/, /^重新生成/, /^回退/, /^匯入/, /^套用/,
     /^我改好了/, /^下載及匯出$/, /^開始調整$/,
     // 第九十輪批次 QC 組：事奉人員申報〔不接受〕〔全部接受〕（〔接受〕已由 /^接受/ 涵蓋）
-    /^不接受$/, /^全部接受$/
+    /^不接受$/, /^全部接受$/,
+    // 第一百一十二輪批次 UC 組：〔複製訊息〕＝取得個人連結（等同這個人的鑰匙），只有可以修改的人
+    /^複製訊息$/
   ];
   /** 文字對上面的規則、但只是打開一個只看的畫面。 */
   const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結'];
@@ -1263,8 +1267,86 @@
    * @param {?Object} u `{people, externalNameCount, error}`
    * @returns {Element[]}
    */
-  function buildUnreachableNodes(u) {
+  /**
+   * 第一百一十二輪批次 UC 組：沒有電郵的人旁邊的〔複製訊息〕。
+   * copyState 由伺服器判斷（OK／NO_LINK／NOT_OPEN）：沒有個人連結或者還未開放 ⇒ 不出按鈕，只寫一句提示。
+   * 按了才向伺服器取得訊息（伺服器端再檢查權限、開放範圍，並寫 AuditLog 只記 PersonID）；
+   * 剪貼簿寫入失敗 ⇒ 顯示可以全選的文字框。
+   * @param {{personId: string, name: string, copyState: string}} p
+   * @param {string} purpose DECLARE（申報）或 OFFICIAL（正式發出）
+   * @returns {?HTMLElement}
+   */
+  function buildCopyMessageControl(p, purpose) {
+    if (!p || !p.personId) return null;
+    if (p.copyState === 'NO_LINK') return make('span', { text: '　還沒有個人連結，未能複製訊息', className: 'muted' });
+    if (p.copyState !== 'OK') return make('span', { text: '　現在還未開放給這位，暫時不用通知', className: 'muted' });
+    const wrap = make('span', { className: 'copy-msg' });
+    const note = make('div', { className: 'ok-line' });
+    const btn = button('複製訊息', () => runAction('複製訊息', async () => {
+      const r = await callServerMutating('apiGetPersonalLinkMessage', currentQuarterId, p.personId, purpose);
+      note.textContent = '';
+      const copied = await copyTextToClipboardAsync_(r.text);
+      if (copied) {
+        note.className = 'ok-line';
+        note.textContent = '已複製給' + (r.name || p.name) + '的訊息，請貼到 WhatsApp 或短訊。';
+        setStatus(note.textContent);
+      } else {
+        note.className = 'err-text';
+        note.textContent = '未能自動複製，請全選下面的文字再複製，然後貼到 WhatsApp 或短訊。';
+        const ta = document.createElement('textarea');
+        ta.value = r.text;
+        ta.readOnly = true;
+        ta.rows = 7;
+        ta.style.width = '100%';
+        ta.addEventListener('focus', () => ta.select());
+        note.appendChild(document.createElement('br'));
+        note.appendChild(ta);
+        ta.focus();
+        ta.select();
+      }
+    }), 'secondary');
+    wrap.appendChild(btn);
+    wrap.appendChild(note);
+    return wrap;
+  }
+
+  /** 複製到剪貼簿；回傳 true／false（不會靜靜當作成功）。 */
+  function copyTextToClipboardAsync_(text) {
+    return new Promise((resolve) => {
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          resolve(!!ok);
+        } catch (e) { resolve(false); }
+      };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => resolve(true), fallback);
+          return;
+        }
+      } catch (e) { /* 落下面那條退路 */ }
+      fallback();
+    });
+  }
+
+  /** 每人一行：名字（原因）＋〔複製訊息〕。 */
+  function buildNoEmailPersonRow(p, purpose, label) {
+    const row = make('div', { className: 'vio-row' }, [make('span', { text: '・' + p.name + (label ? '（' + label + '）' : '') })]);
+    const ctl = purpose ? buildCopyMessageControl(p, purpose) : null;
+    if (ctl) row.appendChild(ctl);
+    return row;
+  }
+
+  function buildUnreachableNodes(u, opts) {
     if (!u) return [];
+    const purpose = (opts && opts.messagePurpose) || '';
     if (u.error) {
       return [make('div', { text: '查不到哪幾位收不到電郵（' + u.error + '）。不是「全部收到」，是「查不到」。', className: 'muted' })];
     }
@@ -1273,11 +1355,10 @@
       const box = make('div', { className: 'warnbox' }, [
         make('div', { text: '這幾位收不到電郵', className: 'warn-head' })
       ]);
-      u.people.forEach((p) => box.appendChild(make('div', {
-        text: '・' + p.name + '（' + p.reason + '）', className: 'vio-row'
-      })));
+      u.people.forEach((p) => box.appendChild(buildNoEmailPersonRow(p, purpose, p.reason)));
       box.appendChild(make('div', {
-        text: '他們不會收到信。請用第 4 步〔下載及匯出〕印紙本給他們。', className: 'lines'
+        text: '他們不會收到信。請用第 4 步〔下載及匯出〕印紙本給他們'
+          + (purpose ? '，或者按〔複製訊息〕把個人連結貼到 WhatsApp。' : '。'), className: 'lines'
       }));
       nodes.push(box);
     }

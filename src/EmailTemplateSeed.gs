@@ -258,6 +258,36 @@ const EMAIL_TEMPLATE_SEEDS = [
     bodyPlain: '{PersonName}：平安！\n\n{DecisionPlain}\n\n這封信由職事表系統發出。',
     placeholders: '{QuarterLabel},{DecisionHtml},{DecisionPlain}',
     attachType: ATTACH_TYPE.NONE
+  },
+  // 第一百一十二輪批次 UC 組：沒有電郵的人——〔複製訊息〕（PersonalLinkMessage.gs；不寄電郵，幹事貼到 WhatsApp 或短訊；Stage 欄只作標記）。
+  // 申報、正式發出各一個範本；用 bodyPlain，bodyHtml 只是為了格式齊全。
+  {
+    templateId: 'TPL_PERSONAL_LINK_MESSAGE_DECLARE_TC',
+    stage: 'PERSONAL_LINK_MESSAGE',
+    lang: 'TC',
+    subject: '{QuarterLabel} 申報不能服侍的主日（訊息）',
+    bodyHtml: '<p>{PersonName}，平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，請在 {Deadline} 之前用你的個人專屬連結申報：</p>'
+      + '<p>{PersonalLink}</p>'
+      + '<p>如果這一季沒有不能服侍的日子，請在同一頁按〔我這一季沒有不能服侍的日子〕。這條連結只供你本人使用，請不要轉發。如有疑問，請聯絡{ContactName}。</p>',
+    bodyPlain: '{PersonName}，平安！{QuarterLabel}的職事表將於 {GenerateDate} 生成。如果你在這一季有不能服侍的主日，請在 {Deadline} 之前用你的個人專屬連結申報：\n'
+      + '{PersonalLink}\n'
+      + '如果這一季沒有不能服侍的日子，請在同一頁按〔我這一季沒有不能服侍的日子〕。這條連結只供你本人使用，請不要轉發。如有疑問，請聯絡{ContactName}。',
+    placeholders: '{QuarterLabel},{GenerateDate},{Deadline},{PersonalLink},{ContactName}',
+    attachType: ATTACH_TYPE.NONE
+  },
+  {
+    templateId: 'TPL_PERSONAL_LINK_MESSAGE_OFFICIAL_TC',
+    stage: 'PERSONAL_LINK_MESSAGE',
+    lang: 'TC',
+    subject: '{QuarterLabel} 職事表已經發出（訊息）',
+    bodyHtml: '<p>{PersonName}，平安！{QuarterLabel}的職事表已經發出。請用你的個人專屬連結查看你的服侍安排（之後有更新，重新打開就會看到最新內容）：</p>'
+      + '<p>{PersonalLink}</p>'
+      + '<p>這條連結只供你本人使用，請不要轉發。如有疑問或者不能如期服侍，請盡早聯絡{ContactName}。</p>',
+    bodyPlain: '{PersonName}，平安！{QuarterLabel}的職事表已經發出。請用你的個人專屬連結查看你的服侍安排（之後有更新，重新打開就會看到最新內容）：\n'
+      + '{PersonalLink}\n'
+      + '這條連結只供你本人使用，請不要轉發。如有疑問或者不能如期服侍，請盡早聯絡{ContactName}。',
+    placeholders: '{QuarterLabel},{PersonalLink},{ContactName}',
+    attachType: ATTACH_TYPE.NONE
   }
 ];
 

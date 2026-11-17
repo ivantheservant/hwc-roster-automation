@@ -356,6 +356,16 @@ function resolveInviteAudience_(selection, todayStr) {
 }
 
 /**
+ * 第一百一十二輪批次 UC 組：沒有電郵的人 ⇒ 給前端的 `{personId, name, copyState}`（沒有 token、沒有連結）。
+ * @param {Object[]} noEmailPeople `resolveInviteAudience_()` 的 noEmailPeople
+ * @returns {Object[]}
+ */
+function personalLinkMessagePeople_(noEmailPeople) {
+  const list = (noEmailPeople || []).map(function (p) { return { personId: p.personId, name: p.displayName }; });
+  return typeof attachPersonalLinkMessageState_ === 'function' ? attachPersonalLinkMessageState_(list) : list;
+}
+
+/**
  * 供前端呼叫：合併窗的內容（收件人選項、會收到電郵的人、沒有電郵的人）。**純讀取。**
  * @param {string} quarterId
  * @param {?Object} selection
@@ -375,6 +385,8 @@ function apiUnavailableLinkPreview(quarterId, selection) {
       audience: buildAudienceOptions_(AUDIENCE_PURPOSE.INVITE, today), selection: who.selection,
       recipientNames: who.recipients.map(function (r) { return r.displayName + (r.preferred ? PREFERRED_EMAIL_MARK : ''); }),   // 第一百零五輪批次 RA 組
       noEmail: who.noEmailPeople.map(function (p) { return p.displayName; }),
+      // 第一百一十二輪批次 UC 組：每位沒有電郵的人帶 personId 及〔複製訊息〕狀態（不帶 token）
+      noEmailPeople: personalLinkMessagePeople_(who.noEmailPeople),
       noLink: who.noLink,
       baseUrlMissing: !String(getConfig_(CONFIG_KEYS.WEBAPP_VOLUNTEER_URL, '') || '').trim(),
       dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
@@ -405,7 +417,8 @@ function apiUnavailableLinkSendAndExport(quarterId, selection) {
       const made = createInvitePaperDocx_(id, who.noEmailPeople);
       writeInvitePaperAudit_(id, 'DOCX', who.noEmailPeople.length);
       paper = { count: who.noEmailPeople.length, fileUrl: made.fileUrl, fileName: made.fileName,
-        names: who.noEmailPeople.map(function (p) { return p.displayName; }) };
+        names: who.noEmailPeople.map(function (p) { return p.displayName; }),
+        people: personalLinkMessagePeople_(who.noEmailPeople) };
     }
     return Object.assign({}, r, { paper: paper });
   });

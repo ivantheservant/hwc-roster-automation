@@ -130,8 +130,9 @@ console.log('\n=== CJ3：畫面 ===');
 
   const z1 = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ScriptZone1.html'), 'utf8');
   check('★★★★★ 正式發出確認窗＋完成窗都用同一個元件',
-    (z1.match(/buildUnreachableNodes\(preview\.unreachable\)/g) || []).length === 2
-      && (z1.match(/buildUnreachableNodes\(r\.unreachable\)/g) || []).length === 2);
+    // 第一百一十二輪批次 UC 組（刻意改動）：正式發出的兩個窗多傳 { messagePurpose: 'OFFICIAL' }（〔複製訊息〕）
+    (z1.match(/buildUnreachableNodes\(preview\.unreachable[,)]/g) || []).length === 2
+      && (z1.match(/buildUnreachableNodes\(r\.unreachable[,)]/g) || []).length === 2);
 
   console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
   process.exit(fail === 0 ? 0 : 1);

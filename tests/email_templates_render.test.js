@@ -275,6 +275,30 @@ function renderAllSamples() {
     attachment: '無（NONE）'
   });
 
+  // 第一百一十二輪批次 UC 組（刻意新增）：沒有電郵的人〔複製訊息〕（不寄電郵，貼到 WhatsApp 或短訊）
+  add({
+    key: 'TPL_PERSONAL_LINK_MESSAGE_DECLARE_TC',
+    template: byId.TPL_PERSONAL_LINK_MESSAGE_DECLARE_TC,
+    recipient: RECIPIENTS.personNoEmail,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', GenerateDate: '2098-12-14', Deadline: '2098-12-07', PersonalLink: 'https://example.invalid/exec?p=SAMPLE&q=2099T1' },
+    purpose: '邀請沒有電郵的事奉人員申報不能服侍的日子（幹事貼到 WhatsApp）',
+    trigger: '〔寄出／匯出申報不能服侍日子連結〕結果窗「沒有電郵的人」旁的〔複製訊息〕',
+    audience: '那一位沒有電郵的事奉人員（一次一位）',
+    attachment: '無（純文字，不是電郵）'
+  });
+  add({
+    key: 'TPL_PERSONAL_LINK_MESSAGE_OFFICIAL_TC',
+    template: byId.TPL_PERSONAL_LINK_MESSAGE_OFFICIAL_TC,
+    recipient: RECIPIENTS.personNoEmail,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', PersonalLink: 'https://example.invalid/exec?p=SAMPLE&q=2099T1' },
+    purpose: '職事表正式發出之後，通知沒有電郵的事奉人員查看自己的安排（幹事貼到 WhatsApp）',
+    trigger: '正式發出的確認窗及完成窗「這幾位收不到電郵」旁的〔複製訊息〕',
+    audience: '那一位沒有電郵的事奉人員（一次一位）',
+    attachment: '無（純文字，不是電郵）'
+  });
+
   return samples;
 }
 
