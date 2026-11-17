@@ -96,7 +96,9 @@ const WEBAPP_READ_ONLY_APIS = [
   // 第一百零一輪批次 ZD／ZG 組：自動排程狀態、個人連結工具、補建設定及範本比對、上線切換現況、使用權限、上線前檢查（只讀；
   // 使用權限、上線切換在函式內再限可以修改的人）
   'apiGetAutomationStatus', 'apiGetPersonalLinkTools', 'apiPlanSeedConfigAndTemplates', 'apiGoLivePlan', 'apiGetPermissions',
-  'apiGetPreLaunchCheck'
+  'apiGetPreLaunchCheck',
+  // 第一百一十二輪批次 UD 組：〔影音組合及協唱〕畫面（只可查看的人可以打開，全部唯讀；儲存要可以修改）
+  'apiGetRuleExtrasEditor'
 ];
 
 /**

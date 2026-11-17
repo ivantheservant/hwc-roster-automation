@@ -187,30 +187,43 @@ function readSheetRowsWithNumbers_(sheetName) {
 }
 
 /**
+ * 核對用的名單、崗位、事奉人員名單對照（`checkRuleExtrasData_()` 與儲存前核對共用）。
+ * @returns {{people: Object, posts: Object, eligible: Object}}
+ */
+function buildRuleExtrasLookups_() {
+  const N = COLUMNS.NAME_MAPPING;
+  const P = COLUMNS.POSTS;
+  const E = COLUMNS.ELIGIBILITY;
+  const people = {};
+  readSheet_(SHEETS.NAME_MAPPING).forEach(function (r) {
+    const id = String(r[N.PERSON_ID] || '').trim();
+    if (id) people[id] = { name: String(r[N.NAME_TC] || '').trim() || id, active: isTrueValue_(r[N.ACTIVE]) };
+  });
+  const posts = {};
+  readSheet_(SHEETS.POSTS).forEach(function (r) {
+    const id = String(r[P.POST_ID] || '').trim();
+    if (id) posts[id] = { name: String(r[P.POST_NAME_TC] || '').trim() || id, active: isTrueValue_(r[P.ACTIVE]) };
+  });
+  const eligible = {};
+  readOptionalSheet_(SHEETS.ELIGIBILITY).forEach(function (r) {
+    if (!isTrueValue_(r[E.ACTIVE])) return;
+    if (r[E.ELIGIBLE] !== '' && r[E.ELIGIBLE] !== undefined && !isTrueValue_(r[E.ELIGIBLE])) return;
+    eligible[String(r[E.PERSON_ID] || '').trim() + ':' + String(r[E.POST_ID] || '').trim()] = true;
+  });
+  return { people: people, posts: posts, eligible: eligible };
+}
+
+/**
  * 讀表後核對三份資料。讀不到 ⇒ null（提示不可以變成阻擋）。
  * @returns {?Object} `validateRuleExtrasData_()` 的結果
  */
 function checkRuleExtrasData_() {
   try {
-    const N = COLUMNS.NAME_MAPPING;
-    const P = COLUMNS.POSTS;
-    const E = COLUMNS.ELIGIBILITY;
-    const people = {};
-    readSheet_(SHEETS.NAME_MAPPING).forEach(function (r) {
-      const id = String(r[N.PERSON_ID] || '').trim();
-      if (id) people[id] = { name: String(r[N.NAME_TC] || '').trim() || id, active: isTrueValue_(r[N.ACTIVE]) };
-    });
-    const posts = {};
-    readSheet_(SHEETS.POSTS).forEach(function (r) {
-      const id = String(r[P.POST_ID] || '').trim();
-      if (id) posts[id] = { name: String(r[P.POST_NAME_TC] || '').trim() || id, active: isTrueValue_(r[P.ACTIVE]) };
-    });
-    const eligible = {};
-    readOptionalSheet_(SHEETS.ELIGIBILITY).forEach(function (r) {
-      if (!isTrueValue_(r[E.ACTIVE])) return;
-      if (r[E.ELIGIBLE] !== '' && r[E.ELIGIBLE] !== undefined && !isTrueValue_(r[E.ELIGIBLE])) return;
-      eligible[String(r[E.PERSON_ID] || '').trim() + ':' + String(r[E.POST_ID] || '').trim()] = true;
-    });
+    // 第一百一十二輪批次 UD 組：名單對照改由 buildRuleExtrasLookups_() 提供（〔影音組合及協唱〕儲存前核對共用）
+    const lookups = buildRuleExtrasLookups_();
+    const people = lookups.people;
+    const posts = lookups.posts;
+    const eligible = lookups.eligible;
     return validateRuleExtrasData_({
       teamRows: readSheetRowsWithNumbers_(SHEETS.POST_TEAMS),
       singerRows: readSheetRowsWithNumbers_(SHEETS.WORSHIP_BACKING_SINGERS),

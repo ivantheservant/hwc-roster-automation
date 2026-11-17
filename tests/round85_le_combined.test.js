@@ -109,7 +109,7 @@ console.log('\n=== LE5：畫面 ===');
   // 第九十輪批次 QB 組（刻意改動）：同一行最後多了〔詩班獻詩日期〕
   check('★★★★★★ 〔合堂主日〕在〔不能服侍的日期〕〔排表偏好〕同一行',
     // 第九十八輪批次 YA 組（刻意改動）：同一行多了〔預先安排領詩、司琴〕
-    JSON.stringify(rowBtns) === JSON.stringify(['不能服侍的日期', '排表偏好', '合堂主日', '詩班獻詩日期', '預先安排領詩、司琴']), JSON.stringify(rowBtns));
+    JSON.stringify(rowBtns) === JSON.stringify(['不能服侍的日期', '排表偏好', '合堂主日', '詩班獻詩日期', '預先安排領詩、司琴', '影音組合及協唱']), JSON.stringify(rowBtns));   // 第一百一十二輪批次 UD 組（刻意改動）：〔影音組合及協唱〕放在〔預先安排領詩、司琴〕旁邊
   ui.callServer = async function (name) {
     if (name === 'apiGetCombinedServices') {
       return { quarterLabel: '2028年7-9月', note: '這個設定會傳給週報系統，不會改動職事表；合堂時不需要的崗位，請在職事表自行清空。',
