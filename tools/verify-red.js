@@ -14630,6 +14630,86 @@ const MUTATIONS = [
     find: "    const undoneDesc = describePreQuarterUndone(d.preQuarter);",
     replace: "    const undoneDesc = { n: d.preQuarter && d.preQuarter.undoneItemCount, headline: '還有 ' + (d.preQuarter && d.preQuarter.undoneItemCount) + ' 項未做', detail: '' };",
     tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "uc-no-edit-guard",
+    why: "取得訊息不要求可以修改的權限",
+    file: "src/PersonalLinkMessage.gs",
+    find: "function apiGetPersonalLinkMessage(quarterId, personId, purpose) {\n  assertWebAppRequestAllowed_();\n",
+    replace: "function apiGetPersonalLinkMessage(quarterId, personId, purpose) {\n",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-ignore-rollout",
+    why: "第一階段不是堂委／執事／幹事也給訊息",
+    file: "src/PersonalLinkMessage.gs",
+    find: "  if (!isPersonalDeclareAllowed_(pid, timezone, today)) {",
+    replace: "  if (false) {",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-no-token-ok",
+    why: "沒有個人連結也當作可以複製",
+    file: "src/PersonalLinkMessage.gs",
+    find: "    if (!tokenById[id]) { out[id] = PERSONAL_LINK_MESSAGE_STATE.NO_LINK; return; }",
+    replace: "    if (!tokenById[id]) { out[id] = PERSONAL_LINK_MESSAGE_STATE.OK; return; }",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-audit-link",
+    why: "AuditLog 記下連結",
+    file: "src/PersonalLinkMessage.gs",
+    find: "    newValue: kind,\n    source: 'apiGetPersonalLinkMessage',",
+    replace: "    newValue: link,\n    source: 'apiGetPersonalLinkMessage',",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-no-audit",
+    why: "沒有寫 AuditLog",
+    file: "src/PersonalLinkMessage.gs",
+    find: "  writeAuditLog_({\n    action: PERSONAL_LINK_MESSAGE_AUDIT_ACTION,",
+    replace: "  if (false) writeAuditLog_({\n    action: PERSONAL_LINK_MESSAGE_AUDIT_ACTION,",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-token-to-ui",
+    why: "清單把 token 一併傳給前端",
+    file: "src/UnavailableInvite.gs",
+    find: "  const list = (noEmailPeople || []).map(function (p) { return { personId: p.personId, name: p.displayName }; });",
+    replace: "  const list = (noEmailPeople || []).map(function (p) { return { personId: p.personId, name: p.displayName, token: p.token }; });",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-no-fallback-box",
+    why: "剪貼簿失敗時沒有可全選的文字框",
+    file: "src/ui/Script.html",
+    find: "        ta.readOnly = true;\n",
+    replace: "",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-viewonly-open",
+    why: "只可查看的人〔複製訊息〕沒有變灰",
+    file: "src/ui/Script.html",
+    find: "    /^複製訊息$/\n  ];",
+    replace: "    /^（略）$/\n  ];",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-review-button",
+    why: "審閱窗也出現〔複製訊息〕（審閱名單不是事奉人員）",
+    file: "src/ui/ScriptZone1.html",
+    find: "      buildUnreachableNodes(preview.unreachable, { messagePurpose: 'OFFICIAL' }).forEach",
+    replace: "      buildUnreachableNodes(preview.unreachable).forEach",
+    tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "uc-sample-own-text",
+    why: "範本樣本不用正式砌文字函式",
+    file: "src/TemplateSamples.gs",
+    find: "      msgPlain = renderPersonalLinkMessageText_(t.template, {",
+    replace: "      msgPlain = String(t.template.bodyPlain) + String({",
+    tests: ["tests/round112_uc_copy_message.test.js"]
   }
 ];
 
