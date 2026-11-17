@@ -119,6 +119,8 @@ function buildPreLaunchWebItems_() {
     }).length;
   } catch (err) { nReq = 0; }
   add('沒有 Eligibility 舊 REQUEST 行', nReq === 0, nReq + ' 行（來源 REQUEST、仍然生效）', '開季前準備〔開啟事奉人員名單〕檢查，然後〔儲存並套用名單〕');
+  // 第一百一十一輪批次 SG 組：上線季度、保護清單、測試季度、上一季資料、主旨字首、使用指南、測試行、轉寄只有開發帳戶
+  if (typeof appendGoLivePreLaunchItems_ === 'function') appendGoLivePreLaunchItems_(add, config);
   return { items: items, okCount: items.filter(function (i) { return i.ok; }).length, total: items.length };
 }
 

@@ -2836,6 +2836,15 @@
     redirect.hidden = redirectText === '';
     redirect.textContent = redirectText;
     redirect.className = 'badge badge-dryrun';
+    // 第一百一十一輪批次 SG 組：自動排程最近沒有執行（頁頂紅字）
+    let auto = document.getElementById('automationAlertBadge');
+    if (!auto) {
+      auto = make('div', { className: 'badge badge-dryrun' });
+      auto.id = 'automationAlertBadge';
+      redirect.insertAdjacentElement('afterend', auto);
+    }
+    auto.textContent = String(d.automationAlert || '');
+    auto.hidden = !d.automationAlert;
   }
 
   // ── 收摺區 ───────────────────────────────────────────────────

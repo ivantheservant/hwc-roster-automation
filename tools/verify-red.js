@@ -14326,6 +14326,62 @@ const MUTATIONS = [
     find: "      const seeded = autoSeedPersonalLinkTokens_('dailyAutomationCheck_');",
     replace: "      const seeded = 0;",
     tests: ["tests/round111_sf_personal_link_auto.test.js"]
+  },
+  {
+    id: "sg-golive-started-ok",
+    why: "上線季度已開始仍然當作通過",
+    file: "src/PreLaunchGoLive.gs",
+    find: "  add('上線季度（GO_LIVE_QUARTER_ID）還未開始而且還未有版本', !started && nGoLive === 0,",
+    replace: "  add('上線季度（GO_LIVE_QUARTER_ID）還未開始而且還未有版本', nGoLive === 0,",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sg-no-backfill-list",
+    why: "只核對整季重設清單，不核對補填合堂清單",
+    file: "src/PreLaunchGoLive.gs",
+    find: "  const missBackfill = before.filter(function (q) { return backfill.indexOf(q.id) === -1; }).map(function (q) { return q.id; });",
+    replace: "  const missBackfill = [];",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sg-test-q-ignored",
+    why: "上線之後的測試季度不列出",
+    file: "src/PreLaunchGoLive.gs",
+    find: "  const testQuarters = quarters.filter(function (q) { return q.start && q.start > goLive.start && Number(versions[q.id] || 0) > 0; })",
+    replace: "  const testQuarters = quarters.filter(function (q) { return false; })",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sg-redirect-any-one",
+    why: "轉寄一個地址就當作開發帳戶（不比較）",
+    file: "src/PreLaunchGoLive.gs",
+    find: "  const ok = r.length === 0 || (r.length === 1 && !!dev && r[0] === dev);",
+    replace: "  const ok = r.length <= 1;",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sg-stale-72h",
+    why: "超過 36 小時仍然不提示",
+    file: "src/PreLaunchGoLive.gs",
+    find: "  if (!(hours <= AUTOMATION_STALE_HOURS)) {",
+    replace: "  if (!(hours <= AUTOMATION_STALE_HOURS * 2)) {",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sg-error-ignored",
+    why: "最近一次有錯誤也不提示",
+    file: "src/PreLaunchGoLive.gs",
+    find: "  if (lastRun.ok === false) return",
+    replace: "  if (false) return",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sg-no-dashboard-alert",
+    why: "狀態卡沒有自動排程紅字",
+    file: "src/WebAppDashboard.gs",
+    find: "    automationAlert: typeof readAutomationStaleAlert_ === 'function' ? readAutomationStaleAlert_() : '',",
+    replace: "    automationAlert: '',",
+    tests: ["tests/round111_sg_prelaunch_golive.test.js"]
   }
 ];
 
