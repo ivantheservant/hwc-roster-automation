@@ -271,13 +271,11 @@
         className: 'muted'
       }));
     } else if (pq.undoneItemCount > 0) {
-      const detail = (pq.items || [])
-        .filter((i) => i.count > 0)
-        .map((i) => i.label + ' ' + i.count)
-        .join('、');
+      // 第一百一十二輪批次 UB 組：數字及文字由 describePreQuarterUndone 統一（與區二標題、寄出確認窗同一個來源）
+      const desc = describePreQuarterUndone(pq);
       nodes.push(make('div', {
-        text: '另外「開季前準備」還有 ' + pq.undoneItemCount + ' 項未做'
-          + (detail ? '（' + detail + '）' : '') + '。',
+        text: '另外「開季前準備」' + desc.headline
+          + (desc.detail ? '（' + desc.detail + '）' : '') + '。',
         className: 'lines'
       }));
     }
@@ -1300,14 +1298,13 @@
     buildUnreachableNodes(r.unreachable).forEach((n) => nodes.push(n));
 
     // 規格 2.5 最後一段：區二未做完 >0 就提一提。
-    const undone = d.preQuarter && d.preQuarter.undoneItemCount;
+    // 第一百一十二輪批次 UB 組：數字及文字由 describePreQuarterUndone 統一
+    const undoneDesc = describePreQuarterUndone(d.preQuarter);
+    const undone = undoneDesc.n;
     if (undone > 0) {
-      const bits = (d.preQuarter.items || [])
-        .filter((i) => i.count > 0)
-        .map((i) => i.label + ' ' + i.count);
       nodes.push(make('div', { className: 'warnbox' }, [
         make('div', {
-          text: '提提你：開季前準備還有 ' + undone + ' 項未做（' + bits.join('、') + '）。'
+          text: '提提你：開季前準備' + undoneDesc.headline + '（' + undoneDesc.detail + '）。'
             + '堂委看到的表會有空格。',
           className: 'err-text'
         })

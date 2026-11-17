@@ -21,14 +21,16 @@
     const pq = d.preQuarter || { undoneItemCount: 0, items: [] };
     const countNode = el('zone2Count');
 
-    if (pq.undoneItemCount < 0) {
+    // 第一百一十二輪批次 UB 組：標題數字只計現階段做得到的項目；文字由 describePreQuarterUndone 統一
+    const desc = describePreQuarterUndone(pq);
+    if (desc.state === 'unknown') {
       // 後端算唔到。**唔可以顯示「全部做好了」**——嗰個等於話「檢查過冇問題」。
-      countNode.textContent = '（暫時查不到）';
+      countNode.textContent = desc.headline;
       countNode.className = 'zone-count warn';
       setZoneOpen('zone2Head', 'zone2Body', true);
       markZoneLoaded('zone2Body');
-    } else if (pq.undoneItemCount === 0) {
-      countNode.textContent = '全部做好了';
+    } else if (desc.state === 'done') {
+      countNode.textContent = desc.headline + (desc.afterText ? '；' + desc.afterText : '');
       countNode.className = 'zone-count ok';
       // ⚠️ 第四十三輪批次 H 組：Ivan 要求呢一組**預設展開**。
       // 佢每一季第一件做嘅事就係呢度（改名單、標特別主日）——
@@ -36,7 +38,7 @@
       setZoneOpen('zone2Head', 'zone2Body', true);
       markZoneLoaded('zone2Body');
     } else {
-      countNode.textContent = '還有 ' + pq.undoneItemCount + ' 項未做';
+      countNode.textContent = desc.headline + (desc.afterText ? '；' + desc.afterText : '');
       countNode.className = 'zone-count warn';
       setZoneOpen('zone2Head', 'zone2Body', true);
       // `setZoneOpen()` 係直接開，唔會行 `wireZoneToggle()` 嗰條路，
@@ -126,15 +128,26 @@
     } else if (st && st.totalBlanks === 0) {
       summary.appendChild(make('div', { text: '✅ 人手檢查：足夠', className: 'vio-row muted' }));
     }
-    (pq.items || []).forEach((i) => {
+    // 第一百一十二輪批次 UB 組：分兩段——「生成之前要做」及「生成之後才做」
+    const renderItem = (i, notYet) => {
       summary.appendChild(make('div', {
-        text: (i.count > 0 ? '⬜ ' : '✅ ') + i.label + '：' + i.count
+        text: (i.count > 0 ? (notYet ? '⏳ ' : '⬜ ') : '✅ ') + i.label + '：' + i.count
           + (i.count > 0 ? ' 項' : ' 項（做好了）')
           // 第七十五輪批次 CD 組：講員／翻譯／獻花嘅提示（「生成之後在職事表直接填」）
           + (i.count > 0 && i.hint ? '——' + i.hint : ''),
-        className: i.count > 0 ? 'vio-row' : 'vio-row muted'
+        className: i.count > 0 && !notYet ? 'vio-row' : 'vio-row muted'
       }));
-    });
+    };
+    const allItems = pq.items || [];
+    const beforeItems = allItems.filter((i) => i.phase !== 'AFTER');
+    const afterItems = allItems.filter((i) => i.phase === 'AFTER');
+    const notGenerated = pq.generated === false;
+    if (afterItems.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));
+    beforeItems.forEach((i) => renderItem(i, false));
+    if (afterItems.length > 0) {
+      summary.appendChild(sectionTitle(notGenerated ? '生成之後才做（現在還做不到，不計入上面的數字）：' : '生成之後要做：'));
+      afterItems.forEach((i) => renderItem(i, notGenerated));
+    }
     body.appendChild(summary);
   }
 

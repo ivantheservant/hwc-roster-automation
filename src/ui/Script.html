@@ -1214,6 +1214,25 @@
   }
   function sectionTitle(text) { return make('div', { text: text, className: 'sec-title' }); }
 
+  /**
+   * 第一百一十二輪批次 UB 組：開季前準備「還有 N 項未做」的文字——區二標題、寄出確認窗、完成窗**都用這一支**，數字來自同一個伺服器函式
+   * （planPreQuarterChecklist_），不會兩處不一致。
+   * 回傳 { state: 'unknown'|'done'|'todo', n, headline, afterText, detail }：
+   *   - unknown：查不到（不可以當成做好了）
+   *   - done：現階段的項目全部做好 ⇒ 「開季前準備已完成」；afterText＝「生成之後還有 N 項」（沒有就空白）
+   *   - todo：「還有 N 項未做」；detail＝逐項數字
+   */
+  function describePreQuarterUndone(pq) {
+    pq = pq || {};
+    const n = pq.undoneItemCount;
+    if (typeof n !== 'number' || n < 0) return { state: 'unknown', n: -1, headline: '（暫時查不到）', afterText: '', detail: '' };
+    const after = pq.generated === false && pq.afterGenerationCount > 0 ? '生成之後還有 ' + pq.afterGenerationCount + ' 項' : '';
+    if (n === 0) return { state: 'done', n: 0, headline: '開季前準備已完成', afterText: after, detail: '' };
+    const isNow = (i) => pq.generated === false ? i.phase !== 'AFTER' : true;
+    const detail = (pq.items || []).filter((i) => i.count > 0 && isNow(i)).map((i) => i.label + ' ' + i.count).join('、');
+    return { state: 'todo', n: n, headline: '還有 ' + n + ' 項未做', afterText: after, detail: detail };
+  }
+
   /** 第一百零一輪批次 ZA-3：去掉結尾尊稱才配對到的名字，確認窗逐個寫明「『某某姊妹』當作『某某』」。沒有 ⇒ null。 */
   function honorificMatchBox(list) {
     if (!list || list.length === 0) return null;

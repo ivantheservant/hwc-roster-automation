@@ -37,6 +37,13 @@ function isCombinedServiceRow_(row) {
 /** 第七十五輪批次 CD 組：講員／翻譯／獻花未填時嘅提示。 */
 const MANUAL_FILL_HINT_TC = '生成之後在職事表直接填';
 
+/**
+ * 第一百一十二輪批次 UB 組：清單項目屬哪個階段。
+ * BEFORE＝生成之前就做得到（特別主日確認、合堂跳過崗位）；
+ * AFTER＝要生成之後才做得到（講員、翻譯、獻花、領詩、司琴等在職事表直接填）。
+ */
+const PRE_QUARTER_PHASE = { BEFORE: 'BEFORE', AFTER: 'AFTER' };
+
 /** 第九十一輪批次 RA 組：講員／翻譯／獻花以外的人手填寫崗位，清單項目 id＝這個前綴＋PostID。 */
 const MANUAL_EMPTY_ITEM_PREFIX = 'manualEmpty_';
 
@@ -94,28 +101,37 @@ function planPreQuarterChecklist_(input) {
   // 第七十五輪批次 CC 組：特別主日關咗（`specialEnabled === false`）⇒ 唔再列「特別主日日期未確認」
   //「合堂未指定跳過崗位」兩項。冇傳（舊呼叫端／純函式測試）⇒ 照舊列。
   const specialItems = input.specialEnabled === false ? [] : [
-    { id: 'specialUnconfirmed', label: '特別主日日期未確認', count: specialUnconfirmed },
-    { id: 'combinedNoSkip', label: '合堂未指定跳過崗位', count: combinedNoSkip }
+    { id: 'specialUnconfirmed', label: '特別主日日期未確認', count: specialUnconfirmed, phase: PRE_QUARTER_PHASE.BEFORE },
+    { id: 'combinedNoSkip', label: '合堂未指定跳過崗位', count: combinedNoSkip, phase: PRE_QUARTER_PHASE.BEFORE }
   ];
   const items = specialItems.concat([
     // 第七十五輪批次 CD 組：提示「生成之後在職事表直接填」（〔填講員／翻譯／獻花〕已拿走）
-    { id: 'preacherEmpty', label: '講員未填', count: countEmptyWeeks(input.preacherPostId), hint: MANUAL_FILL_HINT_TC },
+    { id: 'preacherEmpty', label: '講員未填', count: countEmptyWeeks(input.preacherPostId), hint: MANUAL_FILL_HINT_TC, phase: PRE_QUARTER_PHASE.AFTER },
     {
       id: 'translationEmpty',
       label: '翻譯未填',
       count: countEmptyWeeks(input.translationPostId, function (d) { return d.translationRequired === true; }),
-      hint: MANUAL_FILL_HINT_TC
+      hint: MANUAL_FILL_HINT_TC,
+      phase: PRE_QUARTER_PHASE.AFTER
     },
-    { id: 'flowerEmpty', label: '獻花未填', count: countEmptyWeeks(input.flowerPostId), hint: MANUAL_FILL_HINT_TC }
+    { id: 'flowerEmpty', label: '獻花未填', count: countEmptyWeeks(input.flowerPostId), hint: MANUAL_FILL_HINT_TC, phase: PRE_QUARTER_PHASE.AFTER }
   ]).concat((input.otherManualPosts || []).map(function (p) {
     // 第九十一輪批次 RA 組：其他人手填寫的崗位（Posts.AutoGenerate=FALSE，例如領詩、司琴）逐個列出
     return { id: MANUAL_EMPTY_ITEM_PREFIX + p.postId, label: p.postNameTC + '未填', count: countEmptyWeeks(p.postId),
-      hint: MANUAL_FILL_HINT_TC };
+      hint: MANUAL_FILL_HINT_TC, phase: PRE_QUARTER_PHASE.AFTER };
   }));
 
+  // 第一百一十二輪批次 UB 組（Ivan 決定）：還沒有生成（`input.generated === false`）⇒ 標題數字只計現階段做得到的項目
+  // （BEFORE）；「生成之後才做」的項目另外數（afterGenerationCount）。已經生成，或呼叫端沒有傳（舊呼叫端）⇒ 全部計。
+  const generated = input.generated !== false;
+  const undone = items.filter(function (i) { return i.count > 0; });
+  const counted = generated ? undone : undone.filter(function (i) { return i.phase !== PRE_QUARTER_PHASE.AFTER; });
   return {
     // N ＝ count > 0 嘅**項數**，唔係全部 count 加埋。
-    undoneItemCount: items.filter(function (i) { return i.count > 0; }).length,
+    undoneItemCount: counted.length,
+    // 生成之前：生成之後才做的項目有幾項未做（已經生成 ⇒ 0，因為已經計入 undoneItemCount）
+    afterGenerationCount: generated ? 0 : undone.length - counted.length,
+    generated: generated,
     items: items
   };
 }
@@ -282,6 +298,8 @@ function buildPreQuarterChecklistInputs_(quarterId) {
     flowerPostId: postIds.flowerPostId,
     otherManualPosts: otherManualPosts,
     versionNo: versionNo,
+    // 第一百一十二輪批次 UB 組：已經有版本（生成過）？
+    generated: versionNo >= 0,
     timezone: timezone
   };
 }
@@ -310,6 +328,8 @@ function apiGetPreQuarterChecklist(quarterId) {
 
   return {
     undoneItemCount: checklist.undoneItemCount,
+    afterGenerationCount: checklist.afterGenerationCount,
+    generated: checklist.generated,
     items: checklist.items,
     peopleHints: peopleHints
   };
