@@ -254,6 +254,10 @@
     display: flex; align-items: center; gap: 7px; font-size: var(--fs-hint); cursor: pointer; padding: 2px 0;
   }
   .check-row.inline { display: inline-flex; margin-right: 12px; }
+  /* 第一百一十三輪 UD 組：〔影音組合及協唱〕每一行有很多控件，窄視窗要換行，標籤不可以逐字直排 */
+  .rx-row { flex-wrap: wrap; row-gap: 6px; cursor: default; }
+  .rx-row > * { flex: 0 0 auto; }
+  .rx-row > input[type="text"] { flex: 1 1 8em; min-width: 8em; max-width: 100%; }
   .radio-row.is-off { color: var(--muted); cursor: not-allowed; }
 
   .tag {

@@ -368,6 +368,12 @@ console.log('\n=== UD7：畫面 ===');
     const pv = view();
     check('★★★★★ 現有資料問題逐項列出；工作表未建立有說明；格式不對的例外會移除；空的三段有「現在沒有…」', /現有資料有 1 項問題/.test(pv.text) && /名單上找不到/.test(pv.text) && /第一次儲存時會自動建立/.test(pv.text)
       && /詩班獻詩日的例外設定有 1 項格式不對（X1），儲存時會移除/.test(pv.text) && /現在沒有影音組合/.test(pv.text) && /現在沒有協唱/.test(pv.text) && /現在沒有例外/.test(pv.text), pv.text.slice(0, 400));
+    // 第一百一十三輪：窄視窗每一行要換行，標籤不可以逐字直排（部署後在 800 闊的窗格見到標籤直排）
+    const style = read('src/ui/Style.html');
+    const zone2 = read('src/ui/ScriptZone2.html');
+    const udBlock = zone2.slice(zone2.indexOf('第一百一十二輪批次 UD 組：〔影音組合及協唱〕\n'), zone2.indexOf('/** 第一百零一輪批次 ZC-3：合併後的按鈕名稱'));
+    check('★★★★★★ 每一行（組合名稱列、成員列、協唱列、詩班例外列）都用 rx-row；rx-row 可以換行、標籤不換字',
+      (udBlock.match(/className: 'check-row rx-row'/g) || []).length === 4 && /\.rx-row \{[^}]*flex-wrap: wrap/.test(style) && /\.rx-row > \* \{ flex: 0 0 auto; \}/.test(style));
     // 畫面原始碼沒有程式用字
     const z2 = read('src/ui/ScriptZone2.html');
     const block = z2.slice(z2.indexOf('第一百一十二輪批次 UD 組：〔影音組合及協唱〕\n'), z2.indexOf('/** 第一百零一輪批次 ZC-3：合併後的按鈕名稱'));

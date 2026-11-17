@@ -406,7 +406,7 @@
     const teamSec = make('div', { className: 'sec' }, [sectionTitle('影音組合'), para((data.explain || {}).teams || '', 'muted')]);
     state.teams.forEach((t, ti) => {
       const box = make('div', { className: 'sec' });
-      const head = make('div', { className: 'check-row' }, [make('span', { text: '組合名稱　' }),
+      const head = make('div', { className: 'check-row rx-row' }, [make('span', { text: '組合名稱　' }),
         ruleExtrasText_(t.teamId, '例如：音控組', (v) => { t.teamId = v; }, ro),
         make('span', { text: '　每月一起服侍　' }),
         ruleExtrasSelect_(Array.from({ length: opt.maxPerMonth || 8 }, (_, i) => ({ value: String(i + 1), label: (i + 1) + ' 次' })), String(t.perMonth),
@@ -414,7 +414,7 @@
       if (!ro) head.appendChild(button('移除這一組', () => { state.teams.splice(ti, 1); redraw(); }, 'secondary'));
       box.appendChild(head);
       t.members.forEach((m, mi) => {
-        const line = make('div', { className: 'check-row' });
+        const line = make('div', { className: 'check-row rx-row' });
         line.appendChild(ruleExtrasSelect_(personOptions(idsForPosts(m.postIds), m.personId, true), m.personId, (v) => { m.personId = v; redraw(); }, ro));
         // 崗位：勾選（取消勾選＝移除這個崗位）；再加其他崗位
         line.appendChild(make('span', { text: '　崗位：' }));
@@ -451,7 +451,7 @@
     const singerSec = make('div', { className: 'sec' }, [sectionTitle('協唱'), para((data.explain || {}).singers || '', 'muted')]);
     const leaderIds = eligibleByPost[opt.worshipPostId] || [];
     state.singers.forEach((s, si) => {
-      const line = make('div', { className: 'check-row' });
+      const line = make('div', { className: 'check-row rx-row' });
       line.appendChild(make('span', { text: '領詩　' }));
       line.appendChild(ruleExtrasSelect_(personOptions(leaderIds, s.leaderPersonId, true), s.leaderPersonId, (v) => { s.leaderPersonId = v; }, ro));
       line.appendChild(make('span', { text: '　協唱　' }));
@@ -476,7 +476,7 @@
     const choirSec = make('div', { className: 'sec' }, [sectionTitle('詩班獻詩日照樣可以擔任的崗位'), para((data.explain || {}).choir || '', 'muted')]);
     const choirIds = eligibleByPost[opt.choirPostId] || [];
     state.choir.forEach((c, ci) => {
-      const line = make('div', { className: 'check-row' });
+      const line = make('div', { className: 'check-row rx-row' });
       line.appendChild(ruleExtrasSelect_(personOptions(choirIds, c.personId, true), c.personId, (v) => { c.personId = v; redraw(); }, ro));
       line.appendChild(make('span', { text: '　崗位　' }));
       const postIdsOk = c.personId ? posts.filter((p) => (eligibleByPost[p.postId] || []).indexOf(c.personId) !== -1) : posts;

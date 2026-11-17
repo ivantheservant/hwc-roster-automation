@@ -14846,6 +14846,30 @@ const MUTATIONS = [
     find: "if (seenTeam[teamId]) fail(",
     replace: "if (false) fail(",
     tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-ui-no-wrap",
+    why: "〔影音組合及協唱〕每一行不換行（窄視窗標籤逐字直排）",
+    file: "src/ui/Style.html",
+    find: ".rx-row { flex-wrap: wrap; row-gap: 6px; cursor: default; }",
+    replace: ".rx-row { row-gap: 6px; cursor: default; }",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-ui-label-shrink",
+    why: "控件可以縮小（標籤逐字直排）",
+    file: "src/ui/Style.html",
+    find: ".rx-row > * { flex: 0 0 auto; }",
+    replace: ".rx-row > * { flex: 0 1 auto; }",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-ui-member-row-old",
+    why: "成員列改回不換行的舊樣式",
+    file: "src/ui/ScriptZone2.html",
+    find: "        const line = make('div', { className: 'check-row rx-row' });\n        line.appendChild(ruleExtrasSelect_(personOptions(idsForPosts(m.postIds)",
+    replace: "        const line = make('div', { className: 'check-row' });\n        line.appendChild(ruleExtrasSelect_(personOptions(idsForPosts(m.postIds)",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
   }
 ];
 
