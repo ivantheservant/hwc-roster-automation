@@ -14502,6 +14502,22 @@ const MUTATIONS = [
     find: "        report.push(dailyBackupStep_(today, isDryRun));",
     replace: "",
     tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "sj-selftest-sandbox",
+    why: "〔自我測試〕改讀自測機的沙盒季度鍵（兩個鍵混用）",
+    file: "src/SelfTest.gs",
+    find: "  const configured = String(getConfig_(CONFIG_KEYS.SELF_TEST_QUARTER_ID, '') || '').trim();",
+    replace: "  const configured = String(getConfig_(CONFIG_KEYS.SELFTEST_QUARTER_ID, '') || '').trim();",
+    tests: ["tests/round111_sj_small_items.test.js"]
+  },
+  {
+    id: "sj-remaining-released",
+    why: "「仍然違反」把已放行的格也列出",
+    file: "src/SuggestionSheet.gs",
+    find: "      return !releasedCellKeys[k] && !keptKeys[k];",
+    replace: "      return !keptKeys[k];",
+    tests: ["tests/round111_sj_small_items.test.js"]
   }
 ];
 
