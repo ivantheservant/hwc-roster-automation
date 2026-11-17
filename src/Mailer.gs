@@ -1746,7 +1746,10 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   const reasonLines = [];
   // 第二十五輪批次階段 A2：自動生成已經關閉，所以「到期咗仲未生成」
   // 唔再係「等系統做」，而係「等你去撳掣」——文案一定要講到係幹事要做。
-  if (judgment.reasons.indexOf('NOT_GENERATED') !== -1) {
+  if (judgment.reasons.indexOf('NOT_GENERATED') !== -1 && judgment.quarterStarted) {
+    // 第一百一十一輪批次 SH 組：第一個主日已過
+    reasonLines.push('　• 這一季已經開始（第一個主日 ' + (judgment.firstServiceDate || '') + '），系統內沒有職事表；如果是人手排的，請匯入');
+  } else if (judgment.reasons.indexOf('NOT_GENERATED') !== -1) {
     reasonLines.push('　• 原定 ' + (judgment.generateDueDate || '（未設定日期）')
       + ' 生成初稿，已經過了 ' + judgment.daysSinceGenerateDue + ' 天，但這一季還沒有任何版本');
   }
@@ -1776,11 +1779,15 @@ function notifyAdminStageReminder_(quarterId, judgment, config, isDryRun) {
   // 第二十五輪批次階段 A2：完全沒有版本時，「下一步」不是 Stage 對照表那一項，
   // 而是去撳「生成初稿」。照用 STAGE_NEXT_ACTION 會叫幹事去做一件他做不到的事
   // （沒有版本，那些掣全部是灰的）。
-  const nextStepText = notGenerated
+  const nextStepText = notGenerated && judgment.quarterStarted
+    ? '如果這一季是人手排的，請在幹事介面「進階與診斷」按〔建立匯入表〕，貼上之後按〔檢查並匯入〕；否則請在第 1 步按生成職事表的按鈕。'
+    : notGenerated
     ? '請開啟幹事介面，在第 1 步按生成職事表的按鈕。系統不會自行生成——一定要由你按。'
     : '下一步請執行' + nextActionText + '。';
 
-  const countText = notGenerated
+  const countText = notGenerated && judgment.quarterStarted
+    ? '這一季已經開始，這一項提醒改為每 ' + REMIND_STARTED_INTERVAL_DAYS + ' 日一次，直到生成或匯入職事表，或者這一季結束為止。'
+    : notGenerated
     ? '這一項提醒不設次數上限，會每天提醒一次，直到你生成了初稿為止。\n'
       + '如果這一季其實不需要再排（例如只是用來測試或培訓），'
       + '請把 Quarters 工作表上這一季的 GenerateOn 清空，就不會再收到這封信。'

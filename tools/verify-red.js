@@ -14382,6 +14382,54 @@ const MUTATIONS = [
     find: "    automationAlert: typeof readAutomationStaleAlert_ === 'function' ? readAutomationStaleAlert_() : '',",
     replace: "    automationAlert: '',",
     tests: ["tests/round111_sg_prelaunch_golive.test.js"]
+  },
+  {
+    id: "sh-no-end-stop",
+    why: "季度結束後仍然提醒",
+    file: "src/Trigger.gs",
+    find: "  if (quarterEnd && today > quarterEnd) {",
+    replace: "  if (false) {",
+    tests: ["tests/round111_sh_not_generated_stop.test.js"]
+  },
+  {
+    id: "sh-started-daily",
+    why: "季度已開始仍然每日提醒",
+    file: "src/Trigger.gs",
+    find: "    if (quarterStarted && lastReminded && daysBetween_(lastReminded, today) < REMIND_STARTED_INTERVAL_DAYS) {",
+    replace: "    if (false) {",
+    tests: ["tests/round111_sh_not_generated_stop.test.js"]
+  },
+  {
+    id: "sh-started-from-start",
+    why: "以季度開始日（不是第一個主日）判斷已開始",
+    file: "src/Trigger.gs",
+    find: "    if (dates.length > 0) return dates[0].serviceDate;",
+    replace: "    if (false) return dates[0].serviceDate;",
+    tests: ["tests/round111_sh_not_generated_stop.test.js"]
+  },
+  {
+    id: "sh-silent-any-reason",
+    why: "不論原因，記錄過一次就不再記錄",
+    file: "src/Trigger.gs",
+    find: "    return notes.indexOf('Config 關掉，沒有寄出') !== -1 && notes.slice(-tail.length) === tail;",
+    replace: "    return notes.indexOf('Config 關掉，沒有寄出') !== -1;",
+    tests: ["tests/round111_sh_not_generated_stop.test.js"]
+  },
+  {
+    id: "sh-skipaudit-ignored",
+    why: "workFn 說不用寫仍然寫 AuditLog（每日一行）",
+    file: "src/Trigger.gs",
+    find: "    if (result && typeof result === 'object' && result.skipAudit) {",
+    replace: "    if (false) {",
+    tests: ["tests/round111_sh_not_generated_stop.test.js"]
+  },
+  {
+    id: "sh-mail-old-text",
+    why: "已開始仍然寫「原定生成」舊內容",
+    file: "src/Mailer.gs",
+    find: "  if (judgment.reasons.indexOf('NOT_GENERATED') !== -1 && judgment.quarterStarted) {",
+    replace: "  if (false) {",
+    tests: ["tests/round111_sh_not_generated_stop.test.js"]
   }
 ];
 

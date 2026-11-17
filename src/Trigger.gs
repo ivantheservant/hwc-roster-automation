@@ -163,11 +163,17 @@ function dailyAutomationCheck_() {
 
         const remindJudgment = judgeRemindAction_(quarterId, row, today, config);
         report.push(executeAutomationAction_(remindJudgment, today, function () {
+          // 第一百一十一輪批次 SH 組：Config 關掉而沒有寄出 ⇒ 同一季同一原因只寫第一次 AuditLog（不再每日一行）
+          const reasonsKey = describeRemindReasonsKey_(remindJudgment);
+          if (getConfig_(CONFIG_KEYS.ADMIN_NOTIFY_STAGE_REMINDERS, false) !== true
+            && hasSilentReminderLogged_(readSheet_(SHEETS.AUDIT_LOG), remindJudgment.targetKey, reasonsKey)) {
+            return { skipAudit: true, notes: '階段提醒（Config 關掉，沒有寄出；同一原因已記錄過，不再寫）：' + quarterId + '（' + reasonsKey + '）' };
+          }
           // 第一百零一輪批次 ZB 組：Config ADMIN_NOTIFY_STAGE_REMINDERS（預設 FALSE）關掉 ⇒ 不寄，只寫 AuditLog
           const sent = notifyAdminStageReminderIfEnabled_(quarterId, remindJudgment, config, isDryRun);
           return '第 ' + (remindJudgment.reminderCount + 1) + ' / ' + remindJudgment.maxCount
             + (sent ? ' 次提醒幹事：' : ' 次階段提醒（Config 關掉，沒有寄出）：') + quarterId + ' 停留在 ' + remindJudgment.stage
-            + '（' + remindJudgment.reasons.join('＋') + '）';
+            + '（' + reasonsKey + '）';
         }));
 
         // 第八十五輪批次 LF 組：生成日之前 N 日自動寄季前資料（只寫 AuditLog，不寫 SendLog、不改 Stage）。
@@ -450,6 +456,14 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   }
 
   const timezone = config[CONFIG_KEYS.SYS_TIMEZONE] || DEFAULTS.TIMEZONE;
+  // 第一百一十一輪批次 SH 組：季度結束日已過 ⇒ 不再提醒（任何原因）
+  const quarterEnd = toDateString_(quarterRow ? quarterRow[COLUMNS.QUARTERS.END_DATE] : '', timezone);
+  if (quarterEnd && today > quarterEnd) {
+    return Object.assign({}, base, {
+      outcome: 'SKIPPED_QUARTER_ENDED', detail: '這一季已經在 ' + quarterEnd + ' 結束，不再提醒',
+      reasons: [], reminderCount: 0, maxCount: maxCount, daysStuck: null, daysUntilDeadline: null
+    });
+  }
   const reminderLog = readReminderLog_(quarterId, stage, timezone);
   const reminderCount = reminderLog.length;
   const schedulePeek = computeAutomationSchedule_(quarterRow, config);
@@ -471,6 +485,25 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
   const notGeneratedTriggered = !!schedulePeek.generateDate
     && today >= schedulePeek.generateDate
     && findLatestVersionNo_(quarterId) < 0;
+
+  // 第一百一十一輪批次 SH 組：第一個主日已過而仍然沒有版本 ⇒ 改為每 7 日一次，內容改為「這一季已經開始……請匯入」。
+  // 第一個主日之前照舊每日一次，直至生成。
+  let quarterStarted = false;
+  let firstServiceDate = '';
+  if (notGeneratedTriggered) {
+    firstServiceDate = findFirstServiceDateForRemind_(quarterId, quarterRow, timezone);
+    quarterStarted = !!firstServiceDate && today >= firstServiceDate;
+    const lastReminded = reminderLog.length ? reminderLog.slice().sort()[reminderLog.length - 1] : '';
+    if (quarterStarted && lastReminded && daysBetween_(lastReminded, today) < REMIND_STARTED_INTERVAL_DAYS) {
+      return Object.assign({}, base, {
+        outcome: 'SKIPPED_NOT_DUE',
+        detail: '這一季已經開始（第一個主日 ' + firstServiceDate + '）而沒有版本：每 ' + REMIND_STARTED_INTERVAL_DAYS
+          + ' 日提醒一次，上一次是 ' + lastReminded,
+        reasons: [], reminderCount: reminderCount, maxCount: maxCount, daysStuck: null, daysUntilDeadline: null,
+        quarterStarted: true, firstServiceDate: firstServiceDate
+      });
+    }
+  }
 
   if (!notGeneratedTriggered && reminderCount >= maxCount) {
     return Object.assign({}, base, {
@@ -573,7 +606,9 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
       // 呢個維度冇上限，所以唔可以寫「第 N / M 次」——寫咗就係講緊
       // 一個唔存在嘅上限，幹事會以為「再等幾日就唔會再嘈」。
       ? '第 ' + (reminderCount + 1) + ' 次提醒（' + reasons.join('＋')
-        + '；未生成初稿這一項沒有次數上限，直到生成為止）'
+        + (quarterStarted
+          ? '；這一季已經開始（第一個主日 ' + firstServiceDate + '）而系統內沒有職事表，每 ' + REMIND_STARTED_INTERVAL_DAYS + ' 日提醒一次，直到生成、匯入或這一季結束）'
+          : '；未生成初稿這一項沒有次數上限，直到生成為止）')
       : '第 ' + (reminderCount + 1) + ' / ' + maxCount + ' 次提醒（' + reasons.join('＋') + '）',
     reasons: reasons, reminderCount: reminderCount, maxCount: maxCount,
     daysStuck: daysStuck, daysUntilDeadline: daysUntilDeadline, stuckDays: stuckDays,
@@ -581,7 +616,55 @@ function judgeRemindAction_(quarterId, quarterRow, today, config) {
     daysUntilGenerate: daysUntilGenerate, unconfirmedLeadDays: unconfirmedLeadDays,
     unconfirmedSpecials: unconfirmedSpecials,
     generateDueDate: schedulePeek.generateDate || '',
-    daysSinceGenerateDue: daysSinceGenerateDue
+    daysSinceGenerateDue: daysSinceGenerateDue,
+    quarterStarted: quarterStarted,
+    firstServiceDate: firstServiceDate
+  });
+}
+
+/** 第一百一十一輪批次 SH 組：這一季已經開始而沒有版本時，「未生成」提醒的間隔（日）。 */
+const REMIND_STARTED_INTERVAL_DAYS = 7;
+
+/**
+ * 第一百一十一輪批次 SH 組：這一季第一個主日（ServiceDates；沒有 ⇒ Quarters.StartDate）。讀不到 ⇒ ''。
+ * @param {string} quarterId
+ * @param {Object} quarterRow
+ * @param {string} timezone
+ * @returns {string}
+ */
+function findFirstServiceDateForRemind_(quarterId, quarterRow, timezone) {
+  try {
+    const dates = readServiceDatesNormalized_(quarterId, timezone);
+    if (dates.length > 0) return dates[0].serviceDate;
+  } catch (err) {
+    log_('WARN', '讀不到 ' + quarterId + ' 的主日，改用季度開始日：' + err.message);
+  }
+  return toDateString_(quarterRow ? quarterRow[COLUMNS.QUARTERS.START_DATE] : '', timezone) || '';
+}
+
+/**
+ * 第一百一十一輪批次 SH 組：提醒的原因（AuditLog 用；「已開始」與「未開始」當作不同原因）。**純函式。**
+ * @param {Object} judgment judgeRemindAction_() 的結果
+ * @returns {string}
+ */
+function describeRemindReasonsKey_(judgment) {
+  return (judgment.reasons || []).join('＋') + (judgment.quarterStarted ? '（這一季已開始）' : '');
+}
+
+/**
+ * 第一百一十一輪批次 SH 組：同一季同一個 Stage、同一原因，Config 關掉而沒有寄出的提醒是否已經記錄過。**純函式。**
+ * @param {Object[]} auditRows AuditLog 各行
+ * @param {string} targetKey 'quarterId|stage'
+ * @param {string} reasonsKey describeRemindReasonsKey_()
+ * @returns {boolean}
+ */
+function hasSilentReminderLogged_(auditRows, targetKey, reasonsKey) {
+  const C = COLUMNS.AUDIT_LOG;
+  const tail = '（' + reasonsKey + '）';
+  return (auditRows || []).some(function (r) {
+    if (r[C.ACTION] !== AUTOMATION_ACTIONS.REMIND || r[C.TARGET_KEY] !== targetKey) return false;
+    const notes = String(r[C.NOTES] || '');
+    return notes.indexOf('Config 關掉，沒有寄出') !== -1 && notes.slice(-tail.length) === tail;
   });
 }
 
@@ -624,7 +707,12 @@ function executeAutomationAction_(judgment, today, workFn) {
   const targetKey = judgment.targetKey || judgment.quarterId;
 
   try {
-    const notes = workFn();
+    const result = workFn();
+    // 第一百一十一輪批次 SH 組：workFn 回 {skipAudit: true, notes} ⇒ 照做但不寫 AuditLog（例如同一原因已記錄過的「沒有寄出」）
+    if (result && typeof result === 'object' && result.skipAudit) {
+      return Object.assign({}, judgment, { outcome: 'RAN_SILENT', detail: result.notes || '' });
+    }
+    const notes = result;
     writeAuditLog_({
       action: judgment.action,
       targetSheet: SHEETS.QUARTERS,
