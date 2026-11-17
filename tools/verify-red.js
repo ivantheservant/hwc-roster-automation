@@ -14870,6 +14870,166 @@ const MUTATIONS = [
     find: "        const line = make('div', { className: 'check-row rx-row' });\n        line.appendChild(ruleExtrasSelect_(personOptions(idsForPosts(m.postIds)",
     replace: "        const line = make('div', { className: 'check-row' });\n        line.appendChild(ruleExtrasSelect_(personOptions(idsForPosts(m.postIds)",
     tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ue-no-official-check",
+    why: "未正式發出也寄提醒",
+    file: "src/WeeklyReminder.gs",
+    find: "if (getQuarterStage_(t.quarterId) !== QUARTER_STAGE.OFFICIAL_SENT) return row(",
+    replace: "if (false) return row(",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-sunday-included",
+    why: "主日當日仍然寄（應該只寄到主日前一日）",
+    file: "src/WeeklyReminder.gs",
+    find: "!(s.serviceDate > today && s.serviceDate <= last)",
+    replace: "!(s.serviceDate >= today && s.serviceDate <= last)",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-no-makeup",
+    why: "錯過提醒日不補寄",
+    file: "src/WeeklyReminder.gs",
+    find: "  const last = shiftDateString_(today, weeklyReminderDaysBefore_(weekday));",
+    replace: "  const last = weekdayOfDateString_(today) === weekday ? shiftDateString_(today, weeklyReminderDaysBefore_(weekday)) : today;",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-resend-received",
+    why: "已收到的人再寄一次",
+    file: "src/WeeklyReminder.gs",
+    find: "return !done.received[e.personId] && !done.failedToday[e.personId];",
+    replace: "return !done.failedToday[e.personId];",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-dry-counts-live",
+    why: "上線之後仍把模擬紀錄當作收到",
+    file: "src/WeeklyReminder.gs",
+    find: "if (res === 'SENT' || (dryNow && res === 'DRY_RUN')) received[r.personId] = true;",
+    replace: "if (res === 'SENT' || res === 'DRY_RUN') received[r.personId] = true;",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-retry-same-day",
+    why: "同一日重試失敗的人",
+    file: "src/WeeklyReminder.gs",
+    find: "return !done.received[e.personId] && !done.failedToday[e.personId];",
+    replace: "return !done.received[e.personId];",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-no-rollout",
+    why: "第一階段也寄給所有人",
+    file: "src/WeeklyReminder.gs",
+    find: "  if (readRolloutAudience_() !== ROLLOUT_AUDIENCE.ALL) {\n    const lookup = buildRolloutLeaderLookup_(timezone, today);",
+    replace: "  if (false) {\n    const lookup = buildRolloutLeaderLookup_(timezone, today);",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-free-text-sent",
+    why: "名單以外的名字也當作收件人",
+    file: "src/WeeklyReminder.gs",
+    find: "    const person = peopleById[pid];\n",
+    replace: "    const person = peopleById[pid] || { name: pid, active: true };\n",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-no-email-repeat",
+    why: "沒有電郵摘要每日都寄",
+    file: "src/WeeklyReminder.gs",
+    find: "if (noEmail.length > 0 && !hasWeeklyReminderNotice_(WEEKLY_REMINDER_NO_EMAIL_ACTION, key)) {",
+    replace: "if (noEmail.length > 0) {",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-fail-notify-partial",
+    why: "部分失敗也通知幹事",
+    file: "src/WeeklyReminder.gs",
+    find: "if (!dryNow && failed > 0 && sent === 0 && !hasWeeklyReminderNotice_(",
+    replace: "if (!dryNow && failed > 0 && !hasWeeklyReminderNotice_(",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-fail-notify-repeat",
+    why: "全部寄不出每日都通知",
+    file: "src/WeeklyReminder.gs",
+    find: "&& sent === 0 && !hasWeeklyReminderNotice_(WEEKLY_REMINDER_FAIL_NOTIFY_ACTION, key)) {",
+    replace: "&& sent === 0) {",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-no-budget",
+    why: "沒有時間預算",
+    file: "src/WeeklyReminder.gs",
+    find: "if (shouldStopForSendBudget_(startedAt, loopStartedAt, processed, Date.now(), budget))",
+    replace: "if (false)",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-arrival-no-subtract",
+    why: "到場時間沒有減提早分鐘",
+    file: "src/WeeklyReminder.gs",
+    find: "Number(m[1]) * 60 + Number(m[2]) - early;",
+    replace: "Number(m[1]) * 60 + Number(m[2]);",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-disabled-ignored",
+    why: "Config 關掉照樣寄",
+    file: "src/WeeklyReminder.gs",
+    find: "  if (!isWeeklyReminderEnabled_()) return [row('', 'SKIP', 'DISABLED')];\n",
+    replace: "",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-trigger-unwired",
+    why: "每日自動排程沒有呼叫這一步",
+    file: "src/Trigger.gs",
+    find: "        runWeeklyReminderStep_(today, config, isDryRun).forEach",
+    replace: "        [].forEach",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-weekday-7",
+    why: "7 不當作星期日",
+    file: "src/WeeklyReminder.gs",
+    find: "  return n === 7 ? 0 : n;",
+    replace: "  return n === 7 ? 7 : n;",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-status-onoff",
+    why: "自動排程狀態一律寫開",
+    file: "src/WeeklyReminder.gs",
+    find: "    onOff: on ? '開' : '關'",
+    replace: "    onOff: '開'",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-merge-posts",
+    why: "同一人幾個崗位分開幾項（幾封信）",
+    file: "src/WeeklyReminder.gs",
+    find: "    if (!byPerson[pid]) { byPerson[pid] =",
+    replace: "    if (true) { byPerson[pid] =",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-prelaunch-missing",
+    why: "上線前檢查沒有每週事奉提醒一項",
+    file: "src/PreLaunchWeb.gs",
+    find: "if (typeof isWeeklyReminderEnabled_ === 'function') add(",
+    replace: "if (false) add(",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "ue-log-sheet-unseeded",
+    why: "補建設定及範本不建立 WeeklyReminderLog",
+    file: "src/AdminTools.gs",
+    find: "SHEETS.UNAVAILABLE_INVITE_LOG, SHEETS.WEEKLY_REMINDER_LOG].filter",
+    replace: "SHEETS.UNAVAILABLE_INVITE_LOG].filter",
+    tests: ["tests/round114_ue_weekly_reminder.test.js"]
   }
 ];
 

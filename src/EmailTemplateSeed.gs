@@ -288,6 +288,23 @@ const EMAIL_TEMPLATE_SEEDS = [
       + '這條連結只供你本人使用，請不要轉發。如有疑問或者不能如期服侍，請盡早聯絡{ContactName}。',
     placeholders: '{QuarterLabel},{PersonalLink},{ContactName}',
     attachType: ATTACH_TYPE.NONE
+  },
+  // 第一百一十四輪批次 UE 組：每週事奉提醒（WeeklyReminder.gs；每日自動排程寄；同一人同日幾個崗位合成一封）
+  {
+    templateId: 'TPL_WEEKLY_REMINDER_TC',
+    stage: 'WEEKLY_REMINDER',
+    lang: 'TC',
+    subject: '{QuarterLabel} 職事表：提醒你 {ServiceDateText}的事奉',
+    bodyHtml: '<p>{PersonName}：</p>'
+      + '<p>平安！提醒你在 {ServiceDateText}的事奉：<br>{AssignmentLines}</p>'
+      + '<p>如未能出席，請盡早聯絡{ContactName}，以便安排其他人。</p>'
+      + '<p>{PersonalLinkLine}</p>',
+    bodyPlain: '{PersonName}：\n\n'
+      + '平安！提醒你在 {ServiceDateText}的事奉：\n{AssignmentLines}\n\n'
+      + '如未能出席，請盡早聯絡{ContactName}，以便安排其他人。\n\n'
+      + '{PersonalLinkLine}',
+    placeholders: '{QuarterLabel},{ServiceDateText},{AssignmentLines},{PersonalLinkLine},{ContactName}',
+    attachType: ATTACH_TYPE.NONE
   }
 ];
 

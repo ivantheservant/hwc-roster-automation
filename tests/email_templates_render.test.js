@@ -298,6 +298,19 @@ function renderAllSamples() {
     audience: '那一位沒有電郵的事奉人員（一次一位）',
     attachment: '無（純文字，不是電郵）'
   });
+  // 第一百一十四輪批次 UE 組：每週事奉提醒
+  add({
+    key: 'TPL_WEEKLY_REMINDER_TC',
+    template: byId.TPL_WEEKLY_REMINDER_TC,
+    recipient: RECIPIENTS.personNoEmail,
+    summary: '',
+    extraPlaceholders: { QuarterLabel: '2099年1-3月', ServiceDateText: '1 月 11 日（主日）', AssignmentLines: '・讀經——請在 10:30 前到場\n・司事',
+      PersonalLinkLine: '你的個人專屬連結（可以看這一季全部安排）：\nhttps://example.invalid/exec?p=SAMPLE&q=2099T1' },
+    purpose: '每週提醒緊接的主日有崗位的事奉人員（同一人幾個崗位合成一封）',
+    trigger: '每日自動排程（WEEKLY_REMINDER_ENABLED；每 WEEKLY_REMINDER_WEEKDAY 寄，錯過會在主日之前補寄）',
+    audience: '那個主日有崗位而有電郵的事奉人員（按開放範圍）',
+    attachment: '無'
+  });
 
   return samples;
 }

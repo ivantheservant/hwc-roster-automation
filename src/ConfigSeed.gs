@@ -84,6 +84,21 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百一十四輪批次 UE 組：每週事奉提醒
+      key: CONFIG_KEYS.WEEKLY_REMINDER_ENABLED, type: CONFIG_TYPES.BOOL, group: 'MAIL',
+      defaultValue: 'FALSE',
+      description: '每週事奉提醒：每週一次寄給緊接的主日有崗位的人（只限已正式發出的季度；按開放範圍）；沒有電郵的人合成一封寄幹事。'
+        + 'FALSE（預設）＝不寄；上線時與其他自動寄出一併決定何時開。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.WEEKLY_REMINDER_WEEKDAY, type: CONFIG_TYPES.INT, group: 'MAIL',
+      defaultValue: String(DEFAULTS.WEEKLY_REMINDER_WEEKDAY),
+      description: '每週事奉提醒在星期幾寄：1＝星期一（預設）… 6＝星期六；0 或 7＝星期日（即前一個主日提醒下一個主日）。'
+        + '那一日自動排程沒有執行 ⇒ 之後幾日、主日之前補寄一次；主日當日及之後不補。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, type: CONFIG_TYPES.BOOL, group: 'PDF_BATCH',
       defaultValue: 'FALSE',
       description: '「產生個人 PDF」是否強制重新產生已存在的同版本 PDF。'

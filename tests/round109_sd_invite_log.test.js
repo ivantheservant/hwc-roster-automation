@@ -58,7 +58,7 @@ console.log('\n=== SD1 逐人紀錄（不記電郵）＋工作表 ===');
   const sheet = sc.ss.getSheetByName('UnavailableInviteLog');
   const flat = JSON.stringify(sheet.getDataRange().getValues());
   check('★★★★★★ 工作表不記電郵', !/@/.test(flat), flat);
-  check('★★★★★ 〔補建設定及範本〕會建立這張工作表', /SHEETS\.UNAVAILABLE_INVITE_LOG\]\.filter/.test(read('src/AdminTools.gs'))
+  check('★★★★★ 〔補建設定及範本〕會建立這張工作表', /SHEETS\.UNAVAILABLE_INVITE_LOG[,\]][^\n]*\.filter/.test(read('src/AdminTools.gs'))
     && /ensureUnavailableInviteLogSheet_\(\)\.created/.test(read('src/AdminTools.gs')));
 }
 

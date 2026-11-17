@@ -179,6 +179,9 @@ function getConfigBaselineSnapshot_() {
       BACKUP_FOLDER_ID: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       BACKUP_KEEP_COUNT: { launchTargetValue: '8', source: '程式碼預設值（試算表現時實際值未核實）' },
       BACKUP_WEEKDAY: { launchTargetValue: '1', source: '程式碼預設值（試算表現時實際值未核實）' },
+      // 第一百一十四輪批次 UE 組（上線時與其他自動寄出一併決定何時開）
+      WEEKLY_REMINDER_ENABLED: { launchTargetValue: 'FALSE', source: '程式碼預設值（試算表現時實際值未核實）' },
+      WEEKLY_REMINDER_WEEKDAY: { launchTargetValue: '1', source: '程式碼預設值（試算表現時實際值未核實）' },
       ROLLOUT_AUDIENCE: { launchTargetValue: 'LEADERS', source: '程式碼預設值（試算表現時實際值未核實）' },
       NAME_HONORIFIC_SUFFIXES: { launchTargetValue: '姊妹,弟兄,傳道,牧師,師母,執事,長老', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_VIEWER_EMAILS: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' }

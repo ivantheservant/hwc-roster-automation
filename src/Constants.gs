@@ -59,6 +59,8 @@ const SHEETS = {
   UNAVAILABLE_REPLIES: 'UnavailableReplies',
   // 第一百零九輪批次 SD 組：誰收過這一季的申報連結／提醒（只記 PersonID、季度、日期、人手／自動、結果，不記電郵）
   UNAVAILABLE_INVITE_LOG: 'UnavailableInviteLog',
+  // 第一百一十四輪批次 UE 組：每週事奉提醒逐人紀錄（季度、主日、PersonID、寄出日期、結果；不記電郵）。第一次寄出時自動建立
+  WEEKLY_REMINDER_LOG: 'WeeklyReminderLog',
   // 第一百零五輪批次 RD 組：影音組合（每月一起服侍一次；組合週以外不做這組的崗位）——第一次使用時自動建立
   POST_TEAMS: 'PostTeams',
   // 第一百零五輪批次 RD 組：協唱（某人領詩的主日，他的協唱不擔任其他崗位）——協唱不在職事表顯示
@@ -472,6 +474,14 @@ const COLUMNS = {
     SENT_DATE: 'SentDate',
     KIND: 'Kind',
     MODE: 'Mode',
+    RESULT: 'Result'
+  },
+  // 第一百一十四輪批次 UE 組
+  WEEKLY_REMINDER_LOG: {
+    QUARTER_ID: 'QuarterID',
+    SERVICE_DATE: 'ServiceDate',
+    PERSON_ID: 'PersonID',
+    SENT_DATE: 'SentDate',
     RESULT: 'Result'
   },
   // 第一百零五輪批次 RB 組
@@ -1530,6 +1540,9 @@ const CONFIG_KEYS = {
   BACKUP_WEEKDAY: 'BACKUP_WEEKDAY',
   BACKUP_KEEP_COUNT: 'BACKUP_KEEP_COUNT',
   BACKUP_FOLDER_ID: 'BACKUP_FOLDER_ID',
+  // 第一百一十四輪批次 UE 組：每週事奉提醒（WeeklyReminder.gs）
+  WEEKLY_REMINDER_ENABLED: 'WEEKLY_REMINDER_ENABLED',
+  WEEKLY_REMINDER_WEEKDAY: 'WEEKLY_REMINDER_WEEKDAY',
   PDF_REGENERATE_IF_EXISTS: 'PDF_REGENERATE_IF_EXISTS',
   GRID_NOT_APPLICABLE_LABEL: 'GRID_NOT_APPLICABLE_LABEL',
   GRID_PENDING_LABEL: 'GRID_PENDING_LABEL',
@@ -1980,6 +1993,9 @@ const DEFAULTS = {
   BACKUP_WEEKDAY: 1,
   BACKUP_KEEP_COUNT: 8,
   BACKUP_FOLDER_ID: '',
+  // 第一百一十四輪批次 UE 組
+  WEEKLY_REMINDER_ENABLED: false,
+  WEEKLY_REMINDER_WEEKDAY: 1,
   GRID_NOT_APPLICABLE_LABEL: '—',
   GRID_PENDING_LABEL: GRID_LABELS.PENDING,
   GRID_SPECIAL_SKIP_LABEL: '特殊主日',

@@ -129,8 +129,10 @@ function buildAutomationDailyItems_() {
           ? '；申報期內（截止日之前）不逐次通知，截止日寄一次「申報期已完結」' : ''),
       onOff: getConfig_(CONFIG_KEYS.PERSONAL_UNAVAILABLE_NOTIFY, true) !== false ? '開' : '關' },
     { label: '已有版本之後開季前資料有改動', who: '幹事（MAIL_ADMIN_NOTIFY）',
-      onOff: getConfig_(CONFIG_KEYS.PRESEASON_CHANGE_NOTIFY, true) !== false ? '開' : '關' }
-  ];
+      onOff: getConfig_(CONFIG_KEYS.PRESEASON_CHANGE_NOTIFY, true) !== false ? '開' : '關' },
+    // 第一百一十四輪批次 UE 組：每週事奉提醒（開／關、下一次哪一日寄、寄給誰）
+    typeof describeWeeklyReminderForStatus_ === 'function' && describeWeeklyReminderForStatus_(Utilities.formatDate(new Date(), getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd'))
+  ].filter(Boolean);
 }
 
 /** 最近一次〔我已核對時間表〕的日期（AuditLog）。 */
@@ -268,7 +270,7 @@ function apiPlanSeedConfigAndTemplates() {
   const pid = planPersonIdNormalize_();
   // 第一百零五輪批次 RD 組：排表規則資料的工作表（PostTeams、WorshipBackingSingers）未建立的
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetsMissing = [SHEETS.POST_TEAMS, SHEETS.WORSHIP_BACKING_SINGERS, SHEETS.UNAVAILABLE_INVITE_LOG].filter(function (n) { return !ss.getSheetByName(n); });
+  const sheetsMissing = [SHEETS.POST_TEAMS, SHEETS.WORSHIP_BACKING_SINGERS, SHEETS.UNAVAILABLE_INVITE_LOG, SHEETS.WEEKLY_REMINDER_LOG].filter(function (n) { return !ss.getSheetByName(n); });
   return {
     sheetsMissing: sheetsMissing,
     personIdRenames: pid.renames.map(function (r) { return r.nameTC + '：' + r.fromId + ' → ' + r.toId + '（' + r.cells.length + ' 格）'; }),
@@ -297,6 +299,8 @@ function apiSeedConfigAndTemplates() {
     const sheetsCreated = ensureRuleDataSheets_();
     // 第一百零九輪批次 SD 組：申報連結逐人紀錄
     if (ensureUnavailableInviteLogSheet_().created) sheetsCreated.push(SHEETS.UNAVAILABLE_INVITE_LOG);
+    // 第一百一十四輪批次 UE 組：每週事奉提醒逐人紀錄
+    if (typeof ensureWeeklyReminderLogSheet_ === 'function' && ensureWeeklyReminderLogSheet_().created) sheetsCreated.push(SHEETS.WEEKLY_REMINDER_LOG);
     if (nc > 0) reloadConfigCache_();
     writeAuditLog_({ action: 'CONFIG_TEMPLATES_SEEDED', targetSheet: SHEETS.CONFIG, targetKey: '',
       newValue: 'Config ' + nc + ' 行、範本 ' + nt + ' 個' + (o.needed ? '、Posts.OutputOrder ' + no + ' 行' : '')

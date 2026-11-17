@@ -54,6 +54,11 @@ function buildPreLaunchWebItems_() {
   add('申報時間表自動化（UNAVAILABLE_INVITE_AUTO）已開', autoInvite,
     '現時：' + (autoInvite ? '開' : '關') + '（由 ' + String(getConfig_(CONFIG_KEYS.UNAVAILABLE_INVITE_AUTO_FROM_QUARTER, '2027T2') || '') + ' 開始）',
     'Config 工作表 UNAVAILABLE_INVITE_AUTO（〔自動排程狀態〕時間表顯示申報連結、提醒、申報期完結的日子及開／關）');
+  // 第一百一十四輪批次 UE 組：每週事奉提醒（開或關都可以，Config 工作表有那一行＝已決定）
+  if (typeof isWeeklyReminderEnabled_ === 'function') add('每週事奉提醒（WEEKLY_REMINDER_ENABLED）已決定', has(CONFIG_KEYS.WEEKLY_REMINDER_ENABLED),
+    '現時：' + (isWeeklyReminderEnabled_() ? '開' : '關') + '（每'
+      + WEEKDAY_NAMES_TC[normaliseWeeklyReminderWeekday_(getConfig_(CONFIG_KEYS.WEEKLY_REMINDER_WEEKDAY, DEFAULTS.WEEKLY_REMINDER_WEEKDAY))] + '）',
+    '進階與診斷〔補建設定及範本〕補上之後，在 Config 工作表改（〔自動排程狀態〕顯示下一次哪一日寄）');
   // 第一百零五輪批次 RG 組：影音組合、協唱已填；指定寄信電郵人數（只供核對，0 亦可以是正常）
   let extras = null;
   try { extras = readRuleExtrasContext_(); } catch (err) { extras = null; }

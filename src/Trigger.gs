@@ -224,6 +224,16 @@ function dailyAutomationCheck_() {
       report.push({ quarterId: '', action: 'UNAVAILABLE_SUBMISSIONS', outcome: 'ERROR', detail: err.message });
     }
 
+    // 第一百一十四輪批次 UE 組：每週事奉提醒（出錯只影響這一步）
+    if (typeof runWeeklyReminderStep_ === 'function') {
+      try {
+        runWeeklyReminderStep_(today, config, isDryRun).forEach(function (r) { report.push(r); });
+      } catch (err) {
+        log_('WARN', 'dailyAutomationCheck_: 每週事奉提醒失敗：' + err.message);
+        report.push({ quarterId: '', action: 'WEEKLY_REMINDER', outcome: 'ERROR', detail: err.message });
+      }
+    }
+
     // 第一百一十一輪批次 SI 組：每週備份主試算表（出錯只影響這一步）
     if (typeof dailyBackupStep_ === 'function') {
       try {

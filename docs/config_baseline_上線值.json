@@ -855,6 +855,21 @@
       "launchTargetValue": "1",
       "launchTargetDiffersFromCurrent": false,
       "group": "SYSTEM"
+    },
+    "WEEKLY_REMINDER_ENABLED": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "FALSE",
+      "launchTargetValue": "FALSE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL",
+      "note": "第一百一十四輪新增：上線時與其他自動寄出一併決定何時開。"
+    },
+    "WEEKLY_REMINDER_WEEKDAY": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "1",
+      "launchTargetValue": "1",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "MAIL"
     }
   },
   "quarters": {

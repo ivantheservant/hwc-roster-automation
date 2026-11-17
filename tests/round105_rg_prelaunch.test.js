@@ -20,7 +20,7 @@ function scene() {
   const sc = buildRound75Scene({ extraFiles: ['AdminTools.gs', 'PersonIdFormat.gs', 'PreLaunchWeb.gs', 'GoLiveWizard.gs', 'ConfigSeed.gs', 'EmailTemplateSeed.gs',
     'EmailTemplateUpdate.gs', 'WebAppPersonalLink.gs', 'PersonalLinkInMail.gs', 'WebApp.gs', 'WebAppExclusions.gs', 'WebAppRoster3Common.gs',
     'PreseasonPack.gs', 'UnavailableSchedule.gs', 'PersonalUnavailable.gs', 'UnavailableInvite.gs', 'SendAudience.gs', 'RolloutAudience.gs', 'PreseasonChange.gs',
-    'SeasonRehearsal.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'ManualEmail.gs', 'RuleExtrasCheck.gs'] });
+    'SeasonRehearsal.gs', 'CombinedSkipBackfill.gs', 'QuarterReset.gs', 'SelfTestRunner.gs', 'ManualEmail.gs', 'RuleExtrasCheck.gs', 'WeeklyReminder.gs'] });
   const g = sc.gas;
   g.Session = { getActiveUser: () => ({ getEmail: () => 'editor@example.invalid' }) };
   g.LockService = { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }), getDocumentLock: () => ({ tryLock: () => true, releaseLock: () => {} }) };
@@ -63,13 +63,14 @@ console.log('\n=== RG2：〔補建設定及範本〕建立工作表 ===');
   const sc = scene();
   const g = sc.gas;
   const plan = g.apiPlanSeedConfigAndTemplates();
-  check('★★★★★★ 比對列出未建立的 PostTeams、WorshipBackingSingers', plan.sheetsMissing.join() === 'PostTeams,WorshipBackingSingers,UnavailableInviteLog', JSON.stringify(plan.sheetsMissing));
+  check('★★★★★★ 比對列出未建立的 PostTeams、WorshipBackingSingers', plan.sheetsMissing.join() === 'PostTeams,WorshipBackingSingers,UnavailableInviteLog,WeeklyReminderLog', JSON.stringify(plan.sheetsMissing));
   const created = g.ensureRuleDataSheets_();
   check('★★★★★★ 建立兩張工作表，第 2 行是欄名', created.join() === 'PostTeams,WorshipBackingSingers'
     && sc.ss.getSheetByName('PostTeams').getRange(2, 1, 1, 7).getValues()[0].join() === 'TeamID,PersonID,PostIDs,PerMonth,OutsideTeamLevel,Notes,Active'
     && sc.ss.getSheetByName('WorshipBackingSingers').getRange(2, 1, 1, 6).getValues()[0].join() === 'LeaderPersonID,SingerPersonID,SingerName,Level,Notes,Active');
   sc.ss.getSheetByName('PostTeams').getRange(3, 1, 1, 3).setValues([['AV', 'P9701', 'SOUND']]);
   g.ensureUnavailableInviteLogSheet_();   // 第一百零九輪批次 SD 組：〔補建設定及範本〕亦建立申報連結逐人紀錄
+  g.ensureWeeklyReminderLogSheet_();   // 第一百一十四輪批次 UE 組（刻意改動）：亦建立每週事奉提醒逐人紀錄
   check('★★★★★ 再執行一次：不再建立、不改內容（可重複執行）', g.ensureRuleDataSheets_().length === 0
     && sc.ss.getSheetByName('PostTeams').getRange(3, 1, 1, 3).getValues()[0].join() === 'AV,P9701,SOUND'
     && g.apiPlanSeedConfigAndTemplates().sheetsMissing.length === 0);
