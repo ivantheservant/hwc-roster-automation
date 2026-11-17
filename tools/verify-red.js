@@ -14574,6 +14574,62 @@ const MUTATIONS = [
     find: "try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) { sec.scrollIntoView(); }",
     replace: "window.location.hash = 'unavSection';",
     tests: ["tests/round112_ua_personal_declare_jump.test.js"]
+  },
+  {
+    id: "ub-count-all",
+    why: "生成之前也把「生成之後才做」的項目計入標題",
+    file: "src/WebAppPreQuarter.gs",
+    find: "  const generated = input.generated !== false;",
+    replace: "  const generated = true;",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "ub-after-not-counted",
+    why: "生成之後（已有版本）仍然不計「生成之後才做」的項目",
+    file: "src/WebAppPreQuarter.gs",
+    find: "  const generated = input.generated !== false;",
+    replace: "  const generated = false;",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "ub-no-after-count",
+    why: "沒有另外數「生成之後還有 N 項」",
+    file: "src/WebAppPreQuarter.gs",
+    find: "    afterGenerationCount: generated ? 0 : undone.length - counted.length,",
+    replace: "    afterGenerationCount: 0,",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "ub-generated-flag",
+    why: "輸入的 generated 旗標不看有沒有版本",
+    file: "src/WebAppPreQuarter.gs",
+    find: "    generated: versionNo >= 0,",
+    replace: "    generated: true,",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "ub-unknown-as-done",
+    why: "查不到（-1）被當成做好了",
+    file: "src/ui/Script.html",
+    find: "if (typeof n !== 'number' || n < 0) return { state: 'unknown'",
+    replace: "if (typeof n !== 'number') return { state: 'unknown'",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "ub-done-wording",
+    why: "現階段全部做好時沒有寫「開季前準備已完成」",
+    file: "src/ui/Script.html",
+    find: "headline: '開季前準備已完成'",
+    replace: "headline: '全部做好了'",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
+  },
+  {
+    id: "ub-confirm-own-text",
+    why: "寄出確認窗自己組「還有 N 項未做」，不用共用函式",
+    file: "src/ui/ScriptZone1.html",
+    find: "    const undoneDesc = describePreQuarterUndone(d.preQuarter);",
+    replace: "    const undoneDesc = { n: d.preQuarter && d.preQuarter.undoneItemCount, headline: '還有 ' + (d.preQuarter && d.preQuarter.undoneItemCount) + ' 項未做', detail: '' };",
+    tests: ["tests/round112_ub_prequarter_phases.test.js"]
   }
 ];
 
