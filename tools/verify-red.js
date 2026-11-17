@@ -14166,6 +14166,22 @@ const MUTATIONS = [
     find: "    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;\n    count++;",
     replace: "    if (String(row[C.STAGE] || '').trim() !== MAIL_STAGES.OFFICIAL) return;\n    if (String(row[C.STATUS] || '') !== 'SENT') return;\n    count++;",
     tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb3-official-no-redir",
+    why: "正式發出確認窗沒有轉寄說明",
+    file: "src/ui/ScriptZone1.html",
+    find: "      pushMailRedirectConfirmNode_(nodes, d);\n\n      openConfirm({\n        title: '正式發出給全體（不可逆）',",
+    replace: "\n      openConfirm({\n        title: '正式發出給全體（不可逆）',",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
+  },
+  {
+    id: "tb3-redir-no-warn",
+    why: "轉寄說明沒有講收件人本人不會收到",
+    file: "src/ui/ScriptZone1.html",
+    find: "      text: text + '。收件人本人不會收到；每封信的主旨開頭會寫明原收件人。',",
+    replace: "      text: text,",
+    tests: ["tests/round110_tb_resume_abandon.test.js"]
   }
 ];
 

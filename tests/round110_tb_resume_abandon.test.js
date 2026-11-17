@@ -224,5 +224,21 @@ console.log('\n=== TB-2 之後〔變動的人〕可以用（按鈕條件只看 S
     /function assertNeverOfficiallySent_\(quarterId\) \{\s*const info = summariseOfficialSendLogRows_\(quarterId\);/.test(guards));
 }
 
+console.log('\n=== TB-3 寄出確認窗寫明「全部信件轉寄」（真寄彩排發現） ===');
+{
+  const z1 = read('src/ui/ScriptZone1.html');
+  const helper = /function pushMailRedirectConfirmNode_\(nodes, d\) \{[\s\S]{0,400}?d\.mailRedirectBadge[\s\S]{0,300}?收件人本人不會收到/;
+  check('★★★★★ 共用一支：用頁頂紅標同一句（d.mailRedirectBadge），再講收件人本人不會收到', helper.test(z1));
+  ['寄給堂委審閱', '正式發出給全體（不可逆）', '改動後重發（不可逆）'].forEach(function (title) {
+    const at = z1.indexOf("title: '" + title);
+    const before = at === -1 ? '' : z1.slice(Math.max(0, at - 700), at);
+    check('★★★★★ 「' + title + '」確認窗加了轉寄說明', at !== -1 && /pushMailRedirectConfirmNode_\(nodes, d\);/.test(before),
+      at === -1 ? '找不到標題' : before.slice(-300));
+  });
+  const dash = read('src/WebAppDashboard.gs');
+  check('★★★★ 狀態資料有 mailRedirectBadge（確認窗用的 d 就是 getDashboard() 的結果）',
+    /mailRedirectBadge: buildMailRedirectBadgeText_\(\)/.test(dash));
+}
+
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
 process.exit(fail === 0 ? 0 : 1);

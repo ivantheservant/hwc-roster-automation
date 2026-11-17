@@ -1167,6 +1167,23 @@
   /** 第九十七輪批次 XC 組：〔寄給堂委／執事〕（審閱）確認窗的一句。 */
   const REVIEW_NO_ICS_TEXT = '審閱版不附日曆檔；正式發出（定稿）時，每人才會收到自己的日曆檔。';
 
+  /**
+   * 第一百一十輪批次 TB-3 組：寄出確認窗寫明「全部信件轉寄」。
+   * 真寄彩排時發現：頁頂有轉寄紅標，但確認窗只列出原收件人（遮蔽的電郵），
+   * 沒有講會轉寄——幹事打字確認之前看不到。文字用頁頂紅標同一句（後端 `buildMailRedirectBadgeText_()`）。
+   * @param {Array} nodes 確認窗內容
+   * @param {Object} d `getDashboard()` 的結果
+   * @returns {void}
+   */
+  function pushMailRedirectConfirmNode_(nodes, d) {
+    const text = String((d && d.mailRedirectBadge) || '');
+    if (!text) return;
+    nodes.push(make('div', {
+      text: text + '。收件人本人不會收到；每封信的主旨開頭會寫明原收件人。',
+      className: 'badge badge-dryrun inline'
+    }));
+  }
+
   function openReview(sendOptions, meta) {
     // ⚠️ 第四十五輪批次：`undefined` 同 `MouseEvent` 都過唔到
     // `google.script.run`，兩者都會變成
@@ -1245,6 +1262,7 @@
           className: 'badge badge-dryrun inline'
         }));
       }
+      pushMailRedirectConfirmNode_(nodes, d);
 
       // 規格 2.5：可重複、可逆、對象只有堂委 ⇒ 唔需要打字確認。
       openConfirm({
@@ -1675,6 +1693,7 @@
           className: 'badge badge-dryrun inline'
         }));
       }
+      pushMailRedirectConfirmNode_(nodes, d);
 
       openConfirm({
         title: '正式發出給全體（不可逆）',
@@ -1985,6 +2004,7 @@
           className: 'badge badge-dryrun inline'
         }));
       }
+      pushMailRedirectConfirmNode_(nodes, d);
 
       openConfirm({
         title: '改動後重發（不可逆）',
