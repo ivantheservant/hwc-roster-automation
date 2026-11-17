@@ -13603,7 +13603,7 @@ const MUTATIONS = [
     id: "rd-plan-unavail",
     why: "組合週選了成員申報不能服侍的日子",
     file: "src/PostTeams.gs",
-    find: "          if (isPersonUnavailable_(m.personId, d, postId, context.unavailable || [])) return false;",
+    find: "          if (isPersonUnavailable_(m.personId, d, postId, context.unavailable || [])) { why = 'UNAVAILABLE'; return false; }",
     replace: "",
     tests: ["tests/round105_rd_team_rules.test.js"]
   },
@@ -13619,7 +13619,7 @@ const MUTATIONS = [
     id: "rd-plan-reserved",
     why: "組合週選了成員預先安排了領詩的日子",
     file: "src/PostTeams.gs",
-    find: "        if (reserved) return false;",
+    find: "        if (reserved) { why = 'PREASSIGNED'; return false; }",
     replace: "",
     tests: ["tests/round105_rd_team_rules.test.js"]
   },
@@ -13763,16 +13763,16 @@ const MUTATIONS = [
     id: "rg-teams-always-ok",
     why: "上線前檢查：組合未填也當已填",
     file: "src/PreLaunchWeb.gs",
-    find: "  add('影音組合（PostTeams）已填', nTeams > 0,",
-    replace: "  add('影音組合（PostTeams）已填', true,",
+    find: "  add('影音組合（PostTeams）已填而且沒有問題', nTeams > 0 && !!check && teamIssues === 0,",
+    replace: "  add('影音組合（PostTeams）已填而且沒有問題', true,",
     tests: ["tests/round105_rg_prelaunch.test.js"]
   },
   {
     id: "rg-singers-missing",
     why: "上線前檢查沒有協唱一項",
     file: "src/PreLaunchWeb.gs",
-    find: "  add('協唱（WorshipBackingSingers）已填', nSingers > 0,",
-    replace: "  add('（略）', nSingers > 0,",
+    find: "  add('協唱（WorshipBackingSingers）已填而且沒有問題', nSingers > 0 && !!check && singerIssues === 0,",
+    replace: "  add('（略）', nSingers > 0 && !!check && singerIssues === 0,",
     tests: ["tests/round105_rg_prelaunch.test.js"]
   },
   {
