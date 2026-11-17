@@ -126,6 +126,23 @@ console.log('\n=== SI5：整季重設之前先備份 ===');
     /function executeQuarterResetBatch_\(entries\) \{\n  const results = \[\];\n  const failedQuarters = \[\];\n[^\n]*\n  if \(\(entries \|\| \[\]\)\.length > 0 && typeof backupBeforeQuarterReset_ === 'function'\) backupBeforeQuarterReset_\(\);/.test(qr));
 }
 
+console.log('\n=== SI5b：〔立即備份一次〕（只做備份，不執行每日檢查其他項目） ===');
+{
+  setup();
+  gas.assertWebAppRequestAllowed_ = () => {};
+  gas.withMutationLock_ = (label, fn) => fn();
+  let r = gas.apiRunSpreadsheetBackupNow();
+  check('★★★★★★ 成功 ⇒ 訊息有檔名及大小', r.ok && /已備份：職事表主試算表備份_2099-01-05\.xlsx（121 KB）/.test(r.message), JSON.stringify(r));
+  setup();
+  gas.assertWebAppRequestAllowed_ = () => {};
+  gas.withMutationLock_ = (label, fn) => fn();
+  fetchCode = 500;
+  r = gas.apiRunSpreadsheetBackupNow();
+  check('★★★★★ 失敗 ⇒ ok=false、說明原因、記下失敗（不拋錯）', !r.ok && /備份失敗：/.test(r.message) && JSON.parse(PROPS.LAST_SPREADSHEET_BACKUP).ok === false);
+  const z5 = read('src/ui/ScriptZone5.html');
+  check('★★★★★ 〔自動排程狀態〕有〔立即備份一次〕，呼叫 apiRunSpreadsheetBackupNow', /button\('立即備份一次'[\s\S]{0,200}apiRunSpreadsheetBackupNow/.test(z5));
+}
+
 console.log('\n=== SI6：接線、設定 ===');
 {
   const tr = read('src/Trigger.gs');

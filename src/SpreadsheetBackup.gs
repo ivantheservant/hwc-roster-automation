@@ -179,6 +179,26 @@ function dailyBackupStep_(today, isDryRun) {
 }
 
 /**
+ * 〔自動排程狀態〕〔立即備份一次〕：只做備份這一步（不執行每日檢查的其他項目、不寄信）。
+ * @returns {{ok: boolean, message: string}}
+ */
+function apiRunSpreadsheetBackupNow() {
+  assertWebAppRequestAllowed_();
+  return withMutationLock_('備份主試算表', function () {
+    try {
+      const r = runSpreadsheetBackup_('MANUAL');
+      return { ok: true, message: '已備份：' + r.fileName + '（' + Math.round(r.sizeBytes / 1024) + ' KB）。' };
+    } catch (err) {
+      const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+      const last = readLastBackup_() || {};
+      writeLastBackup_(Object.assign({}, last, { date: Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd'),
+        at: Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd HH:mm'), ok: false, reason: 'MANUAL', error: err.message }));
+      return { ok: false, message: '備份失敗：' + err.message };
+    }
+  });
+}
+
+/**
  * 〔整季重設〕之前先備份。失敗 ⇒ 拋三段式錯誤（不重設）。
  * @returns {{fileName: string, sizeBytes: number}}
  */

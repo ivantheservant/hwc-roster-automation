@@ -320,6 +320,12 @@
           setStatus(r.message);
           openAutomationStatus();
         }), ''),
+        // 第一百一十一輪批次 SI 組：只做備份這一步（不執行每日檢查的其他項目）
+        button('立即備份一次', () => runAction('備份主試算表', async () => {
+          const r = await callServerMutating('apiRunSpreadsheetBackupNow');
+          setStatus(r.message, !r.ok);
+          openAutomationStatus();
+        }), 'secondary'),
         button('關閉', () => closeModal(), 'secondary')
       ]);
     });

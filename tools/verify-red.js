@@ -14518,6 +14518,22 @@ const MUTATIONS = [
     find: "      return !releasedCellKeys[k] && !keptKeys[k];",
     replace: "      return !keptKeys[k];",
     tests: ["tests/round111_sj_small_items.test.js"]
+  },
+  {
+    id: "si-now-throws",
+    why: "〔立即備份一次〕失敗時拋錯（沒有記下失敗）",
+    file: "src/SpreadsheetBackup.gs",
+    find: "      return { ok: false, message: '備份失敗：' + err.message };",
+    replace: "      throw err;",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-no-now-button",
+    why: "〔自動排程狀態〕沒有〔立即備份一次〕",
+    file: "src/ui/ScriptZone5.html",
+    find: "        button('立即備份一次', () => runAction('備份主試算表', async () => {",
+    replace: "        button('（略）', () => runAction('備份主試算表', async () => {",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
   }
 ];
 
