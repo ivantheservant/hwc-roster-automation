@@ -289,6 +289,8 @@
       const nodes = [
         z5Line('觸發器', s.installed ? ('已安裝（每日約 ' + s.hour + ':00 執行一次檢查）') : '未安裝（系統不會自己執行任何動作）', s.installed ? 'ok-line' : 'err-text'),
         z5Line('上次執行', s.lastRun ? (s.lastRun.at + '　' + (s.lastRun.ok ? '✔ ' : '✘ ') + s.lastRun.summary) : '還沒有紀錄'),
+        // 第一百一十一輪批次 SI 組
+        z5Line('最近一次備份', s.lastBackupText || '還沒有紀錄'),
         z5Line('測試模式（DRY_RUN）', s.dryRun ? '開（不會真正寄信）' : '關（會真正寄信）')
       ];
       if (s.triggerError) nodes.push(make('div', { text: '讀不到觸發器：' + s.triggerError, className: 'err-text' }));

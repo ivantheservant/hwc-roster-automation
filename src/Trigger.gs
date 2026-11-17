@@ -224,6 +224,15 @@ function dailyAutomationCheck_() {
       report.push({ quarterId: '', action: 'UNAVAILABLE_SUBMISSIONS', outcome: 'ERROR', detail: err.message });
     }
 
+    // 第一百一十一輪批次 SI 組：每週備份主試算表（出錯只影響這一步）
+    if (typeof dailyBackupStep_ === 'function') {
+      try {
+        report.push(dailyBackupStep_(today, isDryRun));
+      } catch (err) {
+        report.push({ quarterId: '', action: 'BACKUP', outcome: 'ERROR', detail: err.message });
+      }
+    }
+
     // 第一百零一輪批次 ZD 組：記下最近一次執行時間及結果（〔自動排程狀態〕顯示）
     recordAutomationLastRun_(report.every(function (r) { return !/ERROR/.test(String((r && r.outcome) || '')); }), summariseAutomationReport_(report));
     return report;

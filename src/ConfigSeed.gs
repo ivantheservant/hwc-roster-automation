@@ -57,6 +57,33 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百一十一輪批次 SI 組：每週備份主試算表
+      key: CONFIG_KEYS.BACKUP_ENABLED, type: CONFIG_TYPES.BOOL, group: 'SYSTEM',
+      defaultValue: 'TRUE',
+      description: '每週把主試算表匯出一份 xlsx 備份（每日自動排程做；〔整季重設〕之前亦會先備份一次）。'
+        + 'TRUE（預設）＝備份；FALSE＝每日排程不備份（整季重設之前仍然會備份）。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.BACKUP_WEEKDAY, type: CONFIG_TYPES.INT, group: 'SYSTEM',
+      defaultValue: String(DEFAULTS.BACKUP_WEEKDAY),
+      description: '每週哪一日備份：1＝星期一 … 7＝星期日（預設 1）。那一日自動排程沒有執行，同一週之內下一次執行會補做。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.BACKUP_KEEP_COUNT, type: CONFIG_TYPES.INT, group: 'SYSTEM',
+      defaultValue: String(DEFAULTS.BACKUP_KEEP_COUNT),
+      description: '保留最近幾份備份（預設 8）。舊的移到垃圾桶；只清理檔名以「職事表主試算表備份_」開頭的檔，資料夾內其他檔案不會碰。',
+      editable: 'TRUE'
+    },
+    {
+      key: CONFIG_KEYS.BACKUP_FOLDER_ID, type: CONFIG_TYPES.STR, group: 'SYSTEM',
+      defaultValue: '',
+      description: '備份存放的資料夾 ID。留空（預設）＝在職事表資料夾（ROSTER_DRIVE_FOLDER_ID）之下自動建立「備份」資料夾。'
+        + '備份有個人資料：資料夾一定要在 Shared Drive 之內（在 My Drive 會拒絕寫入）；系統不會改任何分享設定。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.PDF_REGENERATE_IF_EXISTS, type: CONFIG_TYPES.BOOL, group: 'PDF_BATCH',
       defaultValue: 'FALSE',
       description: '「產生個人 PDF」是否強制重新產生已存在的同版本 PDF。'

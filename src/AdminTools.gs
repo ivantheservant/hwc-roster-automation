@@ -163,6 +163,8 @@ function apiGetAutomationStatus() {
     today: today, installed: triggers.length > 0, triggerCount: triggers.length, triggerError: triggerError,
     hour: isNaN(rawHour) ? 9 : Math.min(23, Math.max(0, Math.round(rawHour))),
     lastRun: readAutomationLastRun_(),
+    // 第一百一十一輪批次 SI 組：最近一次備份
+    lastBackupText: typeof describeLastBackup_ === 'function' ? describeLastBackup_(readLastBackup_()) : '',
     dryRun: getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false,
     timetable: buildAutomationTimetable_(today),
     daily: buildAutomationDailyItems_(),

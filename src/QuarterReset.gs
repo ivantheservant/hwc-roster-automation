@@ -841,6 +841,8 @@ function summariseQuarterResetBatch_(entries) {
 function executeQuarterResetBatch_(entries) {
   const results = [];
   const failedQuarters = [];
+  // 第一百一十一輪批次 SI 組：重設之前先備份主試算表；備份失敗 ⇒ 拋錯，一季都不重設
+  if ((entries || []).length > 0 && typeof backupBeforeQuarterReset_ === 'function') backupBeforeQuarterReset_();
 
   (entries || []).forEach(function (entry) {
     const quarterId = entry.quarterId;

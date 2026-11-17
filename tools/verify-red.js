@@ -14430,6 +14430,78 @@ const MUTATIONS = [
     find: "  if (judgment.reasons.indexOf('NOT_GENERATED') !== -1 && judgment.quarterStarted) {",
     replace: "  if (false) {",
     tests: ["tests/round111_sh_not_generated_stop.test.js"]
+  },
+  {
+    id: "si-due-weekday-only",
+    why: "備份日沒有執行就不補做（只在那一日）",
+    file: "src/SpreadsheetBackup.gs",
+    find: "  return { due: !lastOkDate || lastOkDate < weekStart, weekStart: weekStart };",
+    replace: "  return { due: (!lastOkDate || lastOkDate < weekStart) && back === 0, weekStart: weekStart };",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-prune-any-file",
+    why: "清理資料夾內所有檔案（不只本程式的備份）",
+    file: "src/SpreadsheetBackup.gs",
+    find: "  const ours = (files || []).filter(function (f) { return re.test(String(f.name || '')); })",
+    replace: "  const ours = (files || []).filter(function (f) { return true; })",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-prune-keep-oldest",
+    why: "保留最舊的、刪除最新的",
+    file: "src/SpreadsheetBackup.gs",
+    find: "    .sort(function (a, b) { return a.name < b.name ? 1 : (a.name > b.name ? -1 : 0); });",
+    replace: "    .sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-mydrive-ok",
+    why: "備份資料夾在 My Drive 也照寫",
+    file: "src/SpreadsheetBackup.gs",
+    find: "  if (isPersonalMyDriveFolder_(folder)) {\n    throw new Error('備份資料夾不在 Shared Drive",
+    replace: "  if (false) {\n    throw new Error('備份資料夾不在 Shared Drive",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-fail-throws",
+    why: "每日排程備份失敗會拋錯（影響其他步驟）",
+    file: "src/SpreadsheetBackup.gs",
+    find: "    return Object.assign(row, { outcome: 'ERROR', detail: '備份失敗：' + err.message });",
+    replace: "    throw err;",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-notify-every-fail",
+    why: "同一週每次失敗都通知",
+    file: "src/SpreadsheetBackup.gs",
+    find: "    const notifyThisWeek = last.failNotifiedWeek !== due.weekStart;",
+    replace: "    const notifyThisWeek = true;",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-reset-no-backup",
+    why: "整季重設之前不備份",
+    file: "src/QuarterReset.gs",
+    find: "  if ((entries || []).length > 0 && typeof backupBeforeQuarterReset_ === 'function') backupBeforeQuarterReset_();",
+    replace: "",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-reset-swallow",
+    why: "重設前備份失敗被吞掉，照樣重設",
+    file: "src/SpreadsheetBackup.gs",
+    find: "    throw new Error(buildThreePartMessage_(\n      '整季重設之前要先備份主試算表，但備份失敗：' + err.message,",
+    replace: "    return null; (buildThreePartMessage_(\n      '整季重設之前要先備份主試算表，但備份失敗：' + err.message,",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "si-no-daily-step",
+    why: "每日自動排程沒有備份一步",
+    file: "src/Trigger.gs",
+    find: "        report.push(dailyBackupStep_(today, isDryRun));",
+    replace: "",
+    tests: ["tests/round111_si_weekly_backup.test.js"]
   }
 ];
 

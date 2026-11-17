@@ -827,6 +827,34 @@
       "launchTargetDiffersFromCurrent": false,
       "group": "WEBAPP",
       "note": "第八十七輪新增：只可以查看幹事介面的人；本文件唔記錄實際電郵名單。"
+    },
+    "BACKUP_ENABLED": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYSTEM"
+    },
+    "BACKUP_FOLDER_ID": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "",
+      "launchTargetValue": "",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYSTEM"
+    },
+    "BACKUP_KEEP_COUNT": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "8",
+      "launchTargetValue": "8",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYSTEM"
+    },
+    "BACKUP_WEEKDAY": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "1",
+      "launchTargetValue": "1",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "SYSTEM"
     }
   },
   "quarters": {
