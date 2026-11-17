@@ -349,6 +349,23 @@ function runUnavailableScheduleSteps_(quarterRow, today, config, isDryRun) {
 }
 
 /**
+ * 第一百一十四輪批次 UF 組：「申報連結寄不出」通知的文字（正式通知及〔寄出電郵範本樣本〕共用）。**純函式。**
+ * @param {string} prefix 主旨前綴
+ * @param {string} quarterId
+ * @param {number} failedCount
+ * @param {number} sentCount
+ * @returns {{subject: string, body: string}}
+ */
+function buildUnavailableInviteFailureText_(prefix, quarterId, failedCount, sentCount) {
+  return {
+    subject: prefix + buildQuarterLabel_(quarterId) + ' 申報連結有 ' + failedCount + ' 封寄不出',
+    body: '自動寄出申報不能服侍日子連結時，有 ' + failedCount + ' 封寄不出（成功 ' + sentCount + ' 封）。\n'
+      + '系統會在翌日只補寄未收到的人（最多 ' + UNAVAILABLE_INVITE_RETRY_DAYS + ' 日）。如果一直寄不出，請核對這些人的電郵地址，'
+      + '或者用〔寄出／匯出申報不能服侍日子連結〕。'
+  };
+}
+
+/**
  * 第一百零九輪批次 SD 組：自動申報連結有寄不出的 ⇒ 第一次就通知幹事（MAIL_ADMIN_NOTIFY）一次，經寄信閘門（notifyAdmin_）。
  * @param {string} quarterId
  * @param {Object} result sendUnavailableInvites_() 的結果
@@ -362,12 +379,8 @@ function notifyUnavailableInviteFailureOnce_(quarterId, result, config, isDryRun
     return row[A.ACTION] === UNAVAILABLE_INVITE_FAIL_NOTIFY_ACTION && String(row[A.TARGET_KEY] || '').trim() === quarterId;
   });
   if (done) return;
-  const prefix = String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '');
-  notifyAdmin_(prefix + buildQuarterLabel_(quarterId) + ' 申報連結有 ' + result.failed.length + ' 封寄不出',
-    '自動寄出申報不能服侍日子連結時，有 ' + result.failed.length + ' 封寄不出（成功 ' + result.sent + ' 封）。\n'
-      + '系統會在翌日只補寄未收到的人（最多 ' + UNAVAILABLE_INVITE_RETRY_DAYS + ' 日）。如果一直寄不出，請核對這些人的電郵地址，'
-      + '或者用〔寄出／匯出申報不能服侍日子連結〕。',
-    String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || ''), isDryRun);
+  const text = buildUnavailableInviteFailureText_(String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || ''), quarterId, result.failed.length, result.sent);
+  notifyAdmin_(text.subject, text.body, String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || ''), isDryRun);
   writeAuditLog_({ action: UNAVAILABLE_INVITE_FAIL_NOTIFY_ACTION, targetSheet: SHEETS.QUARTERS, targetKey: quarterId,
     oldValue: '', newValue: '失敗 ' + result.failed.length + ' 封', source: 'dailyAutomationCheck_', notes: '' });
 }

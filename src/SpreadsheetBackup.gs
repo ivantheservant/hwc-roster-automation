@@ -139,6 +139,22 @@ function runSpreadsheetBackup_(reason) {
 }
 
 /**
+ * 第一百一十四輪批次 UF 組：每週備份失敗通知的文字（正式通知及〔寄出電郵範本樣本〕共用）。**純函式。**
+ * @param {string} prefix 主旨前綴
+ * @param {string} today yyyy-MM-dd
+ * @param {string} errorMessage
+ * @returns {{subject: string, body: string}}
+ */
+function buildBackupFailureNotifyText_(prefix, today, errorMessage) {
+  return {
+    subject: prefix + '職事表系統：每週備份失敗',
+    body: '每日自動排程今日（' + today + '）備份主試算表失敗：\n\n' + errorMessage
+      + '\n\n其餘每日檢查照常執行。系統會在這一週之內每日再試；這一週不會再通知。\n'
+      + '請到幹事介面「進階與診斷」〔自動排程狀態〕看「最近一次備份」。'
+  };
+}
+
+/**
  * 每日自動排程的一步。出錯只影響這一步（回傳報告一行，不拋錯）。
  * @param {string} today yyyy-MM-dd
  * @param {boolean} isDryRun 通知用（經 notifyAdmin_() 的寄信閘門）
@@ -165,11 +181,8 @@ function dailyBackupStep_(today, isDryRun) {
     if (notifyThisWeek) {
       try {
         const config = readConfig_();
-        notifyAdmin_(String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || '') + '職事表系統：每週備份失敗',
-          '每日自動排程今日（' + today + '）備份主試算表失敗：\n\n' + err.message
-            + '\n\n其餘每日檢查照常執行。系統會在這一週之內每日再試；這一週不會再通知。\n'
-            + '請到幹事介面「進階與診斷」〔自動排程狀態〕看「最近一次備份」。',
-          String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || ''), isDryRun);
+        const text = buildBackupFailureNotifyText_(String(config[CONFIG_KEYS.MAIL_SUBJECT_PREFIX] || ''), today, err.message);
+        notifyAdmin_(text.subject, text.body, String(config[CONFIG_KEYS.MAIL_ADMIN_NOTIFY] || ''), isDryRun);
       } catch (e) {
         log_('WARN', '每週備份失敗通知寄不出：' + e.message);
       }

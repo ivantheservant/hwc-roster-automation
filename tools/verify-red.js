@@ -15030,6 +15030,86 @@ const MUTATIONS = [
     find: "SHEETS.UNAVAILABLE_INVITE_LOG, SHEETS.WEEKLY_REMINDER_LOG].filter",
     replace: "SHEETS.UNAVAILABLE_INVITE_LOG].filter",
     tests: ["tests/round114_ue_weekly_reminder.test.js"]
+  },
+  {
+    id: "uf-backup-own-text",
+    why: "備份失敗樣本另寫一份文字",
+    file: "src/TemplateSamples.gs",
+    find: "        const text = buildBackupFailureNotifyText_(prefix, Utilities",
+    replace: "        const text = { subject: prefix + '備份失敗（樣本）', body: '樣本' } || buildBackupFailureNotifyText_(prefix, Utilities",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-invite-own-text",
+    why: "申報連結寄不出樣本另寫一份文字",
+    file: "src/TemplateSamples.gs",
+    find: "        const text = buildUnavailableInviteFailureText_(prefix, quarterId, 2, 10);",
+    replace: "        const text = { subject: prefix + '寄不出（樣本）', body: '樣本' };",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-noemail-own-text",
+    why: "沒有電郵摘要樣本另寫一份文字",
+    file: "src/TemplateSamples.gs",
+    find: "        const text = buildWeeklyReminderNoEmailText_(prefix, quarterId, weeklySampleDate_(quarterId),",
+    replace: "        const text = { subject: prefix + '沒有電郵（樣本）', body: '樣本' } || buildWeeklyReminderNoEmailText_(prefix, quarterId, weeklySampleDate_(quarterId),",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-wfail-own-text",
+    why: "每週提醒寄不出樣本另寫一份文字",
+    file: "src/TemplateSamples.gs",
+    find: "        const text = buildWeeklyReminderFailureText_(prefix, quarterId, weeklySampleDate_(quarterId), 5);",
+    replace: "        const text = { subject: prefix + '寄不出（樣本）', body: '樣本' };",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-sh-not-started",
+    why: "這一季已經開始的樣本變成一般的還沒有生成",
+    file: "src/TemplateSamples.gs",
+    find: "withReasons(['NOT_GENERATED'], { quarterStarted: true,",
+    replace: "withReasons(['NOT_GENERATED'], { quarterStarted: false,",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-sh-missing",
+    why: "沒有這一季已經開始的樣本",
+    file: "src/TemplateSamples.gs",
+    find: "    { name: '幹事通知：階段提醒（這一季已經開始，系統內沒有職事表）', where:",
+    replace: "    { name: '幹事通知：階段提醒（還沒有生成初稿·重複）', where:",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-weekly-tpl-raw",
+    why: "每週提醒樣本沒有用正式佔位符",
+    file: "src/TemplateSamples.gs",
+    find: "      placeholders = buildWeeklyReminderPlaceholders_(entry, quarterId, sampleDate, url, false);",
+    replace: "      placeholders = {};",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-html-placeholders",
+    why: "HTML 版用了純文字的佔位符",
+    file: "src/TemplateSamples.gs",
+    find: "applyPlaceholders_(t.template.bodyHtml, placeholdersHtml || placeholders, recipient, sampleSummary)",
+    replace: "applyPlaceholders_(t.template.bodyHtml, placeholders, recipient, sampleSummary)",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-official-backup",
+    why: "正式備份失敗通知另寫文字",
+    file: "src/SpreadsheetBackup.gs",
+    find: "        const text = buildBackupFailureNotifyText_(String(",
+    replace: "        const text = { subject: '備份失敗', body: '' } || buildBackupFailureNotifyText_(String(",
+    tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "uf-official-invite",
+    why: "正式申報連結寄不出通知另寫文字",
+    file: "src/UnavailableSchedule.gs",
+    find: "  const text = buildUnavailableInviteFailureText_(String(",
+    replace: "  const text = { subject: '寄不出', body: '' } || buildUnavailableInviteFailureText_(String(",
+    tests: ["tests/round114_uf_template_samples.test.js"]
   }
 ];
 

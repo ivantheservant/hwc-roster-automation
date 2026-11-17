@@ -98,6 +98,23 @@ function buildTemplateSampleSubject_(index, total, name, subject) {
   return '[範本樣本 ' + index + '/' + total + '] ' + name + '｜' + subject;
 }
 
+/** 第一百一十四輪批次 UF 組：每週事奉提醒樣本用的主日（這一季第一個主日；找不到 ⇒ 開始日）。 */
+function weeklySampleDate_(quarterId) {
+  const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
+  const SD = COLUMNS.SERVICE_DATES;
+  let first = '';
+  try {
+    readSheet_(SHEETS.SERVICE_DATES).forEach(function (r) {
+      if (String(r[SD.QUARTER_ID] || '').trim() !== quarterId) return;
+      const d = toDateString_(r[SD.SERVICE_DATE], timezone);
+      if (d && (!first || d < first)) first = d;
+    });
+  } catch (err) { first = ''; }
+  if (first) return first;
+  const q = findQuarter_(quarterId);
+  return (q && toDateString_(q[COLUMNS.QUARTERS.START_DATE], timezone)) || '2028-07-02';
+}
+
 /** 幹事通知的示範資料（只用來叫真正的通知函式，不寫任何地方）。 */
 function buildTemplateSampleAdminNotifications_(quarterId, prefix, adminEmail) {
   const demoContext = { subjectPrefix: prefix, quarterId: quarterId, adminEmail: adminEmail };
@@ -137,6 +154,31 @@ function buildTemplateSampleAdminNotifications_(quarterId, prefix, adminEmail) {
         const text = buildPreseasonChangeNotifyText_(prefix, quarterId, 1,
           [{ id: 'WEIGHT', label: '排表偏好', count: 2 }, { id: 'PRE', label: '預先安排', count: 1 }],
           buildPreseasonChangeAdminUrl_(quarterId));
+        notifyAdmin_(text.subject, text.body, adminEmail, true);
+      } },
+    // 第一百一十四輪批次 UF 組：第一百零九至一百一十四輪新增的通知
+    { name: '幹事通知：階段提醒（這一季已經開始，系統內沒有職事表）', where: '程式（Mailer.gs notifyAdminStageReminder_）',
+      run: reminder(withReasons(['NOT_GENERATED'], { quarterStarted: true, firstServiceDate: '2028-07-02', generateDueDate: '2028-05-27', daysSinceGenerateDue: 40 })) },
+    { name: '幹事通知：每週備份失敗', where: '程式（SpreadsheetBackup.gs buildBackupFailureNotifyText_）',
+      run: function () {
+        const text = buildBackupFailureNotifyText_(prefix, Utilities.formatDate(new Date(), getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE), 'yyyy-MM-dd'),
+          '（示範錯誤訊息）找不到備份資料夾');
+        notifyAdmin_(text.subject, text.body, adminEmail, true);
+      } },
+    { name: '幹事通知：申報連結寄不出', where: '程式（UnavailableSchedule.gs buildUnavailableInviteFailureText_）',
+      run: function () {
+        const text = buildUnavailableInviteFailureText_(prefix, quarterId, 2, 10);
+        notifyAdmin_(text.subject, text.body, adminEmail, true);
+      } },
+    { name: '幹事通知：每週事奉提醒（沒有電郵的人）', where: '程式（WeeklyReminder.gs buildWeeklyReminderNoEmailText_）',
+      run: function () {
+        const text = buildWeeklyReminderNoEmailText_(prefix, quarterId, weeklySampleDate_(quarterId),
+          [{ name: '示範甲', postNames: ['讀經', '司事'] }, { name: '示範乙', postNames: ['音響'] }]);
+        notifyAdmin_(text.subject, text.body, adminEmail, true);
+      } },
+    { name: '幹事通知：每週事奉提醒寄不出', where: '程式（WeeklyReminder.gs buildWeeklyReminderFailureText_）',
+      run: function () {
+        const text = buildWeeklyReminderFailureText_(prefix, quarterId, weeklySampleDate_(quarterId), 5);
         notifyAdmin_(text.subject, text.body, adminEmail, true);
       } }
   ];
@@ -224,7 +266,20 @@ function buildTemplateSamples_(quarterId, toEmail) {
     let sampleSummary = isList ? '' : summary;
     let pack = null;
     let msgPlain = null;
-    if (t.id === PRESEASON_TEMPLATE_ID) {
+    let placeholdersHtml = null;   // 第一百一十四輪批次 UF 組：HTML 和純文字的佔位符不同時用（每週事奉提醒）
+    if (typeof WEEKLY_REMINDER_TEMPLATE_ID !== 'undefined' && t.id === WEEKLY_REMINDER_TEMPLATE_ID) {
+      // 每週事奉提醒：用正式寄出同一支砌佔位符的函式（buildWeeklyReminderPlaceholders_）；示範那個人在第一個有崗位的主日的崗位
+      const dates = assignments.map(function (a) { return a.serviceDate; }).sort();
+      const sampleDate = dates[0] || weeklySampleDate_(quarterId);
+      const early = readEarlyArrivalMinutesByPost_();
+      const start = normalizeTimeOfDay_(getConfig_(CONFIG_KEYS.ICS_SERVICE_START_TIME, DEFAULTS.ICS_SERVICE_START_TIME), DEFAULTS.ICS_SERVICE_START_TIME);
+      const entry = { lines: assignments.filter(function (a) { return a.serviceDate === sampleDate; })
+        .map(function (a) { return buildWeeklyReminderPostLine_(context.postNames[a.postId] || a.postId, early[a.postId] || 0, start); }) };
+      const url = buildPersonalRosterUrl_(baseUrl || 'https://example.invalid/exec', token || 'SAMPLE', quarterId);
+      placeholders = buildWeeklyReminderPlaceholders_(entry, quarterId, sampleDate, url, false);
+      placeholdersHtml = buildWeeklyReminderPlaceholders_(entry, quarterId, sampleDate, url, true);
+      sampleSummary = '';
+    } else if (t.id === PRESEASON_TEMPLATE_ID) {
       const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
       const generateDate = readPreseasonGenerateDate_(quarter, config);
       pack = buildPreseasonPack_(quarterId, today, generateDate);
@@ -274,7 +329,7 @@ function buildTemplateSamples_(quarterId, toEmail) {
     // 第一百零一輪批次 ZB 組：和正式寄信同一支判斷（第一階段不是堂委／執事／幹事 ⇒ 只供查看）
     const canDeclare = !personalUrl || isMailDeclareAllowed_(ctx, personId);
     let html = appendPermanentLinkFooter_(appendPersonalLinkFooter_(
-      applyPlaceholders_(t.template.bodyHtml, placeholders, recipient, sampleSummary), personalUrl, true, canDeclare),
+      applyPlaceholders_(t.template.bodyHtml, placeholdersHtml || placeholders, recipient, sampleSummary), personalUrl, true, canDeclare),
       t.template.bodyHtml, permanentLink, true, quarterId);
     let plain = appendPermanentLinkFooter_(appendPersonalLinkFooter_(
       applyPlaceholders_(t.template.bodyPlain, placeholders, recipient, sampleSummary), personalUrl, false, canDeclare),

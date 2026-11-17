@@ -30,7 +30,8 @@ const PREVIEW_LINE = '職事表預覽（只供查看，不能修改；內容更�
 function scene(opts) {
   opts = opts || {};
   const sc = buildSendScene('editor@example.invalid', ['TemplateSamples.gs', 'PersonalLinkMessage.gs', 'UnavailableSchedule.gs', 'IcsExport.gs', 'PreseasonPack.gs', 'UnavailableInvite.gs',
-    'PersonalUnavailable.gs', 'EmailTemplateSeed.gs', 'EmailTemplateUpdate.gs', 'ChoirRule.gs', 'ResendFlow.gs', 'Trigger.gs']);
+    'PersonalUnavailable.gs', 'EmailTemplateSeed.gs', 'EmailTemplateUpdate.gs', 'ChoirRule.gs', 'ResendFlow.gs', 'Trigger.gs',
+    'WeeklyReminder.gs', 'SpreadsheetBackup.gs', 'RolloutAudience.gs', 'PersonalLinkInMail.gs']);   // 第一百一十四輪批次 UF 組（刻意改動）：範本樣本多了五種幹事通知
   const g = sc.gas; const C = sc.C;
   const T = C.EMAIL_TEMPLATES;
   sc.ss.deleteSheet(sc.ss.getSheetByName(sc.S.EMAIL_TEMPLATES));

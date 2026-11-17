@@ -30,7 +30,7 @@ const REDIRECT = 'redirect@example.invalid';
 function scene(opts) {
   opts = opts || {};
   const sc = buildSendScene('self@example.invalid', ['TemplateSamples.gs', 'PersonalLinkMessage.gs', 'UnavailableSchedule.gs', 'IcsExport.gs', 'PreseasonPack.gs', 'UnavailableInvite.gs',
-    'PersonalUnavailable.gs', 'EmailTemplateSeed.gs', 'ChoirRule.gs']);
+    'PersonalUnavailable.gs', 'EmailTemplateSeed.gs', 'ChoirRule.gs', 'WeeklyReminder.gs', 'SpreadsheetBackup.gs', 'RolloutAudience.gs', 'PersonalLinkInMail.gs']);   // 第一百一十四輪批次 UF 組（刻意改動）：新樣本用的檔
   const g = sc.gas; const C = sc.C;
   // EmailTemplates：種子 8 個範本（Active）
   const T = C.EMAIL_TEMPLATES;
@@ -80,12 +80,14 @@ console.log('\n=== TB2／TB3／TB4：內容、DRY_RUN、紀錄（這一季有版
   const mails = s.log.sent;
   const subjects = mails.map((m) => m[1]);
   const TEMPLATES = ['TPL_GENERATE_TC', 'TPL_REVIEW_TC', 'TPL_REMIND_TC', 'TPL_OFFICIAL_TC', 'TPL_OFFICIAL_LIST_TC', 'TPL_RESEND_TC', 'TPL_RESEND_LIST_TC', 'TPL_PRESEASON_TC', 'TPL_UNAVAILABLE_INVITE_TC', 'TPL_UNAVAILABLE_DECIDED_TC']; // 第九十四輪批次 UC 組（刻意改動）：多一個範本
-  const ADMIN_KINDS = ['沒有電郵名單', '生成完成', '還沒有生成初稿', '停在同一階段太久', '接近正式發出日期', '特殊主日日期未確認', '事奉人員申報待確認', '開季前資料有改動'];
-  check('★★★★★★ 一共 23 封：15 個範本＋8 種幹事通知（第一百一十四輪 UE 組刻意加每週事奉提醒範本；第一百零五輪批次 RB 組刻意加截止日前提醒、申報期已完結兩個範本；第一百一十二輪 UC 組刻意加〔複製訊息〕兩個範本）', r.sent === 23 && mails.length === 23, r.sent + '／' + mails.length);
+  const ADMIN_KINDS = ['沒有電郵名單', '生成完成', '還沒有生成初稿', '停在同一階段太久', '接近正式發出日期', '特殊主日日期未確認', '事奉人員申報待確認', '開季前資料有改動',
+    // 第一百一十四輪批次 UF 組（刻意改動）：多五種幹事通知
+    '這一季已經開始，系統內沒有職事表', '每週備份失敗', '申報連結寄不出', '每週事奉提醒（沒有電郵的人）', '每週事奉提醒寄不出'];
+  check('★★★★★★ 一共 28 封：15 個範本＋13 種幹事通知（第一百一十四輪 UF 組刻意加五種幹事通知；第一百一十四輪 UE 組刻意加每週事奉提醒範本；第一百零五輪批次 RB 組刻意加截止日前提醒、申報期已完結兩個範本；第一百一十二輪 UC 組刻意加〔複製訊息〕兩個範本）', r.sent === 28 && mails.length === 28, r.sent + '／' + mails.length);
   check('★★★★★★ 每一封只寄給你選的那一個地址（沒有第二個收件人、沒有轉寄）', mails.every((m) => m[0] === ADMIN), JSON.stringify(mails.map((m) => m[0])));
-  check('★★★★★★ DRY_RUN＝TRUE 也寄（樣本例外）；MAIL_REDIRECT_ALL_TO 有值也不轉寄', s.cfg.DRY_RUN === true && mails.length === 23 && mails.every((m) => m[1].indexOf('[原收件人') === -1));
-  check('★★★★★ 主旨前面：[範本樣本 n/N] 名稱｜…（編號 1 至 23）',
-    subjects.every((t, i) => t.indexOf('[範本樣本 ' + (i + 1) + '/23] ') === 0), JSON.stringify(subjects));
+  check('★★★★★★ DRY_RUN＝TRUE 也寄（樣本例外）；MAIL_REDIRECT_ALL_TO 有值也不轉寄', s.cfg.DRY_RUN === true && mails.length === 28 && mails.every((m) => m[1].indexOf('[原收件人') === -1));
+  check('★★★★★ 主旨前面：[範本樣本 n/N] 名稱｜…（編號 1 至 28）',
+    subjects.every((t, i) => t.indexOf('[範本樣本 ' + (i + 1) + '/28] ') === 0), JSON.stringify(subjects));
   TEMPLATES.forEach((id) => {
     check('★★★★★ 有「' + id + '」', subjects.some((t) => t.indexOf('] ' + id + '｜') !== -1), JSON.stringify(subjects));
   });
@@ -111,7 +113,7 @@ console.log('\n=== TB2／TB3／TB4：內容、DRY_RUN、紀錄（這一季有版
   check('★★★★★ 申報邀請的個人連結有代入', /Deadline|截止|申報/.test(body('TPL_UNAVAILABLE_INVITE_TC')[2]) && !/\{PersonalLink\}/.test(body('TPL_UNAVAILABLE_INVITE_TC')[2]));
 
   const audit = g.readSheet_(sc.S.AUDIT_LOG).filter((row) => row[sc.C.AUDIT_LOG.ACTION] === 'TEMPLATE_SAMPLES_SENT');
-  check('★★★★★★ AuditLog 一筆 TEMPLATE_SAMPLES_SENT（收件人、季度、封數）', audit.length === 1 && /寄出 23 封/.test(audit[0][sc.C.AUDIT_LOG.NEW_VALUE])
+  check('★★★★★★ AuditLog 一筆 TEMPLATE_SAMPLES_SENT（收件人、季度、封數）', audit.length === 1 && /寄出 28 封/.test(audit[0][sc.C.AUDIT_LOG.NEW_VALUE])
     && audit[0][sc.C.AUDIT_LOG.TARGET_KEY] === sc.Q && String(audit[0][sc.C.AUDIT_LOG.NOTES]).indexOf(ADMIN) !== -1, JSON.stringify(audit));
   check('★★★★★★ 不寫 SendLog', g.readSheet_(sc.S.SEND_LOG).length === sendLogBefore);
   check('★★★★★★ 不改任何階段', g.getQuarterStage_(sc.Q) === stageBefore);
@@ -124,7 +126,7 @@ console.log('\n=== TB5：沒有版本 ⇒ 示範資料；入口及權限 ===');
   g.findLatestVersionNo_ = function () { return -1; };
   const r = g.sendTemplateSamples_(sc.Q, EDITOR);
   const mails = s.log.sent;
-  check('★★★★★ 沒有版本也寄得出 23 封，每一封收件人是你選的地址', r.sent === 23 && mails.every((m) => m[0] === EDITOR) && r.hasVersion === false);
+  check('★★★★★ 沒有版本也寄得出 28 封，每一封收件人是你選的地址', r.sent === 28 && mails.every((m) => m[0] === EDITOR) && r.hasVersion === false);
   check('★★★★★ 範本信內文最上面寫明「這一季還沒有版本，下面是示範資料。」', mails.slice(0, 8).every((m) => m[2].indexOf('這一季還沒有版本，下面是示範資料。') !== -1));
   check('★★★★ 訊息講明是示範資料', /示範資料/.test(r.message));
 
