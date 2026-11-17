@@ -385,11 +385,10 @@
       return list;
     };
     const allIds = people.map((p) => p.personId);
+    // 成員要在每一個勾選了的崗位的事奉人員名單上（和儲存前的核對一致）
     const idsForPosts = (postIds) => {
       if (!postIds || postIds.length === 0) return allIds;
-      const set = {};
-      postIds.forEach((pid) => (eligibleByPost[pid] || []).forEach((x) => { set[x] = true; }));
-      return allIds.filter((id) => set[id]);
+      return allIds.filter((id) => postIds.every((pid) => (eligibleByPost[pid] || []).indexOf(id) !== -1));
     };
 
     const nodes = [];
@@ -400,7 +399,7 @@
     }
     if (data.sheetsReady === false) nodes.push(para('影音組合或協唱的工作表還沒有建立，第一次儲存時會自動建立（只有標題）。', 'muted'));
     if ((data.choirInvalid || []).length > 0) {
-      nodes.push(para('Config 的詩班獻詩日例外有 ' + data.choirInvalid.length + ' 項格式不對（' + data.choirInvalid.join('、') + '），儲存時會移除。', 'err-text'));
+      nodes.push(para('詩班獻詩日的例外設定有 ' + data.choirInvalid.length + ' 項格式不對（' + data.choirInvalid.join('、') + '），儲存時會移除。', 'err-text'));
     }
 
     /* ── 影音組合 ── */
@@ -431,7 +430,9 @@
           line.appendChild(lab);
         });
         if (!ro) {
-          const rest = posts.filter((p) => m.postIds.indexOf(p.postId) === -1).map((p) => ({ value: p.postId, label: p.name }));
+          // 已經選了人 ⇒ 只列這位在事奉人員名單上的崗位
+          const rest = posts.filter((p) => m.postIds.indexOf(p.postId) === -1 && (!m.personId || (eligibleByPost[p.postId] || []).indexOf(m.personId) !== -1))
+            .map((p) => ({ value: p.postId, label: p.name }));
           line.appendChild(ruleExtrasSelect_([{ value: '', label: '＋加崗位' }].concat(rest), '', (v) => { if (v) { m.postIds.push(v); redraw(); } }, false));
         }
         line.appendChild(make('span', { text: '　組合週以外：' }));

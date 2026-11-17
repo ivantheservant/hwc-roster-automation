@@ -104,8 +104,10 @@ function apiGetRuleExtrasEditor(quarterId) {
   data.teams.forEach(function (t) { t.members.forEach(function (m) { m.name = nameOf(m.personId); }); });
   data.singers.forEach(function (s) { s.leaderName = nameOf(s.leaderPersonId); s.singerPersonName = nameOf(s.singerPersonId); });
   data.choir.forEach(function (c) { c.personName = nameOf(c.personId); c.postName = postNameOf(c.postId); });
+  const teamRowsAll = readSheetRowsWithNumbers_(SHEETS.POST_TEAMS);
+  const singerRowsAll = readSheetRowsWithNumbers_(SHEETS.WORSHIP_BACKING_SINGERS);
   const check = validateRuleExtrasData_({
-    teamRows: readSheetRowsWithNumbers_(SHEETS.POST_TEAMS), singerRows: readSheetRowsWithNumbers_(SHEETS.WORSHIP_BACKING_SINGERS),
+    teamRows: teamRowsAll, singerRows: singerRowsAll,
     choirRaw: getConfig_(CONFIG_KEYS.CHOIR_SUNDAY_ALLOWED, ''), people: lookups.people, posts: lookups.posts, eligible: lookups.eligible,
     worshipPostId: worshipPostId
   });
@@ -118,7 +120,7 @@ function apiGetRuleExtrasEditor(quarterId) {
       maxPerMonth: RULE_EXTRAS_MAX_PER_MONTH },
     sheetsReady: !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.POST_TEAMS)
       && !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORSHIP_BACKING_SINGERS),
-    problems: check.lines,
+    problems: check.issues.map(function (i) { return describeRuleExtrasIssuePlain_(i, { teamRows: teamRowsAll, singerRows: singerRowsAll, nameOf: function (pid) { return nameOf(pid) || pid; } }, true); }),
     explain: {
       teams: '同一個影音組合的成員，每個月會一起服侍指定的次數（組合週）：那一週組合的崗位由組合成員做。組合週以外，成員不做這組的崗位——「一定不排」是不可以排，「盡量不排」是人手不足才排並提醒。',
       singers: '領詩領詩的那一個主日，他的協唱不擔任其他崗位——「一定不排」是不可以排，「盡量不排」是人手不足才排並提醒。協唱只用來避開排表，不會在職事表或任何輸出出現。',
@@ -213,17 +215,51 @@ function ruleExtrasPayloadToCheckRows_(clean) {
   return { teamRows: teamRows, singerRows: singerRows };
 }
 
+/**
+ * 一項核對問題 ⇒ 給幹事看的一句（指出哪一項；不出現 PersonID、PostID、HARD、SOFT 等程式用字）。**純函式。**
+ * @param {Object} issue `validateRuleExtrasData_()` 的一項問題
+ * @param {{teamRows: Object[], singerRows: Object[], nameOf: function(string): string}} ctx 行要有 `__row`
+ * @param {boolean} forScreen true ＝ 畫面上列出的現有資料問題（加「這一次不會生效」）；false ＝ 儲存被擋
+ * @returns {string}
+ */
+function describeRuleExtrasIssuePlain_(issue, ctx, forScreen) {
+  const T = COLUMNS.POST_TEAMS;
+  const W = COLUMNS.WORSHIP_BACKING_SINGERS;
+  const find = function (rows, n) { return (rows || []).filter(function (r) { return r.__row === n; })[0]; };
+  const msg0 = String(issue.message || '');
+  let where = '';
+  if (issue.source === 'PostTeams') {
+    const r = find(ctx.teamRows, issue.row);
+    where = '影音組合「' + (r ? String(r[T.TEAM_ID] || '').trim() : '') + '」';
+  } else if (issue.source === 'WorshipBackingSingers') {
+    const r = find(ctx.singerRows, issue.row);
+    const leader = r ? String(r[W.LEADER_PERSON_ID] || '').trim() : '';
+    where = leader ? '協唱（領詩「' + ctx.nameOf(leader) + '」）' : '協唱';
+  } else {
+    where = '詩班獻詩日的例外第 ' + issue.row + ' 項';
+  }
+  let msg = msg0;
+  if (issue.code === RULE_EXTRAS_ISSUE.PERSON_MISSING) {
+    msg = '名單上找不到「' + msg0.replace(/^PersonID「/, '').replace(/」不在名單上$/, '') + '」這個人';
+  } else if (issue.code === RULE_EXTRAS_ISSUE.INCOMPLETE) {
+    if (issue.source === 'PostTeams' && issue.field === T.PERSON_ID) msg = '有一位成員沒有選名字';
+    else if (issue.source === 'PostTeams' && issue.field === T.POST_IDS) msg = '有一位成員沒有勾選任何崗位';
+    else if (issue.source === 'WorshipBackingSingers' && issue.field === W.LEADER_PERSON_ID) msg = '沒有選領詩';
+    else if (issue.source === 'WorshipBackingSingers') msg = '沒有選協唱（可以選名單上的人，或者選「其他」自己輸入名字）';
+  } else if (issue.code === RULE_EXTRAS_ISSUE.LEVEL_INVALID) {
+    msg = (issue.source === 'PostTeams' ? '組合週以外' : '領詩那一日協唱') + '的設定不是「一定不排」或「盡量不排」（當作一定不排）';
+  } else if (issue.code === RULE_EXTRAS_ISSUE.FORMAT_INVALID) {
+    msg = msg0.replace(/不是「PersonID:PostID」的格式$/, '格式不對（要同時有人和崗位）');
+  }
+  const soft = issue.code === RULE_EXTRAS_ISSUE.PER_MONTH_INVALID || issue.code === RULE_EXTRAS_ISSUE.LEVEL_INVALID;
+  return where + '：' + msg + (forScreen && !soft ? '——這一行的「' + issue.rule + '」規則這一次不會生效' : '');
+}
+
 /** 核對的結果 ⇒ 給幹事看的行（指出哪一項）。 */
-function describeRuleExtrasSaveProblems_(check, clean) {
-  return check.issues.map(function (i) {
-    if (i.source === 'PostTeams') {
-      const rows = ruleExtrasPayloadToCheckRows_(clean).teamRows;
-      const r = rows[i.row - 1];
-      return '影音組合「' + (r ? r[COLUMNS.POST_TEAMS.TEAM_ID] : '') + '」：' + i.message;
-    }
-    if (i.source === 'WorshipBackingSingers') return '協唱第 ' + i.row + ' 行：' + i.message;
-    return '詩班獻詩日的例外第 ' + i.row + ' 項：' + i.message;
-  });
+function describeRuleExtrasSaveProblems_(check, clean, nameOf) {
+  const rows = ruleExtrasPayloadToCheckRows_(clean);
+  const ctx = { teamRows: rows.teamRows, singerRows: rows.singerRows, nameOf: nameOf || function (id) { return id; } };
+  return check.issues.map(function (i) { return describeRuleExtrasIssuePlain_(i, ctx, false); });
 }
 
 /**
@@ -255,7 +291,8 @@ function planRuleExtrasSheetWrites_(existingRows, desired, keyOf, activeKey) {
     Object.keys(d.fields).forEach(function (col) {
       const cur = first[col] === null || first[col] === undefined ? '' : String(first[col]).trim();
       const want = d.fields[col] === null || d.fields[col] === undefined ? '' : String(d.fields[col]).trim();
-      if (cur !== want) changes[col] = d.fields[col];
+      // sheetSafeText_() 加的單引號不會留在格內（讀回來沒有）⇒ 比較時不算，否則每次儲存都當作有改動
+      if (cur !== want && !(want.charAt(0) === "'" && cur === want.slice(1))) changes[col] = d.fields[col];
     });
     if (Object.keys(changes).length > 0) updates.push({ row: first.__row, changes: changes });
     // 同一個 key 有幾行（例如每個崗位一行）⇒ 合併到第一行，其餘停用
@@ -331,7 +368,7 @@ function apiSaveRuleExtras(quarterId, payload) {
       people: lookups.people, posts: lookups.posts, eligible: lookups.eligible, worshipPostId: worshipPostId
     });
     if (!check.ok) {
-      const lines = describeRuleExtrasSaveProblems_(check, clean);
+      const lines = describeRuleExtrasSaveProblems_(check, clean, function (pid) { return (lookups.people[pid] && lookups.people[pid].name) || pid; });
       throw new Error(buildThreePartMessage_('有 ' + lines.length + ' 項資料不對，不可以儲存：' + lines.join('；') + '。', '甚麼都沒有儲存。',
         ['按上面指出的項目修正（例如把人加入該崗位的事奉人員名單，或者改選另一位）', '修正之後再按〔儲存〕']));
     }

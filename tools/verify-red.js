@@ -6126,8 +6126,8 @@ const MUTATIONS = [
     id: "cd-fill-btn-back",
     why: "開季前準備還原〔填講員／翻譯／獻花〕",
     file: "src/ui/ScriptZone2.html",
-    find: "      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), '')\n    ]));",
-    replace: "      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
+    find: "      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), ''),\n      // 第一百一十二輪批次 UD 組：〔影音組合及協唱〕放在〔預先安排領詩、司琴〕旁邊\n      button(RULE_EXTRAS_BUTTON_LABEL, () => openRuleExtras(), '')\n    ]));",
+    replace: "      button(PREASSIGN_BUTTON_LABEL, () => openPreAssign(), ''),\n      // 第一百一十二輪批次 UD 組：〔影音組合及協唱〕放在〔預先安排領詩、司琴〕旁邊\n      button(RULE_EXTRAS_BUTTON_LABEL, () => openRuleExtras(), ''),\n      button('填講員／翻譯／獻花', () => {}, '')\n    ]));",
     tests: ["tests/round75_cd_manual_posts_in_sheet.test.js"]
   },
   {
@@ -6388,8 +6388,8 @@ const MUTATIONS = [
     id: "cj-noemail-not-listed",
     why: "名單上冇電郵嘅人冇列出",
     file: "src/WebAppFlow.gs",
-    find: "    out.people = split.noEmail.map(function (p) { return { name: p.nameTC, reason: '沒有電郵' }; })",
-    replace: "    out.people = [].map(function (p) { return { name: p.nameTC, reason: '沒有電郵' }; })",
+    find: "    const noEmailPeople = split.noEmail.map(function (p) { return { name: p.nameTC, reason: '沒有電郵', personId: p.personId }; });",
+    replace: "    const noEmailPeople = [].map(function (p) { return { name: p.nameTC, reason: '沒有電郵', personId: p.personId }; });",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
   {
@@ -6436,7 +6436,7 @@ const MUTATIONS = [
     id: "cj-official-off",
     why: "正式發出確認窗冇列",
     file: "src/ui/ScriptZone1.html",
-    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable).forEach((n) => nodes.push(n));\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
+    find: "      // 第七十五輪批次 CJ 組\n      buildUnreachableNodes(preview.unreachable, { messagePurpose: 'OFFICIAL' }).forEach((n) => nodes.push(n));\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
     replace: "      // 第七十五輪批次 CJ 組\n      // 第七十七輪批次 EG 組：上次讀唔到出席系統 ⇒ 講一句（電郵係上次嘅）\n      if (preview.hwcasNotice) nodes.push(make('div', { className: 'warnbox' }, [make('div', { text: preview.hwcasNotice, className: 'lines' })]));\n\n      if (preview.alreadySentCount > 0) {\n        nodes.push(make('div', { className: 'warnbox' }, [\n          make('div', {\n            text: '注意：這個版本已經有 ' + preview.alreadySentCount + ' 個人收過信，'",
     tests: ["tests/round75_cj_unreachable.test.js"]
   },
@@ -14710,6 +14710,142 @@ const MUTATIONS = [
     find: "      msgPlain = renderPersonalLinkMessageText_(t.template, {",
     replace: "      msgPlain = String(t.template.bodyPlain) + String({",
     tests: ["tests/round112_uc_copy_message.test.js"]
+  },
+  {
+    id: "ud-no-edit-guard",
+    why: "儲存不要求可以修改的權限（只可查看的人也寫得入）",
+    file: "src/RuleExtrasEditor.gs",
+    find: "function apiSaveRuleExtras(quarterId, payload) {\n  assertWebAppRequestAllowed_();\n",
+    replace: "function apiSaveRuleExtras(quarterId, payload) {\n",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-no-lock",
+    why: "儲存不經 withMutationLock_",
+    file: "src/RuleExtrasEditor.gs",
+    find: "  return withMutationLock_('儲存影音組合及協唱', function () {",
+    replace: "  return (function (label, fn) { return fn(); })('儲存影音組合及協唱', function () {",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-skip-check",
+    why: "核對不通過照樣儲存",
+    file: "src/RuleExtrasEditor.gs",
+    find: "    if (!check.ok) {",
+    replace: "    if (false) {",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-remove-keeps-active",
+    why: "移除時 Active 沒有設為 FALSE",
+    file: "src/RuleExtrasEditor.gs",
+    find: "plan.deactivate.forEach(function (row) { sheet.getRange(row, colOf(activeKey)).setValue(false); });",
+    replace: "plan.deactivate.forEach(function (row) { sheet.getRange(row, colOf(activeKey)).setValue(true); });",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-team-no-safe",
+    why: "組合名稱不經 sheetSafeText_",
+    file: "src/RuleExtrasEditor.gs",
+    find: "f[T.TEAM_ID] = sheetSafeText_(t.teamId);",
+    replace: "f[T.TEAM_ID] = t.teamId;",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-singer-no-safe",
+    why: "協唱名字不經 sheetSafeText_",
+    file: "src/RuleExtrasEditor.gs",
+    find: "f[W.SINGER_NAME] = sheetSafeText_(s.singerName);",
+    replace: "f[W.SINGER_NAME] = s.singerName;",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-quote-diff",
+    why: "單引號令同一份內容每次儲存都當作有改動",
+    file: "src/RuleExtrasEditor.gs",
+    find: " && !(want.charAt(0) === \"'\" && cur === want.slice(1))",
+    replace: "",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-no-version-note",
+    why: "已有版本也不提示",
+    file: "src/RuleExtrasEditor.gs",
+    find: "const versionNote = any && hasVersion ?",
+    replace: "const versionNote = false ?",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-audit-no-before",
+    why: "AuditLog 不記改前",
+    file: "src/RuleExtrasEditor.gs",
+    find: "oldValue: beforeText.teams,",
+    replace: "oldValue: '',",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-choir-no-write",
+    why: "詩班例外不寫回 Config",
+    file: "src/RuleExtrasEditor.gs",
+    find: "if (oldChoir !== newChoir || before.choirInvalid.length > 0) {",
+    replace: "if (false) {",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-view-api-closed",
+    why: "只可查看的人打不開畫面（不在只讀名單）",
+    file: "src/WebApp.gs",
+    find: "  'apiGetPreLaunchCheck',\n  // 第一百一十二輪批次 UD 組：〔影音組合及協唱〕畫面（只可查看的人可以打開，全部唯讀；儲存要可以修改）\n  'apiGetRuleExtrasEditor'\n",
+    replace: "  'apiGetPreLaunchCheck'\n",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-raw-words",
+    why: "畫面問題句出現 PersonID 等程式用字",
+    file: "src/RuleExtrasEditor.gs",
+    find: "if (issue.code === RULE_EXTRAS_ISSUE.PERSON_MISSING) {\n    msg =",
+    replace: "if (false) {\n    msg =",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-max-per-month",
+    why: "每月次數不限上限",
+    file: "src/RuleExtrasEditor.gs",
+    find: "perMonth >= 1 && perMonth <= RULE_EXTRAS_MAX_PER_MONTH",
+    replace: "perMonth >= 1 && perMonth <= 99",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-ui-not-readonly",
+    why: "只可查看的人畫面仍可以改",
+    file: "src/ui/ScriptZone2.html",
+    find: "    const ro = !!viewOnly_;\n    const opt = data.options || {};",
+    replace: "    const ro = false;\n    const opt = data.options || {};",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-ui-names-union",
+    why: "成員名字下拉改回聯集（和核對不一致）",
+    file: "src/ui/ScriptZone2.html",
+    find: "return allIds.filter((id) => postIds.every(",
+    replace: "return allIds.filter((id) => postIds.some(",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-ui-no-save-choir",
+    why: "〔儲存〕沒有送出詩班例外",
+    file: "src/ui/ScriptZone2.html",
+    find: "teams: state.teams, singers: state.singers, choir: state.choir });",
+    replace: "teams: state.teams, singers: state.singers, choir: [] });",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
+  },
+  {
+    id: "ud-dup-team-allowed",
+    why: "組合名稱重複也接受",
+    file: "src/RuleExtrasEditor.gs",
+    find: "if (seenTeam[teamId]) fail(",
+    replace: "if (false) fail(",
+    tests: ["tests/round112_ud_rule_extras_editor.test.js"]
   }
 ];
 
