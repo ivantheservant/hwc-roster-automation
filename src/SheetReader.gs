@@ -1695,7 +1695,10 @@ function runHwcasSyncSafely_(opts) {
 
 /** 寄出路（已經喺鎖入面）：建立收件名單之前同步一次，10 分鐘內已更新過就略過。**唔會令寄出失敗。** */
 function syncPeopleFromHwcasBeforeSend_() {
-  return runHwcasSyncSafely_({ force: false });
+  const r = runHwcasSyncSafely_({ force: false });
+  // 第一百一十一輪批次 SF 組：各種寄出（申報連結、季前資料、職事表、補寄）之前補發個人連結
+  if (typeof autoSeedPersonalLinkTokens_ === 'function') autoSeedPersonalLinkTokens_('寄出前');
+  return r;
 }
 
 /** 寄出確認窗要講嘅一句（上次讀唔到出席系統 ⇒ 講；冇事 ⇒ 空字串）。 */

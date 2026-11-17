@@ -108,6 +108,43 @@ function ensureNameMappingPersonalLinkTokenColumn_() {
  * @param {Object[]} missing `planPersonalLinkTokenSeed_()` 嘅結果
  * @returns {number} 實際補上 token 嘅人數
  */
+/**
+ * 第一百一十一輪批次 SF 組：新加入的人自動有個人連結。只補還沒有 token 的啟用人員（不會改動任何現有 token）。
+ * 每日自動排程開頭、各種寄出之前（`syncPeopleFromHwcasBeforeSend_()`）呼叫。
+ * AuditLog 只寫人數（token 是敏感憑證，PersonID 亦不寫）。出錯只寫 log，不可以令呼叫的動作失敗。
+ * @param {string} source 由哪裏呼叫（AuditLog Source）
+ * @returns {number} 補了幾位
+ */
+function autoSeedPersonalLinkTokens_(source) {
+  try {
+    const missing = planPersonalLinkTokenSeed_();
+    if (missing.length === 0) return 0;
+    const n = seedPersonalLinkTokens_(missing);
+    if (n > 0) {
+      writeAuditLog_({ action: 'PERSONAL_LINK_TOKENS_AUTO_SEEDED', targetSheet: SHEETS.NAME_MAPPING, targetKey: '',
+        newValue: '自動補發 ' + n + ' 位', source: source || 'autoSeedPersonalLinkTokens_', notes: '只補沒有個人連結的啟用人員；只記人數' });
+    }
+    return n;
+  } catch (err) {
+    log_('WARN', '自動補發個人連結失敗（其餘照做）：' + err.message);
+    return 0;
+  }
+}
+
+/**
+ * 第一百一十一輪批次 SF 組：剛加入的一位即時補 token（加入新人的各條路用）。出錯只寫 log。
+ * @param {string} personId
+ * @returns {number} 0 或 1
+ */
+function seedPersonalLinkTokenForNewPerson_(personId) {
+  try {
+    return seedPersonalLinkTokens_([{ personId: String(personId || '').trim() }]);
+  } catch (err) {
+    log_('WARN', '新人 ' + personId + ' 補不到個人連結（之後每日排程或寄出前會再補）：' + err.message);
+    return 0;
+  }
+}
+
 function seedPersonalLinkTokens_(missing) {
   if (missing.length === 0) return 0;
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.NAME_MAPPING);

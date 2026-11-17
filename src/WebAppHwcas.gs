@@ -657,6 +657,8 @@ function addPersonFromHwcas_locked_(payload) {
 
   const opened = openSheetForEdit_(SHEETS.NAME_MAPPING);
   appendRowFields_(opened.sheet, opened.headers, record);
+  // 第一百一十一輪批次 SF 組：新人即時有個人連結
+  if (typeof seedPersonalLinkTokenForNewPerson_ === 'function') seedPersonalLinkTokenForNewPerson_(personId);
   writeZone3Audit_({
     action: 'PERSON_ADD_FROM_HWCAS',
     targetSheet: SHEETS.NAME_MAPPING,

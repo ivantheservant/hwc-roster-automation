@@ -14278,6 +14278,54 @@ const MUTATIONS = [
     find: "    if (PRESEASON_LATER_CATEGORY_IDS.indexOf(c.id) !== -1 && base && !(c.id in base)) return;",
     replace: "",
     tests: ["tests/round111_se_rule_extras_check.test.js"]
+  },
+  {
+    id: "sf-audit-ids",
+    why: "AuditLog 寫出 PersonID",
+    file: "src/WebAppPersonalLink.gs",
+    find: "newValue: '自動補發 ' + n + ' 位', source:",
+    replace: "newValue: '自動補發 ' + missing.map(function (m) { return m.personId; }).join(','), source:",
+    tests: ["tests/round111_sf_personal_link_auto.test.js"]
+  },
+  {
+    id: "sf-auto-throws",
+    why: "自動補發出錯會令寄出失敗",
+    file: "src/WebAppPersonalLink.gs",
+    find: "    log_('WARN', '自動補發個人連結失敗（其餘照做）：' + err.message);\n    return 0;",
+    replace: "    throw err;",
+    tests: ["tests/round111_sf_personal_link_auto.test.js"]
+  },
+  {
+    id: "sf-no-add-person",
+    why: "〔加入名單〕之後不即時補",
+    file: "src/WebAppPeople.gs",
+    find: "  if (typeof seedPersonalLinkTokenForNewPerson_ === 'function') seedPersonalLinkTokenForNewPerson_(personId);",
+    replace: "",
+    tests: ["tests/round111_sf_personal_link_auto.test.js"]
+  },
+  {
+    id: "sf-no-hwcas-add",
+    why: "由出席系統加入之後不即時補",
+    file: "src/WebAppHwcas.gs",
+    find: "  if (typeof seedPersonalLinkTokenForNewPerson_ === 'function') seedPersonalLinkTokenForNewPerson_(personId);",
+    replace: "",
+    tests: ["tests/round111_sf_personal_link_auto.test.js"]
+  },
+  {
+    id: "sf-no-before-send",
+    why: "寄出之前不補",
+    file: "src/SheetReader.gs",
+    find: "  if (typeof autoSeedPersonalLinkTokens_ === 'function') autoSeedPersonalLinkTokens_('寄出前');",
+    replace: "",
+    tests: ["tests/round111_sf_personal_link_auto.test.js"]
+  },
+  {
+    id: "sf-no-daily",
+    why: "每日自動排程不補",
+    file: "src/Trigger.gs",
+    find: "      const seeded = autoSeedPersonalLinkTokens_('dailyAutomationCheck_');",
+    replace: "      const seeded = 0;",
+    tests: ["tests/round111_sf_personal_link_auto.test.js"]
   }
 ];
 

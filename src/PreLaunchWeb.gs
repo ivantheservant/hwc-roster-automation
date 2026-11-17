@@ -80,6 +80,11 @@ function buildPreLaunchWebItems_() {
     !check ? '讀不到' : (nChoir === 0 ? '沒有例外（不用填）'
       : nChoir + ' 項' + (choirIssues ? '；有 ' + choirIssues + ' 項問題：' + issueText('CHOIR_SUNDAY_ALLOWED') : '；沒有問題')),
     'Config 工作表 CHOIR_SUNDAY_ALLOWED（格式「PersonID:PostID」，逗號分隔）');
+  // 第一百一十一輪批次 SF 組
+  let nNoLink = -1;
+  try { nNoLink = planPersonalLinkTokenSeed_().length; } catch (err) { nNoLink = -1; }
+  add('所有啟用的事奉人員都有個人連結', nNoLink === 0, nNoLink < 0 ? '讀不到' : (nNoLink === 0 ? '全部都有' : nNoLink + ' 位沒有（每日自動排程或寄出前會自動補發）'),
+    '進階與診斷「個人專屬連結」→〔補發個人專屬連結〕');
   let nPreferred = -1;
   try { nPreferred = Object.keys(readPreferredEmailPersonIds_()).length; } catch (err) { nPreferred = -1; }
   add('指定寄信電郵（PreferredEmail）已填人數', nPreferred > 0, nPreferred < 0 ? '讀不到' : nPreferred + ' 人',

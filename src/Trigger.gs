@@ -116,6 +116,12 @@ function dailyAutomationCheck_() {
     const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
     const report = [];
 
+    // 第一百一十一輪批次 SF 組：先為新加入的人補發個人連結（申報連結要用；只補缺少的）
+    if (typeof autoSeedPersonalLinkTokens_ === 'function') {
+      const seeded = autoSeedPersonalLinkTokens_('dailyAutomationCheck_');
+      if (seeded > 0) report.push({ quarterId: '', action: 'PERSONAL_LINK', outcome: 'SEEDED', detail: '自動補發個人連結 ' + seeded + ' 位' });
+    }
+
     // 第七十五輪批次 CB 組：先確保未來 N 個月內開始嘅季度已建立（逐季、寫 AuditLog）。
     // 出事唔可以令其他季度嘅檢查唔做——包 try/catch，同下面每季判斷同一種防禦。
     try {
