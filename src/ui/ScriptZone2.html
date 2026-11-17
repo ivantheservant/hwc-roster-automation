@@ -106,49 +106,51 @@
 
     // 逐項各自顯示自己嘅數字（規格 3.1：N 係項數，每項各自有 count）
     const summary = make('div', { className: 'sec' }, [sectionTitle('這一季還要做的：')]);
+    // 第一百一十二輪批次 UB 組：分兩段——「生成之前要做」及「生成之後才做」
+    // 第一百一十四輪批次 VB-1：季前資料、申報確認、人手檢查屬於「生成之前要做」，排在那個標題之下
+    //（之前排在標題之上，標題下面是空的）；沒有任何「生成之前要做」的項目 ⇒ 不顯示這個標題
+    const beforeRows = [];
     // 第八十五輪批次 LF 組：「季前資料：已寄出（日期，自動／人手）」或「建議 <日期> 寄出（未寄）」
     if (d && d.preseasonStatus) {
-      summary.appendChild(make('div', { text: (/已寄出/.test(d.preseasonStatus) ? '✅ ' : '⬜ ') + d.preseasonStatus,
+      beforeRows.push(make('div', { text: (/已寄出/.test(d.preseasonStatus) ? '✅ ' : '⬜ ') + d.preseasonStatus,
         className: /已寄出/.test(d.preseasonStatus) ? 'vio-row muted' : 'vio-row' }));
     }
     // 第九十輪批次 QC 組：事奉人員在個人專屬連結的申報，等候幹事確認
     if (d && typeof d.pendingSubmissions === 'number') {
       const n = d.pendingSubmissions;
-      summary.appendChild(make('div', {
+      beforeRows.push(make('div', {
         text: n < 0 ? '⬜ 事奉人員申報待確認：暫時查不到' : (n > 0 ? '⬜ 事奉人員申報待確認：' + n + ' 項——在〔不能服侍的日期〕最上面處理'
           : '✅ 事奉人員申報待確認：0 項'),
         className: n === 0 ? 'vio-row muted' : 'vio-row'
       }));
     }
     // 第一百零九輪批次 SB 組：系統內找不到緊接的上一季職事表
-    if (d && d.priorWeeksNote) summary.appendChild(make('div', { text: '⬜ ' + d.priorWeeksNote, className: 'vio-row' }));
+    if (d && d.priorWeeksNote) beforeRows.push(make('div', { text: '⬜ ' + d.priorWeeksNote, className: 'vio-row' }));
     // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題
-    if (d && d.ruleExtrasNote) summary.appendChild(make('div', { text: '⬜ ' + d.ruleExtrasNote, className: 'vio-row' }));
+    if (d && d.ruleExtrasNote) beforeRows.push(make('div', { text: '⬜ ' + d.ruleExtrasNote, className: 'vio-row' }));
     // 第八十五輪批次 LD 組：沒有問題就寫「人手檢查：足夠」；讀不到就照實講
     if (st && st.error) {
-      summary.appendChild(make('div', { text: '⬜ 人手檢查：暫時查不到（' + st.error + '）', className: 'vio-row' }));
+      beforeRows.push(make('div', { text: '⬜ 人手檢查：暫時查不到（' + st.error + '）', className: 'vio-row' }));
     } else if (st && st.totalBlanks === 0) {
-      summary.appendChild(make('div', { text: '✅ 人手檢查：足夠', className: 'vio-row muted' }));
+      beforeRows.push(make('div', { text: '✅ 人手檢查：足夠', className: 'vio-row muted' }));
     }
-    // 第一百一十二輪批次 UB 組：分兩段——「生成之前要做」及「生成之後才做」
-    const renderItem = (i, notYet) => {
-      summary.appendChild(make('div', {
-        text: (i.count > 0 ? (notYet ? '⏳ ' : '⬜ ') : '✅ ') + i.label + '：' + i.count
-          + (i.count > 0 ? ' 項' : ' 項（做好了）')
-          // 第七十五輪批次 CD 組：講員／翻譯／獻花嘅提示（「生成之後在職事表直接填」）
-          + (i.count > 0 && i.hint ? '——' + i.hint : ''),
-        className: i.count > 0 && !notYet ? 'vio-row' : 'vio-row muted'
-      }));
-    };
+    const itemRow = (i, notYet) => make('div', {
+      text: (i.count > 0 ? (notYet ? '⏳ ' : '⬜ ') : '✅ ') + i.label + '：' + i.count
+        + (i.count > 0 ? ' 項' : ' 項（做好了）')
+        // 第七十五輪批次 CD 組：講員／翻譯／獻花嘅提示（「生成之後在職事表直接填」）
+        + (i.count > 0 && i.hint ? '——' + i.hint : ''),
+      className: i.count > 0 && !notYet ? 'vio-row' : 'vio-row muted'
+    });
     const allItems = pq.items || [];
     const beforeItems = allItems.filter((i) => i.phase !== 'AFTER');
     const afterItems = allItems.filter((i) => i.phase === 'AFTER');
     const notGenerated = pq.generated === false;
-    if (afterItems.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));
-    beforeItems.forEach((i) => renderItem(i, false));
+    beforeItems.forEach((i) => beforeRows.push(itemRow(i, false)));
+    if (afterItems.length > 0 && beforeRows.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));
+    beforeRows.forEach((n) => summary.appendChild(n));
     if (afterItems.length > 0) {
       summary.appendChild(sectionTitle(notGenerated ? '生成之後才做（現在還做不到，不計入上面的數字）：' : '生成之後要做：'));
-      afterItems.forEach((i) => renderItem(i, notGenerated));
+      afterItems.forEach((i) => summary.appendChild(itemRow(i, notGenerated)));
     }
     body.appendChild(summary);
   }
@@ -373,7 +375,14 @@
         singerName: s.singerName || '', level: s.level || 'HARD' })),
       choir: (data.choir || []).map((c) => ({ personId: c.personId, postId: c.postId }))
     };
-    const redraw = () => renderRuleExtras_(Object.assign({}, data, { teams: state.teams, singers: state.singers, choir: state.choir, problems: data.problems }));
+    // 第一百一十四輪批次 VB-2：加一行、移除等會重畫整個窗——openModal() 會把捲動位置設回最上面，重畫之後放回原位
+    const redraw = () => {
+      const before = el('modalBody');
+      const top = before ? before.scrollTop : 0;
+      renderRuleExtras_(Object.assign({}, data, { teams: state.teams, singers: state.singers, choir: state.choir, problems: data.problems }));
+      const after = el('modalBody');
+      if (after) after.scrollTop = top;
+    };
 
     // 名字選項：只列有資格的人（名單上的人）；目前的值不在名單上也照樣列出，並寫明
     const personOptions = (ids, current, allowBlank) => {

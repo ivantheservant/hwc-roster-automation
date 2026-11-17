@@ -13963,8 +13963,8 @@ const MUTATIONS = [
     id: "sb-no-dash-note",
     why: "「這一季還要做的」沒有提示",
     file: "src/ui/ScriptZone2.html",
-    find: "    if (d && d.priorWeeksNote) summary.appendChild(",
-    replace: "    if (false) summary.appendChild(",
+    find: "    if (d && d.priorWeeksNote) beforeRows.push(",
+    replace: "    if (false) beforeRows.push(",
     tests: ["tests/round109_sb_prior_weeks.test.js"]
   },
   {
@@ -15110,6 +15110,46 @@ const MUTATIONS = [
     find: "  const text = buildUnavailableInviteFailureText_(String(",
     replace: "  const text = { subject: '寄不出', body: '' } || buildUnavailableInviteFailureText_(String(",
     tests: ["tests/round114_uf_template_samples.test.js"]
+  },
+  {
+    id: "vb1-title-always",
+    why: "沒有生成之前的項目也顯示空標題",
+    file: "src/ui/ScriptZone2.html",
+    find: "if (afterItems.length > 0 && beforeRows.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));",
+    replace: "if (afterItems.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));",
+    tests: ["tests/round114_vb_small_fixes.test.js"]
+  },
+  {
+    id: "vb1-title-below-rows",
+    why: "標題排回三行之下（標題下面是空的）",
+    file: "src/ui/ScriptZone2.html",
+    find: "    if (afterItems.length > 0 && beforeRows.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));\n    beforeRows.forEach((n) => summary.appendChild(n));",
+    replace: "    beforeRows.forEach((n) => summary.appendChild(n));\n    if (afterItems.length > 0 && beforeRows.length > 0) summary.appendChild(sectionTitle('生成之前要做：'));",
+    tests: ["tests/round114_vb_small_fixes.test.js"]
+  },
+  {
+    id: "vb1-split-no-after",
+    why: "沒有生成之後的項目也分段",
+    file: "src/ui/ScriptZone2.html",
+    find: "if (afterItems.length > 0 && beforeRows.length > 0) summary.appendChild(",
+    replace: "if (beforeRows.length > 0) summary.appendChild(",
+    tests: ["tests/round114_vb_small_fixes.test.js"]
+  },
+  {
+    id: "vb2-scroll-reset",
+    why: "重畫之後捲動位置跳回最上面",
+    file: "src/ui/ScriptZone2.html",
+    find: "      if (after) after.scrollTop = top;",
+    replace: "      if (after) after.scrollTop = 0;",
+    tests: ["tests/round114_vb_small_fixes.test.js"]
+  },
+  {
+    id: "vb2-scroll-not-read",
+    why: "重畫之前沒有記下捲動位置",
+    file: "src/ui/ScriptZone2.html",
+    find: "      const top = before ? before.scrollTop : 0;",
+    replace: "      const top = 0;",
+    tests: ["tests/round114_vb_small_fixes.test.js"]
   }
 ];
 

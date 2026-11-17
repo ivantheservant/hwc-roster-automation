@@ -80,7 +80,7 @@ console.log('\n=== SB5 三處顯示及同一支函式 ===');
     /priorWeeks: priorInfo\.weeks/.test(gen) && /priorWeeksNote: describePriorWeeksGap_\(priorInfo\)/.test(gen));
   check('★★★★★ 生成確認窗及完成窗', (read('src/WebAppGenerate.gs').match(/priorWeeksNote: computePriorWeeksNoteForQuarter_/g) || []).length === 2
     && /plan\.priorWeeksNote/.test(read('src/ui/ScriptZone1.html')) && /res\.priorWeeksNote/.test(read('src/ui/ScriptZone1.html')));
-  check('★★★★★ 「這一季還要做的」', /if \(d && d\.priorWeeksNote\) summary\.appendChild/.test(read('src/ui/ScriptZone2.html')) && /priorWeeksNote: versionExists/.test(read('src/WebAppDashboard.gs')));
+  check('★★★★★ 「這一季還要做的」', /if \(d && d\.priorWeeksNote\) beforeRows\.push/   /* 第一百一十四輪批次 VB-1（刻意改動）：先收集再排在「生成之前要做：」標題之下 */.test(read('src/ui/ScriptZone2.html')) && /priorWeeksNote: versionExists/.test(read('src/WebAppDashboard.gs')));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);
