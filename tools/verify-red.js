@@ -14534,6 +14534,46 @@ const MUTATIONS = [
     find: "        button('立即備份一次', () => runAction('備份主試算表', async () => {",
     replace: "        button('（略）', () => runAction('備份主試算表', async () => {",
     tests: ["tests/round111_si_weekly_backup.test.js"]
+  },
+  {
+    id: "ua-always-can",
+    why: "頁頂按鈕不看伺服器判斷（一律可申報）",
+    file: "src/WebAppPersonalLink.gs",
+    find: "  return !!(view && view.quarters && view.quarters.length > 0);",
+    replace: "  return true;",
+    tests: ["tests/round112_ua_personal_declare_jump.test.js"]
+  },
+  {
+    id: "ua-btn-always-show",
+    why: "頁面不看 boot.canDeclare 一律顯示按鈕",
+    file: "src/ui/PersonalRoster.html",
+    find: "if (goBtn && boot.canDeclare) {",
+    replace: "if (goBtn) {",
+    tests: ["tests/round112_ua_personal_declare_jump.test.js"]
+  },
+  {
+    id: "ua-no-roster-order",
+    why: "未有版本時申報區沒有排到最上面",
+    file: "src/ui/PersonalRoster.html",
+    find: ".main-col.no-roster #unavSection { order: -1; }",
+    replace: ".main-col.no-roster #unavSection { order: 0; }",
+    tests: ["tests/round112_ua_personal_declare_jump.test.js"]
+  },
+  {
+    id: "ua-no-msg-scroll",
+    why: "結果訊息不捲到看得到",
+    file: "src/ui/PersonalRoster.html",
+    find: "          scrollToNode(msgEl);\n",
+    replace: "",
+    tests: ["tests/round112_ua_personal_declare_jump.test.js"]
+  },
+  {
+    id: "ua-hash-jump",
+    why: "按鈕改用網址 hash 跳轉（會令 iframe 重新載入）",
+    file: "src/ui/PersonalRoster.html",
+    find: "try { sec.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) { sec.scrollIntoView(); }",
+    replace: "window.location.hash = 'unavSection';",
+    tests: ["tests/round112_ua_personal_declare_jump.test.js"]
   }
 ];
 
