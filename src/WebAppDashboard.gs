@@ -829,7 +829,9 @@ function buildDashboardState_(quarterId) {
       // 第九十五輪批次 VA 組：用同一次載入記憶的次數（沒有再建）
       fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_.reused,
       // 第九十六輪批次 WA 組：「第 3、4 步人數」快取 HIT／MISS／OFF（OFF＝沒有用快取，照舊計算）
-      countsCache: dashboardCounts.cache
+      countsCache: dashboardCounts.cache,
+      // 第一百一十五輪批次 WB-0：讀得最慢的工作表（頁底第三行）
+      slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(6) : []
     }
   };
 }

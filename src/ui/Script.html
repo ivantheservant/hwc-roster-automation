@@ -1083,7 +1083,9 @@
       const box = el('loadTimings');
       const show = !(dashboardState_ && dashboardState_.showLoadTimings === false);
       const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_) : '';
-      if (box) { box.hidden = !show; box.textContent = show ? (line + (serverLine ? '\n' + serverLine : '')) : ''; }
+      // 第一百一十五輪批次 WB-0：第三行——伺服器每一段及讀得最慢的工作表
+      const detailLine = loadServerTimings_ ? buildServerDetailLine_(loadServerTimings_) : '';
+      if (box) { box.hidden = !show; box.textContent = show ? (line + (serverLine ? '\n' + serverLine : '') + (detailLine ? '\n' + detailLine : '')) : ''; }
     } catch (err) { /* 計時絕不可以令載入出事 */ }
   }
 
@@ -1107,6 +1109,21 @@
     });
     const total = ms['合計'] !== undefined ? '（合計 ' + loadTimingSecondsText_(ms['合計']) + '）' : '';
     return '伺服器：' + parts.join('、') + total;
+  }
+  /**
+   * 第一百一十五輪批次 WB-0：頁底第三行（純函式）：「各段：A 1.2、B 0.4…、其餘 0.3；最慢的表：AuditLog 3.1、…」。
+   * 「其餘」＝合計減各段（狀態卡最後組合結果的部分）。
+   */
+  function buildServerDetailLine_(st) {
+    const phases = (st && st.phases) || [];
+    const total = phases.filter((p) => p.label === '合計')[0];
+    const parts = phases.filter((p) => p.label !== '合計');
+    const sum = parts.reduce((a, p) => a + (Number(p.ms) || 0), 0);
+    const rest = total ? Math.max(0, Number(total.ms) - sum) : 0;
+    const sheets = ((st && st.slowestSheets) || []).map((x) => x.name + ' ' + loadTimingSecondsText_(x.ms));
+    return '各段：' + parts.map((p) => p.label + ' ' + loadTimingSecondsText_(p.ms)).join('、')
+      + (total ? '、其餘 ' + loadTimingSecondsText_(rest) : '')
+      + (sheets.length ? '；最慢的表：' + sheets.join('、') : '');
   }
   function markServerLoadTimings_(st) {
     if (loadServerTimings_) return; // 只記第一次載入

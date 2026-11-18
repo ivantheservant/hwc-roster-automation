@@ -21,6 +21,8 @@
  * **只可以喺完全冇寫入嘅純讀取流程開。**
  */
 let SHEET_READ_MEMO_ = null;
+/** 第一百一十五輪批次 WB-0：快取期間每張工作表真正讀取用了幾毫秒（只量度，不影響結果）。 */
+let SHEET_READ_MS_ = null;
 
 /**
  * 開始 `readSheet_()` 快取。**只可以喺完全唔寫入嘅純讀取流程用**，
@@ -29,6 +31,7 @@ let SHEET_READ_MEMO_ = null;
  */
 function beginSheetReadMemo_() {
   SHEET_READ_MEMO_ = {};
+  SHEET_READ_MS_ = {};
 }
 
 /**
@@ -37,6 +40,18 @@ function beginSheetReadMemo_() {
  */
 function endSheetReadMemo_() {
   SHEET_READ_MEMO_ = null;
+  SHEET_READ_MS_ = null;
+}
+
+/**
+ * 第一百一十五輪批次 WB-0：這一次快取期間讀得最慢的幾張工作表（頁底計時用）。**只讀量度。**
+ * @param {number} n 最多幾張
+ * @returns {Array<{name: string, ms: number}>}
+ */
+function listSlowestSheetReads_(n) {
+  if (!SHEET_READ_MS_) return [];
+  return Object.keys(SHEET_READ_MS_).map(function (k) { return { name: k, ms: SHEET_READ_MS_[k] }; })
+    .sort(function (a, b) { return b.ms - a.ms; }).slice(0, n);
 }
 
 /**
@@ -282,6 +297,7 @@ function readSheet_(sheetName) {
     return cloneMemoRows_(SHEET_READ_MEMO_[sheetName]);
   }
 
+  const readStartedAt = Date.now();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) {
     throw new Error('找不到工作表: ' + sheetName);
@@ -289,6 +305,9 @@ function readSheet_(sheetName) {
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   if (lastRow < 3 || lastCol === 0) {
+    // 第一百一十五輪批次 WB-0：空表一樣記住（之前每次都再讀一次）
+    if (SHEET_READ_MEMO_) SHEET_READ_MEMO_[sheetName] = [];
+    if (SHEET_READ_MS_) SHEET_READ_MS_[sheetName] = (SHEET_READ_MS_[sheetName] || 0) + (Date.now() - readStartedAt);
     return [];
   }
 
@@ -310,6 +329,7 @@ function readSheet_(sheetName) {
   }
 
   if (SHEET_READ_MEMO_) SHEET_READ_MEMO_[sheetName] = result;
+  if (SHEET_READ_MS_) SHEET_READ_MS_[sheetName] = (SHEET_READ_MS_[sheetName] || 0) + (Date.now() - readStartedAt);
   return result;
 }
 
