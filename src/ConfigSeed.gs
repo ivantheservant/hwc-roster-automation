@@ -906,6 +906,14 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百一十五輪批次 WC 組
+      key: CONFIG_KEYS.WEBAPP_LOAD_TIMEOUT_SECONDS, type: CONFIG_TYPES.INT, group: 'WEBAPP',
+      defaultValue: String(DEFAULTS.WEBAPP_LOAD_TIMEOUT_SECONDS),
+      description: '幹事介面載入時，每一個只讀的伺服器呼叫最多等幾秒（預設 150）。超過 ⇒ 那一部分寫「載入太久」並有〔再試一次〕，'
+        + '已載入的部分照樣可以用。只影響唯讀的載入，不影響儲存、寄出等會寫入的動作。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.WEBAPP_DEFAULT_QUARTER, type: CONFIG_TYPES.STR, group: 'WEBAPP',
       defaultValue: '',
       description: '幹事介面打開時預設顯示的季度（例如 2027T1）。留空（或者填的季度不存在）＝開始日在今日之後、最早的一季（下一季）；'

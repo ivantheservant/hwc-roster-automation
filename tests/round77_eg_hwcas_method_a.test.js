@@ -197,7 +197,7 @@ console.log('\n=== EG6：寄出路寄信前同步 ===');
   check('★★★★ 補寄都叫', /syncPeopleFromHwcasBeforeSend_\(\);/.test(code(read('src/WebAppZone4.gs'))));
   check('★★★★★ 三個確認窗都帶 hwcasNotice', (flow.match(/hwcasNotice/g) || []).length >= 3);
   check('★★★★★ 幹事介面載入：主畫面畫好之後先 syncHwcasOnLoad()（唔經 runAction 鎖畫面）',
-    /await loadQuarters\(deepLink_\.quarter\);\s*if \(!viewOnly_\) syncHwcasOnLoad\(\);/.test(code(read('src/ui/ScriptBoot.html'))) && /callServerMutating\('apiSyncPeopleFromHwcas', \{\}\)/.test(code(read('src/ui/ScriptZone3.html'))));  // 第九十五輪批次 VB 組：不再 force
+    /await loadQuarters\(deepLink_\.quarter\);[\s\S]{0,500}?if \(!viewOnly_\) syncHwcasOnLoad\(\);/   /* 第一百一十五輪批次 WC 組（刻意改動）：中間多了載入失敗的處理 */.test(code(read('src/ui/ScriptBoot.html'))) && /callServerMutating\('apiSyncPeopleFromHwcas', \{\}\)/.test(code(read('src/ui/ScriptZone3.html'))));  // 第九十五輪批次 VB 組：不再 force
 }
 
 console.log('\n=== EG7：畫面 ===');

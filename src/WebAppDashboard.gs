@@ -822,6 +822,8 @@ function buildDashboardState_(quarterId) {
     // 第九十三輪批次 TF 組：伺服器分段時間（前端寫入 console）。`phases` 是各段毫秒，最後一項「合計」；
     // `fineTuneContext` 是這一次載入建了幾次 fine-tune context、共幾毫秒（已包含在上面各段之內）。
     showLoadTimings: getConfig_(CONFIG_KEYS.WEBAPP_SHOW_LOAD_TIMINGS, true) !== false,
+    // 第一百一十五輪批次 WC 組：載入時每個唯讀呼叫的時限（秒）
+    loadTimeoutSeconds: readWebAppLoadTimeoutSeconds_(),
     timings: {
       phases: timer.list(),
       fineTuneContextCount: FINE_TUNE_CONTEXT_STATS_.count,
@@ -834,6 +836,16 @@ function buildDashboardState_(quarterId) {
       slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(6) : []
     }
   };
+}
+
+/**
+ * 第一百一十五輪批次 WC 組：前端載入時每個唯讀呼叫的時限（秒）。Config `WEBAPP_LOAD_TIMEOUT_SECONDS`；
+ * 20–600 秒以外（或不是數字）⇒ 預設 150。
+ * @returns {number}
+ */
+function readWebAppLoadTimeoutSeconds_() {
+  const n = Math.floor(Number(getConfig_(CONFIG_KEYS.WEBAPP_LOAD_TIMEOUT_SECONDS, DEFAULTS.WEBAPP_LOAD_TIMEOUT_SECONDS)));
+  return n >= 20 && n <= 600 ? n : DEFAULTS.WEBAPP_LOAD_TIMEOUT_SECONDS;
 }
 
 /**

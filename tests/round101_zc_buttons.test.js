@@ -45,7 +45,7 @@ console.log('\n=== ZC3：合併為〔寄出／匯出申報不能服侍日子連�
   check('★★★★★★ 前端、伺服器同一句', /const UNAVAILABLE_LINK_BUTTON_LABEL = '寄出／匯出申報不能服侍日子連結';/.test(z2)
     && /const UNAVAILABLE_LINK_BUTTON_LABEL = '寄出／匯出申報不能服侍日子連結';/.test(read('src/UnavailableInvite.gs')));
   check('★★★★★★ 舊的兩粒按鈕已拿走', z2.indexOf("button('邀請事奉人員申報不能服侍的日子'") === -1 && z2.indexOf('INVITE_PAPER_BUTTON_LABEL') === -1);
-  check('★★★★★ 只可查看的人仍然可以打開窗（看名單；按鈕灰色）', /VIEW_ONLY_ALLOWED_LABELS = \['寄出季前資料', '寄出／匯出申報不能服侍日子連結'\]/.test(read('src/ui/Script.html')));
+  check('★★★★★ 只可查看的人仍然可以打開窗（看名單；按鈕灰色）', /VIEW_ONLY_ALLOWED_LABELS = \['寄出季前資料', '寄出／匯出申報不能服侍日子連結'(, '再試一次')?\]/   /* 第一百一十五輪批次 WC 組（刻意改動）：多了〔再試一次〕 */.test(read('src/ui/Script.html')));
   check('★★★★★ 合併窗的 api：讀取在唯讀清單，寄出及匯出是改動（鎖）', /'apiUnavailableLinkPreview'/.test(read('src/WebApp.gs'))
     && /function apiUnavailableLinkSendAndExport\(quarterId, selection\) \{\s*assertWebAppRequestAllowed_\(\);\s*return withMutationLock_\(UNAVAILABLE_LINK_BUTTON_LABEL/.test(read('src/UnavailableInvite.gs')));
 }

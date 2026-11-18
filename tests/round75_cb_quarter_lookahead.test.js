@@ -103,7 +103,8 @@ console.log('\n=== CB4：三個入口 ===');
     /callServerMutating\('apiEnsureFutureQuarters'\)/.test(load) && /fillQuarterSelect_\(keepQuarterId \|\| null\)/.test(load));  // 第八十七輪 NA 組：網址指定的季度
   // 第九十五輪批次 VC／VD 組（刻意改動）：改在背景做（不 await），失敗由 .catch 接住
   check('★★★★★ 建唔到唔阻住載入（背景、.catch）', /if \(!viewOnly_\) ensureFutureQuartersInBackground_\(\);/.test(load)
-    && /callServerMutating\('apiEnsureFutureQuarters'\)\.then\([\s\S]*?\}\)\.catch\(/.test(load));
+    // 第一百一十五輪批次 WC 組（刻意改動）：外面包了 withLoadTimeout_（有時限、不重試）
+    && /callServerMutating\('apiEnsureFutureQuarters'\)(, 'apiEnsureFutureQuarters'\))?\.then\([\s\S]*?\}\)\.catch\(/.test(load));
   check('★★★★★ 每日自動排程都會做', /ensureLookaheadQuarters_\('dailyAutomationCheck_'\)/.test(read('src/Trigger.gs')));
   const z4 = read('src/ui/ScriptZone4.html');
   check('★★★★★★ 進階與診斷有〔建立未來季度〕', /zone4Row\('建立未來季度'/.test(z4) && /callServerMutating\('apiEnsureFutureQuarters'\)/.test(z4));

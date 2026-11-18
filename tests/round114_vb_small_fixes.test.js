@@ -79,7 +79,7 @@ console.log('\n=== VB-2：〔影音組合及協唱〕重畫之後保留捲動位
 console.log('\n=== VB-3：深連結的啟動流程與一般載入相同（只多選季度及打開畫面） ===');
 {
   const boot = read('src/ui/ScriptBoot.html');
-  check('★★★★★ 啟動：讀權限 → 讀網址參數 → loadQuarters(指定季度) → 載入完成後才打開那個畫面', /await loadMyPermission_\(\);\n\s+deepLink_ = parseDeepLink_\(await readDeepLinkParams_\(\)\);[\s\S]{0,300}await loadQuarters\(deepLink_\.quarter\);[\s\S]{0,120}\}\)\.then\(\(\) => \{ if \(myRole_ !== 'CONFIRMER'\) applyDeepLink_\(deepLink_\); \}\);/.test(boot));
+  check('★★★★★ 啟動：讀權限 → 讀網址參數 → loadQuarters(指定季度) → 載入完成後才打開那個畫面', /await loadMyPermission_\(\);\n\s+deepLink_ = parseDeepLink_\(await readDeepLinkParams_\(\)\);[\s\S]{0,600}await loadQuarters\(deepLink_\.quarter\);[\s\S]{0,700}\}\)\.then\(\(\) => \{ if \(myRole_ !== 'CONFIRMER'\) applyDeepLink_\(deepLink_\); \}\);/.test(boot));
 }
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : fail + ' FAILURE(S)'}`);

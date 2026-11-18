@@ -104,7 +104,7 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
   const boot = read('src/ui/ScriptBoot.html');
   check('★★★★★★ 先權限 → 讀網址 → loadQuarters(quarter) → 載入完成後才 applyDeepLink_',
     // 第九十四輪批次 UB 組（刻意改動）：只是確認者 ⇒ 只顯示確認畫面，不 loadQuarters、不 applyDeepLink_
-    /await loadMyPermission_\(\);\s*deepLink_ = parseDeepLink_\(await readDeepLinkParams_\(\)\);[\s\S]{0,200}?await loadQuarters\(deepLink_\.quarter\);[\s\S]*?\}\)\.then\(\(\) => \{ if \(myRole_ !== 'CONFIRMER'\) applyDeepLink_\(deepLink_\); \}\);/.test(boot));
+    /await loadMyPermission_\(\);\s*deepLink_ = parseDeepLink_\(await readDeepLinkParams_\(\)\);[\s\S]{0,500}?await loadQuarters\(deepLink_\.quarter\);[\s\S]*?\}\)\.then\(\(\) => \{ if \(myRole_ !== 'CONFIRMER'\) applyDeepLink_\(deepLink_\); \}\);/.test(boot));
   const r2 = await ui.readDeepLinkParams_();
   check('★★★★ 讀不到 google.script.url（例如測試環境）⇒ 當沒有參數', JSON.stringify(r2) === '{}');
   ui.google.script.url = { getLocation: (cb) => cb({ parameter: { view: 'combined', quarter: '2027T1', p: 'x' } }) };

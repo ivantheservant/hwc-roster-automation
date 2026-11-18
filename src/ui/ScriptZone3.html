@@ -2001,12 +2001,15 @@
    *   ・有更新 ⇒ 只重新載入狀態卡；主流程第 5 步（沒有電郵、要印紙本的人數）讀 NameMapping 的電郵，
    *     所以電郵有改（`emailChanged > 0`）才連主流程資料一起重讀
    */
+  /** 第一百一十五輪批次 WC 組：載入時同步出席系統太久未回覆（會寫入，不自動再試）。 */
+  const HWCAS_SYNC_TIMEOUT_TEXT = '由出席系統更新電郵載入太久，畫面沒有再等（這個動作會寫入，所以不會自動再試；下次打開會再做一次）。';
   function syncHwcasOnLoad() {
     if (hwcasSyncedOnLoad_) return;
     hwcasSyncedOnLoad_ = true;
     const tSync = Date.now();
     showHwcasSyncing_(true);
-    callServerMutating('apiSyncPeopleFromHwcas', {}).then((r) => {
+    // 第一百一十五輪批次 WC 組：會寫入 ⇒ 有時限但不重試；超時就收起「正在同步出席系統……」並寫明
+    withLoadTimeout_(callServerMutating('apiSyncPeopleFromHwcas', {}), 'apiSyncPeopleFromHwcas').then((r) => {
       showHwcasSyncing_(false);
       markLoadTiming_('hwcasSync', Date.now() - tSync);
       if (!r || r.skipped === 'locked') return;
@@ -2021,7 +2024,10 @@
       // 已經打開的畫面）不可以被這一次背景更新關掉
       const tReload = Date.now();
       runAction('重新整理', () => loadDashboard({ keepModal: true })).then(() => markLoadTiming_('reload', Date.now() - tReload));
-    }).catch(() => { showHwcasSyncing_(false); /* 讀唔到出席系統唔可以令主畫面出事 */ });
+    }).catch((err) => {
+      showHwcasSyncing_(false); /* 讀唔到出席系統唔可以令主畫面出事 */
+      if (err && err.loadTimeout) setStatus(HWCAS_SYNC_TIMEOUT_TEXT, true);
+    });
   }
 
   /** 第九十五輪批次 VB 組：頁頂細字「正在同步出席系統……」。 */

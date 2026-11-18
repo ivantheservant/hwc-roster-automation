@@ -516,7 +516,56 @@
         + '如果它真的一格都不會寫，請把它加入 READ_ONLY_APIS。'));
     }
     // 第六十三輪批次 O 組：唯讀 ⇒ Google 暫時性錯誤自動重試一次（理由見上）
-    return withTransientRetry_(() => callServerRaw_(fnName, ...args));
+    // 第一百一十五輪批次 WC 組：唯讀呼叫有時限——伺服器一直沒有回覆就當作失敗（畫面不會永遠停在「載入中」）
+    return withLoadTimeout_(withTransientRetry_(() => callServerRaw_(fnName, ...args)), fnName);
+  }
+
+  /**
+   * 第一百一十五輪批次 WC 組：唯讀呼叫的時限（毫秒）。第一次載入用預設 150 秒；狀態卡回覆之後跟 Config `WEBAPP_LOAD_TIMEOUT_SECONDS`。
+   * **只用於唯讀呼叫**（`callServer`）；會寫入的呼叫（`callServerMutating`）不設時限、不重試。
+   */
+  let loadTimeoutMs_ = 150000;
+  /** 標記「載入太久」的錯誤。 */
+  const LOAD_TIMEOUT_MARK = '載入太久';
+  /**
+   * 包住一個唯讀呼叫：超過時限 ⇒ 以「載入太久」錯誤結束（伺服器之後才回覆的結果不理會）。
+   * @param {Promise<*>} promise
+   * @param {string} fnName
+   * @returns {Promise<*>}
+   */
+  function withLoadTimeout_(promise, fnName) {
+    const ms = loadTimeoutMs_;
+    let timer = null;
+    const timeout = new Promise((resolve, reject) => {
+      timer = setTimeout(() => {
+        const err = new Error('這一部分' + LOAD_TIMEOUT_MARK + '（超過 ' + Math.round(ms / 1000) + ' 秒伺服器還沒有回覆）。已載入的部分照樣可以用；請按〔再試一次〕。');
+        err.loadTimeout = true;
+        err.fnName = fnName;
+        reject(err);
+      }, ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => { if (typeof clearTimeout === 'function') clearTimeout(timer); });
+  }
+
+  /**
+   * 第一百一十五輪批次 WC 組：頁頂寫明哪一部分未載入，並給〔再試一次〕。`retry` 只可以是唯讀的載入（呼叫端保證）。
+   * @param {string} part 例如「狀態卡」
+   * @param {Error} err
+   * @param {Function} retry 回 Promise 的唯讀載入
+   */
+  function showLoadFailureNotice_(part, err, retry) {
+    const box = el('loadFailureNotice');
+    if (!box) return;
+    clear(box);
+    const why = err && err.loadTimeout ? '載入太久' : '載入失敗';
+    box.appendChild(make('div', { text: '「' + part + '」' + why + '：' + ((err && err.message) || '') + '　依賴這一部分的按鈕暫時不可以用。', className: 'lines' }));
+    box.appendChild(row([button('再試一次', () => {
+      box.hidden = true;
+      runAction('再試一次', async () => {
+        try { await retry(); } catch (e) { showLoadFailureNotice_(part, e, retry); throw e; }
+      });
+    }, '')]));
+    box.hidden = false;
   }
 
   /**
@@ -1001,7 +1050,8 @@
     /^複製訊息$/
   ];
   /** 文字對上面的規則、但只是打開一個只看的畫面。 */
-  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結'];
+  // 第一百一十五輪批次 WC 組：〔再試一次〕只重做唯讀的載入，只可查看的人一樣可以按
+  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結', '再試一次'];
   /** 「進階與診斷」裏只看、不改的工具（其餘〔開始〕一律當作改動）。 */
   const VIEW_ONLY_READ_TOOLS = ['列出待補格子', '草稿覆核報告（給堂委看）', '名單檢查', '出席系統連結',
     // 第一百零一輪批次 ZB／ZD／ZG 組：只讀
@@ -2674,7 +2724,8 @@
    */
   function ensureFutureQuartersInBackground_() {
     const tEnsure = Date.now();
-    callServerMutating('apiEnsureFutureQuarters').then((r) => {
+    // 第一百一十五輪批次 WC 組：會寫入 ⇒ 有時限但不重試（超時就當作沒有建立，不阻住載入）
+    withLoadTimeout_(callServerMutating('apiEnsureFutureQuarters'), 'apiEnsureFutureQuarters').then((r) => {
       markLoadTiming_('ensureQuarters', Date.now() - tEnsure);
       if (r && r.created && r.created.length > 0) return refillQuarterOptions_();
       return null;
@@ -2752,6 +2803,10 @@
     // 主流程的伺服器資料只看季度，不依賴狀態卡的回傳值。畫面仍然按原次序畫（先狀態卡、後主流程）。
     if (typeof prefetchMainFlowState_ === 'function') prefetchMainFlowState_();
     dashboardState_ = await callServer('apiGetDashboardState', currentQuarterId);
+    // 第一百一十五輪批次 WC 組：之後的唯讀呼叫用 Config 的時限
+    if (dashboardState_ && Number(dashboardState_.loadTimeoutSeconds) > 0) loadTimeoutMs_ = Number(dashboardState_.loadTimeoutSeconds) * 1000;
+    const failBox = el('loadFailureNotice');
+    if (failBox) failBox.hidden = true;
     dashboardStale_ = false;
     renderTop(dashboardState_);
     markLoadTiming_('statusCard', Date.now() - tLoad);
@@ -2774,14 +2829,7 @@
     try {
       await renderMainFlow(dashboardState_);
     } catch (err) {
-      const box = clear(el('mainFlowBody'));
-      box.appendChild(make('div', { className: 'warnbox' }, [
-        make('div', {
-          text: '主流程畫不出來：' + (err && err.message ? err.message : String(err))
-            + '　落面的功能仍然用得到。',
-          className: 'lines'
-        })
-      ]));
+      renderMainFlowFailure_(err);
     }
     markLoadTiming_('mainFlow', Date.now() - tFlow);
     renderZone1(dashboardState_);
@@ -2800,6 +2848,26 @@
     // CSS 嗰層唔怕重畫（`body.is-busy` 自動蓋住新節點），
     // 但鍵盤嗰層要補返。
     reapplyBusyLockIfNeeded_();
+  }
+
+  /**
+   * 主流程那一格畫不出來（載入太久或失敗）⇒ 寫一句，並給〔再試一次〕。
+   * 第一百一十五輪批次 WC 組：〔再試一次〕只重讀主流程資料（`apiGetMainFlowState`，唯讀）再畫，不碰其他部分。
+   * @param {Error} err
+   */
+  function renderMainFlowFailure_(err) {
+    const box = clear(el('mainFlowBody'));
+    box.appendChild(make('div', { className: 'warnbox' }, [
+      make('div', {
+        text: '主流程畫不出來：' + (err && err.message ? err.message : String(err))
+          + '　落面的功能仍然用得到。',
+        className: 'lines'
+      }),
+      row([button('再試一次', () => runAction('再試一次', async () => {
+        resetMainFlowState();
+        try { await renderMainFlow(dashboardState_); } catch (e) { renderMainFlowFailure_(e); throw e; }
+      }), '')])
+    ]));
   }
 
   /**

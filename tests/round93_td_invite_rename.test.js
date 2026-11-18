@@ -32,7 +32,7 @@ console.log('\n=== TD1：新名 ===');
     && z2.indexOf("const UNAVAILABLE_LINK_BUTTON_LABEL = '" + NEW + "';") !== -1);
   check('★★★★★ 視窗標題、完成窗標題、寄出動作文字都用新名', z5.indexOf("openModal(UNAVAILABLE_LINK_BUTTON_LABEL + '：'") !== -1
     && z5.indexOf("runAction(UNAVAILABLE_LINK_BUTTON_LABEL,") !== -1 && z5.indexOf("openModal(UNAVAILABLE_LINK_BUTTON_LABEL, done") !== -1);
-  check('★★★★ 只可查看的人仍然可以打開預覽（放行名單用新名）', read('src/ui/Script.html').indexOf("['寄出季前資料', '" + NEW + "']") !== -1);
+  check('★★★★ 只可查看的人仍然可以打開預覽（放行名單用新名）', read('src/ui/Script.html').indexOf("['寄出季前資料', '" + NEW + "'") !== -1);   // 第一百一十五輪批次 WC 組（刻意改動）：名單後面多了〔再試一次〕
   const hits = [];
   ['src', 'src/ui'].forEach((dir) => {
     fs.readdirSync(path.join(ROOT, dir)).filter((f) => /\.(gs|html)$/.test(f)).forEach((f) => {

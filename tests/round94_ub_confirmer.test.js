@@ -148,7 +148,7 @@ console.log('\n=== UB4：前端 ===');
     check('★★★★★ 深連結 unavailable-confirm ⇒ 打開確認畫面', vm.runInContext("typeof DEEP_LINK_VIEWS['unavailable-confirm']", ui) === 'function'
       && vm.runInContext("parseDeepLink_({ view: 'unavailable-confirm', quarter: '2099T1' }).viewKnown", ui) === true);
     const boot = read('src/ui/ScriptBoot.html');
-    check('★★★★★ 開機：只是確認者 ⇒ renderConfirmerOnly_，不 loadQuarters、不同步出席系統', /if \(myRole_ === 'CONFIRMER'\) \{ await renderConfirmerOnly_\(\); return; \}\s*await loadQuarters/.test(boot));
+    check('★★★★★ 開機：只是確認者 ⇒ renderConfirmerOnly_，不 loadQuarters、不同步出席系統', /if \(myRole_ === 'CONFIRMER'\) \{ await renderConfirmerOnly_\(\); return; \}[\s\S]{0,400}?await loadQuarters/   /* 第一百一十五輪批次 WC 組（刻意改動）：loadQuarters 包在 try 之內 */.test(boot));
     check('★★★★★ 只可查看＋確認者：決定那一支照樣可以送出', vm.runInContext("UNAVAILABLE_CONFIRMER_CALLS.join()", ui) === 'apiDecideUnavailableSubmissions'
       && /if \(viewOnly_ && !\(myCanConfirm_ && UNAVAILABLE_CONFIRMER_CALLS\.indexOf\(fnName\) !== -1\)\)/.test(read('src/ui/Script.html')));
     check('★★★★ 〔不能服侍的日期〕最上面用同一個元件', /unavailableConfirmInlineNodes_\(keyword\)/.test(read('src/ui/ScriptZone3.html')));

@@ -15150,6 +15150,238 @@ const MUTATIONS = [
     find: "      const top = before ? before.scrollTop : 0;",
     replace: "      const top = 0;",
     tests: ["tests/round114_vb_small_fixes.test.js"]
+  },
+  {
+    id: "w115_memo_ms",
+    why: "第一百一十五輪 WB-0：讀表不記時間",
+    file: "src/SheetReader.gs",
+    find: "  if (SHEET_READ_MEMO_) SHEET_READ_MEMO_[sheetName] = result;\n  if (SHEET_READ_MS_)",
+    replace: "  if (SHEET_READ_MEMO_) SHEET_READ_MEMO_[sheetName] = result;\n  if (false)",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_empty_memo",
+    why: "第一百一十五輪 WB-0：空表不記住（每次重讀）",
+    file: "src/SheetReader.gs",
+    find: "    if (SHEET_READ_MEMO_) SHEET_READ_MEMO_[sheetName] = [];\n",
+    replace: "",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_slow_sort",
+    why: "第一百一十五輪 WB-0：最慢的表排次倒轉",
+    file: "src/SheetReader.gs",
+    find: "sort(function (a, b) { return b.ms - a.ms; })",
+    replace: "sort(function (a, b) { return a.ms - b.ms; })",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_end_clear",
+    why: "第一百一十五輪 WB-0：關快取不清量度",
+    file: "src/SheetReader.gs",
+    find: "  SHEET_READ_MEMO_ = null;\n  SHEET_READ_MS_ = null;",
+    replace: "  SHEET_READ_MEMO_ = null;",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_detail_rest",
+    why: "第一百一十五輪 WB-0：其餘＝合計（不減各段）",
+    file: "src/ui/Script.html",
+    find: "Math.max(0, Number(total.ms) - sum)",
+    replace: "Number(total.ms)",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_dash_slow",
+    why: "第一百一十五輪 WB-0：狀態卡只帶 3 張最慢的表",
+    file: "src/WebAppDashboard.gs",
+    find: "listSlowestSheetReads_(6) : []",
+    replace: "listSlowestSheetReads_(3) : []",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_perm_confirm",
+    why: "第一百一十五輪 WB-1：確認者也讀季度清單",
+    file: "src/WebApp.gs",
+    find: "if (role === WEBAPP_ROLE.EDITOR || role === WEBAPP_ROLE.VIEWER) {",
+    replace: "if (true) {",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_perm_viewer",
+    why: "第一百一十五輪 WB-1：只可查看的人沒有季度清單",
+    file: "src/WebApp.gs",
+    find: "if (role === WEBAPP_ROLE.EDITOR || role === WEBAPP_ROLE.VIEWER) {",
+    replace: "if (role === WEBAPP_ROLE.EDITOR) {",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_perm_memo",
+    why: "第一百一十五輪 WB-1：權限讀季度清單不開快取",
+    file: "src/WebApp.gs",
+    find: "    beginSheetReadMemo_();\n    try { out.quarters",
+    replace: "    try { out.quarters",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_perm_catch",
+    why: "第一百一十五輪 WB-1：季度清單讀不到令權限失敗",
+    file: "src/WebApp.gs",
+    find: "catch (err) { log_('WARN', 'apiGetMyPermission：季度清單讀不到：' + err.message); }",
+    replace: "catch (err) { throw err; }",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_prefetch_once",
+    why: "第一百一十五輪 WB-1：預先讀的季度清單用完不清",
+    file: "src/ui/Script.html",
+    find: "    prefetchedQuarters_ = null;\n    if (!quarters)",
+    replace: "    if (!quarters)",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_prefetch_use",
+    why: "第一百一十五輪 WB-1：不用預先讀的季度清單",
+    file: "src/ui/Script.html",
+    find: "let quarters = prefetchedQuarters_;",
+    replace: "let quarters = null;",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_timeout_wrap",
+    why: "第一百一十五輪 WC：唯讀呼叫沒有時限",
+    file: "src/ui/Script.html",
+    find: "return withLoadTimeout_(withTransientRetry_(() => callServerRaw_(fnName, ...args)), fnName);",
+    replace: "return withTransientRetry_(() => callServerRaw_(fnName, ...args));",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_timeout_flag",
+    why: "第一百一十五輪 WC：逾時錯誤沒有標記",
+    file: "src/ui/Script.html",
+    find: "        err.loadTimeout = true;\n",
+    replace: "",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_timeout_clear",
+    why: "第一百一十五輪 WC：準時回覆不清計時器",
+    file: "src/ui/Script.html",
+    find: ".finally(() => { if (typeof clearTimeout === 'function') clearTimeout(timer); })",
+    replace: "",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_retry_reshow",
+    why: "第一百一十五輪 WC：再試失敗不重新顯示通知",
+    file: "src/ui/Script.html",
+    find: "try { await retry(); } catch (e) { showLoadFailureNotice_(part, e, retry); throw e; }",
+    replace: "await retry();",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_notice_hide",
+    why: "第一百一十五輪 WC：再試成功通知不收起",
+    file: "src/ui/Script.html",
+    find: "      box.hidden = true;\n      runAction('再試一次'",
+    replace: "      runAction('再試一次'",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_boot_retry",
+    why: "第一百一十五輪 WC：啟動重試經 loadQuarters（會寫入）",
+    file: "src/ui/ScriptBoot.html",
+    find: "() => (currentQuarterId ? loadDashboard() : fillQuarterSelect_(deepLink_.quarter || null))",
+    replace: "() => loadQuarters(deepLink_.quarter)",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_mf_retry_reset",
+    why: "第一百一十五輪 WC：主流程再試不清舊資料",
+    file: "src/ui/Script.html",
+    find: "        resetMainFlowState();\n        try { await renderMainFlow",
+    replace: "        try { await renderMainFlow",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_mf_failure",
+    why: "第一百一十五輪 WC：主流程失敗沒有再試按鈕",
+    file: "src/ui/Script.html",
+    find: "      row([button('再試一次', () => runAction('再試一次', async () => {",
+    replace: "      row([button('重新整理', () => runAction('再試一次', async () => {",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_hwcas_timeout",
+    why: "第一百一十五輪 WC：同步出席系統沒有時限",
+    file: "src/ui/ScriptZone3.html",
+    find: "withLoadTimeout_(callServerMutating('apiSyncPeopleFromHwcas', {}), 'apiSyncPeopleFromHwcas')",
+    replace: "callServerMutating('apiSyncPeopleFromHwcas', {})",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_hwcas_text",
+    why: "第一百一十五輪 WC：同步太久不寫明",
+    file: "src/ui/ScriptZone3.html",
+    find: "if (err && err.loadTimeout) setStatus(HWCAS_SYNC_TIMEOUT_TEXT, true);",
+    replace: "",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_ensure_timeout",
+    why: "第一百一十五輪 WC：建立未來季度沒有時限",
+    file: "src/ui/Script.html",
+    find: "withLoadTimeout_(callServerMutating('apiEnsureFutureQuarters'), 'apiEnsureFutureQuarters')",
+    replace: "callServerMutating('apiEnsureFutureQuarters')",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_cfg_clamp",
+    why: "第一百一十五輪 WC：時限不限範圍",
+    file: "src/WebAppDashboard.gs",
+    find: "return n >= 20 && n <= 600 ? n : DEFAULTS",
+    replace: "return n > 0 ? n : DEFAULTS",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_cfg_default",
+    why: "第一百一十五輪 WC：預設時限改了",
+    file: "src/Constants.gs",
+    find: "  WEBAPP_LOAD_TIMEOUT_SECONDS: 150,",
+    replace: "  WEBAPP_LOAD_TIMEOUT_SECONDS: 60,",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_dash_timeoutset",
+    why: "第一百一十五輪 WC：狀態卡回覆後不換時限",
+    file: "src/ui/Script.html",
+    find: "loadTimeoutMs_ = Number(dashboardState_.loadTimeoutSeconds) * 1000;",
+    replace: "loadTimeoutMs_ = loadTimeoutMs_;",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_failhandler",
+    why: "第一百一十五輪 WC：callServerRaw_ 沒有 withFailureHandler",
+    file: "src/ui/Script.html",
+    find: "        .withFailureHandler((err) => reject(new Error(err && err.message ? err.message : String(err))))\n",
+    replace: "",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_viewonly_retry",
+    why: "第一百一十五輪 WC：只可查看的人不可以按再試一次",
+    file: "src/ui/Script.html",
+    find: "'寄出／匯出申報不能服侍日子連結', '再試一次'];",
+    replace: "'寄出／匯出申報不能服侍日子連結'];",
+    tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_failbox_hide",
+    why: "第一百一十五輪 WC：狀態卡載入成功不收起失敗通知",
+    file: "src/ui/Script.html",
+    find: "    if (failBox) failBox.hidden = true;",
+    replace: "    if (failBox) failBox.hidden = false;",
+    tests: ["tests/round115_wb_wc_load.test.js"]
   }
 ];
 

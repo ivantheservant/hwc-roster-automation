@@ -67,7 +67,14 @@
     deepLink_ = parseDeepLink_(await readDeepLinkParams_());
     // 第九十四輪批次 UB 組：只是確認者 ⇒ 只顯示「事奉人員申報，確認」，不載入其他資料
     if (myRole_ === 'CONFIRMER') { await renderConfirmerOnly_(); return; }
-    await loadQuarters(deepLink_.quarter);
+    // 第一百一十五輪批次 WC 組：季度清單或狀態卡載入太久／失敗 ⇒ 頁頂寫明，〔再試一次〕只重做唯讀的讀取（不再建立未來季度）
+    try {
+      await loadQuarters(deepLink_.quarter);
+    } catch (err) {
+      showLoadFailureNotice_(currentQuarterId ? '狀態卡' : '季度清單', err,
+        () => (currentQuarterId ? loadDashboard() : fillQuarterSelect_(deepLink_.quarter || null)));
+      throw err;
+    }
     if (!viewOnly_) syncHwcasOnLoad();
   }).then(() => { if (myRole_ !== 'CONFIRMER') applyDeepLink_(deepLink_); });
 </script>
