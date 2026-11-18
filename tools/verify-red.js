@@ -15386,6 +15386,22 @@ const MUTATIONS = [
     find: "    if (failBox) failBox.hidden = true;",
     replace: "    if (failBox) failBox.hidden = false;",
     tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "w115_date_memo",
+    why: "第一百一十五輪 WB-2：日期沒有記住（每行再格式化）",
+    file: "src/Generator.gs",
+    find: "    if (!Object.prototype.hasOwnProperty.call(dateTextMemo, key)) dateTextMemo[key] = toDateString_(value, timezone);\n    return dateTextMemo[key];",
+    replace: "    return toDateString_(value, timezone);",
+    tests: ["tests/round115_wb_wc_load.test.js","tests/round109_sb_prior_weeks.test.js"]
+  },
+  {
+    id: "w115_date_key",
+    why: "第一百一十五輪 WB-2：記住的鍵不分日期（全部當成同一日）",
+    file: "src/Generator.gs",
+    find: "'d' + value.getTime() : 's' + String(value);",
+    replace: "'d' : 's' + String(value);",
+    tests: ["tests/round115_wb_wc_load.test.js","tests/round109_sb_prior_weeks.test.js"]
   }
 ];
 

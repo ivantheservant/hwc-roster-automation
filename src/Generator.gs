@@ -283,8 +283,17 @@ function readPriorWeeksInfo_(quarterStartDate, carryOverWeeks, timezone, firstSe
   // 影響——但嗰個係運氣：差嘅格一落喺最後兩週，「連續兩週」就會用一份
   // 從來冇確認過嘅安排去判斷。
   const registered = readRegisteredVersionKeys_();
+  // 第一百一十五輪批次 WB-2：同一個日期值只換算一次（toDateString_ 用 Utilities.formatDate，很慢；
+  // 季度越後，之前的派工紀錄越多——2028T3 要逐行換算幾千次，狀態卡多等十多秒）。
+  // 只在這一次呼叫內記住；換算結果與逐行呼叫 toDateString_ 完全相同。
+  const dateTextMemo = {};
+  const dateTextOf = function (value) {
+    const key = Object.prototype.toString.call(value) === '[object Date]' ? 'd' + value.getTime() : 's' + String(value);
+    if (!Object.prototype.hasOwnProperty.call(dateTextMemo, key)) dateTextMemo[key] = toDateString_(value, timezone);
+    return dateTextMemo[key];
+  };
   const rows = readSheet_(SHEETS.ROSTER_ASSIGNMENTS).filter(function (row) {
-    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const dateStr = dateTextOf(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE]);
     if (!dateStr || dateStr >= quarterStartDate) return false;
     return registered[registeredVersionKey_(
       row[COLUMNS.ROSTER_ASSIGNMENTS.QUARTER_ID], row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO])] === true;
@@ -294,7 +303,7 @@ function readPriorWeeksInfo_(quarterStartDate, carryOverWeeks, timezone, firstSe
   // 每個主日只保留最大版本號的紀錄
   const maxVersionByDate = {};
   rows.forEach(function (row) {
-    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const dateStr = dateTextOf(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE]);
     const versionNo = Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) || 0;
     if (maxVersionByDate[dateStr] === undefined || versionNo > maxVersionByDate[dateStr]) {
       maxVersionByDate[dateStr] = versionNo;
@@ -303,7 +312,7 @@ function readPriorWeeksInfo_(quarterStartDate, carryOverWeeks, timezone, firstSe
 
   const byDate = {};
   rows.forEach(function (row) {
-    const dateStr = toDateString_(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE], timezone);
+    const dateStr = dateTextOf(row[COLUMNS.ROSTER_ASSIGNMENTS.SERVICE_DATE]);
     if ((Number(row[COLUMNS.ROSTER_ASSIGNMENTS.VERSION_NO]) || 0) !== maxVersionByDate[dateStr]) return;
     const personId = row[COLUMNS.ROSTER_ASSIGNMENTS.PERSON_ID];
     if (!personId) return;

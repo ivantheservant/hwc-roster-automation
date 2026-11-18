@@ -100,6 +100,38 @@ function fakeSpreadsheet(gas, sheets) {
     check('★★★★ 頁底只在有伺服器計時才加第三行', /const detailLine = loadServerTimings_ \? buildServerDetailLine_\(loadServerTimings_\) : '';/.test(read('src/ui/Script.html')));
   }
 
+  console.log('\n=== WB-2：上一季提示——同一個日期只格式化一次 ===');
+  {
+    const { FILES_FOR_GENERATOR } = require('./helpers/gas_loader.js');
+    const gas = loadGasSource(FILES_FOR_GENERATOR);
+    const A = gas.COLUMNS.ROSTER_ASSIGNMENTS;
+    const V = gas.COLUMNS.ROSTER_VERSIONS;
+    let formatCalls = 0;
+    gas.Utilities = { formatDate: (d, tz, f) => { formatCalls++; return d.toISOString().slice(0, 10); } };
+    const rows = [];
+    const days = ['2027-03-14', '2027-03-21', '2027-03-28'];
+    // 每個主日 60 行（新的 Date 物件，時間相同）、兩個版本；另加文字日期的行及沒有登記的版本
+    days.forEach((d, di) => {
+      for (let i = 0; i < 60; i++) {
+        const r = {};
+        r[A.QUARTER_ID] = 'QX'; r[A.VERSION_NO] = i % 2; r[A.SERVICE_DATE] = new Date(d + 'T00:00:00Z');
+        r[A.POST_ID] = 'POST' + (i % 6); r[A.PERSON_ID] = 'P9' + di + String(i).padStart(2, '0');
+        rows.push(r);
+      }
+    });
+    const s1 = {}; s1[A.QUARTER_ID] = 'QX'; s1[A.VERSION_NO] = 1; s1[A.SERVICE_DATE] = '2027-03-28'; s1[A.POST_ID] = 'TEXT'; s1[A.PERSON_ID] = 'P9900'; rows.push(s1);
+    const s2 = {}; s2[A.QUARTER_ID] = 'QX'; s2[A.VERSION_NO] = 7; s2[A.SERVICE_DATE] = new Date('2027-03-28T00:00:00Z'); s2[A.POST_ID] = 'GHOST'; s2[A.PERSON_ID] = 'P9901'; rows.push(s2);
+    const after = {}; after[A.QUARTER_ID] = 'QY'; after[A.VERSION_NO] = 0; after[A.SERVICE_DATE] = new Date('2027-04-04T00:00:00Z'); after[A.POST_ID] = 'X'; after[A.PERSON_ID] = 'P9902'; rows.push(after);
+    const vrs = [0, 1].map((n) => { const v = {}; v[V.QUARTER_ID] = 'QX'; v[V.VERSION_NO] = n; return v; });
+    gas.readSheet_ = (name) => (name === gas.SHEETS.ROSTER_ASSIGNMENTS ? rows : name === gas.SHEETS.ROSTER_VERSIONS ? vrs : []);
+    const info = gas.readPriorWeeksInfo_('2027-04-01', 2, 'Pacific/Auckland', '2027-04-04');
+    check('★★★★★★ 183 行、4 個不同的 Date 值 ⇒ Utilities.formatDate 只叫 4 次（之前每行最多 3 次）', formatCalls === 4, formatCalls);
+    const last = info.weeks[1] || {};
+    check('★★★★★★ 結果不變：用最後兩個主日、每個主日只取最大版本；文字日期的行照樣認得；沒有登記的版本不用',
+      info.dates.join() === '2027-03-21,2027-03-28' && !info.short && Object.keys(last).sort().join() === 'POST1,POST3,POST5,TEXT'
+        && last.POST1.length === 10 && !last.GHOST, JSON.stringify(info.dates) + ' ' + JSON.stringify(Object.keys(last)));
+  }
+
   console.log('\n=== WB-1：權限回覆順帶季度清單（伺服器） ===');
   {
     function permSandbox(email, listImpl) {
