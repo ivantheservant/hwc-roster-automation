@@ -1037,10 +1037,15 @@
   }
 
   /** 載入時取得自己的權限。讀不到就照可以修改處理（伺服器仍然會擋）。 */
+  /** 第一百一十五輪批次 WB-1：權限回覆帶來的季度清單（第一次載入用一次就清走）。 */
+  let prefetchedQuarters_ = null;
+
   async function loadMyPermission_() {
     const t0 = Date.now();
     try {
       const r = await callServer('apiGetMyPermission');
+      // 第一百一十五輪批次 WB-1：同一個回覆帶來季度清單（可以修改／只可查看的人）⇒ 不用再等一次來回
+      prefetchedQuarters_ = r && Array.isArray(r.quarters) ? r.quarters : null;
       myRole_ = (r && r.role) || '';
       myCanConfirm_ = !!(r && r.canConfirm);
       setViewOnly_(myRole_ === 'VIEWER');
@@ -2711,7 +2716,10 @@
    */
   async function fillQuarterSelect_(keepQuarterId) {
     const tList = Date.now();
-    const quarters = await callServer('apiListQuarters');
+    // 第一百一十五輪批次 WB-1：第一次載入用權限回覆帶來的季度清單（只用一次）；之後（例如建立了新季度）照舊另外讀
+    let quarters = prefetchedQuarters_;
+    prefetchedQuarters_ = null;
+    if (!quarters) quarters = await callServer('apiListQuarters');
     markLoadTiming_('quarterList', Date.now() - tList);
     if (!quarters || quarters.length === 0) {
       clear(el('quarter'));

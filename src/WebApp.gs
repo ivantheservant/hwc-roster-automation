@@ -389,7 +389,15 @@ function includeHtml(fileName) {
 function apiGetMyPermission() {
   const role = assertWebAppRequestAllowed_('apiGetMyPermission');
   // 第九十四輪批次 UB 組：canConfirm＝可以確認事奉人員申報（可以修改的人，或在確認者名單）
-  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm: isUnavailableConfirmerCaller_() };
+  const out = { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm: isUnavailableConfirmerCaller_() };
+  // 第一百一十五輪批次 WB-1：可以修改或只可查看的人 ⇒ 順帶回傳季度清單（和 apiListQuarters 同一支，純讀取），
+  // 前端不用再等一次來回；只是確認者不給（他們本來就不可以讀季度清單）。讀不到 ⇒ 不回傳，前端照舊另外呼叫。
+  if (role === WEBAPP_ROLE.EDITOR || role === WEBAPP_ROLE.VIEWER) {
+    beginSheetReadMemo_();
+    try { out.quarters = listQuartersForSelect_(); } catch (err) { log_('WARN', 'apiGetMyPermission：季度清單讀不到：' + err.message); }
+    finally { endSheetReadMemo_(); }
+  }
+  return out;
 }
 
 /**
