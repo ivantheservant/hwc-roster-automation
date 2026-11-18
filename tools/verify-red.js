@@ -4236,8 +4236,9 @@ const MUTATIONS = [
     id: 'o-read-no-retry',
     why: '唯讀呼叫撞到 Google 暫時性錯誤唔重試——幹事見到一句英文，而重試一次就得',
     file: 'src/ui/Script.html',
-    find: '    return withTransientRetry_(() => callServerRaw_(fnName, ...args));',
-    replace: '    return callServerRaw_(fnName, ...args);',
+    // 第一百一十五輪批次 WC 組：外面多了 withLoadTimeout_，find 對準新位置
+    find: '    return withLoadTimeout_(withTransientRetry_(() => callServerRaw_(fnName, ...args)), fnName);',
+    replace: '    return withLoadTimeout_(callServerRaw_(fnName, ...args), fnName);',
     tests: ['tests/transient_retry.test.js']
   },
   {
@@ -9299,8 +9300,9 @@ const MUTATIONS = [
     id: "nb-perm-api-role",
     why: "權限 api 一律回可以修改",
     file: "src/WebApp.gs",
-    find: "  return { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm:",
-    replace: "  return { role: role, canModify: true, canConfirm:",
+    // 第一百一十五輪批次 WB-1：回覆先放入 out（順帶季度清單），find 對準新位置
+    find: "  const out = { role: role, canModify: role === WEBAPP_ROLE.EDITOR, canConfirm:",
+    replace: "  const out = { role: role, canModify: true, canConfirm:",
     tests: ["tests/round87_nb_api_permission.test.js"]
   },
   {
@@ -9332,8 +9334,9 @@ const MUTATIONS = [
     why: "寄出季前資料預覽也變灰",
     // 第一百零一輪：本輪改動令舊 find 過期，對準新位置
     file: "src/ui/Script.html",
-    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結'];",
-    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出／匯出申報不能服侍日子連結'];",
+    // 第一百一十五輪批次 WC 組：名單多了〔再試一次〕
+    find: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出季前資料', '寄出／匯出申報不能服侍日子連結', '再試一次'];",
+    replace: "  const VIEW_ONLY_ALLOWED_LABELS = ['寄出／匯出申報不能服侍日子連結', '再試一次'];",
     tests: ["tests/round87_nb_view_only_ui.test.js"]
   },
   {
@@ -10995,8 +10998,9 @@ const MUTATIONS = [
     id: "vb-load-force",
     why: "打開時同步仍然 force",
     file: "src/ui/ScriptZone3.html",
-    find: "callServerMutating('apiSyncPeopleFromHwcas', {}).then((r) => {",
-    replace: "callServerMutating('apiSyncPeopleFromHwcas', { force: true }).then((r) => {",
+    // 第一百一十五輪批次 WC 組：外面多了 withLoadTimeout_
+    find: "withLoadTimeout_(callServerMutating('apiSyncPeopleFromHwcas', {}), 'apiSyncPeopleFromHwcas').then((r) => {",
+    replace: "withLoadTimeout_(callServerMutating('apiSyncPeopleFromHwcas', { force: true }), 'apiSyncPeopleFromHwcas').then((r) => {",
     tests: ["tests/round95_vb_hwcas_sync.test.js"]
   },
   {
