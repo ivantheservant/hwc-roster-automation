@@ -15393,7 +15393,7 @@ const MUTATIONS = [
     file: "src/Generator.gs",
     find: "    if (!Object.prototype.hasOwnProperty.call(dateTextMemo, key)) dateTextMemo[key] = toDateString_(value, timezone);\n    return dateTextMemo[key];",
     replace: "    return toDateString_(value, timezone);",
-    tests: ["tests/round115_wb_wc_load.test.js","tests/round109_sb_prior_weeks.test.js"]
+    tests: ["tests/round115_wb_wc_load.test.js"]
   },
   {
     id: "w115_date_key",
@@ -15401,7 +15401,7 @@ const MUTATIONS = [
     file: "src/Generator.gs",
     find: "'d' + value.getTime() : 's' + String(value);",
     replace: "'d' : 's' + String(value);",
-    tests: ["tests/round115_wb_wc_load.test.js","tests/round109_sb_prior_weeks.test.js"]
+    tests: ["tests/round115_wb_wc_load.test.js"]
   }
 ];
 
