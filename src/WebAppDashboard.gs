@@ -718,7 +718,7 @@ function readDashboardParallel_() {
 /**
  * 第一百一十七輪批次 YB 組：狀態卡第一部分——要 fine-tune context（連職事表工作表）的、以及依賴它們的：
  * 未儲存改動、第 2 至 4 步按鈕（facts）、開季前準備（grid 與 fine-tune 共用同一次記憶）、人手檢查（借用 fine-tune）、
- * 預先安排的領詩司琴、季前資料一行（與 facts 同樣讀 AuditLog）。
+ * 預先安排的領詩司琴、季前資料一行（與 facts 同樣讀 AuditLog）、寄出警告及名單影響（共用同一個 fine-tune context，YB-2）。
  * @param {string} quarterId 季度 ID
  * @returns {Object}
  */
@@ -805,6 +805,14 @@ function buildDashboardPartA_(quarterId) {
   const preAssignMismatch = summarisePreAssignMismatch_(quarterId, versionNo);
   timer.mark('預先安排');
 
+  // 第一百一十七輪批次 YB-2：寄出警告、名單影響放在第一部分——共用這一部分已建的 fine-tune context（放在第二部分要自己再建一次，反而更慢）
+  // 第九十三輪批次 TF 組：「寄出警告」（空格、放行的違反、名單影響）先算好再量度；都是只讀，結果不變
+  const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
+    : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' };
+  const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)
+    : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
+  timer.mark('寄出警告');
+
   return {
     quarterId: quarterId,
     stage: stage,
@@ -828,6 +836,10 @@ function buildDashboardPartA_(quarterId) {
     buttons: computeDashboardButtons_(facts),
     preQuarter: preQuarter,
     preAssignMismatch: preAssignMismatch,
+    // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反
+    sendWarnings: sendWarnings,
+    // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
+    eligibilityImpact: eligibilityImpact,
     // 第九十三輪批次 TF 組：伺服器分段時間（前端寫入頁底）。`phases` 是各段毫秒，最後一項「合計」；
     // `fineTuneContext` 是這一次載入建了幾次 fine-tune context、共幾毫秒（已包含在上面各段之內）。
     timings: Object.assign({
@@ -842,8 +854,8 @@ function buildDashboardPartA_(quarterId) {
 }
 
 /**
- * 第一百一十七輪批次 YB 組：狀態卡第二部分——不依賴未儲存改動的：版本、版本下拉、公開連結、寄出警告（自己建不讀 grid 的
- * fine-tune context）、名單影響、狀態句子、頁頂標籤、未寄完的寄出、提示及設定連結等。
+ * 第一百一十七輪批次 YB 組：狀態卡第二部分——不需要 fine-tune context 的：版本、版本下拉、公開連結、狀態句子、
+ * 頁頂標籤、未寄完的寄出、事奉人員申報、開季前資料改動、提示及設定連結等（寄出警告、名單影響見第一部分，YB-2）。
  * @param {string} quarterId 季度 ID
  * @returns {Object}
  */
@@ -915,12 +927,6 @@ function buildDashboardPartB_(quarterId) {
   }
   timer.mark('事奉人員申報');
 
-  // 第九十三輪批次 TF 組：「寄出警告」（空格、放行的違反、名單影響）先算好再量度；都是只讀，結果不變
-  const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
-    : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' };
-  const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)
-    : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
-  timer.mark('寄出警告');
   // 第九十八輪批次 YB 組：最新版本之後開季前資料有改動（只讀）
   const preseasonChange = describePreseasonChangeForDashboard_(quarterId, versionNo);
   timer.mark('開季前資料改動');
@@ -956,10 +962,6 @@ function buildDashboardPartB_(quarterId) {
     // 第一百零九輪批次 SA 組：上一次寄出未寄完（狀態卡〔繼續寄出〕）
     pendingSendBatch: (function () { try { return describePendingSendBatch_(quarterId); } catch (err) { return null; } })(),
     publicLink: publicLink,
-    // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反
-    sendWarnings: sendWarnings,
-    // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
-    eligibilityImpact: eligibilityImpact,
     preseasonChange: preseasonChange,
     // 第七十五輪批次 CA 組：「常用設定」三粒掣喺新分頁直接開嗰張工作表。
     settingsLinks: buildSettingsSheetLinks_(),

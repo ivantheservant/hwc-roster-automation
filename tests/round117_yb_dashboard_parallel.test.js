@@ -57,6 +57,10 @@ function compareScene(name, g, Q) {
   const keysB = Object.keys(b).filter((k) => ['quarterId', 'stage', 'dashboardSignature', 'timings'].indexOf(k) === -1);
   const overlap = keysA.filter((k) => keysB.indexOf(k) !== -1);
   check('★★★★★ ' + name + '：兩部分的鍵除簽名外互不重疊', overlap.length === 0, overlap.join('、'));
+  // YB-2：寄出警告、名單影響在第一部分（共用已建的 fine-tune context）
+  check('★★★★★ ' + name + '：寄出警告、名單影響、未儲存改動、按鈕在第一部分；版本、狀態句子在第二部分',
+    ['sendWarnings', 'eligibilityImpact', 'unsaved', 'buttons'].every((k) => keysA.indexOf(k) !== -1)
+    && ['latestVersion', 'versionChoices', 'statusText'].every((k) => keysB.indexOf(k) !== -1), JSON.stringify([keysA, keysB]));
   check('★★★★★ ' + name + '：兩部分的簽名一致（季度、版本號、階段、SendLog 行數）',
     JSON.stringify(a.dashboardSignature) === JSON.stringify(b.dashboardSignature) && a.dashboardSignature.quarterId === Q,
     JSON.stringify([a.dashboardSignature, b.dashboardSignature]));

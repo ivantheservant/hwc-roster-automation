@@ -15726,6 +15726,14 @@ const MUTATIONS = [
     find: "'apiGetDashboardState', 'apiGetDashboardStatePart',",
     replace: "'apiGetDashboardState',",
     tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_warn_in_a",
+    why: "第一百一十七輪 YB-2：寄出警告不在第一部分",
+    file: "src/WebAppDashboard.gs",
+    find: "    preAssignMismatch: preAssignMismatch,\n    // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反\n    sendWarnings: sendWarnings,\n",
+    replace: "    preAssignMismatch: preAssignMismatch,\n",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
   }
 ];
 
