@@ -50,7 +50,7 @@ console.log('\n=== WB1／WB2：Quarters 只讀一次 ===');
   const old = g.apiGetDashboardState(sc.Q);
   g.readQuarterValuesForStage_ = realRead;
   check('★★★★★★ WB1 回傳值和以前相同', strip(neu) === strip(old));
-  check('★★★★★★ WB1 狀態卡載入 Quarters 只讀一次（以前兩次）', newReads === 1 && reads === 2, newReads + ' vs ' + reads);
+  check('★★★★★★ WB1 狀態卡載入 Quarters 只讀一次（以前兩次）', newReads === 1 && reads >= 2, newReads + ' vs ' + reads);   // 第一百一十七輪批次 YB 組（刻意改動）：模擬的舊讀法每一部分各問一次階段；新路徑仍然只讀一次
   reads = 0;
   check('★★★★★ WB2 範圍外 getQuarterStage_ 照舊直接讀', g.getQuarterStage_(sc.Q) === 'DRAFT' && reads === 1, String(reads));
   let e1 = '';

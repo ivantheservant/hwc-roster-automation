@@ -170,6 +170,7 @@ function getConfigBaselineSnapshot_() {
       WEBAPP_SHOW_LOAD_TIMINGS: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       // 第一百一十五輪批次 WC 組
       WEBAPP_LOAD_TIMEOUT_SECONDS: { launchTargetValue: '150', source: '程式碼預設值（試算表現時實際值未核實）' },
+      WEBAPP_DASHBOARD_PARALLEL: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },
       WEBAPP_DEFAULT_QUARTER: { launchTargetValue: '', source: '程式碼預設值（試算表現時實際值未核實）' },
       PREASSIGN_POST_IDS: { launchTargetValue: 'WORSHIP,PIANO', source: '程式碼預設值（試算表現時實際值未核實）' },
       PRESEASON_CHANGE_NOTIFY: { launchTargetValue: 'TRUE', source: '程式碼預設值（試算表現時實際值未核實）' },

@@ -604,81 +604,140 @@ function apiGetDashboardState(quarterId) {
 }
 
 /**
+ * 第一百一十七輪批次 YB 組：狀態卡的其中一部分（前端同時呼叫 A、B 兩部分，兩個都回來、簽名一致才合併）。
+ * **純讀取，零寫入、不取鎖**；與 `apiGetDashboardState` 同樣的權限檢查、記憶及只可查看的處理。
+ * @param {string} quarterId 季度 ID
+ * @param {string} part 'A' 或 'B'
+ * @returns {Object}
+ */
+function apiGetDashboardStatePart(quarterId, part) {
+  const role = assertWebAppRequestAllowed_('apiGetDashboardStatePart');
+  if (part !== 'A' && part !== 'B') throw new Error('apiGetDashboardStatePart：part 只可以是 A 或 B。');
+  beginSheetReadMemo_();
+  beginRequestContextMemo_();
+  try {
+    resetFineTuneStats_();
+    return viewerSafeState_(role, part === 'A' ? buildDashboardPartA_(quarterId) : buildDashboardPartB_(quarterId));
+  } finally {
+    endRequestContextMemo_();
+    endSheetReadMemo_();
+  }
+}
+
+/**
  * `apiGetDashboardState()` 嘅實作本體（分開一層，令快取嘅 try/finally 夠清晰）。
  * @param {string} quarterId 季度 ID
  * @returns {Object}
  */
 function buildDashboardState_(quarterId) {
-  // 第九十三輪批次 TF 組：分段計時（只量度，不改任何判斷、次序或結果）
-  const timer = startPhaseTimer_();
-  FINE_TUNE_CONTEXT_STATS_.count = 0;
-  FINE_TUNE_CONTEXT_STATS_.ms = 0;
-  FINE_TUNE_CONTEXT_STATS_.reused = 0;
+  resetFineTuneStats_();
+  // 第一百一十七輪批次 YB 組：單一呼叫（WEBAPP_DASHBOARD_PARALLEL＝FALSE、伺服器其他用途）＝兩部分在同一份記憶內順序計算再合併。
+  // 並行時前端分別呼叫兩部分再合併——兩條路由同一批函式產生，結果相同（計時欄位除外）。
+  return mergeDashboardParts_(buildDashboardPartA_(quarterId), buildDashboardPartB_(quarterId));
+}
+
+/**
+ * 第一百一十七輪批次 YB 組：兩部分合併（純函式；前端 `mergeDashboardStateParts_()` 用同一做法合併內容，
+ * 只是計時不相加——頁底兩部分各寫自己的 fine-tune 次數）。
+ * 兩部分的鍵除了簽名（quarterId、stage、dashboardSignature）之外互不重疊；簽名在合併之前已核對一致。
+ * @param {Object} a 第一部分
+ * @param {Object} b 第二部分
+ * @returns {Object}
+ */
+function mergeDashboardParts_(a, b) {
+  const out = Object.assign({}, a, b);
+  const ta = a.timings || {};
+  const tb = b.timings || {};
+  // 計時：第一部分照舊在 timings，第二部分在 timings.partB；fine-tune context 次數、毫秒、重用次數相加（單一呼叫時是整次載入的總數）
+  out.timings = Object.assign({}, ta, {
+    fineTuneContextCount: (Number(ta.fineTuneContextCount) || 0) + (Number(tb.fineTuneContextCount) || 0),
+    fineTuneContextMs: (Number(ta.fineTuneContextMs) || 0) + (Number(tb.fineTuneContextMs) || 0),
+    fineTuneContextReused: (Number(ta.fineTuneContextReused) || 0) + (Number(tb.fineTuneContextReused) || 0),
+    partB: tb
+  });
+  return out;
+}
+
+/**
+ * 第一百一十七輪批次 YB 組：兩部分共用的開頭（季度、階段、最新版本號等）。都是讀 Quarters／RosterVersions／Config，兩邊各讀一次。
+ * @param {string} quarterId
+ * @returns {Object}
+ */
+function readDashboardPrelude_(quarterId) {
   const timezone = getConfig_(CONFIG_KEYS.SYS_TIMEZONE, DEFAULTS.TIMEZONE);
   const stage = getQuarterStage_(quarterId);
   const versionNo = findLatestVersionNo_(quarterId);
-  const versionExists = versionNo >= 0;
-  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
-
   const quarterRow = findQuarter_(quarterId);
   const generateOnText = quarterRow
     ? toDateString_(quarterRow[COLUMNS.QUARTERS.GENERATE_ON], timezone) : '';
   const today = Utilities.formatDate(new Date(), timezone, 'yyyy-MM-dd');
-  const daysUntilGenerateOn = generateOnText ? daysBetween_(today, generateOnText) : null;
+  return {
+    timezone: timezone, stage: stage, versionNo: versionNo, versionExists: versionNo >= 0,
+    generateOnText: generateOnText, daysUntilGenerateOn: generateOnText ? daysBetween_(today, generateOnText) : null
+  };
+}
 
-  // ── 最新版本資料 ─────────────────────────────────────────────
-  let latestVersion = null;
-  if (versionExists) {
-    const V = COLUMNS.ROSTER_VERSIONS;
-    const row = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
-      return String(r[V.QUARTER_ID] || '').trim() === quarterId
-        && Number(r[V.VERSION_NO]) === versionNo;
-    })[0];
-    latestVersion = {
-      versionNo: versionNo,
-      // ⚠️ 唔可以 String(Date)——第二十二輪已經喺 Diagnostics 修過同一個位。
-      createdAt: row ? toDateString_(row[V.CREATED_AT], timezone) : '',
-      // 第七十七輪批次 EC 組：同版本下拉同一支（有格數就寫「人手改動 N 格＋系統調整 M 格」）
-      basisText: row ? buildVersionSourceText_(row) : '（沒有說明）',
-      // A6：常駐「開啟職事表」連結。搵唔到嗰張工作表就係空字串——
-      // 前端見到空字串就唔會畫個連結出嚟。
-      sheetUrl: row ? buildGridSheetUrl_(row[V.SHEET_NAME]) : ''
-    };
-  }
-  // 第七十五輪批次 CH 組：第 2 步嘅版本下拉（讀唔到唔可以令主畫面出唔到）
-  let versionChoices = [];
-  if (versionExists) {
-    try {
-      versionChoices = listQuarterVersionChoices_(quarterId, timezone);
-    } catch (err) {
-      log_('WARN', 'buildDashboardState_ 讀不到版本清單：' + err.message);
-    }
-  }
+/**
+ * 第一百一十七輪批次 YB 組：兩部分各自回傳的簽名。合併之前前端核對一致（中途有人寫入 ⇒ 重讀）。
+ * `sendLogRows`：SendLog 行數（兩部分都讀 SendLog；寄出會加行）。
+ * @param {string} quarterId
+ * @param {Object} p `readDashboardPrelude_()` 的結果
+ * @returns {{quarterId: string, versionNo: number, stage: string, sendLogRows: number}}
+ */
+function buildDashboardSignature_(quarterId, p) {
+  return { quarterId: quarterId, versionNo: p.versionNo, stage: p.stage, sendLogRows: countSendLogRowsForSignature_() };
+}
+
+/** 第一百一十七輪批次 YB 組：每一次請求開始時把 fine-tune context 統計歸零。 */
+function resetFineTuneStats_() {
+  FINE_TUNE_CONTEXT_STATS_.count = 0;
+  FINE_TUNE_CONTEXT_STATS_.ms = 0;
+  FINE_TUNE_CONTEXT_STATS_.reused = 0;
+}
+
+/** 第一百一十七輪批次 YB 組：現時的 fine-tune context 統計（之後用 fineTuneStatsSince_ 計這一部分自己的次數）。 */
+function readFineTuneStatsSnapshot_() {
+  return { count: FINE_TUNE_CONTEXT_STATS_.count, ms: FINE_TUNE_CONTEXT_STATS_.ms, reused: FINE_TUNE_CONTEXT_STATS_.reused };
+}
+
+/** 第一百一十七輪批次 YB 組：由 snapshot 起計的 fine-tune context 次數、毫秒、重用次數。 */
+function fineTuneStatsSince_(s0) {
+  return {
+    fineTuneContextCount: FINE_TUNE_CONTEXT_STATS_.count - s0.count,
+    fineTuneContextMs: FINE_TUNE_CONTEXT_STATS_.ms - s0.ms,
+    // 第九十五輪批次 VA 組：用同一次載入記憶的次數（沒有再建）
+    fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_.reused - s0.reused
+  };
+}
+
+/** 第一百一十七輪批次 YB 組：Config `WEBAPP_DASHBOARD_PARALLEL`（預設 TRUE；FALSE ⇒ 前端照舊只送一個呼叫）。 */
+function readDashboardParallel_() {
+  return getConfig_(CONFIG_KEYS.WEBAPP_DASHBOARD_PARALLEL, DEFAULTS.WEBAPP_DASHBOARD_PARALLEL) !== false;
+}
+
+/**
+ * 第一百一十七輪批次 YB 組：狀態卡第一部分——要 fine-tune context（連職事表工作表）的、以及依賴它們的：
+ * 未儲存改動、第 2 至 4 步按鈕（facts）、開季前準備（grid 與 fine-tune 共用同一次記憶）、人手檢查（借用 fine-tune）、
+ * 預先安排的領詩司琴、季前資料一行（與 facts 同樣讀 AuditLog）。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object}
+ */
+function buildDashboardPartA_(quarterId) {
+  // 第九十三輪批次 TF 組：分段計時（只量度，不改任何判斷、次序或結果）
+  const timer = startPhaseTimer_();
+  const ft0 = readFineTuneStatsSnapshot_();
+  const p = readDashboardPrelude_(quarterId);
+  const timezone = p.timezone;
+  const stage = p.stage;
+  const versionNo = p.versionNo;
+  const versionExists = p.versionExists;
 
   // ── 未儲存改動（三者任一，規格 2.2）─────────────────────────
   const unsaved = readDashboardUnsavedState_(quarterId, versionNo);
-  timer.mark('讀工作表（版本、未儲存）');
+  timer.mark('讀工作表（未儲存）');
 
   // ── SendLog（整張表只讀一次，同時算齊三個階段 + 有冇 OFFICIAL 紀錄）──
   const sendLog = readSendLogSummaryForDashboard_(quarterId, timezone);
-
-  // 第二十六輪批次階段 A2：公開連結狀態。前端用嚟喺掣 2 旁邊提早講，
-  // 唔使等幹事撳落去先發現。
-  const publicLink = readPublicLinkState_(quarterId);
-  // ⚠️ 第六十三輪批次 A 組：有連結**唔等於**連結係最新。
-  // 填咗講員而未重發佈，堂委開連結見到嘅講員係「待確認」。
-  // 判斷唔到 ⇒ 唔顯示（`stale: false`），寄出前嗰道會照樣補發。
-  publicLink.stale = false;
-  publicLink.staleMessage = '';
-  try {
-    const freshness = evaluatePublicLinkFreshness_(quarterId);
-    publicLink.stale = !!(freshness.hasLink && freshness.stale);
-    publicLink.staleMessage = publicLink.stale ? freshness.message : '';
-  } catch (err) {
-    log_('WARN', 'apiGetDashboardState：查不到公開連結是不是最新：' + err.message);
-  }
-
-  timer.mark('寄出紀錄及公開連結');
 
   // ── 掣 3／掣 4 要嘅人數 ──────────────────────────────────────
   // 第九十六輪批次 WA 組：按簽名快取（命中與否只影響速度，結果和照舊計算一樣）
@@ -687,13 +746,13 @@ function buildDashboardState_(quarterId) {
   const resendBreakdown = dashboardCounts.resend;
   const changedPersonCount = resendBreakdown.total;
 
-  timer.mark('第 3、4 步人數');
+  timer.mark('寄出紀錄及第 3、4 步人數');
 
   const facts = {
     stage: stage,
     versionExists: versionExists,
-    generateOnText: generateOnText,
-    daysUntilGenerateOn: daysUntilGenerateOn,
+    generateOnText: p.generateOnText,
+    daysUntilGenerateOn: p.daysUntilGenerateOn,
     unsaved: unsaved,
     // 第八十二輪批次 IH 組：用舊版本作起點而未儲存，都係一項要儲存嘅改動（IF 組）
     startPointPending: versionExists && readStartPointBasisForSave_(quarterId, versionNo) !== null,
@@ -708,6 +767,7 @@ function buildDashboardState_(quarterId) {
     lastSentAt: sendLog.lastSentAt,
     lastReviewBatch: sendLog.lastReviewBatch
   };
+  timer.mark('按鈕條件（起點、審閱人數）');
 
   let preQuarter = { undoneItemCount: 0, items: [] };
   try {
@@ -739,48 +799,20 @@ function buildDashboardState_(quarterId) {
     log_('WARN', 'apiGetDashboardState：季前資料狀態讀不到：' + err.message);
     preseasonStatus = '季前資料：暫時查不到（' + err.message + '）';
   }
+  timer.mark('季前資料');
 
-  // 第九十輪批次 QC 組：「這一季還要做的」事奉人員申報待確認（全部待確認的，不分季度）。讀不到 ⇒ -1，前端照實講
-  let pendingSubmissions = 0;
-  try {
-    pendingSubmissions = countPendingUnavailableSubmissions_(null);
-  } catch (err) {
-    log_('WARN', 'apiGetDashboardState：事奉人員申報讀不到：' + err.message);
-    pendingSubmissions = -1;
-  }
-  timer.mark('季前資料及事奉人員申報');
-
-  // 第九十三輪批次 TF 組：「寄出警告」（空格、放行的違反、名單影響）先算好再量度；都是只讀，結果不變
-  const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
-    : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' };
-  const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)
-    : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
-  timer.mark('寄出警告');
-  // 第九十八輪批次 YA 組：預先安排的領詩／司琴和表上不同；YB 組：最新版本之後開季前資料有改動（都是只讀）
+  // 第九十八輪批次 YA 組：預先安排的領詩／司琴和表上不同（只讀）
   const preAssignMismatch = summarisePreAssignMismatch_(quarterId, versionNo);
-  const preseasonChange = describePreseasonChangeForDashboard_(quarterId, versionNo);
-  timer.mark('預先安排及開季前資料改動');
+  timer.mark('預先安排');
 
   return {
+    quarterId: quarterId,
+    stage: stage,
+    dashboardSignature: buildDashboardSignature_(quarterId, p),
     staffing: staffing,
     preseasonStatus: preseasonStatus,
-    pendingSubmissions: pendingSubmissions,
-    // 第一百零九輪批次 SB 組：還未生成時，系統內找不到緊接的上一季職事表 ⇒「這一季還要做的」一句
-    priorWeeksNote: versionExists ? '' : computePriorWeeksNoteForQuarter_(quarterId),
-    // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題；最近一次生成找不到組合週的月份
-    // （typeof：本機測試只載入部分檔案；Apps Script 一定有）
-    ruleExtrasNote: (typeof checkRuleExtrasData_ === 'function' ? describeRuleExtrasCheckNote_(checkRuleExtrasData_()) : ''),
-    teamWeekGaps: versionExists && typeof readTeamWeekGaps_ === 'function' ? readTeamWeekGaps_(quarterId) : [],
-    // 第九十一輪批次 RA 組：畫面上「人手填寫的崗位（…）」的名稱（Posts.AutoGenerate=FALSE）
-    manualPostNames: readManualFillPostNamesSafe_(),
-    quarterId: quarterId,
-    quarterLabel: buildQuarterLabel_(quarterId),
-    stage: stage,
     // 第七十七輪批次 EE 組：第 3 步〔變動的人〕要正式發出過先可以撳
     officialSentOnce: !!sendLog.officialSentOnce,
-    // 第七十七輪批次 EG 組：狀態卡「電郵已由出席系統更新（…）」／「讀不到出席系統…」；N 位收不到電郵
-    hwcasSync: describeHwcasSyncForDashboard_(),
-    peopleEmailGaps: countPeopleEmailGaps_(),
     // ⚠️ 第四十七輪批次 A1 組：「三粒掣唔著嘅**唯一**原因就係未儲存」。
     // 詳細理由見 `computeSendBlockedByUnsavedOnly_()` 檔內說明。
     blockedByUnsavedOnly: computeSendBlockedByUnsavedOnly_(facts),
@@ -792,6 +824,124 @@ function buildDashboardState_(quarterId) {
     // 第四十八輪批次 A4 組第 3 點：寄完之後一直顯示，直到佢儲存為止。
     sentWithUnsavedWarning: buildSentWithUnsavedWarning_(
       sendLog.unsavedRelease, unsaved),
+    unsaved: unsaved,
+    buttons: computeDashboardButtons_(facts),
+    preQuarter: preQuarter,
+    preAssignMismatch: preAssignMismatch,
+    // 第九十三輪批次 TF 組：伺服器分段時間（前端寫入頁底）。`phases` 是各段毫秒，最後一項「合計」；
+    // `fineTuneContext` 是這一次載入建了幾次 fine-tune context、共幾毫秒（已包含在上面各段之內）。
+    timings: Object.assign({
+      phases: timer.list()
+    }, fineTuneStatsSince_(ft0), {
+      // 第九十六輪批次 WA 組：「第 3、4 步人數」快取 HIT／MISS／OFF（OFF＝沒有用快取，照舊計算）
+      countsCache: dashboardCounts.cache,
+      // 第一百一十五輪批次 WB-0：讀得最慢的工作表（頁底第三行）
+      slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(6) : []
+    })
+  };
+}
+
+/**
+ * 第一百一十七輪批次 YB 組：狀態卡第二部分——不依賴未儲存改動的：版本、版本下拉、公開連結、寄出警告（自己建不讀 grid 的
+ * fine-tune context）、名單影響、狀態句子、頁頂標籤、未寄完的寄出、提示及設定連結等。
+ * @param {string} quarterId 季度 ID
+ * @returns {Object}
+ */
+function buildDashboardPartB_(quarterId) {
+  const timer = startPhaseTimer_();
+  const ft0 = readFineTuneStatsSnapshot_();
+  const p = readDashboardPrelude_(quarterId);
+  const timezone = p.timezone;
+  const stage = p.stage;
+  const versionNo = p.versionNo;
+  const versionExists = p.versionExists;
+  const generateOnText = p.generateOnText;
+  const isDryRun = getConfig_(CONFIG_KEYS.DRY_RUN, true) !== false;
+
+  // ── 最新版本資料 ─────────────────────────────────────────────
+  let latestVersion = null;
+  if (versionExists) {
+    const V = COLUMNS.ROSTER_VERSIONS;
+    const row = readSheet_(SHEETS.ROSTER_VERSIONS).filter(function (r) {
+      return String(r[V.QUARTER_ID] || '').trim() === quarterId
+        && Number(r[V.VERSION_NO]) === versionNo;
+    })[0];
+    latestVersion = {
+      versionNo: versionNo,
+      // ⚠️ 唔可以 String(Date)——第二十二輪已經喺 Diagnostics 修過同一個位。
+      createdAt: row ? toDateString_(row[V.CREATED_AT], timezone) : '',
+      // 第七十七輪批次 EC 組：同版本下拉同一支（有格數就寫「人手改動 N 格＋系統調整 M 格」）
+      basisText: row ? buildVersionSourceText_(row) : '（沒有說明）',
+      // A6：常駐「開啟職事表」連結。搵唔到嗰張工作表就係空字串——
+      // 前端見到空字串就唔會畫個連結出嚟。
+      sheetUrl: row ? buildGridSheetUrl_(row[V.SHEET_NAME]) : ''
+    };
+  }
+  // 第七十五輪批次 CH 組：第 2 步嘅版本下拉（讀唔到唔可以令主畫面出唔到）
+  let versionChoices = [];
+  if (versionExists) {
+    try {
+      versionChoices = listQuarterVersionChoices_(quarterId, timezone);
+    } catch (err) {
+      log_('WARN', 'buildDashboardState_ 讀不到版本清單：' + err.message);
+    }
+  }
+  timer.mark('讀工作表（版本）');
+
+  // 第二十六輪批次階段 A2：公開連結狀態。前端用嚟喺掣 2 旁邊提早講，
+  // 唔使等幹事撳落去先發現。
+  const publicLink = readPublicLinkState_(quarterId);
+  // ⚠️ 第六十三輪批次 A 組：有連結**唔等於**連結係最新。
+  // 填咗講員而未重發佈，堂委開連結見到嘅講員係「待確認」。
+  // 判斷唔到 ⇒ 唔顯示（`stale: false`），寄出前嗰道會照樣補發。
+  publicLink.stale = false;
+  publicLink.staleMessage = '';
+  try {
+    const freshness = evaluatePublicLinkFreshness_(quarterId);
+    publicLink.stale = !!(freshness.hasLink && freshness.stale);
+    publicLink.staleMessage = publicLink.stale ? freshness.message : '';
+  } catch (err) {
+    log_('WARN', 'apiGetDashboardState：查不到公開連結是不是最新：' + err.message);
+  }
+  timer.mark('公開連結');
+
+  // 第九十輪批次 QC 組：「這一季還要做的」事奉人員申報待確認（全部待確認的，不分季度）。讀不到 ⇒ -1，前端照實講
+  let pendingSubmissions = 0;
+  try {
+    pendingSubmissions = countPendingUnavailableSubmissions_(null);
+  } catch (err) {
+    log_('WARN', 'apiGetDashboardState：事奉人員申報讀不到：' + err.message);
+    pendingSubmissions = -1;
+  }
+  timer.mark('事奉人員申報');
+
+  // 第九十三輪批次 TF 組：「寄出警告」（空格、放行的違反、名單影響）先算好再量度；都是只讀，結果不變
+  const sendWarnings = versionExists ? summariseVersionSendWarnings_(quarterId, versionNo)
+    : { versionNo: -1, blank: { count: 0, items: [], moreCount: 0 }, released: { count: 0, items: [], moreCount: 0 }, error: '' };
+  const eligibilityImpact = versionExists ? summariseEligibilityImpact_(quarterId)
+    : { versionNo: -1, count: 0, items: [], moreCount: 0, error: '' };
+  timer.mark('寄出警告');
+  // 第九十八輪批次 YB 組：最新版本之後開季前資料有改動（只讀）
+  const preseasonChange = describePreseasonChangeForDashboard_(quarterId, versionNo);
+  timer.mark('開季前資料改動');
+
+  const out = {
+    quarterId: quarterId,
+    stage: stage,
+    dashboardSignature: buildDashboardSignature_(quarterId, p),
+    pendingSubmissions: pendingSubmissions,
+    // 第一百零九輪批次 SB 組：還未生成時，系統內找不到緊接的上一季職事表 ⇒「這一季還要做的」一句
+    priorWeeksNote: versionExists ? '' : computePriorWeeksNoteForQuarter_(quarterId),
+    // 第一百一十一輪批次 SE 組：影音組合、協唱、詩班獻詩日例外的資料問題；最近一次生成找不到組合週的月份
+    // （typeof：本機測試只載入部分檔案；Apps Script 一定有）
+    ruleExtrasNote: (typeof checkRuleExtrasData_ === 'function' ? describeRuleExtrasCheckNote_(checkRuleExtrasData_()) : ''),
+    teamWeekGaps: versionExists && typeof readTeamWeekGaps_ === 'function' ? readTeamWeekGaps_(quarterId) : [],
+    // 第九十一輪批次 RA 組：畫面上「人手填寫的崗位（…）」的名稱（Posts.AutoGenerate=FALSE）
+    manualPostNames: readManualFillPostNamesSafe_(),
+    quarterLabel: buildQuarterLabel_(quarterId),
+    // 第七十七輪批次 EG 組：狀態卡「電郵已由出席系統更新（…）」／「讀不到出席系統…」；N 位收不到電郵
+    hwcasSync: describeHwcasSyncForDashboard_(),
+    peopleEmailGaps: countPeopleEmailGaps_(),
     statusText: buildDashboardStatusText_(stage, versionExists, generateOnText,
       readDashboardStatusExtras_(quarterId, versionNo, stage, versionExists)),
     latestVersion: latestVersion,
@@ -805,37 +955,27 @@ function buildDashboardState_(quarterId) {
     automationAlert: typeof readAutomationStaleAlert_ === 'function' ? readAutomationStaleAlert_() : '',
     // 第一百零九輪批次 SA 組：上一次寄出未寄完（狀態卡〔繼續寄出〕）
     pendingSendBatch: (function () { try { return describePendingSendBatch_(quarterId); } catch (err) { return null; } })(),
-    unsaved: unsaved,
-    buttons: computeDashboardButtons_(facts),
-    preQuarter: preQuarter,
     publicLink: publicLink,
     // 第六十七輪批次 AG／AH 組：狀態卡常駐——空格同已放行嘅違反
     sendWarnings: sendWarnings,
     // 第六十七輪批次 AI 組：名單改了之後，這一版有幾多格的人已經唔喺該崗位名單上
     eligibilityImpact: eligibilityImpact,
-    preAssignMismatch: preAssignMismatch,
     preseasonChange: preseasonChange,
     // 第七十五輪批次 CA 組：「常用設定」三粒掣喺新分頁直接開嗰張工作表。
     settingsLinks: buildSettingsSheetLinks_(),
     // 第八十二輪批次 IJ 組：常用設定〔整季清走重來〕可唔可以撳（封鎖季度 ⇒ 灰掣＋原因）
     quarterReset: readQuarterResetAvailabilitySafe_(quarterId),
-    // 第九十三輪批次 TF 組：伺服器分段時間（前端寫入 console）。`phases` 是各段毫秒，最後一項「合計」；
-    // `fineTuneContext` 是這一次載入建了幾次 fine-tune context、共幾毫秒（已包含在上面各段之內）。
     showLoadTimings: getConfig_(CONFIG_KEYS.WEBAPP_SHOW_LOAD_TIMINGS, true) !== false,
     // 第一百一十五輪批次 WC 組：載入時每個唯讀呼叫的時限（秒）
     loadTimeoutSeconds: readWebAppLoadTimeoutSeconds_(),
-    timings: {
-      phases: timer.list(),
-      fineTuneContextCount: FINE_TUNE_CONTEXT_STATS_.count,
-      fineTuneContextMs: FINE_TUNE_CONTEXT_STATS_.ms,
-      // 第九十五輪批次 VA 組：用同一次載入記憶的次數（沒有再建）
-      fineTuneContextReused: FINE_TUNE_CONTEXT_STATS_.reused,
-      // 第九十六輪批次 WA 組：「第 3、4 步人數」快取 HIT／MISS／OFF（OFF＝沒有用快取，照舊計算）
-      countsCache: dashboardCounts.cache,
-      // 第一百一十五輪批次 WB-0：讀得最慢的工作表（頁底第三行）
-      slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(6) : []
-    }
+    // 第一百一十七輪批次 YB 組：前端之後用並行（兩個呼叫）還是單一呼叫
+    dashboardParallel: readDashboardParallel_()
   };
+  timer.mark('其餘');
+  out.timings = Object.assign({ phases: timer.list() }, fineTuneStatsSince_(ft0), {
+    slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(6) : []
+  });
+  return out;
 }
 
 /**

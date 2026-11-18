@@ -33,8 +33,9 @@ console.log('\n=== TF1／TF2／TF3：伺服器 ===');
   const d = g.apiGetDashboardState(sc.Q);
   const t = d.timings;
   check('★★★★★★ 回傳有 timings.phases，最後一項是「合計」', t && Array.isArray(t.phases) && t.phases.length >= 7 && t.phases[t.phases.length - 1].label === '合計', JSON.stringify(t));
-  const labels = t.phases.map((p) => p.label);
-  ['讀工作表（版本、未儲存）', '寄出警告', '人手檢查', '開季前準備'].forEach((l) => {
+  // 第一百一十七輪批次 YB 組（刻意改動）：狀態卡分兩部分——第二部分的分段在 timings.partB；「讀工作表」一段分成未儲存（第一部分）、版本（第二部分）
+  const labels = t.phases.map((p) => p.label).concat(((t.partB && t.partB.phases) || []).map((p) => p.label));
+  ['讀工作表（未儲存）', '讀工作表（版本）', '寄出警告', '人手檢查', '開季前準備'].forEach((l) => {
     check('★★★★★ 分段有「' + l + '」', labels.indexOf(l) !== -1, JSON.stringify(labels));
   });
   check('★★★★★ 每一段是數字（毫秒），不是 NaN／負數', t.phases.every((p) => typeof p.ms === 'number' && p.ms >= 0 && !isNaN(p.ms)));

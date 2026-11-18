@@ -1635,6 +1635,8 @@ const CONFIG_KEYS = {
   WEBAPP_SHOW_LOAD_TIMINGS: 'WEBAPP_SHOW_LOAD_TIMINGS',
   // 第一百一十五輪批次 WC 組：幹事介面載入時每一個伺服器呼叫最多等幾秒（超過就顯示〔再試一次〕）
   WEBAPP_LOAD_TIMEOUT_SECONDS: 'WEBAPP_LOAD_TIMEOUT_SECONDS',
+  // 第一百一十七輪批次 YB 組：狀態卡分成兩個同時進行的唯讀呼叫（預設 TRUE；FALSE ⇒ 照舊一個呼叫）
+  WEBAPP_DASHBOARD_PARALLEL: 'WEBAPP_DASHBOARD_PARALLEL',
   // 第九十六輪批次 WC 組：幹事介面打開時（網址沒有 quarter）預設顯示的季度（預設空白＝下一季；程式預設值，不用寫入工作表）
   WEBAPP_DEFAULT_QUARTER: 'WEBAPP_DEFAULT_QUARTER',
   // 第九十八輪批次 YA 組：可以開季前預先安排的崗位（預設 WORSHIP,PIANO；程式預設值）
@@ -2000,6 +2002,8 @@ const DEFAULTS = {
   WEEKLY_REMINDER_WEEKDAY: 1,
   // 第一百一十五輪批次 WC 組
   WEBAPP_LOAD_TIMEOUT_SECONDS: 150,
+  // 第一百一十七輪批次 YB 組
+  WEBAPP_DASHBOARD_PARALLEL: true,
   GRID_NOT_APPLICABLE_LABEL: '—',
   GRID_PENDING_LABEL: GRID_LABELS.PENDING,
   GRID_SPECIAL_SKIP_LABEL: '特殊主日',

@@ -141,6 +141,8 @@
     'apiCheckImportSheet',
     'apiPlanEligibilitySheetApply',
     'apiGetDashboardState',
+    // 第一百一十七輪批次 YB 組：狀態卡的其中一部分（純讀取）
+    'apiGetDashboardStatePart',
     'apiGetThemePreference',
     'apiGenerateDraftPlan',
     'apiSaveAndConfirmPlan',
@@ -1135,6 +1137,8 @@
       const r = await callServer('apiGetMyPermission');
       // 第一百一十五輪批次 WB-1：同一個回覆帶來季度清單（可以修改／只可查看的人）⇒ 不用再等一次來回
       prefetchedQuarters_ = r && Array.isArray(r.quarters) ? r.quarters : null;
+      // 第一百一十七輪批次 YB 組：狀態卡用並行還是單一呼叫（沒有這一項 ⇒ 照舊單一呼叫）
+      if (r && typeof r.dashboardParallel === 'boolean') dashboardParallel_ = r.dashboardParallel;
       myRole_ = (r && r.role) || '';
       myCanConfirm_ = !!(r && r.canConfirm);
       setViewOnly_(myRole_ === 'VIEWER');
@@ -1176,10 +1180,17 @@
       console.log('[載入時間] ' + line);
       const box = el('loadTimings');
       const show = !(dashboardState_ && dashboardState_.showLoadTimings === false);
-      const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_) : '';
+      // 第一百一十七輪批次 YB 組：有第二部分 ⇒ 兩部分各自一行合計、一行各段
+      const twoParts = !!loadServerTimingsB_;
+      const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_, twoParts ? '伺服器第一部分' : '伺服器') : '';
       // 第一百一十五輪批次 WB-0：第三行——伺服器每一段及讀得最慢的工作表
       const detailLine = loadServerTimings_ ? buildServerDetailLine_(loadServerTimings_) : '';
-      if (box) { box.hidden = !show; box.textContent = show ? (line + (serverLine ? '\n' + serverLine : '') + (detailLine ? '\n' + detailLine : '')) : ''; }
+      const serverLineB = twoParts ? buildServerTimingsLine_(loadServerTimingsB_, '伺服器第二部分') : '';
+      const detailLineB = twoParts ? buildServerDetailLine_(loadServerTimingsB_) : '';
+      if (box) {
+        box.hidden = !show;
+        box.textContent = show ? [line, serverLine, detailLine, serverLineB, detailLineB].filter((x) => x).join('\n') : '';
+      }
     } catch (err) { /* 計時絕不可以令載入出事 */ }
   }
 
@@ -1188,21 +1199,24 @@
    * 和頁底第一行一樣只記第一次載入。
    */
   let loadServerTimings_ = null;
-  const SERVER_TIMING_LABELS = [['讀工作表（版本、未儲存）', '讀工作表'], ['寄出警告', '寄出警告'], ['人手檢查', '人手檢查']];
+  // 第一百一十七輪批次 YB 組：分兩部分之後讀工作表一段分成「（未儲存）」「（版本）」
+  const SERVER_TIMING_LABELS = [['讀工作表（版本、未儲存）', '讀工作表'], ['讀工作表（未儲存）', '讀工作表'], ['讀工作表（版本）', '讀工作表'],
+    ['寄出警告', '寄出警告'], ['人手檢查', '人手檢查']];
   /** 純函式。 */
-  function buildServerTimingsLine_(st) {
+  function buildServerTimingsLine_(st, title) {
     const ms = {};
     (st.phases || []).forEach((p) => { ms[p.label] = p.ms; });
     const parts = [];
     SERVER_TIMING_LABELS.forEach((l, i) => {
       if (ms[l[0]] !== undefined) parts.push(l[1] + ' ' + loadTimingSecondsText_(ms[l[0]]));
-      if (i === 0) {
+      // 第一百一十七輪批次 YB 組：「讀工作表」有三個寫法（見上），fine-tune 一項排在它們之後
+      if (i === 2) {
         parts.push('fine-tune context ' + (Number(st.fineTuneContextCount) || 0) + ' 次 '
           + loadTimingSecondsText_(st.fineTuneContextMs || 0));
       }
     });
     const total = ms['合計'] !== undefined ? '（合計 ' + loadTimingSecondsText_(ms['合計']) + '）' : '';
-    return '伺服器：' + parts.join('、') + total;
+    return (title || '伺服器') + '：' + parts.join('、') + total;
   }
   /**
    * 第一百一十五輪批次 WB-0：頁底第三行（純函式）：「各段：A 1.2、B 0.4…、其餘 0.3；最慢的表：AuditLog 3.1、…」。
@@ -1219,10 +1233,50 @@
       + (total ? '、其餘 ' + loadTimingSecondsText_(rest) : '')
       + (sheets.length ? '；最慢的表：' + sheets.join('、') : '');
   }
-  function markServerLoadTimings_(st) {
+  function markServerLoadTimings_(st, stB) {
     if (loadServerTimings_) return; // 只記第一次載入
     loadServerTimings_ = st;
+    loadServerTimingsB_ = stB || null;
     renderLoadTimings_();
+  }
+  /** 第一百一十七輪批次 YB 組：狀態卡第二部分的伺服器計時（並行或單一呼叫都有）。 */
+  let loadServerTimingsB_ = null;
+
+  /* ══════════════════════════════════════════════════════════════
+   * 第一百一十七輪批次 YB 組：狀態卡分兩部分同時讀
+   * ══════════════════════════════════════════════════════════════
+   * Config `WEBAPP_DASHBOARD_PARALLEL`（權限回覆及每次狀態卡都帶回）：TRUE ⇒ 同時呼叫第一部分（未儲存改動、按鈕等）
+   * 及第二部分（版本、寄出警告、狀態句子等），**兩個都回來、簽名（季度、最新版本號、階段、SendLog 行數）一致才合併**；
+   * 不一致（兩個呼叫之間剛好有人寫入）⇒ 整個重讀一次，仍然不一致 ⇒ 當作載入失敗。任何一部分失敗或超時 ⇒ 整次失敗，
+   * 不會只用其中一半。不知道（還未收到權限回覆）或 FALSE ⇒ 照舊一個呼叫。
+   */
+  let dashboardParallel_ = false;
+  async function fetchDashboardState_(quarterId) {
+    if (!dashboardParallel_) return callServer('apiGetDashboardState', quarterId);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const parts = await Promise.all([
+        callServer('apiGetDashboardStatePart', quarterId, 'A'),
+        callServer('apiGetDashboardStatePart', quarterId, 'B')
+      ]);
+      if (dashboardPartsAgree_(parts[0], parts[1], quarterId)) return mergeDashboardStateParts_(parts[0], parts[1]);
+    }
+    throw new Error('狀態卡兩部分的資料不一致（讀取期間剛好有人改動了資料）。');
+  }
+  /** 純函式：兩部分的簽名一致（而且是請求的那一季）。 */
+  function dashboardPartsAgree_(a, b, quarterId) {
+    const sa = a && a.dashboardSignature;
+    const sb = b && b.dashboardSignature;
+    return !!(sa && sb && sa.quarterId === quarterId && sb.quarterId === quarterId
+      && sa.versionNo === sb.versionNo && sa.stage === sb.stage && sa.sendLogRows === sb.sendLogRows);
+  }
+  /**
+   * 純函式：合併：兩部分的鍵除簽名之外互不重疊（與伺服器 `mergeDashboardParts_()` 相同）；
+   * 計時第一部分照舊在 timings，第二部分在 timings.partB——頁底各自一行，各寫自己的 fine-tune 次數。
+   */
+  function mergeDashboardStateParts_(a, b) {
+    const out = Object.assign({}, a, b);
+    out.timings = Object.assign({}, (a && a.timings) || {}, { partB: (b && b.timings) || {} });
+    return out;
   }
 
   /* ══════════════════════════════════════════════════════════════
@@ -2871,7 +2925,8 @@
     if (typeof prefetchMainFlowState_ === 'function') prefetchMainFlowState_();
     let state;
     try {
-      state = await callServer('apiGetDashboardState', quarterId);
+      // 第一百一十七輪批次 YB 組：並行時分兩部分同時讀，兩個都回來、簽名一致才合併（任何一部分失敗＝整次失敗）
+      state = await fetchDashboardState_(quarterId);
     } catch (err) {
       // 第一百一十六輪批次 XA 組：載入失敗（超時或任何錯誤）。已經有較新的載入 ⇒ 交給它，這裏不碰畫面。
       if (seq === dashboardLoadSeq_) {
@@ -2898,6 +2953,8 @@
     if (seq !== dashboardLoadSeq_ || quarterId !== currentQuarterId) return;
     dashboardState_ = state;
     dashboardLoadFailed_ = false;
+    // 第一百一十七輪批次 YB 組：之後用並行還是單一呼叫（Config WEBAPP_DASHBOARD_PARALLEL）
+    if (dashboardState_ && typeof dashboardState_.dashboardParallel === 'boolean') dashboardParallel_ = dashboardState_.dashboardParallel;
     // 第一百一十五輪批次 WC 組：之後的唯讀呼叫用 Config 的時限
     if (dashboardState_ && Number(dashboardState_.loadTimeoutSeconds) > 0) loadTimeoutMs_ = Number(dashboardState_.loadTimeoutSeconds) * 1000;
     const failBox = el('loadFailureNotice');
@@ -2912,7 +2969,8 @@
         console.log('[載入時間：伺服器] ' + (st.phases || []).map((p) => p.label + ' ' + loadTimingSecondsText_(p.ms) + 's').join('；')
           + '；fine-tune context ' + st.fineTuneContextCount + ' 次、共 ' + loadTimingSecondsText_(st.fineTuneContextMs) + 's');
         // 第九十五輪批次 VD 組：頁底細字也寫主要幾段（不用開 console）
-        markServerLoadTimings_(st);
+        // 第一百一十七輪批次 YB 組：第二部分另外列出（timings.partB）
+        markServerLoadTimings_(st, st.partB || null);
       }
     } catch (err) { /* 計時不可以令載入出事 */ }
     // ⚠️ 第三十九輪批次 A 組：主流程要行喺最前——佢係幹事九成時間睇嘅嘢。

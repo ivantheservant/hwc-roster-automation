@@ -290,7 +290,8 @@ function runStructureTests() {
       assigns === 2 && assignsInLoad === 2, '全檔 ' + assigns + ' 句，loadDashboard 內 ' + assignsInLoad + ' 句');
 
     check('★★★★★ 而且成功嗰一句用嘅係 apiGetDashboardState 嘅結果',
-      /state = await callServer\('apiGetDashboardState', quarterId\)/.test(loadBody) && /dashboardState_ = state;/.test(loadBody)
+      // 第一百一十七輪批次 YB 組（刻意改動）：經 fetchDashboardState_（並行兩部分或單一呼叫）
+      /state = await fetchDashboardState_\(quarterId\)/.test(loadBody) && /dashboardState_ = state;/.test(loadBody)
       && /dashboardState_ = null;/.test(loadBody));
 
     others.forEach((f) => {

@@ -10704,8 +10704,9 @@ const MUTATIONS = [
     id: "tf-no-phases",
     why: "伺服器沒有分段時間",
     file: "src/WebAppDashboard.gs",
-    find: "      phases: timer.list(),",
-    replace: "      phases: [],",
+    // 第一百一十七輪批次 YB 組：狀態卡分兩部分之後 find 過期，對準新位置
+    find: "    timings: Object.assign({\n      phases: timer.list()\n    }, fineTuneStatsSince_(ft0), {",
+    replace: "    timings: Object.assign({\n      phases: []\n    }, fineTuneStatsSince_(ft0), {",
     tests: ["tests/round93_tf_load_timings.test.js"]
   },
   {
@@ -10938,8 +10939,9 @@ const MUTATIONS = [
     id: "va-memo-not-closed",
     why: "狀態卡載入完不關 context 記憶（跨請求）",
     file: "src/WebAppDashboard.gs",
-    find: "    endRequestContextMemo_();\n    endSheetReadMemo_();",
-    replace: "    endSheetReadMemo_();",
+    // 第一百一十七輪批次 YB 組：狀態卡分兩部分之後 find 過期，對準新位置
+    find: "    return viewerSafeState_(role, buildDashboardState_(quarterId));\n  } finally {\n    endRequestContextMemo_();\n    endSheetReadMemo_();",
+    replace: "    return viewerSafeState_(role, buildDashboardState_(quarterId));\n  } finally {\n    endSheetReadMemo_();",
     tests: ["tests/round95_va_context_memo.test.js"]
   },
   {
@@ -11151,7 +11153,8 @@ const MUTATIONS = [
     id: "vd-server-line-missing",
     why: "頁底沒有伺服器分段",
     file: "src/ui/Script.html",
-    find: "      const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_) : '';",
+    // 第一百一十七輪批次 YB 組：狀態卡分兩部分之後 find 過期，對準新位置
+    find: "      const serverLine = loadServerTimings_ ? buildServerTimingsLine_(loadServerTimings_, twoParts ? '伺服器第一部分' : '伺服器') : '';",
     replace: "      const serverLine = '';",
     tests: ["tests/round95_vc_vd_quarters_load.test.js"]
   },
@@ -15205,8 +15208,9 @@ const MUTATIONS = [
     id: "w115_dash_slow",
     why: "第一百一十五輪 WB-0：狀態卡只帶 3 張最慢的表",
     file: "src/WebAppDashboard.gs",
-    find: "listSlowestSheetReads_(6) : []",
-    replace: "listSlowestSheetReads_(3) : []",
+    // 第一百一十七輪批次 YB 組：狀態卡分兩部分之後 find 過期，對準新位置
+    find: "      slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(6) : []\n    })\n  };",
+    replace: "      slowestSheets: typeof listSlowestSheetReads_ === 'function' ? listSlowestSheetReads_(3) : []\n    })\n  };",
     tests: ["tests/round115_wb_wc_load.test.js"]
   },
   {
@@ -15586,6 +15590,142 @@ const MUTATIONS = [
     find: "    if (typeof buildTechDetails === 'function') box.appendChild(buildTechDetails(raw));",
     replace: "",
     tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "y117_sig_version",
+    why: "第一百一十七輪 YB：簽名不比較版本號",
+    file: "src/ui/Script.html",
+    find: "      && sa.versionNo === sb.versionNo && sa.stage === sb.stage",
+    replace: "      && sa.stage === sb.stage",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_sig_stage",
+    why: "第一百一十七輪 YB：簽名不比較階段",
+    file: "src/ui/Script.html",
+    find: " && sa.stage === sb.stage && sa.sendLogRows",
+    replace: " && sa.sendLogRows",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_sig_quarter",
+    why: "第一百一十七輪 YB：簽名不核對請求的季度",
+    file: "src/ui/Script.html",
+    find: "return !!(sa && sb && sa.quarterId === quarterId && sb.quarterId === quarterId",
+    replace: "return !!(sa && sb",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_no_retry",
+    why: "第一百一十七輪 YB：不一致不重讀",
+    file: "src/ui/Script.html",
+    find: "for (let attempt = 1; attempt <= 2; attempt++) {",
+    replace: "for (let attempt = 1; attempt <= 1; attempt++) {",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_accept_mismatch",
+    why: "第一百一十七輪 YB：不一致仍然合併",
+    file: "src/ui/Script.html",
+    find: "    throw new Error('狀態卡兩部分的資料不一致（讀取期間剛好有人改動了資料）。');",
+    replace: "    return {};",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_one_part",
+    why: "第一百一十七輪 YB：只等第一部分",
+    file: "src/ui/Script.html",
+    find: "      if (dashboardPartsAgree_(parts[0], parts[1], quarterId)) return mergeDashboardStateParts_(parts[0], parts[1]);",
+    replace: "      if (dashboardPartsAgree_(parts[0], parts[1], quarterId)) return parts[0];",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_parallel_off",
+    why: "第一百一十七輪 YB：不理會 Config 一律並行",
+    file: "src/ui/Script.html",
+    find: "    if (!dashboardParallel_) return callServer('apiGetDashboardState', quarterId);",
+    replace: "    if (false) return callServer('apiGetDashboardState', quarterId);",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_follow_flag",
+    why: "第一百一十七輪 YB：不跟狀態卡帶回的 Config",
+    file: "src/ui/Script.html",
+    find: "if (dashboardState_ && typeof dashboardState_.dashboardParallel === 'boolean') dashboardParallel_ = dashboardState_.dashboardParallel;",
+    replace: "",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_perm_flag",
+    why: "第一百一十七輪 YB：不跟權限回覆的 Config",
+    file: "src/ui/Script.html",
+    find: "      if (r && typeof r.dashboardParallel === 'boolean') dashboardParallel_ = r.dashboardParallel;",
+    replace: "",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_merge_timing",
+    why: "第一百一十七輪 YB：第二部分計時蓋過第一部分",
+    file: "src/ui/Script.html",
+    find: "    out.timings = Object.assign({}, (a && a.timings) || {}, { partB: (b && b.timings) || {} });",
+    replace: "    out.timings = (b && b.timings) || {};",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_footer_b",
+    why: "第一百一十七輪 YB：頁底沒有第二部分",
+    file: "src/ui/Script.html",
+    find: "        markServerLoadTimings_(st, st.partB || null);",
+    replace: "        markServerLoadTimings_(st, null);",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_viewer_safe",
+    why: "第一百一十七輪 YB：兩部分不經 viewerSafeState_",
+    file: "src/WebAppDashboard.gs",
+    find: "    return viewerSafeState_(role, part === 'A' ? buildDashboardPartA_(quarterId) : buildDashboardPartB_(quarterId));",
+    replace: "    return part === 'A' ? buildDashboardPartA_(quarterId) : buildDashboardPartB_(quarterId);",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_part_check",
+    why: "第一百一十七輪 YB：part 不核對",
+    file: "src/WebAppDashboard.gs",
+    find: "  if (part !== 'A' && part !== 'B') throw new Error('apiGetDashboardStatePart：part 只可以是 A 或 B。');",
+    replace: "",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_server_sig",
+    why: "第一百一十七輪 YB：伺服器簽名少了版本號",
+    file: "src/WebAppDashboard.gs",
+    find: "  return { quarterId: quarterId, versionNo: p.versionNo, stage: p.stage,",
+    replace: "  return { quarterId: quarterId, versionNo: 0, stage: p.stage,",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_cfg_default",
+    why: "第一百一十七輪 YB：Config 預設 FALSE",
+    file: "src/Constants.gs",
+    find: "  WEBAPP_DASHBOARD_PARALLEL: true,",
+    replace: "  WEBAPP_DASHBOARD_PARALLEL: false,",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_perm_server",
+    why: "第一百一十七輪 YB：權限回覆沒有 dashboardParallel",
+    file: "src/WebApp.gs",
+    find: "    try { out.dashboardParallel = readDashboardParallel_(); } catch (err) { /* 讀不到 ⇒ 前端照舊單一呼叫 */ }",
+    replace: "",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
+  },
+  {
+    id: "y117_ro_list",
+    why: "第一百一十七輪 YB：伺服器唯讀名單沒有新 api",
+    file: "src/WebApp.gs",
+    find: "'apiGetDashboardState', 'apiGetDashboardStatePart',",
+    replace: "'apiGetDashboardState',",
+    tests: ["tests/round117_yb_dashboard_parallel.test.js"]
   }
 ];
 

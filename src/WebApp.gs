@@ -62,7 +62,7 @@ const WEBAPP_VIEW_ONLY_MESSAGE = '你只有查看權限，不可以改動。';
 const WEBAPP_READ_ONLY_APIS = [
   'apiListQuarters', 'apiGetMainFlowState', 'apiGetSendPlanSummary', 'apiGetSendRecipientPool',
   'apiGetLastReviewSendOptions', 'apiCheckMyChanges', 'apiGetSuggestionState', 'apiGetPaperListState',
-  'apiGetRecoveryLinks', 'apiCheckImportSheet', 'apiPlanEligibilitySheetApply', 'apiGetDashboardState',
+  'apiGetRecoveryLinks', 'apiCheckImportSheet', 'apiPlanEligibilitySheetApply', 'apiGetDashboardState', 'apiGetDashboardStatePart',
   'apiGetThemePreference', 'apiGenerateDraftPlan', 'apiSaveAndConfirmPlan', 'apiGetSaveButtonState',
   'apiQuarterResetPlan', 'apiGetSendCommitteeRecipients', 'apiStep2Preview', 'apiStep4GetPendingWarnings',
   'apiStep4GetMissingPdfWarnings', 'apiStep4GetSendPreview', 'apiStep5Plan', 'apiListVersionsForRollback',
@@ -395,6 +395,8 @@ function apiGetMyPermission() {
   if (role === WEBAPP_ROLE.EDITOR || role === WEBAPP_ROLE.VIEWER) {
     beginSheetReadMemo_();
     try { out.quarters = listQuartersForSelect_(); } catch (err) { log_('WARN', 'apiGetMyPermission：季度清單讀不到：' + err.message); }
+    // 第一百一十七輪批次 YB 組：狀態卡用並行（兩個呼叫）還是單一呼叫——第一次載入就用得到
+    try { out.dashboardParallel = readDashboardParallel_(); } catch (err) { /* 讀不到 ⇒ 前端照舊單一呼叫 */ }
     finally { endSheetReadMemo_(); }
   }
   return out;

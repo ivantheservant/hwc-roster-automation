@@ -89,7 +89,8 @@ function fakeSpreadsheet(gas, sheets) {
   console.log('\n=== WB-0：狀態卡回傳及頁底第三行 ===');
   {
     const dash = read('src/WebAppDashboard.gs');
-    check('★★★★★ 狀態卡的計時帶「最慢的表」（6 張）', /slowestSheets: typeof listSlowestSheetReads_ === 'function' \? listSlowestSheetReads_\(6\) : \[\]/.test(dash));
+    // 第一百一十七輪批次 YB 組（刻意改動）：狀態卡分兩部分，兩部分的計時都要帶「最慢的表」
+    check('★★★★★ 狀態卡的計時帶「最慢的表」（6 張；兩部分都有）', (dash.match(/slowestSheets: typeof listSlowestSheetReads_ === 'function' \? listSlowestSheetReads_\(6\) : \[\]/g) || []).length === 2);
     const ui = loadUiScripts(['Script.html']);
     const line = ui.buildServerDetailLine_({ phases: [{ label: '讀工作表', ms: 1200 }, { label: '人手檢查', ms: 400 }, { label: '合計', ms: 2000 }],
       slowestSheets: [{ name: 'AuditLog', ms: 3100 }, { name: 'Config', ms: 250 }] });

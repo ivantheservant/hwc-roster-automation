@@ -914,6 +914,14 @@ function getConfigKeySeeds_() {
       editable: 'TRUE'
     },
     {
+      // 第一百一十七輪批次 YB 組
+      key: CONFIG_KEYS.WEBAPP_DASHBOARD_PARALLEL, type: CONFIG_TYPES.BOOL, group: 'WEBAPP',
+      defaultValue: 'TRUE',
+      description: '幹事介面的狀態卡分成兩個同時進行的讀取（較快）。兩部分都回來、核對一致才一次過顯示，畫面內容與一個讀取時相同。'
+        + 'FALSE ⇒ 照舊只用一個讀取（較慢，作為退路）。',
+      editable: 'TRUE'
+    },
+    {
       key: CONFIG_KEYS.WEBAPP_DEFAULT_QUARTER, type: CONFIG_TYPES.STR, group: 'WEBAPP',
       defaultValue: '',
       description: '幹事介面打開時預設顯示的季度（例如 2027T1）。留空（或者填的季度不存在）＝開始日在今日之後、最早的一季（下一季）；'

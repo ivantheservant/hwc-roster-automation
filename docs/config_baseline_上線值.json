@@ -750,6 +750,14 @@
       "group": "WEBAPP",
       "note": "第一百一十五輪新增：載入時每個唯讀伺服器呼叫的時限（秒）。"
     },
+    "WEBAPP_DASHBOARD_PARALLEL": {
+      "source": "程式碼預設值（試算表現時實際值未核實）",
+      "currentValue": "TRUE",
+      "launchTargetValue": "TRUE",
+      "launchTargetDiffersFromCurrent": false,
+      "group": "WEBAPP",
+      "note": "第一百一十七輪新增：狀態卡分成兩個同時進行的讀取；FALSE ⇒ 照舊一個讀取。"
+    },
     "WEBAPP_SHOW_LOAD_TIMINGS": {
       "source": "程式碼預設值（試算表現時實際值未核實）",
       "currentValue": "TRUE",

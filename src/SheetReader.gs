@@ -287,6 +287,14 @@ function cloneMemoRows_(rows) {
 }
 
 /**
+ * 第一百一十七輪批次 YB 組：SendLog 行數（狀態卡兩部分的簽名用；寄出會加行）。在 readSheet_ 快取期間不會多讀一次。
+ * @returns {number}
+ */
+function countSendLogRowsForSignature_() {
+  return readSheet_(SHEETS.SEND_LOG).length;
+}
+
+/**
  * 通用讀表函式：第 1 行視為說明列自動跳過，第 2 行視為標題列，
  * 從第 3 行起讀取資料，回傳以標題為屬性名稱的物件陣列。
  * @param {string} sheetName 工作表名稱
