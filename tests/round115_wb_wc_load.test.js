@@ -226,8 +226,9 @@ function fakeSpreadsheet(gas, sheets) {
     check('★★★★★ 唯讀呼叫：設了 150 秒的計時器（預設）', t.timers.some((x) => x.ms === 150000) && err === null, JSON.stringify(t.timers.map((x) => x.ms)));
     t.fire(150000);
     await p;
-    check('★★★★★★ 超過時限 ⇒ 以「這一部分載入太久（超過 150 秒伺服器還沒有回覆）」結束，不會永遠停住',
-      err && err.loadTimeout === true && /^這一部分載入太久（超過 150 秒伺服器還沒有回覆）。已載入的部分照樣可以用；請按〔再試一次〕。$/.test(err.message) && err.fnName === 'apiGetDashboardState',
+    // 第一百一十六輪批次 XB 組（刻意改動）：訊息不再寫任何按鈕名稱
+    check('★★★★★★ 超過時限 ⇒ 以「這一部分載入太久（伺服器超過 150 秒還沒有回覆）。」結束，不會永遠停住',
+      err && err.loadTimeout === true && /^這一部分載入太久（伺服器超過 150 秒還沒有回覆）。$/.test(err.message) && err.fnName === 'apiGetDashboardState' && err.timeoutSeconds === 150,
       err && err.message);
     check('★★★★ 逾時不算 Google 暫時性錯誤：沒有自動再送一次', rawCalls === 1, rawCalls);
 
@@ -261,18 +262,20 @@ function fakeSpreadsheet(gas, sheets) {
     let retries = 0;
     let failNext = true;
     const retry = () => { retries++; if (failNext) { failNext = false; return Promise.reject(new Error('Quarters 讀不到')); } return Promise.resolve(); };
-    const tmo = new Error('這一部分載入太久（超過 150 秒伺服器還沒有回覆）。已載入的部分照樣可以用；請按〔再試一次〕。');
+    const tmo = new Error('這一部分載入太久（伺服器超過 150 秒還沒有回覆）。');
     tmo.loadTimeout = true;
     ui.showLoadFailureNotice_('狀態卡', tmo, retry);
     const text = box.textContent;
-    check('★★★★★★ 頁頂寫「「狀態卡」載入太久：這一部分載入太久…　依賴這一部分的按鈕暫時不可以用。」',
-      !box.hidden && text.indexOf('「狀態卡」載入太久：這一部分載入太久（超過 150 秒伺服器還沒有回覆）') === 0 && /依賴這一部分的按鈕暫時不可以用。/.test(text), text);
+    // 第一百一十六輪批次 XB 組（刻意改動）：通知自己寫「請按〔再試一次〕」（按鈕在同一個容器）
+    check('★★★★★★ 頁頂寫「「狀態卡」載入太久（伺服器超過 150 秒還沒有回覆）。依賴這一部分的按鈕暫時不可以用。請按〔再試一次〕。」',
+      !box.hidden && text.indexOf('「狀態卡」載入太久（伺服器超過 150 秒還沒有回覆）。依賴這一部分的按鈕暫時不可以用。請按〔再試一次〕。') === 0, text);
     const btn = () => box.flatten().filter((n) => n.tagName === 'BUTTON' && n.textContent === '再試一次')[0];
     check('★★★★★★ 有〔再試一次〕按鈕', !!btn());
     btn().fire('click');
     await settle();
     check('★★★★★★ 按〔再試一次〕⇒ 重做那一部分；再失敗 ⇒ 頁頂重新顯示「載入失敗」及按鈕', retries === 1 && !box.hidden
-      && box.textContent.indexOf('「狀態卡」載入失敗：Quarters 讀不到') === 0 && !!btn(), box.textContent);
+      && box.textContent.indexOf('「狀態卡」載入失敗。依賴這一部分的按鈕暫時不可以用。請按〔再試一次〕。') === 0
+      && /Quarters 讀不到/.test(box.textContent) && !!btn(), box.textContent);
     btn().fire('click');
     await settle();
     check('★★★★★ 再按一次成功 ⇒ 頁頂收起', retries === 2 && box.hidden === true);
@@ -285,10 +288,11 @@ function fakeSpreadsheet(gas, sheets) {
   {
     const boot = read('src/ui/ScriptBoot.html');
     const m = boot.match(/try \{\n\s+await loadQuarters\(deepLink_\.quarter\);\n\s+\} catch \(err\) \{([\s\S]*?)\n\s+throw err;\n\s+\}/);
-    check('★★★★★★ 季度清單／狀態卡失敗 ⇒ 頁頂寫明哪一部分（showLoadFailureNotice_），錯誤照樣交給「載入中」收尾（不會停住）',
-      m && /showLoadFailureNotice_\(currentQuarterId \? '狀態卡' : '季度清單', err,/.test(m[1]));
-    check('★★★★★★ 〔再試一次〕只重讀狀態卡（loadDashboard）或季度清單（fillQuarterSelect_）——不經 loadQuarters（那裏會建立未來季度＝寫入）',
-      m && /\(\) => \(currentQuarterId \? loadDashboard\(\) : fillQuarterSelect_\(deepLink_\.quarter \|\| null\)\)/.test(m[1]) && !/loadQuarters|callServerMutating|syncHwcas/.test(m[1]), m && m[1]);
+    // 第一百一十六輪批次 XA 組（刻意改動）：狀態卡失敗改由 loadDashboard() 自己寫通知；這裏只剩季度清單
+    check('★★★★★★ 季度清單失敗 ⇒ 頁頂寫明（showLoadFailureNotice_），錯誤照樣交給「載入中」收尾（不會停住）；狀態卡失敗交給 loadDashboard()',
+      m && /if \(!currentQuarterId\) \{\s*showLoadFailureNotice_\('季度清單', err,/.test(m[1]) && /err\.shownInNotice = true/.test(m[1]));
+    check('★★★★★★ 〔再試一次〕只重讀季度清單（fillQuarterSelect_）——不經 loadQuarters（那裏會建立未來季度＝寫入）',
+      m && /\(\) => fillQuarterSelect_\(deepLink_\.quarter \|\| null\)/.test(m[1]) && !/loadQuarters\(|callServerMutating|syncHwcas/.test(m[1].replace(/\/\/.*$/gm, '')), m && m[1]);
   }
 
   console.log('\n=== WC：主流程那一格 ===');

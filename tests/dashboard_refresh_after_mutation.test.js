@@ -282,12 +282,16 @@ function runStructureTests() {
     check('★★★★ 個變數係 let 宣告，初值 null', /let dashboardState_ = null;/.test(scriptJs));
     // 宣告嗰句唔算——數嘅係「之後仲有幾多處改佢」。
     const assigns = (scriptJs.match(/(?<!let )dashboardState_\s*=[^=]/g) || []).length;
-    check('★★★★★ 除咗宣告之外，全 Script.html 只有一句賦值畀狀態快取',
-      assigns === 1, '有 ' + assigns + ' 句');
-
     const loadBody = bodyOf(scriptJs, 'loadDashboard');
-    check('★★★★★ 而且嗰一句喺 loadDashboard() 入面',
-      /dashboardState_\s*=\s*await callServer\('apiGetDashboardState'/.test(loadBody));
+    // 第一百一十六輪批次 XA 組（刻意改動）：loadDashboard() 載入失敗而畫面屬於另一季時要清走快取（= null），
+    // 所以有兩句賦值——規則不變：**全部**都要在 loadDashboard() 之內
+    const assignsInLoad = (loadBody.match(/(?<!let )dashboardState_\s*=[^=]/g) || []).length;
+    check('★★★★★ 除咗宣告之外，全 Script.html 嘅賦值（成功時一句、換季度失敗時清走一句）全部喺 loadDashboard() 入面',
+      assigns === 2 && assignsInLoad === 2, '全檔 ' + assigns + ' 句，loadDashboard 內 ' + assignsInLoad + ' 句');
+
+    check('★★★★★ 而且成功嗰一句用嘅係 apiGetDashboardState 嘅結果',
+      /state = await callServer\('apiGetDashboardState', quarterId\)/.test(loadBody) && /dashboardState_ = state;/.test(loadBody)
+      && /dashboardState_ = null;/.test(loadBody));
 
     others.forEach((f) => {
       check('★★★★★ ' + f + ' 完全冇掂過個變數名'
@@ -300,7 +304,8 @@ function runStructureTests() {
   {
     const getBody = bodyOf(scriptJs, 'getDashboard');
     check('★★★★★ getDashboard() 見到過期就先 await loadDashboard()',
-      /if \(dashboardStale_ \|\| !dashboardState_\) await loadDashboard\(/.test(getBody));
+      // 第一百一十六輪批次 XA 組（刻意改動）：上一次載入失敗（dashboardLoadFailed_）一樣要重讀
+      /if \(dashboardStale_ \|\| dashboardLoadFailed_ \|\| !dashboardState_\) await loadDashboard\(/.test(getBody));
     check('★★★★ 刷新時唔會關掉幹事開緊嗰個畫面（keepModal）',
       /keepModal: true/.test(getBody));
   }
@@ -368,7 +373,8 @@ function runStructureTests() {
       runBody.indexOf('finally') !== -1
       && runBody.indexOf('finally') < runBody.indexOf('dashboardStale_'));
     check('★★★★ 刷新自己失敗唔可以蓋過原本嗰個錯',
-      /catch \(e\) \{ setStatus\(/.test(runBody));
+      // 第一百一十六輪批次 XB 組（刻意改動）：頁頂通知已寫明而又沒有視窗蓋住 ⇒ 不再寫第二次
+      /catch \(e\) \{ if \(!\(e && e\.shownInNotice\) \|\| modalOpen\) setStatus\(/.test(runBody));
   }
 
   console.log('\n=== A2 區二身：每次都重畫，唔可以「畫過就算」 ===');

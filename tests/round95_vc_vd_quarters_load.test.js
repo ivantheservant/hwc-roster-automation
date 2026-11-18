@@ -155,7 +155,8 @@ const UI = ['Script.html', 'ScriptZone1.html', 'ScriptZone2.html', 'ScriptZone3.
     check('★★★★ VD2 拿到新季度的資料', (await flowP).q === 'T2');
     const script = read('src/ui/Script.html');
     const ld = script.slice(script.indexOf('async function loadDashboard'), script.indexOf('function patchHwcasSyncLine_'));
-    check('★★★★ VD1 prefetch 在 apiGetDashboardState 之前', /prefetchMainFlowState_\(\);\s*dashboardState_ = await callServer\('apiGetDashboardState'/.test(ld));
+    // 第一百一十六輪批次 XA 組（刻意改動）：結果先放入 state（失敗、遲來的回覆要另外處理）
+    check('★★★★ VD1 prefetch 在 apiGetDashboardState 之前', /prefetchMainFlowState_\(\);\s*let state;\s*try \{\s*state = await callServer\('apiGetDashboardState'/.test(ld));
   }
 
   console.log('\n=== VD1／VD3：季度清單不用等建立未來季度 ===');

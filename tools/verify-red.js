@@ -1011,8 +1011,9 @@ const MUTATIONS = [
       + '——`label` 係一個「進行中」嘅講法，'
       + '駁埋就會出現現場嗰句「系統調整中，請稍候失敗」',
     file: 'src/ui/Script.html',
-    find: '      showErrorModal(actionErrorTitle_(label), err);',
-    replace: "      showErrorModal(label + '失敗', err);",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "      if (!(err && err.shownInNotice)) showErrorModal(actionErrorTitle_(label), err);",
+    replace: "      if (!(err && err.shownInNotice)) showErrorModal(label + '失敗', err);",
     tests: ['tests/client_arg_sanitize.test.js']
   },
   {
@@ -4253,8 +4254,9 @@ const MUTATIONS = [
     id: 'o-modal-english',
     why: '暫時性錯誤嘅彈窗照顯示英文技術訊息做第一句',
     file: 'src/ui/Script.html',
-    find: '    if (!parsed && isTransientServerError_(err)) {',
-    replace: '    if (false) {',
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "    } else if (!parsed && isTransientServerError_(err)) {",
+    replace: "    } else if (false) {",
     tests: ['tests/transient_retry.test.js']
   },
   // ── 第六十三輪批次 R 組：重發確認框用 hash 基準，上次冇收到嘅人當成「改咗」──
@@ -9172,7 +9174,8 @@ const MUTATIONS = [
     id: "na-no-quarter-notice",
     why: "季度找不到也不提示",
     file: "src/ui/Script.html",
-    find: "    if (link.quarter && currentQuarterId !== link.quarter) {",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "    if (link.quarter && currentQuarterId && currentQuarterId !== link.quarter) {",
     replace: "    if (false) {",
     tests: ["tests/round87_na_deep_link.test.js"]
   },
@@ -9188,7 +9191,8 @@ const MUTATIONS = [
     id: "na-view-not-opened",
     why: "深連結不打開畫面",
     file: "src/ui/Script.html",
-    find: "    if (link.view && link.viewKnown) DEEP_LINK_VIEWS[link.view]();",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "    if (link.view && link.viewKnown && !loadFailed) DEEP_LINK_VIEWS[link.view]();",
     replace: "",
     tests: ["tests/round87_na_deep_link.test.js"]
   },
@@ -11121,15 +11125,17 @@ const MUTATIONS = [
     id: "vd-pending-ignored",
     why: "主流程資料請求兩次（不等同時請求的那一個）",
     file: "src/ui/ScriptMainFlow.html",
-    find: "      mainFlowState_ = await (pending || callServer('apiGetMainFlowState', currentQuarterId));",
-    replace: "      mainFlowState_ = await callServer('apiGetMainFlowState', currentQuarterId);",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "      const result = await (pending || callServer('apiGetMainFlowState', quarterId));",
+    replace: "      const result = await callServer('apiGetMainFlowState', quarterId);",
     tests: ["tests/round95_vc_vd_quarters_load.test.js"]
   },
   {
     id: "vd-pending-wrong-q",
     why: "換了季度仍然用舊季度的請求",
     file: "src/ui/ScriptMainFlow.html",
-    find: "      const pending = mainFlowPending_ && mainFlowPending_.quarterId === currentQuarterId ? mainFlowPending_.promise : null;",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "      const pending = mainFlowPending_ && mainFlowPending_.quarterId === quarterId ? mainFlowPending_.promise : null;",
     replace: "      const pending = mainFlowPending_ ? mainFlowPending_.promise : null;",
     tests: ["tests/round95_vc_vd_quarters_load.test.js"]
   },
@@ -15279,8 +15285,9 @@ const MUTATIONS = [
     id: "w115_retry_reshow",
     why: "第一百一十五輪 WC：再試失敗不重新顯示通知",
     file: "src/ui/Script.html",
-    find: "try { await retry(); } catch (e) { showLoadFailureNotice_(part, e, retry); throw e; }",
-    replace: "await retry();",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "          if (box.hidden) showLoadFailureNotice_(part, e, retry, consequence);\n",
+    replace: "",
     tests: ["tests/round115_wb_wc_load.test.js"]
   },
   {
@@ -15295,8 +15302,9 @@ const MUTATIONS = [
     id: "w115_boot_retry",
     why: "第一百一十五輪 WC：啟動重試經 loadQuarters（會寫入）",
     file: "src/ui/ScriptBoot.html",
-    find: "() => (currentQuarterId ? loadDashboard() : fillQuarterSelect_(deepLink_.quarter || null))",
-    replace: "() => loadQuarters(deepLink_.quarter)",
+    // 第一百一十六輪批次 XA／XB 組：改動之後 find 過期，對準新位置
+    find: "showLoadFailureNotice_('季度清單', err, () => fillQuarterSelect_(deepLink_.quarter || null));",
+    replace: "showLoadFailureNotice_('季度清單', err, () => loadQuarters(deepLink_.quarter));",
     tests: ["tests/round115_wb_wc_load.test.js"]
   },
   {
@@ -15402,6 +15410,182 @@ const MUTATIONS = [
     find: "'d' + value.getTime() : 's' + String(value);",
     replace: "'d' : 's' + String(value);",
     tests: ["tests/round115_wb_wc_load.test.js"]
+  },
+  {
+    id: "x116_clear_state",
+    why: "第一百一十六輪 XA：換季度失敗不清狀態快取",
+    file: "src/ui/Script.html",
+    find: "          dashboardState_ = null;\n",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_clear_screen",
+    why: "第一百一十六輪 XA：換季度失敗不收起畫面",
+    file: "src/ui/Script.html",
+    find: "          clearQuarterScreen_();\n",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_other_q",
+    why: "第一百一十六輪 XA：不分辨另一季的狀態",
+    file: "src/ui/Script.html",
+    find: "const otherQuarter = !dashboardState_ || dashboardState_.quarterId !== quarterId;",
+    replace: "const otherQuarter = !dashboardState_;",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_failed_flag",
+    why: "第一百一十六輪 XA：載入失敗不標記過時",
+    file: "src/ui/Script.html",
+    find: "        dashboardLoadFailed_ = true;\n",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_getdash_failed",
+    why: "第一百一十六輪 XA：getDashboard 不理會載入失敗",
+    file: "src/ui/Script.html",
+    find: "if (dashboardStale_ || dashboardLoadFailed_ || !dashboardState_)",
+    replace: "if (dashboardStale_ || !dashboardState_)",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_seq_guard",
+    why: "第一百一十六輪 XA：遲來的回覆蓋過較新的狀態",
+    file: "src/ui/Script.html",
+    find: "    if (seq !== dashboardLoadSeq_ || quarterId !== currentQuarterId) return;\n",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_catch_seq",
+    why: "第一百一十六輪 XA：較舊的失敗也清畫面寫通知",
+    file: "src/ui/Script.html",
+    find: "      if (seq === dashboardLoadSeq_) {",
+    replace: "      if (true) {",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_reset_mainflow",
+    why: "第一百一十六輪 XA：失敗後留下主流程預讀",
+    file: "src/ui/Script.html",
+    find: "        if (typeof resetMainFlowState === 'function') resetMainFlowState();\n        const otherQuarter",
+    replace: "        const otherQuarter",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_zone_reset",
+    why: "第一百一十六輪 XA：失敗後摺疊區不重新讀",
+    file: "src/ui/Script.html",
+    find: "    // 之後展開的摺疊區一定要重新讀狀態（不可以用另一季的狀態畫）\n    resetAllZoneLoadState();",
+    replace: "    // 之後展開的摺疊區一定要重新讀狀態（不可以用另一季的狀態畫）",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_card_hide",
+    why: "第一百一十六輪 XA：失敗後狀態卡不收起",
+    file: "src/ui/Script.html",
+    find: "    if (card) card.hidden = true;",
+    replace: "    if (card) card.hidden = false;",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_shown_flag",
+    why: "第一百一十六輪 XB：通知已寫明但不標記",
+    file: "src/ui/Script.html",
+    find: "        if (err && typeof err === 'object') err.shownInNotice = true;\n      }\n      throw err;",
+    replace: "      }\n      throw err;",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_runaction_skip",
+    why: "第一百一十六輪 XB：頁頂已寫明仍開錯誤視窗",
+    file: "src/ui/Script.html",
+    find: "if (!(err && err.shownInNotice)) showErrorModal(actionErrorTitle_(label), err);",
+    replace: "showErrorModal(actionErrorTitle_(label), err);",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_mf_quarter",
+    why: "第一百一十六輪 XA：主流程換季度後放入快取",
+    file: "src/ui/ScriptMainFlow.html",
+    find: "      if (quarterId !== currentQuarterId) return result;\n",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_deeplink",
+    why: "第一百一十六輪 XA：載入失敗仍打開深連結畫面",
+    file: "src/ui/Script.html",
+    find: "    if (link.view && link.viewKnown && !loadFailed) DEEP_LINK_VIEWS",
+    replace: "    if (link.view && link.viewKnown) DEEP_LINK_VIEWS",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "x116_same_q_text",
+    why: "第一百一十六輪 XA：同一季失敗不講數字可能過時",
+    file: "src/ui/Script.html",
+    find: "            '畫面上的數字可能不是最新的。');",
+    replace: "            '依賴這一部分的按鈕暫時不可以用。');",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_timeout_branch",
+    why: "第一百一十六輪 XB：超時沒有專屬三段",
+    file: "src/ui/Script.html",
+    find: "    if (err && err.loadTimeout) {\n      // 第一百一十六輪批次 XB 組：讀取超時專屬的三段",
+    replace: "    if (false) {\n      // 第一百一十六輪批次 XB 組：讀取超時專屬的三段",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_after_write",
+    why: "第一百一十六輪 XB：寫入後超時仍講沒有改動",
+    file: "src/ui/Script.html",
+    find: "actionSentWrite_ ? TIMEOUT_TEXT_STATE_AFTER_WRITE : TIMEOUT_TEXT_STATE_READ_ONLY",
+    replace: "TIMEOUT_TEXT_STATE_READ_ONLY",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_sent_flag",
+    why: "第一百一十六輪 XB：不記錄送出過改動",
+    file: "src/ui/Script.html",
+    find: "    if (runActionDepth_ > 0) actionSentWrite_ = true;",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_flag_reset",
+    why: "第一百一十六輪 XB：動作完結不重設",
+    file: "src/ui/Script.html",
+    find: "      actionSentWrite_ = false;\n      // 階段 A：",
+    replace: "      // 階段 A：",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_msg_button",
+    why: "第一百一十六輪 XB：超時訊息寫按鈕名稱",
+    file: "src/ui/Script.html",
+    find: "' 秒還沒有回覆）。');",
+    replace: "' 秒還沒有回覆）。請按〔再試一次〕。');",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_notice_btn",
+    why: "第一百一十六輪 XB：通知不畫再試一次按鈕",
+    file: "src/ui/Script.html",
+    find: "    box.appendChild(row([button('再試一次', () => {\n      box.hidden = true;",
+    replace: "    box.appendChild(row([button('重試', () => {\n      box.hidden = true;",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
+  },
+  {
+    id: "xb116_tech",
+    why: "第一百一十六輪 XB：通知沒有技術詳情",
+    file: "src/ui/Script.html",
+    find: "    if (typeof buildTechDetails === 'function') box.appendChild(buildTechDetails(raw));",
+    replace: "",
+    tests: ["tests/round116_xa_xb_load_failure.test.js"]
   }
 ];
 

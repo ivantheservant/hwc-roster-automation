@@ -71,8 +71,11 @@
     try {
       await loadQuarters(deepLink_.quarter);
     } catch (err) {
-      showLoadFailureNotice_(currentQuarterId ? '狀態卡' : '季度清單', err,
-        () => (currentQuarterId ? loadDashboard() : fillQuarterSelect_(deepLink_.quarter || null)));
+      // 第一百一十六輪批次 XA 組：狀態卡失敗由 loadDashboard() 自己寫頁頂通知（並清走畫面）；這裏只處理季度清單
+      if (!currentQuarterId) {
+        showLoadFailureNotice_('季度清單', err, () => fillQuarterSelect_(deepLink_.quarter || null));
+        if (err && typeof err === 'object') err.shownInNotice = true;
+      }
       throw err;
     }
     if (!viewOnly_) syncHwcasOnLoad();

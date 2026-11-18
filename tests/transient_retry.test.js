@@ -36,6 +36,9 @@ const sandbox = {
   viewOnly_: false,
   VIEW_ONLY_TEXT: '你只有查看權限',
   dashboardStale_: false,
+  // 第一百一十六輪批次 XB 組（刻意改動）：callServerMutating 記錄「這個動作送出過改動」要讀 runActionDepth_
+  runActionDepth_: 0,
+  actionSentWrite_: false,
   // 第一百一十五輪批次 WC 組（刻意改動）：重試的短暫等待即時執行；載入時限（長時間）的計時器不觸發
   setTimeout: function (cb, ms) { if (!(Number(ms) > 10000)) cb(); return 0; },
   Promise: Promise,

@@ -68,6 +68,14 @@
    * ⚠️ **只可以喺 `loadDashboard()` 入面賦值，只可以經 `getDashboard()` 讀。**
    */
   let dashboardState_ = null;
+  /**
+   * 第一百一十六輪批次 XA 組：最近一次 `loadDashboard()` 失敗（成功之後變回 false）。
+   * 畫面上的狀態可能已過時 ⇒ `getDashboard()` 一定重讀。與 `dashboardStale_`（寫入之後）分開：
+   * 載入失敗不會令每一個動作完成之後都自動再載入一次（那樣每次都可能再等一整段時限）。
+   */
+  let dashboardLoadFailed_ = false;
+  /** 第一百一十六輪批次 XA 組：`loadDashboard()` 的序號——較舊的回覆遲來不可以蓋過較新的。 */
+  let dashboardLoadSeq_ = 0;
 
   /**
    * 第九十一輪批次 RD 組：〔儲存〕之後公開連結正在背景更新（`startPublishAfterSave()`）。
@@ -538,8 +546,10 @@
     let timer = null;
     const timeout = new Promise((resolve, reject) => {
       timer = setTimeout(() => {
-        const err = new Error('這一部分' + LOAD_TIMEOUT_MARK + '（超過 ' + Math.round(ms / 1000) + ' 秒伺服器還沒有回覆）。已載入的部分照樣可以用；請按〔再試一次〕。');
+        // 第一百一十六輪批次 XB 組：訊息本身不寫任何按鈕名稱——〔再試一次〕只由真正畫出那個按鈕的地方加上
+        const err = new Error('這一部分' + LOAD_TIMEOUT_MARK + '（伺服器超過 ' + Math.round(ms / 1000) + ' 秒還沒有回覆）。');
         err.loadTimeout = true;
+        err.timeoutSeconds = Math.round(ms / 1000);
         err.fnName = fnName;
         reject(err);
       }, ms);
@@ -552,19 +562,34 @@
    * @param {string} part 例如「狀態卡」
    * @param {Error} err
    * @param {Function} retry 回 Promise 的唯讀載入
+   * @param {string=} consequence 第一百一十六輪批次 XA 組：畫面現在的情況（預設「依賴這一部分的按鈕暫時不可以用。」）
    */
-  function showLoadFailureNotice_(part, err, retry) {
+  function showLoadFailureNotice_(part, err, retry, consequence) {
     const box = el('loadFailureNotice');
     if (!box) return;
     clear(box);
-    const why = err && err.loadTimeout ? '載入太久' : '載入失敗';
-    box.appendChild(make('div', { text: '「' + part + '」' + why + '：' + ((err && err.message) || '') + '　依賴這一部分的按鈕暫時不可以用。', className: 'lines' }));
+    const raw = (err && err.message ? err.message : String(err)) + (err && err.fnName ? '（' + err.fnName + '）' : '');
+    // 第一百一十六輪批次 XB 組：同一次失敗只用一種方式講——頁頂通知已寫明，`runAction()` 就不再開錯誤視窗；
+    // 技術詳情放在通知裏（同錯誤視窗那一份）
+    const what = err && err.loadTimeout
+      ? '「' + part + '」載入太久（伺服器超過 ' + (err.timeoutSeconds || Math.round(loadTimeoutMs_ / 1000)) + ' 秒還沒有回覆）。'
+      : '「' + part + '」載入失敗。';
+    box.appendChild(make('div', {
+      text: what + (consequence || '依賴這一部分的按鈕暫時不可以用。') + '請按〔再試一次〕。',
+      className: 'lines'
+    }));
     box.appendChild(row([button('再試一次', () => {
       box.hidden = true;
       runAction('再試一次', async () => {
-        try { await retry(); } catch (e) { showLoadFailureNotice_(part, e, retry); throw e; }
+        try { await retry(); } catch (e) {
+          // 載入本身（例如 loadDashboard）已經重寫通知 ⇒ 不要蓋過它的說法
+          if (box.hidden) showLoadFailureNotice_(part, e, retry, consequence);
+          if (e && typeof e === 'object') e.shownInNotice = true;
+          throw e;
+        }
       });
     }, '')]));
+    if (typeof buildTechDetails === 'function') box.appendChild(buildTechDetails(raw));
     box.hidden = false;
   }
 
@@ -583,6 +608,9 @@
     if (viewOnly_ && !(myCanConfirm_ && UNAVAILABLE_CONFIRMER_CALLS.indexOf(fnName) !== -1)) {
       throw new Error(VIEW_ONLY_TEXT + '，不可以改動。');
     }
+    // 第一百一十六輪批次 XB 組：送出之前就記下（寫了一半才失敗也算送出過）；只記 runAction 之內的
+    // （背景的出席系統同步、建立未來季度不在 runAction 內，不算）
+    if (runActionDepth_ > 0) actionSentWrite_ = true;
     const result = await callServerRaw_(fnName, ...args);
     // 第九十五輪批次 VB／VC 組：背景的出席系統同步、建立未來季度，沒有改到任何東西就不標記過期（不會引起多一次載入）
     const changed = STALE_ONLY_IF_CHANGED_CALLS[fnName];
@@ -659,7 +687,8 @@
    * @returns {Promise<?Object>} 未揀季度時會係 null
    */
   async function getDashboard() {
-    if (dashboardStale_ || !dashboardState_) await loadDashboard({ keepModal: true });
+    // 第一百一十六輪批次 XA 組：上一次載入失敗 ⇒ 畫面上的狀態可能過時或屬於另一季，一定重讀
+    if (dashboardStale_ || dashboardLoadFailed_ || !dashboardState_) await loadDashboard({ keepModal: true });
     return dashboardState_;
   }
 
@@ -977,6 +1006,13 @@
   // 修法：一、呼叫端 `return`；二、呢度數住——**最後一個完成嘅動作先收牌、先解鎖、先刷新**，
   // 將來有人再漏 `return` 都唔會再出事。
   let runActionDepth_ = 0;
+  /**
+   * 第一百一十六輪批次 XB 組：目前這個動作（最外層 `runAction()` 之內）有沒有送出過會寫入的呼叫。
+   * 超時的錯誤視窗用它決定「現在的情況」怎樣寫：沒有送出過 ⇒ 可以講明「沒有改動任何資料」。
+   * 另：錯誤帶 `shownInNotice`（頁頂通知已寫明這一次載入失敗，連技術詳情及〔再試一次〕）⇒
+   * `runAction()` 不再開另一個說法的錯誤視窗——同一次失敗只用一種方式講。
+   */
+  let actionSentWrite_ = false;
 
   async function runAction(label, action, steps) {
     runActionDepth_++;
@@ -994,12 +1030,14 @@
       if (resultShown) busyHide();
     } catch (err) {
       busyHide('fail');
-      showErrorModal(actionErrorTitle_(label), err);
+      if (!(err && err.shownInNotice)) showErrorModal(actionErrorTitle_(label), err);   // 第一百一十六輪 XB：見 shownInNotice
       setStatus('');
     } finally {
       runActionDepth_--;
       // 第八十三輪批次 JG 組：仲有另一個動作做緊（巢狀）⇒ 唔收牌、唔解鎖、唔刷新，留畀最後嗰個
       if (runActionDepth_ > 0) return;
+      // 第一百一十六輪批次 XB 組：最外層動作完結 ⇒ 下一個動作重新記錄有沒有送出過改動
+      actionSentWrite_ = false;
       // 階段 A：呢個動作期間有冇寫過嘢？有嘅話畫面（狀態卡、區一四粒掣、
       // 區二「還有 N 項未做」）一定要跟住變。
       //
@@ -1010,7 +1048,8 @@
       // 完全無關嘅訊息）。所以只寫一句灰字，唔開第二個彈窗。
       if (dashboardStale_) {
         try { await loadDashboard({ keepModal: true }); }
-        catch (e) { setStatus('畫面上的數字可能不是最新的，請按「重新整理」。', true); }
+        // 第一百一十六輪批次 XB 組：頁頂通知已寫明 ⇒ 只在有視窗蓋住頁頂時，才在視窗內補一句
+        catch (e) { if (!(e && e.shownInNotice) || modalOpen) setStatus('畫面上的數字可能不是最新的，請按「重新整理」。', true); }
       }
       // ⚠️ 收牌一定要喺刷新之後——刷新本身可能要幾秒，
       // 喺嗰之前收牌就會出現「講咗已完成、但畫面仲係舊數字」嘅空窗。
@@ -1246,11 +1285,16 @@
   function applyDeepLink_(link) {
     const notes = [];
     if (!link) return notes;
-    if (link.quarter && currentQuarterId !== link.quarter) {
+    // 第一百一十六輪批次 XA 組：季度清單或狀態卡載入失敗（頁頂已有通知）⇒ 不打開畫面，也不講「找不到季度」
+    const loadFailed = dashboardLoadFailed_ || !currentQuarterId;
+    if (link.quarter && currentQuarterId && currentQuarterId !== link.quarter) {
       notes.push('找不到季度 ' + link.quarter + '，已顯示預設季度。');
     }
     if (link.view && !link.viewKnown) {
       notes.push('網址指定的畫面「' + link.view + '」不認得，沒有打開任何畫面。');
+    }
+    if (link.view && link.viewKnown && loadFailed) {
+      notes.push('畫面還未載入成功，所以沒有打開網址指定的畫面。');
     }
     const box = el('deepLinkNotice');
     if (box) {
@@ -1258,7 +1302,7 @@
       notes.forEach((t) => box.appendChild(make('div', { text: t, className: 'lines' })));
       box.hidden = notes.length === 0;
     }
-    if (link.view && link.viewKnown) DEEP_LINK_VIEWS[link.view]();
+    if (link.view && link.viewKnown && !loadFailed) DEEP_LINK_VIEWS[link.view]();
     return notes;
   }
 
@@ -2120,7 +2164,17 @@
     const nodes = [];
     const parsed = parseThreePartMessage(raw);
 
-    if (!parsed && isTransientServerError_(err)) {
+    if (err && err.loadTimeout) {
+      // 第一百一十六輪批次 XB 組：讀取超時專屬的三段。提到的按鈕只可以是畫面上真的有的（「重新整理」在頁頂）。
+      nodes.push(errorPart(ERR_LABEL_WHAT, timeoutWhatText_(err)));
+      nodes.push(errorPart('現在的情況', actionSentWrite_ ? TIMEOUT_TEXT_STATE_AFTER_WRITE : TIMEOUT_TEXT_STATE_READ_ONLY));
+      const doBox = make('div', { className: 'err-part' });
+      doBox.appendChild(make('div', { text: '你可以怎樣做', className: 'err-label' }));
+      const ul = make('ul', { className: 'err-list' });
+      TIMEOUT_TEXT_ACTIONS.forEach((a) => ul.appendChild(make('li', { text: a })));
+      doBox.appendChild(ul);
+      nodes.push(doBox);
+    } else if (!parsed && isTransientServerError_(err)) {
       // ⚠️ 第六十三輪批次 O 組：Google 暫時性錯誤，第一句用中文講。
       // 唯讀嘅已經自動重試過一次；去到呢度即係重試都唔得，或者係一個會寫入嘅
       // 動作（唔自動重試，因為唔知寫咗幾多）。
@@ -2160,9 +2214,19 @@
       nodes.push(doBox);
     }
 
-    nodes.push(buildTechDetails(raw));
+    nodes.push(buildTechDetails(raw + (err && err.fnName ? '（' + err.fnName + '）' : '')));
     openModal(title, nodes, [button('知道了', () => closeModal(), '')]);
   }
+
+  /** 第一百一十六輪批次 XB 組：讀取超時的錯誤視窗字眼（「要留意」一段）。 */
+  function timeoutWhatText_(err) {
+    return '伺服器超過 ' + ((err && err.timeoutSeconds) || Math.round(loadTimeoutMs_ / 1000)) + ' 秒還沒有回覆，畫面沒有再等下去。';
+  }
+  const TIMEOUT_TEXT_STATE_READ_ONLY = '剛才只是讀取資料，沒有改動任何資料，亦沒有寄出任何電郵。';
+  const TIMEOUT_TEXT_STATE_AFTER_WRITE = '剛才的動作已經送出了改動，之後讀取資料時伺服器沒有回覆。'
+    + '改動有沒有完成，請按頁頂的「重新整理」，看狀態卡及版本號。';
+  const TIMEOUT_TEXT_ACTIONS = ['再按一次剛才的按鈕', '仍然這樣，就按頁頂的「重新整理」',
+    '一直這樣的話，把下面的技術詳情複製給開發者'];
 
   /**
    * 三段式訊息第一段嘅**顯示標籤**。
@@ -2799,10 +2863,41 @@
     if (!currentQuarterId) return;
     if (!(opts && opts.keepModal)) closeModal();
     const tLoad = Date.now();
+    // 第一百一十六輪批次 XA 組：這一次載入的季度及序號——較舊的載入之後才回來，不可以蓋過較新的狀態
+    const quarterId = currentQuarterId;
+    const seq = ++dashboardLoadSeq_;
     // 第九十五輪批次 VD 組：主流程的資料（apiGetMainFlowState）和狀態卡同時請求——兩者都是唯讀，
     // 主流程的伺服器資料只看季度，不依賴狀態卡的回傳值。畫面仍然按原次序畫（先狀態卡、後主流程）。
     if (typeof prefetchMainFlowState_ === 'function') prefetchMainFlowState_();
-    dashboardState_ = await callServer('apiGetDashboardState', currentQuarterId);
+    let state;
+    try {
+      state = await callServer('apiGetDashboardState', quarterId);
+    } catch (err) {
+      // 第一百一十六輪批次 XA 組：載入失敗（超時或任何錯誤）。已經有較新的載入 ⇒ 交給它，這裏不碰畫面。
+      if (seq === dashboardLoadSeq_) {
+        dashboardLoadFailed_ = true;
+        // 主流程預讀可能已經失敗或屬於另一季 ⇒ 一律清走，下一次重讀
+        if (typeof resetMainFlowState === 'function') resetMainFlowState();
+        const otherQuarter = !dashboardState_ || dashboardState_.quarterId !== quarterId;
+        if (otherQuarter) {
+          // 畫面上的狀態屬於另一個季度（換季度）或者根本沒有（第一次載入）⇒ 清走，畫面與第一次載入失敗一致
+          dashboardState_ = null;
+          clearQuarterScreen_();
+          showLoadFailureNotice_('狀態卡', err, () => loadDashboard(),
+            '這一季的狀態卡、主流程及各區暫時不顯示，要等狀態卡載入成功才可以用。');
+        } else {
+          // 同一季（重新整理、寫入之後的自動刷新、出席系統同步之後再載入）⇒ 舊內容留下，但已標記過時
+          showLoadFailureNotice_('狀態卡', err, () => loadDashboard(),
+            '畫面上的數字可能不是最新的。');
+        }
+        if (err && typeof err === 'object') err.shownInNotice = true;
+      }
+      throw err;
+    }
+    // 第一百一十六輪批次 XA 組：遲來的回覆（之後已經開始了另一次載入，或者已經換了季度）⇒ 不理會
+    if (seq !== dashboardLoadSeq_ || quarterId !== currentQuarterId) return;
+    dashboardState_ = state;
+    dashboardLoadFailed_ = false;
     // 第一百一十五輪批次 WC 組：之後的唯讀呼叫用 Config 的時限
     if (dashboardState_ && Number(dashboardState_.loadTimeoutSeconds) > 0) loadTimeoutMs_ = Number(dashboardState_.loadTimeoutSeconds) * 1000;
     const failBox = el('loadFailureNotice');
@@ -2848,6 +2943,26 @@
     // CSS 嗰層唔怕重畫（`body.is-busy` 自動蓋住新節點），
     // 但鍵盤嗰層要補返。
     reapplyBusyLockIfNeeded_();
+  }
+
+  /**
+   * 第一百一十六輪批次 XA 組：狀態卡載入失敗、而畫面上的狀態屬於另一個季度 ⇒ 收起所有由狀態畫出來的內容
+   * （狀態卡、「這一季還要做的」、主流程第 1 至 4 步、各摺疊區），與第一次載入失敗時一樣。
+   * 只收起畫面；狀態快取由 `loadDashboard()` 自己清。頁頂的測試模式、轉寄標籤是全域設定，不屬於某一季，保留。
+   */
+  function clearQuarterScreen_() {
+    const card = el('statusCard');
+    if (card) card.hidden = true;
+    ['zone2Body', 'mainFlowBody', 'zone1Body', 'zone3Body', 'zone4Body'].forEach((id) => {
+      const node = el(id);
+      if (node) clear(node);
+    });
+    ['zone2Count', 'flowHeadSub'].forEach((id) => {
+      const node = el(id);
+      if (node) node.textContent = '';
+    });
+    // 之後展開的摺疊區一定要重新讀狀態（不可以用另一季的狀態畫）
+    resetAllZoneLoadState();
   }
 
   /**
